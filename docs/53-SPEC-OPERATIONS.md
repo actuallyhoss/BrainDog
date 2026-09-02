@@ -801,4 +801,4 @@ Eleven, counted.
 
 ---
 
-*Previous: [52-SPEC-TESTING](52-SPEC-TESTING.md). Back to the index: [00-README](00-README.md).*
+*Previous: [52-SPEC-TESTING](52-SPEC-TESTING-AND-CI.md). Back to the index: [00-README](00-README.md).*
