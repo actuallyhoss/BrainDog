@@ -68,10 +68,12 @@ job_event     -- (job_id, seq) PK, kind CHECK (start|say|think|tool|out|limit|no
 **And four header tables, which are not the kernel's but are in every live record.** Migration 0001
 creates `dog_meta` · `dog_section` · `dog_manifest` · `dog_sig` in every live database, DO and file
 alike, because on the self-host the live file *is* the `.dog` ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3).
-`dog_manifest` and `dog_sig` are refreshed by an export and sit empty in a live DO. Seven of the
-twenty-seven carry `dog_section = 'local'` and **never travel**: `vault_key`, `token`, `device_grant`,
-`auth_fail`, `observation`, `job`, `job_event`. `counter` travels, because `seq` allocation must survive
-a move.
+`dog_manifest` and `dog_sig` are refreshed by an export and sit empty in a live DO. Six of the
+twenty-seven carry `dog_section = 'local'` and **never travel**: `token`, `device_grant`, `auth_fail`,
+`observation`, `job`, `job_event`. `counter` travels, because `seq` allocation must survive a move.
+`vault_key` travels **sealed**: a KEK-wrapped key opens nothing without the KEK, and a record restored
+from its own backup must be able to open its own vault ([12-SECURITY](12-SECURITY.md) §8). *(An earlier
+draft listed it as `local`, which would have made every restored vault unreadable.)*
 
 > **`observation` and `prediction` are the two that make [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md)
 > possible, and they are deliberately not one table.** An observation is *Origin* — it is prunable,

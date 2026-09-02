@@ -1,0 +1,800 @@
+# 52 · Testing and CI — specification
+
+Cross-cutting: the test pyramid, the fixtures' use, every gate as a script or a spec, the five workflows, and
+publishing. Derives from [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6, [33-CONTRACTS](33-CONTRACTS.md) §3 and §8,
+[31-STACK](31-STACK.md) §3–§4 and §6–§7, [30-BLUEPRINT](30-BLUEPRINT.md) §6, §7, §13–§14, [22-FRONTEND](22-FRONTEND.md)
+§9–§10, [34-GRAMMARS](34-GRAMMARS.md) §6, and the recorded deviations in [BUILD.md](../BUILD.md). The template is
+[35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §3; the sections keep its headings and read them for a cross-cutting spec:
+*Public API* is the commands a developer runs, *Files* is the tools and workflow files, *Data structures* is the
+fixture and trace formats.
+
+> **Clean room.** No gate, fixture or harness here is ported. `tools/gates/clean-room.mjs` is a tripwire for the
+> predecessor's identifiers — a tripwire, not a proof; the proof is the rule ([BUILD.md](../BUILD.md)).
+
+---
+
+## 1 · Purpose and boundary
+
+**Does.** Turns every assertion the corpus makes about itself into something a runner executes: a unit test, a
+property, a conformance case, a fixture, a script under `tools/gates/`, or a Playwright spec. Runs them in five
+workflows. Publishes two packages. One principle picks the shape of every gate ([18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md)
+§6): *any step whose failure mode is silence gets checked against the thing itself, never against the tool's
+opinion of it* — so `deploy-parity` fetches the live host, `bundle` compresses the built bytes, `targets` measures
+the rendered box.
+
+**Refuses.** A framework where `node --test` and `node:assert/strict` hold (Vitest runs the Durable Object host
+alone — [BUILD.md](../BUILD.md)). A gate whose number lives in its own file: every asserted number is in
+`tools/gates/budgets.json` (§4). A gate that warns: a gate is red or green, and a red gate is fixed or the design
+document is changed first (§6). An HTML snapshot or a full-page pixel diff as an assertion ([22-FRONTEND](22-FRONTEND.md)
+§10). A test that can pass on the degraded branch (§9). A skip that is silent ([33-CONTRACTS](33-CONTRACTS.md) §3).
+
+**May import.** `tools/gates/*.mjs`: `node:*` only — zero dependencies, a few dozen lines each; a gate that needs a
+package imports its `.ts` source directly, because Node 24 runs it. Package tests: `node:test`, `node:assert/strict`,
+`fast-check` in `packages/where`, and `@braindog/fixtures` as a devDependency. `apps/web/test/e2e/*.spec.ts`:
+`@playwright/test`, `axe-core`, `@braindog/fixtures`. `apps/worker/test`: `vitest`, `@cloudflare/vitest-plugin`.
+Nothing here is shipped.
+
+## 2 · Public API
+
+The commands a developer runs. Six root scripts; the first three exist in commit one's `package.json`.
+
+```jsonc
+// package.json (root) — scripts
+{
+  "test":         "pnpm -r --workspace-concurrency=1 run test",          // every package's `node --test "test/**/*.test.ts"`
+  "typecheck":    "pnpm -r run typecheck",                               // tsc -b, noEmit, per package
+  "gates":        "node tools/gates/run.mjs",                            // every script gate; flags below
+  "test:browser": "pnpm --filter ./apps/web exec playwright test",       // the 128-configuration matrix
+  "test:do":      "pnpm --filter ./apps/worker exec vitest run",         // Durable Object host only (phase 5)
+  "release":      "node tools/release.mjs"                               // tag a package for release.yml
+}
+```
+
+| Command | Runs | Where |
+|---|---|---|
+| `pnpm test` | unit, property (1,000 runs), the Node conformance host, the fixture tests (materialise the nine seed records, the seventy-five refusal fixtures through their seven runners, determinism), `dog-roundtrip`, `boot-probe`, `theme-sixteen` | `ci.yml` |
+| `pnpm typecheck` | `tsc -b` over every package and app; `references` mirror the graph so a cycle fails here first ([31-STACK](31-STACK.md) §3) | `ci.yml` |
+| `pnpm gates [-- --only a,b] [-- --allow-skip a,b] [-- --negative]` | the scripts of §3. A gate whose `needs` are unmet prints a skip; under `CI=true` a skip not named in `--allow-skip` is red. `--negative` runs §9 | `gates.yml`, `ci.yml`, `deploy.yml` |
+| `pnpm test:browser [-- --shard=i/n]` | the Playwright specs over 8 fixtures × 4 widths × 2 schemes × 2 directions | `ci.yml` |
+| `pnpm test:do` | the conformance corpus and `boot-probe` under `@cloudflare/vitest-plugin`; with `CONFORMANCE_WRITE=1` it rewrites `reference.json` ([37-SPEC-PORTS](37-SPEC-PORTS.md) §9.3) | `ci.yml` (phase 5) |
+| `pnpm release <render\|cli> <semver>` | asserts a clean tree on `master`, runs `graph` and `licence-closure`, writes the version, commits `release: braindog-<pkg> <semver>`, tags `<pkg>-v<semver>`, pushes the tag | a developer's machine |
+
+The five workflows, one table of steps each. Every job pins `node-version: 24.13.0`, uses `pnpm/action-setup@v4`,
+installs with `--frozen-lockfile`, and carries `timeout-minutes` equal to its §7 budget.
+
+**`ci.yml`** — `on: push, pull_request`. One job, `test`; the browser step shards only when §7's budget is hit.
+
+| # | Step | Fails when |
+|---|---|---|
+| 1 | `actions/checkout@v4` | — |
+| 2 | `pnpm/action-setup@v4` · `actions/setup-node@v4` (`24.13.0`, `cache: pnpm`) | — |
+| 3 | `pnpm install --frozen-lockfile` | the lockfile is stale |
+| 4 | `pnpm typecheck` | any type error, any cycle |
+| 5 | `pnpm test` | any test in §5.3 or §5.5 |
+| 6 | `pnpm --filter ./apps/web build` | the build fails |
+| 7 | `pnpm --filter ./apps/web exec playwright install --with-deps chromium` | — |
+| 8 | `pnpm test:browser` | any spec in §5.4 — `bundle` included, over the step-6 build; `SPARK_ENDPOINT` is unset, so this is the no-model build ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8) |
+| 9 | `actions/upload-artifact@v4` of `apps/web/test-results/`, `if: failure()` | — (screenshots are artefacts, never assertions) |
+| 10 | `pnpm test:do` — phase 5 onward | a trace differs from `reference.json`; a host ran a different case count |
+
+**`gates.yml`** — `on: push, pull_request`. `permissions: contents: read`.
+
+| # | Step | Fails when |
+|---|---|---|
+| 1–3 | checkout · setup · frozen install | as above |
+| 4 | `pnpm --filter ./packages/render --filter ./apps/cli build` | the two publishable packages do not build |
+| 5 | `pnpm gates -- --allow-skip deploy-parity` | any script gate red; any skip other than the one named |
+| 6 | `pnpm gates -- --negative` | a gate passes its seeded violation (§9) |
+
+**`deploy.yml`** — `on: workflow_run: workflows: [ci], types: [completed], branches: [master]`, guarded by
+`if: conclusion == 'success'`. Environment `production`; `concurrency: deploy`, never cancel-in-progress.
+
+| # | Step | Fails when |
+|---|---|---|
+| 1–3 | checkout at `workflow_run.head_sha` · setup · frozen install | — |
+| 4 | `BRAINDOG_BUILD=<YYYY.MM.DD>+<sha7> pnpm --filter ./apps/web build` — the date from `date -u`, the sha from `GITHUB_SHA` | — |
+| 5 | `pnpm --filter ./apps/worker exec wrangler deploy` with `CLOUDFLARE_API_TOKEN` (secret, deploy-scoped) and `CLOUDFLARE_ACCOUNT_ID` (var) | wrangler fails |
+| 6 | `DEPLOY_HOST=<vars.DEPLOY_HOST> pnpm gates -- --only deploy-parity` | the live shell's hashes differ from `build/`; `/api/version` does not carry this run's `app` tuple |
+
+**`release.yml`** — `on: push: tags: ['render-v*', 'cli-v*']`. `permissions: { contents: read, id-token: write }`.
+No npm token exists anywhere ([31-STACK](31-STACK.md) §6).
+
+| # | Step | Fails when |
+|---|---|---|
+| 1–3 | checkout · setup (`registry-url: https://registry.npmjs.org`) · frozen install | — |
+| 4 | resolve `<pkg>` and `<semver>` from the tag; assert `package.json.version == <semver>` | the tag and the manifest disagree |
+| 5 | `pnpm --filter <dir> build` | — |
+| 6 | `pnpm gates -- --only licence-closure,graph` | the tarball closure is broken |
+| 7 | `npm publish` in the package directory — OIDC trusted publishing; provenance is automatic, no `--provenance` flag | npm refuses |
+| 8 | `npm view braindog-<pkg>@<semver> version` | the registry does not show the version |
+
+**`gate1.yml`** — `on: schedule: '0 6 * * 1'` and `workflow_dispatch`. A report, not a gate: it never fails
+([15-ROADMAP](15-ROADMAP.md) §5, gates 1a–1d). `permissions: { contents: read, issues: read }`.
+
+| # | Step | Writes to the step summary |
+|---|---|---|
+| 1 | `GET registry.npmjs.org/-/v1/search?text=depends:braindog-render&size=250` | **1a** dependents not owned by us (target ≥ 3) |
+| 2 | `gh api repos/$REPO/issues?state=all&per_page=100`, paged | **1b** issues and PRs by non-authors, bots excluded (≥ 5) |
+| 3 | `GET api.npmjs.org/downloads/range/last-month/braindog-render`, minus the publish days from `npm view braindog-render time --json` | **1c** downloads per week on non-publish days (≥ 150) |
+| 4 | the last four weekly figures from step 3 with zero publishes in the window | **1d** four consecutive weeks above 1c |
+
+## 3 · Files
+
+The fewest that hold. One gate per file; a shared `lib.mjs` of three functions; one budgets file; one runner.
+
+```
+tools/
+├── gates/
+│   ├── run.mjs                 the runner: discovers *.mjs here, times each, prints one line per gate (§4), exits per §6
+│   ├── lib.mjs                 budgets() · files(glob, root) · line(result) — the only shared code, ~40 lines
+│   ├── budgets.json            every number a gate asserts (§4)
+│   ├── clean-room.txt          the predecessor's identifiers, one per line — maintained by the owner alone
+│   ├── negative/<gate>/…       one seeded violation per gate (§9)
+│   ├── graph.mjs               licence-closure.mjs   clean-room.mjs        no-declarations-in-kernel.mjs
+│   ├── closed-lists.mjs        event-kinds.mjs       refusal-fixtures.mjs  router-groups.mjs
+│   ├── spark-actor.mjs         mcp-budget.mjs        secret-grep.mjs       telemetry-allowlist.mjs
+│   ├── shot-allowlist.mjs      conformance-count.mjs compat-date.mjs       deploy-parity.mjs
+│   ├── grant-note.mjs          harness-constants.mjs css-rules.mjs
+│   └── self-test.mjs           runs every gate against tools/gates/negative/<gate> (§9)
+└── release.mjs                 `pnpm release` (§5.6)
+
+packages/ports/src/conformance/ cases.ts (CASES, runConformance) · reference.json — owned by 37 §3
+packages/ports/test/results/<host>.json   written by each host's conformance run; read by conformance-count; git-ignored
+packages/kernel/test/           materialise.ts (40 §5.3) · roundtrip.test.ts (§5.3)
+packages/<pkg>/test/**/*.test.ts        node --test; packages/where/test/seeds/<seed>.json (§4)
+packages/{declare,record}/test/ the `via` runners of the refusal fixtures (40 §6): lint · install · where · write · rpc · import
+
+apps/web/test/
+├── env.ts                      HOST · PORT · BASE · slugFor(page, dir) — the ONE module a harness literal lives in (50 §3)
+├── unit/*.test.ts              50 §9's twelve unit cases
+└── e2e/
+    ├── matrix.ts               FIXTURES = PAGES.map(p => p.id) · WIDTHS · SCHEMES · DIRS; forEachConfig(fn)
+    ├── setup.ts                globalSetup: materialises the eight pages' records twice (locale en, ar) into a scratch dir
+    ├── playwright.config.ts    four projects {light,dark} × {ltr,rtl}; webServer = `braindog dev` over the scratch dir; chromium
+    ├── targets  row-centre  field-height  contrast  focus  screenshot-mode  motion  bundle  a11y-tree     .spec.ts
+    └── shell  grid-contract  page-render  draft-survives-load  no-model  job-view  keys-sheet  vault-screen   .spec.ts
+
+apps/worker/test/               vitest + @cloudflare/vitest-plugin: conformance.test.ts · boot-probe.test.ts (phase 5)
+.github/workflows/              ci.yml · gates.yml · deploy.yml · release.yml · gate1.yml (§2)
+```
+
+Nineteen script gates, seventeen Playwright specs (50 §9's sixteen plus `vault-screen`), two Durable Object test
+files. Each script gate, its inputs, its assertion, its failure line's `what`, and its runtime budget:
+
+| Gate | Inputs | Asserts | `what` on failure | ms |
+|---|---|---|---|---|
+| `graph` | every `package.json`; every `src/**` import specifier | acyclic; every workspace edge points down 31 §2's order; no undeclared or cross-package relative import; `packages/**` free of `node:` `cloudflare:` `process` `Buffer` `__dirname` bare `fetch` | `import points up the order` · `undeclared import` · `runtime import under packages/` | 300 |
+| `licence-closure` | `npm pack --dry-run --json` of `packages/render`, `apps/cli`; their `dist/` | 31 §4 rule 8, all six clauses | `tarball entry outside the allow-list` · `built ESM names @braindog/` · `LICENSE does not start with …` | 3,000 |
+| `clean-room` | every tracked text file except `docs/`, `BUILD.md`, the list itself | no identifier from `clean-room.txt`, whole-word, case-insensitive | `predecessor identifier` | 500 |
+| `no-declarations-in-kernel` | `packages/kernel/**` | one `INSERT INTO declaration`, id `register.session`; no `.yaml`; no other declaration body | `kernel declares <kind.id>` | 100 |
+| `closed-lists` | 34 §6's table; 30 §1's SQL block; `src/migrations/0001_kernel.ts`; each owner's `as const` array | counts and member sets agree across every source | `list <name>: <source> has n, owner says m` | 400 |
+| `event-kinds` | `event.kind` CHECK in the migration; 30 §2's table and prose; `EVENT_KINDS` | forty, in all four | `event kinds: <source> counts n` | 100 |
+| `refusal-fixtures` | 30 §6's five tables; `packages/fixtures/refusals/*.yaml`; the code list `declare` exports (42 §2) | one fixture per code, one code per fixture, kebab name = code | `code without fixture` · `fixture without code` | 100 |
+| `router-groups` | each host's route table (49 §4.7's `Route[]`; 51 §4); `METHOD_GROUPS`; 30 §5's groups; 44 §2's `REFUSED` | every route has a group; no INTERNAL route; VAULT is cookie-only; ADMIN admits no token principal; `METHOD_GROUPS` keys = 30 §5's six less INTERNAL plus 48's three token methods; every browser-only method is in 44's `REFUSED` | `route without group` · `internal method routed` · `bearer reaches <group>` | 200 |
+| `spark-actor` | the `corpus` record (40 §4.1), materialised | 30 §3's query returns 0 | `spark wrote <kind>` | 2,000 |
+| `mcp-budget` | 44's `tools/list` and `instructions` over the stub `api` of 44 §3 (`index-24.json`); `record_index` and a default `list` page over `corpus` | 10 §4's five budgets, counted by 44 §5.8's `tokenBudget`; `budgets.mcp` equals 44's `BUDGETS` | `tools/list is n tokens` · `<tool> description is n tokens` · `BUDGETS differs from budgets.mcp` | 2,000 |
+| `secret-grep` | `packages/**`, `apps/**` sources | no plaintext source reaches a sink (log, telemetry, push, prompt template); the `Plaintext` brand appears in the two hosts' vault steps only (49 §5 step 9; 51 §5) | `plaintext reaches <sink>` | 500 |
+| `telemetry-allowlist` | 51 §5.18's one `writeDataPoint` call and §4.3's blob tuple; 08 §5's blob table | `writeDataPoint(` once under `apps/**`; the tuple's positions name only 08 §5's six columns; no field-shaped argument | `blob not on the list` · `writeDataPoint called twice` | 200 |
+| `shot-allowlist` | `apps/web/src/**` markup literals; `apps/web/src/lib/shot-allowlist.json` | the committed list equals the extraction, both ways (ADR-050) | `allow-list stale: +n −m` | 500 |
+| `conformance-count` | `packages/ports/test/results/*.json`; `CASES`; `reference.json` | every host's `ran` = `CASES.length − skipped`; equal across hosts; every skip printed with its reason; every trace equals the reference; `provisional: false` once `apps/worker` exists (37 §9.4) | `host <h> ran n of m` · `trace differs at case <id>` · `reference still provisional` | 100 |
+| `compat-date` | `apps/worker/wrangler.jsonc` | `compatibility_date ≥ budgets.worker.compatDateFloor` | `compatibility_date <d> below floor` | 20 |
+| `deploy-parity` | `DEPLOY_HOST`; `apps/web/build/`; `BRAINDOG_BUILD` | SHA-256 of live `/` and `/_app/version.json` equal the build's; `/api/version` `app` equals `BRAINDOG_BUILD` | `live <path> differs` · `live app tuple is <x>` | 70,000 |
+| `grant-note` | the `corpus` record, materialised — it seeds two grants (40 §4.1) | no `grant.*` event note contains its grant's `label` or `opens` (12 §8) | `grant note leaks <label\|opens>` | 2,000 |
+| `harness-constants` | `apps/web/test/**` except `env.ts` | no `localhost`, `127.0.0.1`, `:<4 digits>`, `http(s)://` literal | `harness literal outside env.ts` | 50 |
+| `css-rules` | `apps/web/src/**`, `packages/render/src/**`, the emitted token set, `pairs.json` | the twelve rules of §5.2; the dead-class report | one `what` per rule, §5.2 | 1,500 |
+
+## 4 · Data structures
+
+**The trace** ([33-CONTRACTS](33-CONTRACTS.md) §3; [37-SPEC-PORTS](37-SPEC-PORTS.md) §2) — the differential unit of
+the conformance suite. Cited, not restated: `SqlErrorCode` (thirteen), `TraceLine`, `Case`, `Assert`, `CASES`
+(thirty-two), `runConformance(sql, assert, reference) → { trace, ran, skipped }`, and `ReferenceFile` with its
+`generated_by` and `provisional` flags. What this spec adds is the file each host's conformance test writes for the
+gate to read:
+
+```ts
+// packages/ports/test/results/<host>.json — git-ignored; one per host per run
+type ConformanceResult = {
+  host: 'node-sqlite' | 'durable-object';           // the generated_by vocabulary of 37 §2
+  sqlite: string;                                   // caps.sqlite, so a diff names the build
+  ran: number;                                      // runConformance's count; MUST equal CASES.length − skipped.length
+  skipped: { id: string; reason: string }[];        // printed by conformance-count, never silent
+  trace: Trace;                                     // runConformance's trace, in CASES order
+};
+```
+
+Invariants a test checks: `ran + skipped.length === CASES.length` for every host; `ran` is equal across hosts; two
+results are equal iff their `trace` values are deep-equal — `host`, `sqlite` and `skipped` are excluded from equality
+and included in the failure line; after phase 5 `reference.json` has `provisional: false`.
+
+**The seed file** — every failing property run is committed as a permanent example
+([30-BLUEPRINT](30-BLUEPRINT.md) §14).
+
+```jsonc
+// packages/where/test/seeds/<seed>.json
+{
+  "seed": 1725302400123,            // fast-check's seed; the filename
+  "path": "42:3:1",                 // fast-check's shrink path
+  "predicate": { "all": [ { "field": "due", "before": "+30d" }, { "field": "state", "not_in": ["paid"] } ] },
+  "rows": [ { "id": "01J…", "fields": { "due": "2026-09-30" } } ],
+  "found": "2026-09-02 — negative operator on a missing field disagreed with the evaluator"
+}
+```
+
+Invariants: `seed` is the filename; `predicate` is the JSON tree of [34-GRAMMARS](34-GRAMMARS.md) §1 at depth ≤ 3;
+`rows` ≤ `budgets.property.maxRows`; every seed file is replayed as an explicit example before the random runs, so a
+fixed counter-example never regresses.
+
+**The fixture manifest** — owned by [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §2 and §4.1; cited, not restated. One
+`seed.json` at the package root holds the clock, the `sfc32` RNG state, the owner and nine `records`; `pages/*.json`
+hold the eight `Page`s; the `.dog` is materialised through the real write path by `packages/kernel/test/materialise.ts`
+(40 §5.3), never committed as bytes ([22-FRONTEND](22-FRONTEND.md) §10). What the gates and specs here read:
+
+```ts
+import { PAGES, SEED, REFUSALS, PACKS } from '@braindog/fixtures';     // 40 §2
+PAGES[i].id        // 'empty' | 'twelve' | 'five-hundred' | 'five-thousand' | 'currencies' | 'writeup'
+                   // | 'third-party-kind' | 'unknown-primitive' — 22 §10's order; FIXTURES in matrix.ts is PAGES.map(p => p.id)
+PAGES[i].record    // a key of SEED.records — the record a page is rendered from
+PAGES[i].expect    // { blocks, rows, cap, degraded, empty[] } — the non-vacuous assertions of §5.4
+SEED.records.corpus   // every pack, two seeded grants — the record spark-actor, grant-note and dog-roundtrip run over (40 §9)
+REFUSALS           // kebab code → path; seventy-five files
+```
+
+A refusal fixture (40 §6) carries `code`, `via` (one of seven: `lint install where write rpc import render`), `at`,
+optional `found`, and the input keys its `via` names; its runner is the test file 40 §6's table assigns
+(`declare/test`, `record/test`, `apps/web/test`).
+
+**The budgets file** — every number a gate asserts, in one place. A *count* is never here: a count is read from the
+enumeration that owns it ([34-GRAMMARS](34-GRAMMARS.md) §6).
+
+```jsonc
+// tools/gates/budgets.json
+{
+  "ci":       { "wallMinutes": 20, "gatesWallMinutes": 5, "browserMinutes": 10, "doMinutes": 4, "testSeconds": 90 },
+  "property": { "runs": 1000, "maxRows": 50, "maxDepth": 3 },
+  "bundle":   { "mainJsBrotli": 30720, "mainCssBrotli": 12288, "editorGzip": 81920,
+                "fontsBytes": 46080, "fontFiles": 2, "htmlGzip": 25600 },
+  "mcp":      { "toolsList": 1800, "toolDescription": 200, "recordIndex": 500, "listPage": 2000, "instructions": 300 },
+  "targets":  { "minPx": 43.5 },
+  "row":      { "centreTolerancePx": 1.5 },
+  "layout":   { "emptyTailPx": 2, "widthTolerancePx": 0 },
+  "contrast": { "textAA": 4.5, "nonTextAA": 3, "apcaWarnLc": 60 },
+  "motion":   { "springEnd": 1, "springPeakMax": 1.05, "ceilingMs": 300, "reducedMs": 1 },
+  "web":      { "widths": [390, 768, 1024, 1440] },
+  "worker":   { "compatDateFloor": "2026-02-24" },
+  "deploy":   { "parityAttempts": 6, "parityIntervalMs": 10000 },
+  "jobView":  { "foldBytes": 2048, "pollMs": 700 }
+}
+```
+
+Invariants: every key is read by at least one gate (a `budgets.json` key nothing reads is a `self-test` failure);
+a gate never holds a numeric literal that is not `0`, `1` or an index; a change to this file is reviewed against the
+design document that owns the number (the owners are the citations in §5).
+
+**The gate result** — one line per gate, machine-readable, human-scannable. JSON Lines on stdout; nothing else
+is printed by a gate.
+
+```jsonc
+{"gate":"graph","ok":true,"ms":41}
+{"gate":"deploy-parity","skip":"needs DEPLOY_HOST and apps/web/build — run: pnpm --filter ./apps/web build"}
+{"gate":"closed-lists","ok":false,"ms":118,
+ "what":"list Schedule kinds: migration CHECK has 9, owner 30 §1 says 10",
+ "expected":"digest reminder rule retry purge rotate pull analyse score snapshot",
+ "found":"digest reminder rule retry purge rotate pull analyse score",
+ "where":"packages/kernel/src/migrations/0001_kernel.ts:212"}
+```
+
+Invariants: exactly one of `ok` or `skip`; a red line carries all four of `what`, `expected`, `found`, `where`;
+`where` is `path:line` or a URL; the runner's last line is
+`{"summary":true,"ok":n,"red":m,"skipped":k,"ms":t}`.
+
+## 5 · Algorithms
+
+### 5.1 · The runner — `tools/gates/run.mjs`
+
+1. List `tools/gates/*.mjs` minus `run.mjs`, `lib.mjs`, `self-test.mjs`; apply `--only`.
+2. For each file, in name order: `import()` it; read `export const needs: string[]` (`'web-build'`, `'pack-build'`,
+   `'host'`); if a need is unmet, print a `skip` line naming the command that meets it and continue.
+3. Call `export default async (ctx) => Result` with `ctx = { root, budgets, args }`, timed with `performance.now()`.
+4. Print the result line (§4). A thrown error is a red line with `what: 'gate crashed: <message>'`.
+5. Exit `0` if nothing is red and every skip is allowed (locally: all; under `CI=true`: only `--allow-skip`);
+   `1` if any gate is red; `2` if a gate crashed or a skip is disallowed (§6).
+
+### 5.2 · Source and artefact gates — one script each
+
+**`graph`** ([31-STACK](31-STACK.md) §2–§3; layers 3, 4 and 5 in one file)
+
+1. Read every `packages/*/package.json` and `apps/*/package.json`; collect workspace edges from `dependencies` and
+   `devDependencies` whose value is `workspace:*`; `@braindog/fixtures` may appear only under `devDependencies`.
+2. The total order is the fifteen-row table of 31 §2, as an array in the gate. For each edge `a → b`, assert
+   `index(b) < index(a)`; an edge into a name outside the table is `unknown package`.
+3. Scan `src/**/*.{ts,svelte}`: every `import … from '<spec>'` and `import('<spec>')`. A `@braindog/*` specifier
+   must be a declared edge; a relative specifier resolved against the file must stay under the package root.
+4. Under `packages/**`, except `packages/ports/src/node-sqlite.ts` (the adapter [37-SPEC-PORTS](37-SPEC-PORTS.md)
+   owns), refuse specifiers `node:*`, `cloudflare:*`, and identifiers `process.`, `Buffer`, `__dirname`, and `fetch(`
+   not preceded by `.` — 31 §1's banned surface. `packages/record/**` refuses `fetch(` unconditionally.
+5. Red on the first violation, `where` = `file:line`.
+
+**`licence-closure`** (31 §4 rule 8; `needs: ['pack-build']`). For each of `packages/render` and `apps/cli`:
+
+1. `execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd })` → `files[].path`.
+2. Every path matches `^(dist|src|test/fixtures)/` or is `LICENSE`, `README.md`, `package.json`.
+3. `package.json`: `dependencies` absent or `{}`; `license` is exactly `MIT` or `AGPL-3.0-only`; never `SEE LICENSE IN`.
+4. Every `dist/**/*.js`: contains neither `@braindog/` nor `../../`.
+5. `packages/render/LICENSE` begins `MIT License`; root `LICENSE` and `apps/cli/LICENSE` begin
+   `GNU AFFERO GENERAL PUBLIC LICENSE` and are byte-equal.
+6. Every `packages/render/src/**/*.ts` first line is `// SPDX-License-Identifier: MIT`.
+
+**`clean-room`** ([BUILD.md](../BUILD.md))
+
+1. Read `tools/gates/clean-room.txt`: non-empty lines, lower-cased, each ≥ 6 characters; an empty list is red
+   (`what: 'clean-room list is empty'`) — a tripwire with no wire is decoration.
+2. `git ls-files` minus `docs/**`, `BUILD.md`, `tools/gates/clean-room.txt`, binaries by `.gitattributes`.
+3. For each file, for each identifier: whole-word, case-insensitive match → red, `where` = the first hit.
+
+**`no-declarations-in-kernel`** ([02-DATA-MODEL](02-DATA-MODEL.md) §1)
+
+1. Under `packages/kernel/`: no `*.yaml`, `*.yml`.
+2. Across `src/migrations/*.ts`: `INSERT INTO declaration` occurs exactly once, with `'register.session'` and
+   `pack_id = 'kernel'`.
+3. Across `src/**`: no object literal with `kind: '<one of the eight>'` beside an `id:` key.
+
+**`closed-lists`** ([34-GRAMMARS](34-GRAMMARS.md) §6)
+
+1. Parse 34 §6's table: `{ list, count, members?, owner }`. A Members cell of backtick words yields members; a cell
+   that cites a section yields a count only. A count like `16 + 2 meta` or `5 / 5` is summed per its own rule.
+2. Parse every `CHECK (<col> IN (…))` in 30 §1's SQL block and in the DDL string `packages/kernel/src/migrations/
+   0001_kernel.ts` exports ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §3); assert the two sets of CHECKs are identical —
+   the document and the DDL cannot drift.
+3. Parse each owner's `as const` array by name — the map in the gate: list → `{ sql?: 'table.col', src?:
+   'packages/<p>/src/<f>.ts#NAME' }` — with `export const NAME = [ … ] as const` read by regex.
+4. For every list: every source's length equals the table's count; where members are known in two sources, the
+   sets are equal. Order is not asserted.
+5. One red line per disagreement; `expected` = the owner's members, `found` = the disagreeing source's.
+
+**`event-kinds`** ([30-BLUEPRINT](30-BLUEPRINT.md) §2) — the same comparison for the one list large enough to
+have drifted three times: the migration's CHECK, 30 §1's CHECK, 30 §2's table, and the word *Forty* in 30 §2's
+sentence must all say the same number; `EVENT_KINDS` in `packages/kernel` must equal the CHECK's members.
+
+**`refusal-fixtures`** (30 §6; ADR-057)
+
+1. Parse the five code tables of 30 §6: `{ code, fixture }` rows; assert `fixture === kebab(code)`.
+2. `ls packages/fixtures/refusals/*.yaml` → names.
+3. Set difference both ways: a code without a fixture, a fixture without a code — each a red line.
+4. The closed code list `declare` exports ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §2) equals the table's codes.
+5. Whether a fixture *produces* its code is the `via` runners of §5.3: the script owns the enumeration, the tests own
+   the behaviour.
+
+**`router-groups`** (30 §5; [33-CONTRACTS](33-CONTRACTS.md) §4; [10-MCP](10-MCP.md) §8)
+
+1. Import each host's route table as data — [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §4.7's `Route[]` and
+   `METHOD_GROUPS`, and [51-SPEC-WORKER](51-SPEC-WORKER.md) §4's — the `handle` functions are never called.
+2. Every `group` is one of 49 §4.7's nine; no route carries `INTERNAL`; no INTERNAL method of 30 §5 has a route.
+3. Every `VAULT` route has `auth: 'cookie'`; no `ADMIN` route admits a `token` principal; the runner's three `JOBS`
+   routes have `auth: 'runner'` and no other route does.
+4. `METHOD_GROUPS`' keys equal 30 §5's six groups less INTERNAL, plus 48's three token methods; every DATA and READ+
+   method appears in exactly one `POST /api/<method>` route.
+5. Every method in a browser-only group is a key of 44 §2's `REFUSED` (twenty-one) — 10 §8's *every route has a verdict*.
+
+**`spark-actor`** (30 §3) and **`grant-note`** (12 §8) — the two gates that need a live record
+
+1. `materialise(SEED.records.corpus, openNodeSqlite(':memory:'))` — the materialiser of 40 §5.3
+   (`packages/kernel/test/materialise.ts`), the adapter of 37 §2.5 (`@braindog/ports/node-sqlite`). The `corpus`
+   record installs every pack and seeds two grants (40 §4.1, §9).
+2. `spark-actor`: `SELECT kind FROM event WHERE actor = 'spark' AND kind NOT IN ('suggest','propose','predict')` → zero rows.
+3. `grant-note`: `SELECT e.id FROM event e JOIN grant g ON e.target = 'grant:' || g.id WHERE e.kind LIKE 'grant.%'
+   AND (instr(e.note, g.label) > 0 OR instr(e.note, g.opens) > 0)` → zero rows.
+4. `where` names the record and the event id.
+
+**`mcp-budget`** (10 §4)
+
+1. Assert `BUDGETS` of [44-SPEC-MCP](44-SPEC-MCP.md) §2 deep-equals `budgets.mcp` on the five shared keys — one
+   place for the numbers, and 44's constant must match it.
+2. Render `tools/list` (with `instructions`) over the stub `api` of 44 §3 (`test/fixtures/index-24.json`) — the shape
+   44 assigns this script; then `createMcpHandler` over the materialised `corpus` record for a `record_index`
+   response and a default `list` page.
+3. Count each with 44 §5.8's `tokenBudget` — the calibrated estimator, never `bytes / 4` (44 §5.8 measured it
+   under-counting minified JSON by a fifth).
+4. Assert each against `budgets.mcp`; red names the item and its count.
+
+**`secret-grep`** (12 §8; ADR-062)
+
+1. Sources: identifiers `plaintext`, `decrypted`, `secretValue`, and the branded type `Plaintext`.
+2. Sinks: `console.`, `log(`, `telemetry(`, `push(`, `dispatch.`, any file under `**/prompts/`.
+3. For every sink call whose argument text contains a source → red.
+4. `Plaintext` (the brand) appears only in the two hosts' vault steps — the module 49 §5 step 9 and 51 §5 name for
+   `openGrant`/`bindGrant`'s unwrap; anywhere else is red. The record never sees one.
+
+**`telemetry-allowlist`** (08 §5)
+
+1. `writeDataPoint(` occurs exactly once under `apps/**` — 51 §5.18's one call per request.
+2. The blob tuple type of 51 §4.3 has at most six positions and each position's name is one of the six columns
+   parsed from 08 §5's table.
+3. At the call site no argument token matches `fields|note|label|subject|amount|register|email|body`.
+
+**`shot-allowlist`** (ADR-050; [19-INTERFACE](19-INTERFACE.md) §6)
+
+1. Extract every literal a developer typed into `apps/web/src/**/*.svelte` markup: text nodes and static `{'…'}`
+   expressions, trimmed, deduplicated, sorted.
+2. Read `apps/web/src/lib/shot-allowlist.json`.
+3. Assert set equality; red prints `+n −m` and the first ten of each difference. The count is printed, never asserted.
+
+**`conformance-count`** (33 §3)
+
+1. Read `packages/ports/test/results/*.json` (§4) and `CASES.length` = `m`.
+2. Every result: `ran + skipped.length === m`, and `ran` equal across results; print each skip as
+   `{"gate":"conformance-count","skip":…}` — attributed, never silent (37 §9.3 step 4).
+3. Every result's `trace` deep-equals `reference.json`'s `traces`; the first differing case id is `where`.
+4. Until phase 5 the reference is `generated_by: 'node-sqlite', provisional: true`; from phase 5 only the Worker's
+   Vitest job with `CONFORMANCE_WRITE=1` writes it (37 §9.3), and `provisional: true` while `apps/worker` exists is red.
+
+**`compat-date`** (33 §7) — strip `//` and `/* */` comments from `wrangler.jsonc`, `JSON.parse`, assert
+`compatibility_date >= budgets.worker.compatDateFloor` by ISO string comparison.
+
+**`deploy-parity`** (22 §9; 30 §14; `needs: ['host', 'web-build']`)
+
+1. For `/` and `/_app/version.json`: fetch `https://${DEPLOY_HOST}<path>` with `Cache-Control: no-cache`;
+   SHA-256 the body; compare with `apps/web/build/index.html` and `apps/web/build/_app/version.json`.
+2. Fetch `/api/version`; assert `app === BRAINDOG_BUILD`.
+3. On mismatch, retry every `budgets.deploy.parityIntervalMs` up to `parityAttempts` (propagation), then red with
+   both hashes. A network failure after the last attempt exits `3`.
+
+**`harness-constants`** (22 §7) — over `apps/web/test/**` except `env.ts`: red on
+`localhost|127\.0\.0\.1|:\d{4}\b|https?://`.
+
+**`css-rules`** (18 §6; 22 §7; 13 §7) — one regex tokeniser over first-party CSS: `apps/web/src/**/*.{svelte,css}`
+(the `<style>` block of a component), the emitted token stylesheet from `packages/theme`, and `packages/render`'s
+class emissions. Twelve rules and a report; each rule is its own `what`:
+
+| # | Rule | Red when |
+|---|---|---|
+| 1 | no colour literal outside the token file | `#hex`, `rgb(`, `hsl(`, `oklch(`, `oklab(`, `color-mix(` outside `packages/theme/**`; `currentColor` is ignored |
+| 2 | no `font-size` literal | `font-size:` followed by a digit outside the token file |
+| 3 | every `var(--x)` resolves | a name not in the emitted token set and not declared as `--x:` in the same file |
+| 4 | no `outline: none` | `outline:\s*(none\|0)` anywhere |
+| 5 | no physical inline-axis property | `left right margin-left margin-right padding-left padding-right border-left border-right float:left\|right text-align:left\|right` |
+| 6 | every positive `z-index` is a `var(--z-*)` | `z-index:\s*[1-9]` |
+| 7 | every icon size is one of four names | an `<Icon size=…>` not in `xs sm md lg`; a literal `width`/`height` on an `<svg>` |
+| 8 | the identifier role never meets a display size | one element's class list holds the identifier role class (13 §3.2) and any of `t-xl t-2xl t-3xl` |
+| 9 | no icon component accepts `color` | `color` in `Icon.svelte`'s `$props()` destructure |
+| 10 | a component styles only classes it emits | a `.class` selector in a component's `<style>` whose class its own markup never emits, outside `:global(...)` |
+| 11 | no media rule beaten by a later copy | a bare rule with a selector identical to one inside an earlier `@media` block, declaring the same property |
+| 12 | every semantic colour token has a `pairs.json` entry | a 13 §2.1 role in the emitted set absent from `pairs.json` as foreground or surface |
+| R | dead classes — a report | never red: prints classes declared and never emitted, counting `"s-" + x` as reaching `s-*` |
+
+### 5.3 · Gates that are tests — `node --test`, under `pnpm test`
+
+[33-CONTRACTS](33-CONTRACTS.md) §8 wrote `vitest` on three of these; [BUILD.md](../BUILD.md) records the deviation:
+`node --test` on `.ts` source, Vitest for the Durable Object host only.
+
+**`where-property`** — `packages/where/test/property.test.ts` (30 §7, §14; [38-SPEC-WHERE](38-SPEC-WHERE.md))
+
+1. Arbitraries: a predicate tree of depth ≤ `budgets.property.maxDepth` over every operator of 34 §1.2 except
+   `near` (30 §7: ranking, out of the property), with literals of every value type and the temporal anchors; a row
+   set of ≤ `maxRows` rows whose fields are present, `null`, `""`, `[]` or absent — the missing-value rule
+   (ADR-058) is what makes the oracle and the SQL agree.
+2. For each run: `evaluate(predicate, rows)` in the reference evaluator → set A; `compile(predicate, ctx)` → run the
+   SQL over the same rows in `node:sqlite :memory:` with the `entry` DDL → set B; `assert.deepEqual(A, B)`.
+3. Also assert on the compiled output: `params.length ≤ 100`; compound selects ≤ 5; expression depth ≤ 100; no
+   `"` in the SQL (double-quoted literals are off in `node:sqlite`).
+4. `fc.assert(prop, { numRuns: budgets.property.runs, examples: seeds })` where `seeds` is every file under
+   `test/seeds/` — replayed first, every run.
+5. On failure: write `test/seeds/<seed>.json` (§4) and fail; the file is committed with the fix.
+
+**`boot-probe`** — `packages/ports/test/boot-probe.test.ts` (30 §13; 33 §3)
+
+1. `openNodeSqlite(':memory:')` → `caps.fts5 === true`, `caps.json === true`, `caps.sqlite === '3.50.4'` (37 §9.1).
+2. `bootProbe({ ...caps, fts5: false }, 'node:sqlite')` throws `SqlError` `NO_SUCH_MODULE` whose message equals 37
+   §5.1's four-line text exactly — `assert.equal`, the text held once in the test (37 §9.4).
+3. Phase 5: `apps/worker/test/boot-probe.test.ts` runs step 1 against the real Durable Object adapter.
+
+**`dog-roundtrip`** — `packages/kernel/test/roundtrip.test.ts` (18 §6; 33 §9; 34 §5; 41 §5.10–5.11)
+
+1. Materialise `corpus` (40 §9); page through `exportDogl(cursor)` and concatenate → A.
+2. `importDogl(A, ctx)` into an empty record; export it the same way → B.
+3. Split each into header lines, `dog_sig` lines, body lines. Assert A.body and B.body are identical except that
+   B holds exactly one more `event` line, of kind `import` — asserted as *exactly one*. Assert the `dog_manifest`
+   rows are identical for every table but `event`.
+4. Import into a non-empty record → `IMPORT_NOT_EMPTY`; a flipped byte in a body line → `CHECKSUM_MISMATCH`.
+
+**`refusals`** — the seven `via` runners of 40 §6, one test file per runner where 40's table puts it: `lint` in
+`packages/declare/test`; `install`, `where`, `write`, `rpc`, `import` in `packages/record/test`; `render` in
+`apps/web/test/unit` (30 §6; 40 §6)
+
+1. For each `REFUSALS` entry with this runner's `via`: build the input its keys describe (40 §6's table), run the
+   surface (`lint(pack, null)`; `plan`; `where/sql`'s `compile`; the kernel's `write` on a fresh materialised record;
+   an RPC call; export → tamper → `importDogl`; `toHTML`).
+2. Assert the refusal list is exactly one long, its `code` and `at` equal the fixture's, `found` when the fixture
+   carries it, and `fix` is a non-empty sentence (40 §6 rule two).
+3. The runners' case counts sum to seventy-five, so a code with no fixture fails here as well as in the script.
+
+**Other tests that are gates**, each a case in its package's `test/`:
+
+| Test | Package | Asserts | Source |
+|---|---|---|---|
+| `theme-sixteen` | `theme` | the shipped house and high-contrast themes pass checks A–P, both schemes; the high-contrast theme is never refused or auto-corrected — if it is, the validator is wrong | 28 §4.4–4.5 |
+| `pack-uninstall` | `declare` + `record` | install every first-party pack, write a row under each, uninstall all: rows intact, `retired = 1`, zero active declarations, nav renders | 04 §4 |
+| `money-sum` | `kernel` | summing two currencies throws `MIXED_CURRENCY`; no `+` on a money amount outside `money.ts` (a code-shape grep) | 02 §3; 22 §10 |
+| `dialect-fuzz` | `render` | 1,000 random byte strings parse without throwing | 22 §10 |
+| `params-under-100` | `where` | a 130-value `not_in` compiles to three `AND`-ed chunks | 30 §7 |
+| `reminder-cancel` | `record` | moving a renewal date cancels the old date's reminders before inserting the new | 09 §2 |
+| `determinism` | `kernel` | each seed record materialised twice → `dog_manifest` rows equal, table by table | 40 §9 |
+| `conformance` (Node host) | `ports` | `runConformance(openNodeSqlite(':memory:'), nodeAssert, reference)`; writes `test/results/node-sqlite.json` (§4); the trace deep-equals `reference.json` | 33 §3; 37 §9.3 |
+
+### 5.4 · Rendered-box gates — Playwright, under `pnpm test:browser`
+
+**The matrix.** `e2e/matrix.ts` exports `FIXTURES = PAGES.map(p => p.id)` (eight, §4), `WIDTHS =
+budgets.web.widths`, `SCHEMES = ['light', 'dark']`, `DIRS = ['ltr', 'rtl']`; `forEachConfig(fn)` iterates pages ×
+widths inside a spec, and `playwright.config.ts` declares four projects `{ colorScheme } × { dir }` — 8 × 4 × 2 × 2 =
+**128 configurations** per spec (50 §9). Direction comes from the record: `setup.ts` materialises every page's record
+twice, `locale: 'en'` and `locale: 'ar'`, into the scratch data dir `braindog dev` serves (33 §5), and the shell
+derives `dir` from `record.locale` (30 §1) — the DOM is never poked. `targets` and `field-height` add
+`test.use({ hasTouch: true })` for the coarse pointer. Chromium only. `SPARK_ENDPOINT` is unset. Every spec asserts
+on the accessibility tree and computed geometry, never on markup or pixels (22 §10). The names below are 50 §9's
+sixteen plus `vault-screen`; 50 owns the spec files, this spec owns their place in the workflows and their negatives.
+
+**Non-vacuity, in every spec.** The first assertion of every spec is one the degraded branch cannot satisfy:
+`aria-rowcount === page.expect.rows` for a register page, a mark per row, zero inline comboboxes — never
+`childElementCount > 0` (18 §6).
+
+| Spec | Steps | Source |
+|---|---|---|
+| `targets` | 1 · every `button, a, [role=button], [role=option], input, [role=gridcell] [tabindex]`; 2 · rect = union of the element's box and its `::before`/`::after` boxes; 3 · both axes ≥ `budgets.targets.minPx` | 13 §7 |
+| `row-centre` | 1 · every `[role=row]`; 2 · centre-y of each child's box; 3 · max − min ≤ `budgets.row.centreTolerancePx`, or the row has wrapped (`offsetTop` differs) | 13 §7 |
+| `field-height` | 1 · every `input, select, textarea, [role=combobox]`; 2 · one distinct height per pointer size across all four widths; 3 · a width change never changes the height — measured, not read from source | 18 §6 |
+| `contrast` | 1 · axe-core `color-contrast` over the page: zero violations; every `pairs.json` pair ≥ `budgets.contrast.textAA` as text, ≥ `nonTextAA` for `edge` and focus; a pair over `textAA` with APCA `\|Lc\| < apcaWarnLc` is printed as advisory, never red (28 §4.1); 2 · every element's computed colour is in the emitted token set or an identity accent `oklch(L C h)` on a mark/chip/avatar/dot/series; 3 · the value is in the sRGB gamut via a 1×1 canvas readback, never the CSSOM string (22 §7 gate 3) | 22 §7; 50 §9 |
+| `focus` | 1 · tab order equals visual order (sort by box, compare); 2 · arrow keys in the grid move `activeElement` to the box it *looks* like it lands on — assert the box, not the id; RTL inverts the inline axis only; 3 · the two-tone ring is present on every focusable; 4 · with `requestAnimationFrame` stubbed to a no-op, the selected control still paints a non-transparent background — the decorative pill is never the only thing drawing selection | 13 §7; 22 §7; 22 §10 |
+| `screenshot-mode` | 1 · record every element's box and `scrollHeight`; toggle `html[data-shot]`; boxes and height byte-identical; 2 · a redacted figure re-rendered as all `0` and as all `8`: pixel readback of its box is identical; 3 · every legible text node is in `shot-allowlist.json` | ADR-050; 19 §6 |
+| `motion` | 1 · `--ease-spring` sampled at 1,000 points: last value `=== budgets.motion.springEnd`, max `≤ springPeakMax`; no duration token > `ceilingMs`; 2 · open a panel; after `transitionend`, its box equals the target box exactly — a spring ending at 0.998 leaves a gap; 3 · `prefers-reduced-motion: reduce`: the same state change completes within `reducedMs` and still changes something | 13 §9; 50 §9 |
+| `bundle` | no browser; reads the step-6 build: 1 · parse `build/index.html` for the `_app/immutable/**.js` it preloads and the `.css` it links; 2 · `brotliCompressSync` each — JS sum ≤ `mainJsBrotli`, CSS sum ≤ `mainCssBrotli`; `gzipSync(index.html)` ≤ `htmlGzip`; 3 · `build/**/*.woff2` count `=== fontFiles`, bytes ≤ `fontsBytes`; 4 · from `.svelte-kit/output/client/.vite/manifest.json`, BFS from the entry over static `imports` never reaches the chunk owning `src/lib/editor/index.ts`, whose gzip ≤ `editorGzip` | 22 §9 |
+| `a11y-tree` | 1 · for every fixture block and the degraded fence, the accessibility tree of `<Block>`/`<Table>` equals that of `toHTML`'s markup parsed by the browser, and `--cells`/`--cols` are equal (31 §2; 36 §9); 2 · every plot's list twin holds ≥ every event the plot draws | 22 §10; 19 §4; 50 §9 |
+| `shell` | `/r/obligations` requested directly answers `index.html` and the grid renders; `/_app/version.json` exists and equals the build's | 50 §9 |
+| `grid-contract` | 1 · the APG checklist: roving `tabindex` on the row; ←→↑↓, `Home`/`End`, `⌘Home`/`⌘End`, `PageUp`/`PageDown`; `aria-sort`; `aria-rowcount`/`aria-rowindex` when windowed; the labelled `role=region` with `tabindex=0`; 2 · DOM rows = `min(rows, 2,000)` and the cap line at 2,000; 3 · every grid and flex container: tracks not `0px` equal `children.length`; container width − (children widths + gaps) < `budgets.layout.emptyTailPx`; header cell widths `===` body cell widths, exactly | 13 §7; 22 §10; 50 §9 |
+| `page-render` | every declared block once, in order; each `expect.empty` string present iff zero rows; `aria-rowcount === page.expect.rows`; degraded blocks `=== page.expect.degraded`; a failed block renders `role="status"` and the page one `role="alert"`; the unknown-primitive page renders *Block "…" needs a newer client.* | 22 §10; 40 §9; 50 §9 |
+| `no-model` | with `SPARK_ENDPOINT` unset every spec passes and no element's text contains *Spark* | 23 §8; 50 §9 |
+| `keys-sheet` | the `?` sheet lists exactly the registry; every palette row's printed `<kbd>` matches its binding; nav destinations equal the drawn nav | 19 §4; 50 §9 |
+| `vault-screen` | 1 · a closed row draws no `opens`; 2 · opening a row expands exactly one; 3 · no value control exists when nothing is expanded; 4 · under `data-shot` the screen is absent — not in the DOM, not blurred | 12 §8 |
+| `job-view` | over a fixture job stream: 1 · one row per tool call; 2 · a result over `budgets.jobView.foldBytes` is folded and the fold names both lengths — `2,000 of 41,812 characters`; 3 · a one-line result is not folded; 4 · with the socket held closed, one poll per `budgets.jobView.pollMs`, `after=` monotonic and reaching non-zero; 5 · events received after the panel closes > before; 6 · zero requests when no job is live | 23 §3.1 |
+| `draft-survives-load` | 1 · gate the screen's load behind a promise; 2 · type into the sheet; 3 · resolve the load; 4 · the typed text is present. Verified non-vacuous once by removing the guard and watching it fail | 22 §7 |
+
+### 5.5 · The pyramid — what runs where, and how long
+
+| Layer | Runner | Lives in | Volume | Budget | Workflow |
+|---|---|---|---|---|---|
+| Unit | `node --test` | `packages/*/test` | ~150 cases; each ≤ 50 ms | ≤ 30 s | `ci.yml` |
+| Property | `node --test` + fast-check | `packages/where/test` · `packages/render/test` | 1,000 predicate runs + 1,000 fuzz strings + every seed | ≤ 20 s | `ci.yml` |
+| Conformance | `node --test` (Node); Vitest (DO) | `packages/ports/src/conformance` | thirty-two cases, equal `ran` per host | ≤ 10 s Node; ≤ 4 min DO | `ci.yml` |
+| Fixtures | `node --test` | `packages/fixtures/test` · `kernel/test` · `declare/test` · `record/test` | 9 materialisations (`five-thousand` ≤ 10 s, 40 §7); 75 refusals; round-trip; determinism | ≤ 40 s | `ci.yml` |
+| Gates | `node tools/gates/run.mjs` | `tools/gates` | 19 scripts + 19 negatives | ≤ 5 min | `gates.yml` |
+| Browser | Playwright 1.62.1 | `apps/web/test/e2e` | 17 specs × 128 (+128 coarse for two) | ≤ 10 min | `ci.yml` |
+| Durable Object | Vitest 4.1.11 + plugin 1.1.2 | `apps/worker/test` | conformance + boot-probe | ≤ 4 min | `ci.yml` (phase 5) |
+| Deploy | `deploy-parity` | `tools/gates` | 3 fetches, ≤ 6 attempts | ≤ 2 min | `deploy.yml` |
+
+### 5.6 · Publishing ([31-STACK](31-STACK.md) §6; ADR-042)
+
+1. **Once, by hand, in the first five minutes:** reserve `braindog`, `braindog-render`, `braindog-cli`,
+   `braindog-mcp` and the `@braindog` scope. Pick the GitHub org before the first push — a repo move after gates
+   1a–1d start breaks every dependent link.
+2. **First publish, by hand:** `npm publish` `braindog-render@0.0.1` and `braindog-cli@0.0.1` with a granular
+   token that expires in 7 days; then, per package, configure Trusted Publishing on npmjs.com → this repository,
+   workflow `release.yml`; then revoke the token. Trusted publishing for a *first* publish is unverified, so it is
+   never relied on.
+3. **Every release after:** `pnpm release render 0.1.0` (§2) → tag `render-v0.1.0` → `release.yml` publishes under
+   `id-token: write`. Provenance is automatic. Two packages, two tags, two configurations — no Changesets.
+4. **The version tuple.** `braindog --version` and `GET /api/version` print
+   `app <YYYY.MM.DD>+<sha7> · format 1 · kernel <n> · primitives 1`. `app` is `BRAINDOG_BUILD` injected by
+   `deploy.yml` step 4; `format` is `PRAGMA user_version`; `kernel` is `MAX(migration.version)`; `primitives` is
+   `PRIMITIVES_VERSION`. **The app has no semver.** Only the two npm packages carry one, and their lines are
+   independent of each other and of every record number.
+
+## 6 · Refusals and errors
+
+A gate does not raise refusal codes; it prints one line and sets an exit code. The line is the refusal.
+
+**The one line.** Every red gate prints exactly one JSON line (§4) carrying `gate`, `what`, `expected`, `found`,
+`where`. Read as a sentence: *`closed-lists`: list Schedule kinds — the migration CHECK has 9, the owner says 10;
+expected `… snapshot`, found `… score`; at `0001_kernel.ts:212`.* A `what` is a fact about the thing measured,
+never advice; the `fix` sentence belongs to the design document the `where` points at. A test under `node --test`
+reports the same five facts through `assert`'s `message`: `what — expected X, found Y (where)`.
+
+| Exit | Meaning | Who exits with it |
+|---|---|---|
+| `0` | every gate green; every skip allowed and printed | `run.mjs` |
+| `1` | at least one gate red | `run.mjs`; `node --test`; `playwright test`; `vitest run` |
+| `2` | a gate crashed, a skip was disallowed under `CI=true`, or `budgets.json` has a key nothing reads | `run.mjs`, `self-test.mjs` |
+| `3` | the live host was unreachable after every attempt | `deploy-parity` (mirrors the CLI's `3 unreachable`, 33 §5) |
+
+**A red gate is never skipped.** There is no `skip`, `only`, `retry` or `allow-failure` on a gate. A red gate is
+one of three things, and the third is the only one that touches the gate: the code is wrong — fix the code; the
+gate is wrong — fix the gate and add the case that exposed it to `negative/`; the *rule* is wrong — change the design
+document first, cite the change in the commit that changes the gate, and update `budgets.json` in the same commit.
+A gate deleted without a design amendment is a review finding ([35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §1).
+
+**Skips.** A skip is a missing prerequisite, never a failing assertion; it names the command that removes it; under
+`CI=true` an unlisted skip is exit `2`. A conformance skip (`requires` unmet) is printed by `conformance-count` with
+its reason — attributed, never silent (33 §3).
+
+## 7 · Performance budget
+
+Every number below is a key in `budgets.json`, and every workflow job carries `timeout-minutes` equal to its wall
+budget — so a budget that is exceeded fails, it does not warn (22 §9).
+
+| Budget | Value | Measured how |
+|---|---|---|
+| `ci.yml` wall time | ≤ 20 min | the job's `timeout-minutes`; trend from `gh run list --workflow ci.yml --json createdAt,updatedAt` |
+| `gates.yml` wall time | ≤ 5 min | as above; each gate's `ms` is in its result line |
+| `pnpm test` | ≤ 90 s | `node --test` reporter duration, summed by the CI step |
+| `where-property` | 1,000 runs ≤ 20 s | the test's own `performance.now()`; a run is one compile, one evaluate, one `exec` |
+| Browser matrix | 128 configurations × 17 specs ≤ 10 min on one runner | Playwright's report; shard `--shard=i/4` only when this is hit, never before |
+| `pnpm test:do` | ≤ 4 min | Vitest's report |
+| `deploy-parity` | ≤ 6 attempts × 10 s | the gate's `ms` |
+| Each script gate | its `ms` column in §3 | the result line; a gate over its budget is a review finding, not a red — a gate's own speed is not a product property |
+
+The **INP p75 ≤ 100 ms on the target phone** row of 18 §6 is not in any workflow: 22 §10 measured that a throttled
+headless browser does not measure scroll or input latency. It is recorded per release, by hand, on the target phone
+over ADB, and written into [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)'s release checklist until an ADB harness
+exists (§10).
+
+## 8 · Security
+
+| Boundary | Rule |
+|---|---|
+| Secrets in CI | two, and no more: `CLOUDFLARE_API_TOKEN` (deploy-scoped, environment `production`, `deploy.yml` only) and the npm OIDC identity (`id-token: write`, `release.yml` only). No npm token, no classic token, no long-lived anything (12 §8; 31 §6) |
+| Workflow permissions | every workflow declares `permissions:`; the default is `contents: read`; `gate1.yml` adds `issues: read`; nothing has `write` but the OIDC id-token |
+| Actions | four, pinned to a major: `actions/checkout@v4`, `pnpm/action-setup@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`. `wrangler` and `playwright` run from the lockfile, never from a marketplace action |
+| Installs | `pnpm install --frozen-lockfile` in every job; `minimumReleaseAge: 1440` and `linkWorkspacePackages: false` in `pnpm-workspace.yaml` (31 §3) — a package under 24 h old never installs, a typo'd internal name fails loudly |
+| The deploy | `deploy-parity` runs after every `wrangler deploy`, in the same job, and a red parity fails the deploy run — a green deploy serving a stale asset has happened three times before (30 §14) |
+| What a gate may read | the repository, `build/`, and the live host named by `DEPLOY_HOST`. No gate reads a secret; `deploy-parity` fetches unauthenticated routes only |
+| What a test may hold | fixtures are synthetic: no real payee, credential, email or amount; `clean-room` and `secret-grep` run over `packages/fixtures/**` too |
+| Logs | a gate's line carries a path, a count, a hash, a code — never a field value or a body (35 §2). `deploy-parity` prints hashes, not HTML |
+| Provenance | npm provenance is automatic under trusted publishing; `release.yml` step 8 verifies the version landed, and a consumer may verify the attestation against this repository and `release.yml` |
+
+## 9 · Tests and gates
+
+The gates' own tests. A gate that has never failed is a gate that may not work.
+
+**The negative-fixture rule.** Every script gate has `tools/gates/negative/<gate>/` holding one seeded violation —
+a minimal tree the gate runs against with `ctx.root` pointed at it. `self-test.mjs` runs each gate against its
+negative and asserts: exit red; `what` equals the fixture's `expect.what`; `where` names the seeded file. It also
+asserts that every key of `budgets.json` is read by at least one gate, test or spec (by grepping `budgets.<key>`
+across `tools/gates`, `packages/*/test` and `apps/web/test`), and that every `timeout-minutes:` in
+`.github/workflows/*.yml` equals its `budgets.ci` key. `gates.yml` step 6 runs it; `pnpm gates -- --negative` runs
+it locally.
+
+| Gate | Seeded violation |
+|---|---|
+| `graph` | a `packages/where/src/x.ts` importing `@braindog/kernel` |
+| `licence-closure` | a `dist/index.js` containing `from '@braindog/where'` |
+| `clean-room` | one identifier from the list in a `.ts` comment |
+| `no-declarations-in-kernel` | a second `INSERT INTO declaration` |
+| `closed-lists` | a migration CHECK with nine schedule kinds |
+| `event-kinds` | thirty-nine kinds in the CHECK, forty in the table |
+| `refusal-fixtures` | `refusals/version-stale.yaml` deleted; `refusals/not-a-code.yaml` added |
+| `router-groups` | a `POST /api/openGrant` route with `auth: 'bearer-or-cookie'` |
+| `spark-actor` | a materialised record given one `event` row `actor = 'spark', kind = 'edit'` |
+| `mcp-budget` | a tool description of 1,200 bytes |
+| `secret-grep` | `console.log(plaintext)` |
+| `telemetry-allowlist` | a second `writeDataPoint(` whose blob tuple carries `register` |
+| `shot-allowlist` | one literal removed from the JSON |
+| `conformance-count` | a `results/node-sqlite.json` with `ran` one short and no skip |
+| `compat-date` | `"compatibility_date": "2026-02-23"` |
+| `deploy-parity` | a `build/index.html` whose hash differs from a local stub host's (`http://127.0.0.1:<port>` served by the fixture itself) |
+| `grant-note` | a `grant.add` event whose note contains the grant's `label` |
+| `harness-constants` | `const base = 'http://localhost:5173'` in a spec |
+| `css-rules` | twelve files, one per rule, each breaking exactly its rule |
+
+**Two rules for writing any test here**, enforced at review and named in 18 §6:
+
+1. **Assert on something only the real branch produces.** `rows ≥ 4`, a mark per row, `aria-rowcount ===
+   page.expect.rows` — never `childElementCount > 0`. A spec whose first assertion could pass on the error path
+   is rejected.
+2. **A regression test carries the old wrong number in its name.** `'a 130-value not_in compiled to one IN of 130
+   params (was TOO_MANY_PARAMS)'`, `'spring settled at 0.998 (now 1)'` — so a reviewer sees what it protects.
+
+**The Playwright specs' own check:** each spec runs once against `negative/web/` — a fixture page built to fail it
+(a 40 px control, a header track that differs from the body's, a missing focus ring, a `build/` whose `index.html`
+preloads a 40 KB chunk and whose manifest imports the editor statically) — under `pnpm test:browser --
+--project negative`, which is a fifth project of 8 configurations, not 128.
+
+## 10 · Deliberate ceilings
+
+- `ponytail:` gates run serially in one process; parallelise with `Promise.all` per file when `gates.yml` passes 5 min.
+- `ponytail:` `css-rules` is a regex tokeniser over first-party CSS we control, not a CSS parser; add `postcss` (dev only) the first time a real rule is missed or a false red needs a hand-written exception.
+- `ponytail:` `graph` does layers 3–5 of 31 §3 by regex over import specifiers; add ESLint flat + `import-x` when a rule needs an AST (re-exports, type-only imports, `import.meta`).
+- `ponytail:` `mcp-budget` counts with 44's `tokenBudget`, a calibrated heuristic; the day 44 swaps in a real tokenizer this gate changes nothing.
+- `ponytail:` `deploy-parity` checks `/`, `/_app/version.json` and `/api/version`; add the hashed asset list from `build/` when a stale sub-asset is ever served with a fresh shell.
+- `ponytail:` the browser matrix runs Chromium only; add WebKit for the `focus`, `targets` and `grid-contract` specs when a Safari-only layout bug reaches a user.
+- `ponytail:` no sharding, no retries, no flaky-test quarantine; shard at the §7 budget, and a flaky spec is fixed or deleted, never retried.
+- `ponytail:` the property test runs 1,000 cases in CI (33 §8 said 10,000); raise `budgets.property.runs` when a seed is found that 1,000 runs missed twice.
+- `ponytail:` the conformance reference is Node's until phase 5; the Durable Object's from then, regenerated only by `CONFORMANCE_WRITE=1 pnpm test:do` on a developer's machine, and committed by a person.
+- `ponytail:` INP on the target phone is measured by hand per release; automate over ADB with `long-animation-frame` counting when the release checklist has been run five times.
+- `ponytail:` `shot-allowlist` extracts literals by regex from `.svelte` markup; use the Svelte compiler's AST (already a devDependency of `apps/web`) if a template form escapes the regex.
+- `ponytail:` `clean-room.txt` is a hand-kept list; there is no automated derivation because the derivation would require reading the predecessor, which is the one thing the rule forbids.
+- `ponytail:` `gate1.yml` writes a step summary and nothing else; add an issue comment when the numbers are read by anyone other than the owner.
+- `ponytail:` screenshots are artefacts on failure only; there is no visual-diff service and none is planned.
+
+## 11 · Dependencies
+
+Runtime: **none.** Nothing in this spec ships.
+
+| Dev dependency | Version | Where | For |
+|---|---|---|---|
+| `typescript` | 6.0.3 | root | `pnpm typecheck` ([31-STACK](31-STACK.md) §3) |
+| `@types/node` | 24.13.0 | root | the gates and tests |
+| `fast-check` | 4.9.0 | `packages/where`, `packages/render` | the property test, the parser fuzz |
+| `@playwright/test` | 1.62.1 | `apps/web` | the rendered-box specs |
+| `axe-core` | 4.13.0 | `apps/web` | the `contrast` spec |
+| `vitest` | 4.1.11 | `apps/worker` | the Durable Object host (phase 5) |
+| `@cloudflare/vitest-plugin` | 1.1.2 | `apps/worker` | peers `vitest ^4.1.0` exactly — the repo's hardest pin |
+| `wrangler` | 4.128.0 | `apps/worker` | `deploy.yml` step 5 |
+| `esbuild` | the version `wrangler` 4.128.0 pins | `apps/cli`, `packages/render` | the publish build — one file, no deps (31 §8) |
+
+`tools/gates/**` and `tools/release.mjs` import `node:*` only. Node **24.13.0** pinned to the minor; pnpm
+**11.25.0** via corepack. No task runner, no Changesets, no Stylelint, no dependency-cruiser, no ESLint yet (§10).
+
+## 12 · Build order
+
+| Phase ([BUILD.md](../BUILD.md)) | This spec delivers | Unblocks |
+|---|---|---|
+| 0 · Foundations | `run.mjs`, `lib.mjs`, `budgets.json`, `self-test.mjs`; `graph`, `licence-closure`, `clean-room`, `conformance-count`, `compat-date`; `gates.yml`; the Node conformance host and the first `reference.json`; `where-property` with `test/seeds/`; `dialect-fuzz` | every later package has a green `pnpm test` and `pnpm gates` to land into |
+| 1 · Kernel | `closed-lists`, `event-kinds`, `refusal-fixtures`, `no-declarations-in-kernel`, `spark-actor`, `grant-note`; the `lint`, `where`, `write` and `import` refusal runners, `roundtrip.test.ts`, `determinism`, `money-sum`, `boot-probe`, `theme-sixteen` | a record that refuses every code with a fixture |
+| 2 · Self-host + CLI | `router-groups`; the `install` and `rpc` refusal runners; `pack-uninstall`; `tools/release.mjs`; `release.yml`; the hand publish of `0.0.1` ×2 | `braindog-cli` on npm |
+| 3 · Web | `env.ts`, `e2e/matrix.ts`, `e2e/setup.ts`, the seventeen specs, `negative/web/`; `css-rules`, `shot-allowlist`, `harness-constants`; `ci.yml` steps 6–9 | the eight fixture pages pass the rendered-box gates |
+| 4 · Ingest, rules, metrics | `reminder-cancel`; `job-view` against a fixture stream | — |
+| 5 · Cloud | `apps/worker/test/` under Vitest; `reference.json` regenerated from the Durable Object; `deploy.yml`; `deploy-parity`; `telemetry-allowlist`; `ci.yml` step 10 | a deploy that passes parity |
+| 6 · Packs, MCP, Spark A | `mcp-budget`; `secret-grep`; `vault-screen` | — |
+| after the first publish | `gate1.yml` | the four numbers of 15 §5 |
+
+Nothing in this spec waits on [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md); 53 consumes `deploy.yml`, the version
+tuple and the INP checklist row from here.
+
+## 13 · Decisions taken here
+
+Each decision names the design document to amend in the same revision ([35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §1).
+
+| # | Decision | Amend |
+|---|---|---|
+| 1 | **The budgets file.** Every number a gate asserts lives in `tools/gates/budgets.json`; a gate holds no numeric literal but `0`, `1` and indices; a count is never a budget — it is read from the owning enumeration | 33 §8 (cite the file); 18 §6 (the numbers in its rows point here) |
+| 2 | **The gate output format.** One JSON line per gate — `gate ok ms` or `gate skip`, and on red `what expected found where`; a summary line last; exit codes `0 1 2 3` | 33 §8 |
+| 3 | **`pnpm` scripts.** Six root scripts: `test typecheck gates test:browser test:do release`; per-package `test` is `node --test "test/**/*.test.ts"`; `gates` takes `--only`, `--allow-skip`, `--negative` | 31 §8 (the tree's root); BUILD.md |
+| 4 | **The negative-fixture rule.** Every script gate has one seeded violation under `tools/gates/negative/<gate>/`, run by `self-test.mjs` in `gates.yml`; every Playwright spec runs once against `negative/web/` | 33 §8; 18 §6 |
+| 5 | **`node --test` for `where-property`, `boot-probe`, `dog-roundtrip`.** 33 §8's `vitest` column becomes *test*; Vitest is `apps/worker/test` alone | 33 §8 (BUILD.md already records the deviation) |
+| 6 | **1,000 property runs, not 10,000.** `budgets.property.runs = 1000`, every committed seed replayed first | 33 §8; 30 §7 (add the number) |
+| 7 | **The four widths are 390 / 768 / 1024 / 1440.** 22 §10 said *four widths* and named none; 390 is 22 §4's phone, 1440 is 13 §4.2's column ceiling | 22 §10 |
+| 8 | **Seventeen Playwright specs, not ten.** [50-SPEC-WEB](50-SPEC-WEB.md) §9's sixteen names are adopted as written (they fold 22 §10's layout assertions into `grid-contract` and 18 §6's `page-render`, `shell`, `no-model`, `keys-sheet` rows in); `vault-screen` is added because 50 covers only one of 12 §8's three vault invariants; `bundle` stays a spec — it reads the build, needs no browser, and runs in `ci.yml` step 8 | 33 §8; 50 §9 (add `vault-screen`) |
+| 9 | **`telemetry-allowlist` is two gates.** 33 §8's row conflated 08 §5's Analytics Engine blob list with ADR-050's screenshot-mode provenance list; they are `telemetry-allowlist` and `shot-allowlist` | 33 §8 |
+| 10 | **No Stylelint.** 22 §7 gate 1's three Stylelint rules and 18 §6's CSS rows are the twelve rules of `css-rules.mjs`, one regex tokeniser, zero dependencies; Stylelint or `postcss` is added the day a rule needs a parser (§10) | 22 §7; 31 §3 |
+| 11 | **`graph` covers 31 §3's layers 3–5.** ESLint + `import-x` is deferred until a rule needs an AST | 31 §3 |
+| 12 | **The round-trip differs by exactly one row.** Export → import → export is identical but for one appended `event` of kind `import`, asserted as exactly one; 18 §6's *identical* is amended to say so | 18 §6; 33 §9 |
+| 13 | **Direction comes from the record.** The RTL half of the matrix is every fixture materialised with `locale: 'ar'`; the harness never sets `dir` on the DOM | 22 §10; 40 (two locales per page) |
+| 14 | **`gate1.yml` is a report.** It never fails and maps to no gate; 33 §8's *one-to-one* mapping holds for the other four workflows | 33 §8 |
+| 15 | **Each conformance host writes `packages/ports/test/results/<host>.json`** (§4) so `conformance-count` has an artefact to read; the reference's `provisional` flag and `CONFORMANCE_WRITE=1` are 37 §9.3's, adopted as written | 37 §3, §9.3 (add the results file); 33 §3 |
+| 16 | **INP on the target phone is a release checklist row, not a workflow step**, until an ADB harness exists | 18 §6; 53 |
+| 17 | **`deploy-parity` also checks `/api/version`** — the `app` tuple must equal the deploying run's `BRAINDOG_BUILD` | 33 §8; 22 §9 |
+| 18 | **`refusal-fixtures` is a script and seven runners.** The script owns the enumeration (a code per fixture, a fixture per code); the `via` runners of 40 §6, in the packages 40's table names, own *produces exactly it* | 33 §8; 30 §6 |
+| 19 | **Interface with [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md), confirmed.** This spec reads `PAGES`, `SEED`, `REFUSALS`, `PACKS` as 40 §2 exports them, the `Page.expect` shape, the `corpus` record, and the materialiser at `packages/kernel/test/materialise.ts` (40 §5.3). Two asks of 40: `materialise` takes `{ locale }` so a record can be built `ar` for the RTL half (decision 13), and a fixture job stream for `job-view` | 40 §5.3 (the `locale` option); 40 §3 (a `jobs/` stream) |
+| 20 | **`clean-room.txt` is the owner's file.** Its content is never derived, generated or reviewed by a builder; the gate asserts only that it is non-empty and that nothing matches | BUILD.md |
+| 21 | **`budgets.mcp` and 44's `BUDGETS` are one number twice, asserted equal.** `mcp-budget` deep-equals them on the five shared keys before counting; a change to either without the other is red | 44 §2 (cite `budgets.json`); 33 §8 |
+| 22 | **The four `test/env.ts`, `test/e2e/`, `braindog dev` and `PAGES` names are 50's and 48's**, adopted over this spec's first-draft `harness.ts`, `server.ts`, `FIXTURES` — one name per thing across the two specs | 50 §3, §9 (no change; recorded so the audit sees the agreement) |
+
+Twenty-two, counted.
+
+## 14 · Done when
+
+- [ ] `pnpm gates` prints nineteen result lines and a summary; `pnpm gates -- --negative` prints nineteen reds, each with the seeded `where`
+- [ ] `tools/gates/budgets.json` holds every number in §3–§7; `self-test.mjs` finds no unread key and no gate with a bare numeric literal
+- [ ] `ci.yml`, `gates.yml`, `deploy.yml`, `release.yml`, `gate1.yml` exist as §2's tables; every job has `permissions:` and `timeout-minutes`
+- [ ] `pnpm test` runs `where-property` at 1,000 runs with every `test/seeds/*.json` replayed first, and the seeds directory has at least the first committed counter-example
+- [ ] `packages/ports/src/conformance/reference.json` is committed; `conformance-count` reads `test/results/node-sqlite.json` and reports equal counts and every skip
+- [ ] `refusal-fixtures` and the seven `via` runners are green over seventy-five fixtures, and the runners' counts sum to seventy-five
+- [ ] the seventeen specs run over 128 configurations in four projects; `targets` and `field-height` also under `hasTouch`; the first assertion of every spec is non-vacuous
+- [ ] `env.ts` is the only file under `apps/web/test/` with a host or port literal
+- [ ] `braindog-render@0.0.1` and `braindog-cli@0.0.1` were published by hand; both packages have Trusted Publishing configured; the token used is revoked
+- [ ] `pnpm release render 0.1.0` produced a tag, and `release.yml` published it with automatic provenance
+- [ ] `deploy.yml` deployed once and `deploy-parity` was green on the live host, including `/api/version`
+- [ ] `braindog --version` prints `app <date>+<sha> · format 1 · kernel <n> · primitives 1`
+- [ ] every workflow's wall time is under its §7 budget, read from the run list
+- [ ] every amendment in §13 is applied to its design document in this revision
+
+---
+
+*Previous: [51-SPEC-WORKER](51-SPEC-WORKER.md). Next: [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md).*

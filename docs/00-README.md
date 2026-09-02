@@ -21,7 +21,10 @@ and complete, hosted at $12/mo (D41).
 
 ## How to read this
 
-Thirty-five documents: this index and 01–34.
+Fifty-four documents: this index, the design in 01–34, and the technical specifications in 35–53 — one per
+package and app, written to the level a builder types from without a design meeting, and revised on a loop
+until two audits find nothing ([35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §5). No code exists yet, by decision;
+the loop's log is [BUILD.md](../BUILD.md).
 
 | # | Document | Answers |
 |---|---|---|
@@ -59,6 +62,25 @@ Thirty-five documents: this index and 01–34.
 | 32 | [Parity with the brain](32-PARITY.md) | Every feature of the working predecessor, traced to its mechanism, and where each lands |
 | 33 | [The contracts](33-CONTRACTS.md) | The contracts: port signatures, RPC envelopes, HTTP surface, CLI, self-host process, wrangler, gates, export/import |
 | 34 | [The grammars](34-GRAMMARS.md) | The grammars: `where:` and dialect EBNF, JSON encodings of the sixteen types, identifiers, checksums, declaration key tables |
+| 35 | [Specifications — overview](35-SPEC-OVERVIEW.md) | How to read a spec, the fourteen-section template every spec follows, the eighteen specs, the revision loop |
+| 36 | [Spec · render](36-SPEC-RENDER.md) | `packages/render`: the dialect parser, the sixteen kinds, `toHTML` — stage 0, MIT |
+| 37 | [Spec · ports](37-SPEC-PORTS.md) | `packages/ports`: `Sql` and the eight other ports, the `node:sqlite` adapter, the conformance corpus |
+| 38 | [Spec · where](38-SPEC-WHERE.md) | `packages/where`: the predicate tree, JCS print, validate, compile, the reference evaluator, the property test |
+| 39 | [Spec · theme](39-SPEC-THEME.md) | `packages/theme`: the DTCG wire format, the YAML dialect, the contrast-driven generator, the sixteen checks |
+| 40 | [Spec · fixtures](40-SPEC-FIXTURES.md) | `packages/fixtures`: the eight reference pages, row corpora, the pack corpus, the seed |
+| 41 | [Spec · kernel](41-SPEC-KERNEL.md) | `packages/kernel`: migrations, the write path, counters, events, `entry_fts`, refusals, `.dogl` |
+| 42 | [Spec · declare](42-SPEC-DECLARE.md) | `packages/declare`: the eight kinds' schemas, YAML → JSON, lint, plan, install |
+| 43 | [Spec · extract](43-SPEC-EXTRACT.md) | `packages/extract`: the ten extractors, three combinators, money and date parsing |
+| 44 | [Spec · mcp](44-SPEC-MCP.md) | `packages/mcp`: the eight tools, resources, `instructions`, the streamable-HTTP handler, budgets |
+| 45 | [Spec · record](45-SPEC-RECORD.md) | `packages/record`: the six RPC groups, `CallContext`, `Result`, metrics, rules, schedule and outbox |
+| 46 | [Spec · spark](46-SPEC-SPARK.md) | `packages/spark`: tier A jobs, the projection reader, proposals, the tier-C dispatcher |
+| 47 | [Spec · connect](47-SPEC-CONNECT.md) | `packages/connect`: `ingest` with `fetch:`, placeholders, formats, `expect:`, `probe:`, `metric_point` |
+| 48 | [Spec · cli](48-SPEC-CLI.md) | `apps/cli`: the `braindog` command tree, the device-flow login, export/import/verify |
+| 49 | [Spec · selfhost](49-SPEC-SELFHOST.md) | `apps/selfhost`: one Node process, the Directory file, the HTTP surface, the timer and poller |
+| 50 | [Spec · web](50-SPEC-WEB.md) | `apps/web`: the SvelteKit shell, the eight primitives, the palette, registers, pages, the keyboard model |
+| 51 | [Spec · worker](51-SPEC-WORKER.md) | `apps/worker`: the three Durable Object classes, the DO `Sql` adapter, WebSocket, queue, R2 |
+| 52 | [Spec · testing and CI](52-SPEC-TESTING-AND-CI.md) | The test pyramid, every gate as a script or spec, the workflows, publishing |
+| 53 | [Spec · operations](53-SPEC-OPERATIONS.md) | Deploy, backup and restore, key rotation, erasure requests, incident response, billing lapse |
 
 Read 01, 02 and 16 first. Everything else is downstream of those three.
 
