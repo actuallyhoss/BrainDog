@@ -48,9 +48,9 @@ says so.
 | | Days | Calendar at 4 productive days in 9 (162 productive days a year) |
 |---|---|---|
 | **As originally claimed** | 115 | ~8.5 months |
-| **The described stages, re-costed** | 246–315 | ~1.5–1.9 years |
-| **Plus the unfunded authoring tier** | 334–440 — 246 + 88 = 334 · 315 + 125 = 440 | ≈2.1–2.7 years |
-| **Plus the scope added on 2026-09-01 and the parity trace of 2026-09-02** | **≈486–643** — 334 + 152 = 486 · 440 + 203 = 643 | **≈3.0–4.0 years** |
+| **The described stages, re-costed** | 248–317 — 246 + 2 · 315 + 2, the 2 being `packages/host` (§1b) | ~1.5–2.0 years |
+| **Plus the unfunded authoring tier** | 336–442 — 248 + 88 = 336 · 317 + 125 = 442 | ≈2.1–2.7 years |
+| **Plus the scope added on 2026-09-01 and the parity trace of 2026-09-02** | **≈488–645** — 336 + 152 = 488 · 442 + 203 = 645 | **≈3.0–4.0 years** |
 
 *The calendar column is every Days cell divided by 162 — 365 × 4⁄9. An earlier draft printed
 9.5 months · 1.8–2.3 · 2.6–3.4 · 3.7–4.9 years, which no single divisor reproduces; the header
@@ -77,11 +77,17 @@ work with no line item.**
 | The self-improvement loop | **22** | [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) — Phase C, gated on gate 4 |
 | *Sub-total — the 2026-09-01 validation round* | *≈106–140* | 14+5+3+26+4+18+8+6+22 = 106 · 20+7+4+34+6+26+12+9+22 = 140 |
 | **Parity with the predecessor** — the kernel `session` register, `member.seen_at` (the read mark), `boot`, the device grant and vault refinements, fourteen data-model additions, the completed dialect, the `agents`, `work`, `portfolio` and `people` packs, money's `running`/`pairs`/`snapshot`/forecast, screenshot mode | **46–63** | [32-PARITY](32-PARITY.md) §11 |
-| **Total** | **≈152–203** — 106 + 46 = 152 · 140 + 63 = 203 | 334 + 152 = **486** · 440 + 203 = **643** |
+| **Total** | **≈152–203** — 106 + 46 = 152 · 140 + 63 = 203 | 336 + 152 = **488** · 442 + 203 = **645** |
 
 *An earlier draft printed 148–198 and 488/643: the parity row was 42–58 because the `portfolio`
 and `people` packs had no line — the exact defect Defect 1 describes — and the base it was added
-to was the rounded 340–445 rather than the table's 334–440.*
+to was the rounded 340–445 rather than the table's then 334–440 (336–442 since iteration 2, below).*
+
+*Iteration 2 of the specification loop added one package, `@braindog/host` — the route table, the
+status mapping and the request context both hosts share ([ADR-064](16-DECISIONS.md)) — at ≈2 days,
+as its own row in the §1b shape that builds the hosts. Every total above carries it: 246 → 248,
+334 → 336, 486 → 488, and the upper bounds likewise. The same defect as Defect 1, caught this time
+before the sum was quoted.*
 
 > **None of this changes the recommendation in §1b.** It makes it stronger: the shape one person can
 > actually ship is still *the record and nothing declarative*, and everything above is either inside
@@ -98,7 +104,7 @@ to was the rounded 340–445 rather than the table's 334–440.*
 ### And the tripwire that proves it
 
 §8 of this document sets a stop condition: *"Phase A slips past 90 working days → the estimate was
-wrong by 80%, which means the design is wrong somewhere."* Phase A as described is honestly ~120
+wrong by 80%, which means the design is wrong somewhere."* Phase A as described is honestly ~122
 days. **The plan contains a tripwire its own scope guarantees will fire** — at day 90, with Phase A
 three-quarters built, which is the most expensive possible place to learn the number was wrong.
 
@@ -114,14 +120,16 @@ authoring tier, no assistant.
 | The kernel: 27 tables, ids, money, time, provenance, the outbox, the `where:` grammar, FTS5, per-field audit redaction, the `file` type and store (no viewer) | 26–32 |
 | Foundations: repo, CI, the four token gates, the storage adapter + conformance suite | 9–12 |
 | The record object, the Worker, magic-link auth, agent tokens, the CLI, `.dog` export | 20–26 |
+| `@braindog/host` — the route table, `httpStatus`, the request context and `serveApi`, written once for the Worker and the self-host ([ADR-064](16-DECISIONS.md)) | 2 |
 | MCP: eight tools, resources, the token budget in CI | 8–12 |
 | Native screens per register + the spine + the vault + the decide queue | 20–26 |
 | Alarms, `schedule`, reminders, one hard-coded weekly digest | 8–10 |
 | Cloud: Stripe, signup, backups, the inbound endpoint, inbound email | 12–15 |
 | Stage 0 — the renderer, MIT, alone. Outside the record; keep only if gates 1a–1d are still wanted | +10, not in the total |
-| **Total** | **≈103–133** — 26+9+20+8+20+8+12 = 103 · 32+12+26+12+26+10+15 = 133 |
+| **Total** | **≈105–135** — 26+9+20+2+8+20+8+12 = 105 · 32+12+26+2+12+26+10+15 = 135 |
 
-*The total excludes stage 0. With it, the shape is 113–143.*
+*The total excludes stage 0. With it, the shape is 115–145. An earlier draft said 103–133 and
+113–143; the two days are `@braindog/host`, added in iteration 2.*
 
 > ### The cut list double-counted, and the honest floor is higher
 >
@@ -129,8 +137,8 @@ authoring tier, no assistant.
 > and wrong in the flattering direction.** The cut list totals **155–203 days saved** — 136–173 in
 > the first table below and 19–30 in the second — more than the base it was being subtracted from,
 > which is the arithmetic tell. *(A still earlier draft said 177–234; the rows never added to that,
-> and the argument survives at 155 > 133.)* The cause: **most of the list is already excluded from
-> the 103–133 above.** That base has no authoring tier, no Spark, no
+> and the argument survives at 155 > 135.)* The cause: **most of the list is already excluded from
+> the 105–135 above.** That base has no authoring tier, no Spark, no
 > themes-as-data, no collaboration, no declared metric or digest kinds, and magic-link rather than
 > passkeys. Cutting them again is subtracting them twice.
 >
@@ -138,13 +146,13 @@ authoring tier, no assistant.
 >
 > | | Days |
 > |---|---|
-> | Base — the record and nothing declarative | **103–133** |
+> | Base — the record and nothing declarative | **105–135** |
 > | Less the cuts genuinely still inside it | **−19 to −30** |
-> | **Floor** | **≈84–103** |
+> | **Floor** | **≈86–105** |
 
 The cut list, split into what is already gone and what can still go:
 
-**Already excluded from the 103–133 — listed so nobody subtracts them a second time:**
+**Already excluded from the 105–135 — listed so nobody subtracts them a second time:**
 
 | Already gone | Would have saved | What is lost |
 |---|---|---|
@@ -190,9 +198,13 @@ notice until it was audited.
 
 A standalone **MIT** library: the fenced dialect parser, the eight layout primitives, the sixteen
 block kinds, the token contract, and a test suite. No BrainDog coupling of any kind — it takes
-text and tokens and returns markup. Published as `braindog-render` (root: `parse` · `expand` ·
-`toHTML` · `PRIMITIVES`) and `braindog-render/svelte` — [31-STACK](31-STACK.md) §2; the grammar
-it implements is [34-GRAMMARS](34-GRAMMARS.md) §2.
+text and tokens and returns markup. Published as `braindog-render` (root: `parse` · `toHTML` ·
+`render` · `KINDS` · `PRIMITIVES` · `PRIMITIVES_VERSION` — no `expand`, since kinds expansion is
+`declare`'s) and `braindog-render/svelte` — [31-STACK](31-STACK.md) §2; the grammar it implements is
+[34-GRAMMARS](34-GRAMMARS.md) §2. The suite's budgets — parse and render time, output against input,
+the bundle — are asserted, and every number lives in `tools/gates/budgets.json` rather than here
+([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D20; [52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md)
+§13 D1).
 
 | Why first | |
 |---|---|
@@ -212,25 +224,29 @@ trust it, so they are not the place to save time.
 
 ## 3 · Phase A — a sellable hosted record
 
-**50 days as first estimated; ≈120 after the §1 re-cost. No packs, no page engine, no declared
+**50 days as first estimated; ≈122 after the §1 re-cost. No packs, no page engine, no declared
 anything.** Native screens over a fixed set of registers. This is the smallest thing that tests the
 price, and the price is the open question.
 
-*The Days column is the original estimate — 5+12+10+5+12+6 = 50. §1 re-costs this phase at ≈120;
-the re-costed total for every described stage is §1's 246–315.*
+*The Days column is the original estimate — 5+12+10+5+12+6 = 50. §1 re-costs this phase at ≈122;
+the re-costed total for every described stage is §1's 248–317.*
 
 | # | Stage | Days | Contents |
 |---|---|---|---|
 | A1 | Foundations | 5 | repo, CI, the token system and its four guards, the nine port interfaces, `.dog` header, migration runner |
 | A2 | The kernel | 12 | the 27 kernel tables, ids, money, time, provenance, **the `where:` compiler**, FTS5 wiring |
-| A3 | Record object + API + auth | 10 | the Durable Object, the Worker, passkeys, agent tokens, the CLI |
+| A3 | Record object + API + auth | 10 | the Durable Object, `@braindog/host` — the route table and request context both hosts share — then the Worker and the self-host, passkeys, agent tokens, the CLI |
 | A4 | MCP | 5 | the eight tools, resources, prompts, the token budget in CI, **MRTR decision gate** |
 | A5 | The app, native | 12 | shell, nav, register lists, entry detail, command palette, search, the decide queue, the vault |
 | A6 | Cloud | 6 | Stripe, signup, backups, the inbound endpoint, email |
 
+The stages follow the package order of [31-STACK](31-STACK.md) §2: `record` before `mcp`, because the
+MCP handler wraps the record's type and is tested against a stub of it, and `@braindog/host` last
+among the packages, before the apps that import it ([ADR-064](16-DECISIONS.md)).
+
 ### The checkpoint, and it is a real decision point
 
-At the end of Phase A (~130 working days including stage 0 at the re-costed rate — ~60 as first
+At the end of Phase A (~132 working days including stage 0 at the re-costed rate — ~60 as first
 estimated; ≈9.5 months calendar at 162 productive days a year) there is:
 
 - a hosted, paid, multi-tenant typed business record
@@ -266,8 +282,8 @@ while its own table added to 61; B8 then rose from 7 to 8–9 on
 [20-COLLABORATION](20-COLLABORATION.md) §10's own costing. The order is constrained and the
 constraints are not preferences.
 
-*The Days column is the original estimate. Re-costed, this phase is ≈126–195 — §1's 246–315 less
-Phase A's ≈120.*
+*The Days column is the original estimate. Re-costed, this phase is ≈126–195 — §1's 248–317 less
+Phase A's ≈122.*
 
 | # | Stage | Days | Why here |
 |---|---|---|---|

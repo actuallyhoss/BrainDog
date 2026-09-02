@@ -82,11 +82,13 @@ CREATE TABLE person (                       -- a MIRROR of the Directory row: ac
 
 CREATE TABLE token (                        -- agent tokens. Every token is scoped to ONE record — 10 §2
   id TEXT PRIMARY KEY, person_id TEXT NOT NULL, hash TEXT NOT NULL,
-  scope TEXT NOT NULL CHECK (scope IN ('read','propose','write')),   -- no `admin` scope, ever — ADR-060
+  scope TEXT NOT NULL CHECK (scope IN ('read','propose','write')),   -- no `admin` scope, ever — ADR-060.
+                                            --   ONE word; the host expands the ladder read ⊂ propose ⊂ write (45)
   label TEXT, created_at TEXT NOT NULL,
   last_used_at TEXT, last_surface TEXT,     -- listed with a revoke button — 12 §3
   expires_at TEXT, revoked_at TEXT
-);
+);                                          -- the runner's job bearer is a `token` row too, minted by `claimJob` with an
+                                            --   audience of ONE job and revoked at the job's `end` — §5; 46 §4.7
 
 CREATE TABLE auth_fail (                    -- per-record lockouts: device codes, share tokens. Never exported (local)
   key TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, until TEXT
@@ -123,12 +125,14 @@ CREATE UNIQUE INDEX entry_created_by ON entry(
 --   index: true   → CREATE INDEX entry_i_<reg>__<field> ON entry(json_extract(fields,'$.<field>'))
 --                     WHERE register = '<reg>' AND deleted_at IS NULL;
 --                   a money field gets TWO — '$.<field>.amount' and '$.<field>.currency' — and quantity
---                   likewise ('.value', '.unit'), because the value is an object — §7
+--                   likewise ('.value', '.unit'), because the value is an object — §7. The pair takes a third
+--                   name segment: entry_i_<reg>__<field>__amount / __currency, __value / __unit (42; 34 §4)
 --   unique: true  → CREATE UNIQUE INDEX entry_u_<reg>__<field> ON entry(json_extract(fields,'$.<field>'))
 --                     WHERE register = '<reg>' AND deleted_at IS NULL;
 --                   on a derived field the value is MATERIALISED at step 6 — the only stored derivation
 --   key: [a, b]   → CREATE UNIQUE INDEX entry_k_<reg> ON entry(json_extract(fields,'$.a'), json_extract(fields,'$.b'))
---                     WHERE register = '<reg>';   and step 6 is INSERT … ON CONFLICT DO UPDATE
+--                     WHERE register = '<reg>';   a series upsert resolves the row by its key FIRST (step 1) and
+--                     writes as INSERT … ON CONFLICT DO UPDATE; the index is the backstop, never the lookup (41)
 
 CREATE VIRTUAL TABLE entry_fts USING fts5(
   id UNINDEXED, register UNINDEXED, text,
@@ -187,6 +191,8 @@ CREATE TABLE event (
 CREATE INDEX event_ts     ON event(ts DESC);
 CREATE INDEX event_target ON event(target, ts DESC);
 CREATE UNIQUE INDEX event_op ON event(op_id) WHERE op_id IS NOT NULL;
+-- op_id sits on the FIRST event row of a write only — the unique index admits one — and a replayed op_id returns
+-- the current row with the original rowid as its version (41).
 -- NO foreign key to entry. Deleting a row must not delete its history — 02 §1.
 -- record_version = MAX(event.rowid) — append-only and per-mutation, so no changelog table is needed;
 -- the live channel's changelog is SELECT DISTINCT target FROM event WHERE rowid > ?  (22 §5, 33-CONTRACTS §2).
@@ -209,6 +215,8 @@ CREATE TABLE ingest_receipt (
   id TEXT PRIMARY KEY, raw_id TEXT NOT NULL, ingest_id TEXT NOT NULL,
   wrote TEXT NOT NULL,                       -- json array of entry ids
   confidence TEXT NOT NULL CHECK (confidence IN ('exact','proposed','needs-review')),
+                                             -- derived per row from the run's outcomes; a declaration's
+                                             --   `writes.confidence` is a CEILING, never the value — 43
   ts TEXT NOT NULL
 );
 
@@ -219,7 +227,7 @@ CREATE TABLE observation (
   subject TEXT NOT NULL, day TEXT NOT NULL,  -- subject = register id | page slug | '<register>.<field>:<code>'
   n INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (kind, subject, day)
-) WITHOUT ROWID;                             -- pre-aggregated daily, PRUNED at 400 days, never rolled up.
+) WITHOUT ROWID;                             -- pre-aggregated daily, PRUNED at 400 days by the `purge` row, never rolled up.
                                              -- observe(batch) = INSERT … ON CONFLICT DO UPDATE SET n = n + 1
 
 -- ─── GOVERNANCE ────────────────────────────────────────────────────────────
@@ -290,18 +298,25 @@ CREATE TABLE vault_key (                    -- the wrapped record DEKs and the s
                                             -- EXACTLY one wrapping per key: enabling the passphrase re-wraps and
                                             --   destroys the KEK copy in one transaction. 'connector' is always
                                             --   kek (Q13, ADR-052); 'signing' is the record's Ed25519 private key
-  kek_id     TEXT, salt BLOB,               -- salt only under a passphrase: HKDF(passphrase, salt)
+  kek_id     TEXT, salt BLOB,               -- salt only under a passphrase: PBKDF2-SHA-256 — 12 §6. HKDF is not a
+                                            --   passphrase KDF, and an earlier draft here named it
   rewrapped_at TEXT
-);                                          -- local: never exported
+);                                          -- TRAVELS, sealed — not one of the six `local` tables (below; 12 §8).
+                                            --   An earlier draft's trailing comment said "never exported"
 
 CREATE TABLE device_grant (                 -- RFC 8628: the device shows six digits; the owner
-  id TEXT PRIMARY KEY,                      --   approves from a session already authenticated
-  code_hash TEXT NOT NULL,                  -- never the code. A leaked table cannot approve itself
+  id TEXT PRIMARY KEY,                      --   approves from a session already authenticated. `id` is the poll id
+  code_hash TEXT NOT NULL,                  -- sha256(id ‖ ':' ‖ user_code) — never the code, and no host secret in the
+                                            --   formula (12 §6.1). A leaked table cannot approve itself
   status TEXT NOT NULL CHECK (status IN ('pending','approved','active','expired','denied','revoked')),
-  label TEXT, ua TEXT,                      -- client-supplied, shown to the approver, trusted for nothing
+  reach TEXT NOT NULL DEFAULT 'login'       -- what the approval reaches: a device's login, the runner's grant, or ONE
+        CHECK (reach IN ('login','runner','export','import','pack','token')),
+                                            --   named ADMIN operation — the OPERATION GRANT of §5 and §10 (ADR-060)
+  label TEXT, ua TEXT,                      -- client-supplied — label · subject — shown to the approver, trusted for nothing
   token_hash TEXT, tries INTEGER NOT NULL DEFAULT 0,   -- the 90-day bearer, hashed. No keypair anywhere
   expires TEXT NOT NULL,                    -- the code's life (10 min) while pending; REWRITTEN to +90 d when the
-                                            --   device's poll exchanges an approved row for its token (approved → active)
+                                            --   device's poll exchanges an approved row for its token (approved → active).
+                                            --   An operation reach expires in 10 min, approved or not, and is single-use
   approved_by TEXT, approved_at TEXT, last_used TEXT   -- auto-deregistered after 14 silent days
 );                                          -- a DENIED row is kept: "I said no to a request I did not make"
 
@@ -333,15 +348,18 @@ CREATE TABLE job_event (                    -- one distilled line per stream-jso
 CREATE TABLE schedule (
   id TEXT PRIMARY KEY, due_at TEXT NOT NULL, kind TEXT NOT NULL,
   key TEXT NOT NULL, payload TEXT NOT NULL,  -- a retry row: key = 'outbox:' || outbox.id, payload = { outbox: id } — §8
-  state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
-                                             -- a paused connector is its `pull` row with state = 'paused'
+  state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','firing','done','failed','paused')),   -- five
+  attempts INTEGER NOT NULL DEFAULT 0,       -- a paused connector is its `pull` row with state = 'paused'; a fire moves
+                                             --   a `pull` row to 'firing' and inserts ONE outbox row (47). There is no
+                                             --   'cancelled': an erased schedule or outbox row is 'done', payload '--erased--'
   UNIQUE (kind, key),
   CHECK (kind IN ('digest','reminder','rule','retry','purge','rotate','pull','analyse','score','snapshot'))
 );                                           -- ten. `snapshot` is a metric's snapshot: (08 §2.6); the 12-hour session
 CREATE INDEX schedule_due ON schedule(state, due_at);   -- sweep is a `purge` row, hourly, run by `system` — `list` never writes
--- Purge (kind `purge`) is one transaction per row: DELETE FROM entry_vec WHERE id = ?; DELETE FROM entry_fts WHERE
--- rowid = ?; DELETE FROM entry WHERE id = ? AND deleted_at < cutoff. `event` rows are kept; `seq` is never reused;
--- one `purge` event by `system`. Nothing here promises what the adapter disables — there is no cascade to rely on.
+-- Purge (kind `purge`) is one transaction per RUN over at most 100 rows: DELETE FROM entry_vec WHERE id = ?; DELETE
+-- FROM entry_fts WHERE rowid = ?; DELETE FROM entry WHERE id = ? AND deleted_at < cutoff — and the observation prune.
+-- `event` rows are kept; `seq` is never reused; one `purge` event by `system` per run (41). Nothing here promises
+-- what the adapter disables — there is no cascade to rely on.
 
 CREATE TABLE outbox (
   id TEXT PRIMARY KEY, created TEXT NOT NULL, kind TEXT NOT NULL,
@@ -373,7 +391,7 @@ Five things worth naming, because they are decisions rather than transcription:
 
 | | |
 |---|---|
-| **`CHECK` constraints carry every closed list** | the corpus's closed lists are its security argument. A list enforced only by a validator is a list one code path forgets. **Twenty-one of them are `CHECK (… IN (…))`** — the eight pack kinds, the three token scopes, the forty event kinds, `inbox_raw`'s five channels and seven states, the three confidences, the nine observation signals, the four suggestion bodies, the two `on_miss` verbs, the five member levels, the five grant kinds, `vault_key`'s three purposes and two wrappings, the six device-grant statuses, the four job kinds, nine job statuses and nine job-event kinds, the ten schedule kinds, the nine outbox kinds and five outbox states, and the five `.dog` sections — so the *database* refuses a ninth pack kind, not merely the validator. Two more `CHECK`s are equalities, not lists: `record.singleton = 1` and `dog_sig.alg = 'ed25519'`. *An earlier draft said four and a fifth over a DDL that already had seven; fourteen more arrived with the seven new tables and this review's constraints. The `event.kind` list is still the largest, at forty* |
+| **`CHECK` constraints carry every closed list** | the corpus's closed lists are its security argument. A list enforced only by a validator is a list one code path forgets. **Twenty-three of them are `CHECK (… IN (…))`** — the eight pack kinds, the three token scopes, the forty event kinds, `inbox_raw`'s five channels and seven states, the three confidences, the nine observation signals, the four suggestion bodies, the two `on_miss` verbs, the five member levels, the five grant kinds, `vault_key`'s three purposes and two wrappings, the six device-grant statuses and six reaches, the four job kinds, nine job statuses and nine job-event kinds, the ten schedule kinds and five schedule states, the nine outbox kinds and five outbox states, and the five `.dog` sections — so the *database* refuses a ninth pack kind, not merely the validator. Two more `CHECK`s are equalities, not lists: `record.singleton = 1` and `dog_sig.alg = 'ed25519'`. *An earlier draft said four and a fifth over a DDL that already had seven; fourteen more arrived with the seven new tables and this review's constraints; two more with iteration 2 — `device_grant.reach`, and `schedule.state`, a list the comment beside it had used without enforcing. The `event.kind` list is still the largest, at forty* |
 | **`event.batch`** | the ULID of the *triggering* write, shared by everything it caused — rule `set`s and generated rows alike — which is what makes *"undo this expansion"* one query rather than a heuristic. [07-INGEST](07-INGEST-AND-RULES.md) §6.1 promised it and nothing carried it. It is a `batch`, never a shared event *id*: `event.id` is the primary key and cannot be shared |
 | **One sentinel rule, three values** | a value withheld at write by the redaction list is the literal `--redacted--` (20 §8); a value removed later by an erasure is the literal `--erased--` (02 §10); `NULL` means only *"there was no prior value"*. Hence **`decision.reason` is `NOT NULL`**, never empty at write, and erasure writes `--erased--`: the invariant *"a decision always has a reason field"* survives erasure, and a reader can still tell **that** it was erased — [02-DATA-MODEL](02-DATA-MODEL.md) §10. *An earlier draft made `''` the sentinel, which is indistinguishable from an empty reason, and made `from_v` NULL for both cases* |
 | **`counter`, not `MAX(seq) + 1`** | `MAX(seq) + 1` reissues a spoken id the first time the highest-numbered row is purged, and `D41`/`SG23` had no counter at all. One table, three name families, one `UPDATE … RETURNING` inside the write transaction (§4) |
@@ -402,7 +420,9 @@ types as the bar. It did not exist; kinds were scattered across six documents. *
 mandatory and ≤ 280 characters, `target` is optional, and the actor is the resolved session (§3). Two strings
 other documents once used are **not** kinds: `access.changed` is `access.grant` / `access.revoke` with the levels in
 `from_v`/`to_v` and the reason in `note`; `blocker` is an `export` event carrying `note: 'failed: <reason>'` plus a
-suggestion to re-run.
+suggestion to re-run. Two more that looked like new kinds are not: a KEK re-wrap of `vault_key` is a `grant.rotate`
+row with `target_kind = 'vault_key'`, `from_v`/`to_v` the two `kek_id`s and actor `system` (53); a write to a `tags`
+list is `tag`/`untag`, one row per element added or removed (42). There is no forty-first kind.
 
 > *An earlier draft of this section said thirty-four over a table enumerating thirty-nine. It is the
 > exact failure this corpus keeps finding in itself, made once more, and caught the same way: by
@@ -423,7 +443,7 @@ One string, three shapes, parsed by prefix:
 
 | Shape | Example | Means |
 |---|---|---|
-| a person | `sam` | a session |
+| a person | `p_01J…` | **the person id** — `person.id`, never the display name; the UI resolves it through the `person` mirror, which exists so an actor resolves offline (41, 45). *An earlier draft showed a name here* |
 | **`S<n>`** | `S42` | **a session** — the kernel register's spoken id. This is what an agent write resolves to, *always*: a named session that exists, else the client id, else a live session on the same host and repo, else one opened with `source: auto`. `agent:<name>` below is what you see only when no session could be resolved, which the write path logs as a defect |
 | `agent:<name>` | `agent:claude` · `agent:codex` | a token, named at creation — the fallback, never the norm |
 | `<mechanism>:<id>` | `rule:renewal-30d` · `ingest:hsbc-sms` · `ingest:npm-downloads` · `runner:rnr_9k2` | something declared. A pull connector is an `ingest` declaration, so its run is `ingest:<id>` — there is no `pull:` prefix; *an earlier draft had one* |
@@ -432,7 +452,9 @@ One string, three shapes, parsed by prefix:
 
 That last row is an invariant with a test: **`event WHERE actor='spark' AND kind NOT IN
 ('suggest','propose','predict')` must always be empty.** It is the architectural claim in
-[11-ASSISTANT](11-ASSISTANT.md) §2, expressed as a query anyone can run against a real record.
+[11-ASSISTANT](11-ASSISTANT.md) §2, expressed as a query anyone can run against a real record. Two refusals the
+grammar implies, named so no spec invents a code for them (41): a row write from a `spark` principal is `FORBIDDEN`
+at step 1, and a bare `#7` with no register before it is `REGISTER_UNKNOWN`.
 
 ---
 
@@ -447,8 +469,8 @@ write(register, id?, patch, ctx)          -- ctx: CallContext, built by the Work
  ├─ 1  RESOLVE     declaration, and the actor by the §3 ladder; refuse an unknown register or field
  │                                                       → REFUSE  REGISTER_UNKNOWN · FIELD_UNKNOWN
  ├─ 2  LOCK        immutable_when: over the CURRENT row  → REFUSE  ROW_LOCKED
- ├─ 2b PINNED      a non-person actor may not `set` a field whose last event.actor is a person
- │                 — 07 §6, 32 §3.2                      → REFUSE  HUMAN_ONLY
+ ├─ 2b PINNED      a MECHANISM actor (`rule:` · `ingest:`) may not `set` a field whose last event.actor is a person
+ │                 — 07 §6, 32 §3.2; a token is not pinned out (41)   → REFUSE  HUMAN_ONLY
  ├─ 3  COERCE      per-type parse (34-GRAMMARS §3); TEXT_JSON_QUOTED / TEXT_ESCAPED_NEWLINE refused HERE;
  │                 money/quantity to minor units; an integer past 2^53 is INT_OUT_OF_RANGE   → REFUSE
  ├─ 4  VALIDATE    required, required_when:, enum membership, caps, min/max (OUT_OF_BOUNDS), list<T> element,
@@ -461,33 +483,42 @@ write(register, id?, patch, ctx)          -- ctx: CallContext, built by the Work
  ├─ R  OBSERVE     on any REFUSE: INSERT … ON CONFLICT DO UPDATE SET n = n + 1 into
  │                 observation(kind = 'write.refused', subject = '<register>.<field>:<code>')
  │                 — the one write a refusal makes, and it is not a row write (24 §4.2)
- ├─ 6  PERSIST     upsert entry (INSERT … ON CONFLICT DO UPDATE on the register's key:); mirror fields.state →
- │                 entry.state; bump version and updated_at; allocate seq from `counter`; materialise a derived
- │                 field that carries unique: true — THE ONLY STORED DERIVATION; write session.last_seen for the
- │                 resolved session
+ ├─ 6  PERSIST     upsert entry (INSERT … ON CONFLICT DO UPDATE on the register's key:, the row resolved by that key
+ │                 at step 1); mirror fields.state → entry.state; bump version and updated_at; allocate seq from
+ │                 `counter`; at create under `identity:`, store accent(existingHues) — the INJECTED chooser, the
+ │                 kernel computes no hue (ADR-028); materialise a derived field that carries unique: true — THE
+ │                 ONLY STORED DERIVATION; touch session.last_seen for the resolved session — a HEARTBEAT, not a
+ │                 write: no version bump, no event (41)
  ├─ 6b PAIRS       the register's pairs: self-join for this row; mark, never hide
  ├─ 7  PROJECT     entry_fts by rowid — DELETE, then INSERT the declared `search:` text
  ├─ 8  EVENT       one `create` row (field NULL, to_v = JCS of fields), or one `edit` row per changed field;
  │                 `state` for the state field; batch = the ULID of the triggering write; op_id;
  │                 the redaction list writes --redacted--
  ├─ 9  RULES       one pass, priority asc → longest literal → id; ≤ 1 `set` per field.
- │                 Rule writes — `set` and `create` alike — re-enter at step 2 with cascade = false,
- │                 so a rule cannot write a locked row and cannot trigger another rule.
+ │                 Rule writes — `set` and `create` alike — re-enter at step 2 with cascade = false, the
+ │                 mechanism `rule:<id>` and this write's batch, so a rule cannot write a locked row and cannot
+ │                 trigger another rule; a `once_per` marker is a schedule(kind 'rule') row (45)
  ├─ 10 SCHEDULE    reminders from `remind:` AND occurrences from `repeat:`; CANCEL any whose date or rule moved
  ├─ 12a OUTBOX     INSERT the rows that must leave the object
  │   ═══ transactionSync ends here — steps 1–10 and 12a are ONE synchronous transaction ═══
  ├─ 11 ARM         await scheduler.set(MIN(due_at)) — an async storage op, still under the input gate;
- │                 set only on a difference
- └─ 12b WAKE       await scheduler.wake() — the outbox doorbell: Cloud OUTBOX_Q.send({ record }), self-host a
-                   no-op. The only I/O, and the LAST statement, after commit  → 01 §2
-     ─── entry_vec is NOT here: embeddings are an infer.embed outbox job, never on the write path ───
+ │                 set only on a difference, but considered on EVERY write
+ └─ 12b WAKE       await scheduler.wake() — the outbox doorbell, rung only when this write left an outbox row:
+                   Cloud OUTBOX_Q.send({ record }), self-host a kick to the in-process poller (49). The only I/O,
+                   and the LAST statement, after commit  → 01 §2
+     ─── entry_vec is NOT here: embeddings are an infer.embed outbox job, queued by the hourly sweep over the
+         rows that changed (≤ 100 a row), never on the write path (45) ───
 ```
 
 `write` is what `create` and `update` call; the caller's `version` and `op_id` arrive with their arguments
 ([33-CONTRACTS](33-CONTRACTS.md) §2) and travel with the patch. *An earlier draft's signature ended in `actor`;
-the actor is derived from `ctx` at step 1, never passed.*
+the actor is derived from `ctx` at step 1, never passed.* The kernel that runs it is opened once —
+**`openRecord({ sql, clock, random, accent })`** — and everything non-deterministic is injected: `random` feeds every
+ULID and nonce, so a fixture record is byte-stable ([33-CONTRACTS](33-CONTRACTS.md) §3), and `accent` is the theme
+package's `nextAccentHue` ([13-UI](13-UI.md) §2.1b), so the kernel never computes a hue. `applyMigrations` runs before
+any cache load, and a fresh database never throws on open (41).
 
-Eleven consequences, each of which was previously ambiguous:
+Twelve consequences, each of which was previously ambiguous:
 
 | | |
 |---|---|
@@ -499,6 +530,7 @@ Eleven consequences, each of which was previously ambiguous:
 | **The transaction ends after 12a, and nothing async sits inside it** | `getAlarm()`/`setAlarm()` return Promises on a Durable Object, so re-arm cannot live inside `transactionSync` (its callback is `NotPromise<T>`). Steps 1–10 and the outbox INSERT commit together; then `await scheduler.set(min)`; then `await scheduler.wake()`. The alarm handler has the same shape. [01-ARCHITECTURE](01-ARCHITECTURE.md) §2's "(all synchronous SQLite)" excludes re-arm |
 | **CAS is on `entry.version`** | a write on a stale `version` is `VERSION_STALE`: **409** with the current row and the other actor's name; the caller re-reads and re-applies. There is no 412, and there is no whole-document copy to resend |
 | **The only stored derivation** | a derived field with `unique: true` is materialised into `fields` at step 6 so its partial unique index has an expression to cover; every other `derive:` is computed at read and inlined by the compiler (§7) |
+| **The compiler's clause is the whole `WHERE`** | `compile()` returns `WHERE register = ? AND deleted_at IS NULL AND (…)` entire, and the kernel composes `SELECT … FROM entry <compiled.sql> AND <its own terms>` — at LOCK, at PAIRS, at `list`. It never splices a fragment into a `WHERE` of its own, so `deleted_at IS NULL` is spelled in one place; `includeDeleted` is a flag on `compile`'s `ctx`, not a kernel rewrite (§7; 38, 41) |
 | **`document` fields are not parsed at write** | the dialect degrades at render to a visible fence — [05-BLOCKS](05-BLOCKS-AND-THEMES.md) invariant 1. A write-up is never refused for its dialect, because the fence is the feedback channel |
 | **`seq` comes from `counter`, inside the transaction** | `UPDATE counter SET next = next + 1 WHERE name = ? RETURNING next - 1` — race-free because the object is single-writer, and a purged row's number is never reissued. `D<n>` and `SG<n>` use the same table |
 | **Embeddings are off the write path** | a 400 ms model call inside a write is how a record becomes slow, and `entry_vec` is a derived index that may lag. The Worker fills it through the `infer.embed` outbox kind (§8) |
@@ -512,23 +544,35 @@ surface is split by *who may reach it* rather than by convenience:
 
 | Group | Methods | Reachable by |
 |---|---|---|
-| **DATA** | `index` · `search` · `get` · `list` · `create` · `update` · `propose` · `log` · `markRead` | any token, subject to scope; `markRead` is person principals only — it advances `member.seen_at` with `MAX()` and is not an event. **The first eight are exactly the eight MCP tools**: the method `index` is the tool `record_index` ([10-MCP](10-MCP.md) §3), and the two names are stated here and there and nowhere else |
-| **READ+** | `page(slug)` · `metric(id)` · `schema(register)` · `dialect()` · `digestToday()` · `sessionsLive()` · `learningsFor(repo)` · `whatsNew(cursor)` · `project(query, budget)` (§9) · **`boot()`** — the index, live sessions, open suggestions and `whatsNew` since the caller's read mark, **in one round trip**, because the predecessor measured that a first screen assembled from four calls is a first screen that flickers | any token. Exposed over MCP as **resources**, which is how the web app stays inside ADR-018 — [10-MCP](10-MCP.md) §6. *An earlier draft had five resources with no method behind them* |
-| **VAULT** | `listGrants` · `openGrant` · `bindGrant` · `revokeGrant` | **a browser session only**, re-auth over 15 minutes ([12-SECURITY](12-SECURITY.md) §6 rule 2); every token is refused `403 NEEDS_BROWSER_SESSION` — rule 3, *not scoped, absent*. `openGrant` logs `grant.read`, counts `opened`, and returns **sealed** material `{ ciphertext, nonce, aad, kek_id, wrapped_dek }`; the Worker unwraps via `KeyStore`, derives the grant key, decrypts, and returns plaintext once. The record never sees a plaintext credential (ADR-062); `bindGrant` is the mirror |
-| **JOBS** | `createJob` · `cancelJob` · `listJobs` — a browser session · `claimJob` · `postJobEvent` · `readCancel` — the runner's device grant | **refused to every MCP token, with a reason** — the predecessor's job-surface refusal, [10-MCP](10-MCP.md) §8; a job is code execution |
-| **ADMIN** | `planPack` · `installPack` · `uninstallPack` · `setDeclaration` · `invite` · `export` · `import` · `erase` · `restore` | **a browser session only. No admin token exists** (ADR-060). `planPack(pack) → Diff` is read-only; `installPack(pack, planHash)` refuses `PLAN_STALE` if the record moved since the plan; `import` only into an empty record (`IMPORT_NOT_EMPTY`) — [33-CONTRACTS](33-CONTRACTS.md) §9 |
-| **INTERNAL** | `drainSchedule` · `leaseOutbox` · `ackOutbox` · `observe` · `applyMigrations` · `createRecord` | the Worker only. Not routable from outside. `createRecord` writes the `record` row and the owner's `member('*', 'owner')` row |
+| **DATA** (9) | `index` · `search` · `get` · `list` · `create` · `update` · `propose` · `log` · `markRead` | any token, subject to scope; `markRead` is person principals only — it advances `member.seen_at` with `MAX()` and is not an event. **The first eight are exactly the eight MCP tools**: the method `index` is the tool `record_index` ([10-MCP](10-MCP.md) §3), and the two names are stated here and there and nowhere else. The governance rows — decisions, suggestions, predictions — are DATA pseudo-registers read and written through these same verbs, and `get` of a row that does not exist is `ok` with `value: null`, never a refusal (45) |
+| **READ+** (12) | `page` · `metric` · `schema` · `dialect` · `digestToday` · `sessionsLive` · `learningsFor` · `whatsNew` · `project` (§9) · **`boot`** — the index, live sessions, open suggestions and `whatsNew` since the caller's read mark, **in one round trip**, because the predecessor measured that a first screen assembled from four calls is a first screen that flickers · `whoami` — the caller's principal, scope and record · `ruleTest` — a rule run dry against named rows, writing nothing | any token. Exposed over MCP as **resources**, which is how the web app stays inside ADR-018 — [10-MCP](10-MCP.md) §6. *An earlier draft had five resources with no method behind them* |
+| **VAULT** (4) | `listGrants` · `openGrant` · `bindGrant` · `revokeGrant` | **a browser session only**, re-auth over 15 minutes ([12-SECURITY](12-SECURITY.md) §6 rule 2); every token is refused `403 NEEDS_BROWSER_SESSION` — rule 3, *not scoped, absent* — and no operation grant reaches here. `openGrant` logs `grant.read`, counts `opened`, and returns **sealed** material `{ ciphertext, nonce, aad, kek_id, wrapped_dek }`; the host unwraps via `KeyStore`, derives the grant key, decrypts, and returns plaintext once. The record never sees a plaintext credential (ADR-062); `bindGrant` is the mirror |
+| **JOBS** (7) | `createJob` · `cancelJob` · `listJobs` · `jobEvents` — a browser session (`jobEvents({ id, after })` is the job view's poll; `listJobs({ status?, limit? })` lists) · `claimJob` · `postJobEvent` · `readCancel` — the runner's grant, `device_grant.reach = 'runner'` | **refused to every MCP token, with a reason** — the predecessor's job-surface refusal, [10-MCP](10-MCP.md) §8; a job is code execution. `claimJob` sweeps expired queued jobs, re-claims a lost one **once**, and mints the job bearer — a `token` row with an audience of one job; `postJobEvent` holds the runner to `seq + 1`; `readCancel` renews the lease ([26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §4; the SQL is 46 §4.7's, adopted verbatim by 45) |
+| **ADMIN** (16) | `planPack` · `installPack` · `uninstallPack` · `setDeclaration` · `ruleApply` · `invite` · `export` · `import` · `erase` · `restore` · `snapshot` · `createToken` · `listTokens` · `revokeToken` · `deviceApprove` · `deleteRecord` | **a browser session — or a bearer carrying an operation grant for that one operation**, once, within ten minutes of the owner approving it in a browser (§10). **No standing token reaches here; there is no admin scope** (ADR-060, amended by its own reversal clause). `planPack(pack) → Diff` is read-only; `installPack(pack, planHash)` refuses `PLAN_STALE` if the record moved since the plan — `planHash` is `<record_version>.<sha256(jcs({ pack, base }))>` (42); `import` only into an empty record (`IMPORT_NOT_EMPTY`) — both refusals, 422, never 409 — [33-CONTRACTS](33-CONTRACTS.md) §9. `restore({ bookmark, at? })` is **one method**; on Cloud the Worker performs `pitr(at)` before calling it. `invite({ email, levels })` mints an invitation, by the owner; `setDeclaration` has no `mode`; `ruleApply` is a rule's run over existing rows, dry or real; `deviceApprove` is the approving half of RFC 8628 and of every operation grant; `deleteRecord` is self-service deletion — re-auth, the typed slug, and on Cloud `destroy()` plus the R2 prefix ([02-DATA-MODEL](02-DATA-MODEL.md) §9); `snapshot` and `export` may also be called by `system` from the nightly walk (53) |
+| **INTERNAL** (16) | `drainSchedule` · `leaseOutbox` · `ackOutbox` · `observe` · `applyMigrations` · `createRecord` · `arrive` · `ingestVerify` · `applyPull` · `sealedGrant` · `changed` · `acceptInvite` · `deviceStart` · `devicePoll` · `rewrapKeys` · `opsReport` | **the host only.** Not routable from outside. `createRecord` writes the `record` row and the owner's `member('*', 'owner')` row; `arrive` is the ingest pipeline — store → match → extract → write → outbox — in one transaction, no model; `ingestVerify` hands the host a webhook's verification material, sealed, under a `grant.read` event; `applyPull` writes a connector's page and refuses `PULL_LEASE_EDGE` on a lease no longer the runner's; `sealedGrant(grant_id)` returns the sealed material to the host for a connector run (§8); `changed(since)` feeds the live channel; `acceptInvite` is called at acceptance with the Directory's verified person; `deviceStart`/`devicePoll` are internal because the device has no credential yet — the host's `/auth/device*` routes call them; `rewrapKeys`/`opsReport` serve the runbooks (45, 53) |
 
-Forty-four methods: 9 · 10 · 4 · 6 · 9 · 6. **Every method takes `(args, ctx: CallContext)` and returns
-`Result<T>`** — `ok` with the value and the record version, or `refusals`, or `conflict`. Over HTTP a refusal is
-**422** `{ refusals }` and a conflict is **409** `{ conflict: { version, current, actor } }`; a bearer at a
-browser-only group is **403** `NEEDS_BROWSER_SESSION`. The argument objects, `CallContext`, `Result<T>`, the
-suggestion bodies and the pagination cursors are [33-CONTRACTS](33-CONTRACTS.md) §2; the route table
-(`POST /api/<method>`, the GET aliases, `/mcp`, `/in/webhook/<ingest-id>`) is [33-CONTRACTS](33-CONTRACTS.md) §4.
+**Sixty-four methods: 9 · 12 · 4 · 7 · 16 · 16.** *An earlier draft counted forty-four, and six specs then counted six
+different totals from it; this is the enumeration, and the router test counts it.* **Every method is
+`(args, ctx: CallContext) => Promise<Result<T>>`** — `ok` with the value and the record version, or `refusals`, or
+`conflict` — and every argument is one object, so `ackOutbox` takes `{ id, state, result?, error? }` and never a
+positional list. Over HTTP the envelope returns **unchanged** and the status is one function of it, `httpStatus(result)`:
+a refusal is **422** `{ refusals }`, a conflict is **409** `{ conflict: { version, current, actor } }`, a bearer with no
+grant at a browser-only group is **403** `NEEDS_BROWSER_SESSION`. The argument objects, `CallContext` — whose
+`principal.kind` is one of six, `person · token · runner · share · system · spark`, with `op` naming an operation
+grant — `Result<T>`, the suggestion bodies and the pagination cursors are [33-CONTRACTS](33-CONTRACTS.md) §2; the route
+table (`POST /api/<method>`, dispatched by property lookup on the api object; the GET aliases; `/mcp`;
+`/in/webhook/<ingest-id>`) is [33-CONTRACTS](33-CONTRACTS.md) §4. Neither host re-declares any of this: the route
+table as data, `httpStatus` and context resolution live in one platform-neutral package both hosts import
+([31-STACK](31-STACK.md) §2).
 
 **The rule that keeps it honest:** *if a screen needs something outside DATA and READ+, it is either a
 browser-session group — VAULT, JOBS, ADMIN — or it is a design error.* There is no third case, and the router
-asserts it — every route declares its group, and a CI test walks the router and fails on a route with no group.
+asserts it — every route declares its group, and a CI test walks the router and fails on a route with no group, and
+on an ADMIN route that admits a `token` principal without an operation grant whose reach names it. The **operation
+grant** is the one door a CLI has into ADMIN, and it is the owner's approval of one command — `pack install`,
+`export`, `import`, `token create`, `token revoke` — after seeing its summary (the plan diff, the export scope, the
+token's scope): single-use, ten minutes, recorded in `device_grant.reach` and an `access.grant` event, and the bearer
+then reaches exactly that method once with `ctx.op` set (§10; [12-SECURITY](12-SECURITY.md) §3; 33 §4).
 *An earlier draft had four groups and a token scope `admin`; `openGrant`, the job routes and `import` belonged to
 none of them, so the CI test could not have passed.*
 
@@ -559,8 +603,8 @@ separate list because it names what the *driver* refused, not what the *format* 
 | Surface | Becomes |
 |---|---|
 | CLI | `register.invoices.fields[4].type 'currency' — did you mean 'money'?` |
-| HTTP | `422` with the object; `409` when the code is `VERSION_STALE`; `401`/`403` for the auth codes; `503` for `SCHEMA_MISMATCH` / `SCHEMA_NEWER` |
-| MCP | an error result carrying `code` and `fix`, so **the refusal teaches the agent** — [10-MCP](10-MCP.md) §7 rule 4 |
+| HTTP | the `Result` envelope, unchanged, and a status that is one function of it — `httpStatus(result)`, shared by both hosts: `422` for **any** refusal (`PLAN_STALE` and `IMPORT_NOT_EMPTY` included — refusals, never 409); `409` for a `conflict` (`VERSION_STALE`; `WRONG_KEY` per [12-SECURITY](12-SECURITY.md) §6.1); `401` with an empty body for `UNAUTHORIZED`; `403` with the envelope for `FORBIDDEN` and `NEEDS_BROWSER_SESSION`; `503` for `SCHEMA_MISMATCH` / `SCHEMA_NEWER`. `X-Request-Id` is echoed |
+| MCP | an error result carrying `code` and `fix`, so **the refusal teaches the agent** — [10-MCP](10-MCP.md) §7 rule 4. A call outside its published schema is the protocol's own `-32602`, `message` the fix and `data` `{ at, found, wanted, fix }` — a vocabulary, not a code (below) |
 | UI | the sentence, next to the field, plus in the summary — [06-PAGES](06-PAGES.md) §8 |
 
 Two refusal codes exist because of corruption the predecessor shipped, and they **refuse rather than
@@ -571,12 +615,27 @@ the caller's bug; refusing names it.
 
 ### The codes
 
-Seventy-five, counted — 33 pack and declaration · 10 grammar · 17 write path · 7 auth and vault · 6 format and
-lifecycle · 2 dialect. Every fixture lives at `fixtures/refusals/<name>.yaml`; the name is the code in kebab-case.
-*An earlier draft called the code "enumerated" and enumerated three.*
+Ninety-nine, counted, in eight families — 41 pack and declaration · 13 grammar · 18 write path · 7 auth and vault ·
+6 format and lifecycle · 2 dialect · 5 spark · 7 connector. Every fixture lives at `fixtures/refusals/<name>.yaml`; the
+name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
+`write`, `rpc` and the rest; the split per `via` is the fixtures spec's to count (40 §6), not this table's. *An
+earlier draft called the code "enumerated" and enumerated three; the next said seventy-five, and six specs then each
+added their own to seventy-five, so the corpus briefly held six totals. Their twenty-four proposals are all accepted
+here, once.*
 
-**Pack and declaration** — refused at install. The first twenty-four are [04-PACKS](04-PACKS.md) §5's rows, in
-order; the nine after them are this review's.
+The type `Refusal` (with `RefusalCode`) is a type-only export of `@braindog/ports`, the lowest shared package,
+because `where` raises one and sits below the kernel; **this table stays the list's home**, and every package
+imports the type — none re-declares it. Two things that look like codes are not: JSON-RPC's `-32602` (a call outside
+its published schema, [10-MCP](10-MCP.md) §3) and the `Http` port's four error names — `PrivateRange` · `TooLarge` ·
+`Timeout` · `Network` ([33-CONTRACTS](33-CONTRACTS.md) §1) — are **vocabularies**, mapped onto a code where one
+applies (`PULL_ORIGIN_REFUSED`) and otherwise never on the wire as a refusal. The adapter's own thirteen (§13) are
+the third list, and it stays thirteen.
+
+**Pack and declaration** — refused at install, by `declare`. The first twenty-four are [04-PACKS](04-PACKS.md) §5's
+rows, in order; the nine after them are the 2026-09-02 review's; the eight after those are iteration 2's. Seven
+write-path codes are raised here too, for the same fact in a declaration's seed or default — `FIELD_UNKNOWN`
+`REQUIRED_MISSING` `ENUM_VALUE_UNKNOWN` `OUT_OF_BOUNDS` `REGISTER_UNKNOWN` `INT_OUT_OF_RANGE` `VALUE_MALFORMED` — one
+code, two moments (42).
 
 | Code | Raised where | Fixture |
 |---|---|---|
@@ -584,7 +643,7 @@ order; the nine after them are this review's.
 | `FIELD_TYPE_UNKNOWN` | 04 §5 | `field-type-unknown` |
 | `FIELDS_OVER_CAP` | 04 §5; the caps table, 02 §5 | `fields-over-cap` |
 | `INDEXES_OVER_CAP` | 04 §5; 02 §5 | `indexes-over-cap` |
-| `PATTERN_OVER_CAP` | 04 §5; the 40-byte cap, 02 §6 | `pattern-over-cap` |
+| `PATTERN_OVER_CAP` | 04 §5; the 40-byte cap, 02 §6 — measured on the **escaped** `starts`/`ends` literal, and on a `matches` phrase over 200 bytes (38) | `pattern-over-cap` |
 | `METRIC_NEEDS_TARGET_OR_WINDOW` | 04 §5; 08 §2 | `metric-needs-target-or-window` |
 | `MIXED_CURRENCY` | 04 §5; 08 §4 | `mixed-currency` |
 | `CONTRAST_FLOOR` | 04 §5; 28 §4.4 | `contrast-floor` |
@@ -612,9 +671,19 @@ order; the nine after them are this review's.
 | `SEARCH_FIELD_TYPE` | `search:` naming a field outside `text document enum url email list<text>`, §1 | `search-field-type` |
 | `FIELD_TYPE_CHANGED` | a declaration version changing a field's type — retire it and add a new field, 02 §7 | `field-type-changed` |
 | `PROVIDES_MISMATCH` | a manifest `provides` that is not the declarations' `kind.id` set, 04 §2 | `provides-mismatch` |
-| `PLAN_STALE` | `installPack(pack, planHash)` after the record moved, §5 | `plan-stale` |
+| `PLAN_STALE` | `installPack(pack, planHash)` after the record moved, §5 — a refusal, 422 | `plan-stale` |
+| `THEME_VALUE_INVALID` | a theme dialect value outside [28-THEMING](28-THEMING.md) §1's closure — a colour off the grammar, an alpha, an achromatic seed (39) | `theme-value-invalid` |
+| `INTENT_INSEPARABLE` | no palette keeps two intents apart by the ΔE floor after dichromat simulation, 28 §3 — searched, never repaired (39) | `intent-inseparable` |
+| `THEME_LADDER_ORDER` | a surface or elevation ladder out of order — `sm ≤ md ≤ lg`, L monotonic, 28 §3 (39) | `theme-ladder-order` |
+| `PACK_MALFORMED` | not a well-formed pack: a YAML fault, two kinds or two ids in one declaration, a structural rule of 04 §4 (42) | `pack-malformed` |
+| `PROVIDES_CONFLICT` | an id another installed pack provides — 04 §2 promised the refusal and coded nothing (42) | `provides-conflict` |
+| `REMOTE_ASSET` | a pack asset fetched from elsewhere — a URL, `data:`, a script — 04 §7's enumeration; the one name for the banned-token refusal (42) | `remote-asset` |
+| `SECRET_IN_PACK` | a credential inside a pack — 25 §7's enumeration (42) | `secret-in-pack` |
+| `WOULD_ORPHAN` | an install that would retire a register with rows under it — 04 §5's downgrade rule; no `--force` in v1 (42) | `would-orphan` |
 
-**Grammar** — refused when a `where:` is compiled or validated ([34-GRAMMARS](34-GRAMMARS.md) §1):
+**Grammar** — refused when a `where:`, an `extract:` form or a connector path is compiled or validated
+([34-GRAMMARS](34-GRAMMARS.md) §1, §3, §6); the three at the end are raised at install, by `declare`, before `extract`
+ever sees the declaration (42, 43):
 
 | Code | Raised where | Fixture |
 |---|---|---|
@@ -624,28 +693,32 @@ order; the nine after them are this review's.
 | `MONEY_LITERAL_NEEDS_CURRENCY` | a money literal without `currency`, §7 | `money-literal-needs-currency` |
 | `QUANTITY_LITERAL_NEEDS_UNIT` | a quantity literal without `unit`, §7 | `quantity-literal-needs-unit` |
 | `MATCH_FIELD_UNKNOWN` | a `match:` field outside `from to subject body channel state ts`, 02 §6 | `match-field-unknown` |
-| `MATCH_OP_UNSUPPORTED` | `via has near matches starts ends` on the `inbox_raw` backend, 02 §6 | `match-op-unsupported` |
+| `MATCH_OP_UNSUPPORTED` | the one code for *this test cannot apply here*: `via has near matches starts ends` on the `inbox_raw` backend (02 §6), an operator outside its type's set, `lacks` on a non-list, `near` anywhere but the last leaf (38) | `match-op-unsupported` |
 | `CONTAINS_TOO_LONG` | a `contains` literal over 40 bytes, §7 | `contains-too-long` |
 | `RELATIVE_LITERAL_UNKNOWN` | a temporal literal outside the anchors and offsets, §7 | `relative-literal-unknown` |
-| `RELATIVE_UNIT_FOR_DAY` | an `h` or minute offset against a `day` field, §7 | `relative-unit-for-day` |
+| `RELATIVE_UNIT_FOR_DAY` | an `h` or minute offset against a `day` field, §7 — raised by `declare` on a `remind:`, which the compiler cannot reach, so the fixture has a producer (38) | `relative-unit-for-day` |
+| `EXTRACTOR_UNKNOWN` | an `extract:` form key outside the thirteen, 34 §3 (43) | `extractor-unknown` |
+| `DATE_FORMAT_INVALID` | a `date` form's `format:` outside its token rules, 34 §3 (43) | `date-format-invalid` |
+| `PATH_INVALID` | a response path outside the one `Path` grammar that serves `map`, `read`, `probe`, `expect` and `page.from`, 25 §3 (43) | `path-invalid` |
 
 **Write path** — refused before any row is written (§4); the step is named:
 
 | Code | Raised where | Fixture |
 |---|---|---|
-| `REGISTER_UNKNOWN` | step 1 | `register-unknown` |
-| `FIELD_UNKNOWN` | step 1 | `field-unknown` |
+| `REGISTER_UNKNOWN` | step 1 — a register not installed, or a bare `#7` with no register before it (41) | `register-unknown` |
+| `FIELD_UNKNOWN` | step 1 — also a reserved `_` field, an unknown `predicate:` name, a `via:` target that is not installed; the path and `fix` disambiguate (38, 41) | `field-unknown` |
 | `ROW_LOCKED` | step 2, `immutable_when:` | `row-locked` |
-| `HUMAN_ONLY` | step 2b, a non-person actor on a person-pinned field | `human-only` |
+| `HUMAN_ONLY` | step 2b, a mechanism actor (`rule:` · `ingest:`) on a person-pinned field — never a token: the literal reading would forbid an agent editing any field a person ever created (41) | `human-only` |
 | `TEXT_JSON_QUOTED` | step 3 | `text-json-quoted` |
 | `TEXT_ESCAPED_NEWLINE` | step 3 | `text-escaped-newline` |
 | `INT_OUT_OF_RANGE` | step 3 — the same code the adapter throws for the same fact (§13) | `int-out-of-range` |
+| `VALUE_MALFORMED` | step 3 — a value outside its type's shape that cannot be coerced, an unresolvable id or spoken reference, a non-grant `secret`, an erase subject under three characters; at install too, for a seed (41, 42) | `value-malformed` |
 | `REQUIRED_MISSING` | step 4 | `required-missing` |
 | `ENUM_VALUE_UNKNOWN` | step 4 | `enum-value-unknown` |
 | `OUT_OF_BOUNDS` | step 4, `min:`/`max:` — both bounds named | `out-of-bounds` |
-| `IMMUTABLE_FIELD` | step 4, `immutable:` on a changed field | `immutable-field` |
-| `UNIQUE_VIOLATION` | step 4, `unique:` on a non-key field | `unique-violation` |
-| `ALREADY_KNOWN` | step 4, `unique:` naming the row that already holds the value | `already-known` |
+| `IMMUTABLE_FIELD` | step 4, `immutable:` on a changed field; also a derived, retired or kernel-written field (41) | `immutable-field` |
+| `UNIQUE_VIOLATION` | step 4, `unique:` on a series row, or from the index as the backstop — driver messages are never parsed (41) | `unique-violation` |
+| `ALREADY_KNOWN` | step 4, the `unique:` pre-check, naming the row that already holds the value by its spoken id; also a taken slug at sign-up (41; 51) | `already-known` |
 | `REF_REGISTER_MISMATCH` | step 4, a `ref` into a register the field does not declare | `ref-register-mismatch` |
 | `DELETE_WHILE_REFERENCED` | step 4, `delete: refuse_while_referenced` as `deleted_at` is set | `delete-while-referenced` |
 | `VERSION_STALE` | step 4, the CAS — HTTP 409 | `version-stale` |
@@ -656,8 +729,8 @@ order; the nine after them are this review's.
 | Code | Raised where | Fixture |
 |---|---|---|
 | `UNAUTHORIZED` | no credential, or a bad one — 401, and the body says only this | `unauthorized` |
-| `FORBIDDEN` | a credential outside its scope, level or ceiling — 403, §10 | `forbidden` |
-| `NEEDS_BROWSER_SESSION` | a bearer at VAULT, JOBS-session or ADMIN — 403, §5 | `needs-browser-session` |
+| `FORBIDDEN` | a credential outside its scope, level or ceiling — 403, §10; a row write from a `spark` principal (41); a runner posting out of `seq` order (46) | `forbidden` |
+| `NEEDS_BROWSER_SESSION` | a bearer at VAULT, the session half of JOBS, or ADMIN without an operation grant whose reach names the method — 403, §5 | `needs-browser-session` |
 | `WRONG_KEY` | `kek_id` mismatch on open — 409, never "corrupt", 12 §6.1 | `wrong-key` |
 | `GRANT_REVOKED` | `openGrant` on a row with `revoked_at` | `grant-revoked` |
 | `DEVICE_CODE_EXPIRED` | a poll past the ten-minute life, 12 §6.1 | `device-code-expired` |
@@ -670,7 +743,7 @@ order; the nine after them are this review's.
 | `FORMAT_NEWER_THAN_READER` | a `user_version` above the reader's, §11 | `format-newer-than-reader` |
 | `CHECKSUM_MISMATCH` | `dog_manifest` against the rows; a migration file against its `migration` row | `checksum-mismatch` |
 | `SIGNATURE_INVALID` | `dog_sig` against the manifest, 03 §4 | `signature-invalid` |
-| `IMPORT_NOT_EMPTY` | `import` into a record that has rows, §5 | `import-not-empty` |
+| `IMPORT_NOT_EMPTY` | `import` into a record that has rows, §5 — a refusal, 422 | `import-not-empty` |
 | `SCHEMA_MISMATCH` | a migration checksum the code does not recognise — module-level, every RPC 503 | `schema-mismatch` |
 | `SCHEMA_NEWER` | a database migrated past the code — module-level, every RPC 503 | `schema-newer` |
 
@@ -678,12 +751,38 @@ order; the nine after them are this review's.
 
 | Code | Raised where | Fixture |
 |---|---|---|
-| `DIALECT_ARITY` | a row with more cells than its kind takes; names kind and row | `dialect-arity` |
-| `DIALECT_KIND_UNKNOWN` | an info string naming no installed kind | `dialect-kind-unknown` |
+| `DIALECT_ARITY` | a row with more cells than its kind takes; names kind and row — a block over its row cap too, `at: "rows"` (36) | `dialect-arity` |
+| `DIALECT_KIND_UNKNOWN` | an info string naming no installed kind — `table` inside a write-up included (36) | `dialect-kind-unknown` |
+
+**Spark** — the assistant's own refusals, raised by `spark` before anything is filed ([11-ASSISTANT](11-ASSISTANT.md)
+§4; [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §5–§6; [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6):
+
+| Code | Raised where | Fixture |
+|---|---|---|
+| `PROPOSAL_UNCITED` | a proposal citing a figure or path outside the projection it was given — 23 §5's one hard rule | `proposal-uncited` |
+| `PROPOSAL_NO_ROWS` | a proposal over an empty projection, or a body with no citation at all — never filed, 23 §6 | `proposal-no-rows` |
+| `PROPOSAL_SCHEMA` | structured output that fails its kind's schema — a tier-C `end.result` included | `proposal-schema` |
+| `PREDICTION_UNMEASURABLE` | a `change` body whose prediction names no measurable, or one twelve observations cannot settle in thirty days, 24 §4.6 | `prediction-unmeasurable` |
+| `SPARK_BUDGET_SPENT` | an ask past `ask_cap` this month — the meter, 11 §4 | `spark-budget-spent` |
+
+**Connector** — a pull run's refusals, raised by `connect` and acked to the outbox; every one ends the run with a reason
+a person reads ([25-CONNECTORS](25-CONNECTORS.md) §5, §7, §9):
+
+| Code | Raised where | Fixture |
+|---|---|---|
+| `PULL_AUTH_REJECTED` | the provider rejected the credential — 401/403 at token, probe or page; the connector pauses, 25 §9 | `pull-auth-rejected` |
+| `PULL_PROVIDER_UNAVAILABLE` | the provider is down — a timeout, the network, an `error_when` status | `pull-provider-unavailable` |
+| `PULL_REQUEST_REFUSED` | a 4xx the declaration did not expect; a body over its byte cap | `pull-request-refused` |
+| `PULL_EXPECT_FAILED` | an `expect:` assertion failed — the cursor does not advance, 25 §5.1 | `pull-expect-failed` |
+| `PULL_SHAPE_MISMATCH` | `read.rows` / `map:` do not fit the page — a non-JSON body, rows that are not a list, a repeated cursor | `pull-shape-mismatch` |
+| `PULL_ORIGIN_REFUSED` | the `Http` adapter refused the origin — a private range, size, timeout — or a URL off `base`, 25 §7; the one code the `Http` vocabulary maps onto | `pull-origin-refused` |
+| `PULL_LEASE_EDGE` | the run stopped at its lease's edge; `applyPull` on a lease no longer this runner's | `pull-lease-edge` |
 
 And the test that stops the enumeration rotting: **every `code` has a fixture that produces it.** A
 code with no fixture fails CI; a refusal path with no code fails review; a code in this table that no
-fixture directory carries fails the same gate ([33-CONTRACTS](33-CONTRACTS.md) §8).
+fixture directory carries fails the same gate ([33-CONTRACTS](33-CONTRACTS.md) §8). The gate is one script and a
+runner per `via`: the script owns the enumeration — a code per fixture, a fixture per code — and compares it against
+the union of the packages' exported code lists, so a family added in a package and not here fails the same way (52).
 
 ---
 
@@ -692,10 +791,16 @@ fixture directory carries fails the same gate ([33-CONTRACTS](33-CONTRACTS.md) �
 Seven consumers, two backends, and it was described only in prose. The contract:
 
 ```
-compile(predicate, ctx) → { sql, params, uses }
+compile(predicate | null, ctx) → { sql, params, uses }
   predicate = the JSON tree — the storage form, 34-GRAMMARS §1. YAML→JSON happens in `declare`, the one
-              package with a YAML parser; `where.parse` accepts JSON and `where.print` emits RFC 8785
-  ctx       = { subject: 'entry' | 'inbox_raw', register, now, tz, scope }
+              package with a YAML parser; `where.parse` accepts JSON and `where.print` emits RFC 8785.
+              `null` is the absent `where:` — every row
+  sql       = the WHOLE clause — WHERE register = ? AND deleted_at IS NULL AND (…) — and the caller composes
+              SELECT … FROM entry <sql> AND <its own terms>, never splicing a fragment; `includeDeleted` is a
+              ctx flag here, not a rewrite by the caller (§4)
+  ctx       = { subject: 'entry' | 'inbox_raw', register, schemas, now, tz, scope, includeDeleted? }
+              schemas is REQUIRED — a RegisterSchema per register, built by where.toSchema(declarationBody), so
+              the compiler needs nothing from `declare`; now is an RFC 3339 UTC string
   scope     = { registers: '*' | string[]; rows?: Predicate }   -- AND-ed in, inside the SQL
   uses      = { fts: bool, vec: bool, indexes: [...] }   -- what the planner should have picked
 ```
@@ -703,7 +808,7 @@ compile(predicate, ctx) → { sql, params, uses }
 | Rule | Value |
 |---|---|
 | Max nesting depth | **3**, counting the root group as level 1; a fourth level is `PREDICATE_TOO_DEEP` at install. [21-AUTHORING](21-AUTHORING.md) §4.4 capped it and [02-DATA-MODEL](02-DATA-MODEL.md) §6 states it. A predicate is a group or a single leaf; an absent `where:` is every row; same-quantifier nesting is flattened on save |
-| `IN` chunking | at **64** values, because the parameter ceiling is 100 and a predicate is not the only thing in the statement. Chunks of `in` are joined with `OR`, chunks of `not_in` with `AND`, inside one parenthesis — a 130-value `not_in` is three `NOT IN`s `AND`-ed, never `OR`-ed |
+| `IN` chunking | at **64** values — it bounds the statement's shape, not the parameter count; the 100-parameter ceiling is the adapter's to refuse (§13), and `json_each(?)` is the upgrade when it binds (38). Chunks of `in` are joined with `OR`, chunks of `not_in` with `AND`, inside one parenthesis — a 130-value `not_in` is three `NOT IN`s `AND`-ed, never `OR`-ed |
 | Legal internal subqueries | **three, and only three**: the FTS5 set-membership test for `matches`; the single `via:` hop, `IN (SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND <leaf>)` where `<leaf>` compiles by the target register's rules (so `state` reads the column); and `EXISTS (SELECT 1 FROM json_each(…))` for `has`/`lacks`. Each is correlated to the current row or one register; none is author-writable. A `via:` leaf may not itself carry `matches` or `has` — `VIA_NESTED_SUBQUERY` |
 | `contains` | field-scoped, ASCII-case-folded **substring**: `instr(lower(x), lower(?)) > 0`, literal ≤ 40 bytes (`CONTAINS_TOO_LONG`), **identical on both backends**. Never `LIKE`, never FTS5 — ADR-055 |
 | `matches` | register-wide **FTS5 token match** over the register's `search:` fields, entry backend only: `id IN (SELECT id FROM entry_fts WHERE register = ? AND entry_fts MATCH ?)`. The operand is one quoted phrase with `"` doubled, so no prefix, column or boolean operator is reachable from an author; the same whitespace collapse is applied at index time (§1) |
@@ -711,7 +816,7 @@ compile(predicate, ctx) → { sql, params, uses }
 | Temporal literals | `YYYY-MM-DD`, RFC 3339, or relative (anchors `today tomorrow yesterday bom eom boy eoy`, offsets `<sign><1–4 digits><d|w|m>`) — resolved **once**, at compile time, against `ctx.now` in `ctx.tz`, every one a **bound parameter**, never in SQL, so a query is reproducible and testable. `RELATIVE_LITERAL_UNKNOWN`, `RELATIVE_UNIT_FOR_DAY`; the full grammar is [34-GRAMMARS](34-GRAMMARS.md) §1 |
 | Money and quantity | **two expressions** — `$.f.amount` and `$.f.currency`; `$.f.value` and `$.f.unit`; `index: true` creates both. A comparison compiles to `currency = ? AND amount <op> ?`, so a row in another currency does not match; a literal without its currency or unit is refused at install (`MONEY_LITERAL_NEEDS_CURRENCY`, `QUANTITY_LITERAL_NEEDS_UNIT`) |
 | Literals | single-quoted only, and every value is bound. Double-quoted string literals are **off** in `node:sqlite` (`"$.due"` parses as an identifier), and a conformance case asserts the compiler never emits one |
-| `derive:` | inlined at compile — `sum` → `COALESCE(a,0)+…`, `ratio` → `CASE WHEN per = 0 THEN NULL ELSE of*1.0/per END`, `band` → a `CASE` over exclusive upper bounds, `normalise` → `lower(trim(f))`, `via` → the hop above — so `{ field: tier, is: urgent }` works on a derived field. The shapes are [34-GRAMMARS](34-GRAMMARS.md) §1 |
+| `derive:` | inlined at compile — `sum` → `COALESCE(a,0)+…`, `ratio` → `CASE WHEN per = 0 THEN NULL ELSE of*1.0/per END`, `band` → a `CASE` over exclusive upper bounds, `normalise` → `lower(trim(f))`, `via` → the hop above — so `{ field: tier, is: urgent }` works on a derived field. The shapes are [34-GRAMMARS](34-GRAMMARS.md) §1, and the functions are `where`'s — `derive`, `searchText`, `normalise` (`lower(trim(f))`, no whitespace collapse) are imported by the kernel, so the stored `unique:` fingerprint and the compiled inline share one definition (38, 41) |
 | `near` | **ranking, not filtering, and out of the property test**: legal only as the last leaf of a root `all:`; SQL yields ≤ 5,000 candidate ids, int8 cosine runs in JS, truncate to `k` (default 20, max 100). It has its own fixture, and it is deferred past §1b |
 | Scope | `ctx.scope` is `AND`-ed in **inside** the SQL, never filtered after ranking — [11-ASSISTANT](11-ASSISTANT.md) §5 |
 
@@ -723,7 +828,10 @@ compile(predicate, ctx) → { sql, params, uses }
 a random row set, evaluate the predicate in a reference in-memory interpreter, run the compiled SQL
 against the same rows, and assert the sets are identical. That catches the whole class of bug where
 the compiler and the format drift apart — and it is why the missing-value rule had to be written first:
-until it was, the oracle and the compiler were guaranteed to disagree on every row lacking a field.
+until it was, the oracle and the compiler were guaranteed to disagree on every row lacking a field. It runs
+**1,000 times in CI and 10,000 nightly**, every committed seed replayed first — both numbers true, both stated (38, 52).
+The oracle folds ASCII case and the generator emits ASCII, so the two agree by construction (38). A malformed tree is a
+`SyntaxError` from `parse`, never a `Refusal`: a malformed body is 400 at the record, not 422.
 
 ---
 
@@ -736,28 +844,30 @@ Given, previously: a table and four properties. Missing: the actual protocol.
 | **Kinds** | **nine**: `notify.email` · `notify.push` · `notify.webhook` · `pull.fetch` · `export.r2` · `erase.r2` · `infer.embed` · `infer.prose` · `infer.draft`. States `pending` · `leased` · `done` · `failed` · `dead`, and both lists are a `CHECK` (§1). *An earlier draft had six kinds and no way for an embedding, a digest sentence or the analyser's draft to leave the object* |
 | **Lease** | per kind, because one number cannot serve all: **60 s** for `notify.*`; **300 s** for `pull.fetch`, which can span forty pages, and for `export.r2` and `erase.r2`, because an R2 prefix delete is paged — and [02-DATA-MODEL](02-DATA-MODEL.md) §10's erasure guarantee is stated in that window; **120 s** for `infer.*` |
 | **Drain** | `leaseOutbox(kinds, n)` claims up to *n* rows with `state='pending' OR leased_until < now`, sets `leased_until`, returns them. One statement, so a double-drain finds nothing |
-| **Ack** | `ackOutbox(id, 'done' \| 'failed', error?)`. A `failed` ack sets `failed`, `attempts + 1`, and inserts `schedule(kind = 'retry', key = 'outbox:' \|\| id, due_at = now + min(2^attempts min, 6 h), payload = { outbox: id })`. The outbox row is never retried in place |
+| **Ack** | `ackOutbox({ id, state: 'done' \| 'failed', result?, error? })` — one object, never a positional list (45 wins over every other shape). A `failed` ack sets `failed`, `attempts + 1`, and inserts `schedule(kind = 'retry', key = 'outbox:' \|\| id, due_at = now + min(2^attempts min, 6 h), payload = { outbox: id })` — one jitter formula, the connector spec's (47). The outbox row is never retried in place |
 | **Who retries** | the **schedule**, not the Worker. The `retry` row firing resets the outbox row to `pending`; `outbox.attempts` mirrors it. When the retry row itself goes `failed` — at 8 attempts, one ladder ([09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1) — the outbox row goes `dead` and a `suggestion(body_kind = 'change', opened_by = 'system')` is opened naming the kind, the error and a payload summary — **the visible item**. Retry policy lives in one place. *An earlier draft gave the outbox its own ladder beside the schedule's (09 §1 said `failed` at 8); there is one ladder, and it is here* |
-| **`infer.*`** | the Worker calls the `Inference` port and writes back through `update` (embeddings into `entry_vec`), the digest row (`prose`) or `propose` (`draft`). The record itself never calls a model — [01-ARCHITECTURE](01-ARCHITECTURE.md) §3 |
-| **The doorbell** | `Scheduler.wake()` — Cloud: `OUTBOX_Q.send({ record })`; self-host: a no-op, the poller is in-process. It is step 12b of the write path, after commit, the only I/O; and it is a method on a port, because `cloudflare:*` is banned under `packages/**` |
+| **`infer.*`** | the host calls the `Inference` port and the write-back rides `ackOutbox.result`, persisted in the ack's transaction: `infer.embed` into `entry_vec`, `infer.prose` into the digest row (51). The `infer.draft` ack carries its result and files nothing — a tier-A proposal is filed once, by `propose`, from Spark (45, 46). Embeddings are queued by the hourly sweep — one `infer.embed` row over the rows that changed, ≤ 100 a row — never per write (45). The record itself never calls a model — [01-ARCHITECTURE](01-ARCHITECTURE.md) §3 |
+| **`pull.fetch`** | the payload is `{ ingest_id, declaration_version, grant_id }` and carries nothing sealed: `connect`'s `runPull(job, deps)` fetches the sealed grant through `sealedGrant`, unwraps the connector DEK with `KeyStore`, writes pages through `applyPull` and acks itself; the `pull` schedule row goes `firing` when it fires and inserts this one row, and `paused` on `PULL_AUTH_REJECTED` (§1; [25-CONNECTORS](25-CONNECTORS.md) §9; 47) |
+| **The doorbell** | `Scheduler.wake()` — Cloud: `OUTBOX_Q.send({ record })`; self-host: a kick to the in-process poller, which otherwise ticks every 15 s (49). It is step 12b of the write path, after commit, the only I/O, rung only when the write left an outbox row; and it is a method on a port, because `cloudflare:*` is banned under `packages/**` |
 | **Belt and braces** | the Worker also drains expired leases on the record's next ordinary request. A lost queue message costs latency, never a notification |
 
 ---
 
 ## 9 · The projection Spark reads through
 
-Named in four documents, specified in none. It is a READ+ method — `project(query, budget, ctx)`, `read` scope,
+Named in four documents, specified in none. It is a READ+ method — `project({ query, budget }, ctx)`, `read` scope,
 §5 — and it is the security boundary, so it is a *type*:
 
 ```
 Projection {
-  rows:  [{ id, register, seq, spoken, summary, fields: {…} }]   -- projected, never whole documents
-  index: { registers: [{id, rows, open}], open_questions: [...] }
-  budget: { used, limit }
+  rows:  [{ id, register, seq, spoken, state, version, updated_at, summary, fields: {…} }]   -- projected, never whole documents
+  index: { registers: [{ id, rows, open, fields: [{ id, type }] }], open_questions: [...] }
+                                             -- open = non-terminal rows; fields = id and type, never a schema in full
+  budget: { used, limit }                    -- ≈ tokens, ceil(utf8 bytes / 4)
 }
 ```
 
-Four rules, and the third is the one that must never be relaxed:
+Five rules, and the third is the one that must never be relaxed:
 
 1. **Fields are projected by the register's `search:` and `mobile:` lists**, not by taking everything.
 2. **Every row carries its spoken id**, so every claim can be cited and the UI can link it.
@@ -766,6 +876,7 @@ Four rules, and the third is the one that must never be relaxed:
    prompt.
 4. **`document` fields come only when the question is about the document**, decided by the caller,
    never by the model.
+5. **`series: true` rows are never projected** — a series is read through its metric, not row by row (45).
 
 ---
 
@@ -783,17 +894,20 @@ Two ladders exist in the corpus and nothing mapped them:
 | `write` | `append` | + `create` into registers in scope |
 | `write` | `write` | + `update` |
 | — | `decide` | + resolve a suggestion into a decision. **No token grants this; a decision needs a person** |
-| — | `owner` | + ADMIN, VAULT and the session half of JOBS — **a browser session only. No token scope reaches them, because there is no `admin` scope** (ADR-060) |
-| share link | — | `page(slug)` for one slug; `ctx.scope` is the link's projection (20 §1: an empty ceiling); nothing else |
-| runner job bearer — `read` + `propose` | — | as `propose`, plus `claimJob` · `postJobEvent` · `readCancel`; audience one record; expiry = the job deadline |
+| — | `owner` | + ADMIN, VAULT and the session half of JOBS — **a browser session. No token scope reaches them, because there is no `admin` scope** (ADR-060); ADMIN alone also admits the operation grant below |
+| `share` principal — `{ kind: 'share', id, slug }` | — | `page(slug)` for one slug; `ctx.scope` is the link's projection (20 §1: an empty ceiling); nothing else. Stateless, terminally revoked by `share.close` (49) |
+| `runner` principal — `{ kind: 'runner', id, name }`, built only from a verified device grant (`reach = 'runner'`) or its socket | — | as `propose`, plus `claimJob` · `postJobEvent` · `readCancel`; the job bearer `claimJob` mints is a `token` with an audience of one job and the job's deadline as expiry (46) |
+| **operation grant** — a bearer whose `ctx.op` names an approved operation | the approver is the owner, in a browser | **one ADMIN method, once**, within ten minutes: the method the grant's `reach` names — `pack` · `export` · `import` · `token` — after the owner saw its summary (the plan diff, the export scope, the token's scope). Recorded in `device_grant.reach` and an `access.grant` event. ADR-060's reversal clause — *a signed single-use plan hash* — met, and no standing token minted (§5; 12 §3) |
 | `BRAINDOG_TOKEN` | owner | everything a browser session may — self-host, single user only |
 | invited person | the levels the invitation names | an invitation link (24 h, bound to one email) → a passkey → `member` rows and one `access.grant` event per register |
 
 **Enforced in one place: the record object, at step 1 of the write path and inside the compiler for
 reads.** Not in the Worker — a check in the router is a check the CLI can be pointed around. The
 effective set is `token.scope ∩ person.level ∩ register.ceiling`, computed once per call and passed
-in `ctx.scope` (§7). *An earlier draft had a sixth token scope, `admin`, mapped to `owner`. No such scope exists;
-§12 #4 records the decision.*
+in `ctx.scope` (§7). `CallContext.principal.kind` is one of six — `person · token · runner · share · system · spark` —
+and `runner` and `share` are kinds, never fields beside the principal ([33-CONTRACTS](33-CONTRACTS.md) §2). A billing
+lapse is a ceiling too: read-only, held in the record and not in a host (ADR-059; 53). *An earlier draft had a sixth
+token scope, `admin`, mapped to `owner`. No such scope exists; §12 #4 records the decision.*
 
 ---
 
@@ -805,13 +919,16 @@ in `ctx.scope` (§7). *An earlier draft had a sixth token scope, `admin`, mapped
 | | |
 |---|---|
 | `PRAGMA application_id` | `0x444F4721` — **never changes** |
-| `PRAGMA user_version` | the **`.dog` format revision** — bumped only when an older reader would *misread* the file. **1 at v1.** An additive migration — a new table, a new column — does not bump it; the migration file that must carries `-- format-bump` ([33-CONTRACTS](33-CONTRACTS.md) §9) |
+| `PRAGMA user_version` | the **`.dog` format revision** — bumped only when an older reader would *misread* the file. **1 at v1.** An additive migration — a new table, a new column — does not bump it; a migration is a `.ts` module under `src/migrations/`, and the one that must bump carries `-- format-bump <n>` (41; [33-CONTRACTS](33-CONTRACTS.md) §9) |
 | The kernel migration number | `MAX(migration.version)` — every applied migration, 1 at v1. Not a PRAGMA, not a column |
 | `record.format_ver INTEGER` | mirrors `user_version`, for a reader without PRAGMA access |
 | What a pack requires | `requires: { format: <int>, primitives: <int>, packs: { <id>: <semver-range> } }` — the format revision, `PRIMITIVES_VERSION`, other packs. Never an app version: **the app has no semver** (`FORMAT_OUT_OF_RANGE`, `PRIMITIVES_OUT_OF_RANGE`) |
 | The tuple `braindog --version` prints | `app <date>+<sha> · format <user_version> · kernel <migration> · primitives <PRIMITIVES_VERSION>` — `PRIMITIVES_VERSION = 1` at stage 0 |
 | Reading an older file | upgrade on import, in one transaction, and say so |
 | Reading a **newer** file | refuse, naming both versions (`FORMAT_NEWER_THAN_READER`). A partial read of a format you do not know is data loss with a progress bar |
+
+A `PRAGMA` inside a migration is best effort: an adapter that refuses it (the Durable Object's allow-list) does not
+fail the migration — the refusal is swallowed explicitly, and a conformance case measures that it is (41, 37).
 
 **And v1 ships at `user_version = 1`.** Starting at 3 with no 1 or 2 to migrate from is a fiction
 that costs nothing to remove now and cannot be removed later.
@@ -832,12 +949,12 @@ reader walking the document expects it — 02 and others cite §13 and §14 by n
 |---|---|---|
 | 1 | The block dialect's formal grammar — column counts per kind, escaping a literal `\|`, where the tone token sits, how `{{path}}` interacts with the parser | [34-GRAMMARS](34-GRAMMARS.md) §2: the info string, `\|` and `\\` unescaped before the split, the tone as a trailing cell, a row shape per kind, `{{path}}` substituted per cell *after* splitting and never re-parsed, over-arity degrading to the fence with `DIALECT_ARITY` |
 | 2 | Billing lifecycle — what happens on lapse. Does the record go read-only? Do connectors pause? Is export still guaranteed? | ADR-059: the record goes read-only; connectors and digests pause; export and MCP reads stay available for 90 days; then the erasure ladder. **Export is always guaranteed** — which is the load-bearing half for the no-lock-in argument |
-| 3 | The seed data for the first-party packs | the packs are **six** — `agents` · `work` · `portfolio` · `money-core` · `estate` · `people` — and their seeds are the first task of B2, not a day-one dependency. Fixtures are text; the `.dog` is materialised through the real write path at test time with an injected `Clock` and a seeded RNG ([33-CONTRACTS](33-CONTRACTS.md) §3). *An earlier draft said four* |
-| 4 | Whether `admin` may ever be granted to an agent token | ADR-060: **no**. There is no `admin` scope; ADMIN and VAULT are a browser session only (§5, §10) |
+| 3 | The seed data for the first-party packs | the packs are **six** — `agents` · `work` · `portfolio` · `money-core` · `estate` · `people` — and their seeds are the first task of B2, not a day-one dependency. Fixtures are text; the `.dog` is materialised through the real write path at test time with an injected `Clock` and a seeded RNG ([33-CONTRACTS](33-CONTRACTS.md) §3): the instant is `2031-01-05T09:00:00.000Z`, one second per row; the RNG is `sfc32` seeded `[1, 2, 3, 4]` with fifteen outputs discarded, injected through `openRecord`'s `random` (40, 41). *An earlier draft said four* |
+| 4 | Whether `admin` may ever be granted to an agent token | ADR-060: **no** standing grant — there is no `admin` scope, and VAULT is a browser session only. Iteration 2 met ADR-060's own reversal clause instead: an **operation grant**, the owner's single-use ten-minute approval of one named ADMIN operation, reaches that one method once (§5, §10) |
 
 | # | Open | Blocks |
 |---|---|---|
-| 5 | The DO planner measurement — does the Durable Object's SQL API use a partial expression index for both the bound and the literal `register` form? Node: yes, measured (§13). [Q12](17-OPEN-QUESTIONS.md) | the index model — a half-day spike in week one |
+| 5 | The DO planner measurement — does the Durable Object's SQL API use a partial expression index for both the bound and the literal `register` form? Node: yes, measured (§13). [Q12](17-OPEN-QUESTIONS.md) | the index model — conformance cases #20, #21 and #30, run against the DO in week one, not a spike (37); a disagreement amends §13's divergence table |
 | 6 | The OAuth 2.1 authorization server behind RFC 9728. When built, BrainDog is its own AS on the Worker — passkey or magic-link consent, PKCE, no refresh tokens for CLI clients; Phase A ships agent tokens only and the well-known document is deferred with that reason | MCP clients that will not take an agent token |
 | 7 | The type-change conversion preview — v1 refuses a type change (`FIELD_TYPE_CHANGED`: retire the field, add a new one) | the authoring tier, 15 §1b |
 
@@ -851,8 +968,8 @@ the first register.
 ```ts
 export interface Sql {                       // the port's name in 01, 31 §5 and 33-CONTRACTS §1 —
                                              //   an earlier draft here called it StorageAdapter
-  /** EXACTLY one statement when a parameter is supplied — a second is MULTI_STATEMENT_PARAMS. `?` placeholders.
-   *  NEVER BEGIN/COMMIT/ROLLBACK/SAVEPOINT/RELEASE: refused by statement-prefix check → TXN_STATEMENT_FORBIDDEN. */
+  /** EXACTLY one statement, always — a second is MULTI_STATEMENT_PARAMS, with or without parameters. `?` placeholders.
+   *  NEVER BEGIN/COMMIT/END/ROLLBACK/SAVEPOINT/RELEASE — six keywords, refused by statement-prefix check → TXN_STATEMENT_FORBIDDEN. */
   exec<T = Row>(query: string, ...params: Param[]): Cursor<T>;
   /** Zero-parameter, multi-statement text. The migration runner only. */
   execScript(sql: string): void;
@@ -861,8 +978,9 @@ export interface Sql {                       // the port's name in 01, 31 §5 an
   /** Measured at open: sqlite, fts5, json, the five enforced ceilings, expressionIndexUsed, nestedTransactions: false. */
   readonly caps: Capabilities;
 }
-// Param = null | number | bigint | string | Uint8Array — no boolean, no undefined (the DO rejects them; node:sqlite
-// would coerce). Row, Cursor<T> (toArray · one · first · rowsRead · rowsWritten) and Capabilities: 33-CONTRACTS §1.
+// Param = null | number | bigint | string | Uint8Array — no boolean, no undefined. A non-Param value is refused by the
+// ADAPTER before any driver sees it (SYNTAX); an earlier draft said node:sqlite would coerce — it throws, and the DO
+// rejects. Row, Cursor<T> (toArray · one · first · rowsRead · rowsWritten) and Capabilities: 33-CONTRACTS §1.
 ```
 
 `Sql` is one of nine ports. The other eight — `Scheduler` (`get` · `set` · `clear` · `wake`, the outbox doorbell),
@@ -875,7 +993,7 @@ the self-host quietly out-run it:
 
 | Absent | Because |
 |---|---|
-| `begin()` / `commit()` | workerd refuses: *"`sql.exec()` cannot execute transaction-related statements like `BEGIN TRANSACTION` or `SAVEPOINT`."* Bun's `db.transaction()` nests via SAVEPOINT; a DO cannot. Node **allows** a raw `SAVEPOINT a; RELEASE a` — measured — so the Node adapter refuses `BEGIN/COMMIT/ROLLBACK/SAVEPOINT/RELEASE` by statement prefix, and a conformance case proves every adapter refuses identically. **Nesting is out of the interface** |
+| `begin()` / `commit()` | workerd refuses: *"`sql.exec()` cannot execute transaction-related statements like `BEGIN TRANSACTION` or `SAVEPOINT`."* Bun's `db.transaction()` nests via SAVEPOINT; a DO cannot. Node **allows** a raw `SAVEPOINT a; RELEASE a` — measured — so every adapter refuses the six keywords `BEGIN COMMIT END ROLLBACK SAVEPOINT RELEASE` by statement prefix, and a conformance case proves every adapter refuses identically; a nested `transactionSync`, or a callback returning a thenable, is the same `TXN_STATEMENT_FORBIDDEN` (37). **Nesting is out of the interface** |
 | `attach()`, user-defined functions | ATTACH is denied and there is no API to register a function. §11 of [03-DOG-FORMAT](03-DOG-FORMAT.md) now routes export around it |
 | **anything async** | both DO SQL and `node:sqlite` are synchronous. An async interface invites an `await` between two writes — **exactly the input-gate hazard [01-ARCHITECTURE](01-ARCHITECTURE.md) §2 exists to prevent.** The type system enforces the rule |
 
@@ -884,7 +1002,7 @@ the self-host quietly out-run it:
 `node:sqlite` is the self-host default on Node ≥ 24.13 — zero native dependencies, FTS5 and JSON1 present.
 Measured 2026-09-02 on the official v24.13.0 build: SQLite **3.50.4**, compile options include **`ENABLE_FTS5`**,
 and `CREATE VIRTUAL TABLE … USING fts5` succeeds. It is still Stability 1.1, so the Node minor is pinned and the
-boot probe below measures FTS5 on every start. `better-sqlite3` is the alternative driver for an older Node.
+boot probe below measures FTS5 on every start. There is no alternative driver at v1 — `better-sqlite3` is not shipped, and an older Node is refused at boot, not accommodated (37, 49).
 `bun:sqlite` is **unsupported**: it links Apple's system libsqlite3 on macOS, nests via SAVEPOINT, and has
 different parameter ceilings. **There is no degraded mode.** A build without FTS5 is refused at boot — ADR-038.
 
@@ -919,16 +1037,17 @@ new DatabaseSync(path, {
 | Ceiling | Held by the adapter, above the driver |
 |---|---|
 | `variableNumber` 100 | parameters counted before `prepare` → `TOO_MANY_PARAMS` |
-| `likePatternLength` 50 | every bound string used as a `LIKE` pattern is measured → `LIKE_TOO_LONG`. The validator already caps `starts`/`ends` at 40, so an author never meets this one |
-| `compoundSelect` 5 · `exprDepth` 100 | properties of the compiler's output, asserted by the §7 property test → `COMPOUND_TOO_LONG`, `EXPR_TOO_DEEP` |
+| `likePatternLength` 50 | the parameter bound at a `LIKE ?` or `GLOB ?` is measured at bind time — positional, not every string in the statement (37) → `LIKE_TOO_LONG`. The validator already caps `starts`/`ends` at 40, so an author never meets this one |
+| `compoundSelect` 5 · `exprDepth` 100 | compound terms are guarded by keyword count before `prepare` → `COMPOUND_TOO_LONG`; expression depth is not guarded — it is a property of the compiler's output, asserted by the §7 property test (1,000 runs in CI, 10,000 nightly), and `EXPR_TOO_DEEP` is what the driver's own refusal maps to (37) |
 | `sqlLength` 100 k | statement bytes measured before `exec` → `STATEMENT_TOO_LONG` |
 | an INTEGER beyond 2⁵³ | refused before `prepare` → `INT_OUT_OF_RANGE`, so the DO's silent precision loss and Node's throw become one refusal |
 | the rest — `length`, `column`, `triggerDepth`, `attach`, `vdbeOp`, `functionArg` | the envelope the fixed DDL and the compiler are designed under; nothing approaches them at runtime. SQLite's own *too many columns* maps to `TOO_MANY_COLUMNS`; ATTACH and functions are not in the interface at all |
 
 `caps` declares exactly the five enforced ceilings (`maxParams` · `maxLikePattern` · `maxSqlBytes` ·
 `maxCompoundSelect` · `maxExprDepth`) plus what is measured at open (`sqlite` · `fts5` · `json` ·
-`expressionIndexUsed` · `nestedTransactions: false`). The Node adapter throws the same closed vocabulary the DO
-adapter maps to. **That is what "Node refuses first" means now** — a mechanism in our code, not an option we hoped
+`expressionIndexUsed` · `nestedTransactions: false`). Both adapters map a driver's message onto the same closed
+vocabulary through one table of twelve SQLite message fragments, substring-matched, that lives in `ports` — never a
+message parsed twice (37). **That is what "Node refuses first" means now** — a mechanism in our code, not an option we hoped
 the driver had.
 
 ### The divergences it pins, because every one of them is silent
@@ -957,7 +1076,7 @@ cases, executed against every adapter, producing one normalised trace each, and 
 that the traces are equal.** The reference trace is generated from the **DO adapter**, because the
 cloud is the tighter implementation, and it is committed as `conformance/reference.json`, regenerated only by the
 workers-plugin job. A case is `{ id, requires?: (keyof Capabilities)[], run(sql): TraceLine[] }` with
-`TraceLine = ['rows', unknown[]] | ['err', SqlErrorCode] | ['n', number]`; `Assert` has six methods; CI asserts
+`TraceLine = ['rows', unknown[]] | ['err', SqlErrorCode] | ['n', number]`; `Assert` has four methods — `ok` · `equal` · `deepEqual` · `fail`; *an earlier draft said six, and `throws` and `skip` had no caller*; CI asserts
 equal case counts per host and prints every skip — [33-CONTRACTS](33-CONTRACTS.md) §3.
 
 Two design rules carry it:
@@ -985,13 +1104,18 @@ CI cannot have run on the machine a self-hoster is using. Ten lines at startup, 
 
 ```
 This SQLite build cannot host a .dog file:
+  driver: node:sqlite 24.13.0 · SQLite 3.50.4
   fts5: required, not available
+  json: required, available
 On macOS, Bun loads Apple's libsqlite3.dylib and is unsupported. Use Node 24.13+, which bundles its own SQLite.
 ```
 
 **That turns a missing FTS5 from a corruption bug into a refusal at boot** — and there is nothing behind the
-refusal: no degraded mode, no `LIKE` fallback. It is the mechanism the FTS5 paragraph in
-[01-ARCHITECTURE](01-ARCHITECTURE.md) §4 now depends on.
+refusal: no degraded mode, no `LIKE` fallback. `json` is required beside `fts5`, and the probe names the driver it
+measured (37). It is the mechanism the FTS5 paragraph in [01-ARCHITECTURE](01-ARCHITECTURE.md) §4 now depends on.
+When a self-hoster writes in, the order of diagnosis is fixed too: the version tuple (§11) → the refusal state
+(`SCHEMA_MISMATCH` / `SCHEMA_NEWER`) → `observation` → `event` → the `system` suggestions — and nothing else is asked
+for first (53).
 
 ---
 
@@ -1003,7 +1127,7 @@ if it fails, and all three fail cheaply now and expensively later.
 | # | | Why first |
 |---|---|---|
 | **1** | **The conformance suite and two adapters** | Everything about self-host parity is a claim until it runs, and it turns [Q12](17-OPEN-QUESTIONS.md) — *does the planner actually use a partial expression index?* — from a risk into a green check. **The whole index model rests on one `EXPLAIN QUERY PLAN` assertion.** Q12's Node half is done — both the bound and the literal `register` form use the index (§13); the DO half is the week-one assertion |
-| **2** | **The `where:` property test with its reference evaluator** | Seven consumers and two backends break together. The oracle is ~80 lines: evaluate the predicate in plain JS over plain objects, run the compiled SQL over the same rows, assert the sets are equal |
+| **2** | **The `where:` property test with its reference evaluator** | Seven consumers and two backends break together. The oracle is ~80 lines: evaluate the predicate in plain JS over plain objects, run the compiled SQL over the same rows, assert the sets are equal — 1,000 runs in CI, 10,000 nightly (§7) |
 | **3** | **The deploy parity gate** | It has already failed three times in the prior system — a green deploy with a fresh version id, serving a stale asset. It costs an afternoon, and *"any step whose failure mode is silence gets checked against the thing itself"* |
 
 **And one rule that shapes the rest of the suite:** every property test's failing `{seed, path}` is

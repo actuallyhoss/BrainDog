@@ -22,9 +22,11 @@ They are **the same data at two altitudes**, and the IA is the pair of ladders b
 - **Down** (page → register): every block header names its source. Focus a block, press `o`, and
   the register opens **pre-filtered to that block's `where:`**. Stripe's *Inspect object* does this
   — it *follows* the curated view rather than replacing it.
-- **Up** (register → page): filter a register, `⌥V` names the filter as a saved view, `⌥B` binds
-  that view as a block on any page. Linear's ladder — an ad-hoc filter becomes a first-class named
-  object in one keystroke, because **the URL is the serialisation**.
+- **Up** (register → page): filter a register, `⌥V` names the filter as a saved view — a named
+  predicate; `order` stays URL state — and `⌥B` binds that view as a block on any page. Both write
+  through `setDeclaration`, so both are the owner's ([02-DATA-MODEL](02-DATA-MODEL.md) §5). Linear's
+  ladder — an ad-hoc filter becomes a first-class named object in one keystroke, because **the URL
+  is the serialisation**.
 
 Nothing else in this document may break those two keystrokes.
 
@@ -46,9 +48,10 @@ Nothing else in this document may break those two keystrokes.
 | Search | `/search?q=` | The structured fallback when the palette's ranked list was not enough |
 | Vault | `/vault` | What each key opens, and when each was last rotated |
 | Packs | `/packs` · `/packs/browse` · `/packs/<id>` | Installed · the Kennel · one pack with its diff |
-| Settings | `/settings/<area>` | identity · **recovery** · **people & sharing** · agents · ingest · theme · keyboard · **navigation** · notifications · backups · billing · export. **`recovery` and `people & sharing` were missing from an earlier draft** — the first left a passkey-primary product with no designed way back in, and the second left [20-COLLABORATION](20-COLLABORATION.md)'s 5-person × 14-register access matrix with no screen anywhere in 24 documents. `navigation` was missing too: it holds the *Suggest new pages* switch that [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5 places there |
+| Settings | `/settings/<area>` | identity · **recovery** · **people & sharing** · agents · ingest · theme · keyboard · **navigation** · notifications · backups · billing · export. **`recovery` and `people & sharing` were missing from an earlier draft** — the first left a passkey-primary product with no designed way back in, and the second left [20-COLLABORATION](20-COLLABORATION.md)'s 5-person × 14-register access matrix with no screen anywhere in 24 documents. `navigation` was missing too: it holds the *Suggest new pages* switch that [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §4 places there. `agents` holds the tokens, the connected machines and the code-entry control — the `verification_uri` of every device flow — where a device code or an **operation grant** (one named operation, its summary shown, ten minutes) is approved ([12-SECURITY](12-SECURITY.md) §3). `export` ends in the danger area: **Delete this record** — `deleteRecord`, re-authentication, the slug typed to confirm ([02-DATA-MODEL](02-DATA-MODEL.md) §9) |
 | Onboarding | `/start` | Pack selection, then one capture. **Not a tour** |
 | Audit | `/audit` | Every write, by whom, against which version |
+| **Job** | `/jobs/<id>` | A tier-C run: the route opens the palette in job mode over the shell — never a page. The view polls `jobEvents({ id, after })`; the list is `listJobs` ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1) |
 
 ### Register surfaces — one pair per installed register
 
@@ -72,8 +75,8 @@ Nothing else in this document may break those two keystrokes.
 
 ## 3 · Navigation: a sidebar, and the spine/body split
 
-**A left sidebar above 900px; a bottom tab bar plus a sheet below it. Not a top nav. Not
-palette-first.**
+**A left sidebar above 900 px; a bottom tab bar plus a sheet below it. Rows become cards by default
+below 640 px, and size follows the pointer, never the width. Not a top nav. Not palette-first.**
 
 A top nav cannot hold a **variable-length, sectioned, reorderable** list — and BrainDog's nav is a
 query over `page` rows. A freelancer has four entries; a studio with five packs has eighteen across
@@ -113,7 +116,9 @@ exposed to the extension **read-only**. There is no `default_area` and no auto-p
 equivalent is per-command `disabledByDefault`. Obsidian goes further and forbids a plugin from even
 *offering* a competing control.
 
-**3 · Position lives in a per-user store keyed by page id, and it wins.**
+**3 · Position lives in a per-user store keyed by page id, and it wins.** The store is the
+record's — nav order, hidden pages, pins, dismissals and the *Suggest new pages* switch must survive a
+change of device, so none of them is a cookie (§5).
 
 | Event | What happens to nav |
 |---|---|
@@ -317,9 +322,11 @@ no preview and no crawlable title.
 hand-maintained path list anywhere.** `/api/*` is matched first. If a future change requires
 enumerating app paths in two files, that change is wrong.
 
-`/<ID>` → 302 to canonical. `brain.dog/D41` is a sentence one person can say to another and a
-string an agent can emit with no lookup. One resolver table, and it is the cheapest legibility win
-available.
+`/<ID>` is resolved by the shell, not a server 302 — no server renders a request
+([22-FRONTEND](22-FRONTEND.md) §2): `[id]/+page.svelte` calls `get({ spoken })` and `replaceState`s
+to the canonical address ([50-SPEC-WEB](50-SPEC-WEB.md) §2.2). `brain.dog/D41` is a sentence one
+person can say to another and a string an agent can emit with no lookup. One resolver, and it is the
+cheapest legibility win available.
 
 ### What goes where
 
@@ -327,8 +334,8 @@ available.
 |---|---|---|
 | Register, record id, page slug | **path** | it is the resource |
 | Filters, query, group, sort | **query params**, legible, defaults omitted | it defines *which rows you are looking at* → must be shareable |
-| Focused row | `?row=7` | deep-linking a virtualised list needs a **stable key, never an index** |
-| Density, visible columns, widths, sidebar collapse | **user preference store** | it is about *your eyes*, not the data |
+| Focused row | `?row=7` | deep-linking a paged list needs a **stable key, never an index** |
+| Scheme, text size, density, visible columns, widths, sidebar collapse | the **`bd_pref` cookie** — per device, applied by a hashed one-statement inline script before first paint ([50-SPEC-WEB](50-SPEC-WEB.md) §4.7) | it is about *your eyes*, not the data. Nav position, hidden pages, dismissals and the *Suggest new pages* switch are **the record's** (§3), because they must follow the person to the next device |
 | Expanded groups, open drawers, unsaved text | component state | if replaying the URL in a fresh tab should not reproduce it, it is not URL state |
 | Saved views | a **server row with a short id** | a named permissioned artifact — the URL carries an id, not 2 KB of predicate |
 
@@ -451,8 +458,10 @@ listed as surviving in the same section that deleted it:
 1. **Onboarding is pack selection, not a tour.** Tutorials *"interrupt users who are attempting to
    do something else … don't tend to be memorable, and they also don't result in better task
    performance"* — the paradox of the active user. `/start` is a choice screen.
-2. **Every pack register ships exactly one worked example row, marked `example`** — visibly
-   chipped, and removable record-wide in one undoable action.
+2. **Every pack register ships exactly one worked example row, marked `example`** — the value
+   `example` in the register's declared `tags` field, so the mark is data and travels
+   ([02-DATA-MODEL](02-DATA-MODEL.md) §1; [04-PACKS](04-PACKS.md) §2) — visibly chipped, and
+   removable record-wide in one undoable action.
 
    **It is excluded from digests and notifications, and NOT from the metrics on the page it sits
    on.** An earlier draft excluded it from everything, which produced the incoherent first screen
@@ -493,7 +502,9 @@ listed as surviving in the same section that deleted it:
   aggregated summary: *"3 blocks failed to load."*
 - **Show the failure on attempt one.** A default of three silent retries with backoff means the
   block appears to hang for seconds. Retry once, then render the error with a visible retry.
-- **A copyable request id**, always. One sentence in the house voice — never a stack trace.
+- **A copyable request id**, always. The client mints an `X-Request-Id` on every call, the host echoes
+  and logs it, and that id is what the `error` state shows ([33-CONTRACTS](33-CONTRACTS.md) §4). One
+  sentence in the house voice — never a stack trace.
 
 ### Offline and stale
 
@@ -544,7 +555,9 @@ chrome stays legible. Two properties make it real, and both are tests:
 1. **The allow-list is provenance, not pattern.** Only literals a developer typed into source are
    legible. A label built by concatenation at runtime blurs — which is why a toggle's two states are
    two full literals, and why a placeholder must never name a real payee. Pattern-based redaction let
-   *"GREEN MARKET"* through once.
+   *"GREEN MARKET"* through once. The list is built, never maintained: `scripts/allow.mjs` collects
+   `copy.ts` values, template text nodes and `Kbd` names into a committed `allow.json`, and a gate
+   asserts it is exact ([50-SPEC-WEB](50-SPEC-WEB.md) §4.5; [32-PARITY](32-PARITY.md) §9.1).
 2. **Layout is byte-identical off → on** — element boxes and page height — and **pixel readback**
    proves that redacted digits re-photographed as `0` and as `8` are identical.
 

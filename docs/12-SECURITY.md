@@ -48,14 +48,14 @@ rather than by an incident, which is the only good way to find it.
 |---|---|
 | A person, browser | passkey (WebAuthn) primary; email magic link fallback. Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, 30 days, rotating |
 | A person, second device | passkey on that device, or a magic link |
-| An agent | bearer token, scoped `read` · `propose` · `write` — **there is no `admin` scope, ever**; the ADMIN and VAULT groups are a browser session only ([ADR-060](16-DECISIONS.md)) — revocable, shown once, last-used recorded |
+| An agent | bearer token, scoped `read` · `propose` · `write` — **there is no `admin` scope, ever**, and no standing token reaches ADMIN. VAULT is a browser session only. ADMIN is a browser session — or a bearer carrying an **operation grant**: from a browser session the owner approves *one named operation* (a pack install by plan hash, an export scope, an import by file hash, a token's creation or revocation) after seeing its summary; the approval is single-use, dies in ten minutes, is recorded as `device_grant.reach` and an `access.grant` event, and reaches exactly that one method once ([ADR-060](16-DECISIONS.md), amended; [48-SPEC-CLI](48-SPEC-CLI.md) §5.2; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.6). Revocable, shown once, last-used recorded |
 | An MCP client | an agent token (Phase A ships tokens only); OAuth 2.1 (RFC 9728 metadata, RFC 9207 `iss`, CIMD) when BrainDog is its own authorization server — deferred, [33-CONTRACTS](33-CONTRACTS.md) §4 |
-| A shared link recipient | a signed, scoped, expiring token. Read-only, one page — `page(slug)` for one slug; `ctx.scope` is the link's projection, an empty ceiling ([20-COLLABORATION](20-COLLABORATION.md) §1); nothing else |
-| A person, invited | the owner mints a single-use invitation link (24 h, bound to one email); the invitee registers a passkey behind it; acceptance writes the `member` rows and one `access.grant` event per register ([20-COLLABORATION](20-COLLABORATION.md) §1) |
-| **A machine the customer connected** — the tier-C runner | **the vault's device grant of §6.1** (RFC 8628): six-digit code, owner approves in the browser, a 90-day bearer stored as `token_hash`, auto-deregistered after 14 silent days. It reaches the JOBS group's three runner methods — `claimJob` · `postJobEvent` · `readCancel` ([30-BLUEPRINT](30-BLUEPRINT.md) §5) — and, per job, a job-scoped bearer of `read`+`propose`, audience one record, expiry the job deadline. Never `write`. See [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 |
-| Inbound webhook | per-ingest `verify: { kind: hmac_sha256, header: X-Signature, grant: <label> }` declared on the `ingest` ([25-CONNECTORS](25-CONNECTORS.md) §3.2), or the URL's random path token; an unverified payload is stored `untriaged` and never matched |
+| A shared link recipient | a signed, scoped, expiring token — the `share` principal kind of the one `CallContext`. Read-only, one page — `page(slug)` for one slug; `ctx.scope` is the link's projection, an empty ceiling ([20-COLLABORATION](20-COLLABORATION.md) §1); nothing else |
+| A person, invited | the owner mints a single-use invitation link (24 h, bound to one email) — `invite`, an ADMIN method; the invitee registers a passkey behind it; at `GET /auth/invite/<token>` the host calls `acceptInvite` — INTERNAL — with the Directory's verified person, and that writes the `member` rows and one `access.grant` event per register ([20-COLLABORATION](20-COLLABORATION.md) §1) |
+| **A machine the customer connected** — the tier-C runner | **the device grant of §6.1** with `reach = runner` (RFC 8628): six-digit code, owner approves in the browser, a 90-day bearer stored as `token_hash`, auto-deregistered after 14 silent days; the `runner` principal kind. It reaches the JOBS group's three runner methods — `claimJob` · `postJobEvent` · `readCancel` ([30-BLUEPRINT](30-BLUEPRINT.md) §5) — and, per job, a job bearer that `claimJob` mints as a `token` row: scope `propose` (which reads), labelled `job:<id>`, audience one job, expiring with the job ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.7). Never `write`. See [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 |
+| Inbound webhook | the URL is `/in/webhook/<rec_id>/<ingest-id>/<token>` — a random path token per ingest — and a declared `verify: { kind: hmac_sha256, header: X-Signature, grant: <label> }` ([25-CONNECTORS](25-CONNECTORS.md) §3.2) is checked in the host through the record's `ingestVerify`, since the record never decrypts ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.4); an unverified payload is stored `untriaged` and never matched |
 | Inbound email | the per-record address is the capability; a DKIM/SPF pass is required to match, else the payload is quarantined `untriaged` |
-| Self-host, single user | passkey, or `BRAINDOG_TOKEN` for a private instance — owner level, everything; self-host single-user only |
+| Self-host, single user | `BRAINDOG_TOKEN` for a private instance — owner level, everything; self-host single-user only — with magic links in phase 2 and passkeys in phase 3, when the web app lands: ES256 and RS256, no attestation, registration behind a session ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.10) |
 
 > **One row above deserves a note, because an earlier draft made it different in kind.** That draft
 > gave the connected machine a keypair it generated locally, with BrainDog holding only the public
@@ -63,6 +63,13 @@ rather than by an incident, which is the only good way to find it.
 > the property it bought survives: BrainDog stores the grant only as `token_hash`, exactly as it stores
 > an agent token, so a complete theft of BrainDog's own database still impersonates no customer's
 > machine. One flow to secure instead of two, and no keypair anywhere in this document.
+
+**The routes are one table.** Every authentication path is a `/auth/*` route in [33-CONTRACTS](33-CONTRACTS.md) §4
+— ten of them: `POST /auth/device` · `POST /auth/device/token` · `POST /auth/device/approve` ·
+`POST /auth/magic` · `GET /auth/magic/<token>` · `POST /auth/passkey/register` · `POST /auth/passkey/assert`
+(phase 3) · `POST /auth/logout` · `POST /auth/switch` · `GET /auth/invite/<token>` — and both hosts serve
+exactly these. A bearer on the wire is `<rec_id>.<secret>`; the record keeps only `sha256(secret)`, in
+`token.hash` or `device_grant.token_hash`.
 
 **Passkeys first, and no passwords at all.** A record holding credentials should not be protected
 by a reusable secret that can be phished. WCAG 2.2's accessible-authentication criterion is
@@ -140,7 +147,7 @@ somewhere, and somewhere is currently a notes app. So BrainDog stores them, prop
               draft overclaimed this
       │
       ▼
-  AES-256-GCM(plaintext, nonce, aad = record_id ‖ grant_id ‖ version)
+  AES-256-GCM(plaintext, nonce, aad = record_id ‖ grant_id ‖ version)   -- ‖ is the byte 0x1F; exact below
 ```
 
 **The vault cannot hold its own key.** The KEK, the owner's passkey and a self-host's `BRAINDOG_TOKEN` live
@@ -154,7 +161,13 @@ and per-record keys are wrapped and stored in the record. A design that put a ke
 Secrets Store would have hit a wall at customer 101.
 
 The AAD binding matters: a ciphertext moved to another record or another grant id fails to
-decrypt. Copying a blob between records yields nothing.
+decrypt. Copying a blob between records yields nothing. **The bytes, once, here:**
+`aad = utf8(record_id) ‖ 0x1F ‖ utf8(grant_id) ‖ 0x1F ‖ utf8(String(version))` — wherever this corpus
+writes `‖` it means that byte. The wrapped DEK is bound the same way, to `utf8(record_id) ‖ 0x1F ‖
+utf8(purpose)`; the grant key is HKDF-SHA-256 over the DEK with the grant id as `info`; nonces are 12
+bytes; and everything crosses a wire as base64url. One rule for vault and connector grants alike,
+byte-exact in [47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.6. **Sign-up generates all three keys** — the
+record DEK, the connector DEK (§7) and the signing key ([03-DOG-FORMAT](03-DOG-FORMAT.md) §4).
 
 **Where the wrapped keys live: `vault_key`**, one row per purpose — `record` (this DEK), `connector`
 (the second DEK of §7) and `signing` (the record's Ed25519 export key,
@@ -163,11 +176,22 @@ decrypt. Copying a blob between records yields nothing.
 ([30-BLUEPRINT](30-BLUEPRINT.md) §1). It travels in an export, sealed — a wrapped key is nothing without the
 KEK, and a record restored from its own backup must be able to open its own vault (§8).
 
-**Where AES-GCM runs: the Worker, never the record.** The record has no `KeyStore` port and never
-sees a plaintext credential ([ADR-062](16-DECISIONS.md)). `openGrant(id)` logs `grant.read`, increments
-`opened`, and returns sealed material — `{ ciphertext, nonce, aad, kek_id, wrapped_dek }`; the Worker
-unwraps the DEK via `KeyStore`, derives the grant key by HKDF, decrypts, and returns plaintext to the
-browser once. `bindGrant` is the mirror: the Worker encrypts, the record stores.
+**Rotation is two slots.** The root key has a current slot and a previous one — `KEK` and `KEK_PREV`;
+`rewrapKeys` re-wraps every `vault_key` row from the old to the new, `kek_id` tells the rows apart during
+the walk, rotations are at least 30 days apart, and the previous slot is retired 30 days after the first
+clean night. The age identity that seals the nightly backups lives outside Cloudflare altogether — the
+Worker holds only the recipient half ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.6, §5.4).
+
+**Where AES-GCM runs: the host — the Worker on Cloud, the Node process on a self-host — never the
+record.** The record has no `KeyStore` port and never sees a plaintext credential ([ADR-062](16-DECISIONS.md)).
+`openGrant` logs `grant.read`, increments `opened`, and returns **sealed material** — the one shape
+`{ ciphertext, nonce, aad, kek_id, wrapped_dek }`, everywhere, base64url over the wire; the host unwraps
+the DEK via `KeyStore`, derives the grant key by HKDF, decrypts, and returns plaintext to the browser once.
+`bindGrant` is the mirror: the host encrypts, the record stores; it mints the grant id — `g_` + ULID — and
+a `secret` field may hold only an id that exists. A connector's read is the same event by another door:
+`sealedGrant` hands the host the same sealed shape for a pull, logs `grant.read` with actor `ingest:<id>`
+and counts `opened` ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.4, [47-SPEC-CONNECT](47-SPEC-CONNECT.md) §5.1).
+A `WRONG_KEY` is judged against `vault_key`'s own `kek_id`, never guessed from the row.
 
 ### The optional second factor
 
@@ -202,7 +226,7 @@ sentence as the switch.
 ### What a grant row holds
 
 ```
-id           the grant id — the value a `secret` field stores
+id           the grant id, `g_` + ULID, minted by `bindGrant` — the value a `secret` field stores
 label        "Cloudflare — Quartz account"
 opens        ref → register.services #12
 kind         api_token | password | ssh_key | recovery_codes | note
@@ -240,7 +264,13 @@ FOR" is structural rather than remembered.
    drops them — [03-DOG-FORMAT](03-DOG-FORMAT.md) §5 and §8 below.
 7. **The vault is its own RPC group.** `listGrants` · `openGrant` · `bindGrant` · `revokeGrant` are the
    VAULT group of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — a browser session only; every token, whatever its
-   scope, gets `403 NEEDS_BROWSER_SESSION` ([ADR-060](16-DECISIONS.md)).
+   scope, gets `403 NEEDS_BROWSER_SESSION`, and so does an operation grant — VAULT has no reach
+   ([ADR-060](16-DECISIONS.md)).
+8. **A connector grant is a JSON object of string fields**, its secret keys the closed set per
+   `auth.kind` in [47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.5, and a declared `require_scopes` is
+   **proven at bind**, never assumed. When a provider rotates a refresh token mid-run, connect re-seals
+   it (version + 1) and the record stores it from the ack with one `grant.rotate` event — the previous
+   version kept as `prev_ciphertext`.
 
 
 ### 6.1 · The device-authorisation grant, and five refinements from the predecessor
@@ -262,13 +292,13 @@ never opened the vault all ask the same way.
 | Rule | Why |
 |---|---|
 | The device polls with a **long random id, never the code** | conflating them makes polling a million-guess oracle |
-| The code is stored **hashed with the session secret** | a pending row is readable by anything that reads the database |
+| The code is stored **hashed, never in clear** — `code_hash = sha256(id ‖ ':' ‖ user_code)`, the long random poll id as its salt; the record has no `SESSION_SECRET` and depends on no host secret to check it ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.11) | a pending row is readable by anything that reads the database. *An earlier draft hashed it under the session secret* |
 | **One row, two lives**: pending → approved → active | two tables would mean delete-and-reinsert at approval, and a crash between them loses the approval he just gave |
 | Approval is **browser-session only** — a bearer gets `403 NEEDS_BROWSER_SESSION` (it is authenticated, so it is forbidden — and the `401` rule in §8 stays true) | an agent may not approve its own request |
 | A wrong code bumps `tries` on *every* pending row; five → `denied` (`DEVICE_CODE_TRIES`) | — |
 | **A denied row is kept** | *"I said no to a request I did not make"* is the single most important line this table can produce |
 | The grant is **revocable on its own**, without ending the session | it is a separate long-lived token, 90 days, stored as `token_hash`, because revocation is real. `expires` holds the code's ten minutes while pending and is rewritten to +90 d when the poll exchanges an approved row for its token (approved → active); a device silent for 14 days is auto-deregistered |
-| **And it is the tier-C runner's enrolment flow too** — [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 had a bespoke one; there is now one | one flow to secure, and it is a standard |
+| **And it is the tier-C runner's enrolment flow too** — [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 had a bespoke one; there is now one — **and the operation grant's** (§3). The row's `reach` says which: `login` · `runner` · `export` · `import` · `pack` · `token` — six values. A `runner` exchange returns the 90-day bearer; an operation reach returns a bearer that keeps the code's ten minutes and is spent on one call | one flow to secure, and it is a standard |
 
 Four more rows on the vault itself, each answering a specific way the earlier design would have
 failed:
@@ -277,10 +307,10 @@ failed:
 |---|---|
 | **`opened` and `last_opened` on the row, and the screen draws them** | one secret per request, no bulk read anywhere. *"A script that walked all thirty leaves thirty audit rows and thirty visible counters. The XSS is not prevented — it is made slow and loud, which is the honest claim."* |
 | **`kek_id`** — a 72-bit fingerprint of the wrapping key | rotating the root key otherwise turns every row into a WebCrypto `OperationError`, *"which reads exactly like corruption on the one screen where 'the data is gone' and 'the key changed' need different answers."* A mismatch is `409 WRONG_KEY` |
-| **Reveal is `openGrant(id)`, an RPC in the VAULT group — never a readable address** | no URL, no history, no `Referer`. It returns sealed material and the Worker decrypts — the record never sees plaintext (§6, [ADR-062](16-DECISIONS.md)) |
+| **Reveal is `openGrant`, an RPC in the VAULT group — never a readable address** | no URL, no history, no `Referer`. It returns sealed material and the host decrypts — the record never sees plaintext (§6, [ADR-062](16-DECISIONS.md)) |
 | **`bytes` and `hint`** | *"a 3.2 KB env file"* against *"a 64-character token"* without opening anything — most of what the owner needs at a glance. Exactly two versions are kept — `ciphertext`/`nonce` and `prev_ciphertext`/`prev_nonce` — and the schema says so; there is no version table to prune |
 
-**What is not defended, stated plainly:** a compromised Worker, which can read the root key. The
+**What is not defended, stated plainly:** a compromised host — on Cloud, the Worker — which can read the root key. The
 alternative — end-to-end encryption — would mean no agent could ever read a secret and losing a
 passkey loses the vault. The predecessor's owner chose the other trade knowingly, and the honesty table
 in §7 says so.
@@ -297,11 +327,13 @@ implied.
 | Your rows | **we can read them** — the object runs on our account | no |
 | Your credentials, vault passphrase **off** | **we could decrypt them** | no |
 | Your credentials, vault passphrase **on** | no | no |
-| Your prompts | payload retention off at the gateway — prompts and responses are not stored. Token counts and cost are, because the budget needs them | no provider at all |
+| Your prompts | payload retention off at the gateway — prompts and responses are not stored. Token counts and cost are, in Spark's `call` table ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.1), which holds no prompt text, because the budget needs them | no provider at all |
 | Telemetry | counts and durations only; record id hashed with a monthly-rotating salt | none |
 
-Operationally: access to a customer's record requires a named reason recorded in our own audit,
-and support never asks for a vault passphrase. **The strongest available answer to "can you read
+Operationally: access to a customer's record requires a named reason recorded in our own audit, follows
+the diagnosis order of [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.15 — the tuple, the refusal state,
+`observation`, `event`, the `system` suggestions, and only then a row — and support never asks for a
+vault passphrase. **The strongest available answer to "can you read
 my data" is "self-host, and here is the complete build"** — which is what AGPL and D41 buy, and
 why the self-host must never be a crippled tier.
 
@@ -343,15 +375,15 @@ removes our access going forward, and removes it from the backups thirty days la
 
 | Control | Note |
 |---|---|
-| Content Security Policy | no `unsafe-inline`, no third-party origins. Packs cannot load a remote asset, so the policy has nothing to allow |
+| Content Security Policy | no `unsafe-inline` for scripts or stylesheets, no third-party origins. Packs cannot load a remote asset, so the policy has nothing to allow. One named exception: `style-src-attr 'unsafe-inline'` for the renderer's single `--magnitude` custom property on a bar — an attribute value nothing content-controlled can reach; `style-src-elem` is nonce-based ([22-FRONTEND](22-FRONTEND.md) §7) |
 | Output encoding | one renderer, one escape function, escaping applied before any markup exists so nothing downstream can un-escape |
-| Link safety | `https:`, `mailto:`, anchors, same-origin paths only. Everything else renders as text |
+| Link safety | `https:`, `mailto:`, anchors, same-origin paths only, `rel="noreferrer"` on the first two. Everything else renders as its literal text |
 | CSRF | `SameSite=Lax` plus origin check on every mutation |
 | Rate limiting | per token and per IP at the Worker; per record at AI Gateway |
-| Dependency surface | **a stated goal of near-zero runtime dependencies.** The prior system's Worker had no `package.json` at all, which is why it ran unmodified on plain Node — a supply-chain posture and a portability win from one decision |
+| Dependency surface | **a stated goal of near-zero runtime dependencies**, and the few are enumerated in [ADR-046](16-DECISIONS.md): `valibot` in `declare`, and one YAML parser, `yaml`, on the CLI and self-host paths only ([ADR-063](16-DECISIONS.md)). The prior system's Worker had no `package.json` at all, which is why it ran unmodified on plain Node — a supply-chain posture and a portability win from one decision |
 | Secrets in CI | Cloudflare API tokens scoped to deploy only; no token in the repo, ever |
-| Migrations | forward-only, checksummed, `--dry-run` first, `transferred_classes` never `deleted_classes` |
-| Backups | nightly `.dogl.age` to R2, 30 days, plus platform PITR at any point in 30 days |
+| Migrations | forward-only, checksummed, `--dry-run` first, `transferred_classes` never `deleted_classes`. A deploy carrying a kernel migration is never rolled back and never percentage-rolled; the canary is the ops record and recovery is fix-forward ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.3) |
+| Backups | nightly `.dogl.age` to R2 under the record's own prefix, 30 days, ≤ 40 MiB per record, plus platform PITR at any point in 30 days. The age identity lives outside Cloudflare — two copies in the operator's password manager; the Worker holds only `AGE_RECIPIENT`. Drilled: restore monthly, KEK rotation quarterly for real, erasure quarterly on the ops record, self-host upgrade every release, parity every deploy ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.4, §9) |
 
 
 ### Refusals that do not leak
@@ -362,10 +394,12 @@ Carried from the predecessor, where each was earned:
 |---|---|
 | A `401` says only `UNAUTHORIZED`; a `500` is bare | recon gets nothing |
 | **No CORS, anywhere**; every JSON answer is `no-store` | — |
-| The login lockout **reserves the attempt before comparing**, is sticky at ten, and **fails closed** — a reservation that returns no row is a `503`, not a pass | the magic-link fallback code is short-lived and guessable in principle; the lockout is what makes any code field acceptable |
+| The login lockout **reserves the attempt before comparing**, is sticky at ten strikes for fifteen minutes on a capped counter, keyed four ways — `ip:` `email:` `mint:` `device:` — and **fails closed** — a reservation that returns no row is a `503`, not a pass. Device codes and share tokens are locked out on the record's own `auth_fail`, logins on the Directory's ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.5) | the magic-link fallback code is short-lived and guessable in principle; the lockout is what makes any code field acceptable |
 | **Agent tokens bypass the lockout, deliberately** | *"an agent tripping the ten-strike IP block would lock Sam out of his own brain"* |
 | Passkey verification returns **one word, `rejected`, for every failure** — and the reason is logged, not returned | the caller who deserves the reason is the owner, who reads the log |
 | Passkey registration requires an authenticated session **in place of attestation** | *"behind the gate… is the security model in one line"* |
+| **Two fleet-wide levers, both the host's**: the Directory's session and magic-link hashes are HMAC-SHA-256 under the host's `SESSION_SECRET`, and `TOKENS_VALID_FROM` refuses anything minted before it | rotate one secret and every session is gone; set one date and every token is gone — an incident response that walks no rows ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.11) |
+| **Fixtures carry no real data**: generated names, `.example` hosts, dates in 2030–2031, amounts under 10^7 minor, no ULID or hash on disk | a test corpus is the one copy of a record that is committed in clear ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md)) |
 
 **An audit row is drawn on another screen.** The predecessor logged `Credential indexed: <name> — opens
 <opens>` on the reasoning that an audit row is read in a briefing and should be useful — and that reasoning is
@@ -373,8 +407,9 @@ why it was wrong: audit rows are drawn on the activity screen, and the vault is 
 **absent, not blurred, under screenshot mode**, because an index that is merely smudged is an index still in
 the page source. Latent while credentials were added by hand; a migration indexed thirty-five in one run and
 the harness caught thirty-five `opens` sentences on a screen that should carry none. So: a `grant.*` event's
-`note` carries the grant's id and `kind`, never its `label` or `opens`; the event's `refs` carry the id, so a
-reader entitled to the prose is one call from it. Three invariants of the vault screen are tests
+`note` carries the grant's id and `kind`, never its `label` or `opens` — the rule keys on `target_kind = 'grant'`,
+whatever the event kind, and a `vault_key` re-wrap's note is `<purpose> <from> → <to>`, naming no grant; the
+event's `refs` carry the id, so a reader entitled to the prose is one call from it. Three invariants of the vault screen are tests
 ([18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6): a closed row draws no `opens`; opening a row opens exactly one;
 no value control is drawn on a page with nothing expanded.
 
@@ -390,6 +425,9 @@ The rules for `file` and the `/a/<sha256>` route, all from the predecessor and a
   capability**: an `<img>` cannot send a bearer header, so the route is unauthenticated and the
   64-hex path regex is what stops traversal.
 - 2 MB, checked against `Content-Length` before buffering and against the bytes after.
+- **Uploads exist, and the client names the hash**: `PUT /a/<sha256>` with a session cookie or a `write`
+  bearer; the server hashes what arrived and a mismatch is `CHECKSUM_MISMATCH`
+  ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.5). *(An earlier draft had a store and no way in.)*
 
 ### The export, and what it leaves out
 
@@ -400,8 +438,12 @@ sealed by default**, and so does the wrapped DEK in `vault_key` — which opens 
 Worker secret that is never in any file — so a leaked export is
 bytes. `--redact-grants` drops the ciphertext too. *An earlier draft said the export excludes every
 vault table; that contradicted [03-DOG-FORMAT](03-DOG-FORMAT.md) §5's three export modes and rule 6
-above, and it is withdrawn.* The export flags `auditTruncated`, always writes `latest`, records row
-counts in the object's metadata so *"it is backed up"* is checkable, and **a failed snapshot writes an
+above, and it is withdrawn.* **A snapshot is not an export.** On a self-host a snapshot is a full copy
+that keeps the six `local` tables and never leaves the host — disaster recovery; on Cloud the nightly
+backup is an export, sealed, and it rides the **outbox**, which gives it the retry ladder and the visible
+failure ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.12). The nightly walk flags `auditTruncated`, always
+writes `latest`, records row counts in the object's metadata so *"it is backed up"* is checkable, and
+**a failed night writes an
 `export` event with `note: 'failed: <reason>'` and opens a `suggestion`** (*re-run the snapshot*) — the
 visible item [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1 requires; `blocker` is not an event kind.
 A backup that silently gave up is worse than none. Two routes exist for the owner: **snapshot now**,

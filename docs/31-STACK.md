@@ -10,67 +10,81 @@ Languages, layout, ports, publishing. Every version was read from the registry o
 
 > ### `packages/*` may name a **capability**. Only `apps/*` may name a **runtime**.
 
-The moment a file writes `import { DurableObject } from 'cloudflare:workers'` or
-`import { DatabaseSync } from 'node:sqlite'`, it belongs in `apps/`.
+The moment a file writes `import { DurableObject } from 'cloudflare:workers'`, it belongs in `apps/`.
+`node:*` has two named exceptions under `packages/**`, and only two: `packages/ports/src/node-sqlite.ts`,
+behind the `./node-sqlite` subpath, because the Node `Sql` adapter is a port implementation and the
+conformance corpus runs against it; and `packages/fixtures`' row generator, which writes files. Lint
+layer 4 exempts exactly those paths ([37-SPEC-PORTS](37-SPEC-PORTS.md) §13 D8;
+[40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §13 D9). *(An earlier draft named `node:sqlite` as the import
+that sends a file to `apps/`; the adapter for it is the one file that must not go there.)*
 
 That single rule is what makes [01-ARCHITECTURE](01-ARCHITECTURE.md) §4's self-host claim structural
 rather than aspirational — and it is exactly the thing
 [22-FRONTEND](22-FRONTEND.md) §11 names as expensive to reverse: *"if one `ctx.storage.sql` call
 leaks into a component, self-host is broken and you learn it from a user."*
 
-**Every `packages/*` must run in workerd, in Node, and in a bare Vitest process.** That is not a
+**Every `packages/*` must run in workerd, in Node, and under bare `node --test`.** That is not a
 consequence of the boundaries — it *is* the boundary. Permitted surface: ES2023, WebCrypto,
-`TextEncoder`, `structuredClone`, `URL`, `Intl`. Banned under `packages/**`: `node:*`,
-`cloudflare:*`, `process`, `Buffer`, `__dirname`, and bare `fetch`.
+`TextEncoder`, `structuredClone`, `URL`, `Intl`. Banned under `packages/**`: `node:*` — save the two
+paths above — `cloudflare:*`, `process`, `Buffer`, `__dirname`, and bare `fetch`, under
+`packages/record/**` and `packages/spark/**` alike; `RegExp` is banned under `packages/extract/**`
+([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D4).
 
 ---
 
 ## 2 · The package graph
 
 ```
- L3  apps/worker      apps/selfhost     apps/web        apps/cli
-     wrangler · DOs   node · fs         SvelteKit       one file
-         │  │  │          │  │  │         │  │  │        │  │  │
- L2      └──┴──┼──────────┴──┼──┼─────────┼──┼──┼────────┼──┼──┤
-               │             │  │         │  │  │        │  │  │
-            record ──────────┘  │         │  │  │        │  │  │
-            RPC · write path    │         │  │  │        │  │  │
-            NO network object   │         │  │  │        │  │  │
-               │  │  │  │       │         │  │  │        │  │  │
- L1         mcp┘  │  │  │       │         │  │  │        │  │  │
-                  │  │  │       │         │  │  │        │  │  │
-            declare  kernel  extract      │  │  │        │  │  │
-               │  │     │  │     │        │  │  │        │  │  │
- L0  ──────────┼──┼─────┼──┼─────┼────────┼──┼──┼────────┼──┼──┤
-            render      where            ports    theme    fixtures
-            ★ MIT       parse·print      9 ifaces  oklch    devDep
-            in-deg 0    /sql             + conf.   16 chk   only
+ L3  apps/worker        apps/selfhost       apps/web            apps/cli
+     wrangler · DOs     node · fs           static shell        one file
+         │                  │                   │                   │
+ L2      └────────┬─────────┘                   │                   │
+                host                            │                   │
+                ROUTES · httpStatus             │                   │
+                resolveContext · serveApi       │                   │
+            ┌─────┼─────────┐                   │                   │
+          mcp   spark    connect                │                   │
+          types                                 │                   │
+            └─────┼─────────┘                   │                   │
+                record ─────────────────────────┴── (types) ────────┤
+                RPC · write path · ./directory  · NO network object │
+            ┌─────┼─────────┐                                       │
+ L1     declare  kernel   extract                                   │
+            │  │    │  │     │                                      │
+ L0  ───────┼──┼────┼──┼─────┼──────────────────────────────────────┤
+         render   where    ports     theme     fixtures
+         ★ MIT    parse·   9 ifaces  oklch     devDep
+         in-deg 0 /sql     Refusal   16 chk    only
 ```
 
 **Acyclicity is proved by exhibiting a total order** in which every package's dependencies have
-strictly lower indices — a cycle would require an edge that increases the index:
+strictly lower indices — a cycle would require an edge that increases the index. Thirteen packages,
+then the four apps; apps import packages and never each other:
 
 | # | Package | Depends on |
 |---|---|---|
 | 1 | `render` | — |
 | 2 | `ports` | — |
-| 3 | `where` | — |
+| 3 | `where` | 2 — the `Refusal` type only ([ADR-065](16-DECISIONS.md)) |
 | 4 | `theme` | — |
 | 5 | `fixtures` | — |
 | 6 | `kernel` | 2, 3 |
-| 7 | `declare` | 1, 3 |
-| 8 | `extract` | 3 |
-| 9 | `mcp` | 2, 7 |
-| 10 | `record` | 2, 3, 4, 6, 7, 8 |
-| 11 | `spark` | 2, 7 — Phase B7; ports `{ Sql, Clock, Inference }`, hosted by `apps/worker/src/do/spark.ts` |
-| 12 | `cli` | 1, 2, 3, 6, 7 |
-| 13 | `web` | 1, 3, 7 |
-| 14 | `worker` | 1–4, 7–11, 13 |
-| 15 | `selfhost` | 1–4, 6–11, 13 |
+| 7 | `declare` | 1, 3 — and 2 for the `Refusal` type; its one runtime dependency, `yaml`, sits behind `./yaml` ([ADR-063](16-DECISIONS.md)) |
+| 8 | `extract` | 3 — and 2 for the `Refusal` type |
+| 9 | `record` | 2, 3, 4, 6, 7, 8 — `./directory` is a subpath, not a package |
+| 10 | `mcp` | 6 (types), 9 (types) — the wrapper sits above what it wraps |
+| 11 | `spark` | 2, 3, 9 — Phase B7; ports `{ Sql, Clock, Inference }`, hosted by `apps/worker/src/do/spark.ts` |
+| 12 | `connect` | 2, 8, 9 |
+| 13 | `host` | 2, 6, 9, 10, 11, 12 — platform-neutral ([ADR-064](16-DECISIONS.md)) |
+| 14 | `web` | 1, 3, 4, 9 (types) — `theme` in the editor's own chunk |
+| 15 | `cli` | 1, 2, 3, 6, 7, 11 — `11` for `@braindog/spark/prompts` and nothing else of it |
+| 16 | `worker` | 1–4, 7–13 — and `web`'s `build/` as the asset directory, never an import |
+| 17 | `selfhost` | 1–4, 6–13 — and `web`'s `build/` as the asset directory, never an import |
 
-**Eleven workspaces at the §1b shape, fourteen at the end of Phase A, sixteen at platform.** The
+**Twelve workspaces at the §1b shape, fifteen at the end of Phase A, seventeen at platform.** The
 order is also the build order, so `pnpm -r run build` reproduces it for free. *(An earlier draft had
-no `spark` package: the assistant's object had ports and no capability package to hold them.)*
+no `spark` package, then no `connect` row and no `host`; and it placed `mcp` below `record`, which
+put the wrapper under the thing it wraps — iteration 2 swapped them, [ADR-064](16-DECISIONS.md).)*
 
 ### Each boundary, by what it prevents
 
@@ -78,11 +92,13 @@ no `spark` package: the assistant's object had ports and no capability package t
 |---|---|
 | **`render` has in-degree 0** | the MIT tarball containing AGPL code. **The only boundary here with a legal consequence** — §4 |
 | **`record`'s ports are exactly `{ Sql, Scheduler, Clock }`** | [ADR-002](16-DECISIONS.md) becoming a comment. No `Http`, no `Inference`, no `Dispatch`. *"The record cannot speak"* becomes *"the record has no object to speak with"*. The one outbound act — the outbox doorbell — is `Scheduler.wake()`: Cloud `OUTBOX_Q.send({ record })`, self-host a no-op |
-| **`kernel` → `where`** | the index and the predicate disagreeing. `where` owns `jsonPath(fieldId)`, so `CREATE INDEX … json_extract(fields,'$.due')` and `WHERE json_extract(fields,'$.due') < ?` are **the same string** — which is the difference between the planner using the partial expression index and scanning it |
-| **`where` ⇏ `ports`, ⇏ `kernel`** | shipping the SQL schema to the browser. The query builder round-trips `parse(print(t)) ≡ t` client-side, so `where` has a fourth runtime. Split: `where` (parse · print · validate) and `where/sql` (compile). The client imports only the first |
+| **`kernel` → `where`** | the index and the predicate disagreeing. `where` owns `jsonPath`, `searchText`, `derive` and `toSchema`, and the kernel imports them — so `CREATE INDEX … json_extract(fields,'$.due')` and `WHERE json_extract(fields,'$.due') < ?` are **the same string**, which is the difference between the planner using the partial expression index and scanning it; and the stored `unique:` fingerprint and the compiled inline share one definition. `compile()` returns the whole `WHERE` clause and the kernel never splices a fragment ([38-SPEC-WHERE](38-SPEC-WHERE.md) §13; [41-SPEC-KERNEL](41-SPEC-KERNEL.md)) |
+| **`where` ⇏ `kernel`, and takes one *type* from `ports`** | shipping the SQL schema to the browser. The query builder round-trips `parse(print(t)) ≡ t` client-side, so `where` has a fourth runtime; the `Refusal` type it imports from `ports` is erased at build and costs the browser nothing. Split: `where` (parse · print · validate) and `where/sql` (compile) — and there is no `where/text`; the text lens is `declare`'s. The client imports only the first |
 | **`declare` ⇎ `theme`** | the one cycle the design invites. `declare` owns *shape*, `theme` owns *semantics*; `record` orchestrates both. Neither imports the other |
 | **`declare` ⇏ `kernel`** | `braindog pack lint` needing a database. A pack must lint offline, from a file |
-| **`mcp` ⇏ `record`** | the MCP server reaching into internals, and being untestable without a Durable Object |
+| **`mcp` imports the `RecordApi` *type* only** | the MCP server reaching into internals. It is testable with a stub `RecordApi`, no Durable Object needed — and because a type import is still an edge, it sits *above* `record` in the order, not below it |
+| **`host` is platform-neutral** — standard `Request`/`Response`, no `cloudflare:*`, no `node:*` | the route table, `httpStatus`, `resolveContext` and `serveApi` drifting between the Worker and the self-host: ~300 lines written once ([ADR-064](16-DECISIONS.md)) |
+| **The Directory is `@braindog/record/directory`** | a fourteenth package for tables that share `record`'s port, schema discipline and tests ([51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D10) |
 | **`record` ⇏ `render`** | markup in the record, and therefore markup in the `.dog` |
 | **`fixtures` is a devDependency everywhere** | 402 lines of one person's seed data shipping in a bundle — the exact defect the clean room exists to avoid |
 
@@ -91,7 +107,9 @@ no `spark` package: the assistant's object had ports and no capability package t
 The client interpreter is a recursive Svelte component, and a genuinely zero-dependency MIT package
 cannot contain it. **Two subpath exports, one package:**
 
-- `braindog-render` — `parse` · `expand` · `toHTML` · `PRIMITIVES`. Zero dependencies, zero peers.
+- `braindog-render` — `parse` · `toHTML` · `render` · `KINDS` · `PRIMITIVES` · `PRIMITIVES_VERSION`.
+  Zero dependencies, zero peers. No `expand` at the root: kinds expansion is `declare`'s
+  ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D3).
 - `braindog-render/svelte` — the interpreter. `svelte` as an **optional peer**.
 
 **Cost, stated: two renderers that can drift.** Mitigated by one fixture corpus, shipped in the
@@ -113,13 +131,15 @@ plan.
 | TypeScript version | **pinned 6.0.3, not 7.0.2** | `typescript-eslint@8.69.0` declares `typescript: >=4.8.4 <6.1.0`. **TS 7 and type-aware linting are mutually exclusive today.** Pin with a dated comment; revisit quarterly |
 | Package manager | **pnpm 11.25.0** | Cloudflare's own `workers-sdk` says *"use pnpm, not npm or yarn."* And three pnpm 11 defaults matter — see below |
 | Task runner | **none** | pnpm 11.25 shipped a real scheduler: `tasks:` with `dependsOn: [^build]`, cycle detection, `--resume-from`. **That is most of what Turborepo is installed for, and it is now free** |
-| Test runner | **Vitest 4.1.11** + **`@cloudflare/vitest-plugin` 1.1.2** | renamed from `@cloudflare/vitest-pool-workers` on 2026-08-19. Peers `vitest ^4.1.0` **exactly** — Vitest 5 RC is out of range. **The repo's hardest external pin** |
+| Test runner | **Vitest 4.1.11** + **`@cloudflare/vitest-plugin` 1.1.2** — for `apps/worker/test` alone; every package's own `test` is `node --test` ([52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §13 D5) | renamed from `@cloudflare/vitest-pool-workers` on 2026-08-19. Peers `vitest ^4.1.0` **exactly** — Vitest 5 RC is out of range. **The repo's hardest external pin** |
 | Property testing | **fast-check 4.9.0** | inspected: zero Node built-ins, one zero-dep dependency. **Runs unchanged inside workerd**, which matters because the compiler must be property-tested against a real Durable Object |
-| Lint | ESLint flat + **`eslint-plugin-import-x`** | never `eslint-plugin-import`: no release since 2025-06-20, 581 open issues |
+| Lint | ESLint flat + **`eslint-plugin-import-x`** — **deferred** until a rule needs an AST; `tools/gates/graph.mjs` covers layers 3–5 below until then. **No Stylelint**: the CSS gates are the twelve rules of `css-rules.mjs`, one regex tokeniser, zero dependencies ([52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §13 D10, D11) | when it lands, never `eslint-plugin-import`: no release since 2025-06-20, 581 open issues |
 | E2E | **Playwright 1.62.1** + **axe-core 4.13.0** | the rendered-box and contrast gates run in a real browser ([18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6); Playwright specs are the one gate family that is not a zero-dependency script |
 | Deploy | **wrangler 4.128.0** | read from the registry 2026-09-02 |
 | UI | **Svelte 5.57.0 / SvelteKit 2.70.3** | [22-FRONTEND](22-FRONTEND.md) §2; read from the registry 2026-09-02 |
 | Node | **24.13.0**, pinned to the minor | `node:sqlite` is the self-host default driver (§5) and is still **Stability 1.1** — an earlier draft said 1.2 (RC) — and still emits `ExperimentalWarning`; FTS5 is present in the official build (measured 2026-09-02, §10) and the boot probe re-measures it on every start |
+| Runtime, `declare` | **valibot 1.4.2** (§9) · **`yaml` 2.9.0**, behind `@braindog/declare/yaml` and on the CLI and self-host paths only | [ADR-046](16-DECISIONS.md) enumerates both; [ADR-063](16-DECISIONS.md) is the parser's own decision |
+| Build, dev only | **esbuild** — the CLI bundles to one file, `--platform=node --format=esm --target=node24` · **`@sveltejs/adapter-static`** · **`@valibot/to-json-schema`** — the tool-schema generator, at build | pinned in the catalog from the registry at the first commit; none ships ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D4; [50-SPEC-WEB](50-SPEC-WEB.md) §13 D2; [44-SPEC-MCP](44-SPEC-MCP.md) §13 D1) |
 
 ### Three pnpm 11 defaults that are load-bearing
 
@@ -138,15 +158,15 @@ entirely. Use `publicHoistPattern` for a specific broken package instead.
 |---|---|
 | **1 · pnpm's isolated layout** | an undeclared package import → `ERR_MODULE_NOT_FOUND`. Workspace packages live outside `node_modules`, so the hoisting leak does not reach them |
 | **2 · an `exports` map per package** | a deep import into internals → `ERR_PACKAGE_PATH_NOT_EXPORTED`. Three lines each |
-| **3 · `import-x/no-relative-packages`** | **the hole layer 1 cannot see.** `import '../../where/src/index.js'` from inside `packages/render/src/` **works fine** under pnpm — and it is exactly the import that would break the MIT boundary. *The dangerous form is the one nothing blocks by default* |
-| **4 · path-scoped `no-restricted-imports`** | `node:*` and `cloudflare:*` under `packages/**`; bare `fetch` under `packages/record/**` |
-| **5 · `tools/gates/graph.mjs`** | the fifteen-row edge table and acyclicity. ~40 lines, zero deps |
+| **3 · `import-x/no-relative-packages`** — `graph.mjs` until ESLint lands | **the hole layer 1 cannot see.** `import '../../where/src/index.js'` from inside `packages/render/src/` **works fine** under pnpm — and it is exactly the import that would break the MIT boundary. *The dangerous form is the one nothing blocks by default* |
+| **4 · path-scoped `no-restricted-imports`** — `graph.mjs` until ESLint lands | `node:*` and `cloudflare:*` under `packages/**`, save §1's two `node:*` paths; bare `fetch` under `packages/record/**` and `packages/spark/**`; `RegExp` under `packages/extract/**` |
+| **5 · `tools/gates/graph.mjs`** | the seventeen-row edge table of §2, in its order, and acyclicity. ~40 lines, zero deps |
 
 *Plus a sixth for free: per-package `tsconfig` `references` mirror the graph, and `tsc -b` fails on a
 cycle.*
 
 **Refused: dependency-cruiser.** Good tool. It needs a second resolver config kept in sync with
-tsconfig, and **the thing that enforces a fifteen-row table should be as small as the table.**
+tsconfig, and **the thing that enforces a seventeen-row table should be as small as the table.**
 
 ---
 
@@ -207,7 +227,7 @@ interface** (it is which `apps/*` you deploy), and **three were missing.**
 
 | # | Port | Cloud | Self-host |
 |---|---|---|---|
-| 1 | **`Sql`** | `ctx.storage.sql` | **`node:sqlite`** — the default on Node ≥ 24.13, zero native dependencies, FTS5 and JSON1 present (measured on 24.13.0, §10); `better-sqlite3` is the alternative for an older Node; `bun:sqlite` is unsupported. Both drivers run under **adapter-enforced `DO_LIMITS`** ([30-BLUEPRINT](30-BLUEPRINT.md) §13) and throw the DO adapter's closed error vocabulary, so a Node adapter refuses first. A build without FTS5 is **refused at boot** — there is no degraded mode ([ADR-038](16-DECISIONS.md)). *An earlier draft said `better-sqlite3` default, `node:sqlite` degraded, on the claim that official Node builds lack FTS5; measured false* |
+| 1 | **`Sql`** | `ctx.storage.sql` | **`node:sqlite`** — the default on Node ≥ 24.13, zero native dependencies, FTS5 and JSON1 present (measured on 24.13.0, §10); there is no `better-sqlite3` — the Node minor is pinned, so the older Node it would serve does not arise ([37-SPEC-PORTS](37-SPEC-PORTS.md) §13 D9) — and `bun:sqlite` is unsupported. The adapter enforces **`DO_LIMITS`** above the driver ([30-BLUEPRINT](30-BLUEPRINT.md) §13) and throws the DO adapter's closed error vocabulary, so the Node adapter refuses first. A build without FTS5 is **refused at boot** — there is no degraded mode ([ADR-038](16-DECISIONS.md)). *An earlier draft said `better-sqlite3` default, `node:sqlite` degraded, on the claim that official Node builds lack FTS5; measured false* |
 | 2 | `Scheduler` | DO alarm | one `setTimeout` over `MIN(due_at)` |
 | 3 | **`Clock`** *(new)* | `Date.now()` | `Date.now()` |
 | 4 | `Blobs` | R2 | `node:fs` under a root |
@@ -232,16 +252,19 @@ The full port signatures — `Cursor`, `Row`, `Param`, `Capabilities`, and the o
 `Ingress` — are in [33-CONTRACTS](33-CONTRACTS.md) §1; this document keeps only the line that
 matters.
 
-DO SQLite, `node:sqlite` and `better-sqlite3` are all synchronous. An async signature would permit
+DO SQLite and `node:sqlite` are both synchronous. An async signature would permit
 an `await` between two writes inside a transaction — **the exact interleaving
 [01-ARCHITECTURE](01-ARCHITECTURE.md) §2 spends a page on.**
 
 > **A synchronous type makes the concurrency bug unrepresentable rather than merely forbidden**, and
 > `NotPromise<T>` closes the async-callback hole at compile time.
 
-`Param` excludes `boolean` and `undefined`, because DO's SQL API rejects them while `node:sqlite`
-coerces. **That asymmetry passes every self-host test and fails in production**, so it is
-conformance case #1.
+`Param` excludes `boolean` and `undefined`. DO's SQL API rejects them; `node:sqlite` does not coerce
+a boolean — it throws — while it binds a `Date` as `NULL`, so the two drivers disagree in three
+different ways. The adapter refuses every non-`Param` value as `SYNTAX` before either driver sees it
+([37-SPEC-PORTS](37-SPEC-PORTS.md) §13 D5), which is what stops the asymmetry passing every self-host
+test and failing in production; it is conformance case #1. *(An earlier draft said `node:sqlite`
+coerces.)*
 
 And `BlobKey` is a branded type with `blobKey(recordId, sha256)` as its **only** constructor — which
 makes the cross-tenant dedupe leak in [03-DOG-FORMAT](03-DOG-FORMAT.md) §8 unrepresentable rather
@@ -249,9 +272,10 @@ than merely forbidden.
 
 ### The check that makes conformance real
 
-The cases are **a plain array, not a `describe` block**, and `Assert` is a six-method interface the
-host supplies. No test framework is imported — so the same list runs under bare Vitest, under the
-Cloudflare plugin, and under `node --test` if a self-hoster wants to certify their own build.
+The cases are **a plain array, not a `describe` block**, and `Assert` is a four-method interface the
+host supplies — `ok · equal · deepEqual · fail` ([37-SPEC-PORTS](37-SPEC-PORTS.md) §13 D7; an earlier
+draft said six). No test framework is imported — so the same list runs under `node --test`, under
+the Cloudflare plugin's Vitest, and under any host a self-hoster supplies to certify their own build.
 
 > **Then CI asserts each host ran the same number of cases, and prints every skip reason.** A skip
 > becomes visible and attributed, never silent. *That* is the difference between self-host parity
@@ -339,28 +363,33 @@ That is not cosmetic in *this* product:
 
 ```
 braindog/
-├── .github/workflows/{ci,gates,deploy,release,gate1}.yml
+├── .github/workflows/{ci,gates,deploy,release,gate1,nightly}.yml   gate1.yml is a report, never a gate
 ├── apps/
 │   ├── cli/          braindog-cli · PUBLISHED · esbuild → one file, no deps
 │   ├── selfhost/     Node 24.13+ · node:sqlite · the "free and complete" artefact · Dockerfile
-│   ├── web/          Svelte 5 + SvelteKit · entry-ssr.ts is the ONLY SSR entry
+│   ├── web/          Svelte 5 + SvelteKit · adapter-static · one build/ both hosts serve · no SSR entry
 │   └── worker/       the single Cloudflare deployment · three DO classes — Record, Spark, Directory — ~60 lines each
 ├── packages/
-│   ├── declare/      8 kinds · 16 field types · the refusal codes of 30 §6
-│   ├── extract/      10 extractors + 3 combinators. No regex, ever
-│   ├── fixtures/     8 reference pages · row JSON + seed.json (the .dog is materialised at test time) · a pack corpus
-│   ├── kernel/       27 tables (+ 4 dog_* header tables) · migrations · ULID · money · time · the erase cascade
-│   ├── mcp/          8 tools · resources · 3 prompts · the token-budget fixture
-│   ├── ports/        ★ the linchpin: 9 interfaces + memory impls + the conformance cases
-│   ├── record/       the RPC surface. Ports = { Sql, Scheduler, Clock }. Nothing else
+│   ├── connect/      ingest with fetch: · placeholders · formats · expect: · probe: · metric_point
+│   ├── declare/      8 kinds · 16 field types · one schemas.ts · ./yaml — the one YAML parser (ADR-063)
+│   ├── extract/      10 extractors + 3 combinators. No regex, ever — a scoped lint rule says so
+│   ├── fixtures/     9 records (8 pages + corpus) · row JSON + rows/gen.mjs for the generated corpora · a pack corpus
+│   ├── host/         ROUTES · httpStatus · resolveContext · serveApi · the MCP wiring — what both hosts share (ADR-064)
+│   ├── kernel/       27 tables (+ 4 dog_* header tables) · migrations as .ts modules · ULID · money · time · the erase cascade
+│   ├── mcp/          8 tools · resources · 3 prompts · the token-budget fixture · imports the RecordApi type only
+│   ├── ports/        ★ the linchpin: 9 interfaces · the Refusal type · ./node-sqlite · the conformance cases · no fakes
+│   ├── record/       the RPC surface, 64 methods · ./directory · Ports = { Sql, Scheduler, Clock }. Nothing else
 │   ├── render/       ★★ MIT · PUBLISHED · in-degree 0 · its own LICENSE
-│   ├── spark/        the assistant. Ports = { Sql, Clock, Inference }. Phase B7
-│   ├── theme/        OKLCH generator · Brettel 1997 · the 16 checks · DTCG 2025.10
-│   └── where/        ./ = parse·print·validate (browser)   ./sql = compile (server)
-├── docs/             the 35 documents
-├── tools/gates/      zero-dependency scripts for the source and artefact gates; rendered-box gates are
-│                     Playwright specs under apps/web/test — the inventory is 33-CONTRACTS §8
-└── LICENSE · LICENSING.md · CONTRIBUTING.md · SECURITY.md · .gitattributes · …
+│   ├── spark/        the assistant. Ports = { Sql, Clock, Inference }. Phase B7 · ./prompts is data
+│   ├── theme/        OKLCH generator · Brettel 1997 · the 16 checks · nextAccentHue · DTCG 2025.10
+│   └── where/        ./ = parse·print·validate (browser)   ./sql = compile (server)   no ./text
+├── docs/             the fifty-four documents
+├── tools/gates/      zero-dependency scripts for the source and artefact gates; graph.mjs holds §2's seventeen-row
+│                     table in its order; budgets.json holds every asserted number; negative/<gate>/ holds one
+│                     seeded violation each; rendered-box gates are Playwright specs under apps/web/test —
+│                     the inventory is 33-CONTRACTS §8
+└── LICENSE · LICENSING.md · CONTRIBUTING.md · SECURITY.md · .gitattributes · package.json — six root scripts:
+                      test typecheck gates test:browser test:do release
 ```
 
 **`apps/worker/src/do/record.ts`, `spark.ts` and `directory.ts` are ~60 lines each. If any passes
@@ -368,6 +397,9 @@ braindog/
 refactor to schedule. *(An earlier draft said two DO classes; identity — email → person, slug →
 record, sessions, magic links, the lockout — needed a home outside every record, and it is the third
 class, `Directory`, one instance. On the self-host it is `directory.sqlite` in the same process.)*
+
+There is no staging environment: the ops record — slug `ops`, in production — is the canary, the
+drill target and the operator's audit ledger ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §13 #14).
 
 ---
 
@@ -434,7 +466,9 @@ this product rather than about Ajv:
 does not. Writing the MCP tool-definition generator against it would be a vendor-neutral seam;
 choosing Valibot binds that generator to `@valibot/to-json-schema` instead. **That is cheap, because
 the generator runs at build time** — but it is the cost, and it should be named rather than
-discovered.
+discovered. Named, then: `scripts/gen-schemas.ts` converts the tool schemas and writes the committed
+`src/tool-schemas.gen.ts`; a drift test fails when the two disagree
+([44-SPEC-MCP](44-SPEC-MCP.md) §13 D1).
 
 *(One more measured trap, whichever is picked: `z.toJSONSchema()` **silently drops `.refine()`** —
 emitting a schema without the constraint — while Valibot and ArkType throw. An MCP tool definition

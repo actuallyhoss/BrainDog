@@ -11,7 +11,7 @@ Object.** Everything else in this document is a consequence of it.
                   ┌──────────────────────────────────────────────────────────────────┐
    browser ──────▶│                                                                  │
    MCP client ───▶│   EDGE WORKER  (stateless, one deployment)                       │
-   webhook ──────▶│   auth · routing · render · rate limit                           │
+   webhook ──────▶│   auth · routing · rate limit · the static shell                 │
    inbound email ▶│                                                                  │
    runner ───────▶│                                                                  │
                   └───────┬──────────────────────┬─────────────────────┬─────────────┘
@@ -20,7 +20,7 @@ Object.** Everything else in this document is a consequence of it.
               │  RECORD DO (per      │   │  SPARK DO        │   │  DIRECTORY DO    │
               │  customer)           │   │  (per customer)  │   │  (one instance)  │
               │  ─────────────────   │   │  ────────────    │   │  ──────────────  │
-              │  SQLite 10 GB        │   │  conversation    │   │  email → person  │
+              │  SQLite 10 GB        │   │  settings · call │   │  email → person  │
               │  FTS5 · PITR 30d     │   │  model calls     │   │  passkeys        │
               │  1 alarm → schedule  │   │  proposals only  │   │  sessions, links │
               │  live WebSocket      │   │  runner socket   │   │  slug → rec_id   │
@@ -29,9 +29,9 @@ Object.** Everything else in this document is a consequence of it.
                           │                      │
         ┌─────────────────┼──────────────┬───────┴────────┐
         ▼                 ▼              ▼                ▼
-   R2 (exports,      Queues +        Workers AI      Analytics Engine
-   attachments,      Workflows       via AI Gateway  (OUR telemetry,
-   nightly .dogl.age (ingest)        (inference)      never theirs)
+   R2 (exports,      Queues          Workers AI      Analytics Engine
+   attachments,      (ingest; no     via AI Gateway  (OUR telemetry,
+   nightly .dogl.age Workflow in v1) (inference)      never theirs)
    backups)
 ```
 
@@ -40,6 +40,11 @@ classes** — a `Record` and a `Spark` instance per customer, and one `Directory
 deployment ([ADR-061](16-DECISIONS.md)); and the four platform services beneath them. No per-customer
 provisioning step at all. *An earlier draft said five parts and two classes; the Directory is what
 holds identity outside the record — §3.*
+
+Both hosts — the Worker here and the self-host of §4 — route through one platform-neutral package,
+`@braindog/host`: the route table as data, the status mapping, request-context parsing and `serveApi`
+over standard `Request`/`Response`, so the two can never drift ([ADR-064](16-DECISIONS.md);
+[31-STACK](31-STACK.md) §2).
 
 ---
 
@@ -95,7 +100,7 @@ its consequence rather than listed.
 | **Alarms per object** | **1** | The entire schedule is one alarm plus a table. [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) is about this |
 | Throughput per object | **soft limit** ~1,000 req/s | Documented as a *soft* limit, and the Rules page says 500–1,000 for simple operations. Irrelevant for one customer; it is also a natural per-tenant rate limit |
 | Memory per object | 128 MB | Embeddings are streamed and scored in batches, never all loaded |
-| CPU per request | 30 s default, 300 s max | A long import runs as a Workflow, not a request |
+| CPU per request | 30 s default, 300 s max | A long import is paged — the host streams the body and the record's `importDogl` batches internally ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D3). No Workflow in v1 |
 | DO classes | 500 | We use **three** — `Record`, `Spark`, `Directory` ([ADR-061](16-DECISIONS.md)). Never a class per customer. *An earlier draft said two* |
 | JS number precision | 53-bit | Any id that could exceed 2^53 is stored as `TEXT` |
 | **Compound `SELECT` terms** | **5** | **undocumented by Cloudflare** — read from workerd's source. A `UNION ALL` chain of six fails |
@@ -181,7 +186,10 @@ the outbox is a kernel table rather than a Cloud detail.
 
 ## 3 · The second object: Spark
 
-Conversation state, model calls and retrieval live in a **separate** Durable Object per customer.
+Model calls and the projection reader live in a **separate** Durable Object per customer. Its own
+storage is two tables — `settings` and `call` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.1) — no
+conversation table and no retrieval cache: the drafted predicate is stored on the `call` row and
+re-projected on the second pass; nothing accumulates.
 
 Why separate rather than a method on the record:
 
@@ -190,10 +198,13 @@ Why separate rather than a method on the record:
 3. Spark holds **no write capability**. It reads through a narrow projection and returns
    *proposals*. A compromised prompt cannot become a write, because there is no write path to
    compromise. See [12-SECURITY](12-SECURITY.md) §5.
-4. Conversation history is disposable and separately deletable; the record is not.
+4. Spark's `call` rows are disposable and separately deletable; the record is not.
 5. It is also the **tier-C dispatcher**: the connected machine's hibernatable WebSocket terminates on
-   Spark ([26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.2), which holds the job leases and hands
-   out the job-scoped bearer. A runner is a Spark concern, never the record's.
+   Spark ([26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.2) — as a doorbell. The claim is always
+   the record's `claimJob()`, which mints the job-scoped bearer; `job` and `job_event` are kernel
+   tables, and Spark holds no lease state and no alarm in v1 ([46-SPEC-SPARK](46-SPEC-SPARK.md)
+   §4.7; [51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D13). *(An earlier draft had Spark holding the
+   leases.)*
 
 ### The third object: Directory
 
@@ -267,7 +278,7 @@ start rather than because a table asserted it.
 |---|---|---|
 | Durable Objects SQLite | ✅ compiled in | Cloud. No change |
 | **`node:sqlite`** | ✅ **on official Node ≥ 24.13 — measured: `ENABLE_FTS5` and JSON1 present** | **the self-host default.** Zero native dependencies. Still Stability 1.1, so the Node minor is pinned ([31-STACK](31-STACK.md) §3) and the boot probe measures FTS5 on every start ([ADR-038](16-DECISIONS.md)) |
-| `better-sqlite3` | ✅ bundles its own SQLite with `SQLITE_ENABLE_FTS5` and `SQLITE_ENABLE_JSON1` on by default | **the alternative driver**, for an older Node. One native dependency, prebuilt binaries |
+| `better-sqlite3` | ✅ bundles its own SQLite with `SQLITE_ENABLE_FTS5` and `SQLITE_ENABLE_JSON1` on by default | **not built.** The Node minor is pinned, so the older Node it would serve does not arise; `node:sqlite` is the only driver ([37-SPEC-PORTS](37-SPEC-PORTS.md) §13 D9; [ADR-038](16-DECISIONS.md)). *An earlier draft kept it as the alternative* |
 | `bun:sqlite` | ⚠️ on macOS it links Apple's system `libsqlite3`, which *"doesn't support extensions"*; it nests transactions via `SAVEPOINT`; its parameter ceilings differ | **unsupported.** Node bundles its own SQLite on every platform — the *"on macOS Node loads Apple's libsqlite3"* sentence an earlier draft carried applies to Bun alone |
 
 **The resolution, and it makes the adapter design stronger rather than weaker:** the storage adapter
@@ -297,8 +308,9 @@ an earlier draft of [30-BLUEPRINT](30-BLUEPRINT.md) §13 passed one, and it was 
 
 **A browser read.** Worker validates the session cookie at the `Directory`, which also resolves the
 slug to a `rec_id` → RPC to the record
-→ record runs the page declaration against its own SQLite → returns rows → Worker renders. No
-network hop between the query and the data.
+→ record runs the page declaration against its own SQLite → returns rows → the shell draws them in
+the browser; no server renders a request ([ADR-066](16-DECISIONS.md)). No network hop between the
+query and the data.
 
 **An MCP call.** Worker validates the bearer token, reads `Mcp-Method` and `Mcp-Name` from the
 headers (2026-07-28 spec, no session handshake) → resolves customer → RPC. Stateless, so it load
@@ -311,23 +323,28 @@ made to crash by a stranger.
 
 **A webhook.** Same shape. Verify signature if the ingest declares one, store raw, enqueue.
 
-**An ingest triage.** Queue consumer → Workflow → match declared patterns → if matched, write
-rows with `confidence: exact`; if not, ask Spark for a *proposed* pattern and open a
-suggestion. Never a write from an unmatched payload. See [07-INGEST](07-INGEST-AND-RULES.md).
+**An ingest triage.** Queue consumer → the record's `arrive`: store → match the declared patterns →
+extract → write rows with `confidence: exact` → outbox, in one transaction and with no model in it.
+An unmatched shape earns an `infer.draft` outbox row at its third arrival in 30 days — never a
+model call per payload — and Spark's draft opens a suggestion. Never a write from an unmatched
+payload. See [07-INGEST](07-INGEST-AND-RULES.md).
 
 **A scheduled digest.** The record's single alarm fires → drains every row in `schedule` that is
 due → emits notifications → re-arms to the next due row. See [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md).
 
 ---
 
-## 6 · Why a Workflow rather than a queue consumer for ingest
+## 6 · Why ingest is a queue consumer and not a Workflow — in v1
 
-Ingest is multi-step and each step can fail independently: store, classify, extract, validate,
-write, notify. Workflows give durable execution with per-step retry and survive a deploy
-mid-run. A queue consumer would have to re-do the model call after a failure at the write step,
-which costs money twice for the same payload.
-
-Queues are still the front door — they absorb the burst and give the Workflow a single trigger.
+An earlier draft made ingest a Workflow, on the argument that its steps fail independently and a
+model call should not be repeated after a failure at the write step. Both premises fell away in the
+specification: `arrive` is deterministic — store → match → extract → write → outbox in **one
+transaction**, with no model in it — so there is nothing to retry step by step, and the one model
+call, the pattern draft, rides the outbox as `infer.draft`, leased and acked like every other
+outbound job. **No Workflow in v1** ([51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D12;
+[45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #18). Queues stay the front door — they absorb the burst
+and hand the consumer one record id at a time. A Workflow may return the day a step becomes
+genuinely multi-stage; the seam is the outbox.
 
 ---
 
@@ -340,7 +357,7 @@ outbox of §2.
 
 | Surface | Transport | Notes |
 |---|---|---|
-| Web app | HTTP + a **hibernatable WebSocket** on the `Record` object carrying `{ version, registers }`; fallback 15 s polling of `GET /api/version` ([22-FRONTEND](22-FRONTEND.md) §6, [ADR-044](16-DECISIONS.md)) — never SSE, which holds the object resident | The primary. Server-rendered shell, no build-time page generation |
+| Web app | HTTP + a **hibernatable WebSocket** on the `Record` object carrying `{ version, registers }`; fallback 15 s polling of `GET /api/version` ([22-FRONTEND](22-FRONTEND.md) §6, [ADR-044](16-DECISIONS.md)) — never SSE, which holds the object resident | The primary. A static shell — one `build/` served unchanged by both hosts; no server renders a request ([ADR-066](16-DECISIONS.md)) |
 | MCP | Streamable HTTP, 2026-07-28 | The agent surface. Per-customer dynamic tools |
 | CLI | HTTP + bearer token | For scripts and CI. Ships as one file, no dependencies |
 | Inbound email | Email Worker | An address per record |

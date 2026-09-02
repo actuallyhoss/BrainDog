@@ -37,9 +37,14 @@ inlines**. This is why a pack can add a kind without asking a designer.
 
 A kind is data, not code. A `block` declaration is a primitive, an `accepts:` list and a body of
 primitive nodes, each node one of `parts children rows columns empty value`; `$<name>` substitutes a
-whole node named in `accepts:` and is never spliced into a string. The sixteen ship as JSON under
-`packages/render/kinds/*.json` — JSON because the package has no dependencies — so a first-party kind
-and a pack's kind take one code path. `PRIMITIVES_VERSION = 1` at stage 0.
+whole node named in `accepts:` and is never spliced into a string. The sixteen ship as one TypeScript
+table — `src/kinds.ts`, `as const`, with a derived `Kind` union — whose shape is the shape a pack's
+`block` declaration takes, so a first-party kind and a pack's kind take one code path
+([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D4; an earlier draft said sixteen JSON files).
+`PRIMITIVES_VERSION = 1` at stage 0. The package's root exports `parse`, `toHTML`, `render`, `KINDS`,
+`PRIMITIVES` and `PRIMITIVES_VERSION` — no `expand`; kinds expansion is `declare`'s. `toHTML` serves
+the mirror, exports, tests and the digest email, never a server render: the app draws blocks through
+`braindog-render/svelte` inside a static shell ([ADR-066](16-DECISIONS.md)).
 
 ---
 
@@ -58,7 +63,9 @@ Active worldwide in any hour | 460-640 | your server-mates are not online | warn
 
 `kind | heading`, then one row per line, `field | field | field | tone`. Positional, terse, and
 an agent gets it right first time because there is nothing to nest. The row shape of every kind is
-§2.1.
+§2.1. Between fences the markdown is a closed subset — ATX headings, paragraphs, flat lists, a rule,
+strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
+([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
 ### v1 kinds — sixteen
 
@@ -80,7 +87,7 @@ arrives as a pack, which is the whole reason for the primitive layer.
 
 The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of it:
 
-- The info string is `^(?<kind>[a-z]+)(\s*\|\s*(?<heading>.*))?$`.
+- The info string is `^(?<kind>[a-z]+)(\s*\|\s*(?<heading>.*))?$`. The heading half is row-split like a row, and a trailing tone word there is the block's tone — `note | Kicker | bad` (36 §13 D6).
 - A row is split on `|` **after** unescaping — `\|` is a literal pipe, `\\` a literal backslash.
 - A trailing cell that is a tone word — `good` `warn` `bad` `info`, an alias from §7.4, or `hole` on a `bar` — is the tone. Anything else in that position is a cell.
 - `{{path}}` is substituted **per cell, after splitting**, and a substituted value is never re-parsed, so a value containing `|` cannot add a column.
@@ -116,7 +123,8 @@ accepted**: a `document` is never parsed at write and never refused for its dial
 render is the feedback channel.
 
 **2 · Column positions are FIXED.** An unknown glyph draws no glyph rather than shifting the
-columns. A column that moves is worse than a column an agent has to count.
+columns — a glyph is a `data-glyph` name the host's stylesheet draws, and the renderer ships no glyph
+art (36 §13 D17). A column that moves is worse than a column an agent has to count.
 
 **3 · The dialect names INTENT; the theme names appearance.** An agent writes `warn`, never
 amber. So a theme swap can never break a page, and an agent can never make a page ugly.
@@ -182,7 +190,10 @@ in [22-FRONTEND](22-FRONTEND.md) §7 knows it as the single permitted non-token 
 > promises, and the fact that `forced-colors: active` deletes the surface ladder entirely.
 
 Ships with two themes, each in both schemes: the house theme and a **high-contrast** one. The
-second is the accessibility floor, not a nicety. *An earlier draft counted three, taking light for a
+second is the accessibility floor, not a nicety. Both are constants in `@braindog/theme`, not
+declarations: the high-contrast theme is the house seed built through the `HIGH_CONTRAST` profile —
+no dialect key — and is swapped in under `prefers-contrast: more`
+([39-SPEC-THEME](39-SPEC-THEME.md) §13 D10, D17). *An earlier draft counted three, taking light for a
 theme; light is a scheme of each.*
 
 A theme is the cheapest thing anybody will ever share, which makes it the right first format to
@@ -216,7 +227,7 @@ component   --row-h, --ctl-h, --tap, --measure         ← a component reads onl
 | No component styles a class it does not own | a rule aimed at a class passed into a component, which the compiler prunes — and a control silently loses its chevron |
 | Every `var(--x)` resolves | a token-shaped name that never read a token |
 | A width query never changes a control's **size** | a small laptop window getting phone chrome. Width may change *layout*; only the pointer may change *size* |
-| The elevation ladder only goes up, in both themes | a shadow that is invisible in one theme |
+| The elevation ladder only goes up, in both themes — and the ladder is the generator's: three levels, fixed geometry, alphas per scheme; a theme has no `shadow` or `elevation` key (39 §13 D9) | a shadow that is invisible in one theme |
 
 ---
 
@@ -257,10 +268,12 @@ Four rules, learned by the predecessor over a month of real use:
 2. **Long fields are unavailable.** `document` and `note` are arguments, not figures. A paragraph
    interpolated mid-sentence is a worse lie than a stale number.
 3. **Formatting is decided for you** — money as money, a rate as a level, billions with a suffix, a
-   status with its glyph. Do not wrap a path in `**`; a named figure is already set apart.
+   status with its glyph; a `ref` reads as its spoken `register#seq`, a boolean as `yes`/`no`, a
+   day-shaped string as a day (36 §13 D14). Do not wrap a path in `**`; a named figure is already
+   set apart.
 4. **Code spans are lifted first**, so a literal `{{…}}` from another system survives in backticks.
 
-### 7.2 · Typed interpolations — eight, and three of them link
+### 7.2 · Typed interpolations — eight, and two of them link
 
 `{{path}}` asks the record what a figure is *now*. These render a value **the author wrote** as the
 kind of thing it is, so a date, a sum and a reference stop being hand-formatted differently every
@@ -279,13 +292,19 @@ time.
 
 **Eight, counted: `date` `day` `until` `ago` `money` `quantity` `pct` `ref`.** The predecessor has
 ten; four of them are `ref` for four specific registers, and BrainDog has a spoken id on every
-register, so they collapse into one.
+register, so they collapse into one. The two that link are a `day` — the calendar — and a `row`; the
+visible text of a `ref` is `#seq`, and a link the host cannot resolve is plain text (36 §13 D16; an
+earlier draft said three link). Relative time is banded — days to about two weeks, weeks to about
+two months, months to a year, then years — measured at noon UTC of the day named; `until` and `ago`
+are both signed (36 §13 D15).
 
 **Arguments.** `date` `day` `until` `ago` take `YYYY-MM-DD`. `money` takes `<integer minor units> <ISO 4217>`
 and renders code first, then the amount with the currency's exponent — `{{money:129900 EGP}}` is
 `EGP 1,299.00`, `{{money:1299 JPY}}` is `JPY 1,299`; *an earlier draft wrote `1299 EGP` and drew
 `EGP 1,299`, major units, against the minor-units rule of [02-DATA-MODEL](02-DATA-MODEL.md) §3.*
-`quantity` takes `<decimal> <unit>`. `pct` takes a signed decimal. `ref` takes `register#seq`. **An
+`quantity` takes `<decimal> <unit>`. `pct` takes a signed decimal. `ref` takes `register#seq`.
+Numbers group in `en` — `,` for thousands, `.` for the decimal — the minus is U+2212, a negative
+amount reads `EGP −1,299.00`, and there is no locale option at stage 0 (36 §13 D2). **An
 argument may be a path instead of a literal** — `{{until:renews}}` · `{{money:cost}}` · `{{ref:parent}}`
 — which is how a rule's `say:` names a row's own values; a literal starts with a digit or `-`, a path
 with a letter. There is no conditional `{{? … }}` form, no pipe `{{path | filter}}` form and no
@@ -304,8 +323,9 @@ with a letter. There is no conditional `{{? … }}` form, no pipe `{{path | filt
 `{verified}` · `{inferred}` · `{estimate}` · `{unknown}`, each with an optional source —
 `{verified: Ministry of Labour Decree 2026}`. **Inline**, so they work inside a blocker, a reason
 and a list item, where a block cannot go. A source runs to the first `}` and may not contain `|` or
-`}`; inside a drawn row a tag sits in one cell. Any other `{word}` is text, and a literal tag is
-written in a code span.
+`}` — except a whole `{{…}}` interpolation, which it may hold, tokenised once and one level deep, so
+a source can cite a row (36 §13 D13); inside a drawn row a tag sits in one cell. Any other `{word}`
+is text, and a literal tag is written in a code span.
 
 > **`{unknown}` is the one that carries weight.** It is not a weak claim — it is a hole, and a hole is
 > a task somebody has to close. So it renders as an affordance, not a tag: the same rule as the
@@ -323,10 +343,10 @@ so. Rules that came from that month:
 
 | Rule | Why |
 |---|---|
-| `stat` is capped at **six** | *"a seventh tile is a table"* |
+| `stat` is capped at **six** — rows over a cap (`stat` 6, `quote` 1, `gauge` 1) degrade under `DIALECT_ARITY` at `rows`; there is no `DIALECT_ROWS` code (36 §13 D9) | *"a seventh tile is a table"* |
 | A `chips` row needs a number **and** a word, or it is dropped | an icon alone is a rebus; a colour alone is unreadable to a tenth of readers |
 | The columns of a chip **do not move**; an empty field is left empty | shifting left is how a tone lands in the value slot |
-| A `bar` row whose value is not a number **keeps its words and loses its bar** | a bar at zero claims the value *is* zero |
+| A `bar` row whose value is not a number **keeps its words and loses its bar**; a cell that is one interpolation uses the raw value; `bar` scales to its largest non-hole row and `gauge` to `value / target`, clamped at 1 (36 §13 D19) | a bar at zero claims the value *is* zero |
 | A `bar` whose rows name paths is a live chart; one whose rows are typed numbers is a **snapshot, so it carries dates** | the whole reason `{{path}}` exists |
 | A `note` heading is a **kicker** — two or three words, small caps | the sentence goes in the body |
 | Tone aliases: `earn→good` `danger→bad` `accent→info` `risk→warn` | an author who reaches for a role gets the intent, not a refusal |
@@ -346,7 +366,8 @@ the thing it reports."*
 The general form: **an unknown never participates in a scale, never sorts among the knowns, and is
 always the affordance that fixes it.** `{unknown}` renders the same way. A `{{path}}` that names
 nothing renders the same way — the path, marked, an affordance to fix it. The `bar` kind implements it
-as a tone: a row whose tone cell is `hole` is drawn last, in `warn`, outside the scale, as the button.
+as a tone: a row whose tone cell is `hole` is drawn last, in `warn`, outside the scale, as the button
+— a `<button data-hole>`; `{unknown}` is a `<button>` too (36 §13 D11).
 *An earlier draft made it a row option, `hole: true`, which a positional dialect has no place for.*
 
 ### 7.6 · The write-up skeleton the corpus converged on
@@ -366,6 +387,12 @@ And the five registers of writing, each with its own constraint — a reply in a
 answer first; a table the moment two things are compared) · a task note (a phone, weeks later; full
 markdown) · an option body (comparable without reading both: same headings, same order) · a write-up
 (length allowed, structure not optional) · an audit note (**one sentence, never formatted**).
+
+### 7.7 · The markup
+
+Every block is one `<figure>` carrying its kind, its primitive and its tone as data attributes, with
+the heading as its `<figcaption>`; a cell is a `<span>` named for the cell it is. That is the whole
+contract a host's stylesheet draws against; the class list is [36-SPEC-RENDER](36-SPEC-RENDER.md) §5.9.
 
 ---
 

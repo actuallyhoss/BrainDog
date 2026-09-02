@@ -38,17 +38,22 @@ compare: previous            # the same window, immediately before
 
 | Field | Values | Required |
 |---|---|---|
+| `name` | the display name; when absent the id stands in ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §13 D15) | no |
 | `source` | a register, **or `series.<id>`** — a time series written by a connector, [25-CONNECTORS](25-CONNECTORS.md) §8 | yes |
 | `where` | the one grammar | no (defaults to everything) |
 | `value` | an aggregation, or a **ratio** — see below. Over a `series.<id>` the legal set is `last · sum · avg · delta · min · max · trend` *(an earlier draft omitted `trend`, the one aggregation that is series-only)* | yes |
 | `format` | `money.<CUR>` · `int` · `decimal` · `pct` · `days` · `duration` | yes |
 | `target` | what good looks like | **yes** |
-| `window` | over what period | **yes** |
+| `window` | over what period. For a register source it is the **comparison shift** — `compare` re-evaluates with `asOf = now − W`; for a `series.<id>` source it is the `at` filter ([45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #3) | **yes** |
 | `compare` | `previous` · `year_ago` · `none` | no (default `previous`) |
 | `group_by` | one field — see §2.1 | no |
 | `bucket` | `day` · `week` · `month` · `quarter` · `year` | only with a date `group_by` |
 | `order` | `[{ field, dir }]` — the walk order for `running` (§2.3) | only with `running` |
 | `snapshot` | `{ grain: day, into: series.<id> }` — §2.6 | no |
+
+The evaluator is one synchronous function in `record` — `evaluateMetric(decl, ctx, kernel, sql)`,
+[45-SPEC-RECORD](45-SPEC-RECORD.md) §5.8 — called by `metric(id)`, by a page's `stat` cells and by the
+`snapshot` and `score` schedule kinds; nothing else computes a figure.
 
 ---
 
@@ -167,7 +172,10 @@ Three facts, and the second is the one you act on. A bare `EGP 6,240,000` is a n
 
 One body is exempt, and only one: a prediction's `measure` ([24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md)
 §4.6) is a metric body **without** the two required fields — `{ source, where, value }` — because a
-prediction's target is the claim itself, and its window is `score_at`.
+prediction's target is the claim itself, and its window is `score_at`. Accepting a `change` proposal is
+what writes that `prediction` row: the accepted change carries its own claim, and the `score` schedule
+kind measures it on `score_at` ([24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6;
+[45-SPEC-RECORD](45-SPEC-RECORD.md) §5.2).
 
 ---
 
@@ -189,7 +197,9 @@ plan's countdown to zero is the same reducer with no stop. Neither was expressib
 aggregations, and the workaround — a typed number — is the failure `{{path}}` exists to prevent.
 
 `from:` is a literal or a field on the source rows, **never a metric** — a metric over a metric is what
-§4 refuses, and the walk seeds from a figure the rows carry. `order:` is the walk order. *(An earlier
+§4 refuses, and the walk seeds from a figure the rows carry. `order:` is the walk order. The walk is the
+evaluator's: `acc = from`, then `acc += f` per row in `order`, stopping at the first row that satisfies
+`stop` and naming it as `crossed` ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.8). *(An earlier
 draft wrote `from: { metric: liquid }`, which read another metric inside a metric two sections after
 forbidding it.)*
 
@@ -201,7 +211,9 @@ reported** — because an uncapped exponential on six points is a number that wi
 ## 2.4 · Rules that make a comparison honest
 
 Each of these was a wrong figure the predecessor shipped and then pinned with a regression test that
-records the old wrong number.
+records the old wrong number. The evaluator applies this table verbatim — it is the comparability gate,
+and a `delta` is present only when the comparison is `comparable` ([45-SPEC-RECORD](45-SPEC-RECORD.md)
+§5.8).
 
 | Rule | The figure it prevents |
 |---|---|
@@ -226,6 +238,7 @@ value: { sum: { product: [amount, { lookup: fx, by: currency, as_of: day }] } }
 | The rate is **as-of** | the nearest rate **on or before** the row's day, flagged `exact`; else the earliest rate after it, flagged `forward`; else **none** |
 | A row with no rate is **excluded and listed** | `noRate: [{ currency: AED, amount: 120000 }]` is part of the result — absolute, never netted; `amount`, because a money value has no key called `minor` ([02-DATA-MODEL](02-DATA-MODEL.md) §3) |
 | The total wears **`≥`** | and the note reads *"No rate for AED — those rows are left out."* |
+| **Several currencies meet at runtime and no `lookup` is named** | `value: null`, and the parts travel as per-currency `mixed` partials — refuse to guess, keep the parts ([45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #15) |
 
 **A wrong total is worse than a partial one, and a partial one that pretends to be whole is worst.**
 The rate table is a dated register, as §3 of [02-DATA-MODEL](02-DATA-MODEL.md) says — `fx`, with
@@ -264,8 +277,13 @@ kinds; `sparkline`, `series` and `forecast` are **post-v1** and arrive as the an
 ### Series kinds, from the predecessor's analytics model
 
 A connector's series declares what kind of number it is, because the reducer depends on it — on the
-**ingest**, as `writes: { series: <id>, kind: gauge | flow | cumulative | unique | fact }`
-([25-CONNECTORS](25-CONNECTORS.md) §6), never as a `metric_point` column:
+**ingest**, as `writes: { series: <id>, kind: gauge | flow | cumulative | unique | fact, unit?, scale? }`
+([25-CONNECTORS](25-CONNECTORS.md) §8), never as a `metric_point` column. `unit` is one of `count · ms ·
+bytes · money.<CUR> · pct.bp`; `scale` is an integer multiplier applied to the mapped value, rounding half
+away from zero, so a provider's `12.5%` lands as `1250` basis points. Two reducers read the kind and they
+must agree: connect's at write — `flow` sums a bucket, the four others take the latest sample — and the
+evaluator's at read ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.7, §13 D13;
+[45-SPEC-RECORD](45-SPEC-RECORD.md) §5.8):
 
 | Kind | Reduces by | Partial last bucket? | Notes |
 |---|---|---|---|

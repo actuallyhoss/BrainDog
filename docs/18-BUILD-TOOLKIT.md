@@ -54,7 +54,7 @@ Two conclusions, and the second is strategic rather than practical:
 | A4 MCP | `claude-api` | the Messages API, tool definitions, token counting. **Read it before writing any tool schema** |
 | A5 app | `ui-ux-pro-max`, `web-design-guidelines`, `frontend-design`, `dataviz` | the interface. See §4 for the honest assessment of each |
 | A6 cloud | `cloudflare-email-service`, `turnstile-spin` | inbound email and the signup form's bot problem |
-| B5 ingest | `cloudflare` → `references/workflows`, `references/queues` | durable execution and the front door |
+| B5 ingest | `cloudflare` → `references/queues` | the front door. No Workflow in v1 — `arrive` is one transaction ([01-ARCHITECTURE](01-ARCHITECTURE.md) §6) |
 | B7 Spark | `agents-sdk`, `claude-api`, `cloudflare` → `references/ai-gateway`, `references/workers-ai` | model routing and cost. **Read the live gateway docs, not the reference file** — see §3 |
 | throughout | `web-perf` | measuring LCP/INP/CLS rather than asserting them |
 | throughout | `code-review`, `simplify` | the diff, before it is committed |
@@ -132,11 +132,13 @@ was *tested rather than estimated*, with all 27 migrations applied and 12 of 12 
 | The Worker | zero, ideally | signing and crypto come from WebCrypto |
 | Web Push | one, zero-dep | **`@pushforge/builder@2.0.5`** — MIT, genuinely zero dependencies. *(An earlier draft called it `pushforge`, which **does not exist on npm**. A dependency named from memory is a dependency nobody checked.)* |
 | Age encryption (`.dog.age`) | **six** | `age-encryption@0.3.1` is one direct dependency and **five transitive `@noble`/`@scure` packages**. Counting it as one was the kind of arithmetic this table exists to prevent |
+| Pack schemas | one | **`valibot` 1.4.2** — `declare`'s closed schemas, chosen by [ADR-040](16-DECISIONS.md) and, until iteration 2, missing from this table |
+| YAML | one | **`yaml` 2.9.0**, reachable only through `@braindog/declare/yaml` and only on the CLI and self-host paths — the record never imports it ([ADR-063](16-DECISIONS.md)) |
 | The app | Svelte 5 + SvelteKit 2, and as little else as possible | settled in [22-FRONTEND](22-FRONTEND.md) §2 and [ADR-045](16-DECISIONS.md) |
 | Dev only | vite · wrangler · vitest · playwright · axe-core — **every version is pinned in [31-STACK](31-STACK.md) §3**, which owns them; none is repeated here | not shipped |
 
 **Every runtime dependency is a decision recorded in [ADR-046](16-DECISIONS.md), not a
-convenience** — that ADR enumerates the two permitted packages above and makes any third a new ADR.
+convenience** — that ADR enumerates the four permitted packages above and makes any fifth a new ADR.
 
 ---
 
@@ -145,6 +147,12 @@ convenience** — that ADR enumerates the two permitted packages above and makes
 Not added later. Several of these exist because the equivalent guards caught real, shipped bugs in
 a comparable codebase.
 
+Every number a row below asserts lives in `tools/gates/budgets.json` — a gate holds no numeric
+literal but `0`, `1` and indices — and every script gate has one seeded violation under
+`tools/gates/negative/<gate>/`, every Playwright spec one run against `negative/web/`, so a gate that
+cannot fail is found before it is trusted ([52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §13
+D1, D4).
+
 | Check | Catches |
 |---|---|
 | No colour or font-size literal outside the token file | the slow drift that ends with 1,854 global rules nobody can attribute |
@@ -152,12 +160,14 @@ a comparable codebase.
 | Every `var(--x)` resolves | a token-shaped name that never read a token |
 | A width query never changes a control's **size** | a laptop window getting phone chrome. Width may change layout; only the pointer may change size |
 | The elevation ladder only rises, in both themes | a shadow invisible in one theme |
+| **The CSS rows above are the twelve rules of `css-rules.mjs`** — one regex tokeniser, zero dependencies, no Stylelint | a rule that needs a parser is added the day one does, not before (52 §13 D10) |
 | Contrast gate over every shipped theme | a theme that ships unreadable |
 | **Rendered-box measurement in a real browser** | the class of layout bug that is invisible in source. Most recently: a grid using `auto-fit` produced **7 tracks for 3 items**, leaving a 550 px empty slab — correct in every selector, wrong on screen |
 | MCP token budgets | `tools/list` over 1,800 tokens |
-| Telemetry blob allowlist | a field value reaching Analytics Engine |
+| Telemetry blob allowlist — and its twin, the **screenshot-mode allowlist** (`shot-allowlist`): the committed `allow.json` equals exactly the literals the source declares | a field value reaching Analytics Engine; a runtime string legible under `data-shot` (52 §13 D9; [50-SPEC-WEB](50-SPEC-WEB.md) §13 D4) |
+| **Clean room**: `clean-room.txt` is the owner's file, and the gate asserts only that it is non-empty | a repository whose first rule ([00-README](00-README.md) §1) has no artefact at all (52 §13 D20) |
 | Secret-in-log grep | a credential in a log, a push payload, or a prompt |
-| `.dog` round-trip | export → import → export must produce an identical **canonical logical dump** — rows by primary key, columns in declared order, NULLs normalised ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3, [33-CONTRACTS](33-CONTRACTS.md) §9); never raw bytes, because three runtimes run three SQLite versions and page layout is not portable. An earlier draft said byte-identical |
+| `.dog` round-trip | export → import → export must produce a **canonical logical dump** identical but for exactly one row — the `import` event the second export carries, asserted as exactly one (52 §13 D12) — rows by primary key, columns in declared order, NULLs normalised ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3, [33-CONTRACTS](33-CONTRACTS.md) §9); never raw bytes, because three runtimes run three SQLite versions and page layout is not portable. An earlier draft said byte-identical |
 | Kernel contains no declarations — except `register.session` ([02-DATA-MODEL](02-DATA-MODEL.md) §1), the one named exception | the core silently stopping being packs |
 | Pack install/uninstall leaves rows intact | the contract in [04-PACKS](04-PACKS.md) §4 |
 | Deployed shell matches the build, byte for byte — after `wrangler deploy`, fetch `/` and `/_app/version.json` from the live host and compare their SHA-256 to `build/` | a green deploy serving a stale asset. This has happened before, three times in a row, with a fresh version id each time |
@@ -170,7 +180,7 @@ a comparable codebase.
 | **Screenshot mode: layout byte-identical off → on, and pixel readback** | element boxes and page height must not move; redacted digits re-photographed as `0` and as `8` must be identical |
 | **A check that can pass on the degraded branch tests nothing** | the predecessor's harness asserted `childElementCount > 0` on a screen whose data fetch was stubbed to fail — the error path rendered a subtree, the check was green, and 64 rows went a design-review round unlooked-at. **Assert on something that can only be true if the real branch ran**: `rows ≥ 4`, a mark per row, zero inline comboboxes |
 | **A regression test carries the old wrong number** | the predecessor's money audit produced 45 findings and one test per claim, each recording the figure that was wrong — `-E£48,000.27`, `−94%`, `×4`. A regression test that asserts the right value without naming the wrong one cannot tell a reviewer what it protects |
-| INP p75 ≤ 100 ms on the target phone, gated on LoAF `blockingDuration` | [13-UI](13-UI.md) §9, [22-FRONTEND](22-FRONTEND.md) §9 — an app that feels like it is running underwater |
+| INP p75 ≤ 100 ms on the target phone, gated on LoAF `blockingDuration` — a release-checklist row, not a workflow step, until an ADB harness exists | [13-UI](13-UI.md) §9, [22-FRONTEND](22-FRONTEND.md) §9 — an app that feels like it is running underwater (52 §13 D16) |
 | `outline: none` anywhere in first-party CSS | [13-UI](13-UI.md) §7 — a focus ring a theme cannot remove and a component must not |
 | The `role="grid"` keyboard contract, as a checklist | [13-UI](13-UI.md) §7, [19-INTERFACE](19-INTERFACE.md) §4 — a half-implemented grid is worse than a table |
 | No physical CSS property (`property-disallowed-list`) | [13-UI](13-UI.md) §8, [22-FRONTEND](22-FRONTEND.md) §7 — Arabic is a requirement, not a hypothetical |
@@ -180,13 +190,13 @@ a comparable codebase.
 | Bundle budgets: JS ≤ 30 KB, CSS ≤ 12 KB, fonts ≤ 45 KB, HTML ≤ 25 KB brotli/gzip; the editor chunk unreachable from the entry chunk | [22-FRONTEND](22-FRONTEND.md) §9 — a size budget that only warns is a size budget that is exceeded |
 | No icon component accepts a `color` prop | [22-FRONTEND](22-FRONTEND.md) §9 — a colour-writing component by another name |
 | Header and body cell widths equal, exactly | [22-FRONTEND](22-FRONTEND.md) §10 — a 4 px stagger invisible in source |
-| Every gate runs over 8 fixtures × 4 widths × 2 schemes × 2 directions | [22-FRONTEND](22-FRONTEND.md) §10 — 128 configurations |
+| Every rendered gate runs over 8 page fixtures × 4 widths (390 / 768 / 1024 / 1440) × 2 schemes × 2 directions; direction comes from the record, materialised `locale: 'ar'`, never from the harness; the ninth fixture record, `corpus`, serves the whole-corpus gates | [22-FRONTEND](22-FRONTEND.md) §10 — 128 configurations ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §13 D4; 52 §13 D7, D13) |
 | Every plot's list twin holds every event the plot draws | [19-INTERFACE](19-INTERFACE.md) §4 — the list is the essential, the plot is the view |
 | The no-model build passes every e2e suite (`SPARK_ENDPOINT` unset) | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8 — Spark is absent, not disabled |
-| The shipped high-contrast theme passes all sixteen checks | [28-THEMING](28-THEMING.md) §4.5 — if it fails, the validator is wrong |
-| Every refusal code has a fixture that produces it | [30-BLUEPRINT](30-BLUEPRINT.md) §6 — a code with no fixture fails CI |
+| The shipped high-contrast theme passes all sixteen checks — zero refusals, zero corrections, zero M; N is advisory and not counted | [28-THEMING](28-THEMING.md) §4.5 — if it fails, the validator is wrong ([39-SPEC-THEME](39-SPEC-THEME.md) §13 D6) |
+| Every refusal code has a fixture that produces it — ninety-nine codes, ninety-nine fixtures, keyed by the `via` that raises each | [30-BLUEPRINT](30-BLUEPRINT.md) §6 — a code with no fixture fails CI ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §6; [ADR-057](16-DECISIONS.md)) |
 | **A decorative enhancement is never the only thing drawing a state** | `requestAnimationFrame` does not run in a hidden tab, so anything measured in one — a sliding pill, a nav offset — never happens while occluded. The selected control paints its own background until the pill is in place, and the worst case degrades to the previous design rather than to nothing |
-| **Vault screen**: a closed row draws no `opens`; opening a row opens exactly one; no value control is drawn with nothing expanded; the screen is absent, not blurred, under screenshot mode | [12-SECURITY](12-SECURITY.md) §8 |
+| **Vault screen**: a closed row draws no `opens`; opening a row opens exactly one; no value control is drawn with nothing expanded; the screen is absent, not blurred, under screenshot mode | [12-SECURITY](12-SECURITY.md) §8 — the seventeenth Playwright spec, `vault-screen` (52 §13 D8) |
 | **No `grant.*` event note contains `label` or `opens`** — a grep over every fixture's events | 12 §8, [20-COLLABORATION](20-COLLABORATION.md) §8 |
 | **Job view**: one row per tool call; a fold names both lengths (*2,000 of 41,812 characters*); a one-line result is not folded; `after=` is monotonic and reaches a non-zero value; events received after the panel closes > before; nothing polls when nothing is live | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1 |
 | **A draft survives its screen loading**: type, then release the gated load; the typed text is still there | [22-FRONTEND](22-FRONTEND.md) §7 |
@@ -197,9 +207,11 @@ That last one is worth naming as a principle:
 > **Any step whose failure mode is silence gets checked against the thing itself, never against
 > the tool's opinion of it.**
 
-Which of these is a zero-dependency script under `tools/gates/<name>.mjs` and which is a Playwright
-spec against a rendered box is the inventory in [33-CONTRACTS](33-CONTRACTS.md) §8; the conformance
-suite that makes the self-host adapter a peer of the Durable Object's is §3 there.
+Which of these is a zero-dependency script under `tools/gates/<name>.mjs` and which is one of the
+seventeen Playwright specs against a rendered box is the inventory in [33-CONTRACTS](33-CONTRACTS.md)
+§8; the conformance suite that makes the self-host adapter a peer of the Durable Object's is §3
+there. Fixture hygiene — the synthetic-data rule of [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §5.4 — is
+a package test under `pnpm test`, not a gate row (40 §13 D8).
 
 ---
 

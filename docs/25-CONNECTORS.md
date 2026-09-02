@@ -92,9 +92,12 @@ region, never a key.
 **Five formats, closed:** `:date` · `:instant` · `:epoch_s` · `:epoch_ms` · `:int`.
 
 **No operators, no functions, no arithmetic, no conditionals, no filters.** Every value is either a
-literal the declaration wrote or a named value the kernel computed. Response paths are a restricted
-dotted path — literal keys, integer indices, `[-1]`, `[]`. That covered **every** response shape in
-this research.
+literal the declaration wrote or a named value the kernel computed. Response paths are **one grammar**,
+[43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §4.4's: literal keys, `[n]`, `[-1]`, `[]` at most once, at most
+sixteen segments, own properties only; `select` returns a list, and the same grammar serves `read`,
+`probe.read`, `expect` and `page.from`. A brace group that matches no placeholder is literal text, so a
+GraphQL body survives ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.2). That covered **every** response shape
+in this research.
 
 For contrast: Airbyte has 17 interpolation variables, ~14 macros, and full Jinja including
 `predicate: "{{ 'code' in response }}"`. §2 measures what that costs them.
@@ -121,7 +124,7 @@ fetch:
   schedule: { every: 24h, at: "04:10", tz: record, jitter: auto }
 
   probe: { path: /v1/account, read: { default_currency: settings.default_currency } }   # exactly one, no chaining — §5.3
-  for_each: [acct_live, acct_test]        # a LITERAL list only; a target read from a response is refused — §5.3
+  # for_each: [acct_live, acct_test]      # NOT v1 — deferred with conditional, on_error.backoff, on_error.pause_after; §5.3, §6
 
   window:                               # the typed cursor. THIS is what kills the macros.
     grain: day
@@ -136,33 +139,55 @@ fetch:
     param: starting_after
     from: data[-1].id
     more: { path: has_more, is: true }
-    max_pages: 40
 
   expect:                               # §5.1 — assert the server did what you asked
     - { path: object, is: list }
 
-  conditional: etag                     # a 304 is a no-op, not a failure
-  read: { rows: data }
-  limits: { response_bytes: 2000000, rows_per_run: 5000 }
+  # conditional: etag                   # NOT v1 — a 304 is a no-op, not a failure, when it returns
+  read: { format: json, rows: data }    # format: json (the default under fetch:) | text — 43 §5.5
+  limits: { response_bytes: 2000000, rows_per_run: 5000, max_pages: 40, timeout: 6s }   # the first two are extraction's caps — 43 §13 D16
 
   on_error:
     error_when: [{ status_in: [429, 500, 502, 503, 504] }]   # retry
     fatal_when: [{ status_in: [400, 401, 403, 404] }]        # stop and notify
-    backoff: { kind: exponential, base: 60s, cap: 6h, attempts: 6 }   # the schedule's `retry` ladder — 30 §8; declared only to lower it
+    # backoff: …                        # NOT v1 — the ladder is the schedule's, 09 §1, and is not declared here
     honour: retry_after                 # a HINT — not every provider sends it
-    pause_after: 3
+    # pause_after: 3                    # NOT v1
 
 map:
   at:     { path: created, type: instant, from: epoch_s }
   amount: { path: [amount, currency], type: money, minor: true }
   kind:   { path: type, type: enum, values: [charge, payment, refund, payout], other: other }
 
-writes: { register: ledger, confidence: exact }   # or: writes: { series: <id>, kind: gauge } → §8; kind: gauge | flow | cumulative | unique | fact — 08 §3
-dedupe: [id]
+writes: { register: ledger, confidence: exact }   # or: writes: { series: <id>, kind: gauge, unit?: count, scale?: 1 } → §8; kind: gauge | flow | cumulative | unique | fact — 08 §3
+dedupe: [id]                              # a field list (exact), or { near: { on, day, prefix } } — 07 §2
 on_conflict: update
 ```
 
-`type:` values are the **existing register field types**. No new type system.
+`type:` values are the **existing register field types** minus five — `ref`, `file`, `secret`, `quantity`
+and `list` cannot be mapped from a response — and no new type system; `from: epoch_s | epoch_ms` reads an
+epoch into a `day` or `instant`, and `scale:` is an integer multiplier on an `int` or `money` value
+([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §4.5). The whole `fetch:` block follows
+[47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.1 key for key, and `declare`'s schema encodes it verbatim
+([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.7). Four keys the example once carried are **not in v1** —
+`for_each`, `conditional`, `on_error.backoff`, `on_error.pause_after` — and are refused as unknown keys;
+`limits.timeout` and `limits.max_pages` are in. *They return when a connector needs them*: `for_each` with
+a sixth placeholder, `{each}`, that nothing can yet name ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D7).
+`read.format` is `json` (the default under a `fetch:`) or `text`; `csv`, `xml` and `html_table` readers
+arrive with the first connector that returns one ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §5.5). The two
+`limits` caps are extraction's own — 2,000,000 bytes and 5,000 rows — and a page over either is kept raw in
+`review` ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D16).
+
+The window is arithmetic, not a string the author formats: `since = max(start, watermark − lookback)`,
+`until = min(since + max_span, end of the current grain)`, half-open; after a complete run
+`watermark = min(until, start of the current grain)`, so today is re-asked until it ends
+([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D11). Connect calls `extract(decl, raw, ctx)` **once per page**,
+and `ctx` carries no currency table — the exponent comes from `Intl.NumberFormat`, and `extract` owns only a
+symbol → code map ([02-DATA-MODEL](02-DATA-MODEL.md) §3). Dedupe and `on_conflict` are the record's, inside
+`applyPull`: an exact `dedupe: [id]` matches every named field (lint requires `index: true` on each), a
+`near` dedupe runs [43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §5.7's window query, and a hit goes by
+`on_conflict` — `update` re-enters the write path, `skip` is counted, `new` creates
+([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D3).
 
 A `channel: webhook` ingest carries `verify:` where a pull carries `fetch:` —
 `verify: { kind: hmac_sha256, header: X-Signature, grant: <label> }` — or relies on the URL's random path
@@ -254,7 +279,10 @@ expect:
 ```
 
 Operators: `eq`/`ne` · `is`/`is_not` · `present`/`absent` · `contains`/`starts`/`ends` (capped at 40
-bytes, the same cap as the `where:` grammar) · `len_lte`/`len_gte`. **No combinators, no nesting.** A
+bytes, the same cap as the `where:` grammar) · `len_lte`/`len_gte`. `is`/`is_not` compare a bare literal
+with no substitution — `is: list` is the string `"list"`; `eq`/`ne` substitute placeholders first —
+`eq: "{since:date}"` is npm's clamp check ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D10). **No
+combinators, no nesting.** A
 list is implicitly `all` — the moment `expect:` gets an `any:` it is a predicate language, and this
 is an assertion about *someone else's* response, so it should stay dumber than the one about your
 own rows.
@@ -276,6 +304,11 @@ own rows.
 
 `none` · `bearer` · `basic` · `header` · `query_param` · `oauth2_refresh` · `jwt_rs256` · `aws_sigv4`
 
+Eight, closed, and every one of them is code in `connect` — *kernel code* here means code, never a
+declaration ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.5). `aws_sigv4` follows the AWS IAM User Guide's
+*Create a signed AWS API request* (the 2024 revision), and its test vector is the guide's published
+example ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D2).
+
 | Reason | Why it disqualifies a declaration on its own |
 |---|---|
 | **crypto** | a declaration that can construct a signature can construct **arbitrary signed assertions** with the user's private key — the same PEM that signs a GA4 token assertion signs anything, with any audience. And expressing HMAC or base64 in YAML needs functions, which is the expression language by the back door |
@@ -286,6 +319,11 @@ own rows.
 `{iss: <sa-email>, scope, aud: oauth2.googleapis.com/token}` and **exchanges** it; Enable Banking
 signs `{iss: enablebanking.com, aud: api.enablebanking.com, kid: <appId>}` and **presents** it
 directly. Same signer, two `mode:` values, one kernel implementation.
+
+The one vault write a connector ever causes is the rotated refresh token of `oauth2_refresh`, and even
+that is not the declaration's and not connect's to store: connect re-seals it (`seal`, version + 1) and
+the **record** stores it from the ack's `result.rotated_grant` with one `grant.rotate` event
+([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D5; [12-SECURITY](12-SECURITY.md) §6).
 
 *Named and deliberately not built:* a ninth kind, `claim_once` — SimpleFIN's one-time token
 exchange. It needs a state transition *and* a vault write, so it is legitimately kernel work, and it
@@ -310,11 +348,14 @@ Why exactly one:
 connectors.** A reader who hits it while writing their third connector will assume it was an
 oversight and ask for it.
 
-Fan-out over a **declared literal** list is permitted, because the diff can print it:
+Fan-out over a **declared literal** list is permissible in principle, because the diff can print it —
+but it is **deferred, not in v1**: `for_each` needs a sixth placeholder, `{each}`, that nothing can yet
+name, so `declare` refuses the key as unknown until a connector needs it
+([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D7). When it lands, the line is the diff's:
 
 ```yaml
-for_each: [braindog-render, braindog-cli]                # ✅ the diff names both published packages — 31 §6
-# for_each: { path: data[].id }                            # ❌ refused — a target from a response
+for_each: [braindog-render, braindog-cli]                # later — the diff names both published packages — 31 §6
+# for_each: { path: data[].id }                            # ❌ refused, always — a target from a response
 ```
 
 ---
@@ -364,7 +405,7 @@ points below two-thirds, and calling that convergence was rounding in the flatte
 | `error_when` on a body path | any `any:`/`all:` nesting inside `expect:` — the moment it nests it is a predicate language |
 | `keyset` and `link_header` paging | chained probes |
 | `probe:`, exactly one | fan-out over a fetched list |
-| `for_each:` over a literal list | **an interpolated `base:`** — 20% of Airbyte connectors do it, and it is the SSRF hole |
+| *deferred:* `for_each:` over a literal list — needs the `{each}` placeholder; returns when a connector needs it (§5.3) | **an interpolated `base:`** — 20% of Airbyte connectors do it, and it is the SSRF hole |
 
 > That boundary is precisely where Ansible, GitHub Actions expressions and CloudFormation each
 > crossed without noticing. **Write it into the doc as a refusal with the reason attached, or it
@@ -384,7 +425,10 @@ which grant — and not *how*. On schedule it opens a suggestion:
 The user's own agent fetches it and calls `propose`. **Every invariant survives**: the record still
 makes no outbound call, Spark still has no write path, the human still approves, and BrainDog's
 egress surface does not grow by one byte. This is *"where data is not enough, the extension is an
-agent"* taken literally — and it is the only version that costs nothing architecturally.
+agent"* taken literally — and it is the only version that costs nothing architecturally. `mode: agent` is
+a key on the ingest, not a convention: it forbids `fetch:` and `map:`, requires `schedule` and `writes`,
+and when its `pull` row fires the record opens the suggestion and writes no outbox row
+([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.7; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.9).
 
 A second tier — a Worker-side model with one `http_get` tool restricted to the declared origin — is
 possible, Cloud-only, `confidence: proposed` never `exact`. **Do not build it until a real connector
@@ -427,13 +471,13 @@ registers their own app. **Complete, not crippled** — the same asymmetry
 | # | Rule | Prevents |
 |---|---|---|
 | 1 | `auth.kind` is the closed kernel list. A declaration names a kind and a grant, and never builds a signature | a YAML file that constructs credentials can leak them |
-| 2 | **`Authorization` is a reserved header a declaration may not spell** | `headers: { Authorization: "Bearer sk_live_…" }` in a file shared to the Kennel. **This will happen** |
-| 3 | The validator refuses any literal matching a known key prefix — `sk_live_`, `rk_live_`, `ghp_`, `github_pat_`, `phx_`, `vcp_`, `xoxb-` | the same mistake from the other direction. Cheap, and it catches the real one |
-| 4 | **`base:` is a literal `https://` origin with no placeholders.** Placeholders live in `path` and `query` only, percent-encoded, with `..`, `//`, `@` refused **at install** | SSRF — **and it is not theoretical: 20% of sampled Airbyte connectors interpolate their host** |
-| 5 | Resolve-and-refuse private address space, and `redirect: "manual"` by default, re-validating any followed URL — **including Link-header cursors** — against the allowlisted origin | `302 → http://169.254.169.254/`. On Cloudflare the blast radius is small; **on the self-hosted Node build `localhost:3000` is right there** |
-| 6 | **Prove the scope at bind time.** One *authenticated* probe per grant: Stripe 403s naming the permission, GitHub returns `X-Accepted-GitHub-Permissions`, Cloudflare has a verify endpoint. Refuse a connector whose `require_scopes` is not a subset | attaching a full-access key to a read-only connector. Where scope is not machine-readable, the bind screen says it in words: **"this token can also delete your sites"** |
+| 2 | **`Authorization` is a reserved header a declaration may not spell** — `SECRET_IN_PACK` | `headers: { Authorization: "Bearer sk_live_…" }` in a file shared to the Kennel. **This will happen** |
+| 3 | The validator refuses any literal matching a known key prefix — `sk_live_`, `rk_live_`, `ghp_`, `github_pat_`, `phx_`, `vcp_`, `xoxb-` — the same `SECRET_IN_PACK` | the same mistake from the other direction. Cheap, and it catches the real one |
+| 4 | **`base:` is a literal `https://` origin with no placeholders.** Placeholders live in `path` and `query` only, percent-encoded, with `..`, `//`, `@` refused **at install**; what install cannot see is `PULL_ORIGIN_REFUSED` at run time | SSRF — **and it is not theoretical: 20% of sampled Airbyte connectors interpolate their host** |
+| 5 | Resolve-and-refuse private address space, and `redirect: "manual"` by default, re-validating any followed URL — **including Link-header cursors** — against the allowlisted origin; a miss is `PULL_ORIGIN_REFUSED` | `302 → http://169.254.169.254/`. On Cloudflare the blast radius is small; **on the self-hosted Node build `localhost:3000` is right there** |
+| 6 | **Prove the scope at bind time.** One *authenticated* probe per grant — `proveScopes` — Stripe 403s naming the permission, GitHub returns `X-Accepted-GitHub-Permissions`, Cloudflare has a verify endpoint. Refuse a connector whose `require_scopes` is not a subset; the proven set is stored in `grant.scopes`. A grant's plaintext is a JSON object of string fields whose keys, per `auth.kind`, are a closed set ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.6, §13 D15) | attaching a full-access key to a read-only connector. Where scope is not machine-readable, the bind screen says it in words: **"this token can also delete your sites"** |
 | 7 | Three caps — bytes (2 MB), rows per run, pages per run | **2 MB is not arbitrary**: it is the row/BLOB ceiling, so a larger body could not be stored anyway |
-| 8 | The response body is untrusted content and lands in `inbox_raw` | [12-SECURITY](12-SECURITY.md) §5 then applies unchanged — a provider feeding instructions into a prompt |
+| 8 | The response body is untrusted content and lands in `inbox_raw` — one row per page, `channel = pull`. A page that passed keeps `sha256`, headers and byte count, and its body for thirty days (the re-triage window of [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.8), then `body = NULL`; a page in `review` keeps its body ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D12) | [12-SECURITY](12-SECURITY.md) §5 then applies unchanged — a provider feeding instructions into a prompt |
 | 9 | **The install diff prints the egress** — `CALLS OUT api.stripe.com · every 24h · grant "stripe-read" · scopes …`. Both hosts for a preflight. **The whole query text** for an opaque body | this is the whole trust model. §1's lost row is what you spend; this line is what you buy |
 
 ---
@@ -477,9 +521,13 @@ metric_point (
 
 A `metric:` gains `series.<id>` as a second legal `source:`, with `value: last | sum | avg | delta |
 min | max | trend` ([08-METRICS](08-METRICS-AND-ANALYTICS.md) §3). The series' *kind* — `gauge | flow |
-cumulative | unique | fact` — lives on the declaring `ingest` (`writes: { series, kind }`, §3.2), never as a
-`metric_point` column; the reducer reads it from the declaration. **`target` and `window` stay mandatory** — a number that arrived from someone else's API
-is exactly the kind that most needs to state what good looks like.
+cumulative | unique | fact` — lives on the declaring `ingest` as `writes: { series, kind, unit?, scale? }`
+(§3.2), never as a `metric_point` column: `unit` is one of `count · ms · bytes · money.<CUR> · pct.bp` and
+fills the column above; `scale` is an integer multiplier on the mapped value, rounding half away from zero.
+Both reducers read the kind — connect's at write (`flow` sums, the four others take the latest,
+`n`-weighted when `n` is mapped) and the evaluator's at read ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.7,
+§13 D13; [08-METRICS](08-METRICS-AND-ANALYTICS.md) §3). **`target` and `window` stay mandatory** — a number
+that arrived from someone else's API is exactly the kind that most needs to state what good looks like.
 
 ---
 
@@ -488,11 +536,18 @@ is exactly the kind that most needs to state what good looks like.
 **The alarm was never the problem.** Twenty connectors are twenty rows in `schedule`, and the alarm
 is `MIN(due_at)`. **The egress is the problem, and the `outbox` in
 [01-ARCHITECTURE](01-ARCHITECTURE.md) §2 already solves it** — `kind: pull.fetch`, drained by the
-Worker. Three additions:
+Worker. A `pull` row has three states — `pending · firing · paused` — and its first `due_at` at install is
+`now`: the first run happens on install. A fire writes one outbox row carrying
+`{ ingest_id, declaration_version, grant_id }` and nothing more; the Worker leases it and hands it to
+`runPull(job, deps)`, which fetches the sealed grant through the record's `sealedGrant`, unwraps the
+connector DEK with `KeyStore`, writes each page through `applyPull` and **acks itself**. `deps` is
+`{ http, keyStore, clock, record }`, the last a three-method slice of the record (`sealedGrant · applyPull ·
+ackOutbox`), so connect never sees a key at rest and the record never makes the call
+([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §5.1; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.11). Three additions:
 
 | Addition | Why |
 |---|---|
-| **Jitter is mandatory and deterministic** | twenty connectors declaring `every: 1h` become due at the same instant → one wake → twenty runs in one Worker invocation. At `max_pages: 50` that is **1,000 subrequests — exactly the Workers Paid ceiling, and 20× the Free ceiling of 50.** Derive it from `hash(record_id ‖ ingest_id)` so it is **stable**: random jitter makes *"why was there a gap at 04:00"* unanswerable |
+| **Jitter is mandatory and deterministic** | twenty connectors declaring `every: 1h` become due at the same instant → one wake → twenty runs in one Worker invocation. At `max_pages: 50` that is **1,000 subrequests — exactly the Workers Paid ceiling, and 20× the Free ceiling of 50.** Derive it from `hash(record_id ‖ ingest_id)` so it is **stable**: random jitter makes *"why was there a gap at 04:00"* unanswerable. There is **one** formula and it is connect's — `jitterSeconds(recordId, ingestId, every)`, a SHA-256 over `record_id ‖ 0x1F ‖ ingest_id` modulo a window of `every / 10` clamped to 30 s–15 min — and the record writes the `due_at` the ack carries back ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.8) |
 | **The Worker leases a bounded batch** | ≤5 runs per invocation, `lease_size × max_pages ≤ 200`. Jitter prevents the pile-up; the lease cap survives jitter being wrong |
 | **A minimum interval, refused at install** | 15 minutes, or any declared provider floor. Banks are hard-floored at **6 hours by law** — SCA-RTS Art 36(5), *"no more than four times in a 24-hour period"* |
 
@@ -502,10 +557,26 @@ Worker. Three additions:
 |---|---|
 | **401/403** | `fatal_when` — **never retried.** `grant.stale_at` is set, the ingest's `schedule` row is set `state = 'paused'`, one urgent item. The urgent list already contains *"a credential expiring inside 48 hours"*; extend it to one that just failed |
 | **429** | honour `Retry-After` **when present** — GitHub sends it, **Stripe does not document it**, **Cloudflare puts the delay in the message body**, **Sentry publishes no numbers at all.** So the fallback backoff is the real mechanism |
-| **A provider 500s for a day** | the `retry` ladder — `2^attempts` minutes to a 6 h cap, `dead` at six attempts ([30-BLUEPRINT](30-BLUEPRINT.md) §8) — then paused with **one** item — deduped by `once_per: [ingest, day]`, because a connector failing hourly must not notify hourly |
+| **A provider 500s for a day** | the `retry` ladder — `2^attempts` minutes to a 6 h cap, `dead` at the eighth failed ack, the one ladder of [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1 — then `paused` with **one** item — deduped by `once_per: [ingest, day]`, because a connector failing hourly must not notify hourly |
 | **One provider of several fails** | **only the providers that answered are replaced.** The predecessor's company ledger keeps the last Mercury rows through a Mercury outage rather than blanking them beside live Stripe rows — a partial refresh is not an empty one |
 | **A re-sync meets a row a person edited** | the person's field wins. `event.actor` on the field's last write decides, so a hand-set category survives every sync — the predecessor's `pinned` column, generalised in [07-INGEST](07-INGEST-AND-RULES.md) §6 |
 | **`expect:` fails** | do not write, **do not advance the cursor**, keep the raw response, raise one item naming assertion, expected and actual |
+
+### Seven refusals, one family
+
+Every way a run can end short has a code, and the seven are the *connector* family of
+[30-BLUEPRINT](30-BLUEPRINT.md) §6 — new with this document, each with a fixture, each carrying the `fix`
+sentence the screen below prints ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §6):
+
+| Code | When |
+|---|---|
+| `PULL_AUTH_REJECTED` | the provider answered 401 or 403 — to the token step, the probe or a page. The row is `paused`, never retried |
+| `PULL_PROVIDER_UNAVAILABLE` | an `error_when` status, a timeout, the network — the `retry` ladder |
+| `PULL_REQUEST_REFUSED` | a `fatal_when` or an unlisted non-2xx, a body over `response_bytes`, a non-ASCII header, an unknown placeholder |
+| `PULL_EXPECT_FAILED` | an `expect:` or `more:` test failed with `on_fail: review` or `fail` — nothing written, the cursor not moved |
+| `PULL_SHAPE_MISMATCH` | an unparseable body, `read.rows` not a list, a missing `probe.read` or `page.from`, a repeated cursor |
+| `PULL_ORIGIN_REFUSED` | a 3xx, a URL or `Link` off `base`, a `..`, or the `Http` port's private-range refusal — §7 rules 4 and 5 at run time |
+| `PULL_LEASE_EDGE` | the loop stopped at the lease edge with pages left, or `applyPull` found the lease no longer this runner's |
 
 ```
   npm-downloads          ok        last 05:02 · 7 points · next 05:02 tomorrow

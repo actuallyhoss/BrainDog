@@ -37,7 +37,9 @@ Three consequences, and the first is worth a lot:
    Audit the ceiling once; every page is checkable against it mechanically. **Build grants in
    Phase A and the page engine inherits the property for free.**
 2. **A share link and a logged-in read are the same mechanism** — a share link is a projection with
-   an *empty* ceiling. One code path, not two.
+   an *empty* ceiling. One code path, not two: the recipient is the `share` kind of the one
+   `CallContext`, whose principal has six kinds — `person` · `token` · `runner` · `share` · `system` ·
+   `spark` — and `runner` and `share` are kinds, never fields beside it ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §2).
 3. **The projection is type-level, not a policy engine.** `pick + where` is checkable. An
    interpreted rule set is not.
 
@@ -63,10 +65,10 @@ same `where:` grammar every consumer in [02-DATA-MODEL](02-DATA-MODEL.md) §6 us
 | Level | Can |
 |---|---|
 | `read` | see what the projection shows |
-| **`append`** | **create new rows; cannot see or edit rows it was not granted** |
+| **`append`** | **`create`, `propose` and `log` — and no read.** The conservative half: an appender sees nothing, not even what it filed, unless a `read` grant on that register says so ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.1) |
 | `write` | create, edit, and change state on granted registers |
 | **`decide`** | **settle a question: pick an option and record the binding reason** |
-| **`owner`** | everything `decide` can, plus the ADMIN group of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — packs, declarations, invitations, export, import, erase, restore — and the vault (the VAULT group, owner-only by default). At least one per record; **never held by a token or a share link**, which is why there is no `admin` token scope ([ADR-060](16-DECISIONS.md)). *An earlier draft counted four* |
+| **`owner`** | everything `decide` can, plus the sixteen ADMIN methods of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — packs, declarations, rules, tokens, devices, invitations, export, import, snapshot, erase, restore, and deleting the record — and the vault (the VAULT group, owner-only by default). At least one per record; **never held by a token or a share link**, which is why there is no `admin` token scope ([ADR-060](16-DECISIONS.md)); a bearer reaches one ADMIN method only through an **operation grant** the owner approved in the browser, once, within ten minutes ([12-SECURITY](12-SECURITY.md) §3). *An earlier draft counted four* |
 
 The five are the `member` table's `level` CHECK ([30-BLUEPRINT](30-BLUEPRINT.md) §1). A transition may
 name the level it needs — `transitions: { proposed: { to: [active], by: decide } }`
@@ -76,8 +78,8 @@ name the level it needs — `transitions: { proposed: { to: [active], by: decide
 `append` is taken from Notion's `Can create` — *"can create new pages within the database, but
 can't view or edit existing pages they haven't been individually granted access to."* It is the
 natural role for an append-only system and the correct shape for a contractor: file a task,
-comment, propose an option, read only what you were given or wrote. It is also far cheaper than a
-filtered read.
+comment, propose an option, and read only what a separate `read` grant gives. It is also far cheaper
+than a filtered read.
 
 **`decide` is a level none of the four surveyed products has.** Verified across Notion's six
 levels, Airtable's five, Retool's three and Linear's role set: not one has a permission meaning
@@ -119,7 +121,7 @@ And there is a sharper, disqualifying reason for a record whose premise is an ap
 | `max()` never arises | there is nothing to compose |
 | Person-level is authoritative **in both directions** | which is how shared-vault products already behave |
 | **Every widening is an event** — including one caused by a *rule* change rather than a row change | precisely the event a `max()` lattice structurally cannot produce |
-| The one true deny is **structural** | the ADMIN and VAULT groups of the record's RPC surface ([30-BLUEPRINT](30-BLUEPRINT.md) §5), refused inside the object at the RPC boundary, before step 1 of the write path — never in the Worker's router, which the CLI can be pointed around. A deny at the RPC boundary cannot be widened by any grant, rule or future page |
+| The one true deny is **structural** | the ADMIN and VAULT groups of the record's RPC surface ([30-BLUEPRINT](30-BLUEPRINT.md) §5), refused inside the object at the RPC boundary, before step 1 of the write path — never in the Worker's router, which the CLI can be pointed around. A deny at the RPC boundary cannot be widened by any grant, rule or future page; an operation grant does not widen it either — it admits one bearer to one named ADMIN operation, once, and the record checks the reach itself |
 
 ### Four things to refuse, each with a documented precedent
 
@@ -142,7 +144,7 @@ or changing a property's type"* and *"creating or changing views."*
 |---|---|---|
 | **0 · A collaborator's own agent** | they write through a scoped agent token. Async, no UI, works today | ~0d |
 | **1 · Shared read-only links** | a signed token per page. **Every shared page is also a landing page** | ~1d |
-| **2 · A second person with a login** | largely absorbed by Phase A's auth-for-strangers work — the invitation flow is [12-SECURITY](12-SECURITY.md) §3 | ~4d |
+| **2 · A second person with a login** | largely absorbed by Phase A's auth-for-strangers work — the invitation flow is [12-SECURITY](12-SECURITY.md) §3, and it is two methods: `invite({ email, levels })`, ADMIN, the owner mints the link; `acceptInvite`, INTERNAL, the host calls at acceptance with the Directory's verified person, and that writes the `member` rows and their `access.grant` events ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.6, §5.11). *An earlier draft had one method doing both* | ~4d |
 | **3 · Collaborate on decisions** | comments, and the gate itself | ~3d |
 | 4 · Real-time co-editing | **not this year.** ~15–20d plus permanent maintenance | — |
 
@@ -157,6 +159,10 @@ Airtable's share links are the reference, and two things commonly believed about
   same URL will be preserved unless 'Generate new link' is clicked."* So in BrainDog **revocation
   is terminal**: a revoked share is never reactivated, and re-sharing mints a new id. One boolean,
   and it is the difference between revocation and a pause.
+
+The token itself is signed under a key derived from the root KEK and carries its `kek_id`; an invalid or
+revoked token is a **404**, never a 401 — to that caller the page does not exist
+([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.6).
 
 And one leak precedent to design against: Notion's published pages carry their children —
 *"Subpages are also published by default, along with any of their subpages"* — and both escape
@@ -332,7 +338,7 @@ What is worth building, and what is theatre.
 | **"Who touched this, when"** — free, from the provenance already on every row | live cursors |
 | **`actor` on every write** — `sam` · `agent:claude` · `rule:renewal-30d` — so a change is attributable | typing indicators |
 | An **activity feed** scoped to what your ceiling permits | avatar stacks on a business record |
-| **Read marks on decisions** — who has seen the thing that binds them | "currently viewing" — and the mark itself is a column on `member`, `seen_at`, written with `MAX()` only and never an entry row, so a read is never a write ([30-BLUEPRINT](30-BLUEPRINT.md) §1) |
+| **Read marks on decisions** — who has seen the thing that binds them | "currently viewing" — and the mark itself is a column on `member`, `seen_at`, written with `MAX()` only, by `markRead` — a person principal's call, never a token's — and never an entry row, so a read is never a write ([30-BLUEPRINT](30-BLUEPRINT.md) §1) |
 | **A held-question count**, so a cap is visible rather than silent | — |
 
 ### Multiple people, each running multiple agents
@@ -352,7 +358,9 @@ From Notion's Custom Agents: *"Each connected resource must have at least one Ag
 access to that resource… If all editors lose access to a resource, the agent stops running."*
 
 So: a token's effective scope is `token.scope ∩ owner.grants`, and **suspending a person suspends
-their tokens in the same statement** — not by a nightly job. And the token-minting screen says the
+their tokens in the same statement** — not by a nightly job. And because every `session` row carries
+`token_id`, a token's writes are one query: revoke it and everything it did is one list, not a search
+([02-DATA-MODEL](02-DATA-MODEL.md) §1). And the token-minting screen says the
 quiet part out loud, in Notion's spirit: *when you share an agent token, you are giving it
 everything you can see.*
 
@@ -391,9 +399,11 @@ names sensitive parameters, and *"values hidden this way display as
 `--blacklisted-by-developer--` in audit logs."* The existence of that opt-out is proof that
 everything else is captured.
 
-> **BrainDog's version: a per-field redaction list.** A write to a money amount, a revenue figure,
-> a deal term or anything typed `secret` logs **the fact and the field**, with `from_v`/`to_v` set
-> to the literal `--redacted--` at write time. Fully auditable — who, when, which field — and the
+> **BrainDog's version: a per-field redaction list, by type and by option.** `secret` and `money`
+> fields are on it always; any other field joins it with `redact: true` on its declaration
+> ([02-DATA-MODEL](02-DATA-MODEL.md) §5). A write to one logs **the fact and the field**, with
+> `from_v`/`to_v` set to the literal `--redacted--` at write time — and inside a `create` row's `to_v`,
+> which is the whole row's JSON, the redacted field's value is that same string. Fully auditable — who, when, which field — and the
 > number is not in the backup, the export, or a shared page. A value removed *later* by an erasure is
 > `--erased--`, and `NULL` means only that there was no prior value ([02-DATA-MODEL](02-DATA-MODEL.md)
 > §10) — the three are never confused. One family is redacted by *shape* rather than by field: a `grant.*`

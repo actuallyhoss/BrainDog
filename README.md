@@ -108,8 +108,8 @@ Full reasoning and the rejected alternatives:
 
 | | |
 |---|---|
-| The full platform as designed | **≈486–643 working days** — ≈3.0–4.0 years at 4 productive days in 9. An earlier draft said 115, and a later one 488–643 at 3.7–4.9 years; an adversarial re-cost found ~88–125 days with no line item and the stage estimates ~2.4× optimistic, and a validation round added ~106–140 and a parity trace against the predecessor ~46–63 more — 246–315 + 88–125 + 106–140 + 46–63 |
-| **The largest version one person can ship** | **≈103–133 working days**, or **≈84–103** with every remaining cut taken — the record, and nothing declarative. An earlier draft said 70–85; the cut list it rested on subtracted items the base already excluded. See [docs/15-ROADMAP.md §1b](docs/15-ROADMAP.md) |
+| The full platform as designed | **≈488–645 working days** — ≈3.0–4.0 years at 4 productive days in 9. An earlier draft said 115, and a later one 488–643 at 3.7–4.9 years; an adversarial re-cost found ~88–125 days with no line item and the stage estimates ~2.4× optimistic, a validation round added ~106–140 and a parity trace against the predecessor ~46–63 more, and the specification loop's second iteration added one package at 2 — 248–317 + 88–125 + 106–140 + 46–63 |
+| **The largest version one person can ship** | **≈105–135 working days**, or **≈86–105** with every remaining cut taken — the record, and nothing declarative. An earlier draft said 70–85; the cut list it rested on subtracted items the base already excluded. See [docs/15-ROADMAP.md §1b](docs/15-ROADMAP.md) |
 | Gross margin at $12/mo | **≈95% — about $0.55** of cost per active record, of which $0.20 is inference. An earlier draft said 93%/$0.86 on a dearer model |
 | Base case at month 24 | 80 subscribers, ≈$960/mo |
 | Modal single outcome | **$0.** Stated because it is true |
@@ -118,8 +118,8 @@ Full reasoning and the rejected alternatives:
 once by omitting described work, and once by an arithmetic error that flattered the floor. The
 honest recommendation is unchanged and is in [docs/15-ROADMAP.md §1b](docs/15-ROADMAP.md): build the
 record, cut every declarative layer, and let gate 2 — ten subscribers still paying at day 30,
-[ADR-031](docs/16-DECISIONS.md) — decide whether the platform is ever worth the other ≈350–540
-days (486 − 133 · 643 − 103).
+[ADR-031](docs/16-DECISIONS.md) — decide whether the platform is ever worth the other ≈353–540
+days (488 − 135 · 645 − 105).
 
 The likeliest cause of death is the **cold start**: a record's value is proportional to what is in
 it, and on day one it is empty. Everything about packs exists to attack that.

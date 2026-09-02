@@ -146,7 +146,8 @@ closed** — this is kernel governance, not an extension.
 `event` cannot carry this. It is append-only forever, it travels in every export, and a drifting
 event vocabulary is unqueryable in five years. Observations are **prunable, pre-aggregated daily,
 and a closed enumerated vocabulary in one place**. Retention is **400 days** — one year plus a
-comparison — then pruned. **Nothing is rolled up**: the 400-day daily window is the whole history the
+comparison — then pruned by the kernel's `purge`: one transaction per run over a bounded batch, with
+one event ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §13 #20). **Nothing is rolled up**: the 400-day daily window is the whole history the
 analyser reads, and the table has no grain column to hold a monthly row
 ([30-BLUEPRINT](30-BLUEPRINT.md) §1). *An earlier draft said "then monthly aggregates".*
 
@@ -187,7 +188,7 @@ needs n ≥ 30; 50% needs n ≥ 6. Every number below is derived from that, not 
 
 | Signal | Window | n_min | Fires when |
 |---|---|---|---|
-| Unmatched ingest shape | 30d | **3** | same shape, ≥80% field agreement — already the number in [07-INGEST](07-INGEST-AND-RULES.md) §4, and `3/3 · 2/3 · 0/3` *is* the review UI |
+| Unmatched ingest shape | 30d | **3** | same shape, ≥80% field agreement — already the number in [07-INGEST](07-INGEST-AND-RULES.md) §4, and `3/3 · 2/3 · 0/3` *is* the review UI. The shape is deterministic — channel, sender domain, digit-blanked subject; the model contributes nothing to it — and the third arrival in 30 days earns one `infer.draft` row, never a model call per payload ([46-SPEC-SPARK](46-SPEC-SPARK.md) §13 #15; [45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #18) |
 | Search returns zero | 90d | **5, on ≥3 distinct days** | 5/90 clears the 3/90 rule-of-three floor; distinct days kills the burst |
 | Field always null | 90d | **20 creates** | ≥95% null. Proposes **retire**, never delete |
 | Register never read | **180d** | ≥90d old, ≥1 row | Azure uses 90 days to *drop an index* — free and invisible. This is user-visible, so double it. Proposes **hide from nav**, never uninstall |
@@ -266,7 +267,9 @@ record noticed."* Nothing here is urgent, and the notification rules already say
 [ADR-007](16-DECISIONS.md): *"a number with no target is decoration; a number with no comparison
 window is a number you cannot act on."* Apply the product's own law to itself.
 
-Every accepted proposal writes a `prediction`, atomically with the declaration change:
+Every accepted proposal writes a `prediction`, atomically with the declaration change — the record
+does this when a `change` proposal is accepted, not the client ([45-SPEC-RECORD](45-SPEC-RECORD.md);
+[46-SPEC-SPARK](46-SPEC-SPARK.md) §13):
 
 ```yaml
 prediction:
@@ -291,7 +294,7 @@ prediction:
 | **The measure reuses the `where:` grammar** | it is one of the seven consumers in [02-DATA-MODEL](02-DATA-MODEL.md) §6 — [ADR-013](16-DECISIONS.md)'s canonical list already counts predictions as the sixth. No new machinery — this is why the loop is affordable in *this* architecture and would not be in another. *An earlier draft said "five to six"* |
 | **`score_at` is a row in `schedule`** | the single alarm already drains hundreds of due rows. Zero new infrastructure |
 | **A prediction whose baseline already meets its target is refused at write time** | one validator line, and it is the reward-hacking control. Otherwise the loop learns to predict things that are already true |
-| **A prediction with no measurable form is refused** | ADR-007 one level up. This kills the entire class of "improvements" that are vibes |
+| **A prediction with no measurable form is refused** — `PREDICTION_UNMEASURABLE`, a code in [30-BLUEPRINT](30-BLUEPRINT.md) §6's spark family | ADR-007 one level up. This kills the entire class of "improvements" that are vibes |
 | **The score is written either way, and a miss is visible** | *"The CIB pattern you approved on 1 Sep predicted unmatched payloads would fall to ≤1. They are at 7. Supersede it, or say why you are keeping it."* |
 
 **The window is derived, not chosen.** Three constraints intersect: Azure scales validation with
@@ -430,7 +433,8 @@ disciplines:
    test set contained **only primes**; adding composites inverted the conclusion.
 
 **And one borrowed from SRE practice:** if the brake never fires, everyone quietly starts assuming
-it cannot. **Exercise the suspension deliberately once a quarter in staging**, or it will be
+it cannot. **Exercise the suspension deliberately once a quarter on the ops record — there is no
+staging environment ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §13 #14)**, or it will be
 discovered broken the first time it is needed.
 
 ---

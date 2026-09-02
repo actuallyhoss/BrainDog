@@ -11,7 +11,7 @@ engine is [11-ASSISTANT](11-ASSISTANT.md).
 |---|---|
 | Where does it live? | **Nowhere new.** A second mode of the command palette, plus rows in queues that already exist. No panel, no widget, no page, no chat |
 | Does it ship in v1? | **No conversational surface** — [ADR-030](16-DECISIONS.md). The §1b base ships no in-app model call; Phase A ships tier A-minimal plus *one job*, the ingest-pattern proposal; conversation arrives with tier B |
-| What shape is it? | **A proposal row**, identical in kind to the suggestion rows the decision gate already consumes |
+| What shape is it? | **A proposal row**, identical in kind to the suggestion rows the decision gate already consumes; it carries `model`, `filed` and `read` beside its five fields, and a fifth body, `query`, is the palette's unfiled answer (§4, §10) |
 | What does it emit? | `{{path}}`, block fences, and row addresses. **Never a typed number** |
 | Is it a coordinator? | **No — a peer, and the weakest one.** It cannot write. The coordinator is the record |
 | Does cost show? | One row in Settings, counted in *asks*. Never near the input. **The model name ships with every output, always** |
@@ -105,11 +105,13 @@ Five things that make it better than the terminal it wraps, each a test:
 | **A failure is a word, not a colour** | `ok: false` puts *failed* on the row. A red block in a terminal is red whether the command failed or merely wrote to stderr |
 | **You can leave** | the job store is module state and the stream is owned by no component, so closing the palette does not stop the transcript; asserted: events received before closing < events after. A dot on the launcher says one is running — *a job you can walk away from is only a feature if there is a way back to it* |
 
-Mechanics: the client receives job events over the record's WebSocket ([22-FRONTEND](22-FRONTEND.md) §5)
-and, when it cannot hold one, polls `GET /api/jobEvents?after=<seq>` every 700 ms — the highest `seq` it
-holds, answered only with what came after and **with nothing at all when the job's high-water mark has not
-moved**, one indexed row read ([26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5). Each event crosses the wire
-once; `after=` is asserted monotonic and non-zero; **nothing polls when nothing is live**. The `start` event
+Mechanics: job events are never pushed over the record's WebSocket ([22-FRONTEND](22-FRONTEND.md) §5).
+While a job is live the client polls `jobEvents({ id, after })` every 700 ms — `after` is the highest
+`seq` it holds, answered only with what came after and **with nothing at all when the job's high-water
+mark has not moved**, one indexed row read ([30-BLUEPRINT](30-BLUEPRINT.md) §5;
+[26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5); `listJobs({ status?, limit? })` is the list behind
+the launcher's dot. Each event crosses the wire once; `after` is asserted monotonic and non-zero;
+**nothing polls when nothing is live**. The `start` event
 draws nothing of its own — the header reads model and repo through it, which is also what keeps the header
 honest about the model for the whole of a live job. `Esc` in run mode goes **back to the launcher, not out**:
 one press to leave a mode, a second to leave the panel — and not while the cursor is in the prompt, where
@@ -136,25 +138,28 @@ wrote this row* — any agent. A **paw** means *Spark specifically*.
 
 ## 4 · The proposal review
 
-### One object, four bodies
+### One object, five bodies — four filed, one not
 
 Spark produces exactly one kind of thing: **a suggestion**, which the decision gate already
-consumes and which already becomes an immutable decision with a mandatory reason.
+consumes and which already becomes an immutable decision with a mandatory reason. The gate is one
+mechanism in two clients: here, the review below; over MCP, the protocol's MRTR round trip
+([10-MCP](10-MCP.md) §5) — the same row, the same mandatory reason.
 
 | Body | Case |
 |---|---|
 | `options` | two or more paths, one recommended |
-| `pattern` | an `ingest:` document derived from raw-inbox examples. **The v1 case** |
+| `pattern` | an `ingest:` document derived from raw-inbox examples. **The v1 case.** A Spark-derived pattern always files `confidence: needs-review`; a person raises it at review ([07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §4) |
 | `rowset` | *n* rows to write. Partial acceptance matters most here |
 | **`change`** | **a declaration diff, and the falsifiable prediction that comes with it** — [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6. Phase C |
+| `query` | the palette's answer — a drafted predicate and the rows it selects (§10). **Unfiled**: it reaches the queue only if the person saves it ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.2) |
 
 **`change` is the one that needed a fourth body rather than reusing `options`,** and the reason is
 the prediction. A `change` review shows three things no other body has: the diff, the observation
 that triggered it with its count and window (*"11 unmatched payloads from alerts@cib.eg over 30
 days"*), and **the claim it will be scored against on a named date**. Accepting writes the
 declaration and the prediction in one transaction; a `prediction` with no measurable form is refused
-at write time, so a `change` proposal that cannot state what it would improve cannot reach this
-screen at all.
+at write time (`PREDICTION_UNMEASURABLE`), so a `change` proposal that cannot state what it would
+improve cannot reach this screen at all.
 
 The per-line hit counts the `pattern` review already draws (`3/3 · 2/3 · 0/3`) are the right idiom
 for the diff, which is why this is a fourth body and not a fourth screen.
@@ -419,7 +424,9 @@ nothing, and returns instantly. **There is no honest sentence a model can write 
 not exist.**
 
 The same gate applies to filing: a proposal with zero addressable rows behind it is **never
-written**.
+written** (`PROPOSAL_NO_ROWS`), one that cites nothing is refused (`PROPOSAL_UNCITED`), and a
+proposal is filed exactly once, by `record.propose` — the palette's second call files it and nothing
+else does ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.5).
 
 And guessing is not a tone — it is an absence of citation. A proposal whose *recommendation* rests
 on an uncited figure **cannot be marked recommended**; it files with no recommendation and the
@@ -433,7 +440,7 @@ comparison table shows no star.
 |---|---|---|
 | A **proposal** | **No** | it is a form, and a form that assembles itself under the cursor cannot be reviewed |
 | A **figure or a block** | **No** | a malformed block degrades to a visible fence, and a block streamed character-by-character is malformed for most of its life — it would flicker through the fallback |
-| **Retrieval progress** | **Yes** | `Searched transactions · 412 rows`. This is the real progress signal |
+| **Retrieval progress** | **As pass 1, not a stream** | `Searched transactions · 412 rows` is the `read` call's answer, drawn before any model is asked. This is the real progress signal |
 
 Two supports and one dissolution:
 
@@ -499,6 +506,11 @@ The body renders in two passes, and **the first needs no model.**
 > contribution is a proposal about them.** If the model never returns, the user still got what they
 > came for — which is also the graceful-degradation design and the no-model design, for free.
 
+The palette is two calls — `read`, then `propose` — so pass 1 renders without a stream and Escape
+between them cancels for free. Both are named methods on the Spark object, dispatched over
+`/api/spark/<method>` (`status` · `read` · `propose` · `pattern` · `settings`), a browser session only —
+a bearer gets `403 NEEDS_BROWSER_SESSION` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5).
+
 ### Cancel
 
 Escape **stops** rather than bubbling, instantly, and **the typed text survives**. Toast: `Stopped.`
@@ -560,7 +572,9 @@ Never a modal. Never an upsell in the flow.
 ```
 
 That last sentence is the whole product argument in eleven words, and it is **only true because of
-the two-pass layout in §7.**
+the two-pass layout in §7.** The line above it is the `SPARK_BUDGET_SPENT` refusal's own `fix`
+sentence, shown verbatim — a refusal is never rewritten client-side ([13-UI](13-UI.md) §6); the
+number behind it is `ask_cap`, per record per month ([46-SPEC-SPARK](46-SPEC-SPARK.md) §6).
 
 > **The model is never silently downgraded.**
 
@@ -578,10 +592,12 @@ With a self-hosted endpoint configured, **the meter disappears entirely** — no
 gone. It is not our money. The model name still ships with every output.
 
 With **no** model, Spark is **absent**: no palette row, no `Propose a pattern` action, no **Ask
-Spark** button on any empty state, one line in Settings. **Every deterministic feature is
-byte-identical, and CI proves it** — `SPARK_ENDPOINT` unset must pass every e2e suite (an earlier
-draft named the variable for the withdrawn *Pointer* rename; the row is in
-[18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6).
+Spark** button on any empty state, one line in Settings. `SPARK_ENDPOINT` unset means the host never
+imports the package and registers no Spark route; `GET /api/version` answers `spark: false`, and the
+client draws a Spark affordance on nothing but `spark: true` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.1;
+[50-SPEC-WEB](50-SPEC-WEB.md) §5.5). **Every deterministic feature is byte-identical, and CI proves
+it** — `SPARK_ENDPOINT` unset must pass every e2e suite (an earlier draft named the variable for the
+withdrawn *Pointer* rename; the row is in [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6).
 
 ---
 

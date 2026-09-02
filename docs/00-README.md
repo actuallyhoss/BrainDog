@@ -107,7 +107,7 @@ What this costs, stated honestly rather than buried:
 | Renderer | extract 528 lines + 1,043 lines of tests, 2.5d | write and test from nothing, ~8d |
 | Server | shim an existing Worker, 4d | design the substrate, ~10d |
 | Gate-1 instrument | an already-tested library, publishable in days | a new library nobody has run — **and gate 1 itself has since been replaced**, see [15-ROADMAP](15-ROADMAP.md) §5 |
-| Total | ~46d to platform launch | **≈486–643 working days — ≈3.0–4.0 years at 162 productive days a year** — after an adversarial re-cost, a validation round and a parity trace against the predecessor — see [15-ROADMAP](15-ROADMAP.md) §1. The recommended shape is **≈103–133 days** for the record alone (§1b), plus 10 for stage 0 |
+| Total | ~46d to platform launch | **≈488–645 working days — ≈3.0–4.0 years at 162 productive days a year** — after an adversarial re-cost, a validation round, a parity trace against the predecessor and the specification loop's second iteration — see [15-ROADMAP](15-ROADMAP.md) §1. The recommended shape is **≈105–135 days** for the record alone (§1b), plus 10 for stage 0 |
 
 What it buys, which is the reason to accept it: the prior plan inherited a data model built for
 one person, an `OWNER_ID`, nine `AUTOINCREMENT` id sequences that are spoken out loud, and a

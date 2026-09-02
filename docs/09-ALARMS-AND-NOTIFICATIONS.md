@@ -19,7 +19,7 @@ One alarm, one table, one invariant.
 CREATE TABLE schedule (
   id TEXT PRIMARY KEY, due_at TEXT NOT NULL, kind TEXT NOT NULL,                 -- due_at: RFC 3339 UTC
   key TEXT NOT NULL, payload TEXT NOT NULL,                                      -- key: the once_per dedupe key; payload: json
-  state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,    -- state: pending | firing | done | failed
+  state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,    -- state: pending | firing | done | failed | paused
   UNIQUE (kind, key),
   CHECK (kind IN ('digest','reminder','rule','retry','purge','rotate','pull','analyse','score','snapshot'))
 );
@@ -28,6 +28,11 @@ CREATE INDEX schedule_due ON schedule(state, due_at);
 
 **Ten kinds, and the `CHECK` is the count** — the same DDL as [30-BLUEPRINT](30-BLUEPRINT.md) §1. *(An
 earlier draft here listed six, had no `CHECK`, and left `attempts` nullable.)*
+
+`state` has **five** values — `pending` · `firing` · `done` · `failed` · `paused`. `paused` is a
+connector's row after its credential was rejected or its ladder ran out (§2,
+[25-CONNECTORS](25-CONNECTORS.md) §9); the claim below never takes it. The handler is one INTERNAL method
+of the record, `drainSchedule` ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.9). *(An earlier draft counted four.)*
 
 > **The invariant: the object's alarm is always set to `MIN(due_at) WHERE state='pending'`, or
 > no alarm at all if that set is empty.**
@@ -51,7 +56,7 @@ alarm():
   4. write outbox rows for every notification that must leave the object
   ── transaction ends ──
   5. arm(): await scheduler.set(MIN(due_at) WHERE state='pending')
-  6. await scheduler.wake()     -- the outbox doorbell. Cloud: OUTBOX_Q.send({ record }); self-host: no-op.
+  6. await scheduler.wake()     -- the outbox doorbell. Cloud: OUTBOX_Q.send({ record }); self-host: kicks the poller.
                                 -- The only I/O, and the last statement — 01 §2
 ```
 
@@ -69,12 +74,13 @@ and at 8 attempts the row goes `failed` and raises a *visible* item in the app. 
 that silently gave up is worse than one that never existed.
 
 **The outbox borrows this ladder and is never retried in place.** A delivery the Worker could not make
-comes back as `ackOutbox(id, 'failed', err)`: the outbox row goes `failed` with `attempts + 1`, and a
-`retry` row is inserted **here** — `kind = 'retry'`, `key = 'outbox:' || id`, `due_at = now +
+comes back as `ackOutbox({ id, state: 'failed', error })`: the outbox row goes `failed` with `attempts + 1`,
+and a `retry` row is inserted **here** — `kind = 'retry'`, `key = 'outbox:' || id`, `due_at = now +
 min(2^attempts minutes, 6h)`. When it fires, the outbox row goes back to `pending` and the Worker leases
-it again. When the retry row itself goes `failed` — at 8 attempts, the one ladder above — the outbox row goes
-`dead` and a `suggestion` (`body_kind = 'change'`,
-`opened_by = 'system'`) names the kind, the error and the payload. Retry policy lives in this one table;
+it again. **Retry rows never fail**; it is the **eighth `failed` ack** — the one ladder above, counted on the
+outbox row — that makes the row `dead` and opens the dead-letter `suggestion`: `body_kind = 'change'`,
+`opened_by = 'system'`, `from = { kind, error, attempts, payload: summary }`, `to = 'retry'`, and the one
+question sentence of [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.10. Retry policy lives in this one table;
 the Worker never re-leases a failed row on a clock of its own. *(An earlier draft gave the outbox a
 counter and a cap of its own, so one notification had two ladders; [30-BLUEPRINT](30-BLUEPRINT.md) §8
 has the ack.)*
@@ -110,12 +116,20 @@ rather than necessity, and the enforcement moves:
 > explain. The lint fails the build if the date regresses; the extra `deleteAlarm()` is then belt
 > and braces rather than the load-bearing thing.
 
+The order is fixed and it is the runbook's: a `final` snapshot inside the record's prefix → `destroy()`
+on `Record` (alarm, then storage) → `Spark`, when it has storage → the R2 prefix → `record.forget` in the
+Directory. It runs at day 90 of a lapse, or when the owner asks — `deleteRecord` is an ADMIN method,
+browser session, re-authenticated, the slug typed to confirm ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)
+§13 #17; [30-BLUEPRINT](30-BLUEPRINT.md) §5).
+
 ### Self-hosted
 
 The same `schedule` table, drained by one `setTimeout` loop that re-computes its delay from
 `MIN(due_at)`. Identical semantics, ~30 lines, and it is the `Scheduler` port —
-`get() · set(atMs) · clear() · wake()` — one of the nine in [01-ARCHITECTURE](01-ARCHITECTURE.md) §4;
-`wake()` is a no-op here because the outbox poller is in the same process.
+`get() · set(atMs) · clear() · wake()` — one of the nine in [01-ARCHITECTURE](01-ARCHITECTURE.md) §4.
+`wake()` is not a no-op here: it kicks the in-process outbox poller (`setImmediate`), whose 15-second tick
+is also the belt for an abandoned lease ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §13 #5). *(An earlier
+draft made it a no-op because the poller shares the process — sharing a process is not being woken.)*
 
 ---
 
@@ -125,11 +139,11 @@ The same `schedule` table, drained by one `setTimeout` loop that re-computes its
 |---|---|---|
 | `reminder` | a `day` field with a lead time declared on the register | "brain.dog renews in 30 days — $52.01" |
 | `digest` | a `digest` declaration | the Monday morning brief |
-| `rule` | a rule's `schedule:` action | "check this again in 2 weeks" |
+| `rule` | a rule's `schedule:` action — and the `once_per` marker of every rule that notifies or creates, under the table's `(kind, key)` unique index ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.7) | "check this again in 2 weeks" |
 | `retry` | a failed ingest or notification | exponential, capped |
 | `purge` | a row soft-deleted 30 days ago; the hourly session sweep ([02-DATA-MODEL](02-DATA-MODEL.md) §1) | housekeeping |
 | `rotate` | a credential's rotation interval | "this token is 11 months old" |
-| `pull` | a connector's `fetch.schedule` — [25-CONNECTORS](25-CONNECTORS.md) §9 | fetch npm downloads at 04:10 |
+| `pull` | a connector's `fetch.schedule` — [25-CONNECTORS](25-CONNECTORS.md) §9. Its states are `pending · firing · paused`: a fire sets `firing` and writes one `pull.fetch` outbox row carrying `{ ingest_id, declaration_version, grant_id }` and nothing more — connect fetches the sealed grant itself; the ack returns the row to `pending` with the next `due_at`; `dead`, or a rejected credential, sets `paused` plus one item; the first `due_at` at install is `now` ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D8) | fetch npm downloads at 04:10 |
 | `analyse` | the self-improvement detector — [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.3 | weekly |
 | `score` | a prediction's `score_at` — [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6 | score D41's prediction on 1 Oct |
 | `snapshot` | a metric's `snapshot:` — [08-METRICS](08-METRICS-AND-ANALYTICS.md) §2.6 | nightly, overwrite yesterday |
@@ -145,7 +159,10 @@ The same `schedule` table, drained by one `setTimeout` loop that re-computes its
 Three reminders from one field, deduped by `once_per: [entry, renews]`, and re-derived if the
 date changes. **Changing a renewal date cancels the reminders for the old date** — an obvious
 requirement that is easy to miss and produces the most annoying possible bug, so it is a named
-test.
+test. Mechanically: the key is `<id>:<field>:<at>:<offset>` under the table's `(kind, key)` unique
+index, so `ON CONFLICT DO NOTHING` *is* `once_per`; cancel is a key-range delete of the field's `pending`
+rows; a `day` reminder is due at noon UTC; `repeat:` without `remind:` means offset `0`; the horizon is
+400 days and at most 100 rows per field per write ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §13 #20).
 
 ---
 
@@ -153,7 +170,7 @@ test.
 
 | Channel | Cloud | Self-host | Good for |
 |---|---|---|---|
-| **In-app** | always | always | everything. The record's own inbox is the source of truth |
+| **In-app** | always | always | everything. The `note` event on the row — by `rule:<id>`, `digest:<id>` or `system` — **is** the notification; there is no inbox table, and §5's one unread count is counted over those events ([45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #17) |
 | **Web Push** | VAPID from the Worker | same | time-sensitive, one line, no content |
 | **Email** | Cloudflare Email Service | your own SMTP | digests, anything with a table in it |
 | **MCP** | a resource an agent polls | same | "what should I know" at the start of a session |
@@ -185,7 +202,7 @@ Every notification, on every channel, has these six fields and no others:
 | `because` | the rule, ingest or field that produced it. Always present |
 | `to` | a deep link to the row it is about |
 | `key` | the dedupe key |
-| `urgent` | `true` interrupts; the default, `false`, lands in the digest — §5 rule 2 |
+| `urgent` | `true` interrupts — the `note` event plus a `notify.push` and a `notify.email` outbox row, at most one interrupt per hour per record; the default, `false`, lands in the digest — §5 rule 2 |
 
 Six, counted. There is no `channel` field: routing is §5's, by `urgent`, and a rule that wrote
 `channel: digest` was naming a decision that is not its to make. *(An earlier draft said five and then
@@ -251,9 +268,18 @@ of the sixteen block kinds ([05-BLOCKS](05-BLOCKS-AND-THEMES.md) §2) — `table
 §1). *(An earlier draft wrote `empty: skip` — a keyword in a key that on a page block takes an
 interpolatable string — and `as: list`, which is a primitive, not a kind.)*
 
+The keys are typed and closed: `schedule: { day?, at, tz? }` — weekly with `day`, daily without;
+`channels`, one to five of `in-app · email · push · webhook · mcp`; `sections`, at most twelve; `prose`,
+only ever `spark` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.11). A `webhook` channel names where it posts —
+`webhook: { url, grant? }`, an `https:` URL printed in the install diff's `CALLS OUT` line and the vault
+label of the secret that signs the POST — because a URL a digest posts to is egress, and egress is declared
+or it does not happen ([04-PACKS](04-PACKS.md) §7).
+
 `prose: spark` is the one place the assistant writes into a scheduled output, and it is capped
 at two sentences, generated from the sections that are actually present, and clearly attributed.
 It is opt-in. A digest that is all figures is a perfectly good digest, and it costs no neurons.
+Mechanically it is one `infer.prose` outbox row, and the digest finishes on the ack — a slow model never
+holds the alarm ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.9).
 
 ---
 

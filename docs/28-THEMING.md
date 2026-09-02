@@ -14,8 +14,8 @@ Everything below was measured or retrieved on **2026-09-01**. Live browser measu
 
 | Layer | Format | Why |
 |---|---|---|
-| What a person or an agent **writes** | a small BrainDog YAML dialect — roles, one seed, three scales | the interchange format has no concept of a *role*, an *intent*, or a *contrast floor*. It is a container, not a design system |
-| What BrainDog **stores and shares** | **DTCG 2025.10** + a **Resolver 2025.10** document | a theme is the cheapest thing anybody will ever share. A shareable artefact only one product can read is not shareable |
+| What a person or an agent **writes** | a small BrainDog YAML dialect — roles, one seed, three scales. The YAML is the authoring form; the wire into the theme package is its JSON, and the record **stores that body** ([39-SPEC-THEME](39-SPEC-THEME.md) §4.1) | the interchange format has no concept of a *role*, an *intent*, or a *contrast floor*. It is a container, not a design system |
+| What BrainDog **shares** | **DTCG 2025.10** + a **Resolver 2025.10** document — one file, both schemes inline — **derived byte-stably from the stored body**, as the CSS is; neither is stored ([39-SPEC-THEME](39-SPEC-THEME.md) §5.12) | a theme is the cheapest thing anybody will ever share. A shareable artefact only one product can read is not shareable |
 | What the browser **gets** | generated CSS custom properties in `@layer theme` | already decided in [22-FRONTEND](22-FRONTEND.md) §7 |
 
 > **Never write "W3C design tokens."** As of 2025-10-28 the Design Tokens Community Group has three
@@ -58,7 +58,14 @@ fixed eight steps (`t-xs` 12 · `t-sm` 13 · `t-base` 15 · `t-md` 17 · `t-lg` 
 28 · `t-3xl` 34) and the reader's Text setting picks the body step among `t-sm` / `t-base` / `t-md`;
 a theme never sets type ([13-UI](13-UI.md) §7). **No `intent:` remap** — `warn: warn-quiet` named a
 role no list defines; instead every intent role (`earn` `warn` `danger`) gets a `-fill` variant from
-the generator (§3 step 5). Two themes ship, each in both schemes: **house** and **high-contrast**.
+the generator (§3 step 5). Two themes ship, each in both schemes, **as constants in the package, not as
+declarations** — `HOUSE`, and `build(HOUSE, HIGH_CONTRAST)` for **high-contrast** (§3.1); a `theme`
+declaration row exists only for an installed third-party theme, so [04-PACKS](04-PACKS.md) §6's *no
+declarations in the kernel* test holds ([39-SPEC-THEME](39-SPEC-THEME.md) §13 D17). The dialect is closed:
+`extends: house` only; `scheme: both` only; `neutral_hue: from-accent | <degrees>`; `space.base` 2–8;
+radii 0–999 with `sm ≤ md ≤ lg`; a colour is `#RRGGBB`, `#RGB` or `oklch(L C H)` — no alpha; and `declare`'s
+schema follows the same closure, so a pack that lints clean cannot fail at `build`
+([39-SPEC-THEME](39-SPEC-THEME.md) §13 D18; [42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.10).
 
 ### Why conform at the wire anyway
 
@@ -72,7 +79,7 @@ that the ecosystem does not treat it as settled — issue #210, *"Native modes a
 is still open and was last touched **after** the Resolver shipped, and issue #2, *"[RFC] Theming"*,
 has been open since 2019. Terrazzo is the only implementation of the Resolver anywhere.
 
-> **So: store the Resolver document; depend on nobody else reading it.** Export it for interop, and
+> **So: derive the Resolver document from the stored body; depend on nobody else reading it.** Export it for interop, and
 > expect that in 2026 exactly one other tool round-trips it. That still beats inventing a mode
 > system, because when the ecosystem lands, BrainDog is already there.
 
@@ -82,7 +89,7 @@ has been open since 2019. Terrazzo is the only implementation of the Resolver an
 |---|---|
 | **`$ref` / JSON Pointer aliasing** | a second, more powerful resolution engine to write, secure and cycle-detect, inside a system whose security argument ([04-PACKS](04-PACKS.md) §7) is *enumeration over a small surface*. **And the published stable spec cannot decide whether it is mandatory** — it says MAY in one place and MUST in two others. Issue #383, fix PR #442 **opened 2026-08-30 and still open.** Resolve on import, emit only `{curly.brace}`, and say in the docs that conformance here is undefined by the spec itself |
 | **`gradient`, `transition`, `strokeStyle`, `border`** | no BrainDog primitive consumes them — depth is a luminance ladder, not a gradient, and motion is a 300 ms budget, not a themeable curve. **And the stable spec ships an open *"is the current specification for X fit for purpose?"* issue against every one of them** (#98–#103) |
-| **Free-form `shadow`** | [05-BLOCKS](05-BLOCKS-AND-THEMES.md) §6 already guards *"the elevation ladder only goes up, in both themes."* A theme sets an **ordered ladder of exactly N levels**, validated monotonic in both schemes — not an arbitrary list |
+| **Free-form `shadow`** | [05-BLOCKS](05-BLOCKS-AND-THEMES.md) §6 already guards *"the elevation ladder only goes up, in both themes."* **The generator emits** the elevation — three levels, fixed geometry, alphas per scheme from the profile — validated monotonic in both schemes (check I); there is no `shadow` or `elevation` key in the dialect at all ([39-SPEC-THEME](39-SPEC-THEME.md) §13 D9) |
 
 > **And do not delegate validation to the DTCG JSON Schema.** It is buggy — #439 (group `$type`
 > inheritance is not validated) and #428 (a broken internal reference) — and **there is no
@@ -151,9 +158,12 @@ place; re-registering a property throws `InvalidModificationError`. All useful. 
 > not-a-color`, registered `initial-value: green` → the child computes **blue**.
 
 Colour tokens inherit. So `@property` does **not** rescue `var(--fain)` — the typo case
-[22-FRONTEND](22-FRONTEND.md) §7 gate 1 exists for. **That lint gate stays load-bearing.** Use
+[22-FRONTEND](22-FRONTEND.md) §7 gate 1 exists for. **That lint gate stays load-bearing** — and it is a
+rule of `css-rules.mjs`, not Stylelint ([52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §13 #10). Use
 `@property` for exactly one thing: `syntax: "<color>"` on the semantic colour tokens, as a runtime
-type assertion so a malformed installed token fails loudly. About thirty lines.
+type assertion so a malformed installed token fails loudly. About thirty lines; who registers them — the
+theme's emission or the app's fixed `@layer tokens` sheet — is [39-SPEC-THEME](39-SPEC-THEME.md) §13 D14's
+split to name.
 
 ### 2.4 · `color-mix()` for state layers only
 
@@ -229,14 +239,17 @@ INPUT: accent_seed, scheme ∈ {light, dark}          OUTPUT: every role, in-gam
               from." Below C 0.02 the hue angle is numerically unstable: two identical greys can
               be 180° apart, and every derived rotation lands somewhere random.
 
-1 GROUND      bg = oklch(scheme==light ? 0.99 : 0.16, min(c.C, 0.008), c.H)   # a whisper of hue
-              sunk,s1,s2,s3 = ladder(bg), ΔL ≈ 0.022 light / 0.028 dark
+1 GROUND      dark:  bg = oklch(0.16, min(c.C, 0.008), c.H), the ladder ASCENDS 0.028 to s3   # a whisper of hue
+              light: the ladder anchors at the TOP — s3 = L 0.99 and DESCENDS 0.022 through
+                     s2, s1 to bg 0.924 and sunk 0.902, so the lightest surface is the raised one
+                     and there is room for three above bg (39 D2; 13 §2.2 measured it so)
               assert monotonic RELATIVE LUMINANCE, not L*                          → check H
 
 2 INK RAMP    C_ink = min(c.C * 0.12, 0.02)         # tinted ink, never coloured ink
               worst = (scheme==light) ? sunk : s3   # the worst ground this role ever sits on
               for (role,target) in [ink 12, ink2 8, dim 6, faint 4.5]:
                   L = bisect(L -> wcag(oklch(L,C_ink,c.H), worst), target)
+              # bisect = a 24-step bisection on OKLab L over the quantised, gamut-mapped colour — 39 §5.6
 
 3 BOUNDARIES  edge = solve for exactly 3.0 against the worst surface               → 1.4.11
               line = decorative, no floor, but assert ΔL ≥ 0.06 from edge
@@ -244,10 +257,12 @@ INPUT: accent_seed, scheme ∈ {light, dark}          OUTPUT: every role, in-gam
               (two boundary roles, not four — there is no line2 and no line3)
 
 4 ACCENT      accent      = seed, chroma-clamped into gamut            # the fill role
-              accent_text = solve L for ≥ 4.5 on the worst surface     # emitted as accent-text
-              accent_ink  = white or ink, whichever clears 4.5 on accent    # accent-ink
+              accent_text = the first of a 4.5–9 contrast grid on the worst surface that
+                            also clears check K — it may sit well above 4.5   # accent-text
+              accent_ink  = the first of ink, white, black clearing 4.5 on accent   # accent-ink
               if |L(text) − L(fill)| > 0.10: warn. The link will not look like the button —
               that is the honest cost of splitting the role, and 13-UI §2.2 already pays it.
+              (39 D5)
 
 5 INTENTS     roles earn / warn / danger; hue anchors earn 145°, warn 75°, danger 27°.
               The fourth author word, info, resolves to accent and adds no role.
@@ -256,13 +271,17 @@ INPUT: accent_seed, scheme ∈ {light, dark}          OUTPUT: every role, in-gam
               (earn-fill, warn-fill, danger-fill) solved for ≥ 3.0 on the worst surface,
               for chips and bars.
               YELLOW: warn at 75° cannot reach 4.5:1 on a light ground at useful chroma.
-              Drop chroma, darken to ~L 0.55. It will read olive. Do not fight it.
+              Drop chroma and darken; it reads olive — and the separability search below may
+              push a light warn far past the floor (the house theme's lands at 12:1, #351B00).
+              The glyph carries the intent. Do not fight it.
 
 6 GAMUT MAP   CSS Color 4 §14.2.1 — binary-search chroma down, ΔE_OK ≤ 0.02.
               Never let the browser clip. See §2.1, measured.
 
-7 VALIDATE    §4. On failure retry once with relaxed chroma, then refuse, naming the pair
-              and the number.
+7 VALIDATE    §4. Separability is SEARCHED, not repaired: a two-stage grid over contrast
+              targets and chroma 0.14 → 0.08 per intent, taking the first palette that clears
+              check F; none → refuse INTENT_INSEPARABLE, naming the pair and the number.
+              There is no "retry once with relaxed chroma" (39 D4).
 ```
 
 ### The failure cases, and what each really is
@@ -276,6 +295,27 @@ INPUT: accent_seed, scheme ∈ {light, dark}          OUTPUT: every role, in-gam
 | **"Constant chroma" ramps** | the sRGB gamut is a wildly irregular solid: at L 0.70 you can reach C ≈ 0.19 at hue 145° and C ≈ 0.11 at 262°. Rotating hue at fixed chroma is silently clipped at some hues and not others | solve per hue; never rotate at fixed chroma |
 | **The blue→purple drift** | **a premise worth correcting: this is a *CIELAB* defect, not an Oklab one.** Oklab was built to fix CIELAB's hue non-linearity, and CSS Color 4 uses OKLCH for gamut mapping for that reason | **no action.** Do not add a blue correction; it would fix a bug that is not there |
 | **M3's DislikeAnalyzer** | detects dark yellow-green tones and nudges them | **do not copy it.** It is a *taste* correction, not an accessibility one, and silently changing the colour a user picked is worse than keeping it |
+
+### 3.1 · High-contrast is the house seed through a profile
+
+There is no high-contrast dialect and no second seed. The shipped high-contrast theme is
+`build(HOUSE, HIGH_CONTRAST)`: the same seed, run through a **profile** whose targets are higher — the
+ink ramp, the boundary floors, the mark constants — and swapped in by `prefers-contrast: more`
+([39-SPEC-THEME](39-SPEC-THEME.md) §4.2, §5.9). That is why it is never refused and never auto-corrected
+(§4.5): if the floor fails its own checks, the validator is wrong.
+
+### 3.2 · Identity accents
+
+A register with `identity:` gets a hue at create, and the **kernel never computes it**: it calls the
+`accent(existingHues)` function it was opened with and freezes the answer in the row's `identity.accent`.
+The function is the theme package's `nextAccentHue` — the farthest point on the hue circle, measured
+after simulation, from every existing accent and from the three intent hues (nothing within 20° of `earn`,
+`warn` or `danger`), deterministic for its inputs. The mark it paints is a fixed `(L, C)` per scheme —
+`(0.72, 0.12)` dark, `(0.55, 0.09)` light — chosen so every hue at that lightness is inside sRGB and ≥ 3:1
+on every surface. Four marks stay separable under every simulation at ΔE ≥ 4; after that the name beside
+the mark carries identity, as [13-UI](13-UI.md) §2.1b requires anyway ([39-SPEC-THEME](39-SPEC-THEME.md)
+§5.8, §5.11; [ADR-028](16-DECISIONS.md)). *An earlier spec draft had the kernel spread hues by the golden
+angle with no theme dependency; it is withdrawn — a hue seven degrees from `earn` is an intent, not a mark.*
 
 ---
 
@@ -305,7 +345,10 @@ Use **Brettel, Viénot & Mollon (1997)**, the two-plane method, for all three de
 Viénot 1999's single-plane simplification is valid for protan and deutan only; the reference
 implementation carries a literal warning that it is **not accurate for tritanopia**.
 
-Three matrix pairs plus a plane-selection normal, operating in **linear** RGB, public domain.
+Three matrix pairs plus a plane-selection normal, operating in **linear** RGB, public domain. Every
+constant in this section has a pinned source: OKLab matrices — Ottosson 2020; the Brettel planes —
+libDaltonLens; ΔE2000 — Sharma, Wu & Dalal 2005; APCA — APCA-W3 0.1.9; gamut mapping — CSS Color 4
+§14.2.1 ([39-SPEC-THEME](39-SPEC-THEME.md) §13 D13).
 
 ```
 lin(v) = v/12.92 if v < 0.04045 else ((v+0.055)/1.055) ** 2.4
@@ -371,24 +414,31 @@ Every check runs at install, in CI, and live in the theme editor — both scheme
 |---|---|---|---|
 | A | every ink role × every surface | 4.5:1 | refuse |
 | B | `accent` **as text** × every surface | 4.5:1 | refuse |
-| C | `faint` used below 24 px (`t-xl`) | — | refuse |
-| D | `edge` × every surface | 3:1 (1.4.11) | refuse |
-| E | focus ring vs both neighbours, and focused vs unfocused | 3:1 (2.4.13) | refuse |
-| F | **intent × intent, ΔE2000 after Brettel at severity 1.0, all three deficiencies** | ≥ 20, or ≥ 10 with glyphs | refuse < 10, warn 10–20 |
+| C | `faint` × every surface at the 3:1 large-text floor — the palette check behind *"or use it only above 24 px"*; the usage half (no `--faint` on text below 24 px) is a `css-rules.mjs` rule in apps/web | 3:1 | refuse |
+| D | `edge`, and the three `-fill` roles, × every surface | 3:1 (1.4.11) | refuse |
+| E | focus ring vs both neighbours, and focused vs unfocused — computed as 9:1 between the two ring tones | 3:1 (2.4.13) | refuse |
+| F | **intent × intent, ΔE2000 after Brettel at severity 1.0, all three deficiencies** | ≥ 20, or ≥ 10 with glyphs | refuse < 10 (`INTENT_INSEPARABLE`); 10–20 **passes**, recorded `band: 'glyph'` |
 | G | intent **as text** × every surface | 4.5:1 | refuse |
 | H | surface ladder monotonic in **relative luminance** | strict | refuse |
 | **I** | **elevation ladder monotonic, both schemes** | strict | refuse |
 | **J** | **every emitted colour in sRGB gamut** | ΔE_OK ≤ 0.02 | **auto-correct** |
-| **K** | **hue-only encoding** — any meaningful pair needs \|ΔL\*\| ≥ 8 **or** a non-colour channel | — | refuse |
-| **L** | **`forced-colors` survival** — with tokens replaced by system colours, every load-bearing boundary still has a declared border | — | refuse |
+| **K** | **hue-only encoding** — computed as `accent-text` vs `ink` at \|ΔL\*\| ≥ 8; any meaningful pair needs that **or** a non-colour channel | ΔL\* ≥ 8 | refuse |
+| **L** | **`forced-colors` survival** — a text assertion over the emitted CSS (only `--` declarations) and the exported `A11Y_FORCED_COLORS` block: every load-bearing boundary has a declared border. The rendered assertion under `forcedColors: 'active'` is apps/web's Playwright gate | — | refuse |
 | **M** | `line` vs `edge` not confusable | ΔL ≥ 0.06 | warn |
-| **N** | APCA advisory: `wcag ≥ 4.5` but `\|Lc\| < 60` | — | warn |
+| **N** | APCA advisory: `wcag ≥ 4.5` but `\|Lc\| < 60` — advisory only, never counted against a theme, the high-contrast floor included | — | warn |
 | **O** | every `$value` parses against its `$type` and is **re-serialised from the parse** | — | refuse |
 | **P** | banned in any value: `url(`, `image(`, `element(`, `attr(`, `var(`, `\` | — | refuse |
 
 **I and L are the two worth arguing for.** I, because [05-BLOCKS](05-BLOCKS-AND-THEMES.md) §6
 already promises the elevation ladder only goes up, and a theme is exactly the thing that breaks it.
 L, because forced colours silently deletes the surface ladder and nothing currently notices.
+
+C, D, E and K are computable on a palette alone — no rendered page — which is what lets every check run
+at install ([39-SPEC-THEME](39-SPEC-THEME.md) §13 D7). F's band is a pass and not a warning because the
+house theme itself sits in it on four of six light pairs; a warning on every theme is noise, and `band` is
+exposed for the editor's *Tight* label instead ([39-SPEC-THEME](39-SPEC-THEME.md) §13 D6). The record runs
+the sixteen on every `theme` declaration at plan and at install — it calls `build` directly and the
+refusals join the pack's ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.6).
 
 ### 4.5 · Refuse, warn, or auto-correct
 
@@ -399,7 +449,15 @@ different recoveries.
 |---|---|---|
 | **Mechanically correctable, no intent lost** — out-of-gamut chroma, a missing hex fallback, a dimension in the wrong unit | **auto-correct, and put it in the install diff** | the intent is unambiguous and there is one right answer. Refusing is pedantry. But it must appear in the diff, because [04-PACKS](04-PACKS.md) §3 makes the diff the review surface |
 | **A floor is breached** — A, B, C, D, E, F below ΔE 10, G, H, I, K, L, O, P | **refuse, naming the pair and the number** | auto-correcting a contrast failure silently ships a theme the author did not make, and they blame the app. **And an auto-corrected theme is not portable, because the recipient's correction may differ.** A refusal is portable — which matters most for the one artefact designed to be shared |
-| **Judgement, or an uncertain threshold** — F in the 10–20 band, M, N | **warn, and let it install** | the threshold is flagged low-confidence above. Refusing on a number you have called a guess is dishonest and produces refusals you cannot defend |
+| **Judgement, or an uncertain threshold** — M, N | **warn, and let it install** | the threshold is flagged low-confidence above. Refusing on a number you have called a guess is dishonest and produces refusals you cannot defend. F's 10–20 band is not here: it passes, recorded, because the glyph is structural (§4.4) |
+
+Three codes are the theme's own, and they count in the pack-and-declaration family of
+[30-BLUEPRINT](30-BLUEPRINT.md) §6 beside `CONTRAST_FLOOR` (A, B, C, D, E, G, K): `INTENT_INSEPARABLE` for F
+below 10; `THEME_LADDER_ORDER` for H and I; `THEME_VALUE_INVALID` for what only the colour parser sees — a
+colour outside the grammar, an alpha, an achromatic seed. A `url(` or any other banned token in a value (P)
+is the pack's `REMOTE_ASSET`, the same refusal wherever in a pack it appears — a theme dialect value and a
+pack asset URL are two different refusals, and both codes stay ([39-SPEC-THEME](39-SPEC-THEME.md) §6.2;
+[04-PACKS](04-PACKS.md) §5).
 
 **Two hard exceptions.** The shipped **high-contrast theme is never refused and never
 auto-corrected** — it is the accessibility floor, so if it fails, the *validator* is wrong and CI
@@ -434,12 +492,16 @@ authority*.
 | # | Mechanism | Why |
 |---|---|---|
 | 1 | `<meta name="color-scheme" content="light dark">` **as the first thing in `<head>`** | the only thing that stops the white UA canvas painting before the stylesheet parses. It also governs UA-drawn scrollbars and form controls |
-| 2 | **`data-scheme` on `<html>`, written server-side from the preference row** | not from a client script. An inline script reading `localStorage` is the classic fix and it costs a CSP nonce and a render-blocking script. **The record already knows the scheme — render it** |
-| 3 | the theme text into a nonced `<style>` in the SSR head, from the same generator | already *"one generator, two sinks."* First paint is themed |
+| 2 | **`data-scheme` on `<html>`, written by one hashed, one-statement inline script from the `bd_pref` preference cookie**, before first paint, per device | no server renders a request, so nothing is written server-side. The script is one statement, hash-allowed by the CSP — no nonce plumbing, nothing render-blocking beyond it. *(An earlier draft had the attribute rendered server-side; the shell is static — [50-SPEC-WEB](50-SPEC-WEB.md) §13 #1, #6.)* |
+| 3 | the **house theme as a linked stylesheet built at dev time** — `scripts/theme.mjs` runs the same generator and commits `src/theme/house.css`; an installed theme arrives with `boot()` and is swapped in by the one call above | still one generator; the second sink is a file, not an SSR head. First paint is themed in the house theme, and a record's own theme lands with its first response ([50-SPEC-WEB](50-SPEC-WEB.md) §13 #18) |
 
-**And one addition to the ETag, now made.** [22-FRONTEND](22-FRONTEND.md) §9 keys the document ETag
-on `{page.version, record_version, theme.version, scheme, renderer.version}`. `scheme` was added on
-this document's request: without it a scheme switch serves a stale document.
+**And the ETag this document once amended is gone.** There is no server-rendered document to key: the
+shell is static bytes with its own ETag and `/api/*` is `no-store`; the scheme rides the `bd_pref` cookie
+and the theme rides `boot()`, so a scheme switch cannot serve a stale document because no document is
+served ([22-FRONTEND](22-FRONTEND.md) §9; [50-SPEC-WEB](50-SPEC-WEB.md) §13 #1). *(An earlier draft added
+`scheme` to a document ETag that no longer exists.)* The theme editor (phase 7) is the one place the
+browser runs the generator: it imports `@braindog/theme` in its own chunk for live `build` and `toCSS`;
+nothing else in the app does, and there is no SSR head to feed ([39-SPEC-THEME](39-SPEC-THEME.md) §12).
 
 ### Per-page and per-register theming: refused
 

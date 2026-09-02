@@ -68,7 +68,11 @@ declarations:
 ```
 
 One file, or a directory of files with one manifest. It is text, so it diffs, reviews, and can be
-pasted into a chat window.
+pasted into a chat window. The YAML is read by one parser — `yaml`, the accepted dependency of
+[ADR-063](16-DECISIONS.md) — in one subpath, `@braindog/declare/yaml`, and never inside the record
+([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.1). `parsePack(files) → Pack | Refusal[]` is the way in;
+`lint(pack, installed)` is §5's checks; `checksum(body)` is the SHA-256 below — three names, and
+[42-SPEC-DECLARE](42-SPEC-DECLARE.md) §2 owns them.
 
 ### The manifest, key by key
 
@@ -84,12 +88,15 @@ key that is not here is refused by name.
 | `license` | an SPDX identifier | required |
 | `declarations` | a list of one or more, each one of the eight kinds | required |
 | `requires` | `{ format: <int>, primitives: <int>, packs: { <pack id>: <semver range> } }` — the `.dog` format revision and the `PRIMITIVES_VERSION` the declarations need, and the packs they depend on. **Never an app version: the app has no semver** ([31-STACK](31-STACK.md) §6) | optional |
-| `seeds` | the example rows — marked `example`, counted on their own line in the diff (§3) | optional |
+| `seeds` | `[{ register, fields, note? }]` — the example rows: at most one per register, own registers only, no `ref`/`secret`/`file` values; marked by the value `example` in the register's declared `tags` field, applied through the write path with `cascade = false`, and counted on their own line in the diff (§3) — [42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.5 | optional |
 | `provides` | **derived** — the `kind.id` of every declaration. It may be written out for a reader, and if it is, it must equal the derived list — `PROVIDES_MISMATCH` otherwise | derived |
 
 `requires` on the manifest is a map. `requires` on a `page` declaration is a list of `register.<id>`
 ([06-PAGES](06-PAGES.md) §1.1). The two never appear on the same object. *An earlier draft's manifest
 carried `braindog: ">=0.4 <2"`, a range against a version number the app does not have.*
+
+`note` is legal on every declaration, field, block, section and action — a reader's comment the
+validator keeps and never interprets ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §13 D15).
 
 The pack's checksum — `pack.checksum` in the kernel's `pack` table — is the SHA-256 of the RFC 8785
 (JCS) form of manifest plus declarations, after YAML → JSON ([34-GRAMMARS](34-GRAMMARS.md) §5).
@@ -143,9 +150,17 @@ Four properties of that screen, each deliberate:
    that `planPack(pack)` returns — `adds · changes · conflicts · seeds · spawns · calls_out · touches` —
    computed against the live record and never applied. `y` is `installPack(pack, planHash)`, one
    `transactionSync()` over the declaration writes; if the record changed since the plan it is
-   refused with `PLAN_STALE` and the diff is re-run. A validation failure at declaration 6 of 7
-   leaves nothing behind. Both methods are ADMIN — a browser session only
-   ([30-BLUEPRINT](30-BLUEPRINT.md) §5).
+   refused with `PLAN_STALE` and the diff is re-run. `planHash` is
+   `<record_version>.<sha256hex(jcs({ pack: checksum, base }))>`: the integer half is the kernel's
+   `planVersion`, whose compare-and-swap inside `installDeclarations` is the staleness check, and the
+   hash half catches a pack edited between plan and install, which no version can see
+   ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.4, [41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.6). The
+   kernel writes the `pack` row and the install events in that same batch. A declaration already
+   present with an identical checksum — `/start` installs one by `setDeclaration` — is *already
+   present, unchanged*: neither a change nor a conflict. A validation failure at declaration 6 of 7
+   leaves nothing behind. Both methods are ADMIN — a browser session, or a bearer carrying a
+   single-use **operation grant** for exactly this install, approved in the browser after seeing
+   this diff ([30-BLUEPRINT](30-BLUEPRINT.md) §5, §10; [ADR-060](16-DECISIONS.md)).
 4. **Nav changes are surfaced — and then refused.** The commonest way an extension ecosystem
    degrades a product is by quietly rearranging the navigation, so a pack does not get to. An
    update that would move an existing page's `nav` is **shown and ignored**
@@ -160,7 +175,7 @@ Four properties of that screen, each deliberate:
 | Kennel index | `braindog pack install freelancer-uk` |
 | Any URL | `braindog pack install https://…/x.pack.yaml` |
 | Git ref | `braindog pack install git:owner/repo@v2` |
-| Paste | paste the text into the installer |
+| Paste | paste the text into the installer — *CLI: later* ([48-SPEC-CLI](48-SPEC-CLI.md) §10) |
 | Local file | `braindog pack install ./my.pack.yaml` |
 
 The Kennel is a **convenience, never a gate**. Nothing is trapped behind approval, which is the
@@ -175,16 +190,18 @@ single most important property Obsidian's ecosystem has and a curated app store 
 Uninstalling **retires** the declarations and keeps every row ever created under them. *Retires*,
 not removes: `declaration.retired = 1` and one `uninstall` event — a row in that table is never
 deleted, and a new version of a declaration sets `superseded_at` on the prior row in the same
-transaction ([30-BLUEPRINT](30-BLUEPRINT.md) §1). *An earlier draft said "removes".* The rows under
-them become *orphaned*: not rendered, still exported, still searchable by id, and re-adopted
-automatically if the pack is reinstalled.
+transaction ([30-BLUEPRINT](30-BLUEPRINT.md) §1). The `pack` row itself goes, and the pack's index
+families are dropped, in that same transaction — the declarations stay, retired
+([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.6, [41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.6). *An earlier
+draft said "removes".* The rows under them become *orphaned*: not rendered, still exported, still
+searchable by id, and re-adopted automatically if the pack is reinstalled.
 
 ```
   RETIRES   6 declarations
   KEEPS     412 rows in register.invoices, 38 in register.clients
             They stop being shown. They are in every export.
             Reinstalling freelancer-uk adopts them again.
-  DELETES   nothing
+  DELETES   nothing of yours
 ```
 
 This is only possible because of the one-table decision in
@@ -203,7 +220,7 @@ was expected — the failure mode to avoid is a valid-looking pack that half-loa
 | `KIND_UNKNOWN` | Unknown kind | `declarations[3]: kind 'widget' is not one of the eight` |
 | `FIELD_TYPE_UNKNOWN` | Unknown field type | `register.invoices.fields[4].type 'currency' — did you mean 'money'?` |
 | `FIELDS_OVER_CAP` | Fields per register > 64 | `register.wide: 71 fields. The ceiling is 64 — a register with more than that is a database, not a register.` |
-| `INDEXES_OVER_CAP` | Indexed fields > 8 | `register.invoices: 11 indexed fields; the ceiling is 8` |
+| `INDEXES_OVER_CAP` | Fields with `index` or `unique` > 8 — `key:` is one index and is not counted | `register.invoices: 11 indexed fields; the ceiling is 8` |
 | `PATTERN_OVER_CAP` | `starts`/`ends` pattern > 40 bytes | `rule.x.when — the 'starts' pattern is 63 bytes. The cap is 40. Use 'matches', which searches the full-text index instead.` |
 | `METRIC_NEEDS_TARGET_OR_WINDOW` | A metric with no `target` or no `window` | `metric.unpaid: a number with no target is decoration; a number with no comparison window cannot be acted on` |
 | `MIXED_CURRENCY` | Mixed-currency aggregation | `metric.total: sums register.obligations.amount across 3 currencies. Name an fx source and date, or scope the predicate to one currency` |
@@ -233,18 +250,33 @@ was expected — the failure mode to avoid is a valid-looking pack that half-loa
 | `FIELD_TYPE_CHANGED` | A field's type changed on a register with rows | `register.obligations.amount: text → money changes a type. Retire the field and add a new one` |
 | `PROVIDES_MISMATCH` | `provides` written out and not equal to the declarations | `provides lists register.fx; no declaration provides it` |
 | `PLAN_STALE` | The record changed between `planPack` and `installPack` | `the record changed since this plan was made — 2 declarations differ. Plan again` |
+| `PACK_MALFORMED` | Not a well-formed pack — a YAML fault, or two kinds or two ids on one declaration | `money-core.pack.yaml#14:3: this declaration names both 'register' and 'page'. One kind per declaration` |
+| `PROVIDES_CONFLICT` | An id another installed pack provides | `register.obligations is provided by money-core 1.4.0. Two packs cannot provide one id` |
+| `REMOTE_ASSET` | Anything fetched from elsewhere — a URL, `url(`, `data:`, `<script` — in any pack string, a theme value included | `page.money.blocks[2].body: 'https://cdn.example/logo.png' — a pack loads nothing from elsewhere; an image URL is a callback with the record id in it` |
+| `SECRET_IN_PACK` | A credential-shaped literal, a spelled `Authorization` header, or a `secret`/`file` seed value | `ingest.stripe-ledger.fetch.headers.Authorization: a pack names a grant, never a key. Remove 'sk_live_…' and bind it in the vault` |
+| `WOULD_ORPHAN` | An install whose `retires` would leave rows under a retired register | `freelancer-uk 2.1.0 → 2.0.0 retires register.clients; 38 rows would be orphaned. Uninstall instead, or keep 2.1.0` |
+| `THEME_VALUE_INVALID` | A theme value only the colour parser can refuse — a colour outside the grammar, an alpha, an achromatic seed | `theme.midnight.seed.accent 'oklch(0.62 0.01 262)' is almost grey; there is no hue to build from` |
+| `INTENT_INSEPARABLE` | Two intents under ΔE 10 after dichromat simulation ([28-THEMING](28-THEMING.md) §4.3) | `theme.midnight — good and bad are ΔE 6.2 apart to a deuteranope. Four intents need at least 10. Move one hue, or lower the chroma of the other` |
+| `THEME_LADDER_ORDER` | A surface or elevation ladder out of order | `theme.midnight.roles.light.s2 is darker than s1. The ladder only goes up` |
 
-Thirty-three codes, `UPPER_SNAKE`, each with a fixture that produces it. The one table every code lives
-in is [30-BLUEPRINT](30-BLUEPRINT.md) §6; the grammar's own codes (`VIA_TWICE`, `CONTAINS_TOO_LONG`, …)
-are [34-GRAMMARS](34-GRAMMARS.md) §1. *An earlier draft of this table had no code column, and the last
+Forty-one codes — the thirty-three an earlier draft counted and the eight beneath `PLAN_STALE`, the last
+three of them the theme's — `UPPER_SNAKE`, each with a fixture that produces it. The one table every code
+lives in is [30-BLUEPRINT](30-BLUEPRINT.md) §6, which counts ninety-nine across eight families; the
+grammar's own codes (`VIA_TWICE`, `CONTAINS_TOO_LONG`, …, and the three that guard an ingest's extractor
+forms — [07-INGEST](07-INGEST-AND-RULES.md) §3) are [34-GRAMMARS](34-GRAMMARS.md) §1. *An earlier draft of this table had no code column, and the last
 row compared a `braindog` version the app does not have.* A dialect fault is never one of these — a
 document is not parsed at write; it degrades at render ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §3).
 
 ### Versioning
 
-Semver, with ranges resolved at install and **pinned in `pack`**. A pack that cannot run says so
-rather than half-loading. Upgrades show the same diff as installs, and a *downgrade* that would
-orphan rows requires `--force` and says how many.
+Semver, with ranges resolved at install and **pinned in `pack`**. A range is the `Range` grammar of
+[42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.2 — comparators joined by spaces, no `||`, no `x` — and a
+prerelease orders per SemVer 2.0 §11. A pack that cannot run says so rather than half-loading.
+Upgrades show the same diff as installs, and any install — downgrade or upgrade — whose `retires`
+would leave rows under a retired register is refused `WOULD_ORPHAN`, naming how many; uninstall (§4)
+remains the way to orphan on purpose. There is no `--force` in v1; when one arrives (*CLI: later*,
+[48-SPEC-CLI](48-SPEC-CLI.md) §10) it lifts this one refusal and nothing else
+([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §13 D17).
 
 There is no automatic pack updating. An extension ecosystem that silently updates is an
 ecosystem that can silently change what a page says about your money.
@@ -305,12 +337,13 @@ rather than by re-drawing something that already works. See [06-PAGES](06-PAGES.
 | declare a register | run code — there is no interpreter to reach |
 | draw a page from declared blocks | make an outbound call **except a declared `source:`** — see below |
 | match text and extract typed fields | read a register it did not declare or require |
-| set theme tokens | load a remote asset — font, image, script, iframe |
+| set theme tokens | load a remote asset — font, image, script, iframe (`REMOTE_ASSET`) |
 | schedule a digest | write a colour, a font or a spacing value |
 | open a suggestion | write any row except a declared `example` seed, which is counted on its own line in the diff |
 | tag, move, notify, set a field via a rule | delete anything |
 | declare a **bounded** `create` rule, whose ceiling is shown as `SPAWNS` in the diff | generate an unbounded number of rows, generate into a register it does not own, or generate a `secret` or a `file` |
 | | escalate: no pack grants another pack a capability |
+| | carry a credential — a key-shaped literal, or a spelled `Authorization` header (`SECRET_IN_PACK`; [25-CONNECTORS](25-CONNECTORS.md) §7) |
 
 > ### The one row this table lost, and it is the most expensive change in the corpus
 >

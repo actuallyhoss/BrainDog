@@ -140,6 +140,8 @@ requires that for **SC 2.5.7 Dragging Movements (AA)**.
 
 > **Dismiss must be terminal.** A proposal that returns is worse than one that never appeared: it
 > teaches that dismissing does nothing, which is how a holding pen becomes a badge nobody reads.
+> Every verb here writes the record — a per-person store, never a device cookie — so a dismissal is
+> terminal on every device ([19-INTERFACE](19-INTERFACE.md) §5).
 
 ### (a) Nav that reshuffles, so muscle memory never forms
 
@@ -183,12 +185,13 @@ register declaration.
 |---|---|---|
 | **Title** | `page.title`, else `register.name` | **never `register.id`.** `obligations` is an identifier, not a title. Absent `name`, the validator refuses at install |
 | **Subtitle** | omitted — unless bound to a saved view, where it is the view's name, which the user typed | never generated prose |
-| **Count** | `n` unfiltered, **`n of N`** filtered, and it includes example rows **and says so**: `12 of 40 · includes 1 example` | silently excluding example rows reproduces [19-INTERFACE](19-INTERFACE.md) §6's exact bug — a figure reading zero directly above a table with a row in it |
+| **Count** | `n` unfiltered, **`n of N`** filtered, and it includes example rows **and says so**: `12 of 40 · includes 1 example` — an example row is one whose `tags` holds `example` ([02-DATA-MODEL](02-DATA-MODEL.md) §1) | silently excluding example rows reproduces [19-INTERFACE](19-INTERFACE.md) §6's exact bug — a figure reading zero directly above a table with a row in it |
 | **Primary action** | `New {register.one}`, bound to `n`, iff the caller can write | **`one:` is the register's singular, from [02-DATA-MODEL](02-DATA-MODEL.md) §5.** Do **not** singularise algorithmically: English heuristics fail on `people`, `fx`, `series`, and this product ships Arabic, where the rule is not a suffix. Ask for the word; warn if absent; fall back to `New row` |
 | | **no primary action** if the register contains a `secret` field | reveal is deliberate and audited. A header button is not deliberate |
 | | **`Export`** if the register is read-only to this caller | degrade capability rather than hiding it |
 | **Filters** | **indexed fields only**, declaration order, capped at 8. `enum`→chips · `bool`→toggle · `ref`→picker · `day`→range · text→the search box (`matches:`, FTS5 over the register's `search:` fields) | **a non-indexed field never becomes a header filter.** A filter that table-scans is a filter that times out on the 500-row page it was added for — refused at render, not styled away |
 | **Sort** | the page's `order:`, else the first indexed date descending, else `seq` descending | quantities and dates align end; text and refs align start |
+| **Columns** | the default projection: `seq` · the title field · the `mobile:` fields · `state` · then indexed fields — at most 10, widths per type ([50-SPEC-WEB](50-SPEC-WEB.md) §5.2) | T5 adds to it over time; the ten is [13-UI](13-UI.md) §4.2's column ceiling |
 | **State** | always three: **staleness** (machine-readable `datetime`, relative rendering, absolute on hover), the **offline chip** shown only when offline *and not revalidating*, and the **provisional count** when above zero | *"a surface showing nothing must never be indistinguishable from a surface with nothing to show"* |
 | **Figures** | one `stat` per metric whose `source` is this register, capped at 3, each rendering value · target · window | a metric without a target cannot reach a header, because it cannot exist |
 

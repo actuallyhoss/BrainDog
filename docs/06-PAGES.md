@@ -69,7 +69,11 @@ render when the figure is zero. A page that shows a warning that does not apply 
 ignore warnings.
 
 **Rendered at runtime from the declaration against live rows.** No build step, no generated
-code, no deploy to change a page.
+code, no deploy to change a page. The rendering happens in the browser: the web app is a **static
+shell** and no server renders a request; `toHTML` serves the mirror, exports, tests and the digest
+email, never a page over HTTP ([36-SPEC-RENDER](36-SPEC-RENDER.md) §12, [50-SPEC-WEB](50-SPEC-WEB.md)
+§13 #1). The read behind a page is `page({ slug })`, answered per block — `rows`, `total`, `drawn`,
+`stale_at` ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.3).
 
 ### 1.1 · The keys
 
@@ -96,7 +100,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 
 | Key | Type | Default | Required |
 |---|---|---|---|
-| `kind` | one of the sixteen — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 | — | yes |
+| `kind` | one of the sixteen — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 — or a `block.<id>` this pack declares or the record has installed. A pack kind is **page-only** at stage 0: a write-up's fence takes the sixteen ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.5) | — | yes |
 | `heading` | text | — | no |
 | `span` | int, 1–12 | 12 | no |
 | `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) | — | `table` |
@@ -109,6 +113,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `cells` | `[{ metric, label }]` | — | `stat` |
 | `tone` | intent | — | no |
 | `body` | markdown in the dialect | — | `note` |
+| *`accepts` names* | on a pack-declared `kind`, the keys its `accepts:` names are legal here, typed `register · metric · number · text` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.6) | per the block declaration | as the declaration says |
 
 `tone_when` on a column is a `where:` leaf without `field:` — the column supplies it — plus a `tone`,
 evaluated at render like `when`. *An earlier draft of this document defined none of these; thirty-seven

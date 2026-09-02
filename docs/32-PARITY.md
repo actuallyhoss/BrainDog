@@ -69,7 +69,7 @@ has it. **Pack** means a first-party pack declares it and a new user does not se
 | For You / read mark | — | **`member.seen_at` (the read mark), monotonic** — §2.1 | kernel |
 | Write-up (`doc`) with blocks and `{{path}}` | — | `document` field + the dialect — §4 | kernel ✓ |
 | Evidence tags | — | **added** — §4.3 | kernel dialect |
-| Mirror (git-diffable snapshot) | — | `braindog export --mirror` → `.dog` + rendered markdown | CLI |
+| Mirror (git-diffable snapshot) | — | `braindog export --mirror` → a directory of markdown beside the `.dog`: a README per register, one file per live row, `document` fields verbatim, no renderer involved ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D7) | CLI |
 | Job (remote Claude run) | — | tier C — §6 | kernel `job` and `job_event` tables ([30-BLUEPRINT](30-BLUEPRINT.md) §1), native runner |
 
 ### 2.1 · Kernel changes this forced
@@ -90,6 +90,7 @@ register: session            # declared by the KERNEL — the only one
 seq_prefix: "S"
 fields:
   - { id: client_id, type: text, unique: true }     # the agent runtime's own id, for re-attach
+  - { id: token_id,  type: text, index: true }      # the agent token that opened it — a token's writes are one query (53 §13 #12)
   - { id: title,     type: text }
   - { id: repo,      type: text, index: true }
   - { id: host,      type: text }
@@ -99,7 +100,7 @@ fields:
   - { id: next,      type: text }                    # THE one next step. "carry on" is not resumable
   - { id: tried,     type: list, of: {type: text} }  # dead ends — the highest-value field
   - { id: notes,     type: list, of: {type: text} }  # reasoning, not the diff
-  - { id: last_seen, type: instant }                 # a plain instant the KERNEL writes at step 6 on every write from this session — not a derivation
+  - { id: last_seen, type: instant }                 # written in place by the KERNEL at step 6 on every write from this session — no version bump, no updated_at, no event; not a derivation
 ```
 
 *(An earlier draft wrote `last_seen` as `derive: { touched_by: self }` — a combinator the closed list
@@ -110,7 +111,7 @@ write would have been refused at step 5.)*
 |---|---|
 | **Staleness is derived, never stored** | `stale` = `last_seen` older than 45 minutes; computed at read. A session that crashes never gets to mark itself dead |
 | Death is written at 12 hours | a scheduled sweep — a `schedule` row of kind `purge`, hourly, run by `system` — moves `active`/`idle` past 12 h to `abandoned`. **`list` never writes** |
-| **Every agent write resolves to a session** | the ladder from the brain: a named id that exists → heartbeat; a named id that does not exist → discarded; the client id → re-attach; a live session on the same host and repo → adopt; else **open one** with `source: auto`. Never for a browser |
+| **Every agent write resolves to a session** | the ladder from the brain: a named id that exists → heartbeat; a named id that does not exist → discarded; the client id → re-attach; a live session on the same host and repo → adopt; else **open one** — its `create` event authored by the new `S<n>` itself with `note: 'opened: auto'`, since the register has no `source` field. A heartbeat is not a write: `last_seen` moves in place with no `version` bump and no event ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §13 #6, #19). Never for a browser |
 | `event.actor` becomes the session | `S42`, not `agent:claude`. The actor grammar in [30-BLUEPRINT](30-BLUEPRINT.md) §3 gains the shape |
 | Two sessions in one working tree | `record_index` returns `same_repo: [S47]` and the hook prints the warning verbatim: *"Two sessions in one working tree overwrite each other. Coordinate or stop."* |
 | The hook, not a habit | SessionStart and SessionEnd hooks ship **with the skill**, user-scoped, and exit 0 on every failure — *"a brain that is unreachable is an inconvenience"* |
@@ -138,10 +139,10 @@ sort.
 
 | Brain mechanism | Why it matters | Now in BrainDog |
 |---|---|---|
-| **RFC 8628 device-authorisation grant** — a device shows a six-digit code, the owner approves it from a session that is already his | *"the thing asking is not the thing holding the identity"* — a CLI on a VPS, an agent, a browser that has never opened the vault all ask the same way. **The code is not the security**; it proves the approver is looking at the device that asked | §6.1 of [12-SECURITY](12-SECURITY.md) and the `device_grant` kernel table, [30-BLUEPRINT](30-BLUEPRINT.md) §1; **and it is the enrolment flow for the tier-C runner** — a 90-day bearer stored as `token_hash`, no keypair — which had its own bespoke one |
+| **RFC 8628 device-authorisation grant** — a device shows a six-digit code, the owner approves it from a session that is already his | *"the thing asking is not the thing holding the identity"* — a CLI on a VPS, an agent, a browser that has never opened the vault all ask the same way. **The code is not the security**; it proves the approver is looking at the device that asked | §6.1 of [12-SECURITY](12-SECURITY.md) and the `device_grant` kernel table, [30-BLUEPRINT](30-BLUEPRINT.md) §1; **and it is the enrolment flow for the tier-C runner** — a 90-day bearer stored as `token_hash`, no keypair — which had its own bespoke one. `device_grant.reach` names what a grant is for: `login`, `runner`, or one ADMIN operation ([ADR-060](16-DECISIONS.md)) |
 | **`opened` and `last_opened` on the row** | one secret per request, every read counted **and visible**. *"The XSS is not prevented — it is made slow and loud, which is the honest claim"* | the `grant` table gains both; the Vault screen draws them |
 | **`kek_id`** — a fingerprint of the key that wrapped the row | without it, rotating the root key turns every row into a WebCrypto error that reads exactly like corruption, *"on the one screen where 'the data is gone' and 'the key changed' need different answers"* | `grant.kek_id`; a mismatch is `409 WRONG_KEY`, never *corrupt* |
-| **Reveal is a `POST`, never a `GET`** | no URL, no history, no `Referer` | the RPC is `openGrant(id)` in the VAULT group — a browser session only, every token refused with `403 NEEDS_BROWSER_SESSION`; it returns sealed material and **the Worker decrypts, the record never sees plaintext** ([ADR-062](16-DECISIONS.md)). There is no readable address |
+| **Reveal is a `POST`, never a `GET`** | no URL, no history, no `Referer` | the RPC is `openGrant(id)` in the VAULT group — a browser session only, every token refused with `403 NEEDS_BROWSER_SESSION`; it returns sealed material and **the host decrypts — the Worker or the self-host process — and the record never sees plaintext** ([ADR-062](16-DECISIONS.md)). There is no readable address |
 | `bytes` and `hint` on the row | *"a 3.2 KB env file"* versus *"a 64-character token"* without opening anything — most of what the owner needs at a glance | two columns |
 | A denied grant request is **kept** | *"I said no to a request I did not make"* is the single most important line the table can produce | `status: denied` rows are never purged |
 
@@ -165,7 +166,7 @@ placed; nothing in them needed a new mechanism, and four of them carried a lesso
 | Commit | What landed in the brain | Where it lives here |
 |---|---|---|
 | `f32ffb6` | `.secrets` retired: 72 credentials into the vault, verified byte-identical before deletion; three things moved *out* because the vault cannot hold its own key; an audit-note leak found by the harness (`opens` prose on the activity screen); seven harness assertions rewritten to where the property now lives; the runner live under a hardened systemd unit | [12-SECURITY](12-SECURITY.md) §6 and §8 · [20-COLLABORATION](20-COLLABORATION.md) §8 · [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 · [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6 |
-| `46334fd` | Spark's second mode — a live job transcript with five properties that beat the terminal, `?after=` high-water polling, leave-and-return, `Esc` back-then-out | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1 · [19-INTERFACE](19-INTERFACE.md) §4 |
+| `46334fd` | Spark's second mode — a live job transcript with five properties that beat the terminal, `jobEvents({ id, after })` high-water polling — the job view's poll — leave-and-return, `Esc` back-then-out | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1 · [19-INTERFACE](19-INTERFACE.md) §4 |
 | `d75939a` | the claim long-polls: 15.4 s → under 1.5 s *and* 43,200 → ≈4,300 requests a day; twenty seconds not thirty; an abort at wait + 10; `idle_ms` kept for a runner that cannot hold a connection | [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 · [33-CONTRACTS](33-CONTRACTS.md) §11 |
 | `04c714b` | two money-audit findings: the forecast joined net worth to liquid cash and was right by coincidence; a draft wiped by its own screen finishing loading; and *assert on the code shape, never on the file* | [08-METRICS](08-METRICS-AND-ANALYTICS.md) §3 · [22-FRONTEND](22-FRONTEND.md) §7 · §10 below |
 | `2451e4f` | an e2e file defaulted to a dev-server port copied from a scratch file | [22-FRONTEND](22-FRONTEND.md) §7 · 18 §6 |
@@ -184,7 +185,7 @@ already exist; none is a new kind, a new tool or a new table except where marked
 | **`by:` on a transition** | learning `proposed → active` is `HUMAN_ONLY`; deciding is the owner's | `transitions: { proposed: { to: [active], by: decide } }` — a person level from [20-COLLABORATION](20-COLLABORATION.md) §1. **Generalises the brain's two hard-coded routes into a declaration** |
 | **`delete: refuse_while_referenced`** on a register | an account with transactions → `409, archive instead`; a transaction that settles an instalment | a reverse-reference check at delete, naming the count and the register. `ref` stays soft everywhere else |
 | **`repeat:` gains `bymonthday: [15, -1]` and `workday: previous\|next\|none`** | *"a salary paid twice a month has DAYS"* — the 15th and the last day, moved back to Friday off a weekend; monthly clamped to month end | RRULE cannot say the weekend shift; one post-rule can |
-| **`pairs:`** on a register | transfer detection — two rows, same \|amount\|, opposite sign, different account, within 4 days, paired **once** | `pairs: { on: [currency, abs(amount)], opposite: amount, across: account, within: 4d, mark: moved }`. Rows are **marked, never hidden**. A bounded self-join the kernel implements, because every ledger needs it and a `where:` cannot say it |
+| **`pairs:`** on a register | transfer detection — two rows, same \|amount\|, opposite sign, different account, within 4 days, paired **once** | `pairs: { on: [currency, abs(amount)], opposite: amount, across: account, within: 4d, mark: moved }`. Rows are **marked, never hidden**. A bounded self-join the kernel implements, because every ledger needs it and a `where:` cannot say it. `on:` entries beyond the money field are equality leaves; `mark` names a `bool` field set `true` on both rows and the kernel writes `_pair`; the window runs over `pairs.date`, defaulting to the sole `day` field; a person-pinned `mark` skips the pairing ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §13 #10) |
 | **`running`** aggregation | the runway walk; a plan's `after_minor` countdown | `value: { running: { sum: amount }, from: opening_balance, stop: { lt: 0 } }` over an `order:` — a cumulative reducer with an optional stop condition, returning the first row that crosses. `from:` is a literal or a field on the source rows, never a metric; `order:` is the walk order |
 | **`trend`** aggregation | the measured revenue forecast | series-only. Log-linear fit, **significance-gated** (\|t\| ≥ 2.1, n ≥ 6) → compound growth with a band, or *flat*; a projection capped at 10× **with the cap reported** |
 | **`snapshot: { grain: day, into: series.<id> }`** on a metric | net-worth history | its own schedule kind, `snapshot`; materialises the metric into `metric_point` nightly: **overwrite yesterday** (a Friday text can land Saturday), backfill fills gaps only, today appended live and flagged, `missing` counted |
@@ -286,16 +287,19 @@ register: entities
 identity: { mark: mark, accent: hue }    # a register may declare its rows HAVE an identity
 fields:
   - { id: mark, type: enum, values: [...the glyph library...] }
-  - { id: hue,  type: int, immutable: true }   # generated by the KERNEL at create (ADR-028) — never derived, never picked
+  - { id: hue,  type: int, immutable: true }   # chosen by the THEME's nextAccentHue, stored by the kernel at create (ADR-028) — never derived, never picked, never computed by the kernel
 ```
 
 | An accent may colour | An accent may never colour |
 |---|---|
 | the row's mark, chip and avatar; its calendar dot; its series on a chart | text, an intent, a surface, a border that carries meaning |
 
-The generator is the theme validator's: every accent is checked ≥ 3:1 against every surface **and**
-pairwise distinct under all three dichromat simulations, or it is regenerated. A retired row is
-achromatic. And the glyph library is the theme's, not the pack's — 122 glyphs in the brain, thirteen
+The hue is the theme's: `nextAccentHue` picks the farthest point on the hue circle from every
+existing accent and from the three intent hues, deterministically, and the kernel stores what it is
+handed — it never computes a hue ([39-SPEC-THEME](39-SPEC-THEME.md) §13 D11;
+[ADR-028](16-DECISIONS.md)). Every accent is checked ≥ 3:1 against every surface; separability is
+the farthest available hue, measured — four marks stay ΔE ≥ 4 apart and past that the name carries
+identity — not a regenerate-until-distinct loop. A retired row is achromatic. And the glyph library is the theme's, not the pack's — 122 glyphs in the brain, thirteen
 of which are refused *as marks* because they are controls.
 
 ### 4.5 · Renderer rules learned in production
@@ -409,7 +413,7 @@ brain's features that land there, each with the reason it is not a declaration:
 | Company sync (Mercury, Stripe) | [25-CONNECTORS](25-CONNECTORS.md) covers the fetch. Native: **per-provider partial failure** (a Mercury outage keeps the last Mercury rows), Stripe's available/pending/in-transit kept apart, and the ordered regex table over counterparty + description |
 | The logo proxy | the merchant name **never leaves the Worker**; four icon sources raced; bytes sniffed; a generic-icon hash blocklist. Money-specific, and it is the one exception to *"nothing loads from another server"* |
 | Vault crypto, passkeys, the doors | as [12-SECURITY](12-SECURITY.md) |
-| The runner | as [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md), **now with the brain's five refinements**: `--resume <session>` for follow-ups (*"the single most valuable column"*), a distilled event transcript with nine kinds (`start say think tool out limit note end error`), a per-job `seq` high-water mark so a poll is one indexed read, a `cancel` **flag never a delete** (a stopped job is one you want the transcript of), and **`LOST` is deliberately not a status** — *"a status the runner can never write is a status that lies when the runner dies mid-job"*; the list route derives it from a stale `claimed_at`. The statuses are nine — `queued claimed ok needs_decision refused limit error interrupted cancelled` — and the kinds a closed four, `triage · explain · propose · draft`, that the runner's own templates check (26 §4.3); both are `CHECK`s on the kernel `job` table. The runner **distils rather than relays**: a trivial two-turn job emits ~12 KB of stream-json, most of it constant |
+| The runner | as [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md), **now with the brain's five refinements**: `--resume <session>` for follow-ups (*"the single most valuable column"*), a distilled event transcript with nine kinds (`start say think tool out limit note end error`), a per-job `seq` high-water mark so a poll — `jobEvents({ id, after })`, the job view's — is one indexed read, a `cancel` **flag never a delete** (a stopped job is one you want the transcript of), and **`LOST` is deliberately not a status** — *"a status the runner can never write is a status that lies when the runner dies mid-job"*; the list route derives it from a stale `claimed_at`. The statuses are nine — `queued claimed ok needs_decision refused limit error interrupted cancelled` — and the kinds a closed four, `triage · explain · propose · draft`, that the runner's own templates check (26 §4.3); both are `CHECK`s on the kernel `job` table. The runner **distils rather than relays**: a trivial two-turn job emits ~12 KB of stream-json, most of it constant |
 | Screenshot mode | §9 |
 | The analytics adapters | two vendors' endpoints. The **model** — the series kind (`gauge · flow · cumulative · unique · fact`, declared on the ingest as `writes: { series, kind }`, never a `metric_point` column), the compare window, the partial bucket, the trend — is now declarative |
 
@@ -477,7 +481,9 @@ rather than cosmetic, and both are tests:
 1. **The allow-list is provenance.** Only literals a developer typed into source are legible. A
    label built by concatenation at runtime blurs — which is why a toggle's two states are two full
    literals. A pattern-based redaction would have let *"GREEN MARKET"* through as a placeholder, and
-   once did.
+   once did. The list is built, not typed: a script collects every literal from the copy file and
+   the templates into a committed `allow.json`, and the `shot-allowlist` gate asserts it is exact
+   ([50-SPEC-WEB](50-SPEC-WEB.md) §13 D4; [52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §13 D9).
 2. **Layout is byte-identical off → on**, asserted by element boxes and page height, and **pixel
    readback** proves redacted digits re-photographed as `0` and as `8` are identical.
 

@@ -12,9 +12,9 @@ Ordered by how expensive it is to get wrong.
 ## Q1 · Is the clean room worth its price, now that the price is known?
 
 **The question.** [00-README](00-README.md) §1 withdrew all reuse of `brain`. An earlier version of
-this question priced that at ~115 days. **The audited number is ≈486–643 working days — ≈3.0–4.0
+this question priced that at ~115 days. **The audited number is ≈488–645 working days — ≈3.0–4.0
 years at 4 productive days in 9, which is 162 productive days a year** ([15-ROADMAP](15-ROADMAP.md)
-§1). Against a base case of ~$960/mo at month 24 and a modal single outcome of $0. *(An earlier
+§1; the two days over the previous 486–643 are `@braindog/host`, added in iteration 2). Against a base case of ~$960/mo at month 24 and a modal single outcome of $0. *(An earlier
 draft of this question paired 488–643 days with 2.6–3.4 years — the years the roadmap had computed
 for a smaller number.)*
 
@@ -27,8 +27,8 @@ rather than a measurement.
 
 | | Cost | What it costs you |
 |---|---|---|
-| Clean room, full platform | ≈486–643d | ≈3.0–4.0 years before the platform exists — [15-ROADMAP](15-ROADMAP.md) §1 |
-| Clean room, the §1b shape — the record and nothing declarative — then decide on gate 2 | ≈103–133d (+10 for stage 0) | nothing — this is the recommended shape |
+| Clean room, full platform | ≈488–645d | ≈3.0–4.0 years before the platform exists — [15-ROADMAP](15-ROADMAP.md) §1 |
+| Clean room, the §1b shape — the record and nothing declarative — then decide on gate 2 | ≈105–135d (+10 for stage 0) | nothing — this is the recommended shape |
 | Allow a *clean-room reimplementation informed by* `brain`'s tests | ~95d | nothing material; tests are specifications, not code |
 | Reuse `brain` as originally planned | 46d | inherits `OWNER_ID`, nine spoken id sequences built for one person, and 402 lines of one man's seed data — each paid for twice |
 
@@ -265,7 +265,9 @@ contrast against the record's own semantic roles is a broken product.
 against every surface at 4.5:1, because `accent` is used as text and measurably fails there; a brand
 `accent` passes it or the generator solves `accent-text` from it, and a theme that cannot pass is
 refused, not corrected. A brand colour on a shared page arrives as the register's `identity:`
-accent — mark, chip, avatar, calendar dot, chart series — never as an ungated theme role. *(An
+accent — mark, chip, avatar, calendar dot, chart series — never as an ungated theme role; its hue is
+the theme's farthest-point pick, which the kernel stores and never computes
+([ADR-028](16-DECISIONS.md), as amended in iteration 2). *(An
 earlier draft exempted `accent` from the gate on the grounds that it only appears on interactive
 surfaces; 13 §2.2 measured the link colour failing as text at 4.22 and 3.67, which is why check B
 exists.)*
@@ -284,7 +286,9 @@ too. Storing them is cheap; *rendering* them (a PDF viewer) is not.
 **Answered in [02-DATA-MODEL](02-DATA-MODEL.md) §5 and [03-DOG-FORMAT](03-DOG-FORMAT.md) §8**,
 recorded as [ADR-053](16-DECISIONS.md): the `file` type (`{ sha256, mime, bytes, name }`), the
 per-record content-addressed store and `/a/<sha256>` exist and are in the §1b kernel row of
-[15-ROADMAP](15-ROADMAP.md); nothing is rendered in v1 — a download link and the sha256. Open
+[15-ROADMAP](15-ROADMAP.md); iteration 2 added the way in — `PUT /a/<sha256>`, the client computing
+the hash and the host verifying it ([33-CONTRACTS](33-CONTRACTS.md) §4); nothing is rendered in v1 —
+a download link and the sha256. Open
 remainder: the viewer, Phase C. *(An earlier draft of the roadmap listed attachments among the things
 "the base never had"; 03 §8 records that the deferral was read back as a position.)*
 
@@ -346,6 +350,12 @@ provably implies the index's — so the bound form was measured separately, on t
 v24.13.0: `SEARCH e USING INDEX i (<expr><?)`. Both forms use the index. Node is fully answered;
 the Durable Object half is measured in week one, as the conformance case above.
 
+**And the week-one measurement is now three conformance cases, not a spike.** `EXPLAIN` on the
+Durable Object (#20), double-quoted literals (#21) and the object's counters (#30) sit in the
+conformance corpus with Node's answer recorded, so the Durable Object's answer is a green or red row
+on every commit rather than a one-off ([37-SPEC-PORTS](37-SPEC-PORTS.md) §13 D12;
+[33-CONTRACTS](33-CONTRACTS.md) §3).
+
 **Deadline: week one, for the Durable Object.** It gates the data model, so it happens before
 anything is built on it.
 
@@ -382,7 +392,10 @@ Connector grants live under a second, KEK-wrapped DEK — the `connector` row of
 `vault_key` table, always wrapped by the KEK — that the passphrase does not cover. The honesty table
 carries the row, and the bind screen says it in words: *"this credential is stored so BrainDog can
 use it while you are away. Your passphrase does not cover it."* Then the choice is the user's, at
-the moment it matters, which is the pattern the whole product uses.
+the moment it matters, which is the pattern the whole product uses. Iteration 2 kept the shape and
+added two facts: decryption happens in the host — the Worker or the self-host process — never in the
+record, and sign-up generates all three keys, the record DEK, the connector DEK and the signing key
+([ADR-062](16-DECISIONS.md)).
 
 ---
 
@@ -407,21 +420,23 @@ the expression pressure will come from somewhere else.
 
 ## Q15 · Questions held in other documents
 
-Twenty-five open questions live outside this document. Listed so that this document is the one
-place to look, and so that a question settled elsewhere is not re-asked here.
+Twenty-five open questions live outside this document, and the specification loop's own residue
+is listed with them. Listed so that this document is the one place to look, and so that a question
+settled elsewhere is not re-asked here.
 
 | Where | Count | The ones that gate a stage, and what has since closed |
 |---|---|---|
 | [21-AUTHORING](21-AUTHORING.md) §13 | 8 | none gate a stage — the authoring tier is outside §1b. The type-change conversion preview stays open there |
 | [22-FRONTEND](22-FRONTEND.md) §12 | 5 | **DO bindings in `vite dev`** — verify before A1 (22 says "stage 1", the prior plan's numbering) |
 | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §14 | 7 | none. Row 1 (*does the assistant ship in v1?*) is Q2, answered by [ADR-030](16-DECISIONS.md), and should be deleted there in favour of it |
-| [30-BLUEPRINT](30-BLUEPRINT.md) §12 | 4 | all four closed: the dialect grammar → [34-GRAMMARS](34-GRAMMARS.md) §2; billing lapse and the export guarantee → [ADR-059](16-DECISIONS.md); the six first-party packs' seeds → the first task of B2; an `admin` token for the install path → never, [ADR-060](16-DECISIONS.md) |
+| [30-BLUEPRINT](30-BLUEPRINT.md) §12 | 4 | all four closed: the dialect grammar → [34-GRAMMARS](34-GRAMMARS.md) §2; billing lapse and the export guarantee → [ADR-059](16-DECISIONS.md); the six first-party packs' seeds → the first task of B2; an `admin` token for the install path → never a scope — the install path is a single-use operation grant, [ADR-060](16-DECISIONS.md) as amended in iteration 2 |
 | [31-STACK](31-STACK.md) §6 | 1 | first publish under trusted publishing (stage 0) — publish `0.0.1` by hand and wire it up afterwards |
+| [35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §5 — the revision loop, after iteration 2 | — | the rulings settled the audit's thirty-two conflicts and are folded into 16 as [ADR-063](16-DECISIONS.md)–[ADR-068](16-DECISIONS.md). What the loop leaves open, by design rather than by omission: the Durable Object's three conformance cases (Q12, week one); passkeys and the theme editor in later phases; `pack install --force` and `export --with-grants`, marked *CLI: later*; the OAuth authorization server ([ADR-054](16-DECISIONS.md)). The loop runs until two audits find nothing |
 
 **What stays genuinely open across the corpus:** the Durable Object planner measurement (Q12, week
-one); the OAuth authorization server — Phase A ships agent tokens only and the RFC 9728 document is
-deferred with its reason, [ADR-054](16-DECISIONS.md); and the type-change conversion preview, which
-is authoring-tier scope.
+one, as three conformance cases); the OAuth authorization server — Phase A ships agent tokens only
+and the RFC 9728 document is deferred with its reason, [ADR-054](16-DECISIONS.md); the two CLI flags
+marked *later*; and the type-change conversion preview, which is authoring-tier scope.
 
 ---
 

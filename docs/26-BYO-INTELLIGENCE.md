@@ -136,7 +136,7 @@ business record.
 | Per-tenant credential | ✅ | ✅ | ❌ **account-scoped** | tunnel token |
 | Cross-tenant blast radius | none | none | ⚠️ **a Queues token can read other queues in the account** | tunnel-scoped |
 | Needs a listening service on the laptop | no | no | no | **yes** |
-| Self-host parity | ✅ | ✅ (`ws`) | ❌ | ❌ |
+| Self-host parity | ✅ — **the only self-host transport** | Cloud only; no `ws` dependency | ❌ | ❌ |
 
 **The decisive arithmetic.** Durable Objects bill **$12.50 per million GB-s**. A connection held
 open *inside a DO* keeps that object resident: 30 days × 86,400 s × 0.125 GB = **324,000 GB-s ≈
@@ -149,7 +149,7 @@ with a few messages each is well under a hundred billable requests — **under a
 per customer per month.** `setWebSocketAutoResponse` handles ping/pong **without waking the
 object**, so liveness is free too.
 
-> ### Decision: hibernatable WebSocket to a Durable Object. Long-poll on a *plain Worker* as the degraded fallback. Not Queues. Not Tunnel.
+> ### Decision: hibernatable WebSocket to a Durable Object, as a doorbell. Long-poll on a *plain Worker* as the degraded fallback — and the only transport on a self-host, where the hold runs in the host process and wall time costs nothing. Not Queues. Not Tunnel.
 
 Queues is disqualified on security, not cost: its pull consumer needs an **account-scoped** API
 token with `queues#read`/`queues#write`, and there is no per-queue scope. A cross-tenant read is one
@@ -159,8 +159,12 @@ structurally: it needs a daemon **and** a listening service on the customer's ma
 no self-hosted equivalent.
 
 **Where it lives: on the Spark object.** Spark already makes outbound calls, already holds no write
-RPC, and already returns proposals. It becomes the dispatcher for both tier A and tier C, and the
-record object still makes no outbound calls. The third Durable Object class, `Directory`, holds
+RPC, and already returns proposals. It becomes the dispatcher for both tier A and tier C — named
+methods, dispatched by name over `/api/spark/<method>`, not a generic `dispatch`
+([46-SPEC-SPARK](46-SPEC-SPARK.md) §2) — and the record object still makes no outbound calls. The
+socket it holds is a **doorbell**: one frame, `{ t: 'job', id }`, that ends a runner's wait early;
+every claim is `claimJob` over HTTP, and Spark holds no lease state and no alarm
+([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.15). The third Durable Object class, `Directory`, holds
 identity — people, passkeys, sessions, the slug → `rec_id` map — never a job
 ([ADR-061](16-DECISIONS.md), [01-ARCHITECTURE](01-ARCHITECTURE.md) §3). *An earlier draft said "not a
 third class" when there were two; a runner still adds no class of its own.*
@@ -170,16 +174,23 @@ third class" when there were two; a runner still adds no class of its own.*
 Enrolment **is** the vault's device-authorisation grant ([12-SECURITY](12-SECURITY.md) §6.1, RFC 8628).
 One flow to secure, and it is a standard.
 
-1. *Connect this machine* → `braindog runner enroll` prints a **six-digit code** and polls with its long
-   random id, never the code. The code lives **ten minutes** (`DEVICE_CODE_EXPIRED`) and survives
-   **five** wrong tries (`DEVICE_CODE_TRIES`); a wrong code bumps `tries` on every pending row.
-2. The owner approves the code from a browser session that is already authenticated as him — a bearer
-   gets `403 NEEDS_BROWSER_SESSION`. The row goes `pending → approved → active`; a denied row is kept.
+1. *Connect this machine* → `braindog runner enroll` calls `POST /auth/device` with
+   `reach: 'runner'`, prints the **six-digit code** and polls `POST /auth/device/token` with its long
+   random id, never the code ([33-CONTRACTS](33-CONTRACTS.md) §4). The code lives **ten minutes**
+   (`DEVICE_CODE_EXPIRED`) and survives **five** wrong tries (`DEVICE_CODE_TRIES`); a wrong code bumps
+   `tries` on every pending row.
+2. The owner approves the code at the `verification_uri` — Settings → agents — from a browser session
+   that is already authenticated as him; a bearer gets `403 NEEDS_BROWSER_SESSION`. The row goes
+   `pending → approved → active`; a denied row is kept.
 3. The poll exchanges the approved row for a **90-day device grant**, stored as `token_hash` and shown
-   once. The runner appears in the same list as agent tokens, with `last_used_at` and a revoke button,
-   and is **auto-deregistered after 14 silent days**.
-4. Per job, a **job-scoped MCP bearer**: `read` + `propose` only, audience = one record, expiry =
-   the job deadline, `jti` recorded. Never `write`. Never the customer's long-lived token.
+   once. A runner is a principal kind of its own — `principal = { kind: 'runner', id, name }`, built
+   only from a verified device grant, never a top-level field ([33-CONTRACTS](33-CONTRACTS.md) §2). It
+   appears in the same list as agent tokens, with `last_used_at` and a revoke button, and is
+   **auto-deregistered after 14 silent days**.
+4. Per job, a **job-scoped MCP bearer**, minted by `claimJob` in its own transaction as a `token` row
+   — scope `propose` (the ladder gives it `read`), label `job:<id>`, audience one job, `expires_at`
+   the job's expiry, revoked at `end` ([12-SECURITY](12-SECURITY.md) §3;
+   [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.5). Never `write`. Never the customer's long-lived token.
 
 > **An earlier draft had the runner generate a keypair locally, upload only the public key, and sign a
 > client assertion per connection, behind a ~15-minute enrolment code.** It was dropped for the device
@@ -191,7 +202,7 @@ discover:**
 
 | | |
 |---|---|
-| `serializeAttachment` caps at **16,384 bytes** per connection | enough for `{runner_id, record_id, scopes, lease}` and nothing more. Job bodies live in the kernel's `job` and `job_event` tables ([30-BLUEPRINT](30-BLUEPRINT.md) §1) — four kinds, nine statuses, `local` section so they never travel in an export — keyed from the attachment. Designing a fat attachment first and finding this second is a rewrite |
+| `serializeAttachment` caps at **16,384 bytes** per connection | enough for `{ runner_id, record_id }` — a doorbell needs nothing more. Job bodies and leases live in the kernel's `job` and `job_event` tables ([30-BLUEPRINT](30-BLUEPRINT.md) §1) — four kinds, nine statuses, `local` section so they never travel in an export. Designing a fat attachment first and finding this second is a rewrite |
 | `setWebSocketAutoResponse("ping","pong")` answers **without waking the object** | so liveness costs nothing at all, and `getWebSocketAutoResponseTimestamp()` reads the last one. This is what lets the heartbeat be free rather than a per-minute wake-up billed against duration |
 
 ### 2.4 · What goes wrong, and what happens
@@ -199,10 +210,10 @@ discover:**
 | Failure | Handling |
 |---|---|
 | **Laptop closed** | Socket drops. The job stays queued and unleased. The UI says *your machine is offline* and offers tier A or B **now**. Queued beyond 24 h → cancelled **with a notice**, never silently |
-| **Two machines connected** | A **job** locks to one runner, not the reverse. One machine is marked `preferred`; the other is told it got nothing |
-| **Job half-done** | The lease is **separate from the result upload** — the GitLab lesson. 60-second renewal, no renewal for 60 s → requeue. Liveness rides on auto-response, so the check is free, and the alarm is armed only while jobs are in flight |
+| **Two machines connected** | A **job** locks to one runner, not the reverse — the claim is one statement, and the loser is told it got nothing. No `preferred` machine is built |
+| **Job half-done** | The lease is **separate from the result upload** — the GitLab lesson. `readCancel` renews it: 60 s, called every 20 s while a child runs. A lost job is re-claimed **once**, inside the claim statement, and expiry is swept inside `claimJob` too; Spark holds no lease state and no alarm ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.7; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.5). Liveness rides on auto-response, so the check is free |
 | **Duplicate delivery** | Every job carries a stable `job_id` that a requeue keeps — **the idempotency key all four CI vendors omitted.** First result wins; the rest are discarded, and the `suggestion` row is written idempotently on `job_id` |
-| **Network breaks WebSockets** | A ~25-second long poll on a **plain Worker** — where wall time is not billed. Degraded, and labelled as such |
+| **Network breaks WebSockets** | A 20-second long poll — `claimJob { wait: 20 }` — on a **plain Worker**, where wall time is not billed. Degraded, and labelled as such |
 | **Runner silent 14 days** | Auto-deregistered, and the customer is told. A stale machine should not sit in a token list forever |
 
 ---
@@ -271,7 +282,7 @@ row in `suggestion` that a human still has to accept.
 | **Injection via ingested email reaching an agent with a shell** | The same, plus the existing dual-context split: the tool-less model reads untrusted text and only its *structured output* reaches the tool-bearing one. Tier C receives structured output, never raw `inbox_raw` |
 | **Runner token theft** | `read` + `propose`, one record, no vault access — [12-SECURITY](12-SECURITY.md) §6: no tool returns a secret, *not scoped, absent*. The 90-day device grant is stored only as `token_hash`, revocable on its own, `last_used_at` shown, auto-deregistered after 14 silent days |
 | **Control-plane database theft** | **BrainDog holds only hashes** — of the device grant and of every agent token. It impersonates nothing |
-| **Replay** | a stable `job_id`, short `exp`, `jti` audited. A second result for a `job_id` is discarded, never applied |
+| **Replay** | a stable `job_id`, and a short-lived bearer that is a `token` row — so every use is audited like any token's. A second result for a `job_id` is discarded, never applied |
 | **The job bearer leaks inside the session** | Anthropic warns of exactly this: *"any code Claude runs, and any tool or MCP server the session starts, can read and present it."* Minutes-long expiry, two scopes, every use audited. And BrainDog can do better than Anthropic can here — *"verification is also offline … Anthropic doesn't publish a revocation feed"*, whereas BrainDog **is** the resource server and checks revocation on every call |
 | **The customer's own `~/.claude` is hostile** | Documented and real: *"a `-p` session runs the hooks in a project's `.claude/settings.json` and connects the servers in its `.mcp.json`, even in a folder you've never trusted."* So the runner works from a dedicated empty directory it owns, with `--strict-mcp-config` |
 | **Their plan gets drained** | A turn cap, a per-record daily job cap, no concurrent jobs, and a UI that says plainly this spends *their* allowance |
@@ -292,7 +303,7 @@ So the job is **not free-form text the server may set to anything.**
 
 | Control | Effect |
 |---|---|
-| The runner ships the templates and refuses an unknown `kind` | a compromised server cannot invent a fifth job |
+| The runner ships the templates — data at `@braindog/spark/prompts`, zero imports, the one thing the CLI takes from the package ([31-STACK](31-STACK.md) §2) — and refuses an unknown `kind` | a compromised server cannot invent a fifth job |
 | Arguments are ids and enums, never prose | there is no field to smuggle an instruction into |
 | First use of each kind is shown to the customer before it runs | four approvals, once, forever |
 | Every job appears in the activity feed with its id, kind and runner | *"what did my machine do last night"* is one query |
@@ -342,13 +353,16 @@ claude --restricted -p "$PROMPT"
   --strict-mcp-config --mcp-config "$MCP_JSON"
   --allowedTools "mcp__braindog__record_index,…,mcp__braindog__propose"
   --permission-mode dontAsk --max-turns 12
-  --disable-slash-commands --no-session-persistence
+  --disable-slash-commands
 ```
 
 The final `result` line is validated against the schema; every other line is distilled into one
 `job_event` — `start · say · think · tool · out · limit · note · end · error` — as the runner
 refinements below describe. *An earlier draft asked for `--output-format json`, a single result, while
-the same section consumed a stream.*
+the same section consumed a stream.* `--no-session-persistence` is not passed — it would defeat the
+`--resume <session>` below — and `--allowedTools` takes the prefixed `mcp__braindog__*` names the
+claim returns, filtered to that prefix before they reach the flag ([48-SPEC-CLI](48-SPEC-CLI.md) §5.13;
+[44-SPEC-MCP](44-SPEC-MCP.md) §12).
 
 Run from an empty BrainDog-owned working directory, never the customer's repo. `--restricted` is
 doing the real work — `dontAsk` still permits the read-only command set.
@@ -379,11 +393,13 @@ things in the section below.
 | **`--resume <session>` for follow-ups** | *"the single most valuable column"*: a job may name the Claude session it continues, so *"now do the other half"* does not start from nothing |
 | **The runner distils; it does not relay** | measured: a trivial two-turn job emitted ~12 KB across nine stream-json events — a 3 KB `init` enumerating every tool, a full `usage` object on every message. The runner translates each line into one small event with a `kind` — `start · say · think · tool · out · limit · note · end · error` — and truncates tool output. *"What is kept is what a person reads; what is dropped is the parts that are the same every time."* |
 | **A per-job `seq` high-water mark on the parent row** | a poll answers *"is there anything new"* from **one indexed read**, and fetches events only when there are. That is the difference between a 700 ms poll costing one lookup and costing a range scan |
-| **`cancel` is a flag, never a delete** | *"a job that was stopped is a job he will want to see the transcript of — that is usually WHY it was stopped."* The runner reads the flag on its next event post and kills the child |
+| **`cancel` is a flag, never a delete** | *"a job that was stopped is a job he will want to see the transcript of — that is usually WHY it was stopped."* The runner reads the flag through `readCancel` — which also renews its lease — and kills the child |
 | **`LOST` is deliberately not a status** | a row claimed and never finished stays `claimed` with an old `claimed_at`, and the *list* decides what to call it. *"A status the runner can never write is a status that lies when the runner dies mid-job"* |
 
-And four mechanics. **The runner waits on the WebSocket, and a runner that cannot hold one long-polls
-`claimJob?wait=20`**: the Worker holds the request, checks every 1.5 s and answers the moment something is
+And four mechanics. **The claim is always `claimJob` over HTTP. On Cloud the socket is a doorbell that
+ends the wait early; on a self-host there is no socket and the runner long-polls only —
+`claimJob { wait: 20 }`, `wait` in the body** ([48-SPEC-CLI](48-SPEC-CLI.md) §5.13;
+[33-CONTRACTS](33-CONTRACTS.md) §11): the Worker holds the request, checks every 1.5 s and answers the moment something is
 queued. The predecessor measured the change on 2026-09-02 — claim latency fell from 15.4 s to under 1.5 s
 *and* requests fell from 2,880–43,200 a day by tier to about 4,300, flat, which is unusual enough to state:
 long-polling improved both halves of the trade at once. Twenty seconds, not thirty, because a connection
@@ -458,7 +474,10 @@ assistant so much as a chat assistant that runs out.
 | A-conversational | fallback | with tier B | Labelled honestly: *this is the small model — add a key or connect your machine.* Never silently substituted |
 
 **Why B before C, and it is not close.** B is days: the vault exists, the inference adapter already
-takes any OpenAI-compatible endpoint, and Anthropic is a config row and a request shape. C is
+takes any OpenAI-compatible endpoint, and Anthropic is a config row and a request shape — per ask,
+the host opens the grant under the asker's browser session, decrypts in the Worker, hands Spark a
+per-call `Inference` adapter and writes one `grant.read` event; the package never holds the key
+([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9). C is
 weeks: enrolment over the device grant, a WebSocket dispatcher with leases and requeue, a
 cross-platform runner, an installer, an offline UX, a revocation UI, and a distributed-systems test
 suite. **Prove people want Claude-grade answers before building the tier that makes them free.**
@@ -470,7 +489,7 @@ suite. **Prove people want Claude-grade answers before building the tier that ma
 | Tier A conversation as the **default** | the worst answer in the product, on a budget that runs out |
 | **Queues pull consumer** | no per-queue token scope; a cross-tenant read is one misconfiguration away |
 | **Cloudflare Tunnel** | a daemon *and* a listener on the customer's machine, no self-host equivalent, and it solves a problem an outbound socket already solved |
-| **Long-poll as the primary** | ≈$4.05/customer/month held in a DO — a third of the price of the product |
+| **Long-poll as the Cloud primary** | ≈$4.05/customer/month held in a DO — a third of the price of the product. On a self-host it is the only transport, and free |
 | `--bare` | silently breaks subscription auth |
 | A Durable Object class for the runner | Spark already has the shape and the right prohibitions; the three classes are `Record`, `Spark` and `Directory` ([ADR-061](16-DECISIONS.md)), and the runner is not a fourth |
 | **Any path where BrainDog holds a Claude credential** | explicitly prohibited, enforceable *"without prior notice"*, and independently the worst security decision on the table |

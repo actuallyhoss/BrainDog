@@ -49,9 +49,10 @@ decision      -- immutable. id, question, answer, reason (NOT NULL), decided_by,
 suggestion    -- open questions with options json, status, opened_by
 prediction    -- a falsifiable claim about an accepted change: measure, frozen baseline (INTEGER, with unit), score_at, on_miss
 grant         -- the credential vault. label, opens, kind, version, ciphertext, nonce, kdf, rotated_at, stale_at
-device_grant  -- a device asking to open the vault: code_hash, status, tries, expires. see 12-SECURITY §6.1
+device_grant  -- a device asking in: code_hash, status, tries, expires, reach — six values, login | runner | export | import |
+              -- pack | token; an operation reach is the owner's ten-minute grant of 12-SECURITY §3. see 12-SECURITY §6.1
 member        -- who may do what, per register: person_id, register, level, seen_at (the READ MARK, MAX only)
-schedule      -- the single-alarm work queue: due_at, kind, payload json, state
+schedule      -- the single-alarm work queue: due_at, kind, payload json, state CHECK (five: pending | firing | done | failed | paused)
 outbox        -- work that must leave the object: kind, payload json, state, leased_until
 
 -- VAULT ------------------------------------------------------------------------
@@ -146,8 +147,10 @@ a ninth MCP tool. [32-PARITY](32-PARITY.md) §2.1 has the declaration and the ru
 by a `schedule` row of kind `purge`, hourly, run by `system` — `list` never writes, and the declared
 transitions allow `active → abandoned` so the sweep's own write is legal; `last_seen` is a plain
 `instant` the kernel writes at step 6 of the write path on every write whose resolved actor is that
-session — a kernel-written field, not a derivation (§5); and **every agent write resolves to a session
-or opens one.** Its `declaration` row carries `pack_id = 'kernel'` — the only row that does, so a
+session — a kernel-written field, not a derivation (§5), and **the heartbeat is not a write**: it is set
+in place with no `version` bump, no `updated_at` and no event ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4);
+the row also carries `token_id`, so a token's writes are one query; and **every agent write resolves to a
+session or opens one.** Its `declaration` row carries `pack_id = 'kernel'` — the only row that does, so a
 kernel-declared row and a user-authored one (`pack_id NULL`) are never confused. The CI rule *"the
 kernel contains no register declaration"* gains this one named exception.
 
@@ -178,8 +181,9 @@ The cost is stated rather than hidden: **`state` is a reserved field id.** A reg
 it for anything but its enum, and the validator refuses `{ id: state, type: text }` by name.
 
 Everything else a row is *tagged* with lives in `fields` as a `list<text>` and is matched with
-`has`/`lacks` — including the `example` marker that a pack's seed rows carry, which is why
-clearing the seeds is one predicate rather than a special code path.
+`has`/`lacks` — including the `example` marker that a pack's seed rows carry: it is the value `example`
+in a declared `list<text>` field named `tags`, nothing more ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.4),
+which is why clearing the seeds is one predicate rather than a special code path.
 
 **`seq` is per register, and it is the number a human says.** `entry.id` is an opaque ULID
 (`TEXT` — 53-bit precision makes numeric snowflakes unsafe). `entry.seq` is a per-register
@@ -258,8 +262,11 @@ string. Every one of the sixteen types has one such shape, byte-exact; the list 
 
 Three rules, all enforced at the validator rather than by convention:
 
-1. **Divide by 100 only at the point of display.** A currency's exponent comes from a table
-   (JPY is 0, KWD is 3), never assumed to be 2.
+1. **Divide by 100 only at the point of display.** A currency's exponent (JPY is 0, KWD is 3) is never
+   assumed to be 2 — and **no package ships a currency table**: the exponent comes from the runtime's own
+   `Intl.NumberFormat` currency data, cached per code, in the renderer and the kernel alike. `extract`
+   owns only a symbol → code map for detection and refuses an ambiguous bare `$`
+   ([34-GRAMMARS](34-GRAMMARS.md) §3). *(An earlier draft said "comes from a table".)*
 2. **Two currencies are never added.** A metric summing a mixed-currency field is *refused at
    install*, not silently converted. A total across currencies must name its FX source and date.
 3. **An FX rate is a dated row**, not a live lookup. A figure that changes when you reload it is
@@ -304,6 +311,10 @@ which is already the same shape:
 > own state, is row generation — a different problem, answered by the `create` action in
 > [07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §6. Conflating the two is how a calendar feature
 > becomes a data model.
+
+Those rows are keyed by entry, field, occurrence and offset, so writing the row again is idempotent —
+`once_per` is the key, not a second table; a `day` reminder is due at noon UTC; the horizon is 400 days
+and one write materialises at most 100 rows per field ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4).
 
 **A plain day renders at noon UTC.** This is not pedantry: rendering `2026-08-17` as midnight
 UTC displays as 16 August anywhere west of Greenwich, and a renewal reminder that fires on the
@@ -361,7 +372,7 @@ key: [campaign, channel, day]     # what makes a row unique; upsert, never dupli
 | the vector | see the 26 MB |
 | single-row create in the UI | these arrive from a connector, in batches |
 | `matches`, `contains`, `near`, `starts`, `ends` in any `where:` over the register | refused at install: a series has no text (`SERIES_HAS_NO_TEXT`) |
-| `series: true` turns **on**: `key:` | an idempotent upsert — one `CREATE UNIQUE INDEX entry_k_<reg>` over the key fields, and step 6 of the write path is `INSERT … ON CONFLICT DO UPDATE` — so re-fetching yesterday corrects it rather than duplicating it, which is the single most common failure of every analytics importer ever written |
+| `series: true` turns **on**: `key:` | an idempotent upsert — one `CREATE UNIQUE INDEX entry_k_<reg>` over the key fields; the write resolves the row by its key first and then inserts or updates it by id, and a soft-deleted row with that key is revived rather than duplicated ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4) — so re-fetching yesterday corrects it rather than duplicating it, which is the single most common failure of every analytics importer ever written |
 
 **The storage was never the problem and no second table is needed** — this is the one-table
 decision working exactly as designed. What was wrong was charging a fact the same tax as a thing.
@@ -415,8 +426,8 @@ test showed exactly what their absence cost.
 > own R2 prefix is not the banned thing, and never was. Attachments were deferred on **cost**, and
 > the deferral was then read back as a position.
 >
-> **`quantity` — `{ value, unit }`.** Structurally identical to `money`, with a unit table where
-> `money` has a currency table, and the **same refusal**: two units are never added. `decimal` is
+> **`quantity` — `{ value, unit }`.** Structurally identical to `money`, with a unit where `money`
+> has a currency code, and the **same refusal**: two units are never added. `decimal` is
 > a bare number, so `1.4` metres of fabric and `1.4` grams of trim were the same value and nothing
 > stopped a metric summing them. This is not a fashion nicety — a dose recorded as `5` with the
 > unit in an adjacent enum field is a patient-safety defect, and it is the exact class of bug
@@ -477,7 +488,7 @@ fields:
 
 | Option | Does | Refuses |
 |---|---|---|
-| **`derive:`** | a **row-level** derived value. **Seven shapes, and the list is closed:** `sum: [f, …]` → `COALESCE(a, 0) + …` · `diff: [a, b]` · `product: [a, b]` · `ratio: { of, per }` → `CASE WHEN per = 0 THEN NULL ELSE of * 1.0 / per END` (a zero `per` yields missing, never 0) · `band: { of, edges }` → `CASE WHEN x < e1 THEN v1 … ELSE vn END`, the edges exclusive upper bounds mapped onto the field's `values:` in order — *n* edges ↔ *n*+1 values, else `BAND_EDGES_MISMATCH` · `via: <ref>, field: <far field>` → the one-hop subquery of §6 · `normalise: f` → `lower(trim(f))`, whitespace collapsed. Operands are this row's field ids (numeric for the arithmetic four) or one `lookup` — never aggregations. **Never stored**: computed at read and projection, and **inlined by the `where:` compiler** so `{ field: tier, is: urgent }` still works. Three of the shapes are the metric grammar's combinators (`diff` · `product` · `ratio`) and four are row-scoped only (`sum` over named fields, `band`, `via`, `normalise`); depth one; a derivation may not read another row except through one `via:` hop. **Kernel-written fields are not derivations**: `session.last_seen` is written at step 6 on every write from that session, and the identity accent `hue` is generated at create (ADR-028) — neither is a shape here, and an earlier draft of the kernel's own register used two operators (`touched_by`, `hue_from`) that this list never had | a derived field cannot be written, `index: true`, or `required`. **One exception:** `unique: true` on a derived field materialises the value into `fields` at step 6 of the write path so the partial unique index has an expression to cover — **the only stored derivation** |
+| **`derive:`** | a **row-level** derived value. **Seven shapes, and the list is closed:** `sum: [f, …]` and `diff: [a, b]` — a missing operand counts as 0 · `product: [a, b]` and `ratio: { of, per }` — a missing operand yields missing, and a zero `per` yields missing, never 0 · `band: { of, edges }` — the edges exclusive upper bounds mapped onto the field's `values:` in order, *n* edges ↔ *n*+1 values, else `BAND_EDGES_MISMATCH`; a missing input yields missing · `via: <ref>, field: <far field>` → the one-hop subquery of §6 · `normalise: f` → lower-cased and trimmed, whitespace kept. **The inlines are `where`'s** — one definition, [38-SPEC-WHERE](38-SPEC-WHERE.md) §5.6 — and the kernel imports them, so the stored `unique:` fingerprint and the compiled inline can never disagree. Operands are this row's field ids (numeric for the arithmetic four) or one `lookup` — never aggregations. **Never stored**: computed at read and projection, and **inlined by the `where:` compiler** so `{ field: tier, is: urgent }` still works. Three of the shapes are the metric grammar's combinators (`diff` · `product` · `ratio`) and four are row-scoped only (`sum` over named fields, `band`, `via`, `normalise`); depth one; a derivation may not read another row except through one `via:` hop. **Kernel-written fields are not derivations**: `session.last_seen` is written at step 6 on every write from that session, and the identity accent is chosen at create by `@braindog/theme`'s `nextAccentHue` and stored frozen (ADR-028) — neither is a shape here, and an earlier draft of the kernel's own register used two operators (`touched_by`, `hue_from`) that this list never had | a derived field cannot be written, `index: true`, or `required`. **One exception:** `unique: true` on a derived field materialises the value into `fields` at step 6 of the write path so the partial unique index has an expression to cover — **the only stored derivation** |
 | **`required_when:`** | a conditional requirement, taking one `where:` leaf on the same row, restricted to `is not in not_in gt gte lt lte before after between empty present has lacks` — never `contains`, `matches`, `near` or `via:` (`REQUIRED_WHEN_OP_UNSUPPORTED`). *"Never set a tier without `tier_why`"* was prose in the brain; here it is a refusal that names both fields. **It borrows the leaf syntax and is not an eighth consumer** — it never compiles to SQL; it is one comparison evaluated against the row being written, in validation, the way `transitions:` is | — |
 | **`unique: true`** | a partial unique index over the register — `CREATE UNIQUE INDEX entry_u_<reg>__<field> ON entry(json_extract(fields, '$.<field>')) WHERE register = '<reg>' AND deleted_at IS NULL`. The refusal names the existing row by its spoken id — `ALREADY_KNOWN: LN7` — which is what makes it useful rather than merely correct | — |
 | **`immutable: true`** | set once, on create. A later write to the field is refused with the reason. Distinct from `immutable_when:`, which locks a whole row by predicate | — |
@@ -503,11 +514,11 @@ pairs: { on: [currency, abs(amount)], opposite: amount, across: account, within:
 | Option | Carries |
 |---|---|
 | **`delete: refuse_while_referenced`** | *"an account with transactions cannot be deleted — archive instead."* A reverse-reference check at delete time. `ref` stays soft everywhere else, because *deleting the target does not cascade* is the right default for a record and the wrong one for a ledger |
-| **`pairs:`** | transfer detection: two rows with the same `|amount|` and currency, opposite signs, different accounts, within a window, **paired once** — a third equal row stays unpaired, and zero never matches. Rows are **marked, never hidden**. A bounded self-join the kernel implements, because a `where:` cannot say it and every ledger needs it |
+| **`pairs:`** | transfer detection: two rows with the same `|amount|` and currency, opposite signs, different accounts, within a window, **paired once** — a third equal row stays unpaired, and zero never matches. Rows are **marked, never hidden**: `mark:` names a `bool` field set `true` on both rows, and the kernel writes `_pair` beside it; the window runs over `date:`, which defaults to the register's sole `day` field ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4; the keys are [42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.4). A bounded self-join the kernel implements, because a `where:` cannot say it and every ledger needs it |
 | **`repeat:` gains `bymonthday: [15, -1]` and `workday: previous \| next \| none`** | *"a salary paid twice a month has DAYS"*: the 15th and the last day, each moved back to Friday off a weekend. RRULE cannot express the weekend shift; one post-rule can. Monthly on the 31st clamps to the month's end |
 | **`name`** (required) and **`one:`** | the header title, and the singular for *"New obligation"*. `name` absent is a refusal at install — the id is never shown; `one:` absent is a warning, and the header reads *"New row"* ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) |
-| **`identity: { mark: <enum field>, accent: <int field> }`** | the register's rows carry a mark and one accent hue, generated once at create and validated distinct — [13-UI](13-UI.md) §2.1b, [32-PARITY](32-PARITY.md) §4.4, ADR-028. The accent is kernel-written, never derived |
-| **`predicates: { overdue: { … } }`** | named predicates in the `where:` grammar, referenced from any `where:` on the same register as the leaf `{ predicate: overdue }` — §6. A saved view is a predicate plus an `order:`, keyed by its spoken id |
+| **`identity: { mark: <enum field>, accent: <int field> }`** | the register's rows carry a mark and one accent hue, chosen once at create and validated distinct — [13-UI](13-UI.md) §2.1b, [32-PARITY](32-PARITY.md) §4.4, ADR-028. The hue is `@braindog/theme`'s `nextAccentHue` — the farthest point on the hue circle from every existing accent and from the three intent hues, deterministic — handed to the kernel as an injected chooser; the kernel stores it frozen and never computes a hue ([39-SPEC-THEME](39-SPEC-THEME.md)). *(An earlier draft put a golden-angle rule in the kernel.)* |
+| **`predicates: { overdue: { … } }`** | named predicates in the `where:` grammar, referenced from any `where:` on the same register as the leaf `{ predicate: overdue }` — §6. A saved view **is** a named predicate; its `order` is URL state, never stored; and saving one is a declaration write through `setDeclaration`, so it is the owner's ([50-SPEC-WEB](50-SPEC-WEB.md) §4.6) |
 
 **`by:` on a transition** — the last addition, and it generalises two of the brain's hard-coded
 routes:
@@ -540,6 +551,7 @@ append-only log then recorded the illegal move faithfully, forever.
 | Property | Consequence |
 |---|---|
 | A missing `transitions:` means **every move is legal** | additive. Every register written before this existed keeps working |
+| A `create` may set **any** declared `state` value | `transitions:` govern *moves*, and the first value is not a move ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4) |
 | `requires:` names fields that must be non-null **to enter** that state | the "you cannot post an incomplete entry" rule, declared |
 | The generated form **omits** illegal targets rather than disabling them | a disabled control invites a question the UI cannot answer |
 | The `move` rule action is validated against it at install | a rule that could never fire is caught in the diff, not in production |
@@ -556,6 +568,7 @@ Three field options the review found used and never defined, and one that was de
 |---|---|---|
 | **`min:` / `max:`** | bounds on a field: byte length for `text`/`document` (`max` defaults to the type's cap, `min` to 0), numeric bounds for `int`/`decimal`/`money`/`quantity`/`duration`, element count for `list<T>` | `OUT_OF_BOUNDS`, naming both bounds |
 | **`retired: true`** | the field stops rendering and stops being writable; the data stays in `fields` (§7). A retired field may not be `required`, `index`, `unique`, or in `search`/`mobile` | — |
+| **`redact: true`** | withholds the field's values from the audit log at write — `from_v`/`to_v` are the literal `--redacted--` ([20-COLLABORATION](20-COLLABORATION.md) §8). `secret` and `money` fields are redacted always, with or without the key; `redact:` is how any other field joins the list | — |
 | **a type change** | does not exist in v1: retire the field and add a new one. The conversion preview is authoring-tier scope | `FIELD_TYPE_CHANGED` |
 | **removing `index: true`** | drops the index in the same transaction; nothing else changes | — |
 
@@ -564,8 +577,9 @@ Three field options the review found used and never defined, and one that was de
 | Cap | Value | Source |
 |---|---|---|
 | Fields per register | **64** | **a product decision, not a platform limit.** Fields live in JSON, so nothing in SQLite constrains this — a register with 65 fields is a database, and its owner needs a different product. Stated as a choice because deriving it from the 100-column ceiling was the error described above |
-| Indexed fields per register | 8 | each is a partial expression index, which costs storage and write time rather than a column. Unbounded indexing is how a 10 GB budget and a write-row bill disappear |
+| Indexed fields per register | 8 | each is a partial expression index, which costs storage and write time rather than a column. Unbounded indexing is how a 10 GB budget and a write-row bill disappear. `INDEXES_OVER_CAP` counts the fields marked `index` or `unique`; a series' `key:` is one index and is not counted ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.3) |
 | `document` field size | 512 KB | 2 MB row ceiling, with headroom for the rest of the row |
+| Default value caps | `text` 16 KB · `json` 64 KB · `url`/`email` 2 KB · `list<T>` 1,000 elements · a row's `fields` 1 MB | every one refused as `OUT_OF_BOUNDS`, naming the bound; `max:` above may lower a cap, never raise it ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4) |
 | Registers per record | 64 | not a platform limit; a record with 65 registers is a database, and its owner needs a different product |
 | Predicate nesting depth | 3 | counting the root group as level 1 — §6, [21-AUTHORING](21-AUTHORING.md) §4.4, [30-BLUEPRINT](30-BLUEPRINT.md) §7 |
 | Blocks per page | 24 | [21-AUTHORING](21-AUTHORING.md) §11 |
@@ -629,7 +643,7 @@ page stated formally, is [34-GRAMMARS](34-GRAMMARS.md) §1.
 | `contains` | text, document | **a field-scoped substring**, ASCII-case-folded: `instr(lower(json_extract(…)), lower(?)) > 0`. The literal is ≤ 40 bytes (`CONTAINS_TOO_LONG`). **Identical on both backends** |
 | `matches` | the register | **register-wide full text**: `id IN (SELECT id FROM entry_fts WHERE register = ? AND entry_fts MATCH ?)` over the register's `search:` fields — the projected text is the `search:` values in order, lists joined by a space, fields by LF, whitespace collapsed. The operand is **one quoted phrase** with `"` doubled, so no FTS5 syntax is reachable from an author. Entry backend only; it takes no `field:` |
 | `starts` / `ends` | text | `LIKE ? ESCAPE '\'` with `%` and `_` escaped in the literal; case-insensitive for ASCII only. The pattern is **hard-capped at 40 bytes** by the validator |
-| `empty: true` / `present: true` | all | `IS NULL` / `IS NOT NULL` — `json_extract` yields NULL for an absent key and a JSON `null` alike, and `""` and `[]` count as empty. The value is always the literal `true` |
+| `empty: true` / `present: true` | all | missing or not — `json_extract` yields NULL for an absent key and a JSON `null` alike, and the compiled test also catches `""` and `[]`, so the SQL and the prose agree ([38-SPEC-WHERE](38-SPEC-WHERE.md) §5). The value is always the literal `true` |
 | `has` / `lacks` | `list<T>` | `EXISTS (SELECT 1 FROM json_each(…))`, and `NOT EXISTS` for `lacks`, which is true on a missing list |
 | `near: { text, k }` | text, document | **ranking, not filtering** — see *`near`* below |
 | `{ predicate: <name> }` | the register | a named predicate from the register's `predicates:` (§5), expanded at compile; the expansion counts toward depth 3; a cycle is refused (`PREDICATE_CYCLE`) |
@@ -641,7 +655,9 @@ page stated formally, is [34-GRAMMARS](34-GRAMMARS.md) §1.
 | `via: <ref field>` with `field: <far field>` | a `ref` field | dereferences **exactly one** hop, then applies the operator to `field:` on the target row. `{ via: period, field: state, is: closed }` reads *"the period this row points at is closed"* — **`via:` names the hop, `field:` names the field on the far side**, and `derive: { via: account, field: currency }` (§5) uses the same two keys the same way round. Compiles to `id IN (SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND <leaf>)`, where `<leaf>` is compiled by the same rules as any leaf on that register — so `state` reads the column, and a soft-deleted period does not lock its postings. A second `via:` is refused (`VIA_TWICE`); a `via:` leaf may not itself carry `matches` or `has` — a subquery inside a subquery — and is refused `VIA_NESTED_SUBQUERY`. *(An earlier draft wrote `{ field: period, via: state }`, the two keys the other way round from `derive:`.)* |
 
 **Six kernel fields are addressable in any `where:` and any aggregation** without being declared:
-`id` `seq` `state` `created_at` `updated_at` `version`. `count: id` counts rows.
+`id` `seq` `state` `created_at` `updated_at` `version`. `count: id` counts rows. They are typed — `id`
+a `ref`, `seq` and `version` `int`, `created_at` and `updated_at` `instant`, and `state` the register's
+own `enum`, only when it declares one ([38-SPEC-WHERE](38-SPEC-WHERE.md) §4).
 
 #### Missing values
 
@@ -663,7 +679,8 @@ compile time**, against `ctx.now` in `ctx.tz`, and every resolved literal is a b
 inline SQL. Against a `day` field an anchor resolves to a calendar day; against an `instant` field `today`
 is 00:00 in `ctx.tz` expressed as a UTC instant, and offsets apply to `ctx.now`. An unknown literal is
 refused by name (`RELATIVE_LITERAL_UNKNOWN`); hours (`-1h`) are legal only in `remind:`, and an hour
-offset against a `day` field is `RELATIVE_UNIT_FOR_DAY`.
+offset against a `day` field is `RELATIVE_UNIT_FOR_DAY` — raised by `declare` at install, on the `remind:`
+key, not by the compiler.
 
 #### Money and quantity
 
@@ -798,14 +815,17 @@ and it is the one the platform's governing rule already provides.
 
 Two independent ladders, and conflating them is how a pack ecosystem breaks a database.
 
-**Kernel migrations** are ours: `packages/kernel/migrations/NNNN_<slug>.sql`, numbered, forward-only,
-applied in numeric order from the record object's constructor inside `blockConcurrencyWhile()` so no
-request sees a half-migrated schema. Each runs in one `transactionSync` that also inserts its
-`migration` row — `version`, `applied_at`, and a checksum that is the SHA-256 of the SQL after CRLF→LF
-and trailing-whitespace strip ([34-GRAMMARS](34-GRAMMARS.md) §5), so a fixture hashes the same on
-Windows and on Linux CI. A migration whose file carries `-- format-bump` also sets
+**Kernel migrations** are ours: `packages/kernel/src/migrations/NNNN_<slug>.ts`, numbered, forward-only —
+**a `.ts` module exporting its SQL as a string**, never a loose `.sql` file, so the bundle carries it and
+nothing reads a filesystem — applied in numeric order from the record object's constructor inside
+`blockConcurrencyWhile()` so no request sees a half-migrated schema. The runner creates the `migration`
+table itself, so no migration has to. Each runs in one `transactionSync` that also inserts its
+`migration` row — `version`, `applied_at`, and a checksum that is the SHA-256 of the exported SQL after
+CRLF→LF and trailing-whitespace strip ([34-GRAMMARS](34-GRAMMARS.md) §5), so a fixture hashes the same on
+Windows and on Linux CI. A migration whose SQL carries the `-- format-bump` marker also sets
 `PRAGMA user_version`; the rest do not, because the format revision and the kernel migration number are
-different numbers ([03-DOG-FORMAT](03-DOG-FORMAT.md) §7). A checksum mismatch, or a database newer than
+different numbers ([03-DOG-FORMAT](03-DOG-FORMAT.md) §7). The runner is [41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.2.
+*(An earlier draft said `.sql` files.)* A checksum mismatch, or a database newer than
 the code, does not "refuse to start" in some vague sense: the runner sets a module-level refusal —
 `SCHEMA_MISMATCH` | `SCHEMA_NEWER` — that every RPC returns as **503**, because a silently-diverged
 schema is worse than an outage. The procedure is [33-CONTRACTS](33-CONTRACTS.md) §9, and
@@ -878,7 +898,7 @@ Two consequences worth stating:
 | A row, really | the `purge` schedule kind, after 30 days | via PITR for 30 days |
 | A pack | declarations retired (`retired = 1`), rows kept | yes |
 | A credential | ciphertext zeroed, `grant` row kept with `revoked_at` | no, by design |
-| **A customer** | `deleteAlarm()` **then** `deleteAll()`, and the R2 prefix | no |
+| **A customer** | **`deleteRecord`** — an ADMIN method, browser session, re-authenticated, the slug typed: a final snapshot into the record's prefix, then `destroy()` on the record (the alarm, then the storage), Spark's object, the R2 prefix, and the Directory forgets the slug ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.9, [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.13). Self-service, because deletion is table stakes | no |
 | **A person inside a customer's record** | §10. It is a different mechanism and this table used to omit it | no |
 
 **Purge is one transaction, and every step is explicit** because nothing cascades by foreign key:
@@ -932,14 +952,16 @@ second is load-bearing.
 |---|---|
 | `ts`, `actor`, `kind`, `target`, and the **name** of the field that changed | `from_v`, `to_v`, `note` → `--erased--` |
 | `inbox_raw.ts`, `channel`, `sha256` | `body`, `headers` |
-| `decision.id`, `question`, `answer`, `decided_by`, `ts` | `reason` → `--erased--`; the column stays `NOT NULL` and is never empty at write, so the invariant *"a decision always has a reason field"* still holds |
+| `decision.id`, `decided_by`, `ts` | `reason` → `--erased--`, and `question` and `answer` likewise where they name the subject; the column stays `NOT NULL` and is never empty at write, so the invariant *"a decision always has a reason field"* still holds |
 | the `ingest_receipt` row | what it extracted |
-| the `suggestion`, `prediction`, `grant` and `device_grant` rows | `suggestion.body`, `prediction.claim`, `grant.label`, `device_grant.label`/`ua` naming the subject → `--erased--` |
+| the `suggestion`, `prediction`, `grant` and `device_grant` rows | `suggestion.body`, `prediction.claim`, `grant.label`/`hint`, `device_grant.label`/`ua` naming the subject → `--erased--` |
+| the `person` mirror row | `email`, `name` → `--erased--` |
+| the `job` and `job_event` rows | `job.args`/`result`/`error` and `job_event.body` naming the subject → `--erased--` |
 | — | `observation` rows whose `subject` is the erased value: **deleted** |
 | — | pending `schedule` and `outbox` payloads naming the subject: **cancelled**, payload → `--erased--` |
 | the `access.revoke` event | the subject's `member` row: **deleted** |
 | every row's existence, position and sequence | its content |
-| **a new `erase` event** naming the subject, the legal basis, the actor and the count of rows touched | — |
+| **a new `erase` event** carrying the legal basis, the actor, the counts — and the subject only as a hash, so the value is never written again | — |
 
 **One rule for the three sentinels.** A value withheld at write by the redaction list is the literal
 `--redacted--` ([20-COLLABORATION](20-COLLABORATION.md) §8); a value removed later by an erasure is the
@@ -961,15 +983,15 @@ control, and the audit found the corpus treating them as if they were.
 
 ### And the cascade, which is the part that gets forgotten
 
-`erase(subject)` touches **sixteen** stores. **Fifteen are one transaction; the sixteenth cannot be.**
-An earlier draft counted eight and audited seven — and before that claimed all of them were one
-transaction; the review found eight more places a person can be named:
+`erase(subject)` touches **twenty** stores. **Nineteen are one transaction; the twentieth cannot be.**
+An earlier draft counted eight and audited seven, a later one sixteen — and before that claimed all of
+them were one transaction; the review kept finding places a person can be named. The enumeration is
+[41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.9's:
 
 | | |
 |---|---|
-| **One transaction** | `entry` · `event` · `inbox_raw` · `ingest_receipt` · `entry_fts` · `entry_vec` · `decision` · `suggestion.body` · `prediction.claim` · `grant.label` · `device_grant.label`/`ua` · `schedule` payloads · `outbox` payloads (both cancelled) · `member` (the row deleted; the `access.revoke` event stays) · `observation` (rows whose `subject` is the value, deleted) |
-| **Not in it** | **the R2 prefix.** Deleting an object is an outbound call, and [01-ARCHITECTURE](01-ARCHITECTURE.md) §2 forbids the record making one. It goes on the **outbox** as `erase.r2`, drained by the Worker |
-| **Out of scope, stated** | `metric_point` — aggregates only; no row names a person |
+| **One transaction — nineteen** | `entry` · `entry_fts` · `entry_vec` · `event` · `inbox_raw` · `ingest_receipt` · `decision` · `suggestion.body` · `prediction.claim` · `grant.label`/`hint` · `device_grant.label`/`ua` · `schedule` payloads · `outbox` payloads (both cancelled) · `observation` (rows whose `subject` is the value, deleted) · `person` (`email`, `name` → `--erased--`, the row kept) · `member` (the row deleted; the `access.revoke` event stays) · `job` (`args`, `result`, `error`) · `job_event` (`body`) · `metric_point` (aggregates only, no row names a person — walked so the count is honest) |
+| **Not in it — the twentieth** | **the R2 prefix.** Deleting an object is an outbound call, and [01-ARCHITECTURE](01-ARCHITECTURE.md) §2 forbids the record making one. It goes on the **outbox** as `erase.r2`, drained by the Worker |
 
 So the honest guarantee is: **the record is erased atomically; the attachments are erased within the
 outbox lease window, and a reconciliation job asserts it.** Saying "one transaction" over a store

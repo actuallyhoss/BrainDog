@@ -10,7 +10,7 @@ The strongest single reason a hosted instance is worth $12/mo, and the mechanism
 | Channel | Is | Self-host |
 |---|---|---|
 | **webhook** | a public URL that is always up | needs your own reverse proxy. **This is what Cloud sells** |
-| **inbound email** | an address per record — `<slug>@in.brain.dog` | needs your own MX |
+| **inbound email** | an address per record — `<slug>@in.brain.dog` | a forwarding webhook — `POST /in/email/<token>`, the raw RFC 5322 message as the body — or your own MX. No SMTP receive, no DKIM in-process ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §13 #3) |
 | **pull** | a scheduled fetch of something you already own — **[25-CONNECTORS](25-CONNECTORS.md)**, which specifies the `fetch:` block this row promised and never had. The kernel's word is `pull` everywhere: `channel: pull` on the ingest, schedule kind `pull`, outbox `pull.fetch`, event kind `pull` — never `cron` | needs something awake |
 | **paste** | a box | **always works, everywhere.** The fallback that never breaks |
 | **api** | a `create`/`propose` whose payload is kept raw — the agent door | same |
@@ -46,18 +46,35 @@ arrival → inbox_raw (untriaged, sha256, arrival time, channel, headers)
 > read within a week."* Both are right. The resolution: **kept, not shown.** The inbox is a fold at the
 > foot of a page with counts per status, never a queue; the proposal loop fires only on three
 > same-shape payloads; and a `skipped` status with a reason is the one place a wrong skip ever shows.
-> Three more of its ingest rules travel with it: a **skip list** that names why (a refund, a PIN); a
-> **routing table** — kind × currency → register — that lands a miss in `review` rather than guessing;
-> and a **fuzzy dedupe** against rows already written (same account and amount, the day ±1, a
-> description prefix), because a bank sends the same movement twice with two wordings.
+> Three more of its ingest rules travel with it, each with a syntax: a **skip list** — `skip: [{ when, reason }]`
+> over the arrival — that names why (a refund, a PIN); a **routing table** — `writes.register` may be
+> `{ by: [ids], to: [{ when: [values], register }] }`, kind × currency → register — that lands a miss in
+> `review` rather than guessing; and a **fuzzy dedupe** against rows already written — `dedupe:` is a field
+> list (exact) or `{ near: { on, day, prefix: { field, chars = 12 } } }`: the same `on` fields, the day ±1, a
+> folded prefix equal — because a bank sends the same movement twice with two wordings. The record fetches
+> the candidates and applies `on_conflict`; the package decides ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §5.2,
+> §5.7).
 >
 > `skipped` and `review` are values of `inbox_raw.state` — `untriaged` · `matched` · `skipped` ·
 > `review` · `proposed` · `ignored` · `erased` — with the reason beside them in `inbox_raw.reason`; a
 > validation miss lands as `ingest_receipt.confidence = 'needs-review'` (§7). *(An earlier draft named
 > statuses no column could hold.)*
+>
+> **Confidence is derived, never declared.** Each row's confidence comes from its field outcomes —
+> `exact` when every field read cleanly, `proposed` when a combinator *chose* or *defaulted*, `needs-review`
+> on anything `missing`, `ambiguous` or `invalid` — and `writes.confidence` is only a **ceiling** (default
+> `exact`). `exact` writes rows; `proposed` writes **no row** and opens a `rowset` suggestion, the arrival
+> parked at `state = 'proposed'`; `needs-review` writes nothing and lands the arrival in `review` with the
+> reason ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §5.1; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.11).
 
 `sha256` of the body is stored and unique-indexed per channel, so the same webhook delivered
-twice writes one row. Redelivery is normal; double-counting money is not.
+twice writes one row. Redelivery is normal; double-counting money is not. Two caps bound extraction —
+a body of 2,000,000 bytes and 5,000 rows; over either, the arrival is kept raw in `review` with the
+reason and never extracted ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D16). A pull lands one
+`inbox_raw` row per page, `channel = pull`; a page that passed keeps its `sha256`, headers and byte
+count, and its body for thirty days — the window in which a pattern can still be rolled back and the
+page re-triaged ([24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.8) — after which purge sets
+`body = NULL`; a page in `review` keeps its body ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D12).
 
 The email and webhook handlers themselves **do no parsing**. They verify, store, enqueue, return
 200. A handler that parses is a handler a stranger can crash — and a 5 MiB attachment parsed
@@ -78,7 +95,7 @@ extract:
   amount:   { money: { after: "EGP", currency: "EGP" } }
   date:     { date: { format: "DD/MM/YY" } }
   merchant: { text: { between: ["at ", " on"] } }
-  account:  { lookup: register.accounts, by: last4 }
+  account:  { lookup: { register: accounts, by: last4 } }
 writes:
   register: transactions
   confidence: exact
@@ -87,22 +104,28 @@ on_conflict: skip          # skip | update | new
 
 ### The transform vocabulary, and it is closed
 
-| Transform | Does |
-|---|---|
-| `after` / `before` / `between` | literal-anchored slice |
-| `money` | parse a number and a currency into minor units |
-| `date` | parse to a plain day with an explicit format — never a guess |
-| `text` | trim and normalise whitespace |
-| `int` / `decimal` | numeric parse with locale-aware separators |
-| `enum` | map a matched literal to a declared value |
-| `lookup` | resolve a foreign row by a named field |
-| `first` / `nth` | pick from repeated matches |
-| `default` | a value when the field is absent |
+| Transform | Does | JSON form |
+|---|---|---|
+| `after` / `before` / `between` | literal-anchored slice | `{ after: L }` · `{ before: L }` · `{ between: [A, B] }` — also legal as an optional anchor key inside any value extractor below |
+| `money` | parse a number and a currency into minor units | `{ money: { after?, currency? } }` |
+| `date` | parse to a plain day with an explicit format — never a guess | `{ date: { format, after? } }` |
+| `text` | trim and normalise whitespace | `{ text: { between? } }` |
+| `int` / `decimal` | numeric parse with locale-aware separators | `{ int: { after? } }` · `{ decimal: { after?, sep? } }` |
+| `enum` | map a matched literal to a declared value | `{ enum: { map: { L: V }, after? } }` |
+| `lookup` | resolve a foreign row by a named field | `{ lookup: { register, by, after? } }` |
+| `first` / `nth` | pick from repeated matches | `{ first: [form, …] }` · `{ nth: { n, of: form } }` |
+| `default` | a value when the field is absent | `{ default: { value, of: form } }` |
 
 **Ten extractors** — `after`, `before`, `between`, `money`, `date`, `text`, `int`, `decimal`,
 `enum`, `lookup` — **and three combinators**: `first`, `nth`, `default`. Counted separately because a
 combinator takes an extractor's output rather than reading the payload, and because the builder
-shows the count.
+shows the count. Thirteen forms, then, and every key, type and default is
+[43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §4.3; the forms and the `map:` shapes are that table exactly, and
+`declare`'s schema encodes them verbatim ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.7). Three grammar codes
+guard them — `EXTRACTOR_UNKNOWN` (a key outside the thirteen), `DATE_FORMAT_INVALID` (a `format` breaking
+§4.3's token rules), `PATH_INVALID` (a path outside §4.4's grammar) — raised by `declare` at install and by
+`extract` at first use; they take the grammar family of [30-BLUEPRINT](30-BLUEPRINT.md) §6 from ten to
+thirteen.
 
 > *An earlier draft said nine and enumerated ten, collapsing `int` and `decimal` — two separate rows
 > in the table above — into a single invented name, `number`, which appears nowhere else in this
@@ -114,12 +137,25 @@ shows the count.
 and no way to say which currency the number was in. The forms are `{ money: { after: "EGP", currency:
 "EGP" } }`, `{ date: { format: "DD/MM/YY" } }` — the `format` tokens are `YYYY` `YY` `MM` `M` `DD` `D` and
 nothing else — and `{ text: { between: ["at ", " on"] } }`; `money` accepts `1,250.00`, `1.250,00` and
-`1250` against the register's currency table.
+`1250`. **The thousands rule:** a lone separator followed by exactly three digits is grouping unless the
+currency's exponent is 3; with two or more separators the last differing one is the decimal point; a value
+that would need rounding is refused ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D2). The exponent comes from
+`Intl.NumberFormat`, cached per code — **no currency table is shipped anywhere**; `extract` owns only a
+symbol → code map for detection (`€` → EUR, `E£` → EGP …) and refuses an ambiguous bare `$`
+([02-DATA-MODEL](02-DATA-MODEL.md) §3). Every declared field is **required** and `default` is the only way
+to make one optional; `writes.confidence` is a ceiling, never a promise (§2).
 
 **No regular expressions.** A regex over a text field a stranger controls is catastrophic
 backtracking waiting to happen, and it is unreadable, which defeats the point of a shareable
 declaration. Where one bank words it differently, `first` takes an ordered list of ways — that is
-why `first` exists and why no regex is needed.
+why `first` exists and why no regex is needed. The rule reaches from the declaration into the
+implementation: zero `RegExp` in the package, enforced by a lint rule scoped to `packages/extract`
+([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D4; [31-STACK](31-STACK.md) §3).
+
+`dedupe:` and `on_conflict:` are the record's to apply — inside `arrive`, and for a pull per page inside
+`applyPull`: an exact `dedupe: [id]` matches every named field (lint requires `index: true` on each), a
+`near` dedupe runs the window query of §2, and a hit then goes by `on_conflict` — `update` re-enters the
+write path, `skip` is counted, `new` creates ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D3).
 
 **What this replaces:** in the prior codebase, one bank cost **75 hard-coded lines** and served
 exactly one person. This serves anybody's bank and is a file they can share.
@@ -141,11 +177,14 @@ and free — no model call, no cost, no variance.
     extract   amount    money after "EGP"      → EGP 1,250.00  ✓ 3/3
               date      date format DD/MM/YYYY → 2026-08-29    ✓ 3/3
               merchant  text between "at " and " - " → "UBER"  ✓ 3/3
-    writes    register.transactions, confidence: exact
+    writes    register.transactions, confidence: needs-review
 
   Tested against all 3. Approve, edit, or discard.
   Approving writes a declaration. No model runs on this shape again.
 ```
+
+A Spark-derived pattern always files with `confidence: needs-review`; a person raises the ceiling to
+`exact` at review, once its rows have been looked at ([46-SPEC-SPARK](46-SPEC-SPARK.md) §13 #14).
 
 Three things make this the right shape rather than a gimmick:
 
@@ -195,7 +234,7 @@ once_per: [entry, renews]     # never twice for the same renewal date
 
 | Action | Does |
 |---|---|
-| `tag` / `untag` | add or remove a tag |
+| `tag` / `untag` | add or remove a tag — a value in the register's declared `tags` field (`list<text>`), which a register with either action must declare, `FIELD_UNKNOWN` otherwise; `example` in that field is the seed marker of [04-PACKS](04-PACKS.md) §2 ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §13 D9) |
 | `set` | write one declared field to a literal or an interpolation |
 | `move` | change a `state` enum to a declared value, **and only along a legal transition** |
 | `notify` | emit a notification — the six-field contract in [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §4; a rule never names a `channel` |
@@ -330,15 +369,17 @@ further down, and had no `priority:` key to be ordered by.)*
 | | |
 |---|---|
 | **`hits`** | how many rows a rule has ever filed, on the row, drawn as `warn` when it is zero and the rule is old — *"never"* is information |
-| **Dry run with attribution** | `braindog rule test` returns `matches`, `won`, `lost`, **and `takenBy: { rule: n }`** — which existing rule already claims the rows this one would. A candidate is ranked among the real rules with the id it *would* get, so it loses the tiebreak honestly |
-| **`braindog rule apply --dry`** | re-run every rule over rows where a field is still empty — the predecessor's bulk recategorise. **No undo by design** (sixty writes); the dry run is the undo |
-| **A person's write beats a rule's, everywhere** | the predecessor has a `pinned` column on one table so a hand-set category survives a re-sync. Here it is the write path — **step 2b, PINNED**, in [30-BLUEPRINT](30-BLUEPRINT.md) §4: a non-person actor may not `set` a field whose last `event.actor` is a person, so such a field is **never overwritten by a rule, an ingest or a connector.** One rule, every register |
+| **Dry run with attribution** | `braindog rule test` returns `matches`, `won`, `lost`, **and `takenBy: { rule: n }`** — which existing rule already claims the rows this one would. A candidate is ranked among the real rules with the id it *would* get, so it loses the tiebreak honestly. It is the READ+ method `ruleTest({ id, against })` |
+| **`braindog rule apply --dry`** | re-run every rule over rows where a field is still empty — the predecessor's bulk recategorise. **No undo by design** (sixty writes); the dry run is the undo. It is the ADMIN method `ruleApply({ id, dry })`; neither is a `mode` on `setDeclaration` ([30-BLUEPRINT](30-BLUEPRINT.md) §5) |
+| **A person's write beats a rule's, everywhere** | the predecessor has a `pinned` column on one table so a hand-set category survives a re-sync. Here it is the write path — **step 2b, PINNED**, in [30-BLUEPRINT](30-BLUEPRINT.md) §4: a **mechanism** actor — `rule:<id>` or `ingest:<id>`, and nothing else — may not `set` a field whose last `event.actor` is a person, so such a field is **never overwritten by a rule, an ingest or a connector.** Sessions, `agent:` tokens and `system` are exempt: the rule pins a field against machinery, not against the next person or agent who edits it ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §13 #5). One rule, every register |
 
 ### Three properties that stop a rules engine becoming a haunted house
 
 **1 · `once_per` is mandatory on any rule with a `notify`.** It keys on a tuple; the engine
 records the key and never fires twice for it. A renewal reminder that fires every night until you
-act is a reminder you filter to a folder.
+act is a reminder you filter to a folder. The record is a `schedule` row of kind `rule` under that
+table's `(kind, key)` unique index — one table, one uniqueness, one insertion path
+([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.7; [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1).
 
 **2 · Rules are ordered, and evaluation is bounded.** They run in the order stated above — priority,
 longest literal, id — one pass, max one `set` per field per pass. **No rule can trigger another rule's re-evaluation in the same
@@ -365,22 +406,25 @@ predicate against the real rows and writes nothing.
 
 ## 7 · The pipeline, mechanically
 
-Ingest is a **Workflow**, not a queue consumer, because the steps fail independently and one of
-them costs money:
+Ingest is **one deterministic transaction** — `arrive`, an INTERNAL method of the record: store → match →
+extract → validate → write → rules → outbox, with no model call inside it. It *may become* a Workflow the
+day a model call re-enters the pipeline; in v1 none does ([45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #18;
+[51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D12). *(An earlier draft said "is a Workflow", on the strength of
+a step that no longer sits inside it.)*
 
-| Step | Retries | Note |
-|---|---|---|
-| 1 · store raw | yes | idempotent on `sha256` |
-| 2 · match declared ingests | yes | pure, no cost |
-| 3 · extract | yes | pure, no cost |
-| 4 · validate against the register | yes | a failure downgrades to `needs-review`, never discards |
-| 5 · write | yes | one transaction |
-| 6 · run rules | yes | bounded, one pass |
-| 7 · notify | yes | deduped by `once_per` |
-| 3′ · propose a pattern (unmatched only) | **no** | a model call. Retried manually, because retrying it automatically bills twice for the same payload |
+| Step | Note |
+|---|---|
+| 1 · store raw | idempotent on `sha256` |
+| 2 · match declared ingests | pure, no cost; the first matching ingest wins |
+| 3 · extract | pure, no cost |
+| 4 · validate against the register | a failure downgrades to `needs-review`, never discards |
+| 5 · write | **per arrival, all rows or none.** The receipt is one row per arrival, its `wrote` filled by the record; a skipped arrival has no receipt ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D11) |
+| 6 · run rules | bounded, one pass |
+| 7 · notify | deduped by `once_per`; anything that must leave the object is an outbox row |
+| 3′ · propose a pattern (unmatched only) | **outside the transaction.** An unmatched shape earns one `infer.draft` outbox row at its **third** arrival in 30 days — never a model call per payload — and the ack files the proposal (§4). Retried by a person, from the raw inbox, because retrying a model call automatically bills twice for one payload |
 
-Queues are the front door — they absorb a burst and give the Workflow one trigger. A Workflow
-survives a deploy mid-run, which a queue consumer holding in-memory state does not.
+Queues stay the front door — they absorb a burst and hand the record one call — and it is the record's
+single transaction that survives a deploy mid-run, not in-memory state in a consumer.
 
 ---
 

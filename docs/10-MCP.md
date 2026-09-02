@@ -13,8 +13,8 @@ Built against the **2026-07-28 MCP specification**, which changed enough to matt
 | Change | Consequence for BrainDog |
 |---|---|
 | **`initialize`/`initialized` handshake removed; no `Mcp-Session-Id`** | Every request is self-contained, carrying protocol version, client identity and capabilities in `_meta`. The server is genuinely stateless, so it is just the Worker — no session store, no sticky routing |
-| **`Mcp-Method` and `Mcp-Name` HTTP headers** | Auth and rate limiting happen at the edge on headers, without parsing a JSON body. A per-tool rate limit becomes a WAF rule |
-| **`ttlMs` and `cacheScope` on `tools/list`, `prompts/list`, `resources/list`, `resources/read`** | The tool list is cached by the client. This is the single biggest lever on context cost — see §4 |
+| **`Mcp-Method` and `Mcp-Name` HTTP headers** | The headers must equal the body, so the edge's telemetry names the tool without parsing JSON. The rate limit itself keys on the token, never on a header (§8) |
+| **`ttlMs` and `cacheScope` on `tools/list`, `prompts/list`, `resources/list`, `resources/read`** — top-level fields of the result | The tool list is cached by the client. This is the single biggest lever on context cost — see §4 |
 | **Multi Round-Trip Requests (MRTR)**: a server returns `resultType: "input_required"`, the client retries with `inputResponses` | **The decision gate becomes protocol-native.** See §5 — this is the most important item in this document |
 | **DCR deprecated in favour of Client ID Metadata Documents; `iss` per RFC 9207; issuer-bound credentials; `application_type`** | Standard OAuth 2.1 resource-server behaviour, and desktop/CLI clients on localhost redirects finally work |
 | **Roots, Sampling and Logging deprecated** (12-month minimum support) | Do not build on them. Sampling in particular was the tempting way to have the client's model do our inference; it is going away |
@@ -23,9 +23,13 @@ The legacy HTTP+SSE transport has a one-year offramp. BrainDog ships **streamabl
 does not carry a compatibility layer for a transport that is being retired — with one permitted
 exception, stated in [17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md) Q7 and [ADR-054](16-DECISIONS.md): a
 stateless one-day shim for a named client whose software is still on HTTP+SSE at build time, removed
-at the offramp date. The endpoint is `POST /mcp`; the handler is `createMcpHandler(api, decls)` over
-the `DataApi` envelopes — hand-rolled JSON-RPC, zero dependencies ([33-CONTRACTS](33-CONTRACTS.md)
-§2, §4).
+at the offramp date. The endpoint is `POST /mcp`; the handler is
+`createMcpHandler(api, { context(req), maxBodyBytes? })` — the host authenticates and hands it a
+`CallContext`, or a ready refusal `Response`; there is no `decls` parameter, because the register list
+is one `api.index` read at `tools/list`. The handler imports only the `RecordApi` **type** from
+`@braindog/record`, sits above it in the build order, and is testable with a stub — hand-rolled
+JSON-RPC, zero dependencies ([33-CONTRACTS](33-CONTRACTS.md) §2, §4; [31-STACK](31-STACK.md) §2;
+[44-SPEC-MCP](44-SPEC-MCP.md) §2).
 
 ---
 
@@ -54,8 +58,11 @@ there is no code path that reaches two records — the object boundary is the se
 
 Token scopes are coarse on purpose: `read`, `propose`, `write`. Not per-register. A capability
 matrix nobody can reason about is a capability matrix that gets set to "all". **There is no
-`admin` scope, ever** — the ADMIN and VAULT groups are a browser session only
-([ADR-060](16-DECISIONS.md)), and a bearer at one of their routes gets `403 NEEDS_BROWSER_SESSION`.
+`admin` scope, ever.** VAULT is a browser session only. ADMIN is a browser session — or a bearer
+carrying an **operation grant**: one named operation the owner approved from a browser session after
+seeing its summary, single-use, ten minutes, reaching exactly that method once
+([12-SECURITY](12-SECURITY.md) §3, [ADR-060](16-DECISIONS.md)). A bearer at either group's routes
+without one gets `403 NEEDS_BROWSER_SESSION`; over MCP every token is refused (§8).
 
 ---
 
@@ -72,7 +79,7 @@ choose between. Instead:
 | Tool | Shape | Count |
 |---|---|---|
 | `record_index` | the orientation call. Registers, counts, open questions, what changed | 1 |
-| `search` | FTS5 + vector over everything the token can read | 1 |
+| `search` | FTS5 + vector over everything the token can read; `vec` is the caller's own query embedding — the record never embeds on a read | 1 |
 | `get` | fetch one row: `{ spoken }` \| `{ register, seq }` \| `{ id }`, plus an optional `path` into it | 1 |
 | `list` | a register plus a `where:` and a projection | 1 |
 | `create` / `update` | typed writes against a named register; `update` carries the row's `version` and a client `op_id` | 2 |
@@ -88,16 +95,20 @@ fetched as resources when needed.
 DATA group in [30-BLUEPRINT](30-BLUEPRINT.md) §5 — the tool name carries the noun because a bare
 `index` reads as a verb in a tool list. The other seven tools share their method's name. Every
 method takes `(args, ctx)` and returns the `Result<T>` envelope of [33-CONTRACTS](33-CONTRACTS.md)
-§2; over HTTP a refusal is `422 { refusals }` and a conflict is `409 { conflict }`.
+§2; over HTTP a refusal is `422 { refusals }` and a conflict is `409 { conflict }`; over MCP a refusal
+is an error result carrying the same `code` and `fix`, and a call outside its published schema is the
+protocol's `-32602` — a vocabulary, not a refusal code ([30-BLUEPRINT](30-BLUEPRINT.md) §6).
 
 This is the central design decision of the MCP surface and it exists because of §4.
 
 ### `tools/list_changed`
 
-Emitted on pack install, uninstall or upgrade. The eight tools do not change, but their
-*descriptions* embed the customer's register list, and that list does. A client that cached the
-tool list gets told to refetch rather than calling `list(register: "invoices")` against a record
-that no longer has one.
+Not pushed — the server is stateless — but carried in the response that proves the cache stale: a
+`REGISTER_UNKNOWN` after an uninstall, or a register added within `ttlMs`. The eight tools do not
+change, but `list`'s description embeds the customer's register list — once, capped at 24 ids, never
+as a schema `enum` — and that list does. A client that cached the tool list gets told to refetch
+rather than calling `list(register: "invoices")` against a record that no longer has one
+([44-SPEC-MCP](44-SPEC-MCP.md) §5).
 
 ---
 
@@ -137,25 +148,28 @@ every context window. Registers are arguments; schemas are resources fetched on 
 ```
 
 ~350 tokens. It is enough to orient and deliberately not enough to quote from — which is the
-point: an agent that needs a figure asks for the figure.
+point: an agent that needs a figure asks for the figure. `open` counts rows in non-terminal states —
+`0` for a register without `transitions:` — and each register's `fields` lists `{ id, type }` only
+([45-SPEC-RECORD](45-SPEC-RECORD.md) §5).
 
 **3 · `ttlMs` on every list.** `tools/list` gets `ttlMs: 3600000` and `cacheScope: "record"`.
-Combined with `tools/list_changed` on install, the client refetches when something actually
-changed and not otherwise. This also keeps the client's *upstream prompt cache* stable across
+Combined with `list_changed` riding the response that proves the cache stale (§3), the client
+refetches when something actually changed and not otherwise. This also keeps the client's *upstream prompt cache* stable across
 reconnects, which the 2026-07-28 spec calls out explicitly as a goal of the field.
 
 ### Measured budget targets
 
 | Item | Target | Why |
 |---|---|---|
-| `tools/list` total | **< 1,800 tokens** | it is in every turn of every session |
+| `tools/list` total, `instructions` included | **< 1,800 tokens** | it is in every turn of every session |
 | One tool description | < 200 tokens | forces the description to say when to use it, not how it works |
 | `record_index` response | < 500 tokens | the first call of every session |
 | A `list` response, default page | < 2,000 tokens | 25 rows, projected, not whole documents |
 | A `get` on a document row | full | if you asked for the document, you want the document |
 
-These are asserted in CI by counting tokens on a fixture record. A budget nobody measures is a
-budget that drifts.
+These are asserted in CI by `tokenBudget` over the `corpus` fixture record
+([44-SPEC-MCP](44-SPEC-MCP.md) §5.8), the numbers read from `budgets.json`
+([18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6). A budget nobody measures is a budget that drifts.
 
 
 ### Three read levels, and a scope
@@ -248,17 +262,24 @@ standards-track way to do it.
 | **`sessions/live`** | who else is working, on what, and **`same_repo`** — the list the SessionStart hook prints with *"two sessions in one working tree overwrite each other. Coordinate or stop."* |
 | **`learnings/for/<repo>`** | what earlier sessions worked out, ordered **method → fact, global → scoped, newest within each**, forty by default with `truncated` set honestly. The description carries the four-part test for what qualifies, because it is the thing agents most often get wrong |
 | **`boot`** | the first-screen read: index, live sessions, open suggestions, and everything since the read mark — one call |
+| **`whoami`** | who this token is, its scope and its record — what a new session reads first; `ttlMs` 0 |
+| **`rule-test/<id>`** | a rule's `when:` evaluated against live rows without applying it — the dry run; applying is `ruleApply`, ADMIN |
 
 **Every resource is backed by a method**, so [ADR-018](16-DECISIONS.md)'s rule holds by
 construction: `schema` `dialect` `whats-new` `digest/today` `page` `metric` `sessions/live`
-`learnings/for` and `boot` are the READ+ methods `schema(register)` `dialect()` `whatsNew(cursor)`
-`digestToday()` `page(slug)` `metric(id)` `sessionsLive()` `learningsFor(repo)` `boot()` of
-[30-BLUEPRINT](30-BLUEPRINT.md) §5; `decisions` alone is `list(decision)` under DATA. A resource
+`learnings/for` `boot` `whoami` and `rule-test` are the READ+ methods `schema({ register })`
+`dialect()` `whatsNew({ cursor })` `digestToday()` `page({ slug })` `metric({ id })` `sessionsLive()`
+`learningsFor({ repo })` `boot()` `whoami()` `ruleTest({ id, against })` of
+[30-BLUEPRINT](30-BLUEPRINT.md) §5; `decisions` alone is `list({ register: 'decision' })` under DATA —
+`decision`, `suggestion` and `prediction` are DATA pseudo-registers, read by `list`/`get` and moved by
+`update` ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5), and the move that decides stays a person's act
+(§5). URIs are `braindog:<path>`; `page`, `metric`, `learnings/for`, `whats-new` and `rule-test` are
+templates; every resource carries `ttlMs` — the table is [44-SPEC-MCP](44-SPEC-MCP.md) §4.7. A resource
 with no method behind it is a design error.
 
 > **The last two close a hole [ADR-018](16-DECISIONS.md) would otherwise have called a design
 > error.** Its rule is *"any screen that needs an endpoint no agent can call is a design error"* —
-> and the web app's page render is `GET /api/pages/:slug`, which **no tool in §3 can reach.** Every
+> and the web app's page read is `page({ slug })`, which **no tool in §3 can reach.** Every
 > declared page and every figure on it was invisible to every agent.
 >
 > **The fix is a resource, not a ninth tool**, and that is not a dodge — it is what the distinction
@@ -313,7 +334,7 @@ The rules that fall out:
 
 | Limit | Where | Value |
 |---|---|---|
-| Requests per token | Worker, on `Mcp-Name` | 600/min, burst 60 |
+| Requests per token | the host, keyed by the token's hash — `Mcp-Name` names the tool in telemetry, never in a decision ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5) | 600/min, burst 60 |
 | Writes per token | Worker | 120/min |
 | Model-backed calls per record | **AI Gateway** | budgeted monthly, see [08-METRICS](08-METRICS-AND-ANALYTICS.md) §6 |
 | Payload size | Worker | 1 MB |
@@ -322,7 +343,7 @@ The rules that fall out:
 A runaway agent loop is the realistic failure — not an attacker. It is bounded at the gateway
 rather than by trusting a client, and the customer sees it in their own activity feed with the
 token named, because *"which of my agents did 4,000 calls last night"* is a question they will
-ask.
+ask. A limit answers a bare `429` with `Retry-After`; no refusal code is minted for it.
 
 
 ### The refusal list, and the test that drives it
@@ -332,14 +353,16 @@ reason an agent reads: deciding a suggestion (*"deciding is Sam's, never an agen
 import, every sign-in route (*"registering a passkey would mint a permanent way in that he never
 approved"*), the job surface (*"arbitrary code execution … ask Sam to run it from Spark"*), and every
 vault route (*"the highest-value thing prompt injection could ask for"*). BrainDog's equivalents are
-three RPC groups in [30-BLUEPRINT](30-BLUEPRINT.md) §5, each refused to every MCP token **with a
-reason**, plus `by: decide` on the transitions that need a person:
+the four RPC groups outside DATA and READ+ in [30-BLUEPRINT](30-BLUEPRINT.md) §5 — forty-three of
+the sixty-four methods — each refused to every MCP token **with a reason**, plus `by: decide` on the
+transitions that need a person. `markRead`, alone in DATA, answers a person principal only:
 
 | Group | Methods | The reason an agent reads |
 |---|---|---|
-| **VAULT** | `listGrants` `openGrant` `bindGrant` `revokeGrant` | *a credential is the highest-value thing prompt injection could ask for* — a browser session only; every token gets `403 NEEDS_BROWSER_SESSION` |
-| **JOBS** | `createJob` `cancelJob` `listJobs` (a browser session) · `claimJob` `postJobEvent` `readCancel` (the runner's device grant) | *a job is code execution on a machine* — the predecessor's job-surface refusal, [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2 |
-| **ADMIN** | `planPack` `installPack` `uninstallPack` `setDeclaration` `invite` `export` `import` `erase` `restore` | *installing a pack or erasing a record is the owner's act* — a browser session only; no `admin` token exists |
+| **VAULT** (4) | `listGrants` `openGrant` `bindGrant` `revokeGrant` | *a credential is the highest-value thing prompt injection could ask for* — a browser session only; every token gets `403 NEEDS_BROWSER_SESSION` |
+| **JOBS** (7) | `createJob` `cancelJob` `listJobs` `jobEvents` (a browser session) · `claimJob` `postJobEvent` `readCancel` (the runner's device grant) | *a job is code execution on a machine* — the predecessor's job-surface refusal, [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2 |
+| **ADMIN** (16) | `planPack` `installPack` `uninstallPack` `setDeclaration` `ruleApply` `invite` `export` `import` `erase` `restore` `snapshot` `createToken` `listTokens` `revokeToken` `deviceApprove` `deleteRecord` | *installing a pack or erasing a record is the owner's act* — a browser session, or an operation grant the owner approved from one (§2); never an MCP token, and no `admin` scope exists |
+| **INTERNAL** (16) | `drainSchedule` `leaseOutbox` `ackOutbox` `observe` `applyMigrations` `createRecord` `arrive` `ingestVerify` `applyPull` `sealedGrant` `changed` `acceptInvite` `deviceStart` `devicePoll` `rewrapKeys` `opsReport` | *the host's own machinery* — an outbox lease or a migration is not a thing an agent does; only the host calls these |
 
 Three things carry over as **tests**, not prose:
 
@@ -350,8 +373,9 @@ Three things carry over as **tests**, not prose:
 | **The tool surface has a ceiling** | the predecessor caps the whole tool listing at ~4,900 tokens by test; **BrainDog's sum is §4's 1,800**, and this test asserts that number. §4's budgets are the same idea per tool; this one is the sum |
 
 And the server's `instructions` — returned with every `tools/list` under the same `ttlMs`, since
-2026-07-28 has no initialise step — ~300 tokens — carry the contract every tool description would
-otherwise repeat: minor units; **on a 409, re-read the row and re-apply — the body names who changed
+2026-07-28 has no initialise step, and counted inside §4's 1,800 — carry the contract every tool
+description would otherwise repeat (the exact text is [44-SPEC-MCP](44-SPEC-MCP.md) §4.6): minor
+units; **on a 409, re-read the row and re-apply — the body names who changed
 it** (there is no 412, and there is no whole-document copy to resend: an earlier draft carried the
 predecessor's *"re-read on a 409, never resend"*, which is a whole-document CAS rule); a credential
 never goes in the record; log every material change as one sentence a human reads in six weeks;

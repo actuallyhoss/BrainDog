@@ -56,6 +56,12 @@ with a tool that ships with macOS.
 registry in the SQLite source's `magic.txt`. Setting it means `file(1)` names the format and any
 tool can refuse a file that is not one, before reading a byte of content.
 
+Inside a Durable Object the two PRAGMAs are **best effort** — whether they take is measured by a
+conformance case, never assumed — so the format number that is authoritative is the one written three
+ways as data: `record.format_ver`, `dog_meta.format` and the `#dogl` header line. The CLI and the
+self-host set both PRAGMAs when they materialise a `.dog` ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.2,
+[48-SPEC-CLI](48-SPEC-CLI.md) §5.5).
+
 ### Why not a zip container
 
 `.docx`, `.epub` and `.sketch` are zips. It is a perfectly good design and it is wrong here:
@@ -82,9 +88,11 @@ that cannot drift from its source is worth more than a format that is prettier.*
 > comments that *"we do not support attached databases. It seems unlikely that we ever will."*
 > `VACUUM INTO` needs a second database and is expected to fail for the same reason.
 >
-> **So the record never writes a SQLite file. It streams a canonical logical dump** — `.dogl`: header
-> lines, then one JSON line per row, tables in `dog_section` order, in pages of ≤ 1,000 rows through
-> `export(cursor)` — and the `.dog` is **materialised outside the object** by something that has a real
+> **So the record never writes a SQLite file. It streams a canonical logical dump** — `.dogl`: a
+> `#dogl <format>` first line, which is the magic a reader checks, then for each table a `#table` header
+> and one JCS array per row — header tables first, `dog_sig` last, `local` omitted — in pages of ≤ 1,000
+> rows through `export(cursor)`. The line format has one home, [41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.10,
+> and every other spec cites it. The `.dog` is **materialised outside the object** by something that has a real
 > SQLite: `braindog export` on the CLI, and the self-host, which is writing to disk anyway. Cloud's
 > nightly R2 backup is the dump sealed with age, `.dogl.age`. The property survives intact because both
 > containers carry the *same tables and the same rows* under the *same manifest*; what changes is
@@ -102,7 +110,7 @@ that cannot drift from its source is worth more than a format that is prettier.*
 
 | | `.dog` | `.dogl` |
 |---|---|---|
-| Is | the SQLite file this document is about | the canonical logical dump: header lines, one JSON line per row, tables in `dog_section` order |
+| Is | the SQLite file this document is about | the canonical logical dump of [41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.10: `#dogl` first, one JCS array per row, tables in section order, `dog_sig` last |
 | Made by | the CLI and the self-host, from a `.dogl` or from a live file | the record, streamed in pages of ≤ 1,000 rows |
 | Opens with | `sqlite3` | any text tool |
 | Signed over | the same `dog_manifest` | the same `dog_manifest` |
@@ -122,7 +130,7 @@ is a property of each table, declared in `dog_section` so a reader can project w
 table names.
 
 ```sql
-CREATE TABLE dog_meta     (key TEXT PRIMARY KEY, value TEXT NOT NULL);   -- format, created_at, producer, record_slug, tz, locale
+CREATE TABLE dog_meta     (key TEXT PRIMARY KEY, value TEXT NOT NULL);   -- format, created_at, producer, record_slug, tz, locale — no export timestamp
 CREATE TABLE dog_section  (table_name TEXT PRIMARY KEY,
                            section TEXT NOT NULL CHECK (section IN ('data','origin','governance','local','header')));
 CREATE TABLE dog_manifest (table_name TEXT PRIMARY KEY, rows INTEGER NOT NULL, sha256 TEXT NOT NULL);
@@ -130,8 +138,9 @@ CREATE TABLE dog_sig      (alg TEXT NOT NULL CHECK (alg = 'ed25519'), key_id TEX
                            public_key TEXT NOT NULL, sig TEXT NOT NULL, signed_at TEXT NOT NULL);
 ```
 
-`dog_manifest` and `dog_sig` are refreshed by an export and sit **empty in a live DO**. The fifth
-section, **`local`, never travels**: `token`, `device_grant`, `auth_fail`, `observation`, `job`,
+`dog_manifest` and `dog_sig` are refreshed by an export and sit **empty in a live DO**; `dog_meta`
+carries no export timestamp — that is `dog_sig.signed_at` — so an unchanged record exports identical
+bytes. The fifth section, **`local`, never travels**: `token`, `device_grant`, `auth_fail`, `observation`, `job`,
 `job_event` — six tables that are either lockouts and bearer hashes, or telemetry and transient work that is
 the record's business and nobody else's. **`vault_key` travels, sealed**: a wrapped key opens nothing without
 the root KEK it is wrapped by, and a backup a record can be restored from must carry it, or the sealed grants
@@ -161,10 +170,13 @@ It does not claim: the contents are true, or that we vouch for a third party's f
 
 The private key lives in the record's own vault — `vault_key(purpose = 'signing')`, wrapped like the
 DEK ([12-SECURITY](12-SECURITY.md) §6) — and is generated on first run, self-host and Cloud alike.
-Cloud shows the public half in the UI and serves it at a well-known URL, so a customer can verify a
-backup they downloaded a year ago against a key they can independently fetch.
+Cloud shows the public half in the UI and serves it at a well-known URL — `GET /.well-known/braindog-key`
+→ `{ key_id, public_key }`, on both hosts — so a customer can verify a backup they downloaded a year ago
+against a key they can independently fetch.
 
-Verification is offline and dependency-free, and accepts either container:
+Verification is offline and dependency-free, and accepts either container. `--key` is optional: without
+it the signature is checked against the key the file carries and reported as **`unpinned`**, which is a
+weaker claim and says so ([48-SPEC-CLI](48-SPEC-CLI.md) §5.6):
 
 ```
 braindog verify portfolio.dog --key <pubkey|url>
@@ -197,7 +209,7 @@ never be:
   record can read its own vault; a thief with the file cannot.
 
 ```
-braindog export --with-grants    # requires the passphrase, re-wraps to a passphrase-derived key
+braindog export --with-grants    # requires the passphrase, re-wraps to a passphrase-derived key — CLI: later (48 §10)
 braindog export                  # default: grants present but sealed
 braindog export --redact-grants  # grant rows kept, ciphertext dropped entirely
 ```
@@ -219,7 +231,7 @@ Five operations. Each one is a promise from D41 made mechanical.
 |---|---|---|
 | **Leave** | `braindog export` | Complete. Not a CSV dump — the running record, packs and history included. There is no lock-in to argue about |
 | **Arrive** | `braindog import portfolio.dog` | Into Cloud or a self-host. Same file both directions |
-| **Back up** | Cloud: nightly `.dogl.age` to R2, 30 days. Self-host: the `Snapshots` port — nightly `VACUUM INTO` (permitted there) + sign, keep 30 | Cloud additionally has platform PITR at any point in 30 days |
+| **Back up** | Cloud: nightly `.dogl.age` to R2 under the record's own prefix, 30 days — so deleting a record is one prefix. Self-host: the `Snapshots` port — nightly `VACUUM INTO` (permitted there), keep 30 | Cloud additionally has platform PITR at any point in 30 days. **A snapshot is not an export**: it is a full copy that keeps the six `local` tables and never leaves the host — disaster recovery, not portability. An export is the `.dog` without them ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.4, [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md)) |
 | **Fork** | `braindog export --sections governance` | Governance alone *is* a pack. This is how a way of working gets shared — see [04-PACKS](04-PACKS.md) |
 | **Audit** | `braindog export --sections origin` | Hand an accountant the provenance without the data |
 
@@ -230,7 +242,7 @@ Five operations. Each one is a promise from D41 made mechanical.
 | Who | the record streams `.dogl` pages of ≤ 1,000 rows through `export(cursor)`; the CLI or the self-host writes the `.dog` | `import`, into an **empty** record only (`IMPORT_NOT_EMPTY`) |
 | Checks | signs the manifest with `vault_key(purpose = 'signing')` | verifies signature and manifest; refuses a `user_version` above its own (`FORMAT_NEWER_THAN_READER`) |
 | Rows | every table not in `local`; grants sealed unless `--redact-grants` | tables copied in batches of ≤ 30 rows × ≤ 3 params; `entry_fts` rebuilt from `entry`; one `import` event |
-| Not | the six `local` tables | the write path — this is *"no import that bypasses validation"*, not a replay of every write. `restore(bookmark)` is PITR-only |
+| Not | the six `local` tables | the write path — this is *"no import that bypasses validation"*, not a replay of every write. `restore` is PITR-only and one ADMIN method — on Cloud the Worker performs the platform's point-in-time step before calling it ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.14) |
 
 The full procedure, both directions, is [33-CONTRACTS](33-CONTRACTS.md) §9.
 
@@ -249,7 +261,7 @@ Three numbers, one home each — and an earlier draft had them sharing a slot:
 
 | Number | Lives in | At v1 | Moves when |
 |---|---|---|---|
-| the `.dog` **format revision** | `PRAGMA user_version`, mirrored in `record.format_ver INTEGER` for a reader without PRAGMA access | **1** | an older reader would **misread** the file — a migration file carrying `-- format-bump` |
+| the `.dog` **format revision** | `record.format_ver INTEGER`, `dog_meta.format` and the `#dogl` header — authoritative; `PRAGMA user_version` carries the same number, set by the CLI and the self-host when they materialise a file and best effort inside the record (§2) | **1** | an older reader would **misread** the file — a migration module carrying `-- format-bump` |
 | the **kernel migration number** | `MAX(migration.version)` | 1 | every applied kernel migration ([02-DATA-MODEL](02-DATA-MODEL.md) §7) |
 | the **primitives version** | `PRIMITIVES_VERSION` in the renderer | 1 | the eight primitives change ([31-STACK](31-STACK.md) §6) |
 
@@ -286,8 +298,10 @@ Instead: attachments live in R2 (Cloud) or on disk (self-host), keyed by
 > only turns up by thinking about it. Keys are `rec_<id>/<sha256>`, always, and dedupe is
 > per-record only.
 
-`braindog export --with-attachments` produces `portfolio.dog` plus `portfolio.dog.files/`, and
-the manifest hashes the set so a missing attachment is detectable rather than silent.
+`braindog export --with-attachments` produces `portfolio.dog` plus `portfolio.dog.files/<sha256>`, one
+file per digest, and **the content address is the check**: a `file` field names its bytes by SHA-256, so
+a missing or altered attachment is detectable rather than silent, and nothing is added to the signed
+manifest ([48-SPEC-CLI](48-SPEC-CLI.md) §5.4). *(An earlier draft had the manifest hash the set.)*
 
 ### What refers to one, which an earlier draft never said
 
@@ -300,7 +314,9 @@ got a list of hex digests. [02-DATA-MODEL](02-DATA-MODEL.md) §5 now has `file`:
 ```
 
 The field holds the digest; the bytes are in R2 under the record's prefix; a first-party
-`/a/<sha256>` route serves them. **That route is same-origin, which is the distinction the
+`GET /a/<sha256>` route serves them and `PUT /a/<sha256>` uploads them — the client names the hash, the
+server verifies it, and a mismatch is `CHECKSUM_MISMATCH` ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.5,
+[12-SECURITY](12-SECURITY.md) §8). *(An earlier draft had a store and no way in.)* **That route is same-origin, which is the distinction the
 security rule always turned on** — [04-PACKS](04-PACKS.md) §7 bans a *remote* asset because a
 remote image URL is a callback carrying the record id, and it explicitly permits same-origin
 paths. Attachments were deferred on cost, and the deferral was later read back as a position.
@@ -310,7 +326,7 @@ Two consequences for this format:
 | | |
 |---|---|
 | A `.dog` stays a text database | the 2 MB row ceiling is never in play, and `sqlite3` output stays readable |
-| An erasure ([02-DATA-MODEL](02-DATA-MODEL.md) §10) deletes the R2 key **and** leaves the manifest able to say so | a missing attachment is already detectable rather than silent, which turns out to be exactly the behaviour a lawful deletion needs |
+| An erasure ([02-DATA-MODEL](02-DATA-MODEL.md) §10) deletes the R2 key **and** the `file` field still names the digest | a missing attachment is already detectable rather than silent, which turns out to be exactly the behaviour a lawful deletion needs |
 
 ---
 

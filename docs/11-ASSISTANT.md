@@ -86,7 +86,15 @@ Full architecture, costs, the terms-of-service position and the runner protocol:
 
 The enforcement is architectural, not a prompt instruction: **Spark runs in a separate Durable
 Object with no write RPC.** There is no write path to compromise. A perfect jailbreak of the model
-yields a proposal, and a proposal is a row in `suggestion` that a human has to accept.
+yields a proposal, and a proposal is a row in `suggestion` that a human has to accept — filed once,
+by `record.propose`; an `infer.*` ack carries a tier-A result back and files nothing itself
+([46-SPEC-SPARK](46-SPEC-SPARK.md) §5; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5). A write from a
+`spark` principal is `FORBIDDEN` at the record's first step ([30-BLUEPRINT](30-BLUEPRINT.md) §3).
+Spark's own storage is two tables, `settings` and `call` — no conversation table, no retrieval
+cache; the drafted predicate sits on the `call` row and nothing accumulates
+([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.1). Its refusals are one family of five codes —
+`PROPOSAL_UNCITED` `PROPOSAL_NO_ROWS` `PROPOSAL_SCHEMA` `PREDICTION_UNMEASURABLE`
+`SPARK_BUDGET_SPENT` — each with a fixture ([30-BLUEPRINT](30-BLUEPRINT.md) §6).
 
 This is the single most important design decision about the assistant, and it is worth the
 inconvenience it causes.
@@ -100,9 +108,9 @@ too weak for conversation. Prices from Workers AI, read 2026-08-31, at $0.011 pe
 
 | Job | Model | Why | $/M in | $/M out |
 |---|---|---|---|---|
-| Triage: is this raw payload a known shape? | `llama-3.2-1b` | binary-ish classification with a 1.5k prompt | 0.027 | 0.201 |
+| Triage: is this raw payload a known shape? | `llama-3.2-1b` | binary-ish classification with a 1.5k prompt; the `shape` itself is deterministic — channel, sender domain, digit-blanked subject — and the model contributes `kind` and `actionable` only ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5) | 0.027 | 0.201 |
 | Extraction proposal from 3 examples | **`glm-5.3-flash`** | needs to reason over structure and emit YAML | **0.150** | **0.500** |
-| Conversation and proposals | **`glm-5.3-flash`** | tool calling, and the cheapest model that is good enough to talk to | **0.150** | **0.500** |
+| Conversation and proposals | **`glm-5.3-flash`** | schema-constrained structured output over a projection, and the cheapest model that is good enough to talk to | **0.150** | **0.500** |
 | Long write-up drafting | `glm-5.3` *(opt-in)* | quality where the output is read many times | 1.400 | 4.400 |
 | Embeddings | `bge-m3` | multilingual — the record holds Arabic and English | 0.0118 | — |
 | Digest prose | `llama-3.2-1b` | two sentences over pre-computed figures | 0.027 | 0.201 |
@@ -118,8 +126,9 @@ too weak for conversation. Prices from Workers AI, read 2026-08-31, at $0.011 pe
 > cheaper than `llama-3.2-1b` for triage. Cheaper is not better at classification if it costs
 > accuracy, and the eval suite in §9 is what decides it — not this table.
 
-Function calling is supported across the current Workers AI catalogue including all of the above,
-so the routing is not constrained by tool support the way it was a year ago.
+Function calling is supported across the current Workers AI catalogue including all of the above —
+moot here, because **no Spark call passes `tools`** (§6): what the routing needs is schema-constrained
+structured output, which every model above supports.
 
 ### Everything goes through AI Gateway
 
@@ -147,10 +156,16 @@ second tier a config row rather than a project.
 > is decrypted in the Worker, and is passed as the provider auth header through gateway
 > passthrough. Same caching, same rate limiting, same cost tracking, no ceiling.
 
+Per ask, the host opens that grant under the asker's browser session, decrypts in the Worker, hands
+Spark a per-call `Inference` adapter and writes one `grant.read` event — the package never holds the
+key ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9; [12-SECURITY](12-SECURITY.md) §6).
+
 **With no model configured the product still works.** Every deterministic feature — registers,
 pages, metrics, declared ingests, rules, digests, search, the decision gate, MCP — runs with zero
-inference. Spark is an accelerant, never a dependency. A record that stops working because a
-model endpoint is down is not a record.
+inference. `SPARK_ENDPOINT` unset means the host never imports the package and registers no Spark
+route; `GET /api/version` answers `spark: false` and the client draws nothing
+([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.1). Spark is an accelerant, never a dependency. A record that
+stops working because a model endpoint is down is not a record.
 
 ---
 
@@ -167,9 +182,11 @@ Modelled per active record per month (full table in [08-METRICS](08-METRICS-AND-
 The risk is the tail, not the average. Four mitigations in order of effectiveness: gateway rate
 limiting, gateway caching, model routing, and a **visible monthly neuron budget per record**.
 
-When the budget is spent, Spark says so and everything deterministic keeps working. **Degrade,
-never bill by surprise** — and never silently downgrade the model, because a quietly worse answer
-is worse than a refusal.
+The budget is metered in **asks** — `ask_cap` per record per month, refused `SPARK_BUDGET_SPENT`
+past it ([46-SPEC-SPARK](46-SPEC-SPARK.md) §6), and the UI counts the same unit
+([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8). When it is spent, Spark says so and everything
+deterministic keeps working. **Degrade, never bill by surprise** — and never silently downgrade the
+model, because a quietly worse answer is worse than a refusal.
 
 ### What that budget actually buys, which the margin figure hides
 
@@ -248,12 +265,13 @@ Spark's prompt is assembled from four parts, in this order, with a hard token bu
 | Retrieved rows | 6,000 | projected, not whole documents. Each carries its id so it can be cited |
 | Conversation | 4,000 | rolling, summarised past that |
 
-~11,000 tokens of prompt plus tool-call headroom — modelled as 12k in / 1.5k out, the shape §4 prices — so at `glm-5.3-flash` a turn is **$0.00255**, which is the conversation line in [08-METRICS](08-METRICS-AND-ANALYTICS.md) §6. Three rules:
+~11,000 tokens of prompt plus the output schema — modelled as 12k in / 1.5k out, the shape §4 prices — so at `glm-5.3-flash` a turn is **$0.00255**, which is the conversation line in [08-METRICS](08-METRICS-AND-ANALYTICS.md) §6. **No Spark inference passes `tools`**: every call is schema-constrained structured output, and retrieval is `project()` — the budget counts ≈ tokens as `ceil(utf8 bytes / 4)` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5; [45-SPEC-RECORD](45-SPEC-RECORD.md) §4.4). Three rules:
 
 **1 · Rows are projected, never dumped.** A retrieved obligation is `obligations#7 | Cloudflare
 Workers Paid | USD 5.00 | due 2026-09-01 | open`, not its JSON — the id carries its register, because
-every register has a `#1`, and money prints as code, space, amount. The document field comes only if the question
-is about the document.
+every register has a `#1`, and money prints as code, space, amount. A `series: true` row is never
+projected — it has no spoken id — and in v1 no document body is either
+([45-SPEC-RECORD](45-SPEC-RECORD.md) §4.4).
 
 **2 · Every row in context carries its spoken id**, so every claim can be cited back to a row and
 the UI can link it. A figure Spark states without a citable id is rendered as *uncited* — see
@@ -277,7 +295,7 @@ the third and weaken the second.
 | **No write capability** | a compromised prompt yields a *proposal*. The gate is a separate, human-driven code path |
 | **No credential access** | there is no tool that returns a secret. Not gated — absent |
 | **Quarantine** | raw ingested content lives in `inbox_raw` marked untrusted. It is fenced in the prompt, and the instruction says content inside the fence is data to describe, never instructions to follow |
-| **Dual-context** | the model that *reads untrusted content* runs with **no tools at all** and can only emit a structured proposal. The model that holds tools never sees raw untrusted text — only the structured output of the first |
+| **Dual-context** | the model that *reads untrusted content* can only emit a structured proposal; the model that drafts against the projection never sees raw untrusted text — only the structured output of the first. Neither holds a tool: no Spark inference passes `tools` (§6) |
 | **Egress filtering** | Two layers, because the gateway cannot do it alone. **Ours:** a redaction pass over every projection before it enters a prompt — grant ciphertext never leaves the record, and `secret`-typed fields are replaced by their label. **Theirs:** AI Gateway DLP blocks a request whose prompt trips a sensitive-data profile. DLP offers only *flag* and *block*, never redact, so it is a tripwire and not the control |
 | **Human gate on anything derived from untrusted input** | a write whose provenance chain touches `inbox_raw` cannot be applied without approval. Enforced by provenance, not by a heuristic |
 | **Audit** | every proposal records what it read. A suspicious proposal is traceable to the payload that produced it |

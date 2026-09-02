@@ -12,19 +12,21 @@ after the bundle shipped* — was built and timed before being recommended.
 > layout primitives — not 16 components, and never per-page code.** A third-party block kind is a
 > *named composition of primitives shipped as data*. Tables are CSS grid with **declared** column
 > tracks and chunked `content-visibility`, never `<table>`. Live updates ride a hibernatable
-> WebSocket carrying only a version integer.
+> WebSocket carrying only a version and the names of the registers that changed.
 
 **Measured, on a working prototype:**
 
 | | |
 |---|---|
 | The full recursive interpreter, client | **19.3 KB brotli** |
-| SSR of a **third-party** pack kind with 400 rows | **0.6 ms** |
-| SSR of a 6-block page, 100 rows each | **0.84 ms** |
+| Server render of a **third-party** pack kind with 400 rows | **0.6 ms** |
+| Server render of a 6-block page, 100 rows each | **0.84 ms** |
 | Marginal cost of one more block kind | **0.175 KB brotli for the first eight; ~0.03–0.04 for every kind after** — compression amortises the repetition |
 | htmx 2.0.10 alone, for comparison | 14.6 KB brotli — *and it renders nothing* |
 
-The whole declared-page renderer costs **1.3× htmx by itself**.
+The whole declared-page renderer costs **1.3× htmx by itself**. The server-render rows were
+measured through `svelte/server`'s `render()`; the shipped app is a static shell that hydrates (§2),
+so they now price the parity gate, not a request.
 
 ---
 
@@ -84,12 +86,16 @@ kind.** 100 kinds is 22.2 KB in one chunk; splitting adds a request per block an
 ### Two hard constraints on the pick
 
 1. **No per-page code, ever.** One interpreter. If a page needs code, the primitive set is wrong.
-2. **`render()` from `svelte/server` is the app's only SSR entry point** (`entry-ssr.ts`), called
-   from a thin handler. The published `braindog-render` package additionally exports a framework-free
-   `toHTML` at its root (with `parse` · `expand` · `PRIMITIVES`) and the Svelte interpreter at
-   `braindog-render/svelte`, with a test asserting both produce the same accessibility tree —
-   [31-STACK](31-STACK.md) §2, [ADR-045](16-DECISIONS.md). The
-   app must not be welded to SvelteKit's data-loading conventions — **SvelteKit is at
+2. **The web app is a static shell.** `adapter-static` (`fallback: 'index.html'`, `ssr = false`)
+   builds one `build/` that both hosts serve unchanged; no server renders a request, and there is no
+   `@braindog/web/node` handler. `render()` from `svelte/server` is called by the `a11y-tree` parity
+   gate alone — the test asserting that the Svelte interpreter at `braindog-render/svelte` and the
+   framework-free `toHTML` at the package root produce the same accessibility tree. `toHTML` serves
+   the mirror, exports, tests and the digest email — it is not SSR. The root exports are `parse` ·
+   `toHTML` · `render` · `KINDS` · `PRIMITIVES` · `PRIMITIVES_VERSION`; `expand` is not exported at
+   stage 0, because kinds expansion is `declare`'s — [31-STACK](31-STACK.md) §2,
+   [ADR-045](16-DECISIONS.md), [50-SPEC-WEB](50-SPEC-WEB.md) §2, [36-SPEC-RENDER](36-SPEC-RENDER.md)
+   §2. The app must not be welded to SvelteKit's data-loading conventions — **SvelteKit is at
    `3.0.0-next.25` against stable 2.70.3**, so a major is coming, and this keeps the migration to
    routing files.
 
@@ -111,10 +117,10 @@ kind.** 100 kinds is 22.2 KB in one chunk; splitting adds a request per block an
 > **A block kind is not code. It is a named composition of primitives, plus a query.**
 
 The client ships an interpreter for the **primitives** — a closed, versioned set — and never for
-the **kinds**. A pack adding `burnRate` ships one `block` declaration — a tree of primitives:
+the **kinds**. A pack adding `burn_rate` ships one `block` declaration — a tree of primitives:
 
 ```yaml
-- block: burnRate
+- block: burn_rate
   primitive: panel
   accepts: { source: register, target: number }
   body:
@@ -133,14 +139,20 @@ the **kinds**. A pack adding `burnRate` ships one `block` declaration — a tree
 ```
 
 Three rules the example obeys. **A `block` is one declaration**, like `- register:` or `- page:`
-([04-PACKS](04-PACKS.md) §1), addressed as `block.burnRate`; an earlier draft wrote a `kinds:` root
-that exists nowhere else. **`$source` and `$runway` are the block's `accepts:` names**, substituted as
-whole nodes — the same rule as pack inputs ([21-AUTHORING](21-AUTHORING.md) §9) — never spliced into a
-string. **`columns` is the page grammar's list of `{ field, label?, width?, align?, link? }`**
-([06-PAGES](06-PAGES.md) §1.1); the `k`/`w` shorthand an earlier draft used is gone. The sixteen
-first-party kinds ship in the same data format under `packages/render/kinds/*.json` — JSON, because
-the package is zero-dependency and cannot parse YAML — so first-party and third-party kinds take one
-code path ([34-GRAMMARS](34-GRAMMARS.md) §2.4); `PRIMITIVES_VERSION = 1` at stage 0.
+([04-PACKS](04-PACKS.md) §1), addressed as `block.burn_rate` — block ids follow the declaration `Id`
+grammar, so `burn_rate`, never `burnRate` ([34-GRAMMARS](34-GRAMMARS.md) §4); an earlier draft wrote
+a `kinds:` root that exists nowhere else. **`$source` and `$runway` are the block's `accepts:`
+names**, substituted as whole nodes — the same rule as pack inputs ([21-AUTHORING](21-AUTHORING.md)
+§9) — never spliced into a string; and those names are legal keys on a page block of that kind, typed
+`register metric number text` ([06-PAGES](06-PAGES.md) §1.1). **`columns` is the page grammar's list
+of `{ field, label?, width?, align?, link? }`** ([06-PAGES](06-PAGES.md) §1.1); the `k`/`w`
+shorthand an earlier draft used is gone. The sixteen first-party kinds ship as one TypeScript table —
+`src/kinds.ts`, `as const`, a derived `Kind` union, in the shape a pack's `block` declaration takes
+(`body` and `accepts` join it when `declare` needs them) — so first-party and third-party kinds take
+one code path ([05-BLOCKS](05-BLOCKS-AND-THEMES.md) §1, [34-GRAMMARS](34-GRAMMARS.md) §2.4,
+[ADR-056](16-DECISIONS.md)); `PRIMITIVES_VERSION = 1` at stage 0. A pack kind is page-only at stage 0
+— not a fence in a write-up — so the dialect's fence regex stays `^[a-z]+`
+([34-GRAMMARS](34-GRAMMARS.md) §2.1).
 
 > ### An earlier draft of this example was wrong against the eight primitives, and the fix was a decision not a typo
 >
@@ -167,11 +179,11 @@ code path ([34-GRAMMARS](34-GRAMMARS.md) §2.4); `PRIMITIVES_VERSION = 1` at sta
 **Built and measured.** A single recursive component that imports itself and dispatches on the node
 type:
 
-- Rendered `kind: burnRate` — a kind the bundle had never heard of — with 400 rows, emitting
-  `data-kind="burnRate"` for pack-supplied styling. **401 `role="row"` elements verified.**
-- **SSR 0.6 ms.** Interpreter **19.3 KB brotli** — indistinguishable from the 15-hand-written-
+- Rendered `kind: burn_rate` — a kind the bundle had never heard of — with 400 rows, emitting
+  `data-kind="burn_rate"` for pack-supplied styling. **401 `role="row"` elements verified.**
+- **Server render 0.6 ms.** Interpreter **19.3 KB brotli** — indistinguishable from the 15-hand-written-
   component bundle at 19.0 KB (§2's measured row).
-- An unknown **primitive** degrades to one line: *`Block "reactorCore" needs a newer client.`* A
+- An unknown **primitive** degrades to one line: *`Block "reactor_core" needs a newer client.`* A
   label and what to do — not an explanation, not a metric.
 
 **Why this is a good deal rather than a compromise:**
@@ -250,9 +262,8 @@ So 5,000 rows costs **~833 ms of build on a mid-tier phone no matter what CSS yo
 | Rows | Strategy |
 |---|---|
 | ≤ 300 | grid rows, no chunking |
-| 300–2,000 | grid + chunked `content-visibility` |
-| 2,000–5,000 | same, **plus a visible cap**: *"showing 2,000 of 4,812"* |
-| > 5,000 | **do not render them.** Keyset-paginate in SQL, or virtualise behind an explicit action |
+| 300–2,000 | **200-row keyset pages** into rowgroups of 100 under chunked `content-visibility` |
+| > 2,000 | **the cap.** The DOM stops at 2,000 with the cap line — *"showing 2,000 of 4,812"* — and the way past it is a filter or an export. **No virtualisation, at any size** ([50-SPEC-WEB](50-SPEC-WEB.md) §5.2) |
 
 > **Design the product so a 5,000-row view is a report you export, not a page you scroll.**
 
@@ -275,10 +286,10 @@ express queries the pack system cannot declare, and then the web app has a capab
 storage is in-process, so N queries cost N in-thread SQLite calls and **zero** network hops:
 
 ```
-GET /api/pages/:slug        (one DO invocation)
+page({ slug })              (one DO invocation)
   page = readPage(slug)
   rows = { for each block: runRegister(source, where, projection, limit) }
-  → { page, rows, version, etag }
+  → { blocks[].{ rows, total, drawn, stale_at }, kinds, values, version }
 ```
 
 > **And that endpoint is exposed to agents too, as the MCP resource `page/<slug>`** — because
@@ -289,8 +300,9 @@ GET /api/pages/:slug        (one DO invocation)
 
 Fanning out per block would be N round trips and would burn the 1,000 req/s soft limit N× faster.
 
-**Streaming buys nothing on CPU** — a whole page renders in under 2.12 ms. Rule: stream at block
-granularity **only** when a block's projected row count exceeds ~200.
+**Streaming buys nothing** — a whole page renders in under 2.12 ms, and with no server render there
+is nothing to stream: `page()` answers once, with every block's rows, `total`, `drawn` and `stale_at`,
+the `kinds` the page needs and its values pre-resolved ([50-SPEC-WEB](50-SPEC-WEB.md) §5.1).
 
 ### Writes: three terminal responses, and none of them is silent
 
@@ -302,10 +314,12 @@ unique on `event`, so a replayed write returns the original result instead of ap
 |---|---|
 | `applied` + canonical row + new version | drop the overlay, adopt canonical |
 | **`refused`** (422) + typed reason + field path | **keep the overlay**, mark the field, show the reason inline |
-| `conflict` (409) + the current row + the other actor's name | drop the overlay, re-read, re-apply — the body names who changed it. **There is no 412** |
+| `conflict` (409) + the current row + the other actor's name | drop the overlay, re-read, re-apply — the body names who changed it. **One** automatic resend with the same `op_id` when the other actor's change is disjoint from the patch; otherwise both values are re-presented and the person chooses ([50-SPEC-WEB](50-SPEC-WEB.md) §5.3). **There is no 412** |
 
 These are the `Result<T>` envelopes every method shares ([33-CONTRACTS](33-CONTRACTS.md) §2); the
 HTTP surface is `POST /api/<method>` per method plus four GET aliases ([33-CONTRACTS](33-CONTRACTS.md) §4).
+Every call carries a client-minted `X-Request-Id`; the host echoes and logs it, and it is the copyable
+id of every error state ([19-INTERFACE](19-INTERFACE.md) §6).
 
 > **Never roll back silently. A refused write that vanishes is how a user loses a number they
 > typed.**
@@ -344,7 +358,13 @@ identical for a browser tab, the CLI and an agent.
 Use `ctx.acceptWebSocket()` on the **`Record` object** (`apps/worker/src/do/record.ts`, pushing
 `{ version, registers }`), `serializeAttachment()` for the subscription set (**16,384-byte cap** —
 fine for a register list, not for data), and `setWebSocketAutoResponse()` so keepalives never wake
-the object. Fall back to 15 s polling of `GET /api/version` after two failures.
+the object. Reconnect with 5–30 s jitter; after two failures fall back to polling `GET /api/version`
+every 15 s with one socket attempt per five minutes, and a hidden tab pauses both
+([50-SPEC-WEB](50-SPEC-WEB.md) §5.4). The frame is `{ version, registers }` and nothing else; the
+route answers `{ version, format, kernel, primitives, app, spark }` ([33-CONTRACTS](33-CONTRACTS.md)
+§4). Job events are never pushed — the job view polls `jobEvents({ id, after })`
+([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1). A phase-2 self-host has no `/ws`: the route is 404 and
+the client polls ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §4).
 [ADR-044](16-DECISIONS.md) records the transport; [01-ARCHITECTURE](01-ARCHITECTURE.md) §7 once said
 SSE and now agrees.
 
@@ -373,7 +393,8 @@ overloaded, then retrying will worsen the overload."*
 
 A service worker doing **exactly three things**: precache the shell by content hash;
 `stale-while-revalidate` on the page endpoint, serving the stale copy **with its version** so the UI
-can mark it; and hold the outbox in IndexedDB, draining on `online`. **Do not** cache register
+can mark it; and hold the outbox — `localStorage`, capped at 100 creates, in v1; IndexedDB the day
+Background Sync is used ([50-SPEC-WEB](50-SPEC-WEB.md) §5.12) — draining on `online`. **Do not** cache register
 queries, or build a client-side query engine over cached rows — each is a second source of truth.
 
 The one exception where an offline edit is allowed is a **draft write-up body**, where losing
@@ -385,10 +406,14 @@ prose automatically; never last-writer-wins a number.
 
 ## 7 · Tokens, and a theme installed as data
 
-**Three layers, and the layer boundary is the enforcement boundary:** primitive (`--slate-900`) →
-semantic (the [13-UI](13-UI.md) §2.1 roles, emitted as `--s1`, `--dim`, `--edge`, …) → component
-(`--row-h`, `--ctl-h`). **A component may name only the semantic layer**, and that layer has exactly
-one list — 13 §2.1's — so the linter has one thing to check.
+**Three layers, and the layer boundary is the enforcement boundary:** primitive (`--slate-900` — the
+generator's internal arithmetic, never emitted as CSS) → semantic (the [13-UI](13-UI.md) §2.1 roles,
+emitted as `--s1`, `--dim`, `--edge`, …) → component (`--row-h`, `--ctl-h`). **A component may name
+only the semantic layer**, and that layer has exactly one list — 13 §2.1's — so the linter has one
+thing to check. Who emits what: the theme emits one `@layer theme` block per scheme under
+`:root[data-scheme]`; the fixed type scale is `TOKENS_CSS` in `@layer tokens`; motion tokens,
+`--ctl-h`, `--tap`, `--measure` and `pairs.json` are the web app's ([39-SPEC-THEME](39-SPEC-THEME.md)
+§5; [50-SPEC-WEB](50-SPEC-WEB.md) §4.4).
 
 Authored in the theme YAML dialect and stored as DTCG 2025.10 ([28-THEMING](28-THEMING.md) §1), built
 to one layered stylesheet:
@@ -401,8 +426,14 @@ to one layered stylesheet:
 full expressiveness (`@layer`, media queries, attribute selectors), and **no CSP `unsafe-inline`**,
 because it is never parsed from markup. An injected `<style>` would need a nonce; an inline `style`
 on `:root` cannot express layers or variants. Swapping a theme is **one `replaceSync`**: one style
-recalc, no reflow of the token layer, no flash. The *same generator* emits the same text into a
-nonced `<style>` in the SSR head, so first paint is themed. **One generator, two sinks.**
+recalc, no reflow of the token layer, no flash. First paint is themed with no SSR head: the *same
+generator* builds the house theme into the shell at build time — `scripts/theme.mjs` from
+`@braindog/theme`, committed as `src/theme/house.css` — and an installed theme arrives with `boot()`.
+**One generator, one runtime sink plus the built house file.** The reader's scheme, text and density
+are the `bd_pref` cookie, per device, applied by a hashed one-statement inline script before first
+paint. The theme editor (phase 7) imports `@braindog/theme` live, in its own chunk — `apps/web`
+depends on `render`, `where`, `theme` and `record`'s types, nothing more
+([31-STACK](31-STACK.md) §2; [50-SPEC-WEB](50-SPEC-WEB.md) §5.7; [28-THEMING](28-THEMING.md) §5).
 
 ### Sanitising an untrusted token value is not optional
 
@@ -419,14 +450,17 @@ designed to make none.
 That last point is structural and it prevents the whole class: `@layer a11y` holds the
 non-negotiables — the `:focus-visible` ring, `forced-colors` overrides, the minimum target. **A
 theme in an earlier layer cannot remove a focus ring defined in a later one.** That is the
-mechanical version of *a theme is data, not authority*.
+mechanical version of *a theme is data, not authority*. And the `unsafe-inline` rule is about
+`<style>` elements — `style-src-elem` is nonced; nothing content-controlled ever reaches a `style`
+attribute, and the renderer's one inline `style` is the magnitude it formats itself and asserts by
+regex ([36-SPEC-RENDER](36-SPEC-RENDER.md) §8; [12-SECURITY](12-SECURITY.md) §8).
 
 ### "No component writes a colour" — four gates, or the rule is decoration
 
 | Gate | Catches |
 |---|---|
-| **1 · Stylelint** — `declaration-strict-value` on every colour property, plus **`value-no-unknown-custom-properties`** | the second gate matters as much as the first: `var(--fain)` is not a colour violation, it is an **invisible** one — it resolves to nothing, inherits, looks fine in light mode and is unreadable in dark |
-| **2 · A colour grep over what Stylelint cannot see** | a class computed in TypeScript, `fill="#333"` in an inline SVG. ~30 lines of Node, **and this is the gate that actually fires in practice** |
+| **1 · `css-rules.mjs`** — twelve rules, one regex tokeniser, zero dependencies; **no Stylelint** ([52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §5). Among them: a literal on any colour property, an unknown custom property, and [13-UI](13-UI.md) §2.4 C's usage half — no `--faint` on text below 24 px | the unknown-property rule matters as much as the colour rule: `var(--fain)` is not a colour violation, it is an **invisible** one — it resolves to nothing, inherits, looks fine in light mode and is unreadable in dark |
+| **2 · A colour grep over what the CSS rules cannot see** | a class computed in TypeScript, `fill="#333"` in an inline SVG. ~30 lines of Node, **and this is the gate that actually fires in practice** |
 | **3 · A rendered-DOM gate** | walk **every** element on the reference pages and assert its *computed* colour resolves to a value in the generated token set — **or is an identity accent**: `oklch(L C h)` where `h` is a row's frozen `identity.accent` value and `L`, `C` are the theme's two mark constants ([13-UI](13-UI.md) §2.1b), legal only on a mark, chip, avatar, calendar dot or chart series — **and that the value is already in the sRGB gamut.** Catches colour from a third-party stylesheet, a browser default, or a token that resolved to nothing |
 | **4 · The contrast gate** | **WCAG 2.2 AA fails the build; APCA is reported as advisory.** APCA's own documentation calls it *"a candidate for WCAG 3.0"* and *"still in development"* — so it is a better signal and not a standard |
 
@@ -441,9 +475,9 @@ Enumerate the **declared** foreground/surface pairs from a checked-in `pairs.jso
 (combinatorial and meaningless). **Make "a new semantic colour token without a `pairs.json` entry" a
 CI failure** — that is what stops drift.
 
-Also in gate 1, and **in the first commit**: a `property-disallowed-list` banning physical
-properties (`left`, `margin-right`, `padding-left`, `text-align: left`). It is a day now and a
-fortnight after 16 block kinds exist.
+Also in gate 1, and **in the first commit**: the rule banning physical properties (`left`,
+`margin-right`, `padding-left`, `text-align: left`). It is a day now and a fortnight after 16 block
+kinds exist.
 
 
 ### Eight rules from the predecessor's own frontend, all learned by breaking it
@@ -509,7 +543,9 @@ the app.** That decides the shape:
 > **Ship the textarea. Load CodeMirror on demand. Never in the main bundle.**
 
 **Tier 1 (~1 KB, default):** `<textarea spellcheck="false">` with tab handling and a preview pane
-rendered by **the same interpreter**. This is the 390px path, the low-power path, and — genuinely —
+rendered by `parse` + `toHTML` — the same framework-free renderer that produces the mirror and the
+export, so the preview *is* the artefact; a 10 KB write-up parses in ≤ 1 ms per keystroke
+([36-SPEC-RENDER](36-SPEC-RENDER.md) §7). This is the 390px path, the low-power path, and — genuinely —
 the better iOS path: native keyboard, native selection handles, native undo. CodeMirror cannot match
 any of those on touch.
 
@@ -546,7 +582,7 @@ not silently change what an existing page renders, and an agent can read back ex
 |---|---|
 | Main JS, brotli | **≤ 30 KB** (today: 19.3) |
 | Main CSS, brotli | ≤ 12 KB |
-| Editor chunk | ≤ 80 KB gzip, **and CI asserts it is unreachable from the entry chunk** |
+| Editor chunk | ≤ 80 KB gzip, **and CI asserts it is unreachable from the entry chunk** — as is the theme editor's chunk, the one place `@braindog/theme` is imported at runtime (§7) |
 | Fonts | ≤ 45 KB total, 2 files |
 | First page HTML, gzip | ≤ 25 KB |
 | **LCP p75** | ≤ 1.2 s |
@@ -563,26 +599,26 @@ fetches the Arabic subset. **Skip a webfont for mono entirely**: the system stac
 and the buyer already reads it in a terminal.
 
 Icons: an inline SVG sprite, ~20 glyphs, **`currentColor` only** — which is also why `currentColor`
-is on Stylelint's ignore list. **An icon component that accepts a `color` prop is a colour-writing
+is on `css-rules.mjs`'s allow list. **An icon component that accepts a `color` prop is a colour-writing
 component and CI must reject it.**
 
-Caching: hashed filenames with `immutable`; `no-store` on `/api/*`; the document `no-cache` with an
-ETag over `{page.version, record_version, theme.version, scheme, renderer.version}` so a pack install
-or a scheme switch invalidates the document without invalidating assets (`scheme` was added on
-[28-THEMING](28-THEMING.md) §5's request). Requests to Workers Static Assets are *"free and
-unlimited"* and do not count toward the bundle limit — use
-`run_worker_first: ['/api/*', '/mcp', '/a/*', '/in/*', '/s/*']` ([33-CONTRACTS](33-CONTRACTS.md) §7)
-so asset requests never invoke the Worker.
+Caching: hashed filenames with `immutable`; `no-store` on `/api/*` and `/mcp`; the shell document
+`no-cache` with an ETag over its own bytes — it is the same file for every record, so a pack install
+or a scheme switch changes what `boot()` returns, never the document. Requests to Workers Static
+Assets are *"free and unlimited"* and do not count toward the bundle limit — `run_worker_first`
+names the Worker's routes (`/api/*`, `/mcp`, `/auth/*`, `/a/*`, `/in/*`, `/s/*`, `/ws/*`;
+[33-CONTRACTS](33-CONTRACTS.md) §7) so asset requests never invoke the Worker.
 
 **CI asserts the deployed shell matches the build byte for byte**: after `wrangler deploy`, fetch `/`
 and `/_app/version.json` from the live host and compare their SHA-256 to the `build/` output, failing
-on mismatch ([33-CONTRACTS](33-CONTRACTS.md) §8).
+on mismatch; the same gate reads the `app` tuple back and requires it to equal the deploying run's
+`BRAINDOG_BUILD` ([33-CONTRACTS](33-CONTRACTS.md) §8; [52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §5).
 
-### The self-hosted build differs in exactly three ways
+### The self-hosted build differs in exactly two ways
 
-1. `adapter-node` instead of `adapter-cloudflare`. The SSR entry is the same `render()` call.
-2. Assets served from disk with the same immutable headers.
-3. The storage adapter binds `node:sqlite`'s `DatabaseSync` against the `.dog` file — **the
+1. Assets served from disk with the same immutable headers — the same `build/`, from the same
+   `adapter-static` build; there is no adapter split and nothing renders on the server (§2).
+2. The storage adapter binds `node:sqlite`'s `DatabaseSync` against the `.dog` file — **the
    self-host default** ([ADR-038](16-DECISIONS.md), [33-CONTRACTS](33-CONTRACTS.md) §6). `better-sqlite3`
    implements the same `Sql` port and is the alternative for an older Node; `bun:sqlite` is
    unsupported.
@@ -648,8 +684,9 @@ declaration order; each block's `empty:` string appears **iff** its query return
 `aria-rowcount` equals the register count; DOM row count equals `min(rows, cap)`.
 
 Keyboard: tab order equals visual order; arrow navigation lands on the row it *looks* like it lands
-on — **assert `activeElement`'s bounding box, not its id**. Run the whole suite once with
-`dir="rtl"` and assert arrow keys invert on the **inline** axis and not the block axis.
+on — **assert `activeElement`'s bounding box, not its id**. Run the whole suite once against
+fixtures materialised with `locale: 'ar'` — direction comes from the record; the harness never sets
+`dir` — and assert arrow keys invert on the **inline** axis and not the block axis.
 
 ### Must be MEASURED, not asserted — the bucket that matters
 
@@ -675,7 +712,7 @@ So the precise rule, which nobody can infer from source review:
 turned 3 tiles into 7 live tracks. The two findings together are the complete rule.)*
 
 The CI assertion that catches all five rows in one place, run over **every** grid and flex container
-at four widths in both directions:
+at the four widths — 390 / 768 / 1024 / 1440 — in both directions:
 
 ```js
 const tracks = getComputedStyle(g).gridTemplateColumns.split(' ');
@@ -691,12 +728,20 @@ tracks, and the header's `font-weight: 600` made `ch` wider. **Invisible in sour
 screen.** The assertion: **header cell widths === body cell widths, exactly.** The fix that makes it
 pass is one declared track list in a custom property, shared.
 
-**Eight reference-page fixtures**, checked in as text — pack YAML, row JSON per register, a
-`seed.json` manifest; the `.dog` is materialised at test time through the real write path with an
-injected `Clock` and seeded RNG, never committed as bytes: an
+**Nine fixture records** — one per reference page, eight, plus `corpus`, the whole-corpus record the
+`mcp-budget`, `dog-roundtrip` and `spark-actor` gates read — checked in as text: pack YAML, row JSON
+per register, a `seed.json` manifest. Rows are committed for ≤ 60 and generated beyond that by
+`rows/gen.mjs` from the seed's RNG, output committed and `--check`ed in CI; the data is synthetic by
+rule — generated names, `.example` hosts, 2030–2031 dates, refs as `register#seq`, no ULID or hash on
+disk. The `.dog` is materialised at test time through the real write path with an injected `Clock`
+and seeded RNG, never committed as bytes ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §5). The pages: an
 empty register · 12 rows · 500 rows · 5,000 rows · mixed currencies · a long write-up with inline
-blocks · **a third-party pack kind** · **a deliberately unknown primitive**. Every gate runs against
-all eight at **four widths × two colour schemes × two directions = 128 configurations.**
+blocks · **a third-party pack kind** · **a deliberately unknown primitive**. The 500-row page reads
+the head of the 5,000-row file (`take`) and a `document` value may name a file (`$file`); the
+5,000-row page opens the register view (cap 2,000), not a page block, whose `limit` is ≤ 500; the
+unknown-primitive pack is installed raw and lints `PRIMITIVES_OUT_OF_RANGE` — the one pack that may
+not lint clean, by design, and no new code for it. Every gate runs against all eight pages at **four
+widths (390 / 768 / 1024 / 1440) × two colour schemes × two directions = 128 configurations.**
 
 **Explicitly not tested:** HTML snapshot diffs (fail on whitespace, pass on layout bugs) and
 full-page pixel screenshots *as a gate* — rendering *"can vary based on the host OS, version,
@@ -717,7 +762,7 @@ Never as the assertion.
 | Stage | Work | Days |
 |---|---|---|
 | 0 | **Reversal-expensive decisions, written down**: the primitive set, token layer names and order, the `op_id`/`version`/three-response write contract, logical-properties-only, money as minor units, the ≤100 column / ≤100 param / ≤2 MB schema rules | 1 |
-| 1 | **The interpreter and one real page**, SSR + hydrate, all block queries in one DO call. **Ship this before any styling** | 4 |
+| 1 | **The interpreter and one real page**, hydrated into the static shell, all block queries in one DO call. **Ship this before any styling** | 4 |
 | 2 | **Tokens, both schemes, and all four CI gates.** *Stage 2, not stage 8* — every component written before the gates exist must be re-audited | 3 |
 | 3 | **The dense table primitive properly** — declared tracks, chunked CV, sticky header, roving tabindex, ARIA row counts, visible cap. Plus the layout-invariant assertions and the real-device LoAF baseline | 3 |
 | 4 | Writes, refusals, the hibernatable live channel, jittered reconnect, `.overloaded` handling | 4 |
@@ -725,7 +770,7 @@ Never as the assertion.
 | 6 | Dialect editor, Tier 1 only. Run the Custom Highlight spike | 2 |
 | 7 | Packs installing kinds and themes as data. *Proven feasible* | 3 |
 | 8 | Service worker, outbox, offline creates | 2 |
-| 9 | CodeMirror Tier 2, virtualised tier, prose polish | 3 |
+| 9 | CodeMirror Tier 2, prose polish | 3 |
 | | **Total** | **≈ 29** |
 
 **This is NOT confirmation of the roadmap, and an earlier draft wrongly said it was.** The 29 days
@@ -761,8 +806,7 @@ Treat 29 days as a floor for the runtime alone. The screens on top of it are re-
 | Question | The experiment |
 |---|---|
 | Is CodeMirror needed at all? | the CSS Custom Highlight API spike — if it works, ~2 KB replaces 75 KB gzip |
-| Should SSR stream? | compare TTFB and LCP, buffered vs block-streamed, on the 6-block/500-row fixture from three geographies |
-| workerd's SSR cost vs Node's | the 0.45–2.12 ms figures are Node 24. Re-run inside `wrangler dev`; expect the same order, confirm it |
+| workerd's `toHTML` cost vs Node's | the 0.45–2.12 ms figures are Node 24, and the digest email renders in the Worker. Re-run inside `wrangler dev`; expect the same order, confirm it |
 | Do DO bindings work in `vite dev`? | undocumented on the plugin page. **Verify before stage 1** |
 | Is `node:fs` usable in Workers now? | Cloudflare's compat table says yes; the SvelteKit adapter docs still say *"you can't use `fs` in Cloudflare Workers."* One is stale |
 
