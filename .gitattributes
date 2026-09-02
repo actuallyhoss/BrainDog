@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.dog binary
+*.dogl.age binary
+*.sqlite binary
+*.woff2 binary
+*.png binary

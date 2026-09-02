@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.wrangler/
+.svelte-kit/
+*.tsbuildinfo
+*.dog
+*.dogl
+*.dogl.age
+*.sqlite
+_*
+__*
+.DS_Store

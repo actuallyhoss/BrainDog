@@ -1,0 +1,1288 @@
+# 16 · Decisions
+
+Architectural decisions with their rejected alternatives. A decision without its alternatives is
+an assertion, and an assertion gets re-litigated every six weeks.
+
+Format: what was decided, what was rejected and why, and what would reverse it.
+
+---
+
+## ADR-001 · The system of record is one SQLite Durable Object per customer
+
+**Decided.** One Durable Object instance per customer, SQLite-backed, holding the whole record.
+
+**Rejected:**
+
+| Alternative | Why not |
+|---|---|
+| One shared D1 with a `tenant_id` column | Nine id sequences are **spoken out loud** — "#125", "D41". The second customer's first task would be #4,732. And isolation would be a property of every query being correct forever, rather than of the runtime's addressing |
+| One D1 per customer (the prior plan) | A control-plane API call per signup that can fail, retry and orphan. Plus PITR, FTS5 and per-customer scheduling would all have to be built. A 50,000-database account ceiling |
+| Postgres via Hyperdrive | The record is a single-writer document, not shared OLTP. Adds an operational dependency the self-host must also satisfy |
+| KV or R2 as the store | No queries. Pages, metrics and rules are all queries |
+
+**Bought:** zero-step provisioning (naming *is* provisioning), 30-day point-in-time recovery,
+FTS5, a per-customer alarm, and storage in the same thread as the code.
+
+**Cost:** a 10 GB ceiling per customer, no cross-customer queries, one alarm, and a bug in the
+record class affects every customer at once.
+
+**Would reverse it:** a customer legitimately needing >10 GB of *rows* (not attachments), or
+cross-customer reporting becoming a product requirement.
+
+---
+
+## ADR-002 · The record object makes no outbound network calls
+
+**Decided.** Inference, email out, webhooks out and pack fetching happen in the Worker or in
+Spark's object. The record can be asked for data and can store data. It cannot speak.
+
+**Amended by [ADR-021](16-DECISIONS.md):** the one exception is the outbox doorbell —
+`Scheduler.wake()`, a queue `send()` carrying a record id, the last statement after every write.
+It carries no data and it is a no-op on the self-host.
+
+**Why:** two independent reasons want the same constraint. `fetch()` inside a Durable Object
+breaks the input/output gates and permits request interleaving — a correctness bug. And an object
+that cannot call out cannot exfiltrate — a security property against the lethal trifecta.
+
+**Rejected:** `blockConcurrencyWhile()` around outbound calls. It works, and it makes every future
+contributor responsible for remembering it. A structural rule beats a discipline.
+
+**Cost:** one extra RPC hop for anything that combines a model call with a write.
+
+**Would reverse it:** Durable Objects gaining an outbound call that is provably gate-safe — and even
+then the exfiltration half of the argument stands, so this is unlikely ever to move.
+
+---
+
+## ADR-003 · `entry` is one table; registers are declarations
+
+**Decided.** All rows live in one `entry` table with a JSON `fields` column. A field a register
+declares indexable gets a **partial expression index** on `json_extract(fields,'$.x') WHERE
+register = …` — **not a generated column.** An earlier draft said generated columns, which cannot
+work on a shared table: 64 registers × 8 indexed fields is up to 512 columns against SQLite's
+100-column ceiling, failing at roughly the twelfth installed pack. See
+[02-DATA-MODEL](02-DATA-MODEL.md) §1.
+
+**Rejected:** a real table per register. It is faster and it is typed by the database — and
+uninstalling a pack would then mean dropping tables, which destroys the customer's rows. The pack
+contract is *declarations belong to the pack, rows belong to you*, and that contract is only
+keepable this way. It also keeps the `.dog` schema stable across every pack combination, which is
+what makes the file openable by plain `sqlite3`.
+
+**Cost:** queries go through `json_extract`. Recovered by expression indexes for declared fields;
+an unindexed field is a scan, which is microseconds at thousands of rows.
+
+**Would reverse it:** a register reaching millions of rows, at which point that one register gets
+promoted to a real table with a documented migration.
+
+---
+
+## ADR-004 · `.dog` is a SQLite database, typed by `application_id`
+
+**Decided.** `PRAGMA application_id = 0x444F4721` (`DOG!`), `PRAGMA user_version` as the format
+revision. Acronym: **Data, Origin, Governance** — the file's three real sections.
+
+**Rejected:**
+
+| Alternative | Why not |
+|---|---|
+| A zip container (`.docx`/`.epub` shape) | cannot query without unpacking, cannot read partially, and needs a serialiser that can drift from the live store |
+| JSON or JSONL | no partial read, no query, and 400 MB of JSON is not a document anyone can inspect |
+| A custom binary format | a reader nobody has, for a product whose pitch is that you can check what we hold |
+| Whole-file encryption by default | destroys the property that makes the format worth having |
+
+**Bought:** the export is a **canonical logical dump** (`.dogl`) streamed from the record in pages;
+the `.dog` SQLite file is materialised by the CLI or the self-host, never inside the Worker —
+`VACUUM INTO` and `ATTACH` are unavailable in workerd ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3,
+[ADR-034](16-DECISIONS.md)). There is still no bespoke serialiser to have a bug in: the dump is rows
+by primary key in declared column order, and the round-trip gate is that logical dump, not byte
+equality. `file(1)` names the format. `sqlite3` opens it. *(An earlier version of this ADR recorded
+`VACUUM INTO` as the bought property — a mechanism 03 verified on 2026-09-01 cannot run where the
+record lives.)*
+
+**Would reverse it:** SQLite ceasing to be readable by tooling a customer already has — nothing on
+the horizon.
+
+---
+
+## ADR-005 · Extensions are data; where data is insufficient, an agent
+
+**Decided.** Eight extensible kinds, a closed list, none of which executes. No sandbox, no eval,
+no plugin runtime, no Workers for Platforms.
+
+**Rejected:** a real plugin system. It is the obvious way to be extensible, and it would require a
+sandbox to secure, per-tenant code deployment, a review process for binaries whose intent cannot
+be diffed, and a permanent security surface. The prior research's line holds: *a table survives a
+shared Worker; an `eval` does not.*
+
+**Bought:** the worst a malicious pack achieves is a misleading page, plus one scheduled GET to a named host if it declares a `source:` ([ADR-025](16-DECISIONS.md)), which the diff shows before
+it applies. Every variant is readable, diffable, shareable text. And it makes the marketplace an
+index over files rather than a platform with a moderation queue.
+
+**Cost:** anything genuinely computational is not a pack. That is the escape hatch — it is an
+agent — and the product is already about agents.
+
+**Would reverse it:** a class of pack customers demonstrably need that no declaration plus an agent
+can express — and the answer would still be a ninth kind before a sandbox.
+
+---
+
+## ADR-006 · Embeddings live in the customer's own SQLite; no shared vector index
+
+**Decided.** `bge-m3` embeddings quantised to int8 in `entry_vec`, brute-forced with cosine
+similarity, fused with FTS5 results by reciprocal rank.
+
+**Rejected:** Vectorize with a namespace per customer. It scales far higher and it is one shared
+index — so isolation becomes a property of a metadata filter being correct, and a self-hoster has
+no equivalent at all, which violates *self-host free and complete*.
+
+**The arithmetic that makes it safe:** 1,024 bytes per row at int8/1024-dims → a 20,000-row record
+is ~20 MB in a 10 GB object, and 20M int8 MACs is single-digit milliseconds.
+
+**Cost:** a practical ceiling around 50,000 rows per record.
+
+**Would reverse it:** records routinely exceeding 50,000 rows, which would mean a different
+customer than the one this is for.
+
+---
+
+## ADR-007 · The metric fields `target` and `window` are mandatory
+
+**Decided.** A metric declaration without both is refused at install.
+
+**Why:** *a number with no target is decoration; a number with no comparison window is a number
+you cannot act on.* Every dashboard product makes these optional and every dashboard product is
+full of numbers nobody acts on.
+
+**Cost:** slightly more friction authoring a metric. That is the intended effect.
+
+**Would reverse it:** a metric whose target is genuinely undefined — a raw counter with nothing to
+compare against — and the answer there is a `series`, not an optional `target`.
+
+---
+
+## ADR-008 · Eight MCP tools, fixed, regardless of register count
+
+**Decided.** `record_index`, `search`, `get`, `list`, `create`, `update`, `propose`, `log`, plus
+per-register **schemas delivered as resources**. Registers are arguments, not tools.
+
+**Rejected:** a tool per register — the naive design. It puts every customer's whole schema into
+every context window of every session in every client, forever.
+
+**Evidence:** a comparable prior MCP server shipped a ~27,000-token digest as its default
+orientation response and cut it to a ~1,300-token index — a 95% reduction on the first call of
+every session with no loss of capability.
+
+**Enforced by:** token budgets asserted in CI. `tools/list` under 1,800 tokens.
+
+**Would reverse it:** an MCP client the buyer uses that cannot read resources, which would force
+schemas back into tool descriptions and break the 1,800-token budget.
+
+---
+
+## ADR-009 · The decision gate is enforced server-side, via MCP's MRTR
+
+**Decided.** A write that requires a decision returns `resultType: "input_required"` with the
+options; the client re-calls with `inputResponses` carrying the choice and the mandatory reason.
+
+**Rejected:** a client-side confirmation prompt, or a "pending" status the human resolves in the
+web app later. The first can be bypassed or auto-approved by the client; the second breaks the
+flow of whichever tool the person is actually in.
+
+**Why it matters:** the gate holds **regardless of which client or model is on the other end**,
+because the server refuses the write. That is the property a governance mechanism needs.
+
+**The failure mode to design against, and it has a corpse.** GitHub's Copilot Workspace staged
+every task through five separately-generated, separately-editable, separately-regeneratable
+artifacts — Task → Topic → current spec → proposed spec → Plan — before a line of code existed.
+Each regeneration invalidated everything downstream. Their own final changelog is the walk-back
+("Reducing Action Button Clicks", "Consolidating the Plan Action Buttons"), and the product was
+then deprecated outright.
+
+**So the gate is ONE decision, not a staircase.** Options, a choice, a reason, a row. No
+intermediate artifact that must itself be approved before the real question can be asked. If a
+proposal needs three approvals to land, the design is wrong.
+
+Three mechanisms worth taking from the survivors, all cheap:
+
+| From | Mechanism |
+|---|---|
+| Zed | an **undo for the review action itself** — a rejection stack, so a fast reviewer can decline without fear of losing something mis-read. Nobody else ships it |
+| Warp | **batched review comments as one re-instruction.** Comments anchor to lines, accumulate, and submit together; the agent answers once with a fresh proposal. N chatty turns become one — and it is cheaper in tokens, which matters at $12/mo |
+| GitHub | **resolution reasons** on a closed suggestion — *Addressed · Won't fix · Incorrect*. The cheapest possible instrument for learning which proposals were noise |
+
+And one from Zed that maps exactly onto packs: Zed refuses to offer an "always allow" rung for
+**skills**, reasoning that *"skills are inert by themselves — they're just instructions — but the
+side effects of the model following those instructions are not."* A BrainDog pack is inert data
+whose rules have side effects, so a pack install is never auto-approved, however trusted its
+author.
+
+**Counter-pressure, recorded:** the ecosystem is moving the other way — auto-approve modes replaced
+human approval with a classifier and became default. BrainDog's position is that money,
+cancellations and credentials keep the human, and MRTR is now the standards-track way to do it.
+
+**Would reverse it:** MRTR being withdrawn from the MCP spec — in which case the gate falls back to
+`propose` → suggestion → decide in the app, still refused server-side; the human is never the part
+that moves.
+
+---
+
+## ADR-010 · Spark has no write capability, and no tool that returns a secret
+
+**Decided.** The assistant runs in a separate object with no write RPC. It proposes. There is no
+tool that decrypts a grant — absent, not gated.
+
+**Rejected:** a capable assistant with permission checks. Permissions are a control that has to be
+correct on every path; absence of a path is a control that cannot be wrong.
+
+**Consequence accepted:** the assistant is less immediately impressive. A perfect jailbreak yields
+a row in `suggestion`.
+
+**Would reverse it:** nothing short of the security argument failing; a more capable assistant is an
+agent over MCP, which already exists and already has the gate.
+
+---
+
+## ADR-011 · Passkeys, and no passwords at all
+
+**Decided.** WebAuthn primary, email magic link fallback, agent tokens for headless.
+
+**Rejected:** passwords with 2FA. A record holding credentials should not itself be protected by a
+reusable phishable secret. Also satisfies WCAG 2.2's accessible-authentication criterion for free.
+
+**Rejected:** SMS 2FA. SIM swap is exactly the attack this data attracts.
+
+**Staging:** the §1b base of [15-ROADMAP](15-ROADMAP.md) ships the magic-link fallback alone;
+passkeys land in A3. Neither path is a password.
+
+**Would reverse it:** WebAuthn losing platform support on a device class the buyer uses — the
+fallback is still the magic link, never a password.
+
+---
+
+## ADR-012 · The vault passphrase is optional and defaults to OFF
+
+**Decided.** Envelope encryption always; an optional passphrase that removes the operator's
+ability to decrypt, defaulting to off, with the consequence stated in the same sentence as the
+switch.
+
+**Why off:** a founder locking themselves out of their own hosting credentials is more likely than
+the operator reading them. And the strongest honest answer to "can you read my data" is
+self-hosting, which AGPL makes real.
+
+**Rejected:** on by default (support becomes unable to help with the most valuable data), and
+absent entirely (no answer for a customer who wants one).
+
+**The connector clause (Q13):** connector grants live under a second, KEK-wrapped DEK the
+passphrase does not cover, so a scheduled connector can decrypt with nobody present; the
+[12-SECURITY](12-SECURITY.md) §7 honesty table carries the row and the bind screen says it in words
+— [ADR-052](16-DECISIONS.md).
+
+**Would reverse it:** a measured pattern of operator-side reads of grants, or a regulator requiring
+customer-held keys by default.
+
+---
+
+## ADR-013 · One `where:` grammar, seven consumers
+
+**Decided.** Pages, rules, metrics, alarms, `immutable_when:` locks, self-improvement predictions
+and ingest `match:` share one predicate grammar, built once in stage A2 — seven, and the canonical
+list is [02-DATA-MODEL](02-DATA-MODEL.md) §6; the full grammar is [34-GRAMMARS](34-GRAMMARS.md) §1.
+*(An earlier version of this ADR enumerated six under a title that said seven; the one it dropped
+was ingest `match:`, the consumer with the second backend.)*
+
+**Precedent:** Firefly III has 33 action classes and **zero** trigger classes, because triggers
+feed the same search grammar as transaction search.
+
+**Bought:** "new filter", "new trigger" and "new metric predicate" are one commit. One thing to
+secure instead of seven — the canonical list is [02-DATA-MODEL](02-DATA-MODEL.md) §6, and it is canonical because four documents had four different counts. The fifth and sixth consumers are the evidence: a period lock — the control
+an auditor asks about first — cost one predicate on the write path, and the self-improvement loop's
+falsifiable predictions ([24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6) cost **nothing at
+all**, because a prediction's `measure:` is just a `where:` with a frozen baseline. That is the
+whole reason the loop is affordable in this architecture and would not be in another.
+
+**Cost:** the grammar must serve seven masters, so it is more conservative than any one of them
+would choose. `contains` compiles to `instr(lower(x), lower(?))` rather than `LIKE` because Durable
+Objects cap a LIKE pattern at 50 bytes — **workerd's `sqlite3_limit`, not SQLite's default**, which
+is 50,000 ([02-DATA-MODEL](02-DATA-MODEL.md) §6) — a silent ceiling that would otherwise ship.
+Full-text is a separate operator, `matches:`, over FTS5 ([ADR-055](16-DECISIONS.md)). *(An earlier
+version attributed the cap to SQLite and had `contains` compile to FTS5.)*
+
+**Would reverse it:** a consumer whose predicate needs cannot be met by the shared grammar without
+weakening it for the other six — and the answer would be a named refusal, as in ADR-019, not a
+second grammar.
+
+---
+
+## ADR-014 · Analytics Engine for our telemetry only; never for customer metrics
+
+**Decided.** Customer figures live in their record forever. Product telemetry goes to Analytics
+Engine with a **monthly-rotating salt** on the hashed record id, and never contains field values.
+
+**Why:** Analytics Engine retains for 3 months. A business record keeps figures for years. And the
+rotating salt is a deliberate ceiling on our own ability to profile a customer over time.
+
+**Enforced by:** a test that fails if `writeDataPoint` is called with anything outside the declared
+blob list. The record object cannot reach it at all, per ADR-002.
+
+**Would reverse it:** nothing puts a customer's figures there; the only part that could loosen is
+the salt rotation, if the product ever needed a longer view of its own usage.
+
+---
+
+## ADR-015 · One alarm, one schedule table
+
+**Decided.** The object's single alarm is always set to `MIN(due_at)` over pending schedule rows;
+one `arm()` function, called in a `finally`.
+
+**Rejected:** a global cron Worker fanning out across all customers. It reintroduces a
+cross-customer code path, scales with customer count rather than with work, and cannot be
+self-hosted identically.
+
+**The bug this prevents:** an alarm handler that throws before re-arming stops the customer's
+entire schedule forever.
+
+**Would reverse it:** Durable Objects offering more than one alarm per object — which would remove
+the `MIN(due_at)` indirection but not the one table, because the self-host loop needs it.
+
+---
+
+## ADR-016 · AGPL for the app, MIT for the renderer
+
+**Decided.** Carried forward from D41 and unchanged.
+
+**Why the split:** AGPL stops a competitor hosting our code closed. AGPL on a *library* kills its
+adoption, and the renderer is the gate-1 distribution instrument.
+
+**Recorded consequence:** AGPL does not stop a rehost of the *name*. Only a trademark does — which
+is why the UK TM3 filing is trigger-gated on the first paying subscriber rather than date-gated.
+
+**The licence is `AGPL-3.0-only`, never `-or-later`**, and the layout that makes the split legible
+to scanners is [ADR-041](16-DECISIONS.md), from [31-STACK](31-STACK.md) §4: root `LICENSE` is the
+AGPLv3 text, `LICENSING.md` routes paths to SPDX names, `packages/render/LICENSE` is MIT with SPDX
+headers on `packages/render/src/**` only.
+
+**Would reverse it:** a competitor hosting the *renderer* as a product — which would argue for AGPL
+on the library and accept the adoption cost knowingly.
+
+---
+
+## ADR-017 · The assistant is called Spark, over the name this document recommended
+
+**Decided.** **Spark** — reaffirmed by the owner, twice, over **Pointer**, which an earlier version
+of this ADR recommended and which had the better argument.
+
+**The argument that lost.** *"Spark" cannot travel*: GitHub Spark is Microsoft's and Google shipped
+Gemini Spark in 2026. *Pointer* is a breed, a programming term, and a description of the one
+constraint that matters — a pointer points, it does not dereference itself and it does not decide.
+
+**Why the loss is affordable.** The cost is **discoverability, and only discoverability**: nobody
+finds BrainDog by searching "Spark AI". It is a *feature* name inside a product, which is the level
+at which coexistence is normal, and the expensive register check was already done for **BrainDog**
+itself — empty in every class at USPTO, EUIPO and UK IPO.
+
+**What is kept.** The better half of the rename was never the word. It was compressing the
+governance thesis into the name, and that sentence survives intact:
+**Spark never decides. It points at what does.**
+
+**The rule that makes it survivable:** always **"BrainDog Spark"** on first use in any public
+surface. Never *Spark* alone in a repository, a package or a domain.
+
+**Runners-up:** *Fetch* (the dog verb and `fetch()`; too generic to defend), *Scout* (warm; taken
+several times in developer tooling).
+
+**Open:** [Q8](17-OPEN-QUESTIONS.md) — a register check across classes 9 and 42.
+
+**Would reverse it:** a live registration in class 9 or 42 by somebody who enforces — which is what
+the Q8 search is for.
+
+> *A note on this ADR's own history, because it is the exact failure it now records: a global
+> find-and-replace of Pointer→Spark left this decision asserting that Spark was unavailable and then
+> choosing it, with Pointer's rationale attached. **A rename is not a text substitution in the one
+> document whose subject is the name.***
+
+---
+
+## ADR-018 · The web app is a client of the agent API
+
+**Decided.** No private endpoints. Any screen needing an endpoint no agent can call is a design
+error.
+
+**Why:** it guarantees the MCP surface is complete, and it means every feature is scriptable the
+day it ships. It also prevents the failure where the UI can express something the record cannot
+describe.
+
+**Cost:** some screens are slightly more work than a bespoke endpoint would be.
+
+**Would reverse it:** a screen whose endpoint genuinely cannot be an agent call — none has been found,
+and finding one is a design error to fix, not a private route to add.
+
+---
+
+## ADR-019 · BrainDog is not a ledger, and says so
+
+**Decided.** No cross-row constraint. A transaction cannot be required to have postings that sum
+to zero, and there will be no `constraint:` key.
+
+**Why it came up.** An adversarial audit modelled a bookkeeping operation and found the invariant
+unenforceable: `where:` refuses correlated aggregates, no rule action refuses a write, and you
+cannot even declare the metric that *counts* the unbalanced transactions, because that predicate is
+an aggregate over a joined register — two refusals at once.
+
+**Why the answer is a refusal rather than a feature.** Enforcing balance means evaluating a
+correlated aggregate on the write path, which is the single most expensive thing on the grammar's
+refused list, and it would be evaluated on **every** write in the record to serve one register in
+one vertical. The honest position is the one the audit itself recommended: *"a named refusal is
+worth more than a weak feature."*
+
+**What is offered instead, and it covers most of the ground:** `transitions:` with `requires:`
+gates the *posting* of an entry, `immutable_when:` freezes it afterwards, and the closed `ratio` in
+[08-METRICS](08-METRICS-AND-ANALYTICS.md) §2.2 computes what a bookkeeper actually reads. A draft
+that does not balance can be saved — which is what every real accounting package does anyway.
+
+**Cost:** double-entry bookkeeping is not a market for this product. Said plainly, in the docs,
+rather than discovered by a bookkeeper in their first hour.
+
+**Would reverse it:** a cheap way to evaluate one correlated aggregate on the write path for one
+register only — and even then the product would say *ledger-adjacent*, not *ledger*.
+
+---
+
+## ADR-020 · Sixteen value types, after a four-vertical stress test
+
+**Decided.** `file` and `quantity` join the closed list. `create` joins the rule actions.
+`transitions:`, `group_by`/`bucket`, a closed `ratio`, `immutable_when:` and `series: true` are
+added. `state` is a promoted column. Retroactive erasure is a kernel obligation.
+
+**Why, in one line each.** Every one of these was found by modelling a fashion label, a marketing
+operation, a bookkeeping operation and a clinic against the schema as written — not by reasoning
+about what a platform ought to have. Four of them were **bugs**, not gaps: `series` was a chart
+advertised with no way to feed it, `state` was dual-homed and unresolved, `list<ref>` had no
+declared syntax for its target register, and `decision.reason NOT NULL` made a lawful erasure
+request impossible to honour.
+
+**Cost:** two more validators, two more form controls, two more renderers, two more lines in every
+MCP schema. Paid deliberately. [27-VERTICALS](27-VERTICALS.md) is the evidence and the arithmetic.
+
+**What was refused despite being asked for:** cross-row constraints (ADR-019), a third `each:`
+dimension, nested combinators, and a formula language of any kind.
+
+**Would reverse it:** a fifth vertical stress test finding a value none of the sixteen types can
+carry — one deliberate migration with a validator, exactly as this ADR was.
+
+---
+
+## ADR-021 · The record's outbound work goes through an `outbox` table
+
+**Decided.** A kernel table. The alarm handler writes rows; the Worker leases and sends. The only
+I/O the record object performs is one queue `send()` carrying a record id — `Scheduler.wake()` —
+as the last statement after every write. *(An earlier version called it "a fifteenth kernel table";
+the ordinal is from a fifteen-table draft and the kernel is twenty-seven.)*
+
+**Why.** The rule that the record makes no outbound calls is right, and it had a hole: the alarm
+fires *inside* the record object, so as written nothing could ever send a digest, a push, or a
+connector fetch. The hole was only visible reading two documents together.
+
+**Bought:** at-least-once delivery survives — Cloudflare documents that *"in rare cases, alarms may
+fire more than once"* — because a lease with an expiry is idempotent where a delete-on-send is not.
+And self-hosting needs no second code path: the same table, drained by a loop instead of a queue.
+
+**Cost:** one table, and a rule about statement ordering that a reviewer has to know. Stated in
+[01-ARCHITECTURE](01-ARCHITECTURE.md) §2 with the reason, because a rule whose reason is not
+written down gets optimised away.
+
+**Would reverse it:** the platform delivering alarms exactly once with a guarantee — and the lease
+would stay anyway, because the self-host loop needs it.
+
+---
+
+## ADR-022 · The self-improvement loop recommends; it never acts
+
+**Decided.** BrainDog builds a MAPE-K loop over its own declarations. **Nothing is auto-applied in
+v1.** The loop's only output is a row in `suggestion`. Every accepted change writes a falsifiable
+`prediction` with a baseline frozen at acceptance, scored once on a named date.
+
+**Why not auto-apply the safe class.** A partial expression index is provably semantics-preserving
+and is the obvious candidate. Refused for [ADR-010](16-DECISIONS.md)'s own reason — *absence of a
+path is a control that cannot be wrong.* Once "the loop writes a declaration without a human" is a
+code path, the only thing stopping it writing a page is a conditional. **Microsoft agrees in
+practice:** Azure SQL ships `CREATE_INDEX` and `DROP_INDEX` **off** by default, with only the
+trivially reversible plan correction on, and reports that **~11% of its automated actions are
+reverted** by validation.
+
+**And the exception, recorded here because §4.5 grants it and an earlier version of this ADR did
+not mention it.** After **20 scored predictions at ≥80% met**, auto-apply may be enabled **for the
+index class only**, per-record, defaulting off. That does create the code path this ADR's own
+argument warns about — *absence of a path is a control that cannot be wrong* — so the mitigation is
+named rather than assumed: the path is **typed to one proposal class at the function signature**,
+not gated by a runtime conditional, so extending it to a second class is a code change with a diff
+rather than a flag flip. An auto-applied change still writes an event, still carries a prediction,
+and still appears in the digest.
+
+**Bought:** IBM autonomic maturity **Level 3, Predictive** — *"system monitors, correlates, and
+recommends actions; IT staff approves and initiates actions."* A narrow claim that is true, against
+a broad one that is not.
+
+**Cost:** ≈22 days at the corpus's own correction factor, and it is Phase C, gated on gate 4.
+
+**Refused outright:** the loop proposing a new named metric (it automates the one failure no sandbox
+prevents), a theme change (no signal has "a different colour" as its remedy), and any change to the
+loop's own thresholds, analyser or budget.
+
+**Would reverse it:** twenty scored predictions at ≥ 80 % met enabling the index-class auto-apply,
+per record, off by default — the one exception this ADR already names, and the only one.
+
+---
+
+## ADR-023 · Themes are generated by contrast, and validated before they install
+
+**Decided.** The generator solves for **target contrast ratios**, not lightnesses. Sixteen install
+checks, in both schemes, over every surface. Intent separability is measured as **ΔE2000 after
+Brettel-1997 dichromat simulation**, not as a contrast ratio.
+
+**Why contrast-driven.** BrainDog already has a refusal gate. Generating by lightness and validating
+by contrast builds a loop that can fail, whose failure mode is *"the user picked a colour and the app
+said no,"* repeatedly, with no path forward. **Generate by contrast and the checks the generator
+drives become tautologies** — only separability and monotonicity can fail.
+
+**The correction this records.** [13-UI](13-UI.md) §2.3's measured collapse — two intents at 1.07:1
+under deuteranopia — is correct and is the motivating evidence. **The metric was wrong:** under
+simulated dichromacy colour collapses onto a two-dimensional surface, and contrast ratio measures
+only one axis, so it produces both false failures and false passes.
+
+**Cost:** a per-hue chroma solve instead of a lookup, and a validator that refuses more often.
+
+**Refused:** runtime colour derivation in CSS (browsers clip, and the clip is invisible to
+`getComputedStyle` — measured), `light-dark()`, per-page themes, and auto-correcting a contrast
+failure — because **an auto-corrected theme is not portable**, and portability is the entire point of
+the one artefact designed to be shared.
+
+**Would reverse it:** a perceptual metric shown to predict legibility better than ΔE2000 after
+Brettel simulation; contrast-driven generation stays regardless.
+
+---
+
+## ADR-024 · Pages emerge; navigation does not
+
+**Decided.** Structure appears as the record fills — but in a holding pen. **The system never writes
+nav order after first install.** A proposal becomes a nav entry only when a human promotes it, and
+promotion appends to the end of a section rather than inserting.
+
+**Evidence, and it is unusually direct.** Findlater & McGrenere (CHI 2004, 27 subjects) measured
+static menus **faster** than adaptive ones, with user-arranged menus equal to static. Microsoft
+shipped adaptive menus in Office 2000 and **withdrew them on 2006-01-20**, citing unpredictability,
+loss of spatial memory, and — the counter-intuitive one — that hiding items to reduce clutter made
+**feature discovery worse**. WCAG 2.2 **SC 3.2.3 Consistent Navigation (AA)** is normative against
+reordering.
+
+**The shape taken:** Metabase's X-ray split — generate freely into a quarantine, become real on one
+click. BrainDog already has the quarantine.
+
+**Bought:** the ask — *"page headers are created as you go"* — in full, with no nav entry ever
+appearing unasked.
+
+**Cost:** an `origin: derived | person | pack` field, and one more thing on every page: its origin,
+visible in one word. *(An earlier version spelled the middle value `authored`, which 04 and 06 use
+for a different thing — the tier of every declared page, a pack's included.)*
+
+**Refused:** auto-placing, auto-hiding a stale entry (Office's own finding), and a proposal that
+returns after being dismissed.
+
+**Would reverse it:** a controlled study showing adaptive navigation beating user-arranged
+navigation for this task class — twenty years of evidence say otherwise.
+
+---
+
+## ADR-025 · Pull connectors, and the row they cost
+
+**Decided.** `ingest` gains a `fetch:` block when `channel: pull` — the kernel's word for the
+scheduled channel, as in `inbox_raw.channel`, schedule kind `pull` and outbox kind `pull.fetch`; an
+earlier version said `cron`, a value the kernel's vocabulary does not have. **Not a ninth pack kind.** Five
+placeholders, five formats, no operators and no functions. Three primitives: `expect:`, a closed
+kernel list of eight `auth.kind`s, and `probe:` — **exactly one preflight, never chained.**
+
+**Why it is not free.** [04-PACKS](04-PACKS.md) §7's *"a pack cannot make an outbound call of any
+kind"* becomes false, and that argument is an **enumeration**, so removing an entry weakens it.
+Bought back: a literal origin with no placeholders, every host printed in the install diff, scopes
+proven at bind time, and the response treated as untrusted content.
+
+**The ceiling, measured twice.** Against nine hand-picked APIs: ~64% expressible. Against Airbyte's
+**609 real connectors**: ~53% catalogue-wide, ~71% within its declarative tier. **Two-thirds is the
+honest ceiling**, and the fallback for the rest is `mode: agent` — the record asks, the user's own
+agent fetches, the human approves — which creates **no new capability at all.**
+
+**The lever that made it possible:** 96% of Airbyte's macro usage is date handling, because its
+cursor is a string the author formats. A **typed** incremental window removes the reason for an
+expression language.
+
+**Refused:** an interpolated `base:` (20% of real connectors do it, and it is SSRF), fan-out over a
+*fetched* list (47% of real connectors, and it makes the host list unnameable), a `poll:` state
+machine, and any nesting inside `expect:`.
+
+**Not built:** a bank connector. The format handles it in five minutes; **the credential does not
+exist** — UK open banking has had no self-serve path since GoCardless closed signups, and unattended
+access is capped at four calls a day *by law*.
+
+**Would reverse it:** the measured ceiling falling below half on the connectors this buyer actually
+wants ([Q14](17-OPEN-QUESTIONS.md)) — at which point `mode: agent` is the product and the `fetch:`
+block is removed, restoring 04 §7's enumeration.
+
+---
+
+## ADR-026 · `session` is the kernel's one register
+
+**Decided.** The kernel declares exactly one register, `session` — spoken id `S<n>`, a handoff
+(`title`, `next`, `tried`, `notes`), and liveness that is **half derived**: stale at 45 minutes is
+computed at read and never stored; `abandoned` at 12 hours is **written**, by a `schedule` row of
+kind `purge` run hourly by `system` — never by a read, because `list` never writes. `last_seen` is a
+plain instant the kernel writes at step 6 on every write whose actor is the session, not a
+derivation. **Every agent write resolves to a session or opens one**, and `event.actor` is the
+session. *(An earlier version said all of liveness was derived at read; 02 and 32 wrote `abandoned`,
+and one of them wrote it during `list`.)*
+
+**Why a register and not a table.** The predecessor's most-used coordination feature — *"two sessions
+in one working tree overwrite each other, coordinate or stop"* — needs `list`, `get` and `update`, a
+spoken id, transitions and an audit trail. A table would have cost a ninth MCP tool for each of those;
+a register gets them all from the eight. And it cannot be a pack, because it is the register whose
+rows *are* the agents.
+
+**Cost:** the CI rule *"the kernel contains no register declaration"* gains one named exception, in
+the same spirit as the promoted `state` column — an acknowledged special case with its reason beside
+it, rather than a uniform rule quietly broken.
+
+**Refused:** marking a session `done` from a hook. *"A session ending says the terminal closed, not
+that the work finished."*
+
+**Would reverse it:** a second register the kernel must own — which would mean the pack boundary is
+in the wrong place, and the fix is the boundary, not a second exception.
+
+---
+
+## ADR-027 · Row-level derivation, closed
+
+**Decided.** A field may carry `derive:` — `sum` · `diff` · `product` · `ratio` · `band` · `via` ·
+`normalise` — computed at read, **never stored**, inlined by the `where:` compiler, row-scoped with
+at most one `via:` hop.
+
+**Why.** Tracing the predecessor found the gaps were one shape: it *derives* what the record does not
+store — a tier from four judgements, a currency from an account, a session's staleness — and this model
+had no primitive for it. The predecessor's own version parses a priority score out of a sentence, which
+is the right instinct with a fragile mechanism.
+
+**Why it does not become a formula language.** The combinators are a closed list of seven — three
+shared with the metric grammar (`diff` · `product` · `ratio`) and four that are row-scoped only
+(`sum` over named fields, `band` onto the field's own `values:`, `via` for one hop, `normalise`) —
+there is no nesting, a derivation cannot read another row except through one hop, and a derivation
+over another *register* is a metric. Operands are this row's field ids or one `lookup`, never
+aggregations. A derived field cannot be written, `index: true`, or `required`. **One exception, and
+it is the only stored derivation:** `unique: true` on a derived field materialises the derived value
+into `fields` at step 6 of the write path, so the partial unique index has an expression to cover
+(the learnings fingerprint in [32-PARITY](32-PARITY.md) §5). **Two things that look like
+combinators and are not:** `session.last_seen` is written by the kernel at step 6 on every write from
+that session, and the identity accent `hue` is generated by the kernel at create ([ADR-028](16-DECISIONS.md)) —
+an earlier draft wrote them as `touched_by` and `hue_from`, which a closed list cannot contain.
+
+**Bought:** *derived, never stored* as a mechanism rather than a discipline — and `required_when:`,
+`unique:` and `immutable:` alongside it, each closing a rule the predecessor enforces only in prose.
+
+**Would reverse it:** a derivation that needs nesting or a second hop — that is a metric, and the
+answer is a named refusal, not a formula language.
+
+---
+
+## ADR-028 · Identity is a third axis: one mark, one accent, never the only signal
+
+**Decided.** A register may declare `identity: { mark, accent }`. The accent field (`hue`, an
+immutable `int`) is **generated by the kernel at create**, once, and frozen — a kernel-written field,
+not a `derive:` combinator ([ADR-027](16-DECISIONS.md)) — validated ≥ 3:1 against every surface and
+pairwise distinct under all three dichromat simulations, and may colour **only** the row's mark,
+chip, avatar, calendar dot and chart series — never text, never an intent, never a surface. It is
+the one non-token colour that may reach the DOM, as `oklch(L C h)` with the theme's two mark
+constants. A retired row is achromatic. The name always sits beside the colour.
+
+**Why.** *"Colour means which project, everywhere"* is the predecessor's best UX rule, and this corpus
+closed intent colours at four and refused per-page themes without ever saying where a *thing's* colour
+comes from. Without this ADR the four-intent rule would forbid a product having a colour.
+
+**Refused:** hand-picking an accent. The predecessor's picker shows a hue grid and says *"too close to
+X"* from a ΔE and a deuteranope simulation; the generator here does the same and does not ask.
+
+**Would reverse it:** a customer whose rows need a brand colour per client — the answer would be a
+validated palette per register, still generated, never typed.
+
+---
+
+## ADR-029 · Kept, not shown
+
+**Decided.** Every arriving payload is kept raw, and nothing is *shown* until it earns it. The inbox
+is a fold at the foot of a page with counts per status, never a queue; the pattern loop fires only on
+three same-shape payloads.
+
+**Why.** Two correct rules conflicted. This corpus says *"nothing is ever dropped"* — a pipeline that
+discards what it does not understand cannot be trusted with a bank statement. The predecessor drops
+unmatched bank texts **silently and deliberately**, because *"a review queue that is mostly noise stops
+being read within a week"* — and it is right about that too. Keeping everything and showing almost
+nothing satisfies both.
+
+**Cost:** raw storage for noise, bounded by the 400-day retention already in place. Cheap.
+
+**Would reverse it:** raw storage cost exceeding the 400-day window's value — the window would
+shorten before anything was dropped unread.
+
+---
+
+## ADR-030 · What intelligence ships first
+
+**Decided.** The §1b shape of [15-ROADMAP](15-ROADMAP.md) ships **no intelligence at all**. Phase A
+ships **tier A-minimal**: triage, extraction, digest prose and embeddings on small models
+(`llama-3.2-1b` for triage and digest prose), with no conversational surface; the ingest-pattern
+proposal is the one model-backed in-app job, and the record's own agent can do it over MCP. Spark's
+conversational mode arrives with **tier B** (bring your own key), on `glm-5.3-flash`; **tier C**
+(your machine) comes last. A chat surface is added only when a Cloud customer with MCP configured
+asks for one — and that ask is instrumented.
+
+**Rejected:** shipping Spark as a conversational assistant in the first version (B7 as first
+written). Five documents disagreed on what ships, and the roadmap funded eight days that
+[23-ASSISTANT-UI](23-ASSISTANT-UI.md) says serve no line in the value proposition; the buyer already
+owns a better assistant in a terminal, and GitHub retired its own Spark for exactly that reason
+([Q2](17-OPEN-QUESTIONS.md)).
+
+**Would reverse it:** the instrumented ask firing — a measured majority of Cloud customers with MCP
+configured requesting a chat panel inside their first month.
+
+---
+
+## ADR-031 · Gate 2 authorises spending; gates 1a–1d can only veto
+
+**Decided.** Phase B is spent only when **gate 2** passes — ten subscribers still paying at day 30.
+Gates 1a–1d (dependents, outside issues, non-publish-day downloads, four quiet weeks) are **stop
+signals**: if all four miss, Phase B is not built even if gate 2 passes. The Kennel follows the same
+rule.
+
+**Rejected:** gate 1a–1d as the go signal — 15 §3 and §8 as first written, and 14 §2's *"never
+before gate 1"*. Distribution of a free library says nothing about whether anyone pays for the
+record; the one gate that measures the thing being sold is gate 2.
+
+**Would reverse it:** a paying cohort that never installs a pack and never touches the renderer —
+which would show the platform is unrelated to what is sold, and the platform question should then be
+dropped rather than re-gated.
+
+---
+
+## ADR-032 · Money is an integer in minor units with its own currency
+
+**Decided.** `{ amount, currency }` — `amount` an integer in minor units, never a float, never a
+bare number, never a `minor` key. Two currencies are never added. A metric over mixed currencies is
+refused at install unless it names an FX source; with one, rows without a rate are listed and the
+total wears "≥". Rendering is code, space, amount at the currency's exponent — `EGP 1,299.00`,
+`JPY 1,299` — and a typed interpolation takes minor units: `{{money:129900 EGP}}`.
+
+**Rejected:** a decimal amount with a display currency. Floats drift on every sum, and a bare
+number loses the one fact — which currency — that makes a total mean anything.
+
+**Would reverse it:** a currency whose exponent is not fixed, or a regulator requiring more
+precision than the minor unit; neither exists in ISO 4217 today.
+
+---
+
+## ADR-033 · Nothing is deleted; erasure tombstones the payload and keeps the fact
+
+**Decided.** `retired` and `archived` are states; `delete: refuse_while_referenced` protects
+referenced rows; `event` is append-only with no FK to `entry`; a data-subject erasure (Art. 17)
+replaces payloads across every store that can name a person ([02-DATA-MODEL](02-DATA-MODEL.md) §10)
+with the literal `--erased--` — a value withheld at write is `--redacted--`, and `NULL` means only
+"there was no prior value" — and keeps the row that something happened; R2 bytes go through the
+outbox as `erase.r2`. The purge of soft-deleted rows after 30 days is the one hard delete, and the
+`event` rows survive it.
+
+**Rejected:** hard delete on request. It destroys the audit's ability to say *that* something was
+there — the property the README sells — and a history with holes is a history that can be edited.
+
+**Would reverse it:** a jurisdiction ruling that a tombstoned event row is itself personal data
+that must go.
+
+---
+
+## ADR-034 · The export is a canonical logical dump streamed from the record; `.dog` is materialised outside it
+
+**Decided.** The record streams **`.dogl`** — header lines, then one JSON row per line, tables in
+`dog_section` order — in pages of ≤ 1,000 rows via `export(cursor)`. `braindog export` and the
+self-host materialise the `.dog` SQLite file with a real SQLite and sign it; Cloud's nightly R2 backup
+is `.dogl.age`; `braindog verify` and `import` accept both containers. `VACUUM INTO` and `ATTACH`
+are unavailable in workerd. The round-trip gate is the logical dump, never byte equality; `import`
+goes only into an empty record and through validation ([33-CONTRACTS](33-CONTRACTS.md) §9).
+
+**Rejected:** assembling the SQLite file inside the Worker. workerd has no SQLite engine outside a
+Durable Object, no filesystem and a 128 MB ceiling — there is nothing to write the file with.
+
+**Would reverse it:** a SQLite-in-Worker primitive that can write a file without a filesystem — at
+which point the `.dog` could be produced at the edge and `.dogl` would become an internal format.
+
+---
+
+## ADR-035 · The permission model is ceiling × scope × projection
+
+**Decided.** A person's grants are register × level, materialised in `member` — five levels,
+`read append write decide owner`; scope is rules over typed fields; every page and share link is a
+projection that can only narrow. Capability-based, per register. The vault is its own capability,
+owner-only by default; a share link is a projection with an empty ceiling. Enforced inside the
+record — at step 1 of the write path and in the compiler for reads — never in the router. This
+settles [Q4](17-OPEN-QUESTIONS.md); the model is [20-COLLABORATION](20-COLLABORATION.md) §1.
+
+**Rejected:** role-based access — admin, editor, viewer. It does not extend past five people
+without a re-model, and it puts the deny in a table a future page can widen.
+
+**Would reverse it:** a customer needing row-level grants that rules over typed fields cannot
+express — which would mean the record has become a shared database, not a business record.
+
+---
+
+## ADR-036 · The read mark is `member.seen_at`, written with `MAX()` only
+
+**Decided.** One mark per person, monotonic, a column on `member` — never an `entry` row — so a read
+is never a write and a late device cannot move it back. `markRead({ upTo })` in the DATA group is its
+only writer, for person principals; `whatsNew(cursor)` defaults to it; `boot()` returns index, live
+sessions, open suggestions and `whatsNew` in one round trip.
+
+**Rejected:** a read mark inside the document or an entry row. The predecessor's whole-document
+write made every read a potential destructive write; a column updated with `MAX()` cannot regress.
+
+**Would reverse it:** per-register read marks becoming a product need, which turns the column into
+a small table under the same rule.
+
+---
+
+## ADR-037 · Nine ports; `packages/*` name a capability, `apps/*` name a runtime
+
+**Decided.** `Sql · Scheduler · Clock · Blobs · Inference · Dispatch · Http · KeyStore · Snapshots`,
+plus `Ingress` as an entrypoint contract. The record's ports are exactly `{ Sql, Scheduler, Clock }`;
+Spark's are `{ Sql, Clock, Inference }`. `Sql` is synchronous — `exec`, `execScript`,
+`transactionSync` with `NotPromise<T>`, `readonly caps` — and `Param` excludes `boolean` and
+`undefined`. Conformance cases are a plain array run under every host against a committed Durable
+Object reference trace, and CI asserts equal case counts. Full signatures:
+[33-CONTRACTS](33-CONTRACTS.md) §1.
+
+**Rejected:** *"six adapters"*, the count an earlier draft printed twice. Search is not a seam (FTS5
+is a feature of `Sql`), compute is not an interface, and `Clock`, `Http` and `KeyStore` were missing.
+
+**Would reverse it:** a self-host requirement none of the nine can express — a tenth port is a
+design change recorded here, not a helper.
+
+---
+
+## ADR-038 · `node:sqlite` is the self-host default driver; there is no degraded mode
+
+**Decided.** `node:sqlite` on Node ≥ 24.13 is the default — zero native dependencies, FTS5 and
+JSON1 present (measured 2026-09-02 on official 24.13.0: SQLite 3.50.4, `ENABLE_FTS5`). It is still
+Stability 1.1, so the Node minor is pinned and **the boot probe measures FTS5 on every start**.
+`better-sqlite3` is the alternative driver for an older Node. `bun:sqlite` is **unsupported** — it
+links Apple's system libsqlite3 on macOS, nests via SAVEPOINT, and has different parameter ceilings;
+Node bundles its own SQLite on every platform. A build without FTS5 is **refused at boot** with the
+message in [30-BLUEPRINT](30-BLUEPRINT.md) §13 — there is no `LIKE` fallback. `DO_LIMITS` is
+enforced in the adapter above the driver, because `DatabaseSync` has no `limits` option; both
+drivers throw the closed error vocabulary the Durable Object adapter maps to. That is what *"Node
+refuses first"* means.
+
+**Rejected:** `better-sqlite3` as the default with `node:sqlite` degraded — an earlier draft, resting
+on the claim that official Node builds lack FTS5, which was measured false. A native dependency is a
+build step for every self-hoster, and a degraded mode is a third compilation with different
+semantics.
+
+**Would reverse it:** `node:sqlite` dropping FTS5 from official builds, or Bun shipping its own
+SQLite with matching limits and no SAVEPOINT nesting.
+
+---
+
+## ADR-039 · The toolchain pins
+
+**Decided.** TypeScript 6.0.3 (not 7 — `typescript-eslint@8.69.0` caps at `<6.1.0`); pnpm 11.25.0
+with `minimumReleaseAge: 1440` and `linkWorkspacePackages: false`, never hoisted; Vitest 4.1.11 +
+`@cloudflare/vitest-plugin` 1.1.2 (peer `vitest ^4.1.0`, the hardest external pin); fast-check
+4.9.0; ESLint flat + `eslint-plugin-import-x`; **Playwright 1.62.1**; **axe-core 4.13.0**;
+**wrangler 4.128.0**; **Svelte 5.57.0 / SvelteKit 2.70.3**; **Node 24.13.0**, pinned to the minor.
+Every pin carries a dated comment and is revisited quarterly ([31-STACK](31-STACK.md) §3).
+
+**Rejected:** floating ranges. A pin with no recorded reason is re-litigated at the first upgrade
+PR, and the Vitest ↔ Cloudflare-plugin peer range is the one that breaks silently.
+
+**Would reverse it:** any single pin, on its own dated review — this ADR is amended, not replaced.
+
+---
+
+## ADR-040 · Valibot 1.4.2; validators compiled at module top level
+
+**Decided.** Valibot over Zod, Ajv and ArkType for the closed pack schemas — 2.1 kB gzip, refusals
+that name the field, throws on an unrepresentable JSON Schema. `new Function` / `Ajv.compile()`
+never run inside `fetch()` or a Durable Object constructor (`EvalError` in workerd, measured).
+`ajv/dist/standalone` at build time is the fallback if JSON Schema ever becomes primary. The MCP
+tool-definition generator binds to `@valibot/to-json-schema`.
+
+**Rejected:** ArkType — a 90.7 ms cold start for one schema module and an error path 12× its
+success path, the wrong asymmetry for a validator whose whole job is producing refusals.
+
+**Would reverse it:** Valibot exposing Standard Schema's `~standard.jsonSchema`, which removes the
+one vendor binding — or a measured regression in its refusal quality.
+
+---
+
+## ADR-041 · The licence layout follows Grafana
+
+**Decided.** Root `LICENSE` is the AGPLv3 text only; root `package.json` is `AGPL-3.0-only,
+private: true`; `LICENSING.md` routes paths to SPDX names; `packages/render/LICENSE` is MIT, the
+filename exactly `LICENSE`, with SPDX headers on `packages/render/src/**` only; never `SEE LICENSE
+IN`; the closure is enforced on `npm pack --dry-run --json` output from commit one; one repository
+until a second committer or a bypassed gate ([31-STACK](31-STACK.md) §4).
+
+**Rejected:** cal.com's shape — MIT at the root of an AGPL app. GitHub's API then reports the whole
+repository as MIT, which is not retroactively fixable for anyone who relied on it.
+
+**Would reverse it:** a second committer, or one bypass of the closure gate — either moves the
+renderer to its own repository.
+
+---
+
+## ADR-042 · Two published packages, trusted publishing, three record version numbers, no app semver
+
+**Decided.** `braindog-render` (MIT) and `braindog-cli` (AGPL), unscoped; `braindog`,
+`braindog-mcp` and `@braindog` reserved and never published under this design. Publishing is OIDC
+trusted publishing per package, `0.0.1` by hand first. The version surface is the tuple
+`app <date>+<sha> · format <user_version> · kernel <migration> · primitives <PRIMITIVES_VERSION>` —
+`format 1 · kernel 1 · primitives 1` at v1, where `user_version` is the `.dog` format revision
+(bumped only when an older reader would misread), the kernel number is `MAX(migration.version)`,
+and `record.format_ver INTEGER` mirrors `user_version`. A pack's `requires:` is
+`{ format: <int>, primitives: <int>, packs: { id: semver-range } }` — never an app version, never
+`kernel:`. Changesets refused until package #3 or contributor #2.
+
+**Rejected:** `braindog: ">=0.4"` — a semver range in the manifest. The app has no semver, it is a
+hosted service, so the installer would have nothing to compare against.
+
+**Would reverse it:** a third published package or a second contributor, which brings Changesets
+in; or a self-host release cadence that needs a user-facing app version.
+
+---
+
+## ADR-043 · `.gitattributes` in commit one: LF everywhere, binaries marked
+
+**Decided.** `* text=auto eol=lf`; `*.dog *.dog.age *.sqlite *.woff2 binary`; `*.sh eol=lf`;
+`*.ps1 eol=crlf`. It is the first commit, because it is not retroactive.
+
+**Rejected:** relying on each developer's `core.autocrlf`. It is `true` at the system level on the
+development machine, and `declaration.checksum` and the `.dog` manifest hash checked-in files — the
+round-trip test would pass on one OS and fail on the other with a diff that shows nothing.
+
+**Would reverse it:** nothing foreseeable; the migration checksum already normalises CRLF for SQL,
+and doing the same for every hashed file would make this hygiene rather than load-bearing.
+
+---
+
+## ADR-044 · Live updates and tier-C dispatch ride a hibernatable WebSocket to the Durable Object
+
+**Decided.** Live updates are a **hibernatable WebSocket on the `Record` object** carrying
+`{ version, registers }`, with 15-second polling of `GET /api/version` as the fallback; the tier-C
+runner's socket terminates on `Spark`. Non-hibernating sockets and SSE are refused on cost — a held
+object is 0.125 GB × 2,592,000 s = **324,000 GB-s ≈ $4.05 per customer-month, 81 % of the included
+allowance**; Queues are refused on scope (an account-wide token, no per-queue scope); Cloudflare
+Tunnel on footprint. Outgoing change notifications are free.
+
+**Rejected:** SSE. An open SSE response is an active request, so the object cannot hibernate and
+pays the whole held-object cost.
+
+**Would reverse it:** Cloudflare pricing a hibernating socket, or hibernation ceasing to cover the
+runner's idle hours.
+
+---
+
+## ADR-045 · Svelte 5 + SvelteKit 2, and one renderer package with two subpath exports
+
+**Decided.** Svelte 5.57.0 / SvelteKit 2.70.3 on Workers Static Assets; `render()` from
+`svelte/server` is the app's only SSR entry (`entry-ssr.ts`). `braindog-render` exports the
+zero-dependency `parse · expand · toHTML · PRIMITIVES` at its root and the Svelte interpreter at
+`braindog-render/svelte` with `svelte` as an optional peer; `toHTML` never calls `svelte/server`;
+one fixture corpus asserts both paths agree on the accessibility tree and the declared column tracks.
+
+**Rejected:** SolidStart — a Babel pass, release churn, and no scoped-CSS story; and making `toHTML`
+call `render()`, which deletes the drift risk by making the package unusable to anyone not on
+Svelte, killing the one distribution instrument.
+
+**Would reverse it:** the drift test failing repeatedly on real fixtures, which would mean two
+renderers cost more than one framework dependency.
+
+---
+
+## ADR-046 · Runtime dependencies are enumerated
+
+**Decided.** The record object has **zero** runtime dependencies; the Worker ideally zero (WebCrypto
+for signing). The only permitted runtime packages are `@pushforge/builder@2.0.5` (Web Push) and
+`age-encryption@0.3.1` with its five `@noble`/`@scure` transitive packages (`.dogl.age`). Anything
+else is a new ADR.
+
+**Rejected:** dependencies as conveniences added per PR. Every runtime package is a supply-chain
+surface in a Worker holding a KEK, and 18 §5 promised a record of them that did not exist.
+
+**Would reverse it:** a dependency with no zero-dependency alternative — which is exactly what this
+ADR is amended to record.
+
+---
+
+## ADR-047 · The Kennel is an index over files
+
+**Decided.** Two JSON files in one public repository, submitted by pull request, reviewed by one
+person plus a CI schema check that installs the pack into a throwaway record; install from URL, git
+ref, paste or file; the index is a convenience, never a gate; the diff names every host a declared
+`source:` will call. Refused: paid packs in v1, ratings and reviews, remote assets in packs, a
+submission portal, a hosted forum, in-app social, a Discord before launch. Built last, and never
+before gate 2 ([ADR-031](16-DECISIONS.md)).
+
+**Rejected:** a marketplace with accounts, ratings and a moderation queue. A five-star system over
+twelve packs is theatre, and a platform with a moderation queue is a company before there are users.
+
+**Would reverse it:** a pack author asking to be paid — which brings Stripe Connect, tax and
+refunds, and is a company decision, not a format one.
+
+---
+
+## ADR-048 · A pack install is never auto-approved, and packs never auto-update
+
+**Decided.** No "always allow" for a pack author however trusted — Zed's argument about skills:
+inert by themselves, side effects not. No automatic pack updating. An update that would move an
+existing page's `nav` is shown and ignored. Seeds are marked `example` and clearable in one undoable
+action. Install is two phases with one plan: `planPack(pack) → Diff`, then
+`installPack(pack, planHash)`, refused with `PLAN_STALE` if the record moved in between.
+
+**Rejected:** trusted-author auto-update. It makes the Kennel a distribution channel for a rule that
+silently changes what a rule does to money.
+
+**Would reverse it:** nothing; a customer needing unattended updates gets a scheduled `planPack`
+that opens a suggestion, never an auto-apply.
+
+---
+
+## ADR-049 · Rule precedence is fixed, and a person's write beats a rule's
+
+**Decided.** Rules resolve by `priority` ascending (default 100) → longest literal (the byte length
+of the longest `is`/`contains`/`starts`/`ends` literal in `when:`; none = 0) → `id`; one pass; ≤ 1
+`set` per field. `hits` is drawn per rule; a dry run reports `won`, `lost`, `takenBy`;
+`rule apply --dry` is the undo. A field whose last `event.actor` is a person is **never overwritten**
+by a rule, an ingest or a connector — step 2b of the write path.
+
+**Rejected:** "declared order". It makes specificity a matter of where an author put a line, and a
+pack merge changes it silently.
+
+**Would reverse it:** a measured case where a person's stale value should lose to a connector's
+fresh one — a per-field `pinned: false` option, not a change to the default.
+
+---
+
+## ADR-050 · Screenshot mode is a kernel display mode with a provenance allow-list
+
+**Decided.** Under `html[data-shot]` every record-held figure and string is plated and blurred; only
+literals typed into source are legible; layout is byte-identical off → on (element boxes and page
+height asserted) and pixel readback proves redacted digits are indistinguishable. It is a display
+mode for a shoulder, not a privacy boundary, and says so.
+
+**Rejected:** pattern-based redaction. It once let *"GREEN MARKET"* through as a placeholder;
+provenance cannot.
+
+**Would reverse it:** a requirement that the redacted words leave the DOM — which is a different
+feature, a redacted projection, and is named as such.
+
+---
+
+## ADR-051 · Spark has no panel; it is a mode of the palette and rows in existing queues
+
+**Decided.** No chat panel, widget or page. The command surface is **the palette** (`⌘K`); Spark is
+its fallback row when a model is configured — one proposal with its verbs, never a transcript — plus
+rows in Decide and Inbox. Every deterministic feature is byte-identical with Spark absent, and CI
+proves it with `SPARK_ENDPOINT` unset. Spark may not type a number — figures are `{{path}}`
+interpolations. Open proposals are capped at 3 per register; a fourth displaces the lowest-ranked,
+which closes with a recorded reason. This settles [Q5](17-OPEN-QUESTIONS.md).
+
+**Rejected:** a chat panel. It eats the design, it accumulates, and it has a substitute the buyer
+already owns in a terminal.
+
+**Would reverse it:** [ADR-030](16-DECISIONS.md)'s instrumented ask firing.
+
+---
+
+## ADR-052 · Connector credentials live under a second, KEK-wrapped DEK
+
+**Decided.** A scheduled connector must decrypt with nobody present, so connector grants are wrapped
+by the operator's KEK — `vault_key.purpose = 'connector'`, always `kek` — even when the vault
+passphrase is on. The [12-SECURITY](12-SECURITY.md) §7 honesty table carries the row and the bind
+screen says it in words. *"We cannot read it"* is true only after the 30-day PITR and backup window.
+This settles [Q13](17-OPEN-QUESTIONS.md).
+
+**Rejected:** pausing connectors whenever the passphrase is on. Honest, but a security feature
+silently disabling an unrelated one, discovered from a gap in a chart.
+
+**Would reverse it:** a passphrase-derived key usable unattended — a hardware token per record,
+which no self-hoster has.
+
+---
+
+## ADR-053 · Attachments: a `file` type, a per-record content-addressed store, same-origin delivery, no viewer
+
+**Decided.** `file = { sha256, mime, bytes, name }` is a kernel value type; bytes live in R2 or on
+disk under `rec_<id>/<sha256>` (dedupe per record only — `BlobKey` is the only constructor); served
+at `/a/<sha256>` with the type sniffed from bytes, SVG refused (415), a 2 MB cap and
+`default-src 'none'; sandbox`; `export --with-attachments` hashes the set; nothing is rendered in
+v1. This settles [Q10](17-OPEN-QUESTIONS.md).
+
+**Rejected:** deferring attachments entirely. An invoice PDF is exactly what arrives by email, and
+the deferral had been read back as a position.
+
+**Would reverse it:** nothing — the open remainder is the viewer, Phase C.
+
+---
+
+## ADR-054 · Streamable HTTP only; the legacy HTTP+SSE transport is not carried
+
+**Decided.** One MCP transport per the 2026-07-28 spec, hand-rolled JSON-RPC with zero
+dependencies; `instructions` returned with every `tools/list` under the same `ttlMs`, since there is
+no initialise step; `tools/list` ≤ 1,800 tokens. Phase A ships agent tokens only; the RFC 9728
+document and the authorization server are deferred with a stated reason, and when built BrainDog is
+its own AS. A stateless one-day shim for a named client is the only permitted exception, removed at
+the offramp date.
+
+**Rejected:** a dual-transport server. It carries the statelessness assumption of the old transport
+forever.
+
+**Would reverse it:** one of the three clients the buyer uses still lacking streamable HTTP at build
+time — which is the shim, not a reversal.
+
+---
+
+## ADR-055 · `contains:` is substring; `matches:` is full-text
+
+**Decided.** `contains:` is field-scoped, ASCII-case-folded substring —
+`instr(lower(x), lower(?)) > 0`, ≤ 40 bytes, **identical on both backends**. `matches:` is
+register-wide FTS5 token match over the register's `search:` fields, on the entry backend only; the
+MATCH operand is one quoted phrase with `"` doubled, so no FTS5 operator is reachable from an
+author. Neither compiles to `LIKE`; `starts`/`ends` do, with `ESCAPE` and a 40-byte cap under
+workerd's 50-byte `sqlite3_limit`.
+
+**Rejected:** `contains` compiling to FTS5. A field-scoped test cannot be answered by one
+register-wide `text` column, and a token match is not a substring match — an author would learn the
+difference from a wrong result.
+
+**Would reverse it:** per-field FTS5 columns becoming cheap enough to make `contains` a token match
+without losing field scope — and even then `contains` and `matches` stay two operators.
+
+---
+
+## ADR-056 · Sixteen block kinds
+
+**Decided.** `note quote stat bar gauge chips spec params todo steps timeline board code tree
+comparison table` — sixteen, counted. `table` is the one kind bound to a `source:` register with
+declared `columns:`, page-only and refused in a write-up. `diagram sparkline series forecast` are
+post-v1 and arrive as a pack. Kinds are declared as JSON under `packages/render/kinds/*.json`, so
+first-party and third-party kinds take one code path; `PRIMITIVES_VERSION = 1`. The grammar is
+[34-GRAMMARS](34-GRAMMARS.md) §2.
+
+**Rejected:** fifteen, with `table` spelled `comparison`. The canonical page declaration, the T1
+emergent page and the width-class table all used `table`, and a validator built from fifteen refused
+every declared page in the corpus.
+
+**Would reverse it:** a seventeenth kind that cannot arrive as a pack — which would mean the
+primitive layer is wrong, not the count.
+
+---
+
+## ADR-057 · Refusal codes are enumerated, `UPPER_SNAKE`, in one table, with a fixture per code
+
+**Decided.** Every refusal has a code from the one table in [30-BLUEPRINT](30-BLUEPRINT.md) §6 —
+pack/declaration, grammar, write path, auth/vault, format/lifecycle, dialect — plus the adapter's
+separate closed vocabulary. A code with no fixture fails CI; a refusal path with no code fails
+review. Adding a code is a diff to that table.
+
+**Rejected:** codes as free strings in two conventions — `already_known`, `wrong_key`, `human_only`
+beside `FIELD_TYPE_UNKNOWN`. A refusal an implementer cannot grep is a refusal that cannot be tested.
+
+**Would reverse it:** nothing; the table grows, the rule does not change.
+
+---
+
+## ADR-058 · Missing-value semantics: positive operators are false, negative operators are true
+
+**Decided.** An absent key, JSON `null`, `""` and `[]` are **missing**. `empty: true` matches;
+`present: true` does not. Positive operators — `is in gt gte lt lte before after between has
+contains matches starts ends` — are **false** on missing. Negative operators — `not not_in lacks` —
+are **true**, and compile to `(expr IS NULL OR expr <> ?)`. `none:` is `NOT(any)` over branches
+already two-valued by this rule; `bool` literals bind as 1/0. The reference evaluator and the
+compiler agree by construction, which is what the property test needs.
+
+**Rejected:** SQL's three-valued logic as the truth table. `<>` and `NOT IN` yield NULL on a missing
+field, so `{ field: tag, not: x }` would silently exclude every row with no tag.
+
+**Would reverse it:** an author-facing need for *unknown* as a third value — which would be a new
+operator, not a change to these.
+
+---
+
+## ADR-059 · Billing lapse: read-only, then a 90-day ladder; export is always guaranteed
+
+**Decided.** When a Cloud subscription lapses the record goes **read-only**: connectors and digests
+pause; export and MCP reads stay available for 90 days; then the erasure ladder runs. At no point is
+export withheld — the no-lock-in argument depends on it.
+
+**Rejected:** immediate suspension with the data held pending payment. It turns the record into a
+ransom, which is the one thing the format exists to make impossible.
+
+**Would reverse it:** nothing about the guarantee; the 90-day figure moves with storage cost.
+
+---
+
+## ADR-060 · No admin token; ADMIN and VAULT are a browser session only
+
+**Decided.** Token scopes are `read propose write` and nothing else — **there is no `admin` scope,
+ever**. The ADMIN group (`planPack installPack uninstallPack setDeclaration invite export import
+erase restore`) and the VAULT group (`listGrants openGrant bindGrant revokeGrant`) answer a browser
+session only; every bearer at those routes gets `403 NEEDS_BROWSER_SESSION`. The CLI's install path
+is a device grant approved in the browser; the self-host's `BRAINDOG_TOKEN` is the one owner-level
+bearer and exists only for a single-user private instance.
+
+**Rejected:** an `admin` scope, off by default. A scope that exists can be minted, leaked and
+replayed; a group no token can reach cannot.
+
+**Would reverse it:** a headless deployment that must install packs unattended — which would be a
+signed, single-use plan hash, not a scope.
+
+---
+
+## ADR-061 · Identity lives in a `Directory` object; three DO classes
+
+**Decided.** `Record`, `Spark`, `Directory`. The Directory is one instance holding email → person,
+credential → passkey, person → records, slug → `rec_id`, browser sessions, magic links and the login
+lockout; the record keeps what a `.dog` must resolve offline and what is scoped to one record —
+`person` (a mirror), `token`, `auth_fail`, `counter`, `vault_key`, `job`, `job_event` — for
+**twenty-seven kernel tables**, plus the four `dog_*` header tables in every live record. On the
+self-host the Directory is `directory.sqlite` in the same process, same schema, same `Sql` port.
+The Worker resolves slug → `rec_id` there, then `idFromName(rec_id)`.
+
+**Rejected:** identity tables inside every record, or KV as a hot directory. The first cannot answer
+*which records does this email own* without fanning out; the second is a second store to replicate
+that the self-host cannot match.
+
+**Would reverse it:** a customer count at which one Directory object's single-writer throughput
+binds — sharding by email prefix is the documented next step.
+
+---
+
+## ADR-062 · The record never sees a plaintext credential
+
+**Decided.** AES-GCM runs in **the Worker**, never in the record. `openGrant(id)` logs `grant.read`,
+increments `opened`, and returns sealed material `{ ciphertext, nonce, aad, kek_id, wrapped_dek }`;
+the Worker unwraps the DEK via `KeyStore`, derives the grant key, decrypts, and returns plaintext to
+the browser once. `bindGrant` is the mirror: the Worker encrypts, the record stores. The record has
+no `KeyStore` port, so the property is structural rather than policed.
+
+**Rejected:** decryption inside the object. It would give the record a `KeyStore` port and make a
+compromised record a compromised vault; today a compromised record yields ciphertext.
+
+**Would reverse it:** a per-record hardware key that only the object can drive — which does not
+exist on the platform.
+
+---
+
+*Next: [17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md).*
+

@@ -1,0 +1,987 @@
+# 02 · The data model
+
+One SQLite schema per customer, inside that customer's Durable Object. Two layers: a **kernel**
+that BrainDog owns and every record has, and **registers** that packs declare.
+
+---
+
+## 1 · The kernel
+
+Twenty-seven tables, and four header tables the format adds to every live record — thirty-one in
+the file. Nothing a pack declares can alter them, and nothing in them is optional. *(An earlier draft
+said twenty. The review proved seven missing: the people, tokens, lockouts and counters a `.dog` must
+resolve offline, the vault's wrapped keys, and the two job tables of tier C.)*
+
+```sql
+-- IDENTITY AND SHAPE ------------------------------------------------------------
+record        -- one row (singleton = 1). id 'rec_' + ULID, slug, name, locale, tz, format_ver (mirrors PRAGMA user_version), created_at
+pack          -- installed packs: id, version, source, installed_at, manifest json, checksum
+declaration   -- every declared thing: kind, id, version, pack_id, body json, checksum, superseded_at, retired. PRIMARY KEY (id, version)
+migration     -- applied kernel migrations: version, applied_at, checksum
+
+-- IDENTITY: PEOPLE, TOKENS, COUNTERS --------------------------------------------
+-- The DIRECTORY (email → person, credential_id → passkey, person → records, slug → rec_id, browser
+-- sessions, magic links, the login lockout) lives OUTSIDE the record in the third Durable Object class,
+-- `Directory`, one instance; on the self-host it is `directory.sqlite` in the same process, same schema, same Sql
+-- port. The record keeps what a .dog must resolve offline and what is scoped to one record.
+person        -- id ('p_' + ULID, minted by the Directory), email, name, suspended_at. Mirror; actors and members resolve here
+token         -- agent tokens, one record each: id, person_id, hash, scope CHECK (read|propose|write), label, created_at,
+              -- last_used_at, last_surface, expires_at, revoked_at
+auth_fail     -- per-record lockouts (device codes, share tokens): key, n, until. Never exported
+counter       -- name ('seq:<register>' | 'decision' | 'suggestion'), next. Allocation is
+              -- UPDATE counter SET next = next + 1 WHERE name = ? RETURNING next - 1 — race-free because the object is
+              -- single-writer; a purged row's seq is never reissued
+
+-- THE ROWS ---------------------------------------------------------------------
+entry         -- the universal row: id, register, seq, fields json, state, version, deleted_at
+entry_fts     -- FTS5 virtual table over the projected text of every entry; rowid = entry.rowid
+entry_vec     -- id, register, dims, vec BLOB (int8), model, built_at. No FK: purge and erase delete it explicitly
+metric_point  -- (series, grain, at) -> integer value. WITHOUT ROWID. see 25-CONNECTORS §8
+
+-- ORIGIN -----------------------------------------------------------------------
+event         -- append-only audit: ts, actor, kind, target, target_kind, field, from_v, to_v, note, batch, op_id
+inbox_raw     -- untriaged arrivals: ts, channel, headers json, body, state, reason, sha256
+ingest_receipt-- which pattern matched which raw payload, and what it wrote; confidence
+observation   -- how the record is actually used: kind, subject, day, n. PRUNABLE, 400 days, never rolled up
+
+-- GOVERNANCE -------------------------------------------------------------------
+decision      -- immutable. id, question, answer, reason (NOT NULL), decided_by, ts
+suggestion    -- open questions with options json, status, opened_by
+prediction    -- a falsifiable claim about an accepted change: measure, frozen baseline (INTEGER, with unit), score_at, on_miss
+grant         -- the credential vault. label, opens, kind, version, ciphertext, nonce, kdf, rotated_at, stale_at
+device_grant  -- a device asking to open the vault: code_hash, status, tries, expires. see 12-SECURITY §6.1
+member        -- who may do what, per register: person_id, register, level, seen_at (the READ MARK, MAX only)
+schedule      -- the single-alarm work queue: due_at, kind, payload json, state
+outbox        -- work that must leave the object: kind, payload json, state, leased_until
+
+-- VAULT ------------------------------------------------------------------------
+vault_key     -- purpose CHECK (record|connector|signing), wrapped BLOB, nonce BLOB, wrapped_by CHECK (kek|passphrase),
+              -- kek_id, salt, rewrapped_at. Exactly one wrapping per key; 'connector' is always kek (Q13); 'signing' is
+              -- the record's Ed25519 private key (03 §4)
+
+-- JOBS (tier C) ----------------------------------------------------------------
+job           -- id, kind CHECK (four), args, status CHECK (nine), runner_id, claimed_at, lease_until, seq (event high-water
+              -- mark), cancel, session, created_at, expires, claude_session, result, error, cost_minor, turns, ms
+job_event     -- (job_id, seq) PK, kind CHECK (start|say|think|tool|out|limit|note|end|error), body, ts
+```
+
+**And four header tables, which are not the kernel's but are in every live record.** Migration 0001
+creates `dog_meta` · `dog_section` · `dog_manifest` · `dog_sig` in every live database, DO and file
+alike, because on the self-host the live file *is* the `.dog` ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3).
+`dog_manifest` and `dog_sig` are refreshed by an export and sit empty in a live DO. Seven of the
+twenty-seven carry `dog_section = 'local'` and **never travel**: `vault_key`, `token`, `device_grant`,
+`auth_fail`, `observation`, `job`, `job_event`. `counter` travels, because `seq` allocation must survive
+a move.
+
+> **`observation` and `prediction` are the two that make [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md)
+> possible, and they are deliberately not one table.** An observation is *Origin* — it is prunable,
+> pre-aggregated daily, and never travels in an export. A prediction is *Governance* — it sits beside
+> `decision` because it is a decision's falsifiable half, and it is the only thing in the record that
+> can say an accepted change did not work. `event` could carry neither: it is append-only forever, it
+> travels in every export, and a drifting event vocabulary is unqueryable in five years.
+>
+> `outbox` — an earlier draft called it "the fifteenth", of fifteen — exists because the record object may make no outbound call
+> while the alarm that must send a digest fires *inside* it. The alarm writes rows; the Worker
+> leases and sends them. [01-ARCHITECTURE](01-ARCHITECTURE.md) §2 has the mechanism and the
+> ordering rule it depends on.
+
+### Three deliberate choices in that list
+
+**`entry` is one table, not one per register.** A register is a *declaration*, not a DDL
+statement. Fields live in a JSON column, and a field a register marks indexable gets a **partial
+expression index** over `json_extract(...)` — never a column. The next subsection is entirely
+about why, because an earlier draft said generated columns here and was wrong.
+
+Why: a pack that creates real tables can only be uninstalled by dropping them, which destroys
+the customer's rows — and the pack contract in [04-PACKS](04-PACKS.md) is that *declarations
+belong to the pack, rows belong to you*. One table makes uninstall a metadata operation, and it
+makes the `.dog` file's schema stable across every possible pack combination, which is what makes
+the format [readable by plain `sqlite3`](03-DOG-FORMAT.md).
+
+### How an indexed field is actually indexed — and why it is NOT a generated column
+
+**An earlier draft of this document said generated columns, and that was wrong in a way that would
+have failed at the twelfth installed pack.** The arithmetic: `entry` is *one shared table*, so every
+register's indexed fields compete for the same 100-column SQLite ceiling. At 8 indexed fields per
+register and 64 registers that is up to **512 generated columns on a 100-column table** — and a
+`money` field needs two, so the wall arrives sooner. Worse, it fails in the worst possible order:
+the author with five packs never sees it, and the first studio customer with twelve packs — exactly
+the persona the $29 tier is priced for — gets an install refusal naming the wrong cause.
+
+**So an indexed field gets a partial expression index instead, and no column at all:**
+
+```sql
+CREATE INDEX entry_i_obligations__due
+  ON entry (json_extract(fields, '$.due'))
+  WHERE register = 'obligations' AND deleted_at IS NULL;
+```
+
+The name is `entry_i_<reg>__<field>` — the double underscore keeps `a_b` + `c` apart from `a` + `b_c`
+(§2). A `unique: true` field gets `entry_u_<reg>__<field>` on the same shape; a `series: true` register's
+`key:` gets one `entry_k_<reg>` over the key fields (§5).
+
+SQLite has indexed *expressions* since 3.9 and *partial* indexes since 3.8. This costs zero columns,
+so the count of indexed fields is bounded only by storage; the predicate compiler emits the same
+`json_extract(…)` expression, so the planner uses the index; and `WHERE register = …` keeps each
+index the size of one register rather than the whole table.
+
+> **This is on the must-verify list** ([17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md) Q12): confirm the
+> Durable Object's SQL API accepts an expression index and that the planner picks it. It is a
+> half-day spike and it gates the whole index model, so it happens in week one.
+
+The remaining cost is honest: an unindexed field is a scan through `json_extract`. At thousands of
+rows per register that is microseconds; the ceiling is stated in
+[22-FRONTEND](22-FRONTEND.md) §4 and it is a rendering ceiling long before it is a query one.
+
+### `session` is the one register the kernel declares, and it is the second exception
+
+The predecessor's most-used coordination feature — agent sessions with a spoken id, a handoff, and
+derived liveness — had no counterpart here. It becomes **the kernel's one declared register**, for
+the same kind of reason `state` is the one promoted column: it is the register whose rows *are* the
+agents, so it cannot live in a pack a user might not install, and making it a plain table would cost
+a ninth MCP tool. [32-PARITY](32-PARITY.md) §2.1 has the declaration and the rules —
+`S42` is spoken; staleness is derived at 45 minutes and never stored; death is **written** at 12 hours
+by a `schedule` row of kind `purge`, hourly, run by `system` — `list` never writes, and the declared
+transitions allow `active → abandoned` so the sweep's own write is legal; `last_seen` is a plain
+`instant` the kernel writes at step 6 of the write path on every write whose resolved actor is that
+session — a kernel-written field, not a derivation (§5); and **every agent write resolves to a session
+or opens one.** Its `declaration` row carries `pack_id = 'kernel'` — the only row that does, so a
+kernel-declared row and a user-authored one (`pack_id NULL`) are never confused. The CI rule *"the
+kernel contains no register declaration"* gains this one named exception.
+
+### `state` is the one promoted field, and an earlier draft never said so
+
+`entry` has a `state` column. A register also declares `state` as an ordinary `enum` field inside
+`fields`. **Both are in the corpus, and nothing said which one `{ field: state, is: open }`
+compiles against** — which for a state machine is not a detail, it is the whole thing.
+
+The resolution, and it is a deliberate special case:
+
+> **`state` is mirrored.** A register that declares a field with the id `state` must type it
+> `enum`; the write path copies its value into the `entry.state` column in the same statement that
+> writes `fields`. The predicate compiles against the **column**. A register that declares no
+> `state` field stores `NULL` there.
+
+Three reasons it earns its exception, in a model that is otherwise uniform:
+
+1. It is the most-filtered field in every register anybody has written, so it gets a **native
+   index** instead of an expression index — the one place that is worth a special case.
+2. It keeps the README's promise literally true. `sqlite3 portfolio.dog "select seq … where
+   register='obligations' and state='open'"` is the product's opening argument, and it only works
+   if `state` is a column.
+3. `move` — one of the nine rule actions — is defined as changing a state. An action that
+   operates on a field the kernel does not know about cannot be validated at install.
+
+The cost is stated rather than hidden: **`state` is a reserved field id.** A register cannot use
+it for anything but its enum, and the validator refuses `{ id: state, type: text }` by name.
+
+Everything else a row is *tagged* with lives in `fields` as a `list<text>` and is matched with
+`has`/`lacks` — including the `example` marker that a pack's seed rows carry, which is why
+clearing the seeds is one predicate rather than a special code path.
+
+**`seq` is per register, and it is the number a human says.** `entry.id` is an opaque ULID
+(`TEXT` — 53-bit precision makes numeric snowflakes unsafe). `entry.seq` is a per-register
+counter: obligation #7, task #125. Two customers both have a #1. This is the naming requirement
+that forced per-customer isolation in the first place, and it is finally cheap. The number comes from
+the `counter` table inside the write transaction — `UPDATE counter SET next = next + 1 WHERE name =
+'seq:<register>' RETURNING next - 1` — race-free because the object is single-writer, and **never from
+`MAX(seq) + 1`**, which would reissue a spoken id the first time the highest-numbered row was purged.
+`D<n>` and `SG<n>` draw from the same table.
+
+**`event` is append-only and never has a foreign key to `entry`.** Deleting an entry must not
+delete its history. A record whose audit log can be pruned by a delete is a record that cannot
+answer "what happened to that". SQLite in Durable Objects does not enable `PRAGMA foreign_keys`
+by default — that is a documented behaviour we rely on rather than fight, and the self-host adapter
+opens with `foreign_keys = OFF` to match. The corollary is that **no table promises a cascade**:
+`entry_vec` has no `REFERENCES … ON DELETE CASCADE`, because with constraints off it would never fire;
+purge and erasure delete its row explicitly (§9, §10). `decision.supersedes REFERENCES` is documentary.
+
+---
+
+## 2 · Ids, and what each is for
+
+| Id | Type | Shape | Spoken? |
+|---|---|---|---|
+| Record | `TEXT` | `rec_` + 26-char ULID — `record.id`, `NOT NULL UNIQUE`. The one row is pinned by `singleton INTEGER PRIMARY KEY CHECK (singleton = 1)`, never by `CHECK (id = 'self')` | no |
+| Entry | `TEXT` | 26-char ULID | no |
+| Entry seq | `INTEGER` | per register, from 1, allocated from `counter` | **yes** — "#125" |
+| Decision | `TEXT` | `D` + integer, per record, from `counter` | **yes** — "D41" |
+| Suggestion | `TEXT` | `SG` + integer, per record, from `counter` | **yes** — "SG23" |
+| Person | `TEXT` | `p_` + 26-char ULID, minted by the `Directory` object and mirrored into `person` | no |
+| Declaration | `TEXT` | `kind.id`, e.g. `register.obligations` | yes, by authors |
+| Pack | `TEXT` | kebab-case, `^[a-z][a-z0-9-]{1,63}$`, globally unique in the Kennel | yes |
+
+A spoken id is **stable forever**. Renaming a display label is free; changing an id breaks the
+audit trail and every `#125` written into a note. This is stated in the pack validator as a
+refusal, not a warning.
+
+### Spoken ids have a grammar, and `#` never resolves bare
+
+Two forms, and `get` accepts either — `{ spoken }`, `{ register, seq }` or `{ id }`:
+
+| Form | Pattern | Example |
+|---|---|---|
+| **Prefixed** | `^([A-Z][A-Z0-9]{0,3})([1-9][0-9]*)$` | `D41` · `SG23` · `S42` · `LN7` |
+| **Qualified** | `^([a-z][a-z0-9_]*)#([1-9][0-9]*)$` | `tasks#125` · `obligations#7` |
+
+`#` is the display default (`seq_prefix: "#"`) and **never resolves bare** — every register has a `#7`,
+so a bare `#7` is ambiguous the moment two registers keep the default, and the kernel refuses it rather
+than guessing. A non-`#` prefix must be unique among installed registers; a second register claiming
+`LN` is refused at install (`SEQ_PREFIX_TAKEN`). `D`, `SG` and `S` are reserved by the kernel. The
+full grammar is [34-GRAMMARS](34-GRAMMARS.md) §4.
+
+### Identifiers
+
+| Thing | Grammar |
+|---|---|
+| register and field ids | `^[a-z][a-z0-9_]{0,31}$` — so `json_extract(fields, '$.<id>')` never needs quoting |
+| pack ids | `^[a-z][a-z0-9-]{1,63}$` |
+| index names | `entry_i_<reg>__<field>` for `index: true` · `entry_u_<reg>__<field>` for `unique: true` · `entry_k_<reg>` for a `key:` |
+| reserved field ids | `id` `seq` `register` `created_at` `updated_at` `deleted_at` `version` `spoken` `title`; `state` unless it is the register's `enum` (§1); anything starting `_`, which is the kernel's — `_rule` `_parent` `_each` on a rule-generated row |
+
+---
+
+## 3 · Money
+
+> **Money is always an integer in minor units, with its own currency. Never a float. Never a
+> bare number.**
+
+```json
+{ "amount": 131624600, "currency": "EGP" }
+```
+
+That is the canonical JSON of a `money` value — `amount` and `currency`, never `minor`, never a
+string. Every one of the sixteen types has one such shape, byte-exact; the list is
+[34-GRAMMARS](34-GRAMMARS.md) §3 and §5 below summarises it.
+
+Three rules, all enforced at the validator rather than by convention:
+
+1. **Divide by 100 only at the point of display.** A currency's exponent comes from a table
+   (JPY is 0, KWD is 3), never assumed to be 2.
+2. **Two currencies are never added.** A metric summing a mixed-currency field is *refused at
+   install*, not silently converted. A total across currencies must name its FX source and date.
+3. **An FX rate is a dated row**, not a live lookup. A figure that changes when you reload it is
+   not a figure you can act on.
+
+`fx` is a kernel-adjacent register shipped by the `money-core` pack: `currency`, `base`, `rate`,
+`as_of`, `source` — a lookup spells `{ lookup: fx, by: currency, as_of: day }`
+([08-METRICS](08-METRICS-AND-ANALYTICS.md) §2.5). *(An earlier draft gave it a `pair` field, which
+nothing could look a row up by.)* A converted total renders as `~$41,420 at 48.9 EGP/USD, 26 Aug 2026` — the
+approximation sign and the date are part of the value, not decoration.
+
+---
+
+## 4 · Time
+
+| Field kind | Stored as | Why |
+|---|---|---|
+| Instant | `TEXT` RFC 3339 UTC | sortable as text, unambiguous |
+| Plain day | `TEXT` `YYYY-MM-DD` | a renewal date has no time zone |
+| Recurrence | RRULE subset on a `day`/`instant` field | `FREQ`, `INTERVAL`, `BYDAY`, `BYMONTHDAY`, `UNTIL`, `COUNT` |
+
+### Recurrence is a property of a date field, not a type — and `BYDAY` was missing
+
+An audit called the old subset *the most revealing line in the data model*, and it was right:
+**`BYMONTHDAY` with no `BYDAY`** is the recurrence of a subscription renewal, not of a person's
+calendar. *"Every Tuesday and Thursday for six weeks"* could not be written. The word "recurrence"
+appeared exactly once in twenty-four documents, and `recurrence` was not one of the value types —
+so the row in the table above described something that did not exist.
+
+It is not a seventeenth type. It is a key on a `day` or `instant` field, sitting beside `remind:`,
+which is already the same shape:
+
+```yaml
+- id: starts
+  type: instant
+  repeat: { freq: weekly, byday: [TU, TH], count: 12 }
+  remind: [-1d, -1h]
+```
+
+> **What a `repeat:` produces is `schedule` rows, not `entry` rows.** Twelve reminders off one
+> appointment is free. Twelve *appointments*, each separately editable with its own notes and its
+> own state, is row generation — a different problem, answered by the `create` action in
+> [07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §6. Conflating the two is how a calendar feature
+> becomes a data model.
+
+**A plain day renders at noon UTC.** This is not pedantry: rendering `2026-08-17` as midnight
+UTC displays as 16 August anywhere west of Greenwich, and a renewal reminder that fires on the
+wrong day is worse than no reminder. The record's own timezone is stored on `record` and used for
+digest scheduling; plain days are never shifted by it.
+
+---
+
+## 5 · A register declaration
+
+```yaml
+register: obligations
+name: Obligations             # REQUIRED — the header title; the id is never shown
+pack: money-core
+seq_prefix: "#"
+fields:
+  - { id: what,     type: text,     required: true, index: true }
+  - { id: to,       type: ref,      register: people }
+  - { id: amount,   type: money,    required: true }
+  - { id: due,      type: day,      required: true, index: true }
+  - { id: state,    type: enum,     values: [open, part, paid, void], default: open, index: true }
+  - { id: note,     type: document, max: 512000 }
+search: [what, note]          # what `matches` searches — text document enum url email list<text> only (SEARCH_FIELD_TYPE)
+title: what                   # what a row is called in a list
+mobile: [what, amount, due]   # the three fields the phone view keeps — see 19-INTERFACE §8
+one: obligation               # the singular, for "New obligation". ASKED FOR, never derived —
+                              # English heuristics fail on people/fx/series, and this ships Arabic.
+                              # Absent: a validator warning, and the header reads "New row"
+```
+
+### `series: true` — the registers that are facts, not things
+
+Every register above pays what an audit called a **named-business-record tax**: a `seq` that is
+spoken and stable forever, a `title` because a row is called something, three fields for a phone
+view, an FTS5 projection, and a 1,024-byte embedding.
+
+For a register of daily measurements that is all wrong, and one line of it is absurd: a marketing
+record with twelve campaigns across six channels writes ~26,000 rows a year, which is **fine** —
+about 6 MB in a 10 GB object, and the partial index is per-register so it never touches anything
+else. But it also generates **26 MB of int8 embeddings of integers**, five times the size of the
+data, polluting every `near` search with rows whose entire content is a number. And `seq` promises
+that `campaign_day #18,432` is a name a human says, which nobody ever will.
+
+```yaml
+register: campaign_day
+series: true          # no seq, no title, no mobile view, no FTS, no vector
+key: [campaign, channel, day]     # what makes a row unique; upsert, never duplicate
+```
+
+| `series: true` turns off | Because |
+|---|---|
+| `seq` | a spoken id for an observation is a promise nobody wants kept |
+| `title` and `mobile` | a Tuesday's ad spend is not a thing with a name |
+| the FTS5 projection | there is no text |
+| the vector | see the 26 MB |
+| single-row create in the UI | these arrive from a connector, in batches |
+| `matches`, `contains`, `near`, `starts`, `ends` in any `where:` over the register | refused at install: a series has no text (`SERIES_HAS_NO_TEXT`) |
+| `series: true` turns **on**: `key:` | an idempotent upsert — one `CREATE UNIQUE INDEX entry_k_<reg>` over the key fields, and step 6 of the write path is `INSERT … ON CONFLICT DO UPDATE` — so re-fetching yesterday corrects it rather than duplicating it, which is the single most common failure of every analytics importer ever written |
+
+**The storage was never the problem and no second table is needed** — this is the one-table
+decision working exactly as designed. What was wrong was charging a fact the same tax as a thing.
+
+### The field types, and the list is closed
+
+`text` · `document` · `int` · `decimal` · `money` · **`quantity`** · `day` · `instant` ·
+`duration` · `bool` · `enum` · `ref` · **`file`** · `url` · `email` · `secret` ·
+`list<T>` · `json`
+
+**Sixteen value types, plus two meta.** The two meta are `list<T>`, a *container* over a value
+type, and `json`, the escape hatch. Counted: text, document, int, decimal, money, quantity, day,
+instant, duration, bool, enum, ref, file, url, email, secret. They are counted separately because
+the UI shows the count — a type picker of *n* cells — and a closed list whose stated number
+disagrees with its own enumeration is the kind of imprecision that gets repeated in a README
+forever.
+
+### The canonical JSON of each, in one line apiece
+
+| Type | Stored as | Type | Stored as |
+|---|---|---|---|
+| `text` | string — never JSON-quoted (`TEXT_JSON_QUOTED`, `TEXT_ESCAPED_NEWLINE` refuse at step 3) | `enum` | a string in `values` |
+| `document` | string, the dialect, LF line endings | `ref` | the target `entry.id` |
+| `int` | JSON integer, \|n\| ≤ 2^53 − 1 (`INT_OUT_OF_RANGE`) | `file` | `{ "sha256", "mime", "bytes", "name" }` |
+| `decimal` | JSON number, ≤ 15 significant digits | `url` | absolute, `https:` or `mailto:` only |
+| `money` | `{ "amount": int, "currency": "EGP" }` — never `minor` | `email` | one addr-spec, domain lower-cased |
+| `quantity` | `{ "value": number, "unit": "m" }` | `secret` | the `grant.id` |
+| `day` | `"YYYY-MM-DD"` | `list<T>` | a JSON array of T |
+| `instant` | RFC 3339 UTC, `Z`, millisecond precision | `json` | any JSON |
+| `duration` | integer seconds (displayed `3d 4h`) | | |
+| `bool` | `true` / `false`, bound to SQL as `1`/`0` | | |
+
+Byte-exact, and the authority is [34-GRAMMARS](34-GRAMMARS.md) §3; step 3 of the write path (COERCE)
+parses to these shapes and nothing else, and the `where:` compiler compares against them.
+
+Each type is a validator, a form control, a renderer, a `where:` compilation and a line in the MCP
+schema. **A seventeenth is five pieces of work and a new way to be wrong**, which is the same
+argument the eight pack kinds rest on, and it is why the two below were added only after a stress
+test showed exactly what their absence cost.
+
+> ### The two that were added, and why an earlier draft was wrong to stop at fourteen
+>
+> **`file` — `{ sha256, mime, bytes, name }`.** The audit's sharpest structural finding: BrainDog
+> had an attachment **store** and no attachment **type**. R2 keys, per-record prefixes, a manifest
+> that hashes the set, a `media` primitive sitting right there — and nowhere in a register
+> declaration to say *"this row has a picture."* A fashion label got a list of hex digests.
+>
+> The security objection does not reach it. [04-PACKS](04-PACKS.md) §7 bans a **remote** asset,
+> because a remote image URL is a callback with the record id in the query string. It explicitly
+> permits same-origin paths. A first-party `/a/<sha256>` route serving bytes out of the record's
+> own R2 prefix is not the banned thing, and never was. Attachments were deferred on **cost**, and
+> the deferral was then read back as a position.
+>
+> **`quantity` — `{ value, unit }`.** Structurally identical to `money`, with a unit table where
+> `money` has a currency table, and the **same refusal**: two units are never added. `decimal` is
+> a bare number, so `1.4` metres of fabric and `1.4` grams of trim were the same value and nothing
+> stopped a metric summing them. This is not a fashion nicety — a dose recorded as `5` with the
+> unit in an adjacent enum field is a patient-safety defect, and it is the exact class of bug
+> money-as-minor-units exists to prevent. It reuses `money`'s validator, renderer and refusal
+> almost entirely, which is why it costs far less than a genuinely new type.
+
+Four of them are special:
+
+- **`secret`** never stores a value in `fields`. It stores a `grant` id. The row shows *what the
+  key opens*; the key itself is in the vault. See [12-SECURITY](12-SECURITY.md) §6.
+- **`file`** never stores bytes in `fields` either — same pattern, one indirection. It stores the
+  digest, and the bytes are in R2 under the record's prefix. So a `.dog` stays a text database,
+  the 2 MB row ceiling is never in play, and an export's manifest can report a missing attachment
+  rather than silently shipping a broken reference.
+- **`ref`** is a soft reference to an `entry.id` in a named register. Deleting the target does
+  not cascade; the reference renders as "deleted", because a dangling reference is information.
+- **`quantity`** carries its unit into every comparison and every aggregation. `gt` between two
+  quantities of different units is refused at install, exactly as it is for money.
+
+### `list<T>`, and the syntax an earlier draft never wrote down
+
+`list<ref>` is used throughout the corpus and **the declaration for its target register appeared
+nowhere** — a plain `ref` takes `register:`, and nothing said where that goes inside a container.
+It goes in `of:`, and a container declares its element the same way an element declares itself:
+
+```yaml
+- { id: tags,     type: list, of: { type: text } }
+- { id: fabrics,  type: list, of: { type: ref, register: materials } }
+```
+
+**And the cost of using it for a relationship is now stated, because it is not obvious.** `has` /
+`lacks` compile to `EXISTS (SELECT 1 FROM json_each(…))`, which **cannot use an index** — so the
+*forward* read is free (the ids are on the row) and the *reverse* lookup is a full scan of the
+register. For a handful of tags that is nothing. For "which styles use this fabric" across
+thousands of rows it is the wrong instrument, and the right one is a junction register. The
+validator does not refuse it; the register editor says so at the point of choosing.
+
+### Field options added by the parity trace — `derive:`, `required_when:`, `unique:`, `immutable:`
+
+[32-PARITY](32-PARITY.md) traced the working predecessor and found the gaps were not scattered:
+nearly every one was a case where the brain **derives** something the record does not store, and
+this model had no row-level derivation. These four options close most of the list. Each is a key on
+a field declaration that already exists; none is a new type.
+
+```yaml
+fields:
+  - { id: rev,     type: int }          # four judgements, 0–30 each
+  - { id: unblock, type: int }
+  - { id: clock,   type: int }
+  - { id: cheap,   type: int }
+  - { id: score,   type: int,  derive: { sum: [rev, unblock, clock, cheap] } }
+  - { id: tier,    type: enum, values: [low, medium, high, urgent],
+      derive: { band: { of: score, edges: [40, 60, 80] } } }
+  - { id: tier_why, type: text, required_when: { field: tier, present: true } }
+  - { id: currency, type: text, immutable: true, derive: { via: account, field: currency } }
+  - { id: fingerprint, type: text, unique: true, derive: { normalise: lesson } }
+```
+
+| Option | Does | Refuses |
+|---|---|---|
+| **`derive:`** | a **row-level** derived value. **Seven shapes, and the list is closed:** `sum: [f, …]` → `COALESCE(a, 0) + …` · `diff: [a, b]` · `product: [a, b]` · `ratio: { of, per }` → `CASE WHEN per = 0 THEN NULL ELSE of * 1.0 / per END` (a zero `per` yields missing, never 0) · `band: { of, edges }` → `CASE WHEN x < e1 THEN v1 … ELSE vn END`, the edges exclusive upper bounds mapped onto the field's `values:` in order — *n* edges ↔ *n*+1 values, else `BAND_EDGES_MISMATCH` · `via: <ref>, field: <far field>` → the one-hop subquery of §6 · `normalise: f` → `lower(trim(f))`, whitespace collapsed. Operands are this row's field ids (numeric for the arithmetic four) or one `lookup` — never aggregations. **Never stored**: computed at read and projection, and **inlined by the `where:` compiler** so `{ field: tier, is: urgent }` still works. Three of the shapes are the metric grammar's combinators (`diff` · `product` · `ratio`) and four are row-scoped only (`sum` over named fields, `band`, `via`, `normalise`); depth one; a derivation may not read another row except through one `via:` hop. **Kernel-written fields are not derivations**: `session.last_seen` is written at step 6 on every write from that session, and the identity accent `hue` is generated at create (ADR-028) — neither is a shape here, and an earlier draft of the kernel's own register used two operators (`touched_by`, `hue_from`) that this list never had | a derived field cannot be written, `index: true`, or `required`. **One exception:** `unique: true` on a derived field materialises the value into `fields` at step 6 of the write path so the partial unique index has an expression to cover — **the only stored derivation** |
+| **`required_when:`** | a conditional requirement, taking one `where:` leaf on the same row, restricted to `is not in not_in gt gte lt lte before after between empty present has lacks` — never `contains`, `matches`, `near` or `via:` (`REQUIRED_WHEN_OP_UNSUPPORTED`). *"Never set a tier without `tier_why`"* was prose in the brain; here it is a refusal that names both fields. **It borrows the leaf syntax and is not an eighth consumer** — it never compiles to SQL; it is one comparison evaluated against the row being written, in validation, the way `transitions:` is | — |
+| **`unique: true`** | a partial unique index over the register — `CREATE UNIQUE INDEX entry_u_<reg>__<field> ON entry(json_extract(fields, '$.<field>')) WHERE register = '<reg>' AND deleted_at IS NULL`. The refusal names the existing row by its spoken id — `ALREADY_KNOWN: LN7` — which is what makes it useful rather than merely correct | — |
+| **`immutable: true`** | set once, on create. A later write to the field is refused with the reason. Distinct from `immutable_when:`, which locks a whole row by predicate | — |
+
+**Why `derive:` is the important one, and why it is safe.** The brain parses a task's priority score
+out of a *sentence* — `"Rev 30 + unblock 14 + clock 20 + cheap 20"` — because storing the number
+would let it drift from the reasoning. That instinct is right and the mechanism is fragile. Four
+`int` fields and a derived `score` keep the reasoning as data and the number as a consequence, which
+is the brain's own philosophy — *derived, never stored* — applied to the one thing it stores. And it
+cannot become a formula language: three of the seven shapes are the metric grammar's combinators, there
+is no nesting, and a derivation over another register is a **metric**, not a field.
+
+### Register options added by the same trace — `delete:`, `pairs:`, `repeat:` extensions
+
+```yaml
+register: accounts
+delete: refuse_while_referenced        # 409, naming the count and the register. Archive instead.
+
+register: transactions
+pairs: { on: [currency, abs(amount)], opposite: amount, across: account, within: 4d, mark: moved }
+```
+
+| Option | Carries |
+|---|---|
+| **`delete: refuse_while_referenced`** | *"an account with transactions cannot be deleted — archive instead."* A reverse-reference check at delete time. `ref` stays soft everywhere else, because *deleting the target does not cascade* is the right default for a record and the wrong one for a ledger |
+| **`pairs:`** | transfer detection: two rows with the same `|amount|` and currency, opposite signs, different accounts, within a window, **paired once** — a third equal row stays unpaired, and zero never matches. Rows are **marked, never hidden**. A bounded self-join the kernel implements, because a `where:` cannot say it and every ledger needs it |
+| **`repeat:` gains `bymonthday: [15, -1]` and `workday: previous \| next \| none`** | *"a salary paid twice a month has DAYS"*: the 15th and the last day, each moved back to Friday off a weekend. RRULE cannot express the weekend shift; one post-rule can. Monthly on the 31st clamps to the month's end |
+| **`name`** (required) and **`one:`** | the header title, and the singular for *"New obligation"*. `name` absent is a refusal at install — the id is never shown; `one:` absent is a warning, and the header reads *"New row"* ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) |
+| **`identity: { mark: <enum field>, accent: <int field> }`** | the register's rows carry a mark and one accent hue, generated once at create and validated distinct — [13-UI](13-UI.md) §2.1b, [32-PARITY](32-PARITY.md) §4.4, ADR-028. The accent is kernel-written, never derived |
+| **`predicates: { overdue: { … } }`** | named predicates in the `where:` grammar, referenced from any `where:` on the same register as the leaf `{ predicate: overdue }` — §6. A saved view is a predicate plus an `order:`, keyed by its spoken id |
+
+**`by:` on a transition** — the last addition, and it generalises two of the brain's hard-coded
+routes:
+
+```yaml
+transitions:
+  proposed: { to: [active], by: decide }     # a PERSON at the `decide` level. No token grants it.
+```
+
+The brain refuses an agent promoting a learning, and an agent deciding a question, with a
+`HUMAN_ONLY` 403 on two specific routes. Here it is a word on the transition, using the level ladder
+in [20-COLLABORATION](20-COLLABORATION.md) §1, and it works for any register.
+
+### `transitions:` — an enum that knows which moves are legal
+
+An `enum` gave a set of values and nothing else, so a generated form offered every value at every
+moment. Nothing prevented `proto → top`, `paid → open`, or `discharged → admitted`; the
+append-only log then recorded the illegal move faithfully, forever.
+
+```yaml
+- id: state
+  type: enum
+  values: [draft, posted, void]
+  transitions:
+    draft:  { to: [posted, void], requires: [date, narrative] }
+    posted: { to: [void] }
+    void:   { to: [] }
+```
+
+| Property | Consequence |
+|---|---|
+| A missing `transitions:` means **every move is legal** | additive. Every register written before this existed keeps working |
+| `requires:` names fields that must be non-null **to enter** that state | the "you cannot post an incomplete entry" rule, declared |
+| The generated form **omits** illegal targets rather than disabling them | a disabled control invites a question the UI cannot answer |
+| The `move` rule action is validated against it at install | a rule that could never fire is caught in the diff, not in production |
+| A refusal names both ends | `register.transactions: state cannot move draft → void … it can` reads as feedback |
+
+It is a key inside a declaration that already exists: no new type, no new block kind, no parser
+change. That ratio is why it is in the kernel rather than in a phase.
+
+### `min:` / `max:`, `retired: true`, and what a type change is
+
+Three field options the review found used and never defined, and one that was defined too loosely:
+
+| Option | Does | Refuses |
+|---|---|---|
+| **`min:` / `max:`** | bounds on a field: byte length for `text`/`document` (`max` defaults to the type's cap, `min` to 0), numeric bounds for `int`/`decimal`/`money`/`quantity`/`duration`, element count for `list<T>` | `OUT_OF_BOUNDS`, naming both bounds |
+| **`retired: true`** | the field stops rendering and stops being writable; the data stays in `fields` (§7). A retired field may not be `required`, `index`, `unique`, or in `search`/`mobile` | — |
+| **a type change** | does not exist in v1: retire the field and add a new one. The conversion preview is authoring-tier scope | `FIELD_TYPE_CHANGED` |
+| **removing `index: true`** | drops the index in the same transaction; nothing else changes | — |
+
+### The caps, and where they come from
+
+| Cap | Value | Source |
+|---|---|---|
+| Fields per register | **64** | **a product decision, not a platform limit.** Fields live in JSON, so nothing in SQLite constrains this — a register with 65 fields is a database, and its owner needs a different product. Stated as a choice because deriving it from the 100-column ceiling was the error described above |
+| Indexed fields per register | 8 | each is a partial expression index, which costs storage and write time rather than a column. Unbounded indexing is how a 10 GB budget and a write-row bill disappear |
+| `document` field size | 512 KB | 2 MB row ceiling, with headroom for the rest of the row |
+| Registers per record | 64 | not a platform limit; a record with 65 registers is a database, and its owner needs a different product |
+| Predicate nesting depth | 3 | counting the root group as level 1 — §6, [21-AUTHORING](21-AUTHORING.md) §4.4, [30-BLUEPRINT](30-BLUEPRINT.md) §7 |
+| Blocks per page | 24 | [21-AUTHORING](21-AUTHORING.md) §11 |
+| `limit` on a page block · on `list` | default 50, max 500 · default 25, max 200 | a page renders; an agent pages. [22-FRONTEND](22-FRONTEND.md) §4 has the rendering ceiling |
+
+---
+
+## 6 · The `where:` grammar — built once, used by seven things
+
+This is the highest-leverage decision in the data model, and it is taken on precedent:
+**Firefly III has 33 action classes and zero trigger classes**, because its triggers feed the
+same search grammar that powers transaction search. One grammar, seven consumers:
+
+| Consumer | Uses it for |
+|---|---|
+| **Pages** | which rows a block shows |
+| **Rules** | when X, do Y |
+| **Metrics** | what to aggregate over |
+| **Alarms** | what makes something due |
+| **Locks** | which rows have stopped being writable — §6.1 |
+| **Predictions** | what an accepted change claimed it would do to a number — [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6 |
+| **Ingest `match:`** | which raw payload a pattern claims — **and it is the one that runs against `inbox_raw`, not `entry`**, which is why it has a second compilation backend |
+
+> **Seven, and this list is canonical.** Other documents have enumerated it as four, five, six and
+> seven, and two of them named a different seven. **When a count is needed, cite this table rather
+> than re-counting** — [ADR-013](16-DECISIONS.md), [06-PAGES](06-PAGES.md) §2 and
+> [21-AUTHORING](21-AUTHORING.md) §4.1 all point here now. Register validation, digest sections and
+> collaboration scopes *use* the grammar but are not separate consumers: they are the same compiler
+> reached through a different declaration.
+
+"New filter", "new trigger" and "new metric predicate" become **the same commit**. It saves
+roughly two days of build and, more importantly, it is one thing to secure instead of seven.
+
+### The grammar
+
+```yaml
+where:
+  all:                                  # all | any | none
+    - { field: state,  is: open }
+    - { field: due,    before: "+30d" }
+    - { field: amount, gt: { amount: 100000, currency: EGP } }
+    - any:
+        - { field: what, contains: "hosting" }
+        - { field: tags, has: infra }
+```
+
+**The root production, which five documents used and none stated.** A predicate is a **group** —
+`all:` / `any:` / `none:` over a list of predicates — **or a single leaf**, so
+`where: { field: paid, is: false }` is legal at the root. An absent `where:` means every row
+([08-METRICS](08-METRICS-AND-ANALYTICS.md) §2). Groups nest to **depth 3**, counting the root group
+as level 1; a fourth level is refused at install (`PREDICATE_TOO_DEEP`), and same-quantifier nesting is
+flattened on save ([21-AUTHORING](21-AUTHORING.md) §4.4). The EBNF, and every compile rule on this
+page stated formally, is [34-GRAMMARS](34-GRAMMARS.md) §1.
+
+| Operator | Applies to | Compiles to |
+|---|---|---|
+| `is` / `not` | all | `=` on `json_extract(fields, '$.<id>')`, which is the indexed expression; `not` is `(expr IS NULL OR expr <> ?)` — see *Missing values* |
+| `in` / `not_in` | enum, ref, text | `IN (…)`, **chunked at 64 values** (100-parameter ceiling): chunks of `in` are joined with `OR`, chunks of `not_in` with `AND`, inside one parenthesis |
+| `gt` `gte` `lt` `lte` | int, decimal, money, quantity, day, instant, duration | comparison; money and quantity compare inside one currency or unit — see *Money and quantity* |
+| `before` / `after` / `between` | day, instant | a bound parameter, resolved once at compile — see *Temporal literals*. `between: [a, b]` is inclusive of both ends |
+| `contains` | text, document | **a field-scoped substring**, ASCII-case-folded: `instr(lower(json_extract(…)), lower(?)) > 0`. The literal is ≤ 40 bytes (`CONTAINS_TOO_LONG`). **Identical on both backends** |
+| `matches` | the register | **register-wide full text**: `id IN (SELECT id FROM entry_fts WHERE register = ? AND entry_fts MATCH ?)` over the register's `search:` fields — the projected text is the `search:` values in order, lists joined by a space, fields by LF, whitespace collapsed. The operand is **one quoted phrase** with `"` doubled, so no FTS5 syntax is reachable from an author. Entry backend only; it takes no `field:` |
+| `starts` / `ends` | text | `LIKE ? ESCAPE '\'` with `%` and `_` escaped in the literal; case-insensitive for ASCII only. The pattern is **hard-capped at 40 bytes** by the validator |
+| `empty: true` / `present: true` | all | `IS NULL` / `IS NOT NULL` — `json_extract` yields NULL for an absent key and a JSON `null` alike, and `""` and `[]` count as empty. The value is always the literal `true` |
+| `has` / `lacks` | `list<T>` | `EXISTS (SELECT 1 FROM json_each(…))`, and `NOT EXISTS` for `lacks`, which is true on a missing list |
+| `near: { text, k }` | text, document | **ranking, not filtering** — see *`near`* below |
+| `{ predicate: <name> }` | the register | a named predicate from the register's `predicates:` (§5), expanded at compile; the expansion counts toward depth 3; a cycle is refused (`PREDICATE_CYCLE`) |
+
+**And one modifier, which is not an operator:**
+
+| Modifier | Applies to | Does |
+|---|---|---|
+| `via: <ref field>` with `field: <far field>` | a `ref` field | dereferences **exactly one** hop, then applies the operator to `field:` on the target row. `{ via: period, field: state, is: closed }` reads *"the period this row points at is closed"* — **`via:` names the hop, `field:` names the field on the far side**, and `derive: { via: account, field: currency }` (§5) uses the same two keys the same way round. Compiles to `id IN (SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND <leaf>)`, where `<leaf>` is compiled by the same rules as any leaf on that register — so `state` reads the column, and a soft-deleted period does not lock its postings. A second `via:` is refused (`VIA_TWICE`); a `via:` leaf may not itself carry `matches` or `has` — a subquery inside a subquery — and is refused `VIA_NESTED_SUBQUERY`. *(An earlier draft wrote `{ field: period, via: state }`, the two keys the other way round from `derive:`.)* |
+
+**Six kernel fields are addressable in any `where:` and any aggregation** without being declared:
+`id` `seq` `state` `created_at` `updated_at` `version`. `count: id` counts rows.
+
+#### Missing values
+
+An absent key, a JSON `null`, `""` and `[]` are all **missing**. `empty: true` matches a missing value;
+`present: true` does not. Every **positive** operator — `is in gt gte lt lte before after between has
+contains matches starts ends` — is **false** on a missing value. Every **negative** operator — `not`,
+`not_in`, `lacks` — is **true** on it, and compiles to `(expr IS NULL OR expr <> ?)` so the SQL agrees
+with the reference evaluator the property test runs beside it. `none:` is `NOT (any: …)` over branches
+already made two-valued by this rule. `bool` literals bind as `1`/`0`, because `json_extract` yields
+integers and the `Sql` port's `Param` excludes booleans. SQL's three-valued surprises stop at the
+compiler (ADR-058).
+
+#### Temporal literals
+
+A `day` literal is `YYYY-MM-DD`; an `instant` literal is RFC 3339. A **relative** literal is an anchor —
+`today` `tomorrow` `yesterday` `bom` `eom` `boy` `eoy` — or an offset `<sign><1–4 digits><d|w|m>`, where
+`m` is a calendar month, clamped (`+1m` from 31 January is 28 February). It is resolved **once, at
+compile time**, against `ctx.now` in `ctx.tz`, and every resolved literal is a bound parameter, never
+inline SQL. Against a `day` field an anchor resolves to a calendar day; against an `instant` field `today`
+is 00:00 in `ctx.tz` expressed as a UTC instant, and offsets apply to `ctx.now`. An unknown literal is
+refused by name (`RELATIVE_LITERAL_UNKNOWN`); hours (`-1h`) are legal only in `remind:`, and an hour
+offset against a `day` field is `RELATIVE_UNIT_FOR_DAY`.
+
+#### Money and quantity
+
+A `money` field is read as **two expressions**, `json_extract(fields, '$.<id>.amount')` and
+`json_extract(fields, '$.<id>.currency')`; `index: true` on a money field creates both. `gt gte lt lte
+is not` on money compile to `currency = ? AND amount <op> ?` — a row in another currency does not match,
+and is counted in `uses.currency_excluded`. A money literal without `currency`, or a `quantity` literal
+without `unit`, is refused at install (`MONEY_LITERAL_NEEDS_CURRENCY` / `QUANTITY_LITERAL_NEEDS_UNIT`).
+`quantity` reads `$.<id>.value` and `$.<id>.unit` the same way.
+
+#### `near` is ranking, not filtering
+
+`near: { text: "…", k: 20 }` is legal only as the **last leaf of a root `all:`** — never inside `any:` or
+`none:`, never in a rule, a lock, a prediction or a `match:`. It orders the rows the rest of the predicate
+already selected: the SQL yields ≤ 5,000 candidate ids, the record scores int8 cosine over `entry_vec` in
+JS, and the result is truncated to `k` (default 20, max 100). It is outside the property test and covered
+by its own fixture, and the operator is deferred past the §1b shape of [15-ROADMAP](15-ROADMAP.md).
+[11-ASSISTANT](11-ASSISTANT.md) §5 has the embeddings.
+
+> **`contains` is a substring test and `matches` is full text, and an earlier draft had one operator
+> doing both.** `contains` compiled to FTS5 `MATCH`, which is register-wide and token-based — so
+> `{ field: what, contains: "hosting" }` was satisfied by a `note`, and could not match half a word.
+> The split is ADR-055: `contains` is `instr(lower(x), lower(?))` on one named field, the same SQL on
+> `entry` and on `inbox_raw`; `matches` is the FTS5 set-membership test over the register's `search:`
+> fields, and exists on the entry backend alone. Neither uses `LIKE`. `starts`/`ends` do, and that is
+> where the platform's cap matters: Durable Objects cap a LIKE/GLOB pattern at **50 bytes** — and the
+> attribution matters: **this is Cloudflare's limit, not SQLite's.** Stock SQLite defaults
+> `SQLITE_MAX_LIKE_PATTERN_LENGTH` to **50,000**; workerd calls `sqlite3_limit(…, 50)`. **A thousand
+> times tighter**, which is why the self-host adapter has to apply it deliberately rather than inherit
+> it — [30-BLUEPRINT](30-BLUEPRINT.md) §13. A pattern longer than that fails as a query error, on a
+> page that worked yesterday with a shorter phrase. So `starts`/`ends` — and `contains`, so that the
+> two backends refuse identically — are capped at **40 bytes** by the validator, and the refusal
+> happens at install, in a message naming the field, rather than at render. *(An earlier draft's
+> refusal text quoted the 50-byte platform limit rather than the 40-byte validator cap; the message
+> now states the cap it is enforcing.)*
+
+### The second backend, which an earlier draft did not admit
+
+**The ingest `match:` consumer predicates over `inbox_raw`, not over `entry`** — an email's sender
+and subject are not register fields, have no expression index, and are not in `entry_fts`. So the
+grammar has **two backends**, and they differ in exactly two things: **how a field is addressed**, and
+**which operators exist**.
+
+| | `entry` — pages · rules · metrics · alarms · locks · predictions | `inbox_raw` — ingest `match:` |
+|---|---|---|
+| a `field:` | a declared field, `json_extract(fields, '$.<id>')`; `state` and the six kernel fields read their columns | exactly `from` `to` `subject` `body` `channel` `state` `ts`. `from`/`to`/`subject` are `json_extract(headers, '$.<name>')` — headers are lower-cased on arrival; the rest are columns. Anything else is `MATCH_FIELD_UNKNOWN` |
+| `contains` | `instr(lower(…), lower(?)) > 0`, ≤ 40 bytes | **the same** — same SQL, same cap |
+| absent | — | `matches` `via` `has` `near` `starts` `ends`, refused at install (`MATCH_OP_UNSUPPORTED`) |
+
+`instr()` has no pattern-length ceiling and no wildcard semantics, which is exactly right for
+matching a sender or a subject literal — and it is now the same instrument on both backends. The
+40-byte cap stays on both so that they refuse identically and an author never learns the difference.
+*(An earlier draft compiled `contains` to FTS5 on one backend and `instr()` on the other, and called
+them the same operator.)*
+
+**And one note on the subquery ban.** The author-facing grammar refuses subqueries. The *compiler*
+emits exactly **three** internal subquery forms — the FTS5 set-membership test for `matches`, the
+`IN (SELECT id …)` hop for `via:`, and `EXISTS (SELECT 1 FROM json_each(…))` for `has`/`lacks` — each
+correlated to the current row or to a single register, none author-writable. That is what lets
+`matches` sit inside `any:` and `none:` branches at all, and it is why a `via:` leaf may not carry
+`matches` or `has` (`VIA_NESTED_SUBQUERY`). An earlier draft said one form, five paragraphs after
+defining a second; the count is three.
+
+### 6.1 · `immutable_when:` — the fifth consumer, and it costs one predicate
+
+An audit modelled a bookkeeping operation against this schema and found no way to freeze a closed
+period. It enumerated every candidate and every one was the wrong instrument: `decision` is
+immutable but is the wrong table, `retired` applies to a *field*, `deleted_at` is a soft delete
+which is the opposite direction, and **no rule action refuses a write** — `stop` halts rule
+evaluation, not the write itself. Its verdict: *"a ledger that cannot enforce its one invariant is
+not a ledger,"* and *"for a bookkeeping product this is not a missing feature, it is a missing
+control, and it is the one an auditor asks about first."*
+
+The fix is one line on a register, and it is the grammar that already exists:
+
+```yaml
+register: postings
+immutable_when:
+  any:
+    - { field: state, is: posted }
+    - { via: period, field: state, is: closed }   # ONE ref hop — see below
+```
+
+> **An earlier draft wrote `in_state: closed` here, and that operator does not exist.** It was not
+> in §6's table, and no operator in that table performs a ref hop — so the one control
+> [ADR-019](16-DECISIONS.md) leans on to cover bookkeeping could not be written. **The fix is a
+> modifier, not an operator:** `via: <ref field>` names the hop and `field:` names the field on the
+> far side, and the *existing* operator applies to it. It compiles to a single indexed subquery on
+> the target register (`deleted_at IS NULL` included), it is bounded by the same one-hop rule the
+> grammar already states, and it adds **no** new operator to the closed list. `via:` is the one row
+> of §6's modifier table.
+
+A row matching the predicate refuses every write — field edit, state move, rule `set`, agent
+`update`, and `create` into it. The refusal names the clause that caught it, so *"this posting is
+locked because its period is closed"* is the message, never *"forbidden"*.
+
+| It gives | Which vertical asked |
+|---|---|
+| A closed accounting period | bookkeeping |
+| A posted journal that can be voided but never edited | bookkeeping, and it pairs with `transitions:` |
+| A litigation hold, and a signed-off clinical record | clinic, law |
+| A finalised invoice | freelancing — the one already in scope |
+
+**Three things it is not.** It is not row-level security: a locked row is fully readable, and
+[20-COLLABORATION](20-COLLABORATION.md) §1 still owns who can see what. It is not a delete guard —
+`deleted_at` is a write, so a locked row cannot be deleted either, which is the point. And it is
+not retention: making a row *un*deletable forever is a different declaration and a legal
+liability, so `immutable_when` never blocks the erasure path in §10. **Compliance outranks the
+lock**, and an erasure over locked rows writes its own event saying so.
+
+The reason it is worth having at all is the ratio: it reuses the compiler, the validator, the
+refusal vocabulary and the test harness of a grammar that was already built for four other things.
+The whole feature is a predicate evaluated on the write path.
+
+### What the grammar cannot express, on purpose
+
+| Refused | Because |
+|---|---|
+| Arbitrary SQL | an `eval` by another name |
+| Joins across registers beyond a single `ref` hop | unbounded query cost from a declaration a validator cannot reason about |
+| Subqueries | same |
+| Regular expressions | catastrophic backtracking from a text field somebody else can write into |
+| Correlated aggregates | a metric over a metric is a report generator; that is a different product. §2.2 of [08-METRICS](08-METRICS-AND-ANALYTICS.md) adds a *closed* two-operand ratio, which is not this: both operands read one query |
+| **A cross-row constraint** — "these postings must sum to zero" | it is a correlated aggregate evaluated on the write path, which is the most expensive thing on this list. See [ADR-019](16-DECISIONS.md): **BrainDog is not a ledger**, and says so |
+
+A declaration that needs more than this is an **agent**, not a page. That is the escape hatch,
+and it is the one the platform's governing rule already provides.
+
+---
+
+## 7 · Migrations
+
+Two independent ladders, and conflating them is how a pack ecosystem breaks a database.
+
+**Kernel migrations** are ours: `packages/kernel/migrations/NNNN_<slug>.sql`, numbered, forward-only,
+applied in numeric order from the record object's constructor inside `blockConcurrencyWhile()` so no
+request sees a half-migrated schema. Each runs in one `transactionSync` that also inserts its
+`migration` row — `version`, `applied_at`, and a checksum that is the SHA-256 of the SQL after CRLF→LF
+and trailing-whitespace strip ([34-GRAMMARS](34-GRAMMARS.md) §5), so a fixture hashes the same on
+Windows and on Linux CI. A migration whose file carries `-- format-bump` also sets
+`PRAGMA user_version`; the rest do not, because the format revision and the kernel migration number are
+different numbers ([03-DOG-FORMAT](03-DOG-FORMAT.md) §7). A checksum mismatch, or a database newer than
+the code, does not "refuse to start" in some vague sense: the runner sets a module-level refusal —
+`SCHEMA_MISMATCH` | `SCHEMA_NEWER` — that every RPC returns as **503**, because a silently-diverged
+schema is worse than an outage. The procedure is [33-CONTRACTS](33-CONTRACTS.md) §9, and
+`applyMigrations` stays INTERNAL for the self-host path.
+
+**Declaration changes** are a pack's. They never run DDL **on a table** — no `CREATE TABLE`, no
+`ALTER TABLE`, no `DROP`. Adding a field marked `index: true` does create an *index*, which is the
+one exception and it is a narrow one: an index is derived, additive, droppable without touching a
+row, and rebuildable from the data. The rule is therefore *"a declaration never changes the shape of
+a table"*, which is what it was always for. An earlier draft said "never runs DDL" flatly, which the
+expression-index model in §1 contradicts. Adding a field is a declaration edit;
+existing rows simply lack it, and a `required` field added to a populated register is
+**refused** — the pack must ship a default or a migration *rule* that fills it, and the rule runs
+through the same approval gate everything else does.
+
+**A declaration is versioned by supersession, never edited.** `declaration` is keyed
+`PRIMARY KEY (id, version)`; a new version inserts a row and sets `superseded_at` on the prior one in
+the same transaction; the active declaration is `superseded_at IS NULL AND retired = 0`, and rows are
+never deleted. Uninstalling a pack sets `retired = 1` on its declarations and emits one `uninstall`
+event. *(An earlier draft keyed the table on `id` alone, under which a second version could not be
+inserted, and said uninstall "removes" the rows.)*
+
+Removing a field marks it `retired: true`: it stops rendering and stops being writable, and the data
+stays in `fields`; a retired field may not be `required`, `index`, `unique`, or in `search`/`mobile`.
+Changing a field's type is refused in v1 (`FIELD_TYPE_CHANGED` — retire it and add a new field), and
+removing `index: true` drops the index in the same transaction. Nothing a pack does deletes a
+customer's data. Uninstalling a pack retires its declarations and leaves every row it ever created,
+orphaned but exportable — which is the promise, and it is only keepable because of the one-table
+decision in §1.
+
+---
+
+## 8 · Provenance: every row knows where it came from
+
+`event` is not a log we keep for support. It is a first-class part of the record and it is why
+the `.dog` format has a whole section named for it.
+
+Every write carries:
+
+| Column | Example |
+|---|---|
+| `actor` | `sam` · `agent:claude` · `ingest:hsbc-sms` · `rule:renewal-30d` · `spark` — a pull connector is an `ingest` declaration, so its actor is `ingest:<id>`, never `pull:<id>` |
+| `kind` | `create` · `edit` · `state` · `delete` · `decide` · `install` · `grant.read` · `note` — one of the **forty** kinds the `CHECK` in [30-BLUEPRINT](30-BLUEPRINT.md) §2 admits |
+| `target` | `entry:01J…` · `decision:D41` · `pack:money-core` |
+| `from_v` / `to_v` | the old and new value, when something changed (`from` is a SQL keyword). `--redacted--` when the redaction list withheld it at write ([20-COLLABORATION](20-COLLABORATION.md) §8); `--erased--` after an erasure (§10); `NULL` only when there was no prior value |
+| `note` | one sentence a human reads in six weeks |
+| `batch` · `op_id` | `batch` is the ULID of the triggering write, shared by everything it caused — a rule's `set`s, a `create` expansion — so undo is one query. `op_id` is the client's idempotency key: `CREATE UNIQUE INDEX event_op ON event(op_id) WHERE op_id IS NOT NULL`, and a replayed `op_id` returns the original result |
+
+**How many rows a write makes.** A `create` is **one** row — `field` NULL, `to_v` the canonical JSON
+(JCS) of the whole `fields`. An `edit` is one row **per changed field**, `from_v`/`to_v` the JCS of each
+value. A state change is the `state` kind, for the `state` field alone. `record_version` is
+`MAX(event.rowid)`, and the live channel's changelog is `SELECT DISTINCT target FROM event WHERE rowid > ?`
+— `event` is append-only and per-mutation, so no second table is needed.
+
+Two consequences worth stating:
+
+1. **`grant.read` is an event.** Every decryption of a credential is logged with the actor. A
+   vault whose reads are not audited is a vault that cannot answer "did anything get out".
+2. **An agent's writes are attributable.** `actor` distinguishes Claude from Codex from a rule
+   from a human. This is the thing no vendor's memory store gives you, and it is cheap here.
+
+---
+
+## 9 · Deleting
+
+| Level | Mechanism | Recoverable |
+|---|---|---|
+| A field | `retired` in the declaration | yes, data untouched |
+| A row | `deleted_at` set, excluded from every query | yes, until purge |
+| A row, really | the `purge` schedule kind, after 30 days | via PITR for 30 days |
+| A pack | declarations retired (`retired = 1`), rows kept | yes |
+| A credential | ciphertext zeroed, `grant` row kept with `revoked_at` | no, by design |
+| **A customer** | `deleteAlarm()` **then** `deleteAll()`, and the R2 prefix | no |
+| **A person inside a customer's record** | §10. It is a different mechanism and this table used to omit it | no |
+
+**Purge is one transaction, and every step is explicit** because nothing cascades by foreign key:
+`DELETE FROM entry_vec WHERE id = ?`, `DELETE FROM entry_fts WHERE rowid = ?`, then
+`DELETE FROM entry WHERE deleted_at < :cutoff`. `event` rows are kept, `seq` is never reissued (§1),
+and one `purge` event by `system` records the count.
+
+**`deleteAll()` removes the alarm too, at `compatibility_date >= 2026-02-24`** — verified
+2026-09-01. Below that date it does not, and a deleted object leaves a timer that wakes a dead
+record. The two-step procedure stays because it is correct under both, but see
+[09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1: **the real enforcement is a lint on the
+compatibility date**, not a sentence here.
+
+---
+
+## 10 · Erasing a person, which is not the same as deleting a row
+
+**This section fixes a contradiction, and the contradiction was structural rather than an
+oversight.** An adversarial audit modelled a clinic against this schema and found that the model
+has a *tenant* erasure story and no *data-subject* erasure story. The table in §9 had a row for "a
+customer" and no row for "a person inside a customer's record" — and the difference is not
+academic, because the second one is a legal obligation with a one-month clock on it.
+
+Erasure was audited store by store. Three of them could not comply, **by construction**:
+
+| Store | Holds a person's data | As designed |
+|---|---|---|
+| `entry.fields` | yes | ✅ `deleted_at`, purged at 30 days |
+| `event.from_v` / `event.to_v` | **yes** — §8 stores the old and new *values* | ❌ append-only, no purge path |
+| `event.note` | free text somebody typed | ❌ |
+| `inbox_raw.body` | the original email, headers and all | ❌ no purge path documented anywhere |
+| `ingest_receipt` | what was extracted from it | ❌ |
+| `entry_fts` | the projected text | ❌ **undefined** — nothing said FTS rows are removed on purge |
+| `entry_vec` | an embedding of that text, which is derived personal data | ❌ **undefined** |
+| `decision.reason` | a sentence a human wrote about a person | ❌ **`NOT NULL`.** The schema forbade compliance |
+| R2 attachment | the scan, the photo | ✅ delete the key |
+| Backups and PITR | everything | 30-day lag — defensible; regulators accept backups being beyond use pending rotation |
+
+> **`decision.reason NOT NULL` is the sharpest one.** A mandatory-reason column is the product's
+> governance thesis, and as written it meant an erasure request could not be honoured without
+> violating the schema. A rule that cannot bend at the one point the law requires is a rule that
+> gets switched off entirely.
+
+### The resolution: tombstone the payload, keep the fact
+
+The append-only principle survives intact, because **the principle was never "keep the values
+forever" — it was "nobody can rewrite what happened."** Those are different claims, and only the
+second is load-bearing.
+
+| Kept, always | Erased |
+|---|---|
+| `ts`, `actor`, `kind`, `target`, and the **name** of the field that changed | `from_v`, `to_v`, `note` → `--erased--` |
+| `inbox_raw.ts`, `channel`, `sha256` | `body`, `headers` |
+| `decision.id`, `question`, `answer`, `decided_by`, `ts` | `reason` → `--erased--`; the column stays `NOT NULL` and is never empty at write, so the invariant *"a decision always has a reason field"* still holds |
+| the `ingest_receipt` row | what it extracted |
+| the `suggestion`, `prediction`, `grant` and `device_grant` rows | `suggestion.body`, `prediction.claim`, `grant.label`, `device_grant.label`/`ua` naming the subject → `--erased--` |
+| — | `observation` rows whose `subject` is the erased value: **deleted** |
+| — | pending `schedule` and `outbox` payloads naming the subject: **cancelled**, payload → `--erased--` |
+| the `access.revoke` event | the subject's `member` row: **deleted** |
+| every row's existence, position and sequence | its content |
+| **a new `erase` event** naming the subject, the legal basis, the actor and the count of rows touched | — |
+
+**One rule for the three sentinels.** A value withheld at write by the redaction list is the literal
+`--redacted--` ([20-COLLABORATION](20-COLLABORATION.md) §8); a value removed later by an erasure is the
+literal `--erased--`; `NULL` means only *"there was no prior value"*. Three states, three spellings —
+an earlier draft used `NULL` for two of them, and a reader could not tell *nothing* from *removed*.
+
+The erasure is itself the most auditable thing in the record. You cannot tell what was erased; you
+can always tell **that** it was, by whom, under what basis, and when. That is a stronger position
+than either extreme, and it is the same instrument as the per-field redaction list in
+[20-COLLABORATION](20-COLLABORATION.md) §8 — **applied retroactively instead of prospectively.**
+One mechanism, two directions, one new event kind.
+
+### Why the existing redaction list did not already cover this
+
+Because it is a **design-time opt-out**. It requires having decided, before the person existed,
+that a given field is sensitive. It cannot answer a request about somebody whose name a user typed
+into a free-text `note` in 2024. Prospective redaction and retroactive erasure are not the same
+control, and the audit found the corpus treating them as if they were.
+
+### And the cascade, which is the part that gets forgotten
+
+`erase(subject)` touches **sixteen** stores. **Fifteen are one transaction; the sixteenth cannot be.**
+An earlier draft counted eight and audited seven — and before that claimed all of them were one
+transaction; the review found eight more places a person can be named:
+
+| | |
+|---|---|
+| **One transaction** | `entry` · `event` · `inbox_raw` · `ingest_receipt` · `entry_fts` · `entry_vec` · `decision` · `suggestion.body` · `prediction.claim` · `grant.label` · `device_grant.label`/`ua` · `schedule` payloads · `outbox` payloads (both cancelled) · `member` (the row deleted; the `access.revoke` event stays) · `observation` (rows whose `subject` is the value, deleted) |
+| **Not in it** | **the R2 prefix.** Deleting an object is an outbound call, and [01-ARCHITECTURE](01-ARCHITECTURE.md) §2 forbids the record making one. It goes on the **outbox** as `erase.r2`, drained by the Worker |
+| **Out of scope, stated** | `metric_point` — aggregates only; no row names a person |
+
+So the honest guarantee is: **the record is erased atomically; the attachments are erased within the
+outbox lease window, and a reconciliation job asserts it.** Saying "one transaction" over a store
+the object cannot reach is the kind of claim that is only false on the one path where it matters.
+
+The two stores that were *undefined* are the two that would have leaked: an FTS index still answers a
+search for a name whose row is gone, and a vector still answers `near`. Both are now explicit steps
+with their own tests.
+
+> **This is not a clinic feature.** Any B2C marketing list has unsubscribed leads with the same
+> right; any HR use has ex-employees; any agency holds a former client's contacts. The audit found
+> this blocks four verticals, not one. It is the cheapest item on the whole remediation list and it
+> is a correctness fix, so it ships in the kernel rather than in a phase.
+
+---
+
+*Next: [03-DOG-FORMAT](03-DOG-FORMAT.md) — the file this schema exports to, and the acronym.*
