@@ -1,0 +1,28 @@
+{
+  "name": "@braindog/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "node scripts/theme.mjs && vite build",
+    "preview": "vite preview",
+    "theme": "node scripts/theme.mjs",
+    "test": "node --test src/**/*.test.ts",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "svelte": "5.57.0"
+  },
+  "devDependencies": {
+    "@braindog/theme": "workspace:*",
+    "@sveltejs/adapter-static": "3.0.10",
+    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
+    "braindog-render": "workspace:*",
+    "svelte-check": "4.7.6",
+    "typescript": "6.0.3",
+    "vite": "8.2.2"
+  }
+}

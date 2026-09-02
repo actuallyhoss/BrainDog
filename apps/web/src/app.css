@@ -1,0 +1,338 @@
+/**
+ * The token layer, the accessibility layer, and the handful of element defaults.
+ *
+ * The layer ORDER is the enforcement boundary and it is the most expensive line in this file to
+ * reverse — installed themes depend on it (22 §11). A theme emits into `@layer theme`, which sits
+ * before `@layer a11y`, so a theme cannot remove the focus ring, the forced-colors overrides or the
+ * target floor. That is the mechanical form of "a theme is data, not authority".
+ *
+ * Three layers of token, and a component may name only the third:
+ *   primitive   the generator's internal arithmetic, never emitted as CSS
+ *   semantic    --ink --s1 --edge ...   a theme maps these (13 §2.1)
+ *   component   --row-h --ctl-h --tap   a component reads only these
+ */
+
+@layer tokens, theme, a11y, components;
+
+@import './theme/house.css';
+
+@layer tokens {
+  /* ── Faces ──────────────────────────────────────────────────────────────
+     Three roles, and the pairing is deliberate rather than convenient.
+
+     IBM Plex Sans carries the work: a humanist grotesque with a large x-height that holds up at
+     11px, and true tabular figures. It is also the engineered Latin sibling of IBM Plex Sans
+     Arabic, which 13 §3.1 already requires — so the Arabic requirement is met by a real companion
+     design instead of a fallback.
+
+     Poppins carries the brand: it is the wordmark's own face, geometric where Plex is humanist, and
+     it appears only at display sizes. It never touches a table, because a geometric face with a
+     small x-height and lining figures is the wrong tool for a column of money.
+
+     The identifier face is the system monospace stack and costs zero bytes. It is the ROLE that
+     makes #125 and D41 read as identifiers, not a chosen face (13 §3.1).
+
+     ponytail: 52.4 KB of Latin against a 45 KB budget (22 §9), because these are Google's stock
+     subsets. Subset both with pyftsubset to the glyphs actually reachable and the measured headroom
+     is ~15 KB; do it when the `bundle` gate lands, not before. */
+
+  @font-face {
+    font-family: 'Plex';
+    src: url('/fonts/plex-sans.woff2') format('woff2');
+    font-weight: 400 600;
+    font-display: swap;
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2074, U+20AC,
+      U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  @font-face {
+    font-family: 'Plex';
+    src: url('/fonts/plex-arabic.woff2') format('woff2');
+    font-weight: 400 600;
+    font-display: swap;
+    /* All-or-nothing per file and evaluated per page, so an English-only session never fetches
+       this one (22 §9). */
+    unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+  }
+
+  @font-face {
+    font-family: 'Poppins';
+    src: url('/fonts/poppins-600.woff2') format('woff2');
+    font-weight: 600;
+    font-display: swap;
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212;
+  }
+
+  :root {
+    --font-ui: 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Poppins', 'Plex', system-ui, sans-serif;
+    --font-id: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+    /* Eight steps, fixed. A theme never sets type; the reader's Text setting picks the body step
+       among three of them. Raising the scale is not a fix for a hard-to-read screen — the fault is
+       in what it says and how it is arranged (13 §7). */
+    --t-xs: 12px;
+    --t-sm: 13px;
+    --t-base: 15px;
+    --t-md: 17px;
+    --t-lg: 20px;
+    --t-xl: 24px;
+    --t-2xl: 28px;
+    --t-3xl: 34px;
+    --text: var(--t-base);
+
+    --lh-tight: 1.25;
+    --lh-body: 1.55;
+
+    /* Space is one base multiplied. Six steps is all any screen here has ever needed. */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --sp-6: 32px;
+    --sp-7: 48px;
+
+    --r-sm: 4px;
+    --r-md: 9px;
+    --r-lg: 16px;
+
+    /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
+       never the pixels (13 §4.2). */
+    --row-h: 32px;
+    --ctl-h: 32px;
+    --tap: 44px;
+    --measure: 72ch;
+    --sticky: 52px;
+    --rail: 244px;
+    --kb: 0px;
+
+    --icon-s: 12px;
+    --icon-m: 16px;
+    --icon-l: 20px;
+    --icon-xl: 24px;
+
+    /* Every positive z-index in the app is one of these four names. A number that matches no rule
+       is how an overlay ends up under the thing it covers. */
+    --z-sheet: 10;
+    --z-palette: 20;
+    --z-toast: 30;
+    --z-hint: 40;
+
+    /* Open and close are not symmetric. Opening is something you watch; closing is something you
+       have already decided about (13 §9). Ceiling 300ms — nothing is longer. */
+    --d-press: 90ms;
+    --d-release: 180ms;
+    --d-state: 180ms;
+    --d-move: 240ms;
+    --d-enter: 280ms;
+    --d-exit: 160ms;
+
+    /* zeta 0.7467, omega 6.56, settle 1.214s, peak 1.0292 — scripts/spring.mjs.
+       The last stop is forced to exactly 1: a spring that settles at 0.998 leaves a one-pixel gap
+       on every panel forever. */
+    --ease-spring: linear(
+      0, 0.0503, 0.1684, 0.3158, 0.4672, 0.6068, 0.7265, 0.8232, 0.8972, 0.9509, 0.9875, 1.0104,
+      1.0232, 1.0286, 1.0292, 1.0268, 1.0229, 1.0185, 1.0141, 1.0102, 1.0069, 1.0043, 1.0024, 1
+    );
+    --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
+
+    /* The mark, at full strength. Not a role and not an identity accent: the one colour in the
+       product that belongs to the product rather than to a meaning. It paints the logo and nothing
+       else, which is why it is a token and not a literal in an SVG (22 §7 gate 2). */
+    --brand: #f42a2a;
+  }
+
+  /* The reader's Text setting picks the body step. Three, not a slider. */
+  html[data-text='sm'] { --text: var(--t-sm); }
+  html[data-text='base'] { --text: var(--t-base); }
+  html[data-text='md'] { --text: var(--t-md); }
+
+  html[data-density='compact'] { --row-h: 28px; }
+  html[data-density='comfortable'] { --row-h: 32px; }
+  html[data-density='roomy'] { --row-h: 36px; }
+
+  /* SIZE follows the pointer, never the width. A small laptop window is not a phone, and a width
+     query that changes a control's size is how it starts behaving like one (05 §6). */
+  @media (pointer: coarse) {
+    :root { --ctl-h: 44px; }
+  }
+
+  html[data-scheme='dark'] { color-scheme: dark; }
+  html[data-scheme='light'] { color-scheme: light; }
+
+  /* A runtime type assertion on every semantic colour role, so a malformed installed token fails
+     loudly instead of inheriting. It does NOT rescue `var(--fain)` — a typo resolves to the
+     inherited value, not to `initial-value`, measured (28 §2.3). The lint gate stays load-bearing. */
+  @property --sunk { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --bg { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --s1 { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --s2 { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --s3 { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --ink { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --ink2 { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --dim { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --faint { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --line { syntax: '<color>'; inherits: true; initial-value: #888; }
+  @property --edge { syntax: '<color>'; inherits: true; initial-value: #888; }
+  @property --earn { syntax: '<color>'; inherits: true; initial-value: #0a0; }
+  @property --warn { syntax: '<color>'; inherits: true; initial-value: #a80; }
+  @property --danger { syntax: '<color>'; inherits: true; initial-value: #c00; }
+  @property --accent { syntax: '<color>'; inherits: true; initial-value: #06c; }
+}
+
+@layer components {
+  /* Element defaults. Everything else is scoped to the component that owns it. */
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: var(--bg);
+    /* 2.4.11: keyboard focus must not land under the sticky header. Paid once, here. */
+    scroll-padding-block-start: calc(var(--sticky) + var(--sp-2));
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--text);
+    line-height: var(--lh-body);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+    letter-spacing: -0.014em;
+  }
+
+  p, ul, ol {
+    margin: 0;
+  }
+
+  a {
+    color: var(--accent-text);
+    text-decoration-color: color-mix(in srgb, var(--accent-text) 40%, transparent);
+    text-underline-offset: 0.18em;
+  }
+
+  a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Quantities get tabular figures on a PROPORTIONAL face. A monospace face gives the thousands
+     separator a full cell, so EGP 2,869 renders as EGP 2 , 869 at display size — the comma floats
+     and the figure reads wider and smaller than the sans figure beside it. Mono is for IDENTITY;
+     tabular-proportional is for QUANTITY (13 §3.2). */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'ss02';
+  }
+
+  /* Arabic sits at a different optical size: no capitals, no x-height, weight above and below the
+     baseline, and diacritics need room. letter-spacing is EXACTLY 0, always — it is a joined script
+     and tracking breaks the joins. The multiplier and the leading are practitioner numbers, marked
+     low confidence in 13 §3.3 and owed a measurement. */
+  :root:dir(rtl) body {
+    font-size: calc(var(--text) * 1.12);
+    line-height: calc(var(--lh-body) + 0.18);
+    letter-spacing: 0;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 34%, transparent);
+  }
+}
+
+@layer a11y {
+  /* Nothing in this layer is reachable by a theme, because `@layer theme` is declared before it. */
+
+  /* A two-tone ring, so it is visible on every surface in both schemes. Never animated — keyboard
+     navigation through an animated ring is wading (13 §9). */
+  :focus-visible {
+    outline: 2px solid var(--focus-in);
+    outline-offset: 1px;
+    box-shadow: 0 0 0 4px var(--focus-out);
+    border-radius: var(--r-sm);
+  }
+
+  /* An invisible hit box, so a 20px chevron inside a 44px control is a 44px target. Both axes: a
+     control grown only in height measures 38x44 and fails. The pseudo-element counts because it is
+     what takes the pointer (13 §7). */
+  .tap {
+    position: relative;
+  }
+
+  .tap::before {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc((100% - var(--tap)) / 2)) min(0px, calc((100% - var(--tap)) / 2));
+  }
+
+  /* Reduced motion is a PROMISE, not a preference: durations collapse and the state simply
+     changes. Replace, never delete — every state must still change something. */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --d-press: 1ms;
+      --d-release: 1ms;
+      --d-state: 1ms;
+      --d-move: 1ms;
+      --d-enter: 1ms;
+      --d-exit: 1ms;
+      --ease-spring: linear(0, 1);
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Under forced colours the UA overrides every colour property and `box-shadow` computes to
+     `none`, so sunk, bg, s1, s2 and s3 all become Canvas: a five-level ladder becomes one level and
+     every block boundary in the product disappears. The elevation ladder cannot rescue it, because
+     the shadows are gone too. Each boundary is re-expressed as a border (28 §2.5, check L). */
+  @media (forced-colors: active) {
+    .panel,
+    .grid,
+    .rows,
+    .table,
+    .media,
+    .block,
+    .card,
+    .field,
+    .sheet,
+    .rail,
+    .chip {
+      border: 1px solid CanvasText;
+    }
+
+    [data-intent] {
+      forced-color-adjust: none;
+    }
+
+    :focus-visible {
+      outline: 2px solid Highlight;
+      outline-offset: 2px;
+    }
+  }
+}

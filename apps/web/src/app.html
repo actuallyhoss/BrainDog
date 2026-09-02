@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- FIRST, always. The only thing that stops the white UA canvas painting before the stylesheet
+         parses, and the thing that governs UA scrollbars and form controls (28 §5 mechanism 1). -->
+    <meta name="color-scheme" content="light dark" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Everything about your business that isn't code, in one record your agents can write to." />
+    <link rel="icon" href="%sveltekit.assets%/mark.svg" type="image/svg+xml" />
+
+    <!-- ONE statement, static bytes, so its SHA-256 is the single hash in the hosts' script-src.
+         A static shell has no server to write the attributes, so this reads the per-device
+         preference cookie and sets them before first paint (50 §4.7). -->
+    <script>try{var p=JSON.parse(decodeURIComponent((document.cookie.match(/(?:^|; )bd_pref=([^;]*)/)||[])[1]||'{}')),d=document.documentElement;p.scheme&&d.setAttribute('data-scheme',p.scheme),d.setAttribute('data-text',p.text||'base'),d.setAttribute('data-density',p.density||'comfortable'),p.theme&&d.setAttribute('data-theme',p.theme),p.sidebar===false&&d.setAttribute('data-rail','off')}catch(e){}</script>
+
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

@@ -1,0 +1,198 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  apcaLc,
+  contrast,
+  deltaE2000,
+  fromHex,
+  gamutMap,
+  inGamut,
+  lchToRgb,
+  relLuminance,
+  rgbToCielab,
+  rgbToLch,
+  separation,
+  simulate,
+  solveL,
+  toHex,
+} from './color.ts';
+import { HOUSE, HIGH_CONTRAST, HOUSE_SEED } from './index.ts';
+import { INKS, INTENTS, SURFACES, buildScheme, HOUSE_PROFILE, nextAccentHue, INTENT_HUE, parseColour } from './build.ts';
+import { refusals, validate } from './checks.ts';
+import { toCSS, A11Y_FORCED_COLORS } from './css.ts';
+
+/* ── the arithmetic ───────────────────────────────────────────────────────── */
+
+test('OKLCH round-trips through sRGB', () => {
+  for (const hex of ['#F42A2A', '#407FDB', '#FFFFFF', '#000000', '#73D678']) {
+    const back = toHex(lchToRgb(rgbToLch(fromHex(hex))));
+    assert.equal(back, hex, `${hex} did not round-trip`);
+  }
+});
+
+test('the BrainDog red sits on the danger hue anchor', () => {
+  const c = rgbToLch(fromHex('#F42A2A'));
+  assert.ok(Math.abs(c.H - INTENT_HUE.danger) < 1, `hue ${c.H.toFixed(1)} is not within 1 of 27`);
+  assert.ok(c.C > 0.2, 'the mark should be a saturated colour');
+});
+
+test('contrast matches the WCAG definition at the extremes', () => {
+  assert.equal(Math.round(contrast(fromHex('#FFFFFF'), fromHex('#000000'))), 21);
+  assert.equal(contrast(fromHex('#777777'), fromHex('#777777')), 1);
+});
+
+test('gamut mapping brings an unrepresentable colour inside sRGB', () => {
+  // Measured in Chrome 152: oklch(0.70 0.30 30), 0.40 and 0.50 all paint as rgb(255,0,0), and the
+  // CSSOM returns the authored string at every chroma. The generator must map, never let the
+  // browser clip (28 §2.1).
+  const wild = { L: 0.7, C: 0.5, H: 30 };
+  assert.equal(inGamut(lchToRgb(wild)), false);
+  const mapped = gamutMap(wild);
+  assert.equal(inGamut(lchToRgb(mapped)), true);
+  assert.ok(mapped.C < wild.C && mapped.C > 0.1, 'chroma should be reduced, not discarded');
+  assert.equal(mapped.L, wild.L, 'lightness is preserved — clipping is what does not preserve it');
+});
+
+test('solveL hits its contrast target on the quantised colour', () => {
+  const ground = fromHex('#241F1E');
+  for (const target of [3, 4.5, 7, 12]) {
+    const got = contrast(fromHex(toHex(lchToRgb(solveL(target, 0.018, 27, ground, 'up')))), ground);
+    assert.ok(got >= target - 0.02, `asked ${target}, got ${got.toFixed(2)}`);
+    assert.ok(got <= target + 0.25, `asked ${target}, overshot to ${got.toFixed(2)}`);
+  }
+});
+
+test('delta-E 2000 is zero for a colour against itself and grows with distance', () => {
+  const a = rgbToCielab(fromHex('#F42A2A'));
+  const b = rgbToCielab(fromHex('#F42A2C'));
+  const c = rgbToCielab(fromHex('#00A32B'));
+  assert.equal(deltaE2000(a, a), 0);
+  assert.ok(deltaE2000(a, b) < 1, 'two adjacent reds are below a just-noticeable difference');
+  assert.ok(deltaE2000(a, c) > 40, 'red and green are far apart to a trichromat');
+});
+
+test('Brettel simulation collapses red and green for a deuteranope', () => {
+  const red = fromHex('#F42A2A');
+  const green = fromHex('#00A32B');
+  assert.ok(
+    separation(red, green, 'deutan') < deltaE2000(rgbToCielab(red), rgbToCielab(green)),
+    'simulation must reduce the distance, not preserve it',
+  );
+  // The measurement 13 §2.3 was built on: to a deuteranope these are close to the same olive.
+  assert.ok(simulate(red, 'deutan').g > red.g, 'red gains green under deuteranope simulation');
+});
+
+test('APCA reports a polarity-aware score and WCAG does not', () => {
+  const light = fromHex('#FFFFFF');
+  const dark = fromHex('#111111');
+  assert.equal(contrast(light, dark), contrast(dark, light));
+  assert.notEqual(apcaLc(light, dark), apcaLc(dark, light));
+});
+
+/* ── the generated themes ─────────────────────────────────────────────────── */
+
+for (const built of [HOUSE, HIGH_CONTRAST]) {
+  test(`theme.${built.id} passes its own sixteen checks`, () => {
+    const bad = refusals(validate(built, toCSS(HOUSE, HIGH_CONTRAST) + A11Y_FORCED_COLORS));
+    assert.deepEqual(
+      bad.map((f) => f.fix),
+      [],
+    );
+  });
+
+  for (const scheme of ['dark', 'light'] as const) {
+    test(`theme.${built.id} ${scheme}: the surface ladder only goes up`, () => {
+      const lum = SURFACES.map((s) => relLuminance(parseColour(built.schemes[scheme][s])));
+      for (let i = 1; i < lum.length; i++)
+        assert.ok(lum[i]! > lum[i - 1]!, `${SURFACES[i]} is not above ${SURFACES[i - 1]}`);
+    });
+
+    test(`theme.${built.id} ${scheme}: no intent is achromatic`, () => {
+      for (const intent of INTENTS)
+        assert.ok(
+          rgbToLch(parseColour(built.schemes[scheme][intent])).C >= 0.045,
+          `${intent} has no hue left — it is ink, not an intent`,
+        );
+    });
+
+    test(`theme.${built.id} ${scheme}: every ink clears AA on every surface`, () => {
+      for (const ink of INKS)
+        for (const surface of SURFACES) {
+          const got = contrast(parseColour(built.schemes[scheme][ink]), parseColour(built.schemes[scheme][surface]));
+          assert.ok(got >= 4.5, `${ink} on ${surface} is ${got.toFixed(2)}:1`);
+        }
+    });
+  }
+}
+
+test('the dark danger chip is the mark, to within a rounding step', () => {
+  const chip = parseColour(HOUSE.schemes.dark['danger-fill']);
+  assert.ok(
+    deltaE2000(rgbToCielab(chip), rgbToCielab(fromHex('#F42A2A'))) < 1,
+    `the chip is ${HOUSE.schemes.dark['danger-fill']}, which is not the mark`,
+  );
+});
+
+/* ── the refusals, which are the point ────────────────────────────────────── */
+
+test('an achromatic seed is refused, not silently substituted', () => {
+  assert.throws(
+    () => buildScheme({ ...HOUSE_SEED, accent: '#808080' }, HOUSE_PROFILE, 'dark'),
+    /almost grey/,
+  );
+});
+
+test('a seed on the danger hue is refused for making info and bad the same colour', () => {
+  // The whole reason the accent is not red. `info` resolves to `accent`, so a red accent puts two
+  // of the four intents at delta-E 0 and check F cannot pass at any chroma.
+  assert.throws(
+    () => buildScheme({ ...HOUSE_SEED, accent: '#F42A2A' }, HOUSE_PROFILE, 'dark'),
+    /INTENT_INSEPARABLE/,
+  );
+});
+
+test('a value outside the dialect grammar is refused', () => {
+  assert.throws(() => parseColour('rgb(1 2 3)'), /THEME_VALUE_INVALID/);
+  assert.throws(() => parseColour('var(--x)'), /THEME_VALUE_INVALID/);
+});
+
+/* ── identity accents ─────────────────────────────────────────────────────── */
+
+test('an identity hue never lands within 20 degrees of an intent', () => {
+  const hues: number[] = [];
+  for (let i = 0; i < 8; i++) hues.push(nextAccentHue(hues));
+  const gap = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+  for (const h of hues)
+    for (const anchor of Object.values(INTENT_HUE))
+      assert.ok(gap(h, anchor) >= 20, `hue ${h} is ${gap(h, anchor).toFixed(0)} from an intent anchor`);
+});
+
+test('the first four identity hues stay apart under every simulation', () => {
+  const hues: number[] = [];
+  for (let i = 0; i < 4; i++) hues.push(nextAccentHue(hues));
+  const marks = hues.map((h) => parseColour(`oklch(${HOUSE.mark.dark.L} ${HOUSE.mark.dark.C} ${h})`));
+  for (let i = 0; i < marks.length; i++)
+    for (let j = i + 1; j < marks.length; j++)
+      for (const d of ['protan', 'deutan', 'tritan'] as const)
+        assert.ok(separation(marks[i]!, marks[j]!, d) >= 4, `marks ${i} and ${j} collapse for a ${d}ope`);
+});
+
+/* ── the emitted stylesheet ───────────────────────────────────────────────── */
+
+test('the stylesheet emits both schemes and cannot reach the a11y layer', () => {
+  const css = toCSS(HOUSE, HIGH_CONTRAST);
+  assert.match(css, /@layer theme \{/);
+  assert.match(css, /prefers-color-scheme: dark/);
+  assert.match(css, /prefers-contrast: more/);
+  assert.doesNotMatch(css, /@layer a11y/);
+  assert.doesNotMatch(css, /:focus-visible/);
+  for (const banned of ['url(', '@import', 'expression(']) assert.ok(!css.includes(banned));
+});
+
+test('the forced-colors block restores every boundary the ladder loses', () => {
+  // Under forced-colors the five surfaces all become Canvas and box-shadow computes to none, so a
+  // five-level ladder becomes one level and every block boundary disappears (28 §2.5).
+  assert.match(A11Y_FORCED_COLORS, /CanvasText/);
+  assert.match(A11Y_FORCED_COLORS, /forced-color-adjust: none/);
+});
