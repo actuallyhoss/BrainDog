@@ -9,6 +9,7 @@
   something you watch; closing is something you have already decided about (13 §9).
 -->
 <script lang="ts">
+  import { copy } from '../copy.ts';
   import type { Snippet } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
   import Icon from './Icon.svelte';
@@ -60,7 +61,7 @@
       </h2>
       {#if subtitle}<p class="sheet-sub">{subtitle}</p>{/if}
     </div>
-    <button type="button" class="sheet-close tap" onclick={close} aria-label="Close">
+    <button type="button" class="sheet-close tap" onclick={close} aria-label={copy.close}>
       <Icon name="close" size="m" />
     </button>
   </header>

@@ -258,7 +258,7 @@
     {/if}
     {#snippet footer()}
       <Button weight="primary" href="/r/{id}/{peeked}">{copy.openRow}</Button>
-      <Button weight="bare" onclick={() => (peeked = null)}>Close</Button>
+      <Button weight="bare" onclick={() => (peeked = null)}>{copy.close}</Button>
     {/snippet}
   </Sheet>
 {/if}

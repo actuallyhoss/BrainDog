@@ -22,6 +22,7 @@
   import { copy } from '$lib/copy.ts';
   import { GoPrefix, overlays, typing } from '$lib/a11y/keys.svelte.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
+  import Spark from '$lib/ui/Spark.svelte';
   import TabBar from '$lib/ui/TabBar.svelte';
   import Palette from '$lib/palette/Palette.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -40,6 +41,7 @@
   let paletteOpen = $state(false);
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
+  let sparkOpen = $state(false);
   const go = new GoPrefix();
 
   /** `ponytail:` a constant in the mock-up. The live channel is `lib/data/live.ts` in the real app:
@@ -136,6 +138,10 @@
   </button>
 
   <Palette bind:open={paletteOpen} nav={data.nav} />
+
+  <!-- The agent lives in the corner of every surface, so there is never a screen where the answer
+       to "who do I ask about this?" is somewhere else. -->
+  <Spark bind:open={sparkOpen} />
 {/if}
 
 <Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>
@@ -208,6 +214,10 @@
     border-inline-start: 1px solid var(--line);
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* Spark floats over the bottom-right corner of every surface, so every surface ends above it.
+       A floating button that covers the last row of a list is a floating button that hides exactly
+       the thing a long list is scrolled to the bottom to see. */
+    padding-block-end: calc(var(--tap) + var(--sp-5));
   }
 
   .tab-slot,

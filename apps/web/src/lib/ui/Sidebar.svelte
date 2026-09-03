@@ -28,7 +28,6 @@
   import type { NavEntry } from '../record/api.ts';
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
   import Icon, { type IconName } from './Icon.svelte';
-  import Mark from './Mark.svelte';
 
   let {
     nav,
@@ -67,12 +66,11 @@
 </script>
 
 <nav class="rail" aria-label="Record">
+  <!-- No lockup. The mark is on the Spark button in the corner, where it is an affordance rather
+       than a caption, and the record switcher takes the space it used to occupy. The name of the
+       thing you are inside is worth more here than the name of the software you are inside: you
+       chose the software once, and you switch records every day. -->
   <div class="top">
-    <a class="brand" href="/">
-      <Mark height={26} />
-      <span class="wordmark">{copy.product}</span>
-    </a>
-
     <button type="button" class="record tap">
       <span class="record-avatar" aria-hidden="true">{record.slice(0, 1)}</span>
       <span class="record-name">{record}</span>
@@ -186,43 +184,28 @@
     padding-inline: var(--sp-2);
   }
 
-  /* The lockup. The mark is 26px tall because below about 24 the dog stops being a dog: the negative
-     space that IS the drawing collapses to a notch, and what is left reads as a red blob. A mark
-     that has to be explained at its working size is the wrong size, not the wrong mark. */
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-  }
+  /* A CONTROL, not a caption, and now the largest thing in the rail.
 
-  .wordmark {
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-size: 19px;
-    font-weight: 600;
-    letter-spacing: -0.022em;
-  }
-
-  /* A CONTROL, not a caption. This opens a record switcher, and the first build drew it as
-     letterspaced grey small caps with a chevron floating after it — which is the shape of a label,
-     so nobody would ever click it. It is a button now: a surface, a border on hover, and the
-     record's initial in a tile, which is the affordance every product with more than one workspace
-     has taught people to look for in exactly this corner. */
+     The first build drew it as letterspaced grey small caps under the logo — the shape of a label,
+     so nobody would ever click it, sized as if the record's name were a footnote to the product's.
+     It is the other way round. The record is what you are in and what you switch between; the
+     product is what you opened once. So it gets the display face at 17px, a 28px tile with the
+     record's initial, and the 44px height of a real target. */
   .record {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: 32px;
-    margin-block-start: var(--sp-3);
+    min-block-size: 44px;
     padding: 0 var(--sp-2);
     background: none;
     border: 1px solid transparent;
     border-radius: var(--r-md);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.018em;
     text-align: start;
     cursor: pointer;
     transition:
@@ -233,19 +216,19 @@
   .record:hover {
     background: color-mix(in srgb, var(--ink) 5%, transparent);
     border-color: var(--line);
-    color: var(--ink);
   }
 
   .record-avatar {
     display: grid;
     place-items: center;
-    inline-size: 20px;
-    block-size: 20px;
+    inline-size: 28px;
+    block-size: 28px;
     flex: none;
     background: color-mix(in srgb, var(--accent) 16%, transparent);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--accent-text);
-    font-size: 11px;
+    font-family: var(--font-display);
+    font-size: 14px;
     font-weight: 700;
     line-height: 1;
   }
