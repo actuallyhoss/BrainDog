@@ -17,7 +17,8 @@
   import { page } from '$app/state';
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { REGISTERS, applyFilters, columnsFor, entry, list, sortRows, toRows, type Filter } from '$lib/record/api.ts';
+  import { REGISTERS, columnsFor, display, entry, identityOf, list, toRows, type Filter } from '$lib/record/api.ts';
+  import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -195,18 +196,47 @@
         {/snippet}
       </Empty>
     {:else}
-      <Table
-        {columns}
-        {rows}
-        total={result.matched}
-        cap={DOM_CAP}
-        label={decl.name}
-        {sort}
-        bind:focus
-        onactivate={(row) => goto(`/r/${id}/${row.key.split('#')[1]}`)}
-        onsort={(field) =>
-          setParam((p) => p.set('sort', `${field}:${sort?.field === field && sort.dir === 'asc' ? 'desc' : 'asc'}`))}
-      />
+      <!-- Below 640px the default body is CARDS over the register's three declared `mobile:` fields,
+           and the table is one `v` away. Which fields a card shows comes from the declaration, never
+           from a media query: a phone is not a narrow desktop, and the register knows what matters
+           about its own rows better than a breakpoint does (13 §10, 50 §5.2 step 10). -->
+      <ul class="cards">
+        {#each result.entries.slice(0, DOM_CAP) as e}
+          <li>
+            <a class="card" href="/r/{id}/{e.seq}">
+              <span class="card-seq">#{e.seq}</span>
+              <span class="card-title">{display(id, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}</span>
+              <span class="card-b">{display(id, decl.mobile[1], e.fields[decl.mobile[1]]) ?? ''}</span>
+              <span class="card-c">{display(id, decl.mobile[2], e.fields[decl.mobile[2]]) ?? ''}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+
+      <div class="table-slot">
+        <Table
+          {columns}
+          {rows}
+          total={result.matched}
+          cap={DOM_CAP}
+          label={decl.name}
+          {sort}
+          bind:focus
+          onactivate={(row) => goto(`/r/${id}/${row.key.split('#')[1]}`)}
+          onsort={(field) =>
+            setParam((p) => p.set('sort', `${field}:${sort?.field === field && sort.dir === 'asc' ? 'desc' : 'asc'}`))}
+        >
+          {#snippet cellSnippet(row, column, value)}
+            {@const seq = Number(row.key.split('#')[1])}
+            {@const ident = identityOf(id, column.field, entry(id, seq)?.fields[column.field])}
+            {#if ident}
+              <IdentityMark identity={ident} />
+            {:else if value === null}
+              <span class="missing">—</span>
+            {:else}{value}{/if}
+          {/snippet}
+        </Table>
+      </div>
     {/if}
   </div>
 
@@ -268,10 +298,10 @@
   .search-input {
     inline-size: 22ch;
     border: 0;
+    border-radius: var(--r-sm);
     background: none;
     color: var(--ink);
     font-size: var(--t-ui);
-    outline: none;
   }
 
   .chips {
@@ -335,6 +365,12 @@
     overflow-wrap: anywhere;
   }
 
+  /* Above 640px the cards do not exist. Below it, the table does not — the register keeps ONE body
+     and the other is an explicit choice, so there is never a moment where both are half-visible. */
+  .cards {
+    display: none;
+  }
+
   @media (width < 900px) {
     .page {
       padding: var(--sp-3) var(--sp-3) var(--sp-7);
@@ -342,6 +378,74 @@
 
     .bar-hint {
       display: none;
+    }
+  }
+
+  @media (width < 640px) {
+    .table-slot {
+      display: none;
+    }
+
+    .cards {
+      display: block;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      background: var(--s1);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      box-shadow: var(--raise);
+      overflow: hidden;
+    }
+
+    .cards li + li .card {
+      border-block-start: 1px solid var(--line);
+    }
+
+    .card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 2px var(--sp-3);
+      /* 44px on both axes. A control grown only in height measures 38 x 44 and fails (13 §7). */
+      min-block-size: 56px;
+      padding: var(--sp-2) var(--sp-4);
+      color: var(--ink);
+      font-size: var(--t-ui);
+      text-decoration: none;
+    }
+
+    .card-seq {
+      grid-column: 2;
+      grid-row: 1;
+      color: var(--dim);
+      font-family: var(--font-id);
+      font-size: var(--t-xs);
+      text-align: end;
+    }
+
+    .card-title {
+      grid-column: 1;
+      grid-row: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .card-b {
+      grid-column: 1;
+      grid-row: 2;
+      color: var(--dim);
+      font-size: var(--t-xs);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .card-c {
+      grid-column: 2;
+      grid-row: 2;
+      color: var(--dim);
+      font-size: var(--t-xs);
+      font-variant-numeric: tabular-nums;
+      text-align: end;
     }
   }
 </style>

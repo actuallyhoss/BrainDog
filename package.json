@@ -9,7 +9,11 @@
   "scripts": {
     "test": "pnpm -r --workspace-concurrency=1 run test",
     "typecheck": "pnpm -r run typecheck",
-    "gates": "node tools/gates/run.mjs"
+    "gates": "node tools/gates/run.mjs",
+    "dev": "pnpm --filter @braindog/web dev",
+    "build": "pnpm --filter @braindog/web build",
+    "shots": "pnpm --filter @braindog/web exec node scripts/shot.mjs",
+    "proof": "pnpm --filter @braindog/theme run proof"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

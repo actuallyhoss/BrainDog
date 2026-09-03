@@ -13,7 +13,7 @@
 <script lang="ts">
   import type { Degraded } from '../src/index.ts';
 
-  let { segment, onfix }: { segment: Degraded; onfix?: () => void } = $props();
+  let { segment, onfix }: { segment: Degraded; onfix?: (() => void) | undefined } = $props();
 </script>
 
 <figure class="block block-degraded" data-code={segment.code}>

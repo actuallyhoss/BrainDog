@@ -35,8 +35,8 @@
     pen: PageDecl[];
     record: string;
     registers: { id: string; name: string; count: number }[];
-    open?: number;
-    inbox?: number;
+    open?: number | undefined;
+    inbox?: number | undefined;
   } = $props();
 
   const sections = $derived.by(() => {

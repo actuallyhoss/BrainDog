@@ -12,7 +12,11 @@
   import { TONES } from 'braindog-render';
   import type { Tone } from 'braindog-render';
 
-  let { label, tone, filled = false }: { label: string; tone?: Tone; filled?: boolean } = $props();
+  let {
+    label,
+    tone,
+    filled = false,
+  }: { label: string; tone?: Tone | undefined; filled?: boolean | undefined } = $props();
 </script>
 
 <span class="chip" data-intent={tone} data-filled={filled ? '' : undefined}>

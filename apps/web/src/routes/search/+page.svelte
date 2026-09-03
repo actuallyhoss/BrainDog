@@ -96,10 +96,10 @@
   .input {
     flex: 1;
     border: 0;
+    border-radius: var(--r-sm);
     background: none;
     color: var(--ink);
     font-size: var(--t-md);
-    outline: none;
   }
 
   .prompt {

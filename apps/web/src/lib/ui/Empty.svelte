@@ -26,15 +26,15 @@
   }: {
     kind: EmptyKind;
     title: string;
-    body?: string;
+    body?: string | undefined;
     /** Quoted VERBATIM. "38 rows, none matching `overdue`" is the whole of the state. */
-    query?: string;
+    query?: string | undefined;
     /** A copyable request id, always. One sentence in the house voice, never a stack trace. */
-    rid?: string;
-    actions?: Snippet;
+    rid?: string | undefined;
+    actions?: Snippet | undefined;
     /** The highest-value line in the product: the buyer already has agents, and an empty register is
         the right place to say so. */
-    agentPrompt?: string;
+    agentPrompt?: string | undefined;
   } = $props();
 </script>
 

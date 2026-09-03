@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src/**/*.ts"],
+  "comment": "The `svelte/` subpath is type-checked by svelte-check from apps/web, which is the only place a Svelte compiler exists (31 §2)."
+}

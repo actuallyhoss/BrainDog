@@ -13,7 +13,6 @@
   import '$lib/blocks.css';
   import '$lib/ui/rows.css';
 
-  import { INBOX } from '$lib/record/api.ts';
   import { copy } from '$lib/copy.ts';
   import { GoPrefix, overlays, typing } from '$lib/a11y/keys.svelte.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
@@ -36,6 +35,10 @@
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
   const go = new GoPrefix();
+
+  /** `ponytail:` a constant in the mock-up. The live channel is `lib/data/live.ts` in the real app:
+      a hibernatable WebSocket carrying `{ version, registers }` and nothing else. */
+  const live: 'open' | 'polling' | 'offline' = 'open';
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
   const GOTO: Record<string, string> = { h: '/', d: '/decide', i: '/inbox', s: '/search', v: '/vault', p: '/packs', ',': '/settings/appearance' };
@@ -92,7 +95,11 @@
 
 <a class="skip" href="#main">Skip to content</a>
 
-<div class="live" data-state="open" aria-hidden="true"></div>
+<!-- The record's own state, two pixels, always there. Solid while the socket is open, dashed while
+     polling, dim when a write has actually failed — never from `navigator.onLine`, which reports
+     online on a LAN with no internet. And the chip must not cry wolf: one that appears and withdraws
+     on every open is a chip nobody believes the day it is true (19 §6). -->
+<div class="live" data-state={live} aria-hidden="true"></div>
 
 {#if bare}
   <main id="main">{@render children()}</main>
@@ -105,7 +112,7 @@
         record={data.index.name}
         registers={data.index.registers}
         open={data.questions.length}
-        inbox={INBOX.length}
+        inbox={data.inbox}
       />
     </div>
 
@@ -115,7 +122,7 @@
   </div>
 
   <div class="tab-slot">
-    <TabBar open={data.questions.length} inbox={INBOX.length} onmore={() => (moreOpen = true)} />
+    <TabBar open={data.questions.length} inbox={data.inbox} onmore={() => (moreOpen = true)} />
   </div>
 
   <button type="button" class="palette-launcher tap" onclick={() => (paletteOpen = true)} aria-label={copy.paletteLabel}>

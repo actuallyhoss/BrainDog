@@ -22,14 +22,14 @@
     children,
     footer,
   }: {
-    open?: boolean;
+    open?: boolean | undefined;
     title: string;
-    subtitle?: string;
-    id?: string;
+    subtitle?: string | undefined;
+    id?: string | undefined;
     /** For a caller whose open state is derived from something else — a peeked row's seq, say. */
-    onclose?: () => void;
+    onclose?: (() => void) | undefined;
     children: Snippet;
-    footer?: Snippet;
+    footer?: Snippet | undefined;
   } = $props();
 
   let el = $state<HTMLDialogElement>();

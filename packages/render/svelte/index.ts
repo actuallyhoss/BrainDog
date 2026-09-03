@@ -15,6 +15,8 @@ export { default as Markdown } from './Markdown.svelte';
 export { default as Degraded } from './Degraded.svelte';
 export { default as Text } from './Text.svelte';
 
+export type { Column, TableRow } from './types.ts';
+
 export { default as Panel } from './p/Panel.svelte';
 export { default as Grid } from './p/Grid.svelte';
 export { default as Rows } from './p/Rows.svelte';

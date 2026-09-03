@@ -8,8 +8,9 @@
 <script lang="ts">
   import type { Block, RenderOptions } from '../../src/index.ts';
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
-  void opts;
+  // `opts` is part of every primitive's signature and is not read here: `code` and `tree` rows are
+  // verbatim, so nothing in them is interpolated or linked.
+  let { block }: { block: Block; opts?: RenderOptions | undefined } = $props();
 
   const body = $derived(
     block.rows

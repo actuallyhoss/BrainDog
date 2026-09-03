@@ -1,0 +1,241 @@
+/**
+ * `css-rules` — one regex tokeniser, zero dependencies, no Stylelint.
+ *
+ * "No component writes a colour" is decoration unless something checks it. This is the check, and
+ * two of its rules matter more than they look:
+ *
+ *   - THE UNKNOWN-PROPERTY RULE matters as much as the colour rule. `var(--fain)` is not a colour
+ *     violation, it is an INVISIBLE one: it resolves to nothing, inherits, looks fine in light mode
+ *     and is unreadable in dark. `@property` does not rescue it either — measured, an
+ *     invalid-at-computed-value-time custom property falls back to the INHERITED value, not to
+ *     `initial-value` (28 §2.3).
+ *   - THE PHYSICAL-PROPERTY RULE is a day's work now and a manual audit of hundreds of declarations
+ *     later, which is why it is in the first commit rather than after sixteen block kinds exist.
+ *
+ * Usage:  node tools/gates/css-rules.mjs
+ */
+
+import { readdir, readFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
+
+const ROOT = process.cwd();
+const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots']);
+
+/** Properties whose value paints. A literal in any of them is a component writing a colour. */
+const COLOUR_PROPS = new Set([
+  'color',
+  'background',
+  'background-color',
+  'background-image',
+  'border',
+  'border-color',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+  'border-block-color',
+  'border-inline-color',
+  'border-block-start-color',
+  'border-block-end-color',
+  'border-inline-start-color',
+  'border-inline-end-color',
+  'border-block',
+  'border-inline',
+  'border-block-start',
+  'border-block-end',
+  'border-inline-start',
+  'border-inline-end',
+  'outline',
+  'outline-color',
+  'fill',
+  'stroke',
+  'box-shadow',
+  'text-shadow',
+  'text-decoration-color',
+  'caret-color',
+  'accent-color',
+  'column-rule-color',
+]);
+
+/** A literal colour, in any of the forms a stylesheet can spell one. */
+const LITERAL = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\blab\(|\blch\(|\bcolor\(/i;
+
+/** Values that are not a colour a theme owns, and are legal anywhere. */
+const ALLOWED_VALUES = new Set([
+  'currentcolor',
+  'transparent',
+  'inherit',
+  'initial',
+  'unset',
+  'revert',
+  'none',
+  'auto',
+  // The forced-colors block surrenders the palette to the user agent on purpose (28 §2.5).
+  'canvas',
+  'canvastext',
+  'highlight',
+  'linktext',
+  'buttonface',
+  'buttontext',
+  'graytext',
+]);
+
+/** Physical properties. Logical properties only — a CI grep on these fails the build (13 §8). */
+const PHYSICAL = new Set([
+  'left',
+  'right',
+  'margin-left',
+  'margin-right',
+  'padding-left',
+  'padding-right',
+  'border-left',
+  'border-right',
+  'border-left-color',
+  'border-right-color',
+  'border-left-width',
+  'border-right-width',
+  'border-top-left-radius',
+  'border-top-right-radius',
+  'border-bottom-left-radius',
+  'border-bottom-right-radius',
+  'float',
+  'clear',
+  'width',
+  'height',
+  'min-width',
+  'min-height',
+  'max-width',
+  'max-height',
+  'top',
+  'bottom',
+  'margin-top',
+  'margin-bottom',
+  'padding-top',
+  'padding-bottom',
+  'border-top',
+  'border-bottom',
+]);
+
+/** …except where the physical axis IS the meaning, or no logical equivalent exists. */
+const PHYSICAL_OK = new Set(['width', 'height', 'min-width', 'min-height', 'max-width', 'max-height']);
+
+const PHYSICAL_ALIGN = /^(text-align|float|clear)$/;
+
+async function walk(dir, out = []) {
+  for (const e of await readdir(dir, { withFileTypes: true })) {
+    if (SKIP.has(e.name)) continue;
+    const p = join(dir, e.name);
+    if (e.isDirectory()) await walk(p, out);
+    else if (/\.(css|svelte)$/.test(e.name)) out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Comments are blanked rather than removed, so every offset still points at the right line — and
+ * blanking them is not cosmetic: a comment containing a colon and a semicolon reads as a
+ * declaration to a regex, and a comment containing a `;` swallows the declaration after it. The
+ * first run of this gate reported forty tokens as undeclared for exactly that reason.
+ */
+const blankComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+
+/** Everything between `<style>` and `</style>`, or the whole file when it is already CSS. */
+function cssOf(file, text) {
+  if (file.endsWith('.css')) return [{ css: blankComments(text), offset: 0 }];
+  const out = [];
+  const re = /<style[^>]*>([\s\S]*?)<\/style>/g;
+  for (let m; (m = re.exec(text)); )
+    out.push({ css: blankComments(m[1]), offset: m.index + m[0].indexOf(m[1]) });
+  return out;
+}
+
+const lineOf = (text, index) => text.slice(0, index).split('\n').length;
+
+/**
+ * Declarations, found without a parser: `prop : value ;` outside a selector or an at-rule prelude.
+ * The name class carries DIGITS — `--s1`, `--sp-4`, `--t-2xl`, `--e3` are all tokens, and a class
+ * of `[-a-z]` silently declared none of them.
+ */
+function* declarations(css, offset) {
+  const re = /(^|[;{}])\s*(--)?([-a-z][-a-z0-9]*)\s*:\s*([^;{}]+)/gi;
+  for (let m; (m = re.exec(css)); ) {
+    const [, , custom, prop, value] = m;
+    yield {
+      custom: Boolean(custom),
+      prop: prop.toLowerCase(),
+      value: value.trim(),
+      at: offset + m.index,
+    };
+  }
+}
+
+const findings = [];
+const declared = new Set();
+const used = [];
+
+const files = await walk(ROOT);
+
+for (const file of files) {
+  const text = await readFile(file, 'utf8');
+  const rel = relative(ROOT, file).replace(/\\/g, '/');
+  const generated = rel.includes('theme/house.css');
+
+  // Inline `style="--x: …"` in a template declares a custom property too.
+  for (const m of text.matchAll(/style=["'][^"']*?--([a-z-]+)\s*:/gi)) declared.add(`--${m[1]}`);
+
+  for (const { css, offset } of cssOf(file, text)) {
+    for (const d of declarations(css, offset)) {
+      const line = lineOf(text, d.at);
+      const where = `${rel}:${line}`;
+
+      if (d.custom) {
+        declared.add(`--${d.prop}`);
+        continue;
+      }
+
+      for (const m of d.value.matchAll(/var\(\s*(--[a-z0-9-]+)/gi))
+        used.push({ name: m[1].toLowerCase(), where });
+
+      if (generated) continue;
+
+      const bare = d.value.toLowerCase().replace(/var\([^)]*\)/g, '').trim();
+
+      if (COLOUR_PROPS.has(d.prop) && LITERAL.test(bare) && !ALLOWED_VALUES.has(bare))
+        findings.push({ where, rule: 'colour-literal', text: `${d.prop}: ${d.value}` });
+
+      if (d.prop === 'outline' && /\bnone\b/.test(d.value))
+        findings.push({ where, rule: 'outline-none', text: `${d.prop}: ${d.value}` });
+
+      if (PHYSICAL.has(d.prop) && !PHYSICAL_OK.has(d.prop))
+        findings.push({ where, rule: 'physical-property', text: `${d.prop}: ${d.value}` });
+
+      if (PHYSICAL_ALIGN.test(d.prop) && /\b(left|right)\b/.test(d.value))
+        findings.push({ where, rule: 'physical-property', text: `${d.prop}: ${d.value}` });
+
+      // 13 §2.4 check C's usage half: `faint` clears only the LARGE-text floor, so it may not carry
+      // text below 24px. The palette half is the theme validator's.
+      if (d.prop === 'color' && /--faint/.test(d.value))
+        findings.push({ where, rule: 'faint-on-text', text: `${d.prop}: ${d.value}` });
+    }
+  }
+}
+
+for (const u of used)
+  if (!declared.has(u.name))
+    findings.push({ where: u.where, rule: 'unknown-property', text: `var(${u.name})` });
+
+const RULES = {
+  'colour-literal': 'a component may name only the semantic layer, never a colour',
+  'unknown-property': 'this resolves to nothing, inherits, and is invisible until dark mode',
+  'physical-property': 'logical properties only — this breaks under dir="rtl"',
+  'outline-none': 'the focus ring is not removable',
+  'faint-on-text': 'faint clears the large-text floor only; not below 24px',
+};
+
+if (findings.length === 0) {
+  console.log(`  css-rules: ${files.length} files, ${declared.size} tokens, 0 findings`);
+} else {
+  for (const f of findings) console.error(`  ${f.rule.padEnd(18)} ${f.where}  ${f.text}\n${' '.repeat(22)}${RULES[f.rule]}`);
+  console.error(`\n  css-rules: ${findings.length} findings`);
+  process.exitCode = 1;
+}

@@ -11,8 +11,9 @@
 <script lang="ts">
   import { TONES, type Block, type RenderOptions } from '../../src/index.ts';
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
-  void opts;
+  // `opts` is part of every primitive's signature and is not read here: a chip is a glyph, a figure
+  // and a word, and none of the three may contain an inline run.
+  let { block }: { block: Block; opts?: RenderOptions | undefined } = $props();
 
   const rows = $derived(block.rows.filter((r) => (r.cells[1] ?? '') !== '' && (r.cells[2] ?? '') !== ''));
 </script>

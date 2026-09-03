@@ -23,12 +23,12 @@
     children,
     ...rest
   }: {
-    weight?: 'primary' | 'quiet' | 'bare';
-    href?: string;
-    type?: 'button' | 'submit';
-    tone?: 'good' | 'warn' | 'bad' | 'info';
-    disabled?: boolean;
-    onclick?: (e: MouseEvent) => void;
+    weight?: 'primary' | 'quiet' | 'bare' | undefined;
+    href?: string | undefined;
+    type?: 'button' | 'submit' | undefined;
+    tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
+    disabled?: boolean | undefined;
+    onclick?: ((e: MouseEvent) => void) | undefined;
     children: Snippet;
     [key: string]: unknown;
   } = $props();

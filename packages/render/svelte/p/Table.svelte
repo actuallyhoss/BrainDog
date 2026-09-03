@@ -25,28 +25,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { Tone } from '../../src/index.ts';
-
-  export type Column = {
-    field: string;
-    label: string;
-    /** A CSS track. Declared, never content-derived — see the note above. */
-    width: string;
-    /** Quantities, dates and counts end; text and refs start. A decimal point that moves is a
-        column you cannot scan (13 §4.2). */
-    align?: 'start' | 'end';
-    /** An identifier truncates in the MIDDLE, keeping prefix and suffix. A figure never truncates:
-        a truncated figure is not shortened, it is wrong. */
-    truncate?: 'end' | 'middle' | 'never';
-  };
-
-  export type TableRow = {
-    key: string;
-    cells: (string | null)[];
-    /** Per-row intent, from `tone_when` on a column or from the row's own state. */
-    tone?: Tone;
-    href?: string;
-  };
+  import type { Column, TableRow } from '../types.ts';
 
   let {
     columns,
@@ -63,20 +42,20 @@
     onmore,
     cellSnippet,
   }: {
-    columns: Column[];
-    rows: TableRow[];
+    columns: readonly Column[];
+    rows: readonly TableRow[];
     /** `aria-rowcount`. -1 while a filtered total is unknown, which is the honest answer. */
-    total?: number;
-    cap?: number;
-    label?: string;
-    sort?: { field: string; dir: 'asc' | 'desc' };
-    focus?: { row: number; col: number };
-    selected?: Set<string>;
-    chunk?: number;
-    onactivate?: (row: TableRow) => void;
-    onsort?: (field: string) => void;
-    onmore?: () => void;
-    cellSnippet?: Snippet<[TableRow, Column, string | null]>;
+    total?: number | undefined;
+    cap?: number | undefined;
+    label?: string | undefined;
+    sort?: { field: string; dir: 'asc' | 'desc' } | undefined;
+    focus?: { row: number; col: number } | undefined;
+    selected?: Set<string> | undefined;
+    chunk?: number | undefined;
+    onactivate?: ((row: TableRow) => void) | undefined;
+    onsort?: ((field: string) => void) | undefined;
+    onmore?: (() => void) | undefined;
+    cellSnippet?: Snippet<[TableRow, Column, string | null]> | undefined;
   } = $props();
 
   const tracks = $derived(columns.map((c) => c.width).join(' '));
@@ -95,7 +74,10 @@
     sort?.field === field ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
 </script>
 
-<!-- A labelled region with tabindex 0, so a keyboard user can scroll the grid itself. -->
+<!-- A labelled region with tabindex 0, so a keyboard user can scroll the grid itself. The linter is
+     right in general and wrong here: a scrollable region MUST be focusable or a keyboard user cannot
+     reach the scrollbar, and the APG grid pattern requires exactly this wrapper. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="table-region" role="region" tabindex="0" aria-label={label ?? 'Rows'}>
   <div
     class="table"

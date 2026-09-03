@@ -28,7 +28,16 @@
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
 
-  type Row = { id: string; title: string; detail?: string; href: string; group: string; keys?: string; icon?: IconName; spoken?: string };
+  type Row = {
+    id: string;
+    title: string;
+    href: string;
+    group: string;
+    detail?: string | undefined;
+    keys?: string | undefined;
+    icon?: IconName | undefined;
+    spoken?: string | undefined;
+  };
 
   let el = $state<HTMLDialogElement>();
   let input = $state<HTMLInputElement>();
@@ -244,14 +253,17 @@
     color: var(--dim);
   }
 
+  /* No `outline: none`. The ring stays: the dialog's own border is the frame, and the ring is what
+     tells a keyboard user where the caret went. `outline: none` in first-party CSS is a CI failure,
+     and this file had it (13 §7). */
   .p-input {
     flex: 1;
     min-inline-size: 0;
     border: 0;
+    border-radius: var(--r-sm);
     background: none;
     color: var(--ink);
     font-size: var(--t-md);
-    outline: none;
   }
 
   .p-input::placeholder {

@@ -90,8 +90,13 @@ export type KindSpec = {
 /**
  * Sixteen, counted. `diagram`, `sparkline`, `series` and `forecast` are post-v1 and arrive as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
+ *
+ * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
+ * shape-checked — and then re-exported as `Record<Kind, KindSpec>`, because `as const` alone narrows
+ * each entry to its own literal type and `KINDS[kind].ordered` stops compiling for the fifteen kinds
+ * that do not set it.
  */
-export const KINDS = {
+const TABLE = {
   /* Prose and emphasis */
   note: { primitive: 'panel', cells: 0, tone: true, prose: true },
   quote: { primitive: 'panel', cells: 2, tone: false, rows: 1 },
@@ -122,9 +127,11 @@ export const KINDS = {
   table: { primitive: 'table', cells: 0, tone: false, pageOnly: true },
 } as const satisfies Record<string, KindSpec>;
 
-export type Kind = keyof typeof KINDS;
+export type Kind = keyof typeof TABLE;
 
-export const isKind = (s: string): s is Kind => Object.hasOwn(KINDS, s);
+export const KINDS: Record<Kind, KindSpec> = TABLE;
+
+export const isKind = (s: string): s is Kind => Object.hasOwn(TABLE, s);
 
 /** The two render-time degradations. Neither is a refusal: a document is never refused for its dialect. */
 export type DegradeCode = 'DIALECT_ARITY' | 'DIALECT_KIND_UNKNOWN';

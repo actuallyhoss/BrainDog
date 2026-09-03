@@ -23,13 +23,13 @@
     id,
   }: {
     title: string;
-    count?: number;
-    total?: number;
-    kicker?: string;
-    subtitle?: string;
-    id?: string;
-    actions?: Snippet;
-    filters?: Snippet;
+    count?: number | undefined;
+    total?: number | undefined;
+    kicker?: string | undefined;
+    subtitle?: string | undefined;
+    id?: string | undefined;
+    actions?: Snippet | undefined;
+    filters?: Snippet | undefined;
   } = $props();
 </script>
 
@@ -140,7 +140,32 @@
 
   @media (width < 900px) {
     .head {
-      padding-inline: var(--sp-3);
+      /* The palette launcher is a fixed header button at this width, so the title clears it. */
+      padding: var(--sp-3) var(--sp-3) var(--sp-2);
+      padding-inline-end: 56px;
+    }
+
+    .head-main {
+      flex-wrap: wrap;
+      align-items: baseline;
+    }
+
+    .head-titles {
+      flex-basis: 100%;
+    }
+
+    /* The subtitle is the register's own one-line description. It earns its place on a wide screen
+       and costs four wrapped lines above the fold on a phone, so it goes. */
+    .subtitle {
+      display: none;
+    }
+
+    .head-actions {
+      margin-inline-start: auto;
+    }
+
+    .title {
+      font-size: var(--t-lg);
     }
   }
 </style>

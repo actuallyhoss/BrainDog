@@ -81,6 +81,36 @@ export function display(register: string, field: string, value: unknown): string
 /** The second line of a date cell: the band a person actually holds. */
 export const dueBand = (iso: unknown): string => (typeof iso === 'string' ? relative(iso, NOW) : '');
 
+/**
+ * The identity of the row a `ref` points at, when its register declares one.
+ *
+ * One mark and one accent per thing, and colour means WHICH PROJECT, everywhere. The hue is frozen
+ * at create and never hand-picked; it reaches the DOM as `oklch(L C h)` with the theme's two mark
+ * constants, and it may colour a mark, a chip, an avatar, a calendar dot or a chart series — and
+ * NEVER text, an intent, a surface, or any border that carries meaning (13 §2.1b).
+ *
+ * It is never the only signal either: the name always sits beside it. Past four marks the name is
+ * what carries identity anyway, which is why there is no fifth colour to find.
+ */
+export type Identity = { mark: string; hue: number; name: string; retired: boolean };
+
+export function identityOf(register: string, field: string, value: unknown): Identity | null {
+  const f = decl(register, field);
+  if (!f || f.type !== 'ref' || !f.to) return null;
+  const target = REGISTERS[f.to];
+  if (!target?.identity) return null;
+  const row = (ROWS[f.to] ?? []).find((e) => e.seq === Number(value));
+  if (!row) return null;
+  const lane = target.state ? String(row.fields[target.state] ?? '') : '';
+  return {
+    mark: String(row.fields[target.identity.mark] ?? '●'),
+    hue: Number(row.fields[target.identity.accent] ?? 0),
+    name: String(row.fields[target.title] ?? ''),
+    // A retired row is achromatic. It still has a mark; it no longer has a claim on a hue.
+    retired: lane === 'retired' || lane === 'parked',
+  };
+}
+
 /* ── columns ─────────────────────────────────────────────────────────────
    The default projection: seq, the title field, the `mobile:` fields, state, then indexed fields,
    capped at TEN. At 1440px the return sweep is ~1392px, and beyond ten columns of legible width the
@@ -205,9 +235,9 @@ export type Metric = {
   label: string;
   value: string;
   note: string;
-  tone?: 'good' | 'warn' | 'bad' | 'info';
+  tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
   /** Where the figure came from, so pressing it opens the rows behind it. */
-  href?: string;
+  href?: string | undefined;
 };
 
 const open = (e: Entry) => e.fields.state === 'open' || e.fields.state === 'part';
@@ -348,9 +378,11 @@ export type BlockResult = PageBlock & {
   entries: Entry[];
   total: number;
   drawn: boolean;
+  /** Machine-readable, and every block that renders a query result carries one: staleness is a
+      TIMESTAMP, not a vibe (19 §6). */
   stale_at: string;
-  register?: string;
-  metrics?: Metric[];
+  register?: string | undefined;
+  metrics?: Metric[] | undefined;
 };
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {

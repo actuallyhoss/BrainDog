@@ -2,6 +2,7 @@ name: ci
 on:
   push:
   pull_request:
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,7 +13,26 @@ jobs:
         with:
           node-version: 24.13.0
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
+
+      # Types first: a type error makes every failure below it harder to read.
       - run: pnpm typecheck
+
       - run: pnpm test
+
+      # The gates need an artefact to measure, and `bundle` is the reason the budget is a budget
+      # rather than an aspiration.
+      - run: pnpm --filter @braindog/web build
       - run: pnpm gates
+
+      # Screenshots are ARTEFACTS FOR A HUMAN, never an assertion: rendering can vary with the host
+      # OS, version, settings, hardware and power source, so a pixel diff fails on whitespace and
+      # passes on layout bugs (22 §10).
+      - name: screens
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: apps/web/shots
+          if-no-files-found: ignore
