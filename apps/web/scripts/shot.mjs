@@ -26,6 +26,7 @@ const ROUTES = [
   ['page-money', '/p/money'],
   ['page-estate', '/p/estate'],
   ['page-work', '/p/work'],
+  ['page-kiln', '/p/kiln'],
   ['vault', '/vault'],
   ['packs', '/packs'],
   ['settings', '/settings/appearance'],

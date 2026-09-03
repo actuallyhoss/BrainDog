@@ -40,6 +40,7 @@ export const copy = {
   moveDown: 'Move down',
   removeBlock: 'Remove this block',
   addBlock: 'Add a block',
+  blockLink: 'a link to this block',
   blockAdded: (kind: string) => `Added a ${kind}. Nothing was written — this is a mock-up.`,
 
   /* The picker groups by PURPOSE, because somebody adding a block knows they want to show a list

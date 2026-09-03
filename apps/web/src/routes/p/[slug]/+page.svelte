@@ -13,6 +13,7 @@
 <script lang="ts">
   import { KINDS, isKind } from 'braindog-render';
   import { Block, Table } from 'braindog-render/svelte';
+  import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { page as readPage, values, type BlockResult } from '$lib/record/api.ts';
@@ -119,6 +120,71 @@
 
   let adding = $state(false);
 
+  /**
+   * The block cursor, and the five page-scope keys the keymap has always advertised.
+   *
+   * `j k`, `↵ Esc`, `o`, `y` and `⇧E` are registered in `keys.svelte.ts` and printed on `?`, and
+   * not one of them did anything — the `<Kbd>` chips beside the block bars were advertisements for
+   * bindings that did not exist. A keymap that lists a key which does nothing is worse than one
+   * that omits it: the reader tries it, nothing happens, and now they distrust the whole sheet.
+   */
+  let cursor = $state(0);
+
+  function onkeydown(e: KeyboardEvent) {
+    const el = document.activeElement;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+    if (e.metaKey || e.ctrlKey) return;
+
+    /* ⇧E toggles the declaration. Shift, not a bare `e`, because bare `e` means edit-in-place
+       inside a grid and a key's meaning must be a function of the object in focus rather than of
+       the page you happen to be on. */
+    if (e.shiftKey && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      void goto(`?src=${showSource ? '0' : '1'}`, { replaceState: true, noScroll: true });
+      return;
+    }
+    if (e.altKey || e.shiftKey || showSource || arranging) return;
+
+    const blocks = laid;
+    if (e.key === 'j' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      cursor = Math.min(cursor + 1, blocks.length - 1);
+      focusBlock();
+    } else if (e.key === 'k' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      cursor = Math.max(cursor - 1, 0);
+      focusBlock();
+    } else if (e.key === 'o') {
+      const register = blocks[cursor]?.block.register;
+      if (register) {
+        e.preventDefault();
+        void goto(`/r/${register}`);
+      }
+    } else if (e.key === 'y') {
+      const slotIndex = blocks[cursor]?.slot.i;
+      if (slotIndex !== undefined) {
+        e.preventDefault();
+        void copyBlockLink(slotIndex);
+      }
+    }
+  }
+
+  /** Scrolls the cursor into view under the sticky head. `.block-slot` already carries the margin. */
+  function focusBlock() {
+    const slot = laid[cursor]?.slot.i;
+    if (slot !== undefined) document.getElementById(`b-${slot + 1}`)?.scrollIntoView({ block: 'nearest' });
+  }
+
+  async function copyBlockLink(slotIndex: number) {
+    const url = `${route.url.origin}${route.url.pathname}#b-${slotIndex + 1}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toasts.push(copy.copied(copy.blockLink));
+    } catch {
+      toasts.push(copy.copyRefused, { intent: 'warn' });
+    }
+  }
+
   /** The register the page is mostly about — what a new block binds to before you narrow it. */
   const primary = $derived(result?.blocks.find((b) => b.register)?.register ?? 'obligations');
 
@@ -172,6 +238,8 @@
   );
 </script>
 
+<svelte:window {onkeydown} />
+
 {#if !result}
   <div class="page">
     <Empty kind="error" title="Couldn't load {slug}." rid="r7k2m9qd4x">
@@ -222,6 +290,7 @@
             aria-labelledby="h-{slot.i + 1}"
             style="--span:{slot.span}"
             data-arranging={arranging ? '' : undefined}
+            data-cursor={!arranging && !showSource && at === cursor ? '' : undefined}
             role={arranging ? 'listitem' : undefined}
             data-dragging={dragging === at ? '' : undefined}
             draggable={arranging}
@@ -387,6 +456,14 @@
      were applying, so every gap on a declared page was 48px where the token says 24. */
   .block-slot :global(.block) {
     margin-block-end: 0;
+  }
+
+  /* The cursor is a BAND on the leading edge, not a box around the block. A block is already a
+     bordered card; a second border around it reads as two nested boxes rather than as "this one".
+     The same 2px inset the register grid uses for its focused row, for the same reason. */
+  .block-slot[data-cursor] {
+    box-shadow: inset 3px 0 0 0 var(--accent);
+    border-radius: var(--r-sm);
   }
 
   /* ── arranging ────────────────────────────────────────────────────────────
