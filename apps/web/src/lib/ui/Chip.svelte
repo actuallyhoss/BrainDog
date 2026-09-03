@@ -25,26 +25,33 @@
 </span>
 
 <style>
+  /* A TAG, not a pill. The fully rounded capsule is the shape of a count or a notification —
+     something with a number in it — and a state word wearing that shape reads as a badge that has
+     been stuck onto the row rather than as a property of it. A 4px corner, the same corner every
+     control in the product has, reads as part of the row. */
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 1px 8px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: 999px;
+    padding: 2px 7px;
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
     color: var(--ink2);
     font-size: var(--t-xs);
-    letter-spacing: 0.03em;
+    font-weight: 600;
+    line-height: 1.35;
     white-space: nowrap;
   }
 
   .chip[data-intent] {
-    border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+    background: color-mix(in srgb, var(--tone) 12%, transparent);
+    border-color: color-mix(in srgb, var(--tone) 28%, transparent);
     color: var(--tone);
   }
 
   .chip[data-filled][data-intent] {
-    background: color-mix(in srgb, var(--tone-fill) 18%, transparent);
+    background: color-mix(in srgb, var(--tone-fill) 20%, transparent);
+    border-color: color-mix(in srgb, var(--tone-fill) 40%, transparent);
   }
 </style>

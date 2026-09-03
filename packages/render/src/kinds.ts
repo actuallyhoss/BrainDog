@@ -41,7 +41,9 @@ export const TONES = {
   good: { role: 'earn', glyph: '✓︎', label: 'good' },
   warn: { role: 'warn', glyph: '⚠︎', label: 'watch this' },
   bad: { role: 'danger', glyph: '⊘︎', label: 'wrong' },
-  info: { role: 'accent', glyph: 'ⓘ︎', label: 'note' },
+  // `info` names a role of its own rather than borrowing `accent`, because in the house theme the
+  // accent IS the mark and the mark is red — see the seed in `@braindog/theme`.
+  info: { role: 'info', glyph: 'ⓘ︎', label: 'note' },
 } as const;
 
 export type Tone = keyof typeof TONES;

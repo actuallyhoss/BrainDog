@@ -82,8 +82,8 @@ console.log(
     : `\n  REFUSED — ${bad.length} floors breached.\n`,
 );
 
-console.log(`  BrainDog red #F42A2A is oklch(${(() => {
-  const c = rgbToLch(parseColour('#F42A2A'));
+console.log(`  BrainDog red #CF413A is oklch(${(() => {
+  const c = rgbToLch(parseColour('#CF413A'));
   return `${c.L.toFixed(3)} ${c.C.toFixed(3)} ${c.H.toFixed(1)}`;
 })()})`);
 console.log(`  danger-fill  dark  ${HOUSE.schemes.dark['danger-fill']}   light ${HOUSE.schemes.light['danger-fill']}`);

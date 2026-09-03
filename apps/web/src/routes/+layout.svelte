@@ -2,11 +2,17 @@
   The shell: a skip link, the rail or the tab bar, the palette, the toast stack, and one polite live
   region.
 
-  The live hairline across the top is the record's own state — solid when the socket is open, dashed
-  while polling, dim when offline. It is two pixels and it is always there, because "a surface
-  showing nothing must never be indistinguishable from a surface with nothing to show" (19 §6). And
-  the offline chip must not cry wolf: `navigator.onLine` reports online on a LAN with no internet, so
-  the real signal is a failed write, never the browser's guess.
+  The live hairline across the top is the record's own state. It is two pixels and it is ALWAYS
+  there, because "a surface showing nothing must never be indistinguishable from a surface with
+  nothing to show" (19 §6) — but "always there" is not the same as "always coloured", and it was
+  built the wrong way round once. A saturated stripe across the full width of every screen, painted
+  in the one colour reserved for *this is interactive*, is a permanent alarm for the state in which
+  nothing is wrong. So the healthy state is the boundary colour, indistinguishable from the chrome
+  it sits in, and the bar takes an intent only when the connection has actually taken one.
+
+  The offline signal must not cry wolf, which is a detection rule and not a styling one:
+  `navigator.onLine` reports online on a LAN with no internet, so the real signal is a failed write,
+  never the browser's guess. Once it IS detected, it is shown as what it is — writes will fail.
 -->
 <script lang="ts">
   import '../app.css';
@@ -175,20 +181,20 @@
     inset-inline: 0;
     z-index: var(--z-hint);
     block-size: 2px;
-    background: var(--accent);
-  }
-
-  .live[data-state='polling'] {
-    background: repeating-linear-gradient(90deg, var(--warn) 0 8px, transparent 8px 16px);
-  }
-
-  .live[data-state='offline'] {
     background: var(--line);
   }
 
-  /* Chrome on the canvas; work in a panel lifted off it.
-     The panel is the scroll container, so the rail never moves and the work never runs to the
-     window's hard edge. It is the difference between an application and a web page. */
+  .live[data-state='polling'] {
+    background: repeating-linear-gradient(90deg, var(--warn) 0 8px, var(--line) 8px 16px);
+  }
+
+  .live[data-state='offline'] {
+    background: var(--danger);
+  }
+
+  /* Rail on the darker ground, work on the lighter one, one hairline between them, and no inset
+     panel: nothing floats, so nothing needs a shadow to explain why it floats. The work area is the
+     ONE scroll container, so the rail never moves and the window shows exactly one scrollbar. */
   .shell {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -198,10 +204,8 @@
 
   .body {
     min-inline-size: 0;
-    margin: var(--sp-2) var(--sp-2) var(--sp-2) 0;
     background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 14px;
+    border-inline-start: 1px solid var(--line);
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -220,12 +224,8 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
-    /* No inset on a phone: the screen is the panel, and eight pixels of canvas down each side is
-       eight pixels the content does not have. */
     .body {
-      margin: 0;
       border: 0;
-      border-radius: 0;
       padding-block-end: 76px;
     }
 

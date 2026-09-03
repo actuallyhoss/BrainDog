@@ -11,3 +11,8 @@ build/
 _*
 __*
 .DS_Store
+
+# Screenshots and the proof dump are artefacts for a human to look at, regenerated on demand
+# (`node scripts/shot.mjs`, `node src/proof.ts`) and never asserted on — see scripts/shot.mjs.
+shots/
+proof.txt

@@ -55,13 +55,18 @@
     justify-content: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
-    background: var(--s2);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    padding: 0 var(--sp-4);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    /* One pixel of shade under the bottom edge — not a drop shadow, which would put the control on
+       a different plane from the flat cards around it, but enough that a button reads as a thing
+       you press rather than as a rectangle with a border. It inverts on :active, which is the whole
+       reason it is worth a line: the control visibly goes down. */
+    box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--ink) 12%, transparent);
     color: var(--ink);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--t-ui);
+    font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
@@ -71,27 +76,39 @@
   }
 
   .btn:hover:not(:disabled) {
-    background: var(--s3);
+    background: var(--s2);
+    border-color: var(--edge);
   }
 
   .btn:active:not(:disabled) {
     transition-duration: var(--d-press);
     background: var(--s1);
+    box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--ink) 12%, transparent);
   }
 
+  /* The primary control is the MARK'S OWN COLOUR. There is no second brand red and no tint of it:
+     the one loud thing on a screen is the thing the product is called. */
   .btn[data-weight='primary'] {
     background: var(--accent);
-    border-color: var(--edge);
+    border-color: color-mix(in srgb, var(--accent) 72%, var(--sunk));
+    box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 60%, var(--sunk));
     color: var(--accent-ink);
   }
 
   .btn[data-weight='primary']:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--accent) 88%, var(--ink));
+    background: color-mix(in srgb, var(--accent) 90%, var(--sunk));
+    border-color: color-mix(in srgb, var(--accent) 58%, var(--sunk));
+  }
+
+  .btn[data-weight='primary']:active:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 82%, var(--sunk));
+    box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--accent) 60%, var(--sunk));
   }
 
   .btn[data-weight='bare'] {
     background: none;
     border-color: transparent;
+    box-shadow: none;
     color: var(--ink2);
   }
 

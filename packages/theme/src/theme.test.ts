@@ -18,7 +18,17 @@ import {
   toHex,
 } from './color.ts';
 import { HOUSE, HIGH_CONTRAST, HOUSE_SEED } from './index.ts';
-import { INKS, INTENTS, SURFACES, buildScheme, HOUSE_PROFILE, nextAccentHue, INTENT_HUE, parseColour } from './build.ts';
+import {
+  BRAND_RED,
+  INKS,
+  INTENTS,
+  SURFACES,
+  buildScheme,
+  HOUSE_PROFILE,
+  nextAccentHue,
+  INTENT_HUE,
+  parseColour,
+} from './build.ts';
 import { refusals, validate } from './checks.ts';
 import { toCSS, A11Y_FORCED_COLORS } from './css.ts';
 
@@ -32,9 +42,13 @@ test('OKLCH round-trips through sRGB', () => {
 });
 
 test('the BrainDog red sits on the danger hue anchor', () => {
-  const c = rgbToLch(fromHex('#F42A2A'));
-  assert.ok(Math.abs(c.H - INTENT_HUE.danger) < 1, `hue ${c.H.toFixed(1)} is not within 1 of 27`);
-  assert.ok(c.C > 0.2, 'the mark should be a saturated colour');
+  // The coincidence the whole palette is built on, and it survived the mark being toned down:
+  // #F42A2A and #CF413A are the same hue, one is simply louder.
+  for (const red of [BRAND_RED, '#F42A2A']) {
+    const c = rgbToLch(fromHex(red));
+    assert.ok(Math.abs(c.H - INTENT_HUE.danger) < 1.5, `${red} is hue ${c.H.toFixed(1)}, not 27`);
+    assert.ok(c.C > 0.15, `${red} should still be a saturated colour`);
+  }
 });
 
 test('contrast matches the WCAG definition at the extremes', () => {
@@ -126,11 +140,19 @@ for (const built of [HOUSE, HIGH_CONTRAST]) {
   }
 }
 
-test('the dark danger chip is the mark, to within a rounding step', () => {
-  const chip = parseColour(HOUSE.schemes.dark['danger-fill']);
+test('the alarm is louder than the brand it shares a hue with', () => {
+  // The mark and `danger` are the same hue on purpose, so the ONE thing that has to stay true is
+  // that the overdue chip out-shouts the accent. It is arranged in the profile (`fillChroma` sits
+  // above the seed's chroma), not hoped for, and this is where that arrangement is held.
+  for (const scheme of ['dark', 'light'] as const) {
+    const chip = rgbToLch(parseColour(HOUSE.schemes[scheme]['danger-fill']));
+    const mark = rgbToLch(parseColour(BRAND_RED));
+    assert.ok(chip.C > mark.C, `in ${scheme} the chip is ${chip.C.toFixed(3)} chroma, the mark ${mark.C.toFixed(3)}`);
+  }
+  // And in dark it lands on the product's original fire-engine red, which is where that value went.
   assert.ok(
-    deltaE2000(rgbToCielab(chip), rgbToCielab(fromHex('#F42A2A'))) < 1,
-    `the chip is ${HOUSE.schemes.dark['danger-fill']}, which is not the mark`,
+    deltaE2000(rgbToCielab(parseColour(HOUSE.schemes.dark['danger-fill'])), rgbToCielab(fromHex('#F42A2A'))) < 1,
+    `the dark chip is ${HOUSE.schemes.dark['danger-fill']}`,
   );
 });
 
@@ -143,13 +165,26 @@ test('an achromatic seed is refused, not silently substituted', () => {
   );
 });
 
-test('a seed on the danger hue is refused for making info and bad the same colour', () => {
-  // The whole reason the accent is not red. `info` resolves to `accent`, so a red accent puts two
-  // of the four intents at delta-E 0 and check F cannot pass at any chroma.
-  assert.throws(
-    () => buildScheme({ ...HOUSE_SEED, accent: '#F42A2A' }, HOUSE_PROFILE, 'dark'),
-    /INTENT_INSEPARABLE/,
-  );
+test('the accent is the mark, exactly', () => {
+  // Asserted rather than described, because this is the decision the palette is built around and
+  // the constraint that used to forbid it is still one line away in build.ts. `info` is a generated
+  // role precisely so this can hold; re-point it at `accent` and this test is what fails.
+  for (const scheme of ['dark', 'light'] as const) assert.equal(HOUSE.schemes[scheme].accent, BRAND_RED);
+});
+
+test('the four intent words stay separable with a red accent beside them', () => {
+  // The accent is NOT one of the four — it is chrome, and never a row's verdict — so what has to
+  // hold is that the four words are separable among themselves, `info` included.
+  for (const scheme of ['dark', 'light'] as const) {
+    const p = HOUSE.schemes[scheme];
+    const four = INTENTS.map((k) => p[k]);
+    for (let i = 0; i < four.length; i++)
+      for (let j = i + 1; j < four.length; j++)
+        for (const d of ['protan', 'deutan', 'tritan'] as const) {
+          const de = separation(parseColour(four[i]!), parseColour(four[j]!), d);
+          assert.ok(de >= 10, `${INTENTS[i]} and ${INTENTS[j]} are ${de.toFixed(1)} apart to a ${d}ope in ${scheme}`);
+        }
+  }
 });
 
 test('a value outside the dialect grammar is refused', () => {

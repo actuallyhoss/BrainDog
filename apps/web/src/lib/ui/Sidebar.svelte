@@ -161,14 +161,15 @@
 </nav>
 
 <style>
-  /* The rail sits ON the canvas with no fill and no border of its own. It is dimmer than the panel
-     on purpose: the navigation is how you get to the work, and the work is what should be bright. */
+  /* The rail is the darker ground. Navigation is how you get to the work; the work is what should
+     be bright. */
   .rail {
     display: flex;
     flex-direction: column;
     inline-size: var(--rail);
     block-size: 100dvh;
-    padding: var(--sp-4) var(--sp-3) var(--sp-3) var(--sp-4);
+    padding: var(--sp-4) var(--sp-3) var(--sp-3);
+    background: var(--sunk);
   }
 
   .top {
@@ -269,12 +270,16 @@
     color: var(--ink2);
   }
 
-  /* "Here" is the one thing in the rail drawn at full ink. No fill, no shadow: the panel beside it
-     is already the brightest thing on screen, and a second bright object competes with it. */
+  /* "Here" is the mark's colour. It is the one place in the rail that is allowed to be loud, and it
+     is the cheapest way for a product to look like itself on every screen. */
   .item[aria-current='page'] {
-    background: color-mix(in srgb, var(--ink) 9%, transparent);
-    color: var(--ink);
-    font-weight: 500;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+
+  .item[aria-current='page'] :global(.icon) {
+    color: var(--accent);
   }
 
   .item-name {

@@ -174,11 +174,15 @@
     border-block-end: 0;
   }
 
+  /* Sentence case, at body size, at the same weight as a column header. A field label is a WORD
+     YOU READ — "Direction", "Amount", "Due" — not a category stamp, and small letterspaced caps
+     make eight of them in a column read as a form to be filled rather than a row to be understood.
+     Same decision as the table header in blocks.css, held here so the two agree. */
   .field-label {
     color: var(--dim);
-    font-size: var(--t-xs);
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    letter-spacing: 0;
   }
 
   .field-value {

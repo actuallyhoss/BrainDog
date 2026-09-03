@@ -33,8 +33,8 @@
     --tone-fill: var(--danger-fill);
   }
   [data-intent='info'] {
-    --tone: var(--accent-text);
-    --tone-fill: var(--accent);
+    --tone: var(--info);
+    --tone-fill: var(--info-fill);
   }
 
   .glyph {
@@ -297,6 +297,11 @@
     overflow: hidden;
   }
 
+  /* AN UNTONED BAR IS INK, NOT THE ACCENT. A `bar` block is a magnitude comparison — eight rows of
+     "who you owe, largest first" — and painting all eight in the brand colour spends the one loud
+     thing on the screen on the fact that a list is a list. The bar earns a colour only when the row
+     it belongs to carries an intent; otherwise it is a dark neutral and the LENGTH does the work,
+     which is the only channel a bar chart actually has. */
   .prop-track::after {
     content: '';
     position: absolute;
@@ -304,7 +309,7 @@
     inset-inline-start: 0;
     inline-size: calc(var(--magnitude) * 100%);
     border-radius: 4px;
-    background: var(--tone-fill, var(--accent));
+    background: var(--tone-fill, color-mix(in srgb, var(--ink) 62%, var(--s1)));
   }
 
   .prop-label {
@@ -350,7 +355,7 @@
     padding: 5px var(--sp-3);
     background: var(--sunk);
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: var(--r-sm);
     white-space: nowrap;
   }
 
@@ -495,22 +500,27 @@
     border-block-end: 1px solid var(--line);
   }
 
-  /* The header row and the first column are the two things you look back to. */
+  /* The header row and the first column are the two things you look back to.
+
+     It is a BAND, not a row that happens to be first: the sunk surface plus a full-strength edge
+     under it, so a table scrolled halfway still shows where its top is. And the labels are set in
+     sentence case at body weight rather than as letterspaced small caps — a column header is a word
+     you read once and then navigate by, and uppercase costs about 15% of reading speed for the
+     privilege of looking like a spreadsheet. */
   .th-row {
     position: sticky;
     inset-block-start: 0;
     z-index: 1;
-    background: var(--s2);
-    border-block-end: 1px solid var(--line);
+    background: var(--sunk);
+    border-block-end: 1px solid var(--edge);
   }
 
   .th {
     padding: var(--sp-2) var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 500;
-    letter-spacing: 0.055em;
-    text-transform: uppercase;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    letter-spacing: 0;
   }
 
   .th-sort {
@@ -554,6 +564,12 @@
   .td[data-truncate='never'] {
     overflow: visible;
     text-overflow: clip;
+  }
+
+  /* Hover is a POINTER affordance and nothing more — it says "this row is a thing you can click".
+     It is deliberately weaker than the focus band below, which is the one that carries state. */
+  .rowgroup .tr:hover {
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
   }
 
   /* A persistent focus band, not hover: hover does not help a keyboard user and does not survive a

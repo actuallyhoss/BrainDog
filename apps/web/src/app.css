@@ -103,19 +103,26 @@
     --sp-8: 64px;
     --sp-9: 96px;
 
-    --r-sm: 6px;
-    --r-md: 10px;
-    --r-lg: 16px;
+    --r-sm: 4px;
+    --r-md: 6px;
+    --r-lg: 8px;
 
-    /* Raised surfaces get a one-pixel highlight along their top edge and nothing else. It is the
-       cheapest legible depth cue in a dark interface, it costs no blur, and it is a token mix rather
-       than a literal so gate 2 stays satisfied. */
-    --raise: inset 0 1px 0 0 color-mix(in srgb, var(--ink) 7%, transparent);
+    /**
+     * NO ELEVATION. Not a soft shadow, not an inset highlight, nothing.
+     *
+     * A card sits flat on the ground and a one-pixel border is its whole boundary. Shadows are how a
+     * flat medium fakes depth it does not have, and once every card has one the screen is a pile of
+     * slightly-floating rectangles. A border is honest and it is also cheaper to read.
+     *
+     * The token stays, valued `none`, so the rule is stated rather than merely absent — and so a
+     * component that wants elevation has to come and change this line.
+     */
+    --raise: none;
 
     /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
        never the pixels (13 §4.2). */
-    --row-h: 32px;
-    --ctl-h: 30px;
+    --row-h: 34px;
+    --ctl-h: 36px;
     --tap: 44px;
     --measure: 72ch;
     --sticky: 52px;
@@ -152,10 +159,14 @@
     );
     --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
 
-    /* The mark, at full strength. Not a role and not an identity accent: the one colour in the
-       product that belongs to the product rather than to a meaning. It paints the logo and nothing
-       else, which is why it is a token and not a literal in an SVG (22 §7 gate 2). */
-    --brand: #f42a2a;
+    /* The mark. Not a role and not an identity accent: the one colour in the product that belongs
+       to the product rather than to a meaning. It paints the logo and nothing else, which is why it
+       is a token and not a literal in an SVG (22 §7 gate 2).
+
+       It is also, deliberately, the same value the theme generator seeds `--accent` from — the
+       accent IS the mark here. Kept as a separate token anyway, because the logo must not change
+       colour when someone installs a theme. */
+    --brand: #cf413a;
   }
 
   /* The reader's Text setting picks the body step. Three, not a slider. */
@@ -163,15 +174,16 @@
   html[data-text='base'] { --text: var(--t-base); }
   html[data-text='md'] { --text: var(--t-md); }
 
-  html[data-density='compact'] { --row-h: 28px; }
-  html[data-density='comfortable'] { --row-h: 32px; }
-  html[data-density='roomy'] { --row-h: 36px; }
 
   /* SIZE follows the pointer, never the width. A small laptop window is not a phone, and a width
      query that changes a control's size is how it starts behaving like one (05 §6). */
   @media (pointer: coarse) {
     :root { --ctl-h: 44px; }
   }
+
+  html[data-density='compact'] { --row-h: 30px; }
+  html[data-density='comfortable'] { --row-h: 34px; }
+  html[data-density='roomy'] { --row-h: 40px; }
 
   html[data-scheme='dark'] { color-scheme: dark; }
   html[data-scheme='light'] { color-scheme: light; }
@@ -193,6 +205,7 @@
   @property --earn { syntax: '<color>'; inherits: true; initial-value: #0a0; }
   @property --warn { syntax: '<color>'; inherits: true; initial-value: #a80; }
   @property --danger { syntax: '<color>'; inherits: true; initial-value: #c00; }
+  @property --info { syntax: '<color>'; inherits: true; initial-value: #06c; }
   @property --accent { syntax: '<color>'; inherits: true; initial-value: #06c; }
 }
 
@@ -207,6 +220,14 @@
 
   /* The window is the CANVAS — the darkest surface, which the chrome sits directly on. The work
      sits in a panel lifted off it. `sunk` is not a hole in the page; it is the desk the page is on. */
+  /* The panel is the ONE scroll container. Without this the document scrolls too and the window
+     shows two scrollbars — the panel's, and an outer one for a page that has nowhere to go. */
+  html,
+  body {
+    block-size: 100%;
+    overflow: hidden;
+  }
+
   html {
     background: var(--sunk);
     /* 2.4.11: keyboard focus must not land under the sticky header. Paid once, here. */

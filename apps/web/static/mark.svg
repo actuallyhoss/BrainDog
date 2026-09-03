@@ -5,7 +5,7 @@
     space collapses to a notch. Reversed out of a solid ground the silhouette survives, which is what
     the filled variant exists for.
   -->
-  <rect width="1024" height="1024" rx="228" fill="#F42A2A" />
+  <rect width="1024" height="1024" rx="228" fill="#CF413A" />
   <g transform="translate(101 193) scale(0.8235)" fill="#FFFFFF">
     <path
       d="M498.69,345c-18.16,0-32.84-14.67-32.84-32.79s14.67-32.84,32.84-32.84,32.79,14.68,32.79,32.84-14.68,32.79-32.79,32.79Z"

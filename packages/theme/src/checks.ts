@@ -73,8 +73,10 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   /* C · faint at the large-text floor. The usage half — no faint below 24px — is a css-rules rule. */
   out.push(...pairsAgainstSurfaces(p, ['faint'], 3, 'C', scheme));
 
-  /* D · edge and the three -fill roles */
-  out.push(...pairsAgainstSurfaces(p, ['edge', 'earn-fill', 'warn-fill', 'danger-fill'], 3, 'D', scheme));
+  /* D · edge and the four -fill roles */
+  out.push(
+    ...pairsAgainstSurfaces(p, ['edge', 'earn-fill', 'warn-fill', 'danger-fill', 'info-fill'], 3, 'D', scheme),
+  );
 
   /* E · the focus ring against both neighbours, and the two tones nine apart */
   const ringTones = contrast(rgb(p['focus-in']), rgb(p['focus-out']));
@@ -96,7 +98,9 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
     ['good', p.earn],
     ['warn', p.warn],
     ['bad', p.danger],
-    ['info', p.accent],
+    // `info` has a generated role of its own here, and the seed file says why: the accent is the
+    // mark, the mark is red, and `danger` is anchored at 27.
+    ['info', p.info],
   ];
   let worstF = Infinity;
   for (let i = 0; i < intents.length; i++)

@@ -294,7 +294,7 @@
   .card-rec {
     padding: 1px var(--sp-2);
     border: 1px solid color-mix(in srgb, var(--earn) 45%, transparent);
-    border-radius: 999px;
+    border-radius: var(--r-sm);
     color: var(--earn);
     font-size: var(--t-xs);
   }

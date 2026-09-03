@@ -107,7 +107,7 @@
     padding: 2px var(--sp-3);
     background: var(--sunk);
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: var(--r-sm);
     color: var(--dim);
     font-size: var(--t-xs);
   }

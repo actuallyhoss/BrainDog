@@ -278,20 +278,31 @@
     gap: var(--sp-2);
   }
 
+  /* A field is a HOLE cut into the page, so it takes the raised surface and a real border rather
+     than the sunk one: on a cream ground a sunk field and the page are the same colour, and the
+     input stops looking like somewhere you can type. */
   .search {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--sunk);
+    background: var(--s3);
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--dim);
+    transition: border-color var(--d-state) var(--ease-out);
   }
 
-  .search:focus-within {
+  .search:hover {
     border-color: var(--edge);
+  }
+
+  /* The ring is drawn on the WRAPPER, because the input inside it has no border of its own and a
+     ring around a borderless box lands in the wrong place by a pixel on every platform. */
+  .search:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
   }
 
   .search-input {
@@ -303,35 +314,43 @@
     font-size: var(--t-ui);
   }
 
+  /* A segmented control, not a row of buttons: one sunk track, and the chosen option is a raised
+     card sitting in it. The selected state has to be a SHAPE and not a shade — a slightly lighter
+     grey behind one word out of four is the single most-missed control in dense software. */
   .chips {
     display: flex;
-    gap: 4px;
+    gap: 2px;
     padding: 2px;
     background: var(--sunk);
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
   }
 
   .chip {
-    min-block-size: 24px;
-    padding: 0 var(--sp-2);
+    min-block-size: 28px;
+    padding: 0 var(--sp-3);
     background: none;
-    border: 0;
-    border-radius: 4px;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    font-weight: 500;
     cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
-  .chip:hover {
+  .chip:hover:not([data-on]) {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
     color: var(--ink2);
   }
 
   .chip[data-on] {
-    background: var(--s2);
-    box-shadow: var(--raise);
+    background: var(--s3);
+    border-color: var(--line);
     color: var(--ink);
+    font-weight: 600;
   }
 
   .bar-hint {
@@ -352,9 +371,8 @@
 
   .peek dt {
     color: var(--dim);
-    font-size: var(--t-xs);
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
+    font-size: var(--t-sm);
+    font-weight: 600;
   }
 
   .peek dd {

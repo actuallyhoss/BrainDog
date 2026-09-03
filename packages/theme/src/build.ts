@@ -27,7 +27,20 @@ export type Scheme = 'dark' | 'light';
 
 export const SURFACES = ['sunk', 'bg', 's1', 's2', 's3'] as const;
 export const INKS = ['ink', 'ink2', 'dim', 'faint'] as const;
-export const INTENTS = ['earn', 'warn', 'danger'] as const;
+
+/**
+ * Four, not three, and this is the reversal the whole palette turns on.
+ *
+ * 28 §3 step 5 has `info` resolve to `accent`, which spends no generated colour and is the right
+ * default for a theme whose accent is arbitrary. It is the wrong default HERE: BrainDog's accent is
+ * its mark, the mark is red, and `danger` is anchored at 27. `info` resolving to `accent` therefore
+ * puts two of the four intent words on one hue and the generator refuses the house theme — which is
+ * the generator being right about a rule and wrong about the product.
+ *
+ * So `info` is a role. It costs one generated colour and one -fill, and it buys back the ability to
+ * paint the product in its own colour.
+ */
+export const INTENTS = ['earn', 'warn', 'danger', 'info'] as const;
 
 export type Role =
   | (typeof SURFACES)[number]
@@ -38,6 +51,7 @@ export type Role =
   | 'earn-fill'
   | 'warn-fill'
   | 'danger-fill'
+  | 'info-fill'
   | 'accent'
   | 'accent-text'
   | 'accent-ink'
@@ -73,8 +87,9 @@ export type Profile = {
    * knows the floor will happily ship the worst legal answer.
    *
    * `bad` is weighted hardest to move (`weight` below) because in this product red is not a
-   * decoration: #F42A2A is the mark, `danger`'s hue anchor is 27, and they are the same hue. Red
-   * always means *this is owed, this is late, this is wrong*, so it is the intent least free to drift.
+   * decoration: the mark is red, `danger`'s hue anchor is 27, and they are the same hue by design.
+   * Red always means *this is owed, this is late, this is wrong*, so it is the intent least free to
+   * drift.
    */
   prefer: Record<Scheme, Record<(typeof INTENTS)[number], number>>;
   weight: Record<(typeof INTENTS)[number], number>;
@@ -89,17 +104,18 @@ export const HOUSE_PROFILE: Profile = {
   mark: { dark: { L: 0.72, C: 0.12 }, light: { L: 0.55, C: 0.09 } },
   chromaLadder: [0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1, 0.09, 0.08],
   targetGrid: [4.5, 5.5, 7, 9, 12, 15, 18],
-  // The fill band IS the mark. #F42A2A is oklch(0.623 0.233 27.4), and `danger`'s hue anchor is 27,
-  // so putting the band at that lightness and that chroma makes the chip which means "overdue" the
-  // BrainDog red itself, to the byte, in the dark scheme. Green and amber gamut-clamp below it on
-  // their own, which is why one pair of numbers serves all three.
+  // THE ALARM IS LOUDER THAN THE BRAND, and this is the one place that is arranged rather than
+  // hoped for. The mark sits at chroma 0.18; the fill band sits at 0.233 — the product's original,
+  // fully saturated red — so the dark `danger` chip is always a step more insistent than the accent
+  // it shares a hue with. Green and amber gamut-clamp below the band on their own, which is why one
+  // pair of numbers serves all four.
   fillChroma: 0.233,
   fillL: { dark: 0.623, light: 0.56 },
   prefer: {
-    dark: { earn: 7, warn: 8.5, danger: 5 },
-    light: { earn: 4.5, warn: 7, danger: 5.5 },
+    dark: { earn: 7, warn: 8.5, danger: 5, info: 6 },
+    light: { earn: 4.5, warn: 7, danger: 5.5, info: 5.5 },
   },
-  weight: { earn: 1, warn: 1, danger: 2.5 },
+  weight: { earn: 1, warn: 1, danger: 2.5, info: 1 },
 };
 
 /**
@@ -128,10 +144,10 @@ export const HIGH_CONTRAST_PROFILE: Profile = {
   fillChroma: 0.21,
   fillL: { dark: 0.66, light: 0.5 },
   prefer: {
-    dark: { earn: 8.5, warn: 10, danger: 7 },
-    light: { earn: 5, warn: 7, danger: 5.5 },
+    dark: { earn: 8.5, warn: 10, danger: 7, info: 8 },
+    light: { earn: 5, warn: 7, danger: 5.5, info: 6 },
   },
-  weight: { earn: 1, warn: 1, danger: 2.5 },
+  weight: { earn: 1, warn: 1, danger: 2.5, info: 1 },
 };
 
 export type Seed = {
@@ -145,10 +161,29 @@ export type Seed = {
 };
 
 /** Hue anchors, 28 §3 step 5. `danger` sits at 27 — which is where the BrainDog red already is. */
-export const INTENT_HUE: Record<(typeof INTENTS)[number], number> = { earn: 145, warn: 75, danger: 27 };
+export const INTENT_HUE: Record<(typeof INTENTS)[number], number> = {
+  earn: 145,
+  warn: 75,
+  danger: 27,
+  /**
+   * 264 is not a taste call. 27, 75 and 145 are all in the warm half of the circle, so the widest
+   * unspent arc is the cool one, and its middle is the farthest an intent can get from every hue
+   * that already means something — which is what leaves the search room to place a red accent
+   * beside a red `danger` without the two colliding.
+   */
+  info: 264,
+};
 
-/** The mark, at full strength. The one colour that is neither a role nor an identity accent. */
-export const BRAND_RED = '#F42A2A';
+/**
+ * The mark. One value, used by the logo, the favicon and the seed, so the brand cannot drift.
+ *
+ * It was #F42A2A — a fire-engine red at chroma 0.233 — and it was toned down by a third, because a
+ * whole product painted in the loudest red the display can make reads as an emergency rather than
+ * as a brand. Same hue, so nothing about the identity moves; less chroma, so the saturated red is
+ * free to mean only one thing. The old value did not go away: it is the ALARM now, the band the
+ * `danger` chip is struck from, one step louder than the mark by construction (see `fillChroma`).
+ */
+export const BRAND_RED = '#CF413A';
 
 export type Built = {
   id: string;
@@ -200,12 +235,25 @@ export function normalise(seed: string): Lch {
  * shape, same monotonic ladder (check H), opposite anchor (39 D2).
  */
 const LADDER: Record<Scheme, Record<(typeof SURFACES)[number], number>> = {
-  dark: { sunk: 0.07, bg: 0.175, s1: 0.205, s2: 0.225, s3: 0.245 },
-  light: { sunk: 0.905, bg: 0.972, s1: 0.983, s2: 0.991, s3: 0.998 },
+  /* Warm olive-charcoal, and the rail is the darkest thing on screen.
+     MEASURED AND MOVED: the first dark ladder put `bg` at L 0.168, relative luminance 0.0050. The
+     cards on it were fine — 0.0174, within a rounding step of what a good dark product uses — but
+     the canvas under them was three times too dark, which is the difference between a warm dark
+     room and an OLED test pattern. The bottom of the ladder came up; the top barely moved. */
+  dark: { sunk: 0.205, bg: 0.241, s1: 0.263, s2: 0.284, s3: 0.302 },
+  // Cream, and cards go to near-white on it. `sunk` is the rail; `bg` is where the work sits.
+  light: { sunk: 0.938, bg: 0.962, s1: 0.988, s2: 0.994, s3: 0.999 },
 };
 
 function ground(scheme: Scheme, hue: number, chroma: number): Record<(typeof SURFACES)[number], string> {
-  const C = Math.min(chroma, 0.008); // a whisper of hue, never a coloured surface
+  /**
+   * A VISIBLE amount of hue, not a whisper.
+   *
+   * Capping the surfaces at 0.008 chroma is what makes a neutral read as neutral, and a page of
+   * neutral grey is a page that could belong to anything. Cream is a colour, and it is the single
+   * cheapest thing a product can do to stop looking like every other dark dashboard.
+   */
+  const C = Math.min(chroma, scheme === 'light' ? 0.014 : 0.01);
   const rung = LADDER[scheme];
   return {
     sunk: hex({ L: rung.sunk, C, H: hue }),
@@ -220,7 +268,7 @@ function ground(scheme: Scheme, hue: number, chroma: number): Record<(typeof SUR
 const worstOf = (scheme: Scheme, g: Record<string, string>) => rgb(scheme === 'light' ? g.sunk! : g.s3!);
 const away = (scheme: Scheme): 'up' | 'down' => (scheme === 'dark' ? 'up' : 'down');
 
-/** Check F compares the four intent words, and `info` resolves to `accent` — 13 §2.3. */
+/** The words check F names in its refusal, in INTENTS order. */
 const INTENT_NAMES = ['good', 'warn', 'bad', 'info'] as const;
 
 /**
@@ -267,8 +315,9 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   const worst = worstOf(scheme, g);
   const dir = away(scheme);
 
-  /* 2 · ink ramp — tinted ink, never coloured ink */
-  const Cink = Math.min(acc.C * 0.12, 0.02);
+  /* 2 · ink ramp. Tinted toward the GROUND, not toward the accent: warm paper wants warm ink, and
+     ink that leans toward a red accent comes out pink. */
+  const Cink = 0.012;
   const [ink, ink2, dim, faint] = profile.ink.map((t) => hex(solveL(t, Cink, nHue, worst, dir))) as [
     string, string, string, string,
   ];
@@ -280,7 +329,10 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
      border, which is how a dense screen turns into a grid of visible boxes. A separator's job is to
      be findable, not to be seen. */
   const edge = hex(solveL(profile.edge, Cink, nHue, worst, dir));
-  const line = hex(solveL(1.35, Cink, nHue, rgb(g.bg), dir));
+  /* 1.55, not 1.35. With no shadow anywhere in the system a border IS the boundary, so it has to be
+     seen rather than merely found — a thin olive hairline that says "this is a card", not a
+     suggestion of one. Flat and confident beats soft and vague. */
+  const line = hex(solveL(1.55, Cink, nHue, rgb(g.bg), dir));
 
   /* 4 · accent. The fill is the seed; the text role is solved, and may sit well above 4.5. */
   const accent = hex(gamutMap(acc));
@@ -304,7 +356,6 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
      There is no "retry once with relaxed chroma": a two-stage grid over chroma and contrast
      targets, taking the FIRST palette that clears check F, so the answer is the most saturated
      one that works rather than the first one that happens to (39 D4). */
-  const accentRgb = quantise(gamutMap(acc));
   const solved = new Map<string, Lch>();
   const candidate = (t: number, C: number, H: number) => {
     const key = `${t}|${C}|${H}`;
@@ -317,38 +368,42 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   };
 
   const want = profile.prefer[scheme];
-  const cost = (tE: number, tW: number, tD: number, C: number) =>
-    profile.weight.earn * Math.abs(tE - want.earn) +
-    profile.weight.warn * Math.abs(tW - want.warn) +
-    profile.weight.danger * Math.abs(tD - want.danger) +
+  const cost = (t: Record<(typeof INTENTS)[number], number>, C: number) =>
+    INTENTS.reduce((sum, k) => sum + profile.weight[k] * Math.abs(t[k] - want[k]), 0) +
     (profile.chromaLadder[0]! - C) * 40;
 
   let chosen: Record<(typeof INTENTS)[number], string> | null = null;
   let chosenCost = Infinity;
   let best = { worst: -1, pair: '' };
+
+  // The set is the four INTENT WORDS and nothing else. The accent is deliberately not a member:
+  // it shares `danger`'s hue by design, and an accent is chrome — it never appears as a row's
+  // verdict, so it is never the thing a reader has to tell a `bad` chip apart from.
   for (const C of profile.chromaLadder)
     for (const tEarn of profile.targetGrid)
       for (const tWarn of profile.targetGrid)
-        for (const tDanger of profile.targetGrid) {
-          const c = cost(tEarn, tWarn, tDanger, C);
-          if (c >= chosenCost) continue;
-          const earn = candidate(tEarn, C, INTENT_HUE.earn);
-          const warn = candidate(tWarn, C, INTENT_HUE.warn);
-          const danger = candidate(tDanger, C, INTENT_HUE.danger);
-          // An intent that has bottomed out against the gamut is achromatic, and an achromatic
-          // intent is not a colour — it is ink. The first run of this generator returned pure black
-          // for `good` in the high-contrast light scheme, which passed every contrast floor and was
-          // indistinguishable from body text.
-          if (Math.min(earn.C, warn.C, danger.C) < 0.045) continue;
-          const set = [quantise(earn), quantise(warn), quantise(danger), accentRgb];
-          const sep = separable(set, 10);
-          if (sep.worst > best.worst)
-            best = { worst: sep.worst, pair: `${INTENT_NAMES[sep.pair[0]]}/${INTENT_NAMES[sep.pair[1]]}` };
-          if (sep.ok) {
-            chosen = { earn: hex(earn), warn: hex(warn), danger: hex(danger) };
-            chosenCost = c;
+        for (const tDanger of profile.targetGrid)
+          for (const tInfo of profile.targetGrid) {
+            const t = { earn: tEarn, warn: tWarn, danger: tDanger, info: tInfo };
+            const c = cost(t, C);
+            if (c >= chosenCost) continue;
+            const solvedSet = INTENTS.map((k) => candidate(t[k], C, INTENT_HUE[k]));
+            // An intent that has bottomed out against the gamut is achromatic, and an achromatic
+            // intent is not a colour — it is ink. The first run of this generator returned pure
+            // black for `good` in the high-contrast light scheme, which passed every contrast floor
+            // and was indistinguishable from body text.
+            if (Math.min(...solvedSet.map((s) => s.C)) < 0.045) continue;
+            const sep = separable(solvedSet.map(quantise), 10);
+            if (sep.worst > best.worst)
+              best = { worst: sep.worst, pair: `${INTENT_NAMES[sep.pair[0]]}/${INTENT_NAMES[sep.pair[1]]}` };
+            if (sep.ok) {
+              chosen = Object.fromEntries(INTENTS.map((k, i) => [k, hex(solvedSet[i]!)])) as Record<
+                (typeof INTENTS)[number],
+                string
+              >;
+              chosenCost = c;
+            }
           }
-        }
   if (!chosen)
     throw new Error(
       `INTENT_INSEPARABLE — in ${scheme}, the best palette on the search grid gets ${best.pair} only ` +
@@ -378,9 +433,11 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     earn: chosen.earn,
     warn: chosen.warn,
     danger: chosen.danger,
+    info: chosen.info,
     'earn-fill': fill(INTENT_HUE.earn),
     'warn-fill': fill(INTENT_HUE.warn),
     'danger-fill': fill(INTENT_HUE.danger),
+    'info-fill': fill(INTENT_HUE.info),
     accent,
     'accent-text': accentText,
     'accent-ink': accentInk,

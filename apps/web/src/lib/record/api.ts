@@ -131,7 +131,7 @@ const WIDTH: Record<string, string> = {
   bool: '6ch',
   text: 'minmax(14ch, 1fr)',
   document: 'minmax(14ch, 1fr)',
-  ref: 'minmax(12ch, 20ch)',
+  ref: 'minmax(11ch, 16ch)',
   secret: '14ch',
 };
 
@@ -153,7 +153,11 @@ export function columnsFor(register: string): Column[] {
     cols.push({
       field: f.id,
       label: labelOf(f),
-      width: WIDTH[f.type] ?? WIDTH.text!,
+      // THE TITLE COLUMN IS NOT JUST ANOTHER TEXT COLUMN. Sharing the free space equally between
+      // every flexible column let a fixed 13ch enum sit at its full width beside a title being
+      // truncated mid-word — and the title is the only cell in the row a person actually reads to
+      // find what they came for. It takes the lion's share of whatever is left over.
+      width: f.id === r.title ? 'minmax(24ch, 3fr)' : (WIDTH[f.type] ?? WIDTH.text!),
       align: END.has(f.type) ? 'end' : 'start',
       // A figure never truncates: a truncated figure is not shortened, it is wrong.
       truncate: f.type === 'money' ? 'never' : 'end',
