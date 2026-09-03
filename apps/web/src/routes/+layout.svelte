@@ -25,6 +25,7 @@
   import Sidebar from '$lib/ui/Sidebar.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import TabBar from '$lib/ui/TabBar.svelte';
+  import Toasts from '$lib/ui/Toasts.svelte';
   import Palette from '$lib/palette/Palette.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
@@ -168,6 +169,10 @@
     <a href="/audit" onclick={() => (moreOpen = false)}>{copy.audit}</a>
   </nav>
 </Sheet>
+
+<!-- One stack, one live region, on every surface including the two that carry no shell: an action
+     taken from a shared page still has to be able to report itself. -->
+<Toasts />
 
 <!-- Debounced elsewhere; a live region that announces on every keystroke is unusable (13 §7). -->
 <div class="sr-only" role="status" aria-live="polite"></div>

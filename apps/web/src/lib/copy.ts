@@ -30,6 +30,16 @@ export const copy = {
   more: 'More',
   close: 'Close',
 
+  /* Toasts. Past tense, the row named, and the undo is the sentence's point — never "Row archived
+     successfully", which reports on the software rather than on the record. */
+  toasts: 'Recent actions',
+  undo: 'Undo',
+  archived: (id: string) => `Archived ${id}.`,
+  restored: (id: string) => `Restored ${id}.`,
+  marked: (id: string, state: string) => `${id} is ${state}.`,
+  copied: (what: string) => `Copied ${what}.`,
+  copyRefused: 'The browser would not give this page the clipboard.',
+
   /* home */
   needsYou: 'What needs you',
   sinceAway: 'Since you were away',
@@ -58,6 +68,15 @@ export const copy = {
   /* the register grid */
   newRow: 'New',
   filter: 'Filter',
+  done: 'Done',
+  noFilters: 'This register declares no indexed fields, so there is nothing to filter on yet.',
+  /* What a field CAN be filtered on, said plainly, instead of a disabled range control. */
+  filterKind: (type: string) =>
+    type === 'money' || type === 'int' || type === 'decimal'
+      ? 'A range control for numbers is not built yet. Sort on the column instead.'
+      : type === 'day' || type === 'instant'
+        ? 'A date range is not built yet. Sort on the column instead.'
+        : 'Search matches this field.',
   displayOptions: 'Display',
   clearFilters: 'Clear filters',
   saveAsView: 'Save as a view',

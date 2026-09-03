@@ -18,6 +18,7 @@
   import { MISSING } from 'braindog-render';
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { REGISTERS, columnsFor, display, entry, identityOf, labelOf, list, toRows, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -48,12 +49,51 @@
   );
 
   const columns = $derived(columnsFor(id));
-  const result = $derived(list(id, { filters, q, ...(sort ? { sort } : {}) }));
+  const found = $derived(list(id, { filters, q, ...(sort ? { sort } : {}) }));
+  const result = $derived({
+    ...found,
+    entries: found.entries.filter((e) => !archived.has(e.seq)),
+    matched: found.entries.filter((e) => !archived.has(e.seq)).length,
+  });
   const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns));
+
+  function archive(seq: number) {
+    archived = new Set([...archived, seq]);
+    toasts.push(copy.archived(`${id}#${seq}`), {
+      undo: () => {
+        const next = new Set(archived);
+        next.delete(seq);
+        archived = next;
+      },
+    });
+  }
+
+  /** `navigator.clipboard` is absent over plain HTTP and in a sandboxed frame, and a copy button
+      that silently does nothing is worse than one that is not there — so the toast reports either
+      way and says which happened. */
+  async function copyId(seq: number) {
+    const spoken = `${id}#${seq}`;
+    try {
+      await navigator.clipboard.writeText(spoken);
+      toasts.push(copy.copied(spoken));
+    } catch {
+      toasts.push(copy.copyRefused, { intent: 'warn' });
+    }
+  }
 
   let focus = $state({ row: 0, col: 1 });
   let peeked = $state<number | null>(null);
   let filterOpen = $state(false);
+
+  /**
+   * Archived rows, in the mock-up, held in the page rather than in the record.
+   *
+   * A destructive action here is UNDONE, never confirmed. A confirmation dialog asks its question
+   * before anything has happened, when the reader knows the least they ever will about it, and the
+   * answer is always yes — which is why people stop reading them. Ten seconds of undo, with the row
+   * named in the past tense, gives back the one thing a dialog cannot.
+   */
+  let archived = $state(new Set<number>());
 
   const peekedEntry = $derived(peeked === null ? undefined : entry(id, peeked));
 
@@ -103,6 +143,19 @@
     } else if (e.key === 'f') {
       e.preventDefault();
       filterOpen = true;
+    } else if (e.key === 'y') {
+      const row = result.entries[focus.row];
+      if (row) {
+        e.preventDefault();
+        void copyId(row.seq);
+      }
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      const row = result.entries[focus.row];
+      if (row) {
+        e.preventDefault();
+        archive(row.seq);
+        focus = { ...focus, row: Math.min(focus.row, result.entries.length - 2) };
+      }
     }
   }
 
@@ -167,7 +220,7 @@
       {/if}
 
       <span class="bar-hint">
-        <Kbd keys="j  k" /> move <Kbd keys="p" /> peek <Kbd keys="↵" /> open
+        <Kbd keys="j  k" /> move <Kbd keys="p" /> peek <Kbd keys="↵" /> open <Kbd keys="⌫" /> archive
       </span>
     </div>
 
@@ -271,6 +324,56 @@
       <Button weight="bare" onclick={() => (peeked = null)}>{copy.close}</Button>
     {/snippet}
   </Sheet>
+
+  <!-- The filter drawer. The bar above holds the enum filters because they are the ones worth a
+       permanent control; everything else declared `indexed:` lives here, so the bar stays one line
+       on a register with eight filterable fields.
+
+       ONLY INDEXED FIELDS ARE OFFERED. A filter on an unindexed field is a promise the storage
+       cannot keep at five thousand rows, and a control that gets slower the more rows you have is a
+       control that breaks exactly when the register becomes worth filtering. -->
+  <Sheet bind:open={filterOpen} title={copy.filter} id={id}>
+    {#if filterable.length === 0}
+      <p class="filter-none">{copy.noFilters}</p>
+    {:else}
+      <div class="filter-groups">
+        {#each filterable as f}
+          <fieldset class="filter-group">
+            <legend class="filter-legend">{labelOf(f)}</legend>
+            {#if f.type === 'enum'}
+              <div class="filter-values">
+                {#each f.values ?? [] as value}
+                  {@const on = filters.find((x) => x.field === f.id)?.values.includes(value)}
+                  <button
+                    type="button"
+                    class="filter-value"
+                    data-on={on ? '' : undefined}
+                    aria-pressed={on ? 'true' : 'false'}
+                    onclick={() => toggleFilter(f.id, value)}
+                  >
+                    <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
+                    {value.replace(/_/g, ' ')}
+                  </button>
+                {/each}
+              </div>
+            {:else}
+              <!-- ABSENT, not disabled. A range control that cannot be built yet is not shown as a
+                   greyed-out one: a disabled control tells you a thing exists and refuses to say
+                   why it will not work (23 §8). This says what it can filter on instead. -->
+              <p class="filter-kind">{copy.filterKind(f.type)}</p>
+            {/if}
+          </fieldset>
+        {/each}
+      </div>
+    {/if}
+
+    {#snippet footer()}
+      <Button weight="primary" onclick={() => (filterOpen = false)}>{copy.done}</Button>
+      {#if filters.length}
+        <Button weight="bare" href="/r/{id}">{copy.clearFilters}</Button>
+      {/if}
+    {/snippet}
+  </Sheet>
 {/if}
 
 <style>
@@ -302,6 +405,84 @@
     grid-template-columns: minmax(0, 12ch) minmax(0, 1fr);
     gap: var(--sp-2) var(--sp-3);
     margin: 0;
+  }
+
+  .filter-groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+  }
+
+  .filter-group {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .filter-legend {
+    margin-block-end: var(--sp-2);
+    padding: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .filter-values {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* A full-width row, not a chip. Eight values in a wrapped chip cloud is a shape you have to scan;
+     a column of rows with the boxes aligned is a shape you can run your eye down. */
+  .filter-value {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: 34px;
+    padding: 0 var(--sp-2);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .filter-value:hover {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    color: var(--ink);
+  }
+
+  .filter-value[data-on] {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .filter-box {
+    display: grid;
+    place-items: center;
+    inline-size: 17px;
+    block-size: 17px;
+    flex: none;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--accent-ink);
+    font-size: var(--t-xs);
+    line-height: 1;
+  }
+
+  .filter-value[data-on] .filter-box {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .filter-kind,
+  .filter-none {
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .peek dt {
