@@ -40,6 +40,20 @@ export const copy = {
   moveDown: 'Move down',
   removeBlock: 'Remove this block',
   addBlock: 'Add a block',
+
+  /* Binding a saved view onto a page — 21 §3.4's sentence, with the two halves the view already
+     answered stated rather than asked. */
+  bindBlock: 'Bind as a block',
+  showMe: 'Show me',
+  thatIs: 'that is',
+  asA: 'Draw it as',
+  onPage: 'On the page',
+  noDestination: (register: string) =>
+    `No page requires ${register} yet, so there is nowhere for this to live. A page declares which registers it reads.`,
+  willAdd: (kind: string, span: number) =>
+    `Adds one ${kind} at the end of the page, ${span} of 12 columns wide. You can move and resize it there.`,
+  bound: (kind: string, page: string) =>
+    `Added a ${kind} to ${page}. Nothing was written — this is a mock-up.`,
   blockLink: 'a link to this block',
   blockAdded: (kind: string) => `Added a ${kind}. Nothing was written — this is a mock-up.`,
 

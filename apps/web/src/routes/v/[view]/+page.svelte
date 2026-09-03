@@ -19,6 +19,9 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
+  import BindBlock from '$lib/ui/BindBlock.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { PAGES } from '$lib/record/data.ts';
 
   /** A register's named predicate, never a free-form slug. */
   const VIEWS: Record<string, { register: string; name: string; filters: Filter[]; says: string }> = {
@@ -44,7 +47,20 @@
   const rows = $derived(view ? toRows(view.register, result.entries, columns) : []);
 
   let focus = $state({ row: 0, col: 1 });
+  let binding = $state(false);
+
+  /* `⌥B`, which 50 §5.2 step 9 has specified all along and nothing bound. */
+  function onkeydown(e: KeyboardEvent) {
+    const el = document.activeElement;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+    if (e.altKey && e.key.toLowerCase() === 'b' && view) {
+      e.preventDefault();
+      binding = true;
+    }
+  }
 </script>
+
+<svelte:window {onkeydown} />
 
 {#if !view || !decl}
   <div class="page">
@@ -56,9 +72,17 @@
   <PageHead kicker="{decl.name} · saved view" title={view.name} count={result.matched} total={result.total}>
     {#snippet actions()}
       <Button weight="bare" href="/r/{view.register}">Open the register<Kbd keys="o" /></Button>
-      <Button weight="quiet">Bind as a block<Kbd keys="⌥B" /></Button>
+      <Button weight="quiet" onclick={() => (binding = true)}>{copy.bindBlock}<Kbd keys="⌥B" /></Button>
     {/snippet}
   </PageHead>
+
+  <BindBlock
+    bind:open={binding}
+    register={view.register}
+    predicate={view.name}
+    says={view.says}
+    onbind={(target, kind) => toasts.push(copy.bound(kind, PAGES[target]?.title ?? target), { intent: 'warn' })}
+  />
 
   <div class="page">
     <p class="predicate">
