@@ -1,0 +1,146 @@
+<!--
+  The header of every body surface: a title, a count, one primary action, and the filters.
+
+  The title is `page.title` else `register.name` — NEVER an id. `register`, `predicate` and
+  `projection` are internal vocabulary and where a draft leaked them into UI copy, that is a defect
+  (19 §9).
+
+  The count says `n of N`, and when examples are in the figure it says so: a metric counts example
+  rows and admits it, because the alternative is a money page reading "Due in 30 days · EGP 0"
+  directly above a table containing one obligation due in 30 days (19 §6).
+-->
+<script lang="ts">
+  import type { Snippet } from 'svelte';
+
+  let {
+    title,
+    count,
+    total,
+    kicker,
+    subtitle,
+    actions,
+    filters,
+    id,
+  }: {
+    title: string;
+    count?: number;
+    total?: number;
+    kicker?: string;
+    subtitle?: string;
+    id?: string;
+    actions?: Snippet;
+    filters?: Snippet;
+  } = $props();
+</script>
+
+<header class="head">
+  <div class="head-main">
+    <div class="head-titles">
+      {#if kicker}<p class="kicker">{kicker}</p>{/if}
+      <h1 class="title">
+        {title}
+        {#if id}<span class="title-id">{id}</span>{/if}
+      </h1>
+      {#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
+    </div>
+    {#if count !== undefined}
+      <p class="count num">
+        {count.toLocaleString('en')}{#if total !== undefined && total !== count}<span class="of">
+            of {total.toLocaleString('en')}</span
+          >{/if}
+      </p>
+    {/if}
+    {#if actions}<div class="head-actions">{@render actions()}</div>{/if}
+  </div>
+  {#if filters}<div class="head-filters">{@render filters()}</div>{/if}
+</header>
+
+<style>
+  /* Sticky, and `--sticky` is what `scroll-padding-block` is set from, so keyboard focus never
+     lands underneath it (WCAG 2.4.11). Paid once, in app.css. */
+  .head {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-4) var(--sp-5) var(--sp-3);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(12px);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .head-main {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--sp-4);
+  }
+
+  .head-titles {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .kicker {
+    margin-block-end: 1px;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+  }
+
+  .title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    font-size: var(--t-xl);
+    letter-spacing: -0.026em;
+  }
+
+  .title-id {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-md);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    margin-block-start: 2px;
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .count {
+    color: var(--ink2);
+    font-size: var(--t-lg);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .of {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .head-actions {
+    display: flex;
+    gap: var(--sp-2);
+  }
+
+  .head-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    align-items: center;
+  }
+
+  @media (width < 900px) {
+    .head {
+      padding-inline: var(--sp-3);
+    }
+  }
+</style>

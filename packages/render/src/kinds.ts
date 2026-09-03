@@ -32,12 +32,16 @@ export const PRIMITIVES_VERSION = 1;
  * The GLYPH IS PART OF THE TOKEN, not a choice at the call site. Under simulated dichromacy the
  * intent hues collapse — measured, 13 §2.3 — so a component cannot render `warn` without its glyph,
  * because there is no API that lets it.
+ *
+ * Each glyph carries U+FE0E, the text presentation selector. Without it ⚠ and ✓ resolve to COLOUR
+ * EMOJI on most platforms — which paints an intent in a colour no theme chose and no validator
+ * measured, and quietly breaks the rule that no component writes a colour (22 §7 gate 3).
  */
 export const TONES = {
-  good: { role: 'earn', glyph: '✓', label: 'good' },
-  warn: { role: 'warn', glyph: '⚠', label: 'watch this' },
-  bad: { role: 'danger', glyph: '⊘', label: 'wrong' },
-  info: { role: 'accent', glyph: 'ⓘ', label: 'note' },
+  good: { role: 'earn', glyph: '✓︎', label: 'good' },
+  warn: { role: 'warn', glyph: '⚠︎', label: 'watch this' },
+  bad: { role: 'danger', glyph: '⊘︎', label: 'wrong' },
+  info: { role: 'accent', glyph: 'ⓘ︎', label: 'note' },
 } as const;
 
 export type Tone = keyof typeof TONES;

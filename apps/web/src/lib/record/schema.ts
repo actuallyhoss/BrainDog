@@ -1,0 +1,178 @@
+/**
+ * The shapes the app renders.
+ *
+ * These are the record's types as the browser sees them, not the kernel's. The app is a client of
+ * the same API the agents use: every call is `POST /api/<method>` with the session cookie and
+ * nothing else, and it never holds a bearer token (50 §1).
+ *
+ * MONEY IS ALWAYS AN INTEGER IN MINOR UNITS, with its own currency beside it. Divide by 100 before
+ * saying a number out loud, and never add two currencies.
+ */
+
+export type FieldType =
+  | 'text'
+  | 'document'
+  | 'money'
+  | 'day'
+  | 'instant'
+  | 'int'
+  | 'decimal'
+  | 'enum'
+  | 'bool'
+  | 'ref'
+  | 'secret'
+  | 'duration';
+
+export type FieldDecl = {
+  id: string;
+  type: FieldType;
+  /** The label a person reads. Absent means the id with `_` as a space (50 §10). */
+  label?: string;
+  /** `enum` only. An unknown value at install is ENUM_VALUE_UNKNOWN. */
+  values?: readonly string[];
+  /** Only indexed fields may be filtered on, and only eight are offered (50 §5.2). */
+  indexed?: boolean;
+  required?: boolean;
+  /** `ref` only: the register it points at. */
+  to?: string;
+  unit?: string;
+};
+
+export type RegisterDecl = {
+  id: string;
+  /** What a person calls the collection, and one of them. Never an id in a heading (29 §5). */
+  name: string;
+  one: string;
+  /** One line saying what this register is FOR — the body of its `no-data-yet` state. */
+  holds: string;
+  /** The field that titles a row. */
+  title: string;
+  /** Three fields, declared, that become a two-line card below 640px. A declaration, not a media
+      query — density follows the pointer, never the width (13 §10). */
+  mobile: readonly [string, string, string];
+  /** The field whose value carries the row's state, if it has one. */
+  state?: string;
+  /** Which state values are terminal, so `cleared` can say when the last one closed. */
+  done?: readonly string[];
+  fields: readonly FieldDecl[];
+  /** Rows of this register HAVE an identity: a mark and a frozen accent hue (13 §2.1b). */
+  identity?: { mark: string; accent: string };
+  /** The pack that owns it, or absent for a register the person made. */
+  pack?: string;
+};
+
+export type Fields = Record<string, string | number | boolean | null>;
+
+export type Entry = {
+  /** The number you can say out loud. Per-register, and it is why renaming a register is refused. */
+  seq: number;
+  fields: Fields;
+  /** The compare-and-set value. Last-writer-wins is wrong for money (22 §5). */
+  version: number;
+  created: string;
+  /** Written by an agent, by a rule, or by a person. */
+  by: string;
+};
+
+export type PageBlock = {
+  kind: string;
+  heading?: string;
+  span?: number;
+  source?: string;
+  where?: string;
+  columns?: readonly { field: string; label?: string; width?: string; align?: 'start' | 'end'; link?: boolean }[];
+  cells?: readonly { metric: string; label: string }[];
+  order?: readonly { field: string; dir: 'asc' | 'desc' }[];
+  limit?: number;
+  /** Mandatory on every source-bound block. An empty state that says nothing is a dead end, and a
+      record is MOSTLY empty on day one (06 §1). */
+  empty?: string;
+  tone?: 'good' | 'warn' | 'bad' | 'info';
+  body?: string;
+  /** The server evaluated `when:` and said whether to draw it. A page that shows a warning that does
+      not apply teaches people to ignore warnings. */
+  drawn?: boolean;
+};
+
+export type PageDecl = {
+  page: string;
+  title: string;
+  nav?: { section: string; order: number };
+  requires: readonly string[];
+  blocks: readonly PageBlock[];
+  pack?: string;
+  /** A page that emerged from the data and has not been placed in nav yet (29 §3). */
+  origin?: 'derived' | 'person' | 'pack';
+  placed?: boolean;
+};
+
+/** One open question. Ranked by the cost of being wrong, never by age. */
+export type Question = {
+  id: string;
+  title: string;
+  /** Why deciding late is expensive. This is the ranking, made legible. */
+  cost: string;
+  rank: number;
+  opened: string;
+  entity?: string;
+  options: readonly { key: string; title: string; body: string; recommended?: boolean }[];
+  /** Set once, with a mandatory reason, and then the row is immutable. */
+  decided?: { option: string; reason: string; by: string; at: string };
+};
+
+export type InboxItem = {
+  id: string;
+  arrived: string;
+  from: string;
+  subject: string;
+  /** Why no pattern matched it. The inbox is what the rules did not claim. */
+  body: string;
+  /** A pattern Spark proposed, present only when a model is configured. */
+  suggestion?: string;
+};
+
+export type Credential = {
+  id: string;
+  label: string;
+  /** What it OPENS. The register indexes that and never the value itself. */
+  opens: string;
+  kind: string;
+  rotated: string;
+  /** Days since rotation, past which the record says so. */
+  stale?: boolean;
+};
+
+export type AuditEvent = {
+  seq: number;
+  at: string;
+  by: string;
+  kind: string;
+  target: string;
+  note: string;
+  version: number;
+};
+
+export type PackInfo = {
+  id: string;
+  name: string;
+  blurb: string;
+  version: string;
+  installed: boolean;
+  registers: readonly string[];
+  pages: readonly string[];
+  author: string;
+  stars?: number;
+};
+
+export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
+
+export type Person = { id: string; name: string; level: 'read' | 'write' | 'admin' | 'owner'; hue: number };
+
+export type Job = {
+  id: string;
+  kind: string;
+  status: 'queued' | 'claimed' | 'running' | 'done' | 'failed' | 'stopped';
+  model: string;
+  started: string;
+  events: readonly { seq: number; tool: string; input: string; out: string; ok: boolean }[];
+};

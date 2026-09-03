@@ -1,0 +1,737 @@
+/**
+ * The host's half of the markup contract.
+ *
+ * `braindog-render/svelte` ships no CSS. It emits a `<figure>` per block carrying its kind, its
+ * primitive and its tone, and a `<span>` per cell named for the cell it is. Everything below draws
+ * against that and nothing else, which is what lets a pack invent a kind after this file shipped.
+ *
+ * THE ONE RULE OF THIS FILE: no colour is written here. Every value is a semantic role a theme maps
+ * (13 §2.1), and the four intents reach the DOM only through the one mapping block below.
+ *
+ * The motif, stated once so it stays consistent: CONTENT RISES, CHROME AND CONTROLS SINK. A block
+ * steps up the surface ladder; an id chip, a field and a focus band are cut into it. Depth is a
+ * luminance ladder and never a blur — translucency behind a column of small tabular digits is a
+ * measurable legibility cost with no information gain, and it puts every figure's contrast at the
+ * mercy of whatever scrolls under it (13 §2.1).
+ */
+
+@layer components {
+  /* ── the intent map ──────────────────────────────────────────────────────
+     The ONLY place an intent becomes a colour. A component cannot render `warn` without going
+     through here, and the glyph is emitted by the renderer, not by a call site (13 §2.3). */
+
+  [data-intent='good'] {
+    --tone: var(--earn);
+    --tone-fill: var(--earn-fill);
+  }
+  [data-intent='warn'] {
+    --tone: var(--warn);
+    --tone-fill: var(--warn-fill);
+  }
+  [data-intent='bad'] {
+    --tone: var(--danger);
+    --tone-fill: var(--danger-fill);
+  }
+  [data-intent='info'] {
+    --tone: var(--accent-text);
+    --tone-fill: var(--accent);
+  }
+
+  .glyph {
+    color: var(--tone, var(--dim));
+    /* Belt and braces with the U+FE0E in the token: a colour emoji here would be a colour no theme
+       chose and no validator measured. */
+    font-variant-emoji: text;
+    font-size: var(--t-xs);
+    line-height: 1;
+    flex: none;
+  }
+
+  /* ── the block frame ────────────────────────────────────────────────────
+     Width is a property of the KIND, not of the page, and this is the third time that family of bug
+     has been paid for. `measure` for prose; the room for tables; its own content for short drawn
+     blocks (13 §4.1). */
+
+  .block {
+    margin: 0 0 var(--sp-5);
+  }
+
+  .measure {
+    max-inline-size: var(--measure);
+  }
+
+  /* A heading is a KICKER: two or three words, small caps. The sentence goes in the body. */
+  .block-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .block-head [data-intent],
+  .block-head .glyph {
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* ── panel: note, quote ─────────────────────────────────────────────────── */
+
+  .panel {
+    margin: 0;
+    padding: var(--sp-4);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-inline-start: 3px solid var(--tone, var(--edge));
+    border-radius: var(--r-md);
+    color: var(--ink2);
+  }
+
+  .panel p + p {
+    margin-block-start: var(--sp-3);
+  }
+
+  blockquote.panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    font-size: var(--t-md);
+    color: var(--ink);
+  }
+
+  .quote-by {
+    font-size: var(--t-sm);
+    font-style: normal;
+    color: var(--dim);
+  }
+
+  .quote-by::before {
+    content: '— ';
+  }
+
+  /* ── grid: stat, board ──────────────────────────────────────────────────
+     `--cells` comes from the declaration. A layout primitive must be TOLD how many things it
+     contains and must never infer the count from the space available (05 §4). */
+
+  /* ONE surface per block, and the cells inside it are divided by a rule rather than boxed by one.
+     Nested boxes are what makes a dense screen read as clutter; one soft container with hairline
+     divisions reads as a single object with parts. */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--raise);
+    overflow: hidden;
+  }
+
+  .cell {
+    display: grid;
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'note note';
+    /* `max-content` puts the glyph immediately after the label rather than at the far edge of the
+       cell: a tone belongs to the thing it qualifies, and half a column away it belongs to nothing. */
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    row-gap: 3px;
+    column-gap: var(--sp-2);
+    padding: var(--sp-4);
+  }
+
+  .cell + .cell {
+    border-inline-start: 1px solid var(--line);
+  }
+
+  .cell-label {
+    grid-area: label;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+  }
+
+  .cell .glyph {
+    grid-area: glyph;
+    justify-self: start;
+  }
+
+  /* Tabular figures on a PROPORTIONAL face. A monospace face gives the thousands separator a full
+     cell, so EGP 2,869 renders as EGP 2 , 869 at display size (13 §3.2). */
+  .cell-figure {
+    grid-area: figure;
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 500;
+    letter-spacing: -0.028em;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cell-note {
+    grid-area: note;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* A FIGURE IS INK UNLESS IT IS WRONG. Colouring every toned figure puts three shouting numbers on
+     one band and the reader stops hearing any of them; the glyph carries `good` and `warn`, and red
+     is spent on the one thing that is actually late. */
+  .cell[data-intent='bad'] .cell-figure {
+    color: var(--tone);
+  }
+
+  .board-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-3);
+    background: var(--s1);
+  }
+
+  .board-head {
+    color: var(--dim);
+    font-family: var(--font-ui);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-3);
+    background: var(--s2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+  }
+
+  .card-title {
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
+  .card-detail {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* ── rows: spec, params ─────────────────────────────────────────────────── */
+
+  .rows {
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--raise);
+    overflow: hidden;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: minmax(9ch, 22ch) minmax(0, 1fr) minmax(0, auto);
+    gap: var(--sp-3);
+    align-items: baseline;
+    padding: var(--sp-2) var(--sp-4);
+    min-block-size: var(--row-h);
+    font-size: var(--t-ui);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .row:last-child {
+    border-block-end: 0;
+  }
+
+  .row-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .row-value {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .row-note {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    text-align: end;
+  }
+
+  /* ── proportional: bar, gauge ───────────────────────────────────────────── */
+
+  .prop {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+  }
+
+  .prop-row {
+    display: grid;
+    grid-template-columns: minmax(9ch, 20ch) minmax(0, 1fr) auto auto auto;
+    gap: var(--sp-3);
+    align-items: center;
+    padding: var(--sp-1) var(--sp-2);
+    min-block-size: var(--row-h);
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+  }
+
+  .prop-track {
+    position: relative;
+    block-size: 8px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--line) 55%, transparent);
+    overflow: hidden;
+  }
+
+  .prop-track::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: calc(var(--magnitude) * 100%);
+    border-radius: 4px;
+    background: var(--tone-fill, var(--accent));
+  }
+
+  .prop-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .prop-value {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .prop-note {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* The hole is the only row that is a button: it opens the register filtered to exactly those
+     rows, because an unknown is a task somebody has to close (05 §7.5). */
+  .prop-row[data-hole] {
+    cursor: pointer;
+    border: 1px dashed var(--edge);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .prop-row[data-hole]:hover {
+    background: color-mix(in srgb, var(--warn-fill) 12%, transparent);
+  }
+
+  /* ── inline: chips ──────────────────────────────────────────────────────── */
+
+  .inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 5px var(--sp-3);
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .pill[data-intent] {
+    border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+  }
+
+  .pill-glyph {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 999px;
+    background: var(--tone-fill, var(--edge));
+    flex: none;
+  }
+
+  /* An unknown glyph draws NO glyph rather than shifting the columns. A column that moves is worse
+     than a column an agent has to count (05 §3 invariant 2). */
+  .pill-glyph:not([data-glyph]),
+  .pill-glyph[data-glyph=''] {
+    background: none;
+  }
+
+  .pill-figure {
+    color: var(--ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pill-word {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ── list: todo, steps, timeline ────────────────────────────────────────── */
+
+  .list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--raise);
+    overflow: hidden;
+  }
+
+  .item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, auto) auto;
+    gap: var(--sp-3);
+    align-items: baseline;
+    padding: var(--sp-2) var(--sp-4);
+    min-block-size: var(--row-h);
+    font-size: var(--t-ui);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .item:last-child {
+    border-block-end: 0;
+  }
+
+  .list[data-kind='steps'] .item {
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto;
+    counter-increment: step;
+  }
+
+  .list[data-kind='steps'] .item-title::before {
+    content: counter(step) '  ';
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .item-title {
+    color: var(--ink);
+  }
+
+  .item-detail {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .item-state {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: end;
+  }
+
+  .item-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 17px;
+    block-size: 17px;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--earn);
+    font-size: var(--t-xs);
+    align-self: center;
+  }
+
+  .item-marker[data-done='yes'] {
+    border-color: var(--earn);
+  }
+
+  .list[data-kind='timeline'] .item-marker {
+    inline-size: auto;
+    block-size: auto;
+    border: 0;
+    border-radius: 0;
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    letter-spacing: -0.02em;
+  }
+
+  /* ── table: comparison, and the register grid's body ────────────────────── */
+
+  .table-region {
+    overflow: auto;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--raise);
+    scroll-padding-block-start: var(--row-h);
+  }
+
+  .table {
+    min-inline-size: 100%;
+    font-size: var(--t-ui);
+  }
+
+  .tr {
+    display: grid;
+    grid-template-columns: var(--cols);
+    align-items: center;
+    min-block-size: var(--row-h);
+    border-block-end: 1px solid var(--line);
+  }
+
+  /* The header row and the first column are the two things you look back to. */
+  .th-row {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    background: var(--s2);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .th {
+    padding: var(--sp-2) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+  }
+
+  .th-sort {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+
+  .th[aria-sort='ascending'] .th-sort::after {
+    content: ' ↑';
+  }
+
+  .th[aria-sort='descending'] .th-sort::after {
+    content: ' ↓';
+  }
+
+  .rowgroup {
+    content-visibility: auto;
+  }
+
+  .td {
+    padding: 0 var(--sp-3);
+    color: var(--ink2);
+    line-height: var(--row-h);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [data-align='end'] {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A figure NEVER truncates. A truncated figure is not shortened, it is wrong (13 §4.2). */
+  .td[data-truncate='never'] {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* A persistent focus band, not hover: hover does not help a keyboard user and does not survive a
+     glance away. The leading edge is the row's own state. */
+  .tr[data-focused] {
+    background: var(--s2);
+    box-shadow: inset 2px 0 0 0 var(--accent);
+  }
+
+  .tr[data-intent] .td {
+    color: var(--ink2);
+  }
+
+  .tr[data-intent='bad'] {
+    box-shadow: inset 2px 0 0 0 var(--danger-fill);
+  }
+
+  .tr[data-intent='warn'] {
+    box-shadow: inset 2px 0 0 0 var(--warn-fill);
+  }
+
+  .tr:last-child {
+    border-block-end: 0;
+  }
+
+  .missing {
+    color: var(--dim);
+  }
+
+  .cap-line {
+    padding: var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    text-align: center;
+  }
+
+  /* ── media: code, tree ──────────────────────────────────────────────────── */
+
+  .media {
+    margin: 0;
+    padding: var(--sp-3);
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    line-height: 1.6;
+    overflow-x: auto;
+    tab-size: 2;
+  }
+
+  .media[data-lang]::before {
+    content: attr(data-lang);
+    display: block;
+    margin-block-end: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  /* ── the visible fence ──────────────────────────────────────────────────
+     Designed, not apologetic. It shows exactly what the author typed with the reason above it, and
+     when the author is an agent it is the only feedback channel there is (05 §3). */
+
+  .block-degraded .media {
+    border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
+    border-start-start-radius: 0;
+    border-start-end-radius: 0;
+  }
+
+  .degraded-fix {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    background: color-mix(in srgb, var(--warn-fill) 14%, var(--s1));
+    border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line));
+    border-block-end: 0;
+    border-start-start-radius: var(--r-md);
+    border-start-end-radius: var(--r-md);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .degraded-fix::before {
+    content: '⚠';
+    color: var(--warn);
+  }
+
+  .degraded-action {
+    margin-inline-start: auto;
+    padding: 2px var(--sp-2);
+    background: none;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    cursor: pointer;
+  }
+
+  .needs-client {
+    padding: var(--sp-3);
+    background: var(--s1);
+    border: 1px dashed var(--edge);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* ── inline values ──────────────────────────────────────────────────────── */
+
+  .figure,
+  .typed {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .typed[data-form='money'],
+  .typed[data-form='pct'] {
+    font-weight: 500;
+  }
+
+  /* A hole is an affordance, never a tag: it is the thing that fixes it. */
+  .hole {
+    padding: 1px var(--sp-2);
+    background: none;
+    border: 1px dashed color-mix(in srgb, var(--warn) 60%, var(--line));
+    border-radius: var(--r-sm);
+    color: var(--warn);
+    font: inherit;
+    font-size: 0.92em;
+    cursor: pointer;
+  }
+
+  .evidence {
+    padding: 1px var(--sp-1);
+    border-radius: 3px;
+    background: var(--sunk);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    letter-spacing: 0.04em;
+  }
+
+  .evidence[data-evidence='verified'] {
+    color: var(--earn);
+  }
+
+  .unresolved {
+    border-block-end: 1px dotted var(--edge);
+    color: var(--dim);
+  }
+
+  .document > :is(h1, h2, h3, h4) {
+    margin-block: var(--sp-5) var(--sp-2);
+  }
+
+  .document > p,
+  .prose-list {
+    margin-block: 0 var(--sp-3);
+    color: var(--ink2);
+  }
+
+  .prose-list {
+    padding-inline-start: var(--sp-4);
+  }
+
+  .document code {
+    padding: 1px 5px;
+    background: var(--sunk);
+    border-radius: 3px;
+    font-family: var(--font-id);
+    font-size: 0.9em;
+  }
+
+  .document hr {
+    margin-block: var(--sp-5);
+    border: 0;
+    border-block-start: 1px solid var(--line);
+  }
+}

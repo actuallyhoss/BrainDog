@@ -14,27 +14,30 @@ export * from './css.ts';
 import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.ts';
 
 /**
- * The house seed, and the two sentences behind it.
+ * The house seed.
  *
- * `neutralHue: 27` is the BrainDog red's own hue. Every surface and every ink in the product
- * therefore carries a whisper of it — a warm near-black in dark, warm paper in light — which is how
- * the brand reaches every pixel without ever raising its voice. Measured: #F42A2A is
- * oklch(0.618 0.221 27.4), and 28 §3 step 5 anchors `danger` at 27. The mark and the alarm are the
- * same hue by construction, not by coincidence, so red in this product always means *this is owed,
- * this is late, this is wrong* — which in a record of what you owe is the most useful thing red
- * could mean.
+ * Where the brand red lives, settled: #F42A2A is oklch(0.623 0.233 27.4) and 28 §3 step 5 anchors
+ * `danger` at 27. The mark and the alarm are the same hue by construction, so red in this product
+ * always means *this is owed, this is late, this is wrong* — the most useful thing red could mean in
+ * a record of what you owe. The dark `danger` chip generates to the mark's own colour.
  *
- * `accent` is therefore NOT red, and could not be: `info` resolves to `accent`, so a red accent
- * would put the four intents at delta-E 0 and check F would refuse the theme. It is an ink blue —
- * the pen beside the red ledger line. Restrained on purpose; the only loud colours on a BrainDog
- * screen are the ones that mean something.
+ * `accent` is therefore not red and could not be: `info` resolves to `accent`, so a red accent puts
+ * two of the four intents on one hue and the generator refuses it.
+ *
+ * `neutralHue: 'from-accent'` — AND THIS IS A REVERSAL WORTH RECORDING. The first house seed put the
+ * neutral hue on 27 as well, so that every surface and every ink carried a whisper of the brand. The
+ * argument was good. The render was BROWN: at L 0.16 even 0.008 of chroma at that hue reads as dirt
+ * rather than as warmth, the ink came out pink, and the one colour the whole system exists to
+ * protect — the red — had nothing clean to sit against. The logo is red on white and red on black,
+ * never red on brown. So the neutrals went cool and the brand stays where a brand belongs: on the
+ * mark, and on the one intent that matters.
  */
 export const HOUSE_SEED: Seed = {
   // L 0.60 is not a taste decision: it is the one band where the accent fill clears 3:1 against the
   // lightest LIGHT surface and the lightest DARK surface at the same time, so one seed serves both
   // schemes and a filled control has a legal boundary in each.
   accent: 'oklch(0.60 0.155 258)',
-  neutralHue: 27,
+  neutralHue: 'from-accent',
   space: 4,
   radius: { sm: 4, md: 9, lg: 16 },
   density: 'comfortable',
