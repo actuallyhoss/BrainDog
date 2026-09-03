@@ -49,7 +49,11 @@ function barRows(block: BlockResult): string[] {
   }
   return [...totals]
     .sort((a, b) => b[1] - a[1])
-    .map(([key, total]) => `${key} | ${money(total, CURRENCY)} | `);
+    /* The SUM is formatted through the summed field's own type, not always as money. A bar over
+       `effort` in days printed `GBP 0.02` — the total was 2.4 days, run through a money formatter
+       that reads its input as minor units. A block that can be bound to any register cannot assume
+       the thing it is adding up is currency. */
+    .map(([key, total]) => `${key} | ${display(block.register ?? '', of, total) ?? money(total, CURRENCY)} | `);
 }
 
 /**

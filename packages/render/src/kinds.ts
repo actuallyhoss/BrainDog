@@ -100,6 +100,15 @@ export type KindSpec = {
    * not discoveries, and a closed list's control cannot express a non-member.
    */
   minSpan: number;
+  /**
+   * What this kind is FOR, in the picker's own grouping.
+   *
+   * 21 §3.3 groups the picker by purpose rather than by primitive, and the difference matters: a
+   * person adding a block knows they want to show a list, and does not know or care that `todo`,
+   * `steps` and `timeline` share the `list` primitive while `chips` does not. The primitive is how
+   * the renderer thinks; the purpose is how the author does.
+   */
+  purpose: 'say' | 'figure' | 'list' | 'plan' | 'media';
 };
 
 /**
@@ -113,33 +122,33 @@ export type KindSpec = {
  */
 const TABLE = {
   /* Prose and emphasis */
-  note: { primitive: 'panel', cells: 0, tone: true, prose: true, minSpan: 4 },
-  quote: { primitive: 'panel', cells: 2, tone: false, rows: 1, minSpan: 4 },
+  note: { primitive: 'panel', cells: 0, tone: true, prose: true, minSpan: 4, purpose: 'say' },
+  quote: { primitive: 'panel', cells: 2, tone: false, rows: 1, minSpan: 4, purpose: 'say' },
 
   /* Figures */
-  stat: { primitive: 'grid', cells: 3, tone: true, rows: 6, minSpan: 4 },
-  bar: { primitive: 'proportional', cells: 3, tone: true, hole: true, minSpan: 4 },
-  gauge: { primitive: 'proportional', cells: 3, tone: true, rows: 1, minSpan: 4 },
-  chips: { primitive: 'inline', cells: 3, tone: true, minSpan: 3 },
+  stat: { primitive: 'grid', cells: 3, tone: true, rows: 6, minSpan: 4, purpose: 'figure' },
+  bar: { primitive: 'proportional', cells: 3, tone: true, hole: true, minSpan: 4, purpose: 'figure' },
+  gauge: { primitive: 'proportional', cells: 3, tone: true, rows: 1, minSpan: 4, purpose: 'figure' },
+  chips: { primitive: 'inline', cells: 3, tone: true, minSpan: 3, purpose: 'figure' },
 
   /* Rows — `spec` is the workhorse: 194 of 7,138 rendered lines in the predecessor's census, and
      no writing guide said so (05 §7.4). */
-  spec: { primitive: 'rows', cells: 3, tone: false, minSpan: 4 },
-  params: { primitive: 'rows', cells: 3, tone: false, minSpan: 4 },
+  spec: { primitive: 'rows', cells: 3, tone: false, minSpan: 4, purpose: 'list' },
+  params: { primitive: 'rows', cells: 3, tone: false, minSpan: 4, purpose: 'list' },
 
   /* Work */
-  todo: { primitive: 'list', cells: 2, tone: false, checkbox: true, minSpan: 3 },
-  steps: { primitive: 'list', cells: 3, tone: false, ordered: true, minSpan: 4 },
-  timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4 },
-  board: { primitive: 'grid', cells: 3, tone: false, minSpan: 6 },
+  todo: { primitive: 'list', cells: 2, tone: false, checkbox: true, minSpan: 3, purpose: 'plan' },
+  steps: { primitive: 'list', cells: 3, tone: false, ordered: true, minSpan: 4, purpose: 'plan' },
+  timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4, purpose: 'plan' },
+  board: { primitive: 'grid', cells: 3, tone: false, minSpan: 6, purpose: 'plan' },
 
   /* Technical */
-  code: { primitive: 'media', cells: 0, tone: false, verbatim: true, minSpan: 4 },
-  tree: { primitive: 'media', cells: 0, tone: false, verbatim: true, indented: true, minSpan: 4 },
-  comparison: { primitive: 'table', cells: 0, tone: false, header: true, minSpan: 6 },
+  code: { primitive: 'media', cells: 0, tone: false, verbatim: true, minSpan: 4, purpose: 'media' },
+  tree: { primitive: 'media', cells: 0, tone: false, verbatim: true, indented: true, minSpan: 4, purpose: 'media' },
+  comparison: { primitive: 'table', cells: 0, tone: false, header: true, minSpan: 6, purpose: 'list' },
 
   /* Register-bound */
-  table: { primitive: 'table', cells: 0, tone: false, pageOnly: true, minSpan: 6 },
+  table: { primitive: 'table', cells: 0, tone: false, pageOnly: true, minSpan: 6, purpose: 'list' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

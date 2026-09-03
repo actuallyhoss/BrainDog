@@ -17,12 +17,14 @@
   import { copy } from '$lib/copy.ts';
   import { page as readPage, values, type BlockResult } from '$lib/record/api.ts';
   import { toSegments } from '$lib/record/blocks.ts';
+  import type { PageBlock } from '$lib/record/schema.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import BlockBar from '$lib/ui/BlockBar.svelte';
+  import AddBlock from '$lib/ui/AddBlock.svelte';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
 
@@ -65,7 +67,7 @@
    * confirmed was not the layout you got.
    */
   const laid = $derived.by(() => {
-    const blocks = result?.blocks ?? [];
+    const blocks = all;
     const slots = arrangement.slots ?? blocks.map((b, i) => ({ i, span: spanOf(b) }));
     return slots
       .map((slot) => ({ slot, block: blocks[slot.i] }))
@@ -73,7 +75,23 @@
   });
 
   function beginArrange() {
-    arrangement.begin((result?.blocks ?? []).map((b, i) => ({ i, span: spanOf(b) })));
+    arrangement.begin(all.map((b, i) => ({ i, span: spanOf(b) })));
+  }
+
+  /**
+   * A block added here is resolved through the SAME page read as a declared one.
+   *
+   * `readPage` answers per block against live rows, so a seeded block gets real data the moment it
+   * exists — which is what makes "already bound and already drawing" (21 §3.3) true rather than a
+   * promise the picker makes and the page breaks.
+   */
+  function add(block: PageBlock) {
+    extra = [...extra, block];
+    arrangement.slots = [
+      ...(arrangement.slots ?? (result?.blocks ?? []).map((b, i) => ({ i, span: spanOf(b) }))),
+      { i: (result?.blocks.length ?? 0) + extra.length - 1, span: block.span ?? 12 },
+    ];
+    toasts.push(copy.blockAdded(block.kind), { intent: 'warn' });
   }
 
   /**
@@ -98,6 +116,36 @@
 
   /** Held while a handle is down, so the drop target knows what is moving. */
   let dragging = $state<number | null>(null);
+
+  let adding = $state(false);
+
+  /** The register the page is mostly about — what a new block binds to before you narrow it. */
+  const primary = $derived(result?.blocks.find((b) => b.register)?.register ?? 'obligations');
+
+  /** Blocks added in this session. They live beside the declared ones and index past them. */
+  let extra = $state<PageBlock[]>([]);
+
+  /** Declared, then added. One list, so ordering and spans do not care which is which. */
+  const all = $derived([...(result?.blocks ?? []), ...extra.map((b) => resolveExtra(b))]);
+
+  /** An added block, run through the page read so it carries rows rather than a declaration. */
+  function resolveExtra(block: PageBlock): BlockResult {
+    const template = result?.blocks.find((b) => b.register === block.source?.replace('register.', ''));
+    return {
+      ...(template ?? { rows: [], entries: [], total: 0, drawn: true, stale_at: '' }),
+      ...block,
+      columns: (block.columns ?? []).map((c) => ({
+        field: c.field,
+        label: c.label ?? c.field,
+        width: c.width ?? 'minmax(12ch,1fr)',
+        align: c.align ?? ('start' as const),
+        truncate: 'end' as const,
+      })),
+      metrics: undefined,
+      register: block.source?.replace('register.', ''),
+      drawn: true,
+    } as BlockResult;
+  }
 
   const declaration = $derived(
     result
@@ -134,6 +182,10 @@
   <PageHead kicker={result.page.nav?.section} title={result.page.title}>
     {#snippet actions()}
       {#if arranging}
+        <Button weight="quiet" onclick={() => (adding = true)}>
+          <Icon name="plus" size="s" />
+          {copy.addBlock}
+        </Button>
         <Button weight="bare" onclick={() => arrangement.cancel()}>{copy.arrangeCancel}</Button>
         <Button weight="primary" onclick={commitArrange}>{copy.arrangeDone}</Button>
       {:else}
@@ -233,6 +285,8 @@
       {/each}
     {/if}
   </div>
+
+  <AddBlock bind:open={adding} {slug} register={primary} onadd={add} />
 {/if}
 
 <style>

@@ -40,6 +40,38 @@ export const copy = {
   moveDown: 'Move down',
   removeBlock: 'Remove this block',
   addBlock: 'Add a block',
+  blockAdded: (kind: string) => `Added a ${kind}. Nothing was written — this is a mock-up.`,
+
+  /* The picker groups by PURPOSE, because somebody adding a block knows they want to show a list
+     and does not know that `todo` and `timeline` share a primitive while `chips` does not. */
+  purposes: {
+    say: 'Say something',
+    figure: 'Show a figure',
+    list: 'Show a list',
+    plan: 'Show a plan',
+    media: 'Show media',
+  } as Record<string, string>,
+
+  /* One line per kind, in the picker. What it is FOR, never how it is drawn — "the money you are
+     owed, biggest first" tells you whether you want it; "a horizontal proportional bar" does not. */
+  kinds: {
+    bar: 'amounts side by side, biggest first',
+    gauge: 'one number against its target',
+    chips: 'a few short facts in a row',
+    spec: 'label, value, note — the workhorse',
+    params: 'settings and their values',
+    todo: 'things to do, with a date',
+    steps: 'a sequence, numbered',
+    timeline: 'what happened, most recent first',
+    board: 'cards in columns by state',
+    comparison: 'a small table you write yourself',
+    table: 'a register, in full',
+    note: 'a paragraph that matters',
+    quote: 'something somebody said',
+    code: 'code, exactly as typed',
+    tree: 'a shape with indentation',
+    stat: 'two or three figures across the top',
+  } as Record<string, string>,
   arrangedNotSaved: (title: string) =>
     `${title} rearranged here. Nothing was written — this is a mock-up of the record.`,
   arrangeNothing: 'Nothing moved.',
