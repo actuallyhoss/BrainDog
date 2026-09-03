@@ -162,17 +162,24 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         });
   }
 
-  /* K · hue-only encoding: accent-text must differ from ink in lightness too */
-  const dL = Math.abs(rgbToCielab(rgb(p['accent-text'])).L - rgbToCielab(rgb(p.ink)).L);
-  if (dL < 8)
-    out.push({
-      check: 'K',
-      scheme,
-      level: 'refuse',
-      code: 'CONTRAST_FLOOR',
-      measured: r2(dL),
-      fix: `theme — a link and body text are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
-    });
+  /* K · hue-only encoding. A link must differ in LIGHTNESS from the two things it is most likely to
+     be confused with: body ink, and `danger` — which in a theme whose accent is a red mark is the
+     same hue as the link by construction. */
+  for (const [what, against] of [
+    ['body text', p.ink],
+    ['an overdue figure', p.danger],
+  ] as const) {
+    const dL = Math.abs(rgbToCielab(rgb(p['accent-text'])).L - rgbToCielab(rgb(against)).L);
+    if (dL < 8)
+      out.push({
+        check: 'K',
+        scheme,
+        level: 'refuse',
+        code: 'CONTRAST_FLOOR',
+        measured: r2(dL),
+        fix: `theme — a link and ${what} are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
+      });
+  }
 
   /* M · line and edge not confusable — a judgement call, so it warns */
   const dLine = Math.abs(rgbToLch(rgb(p.line)).L - rgbToLch(rgb(p.edge)).L);

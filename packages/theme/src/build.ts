@@ -334,18 +334,8 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
      suggestion of one. Flat and confident beats soft and vague. */
   const line = hex(solveL(1.55, Cink, nHue, rgb(g.bg), dir));
 
-  /* 4 · accent. The fill is the seed; the text role is solved, and may sit well above 4.5. */
+  /* 4 · the accent FILL. The text role waits until after the intents, and step 6 says why. */
   const accent = hex(gamutMap(acc));
-  let accentText = '';
-  for (const t of [4.5, 5, 5.5, 6, 7, 8, 9]) {
-    const cand = solveL(t, Math.min(acc.C, 0.16), acc.H, worst, dir);
-    // check K: hue alone may not encode meaning — the link must differ from ink in lightness too.
-    if (Math.abs(rgbToCielab(quantise(cand)).L - rgbToCielab(rgb(ink)).L) >= 8) {
-      accentText = hex(cand);
-      break;
-    }
-  }
-  if (!accentText) accentText = hex(solveL(9, Math.min(acc.C, 0.16), acc.H, worst, dir));
   // The theme's own darkest neutral is tried before pure black, so a primary control reads as part
   // of the same warm palette rather than as a hole punched in it. Falls through to black if neither
   // clears — the label on a control is never allowed to be the thing that fails.
@@ -410,6 +400,27 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
         `${best.worst.toFixed(1)} apart to a dichromat. Four intents need at least 10. ` +
         `Move the accent hue, or widen the profile's chroma ladder.`,
     );
+
+  /* 6 · the accent AS TEXT — solved last, because it has to keep clear of two colours rather than
+     one, and the second is not known until the intents are.
+
+     Check K's rule is that hue alone may never encode meaning, so a link has to differ from body
+     ink in LIGHTNESS. In this theme it has to differ from `danger` too, and for a stronger reason:
+     the accent and `danger` are the same hue by design, and solving both against the same ground at
+     similar contrast targets put them on the same value — a link and an overdue figure rendering to
+     one colour, in the scheme where the product is read most. So the search walks upward until the
+     candidate is 8 L* clear of both. Falling back to the top of the range rather than refusing:
+     an unreadable link is a floor, and this is a collision. */
+  const accentText = (() => {
+    const AC = Math.min(acc.C, 0.16);
+    const clear = (c: string, of: string) =>
+      Math.abs(rgbToCielab(rgb(c)).L - rgbToCielab(rgb(of)).L) >= 8;
+    for (const t of [4.5, 5, 5.5, 6, 7, 8, 9, 11, 13]) {
+      const cand = hex(solveL(t, AC, acc.H, worst, dir));
+      if (clear(cand, ink) && clear(cand, chosen.danger)) return cand;
+    }
+    return hex(solveL(9, AC, acc.H, worst, dir));
+  })();
 
   /* -fill variants: chips and bars. Free to carry more chroma than the text role, because a chip
      is a shape and not a paragraph. Each aims at the scheme's fill band and is pushed away from the
