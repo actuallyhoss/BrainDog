@@ -85,8 +85,12 @@
     font-size: var(--t-ui);
   }
 
+  /* Ink, not the accent. This is the name of the step the job is on — a fact, and one that is red
+     in a line that already carries a red `failed` further down the page. Monospace already sets it
+     apart from the sentence around it; colour on top of that is the same distinction made twice,
+     in the one hue this product reserves for something being wrong. */
   .status code {
-    color: var(--accent-text);
+    color: var(--ink);
     font-family: var(--font-id);
   }
 

@@ -27,11 +27,16 @@
              timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
              its own source. -->
         <span class="item-marker num"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
-        <span class="item-title"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
+        <!-- The glyph sits with the TITLE, not at the far edge of the row. A tone belongs to the
+             thing it qualifies, and five hundred pixels away it belongs to nothing — the same
+             finding the stat cell's layout is built on (13 §2.3). -->
+        <span class="item-title">
+          <Text nodes={inline(row.cells[1] ?? '', opts)} {opts} />
+          {#if row.tone}
+            <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
+          {/if}
+        </span>
         <span class="item-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
-        {#if row.tone}
-          <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
-        {/if}
       </li>
     {:else}
       <li class="item">

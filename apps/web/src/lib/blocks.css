@@ -452,6 +452,10 @@
   }
 
   .item-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
     color: var(--ink);
   }
 
@@ -483,6 +487,11 @@
 
   .item-marker[data-done='yes'] {
     border-color: var(--earn);
+  }
+
+  /* Three tracks now, not four: the tone travels with the title. */
+  .list[data-kind='timeline'] .item {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, auto);
   }
 
   .list[data-kind='timeline'] .item-marker {
