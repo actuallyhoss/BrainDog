@@ -28,6 +28,13 @@ const EXEMPT = [
   /^apps\/web\/src\/theme\/house\.css$/,
   /^tools\/gates\//,
   /\.test\.ts$/,
+  /**
+   * The favicon. It is fetched as its own document, outside any page, so it can reach no custom
+   * property and no theme — the mark's colours have to be literal or it has none. It is also the
+   * FILLED lockup rather than the outline one, because at 16px the dog's negative space collapses
+   * to a notch and the silhouette only survives reversed out of a solid ground.
+   */
+  /^apps\/web\/static\/mark\.svg$/,
 ];
 
 /**

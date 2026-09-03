@@ -141,8 +141,98 @@ export const REGISTERS: Record<string, RegisterDecl> = {
    The hue is chosen at create by the theme's `nextAccentHue` and written once. The kernel never
    computes it: a hue seven degrees from `earn` is an intent, not a mark. */
 
+/**
+ * The write-up shape a month of real use settled into (05 §7.6). Nobody designed it; it is worth
+ * writing down so an agent does not rediscover it:
+ *
+ *   1. a `chips` line at the very top, with `{{path}}` values, so the page answers itself before
+ *      anyone scrolls
+ *   2. `# Name`, then a status line
+ *   3. numbered `## N · Title` sections, EACH OPENING WITH A BLOCK AND THEN PROSE
+ *   4. for research: `## What is not verified` and `## Sources`
+ *   5. a `## Log` of dated one-liners — the document's own history
+ *   6. settled things marked so nobody re-runs them
+ *
+ * The last block is malformed on purpose. It is the visible fence, and it is the only feedback
+ * channel an agent has.
+ */
+const KILN_NOTE = `\`\`\`chips
+● | 3 | cuts
+● | 2 | clients | good
+● | 1 | open question | warn
+\`\`\`
+
+# Kiln
+
+Earning · a variable type family, licensed direct. {{money:1840000 GBP}} since March 2024.
+
+## 1 · Where the money comes from
+
+\`\`\`bar | Revenue by channel, twelve months
+Direct licences | 11200 | 61%
+Studio deals | 5300 | 29%
+Specimen prints | 1900 | 10%
+Unattributed | 3400 | | hole
+\`\`\`
+
+Direct licensing carries it, and that is the thing to protect. The unattributed row is not a
+channel — it is three months of payouts that arrived before the reference field existed, and it
+sits outside the scale because a hole that sets the bar makes every real category a stub.
+
+## 2 · The licensing question
+
+\`\`\`spec | What each model costs to run
+Per seat | Honour system | every foundry does this
+Per product | One number per shipped thing | needs a definition of "shipped"
+Flat studio | One price, no counting | hardest to raise later
+\`\`\`
+
+Open as SG31 and it blocks two quotes. The September issue announces whichever wins, so it is not
+deferrable past {{date:2026-09-20}}.
+
+## 3 · What is on the roadmap
+
+\`\`\`steps | Next three
+Variable axis QA | the new cut, all weights | doing
+Specimen page | one screen, no marketing | open
+Licence generator | reads the tier, emits the PDF | blocked
+\`\`\`
+
+## 4 · The estate underneath it
+
+\`\`\`spec | Domains and hosting
+kiln.example | renews {{until:2026-09-15}} | the apex
+kilnfonts.example | lapsing {verified: registrar email, 8 Aug} | auto-renew is off
+Object storage | {{money:4100 GBP}} a month | the binaries
+\`\`\`
+
+\`\`\`note | Watch this | warn
+\`kilnfonts.example\` is the redirect every old licence PDF points at. Letting it lapse breaks
+links in files that have already been delivered, which is not a thing an apology fixes. Tracked
+as {{ref:tasks#3}}.
+\`\`\`
+
+## What is not verified
+
+- The 61% direct share {estimate} — it excludes the unattributed rows above.
+- Whether studio deals renew at all {unknown}
+
+## Log
+
+\`\`\`timeline | Recent
+{{ago:2026-08-14}} | Raised the studio tier | first increase since launch | good
+{{ago:2026-07-02}} | Shipped the italic | four weights | good
+{{ago:2026-05-19}} | Moved off the old CI | Hobnail cancelled
+\`\`\`
+
+Settled by research — do not run it again: the registrar comparison is D41.
+
+\`\`\`stat | This block is wrong on purpose
+Too | many | cells | for | a | stat | row
+\`\`\``;
+
 export const THINGS: Entry[] = [
-  row(1, { name: 'Kiln', lane: 'earning', revenue: 184_000, since: '2024-03-11', mark: '◆', hue: 214 }),
+  row(1, { name: 'Kiln', lane: 'earning', revenue: 184_000, since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE }),
   row(2, { name: 'Marlow & Co', lane: 'earning', revenue: 420_000, since: '2023-01-08', mark: '▲', hue: 305 }),
   row(3, { name: 'Portage', lane: 'building', revenue: 0, since: '2026-05-02', mark: '●', hue: 176 }),
   row(4, { name: 'Tallow', lane: 'parked', revenue: 0, since: '2025-02-20', mark: '◼', hue: 261 }),

@@ -18,10 +18,20 @@
     | { t: 'ul'; items: string[] }
     | { t: 'hr' };
 
+  /**
+   * A BLANK LINE ENDS A PARAGRAPH; a newline does not.
+   *
+   * Emitting one `<p>` per source line is the mistake that makes wrapped prose render as a column of
+   * short, separately-spaced lines — which is what a hard-wrapped write-up looks like the moment
+   * anybody writes one.
+   */
   const nodes = $derived.by(() => {
     const out: Node[] = [];
     let bullets: string[] = [];
+    let para: string[] = [];
     const flush = () => {
+      if (para.length) out.push({ t: 'p', text: para.join(' ') });
+      para = [];
       if (bullets.length) out.push({ t: 'ul', items: bullets });
       bullets = [];
     };
@@ -44,11 +54,12 @@
       }
       const li = /^[-*]\s+(.*)$/.exec(line);
       if (li) {
+        if (para.length) flush();
         bullets.push(li[1]!);
         continue;
       }
-      flush();
-      out.push({ t: 'p', text: line });
+      if (bullets.length) flush();
+      para.push(line);
     }
     flush();
     return out;

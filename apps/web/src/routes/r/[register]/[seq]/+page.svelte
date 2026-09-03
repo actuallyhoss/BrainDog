@@ -11,14 +11,26 @@
 -->
 <script lang="ts">
   import { relative } from 'braindog-render';
+  import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { AUDIT, CURRENCY, NOW, REGISTERS, display, entry, labelOf } from '$lib/record/api.ts';
+  import {
+    AUDIT,
+    CURRENCY,
+    NOW,
+    REGISTERS,
+    display,
+    entry,
+    identityOf,
+    labelOf,
+    values,
+  } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Money from '$lib/ui/Money.svelte';
   import Chip from '$lib/ui/Chip.svelte';
+  import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
 
   const id = $derived(page.params.register ?? '');
@@ -30,6 +42,19 @@
 
   const state = $derived(decl?.state ? String(row?.fields[decl.state] ?? '') : '');
   const tone = $derived(decl?.done?.includes(state) ? ('good' as const) : undefined);
+
+  /* A `document` is an argument, not a figure, so it never sits in the field list beside a date and
+     a currency — it gets the room prose needs (05 §7.1). */
+  const documents = $derived((decl?.fields ?? []).filter((f) => f.type === 'document'));
+  const shortFields = $derived((decl?.fields ?? []).filter((f) => f.type !== 'document'));
+
+  const resolved = values();
+  const resolve = (path: string) => resolved[path] ?? null;
+  /** A link the host cannot resolve is plain text, never a dead anchor (36 §13 D16). */
+  const link = (spoken: string) => {
+    const m = /^([a-z][a-z0-9_]*)#(\d+)$/.exec(spoken);
+    return m && REGISTERS[m[1]!] ? `/r/${m[1]}/${m[2]}` : null;
+  };
 </script>
 
 {#if !decl || !row}
@@ -50,7 +75,7 @@
     <div class="split">
       <section class="fields">
         <dl class="field-list">
-          {#each decl.fields as f}
+          {#each shortFields as f}
             {@const value = row.fields[f.id]}
             <div class="field">
               <dt class="field-label">{labelOf(f)}</dt>
@@ -61,6 +86,8 @@
                   <Money minor={Number(value)} currency={CURRENCY} weight="strong" />
                 {:else if f.id === decl.state}
                   <Chip label={String(value).replace(/_/g, ' ')} {tone} />
+                {:else if identityOf(id, f.id, value)}
+                  <IdentityMark identity={identityOf(id, f.id, value)!} size="md" />
                 {:else if f.type === 'day'}
                   {display(id, f.id, value)}
                   <span class="rel">{relative(String(value), NOW)}</span>
@@ -71,6 +98,17 @@
             </div>
           {/each}
         </dl>
+
+        <!-- A `document` field is the dialect, drawn by the same interpreter a declared page uses.
+             The read view IS the renderer, so what you are looking at is the artefact (22 §8). -->
+        {#each documents as f}
+          {#if row.fields[f.id]}
+            <article class="document-slot">
+              <h2 class="doc-label">{labelOf(f)}</h2>
+              <Document src={String(row.fields[f.id])} opts={{ resolve, link }} />
+            </article>
+          {/if}
+        {/each}
       </section>
 
       <aside class="side">
@@ -162,6 +200,38 @@
   .missing {
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  .document-slot {
+    margin-block-start: var(--sp-6);
+  }
+
+  .doc-label {
+    margin-block-end: var(--sp-3);
+    color: var(--dim);
+    font-family: var(--font-ui);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+  }
+
+  /* Prose gets a reading measure; a table, a grid and a ledger get the room. Width is a property of
+     the block KIND, not of the page — the third time that family of bug was paid for (13 §4.1). */
+  .document-slot :global(.document > h1) {
+    margin-block: var(--sp-5) var(--sp-2);
+    font-size: var(--t-xl);
+    letter-spacing: -0.026em;
+  }
+
+  .document-slot :global(.document > h2) {
+    margin-block: var(--sp-6) var(--sp-3);
+    font-size: var(--t-md);
+    letter-spacing: -0.012em;
+  }
+
+  .document-slot :global(.document > h1:first-child) {
+    margin-block-start: 0;
   }
 
   .side-title {

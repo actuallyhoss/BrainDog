@@ -23,7 +23,10 @@
       </li>
     {:else if block.kind === 'timeline'}
       <li class="item" data-intent={row.tone}>
-        <span class="item-marker num">{row.cells[0] ?? ''}</span>
+        <!-- The date cell goes through the inline renderer like every other cell. It did not, and a
+             timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
+             its own source. -->
+        <span class="item-marker num"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
         <span class="item-title"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
         <span class="item-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
         {#if row.tone}

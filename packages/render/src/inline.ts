@@ -49,8 +49,13 @@ function braced(body: string, opts: InlineOptions): Inline {
     if ((TYPED as readonly string[]).includes(form)) {
       const raw = body.slice(colon + 1).trim();
       // An argument may be a path instead of a literal: a literal starts with a digit or `-`, a
-      // path with a letter. The two forms cannot collide, because a path has no colon in its class.
-      const isPath = /^[A-Za-z]/.test(raw);
+      // path with a letter.
+      //
+      // `ref` is the one form where that rule is not enough, because its literal argument is
+      // `register#seq` and a path SEGMENT is also allowed to be `register#seq`. So `{{ref:tasks#241}}`
+      // read as a path, resolved to nothing, and drew a hole where a link belonged. For `ref` the
+      // `register#digits` shape is the literal; a bare name is still a path.
+      const isPath = /^[A-Za-z]/.test(raw) && !(form === 'ref' && /^[a-z][a-z0-9_]*#\d+$/.test(raw));
       const arg = isPath ? (opts.resolve?.(raw) ?? null) : raw;
       if (arg === null || arg === undefined)
         return { type: 'path', path: raw, resolved: null };

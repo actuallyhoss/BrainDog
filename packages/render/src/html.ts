@@ -194,7 +194,7 @@ function list(b: Block, o: RenderOptions): string {
       if (b.kind === 'todo')
         return `<li class="item"><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}</li>`;
       if (b.kind === 'timeline')
-        return `<li class="item"${toneAttrs(r.tone)}><span class="item-marker num">${escape(r.cells[0] ?? '')}</span>${cell('item-title', r.cells[1], o)}${cell('item-detail', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+        return `<li class="item"${toneAttrs(r.tone)}>${cell('item-marker num', r.cells[0], o)}${cell('item-title', r.cells[1], o)}${cell('item-detail', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
       return `<li class="item">${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
     })
     .join('');
@@ -247,11 +247,18 @@ function degraded(d: Degraded): string {
   return `<figure class="block block-degraded" data-code="${d.code}"><figcaption class="degraded-fix">${escape(d.fix)}</figcaption><pre class="media"><code>${escape(d.raw)}</code></pre></figure>`;
 }
 
-/** The closed markdown subset: ATX headings, paragraphs, flat lists, a rule, and inline spans. */
+/**
+ * The closed markdown subset: ATX headings, paragraphs, flat lists, a rule, and inline spans.
+ * A BLANK LINE ends a paragraph; a newline does not — see the note in Markdown.svelte, and the
+ * `a11y-tree` parity gate is what keeps these two in step.
+ */
 function markdown(m: Markdown, o: RenderOptions): string {
   const out: string[] = [];
   let bullets: string[] = [];
+  let para: string[] = [];
   const flush = () => {
+    if (para.length) out.push(`<p class="measure">${renderInline(inline(para.join(' '), o), o)}</p>`);
+    para = [];
     if (bullets.length) out.push(`<ul class="prose-list measure">${bullets.join('')}</ul>`);
     bullets = [];
   };
@@ -275,11 +282,12 @@ function markdown(m: Markdown, o: RenderOptions): string {
     }
     const li = /^[-*]\s+(.*)$/.exec(line);
     if (li) {
+      if (para.length) flush();
       bullets.push(`<li>${renderInline(inline(li[1]!, o), o)}</li>`);
       continue;
     }
-    flush();
-    out.push(`<p class="measure">${renderInline(inline(line, o), o)}</p>`);
+    if (bullets.length) flush();
+    para.push(line);
   }
   flush();
   return out.join('');
