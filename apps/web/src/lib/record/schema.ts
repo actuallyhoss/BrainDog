@@ -89,6 +89,21 @@ export type Entry = {
 export type PageBlock = {
   kind: string;
   heading?: string;
+  /**
+   * How many of the page's twelve columns this block takes. 1–12, default 12 (06 §1.1).
+   *
+   * COLUMNS, AND NOTHING ELSE. There is no x, no y, no height and no pixel anywhere in this type,
+   * and that is the whole design rather than an omission. 21 §3.1 rejects free placement on
+   * measured evidence: in Home Assistant's masonry a ONE-PIXEL height difference could move a card
+   * from the leftmost column to the rightmost, and people lost their spatial memory of where a
+   * control lived. Blocks flow in declaration order, so a layout cannot have a hole in it, cannot
+   * reflow when a query returns one more row, and collapses to one column on a phone by keeping
+   * the only thing that carried meaning — the order.
+   *
+   * Height is deliberately absent too. What a person means by "make it taller" is "show me more
+   * rows", and that is `limit` — a number that survives a font-size change, a density change and a
+   * phone, where a pixel height does not.
+   */
   span?: number;
   source?: string;
   where?: string;

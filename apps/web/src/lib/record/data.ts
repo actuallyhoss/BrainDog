@@ -378,6 +378,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'stat',
         heading: 'Right now',
+        span: 12,
         cells: [
           { metric: 'owed-to-you', label: 'Owed to you' },
           { metric: 'due-30d', label: 'Due in 30 days' },
@@ -387,6 +388,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'table',
         heading: 'Owed to you',
+        span: 12,
         source: 'register.obligations',
         where: 'direction is owed to me, state is open or part',
         columns: [
@@ -404,12 +406,14 @@ export const PAGES: Record<string, PageDecl> = {
         kind: 'note',
         tone: 'bad',
         heading: 'Late',
+        span: 5,
         body: 'One invoice is {{ago:obligations.oldest_overdue}} past its terms. UK statutory interest is 8% above base, and the clause is in the Halden contract.',
         drawn: true,
       },
       {
         kind: 'bar',
         heading: 'Owed by you, by counterparty',
+        span: 7,
         source: 'register.obligations',
         where: 'direction is owed by me, state is open',
         empty: 'You owe nobody anything.',
@@ -417,6 +421,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'table',
         heading: 'Owed by you',
+        span: 12,
         source: 'register.obligations',
         where: 'direction is owed by me, state is open or part',
         columns: [
@@ -442,6 +447,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'stat',
         heading: 'Renewals',
+        span: 12,
         cells: [
           { metric: 'renews-30d', label: 'Renews in 30 days' },
           { metric: 'estate-year', label: 'Cost per year' },
@@ -451,12 +457,14 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'timeline',
         heading: 'Next ninety days',
+        span: 6,
         source: 'register.services',
         empty: 'Nothing renews in the next ninety days.',
       },
       {
         kind: 'table',
         heading: 'Everything',
+        span: 6,
         source: 'register.services',
         columns: [
           { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)', link: true },
@@ -473,6 +481,7 @@ export const PAGES: Record<string, PageDecl> = {
         kind: 'note',
         tone: 'warn',
         heading: 'Points at nothing',
+        span: 12,
         body: 'Two domains resolve to nothing and still renew. `tallow.example` costs {{money:1400 GBP}} a year to point at an empty page.',
         drawn: true,
       },
@@ -489,12 +498,14 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'board',
         heading: 'By state',
+        span: 12,
         source: 'register.tasks',
         empty: 'Nothing open.',
       },
       {
         kind: 'table',
         heading: 'Everything open',
+        span: 12,
         source: 'register.tasks',
         columns: [
           { field: 'seq', label: '#', width: '9ch', align: 'end' },

@@ -87,6 +87,19 @@ export type KindSpec = {
   indented?: boolean;
   /** Bound to a register rather than to authored rows, so it cannot appear in a write-up. */
   pageOnly?: boolean;
+  /**
+   * The narrowest `span` this kind stays legible at, out of the page's twelve columns.
+   *
+   * NOT a taste value and not a per-page decision — it is 13 §4.1's three width classes made
+   * enforceable. Width is a property of the KIND: `measure` for prose, `room` for anything with its
+   * own internal columns, `content` for a short drawn thing. A `table` at span 3 is eight columns in
+   * a quarter of a page, which is not a narrow table — it is an unreadable one, and the person who
+   * dragged it there gets no signal that they broke it.
+   *
+   * So the size control REFUSES below this rather than clamping silently. 21 §11: caps are counters,
+   * not discoveries, and a closed list's control cannot express a non-member.
+   */
+  minSpan: number;
 };
 
 /**
@@ -100,33 +113,33 @@ export type KindSpec = {
  */
 const TABLE = {
   /* Prose and emphasis */
-  note: { primitive: 'panel', cells: 0, tone: true, prose: true },
-  quote: { primitive: 'panel', cells: 2, tone: false, rows: 1 },
+  note: { primitive: 'panel', cells: 0, tone: true, prose: true, minSpan: 4 },
+  quote: { primitive: 'panel', cells: 2, tone: false, rows: 1, minSpan: 4 },
 
   /* Figures */
-  stat: { primitive: 'grid', cells: 3, tone: true, rows: 6 },
-  bar: { primitive: 'proportional', cells: 3, tone: true, hole: true },
-  gauge: { primitive: 'proportional', cells: 3, tone: true, rows: 1 },
-  chips: { primitive: 'inline', cells: 3, tone: true },
+  stat: { primitive: 'grid', cells: 3, tone: true, rows: 6, minSpan: 4 },
+  bar: { primitive: 'proportional', cells: 3, tone: true, hole: true, minSpan: 4 },
+  gauge: { primitive: 'proportional', cells: 3, tone: true, rows: 1, minSpan: 4 },
+  chips: { primitive: 'inline', cells: 3, tone: true, minSpan: 3 },
 
   /* Rows — `spec` is the workhorse: 194 of 7,138 rendered lines in the predecessor's census, and
      no writing guide said so (05 §7.4). */
-  spec: { primitive: 'rows', cells: 3, tone: false },
-  params: { primitive: 'rows', cells: 3, tone: false },
+  spec: { primitive: 'rows', cells: 3, tone: false, minSpan: 4 },
+  params: { primitive: 'rows', cells: 3, tone: false, minSpan: 4 },
 
   /* Work */
-  todo: { primitive: 'list', cells: 2, tone: false, checkbox: true },
-  steps: { primitive: 'list', cells: 3, tone: false, ordered: true },
-  timeline: { primitive: 'list', cells: 3, tone: true },
-  board: { primitive: 'grid', cells: 3, tone: false },
+  todo: { primitive: 'list', cells: 2, tone: false, checkbox: true, minSpan: 3 },
+  steps: { primitive: 'list', cells: 3, tone: false, ordered: true, minSpan: 4 },
+  timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4 },
+  board: { primitive: 'grid', cells: 3, tone: false, minSpan: 6 },
 
   /* Technical */
-  code: { primitive: 'media', cells: 0, tone: false, verbatim: true },
-  tree: { primitive: 'media', cells: 0, tone: false, verbatim: true, indented: true },
-  comparison: { primitive: 'table', cells: 0, tone: false, header: true },
+  code: { primitive: 'media', cells: 0, tone: false, verbatim: true, minSpan: 4 },
+  tree: { primitive: 'media', cells: 0, tone: false, verbatim: true, indented: true, minSpan: 4 },
+  comparison: { primitive: 'table', cells: 0, tone: false, header: true, minSpan: 6 },
 
   /* Register-bound */
-  table: { primitive: 'table', cells: 0, tone: false, pageOnly: true },
+  table: { primitive: 'table', cells: 0, tone: false, pageOnly: true, minSpan: 6 },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;
