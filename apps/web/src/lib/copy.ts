@@ -29,6 +29,20 @@ export const copy = {
   audit: 'Audit',
   more: 'More',
   close: 'Close',
+
+  /* Arranging a page. Verb + Noun on every action, and the mode's own name is a verb: you are
+     doing something to the page, not entering a place. */
+  arrange: 'Arrange',
+  arrangeDone: 'Done',
+  arrangeCancel: 'Cancel',
+  width: 'Width',
+  moveUp: 'Move up',
+  moveDown: 'Move down',
+  removeBlock: 'Remove this block',
+  addBlock: 'Add a block',
+  arrangedNotSaved: (title: string) =>
+    `${title} rearranged here. Nothing was written — this is a mock-up of the record.`,
+  arrangeNothing: 'Nothing moved.',
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
   newRecord: 'New record',

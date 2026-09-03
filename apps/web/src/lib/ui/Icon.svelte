@@ -52,6 +52,12 @@
     tag: 'M3 11V4h7l11 11-7 7zM7.2 7.2h.01',
     bell: 'M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 19a2 2 0 0 0 4 0',
     session: 'M3 5h18v13H3zM7.5 9.5l2.5 2.5-2.5 2.5M12.5 14.5h4',
+    /* Arranging. `drag` is the six-dot grip every list in every product uses; borrowing the
+       convention is the point — a novel handle is a handle nobody grabs. */
+    drag: 'M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01',
+    arrowUp: 'M12 19V5m-6 6 6-6 6 6',
+    arrowDown: 'M12 5v14m6-6-6 6-6-6',
+    grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   } as const;
 
   export type IconName = keyof typeof PATHS;
@@ -92,6 +98,14 @@
     <circle cx="17.5" cy="14.5" r="0.7" fill="currentColor" stroke="none" />
   {/if}
   {#if name === 'tag'}<circle cx="7.2" cy="7.2" r="1.2" fill="currentColor" stroke="none" />{/if}
+  <!-- Six dots, drawn as dots. A `M9 5h.01` with a round cap paints a dot in every browser, but a
+       real circle is what a screen magnifier resamples cleanly. -->
+  {#if name === 'drag'}
+    {#each [5, 12, 19] as y}
+      <circle cx="9" cy={y} r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15" cy={y} r="1.4" fill="currentColor" stroke="none" />
+    {/each}
+  {/if}
 </svg>
 
 <style>

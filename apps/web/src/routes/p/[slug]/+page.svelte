@@ -13,7 +13,7 @@
 <script lang="ts">
   import { KINDS, isKind } from 'braindog-render';
   import { Block, Table } from 'braindog-render/svelte';
-  import { page as state } from '$app/state';
+  import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { page as readPage, values, type BlockResult } from '$lib/record/api.ts';
   import { toSegments } from '$lib/record/blocks.ts';
@@ -22,10 +22,13 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import BlockBar from '$lib/ui/BlockBar.svelte';
+  import { Arrangement } from '$lib/record/arrange.svelte.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
 
-  const slug = $derived(state.params.slug ?? '');
+  const slug = $derived(route.params.slug ?? '');
   const result = $derived(readPage(slug));
-  const showSource = $derived(state.url.searchParams.get('src') === '1');
+  const showSource = $derived(route.url.searchParams.get('src') === '1');
   const resolved = values();
 
   /** Every `{{path}}` is resolved server-side and handed over; a missing value is an em dash. */
@@ -45,6 +48,56 @@
     const floor = isKind(block.kind) ? KINDS[block.kind].minSpan : 4;
     return Math.min(12, Math.max(floor, block.span ?? 12));
   };
+
+  /* ── arranging ─────────────────────────────────────────────────────────────
+     A MODE, not an always-on affordance. Drag handles on a page you are reading are noise, and an
+     accidental drag that rewrites a row is the kind of edit nobody can attribute later. */
+  const arrangement = new Arrangement();
+  const arranging = $derived(arrangement.editing);
+
+  /**
+   * The blocks in the order and at the widths currently in force, each carrying the index it had in
+   * the declaration.
+   *
+   * `slot.span` is authoritative whether or not the mode is open — it falls back to the declared
+   * span when there is no arrangement. The template read `arranging ? slot.span : spanOf(block)`
+   * once, which meant Done kept the ORDER and silently threw away every width: the layout you
+   * confirmed was not the layout you got.
+   */
+  const laid = $derived.by(() => {
+    const blocks = result?.blocks ?? [];
+    const slots = arrangement.slots ?? blocks.map((b, i) => ({ i, span: spanOf(b) }));
+    return slots
+      .map((slot) => ({ slot, block: blocks[slot.i] }))
+      .filter((x): x is { slot: { i: number; span: number }; block: BlockResult } => Boolean(x.block));
+  });
+
+  function beginArrange() {
+    arrangement.begin((result?.blocks ?? []).map((b, i) => ({ i, span: spanOf(b) })));
+  }
+
+  /**
+   * ONE write, one event batch, one undo — even for four moves.
+   *
+   * 02 §8 makes an `edit` one event row per changed FIELD, all sharing one `batch` ULID, and undo is
+   * a query over that batch. Committing per drag would put four unrelated lines in the audit log
+   * for one act of tidying, and leave no single thing to undo.
+   */
+  function commitArrange() {
+    if (!arrangement.dirty) {
+      arrangement.cancel();
+      toasts.push(copy.arrangeNothing);
+      return;
+    }
+    const undo = arrangement.commit();
+    /* The layout STAYS. In the real client this is where `setDeclaration({ body })` goes; here the
+       toast says plainly that nothing was written, because a mock that pretends to have saved is a
+       mock that will be believed. */
+    toasts.push(copy.arrangedNotSaved(result?.page.title ?? slug), { intent: 'warn', undo });
+  }
+
+  /** Held while a handle is down, so the drop target knows what is moving. */
+  let dragging = $state<number | null>(null);
 
   const declaration = $derived(
     result
@@ -80,31 +133,79 @@
 {:else}
   <PageHead kicker={result.page.nav?.section} title={result.page.title}>
     {#snippet actions()}
-      <Button weight="bare" href="?src={showSource ? '0' : '1'}">
-        <Icon name="copy" size="s" />
-        {showSource ? 'Page' : 'Source'}
-        <Kbd keys="⇧E" />
-      </Button>
+      {#if arranging}
+        <Button weight="bare" onclick={() => arrangement.cancel()}>{copy.arrangeCancel}</Button>
+        <Button weight="primary" onclick={commitArrange}>{copy.arrangeDone}</Button>
+      {:else}
+        <Button weight="bare" href="?src={showSource ? '0' : '1'}">
+          <Icon name="copy" size="s" />
+          {showSource ? 'Page' : 'Source'}
+          <Kbd keys="⇧E" />
+        </Button>
+        {#if !showSource}
+          <Button weight="quiet" onclick={beginArrange}>
+            <Icon name="grid" size="s" />
+            {copy.arrange}
+          </Button>
+        {/if}
+      {/if}
     {/snippet}
   </PageHead>
 
-  <div class="page">
+  <!-- A LIST while arranging, and nothing while reading. The blocks become a reorderable list only
+       in the mode where they are reorderable; announcing "list, 5 items" to somebody reading a page
+       is describing the furniture. -->
+  <div class="page" role={arranging ? 'list' : undefined}>
     {#if showSource}
       <!-- The declaration as diffable text. A page is a row, so this is the row (19 §2). -->
       <pre class="source"><code>{declaration}</code></pre>
     {:else}
-      {#each result.blocks as block, i}
+      {#each laid as { slot, block }, at (slot.i)}
         <!-- `drawn: false` means the server evaluated `when:` and said no. A page that shows a
              warning that does not apply teaches people to ignore warnings (06 §1). -->
         {#if block.drawn}
           <section
             class="block-slot"
-            id="b-{i + 1}"
-            aria-labelledby="h-{i + 1}"
-            style="--span:{spanOf(block)}"
+            id="b-{slot.i + 1}"
+            aria-labelledby="h-{slot.i + 1}"
+            style="--span:{slot.span}"
+            data-arranging={arranging ? '' : undefined}
+            role={arranging ? 'listitem' : undefined}
+            data-dragging={dragging === at ? '' : undefined}
+            draggable={arranging}
+            ondragstart={() => (dragging = at)}
+            ondragend={() => (dragging = null)}
+            ondragover={(e) => arranging && e.preventDefault()}
+            ondrop={(e) => {
+              e.preventDefault();
+              if (dragging !== null) arrangement.move(dragging, at);
+              dragging = null;
+            }}
+            onkeydown={(e) => {
+              /* `⌥↑` / `⌥↓` — WCAG 2.5.7's single-pointer alternative, and it calls the same
+                 `move` the drag calls rather than re-implementing it.
+                 
+                 No `tabindex` on the section: keydown BUBBLES from whichever control inside it has
+                 focus — the handle, a width button, Move up. A listitem that is itself a tab stop
+                 puts a stop in the sequence that does nothing when you land on it. */
+              if (!arranging || !e.altKey) return;
+              if (e.key === 'ArrowUp') { e.preventDefault(); arrangement.move(at, at - 1); }
+              if (e.key === 'ArrowDown') { e.preventDefault(); arrangement.move(at, at + 1); }
+            }}
           >
+            {#if arranging}
+              <BlockBar
+                kind={block.kind}
+                span={slot.span}
+                {at}
+                count={laid.length}
+                onmove={(to) => arrangement.move(at, to)}
+                onspan={(span) => arrangement.setSpan(at, span)}
+                onremove={() => arrangement.remove(at)}
+              />
+            {/if}
             <header class="block-bar">
-              <h2 class="block-name" id="h-{i + 1}">{block.heading ?? block.kind}</h2>
+              <h2 class="block-name" id="h-{slot.i + 1}">{block.heading ?? block.kind}</h2>
               {#if block.register}
                 <a class="block-source" href="/r/{block.register}">
                   {block.register}
@@ -232,6 +333,32 @@
      were applying, so every gap on a declared page was 48px where the token says 24. */
   .block-slot :global(.block) {
     margin-block-end: 0;
+  }
+
+  /* ── arranging ────────────────────────────────────────────────────────────
+     The block is outlined rather than lifted. A card that grows a shadow the moment a mode opens
+     tells you the mode changed the page; an outline tells you the mode changed what you can do TO
+     the page, which is the true thing. */
+  .block-slot[data-arranging] {
+    outline: 1px dashed var(--edge);
+    outline-offset: var(--sp-2);
+    border-radius: var(--r-sm);
+    cursor: grab;
+  }
+
+  /* The one moving. Half-visible rather than hidden, so the row you are dragging out of does not
+     collapse and re-lay-out under the pointer. */
+  .block-slot[data-dragging] {
+    opacity: 0.45;
+    outline-style: solid;
+    outline-color: var(--accent);
+  }
+
+  /* A page being arranged is a page whose content is not the point. Dimming the blocks themselves
+     puts the controls in front without moving anything — no scale, no lift, no reflow. */
+  .block-slot[data-arranging] :global(.block) {
+    opacity: 0.65;
+    pointer-events: none;
   }
 
   /* ONE COLUMN below 900px, in declaration order.
