@@ -119,6 +119,7 @@
         nav={data.nav}
         pen={data.pen}
         record={data.index.name}
+        records={data.me.records}
         registers={data.index.registers}
         open={data.questions.length}
         inbox={data.inbox}

@@ -29,6 +29,9 @@ export const copy = {
   audit: 'Audit',
   more: 'More',
   close: 'Close',
+  switchRecord: 'Switch record',
+  recordSettings: 'Record settings',
+  newRecord: 'New record',
 
   /* Toasts. Past tense, the row named, and the undo is the sentence's point — never "Row archived
      successfully", which reports on the software rather than on the record. */

@@ -396,7 +396,18 @@ export function boot() {
     nav,
     /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */
     pen: Object.values(PAGES).filter((p) => p.placed === false),
-    me: { person: 'you', level: 'owner' as const, owner: true, records: [{ slug: 'the-studio', name: 'The Studio' }] },
+    me: {
+      person: 'you',
+      level: 'owner' as const,
+      owner: true,
+      /* Two, because a switcher over a list of one is a control that can only ever confirm what you
+         already know. The second is somebody else's record you have read access to, which is the
+         case the level badge exists for. */
+      records: [
+        { slug: 'the-studio', name: 'The Studio', level: 'owner' as const },
+        { slug: 'pell-vine', name: 'Pell & Vine', level: 'read' as const },
+      ],
+    },
     people: PEOPLE_ACCESS,
     questions: QUESTIONS,
     whatsNew: NEWS,

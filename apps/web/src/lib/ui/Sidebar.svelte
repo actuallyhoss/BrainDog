@@ -34,11 +34,13 @@
   import type { NavEntry } from '../record/api.ts';
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
   import Icon, { type IconName } from './Icon.svelte';
+  import Menu from './Menu.svelte';
 
   let {
     nav,
     pen,
     record,
+    records = [],
     registers,
     open = 0,
     inbox = 0,
@@ -46,6 +48,7 @@
     nav: NavEntry[];
     pen: PageDecl[];
     record: string;
+    records?: { slug: string; name: string; level: string }[];
     registers: { id: string; name: string; count: number; icon: IconName }[];
     open?: number | undefined;
     inbox?: number | undefined;
@@ -72,11 +75,30 @@
        the thing you are inside is worth more here than the name of the software you are inside: you
        chose the software once, and you switch records every day. -->
   <div class="top">
-    <button type="button" class="record tap">
-      <span class="record-avatar" aria-hidden="true">{record.slice(0, 1)}</span>
-      <span class="record-name">{record}</span>
-      <Icon name="chevronDown" size="s" />
-    </button>
+    <Menu label={copy.switchRecord}>
+      {#snippet trigger()}
+        <span class="record">
+          <span class="record-avatar" aria-hidden="true">{record.slice(0, 1)}</span>
+          <span class="record-name">{record}</span>
+          <Icon name="chevronDown" size="s" />
+        </span>
+      {/snippet}
+
+      {#each records as r}
+        <a class="mi" role="menuitem" href="/" aria-current={r.name === record ? 'true' : undefined}>
+          <span class="mi-avatar" aria-hidden="true">{r.name.slice(0, 1)}</span>
+          <span class="mi-name">{r.name}</span>
+          <!-- The level is on the ROW, not on a settings screen. Which record you are in and what
+               you are allowed to do in it are one fact, and separating them is how somebody edits
+               the wrong record's rows. -->
+          {#if r.level !== 'owner'}<span class="mi-level">{r.level}</span>{/if}
+          {#if r.name === record}<Icon name="check" size="s" />{/if}
+        </a>
+      {/each}
+      <hr class="mi-rule" />
+      <a class="mi" role="menuitem" href="/settings/identity"><Icon name="settings" size="s" />{copy.recordSettings}</a>
+      <a class="mi" role="menuitem" href="/start"><Icon name="plus" size="s" />{copy.newRecord}</a>
+    </Menu>
   </div>
 
   <!-- The spine. Home, Decide and Inbox are the three surfaces whose absence would make this a
@@ -193,10 +215,8 @@
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    inline-size: 100%;
     min-block-size: 44px;
     padding: 0 var(--sp-2);
-    background: none;
     border: 1px solid transparent;
     border-radius: var(--r-md);
     color: var(--ink);
@@ -204,16 +224,82 @@
     font-size: 17px;
     font-weight: 600;
     letter-spacing: -0.018em;
-    text-align: start;
-    cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
       border-color var(--d-state) var(--ease-out);
   }
 
-  .record:hover {
+  :global(.menu-trigger:hover) .record,
+  :global(.menu-trigger[aria-expanded='true']) .record {
     background: color-mix(in srgb, var(--ink) 5%, transparent);
     border-color: var(--line);
+  }
+
+  /* The menu rows. Same 32px height and same tint-on-hover as a rail item, because they are the
+     same kind of thing: a list of places, one of which you are in. */
+  .mi {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: 34px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-ui);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .mi:hover,
+  .mi:focus-visible {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    color: var(--ink);
+  }
+
+  .mi[aria-current] {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .mi :global(.icon) {
+    color: var(--dim);
+  }
+
+  .mi-avatar {
+    display: grid;
+    place-items: center;
+    inline-size: 20px;
+    block-size: 20px;
+    flex: none;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border-radius: var(--r-sm);
+    color: var(--accent-text);
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .mi-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mi-level {
+    padding: 1px 6px;
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    border-radius: var(--r-sm);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 600;
+  }
+
+  .mi-rule {
+    margin: 4px 0;
+    border: 0;
+    border-block-start: 1px solid var(--line);
   }
 
   .record-avatar {
