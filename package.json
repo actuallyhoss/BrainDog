@@ -11,10 +11,12 @@
     "typecheck": "pnpm -r run typecheck",
     "gates": "node tools/gates/run.mjs",
     "dev": "pnpm --filter @braindog/web dev",
-    "build": "pnpm --filter @braindog/web build",
+    "build": "pnpm -r --workspace-concurrency=1 run build",
     "shots": "pnpm --filter @braindog/web exec node scripts/shot.mjs",
     "theme": "pnpm --filter @braindog/skin theme",
-    "proof": "pnpm --filter @braindog/theme run proof"
+    "proof": "pnpm --filter @braindog/theme run proof",
+    "dev:site": "pnpm --filter @braindog/site dev",
+    "shots:site": "pnpm --filter @braindog/site exec node scripts/shot.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

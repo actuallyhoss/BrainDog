@@ -1,0 +1,26 @@
+/**
+ * The site's own half of the stylesheet. Everything else is `@braindog/skin`.
+ *
+ * Two rules, and both are the site being a DOCUMENT where the app is an application: the page
+ * scrolls (the app is one inner scroll container), and the ground is the work surface rather than
+ * the desk the chrome sits on — there is no chrome here to sit on it.
+ */
+
+@layer components {
+  html {
+    background: var(--bg);
+    scroll-behavior: smooth;
+  }
+
+  /* Somebody who has asked their system to stop animating things did not mean "except when I click
+     an anchor". */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background: var(--bg);
+  }
+}

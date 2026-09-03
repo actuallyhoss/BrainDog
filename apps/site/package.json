@@ -1,0 +1,26 @@
+{
+  "name": "@braindog/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "description": "brain.dog — the marketing site. Prerendered, no JavaScript required to read it.",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "pnpm --filter @braindog/skin theme && vite build",
+    "preview": "vite preview",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "svelte": "5.57.0"
+  },
+  "devDependencies": {
+    "@braindog/skin": "workspace:*",
+    "@sveltejs/adapter-static": "3.0.10",
+    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
+    "svelte-check": "4.7.6",
+    "typescript": "6.0.3",
+    "vite": "8.2.2"
+  }
+}
