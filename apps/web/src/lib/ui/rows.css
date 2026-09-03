@@ -49,6 +49,19 @@
     padding-block: var(--sp-3);
   }
 
+  /* A tall row has room for two lines, so its detail wraps rather than truncating. An ellipsis in
+     the middle of the sentence explaining why a decision is expensive is the one place truncation
+     costs the reader the whole point of the row. */
+  .line-tall .line-detail {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
   .line-short {
     min-block-size: 34px;
   }

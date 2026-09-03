@@ -78,7 +78,6 @@
             </button>
           {/each}
         </div>
-        <p class="hint">System is always one press away, in both directions.</p>
       </Section>
 
       <Section title={copy.textSize}>
@@ -92,10 +91,6 @@
             >
           {/each}
         </div>
-        <p class="hint">
-          The scale is fixed at eight steps and this picks the body one. Raising a type scale is not
-          a fix for a hard-to-read screen — the fault is in what it says and how it is arranged.
-        </p>
       </Section>
 
       <Section title={copy.density}>
@@ -109,7 +104,6 @@
             >
           {/each}
         </div>
-        <p class="hint">Row height only. Target size follows the pointer, never the width.</p>
       </Section>
     {:else if area === 'keyboard'}
       <Section title={copy.characterKeys}>
@@ -117,13 +111,6 @@
           <button type="button" class="seg" data-on={chars ? '' : undefined} onclick={() => (chars = true)}>{copy.on}</button>
           <button type="button" class="seg" data-on={!chars ? '' : undefined} onclick={() => (chars = false)}>{copy.off}</button>
         </div>
-        <p class="hint">{copy.characterKeysHint}</p>
-      </Section>
-      <Section title="The keymap">
-        <p class="hint">
-          Press <kbd class="k">?</kbd> anywhere. The sheet is read from the binding registry, so it cannot
-          drift from what is bound.
-        </p>
       </Section>
     {:else if area === 'navigation'}
       <Section title="Suggested pages" count={pen.length}>
@@ -146,10 +133,6 @@
             {/each}
           </ul>
         {/if}
-        <p class="hint">
-          The system never writes nav order after first install. A controlled study measured static
-          menus faster than adaptive ones, and Microsoft shipped the alternative and withdrew it.
-        </p>
       </Section>
     {:else if area === 'people'}
       <Section title="Who can see this record" count={PEOPLE_ACCESS.length}>
@@ -168,19 +151,11 @@
       </Section>
     {:else if area === 'export'}
       <Section title="Your data">
-        <p class="hint">
-          A single file you can open with tooling you already have. <code class="k">.dog</code> is a
-          SQLite database with an application id, and self-hosting is a real option.
-        </p>
         <div class="row-actions"><Button>Export the record</Button><Button weight="bare">Verify a `.dog`</Button></div>
       </Section>
       <Section title="Danger">
         <div class="danger">
           <p class="danger-title">Delete this record</p>
-          <p class="hint">
-            Re-authentication, and the slug typed to confirm. There is no undo and no thirty-day
-            grace: the export above is the grace.
-          </p>
           <Button tone="bad">Delete the studio</Button>
         </div>
       </Section>
@@ -203,7 +178,7 @@
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr);
     gap: var(--sp-5);
-    padding: var(--sp-4) var(--sp-5) var(--sp-7);
+    padding: var(--sp-5) var(--sp-6) var(--sp-9);
     max-inline-size: 1100px;
   }
 
@@ -275,21 +250,7 @@
     color: var(--ink);
   }
 
-  .hint {
-    margin-block-start: var(--sp-2);
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-ui);
-  }
 
-  .k {
-    padding: 1px 5px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-  }
 
   .row-actions {
     display: flex;
@@ -321,7 +282,7 @@
   @media (width < 900px) {
     .shell {
       grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-3) var(--sp-3) var(--sp-7);
+      padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
 
     .areas {

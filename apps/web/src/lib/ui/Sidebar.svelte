@@ -161,18 +161,14 @@
 </nav>
 
 <style>
-  /* Chrome sinks. The rail is the one surface below the page, so the body reads as a sheet lifted
-     off the desk — depth from the luminance ladder, never from a blur (13 §2.1). */
+  /* The rail sits ON the canvas with no fill and no border of its own. It is dimmer than the panel
+     on purpose: the navigation is how you get to the work, and the work is what should be bright. */
   .rail {
-    position: sticky;
-    inset-block-start: 0;
     display: flex;
     flex-direction: column;
     inline-size: var(--rail);
     block-size: 100dvh;
-    padding: var(--sp-4) var(--sp-2) var(--sp-2);
-    background: var(--sunk);
-    border-inline-end: 1px solid var(--line);
+    padding: var(--sp-4) var(--sp-3) var(--sp-3) var(--sp-4);
   }
 
   .top {
@@ -258,11 +254,11 @@
   .item {
     display: flex;
     align-items: center;
-    gap: 9px;
-    min-block-size: 30px;
-    padding: 0 var(--sp-2);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
+    gap: 10px;
+    min-block-size: 34px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-md);
+    color: var(--dim);
     font-size: var(--t-ui);
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
@@ -270,14 +266,13 @@
 
   .item:hover {
     background: color-mix(in srgb, var(--ink) 6%, transparent);
-    color: var(--ink);
+    color: var(--ink2);
   }
 
-  /* The current item is a filled pill with a raised top edge — the same depth cue every other
-     raised surface uses, so "here" reads as one of the app's own materials. */
+  /* "Here" is the one thing in the rail drawn at full ink. No fill, no shadow: the panel beside it
+     is already the brightest thing on screen, and a second bright object competes with it. */
   .item[aria-current='page'] {
-    background: var(--s2);
-    box-shadow: var(--raise);
+    background: color-mix(in srgb, var(--ink) 9%, transparent);
     color: var(--ink);
     font-weight: 500;
   }

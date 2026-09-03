@@ -23,7 +23,7 @@
   let diff = $state<string | null>(null);
 </script>
 
-<PageHead title={copy.packs} subtitle={copy.packBlurb} />
+<PageHead title={copy.packs} />
 
 <div class="page">
   <Section title={copy.installed} count={installed.length}>
@@ -84,7 +84,7 @@ an update that would move something is shown here and then ignored.`}</code></pr
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding: var(--sp-4) var(--sp-5) var(--sp-7);
+    padding: var(--sp-5) var(--sp-6) var(--sp-9);
     max-inline-size: 1100px;
   }
 
@@ -181,7 +181,7 @@ an update that would move something is shown here and then ignored.`}</code></pr
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-3) var(--sp-3) var(--sp-7);
+      padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
 
     .grid-packs {

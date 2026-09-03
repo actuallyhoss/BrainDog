@@ -77,9 +77,6 @@
         </div>
       </form>
 
-      <p class="hint">
-        A register is <em>{copy.defRegister}</em>. You can add the rest later, and delete this one.
-      </p>
     {/if}
   </div>
 </div>

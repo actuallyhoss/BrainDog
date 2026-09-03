@@ -73,7 +73,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-    padding: var(--sp-4) var(--sp-5) var(--sp-7);
+    padding: var(--sp-5) var(--sp-6) var(--sp-9);
     max-inline-size: 900px;
   }
 
@@ -138,7 +138,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-3) var(--sp-3) var(--sp-7);
+      padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
   }
 </style>

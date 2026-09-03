@@ -187,28 +187,32 @@ export function normalise(seed: string): Lch {
   return c;
 }
 
-/** Step 1. Dark ascends from a floor; light anchors at the TOP and descends (39 D2). */
+/**
+ * Step 1. The ladder is NOT evenly spaced, and that is the whole of it.
+ *
+ * `sunk` is the canvas the application chrome sits on, and `bg` is the panel the work sits in. The
+ * gap between those two is large; every step above `bg` is small. An evenly-spaced ladder makes
+ * five greys that all read as "a box", which is what a screen full of boxes is made of. One decisive
+ * lift and then near-nothing makes the work surface the thing you look at, and leaves hierarchy
+ * inside it to space and type weight rather than to more grey.
+ *
+ * Light has no headroom above white, so the canvas moves down instead of the panel moving up. Same
+ * shape, same monotonic ladder (check H), opposite anchor (39 D2).
+ */
+const LADDER: Record<Scheme, Record<(typeof SURFACES)[number], number>> = {
+  dark: { sunk: 0.07, bg: 0.175, s1: 0.205, s2: 0.225, s3: 0.245 },
+  light: { sunk: 0.905, bg: 0.972, s1: 0.983, s2: 0.991, s3: 0.998 },
+};
+
 function ground(scheme: Scheme, hue: number, chroma: number): Record<(typeof SURFACES)[number], string> {
   const C = Math.min(chroma, 0.008); // a whisper of hue, never a coloured surface
-  if (scheme === 'dark') {
-    const bg = 0.16;
-    const step = 0.028;
-    return {
-      sunk: hex({ L: bg - step, C, H: hue }),
-      bg: hex({ L: bg, C, H: hue }),
-      s1: hex({ L: bg + step, C, H: hue }),
-      s2: hex({ L: bg + step * 2, C, H: hue }),
-      s3: hex({ L: bg + step * 3, C, H: hue }),
-    };
-  }
-  const top = 0.99;
-  const step = 0.022;
+  const rung = LADDER[scheme];
   return {
-    s3: hex({ L: top, C, H: hue }),
-    s2: hex({ L: top - step, C, H: hue }),
-    s1: hex({ L: top - step * 2, C, H: hue }),
-    bg: hex({ L: top - step * 3, C, H: hue }),
-    sunk: hex({ L: top - step * 4, C, H: hue }),
+    sunk: hex({ L: rung.sunk, C, H: hue }),
+    bg: hex({ L: rung.bg, C, H: hue }),
+    s1: hex({ L: rung.s1, C, H: hue }),
+    s2: hex({ L: rung.s2, C, H: hue }),
+    s3: hex({ L: rung.s3, C, H: hue }),
   };
 }
 
@@ -269,11 +273,14 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     string, string, string, string,
   ];
 
-  /* 3 · boundaries. `line` is decorative with no floor, but must not be confusable with `edge`. */
-  const edgeC = solveL(profile.edge, Cink, nHue, worst, dir);
-  const lineL = scheme === 'dark' ? edgeC.L - 0.07 : edgeC.L + 0.07;
-  const edge = hex(edgeC);
-  const line = hex({ L: lineL, C: Cink, H: nHue });
+  /* 3 · boundaries. `edge` is load-bearing at 3:1; `line` is decorative and has no floor at all.
+     `line` is solved as a RATIO AGAINST THE PANEL rather than as an offset from `edge`, and it is
+     deliberately near-invisible — 1.45:1, which is a hairline you notice only when you look for it.
+     Deriving it from `edge` made every divider in the product a quarter as strong as a load-bearing
+     border, which is how a dense screen turns into a grid of visible boxes. A separator's job is to
+     be findable, not to be seen. */
+  const edge = hex(solveL(profile.edge, Cink, nHue, worst, dir));
+  const line = hex(solveL(1.35, Cink, nHue, rgb(g.bg), dir));
 
   /* 4 · accent. The fill is the seed; the text role is solved, and may sit well above 4.5. */
   const accent = hex(gamutMap(acc));

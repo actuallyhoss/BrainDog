@@ -21,10 +21,8 @@
 </script>
 
 <PageHead
-  kicker={copy.rankedBy}
   title={copy.decide}
   count={open.length}
-  subtitle="An agent lays out the options and never chooses. You choose, and it becomes a numbered row with a reason attached to it."
 />
 
 <div class="page">
@@ -48,7 +46,7 @@
                   <span class="q-age">opened {relative(q.opened.slice(0, 10), NOW)}</span>
                 </span>
                 <span class="q-title">{q.title}</span>
-                <span class="q-cost"><span class="q-cost-label">{copy.costOfDelay}</span>{q.cost}</span>
+                <span class="q-cost">{q.cost}</span>
                 <span class="q-options">
                   {#each q.options as o}<span class="q-option">{o.title}</span>{/each}
                 </span>
@@ -86,7 +84,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding: var(--sp-4) var(--sp-5) var(--sp-7);
+    padding: var(--sp-5) var(--sp-6) var(--sp-9);
     max-inline-size: 980px;
   }
 
@@ -171,13 +169,6 @@
     font-size: var(--t-ui);
   }
 
-  .q-cost-label {
-    margin-inline-end: var(--sp-2);
-    color: var(--warn);
-    font-size: var(--t-xs);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
 
   .q-options {
     display: flex;
@@ -208,7 +199,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-3) var(--sp-3) var(--sp-7);
+      padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
   }
 </style>

@@ -84,12 +84,15 @@
     --lh-tight: 1.22;
     --lh-body: 1.5;
 
-    /* The chrome runs one step below the body. Labels, rows, controls and nav are UI, not prose:
-       15px is right for a paragraph and one size too loud for a column of them. Prose keeps
-       `--text`; everything structural reads `--t-ui`. */
-    --t-ui: var(--t-sm);
+    /* The chrome reads at the body size, not below it. Running labels, rows and controls at 13
+       bought density nobody asked for and cost comfort everybody notices: a record is read for an
+       hour at a time. 15 is the body step, and the chrome is body. */
+    --t-ui: var(--t-base);
 
-    /* Space is one base multiplied. Six steps is all any screen here has ever needed. */
+    /* Space is one base multiplied, and it goes further than it used to. The old scale stopped at
+       48 and every gap between sections was 24 or 32, which is what made a screen of five groups
+       read as one undifferentiated wall. Separation is the job of SPACE; a rule is what you reach
+       for when there is no space to spend. */
     --sp-1: 4px;
     --sp-2: 8px;
     --sp-3: 12px;
@@ -97,6 +100,8 @@
     --sp-5: 24px;
     --sp-6: 32px;
     --sp-7: 48px;
+    --sp-8: 64px;
+    --sp-9: 96px;
 
     --r-sm: 6px;
     --r-md: 10px;
@@ -200,15 +205,17 @@
     box-sizing: border-box;
   }
 
+  /* The window is the CANVAS — the darkest surface, which the chrome sits directly on. The work
+     sits in a panel lifted off it. `sunk` is not a hole in the page; it is the desk the page is on. */
   html {
-    background: var(--bg);
+    background: var(--sunk);
     /* 2.4.11: keyboard focus must not land under the sticky header. Paid once, here. */
     scroll-padding-block-start: calc(var(--sticky) + var(--sp-2));
   }
 
   body {
     margin: 0;
-    background: var(--bg);
+    background: var(--sunk);
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--text);

@@ -17,7 +17,6 @@
     count,
     total,
     kicker,
-    subtitle,
     actions,
     filters,
     id,
@@ -26,7 +25,6 @@
     count?: number | undefined;
     total?: number | undefined;
     kicker?: string | undefined;
-    subtitle?: string | undefined;
     id?: string | undefined;
     actions?: Snippet | undefined;
     filters?: Snippet | undefined;
@@ -41,7 +39,6 @@
         {title}
         {#if id}<span class="title-id">{id}</span>{/if}
       </h1>
-      {#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
     </div>
     {#if count !== undefined}
       <p class="count num">
@@ -107,12 +104,6 @@
     letter-spacing: -0.02em;
   }
 
-  .subtitle {
-    margin-block-start: 2px;
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
 
   .count {
     color: var(--ink2);
@@ -154,11 +145,6 @@
       flex-basis: 100%;
     }
 
-    /* The subtitle is the register's own one-line description. It earns its place on a wide screen
-       and costs four wrapped lines above the fold on a phone, so it goes. */
-    .subtitle {
-      display: none;
-    }
 
     .head-actions {
       margin-inline-start: auto;

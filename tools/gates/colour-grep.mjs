@@ -35,6 +35,11 @@ const EXEMPT = [
    * to a notch and the silhouette only survives reversed out of a solid ground.
    */
   /^apps\/web\/static\/mark\.svg$/,
+  /**
+   * Build and screenshot tooling. Nothing here reaches a user: the contact sheet is a page rendered
+   * once for a person to look at, and it has no theme to read because it is not the app.
+   */
+  /^apps\/web\/scripts\//,
 ];
 
 /**

@@ -19,7 +19,6 @@
 <PageHead
   title={copy.audit}
   count={AUDIT.length}
-  subtitle="Append-only by construction: one write path, and no control on this screen can remove a line."
 />
 
 <div class="page">
@@ -48,7 +47,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-4) var(--sp-5) var(--sp-7);
+    padding: var(--sp-5) var(--sp-6) var(--sp-9);
     max-inline-size: 1100px;
   }
 
@@ -85,7 +84,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-3) var(--sp-3) var(--sp-7);
+      padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
   }
 </style>

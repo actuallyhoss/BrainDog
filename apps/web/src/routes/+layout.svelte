@@ -186,15 +186,24 @@
     background: var(--line);
   }
 
+  /* Chrome on the canvas; work in a panel lifted off it.
+     The panel is the scroll container, so the rail never moves and the work never runs to the
+     window's hard edge. It is the difference between an application and a web page. */
   .shell {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
-    min-block-size: 100dvh;
+    block-size: 100dvh;
+    overflow: hidden;
   }
 
   .body {
     min-inline-size: 0;
-    padding-block-end: var(--sp-7);
+    margin: var(--sp-2) var(--sp-2) var(--sp-2) 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .tab-slot,
@@ -211,7 +220,12 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
+    /* No inset on a phone: the screen is the panel, and eight pixels of canvas down each side is
+       eight pixels the content does not have. */
     .body {
+      margin: 0;
+      border: 0;
+      border-radius: 0;
       padding-block-end: 76px;
     }
 

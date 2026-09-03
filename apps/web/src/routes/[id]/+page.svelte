@@ -61,7 +61,7 @@
 
 <style>
   .page {
-    padding: var(--sp-6) var(--sp-5);
+    padding: var(--sp-8) var(--sp-6);
     max-inline-size: 900px;
   }
 </style>
