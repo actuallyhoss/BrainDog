@@ -17,9 +17,13 @@
 {#if block.kind === 'board'}
   <div class="grid" style="--cells:{columns.length}">
     {#each columns as column}
+      {@const cards = block.rows.filter((r) => r.cells[0] === column)}
       <div class="board-col">
-        <h4 class="board-head">{column}</h4>
-        {#each block.rows.filter((r) => r.cells[0] === column) as row}
+        <!-- The count is the column's whole reason to have a header. A board is read by comparing
+             heights, and heights lie the moment one column scrolls and another does not — so the
+             number sits beside the name rather than being inferred from the stack. -->
+        <h4 class="board-head">{column}<span class="board-count num">{cards.length}</span></h4>
+        {#each cards as row}
           <div class="card">
             <span class="card-title"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
             <span class="card-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>

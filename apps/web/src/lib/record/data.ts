@@ -38,6 +38,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
   obligations: {
     id: 'obligations',
     name: 'Obligations',
+    icon: 'obligation',
     one: 'obligation',
     holds: 'what you owe and what you are owed, with a date and a currency',
     title: 'what',
@@ -58,6 +59,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
   },
   services: {
     id: 'services',
+    icon: 'service',
     name: 'Services',
     one: 'service',
     holds: 'a renewal date, a registrar and a cost, so the record can tell you what is due in October',
@@ -80,6 +82,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
   },
   things: {
     id: 'things',
+    icon: 'thing',
     name: 'Things',
     one: 'thing',
     holds: 'the things you run, and the plan for each',
@@ -103,6 +106,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
   people: {
     id: 'people',
     name: 'People',
+    icon: 'people',
     one: 'person',
     holds: 'collaborators, contractors and accountants, and what each one is for',
     title: 'name',
@@ -118,6 +122,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
   },
   tasks: {
     id: 'tasks',
+    icon: 'task',
     name: 'Tasks',
     one: 'task',
     holds: 'work with a state and a date, so nothing is carried in your head',
@@ -366,6 +371,7 @@ export const PAGES: Record<string, PageDecl> = {
     page: 'money',
     title: 'Overview',
     nav: { section: 'Money', order: 10 },
+    icon: 'money',
     requires: ['register.obligations', 'register.people'],
     pack: 'money-core',
     blocks: [
@@ -429,6 +435,7 @@ export const PAGES: Record<string, PageDecl> = {
     page: 'estate',
     title: 'Renewals',
     nav: { section: 'Estate', order: 10 },
+    icon: 'calendar',
     requires: ['register.services'],
     pack: 'estate',
     blocks: [
@@ -475,6 +482,7 @@ export const PAGES: Record<string, PageDecl> = {
     page: 'work',
     title: 'Board',
     nav: { section: 'Work', order: 10 },
+    icon: 'board',
     requires: ['register.tasks'],
     pack: 'work',
     blocks: [
@@ -506,6 +514,7 @@ export const PAGES: Record<string, PageDecl> = {
   people: {
     page: 'people',
     title: 'People',
+    icon: 'people',
     requires: ['register.people'],
     origin: 'derived',
     placed: false,

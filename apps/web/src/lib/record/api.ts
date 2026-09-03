@@ -12,6 +12,7 @@
 
 import { day as fmtDay, money, relative, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
+import { PATHS, type IconName } from '../ui/Icon.svelte';
 import {
   AUDIT,
   INBOX,
@@ -348,19 +349,49 @@ export function values(): Record<string, string> {
 
 /* ── the endpoints ───────────────────────────────────────────────────────── */
 
-export type NavEntry = { id: string; title: string; href: string; section: string; order: number };
+export type NavEntry = {
+  id: string;
+  title: string;
+  href: string;
+  section: string;
+  order: number;
+  icon: IconName;
+};
+
+/**
+ * A declared icon name, resolved against the set that actually shipped.
+ *
+ * A declaration is DATA — it arrives with a pack, and a pack is a thing a stranger wrote. The name
+ * it asks for may be one this build has never heard of, and the answer to that is the fallback
+ * glyph for the kind of row, never an empty box and never a thrown error: a rail is not allowed to
+ * fail to render because someone spelled `obligations` where the set says `obligation`.
+ */
+export const iconFor = (declared: string | undefined, fallback: IconName): IconName =>
+  declared && Object.hasOwn(PATHS, declared) ? (declared as IconName) : fallback;
 
 export function boot() {
   const nav: NavEntry[] = Object.values(PAGES)
     .filter((p) => p.nav && p.placed !== false)
-    .map((p) => ({ id: p.page, title: p.title, href: `/p/${p.page}`, section: p.nav!.section, order: p.nav!.order }));
+    .map((p) => ({
+      id: p.page,
+      title: p.title,
+      href: `/p/${p.page}`,
+      section: p.nav!.section,
+      order: p.nav!.order,
+      icon: iconFor(p.icon, 'doc'),
+    }));
 
   return {
     index: {
       slug: 'the-studio',
       name: 'The Studio',
       locale: 'en',
-      registers: Object.values(REGISTERS).map((r) => ({ id: r.id, name: r.name, count: (ROWS[r.id] ?? []).length })),
+      registers: Object.values(REGISTERS).map((r) => ({
+        id: r.id,
+        name: r.name,
+        count: (ROWS[r.id] ?? []).length,
+        icon: iconFor(r.icon, 'rows'),
+      })),
     },
     nav,
     /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */

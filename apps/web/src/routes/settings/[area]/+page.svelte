@@ -189,25 +189,31 @@
     inset-block-start: calc(var(--sticky) + var(--sp-4));
   }
 
+  /* The same row as the rail's, because it IS the same thing: a vertical list of places, one of
+     which you are in. It read as a different control entirely — a grey box where the rail uses the
+     accent — which teaches that "here" looks like two things. */
   .area {
-    min-block-size: 30px;
+    min-block-size: 32px;
     display: flex;
     align-items: center;
-    padding: 0 var(--sp-2);
-    border-radius: var(--r-sm);
-    color: var(--dim);
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-md);
+    color: var(--ink2);
     font-size: var(--t-ui);
+    font-weight: 500;
     text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .area:hover {
-    color: var(--ink2);
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    color: var(--ink);
   }
 
   .area[aria-current='page'] {
-    background: var(--s1);
-    box-shadow: var(--raise);
-    color: var(--ink);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent-text);
+    font-weight: 600;
   }
 
   .body {

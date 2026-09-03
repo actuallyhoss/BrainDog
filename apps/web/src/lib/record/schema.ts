@@ -38,6 +38,16 @@ export type FieldDecl = {
   unit?: string;
 };
 
+/**
+ * The glyph a nav row wears.
+ *
+ * A NAME, not a path: a declaration that could ship arbitrary SVG is a declaration that can ship a
+ * colour and a tracking pixel, and the icon set is the whole point of having one (22 §9). Unknown
+ * names fall back to the primitive glyph for the thing, never to nothing — a rail where half the
+ * rows have a glyph and half do not reads as a rendering bug, not as a hierarchy.
+ */
+export type IconRef = string;
+
 export type RegisterDecl = {
   id: string;
   /** What a person calls the collection, and one of them. Never an id in a heading (29 §5). */
@@ -57,6 +67,8 @@ export type RegisterDecl = {
   fields: readonly FieldDecl[];
   /** Rows of this register HAVE an identity: a mark and a frozen accent hue (13 §2.1b). */
   identity?: { mark: string; accent: string };
+  /** The rail glyph. Falls back to `rows`, which is what a register is. */
+  icon?: IconRef;
   /** The pack that owns it, or absent for a register the person made. */
   pack?: string;
 };
@@ -98,6 +110,8 @@ export type PageDecl = {
   page: string;
   title: string;
   nav?: { section: string; order: number };
+  /** The rail glyph, when the page is placed in nav. Falls back to `doc`. */
+  icon?: IconRef;
   requires: readonly string[];
   blocks: readonly PageBlock[];
   pack?: string;

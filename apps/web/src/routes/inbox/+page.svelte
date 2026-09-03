@@ -123,10 +123,13 @@
     font-size: var(--t-xs);
   }
 
+  /* Ink, not the accent. This is the rule the record is offering to write — a thing to READ and
+     agree with — and a line of red monospace is the universal shape of a stack trace. The accent is
+     spent on the button beside it, which is the part that is actually a decision. */
   .pattern-code {
     display: block;
     margin-block: var(--sp-2);
-    color: var(--accent-text);
+    color: var(--ink);
     font-family: var(--font-id);
     font-size: var(--t-ui);
   }

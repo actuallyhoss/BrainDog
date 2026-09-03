@@ -123,13 +123,23 @@
   }
 
   /* A bare control stays bare when it carries an intent. Otherwise a pair of adjacent bare buttons
-     comes out as one bare and one boxed, which reads as two different kinds of thing. */
+     comes out as one bare and one boxed, which reads as two different kinds of thing.
+
+     AND IT STAYS QUIET UNTIL IT IS TOUCHED. A destructive bare action is a link — "Uninstall",
+     "Archive", "Remove" — and there are usually several on a screen at once: five pack cards put
+     five red words in a grid, which is a colour-noise problem rather than a safety one, because
+     nobody is about to click any of them. Red belongs on the CONFIRMATION, which is a filled button
+     and keeps its colour throughout. Here the intent arrives on hover and focus, at the moment the
+     control is actually the subject of attention. */
   .btn[data-weight='bare'][data-intent] {
     border-color: transparent;
+    color: var(--ink2);
   }
 
-  .btn[data-weight='bare'][data-intent]:hover:not(:disabled) {
+  .btn[data-weight='bare'][data-intent]:hover:not(:disabled),
+  .btn[data-weight='bare'][data-intent]:focus-visible {
     background: color-mix(in srgb, var(--tone) 12%, transparent);
+    color: var(--tone);
   }
 
   .btn:disabled {

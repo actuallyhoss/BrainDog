@@ -196,13 +196,33 @@
     background: var(--s1);
   }
 
+  /* The same hairline the stat cells use. Four stacks of cards floating on one surface with nothing
+     between them is four stacks, not four columns — the eye has to infer the boundary from where
+     the cards happen to end, which is exactly what fails when one column is empty. */
+  .board-col + .board-col {
+    border-inline-start: 1px solid var(--line);
+  }
+
   .board-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-block-end: var(--sp-1);
     color: var(--dim);
     font-family: var(--font-ui);
     font-size: var(--t-xs);
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
+  }
+
+  .board-count {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    font-weight: 400;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
   }
 
   .card {
