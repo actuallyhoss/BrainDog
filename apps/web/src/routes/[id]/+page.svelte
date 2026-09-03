@@ -43,8 +43,13 @@
 
 {#if !target}
   <div class="page">
+    <!-- `no-results`, not `error`. Nothing failed here — a string was typed and it does not name a
+         row, which is the same class of event as a search with no hits. `error` paints the heading
+         in `danger`, and spending the alarm colour on "you typed an id that doesn't exist" is how a
+         product teaches people that red means nothing in particular. There is a `rid` on it because
+         the resolver did make a call, and a request id is free to keep. -->
     <Empty
-      kind="error"
+      kind="no-results"
       title={bare ? `“${raw}” could be a row in any register.` : `Nothing answers to “${raw}”.`}
       body={bare
         ? 'Every register has a #1, so a bare number never resolves on its own. Qualify it — obligations#4, tasks#7.'

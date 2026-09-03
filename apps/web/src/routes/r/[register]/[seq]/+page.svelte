@@ -59,7 +59,9 @@
 
 {#if !decl || !row}
   <div class="page">
-    <Empty kind="error" title="Couldn't find {id}#{seq}." rid="r7k2m9qd4x">
+    <!-- A URL naming a row that is not there is a MISS, not a failure: nothing broke, the address is
+         just wrong. `error` is reserved for a call that did not come back. -->
+    <Empty kind="no-results" title="Couldn't find {id}#{seq}." rid="r7k2m9qd4x">
       {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
     </Empty>
   </div>

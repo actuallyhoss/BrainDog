@@ -13,10 +13,10 @@
 -->
 <script lang="ts">
   import { Block, Table } from 'braindog-render/svelte';
-  import { parse } from 'braindog-render';
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { page as readPage, values } from '$lib/record/api.ts';
+  import { toSegments } from '$lib/record/blocks.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -56,8 +56,12 @@
               {:else}
                 <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
               {/if}
-            {:else if block.metrics}
-              {#each parse(['```stat', ...block.metrics.map((m) => `${m.label} | ${m.value} | ${m.note}${m.tone ? ` | ${m.tone}` : ''}`), '```'].join('\n')) as segment}
+            {:else}
+              <!-- EVERY kind, through the same conversion the page route uses. This branch used to
+                   read `{:else if block.metrics}`, so a `note` or a `bar` on a shared page drew its
+                   heading and then nothing — a section title over an empty body, which tells the
+                   reader something is there and then shows them it is not. -->
+              {#each toSegments(block) as segment}
                 {#if segment.type === 'block'}<Block block={segment} {opts} />{/if}
               {/each}
             {/if}

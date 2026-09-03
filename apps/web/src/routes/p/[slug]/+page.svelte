@@ -11,11 +11,11 @@
   simultaneous assertive announcements is a denial of service on a screen-reader user (19 §6).
 -->
 <script lang="ts">
-  import { money, parse, relative } from 'braindog-render';
   import { Block, Table } from 'braindog-render/svelte';
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { CURRENCY, NOW, display, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
+  import { page as readPage, values } from '$lib/record/api.ts';
+  import { toSegments } from '$lib/record/blocks.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -29,56 +29,6 @@
 
   /** Every `{{path}}` is resolved server-side and handed over; a missing value is an em dash. */
   const opts = { resolve: (path: string) => resolved[path] ?? null };
-
-  /**
-   * A page block becomes a Block segment through the dialect, so a declared page and a write-up take
-   * one code path from the first `<figure>` down.
-   *
-   * The heading is DELIBERATELY not passed through. The block bar above already names the block and
-   * says where its rows came from; a figcaption repeating it is the same sentence twice, in two
-   * different typographic registers.
-   */
-  function toSegment(block: BlockResult) {
-    const head = `${block.kind}${block.tone ? ` |  | ${block.tone}` : ''}`;
-    const rows = block.metrics
-      ? block.metrics.map((m) => `${m.label} | ${m.value} | ${m.note}${m.tone ? ` | ${m.tone}` : ''}`)
-      : block.kind === 'bar'
-        ? barRows(block)
-        : block.kind === 'timeline'
-          ? timelineRows(block)
-          : block.kind === 'board'
-            ? boardRows(block)
-            : block.body
-              ? [block.body]
-              : [];
-    return parse(['```' + head, ...rows, '```'].join('\n'));
-  }
-
-  /** A bar over a register groups its rows and sums them — the one place the page does arithmetic. */
-  function barRows(block: BlockResult): string[] {
-    const totals = new Map<string, number>();
-    for (const e of block.entries) {
-      const key = display(block.register ?? '', 'party', e.fields.party) ?? 'Nobody in particular';
-      totals.set(key, (totals.get(key) ?? 0) + Number(e.fields.amount ?? 0));
-    }
-    const sorted = [...totals].sort((a, b) => b[1] - a[1]);
-    return sorted.map(([party, total]) => `${party} | ${money(total, CURRENCY)} | `);
-  }
-
-  function timelineRows(block: BlockResult): string[] {
-    return block.entries
-      .slice(0, 10)
-      .map((e) => {
-        const iso = String(e.fields.renews ?? '');
-        const days = (Date.parse(`${iso}T12:00:00Z`) - NOW) / 86_400_000;
-        const tone = days < 0 ? ' | bad' : days < 21 ? ' | warn' : '';
-        return `${relative(iso, NOW)} | ${e.fields.name} | ${e.fields.provider}${tone}`;
-      });
-  }
-
-  function boardRows(block: BlockResult): string[] {
-    return block.entries.map((e) => `${String(e.fields.state).replace(/_/g, ' ')} | ${e.fields.what} | ${e.fields.thing ? display('tasks', 'thing', e.fields.thing) : ''}`);
-  }
 
   const declaration = $derived(
     result
@@ -151,7 +101,7 @@
                 <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
               {/if}
             {:else}
-              {#each toSegment(block) as segment}
+              {#each toSegments(block) as segment}
                 {#if segment.type === 'block'}<Block block={segment} {opts} />{/if}
               {/each}
             {/if}

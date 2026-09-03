@@ -81,7 +81,7 @@
 
 {#if !question}
   <div class="page">
-    <Empty kind="error" title="Couldn't find {page.params.id}." rid="r7k2m9qd4x">
+    <Empty kind="no-results" title="Couldn't find {page.params.id}." rid="r7k2m9qd4x">
       {#snippet actions()}<Button href="/decide">Back to Decide</Button>{/snippet}
     </Empty>
   </div>
