@@ -15,6 +15,7 @@
   import { Block, Table } from 'braindog-render/svelte';
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { page as readPage, values } from '$lib/record/api.ts';
   import { toSegments } from '$lib/record/blocks.ts';
   import Mark from '$lib/ui/Mark.svelte';
@@ -39,7 +40,7 @@
 
   {#if !result}
     <Empty kind="no-permission" title="This link has been revoked." body="Whoever shared it can send a new one.">
-      {#snippet actions()}<Button>{copy.requestAccess}</Button>{/snippet}
+      {#snippet actions()}<Button onclick={() => toasts.push(copy.notWritten('Whoever shared this would be asked'), { intent: 'warn' })}>{copy.requestAccess}</Button>{/snippet}
     </Empty>
   {:else}
     <main class="body">

@@ -246,7 +246,7 @@
             <Button href="/r/{id}">{copy.clearFilters}</Button>
           {:else if emptyKind === 'no-data-yet'}
             <Button weight="primary" onclick={() => (createOpen = true)}>{copy.addOne}</Button>
-            <Button>{copy.showExample}</Button>
+            <Button onclick={() => toasts.push(copy.notWritten('One example row would be added, marked `example`'), { intent: 'warn' })}>{copy.showExample}</Button>
           {/if}
         {/snippet}
       </Empty>

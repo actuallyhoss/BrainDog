@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PACKS } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -71,7 +72,7 @@ an update that would move something is shown here and then ignored.`}</code></pr
             <span class="line-amount">
               {#if pack.stars}<span class="stars">{pack.stars}★</span>{/if}
             </span>
-            <span class="line-when"><Button weight="quiet">{copy.install}</Button></span>
+            <span class="line-when"><Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The install plan would be shown before anything applied'), { intent: 'warn' })}>{copy.install}</Button></span>
           </div>
         </li>
       {/each}

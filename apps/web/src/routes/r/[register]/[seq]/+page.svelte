@@ -14,6 +14,7 @@
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
     AUDIT,
     CURRENCY,
@@ -69,7 +70,7 @@
   <PageHead kicker={decl.name} title={String(row.fields[decl.title] ?? '')} id="#{row.seq}">
     {#snippet actions()}
       <Button weight="bare">{copy.copyId}<Kbd keys="y" /></Button>
-      <Button weight="quiet">Edit</Button>
+      <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>Edit</Button>
     {/snippet}
   </PageHead>
 

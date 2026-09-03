@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { JOB } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -33,7 +34,7 @@
 <PageHead kicker="Job" title={JOB.kind} id={JOB.id}>
   {#snippet actions()}
     <Chip label={JOB.status} tone={JOB.status === 'failed' ? 'bad' : JOB.status === 'running' ? 'info' : 'good'} />
-    <Button weight="quiet" tone="bad"><Icon name="stop" size="s" />Stop</Button>
+    <Button weight="quiet" tone="bad" onclick={() => toasts.push(copy.notWritten('The job would stop at its next step'), { intent: 'warn' })}><Icon name="stop" size="s" />Stop</Button>
   {/snippet}
 </PageHead>
 

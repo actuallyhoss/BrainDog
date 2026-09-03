@@ -15,6 +15,8 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import type { PageDecl } from '$lib/record/schema.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PACKS, PAGES, PEOPLE_ACCESS, REGISTERS } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -53,7 +55,35 @@
     else set('scheme', v);
   }
 
-  const pen = Object.values(PAGES).filter((p) => p.placed === false);
+  const pen = $derived(
+    Object.values(PAGES).filter((p) => p.placed === false && !placed.some((x) => x.page === p.page)),
+  );
+
+  /**
+   * PROMOTION IS THE ONE VERB THAT ACTUALLY WORKS HERE, and it works because it is client state.
+   *
+   * 29 §2's three tiers are derived → proposed → placed, and *"Movement is forward-only and needs a
+   * user action."* This is the user action. Two rules from §4 are in the four lines below and both
+   * are load-bearing:
+   *
+   *   - It appends AT THE END OF ITS SECTION, never inserted mid-list. Microsoft's Personalized
+   *     Menus put items at different distances down the menu each time, and Jensen Harris announced
+   *     the reversal in 2006 with that as the first reason.
+   *   - Nothing is ever placed WITHOUT it. The system never writes nav order after first install
+   *     (06 §3), because Findlater & McGrenere measured static menus faster than adaptive ones.
+   *
+   * The undo is on the toast rather than a second button, because a promotion is small and
+   * reversible and does not deserve a confirm — 23 §4: every extra confirm devalues the one gate
+   * that matters.
+   */
+  let placed = $state<PageDecl[]>([]);
+
+  function promote(decl: PageDecl) {
+    placed = [...placed, decl];
+    toasts.push(copy.promoted(decl.title), {
+      undo: () => (placed = placed.filter((x) => x.page !== decl.page)),
+    });
+  }
 </script>
 
 <PageHead kicker={copy.settings} title={area.replace(/^./, (c) => c.toUpperCase())} />
@@ -127,7 +157,9 @@
                     <span class="line-detail">{copy.holdingPen} Derived from {p.requires[0]}.</span>
                   </span>
                   <span class="line-amount"></span>
-                  <span class="line-when"><Button weight="quiet">Place in nav</Button></span>
+                  <span class="line-when">
+                    <Button weight="quiet" onclick={() => promote(p)}>Place in nav</Button>
+                  </span>
                 </div>
               </li>
             {/each}
@@ -156,7 +188,7 @@
       <Section title="Danger">
         <div class="danger">
           <p class="danger-title">Delete this record</p>
-          <Button tone="bad">Delete the studio</Button>
+          <Button tone="bad" onclick={() => toasts.push(copy.notWritten('Deleting a record asks you to type its name first'), { intent: 'bad' })}>Delete the studio</Button>
         </div>
       </Section>
     {:else}

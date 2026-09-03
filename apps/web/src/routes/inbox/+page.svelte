@@ -9,6 +9,7 @@
 <script lang="ts">
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { INBOX, NOW } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -58,7 +59,7 @@
                   </p>
                   <code class="pattern-code">{item.suggestion}</code>
                   <div class="pattern-actions">
-                    <Button weight="primary">Make it a rule</Button>
+                    <Button weight="primary" onclick={() => toasts.push(copy.notWritten('The rule would be written and tested against the last 30 days'), { intent: 'warn' })}>Make it a rule</Button>
                     <Button weight="bare">Not this one</Button>
                   </div>
                 </div>
@@ -67,7 +68,7 @@
               {/if}
 
               <div class="actions">
-                <Button>Create a row</Button>
+                <Button onclick={() => toasts.push(copy.notWritten('A row would be created from this arrival'), { intent: 'warn' })}>Create a row</Button>
                 <Button weight="bare">Archive</Button>
               </div>
             </div>
