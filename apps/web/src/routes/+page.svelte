@@ -168,116 +168,12 @@
     max-inline-size: 1140px;
   }
 
-  /* One surface per group, hairlines between the rows inside it, and every figure in one column so
-     the eye can run down it. */
-  .ledger {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
-    overflow: hidden;
-  }
+  /* The row shape is `$lib/ui/rows.css` — one contract, one file. Only what is Home's own is here.
 
-  .ledger li + li .line {
-    border-block-start: 1px solid var(--line);
-  }
-
-  .line {
-    display: grid;
-    grid-template-columns: 12ch minmax(0, 1fr) auto 9ch;
-    align-items: center;
-    gap: var(--sp-4);
-    min-block-size: 38px;
-    padding: var(--sp-2) var(--sp-4);
-    color: var(--ink);
-    font-size: var(--t-ui);
-    text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .line:hover {
-    background: var(--s2);
-  }
-
-  /* No margin rule. A leading edge per row is right when a FEW rows are marked and wrong when most
-     of them are: eleven marked rows merge into one continuous stripe down the card, which reads as
-     a rendering fault rather than as eleven separate warnings. The state lives in the date column
-     instead — one place, one column, aligned. */
-
-  .line-tall {
-    align-items: start;
-    min-block-size: 56px;
-    padding-block: var(--sp-3);
-  }
-
-  .line-short {
-    min-block-size: 34px;
-  }
-
-  /* The id is a COLUMN, not a badge. These are strings a person says out loud, so they line up the
-     way line numbers line up in a ledger — one fixed width, one face, one quiet ink, nothing drawn
-     around them. The state is in the margin mark, never in the id. */
-  .seq {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    letter-spacing: -0.02em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .line-main {
-    min-inline-size: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .line-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .line-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .line-amount {
-    color: var(--ink2);
-    font-variant-numeric: tabular-nums;
-    text-align: end;
-  }
-
-  /* Owed TO you reads as an asset, so it is not in the same ink as what you owe. One weight, not a
-     colour: a percentage carries no colour on purpose, and neither does a direction. */
-  .line-amount[data-owed] {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .line-when {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 5px;
-    color: var(--tone, var(--dim));
-    font-size: var(--t-xs);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .line :global(.icon) {
-    color: var(--dim);
-  }
+     No margin rule per row, and that is a reversal: a leading edge is right when a FEW rows are
+     marked and wrong when most of them are — eleven marked rows merge into one continuous stripe
+     down the card, which reads as a rendering fault rather than as eleven warnings. The state lives
+     in the date column instead: one place, one column, aligned. */
 
   .more {
     display: inline-flex;
@@ -312,35 +208,6 @@
   @media (width < 900px) {
     .page {
       padding: var(--sp-3) var(--sp-3) var(--sp-7);
-    }
-
-    .line {
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: var(--sp-1) var(--sp-3);
-      padding-inline: 0;
-    }
-
-    .seq {
-      grid-column: 1;
-    }
-
-    .line-main {
-      grid-column: 1 / -1;
-      grid-row: 2;
-    }
-
-    .line-amount {
-      grid-column: 2;
-      grid-row: 1;
-    }
-
-    .line-when {
-      grid-column: 2;
-      grid-row: 3;
-    }
-
-    .line :global(.icon) {
-      display: none;
     }
   }
 </style>

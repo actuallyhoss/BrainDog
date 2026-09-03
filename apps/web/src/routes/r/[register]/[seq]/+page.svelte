@@ -1,0 +1,246 @@
+<!--
+  One row.
+
+  A label is VISIBLE, always. A placeholder is not a label — it disappears exactly when a user needs
+  it, and it fails contrast in most themes (06 §8). Every field below carries its own label whether
+  or not it has a value.
+
+  `#125` is the number you can say out loud, and it is per-register, which is why renaming a register
+  is refused: `register.obligations → register.bills` renames a spoken id, and `#125` in a note would
+  stop resolving. Change the display name instead; it is free.
+-->
+<script lang="ts">
+  import { relative } from 'braindog-render';
+  import { page } from '$app/state';
+  import { copy } from '$lib/copy.ts';
+  import { AUDIT, CURRENCY, NOW, REGISTERS, display, entry, labelOf } from '$lib/record/api.ts';
+  import PageHead from '$lib/ui/PageHead.svelte';
+  import Button from '$lib/ui/Button.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
+  import Money from '$lib/ui/Money.svelte';
+  import Chip from '$lib/ui/Chip.svelte';
+  import Kbd from '$lib/ui/Kbd.svelte';
+
+  const id = $derived(page.params.register ?? '');
+  const seq = $derived(Number(page.params.seq));
+  const decl = $derived(REGISTERS[id]);
+  const row = $derived(entry(id, seq));
+
+  const history = $derived(AUDIT.filter((e) => e.target === `${id}#${seq}`));
+
+  const state = $derived(decl?.state ? String(row?.fields[decl.state] ?? '') : '');
+  const tone = $derived(decl?.done?.includes(state) ? ('good' as const) : undefined);
+</script>
+
+{#if !decl || !row}
+  <div class="page">
+    <Empty kind="error" title="Couldn't find {id}#{seq}." rid="r7k2m9qd4x">
+      {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
+    </Empty>
+  </div>
+{:else}
+  <PageHead kicker={decl.name} title={String(row.fields[decl.title] ?? '')} id="#{row.seq}">
+    {#snippet actions()}
+      <Button weight="bare">{copy.copyId}<Kbd keys="y" /></Button>
+      <Button weight="quiet">Edit</Button>
+    {/snippet}
+  </PageHead>
+
+  <div class="page">
+    <div class="split">
+      <section class="fields">
+        <dl class="field-list">
+          {#each decl.fields as f}
+            {@const value = row.fields[f.id]}
+            <div class="field">
+              <dt class="field-label">{labelOf(f)}</dt>
+              <dd class="field-value" data-type={f.type}>
+                {#if value === null || value === undefined || value === ''}
+                  <span class="missing">—</span>
+                {:else if f.type === 'money'}
+                  <Money minor={Number(value)} currency={CURRENCY} weight="strong" />
+                {:else if f.id === decl.state}
+                  <Chip label={String(value).replace(/_/g, ' ')} {tone} />
+                {:else if f.type === 'day'}
+                  {display(id, f.id, value)}
+                  <span class="rel">{relative(String(value), NOW)}</span>
+                {:else}
+                  {display(id, f.id, value)}
+                {/if}
+              </dd>
+            </div>
+          {/each}
+        </dl>
+      </section>
+
+      <aside class="side">
+        <h2 class="side-title">This row</h2>
+        <dl class="meta">
+          <dt>Spoken id</dt>
+          <dd class="mono">{id}#{row.seq}</dd>
+          <dt>Version</dt>
+          <dd class="mono">{row.version}</dd>
+          <dt>Created</dt>
+          <dd>{relative(row.created.slice(0, 10), NOW)} by {row.by}</dd>
+        </dl>
+
+        {#if history.length}
+          <h2 class="side-title">History</h2>
+          <ol class="history">
+            {#each history as e}
+              <li>
+                <span class="history-by">{e.by}</span>
+                <span class="history-note">{e.note}</span>
+                <span class="history-when">{relative(e.at.slice(0, 10), NOW)}</span>
+              </li>
+            {/each}
+          </ol>
+        {/if}
+      </aside>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .page {
+    padding: var(--sp-4) var(--sp-5) var(--sp-7);
+    max-inline-size: 1140px;
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: var(--sp-5);
+    align-items: start;
+  }
+
+  .field-list {
+    margin: 0;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--raise);
+    overflow: hidden;
+  }
+
+  .field {
+    display: grid;
+    grid-template-columns: minmax(0, 16ch) minmax(0, 1fr);
+    gap: var(--sp-4);
+    align-items: baseline;
+    padding: var(--sp-3) var(--sp-4);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .field:last-child {
+    border-block-end: 0;
+  }
+
+  .field-label {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .field-value {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-ui);
+    overflow-wrap: anywhere;
+  }
+
+  .field-value[data-type='money'],
+  .field-value[data-type='day'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rel,
+  .missing {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .side-title {
+    margin-block-end: var(--sp-2);
+    color: var(--ink2);
+    font-family: var(--font-ui);
+    font-size: var(--t-ui);
+    font-weight: 500;
+  }
+
+  .side-title + * + .side-title {
+    margin-block-start: var(--sp-5);
+  }
+
+  .meta {
+    display: grid;
+    grid-template-columns: minmax(0, 10ch) minmax(0, 1fr);
+    gap: var(--sp-2) var(--sp-3);
+    margin: 0;
+  }
+
+  .meta dt {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .meta dd {
+    margin: 0;
+    font-size: var(--t-xs);
+  }
+
+  .mono {
+    font-family: var(--font-id);
+  }
+
+  .history {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .history li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--sp-2);
+    padding-block-end: var(--sp-2);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .history-by {
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
+  .history-note {
+    grid-column: 1 / -1;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .history-when {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    text-align: end;
+  }
+
+  @media (width < 1000px) {
+    .split {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (width < 900px) {
+    .page {
+      padding: var(--sp-3) var(--sp-3) var(--sp-7);
+    }
+  }
+</style>

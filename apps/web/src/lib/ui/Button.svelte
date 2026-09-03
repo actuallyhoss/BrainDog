@@ -105,6 +105,16 @@
     border-color: color-mix(in srgb, var(--tone) 50%, var(--edge));
   }
 
+  /* A bare control stays bare when it carries an intent. Otherwise a pair of adjacent bare buttons
+     comes out as one bare and one boxed, which reads as two different kinds of thing. */
+  .btn[data-weight='bare'][data-intent] {
+    border-color: transparent;
+  }
+
+  .btn[data-weight='bare'][data-intent]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--tone) 12%, transparent);
+  }
+
   .btn:disabled {
     color: var(--dim);
     cursor: not-allowed;

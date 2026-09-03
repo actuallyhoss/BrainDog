@@ -30,8 +30,12 @@ const ROUTES = [
   ['settings', '/settings/appearance'],
   ['start', '/start'],
   ['audit', '/audit'],
-  ['search', '/search?q=kiln'],
+  ['search', '/search?q=invoice'],
   ['job', '/jobs/j_7Q2F'],
+  ['view', '/v/obligations.overdue'],
+  ['shared', '/s/9f2a7c41d8b3'],
+  ['resolver', '/SG31'],
+  ['not-found', '/nowhere'],
 ];
 
 const [argRoute, argWidth] = process.argv.slice(2);
@@ -58,7 +62,17 @@ for (const scheme of schemes) {
     await page.goto(HOST + path, { waitUntil: 'networkidle' });
     // A hydrated shell, not a silhouette: wait for the router to have painted something real.
     await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+
+    // `content-visibility: auto` skips rendering off-screen rowgroups, and a full-page capture asks
+    // for the whole document at once — so a table below the fold photographs as a reserved but EMPTY
+    // box. That is the optimisation working, not a layout bug: the rows are in the DOM, they are
+    // simply not laid out until they are near the viewport. Turning it off for the shutter is the
+    // honest fix, and it is one more reason 22 §10 keeps pixels out of the gates entirely.
+    await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+
+    const rows = await page.locator('[role="row"]').count();
     const file = `${OUT}/${name}-${scheme}-${width}.png`;
+    if (process.env.BD_VERBOSE) console.log(`    ${rows} rows in the DOM`);
     await page.screenshot({ path: file, fullPage: true });
     console.log(`  ${file}`);
   }

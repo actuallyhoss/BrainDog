@@ -294,7 +294,7 @@ export const PAGES: Record<string, PageDecl> = {
         source: 'register.obligations',
         where: 'direction is owed to me, state is open or part',
         columns: [
-          { field: 'seq', label: '#', width: '6ch', align: 'end' },
+          { field: 'seq', label: '#', width: '9ch', align: 'end' },
           { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
           { field: 'party', label: 'Party', width: 'minmax(12ch,20ch)' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
@@ -324,7 +324,7 @@ export const PAGES: Record<string, PageDecl> = {
         source: 'register.obligations',
         where: 'direction is owed by me, state is open or part',
         columns: [
-          { field: 'seq', label: '#', width: '6ch', align: 'end' },
+          { field: 'seq', label: '#', width: '9ch', align: 'end' },
           { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
@@ -399,7 +399,7 @@ export const PAGES: Record<string, PageDecl> = {
         heading: 'Everything open',
         source: 'register.tasks',
         columns: [
-          { field: 'seq', label: '#', width: '6ch', align: 'end' },
+          { field: 'seq', label: '#', width: '9ch', align: 'end' },
           { field: 'what', label: 'What', width: 'minmax(20ch,1fr)', link: true },
           { field: 'thing', label: 'Thing', width: 'minmax(10ch,16ch)' },
           { field: 'state', label: 'State', width: '12ch' },

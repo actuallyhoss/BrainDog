@@ -11,6 +11,7 @@
 <script lang="ts">
   import '../app.css';
   import '$lib/blocks.css';
+  import '$lib/ui/rows.css';
 
   import { INBOX } from '$lib/record/api.ts';
   import { copy } from '$lib/copy.ts';
@@ -22,8 +23,14 @@
   import Keymap from '$lib/ui/Keymap.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
 
   let { data, children } = $props();
+
+  /* Two surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
+     and `/s/<token>` because a shared page is a capability URL: it renders one page, read-only,
+     with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6). */
+  const bare = $derived(page.url.pathname === '/start' || page.url.pathname.startsWith('/s/'));
 
   let paletteOpen = $state(false);
   let keymapOpen = $state(false);
@@ -87,32 +94,36 @@
 
 <div class="live" data-state="open" aria-hidden="true"></div>
 
-<div class="shell">
-  <div class="rail-slot">
-    <Sidebar
-      nav={data.nav}
-      pen={data.pen}
-      record={data.index.name}
-      registers={data.index.registers}
-      open={data.questions.length}
-      inbox={INBOX.length}
-    />
+{#if bare}
+  <main id="main">{@render children()}</main>
+{:else}
+  <div class="shell">
+    <div class="rail-slot">
+      <Sidebar
+        nav={data.nav}
+        pen={data.pen}
+        record={data.index.name}
+        registers={data.index.registers}
+        open={data.questions.length}
+        inbox={INBOX.length}
+      />
+    </div>
+
+    <main id="main" class="body">
+      {@render children()}
+    </main>
   </div>
 
-  <main id="main" class="body">
-    {@render children()}
-  </main>
-</div>
+  <div class="tab-slot">
+    <TabBar open={data.questions.length} inbox={INBOX.length} onmore={() => (moreOpen = true)} />
+  </div>
 
-<div class="tab-slot">
-  <TabBar open={data.questions.length} inbox={INBOX.length} onmore={() => (moreOpen = true)} />
-</div>
+  <button type="button" class="palette-launcher tap" onclick={() => (paletteOpen = true)} aria-label={copy.paletteLabel}>
+    <Icon name="search" size="l" />
+  </button>
 
-<button type="button" class="palette-launcher tap" onclick={() => (paletteOpen = true)} aria-label={copy.paletteLabel}>
-  <Icon name="search" size="l" />
-</button>
-
-<Palette bind:open={paletteOpen} nav={data.nav} />
+  <Palette bind:open={paletteOpen} nav={data.nav} />
+{/if}
 
 <Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>
   <Keymap />

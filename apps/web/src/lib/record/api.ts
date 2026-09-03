@@ -87,7 +87,10 @@ export const dueBand = (iso: unknown): string => (typeof iso === 'string' ? rela
    eye loses the row — which in a money ledger means reading a figure off the wrong line (13 §4.2). */
 
 const WIDTH: Record<string, string> = {
-  seq: '6ch',
+  // 6ch is the number's width and not the CELL's: the cell also carries its padding, so `#10`
+  // truncated where `#9` did not. An identifier truncates in the middle by rule, which meant the
+  // spoken id — the whole point of the column — came out as `#…`.
+  seq: '9ch',
   money: '15ch',
   day: '15ch',
   instant: '20ch',

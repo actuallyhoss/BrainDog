@@ -18,6 +18,7 @@
     title,
     subtitle,
     id,
+    onclose,
     children,
     footer,
   }: {
@@ -25,6 +26,8 @@
     title: string;
     subtitle?: string;
     id?: string;
+    /** For a caller whose open state is derived from something else — a peeked row's seq, say. */
+    onclose?: () => void;
     children: Snippet;
     footer?: Snippet;
   } = $props();
@@ -44,6 +47,7 @@
 
   function close() {
     open = false;
+    onclose?.();
   }
 </script>
 
