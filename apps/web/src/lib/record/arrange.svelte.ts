@@ -32,15 +32,9 @@
  * asks for — a single-pointer alternative that is not a re-implementation.
  */
 
-import { KINDS, isKind } from 'braindog-render';
+import { differs, moveAt, removeAt, setSpanAt, type Slot } from './arrange.ts';
 
-/** One block's arrangement. `i` indexes the DECLARED order, so a draft can be diffed against it. */
-export type Slot = { i: number; span: number };
-
-/** 12 · 6 · 4 — full, half, third. 21 §3.1's steps, and Home Assistant's multiplier of 3. */
-export const STEPS = [12, 6, 4] as const;
-
-export const COLUMNS = 12;
+export { COLUMNS, STEPS, spanLabel, spanOf, stepsFor, type Slot } from './arrange.ts';
 
 export class Arrangement {
   /**
@@ -86,33 +80,19 @@ export class Arrangement {
 
   /** True once the draft says something different from what was in force when the mode opened. */
   get dirty() {
-    const now = this.slots;
-    const was = this.#before ?? this.#declared;
-    if (!now || now.length !== was.length) return true;
-    return now.some((s, n) => s.i !== was[n]?.i || s.span !== was[n]?.span);
+    return this.slots ? differs(this.slots, this.#before ?? this.#declared) : true;
   }
 
   move(from: number, to: number) {
-    const now = this.slots;
-    if (!now) return;
-    const at = Math.max(0, Math.min(now.length - 1, to));
-    if (at === from) return;
-    const next = [...now];
-    const [held] = next.splice(from, 1);
-    if (held) next.splice(at, 0, held);
-    this.slots = next;
+    if (this.slots) this.slots = moveAt(this.slots, from, to);
   }
 
   remove(at: number) {
-    const now = this.slots;
-    if (!now) return;
-    this.slots = now.filter((_, n) => n !== at);
+    if (this.slots) this.slots = removeAt(this.slots, at);
   }
 
   setSpan(at: number, span: number) {
-    const now = this.slots;
-    if (!now) return;
-    this.slots = now.map((s, n) => (n === at ? { ...s, span } : s));
+    if (this.slots) this.slots = setSpanAt(this.slots, at, span);
   }
 
   /** What the declaration would become. The caller writes it; this class never does. */
@@ -120,25 +100,3 @@ export class Arrangement {
     return (this.slots ?? []).map((s) => ({ block: s.i, span: s.span }));
   }
 }
-
-/**
- * The narrowest span a kind survives, and the steps that are therefore offered.
- *
- * REFUSED, NOT CLAMPED. 21 §11: caps are counters, not discoveries, and a closed list's control
- * cannot express a non-member. A `Third` button that silently gives you a half is a button that has
- * taught you the wrong thing about your own page.
- */
-export const stepsFor = (kind: string): number[] => {
-  const floor = isKind(kind) ? KINDS[kind].minSpan : 4;
-  return STEPS.filter((s) => s >= floor);
-};
-
-/**
- * `Full · Half · Third`, and `Precise` for anything else.
- *
- * Precise is INFERRED from `span % 3 !== 0`, never stored — 21 §3.1, adopting Home Assistant's
- * trick. No extra state to keep in sync, and a span a pack wrote as 5 shows its own number rather
- * than being rounded to the nearest button.
- */
-export const spanLabel = (span: number): string =>
-  span === 12 ? 'Full' : span === 6 ? 'Half' : span === 4 ? 'Third' : `${span}/12`;

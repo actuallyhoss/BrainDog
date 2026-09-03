@@ -14,7 +14,7 @@
 <script lang="ts">
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
-  import { spanLabel, stepsFor } from '../record/arrange.svelte.ts';
+  import { spanLabel, stepsFor } from '../record/arrange.ts';
 
   let {
     kind,

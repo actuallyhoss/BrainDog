@@ -27,6 +27,7 @@
   import BlockBar from '$lib/ui/BlockBar.svelte';
   import AddBlock from '$lib/ui/AddBlock.svelte';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
+  import { spanOf as declaredSpan } from '$lib/record/arrange.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
 
   const slug = $derived(route.params.slug ?? '');
@@ -47,10 +48,7 @@
    * clamping, because a control that silently corrects you teaches nothing; this clamp is for
    * declarations that never went through that control.
    */
-  const spanOf = (block: BlockResult) => {
-    const floor = isKind(block.kind) ? KINDS[block.kind].minSpan : 4;
-    return Math.min(12, Math.max(floor, block.span ?? 12));
-  };
+  const spanOf = (block: BlockResult) => declaredSpan(block.kind, block.span);
 
   /* ── arranging ─────────────────────────────────────────────────────────────
      A MODE, not an always-on affordance. Drag handles on a page you are reading are noise, and an
