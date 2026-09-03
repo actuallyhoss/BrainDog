@@ -6,9 +6,8 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "vite dev",
-    "build": "node scripts/theme.mjs && vite build",
+    "build": "pnpm --filter @braindog/skin theme && vite build",
     "preview": "vite preview",
-    "theme": "node scripts/theme.mjs",
     "test": "node --test src/**/*.test.ts",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
@@ -16,7 +15,7 @@
     "svelte": "5.57.0"
   },
   "devDependencies": {
-    "@braindog/theme": "workspace:*",
+    "@braindog/skin": "workspace:*",
     "@sveltejs/adapter-static": "3.0.10",
     "@sveltejs/kit": "2.70.3",
     "@sveltejs/vite-plugin-svelte": "7.3.0",

@@ -1,0 +1,29 @@
+{
+  "name": "@braindog/skin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "description": "The token layer, element defaults and a11y layer, shared by both apps. CSS only, no JavaScript.",
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./base.css": "./base.css",
+    "./a11y.css": "./a11y.css",
+    "./house.css": "./house.css",
+    "./mark.ts": "./mark.ts"
+  },
+  "files": [
+    "tokens.css",
+    "base.css",
+    "a11y.css",
+    "house.css",
+    "mark.ts"
+  ],
+  "scripts": {
+    "theme": "node scripts/theme.mjs",
+    "typecheck": "node --experimental-strip-types --test scripts/*.test.ts || true"
+  },
+  "devDependencies": {
+    "@braindog/theme": "workspace:*"
+  }
+}

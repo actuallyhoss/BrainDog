@@ -25,16 +25,18 @@ const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 's
 // `--brand` lives in app.css and is caught deliberately: see the exemption note below.
 const EXEMPT = [
   /^packages\/theme\//,
-  /^apps\/web\/src\/theme\/house\.css$/,
+  /^packages\/skin\/house\.css$/,
   /^tools\/gates\//,
   /\.test\.ts$/,
   /**
-   * The favicon. It is fetched as its own document, outside any page, so it can reach no custom
-   * property and no theme — the mark's colours have to be literal or it has none. It is also the
-   * FILLED lockup rather than the outline one, because at 16px the dog's negative space collapses
-   * to a notch and the silhouette only survives reversed out of a solid ground.
+   * The favicons, one per app. Fetched as their own document, outside any page, so they can reach no
+   * custom property and no theme — the mark's colour has to be literal there or it has none.
+   *
+   * Which is exactly why they are GENERATED rather than written: they were the one copy of the mark
+   * that no token change touched, and so the one copy that drifted. `packages/skin/scripts/theme.mjs`
+   * writes both from `MARK` and `BRAND_RED`, and the theme gate byte-compares them.
    */
-  /^apps\/web\/static\/mark\.svg$/,
+  /^apps\/(web|site)\/static\/mark\.svg$/,
   /**
    * Build and screenshot tooling. Nothing here reaches a user: the contact sheet is a page rendered
    * once for a person to look at, and it has no theme to read because it is not the app.

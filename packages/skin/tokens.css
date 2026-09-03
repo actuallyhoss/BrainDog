@@ -1,0 +1,210 @@
+/**
+ * The token layer: faces, the type scale, spacing, radius, motion, z-index, and the mark.
+ *
+ * It lives in a package because TWO apps render this product — the record at app.brain.dog and the
+ * marketing site at brain.dog — and a second copy of a type scale is a type scale that drifts. The
+ * site is not a different brand with a similar palette; it is the same system with fewer screens,
+ * and the only honest way to hold that is for both to import the same file.
+ *
+ * `@layer tokens, theme, a11y, components` is declared here and nowhere else, so the ORDER is a
+ * property of the design system rather than of whichever stylesheet happened to load first. The
+ * consequence that matters: a theme cannot reach the a11y layer, so no palette anyone installs can
+ * remove a focus ring.
+ */
+
+@layer tokens, theme, a11y, components;
+
+@import './house.css';
+
+@layer tokens {
+  /* ── Faces ──────────────────────────────────────────────────────────────
+     Three roles, and the pairing is deliberate rather than convenient.
+
+     IBM Plex Sans carries the work: a humanist grotesque with a large x-height that holds up at
+     11px, and true tabular figures. It is also the engineered Latin sibling of IBM Plex Sans
+     Arabic, which 13 §3.1 already requires — so the Arabic requirement is met by a real companion
+     design instead of a fallback.
+
+     Poppins carries the brand: it is the wordmark's own face, geometric where Plex is humanist, and
+     it appears only at display sizes. It never touches a table, because a geometric face with a
+     small x-height and lining figures is the wrong tool for a column of money.
+
+     The identifier face is the system monospace stack and costs zero bytes. It is the ROLE that
+     makes #125 and D41 read as identifiers, not a chosen face (13 §3.1).
+
+     ponytail: 52.4 KB of Latin against a 45 KB budget (22 §9), because these are Google's stock
+     subsets. Subset both with pyftsubset to the glyphs actually reachable and the measured headroom
+     is ~15 KB; do it when the `bundle` gate lands, not before. */
+
+  @font-face {
+    font-family: 'Plex';
+    src: url('/fonts/plex-sans.woff2') format('woff2');
+    font-weight: 400 600;
+    font-display: swap;
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2074, U+20AC,
+      U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  @font-face {
+    font-family: 'Plex';
+    src: url('/fonts/plex-arabic.woff2') format('woff2');
+    font-weight: 400 600;
+    font-display: swap;
+    /* All-or-nothing per file and evaluated per page, so an English-only session never fetches
+       this one (22 §9). */
+    unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+  }
+
+  @font-face {
+    font-family: 'Poppins';
+    src: url('/fonts/poppins-600.woff2') format('woff2');
+    font-weight: 600;
+    font-display: swap;
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212;
+  }
+
+  :root {
+    --font-ui: 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Poppins', 'Plex', system-ui, sans-serif;
+    --font-id: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+    /* Eight steps, fixed. A theme never sets type; the reader's Text setting picks the body step
+       among three of them. Raising the scale is not a fix for a hard-to-read screen — the fault is
+       in what it says and how it is arranged (13 §7). */
+    --t-xs: 12px;
+    --t-sm: 13px;
+    --t-base: 15px;
+    --t-md: 17px;
+    --t-lg: 20px;
+    --t-xl: 24px;
+    --t-2xl: 28px;
+    --t-3xl: 34px;
+    --text: var(--t-base);
+
+    --lh-tight: 1.22;
+    --lh-body: 1.5;
+
+    /* The chrome reads at the body size, not below it. Running labels, rows and controls at 13
+       bought density nobody asked for and cost comfort everybody notices: a record is read for an
+       hour at a time. 15 is the body step, and the chrome is body. */
+    --t-ui: var(--t-base);
+
+    /* Space is one base multiplied, and it goes further than it used to. The old scale stopped at
+       48 and every gap between sections was 24 or 32, which is what made a screen of five groups
+       read as one undifferentiated wall. Separation is the job of SPACE; a rule is what you reach
+       for when there is no space to spend. */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --sp-6: 32px;
+    --sp-7: 48px;
+    --sp-8: 64px;
+    --sp-9: 96px;
+
+    --r-sm: 4px;
+    --r-md: 6px;
+    --r-lg: 8px;
+
+    /**
+     * NO ELEVATION. Not a soft shadow, not an inset highlight, nothing.
+     *
+     * A card sits flat on the ground and a one-pixel border is its whole boundary. Shadows are how a
+     * flat medium fakes depth it does not have, and once every card has one the screen is a pile of
+     * slightly-floating rectangles. A border is honest and it is also cheaper to read.
+     *
+     * The token stays, valued `none`, so the rule is stated rather than merely absent — and so a
+     * component that wants elevation has to come and change this line.
+     */
+    --raise: none;
+
+    /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
+       never the pixels (13 §4.2). */
+    --row-h: 34px;
+    --ctl-h: 36px;
+    --tap: 44px;
+    --measure: 72ch;
+    --sticky: 52px;
+    --rail: 244px;
+    --kb: 0px;
+
+    --icon-s: 12px;
+    --icon-m: 16px;
+    --icon-l: 20px;
+    --icon-xl: 24px;
+
+    /* Every positive z-index in the app is one of these four names. A number that matches no rule
+       is how an overlay ends up under the thing it covers. */
+    --z-sheet: 10;
+    --z-palette: 20;
+    --z-toast: 30;
+    --z-hint: 40;
+
+    /* Open and close are not symmetric. Opening is something you watch; closing is something you
+       have already decided about (13 §9). Ceiling 300ms — nothing is longer. */
+    --d-press: 90ms;
+    --d-release: 180ms;
+    --d-state: 180ms;
+    --d-move: 240ms;
+    --d-enter: 280ms;
+    --d-exit: 160ms;
+
+    /* zeta 0.7467, omega 6.56, settle 1.214s, peak 1.0292 — scripts/spring.mjs.
+       The last stop is forced to exactly 1: a spring that settles at 0.998 leaves a one-pixel gap
+       on every panel forever. */
+    --ease-spring: linear(
+      0, 0.0503, 0.1684, 0.3158, 0.4672, 0.6068, 0.7265, 0.8232, 0.8972, 0.9509, 0.9875, 1.0104,
+      1.0232, 1.0286, 1.0292, 1.0268, 1.0229, 1.0185, 1.0141, 1.0102, 1.0069, 1.0043, 1.0024, 1
+    );
+    --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
+
+    /* The mark. Not a role and not an identity accent: the one colour in the product that belongs
+       to the product rather than to a meaning. It paints the logo and nothing else, which is why it
+       is a token and not a literal in an SVG (22 §7 gate 2).
+
+       It is also, deliberately, the same value the theme generator seeds `--accent` from — the
+       accent IS the mark here. Kept as a separate token anyway, because the logo must not change
+       colour when someone installs a theme. */
+    --brand: #cf413a;
+  }
+
+  /* The reader's Text setting picks the body step. Three, not a slider. */
+  html[data-text='sm'] { --text: var(--t-sm); }
+  html[data-text='base'] { --text: var(--t-base); }
+  html[data-text='md'] { --text: var(--t-md); }
+
+
+  /* SIZE follows the pointer, never the width. A small laptop window is not a phone, and a width
+     query that changes a control's size is how it starts behaving like one (05 §6). */
+  @media (pointer: coarse) {
+    :root { --ctl-h: 44px; }
+  }
+
+  html[data-density='compact'] { --row-h: 30px; }
+  html[data-density='comfortable'] { --row-h: 34px; }
+  html[data-density='roomy'] { --row-h: 40px; }
+
+  html[data-scheme='dark'] { color-scheme: dark; }
+  html[data-scheme='light'] { color-scheme: light; }
+
+  /* A runtime type assertion on every semantic colour role, so a malformed installed token fails
+     loudly instead of inheriting. It does NOT rescue `var(--fain)` — a typo resolves to the
+     inherited value, not to `initial-value`, measured (28 §2.3). The lint gate stays load-bearing. */
+  @property --sunk { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --bg { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --s1 { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --s2 { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --s3 { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --ink { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --ink2 { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --dim { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --faint { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --line { syntax: '<color>'; inherits: true; initial-value: #888; }
+  @property --edge { syntax: '<color>'; inherits: true; initial-value: #888; }
+  @property --earn { syntax: '<color>'; inherits: true; initial-value: #0a0; }
+  @property --warn { syntax: '<color>'; inherits: true; initial-value: #a80; }
+  @property --danger { syntax: '<color>'; inherits: true; initial-value: #c00; }
+  @property --info { syntax: '<color>'; inherits: true; initial-value: #06c; }
+  @property --accent { syntax: '<color>'; inherits: true; initial-value: #06c; }
+}

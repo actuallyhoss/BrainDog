@@ -15,6 +15,13 @@
   never the browser's guess. Once it IS detected, it is shown as what it is — writes will fail.
 -->
 <script lang="ts">
+  /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
+     with it the rule that no installed theme can reach the a11y layer — is established before any
+     other stylesheet is parsed. */
+  import '@braindog/skin/tokens.css';
+  import '@braindog/skin/base.css';
+  import '@braindog/skin/a11y.css';
+
   import '../app.css';
   import '$lib/blocks.css';
   import '$lib/ui/rows.css';

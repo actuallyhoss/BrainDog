@@ -19,7 +19,7 @@ const GATES = [
   ['clean-room', ['node', [join(here, 'clean-room.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
-  ['theme', ['node', [join(root, 'apps/web/scripts/theme.mjs'), '--check']]],
+  ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
   // Needs a build. It reports and exits 0 when there is not one, so `pnpm gates` is useful on a
   // fresh checkout; CI builds first, and then it is a real gate.
   ['bundle', ['node', [join(here, 'bundle.mjs')]]],

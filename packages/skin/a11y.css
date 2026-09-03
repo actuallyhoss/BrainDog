@@ -1,0 +1,85 @@
+/**
+ * The accessibility layer, and it is a LAYER on purpose.
+ *
+ * `@layer tokens, theme, a11y, components` puts this above every theme and below every component,
+ * which is the whole mechanism: an installed palette cannot reach in here and remove a focus ring,
+ * and a component that tries has to be written knowing it is overriding the a11y layer by name.
+ */
+
+@layer a11y {
+  /* Nothing in this layer is reachable by a theme, because `@layer theme` is declared before it. */
+
+  /* A two-tone ring, so it is visible on every surface in both schemes. Never animated — keyboard
+     navigation through an animated ring is wading (13 §9). */
+  :focus-visible {
+    outline: 2px solid var(--focus-in);
+    outline-offset: 1px;
+    box-shadow: 0 0 0 4px var(--focus-out);
+    border-radius: var(--r-sm);
+  }
+
+  /* An invisible hit box, so a 20px chevron inside a 44px control is a 44px target. Both axes: a
+     control grown only in height measures 38x44 and fails. The pseudo-element counts because it is
+     what takes the pointer (13 §7). */
+  .tap {
+    position: relative;
+  }
+
+  .tap::before {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc((100% - var(--tap)) / 2)) min(0px, calc((100% - var(--tap)) / 2));
+  }
+
+  /* Reduced motion is a PROMISE, not a preference: durations collapse and the state simply
+     changes. Replace, never delete — every state must still change something. */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --d-press: 1ms;
+      --d-release: 1ms;
+      --d-state: 1ms;
+      --d-move: 1ms;
+      --d-enter: 1ms;
+      --d-exit: 1ms;
+      --ease-spring: linear(0, 1);
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Under forced colours the UA overrides every colour property and `box-shadow` computes to
+     `none`, so sunk, bg, s1, s2 and s3 all become Canvas: a five-level ladder becomes one level and
+     every block boundary in the product disappears. The elevation ladder cannot rescue it, because
+     the shadows are gone too. Each boundary is re-expressed as a border (28 §2.5, check L). */
+  @media (forced-colors: active) {
+    .panel,
+    .grid,
+    .rows,
+    .table,
+    .media,
+    .block,
+    .card,
+    .field,
+    .sheet,
+    .rail,
+    .chip {
+      border: 1px solid CanvasText;
+    }
+
+    [data-intent] {
+      forced-color-adjust: none;
+    }
+
+    :focus-visible {
+      outline: 2px solid Highlight;
+      outline-offset: 2px;
+    }
+  }
+}

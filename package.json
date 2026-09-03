@@ -13,6 +13,7 @@
     "dev": "pnpm --filter @braindog/web dev",
     "build": "pnpm --filter @braindog/web build",
     "shots": "pnpm --filter @braindog/web exec node scripts/shot.mjs",
+    "theme": "pnpm --filter @braindog/skin theme",
     "proof": "pnpm --filter @braindog/theme run proof"
   },
   "devDependencies": {

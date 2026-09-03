@@ -1,0 +1,87 @@
+/**
+ * Element defaults, shared by both apps.
+ *
+ * Everything past this is scoped to the component that owns it. What is here is what an element
+ * IS before anybody styles it — box sizing, the body face and rhythm, headings on the display
+ * face, links in the accent, and the two rules that make figures and Arabic set correctly.
+ *
+ * Deliberately NOT here: `html, body { overflow: hidden }`. The record app is a single scroll
+ * container by design and the marketing site is a document that scrolls; a shared base that picks
+ * one of those forces the other to undo it, and an undone rule is a rule nobody can find.
+ */
+
+@layer components {
+  /* Element defaults. Everything else is scoped to the component that owns it. */
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    /* 2.4.11: keyboard focus must not land under the sticky header. Paid once, here. */
+    scroll-padding-block-start: calc(var(--sticky) + var(--sp-2));
+  }
+
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--text);
+    line-height: var(--lh-body);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+    letter-spacing: -0.014em;
+  }
+
+  p, ul, ol {
+    margin: 0;
+  }
+
+  a {
+    color: var(--accent-text);
+    text-decoration-color: color-mix(in srgb, var(--accent-text) 40%, transparent);
+    text-underline-offset: 0.18em;
+  }
+
+  a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Quantities get tabular figures on a PROPORTIONAL face. A monospace face gives the thousands
+     separator a full cell, so EGP 2,869 renders as EGP 2 , 869 at display size — the comma floats
+     and the figure reads wider and smaller than the sans figure beside it. Mono is for IDENTITY;
+     tabular-proportional is for QUANTITY (13 §3.2). */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'ss02';
+  }
+
+  /* Arabic sits at a different optical size: no capitals, no x-height, weight above and below the
+     baseline, and diacritics need room. letter-spacing is EXACTLY 0, always — it is a joined script
+     and tracking breaks the joins. The multiplier and the leading are practitioner numbers, marked
+     low confidence in 13 §3.3 and owed a measurement. */
+  :root:dir(rtl) body {
+    font-size: calc(var(--text) * 1.12);
+    line-height: calc(var(--lh-body) + 0.18);
+    letter-spacing: 0;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 34%, transparent);
+  }
+}
