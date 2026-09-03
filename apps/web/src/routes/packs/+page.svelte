@@ -103,6 +103,11 @@ an update that would move something is shown here and then ignored.`}</code></pr
     border: 1px solid var(--line);
     border-radius: var(--r-md);
     box-shadow: var(--raise);
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .pack:hover {
+    border-color: var(--edge);
   }
 
   .pack-head {
@@ -148,11 +153,17 @@ an update that would move something is shown here and then ignored.`}</code></pr
     font-size: var(--t-xs);
   }
 
+  /* A hairline, and the card's own padding pulled back over it, so the actions read as the card's
+     FOOTER rather than as two more lines of its body. Without it "What this adds" sits at the same
+     level as the blurb above it and the card has no bottom. */
   .pack-foot {
     display: flex;
     gap: var(--sp-1);
-    margin-block-start: var(--sp-1);
-    margin-inline-start: calc(var(--sp-3) * -1);
+    margin-block-start: auto;
+    padding-block-start: var(--sp-3);
+    margin-inline: calc(var(--sp-4) * -1);
+    padding-inline: calc(var(--sp-4) - var(--sp-3));
+    border-block-start: 1px solid var(--line);
   }
 
   .diff {

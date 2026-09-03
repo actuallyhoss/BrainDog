@@ -146,7 +146,7 @@
   }
 
   .choice:hover {
-    background: var(--s2);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
   }
 
   .choice-n {

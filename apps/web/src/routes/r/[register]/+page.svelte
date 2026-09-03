@@ -136,10 +136,10 @@
 
   <div class="page">
     <div class="bar">
-      <label class="search">
+      <label class="field">
         <Icon name="search" size="s" />
         <input
-          class="search-input"
+          class="field-input"
           type="search"
           placeholder="Search {decl.name.toLowerCase()}"
           value={q}
@@ -152,10 +152,10 @@
       </label>
 
       {#each filterable.filter((f) => f.type === 'enum') as f}
-        <div class="chips" role="group" aria-label={f.id}>
+        <div class="segmented" role="group" aria-label={f.id}>
           {#each f.values ?? [] as value}
             {@const on = filters.find((x) => x.field === f.id)?.values.includes(value)}
-            <button type="button" class="chip" data-on={on ? '' : undefined} onclick={() => toggleFilter(f.id, value)}>
+            <button type="button" class="segment" data-on={on ? '' : undefined} onclick={() => toggleFilter(f.id, value)}>
               {value.replace(/_/g, ' ')}
             </button>
           {/each}
@@ -286,81 +286,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-  }
-
-  /* A field is a HOLE cut into the page, so it takes the raised surface and a real border rather
-     than the sunk one: on a cream ground a sunk field and the page are the same colour, and the
-     input stops looking like somewhere you can type. */
-  .search {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--dim);
-    transition: border-color var(--d-state) var(--ease-out);
-  }
-
-  .search:hover {
-    border-color: var(--edge);
-  }
-
-  /* The ring is drawn on the WRAPPER, because the input inside it has no border of its own and a
-     ring around a borderless box lands in the wrong place by a pixel on every platform. */
-  .search:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-  }
-
-  .search-input {
-    inline-size: 22ch;
-    border: 0;
-    border-radius: var(--r-sm);
-    background: none;
-    color: var(--ink);
-    font-size: var(--t-ui);
-  }
-
-  /* A segmented control, not a row of buttons: one sunk track, and the chosen option is a raised
-     card sitting in it. The selected state has to be a SHAPE and not a shade — a slightly lighter
-     grey behind one word out of four is the single most-missed control in dense software. */
-  .chips {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-  }
-
-  .chip {
-    min-block-size: 28px;
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 1px solid transparent;
-    border-radius: var(--r-sm);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    cursor: pointer;
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
-  }
-
-  .chip:hover:not([data-on]) {
-    background: color-mix(in srgb, var(--ink) 5%, transparent);
-    color: var(--ink2);
-  }
-
-  .chip[data-on] {
-    background: var(--s3);
-    border-color: var(--line);
-    color: var(--ink);
-    font-weight: 600;
   }
 
   .bar-hint {

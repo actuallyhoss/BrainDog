@@ -38,9 +38,13 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
+  /* A TINT, not a rung. `--s2` is one step up the surface ladder from the `--s1` the ledger sits on,
+     and in the light scheme that is two points of luminance — a hover state you cannot see, on the
+     rows that carry most of what a person clicks. The same mix the table rows use, so a row is a
+     row wherever it is drawn. */
   a.line:hover,
   button.line:hover {
-    background: var(--s2);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
   }
 
   .line-tall {

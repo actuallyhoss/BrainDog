@@ -29,10 +29,10 @@
 <PageHead title={copy.search} count={q ? hits.length : undefined} />
 
 <div class="page">
-  <label class="field">
+  <label class="field field-lg">
     <Icon name="search" size="m" />
     <input
-      class="input"
+      class="field-input"
       type="search"
       value={q}
       placeholder="A name, a word, or a spoken id"
@@ -75,31 +75,6 @@
     gap: var(--sp-4);
     padding: var(--sp-5) var(--sp-6) var(--sp-9);
     max-inline-size: 900px;
-  }
-
-  .field {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: 44px;
-    padding: 0 var(--sp-4);
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--dim);
-  }
-
-  .field:focus-within {
-    border-color: var(--edge);
-  }
-
-  .input {
-    flex: 1;
-    border: 0;
-    border-radius: var(--r-sm);
-    background: none;
-    color: var(--ink);
-    font-size: var(--t-md);
   }
 
   .prompt {

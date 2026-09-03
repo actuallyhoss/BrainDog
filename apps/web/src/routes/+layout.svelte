@@ -18,6 +18,7 @@
   import '../app.css';
   import '$lib/blocks.css';
   import '$lib/ui/rows.css';
+  import '$lib/ui/controls.css';
 
   import { copy } from '$lib/copy.ts';
   import { GoPrefix, overlays, typing } from '$lib/a11y/keys.svelte.ts';

@@ -1,0 +1,105 @@
+/**
+ * The field shape, once.
+ *
+ * It lives here rather than in the three screens that draw one for the reason `rows.css` gives: it
+ * is ONE contract, not three, and three copies of a control drift. They already had — the register's
+ * filter bar, the search page and the onboarding step each grew their own, and by the time anyone
+ * looked they disagreed about the surface, the radius and what focus does.
+ *
+ * A FIELD IS A HOLE CUT INTO THE PAGE, and on this palette that means the RAISED surface and a real
+ * border. The instinct is the other way round — a field is where you put something, so it should
+ * look recessed — and on a cream ground it is exactly wrong: `sunk` and the page are within a couple
+ * of points of each other, so a "recessed" field is a flat slab of the same colour as everything
+ * around it and stops looking like somewhere you can type. Depth here is a luminance ladder and the
+ * ladder only has room in one direction.
+ */
+
+@layer components {
+  .field {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .field:hover {
+    border-color: var(--edge);
+  }
+
+  /* The ring is drawn on the WRAPPER, because the input inside it has no border of its own and a
+     ring around a borderless box lands in the wrong place by a pixel on every platform. This does
+     not replace the a11y layer's focus ring, which the input still gets and which is not
+     removable — it is what makes the FIELD look focused rather than only the caret inside it. */
+  .field:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  .field-lg {
+    min-block-size: 44px;
+    padding-inline: var(--sp-4);
+    gap: var(--sp-3);
+  }
+
+  .field-input {
+    flex: 1;
+    min-inline-size: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font-size: var(--t-ui);
+  }
+
+  .field-lg .field-input {
+    font-size: var(--t-md);
+  }
+
+  .field-input::placeholder {
+    color: var(--dim);
+  }
+
+  /* A SEGMENTED CONTROL, and the same rule as the field: one sunk track, and the chosen option is a
+     raised card sitting in it. The selected state has to be a SHAPE and not a shade — a slightly
+     lighter grey behind one word out of four is the single most-missed control in dense software. */
+  .segmented {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .segment {
+    min-block-size: 28px;
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  .segment:hover:not([data-on]) {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    color: var(--ink2);
+  }
+
+  .segment[data-on] {
+    background: var(--s3);
+    border-color: var(--line);
+    color: var(--ink);
+    font-weight: 600;
+  }
+}
