@@ -22,7 +22,7 @@
   import { copy } from '$lib/copy.ts';
   import { GoPrefix, overlays, typing } from '$lib/a11y/keys.svelte.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
-  import Spark from '$lib/ui/Spark.svelte';
+  import Mark from '$lib/ui/Mark.svelte';
   import TabBar from '$lib/ui/TabBar.svelte';
   import Palette from '$lib/palette/Palette.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -41,7 +41,6 @@
   let paletteOpen = $state(false);
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
-  let sparkOpen = $state(false);
   const go = new GoPrefix();
 
   /** `ponytail:` a constant in the mock-up. The live channel is `lib/data/live.ts` in the real app:
@@ -133,15 +132,24 @@
     <TabBar open={data.questions.length} inbox={data.inbox} onmore={() => (moreOpen = true)} />
   </div>
 
-  <button type="button" class="palette-launcher tap" onclick={() => (paletteOpen = true)} aria-label={copy.paletteLabel}>
-    <Icon name="search" size="l" />
+  <!--
+    The mark, and the only place it appears in the app chrome.
+
+    It used to sit at the top of the rail, where a logo is decoration: it names the product you are
+    already inside, and spends the most valuable sixty pixels on the screen doing it. Here it has a
+    job. It opens the palette — the one surface that reaches anything in the record — from the
+    corner every product has trained people to look in.
+
+    NOT AN ASSISTANT AND NOT A PANEL OF ITS OWN. There was a version of this with a prompt field and
+    four suggested questions, and it was wrong twice over: a record you talk to instead of read is
+    a different product, and a second overlay that does most of what the palette does is a second
+    place to look for one thing. The button opens the palette that already exists.
+  -->
+  <button type="button" class="launcher tap" onclick={() => (paletteOpen = true)} aria-label={copy.paletteLabel}>
+    <Mark height={26} tone="inherit" />
   </button>
 
   <Palette bind:open={paletteOpen} nav={data.nav} />
-
-  <!-- The agent lives in the corner of every surface, so there is never a screen where the answer
-       to "who do I ask about this?" is somewhere else. -->
-  <Spark bind:open={sparkOpen} />
 {/if}
 
 <Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>
@@ -214,15 +222,63 @@
     border-inline-start: 1px solid var(--line);
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* Spark floats over the bottom-right corner of every surface, so every surface ends above it.
-       A floating button that covers the last row of a list is a floating button that hides exactly
-       the thing a long list is scrolled to the bottom to see. */
+    /* The launcher floats over the bottom-right corner of every surface, so every surface ends
+       above it. A floating button that covers the last row of a list hides exactly the thing a long
+       list is scrolled to the bottom to see. */
     padding-block-end: calc(var(--tap) + var(--sp-5));
   }
 
-  .tab-slot,
-  .palette-launcher {
+  /* Below 900px the rail becomes a tab bar; above it, the tab bar does not exist. */
+  .tab-slot {
     display: none;
+  }
+
+  /* A RED CIRCLE. The mark reversed out of its own colour, 52px, bottom-right, and nothing else in
+     it — no label, no count, no chevron. It is the product's own drawing, so the drawing is the
+     whole affordance; a word beside it would be explaining a logo.
+
+     The only control in the app that floats, and therefore the only place a shadow is allowed to
+     exist. Everything else is flat because everything else is IN the page; this is over it, and a
+     thing over the page that casts nothing reads as stuck to the glass. It uses the generated
+     elevation ladder rather than a number invented here. */
+  .launcher {
+    position: fixed;
+    inset-block-end: var(--sp-5);
+    inset-inline-end: var(--sp-5);
+    z-index: var(--z-hint);
+    display: grid;
+    place-items: center;
+    inline-size: 52px;
+    block-size: 52px;
+    padding: 0;
+    background: var(--brand);
+    border: 0;
+    border-radius: 999px;
+    box-shadow: var(--e2);
+    color: var(--accent-ink);
+    cursor: pointer;
+    transition:
+      transform var(--d-state) var(--ease-out),
+      box-shadow var(--d-state) var(--ease-out);
+  }
+
+  .launcher:hover {
+    box-shadow: var(--e3);
+    transform: translateY(-1px);
+  }
+
+  .launcher:active {
+    transition-duration: var(--d-press);
+    transform: none;
+    box-shadow: var(--e1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .launcher,
+    .launcher:hover,
+    .launcher:active {
+      transform: none;
+    }
   }
 
   @media (width < 900px) {
@@ -236,29 +292,21 @@
 
     .body {
       border: 0;
-      padding-block-end: 76px;
+      padding-block-end: calc(56px + var(--sp-6));
     }
 
     .tab-slot {
       display: block;
     }
 
-    /* The palette is a HEADER button, not a fifth tab: a command surface in a tab slot looks like
-       another place to go (19 §3). */
-    .palette-launcher {
-      position: fixed;
-      inset-block-start: max(var(--sp-2), env(safe-area-inset-top));
-      inset-inline-end: var(--sp-2);
-      z-index: var(--z-hint);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      inline-size: 40px;
-      block-size: 40px;
-      background: var(--s2);
-      border: 1px solid var(--edge);
-      border-radius: var(--r-sm);
-      color: var(--ink2);
+    /* The tab bar owns the bottom of a phone, so the circle lifts clear of it rather than covering
+       the fifth tab. It stays a circle and stays in the corner: one launcher, one shape, one place
+       to look, whatever the window is doing. */
+    .launcher {
+      inset-block-end: calc(56px + var(--sp-3));
+      inset-inline-end: var(--sp-3);
+      inline-size: 48px;
+      block-size: 48px;
     }
   }
 

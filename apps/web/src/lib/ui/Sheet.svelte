@@ -81,6 +81,16 @@
     display: flex;
     flex-direction: column;
     inline-size: min(480px, 100vw);
+    /* EXPLICIT, because `inset-block: 0` is not enough. The UA stylesheet gives `<dialog>` a
+       `height: fit-content`, which beats the stretch the two insets ask for — so the drawer was
+       hanging from the top-right corner at the height of whatever was in it, ending mid-page with
+       the table still visible underneath. A drawer that covers a corner is a popover in the wrong
+       place.
+
+       BOTH properties, and the second one is not redundant. The UA also sets
+       `max-height: calc(100% - 6px - 2em)`, which clamps a 900px viewport to 864 and leaves a
+       36-pixel strip of the page showing under the drawer — measured, not guessed. */
+    block-size: 100dvh;
     max-block-size: 100dvh;
     margin: 0;
     padding: 0;

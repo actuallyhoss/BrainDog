@@ -7,7 +7,7 @@
     - No pack vocabulary on screen one. The word "pack" does not appear until the user goes looking
       for a second register.
     - No model, no agent, no MCP required. Everything here works on a fresh self-host with nothing
-      configured — an earlier draft made the core loop a capture field whose rows come from Spark,
+      configured — an earlier draft made the core loop a capture field whose rows come from a model,
       which v1 does not ship and self-host does not have. A first run that depends on an absent
       component is not a first run.
     - Nothing to approve. Selecting a PACK means reading an install diff written in the language of

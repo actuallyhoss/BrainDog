@@ -87,17 +87,6 @@ export const copy = {
   holdingPen: 'Not placed. Nothing moved.',
   review: 'Review',
 
-  /* Spark — the agent. Openings, not features: each is a question somebody would actually say out
-     loud, and each is one the record can answer from rows it already holds. */
-  spark: 'Spark',
-  sparkPlaceholder: 'Ask about the record',
-  sparkSend: 'Ask',
-  sparkOne: 'Who owes me the most, and for how long?',
-  sparkTwo: 'What renews before the end of the month?',
-  sparkThree: 'Draft a chase for the two oldest invoices.',
-  sparkFour: 'What did you change while I was away?',
-  sparkNote: 'Spark writes to the record, and every write is signed and in the audit log.',
-
   /* the palette */
   paletteLabel: 'Search, or run a command',
   palettePlaceholder: 'Type a name, an id, or a command',
@@ -106,7 +95,7 @@ export const copy = {
   destinations: 'Go to',
   records: 'Rows',
   pages: 'Pages and registers',
-  askSpark: 'Ask Spark',
+  askBrainDog: 'Ask BrainDog',
 
   /* the vault */
   vaultBlurb: 'What each key opens, and when each was last rotated. The value is never shown here.',

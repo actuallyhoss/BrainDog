@@ -402,8 +402,8 @@ export function boot() {
     whatsNew: NEWS,
     sinceCapped: false,
     version: 4192,
-    /** Absent means every "Ask Spark" affordance is ABSENT, not disabled (23 §8). */
-    spark: false,
+    /** Absent means every "Ask BrainDog" affordance is ABSENT, not disabled (23 §8). */
+    assistant: false,
   };
 }
 

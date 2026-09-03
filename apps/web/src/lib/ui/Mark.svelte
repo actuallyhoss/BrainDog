@@ -14,11 +14,22 @@
 <script lang="ts">
   const RATIO = 997.34 / 775.17;
 
-  let { height = 22, title }: { height?: number; title?: string } = $props();
+  let {
+    height = 22,
+    title,
+    tone = 'brand',
+  }: {
+    height?: number;
+    title?: string;
+    /** `brand` paints it in the mark's own red; `inherit` takes the parent's colour, which is what
+        lets the mark be reversed out of a red ground without a second copy of the artwork. */
+    tone?: 'brand' | 'inherit';
+  } = $props();
 </script>
 
 <svg
   class="mark"
+  data-tone={tone}
   width={Math.round(height * RATIO * 100) / 100}
   {height}
   viewBox="0 0 997.34 775.17"
@@ -39,5 +50,9 @@
     display: block;
     fill: var(--brand);
     flex: none;
+  }
+
+  .mark[data-tone='inherit'] {
+    fill: currentColor;
   }
 </style>

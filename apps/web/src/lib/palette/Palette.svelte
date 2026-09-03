@@ -195,7 +195,7 @@
       {/each}
     {:else}
       <!-- A query matching nothing falls through to a fallback row when a model is configured.
-           Without one the row, the status call and every Ask Spark button do not exist — ABSENT,
+           Without one the row, the status call and every "Ask BrainDog" button do not exist — ABSENT,
            not disabled (23 §8). This record has no model, so this is what you get. -->
       <p class="p-none">{copy.noMatches} “{q}”</p>
     {/each}
@@ -309,10 +309,17 @@
     cursor: pointer;
   }
 
+  /* The same tint the rail uses for "here", because it is the same idea: one row out of a list is
+     the one you are on. It was `--s3` plus a 2px bar, which on a light palette is one rung of the
+     surface ladder away from the ground it sits on — a highlight you have to hunt for in the one
+     control that exists to be driven from the keyboard. */
   .p-row[data-cursor] {
-    background: var(--s3);
-    box-shadow: inset 2px 0 0 0 var(--accent);
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
     color: var(--ink);
+  }
+
+  .p-row[data-cursor] :global(.icon) {
+    color: var(--accent-text);
   }
 
   .p-title {

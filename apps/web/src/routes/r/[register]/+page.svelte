@@ -15,9 +15,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { MISSING } from 'braindog-render';
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { REGISTERS, columnsFor, display, entry, identityOf, list, toRows, type Filter } from '$lib/record/api.ts';
+  import { REGISTERS, columnsFor, display, entry, identityOf, labelOf, list, toRows, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -249,10 +250,19 @@
     onclose={() => (peeked = null)}
   >
     {#if peekedEntry}
+      <!-- FORMATTED, through the same `display` every other surface goes through.
+
+           This drew `peekedEntry.fields[f.id]` straight out of the row, which is how the drawer
+           came to show `amount 480000`, `party 1` and `due 2026-07-27` beside a table showing
+           `GBP 4,800.00`, `Halden Type Co` and `27 Jul 2026` for the same row. Money in minor units
+           on a screen a person reads is the one formatting bug this product cannot ship, and a
+           `ref` rendered as the integer it is stored as is a row nobody can identify.
+
+           Labels go through `labelOf` for the same reason: the drawer was printing raw field ids. -->
       <dl class="peek">
         {#each decl.fields as f}
-          <dt>{f.label ?? f.id.replace(/_/g, ' ')}</dt>
-          <dd>{peekedEntry.fields[f.id] ?? '—'}</dd>
+          <dt>{labelOf(f)}</dt>
+          <dd>{display(id, f.id, peekedEntry.fields[f.id]) ?? MISSING}</dd>
         {/each}
       </dl>
     {/if}

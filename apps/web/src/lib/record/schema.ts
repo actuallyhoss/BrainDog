@@ -141,7 +141,7 @@ export type InboxItem = {
   subject: string;
   /** Why no pattern matched it. The inbox is what the rules did not claim. */
   body: string;
-  /** A pattern Spark proposed, present only when a model is configured. */
+  /** A pattern the record proposed, present only when a model is configured. */
   suggestion?: string;
 };
 

@@ -15,6 +15,12 @@
   Three rules stop an ecosystem rearranging it: the spine is not extensible; a pack declares content
   and identity, never position or visibility; and position lives in a per-user store and wins.
 
+  NO CHORD HINTS IN THE ROWS. `g h`, `g d` and `g 1`–`g 9` all still work — they are in the keymap,
+  which is what `?` is for. Printing them beside the labels put a second column of grey monospace
+  down the whole rail, fading in and out as the pointer crossed it, so the rail flickered every time
+  you moved the mouse past it. A shortcut is worth advertising in the one place somebody goes
+  looking for shortcuts, not in the eleven places they are trying to read a name.
+
   EVERY ROW WEARS A GLYPH, and it is declared rather than guessed. The first build gave icons to the
   spine and the footer and left the middle — the declared pages and the registers, which is most of
   the rail and all of the part that varies — as bare words. A list where the top three and the
@@ -54,11 +60,6 @@
     return [...out];
   });
 
-  /** `g 1`–`g 9` address a POSITION the user controls, not a name the pack chose — so a pack cannot
-      steal muscle memory. The digit is printed beside the item, so the chord is discoverable by
-      looking at the thing it operates. */
-  const digits = $derived(new Map(nav.map((e, i) => [e.id, i < 9 ? String(i + 1) : ''])));
-
   const here = (href: string) => page.url.pathname === href;
   const under = (href: string) => page.url.pathname.startsWith(href);
 
@@ -66,9 +67,9 @@
 </script>
 
 <nav class="rail" aria-label="Record">
-  <!-- No lockup. The mark is on the Spark button in the corner, where it is an affordance rather
-       than a caption, and the record switcher takes the space it used to occupy. The name of the
-       thing you are inside is worth more here than the name of the software you are inside: you
+  <!-- No lockup. The mark is the red circle in the bottom-right corner, where it is an affordance
+       rather than a caption, and the record switcher takes the space it used to occupy. The name of
+       the thing you are inside is worth more here than the name of the software you are inside: you
        chose the software once, and you switch records every day. -->
   <div class="top">
     <button type="button" class="record tap">
@@ -83,21 +84,19 @@
   <ul class="group spine">
     <li>
       <a class="item tap" href="/" aria-current={here('/') ? 'page' : undefined}>
-        <Icon name="home" size="m" /><span class="item-name">{copy.home}</span><kbd class="hint">g h</kbd>
+        <Icon name="home" size="m" /><span class="item-name">{copy.home}</span>
       </a>
     </li>
     <li>
       <a class="item tap" href="/decide" aria-current={under('/decide') ? 'page' : undefined}>
         <Icon name="decide" size="m" /><span class="item-name">{copy.decide}</span>
         {#if open}<span class="count" data-intent="warn">{open}</span>{/if}
-        <kbd class="hint">g d</kbd>
       </a>
     </li>
     <li>
       <a class="item tap" href="/inbox" aria-current={under('/inbox') ? 'page' : undefined}>
         <Icon name="inbox" size="m" /><span class="item-name">{copy.inbox}</span>
         {#if inbox}<span class="count">{inbox}</span>{/if}
-        <kbd class="hint">g i</kbd>
       </a>
     </li>
   </ul>
@@ -112,7 +111,6 @@
             <a class="item tap" href={entry.href} aria-current={here(entry.href) ? 'page' : undefined}>
               <Icon name={entry.icon} size="m" />
               <span class="item-name">{entry.title}</span>
-              <kbd class="hint">{digits.get(entry.id)}</kbd>
             </a>
           </li>
         {/each}
@@ -355,26 +353,6 @@
 
   .item[aria-current='page'] .tally {
     color: inherit;
-  }
-
-  .hint {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    opacity: 0;
-    transition: opacity var(--d-state) var(--ease-out);
-  }
-
-  .rail:hover .hint,
-  .item:focus-visible .hint {
-    opacity: 1;
-  }
-
-  /* Under a coarse pointer the chord hint is noise: there is no keyboard to press it with. */
-  @media (pointer: coarse) {
-    .hint {
-      display: none;
-    }
   }
 
   .pen {
