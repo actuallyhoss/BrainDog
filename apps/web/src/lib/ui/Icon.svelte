@@ -51,6 +51,7 @@
     doc: 'M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h4',
     tag: 'M3 11V4h7l11 11-7 7zM7.2 7.2h.01',
     bell: 'M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 19a2 2 0 0 0 4 0',
+    session: 'M3 5h18v13H3zM7.5 9.5l2.5 2.5-2.5 2.5M12.5 14.5h4',
   } as const;
 
   export type IconName = keyof typeof PATHS;

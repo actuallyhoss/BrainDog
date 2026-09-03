@@ -253,7 +253,49 @@ export function metric(id: string): Metric {
   const obligations = ROWS.obligations ?? [];
   const services = ROWS.services ?? [];
 
+  /* The Kiln metrics are the same three shapes, narrowed by one `ref`. That is the whole trick of a
+     project page: nothing about it is a new kind of thing, it is the register's own numbers with a
+     `thing is Kiln` on the front. `KILN` is `things#1`. */
+  const KILN = 1;
+  const tasks = ROWS.tasks ?? [];
+
   switch (id) {
+    case 'kiln-open': {
+      const rows = tasks.filter((e) => e.fields.thing === KILN && e.fields.state !== 'done' && e.fields.state !== 'dropped');
+      const late = rows.filter((e) => days(e.fields.by) < 0).length;
+      return {
+        id,
+        label: 'Open',
+        value: integer(rows.length),
+        note: late > 0 ? `${late} past its date` : 'none past its date',
+        tone: late > 0 ? 'warn' : 'good',
+        href: '/r/tasks?f=thing:is:1&f=state:in:open,doing',
+      };
+    }
+    case 'kiln-owed': {
+      const rows = obligations.filter((e) => open(e) && e.fields.thing === KILN && e.fields.direction === 'owed_to_me');
+      const total = rows.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
+      const late = rows.filter((e) => days(e.fields.due) < 0).length;
+      return {
+        id,
+        label: 'Owed to you',
+        value: money(total, CURRENCY),
+        note: `${rows.length} open · ${late} past terms`,
+        tone: late > 0 ? 'bad' : 'good',
+        href: '/r/obligations?f=thing:is:1',
+      };
+    }
+    case 'kiln-cost': {
+      const rows = services.filter((e) => e.fields.thing === KILN && e.fields.state !== 'cancelled');
+      const total = rows.reduce((a, e) => a + Number(e.fields.cost ?? 0), 0);
+      return {
+        id,
+        label: 'Costs a year',
+        value: money(total, CURRENCY),
+        note: `${rows.length} live`,
+        href: '/r/services?f=thing:is:1',
+      };
+    }
     case 'owed-to-you': {
       const rows = obligations.filter((e) => open(e) && e.fields.direction === 'owed_to_me');
       const total = rows.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
@@ -470,6 +512,18 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): Entry
   if (b.where?.includes('owed to me')) out = out.filter((e) => e.fields.direction === 'owed_to_me');
   if (b.where?.includes('owed by me')) out = out.filter((e) => e.fields.direction === 'owed_by_me');
   if (b.where?.includes('state is open')) out = out.filter(open);
+
+  /* `thing is <name>` — the one predicate a project page is made of. Resolved by NAME rather than
+     by seq, because the declaration a person reads says `thing is Kiln` and not `thing is 1`, and
+     the whole argument for the `where:` grammar is that the stored form is the readable form. */
+  const named = /thing is ([A-Za-z][A-Za-z0-9 &.'-]*)/.exec(b.where ?? '')?.[1]?.trim();
+  if (named) {
+    const seq = (ROWS.things ?? []).find((t) => String(t.fields.name) === named)?.seq;
+    out = out.filter((e) => e.fields.thing === seq);
+  }
+  if (b.where?.includes('state is open or doing'))
+    out = out.filter((e) => e.fields.state === 'open' || e.fields.state === 'doing');
+
   if (register === 'services' && b.kind === 'timeline')
     out = out.filter((e) => e.fields.state !== 'cancelled' && days(e.fields.renews) <= 90);
   if (register === 'tasks' && b.kind === 'table') out = out.filter((e) => e.fields.state !== 'done' && e.fields.state !== 'dropped');

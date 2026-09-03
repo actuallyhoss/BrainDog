@@ -30,6 +30,9 @@ export const TODAY = '2026-09-03';
 export const NOW = Date.UTC(2026, 8, 3, 12);
 
 const day = (offset: number): string => new Date(NOW + offset * 86_400_000).toISOString().slice(0, 10);
+
+/** An `instant`, not a `day`: a session's age is said in hours and minutes, never in whole days. */
+const hours = (ago: number): string => new Date(NOW - ago * 3_600_000).toISOString();
 const stamp = (offsetHours: number): string => new Date(NOW + offsetHours * 3_600_000).toISOString();
 
 /* ── registers ────────────────────────────────────────────────────────────── */
@@ -118,6 +121,37 @@ export const REGISTERS: Record<string, RegisterDecl> = {
       { id: 'rate', type: 'money' },
       { id: 'email', type: 'text' },
       { id: 'note', type: 'text' },
+    ],
+  },
+  /**
+   * AGENT SESSIONS ARE A REGISTER, and 02 §1 already made them the one register the kernel itself
+   * declares. That is the whole answer to "a Claude Code widget on my project page": there is no
+   * new machinery, no embedded runtime and no code in a block. A session is a typed row like an
+   * invoice is, so it can be listed, filtered, referenced by a `thing`, and drawn by any block kind
+   * that draws rows.
+   *
+   * `last_seen` is written by the kernel on every write from that session and is NOT a derivation
+   * (02 §5) — the heartbeat sets it in place with no version bump and no event, because a session
+   * saying "still here" is not a fact about the business.
+   */
+  sessions: {
+    id: 'sessions',
+    icon: 'session',
+    name: 'Sessions',
+    one: 'session',
+    holds: 'what each agent is doing in this record, and what it has touched',
+    title: 'doing',
+    mobile: ['doing', 'agent', 'state'],
+    state: 'state',
+    done: ['ended'],
+    fields: [
+      { id: 'doing', type: 'text', required: true },
+      { id: 'agent', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], indexed: true, required: true },
+      { id: 'state', type: 'enum', values: ['live', 'idle', 'ended'], indexed: true, required: true },
+      { id: 'thing', type: 'ref', to: 'things', indexed: true },
+      { id: 'last_seen', type: 'instant', indexed: true },
+      { id: 'wrote', type: 'int' },
+      { id: 'host', type: 'text' },
     ],
   },
   tasks: {
@@ -356,12 +390,25 @@ export const TASKS: Entry[] = [
   { what: 'Cancel the Hobnail plan', state: 'done', thing: 4, by: day(-58), effort: 0.2, note: '' },
 ].map((f, i) => row(i + 1, f as Fields));
 
+/**
+ * Live agent sessions. `hours(n)` rather than `day(n)`, because a session's age is measured in the
+ * unit a person would say it in — "8m ago", not "0d ago".
+ */
+const SESSIONS: Entry[] = [
+  { doing: 'Variable axis QA — instances 3 of 9', agent: 'claude', state: 'live', thing: 1, last_seen: hours(0), wrote: 14, host: 'kiln-mbp' },
+  { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'live', thing: 1, last_seen: hours(0.1), wrote: 2, host: 'kiln-mbp' },
+  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', thing: 3, last_seen: hours(3), wrote: 6, host: 'studio-desktop' },
+  { doing: 'Chasing Halden on 2026-041', agent: 'you', state: 'ended', thing: 2, last_seen: hours(26), wrote: 1, host: 'studio-desktop' },
+  { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'ended', thing: 1, last_seen: hours(34), wrote: 41, host: 'kiln-mbp' },
+].map((f, i) => row(i + 1, f as Fields));
+
 export const ROWS: Record<string, Entry[]> = {
   obligations: OBLIGATIONS,
   services: SERVICES,
   things: THINGS,
   people: PEOPLE,
   tasks: TASKS,
+  sessions: SESSIONS,
 };
 
 /* ── declared pages ───────────────────────────────────────────────────────── */
@@ -414,6 +461,7 @@ export const PAGES: Record<string, PageDecl> = {
         kind: 'bar',
         heading: 'Owed by you, by counterparty',
         span: 7,
+        columns: [{ field: 'party' }, { field: 'amount' }],
         source: 'register.obligations',
         where: 'direction is owed by me, state is open',
         empty: 'You owe nobody anything.',
@@ -458,6 +506,7 @@ export const PAGES: Record<string, PageDecl> = {
         kind: 'timeline',
         heading: 'Next ninety days',
         span: 6,
+        columns: [{ field: 'renews' }, { field: 'name' }, { field: 'provider' }],
         source: 'register.services',
         empty: 'Nothing renews in the next ninety days.',
       },
@@ -487,6 +536,92 @@ export const PAGES: Record<string, PageDecl> = {
       },
     ],
   },
+  /**
+   * A PROJECT PAGE: every block filtered to one thing.
+   *
+   * This is the shape the whole widget idea was really asking for, and it needs no new machinery —
+   * it is an ordinary `page` row whose blocks all carry `where: thing is Kiln`. Open the project and
+   * the page is about the project: what is open on it, who is working on it right now, what it is
+   * owed, what it costs to keep alive.
+   *
+   * The SESSIONS block is the interesting one. "A Claude Code widget I can code into" cannot be a
+   * block that runs code — 04 §7 has no interpreter to reach and 22 §3 names and rejects the three
+   * ways people try. It does not need to be. A session is a typed row (02 §1), so the widget is an
+   * ordinary register-bound block, and the instruction you type is an ordinary WRITE — which is the
+   * product's own thesis stated back at it: the record is the coordinator, and it is better than a
+   * model because it cannot be persuaded (23 §12).
+   *
+   * Spans read left to right: the stat takes the row, then work and agents sit side by side,
+   * then money and the estate.
+   */
+  kiln: {
+    page: 'kiln',
+    title: 'Kiln',
+    nav: { section: 'Projects', order: 10 },
+    icon: 'thing',
+    requires: ['register.tasks', 'register.sessions', 'register.obligations', 'register.services'],
+    blocks: [
+      {
+        kind: 'stat',
+        heading: 'Kiln',
+        span: 12,
+        cells: [
+          { metric: 'kiln-open', label: 'Open' },
+          { metric: 'kiln-owed', label: 'Owed to you' },
+          { metric: 'kiln-cost', label: 'Costs a year' },
+        ],
+      },
+      {
+        kind: 'todo',
+        heading: 'What is open',
+        span: 5,
+        columns: [{ field: 'what' }, { field: 'by' }],
+        source: 'register.tasks',
+        where: 'thing is Kiln, state is open or doing',
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing open on Kiln.',
+      },
+      {
+        kind: 'timeline',
+        heading: 'Agents',
+        span: 7,
+        columns: [{ field: 'last_seen' }, { field: 'doing' }, { field: 'agent' }],
+        source: 'register.sessions',
+        where: 'thing is Kiln',
+        order: [{ field: 'last_seen', dir: 'desc' }],
+        limit: 6,
+        empty: 'No agent has touched Kiln.',
+      },
+      {
+        kind: 'table',
+        heading: 'Money',
+        span: 7,
+        source: 'register.obligations',
+        where: 'thing is Kiln',
+        columns: [
+          { field: 'seq', label: '#', width: '9ch', align: 'end' },
+          { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
+          { field: 'due', label: 'Due', width: '15ch', align: 'end' },
+        ],
+        order: [{ field: 'due', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing owed either way on Kiln.',
+      },
+      {
+        kind: 'spec',
+        heading: 'Keeping it alive',
+        span: 5,
+        columns: [{ field: 'name' }, { field: 'cost' }, { field: 'renews' }],
+        source: 'register.services',
+        where: 'thing is Kiln',
+        limit: 6,
+        empty: 'Kiln runs on nothing you pay for.',
+      },
+    ],
+  },
+
   work: {
     page: 'work',
     title: 'Board',
@@ -499,6 +634,7 @@ export const PAGES: Record<string, PageDecl> = {
         kind: 'board',
         heading: 'By state',
         span: 12,
+        columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
         source: 'register.tasks',
         empty: 'Nothing open.',
       },
