@@ -72,6 +72,13 @@ export const copy = {
   newRow: 'New',
   filter: 'Filter',
   done: 'Done',
+  /* Verb + Noun, never "Save" or "Submit": the button says what will exist afterwards. */
+  addRow: 'Add',
+  required: 'required',
+  noneChosen: 'None',
+  yes: 'Yes',
+  secretsLiveInTheVault: 'A key or a token goes in the Vault, never in a row. The row records what it opens.',
+  savedNothing: 'Nothing was written. This is a mock-up of the record, not the record.',
   noFilters: 'This register declares no indexed fields, so there is nothing to filter on yet.',
   /* What a field CAN be filtered on, said plainly, instead of a disabled range control. */
   filterKind: (type: string) =>

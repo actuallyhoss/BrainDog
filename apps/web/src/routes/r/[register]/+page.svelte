@@ -25,6 +25,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import RowForm from '$lib/ui/RowForm.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
 
@@ -84,6 +85,7 @@
   let focus = $state({ row: 0, col: 1 });
   let peeked = $state<number | null>(null);
   let filterOpen = $state(false);
+  let createOpen = $state(false);
 
   /**
    * Archived rows, in the mock-up, held in the page rather than in the record.
@@ -183,7 +185,7 @@
         <Icon name="filter" size="s" />
         {copy.filter}
       </Button>
-      <Button weight="primary">{copy.newRow} {decl.one}</Button>
+      <Button weight="primary" onclick={() => (createOpen = true)}>{copy.newRow} {decl.one}</Button>
     {/snippet}
   </PageHead>
 
@@ -243,7 +245,7 @@
           {#if emptyKind === 'no-results'}
             <Button href="/r/{id}">{copy.clearFilters}</Button>
           {:else if emptyKind === 'no-data-yet'}
-            <Button weight="primary">{copy.addOne}</Button>
+            <Button weight="primary" onclick={() => (createOpen = true)}>{copy.addOne}</Button>
             <Button>{copy.showExample}</Button>
           {/if}
         {/snippet}
@@ -332,6 +334,25 @@
        ONLY INDEXED FIELDS ARE OFFERED. A filter on an unindexed field is a promise the storage
        cannot keep at five thousand rows, and a control that gets slower the more rows you have is a
        control that breaks exactly when the register becomes worth filtering. -->
+  <!-- The new-row drawer. Every control in it comes from the register's own field declarations —
+       see RowForm — so a pack that adds a field gets a form field, and nobody writes a second copy
+       of the schema in markup. -->
+  <Sheet bind:open={createOpen} title="{copy.newRow} {decl.one}" id={id}>
+    <RowForm register={id} />
+    {#snippet footer()}
+      <Button
+        weight="primary"
+        onclick={() => {
+          createOpen = false;
+          toasts.push(copy.savedNothing, { intent: 'warn' });
+        }}
+      >
+        {copy.addRow} {decl.one}
+      </Button>
+      <Button weight="bare" onclick={() => (createOpen = false)}>{copy.close}</Button>
+    {/snippet}
+  </Sheet>
+
   <Sheet bind:open={filterOpen} title={copy.filter} id={id}>
     {#if filterable.length === 0}
       <p class="filter-none">{copy.noFilters}</p>

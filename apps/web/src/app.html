@@ -1,8 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <!-- FIRST, always. The only thing that stops the white UA canvas painting before the stylesheet
          parses, and the thing that governs UA scrollbars and form controls (28 §5 mechanism 1). -->
+    <!-- `en-GB`, not `en`. The document language is what a native `<input type="date">` reads to
+         decide whether to prompt for `dd/mm/yyyy` or `mm/dd/yyyy`, and it was showing the American
+         order beside a table rendering `27 Jul 2026` for the same field. A date control that asks
+         for a different order than the one displayed two inches away is a data-entry bug waiting
+         to be entered. -->
     <meta name="color-scheme" content="light dark" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
