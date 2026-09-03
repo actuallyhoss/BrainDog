@@ -24,6 +24,11 @@ jobs:
       # The gates need an artefact to measure, and `bundle` is the reason the budget is a budget
       # rather than an aspiration.
       - run: pnpm --filter @braindog/web build
+
+      # The site builds too, and `strict: true` on its adapter means a route that quietly stopped
+      # prerendering fails here rather than shipping blank.
+      - run: pnpm --filter @braindog/site build
+
       - run: pnpm gates
 
       # Screenshots are ARTEFACTS FOR A HUMAN, never an assertion: rendering can vary with the host

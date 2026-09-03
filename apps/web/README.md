@@ -34,7 +34,7 @@ that file are the real ones.
 
 ---
 
-## Four things worth reading the source for
+## Five things worth reading the source for
 
 **The gate** (`routes/decide/[id]`). `1`–`9` **highlight** an option and do not choose it; `↵` opens
 the commit step and moves focus to the empty, required reason; only `⌘↵` from inside that field
@@ -58,6 +58,33 @@ safe and it is exactly where they are wanted.
 typed, so the rule that the interface never explains itself is reviewable in one pass; and it is the
 first input of the screenshot allow-list, where only text a developer typed into source stays legible.
 
+
+**The widgets** (`routes/p/[slug]`, `lib/record/arrange.ts`, `lib/ui/AddBlock.svelte`). A page is a
+twelve-column grid and a block takes the columns it declares. `span: 1–12` has been in the page
+declaration since `06-PAGES` was written and nothing had ever read it.
+
+A **flow, not a canvas**: blocks fill the row and wrap, so a layout cannot have a hole in it, cannot
+reflow because a query returned one more row, and collapses to one column on a phone by keeping the
+only thing a span encodes — which block comes after which. `21-AUTHORING` §3.1 rejected free
+placement on measured evidence: in Home Assistant's masonry a **one-pixel** height difference could
+move a card from the leftmost column to the rightmost, and people lost their spatial memory of where
+a control lived.
+
+**No height.** What a person means by "make it taller" is "show me more rows", and that is `limit` —
+a number that survives a font-size change, a density change and a phone, where a pixel height does
+not. Order and span are the only authorable dimensions, which is why an amateur cannot produce
+something ugly: the vocabulary has no word for it.
+
+Each kind declares the narrowest span it survives, and the width control **refuses** below it rather
+than clamping. A `table` at span 4 is eight columns in a third of a page — not a narrow table, an
+unreadable one — and a `Third` button that silently gives you a half has taught you the wrong thing
+about your own page.
+
+The picker's tiles are **live rendered blocks over your own rows**, through the same component the
+page uses, because the preview is the real renderer. Selecting one inserts it already bound and
+already drawing, with each cell filled by the first type-compatible field: the first act is
+narrowing, never starting.
+
 ---
 
 ## What is deliberately absent
@@ -66,6 +93,10 @@ first input of the screenshot allow-list, where only text a developer typed into
 - **No Spark.** The record has no model configured, so every *Ask Spark* affordance is **absent, not
   disabled** — which is also the correct behaviour on any self-host.
 - **No service worker, no outbox, no dialect editor.** Named in `50-SPEC-WEB` and not built here.
+- **No page-generation wizard.** `Bind as a block` puts one saved view on one page you already have,
+  which is the largest generator that does not break the contract: a whole-page proposal cannot be
+  filed at all, because a `change` body needs a falsifiable prediction and "is this page good?" has
+  no measure that is not `page.render` count — which is Goodhart, and refused by name.
 
 ---
 
