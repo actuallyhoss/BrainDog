@@ -85,11 +85,39 @@ for (const scheme of ['light', 'dark']) {
     await page.goto(`http://localhost:${PORT}${path}`, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
       for (const img of document.images) img.loading = 'eager';
+      /* WAIT FOR `load` BEFORE `decode`, which is the bit that was missing and the reason three of
+         the five product shots photographed as empty boxes. Flipping `loading` to `eager` starts
+         the fetch, but it starts it ASYNCHRONOUSLY — and `decode()` on an image that has not begun
+         loading REJECTS. The rejection went into a `.catch(() => {})` written to ignore a broken
+         file, so the script sailed past three unloaded images and photographed the reserved boxes
+         `Shot.svelte` had helpfully laid out for them. */
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+      await Promise.all(
+        [...document.images].map(
+          (img) =>
+            new Promise((res) => {
+              if (img.complete && img.naturalWidth > 0) return res(undefined);
+              img.addEventListener('load', () => res(undefined), { once: true });
+              img.addEventListener('error', () => res(undefined), { once: true });
+            }),
+        ),
+      );
       // `decode()` and not `complete`: `complete` is true the moment the bytes have arrived, and a
       // full-page capture can fire between the last byte and the first painted pixel.
       await Promise.all([...document.images].map((i) => i.decode().catch(() => {})));
     });
     await page.waitForTimeout(200);
+
+    /* AND THEN CHECK. A screenshot script that silently ships a blank frame is worse than one that
+       fails, because the blank frame goes on the marketing page and nothing says so. */
+    const blank = await page.evaluate(() =>
+      [...document.images].filter((i) => !i.complete || i.naturalWidth === 0).map((i) => i.currentSrc || i.src),
+    );
+    if (blank.length) {
+      console.error(`  ${blank.length} image(s) never loaded on ${path}:`);
+      for (const b of blank) console.error(`      ${b}`);
+      broken += blank.length;
+    }
 
     const file = join(OUT, `${name}-${scheme}.png`);
     await page.screenshot({ path: file, fullPage: true });
