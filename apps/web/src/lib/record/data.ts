@@ -596,7 +596,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'table',
         heading: 'Money',
-        span: 8,
+        span: 6,
         source: 'register.obligations',
         where: 'thing is Kiln',
         columns: [
@@ -612,8 +612,11 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'spec',
         heading: 'Keeping it alive',
+        /* Two cells, not three. A third column pushes this block's own floor to six, and six beside
+           the eight the money table needs is fourteen of twelve — the row would wrap and leave a
+           gap. The renewal date is what the Renewals page is for. */
         span: 4,
-        columns: [{ field: 'name' }, { field: 'cost' }, { field: 'renews' }],
+        columns: [{ field: 'name' }, { field: 'cost' }],
         source: 'register.services',
         where: 'thing is Kiln',
         limit: 6,

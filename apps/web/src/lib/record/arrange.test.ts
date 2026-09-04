@@ -109,9 +109,12 @@ test("a table's floor grows with its own column count", () => {
   assert.equal(floorFor('table', 5), 10);
   assert.equal(floorFor('table', 8), 12, 'never past the twelve there are');
   assert.equal(floorFor('table', 0), 6, 'with nothing declared, the kind floor stands');
-  // Only the table primitive. A `todo` with three columns is three cells in a row, not three
-  // tracks that have to fit side by side.
+  // `rows` too: a three-cell `spec` at span 4 broke `GBP 14.00` across two lines.
+  assert.equal(floorFor('spec', 3), 6);
+  // But not the kinds that stack or wrap. A `todo` with three columns is three things on one line
+  // that can reflow, not three tracks that have to fit side by side.
   assert.equal(floorFor('todo', 5), 3);
+  assert.equal(floorFor('chips', 5), 3);
 });
 
 test("the width control offers nothing below a table's own floor", () => {

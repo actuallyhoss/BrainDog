@@ -83,7 +83,12 @@ export const spanLabel = (span: number): string =>
 export const floorFor = (kind: string, columns = 0): number => {
   const base = isKind(kind) ? KINDS[kind].minSpan : 4;
   const primitive = isKind(kind) ? KINDS[kind].primitive : undefined;
-  if (primitive !== 'table' || columns === 0) return base;
+  /* `table` and `rows` lay their cells out as HORIZONTAL TRACKS, so their width requirement is a
+     function of how many. Every other primitive stacks or wraps its cells and does not care: a
+     `todo` with three columns is three things on one line that can reflow, not three tracks that
+     have to fit side by side. Measured on the Kiln page, where a three-cell `spec` at span 4 broke
+     `GBP 14.00` across two lines. */
+  if ((primitive !== 'table' && primitive !== 'rows') || columns === 0) return base;
   return Math.min(COLUMNS, Math.max(base, columns * 2));
 };
 

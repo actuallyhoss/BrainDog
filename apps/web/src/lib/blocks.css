@@ -275,9 +275,13 @@
     font-size: var(--t-sm);
   }
 
+  /* A FIGURE NEVER WRAPS. `GBP 14.00` broken across two lines is not a narrower figure, it is a
+     currency on one line and a number on another — the same class of wrong as truncating one. The
+     track can be narrow; the value inside it stays whole and the row grows instead. */
   .row-value {
     color: var(--ink);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .row-note {
