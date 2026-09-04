@@ -12,7 +12,7 @@
 
 import { day as fmtDay, money, relative, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
-import { PATHS, type IconName } from '../ui/Icon.svelte';
+import { PATHS, type IconName } from '../ui/icons.ts';
 import {
   AUDIT,
   INBOX,
