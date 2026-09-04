@@ -91,6 +91,30 @@ export const site = {
         'any other.',
       note: 'Nothing about it is a new kind of thing. It is the same blocks over the same registers with `thing is Kiln` on the front.',
     },
+    tracks: {
+      kicker: 'Keeping the thread',
+      title: 'Pin an agent to a track.',
+      body:
+        'A track is the line of work you are in the middle of. Pin a session to one and the context ' +
+        'survives the session: close the window, come back on Tuesday, and what each agent was ' +
+        'doing is there in order, next to the updates that say how it was going.',
+      note:
+        'Health is never a stored field. It is derived from the newest update, so it can always tell ' +
+        'you who said so and when. And a finished track expects no update, which is a different ' +
+        'thing from one that is overdue.',
+    },
+    forecast: {
+      kicker: 'What is coming',
+      title: 'The day the money runs out, and what does it.',
+      body:
+        'Start from what is liquid, apply every dated movement in order, and stop at the first day ' +
+        'the balance goes under. Invoices in both directions, and every renewal a subscription will ' +
+        'actually charge inside the window rather than the one date it stores.',
+      note:
+        'It names the row that crosses, not just the date. And the growth fit refuses to answer when ' +
+        'the data cannot support one: six points of noise always produce a slope, and printing it is ' +
+        'how a number gets quoted for a year.',
+    },
     arrange: {
       kicker: 'Arrange it',
       title: 'Order and span. Nothing else.',

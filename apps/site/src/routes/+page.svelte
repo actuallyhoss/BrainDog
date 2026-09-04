@@ -94,7 +94,27 @@
   </div>
 </section>
 
+<!-- TWO SECTIONS THAT ARE NOT SCREENSHOTS. Both describe a mechanism rather than a surface, and a
+     picture of a track page is a picture of a list — the interesting part is the rule underneath it,
+     which is a sentence. A shot here would be decoration, and this page has a rule against those. -->
 <section class="band">
+  <div class="pair">
+    <article class="card">
+      <p class="kicker">{s.tracks.kicker}</p>
+      <h2 class="card-title">{s.tracks.title}</h2>
+      <p class="card-body">{s.tracks.body}</p>
+      <p class="row-note">{s.tracks.note}</p>
+    </article>
+    <article class="card">
+      <p class="kicker">{s.forecast.kicker}</p>
+      <h2 class="card-title">{s.forecast.title}</h2>
+      <p class="card-body">{s.forecast.body}</p>
+      <p class="row-note">{s.forecast.note}</p>
+    </article>
+  </div>
+</section>
+
+<section class="band band-sunk">
   <div class="stack">
     <div class="stack-copy">
       <p class="kicker">{s.arrange.kicker}</p>
@@ -106,7 +126,7 @@
   </div>
 </section>
 
-<section class="band band-sunk">
+<section class="band">
   <div class="pair">
     <article class="card">
       <p class="kicker">{s.vault.kicker}</p>
