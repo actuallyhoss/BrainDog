@@ -80,6 +80,32 @@
   </div>
 </section>
 
+<!-- The two sections the widget system earns. `project` states the idea; `arrange` shows the
+     controls, because "you can rearrange it" is a claim and a screenshot of the handles is not. -->
+<section class="band band-sunk">
+  <div class="row row-narrow">
+    <div class="row-copy">
+      <p class="kicker">{s.project.kicker}</p>
+      <h2 class="row-title">{s.project.title}</h2>
+      <p class="row-body">{s.project.body}</p>
+      <p class="row-note">{s.project.note}</p>
+    </div>
+    <Shot name="project" alt="A project page: open tasks, live agent sessions, money owed, and what it costs to run." />
+  </div>
+</section>
+
+<section class="band">
+  <div class="stack">
+    <div class="stack-copy">
+      <p class="kicker">{s.arrange.kicker}</p>
+      <h2 class="row-title">{s.arrange.title}</h2>
+      <p class="row-body">{s.arrange.body}</p>
+      <p class="row-note">{s.arrange.note}</p>
+    </div>
+    <Shot name="arrange" alt="The same page being arranged: a handle, a width control reading Full, Half and Third, and move and remove buttons on every block." />
+  </div>
+</section>
+
 <section class="band band-sunk">
   <div class="pair">
     <article class="card">

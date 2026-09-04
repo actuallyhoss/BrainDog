@@ -76,10 +76,29 @@ export const site = {
       kicker: 'A page is a row',
       title: 'The screens are data too.',
       body:
-        'A page is a declaration: which blocks, over which query, in which order. Editing one is editing a ' +
-        'row, so it versions, diffs and reverts like everything else — and a pack can ship a page the same ' +
-        'way it ships a register.',
+        'A page is a declaration: which blocks, over which query, in which order and how wide. Editing one ' +
+        'is editing a row, so it versions, diffs and reverts like everything else — and a pack can ship a ' +
+        'page the same way it ships a register.',
       note: 'Sixteen block kinds over eight primitives. A pack may invent a kind; it may never write a colour, a font or a spacing value.',
+    },
+    project: {
+      kicker: 'Per project',
+      title: 'A page that is about one thing.',
+      body:
+        'Point every block on a page at one project and it stops being a dashboard and starts being that ' +
+        "project's page: what is open on it, which of your agents are working on it right now, what it is " +
+        'owed, what it costs to keep alive. Agent sessions are a register like any other, so they draw like ' +
+        'any other.',
+      note: 'Nothing about it is a new kind of thing. It is the same blocks over the same registers with `thing is Kiln` on the front.',
+    },
+    arrange: {
+      kicker: 'Arrange it',
+      title: 'Order and span. Nothing else.',
+      body:
+        'Drag to reorder, or move with the keyboard — the same operation either way. Set a width in twelfths. ' +
+        'That is the whole vocabulary, and it is why you cannot make one of these pages ugly: spacing, type, ' +
+        'colour, radius and density all come from the theme, so there is no word for ugly to say.',
+      note: 'Each kind knows the narrowest it survives, and the control refuses below it rather than clamping. A table at a third of a page is not a narrow table, it is an unreadable one.',
     },
     vault: {
       kicker: 'Credentials',
