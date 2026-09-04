@@ -23,7 +23,8 @@ const GATES = [
   // Needs a build. Both report and exit 0 when there is not one, so `pnpm gates` is useful on a
   // fresh checkout; CI builds first, and then they are real gates.
   ['bundle', ['node', [join(here, 'bundle.mjs')]]],
-  // Last because it is the slow one: a real browser, every route, both schemes, two widths.
+  // Last two because they are the slow ones: a real browser over every route.
+  ['layout', ['node', [join(here, 'layout.mjs')]]],
   ['a11y', ['node', [join(here, 'a11y.mjs')]]],
 ];
 
