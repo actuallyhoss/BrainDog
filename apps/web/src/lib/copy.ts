@@ -248,12 +248,31 @@ export const copy = {
   on: 'On',
   off: 'Off',
 
-  /* first run */
-  firstQuestion: 'What do you want to stop forgetting?',
-  firstHint: 'A record holds typed rows. Pick one kind and add a real one — you can add the rest later, and delete this one.',
-  firstOwed: 'Something I owe, or am owed',
-  firstRenewing: 'A domain or a subscription renewing',
-  firstDecision: 'A decision I keep re-making',
+  /* first run.
+
+     THE FIRST SCREEN SETS THE CEILING. It used to open with "What do you want to stop forgetting?"
+     over three narrow nouns — an invoice, a domain, a decision — and somebody reading that meets a
+     reminders app with a database under it. The record is the whole of a business that isn't code,
+     and a first run that asks about a domain renewal has already decided it is something smaller.
+
+     So the scope is stated before the question is asked, and the choices are the PARTS OF A
+     BUSINESS rather than three things worth remembering. The mechanic underneath is unchanged and
+     still right (19 §6): one row, typed by hand, no pack vocabulary, nothing to approve. You are
+     not picking a plan or a template — you are picking where to start, which is a different
+     sentence and the reason there are five of them now instead of three. */
+  firstLede: "Everything about your business that isn't code.",
+  firstBody:
+    'Money, the estate it runs on, the people, the projects, and the decisions and the reasons for ' +
+    'them — typed, versioned, and readable by every agent you use.',
+  firstQuestion: 'Where do you want to start?',
+  firstHint: 'One real row is enough. The rest of the record arrives as you need it, and you can delete this one.',
+  firstChoices: [
+    { key: 'obligations', label: 'Money', body: 'What you owe, and what you are owed.', field: 'What is it, and how much?' },
+    { key: 'services', label: 'The estate', body: 'Domains, hosting, subscriptions, licences.', field: 'What renews, and when?' },
+    { key: 'people', label: 'People', body: 'Clients, contractors, and who does what.', field: 'Who is it, and what are they for?' },
+    { key: 'things', label: 'Projects', body: 'The things you run, and the plan for each.', field: 'What is it, and what is it for?' },
+    { key: 'decisions', label: 'Decisions', body: 'The ones you keep re-making, and why.', field: 'What do you keep re-deciding?' },
+  ],
 
   /* the vocabulary, defined on first use, in place, once */
   defRegister: 'a typed collection — obligations, domains, people',

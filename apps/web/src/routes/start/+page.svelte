@@ -22,11 +22,9 @@
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
 
-  const CHOICES = [
-    { key: 'obligations', label: copy.firstOwed, register: 'obligations', field: 'What is it, and how much?' },
-    { key: 'services', label: copy.firstRenewing, register: 'services', field: 'What renews, and when?' },
-    { key: 'decisions', label: copy.firstDecision, register: 'decisions', field: 'What do you keep re-deciding?' },
-  ];
+  /* The five live in `copy.ts` with every other sentence in the product, so the scope this screen
+     claims can be checked against the rest of it in one pass rather than found in a component. */
+  const CHOICES = copy.firstChoices;
 
   let picked = $state<string | null>(null);
   let field = $state<HTMLInputElement>();
@@ -49,24 +47,32 @@
     </header>
 
     {#if !choice}
-      <h1 class="question">{copy.firstQuestion}</h1>
+      <!-- SAY WHAT THIS IS BEFORE ASKING WHAT THEY WANT. The question on its own let the three
+           examples under it define the product, and three examples always define it downward. -->
+      <h1 class="lede">{copy.firstLede}</h1>
+      <p class="body">{copy.firstBody}</p>
+
+      <h2 class="question">{copy.firstQuestion}</h2>
 
       <div class="choices" role="group" aria-label={copy.firstQuestion}>
         {#each CHOICES as c, i}
           <button type="button" class="choice" onclick={() => pick(c.key)}>
             <span class="choice-n">{i + 1}</span>
-            <span class="choice-label">{c.label}</span>
-            <span class="choice-register">{c.register}</span>
+            <span class="choice-main">
+              <span class="choice-label">{c.label}</span>
+              <span class="choice-body">{c.body}</span>
+            </span>
+            <span class="choice-register">{c.key}</span>
           </button>
         {/each}
       </div>
 
       <p class="hint">{copy.firstHint}</p>
     {:else}
-      <h1 class="question">{choice.field}</h1>
+      <h1 class="question step">{choice.field}</h1>
 
       <form class="form" onsubmit={(e) => e.preventDefault()}>
-        <label class="label" for="first">Your first {choice.register.replace(/s$/, '')}</label>
+        <label class="label" for="first">Your first {choice.label.toLowerCase().replace(/^the /, '').replace(/s$/, '')}</label>
         <input bind:this={field} id="first" class="input" type="text" placeholder="" spellcheck="false" />
 
         <label class="label" for="due">Due</label>
@@ -111,10 +117,26 @@
     letter-spacing: -0.026em;
   }
 
+  /* The question is now the SECOND thing on the screen, under the claim, so it steps down a level:
+     it is a label for the list rather than the headline of the page. On the step after a choice it
+     is the headline again, and `.step` puts the size back. */
   .question {
-    margin-block-end: var(--sp-5);
+    margin-block: var(--sp-7) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .question.step {
+    margin-block: 0 var(--sp-5);
+    color: var(--ink);
+    font-family: var(--font-display);
     font-size: var(--t-2xl);
+    font-weight: 600;
     letter-spacing: -0.028em;
+    text-transform: none;
   }
 
   .choices {
@@ -127,13 +149,34 @@
     overflow: hidden;
   }
 
+  /* The claim, at the top, in the display face — the same sentence the marketing site leads with,
+     because the first screen of the product and the first screen of the site should not describe
+     two different things. */
+  .lede {
+    max-inline-size: 22ch;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--t-2xl);
+    font-weight: 600;
+    letter-spacing: -0.022em;
+    line-height: var(--lh-tight);
+  }
+
+  .body {
+    margin-block-start: var(--sp-3);
+    max-inline-size: 54ch;
+    color: var(--dim);
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
+  }
+
   .choice {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--sp-3);
-    min-block-size: 56px;
-    padding: 0 var(--sp-4);
+    gap: var(--sp-4);
+    min-block-size: 66px;
+    padding: var(--sp-3) var(--sp-4);
     background: none;
     border: 0;
     border-block-end: 1px solid var(--line);
@@ -162,6 +205,27 @@
     font-size: var(--t-xs);
     line-height: 18px;
     text-align: center;
+  }
+
+  .choice-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  /* The name carries the weight and the sentence under it does the explaining. One line each was
+     what made the old three read as a list of chores rather than as the parts of a business. */
+  .choice-label {
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+    letter-spacing: -0.012em;
+  }
+
+  .choice-body {
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .choice-register {
