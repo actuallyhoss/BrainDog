@@ -16,6 +16,71 @@
  */
 
 @layer components {
+  /* ── bidirectional text ───────────────────────────────────────────────────
+     Every cell in the block system is its own bidi paragraph.
+
+     A cell holds one value, and Unicode resolves the direction of the NEUTRAL characters in it —
+     spaces, the `—` in an invoice title, a trailing full stop, brackets — from the paragraph
+     around them. A cell that inherits the page's paragraph therefore renders an Arabic party name
+     with its punctuation on the wrong end, in an app whose UI never left English. The text is not
+     merely aligned oddly. It is in the wrong ORDER, and the reader cannot tell that we did it
+     rather than whoever typed it.
+
+     `plaintext` says: take this element's paragraph direction from its own first strong character.
+     "Invoice 2026-041" starts with a Latin I and reads left to right; "فاتورة 2026" starts with an
+     Arabic letter and reads right to left; both then place their own neutrals correctly, side by
+     side in one column, with no locale setting anywhere.
+
+     IT IS ON EVERY CELL, not just the prose ones, and that is deliberate. A cell this file's own
+     code built — "GBP 4,800.00", "27 Jul 2026" — leads with a strong Latin character and resolves
+     exactly as it does today, so the rule cannot change a machine-formatted value. One that is all
+     digits and neutrals has no strong character at all and falls back to the element's `direction`,
+     which is the UI's. The rule only ever fires where it is needed.
+
+     It is `unicode-bidi` and not `dir="auto"` because these cells arrive as a pipe-delimited
+     dialect string: there is no per-cell attribute to hang metadata on without versioning the
+     dialect, and this is a rendering concern rather than a data one. The two are otherwise
+     equivalent here — CSS Writing Modes resolves `text-align: start` against the PARAGRAPH
+     direction under `plaintext`, so this flips a right-to-left cell's alignment exactly as the
+     attribute would. Measured, not assumed: an Arabic title in this grid sits flush right and
+     truncates on its left.
+
+     THAT FLIP IS KEPT, and it is the one judgement call in this rule. A grid earns its keep from a
+     stable column edge, and mixing alignments inside one column costs some of that. But a cell
+     reads from its own start or it does not read, and the ellipsis has to land where the text ran
+     out — flush-left Arabic with the ellipsis on the right is a sentence trimmed from the front.
+     Every mature bilingual product resolves this the same way, and so does this one. */
+
+  .cell-label,
+  .cell-figure,
+  .cell-note,
+  .card-title,
+  .card-detail,
+  .item-title,
+  .item-detail,
+  .item-state,
+  .prop-label,
+  .prop-value,
+  .prop-note,
+  .quote-text,
+  .quote-by,
+  .row-label,
+  .row-value,
+  .row-note,
+  .pill-word,
+  .pill-figure,
+  .measure,
+  /* A `ul` is a block container, so `plaintext` on it resolves nothing — each `li` is its own
+     bidi paragraph and has to say so itself. */
+  .prose-list > li,
+  /* A board's column heading is a GROUP KEY: the value the rows were grouped by, which is a party
+     name or a project as often as it is a state. It is data, not a heading we wrote. */
+  .board-head,
+  .td,
+  .th {
+    unicode-bidi: plaintext;
+  }
+
   /* ── the intent map ──────────────────────────────────────────────────────
      The ONLY place an intent becomes a colour. A component cannot render `warn` without going
      through here, and the glyph is emitted by the renderer, not by a call site (13 §2.3). */

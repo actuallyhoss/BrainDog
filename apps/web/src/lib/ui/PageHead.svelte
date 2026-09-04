@@ -35,8 +35,14 @@
   <div class="head-main">
     <div class="head-titles">
       {#if kicker}<p class="kicker">{kicker}</p>{/if}
+      <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`, and the difference is
+           the whole rule: the title came from whoever typed it, the id chip beside it is ours. An
+           Arabic title in an English paragraph puts its own full stop on the wrong end and has to
+           be fixed — but `.title` is a flex row, so putting the attribute on the `h1` resolved the
+           FLEX direction too and swung our own id chip to the other side of the heading. Chrome
+           keeps the UI's direction; data follows its own. See the note in `blocks.css`. -->
       <h1 class="title">
-        {title}
+        <span dir="auto">{title}</span>
         {#if id}<span class="title-id">{id}</span>{/if}
       </h1>
     </div>

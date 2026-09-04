@@ -43,6 +43,36 @@ export const labelOf = (f: FieldDecl): string =>
   f.label ?? f.id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
 /**
+ * Is what this field renders a string SOMEBODY TYPED, or a string the app built?
+ *
+ * The distinction is bidirectional text, and it is not cosmetic. Unicode resolves the direction of
+ * neutral characters — spaces, punctuation, brackets, the `—` in an invoice title — from the
+ * paragraph around them. So an Arabic party name sitting in an English paragraph puts its full stop
+ * on the wrong end of the sentence, and an English title in an Arabic UI does the same in reverse.
+ * The text is not merely aligned oddly; it is in the wrong ORDER, and the reader has no way to know
+ * that the app did it rather than whoever typed it.
+ *
+ * `dir="auto"` hands the browser the one rule it needs: take the direction from the first strong
+ * character in the string. "Invoice 2026-041" starts with a Latin I and reads left-to-right;
+ * "فاتورة 2026" starts with an Arabic letter and reads right-to-left; both then place their own
+ * neutrals correctly, in the same grid, with no locale setting and no guess by us.
+ *
+ * It is TRUE for `text` and `document`, obviously, and also for `ref` — a reference renders as the
+ * TITLE of the row it points at, which is prose. It is false for everything else on purpose: money,
+ * dates, integers and durations are strings this file assembled from a number, and their direction
+ * is the app's rather than the reader's. An unknown field is treated as prose, because the failure
+ * of guessing wrong that way is a correctly-ordered string, and the other way it is a broken one.
+ */
+export const isProse = (register: string, field: string): boolean => {
+  const t = decl(register, field)?.type;
+  return t === undefined || t === 'text' || t === 'document' || t === 'ref';
+};
+
+/** `dir` for a prose element, and nothing at all otherwise — Svelte drops an undefined attribute. */
+export const dirOf = (register: string, field: string): 'auto' | undefined =>
+  isProse(register, field) ? 'auto' : undefined;
+
+/**
  * Formatting is decided for the reader, not at the call site. A `ref` reads as the title of the row
  * it points at, because a person says "Halden", not "people#1".
  */

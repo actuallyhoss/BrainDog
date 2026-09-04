@@ -19,7 +19,7 @@
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { REGISTERS, columnsFor, display, entry, identityOf, labelOf, list, toRows, type Filter } from '$lib/record/api.ts';
+  import { REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, toRows, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -409,9 +409,9 @@
           <li>
             <a class="card" href="/r/{id}/{e.seq}">
               <span class="card-seq">#{e.seq}</span>
-              <span class="card-title">{display(id, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}</span>
-              <span class="card-b">{display(id, decl.mobile[1], e.fields[decl.mobile[1]]) ?? ''}</span>
-              <span class="card-c">{display(id, decl.mobile[2], e.fields[decl.mobile[2]]) ?? ''}</span>
+              <span class="card-title" dir={dirOf(id, decl.mobile[0])}>{display(id, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}</span>
+              <span class="card-b" dir={dirOf(id, decl.mobile[1])}>{display(id, decl.mobile[1], e.fields[decl.mobile[1]]) ?? ''}</span>
+              <span class="card-c" dir={dirOf(id, decl.mobile[2])}>{display(id, decl.mobile[2], e.fields[decl.mobile[2]]) ?? ''}</span>
             </a>
           </li>
         {/each}
@@ -467,7 +467,7 @@
       <dl class="peek">
         {#each decl.fields as f}
           <dt>{labelOf(f)}</dt>
-          <dd>{display(id, f.id, peekedEntry.fields[f.id]) ?? MISSING}</dd>
+          <dd dir={dirOf(id, f.id)}>{display(id, f.id, peekedEntry.fields[f.id]) ?? MISSING}</dd>
         {/each}
       </dl>
     {/if}

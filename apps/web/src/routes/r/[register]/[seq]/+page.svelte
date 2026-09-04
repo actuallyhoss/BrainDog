@@ -21,6 +21,7 @@
     NOW,
     REGISTERS,
     display,
+    dirOf,
     entry,
     identityOf,
     labelOf,
@@ -82,7 +83,7 @@
             {@const value = row.fields[f.id]}
             <div class="field">
               <dt class="field-label">{labelOf(f)}</dt>
-              <dd class="field-value" data-type={f.type}>
+              <dd class="field-value" data-type={f.type} dir={dirOf(id, f.id)}>
                 {#if value === null || value === undefined || value === ''}
                   <span class="missing">—</span>
                 {:else if f.type === 'money'}
