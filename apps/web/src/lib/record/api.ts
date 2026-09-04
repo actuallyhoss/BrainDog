@@ -270,6 +270,84 @@ export function sortRows(register: string, entries: Entry[], field: string, dir:
   });
 }
 
+/* ── tracks ──────────────────────────────────────────────────────────────── */
+
+export type Health = 'on_track' | 'at_risk' | 'off_track';
+export type UpdateState = 'current' | 'missing' | 'not_expected';
+
+export type TrackHealth = {
+  /** The newest update's health, or null when there has never been one. Never a stored field. */
+  health: Health | null;
+  /** When that update was written. */
+  asOf: string | null;
+  state: UpdateState;
+  by: string | null;
+};
+
+/** How long an open track may go unspoken about before the absence is worth showing. */
+const UPDATE_WINDOW_DAYS = 14;
+
+/**
+ * A track's current health, DERIVED from its newest update and never read from the track.
+ *
+ * A mutable health column tells you a track was healthy; it cannot tell you whether that was
+ * verified on Friday or has said the same thing since March. Storing it beside an append-only log
+ * of changes to it is two systems that can disagree, so there is one system: the newest row wins
+ * and there is nowhere else to look (20 §9).
+ *
+ * `not_expected` IS A SEPARATE VALUE FROM `missing`, and it is the part every implementation of
+ * this omits. A track that is holding, done or dropped is not silent — nobody is expected to say
+ * anything about it. Without the distinction, every finished and parked track piles into the
+ * missing bucket, the bucket becomes noise, and the nudge built on it is dead inside a month.
+ */
+export function trackHealth(seq: number): TrackHealth {
+  const track = ROWS.tracks?.find((t) => t.seq === seq);
+  const state = String(track?.fields.state ?? '');
+  const expected = state === 'open';
+
+  const newest = (ROWS.updates ?? [])
+    .filter((u) => Number(u.fields.track) === seq)
+    .sort((a, b) => String(a.fields.at).localeCompare(String(b.fields.at)))
+    .at(-1);
+
+  if (!newest) {
+    return { health: null, asOf: null, by: null, state: expected ? 'missing' : 'not_expected' };
+  }
+
+  const asOf = String(newest.fields.at);
+  const age = (NOW - Date.parse(asOf)) / 86_400_000;
+  return {
+    health: newest.fields.health as Health,
+    asOf,
+    by: String(newest.fields.by ?? ''),
+    state: !expected ? 'not_expected' : age > UPDATE_WINDOW_DAYS ? 'missing' : 'current',
+  };
+}
+
+/** The intent a health carries. `null` is not an alarm — nobody having spoken is not bad news. */
+export const healthTone = (h: Health | null): 'good' | 'warn' | 'bad' | undefined =>
+  h === 'on_track' ? 'good' : h === 'at_risk' ? 'warn' : h === 'off_track' ? 'bad' : undefined;
+
+/** What a reader sees where a health goes, including when there isn't one. */
+export function healthLabel(t: TrackHealth): string {
+  if (t.state === 'not_expected') return 'No update expected';
+  if (!t.health) return 'Update missing';
+  const words = { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' } as const;
+  return t.state === 'missing' ? `${words[t.health]}, and stale` : words[t.health];
+}
+
+/** Every update on a track, newest first — the thread a person actually reads. */
+export const updatesFor = (seq: number): Entry[] =>
+  (ROWS.updates ?? [])
+    .filter((u) => Number(u.fields.track) === seq)
+    .sort((a, b) => String(b.fields.at).localeCompare(String(a.fields.at)));
+
+/** Every session pinned to a track, most recently seen first. */
+export const sessionsFor = (seq: number): Entry[] =>
+  (ROWS.sessions ?? [])
+    .filter((x) => Number(x.fields.track) === seq)
+    .sort((a, b) => String(b.fields.last_seen).localeCompare(String(a.fields.last_seen)));
+
 /* ── metrics ─────────────────────────────────────────────────────────────
    A metric with no target is decoration, and a metric with no comparison window cannot be acted on.
    Each one below carries both, and the mixed-currency case is refused at install, not at render. */

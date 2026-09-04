@@ -149,11 +149,89 @@ export const REGISTERS: Record<string, RegisterDecl> = {
       { id: 'agent', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], indexed: true, required: true },
       { id: 'state', type: 'enum', values: ['live', 'idle', 'ended'], indexed: true, required: true },
       { id: 'thing', type: 'ref', to: 'things', indexed: true },
+      /* THE PIN. A session pinned to a track is how context survives the session that made it:
+         close the window, come back on Tuesday, open the track, and the thread is all there — what
+         each agent was doing, in order, next to the updates that say how it was going. Without it
+         an agent session is a thing that happened once and then could not be found again. */
+      { id: 'track', type: 'ref', to: 'tracks', indexed: true },
       { id: 'last_seen', type: 'instant', indexed: true },
       { id: 'wrote', type: 'int' },
       { id: 'host', type: 'text' },
     ],
   },
+  /**
+   * A TRACK IS A LINE OF WORK THAT OUTLIVES THE THINGS ON IT.
+   *
+   * "Rebuild the specimen page", "get off the Fenwick contract", "variable axis QA" — the thread a
+   * person is actually pursuing, which is bigger than a task and smaller than a project. A project
+   * is a thing you own; a track is something you are in the middle of, and it ends.
+   *
+   * IT IS OPTIONAL EVERYWHERE, and that is the single most important property. The prior system
+   * traced in 10 §7 put 105 of its 123 tasks into a group, and 61% of those groups held fewer than
+   * two items — a grouping field that everything carries is a column of noise that has stopped
+   * telling you anything. So `track` is absent from every register's `mobile` list, absent from the
+   * default columns, and its field description leads with the normal case. Most rows carry no
+   * track. That is not a gap to be filled in.
+   *
+   * There is NO health field here on purpose. Health exists only as a property of an `updates` row,
+   * because a mutable string with no author and no date cannot tell you whether a track was
+   * verified healthy on Friday or has said the same thing since March (20 §9). The current value is
+   * derived from the newest update, never stored beside it — a column plus a trail of changes to
+   * that column is two systems that can disagree.
+   */
+  tracks: {
+    id: 'tracks',
+    icon: 'rows',
+    name: 'Tracks',
+    one: 'track',
+    holds: 'the lines of work you are in the middle of, and what each one is waiting on',
+    title: 'name',
+    mobile: ['name', 'thing', 'state'],
+    state: 'state',
+    done: ['done', 'dropped'],
+    pack: 'work',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'state', type: 'enum', values: ['open', 'holding', 'done', 'dropped'], indexed: true, required: true },
+      { id: 'thing', type: 'ref', to: 'things', indexed: true },
+      { id: 'opened', type: 'day', indexed: true },
+      { id: 'note', type: 'document' },
+    ],
+  },
+
+  /**
+   * An update: prose, a health, an author and a date, appended and never edited.
+   *
+   * FOUR PARTS, AND THE FOURTH IS THE ONE EVERYBODY OMITS (20 §9). Health is never a standalone
+   * field — you cannot post prose without a health and cannot have a health without prose, an
+   * author and a date. The current health is the newest row's, derived. Absence renders as its own
+   * value rather than as nothing. And "no update expected" is a SEPARATE value from "update
+   * missing", driven by the track's own state — without that, every finished and dormant track
+   * piles into the missing bucket, the bucket becomes noise, and the reminder is dead inside a
+   * month.
+   *
+   * Corrections are new rows carrying `supersedes`. There is no edit and no delete, because the
+   * append-only log IS the storage for state here rather than an audit artefact bolted beside it.
+   */
+  updates: {
+    id: 'updates',
+    icon: 'doc',
+    name: 'Updates',
+    one: 'update',
+    holds: 'what was true about a track on a date, who said so, and how it was going',
+    title: 'body',
+    mobile: ['body', 'health', 'at'],
+    pack: 'work',
+    fields: [
+      { id: 'body', type: 'document', required: true },
+      { id: 'health', type: 'enum', values: ['on_track', 'at_risk', 'off_track'], indexed: true, required: true },
+      { id: 'track', type: 'ref', to: 'tracks', indexed: true, required: true },
+      { id: 'by', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], indexed: true, required: true },
+      { id: 'at', type: 'instant', indexed: true, required: true },
+      { id: 'supersedes', type: 'ref', to: 'updates' },
+    ],
+  },
+
   tasks: {
     id: 'tasks',
     icon: 'task',
@@ -170,6 +248,9 @@ export const REGISTERS: Record<string, RegisterDecl> = {
       { id: 'state', type: 'enum', values: ['open', 'doing', 'blocked', 'done', 'dropped'], indexed: true, required: true },
       { id: 'thing', type: 'ref', to: 'things', indexed: true },
       { id: 'by', type: 'day', indexed: true },
+      /* Usually unset, and the schema has to be the thing that says so — the prose two documents
+         away saying "most tasks carry no track" is what lost last time (10 §7). */
+      { id: 'track', type: 'ref', to: 'tracks', indexed: true },
       { id: 'effort', type: 'duration', unit: 'd' },
       { id: 'note', type: 'document' },
     ],
@@ -395,11 +476,36 @@ export const TASKS: Entry[] = [
  * unit a person would say it in — "8m ago", not "0d ago".
  */
 const SESSIONS: Entry[] = [
-  { doing: 'Variable axis QA — instances 3 of 9', agent: 'claude', state: 'live', thing: 1, last_seen: hours(0), wrote: 14, host: 'kiln-mbp' },
-  { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'live', thing: 1, last_seen: hours(0.1), wrote: 2, host: 'kiln-mbp' },
-  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', thing: 3, last_seen: hours(3), wrote: 6, host: 'studio-desktop' },
+  { doing: 'Variable axis QA — instances 3 of 9', agent: 'claude', state: 'live', thing: 1, track: 1, last_seen: hours(0), wrote: 14, host: 'kiln-mbp' },
+  { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'live', thing: 1, track: 3, last_seen: hours(0.1), wrote: 2, host: 'kiln-mbp' },
+  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', thing: 3, track: 2, last_seen: hours(3), wrote: 6, host: 'studio-desktop' },
   { doing: 'Chasing Halden on 2026-041', agent: 'you', state: 'ended', thing: 2, last_seen: hours(26), wrote: 1, host: 'studio-desktop' },
-  { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'ended', thing: 1, last_seen: hours(34), wrote: 41, host: 'kiln-mbp' },
+  { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'ended', thing: 1, track: 1, last_seen: hours(34), wrote: 41, host: 'kiln-mbp' },
+].map((f, i) => row(i + 1, f as Fields));
+
+/* Five tracks, and the shape of the set is the point.
+   Two are open and healthy, one is at risk, one is HOLDING (so no update is expected of it, and it
+   must not appear in the missing bucket), and one is open with no update at all — which is the case
+   that renders as "Update missing" rather than as blank. A seed where every row is in the happy
+   state cannot show you what the mechanism is for. */
+const TRACKS: Entry[] = [
+  { name: 'Variable axis QA', state: 'open', thing: 1, opened: day(-38), note: 'Nine instances, three signed off. The rest need the mastering pass first.' },
+  { name: 'Get off the Fenwick contract', state: 'open', thing: 3, opened: day(-61), note: 'Notice period is 60 days from the anniversary.' },
+  { name: 'Specimen page rebuild', state: 'open', thing: 1, opened: day(-12) },
+  { name: 'Move the newsletter off portagemail', state: 'holding', thing: 2, opened: day(-90), note: 'Waiting on the deliverability question, SG29.' },
+  { name: 'Year-end filing', state: 'done', opened: day(-210) },
+].map((f, i) => row(i + 1, f as Fields));
+
+/* Updates run oldest to newest per track, because the derivation takes the LAST one and a seed
+   ordered the other way would pass every test while showing the wrong health on screen.
+   `stamp` counts HOURS, so a figure in days is written as days times 24 rather than left looking
+   like a date and behaving like an afternoon. */
+const UPDATES: Entry[] = [
+  { body: 'Three instances signed off. Mastering pass is the gate on the other six.', health: 'on_track', track: 1, by: 'you', at: stamp(-20 * 24) },
+  { body: 'Mastering pass done. Six instances queued, claude is working through them.', health: 'on_track', track: 1, by: 'claude', at: stamp(-3 * 24) },
+  { body: 'Notice window opens on the 12th and closes 60 days later. Nothing to do until then.', health: 'on_track', track: 2, by: 'you', at: stamp(-30 * 24) },
+  { body: 'Missed the window last year by four days. Diarised this time, but the renewal auto-charges before the notice lands.', health: 'at_risk', track: 2, by: 'you', at: stamp(-2 * 24) },
+  { body: 'Parked behind SG29. Nothing moves until the sending question is decided.', health: 'on_track', track: 4, by: 'you', at: stamp(-45 * 24) },
 ].map((f, i) => row(i + 1, f as Fields));
 
 export const ROWS: Record<string, Entry[]> = {
@@ -409,6 +515,8 @@ export const ROWS: Record<string, Entry[]> = {
   people: PEOPLE,
   tasks: TASKS,
   sessions: SESSIONS,
+  tracks: TRACKS,
+  updates: UPDATES,
 };
 
 /* ── declared pages ───────────────────────────────────────────────────────── */
