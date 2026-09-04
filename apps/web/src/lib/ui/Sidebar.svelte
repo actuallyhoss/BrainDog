@@ -130,7 +130,18 @@
       <ul class="group">
         {#each entries as entry}
           <li>
-            <a class="item tap" href={entry.href} aria-current={here(entry.href) ? 'page' : undefined}>
+            <!-- A page about a THING wears that thing's colour. The hue is chosen once at create
+                 and frozen, and it is the only colour in the product that means something specific
+                 rather than something general: not "this is important", but "this is Kiln". Using
+                 it here is the difference between a rail of grey rows and a rail where the project
+                 you are looking for is the one you already recognise. -->
+            <a
+              class="item tap"
+              href={entry.href}
+              aria-current={here(entry.href) ? 'page' : undefined}
+              style={entry.hue === undefined ? undefined : `--hue:${entry.hue}`}
+              data-hued={entry.hue === undefined ? undefined : ''}
+            >
               <Icon name={entry.icon} size="m" />
               <span class="item-name">{entry.title}</span>
             </a>
@@ -407,6 +418,14 @@
 
   .item[aria-current='page'] :global(.icon) {
     color: var(--accent-text);
+  }
+
+  /* Only the glyph takes it. The label stays `ink` so the row still reads as a row, and a rail of
+     coloured words would be a rail nobody can scan. Same lightness and chroma as `IdentityMark`,
+     which is what makes the mark in the grid and the row in the rail the same colour. */
+  .item[data-hued] :global(svg),
+  .item[data-hued][aria-current] :global(svg) {
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
 
   .item-name {

@@ -557,7 +557,7 @@ export const PAGES: Record<string, PageDecl> = {
       },
       {
         kind: 'table',
-        heading: 'Owed to you',
+        heading: 'Who owes you',
         span: 12,
         source: 'register.obligations',
         where: 'direction is owed to me, state is open or part',
@@ -591,7 +591,7 @@ export const PAGES: Record<string, PageDecl> = {
       },
       {
         kind: 'table',
-        heading: 'Owed by you',
+        heading: 'Who you owe',
         span: 12,
         source: 'register.obligations',
         where: 'direction is owed by me, state is open or part',
@@ -617,7 +617,7 @@ export const PAGES: Record<string, PageDecl> = {
     blocks: [
       {
         kind: 'stat',
-        heading: 'Renewals',
+        heading: 'At a glance',
         span: 12,
         cells: [
           { metric: 'renews-30d', label: 'Renews in 30 days' },
@@ -680,13 +680,14 @@ export const PAGES: Record<string, PageDecl> = {
   kiln: {
     page: 'kiln',
     title: 'Kiln',
+    identity: { register: 'things', seq: 1 },
     nav: { section: 'Projects', order: 10 },
     icon: 'thing',
     requires: ['register.tasks', 'register.sessions', 'register.obligations', 'register.services'],
     blocks: [
       {
         kind: 'stat',
-        heading: 'Kiln',
+        heading: 'At a glance',
         span: 12,
         cells: [
           { metric: 'kiln-open', label: 'Open' },

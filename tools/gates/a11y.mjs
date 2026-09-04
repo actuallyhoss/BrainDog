@@ -178,8 +178,18 @@ for (const scheme of ['dark', 'light']) {
     const open = async (route) => {
       await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'networkidle' });
       await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
-      // The same reason the screenshots do it: an un-laid-out rowgroup has no colours to measure.
-      await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+      /* Two things, and the second is about the gate being TRUSTWORTHY rather than about the app.
+         An un-laid-out rowgroup has no colours to measure, which is why the screenshots do it too.
+         And every transition is killed outright: `reducedMotion` suppresses the animations that
+         honour the media query, but a `transition` on a hover or focus colour is not covered by it,
+         and axe measuring a colour halfway through one is a contrast finding that appears and
+         disappears between runs. A gate that fails one run in ten is a gate people re-run until it
+         passes, which is the same as not having one. */
+      await page.addStyleTag({
+        content:
+          '.rowgroup{content-visibility:visible !important}' +
+          '*,*::before,*::after{transition:none !important;animation:none !important}',
+      });
       await page.addScriptTag({ content: axeSource });
     };
 

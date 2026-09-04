@@ -577,6 +577,8 @@ export type NavEntry = {
   section: string;
   order: number;
   icon: IconName;
+  /** The frozen hue of the row this page is about, when it is about one. */
+  hue?: number | undefined;
 };
 
 /**
@@ -590,6 +592,17 @@ export type NavEntry = {
 export const iconFor = (declared: string | undefined, fallback: IconName): IconName =>
   declared && Object.hasOwn(PATHS, declared) ? (declared as IconName) : fallback;
 
+/** The frozen hue of a declared identity, or undefined when the page is not about a row. */
+export const hueOf = (id: { register: string; seq: number } | undefined): number | undefined => {
+  if (!id) return undefined;
+  const target = REGISTERS[id.register];
+  const accent = target?.identity?.accent;
+  if (!accent) return undefined;
+  const row = (ROWS[id.register] ?? []).find((e) => e.seq === id.seq);
+  const hue = row ? Number(row.fields[accent]) : NaN;
+  return Number.isFinite(hue) ? hue : undefined;
+};
+
 export function boot() {
   const nav: NavEntry[] = Object.values(PAGES)
     .filter((p) => p.nav && p.placed !== false)
@@ -600,6 +613,7 @@ export function boot() {
       section: p.nav!.section,
       order: p.nav!.order,
       icon: iconFor(p.icon, 'doc'),
+      hue: hueOf(p.identity),
     }));
 
   /* OPEN TRACKS IN THE RAIL, under their own heading. A track is a thing you are in the middle of,

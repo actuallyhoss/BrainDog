@@ -23,10 +23,13 @@
     filters,
     id,
     icon,
+    hue,
   }: {
     title: string;
     /** The glyph the register or page already declares. The rail draws it; the page dropped it. */
     icon?: IconName | undefined;
+    /** The frozen hue of the row this page is about, when it is about one. */
+    hue?: number | undefined;
     count?: number | undefined;
     total?: number | undefined;
     kicker?: string | undefined;
@@ -50,7 +53,15 @@
         <!-- Every register and page declares an icon, the rail has always drawn it, and the page's
              own header threw it away — so the one heading that names the thing you are looking at
              was the only place it did not appear. -->
-        {#if icon}<span class="title-icon"><Icon name={icon} size="l" /></span>{/if}
+        {#if icon}
+          <span
+            class="title-icon"
+            data-hued={hue === undefined ? undefined : ''}
+            style={hue === undefined ? undefined : `--hue:${hue}`}
+          >
+            <Icon name={icon} size="l" />
+          </span>
+        {/if}
         <span dir="auto">{title}</span>
         {#if id}<span class="title-id">{id}</span>{/if}
       </h1>
@@ -116,6 +127,12 @@
     place-items: center;
     align-self: center;
     color: var(--dim);
+  }
+
+  /* The thing's own frozen hue, same lightness and chroma as its mark in the grid. A page about
+     Kiln is headed in Kiln's colour, which is the one colour here that names something. */
+  .title-icon[data-hued] {
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
 
   .title-id {

@@ -17,7 +17,7 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { REGISTERS, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
+  import { REGISTERS, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
   import { toSegments } from '$lib/record/blocks.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -334,7 +334,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead icon={iconFor(result.page.icon, 'doc')} kicker={result.page.nav?.section} title={result.page.title}>
+  <PageHead icon={iconFor(result.page.icon, 'doc')} hue={hueOf(result.page.identity)} kicker={result.page.nav?.section} title={result.page.title}>
     {#snippet actions()}
       {#if arranging}
         <Button weight="quiet" onclick={() => (adding = true)}>
@@ -670,11 +670,25 @@
     outline-color: var(--accent);
   }
 
-  /* A page being arranged is a page whose content is not the point. Dimming the blocks themselves
-     puts the controls in front without moving anything — no scale, no lift, no reflow. */
+  /* A page being arranged is a page whose content is not the point, and the obvious way to say so —
+     `opacity: 0.65` on the block — put every word in it under the contrast floor. In a mode a
+     person is actively working in, for as long as they are in it.
+
+     It is the same mistake as `.block-where`, and the same fix: build the hierarchy by RAISING the
+     controls rather than sinking the content through the floor. The block recedes onto the sunk
+     surface, its own borders soften, and the control bar above it keeps full contrast — so the
+     blocks read as objects being moved rather than as text you are meant to be reading, and the
+     text stays readable, which it has to be to know which block you are holding.
+
+     The gate only caught this once transitions were killed. Before that, axe kept measuring the
+     opacity mid-transition and reporting a pass, which is a gate agreeing with itself. */
   .block-slot[data-arranging] :global(.block) {
-    opacity: 0.65;
     pointer-events: none;
+  }
+
+  .block-slot[data-arranging] :global(.block) > :global(*) {
+    background: var(--sunk);
+    border-color: color-mix(in srgb, var(--line) 55%, transparent);
   }
 
   /* ONE COLUMN below 900px, in declaration order.

@@ -122,6 +122,15 @@ export type PageBlock = {
 };
 
 export type PageDecl = {
+  /**
+   * The row this page is ABOUT, when it is about one.
+   *
+   * A project page is the register's own numbers with one `where` on the front, and the thing it
+   * narrows to already carries an identity: a mark and a hue chosen at create and frozen. Naming it
+   * here lets the page and its rail row wear that colour, which is the only colour in the product
+   * that means something specific — WHICH PROJECT — rather than something general.
+   */
+  identity?: { register: string; seq: number };
   page: string;
   title: string;
   nav?: { section: string; order: number };

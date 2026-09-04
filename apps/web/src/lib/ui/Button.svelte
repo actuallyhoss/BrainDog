@@ -95,14 +95,20 @@
     color: var(--accent-ink);
   }
 
+  /* THE THEME SOLVES THESE, this file does not mix them. Mixing the accent with `--sunk` is one
+     formula that does opposite things in the two schemes — `sunk` is a pale surface in light and a
+     dark one in dark — so it lightened the button under its white label in light and darkened it in
+     dark. Measured: 4.16 against the label in light, which is a control failing AA at the moment
+     somebody is about to press it, in one scheme only. `--accent-hover` and `--accent-press` step
+     away from the label in whichever direction that is, and are checked when they are generated. */
   .btn[data-weight='primary']:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--accent) 90%, var(--sunk));
-    border-color: color-mix(in srgb, var(--accent) 58%, var(--sunk));
+    background: var(--accent-hover);
+    border-color: color-mix(in srgb, var(--accent-hover) 58%, var(--sunk));
   }
 
   .btn[data-weight='primary']:active:not(:disabled) {
-    background: color-mix(in srgb, var(--accent) 82%, var(--sunk));
-    box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--accent) 60%, var(--sunk));
+    background: var(--accent-press);
+    box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--accent-press) 60%, var(--sunk));
   }
 
   .btn[data-weight='bare'] {

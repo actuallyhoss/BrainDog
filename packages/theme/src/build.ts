@@ -53,6 +53,8 @@ export type Role =
   | 'danger-fill'
   | 'info-fill'
   | 'accent'
+  | 'accent-hover'
+  | 'accent-press'
   | 'accent-text'
   | 'accent-ink'
   | 'focus-in'
@@ -342,6 +344,28 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   const accentInk =
     [ink, g.sunk, '#FFFFFF', '#000000'].find((c) => contrast(rgb(c), rgb(accent)) >= 4.5) ?? '#000000';
 
+  /* 4b · THE ACCENT'S TWO INTERACTION STATES, solved here rather than mixed at the call site.
+     A component reaching for `color-mix(in srgb, var(--accent) 90%, var(--sunk))` writes one
+     formula that does OPPOSITE things in the two schemes: `sunk` is a pale surface in light and a
+     dark one in dark, so the same line lightens the button under a white label in one scheme and
+     darkens it in the other. Measured on the real palette, that hover state was 4.16 against its
+     own label in light and 5.42 in dark — a control failing AA at exactly the moment somebody is
+     about to press it, in one scheme only, which is the kind of bug that survives review forever.
+
+     The direction is not a taste: it is AWAY FROM THE LABEL. `accentInk` is already solved to clear
+     4.5 against `accent`, so hover and press step the accent's lightness further from it and keep
+     the hue and chroma, and each is checked rather than assumed. A state that cannot clear the
+     floor falls back to the accent itself — an interaction with no colour change is worse than an
+     interaction, and much better than an unreadable one. */
+  const inkIsLight = rgbToLch(rgb(accentInk)).L > 0.5;
+  const stepped = (delta: number): string => {
+    const away = inkIsLight ? -delta : delta;
+    return hex(gamutMap({ ...acc, L: Math.min(0.98, Math.max(0.02, acc.L + away)) }));
+  };
+  const clears = (c: string) => contrast(rgb(c), rgb(accentInk)) >= 4.5;
+  const accentHover = [stepped(0.05), stepped(0.07), stepped(0.09)].find(clears) ?? accent;
+  const accentPress = [stepped(0.1), stepped(0.13), stepped(0.16)].find(clears) ?? accentHover;
+
   /* 5 · intents. Solved for text, then SEARCHED for separability — searched, never repaired.
      There is no "retry once with relaxed chroma": a two-stage grid over chroma and contrast
      targets, taking the FIRST palette that clears check F, so the answer is the most saturated
@@ -452,6 +476,8 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     accent,
     'accent-text': accentText,
     'accent-ink': accentInk,
+    'accent-hover': accentHover,
+    'accent-press': accentPress,
     /* The ring is two tones, nine apart, so it survives on every surface in both schemes. */
     'focus-in': ink,
     'focus-out': g.bg,
