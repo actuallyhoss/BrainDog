@@ -17,3 +17,6 @@ __*
 # SERVES product shots from `apps/site/static/shots/` and a bare pattern silently excluded them.
 apps/*/shots/
 packages/theme/proof.txt
+
+# the a11y gate writes its run here
+.a11y.log

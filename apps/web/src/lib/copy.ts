@@ -263,6 +263,9 @@ export const copy = {
   defBlock: 'one thing on a page — a table, a figure, a note',
   defTone: 'what a value means: good, watch, wrong, note',
 
+  /** Names the source block so tabbing into it says which page's declaration it is. */
+  declarationOf: (page: string) => `Declaration for ${page}`,
+
   /* the keymap sheet */
   keymap: 'Keyboard',
   keymapHint: 'Bare letters act only inside a focused grid.',

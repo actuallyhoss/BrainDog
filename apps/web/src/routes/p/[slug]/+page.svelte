@@ -332,20 +332,29 @@
   <div class="page" role={arranging ? 'list' : undefined}>
     {#if showSource}
       <!-- The declaration as diffable text. A page is a row, so this is the row (19 §2). -->
-      <pre class="source"><code>{declaration}</code></pre>
+      <!-- `tabindex="0"`: it is a long scrolling code block, and a scrolling box a keyboard cannot
+           focus is a box a keyboard cannot read. Named, so tabbing into it says what it is. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <pre class="source" tabindex="0" aria-label={copy.declarationOf(result.page.title)}><code
+          >{declaration}</code></pre>
     {:else}
       {#each laid as { slot, block }, at (slot.i)}
         <!-- `drawn: false` means the server evaluated `when:` and said no. A page that shows a
              warning that does not apply teaches people to ignore warnings (06 §1). -->
         {#if block.drawn}
-          <section
+          <!-- A `div` that takes `region` or `listitem`, and NOT a `<section>`. A section is already
+               a region landmark once it is named, and ARIA does not let one be a `listitem` — so
+               while arranging, every block on the page carried a role its element could not have.
+               `div` + an explicit role says the same thing in both modes and, unlike swapping the
+               tag, does not tear the node down and drop focus when the mode changes. -->
+          <div
             class="block-slot"
             id="b-{slot.i + 1}"
             aria-labelledby="h-{slot.i + 1}"
             style="--span:{slot.span}"
             data-arranging={arranging ? '' : undefined}
             data-cursor={!arranging && !showSource && at === cursor ? '' : undefined}
-            role={arranging ? 'listitem' : undefined}
+            role={arranging ? 'listitem' : 'region'}
             data-dragging={dragging === at ? '' : undefined}
             draggable={arranging}
             ondragstart={() => (dragging = at)}
@@ -404,7 +413,7 @@
                 {#if segment.type === 'block'}<Block block={segment} {opts} />{/if}
               {/each}
             {/if}
-          </section>
+          </div>
         {/if}
       {/each}
     {/if}

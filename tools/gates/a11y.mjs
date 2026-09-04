@@ -31,12 +31,22 @@ import { extname, join, normalize } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-const ROOT = join(import.meta.dirname, '..', '..', 'apps', 'web', 'build');
-const AXE = join(import.meta.dirname, '..', '..', 'node_modules', 'axe-core', 'axe.min.js');
+const REPO = join(import.meta.dirname, '..', '..');
+
+/**
+ * BOTH APPS. The record app is where the interesting failures are, but the marketing site is the
+ * first page anybody ever sees and the only one they meet before deciding whether to trust the
+ * rest — a contrast failure there is a contrast failure in the shop window. It is prerendered
+ * rather than a shell, so it needs no fallback and has no states to drive.
+ */
+const APPS = [
+  { name: 'web', root: join(REPO, 'apps', 'web', 'build'), routes: null, spa: true },
+  { name: 'site', root: join(REPO, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], spa: false },
+];
+const AXE = join(REPO, 'node_modules', 'axe-core', 'axe.min.js');
 const PORT = 5186;
 
-/* Every surface, plus the two that only exist in a state: a grid with a selection, and a sheet
-   open over it. A dialog that traps focus badly is a dialog nothing else in this file would reach. */
+/* Every surface at rest. */
 const ROUTES = [
   '/',
   '/decide',
@@ -57,6 +67,35 @@ const ROUTES = [
   '/nowhere',
 ];
 
+/**
+ * The states a route can only be IN, which is where the accessibility bugs actually live.
+ *
+ * Everything above is a page at rest, and a page at rest is the easy case. A dialog that never
+ * moves focus into itself, a menu with no accessible name, a toggle whose `aria-pressed` never
+ * flips, a selection count nothing announces — none of those exist until somebody presses a key,
+ * and none of them are reachable by a crawler that only visits URLs.
+ *
+ * Each one names the keys to press and what should exist afterwards. The `expect` is not
+ * decoration: if a keystroke silently stops working, the scenario would otherwise still "pass" by
+ * auditing the page underneath it, and the gate would go green over a dialog that no longer opens.
+ */
+const STATES = [
+  { name: 'grid: filter sheet', route: '/r/obligations', keys: ['f'], expect: 'dialog[open]' },
+  { name: 'grid: create sheet', route: '/r/obligations', keys: ['n'], expect: 'dialog[open]' },
+  { name: 'grid: display options', route: '/r/obligations', keys: ['v'], expect: 'dialog[open]' },
+  { name: 'grid: peek drawer', route: '/r/obligations', keys: ['p'], expect: 'dialog[open]' },
+  /* Desktop only, and that is the product being right rather than the gate being lax: below 900px
+     the register draws declared CARDS instead of a grid, so there are no cells to select. */
+  { name: 'grid: selection', route: '/r/obligations', keys: ['x', 'j', 'x'], expect: '[aria-selected="true"]', desktop: true },
+  { name: 'grid: row menu', route: '/r/obligations', keys: ['Shift+F10'], expect: '[role="menu"]' },
+  { name: 'keymap sheet', route: '/r/obligations', keys: ['?'], expect: 'dialog[open]' },
+  { name: 'palette', route: '/', keys: ['/'], expect: '[role="listbox"], [role="dialog"]' },
+  { name: 'page: declaration', route: '/p/kiln', keys: ['Shift+E'], expect: '.source, pre' },
+  /* Arranging has no key — it is a button, and only on desktop. 13 §10 keeps authoring off phones,
+     and `.arrange-slot` is display:none below 900px rather than a control that exists and refuses. */
+  { name: 'page: arrange mode', route: '/p/kiln', click: '.arrange-slot button', expect: '[role="listitem"]', desktop: true },
+];
+
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
@@ -67,19 +106,17 @@ const TYPES = {
   '.json': 'application/json',
 };
 
-if (!(await stat(ROOT).catch(() => null))) {
-  console.log('  a11y: no build to check. `pnpm build` first, and CI does.');
-  process.exit(0);
-}
-
 const axeSource = await readFile(AXE, 'utf8');
+
+/** The app the server is currently answering for. The outer loop sets it before each pass. */
+let current = APPS[0];
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
-    const file = join(ROOT, candidate);
+    const file = join(current.root, candidate);
     const info = await stat(file).catch(() => null);
     if (!info?.isFile()) continue;
     res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
@@ -97,9 +134,9 @@ const server = createServer(async (req, res) => {
      a genuinely broken asset still fails loudly, and everything else gets the shell. Worth knowing
      when this is deployed, because an SPA fallback that excludes dotted paths — several hosts
      default to exactly that — would 404 every view in production. */
-  const shell = join(ROOT, 'index.html');
+  const shell = join(current.root, 'index.html');
   const asset = Object.hasOwn(TYPES, extname(rel));
-  if (!asset && (await stat(shell).catch(() => null))?.isFile()) {
+  if (current.spa && !asset && (await stat(shell).catch(() => null))?.isFile()) {
     res.writeHead(200, { 'content-type': TYPES['.html'] });
     return createReadStream(shell).pipe(res);
   }
@@ -111,6 +148,15 @@ const browser = await chromium.launch();
 /** `id -> { help, nodes: Set<'route scheme@width  target'> }`, so one bug is one line however often it repeats. */
 const found = new Map();
 let checked = 0;
+/** Scenarios whose keystroke did not produce the state it names — a silently dead key. */
+const broken = [];
+
+for (const app of APPS) {
+  if (!(await stat(app.root).catch(() => null))) {
+    console.log(`  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`);
+    continue;
+  }
+  current = app;
 
 for (const scheme of ['dark', 'light']) {
   for (const width of [1440, 390]) {
@@ -124,15 +170,18 @@ for (const scheme of ['dark', 'light']) {
     const page = await context.newPage();
     /* A gate that runs a browser over sixty-eight pages and prints nothing for four minutes is a
        gate people learn to kill. One line per pass, flushed as it goes. */
-    process.stdout.write(`    ${scheme}@${width} `);
 
-    for (const route of ROUTES) {
+
+    /** Loads a route, waits for it to be real, and injects axe. */
+    const open = async (route) => {
       await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'networkidle' });
       await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
       // The same reason the screenshots do it: an un-laid-out rowgroup has no colours to measure.
       await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
       await page.addScriptTag({ content: axeSource });
+    };
 
+    const audit = async (where) => {
       const result = await page.evaluate(async () => {
         // @ts-expect-error injected
         return await window.axe.run(document, {
@@ -140,18 +189,54 @@ for (const scheme of ['dark', 'light']) {
           resultTypes: ['violations'],
         });
       });
-
       checked++;
       process.stdout.write(result.violations.length ? '!' : '.');
       for (const v of result.violations) {
         const entry = found.get(v.id) ?? { help: v.help, impact: v.impact, nodes: new Set() };
-        for (const n of v.nodes) entry.nodes.add(`${route} ${scheme}@${width}  ${n.target.join(' ')}`);
+        for (const n of v.nodes) entry.nodes.add(`${app.name}${where.startsWith('/') ? '' : ' '}${where} ${scheme}@${width}  ${n.target.join(' ')}`);
         found.set(v.id, entry);
       }
+    };
+
+    process.stdout.write(`    ${(app.name + '     ').slice(0, 5)} ${(scheme + '@' + width + '   ').slice(0, 11)} `);
+    for (const route of app.routes ?? ROUTES) {
+      await open(route);
+      await audit(route);
+    }
+
+    /* States are the record app's. The site is three prerendered pages with nothing to drive. */
+    if (!app.spa) {
+      process.stdout.write('\n');
+      await context.close();
+      continue;
+    }
+
+    process.stdout.write(' ');
+    for (const st of STATES) {
+      if (st.desktop && width < 900) continue;
+      await open(st.route);
+      // Focus the grid first: bare letters act only inside one, which is the point of the rule.
+      /* SHORT timeouts, and they matter. Both of these clicks are speculative — a page surface has
+         no `[role="row"]` at all — and Playwright's default is to wait thirty seconds before
+         admitting it. Nine scenarios times four passes times thirty seconds is the difference
+         between a gate that runs and a gate nobody waits for. */
+      await page.locator('[role="row"]').first().click({ timeout: 1200 }).catch(() => {});
+      if (st.click) await page.locator(st.click).first().click({ timeout: 1200 }).catch(() => {});
+      for (const k of st.keys ?? []) {
+        await page.keyboard.press(k);
+        await page.waitForTimeout(120);
+      }
+      if (!(await page.locator(st.expect).first().isVisible().catch(() => false))) {
+        broken.push(`${app.name} ${st.name} ${scheme}@${width}: after ${st.click ?? st.keys.join(' ')}, no ${st.expect}`);
+        process.stdout.write('?');
+        continue;
+      }
+      await audit(st.name);
     }
     process.stdout.write('\n');
     await context.close();
   }
+}
 }
 
 await browser.close();
@@ -172,4 +257,12 @@ const show = (id, e) => {
 for (const [id, e] of found) show(id, e);
 if (contrast) show(CONTRAST, contrast);
 
-if (found.size || contrast) process.exitCode = 1;
+/* A scenario that cannot reach its state is a FAILURE, not a skip. Otherwise a key that quietly
+   stopped working leaves the gate auditing the page underneath the dialog and reporting green. */
+if (broken.length) {
+  console.error(`
+  ${broken.length} scenario(s) never reached their state:`);
+  for (const b of broken) console.error(`      ${b}`);
+}
+
+if (found.size || contrast || broken.length) process.exitCode = 1;

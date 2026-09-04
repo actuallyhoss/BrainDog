@@ -66,7 +66,14 @@
     </button>
   </header>
 
-  <div class="sheet-body">{@render children()}</div>
+  <!-- `tabindex="0"` because this is the scrolling box, and a scrolling box that a keyboard cannot
+       reach is content a keyboard cannot read. The sheet that proved it was the KEYMAP: forty
+       bindings, all of them text and `kbd`, not one focusable node in the whole panel — so the one
+       surface in the product whose entire subject is the keyboard could not be scrolled with one.
+       Sheets that are full of fields never showed the bug, because their fields carry the focus
+       that scrolls the box for free. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div class="sheet-body" tabindex="0">{@render children()}</div>
 
   {#if footer}<footer class="sheet-foot">{@render footer()}</footer>{/if}
 </dialog>
