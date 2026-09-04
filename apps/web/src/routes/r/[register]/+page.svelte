@@ -25,6 +25,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import RowMenu from '$lib/ui/RowMenu.svelte';
   import RowForm from '$lib/ui/RowForm.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
@@ -156,6 +157,16 @@
       toasts.push(copy.notWritten('This filter would be bound as a block on a page'), { intent: 'warn' });
       return;
     }
+    if (e.shiftKey && e.key === 'F10') {
+      e.preventDefault();
+      openRowMenu();
+      return;
+    }
+    if (e.key === 'ContextMenu') {
+      e.preventDefault();
+      openRowMenu();
+      return;
+    }
     if (mod || e.altKey) return;
 
     if (e.key === 'j' || e.key === 'ArrowDown') {
@@ -239,6 +250,19 @@
    */
   let selected = $state(new Set<number>());
   let anchor = 0;
+
+  /* ⇧F10 and the context-menu key. The rect is taken at open and not tracked: a menu that follows
+     a scrolling row is a menu that walks away from the pointer. */
+  let menuAt = $state<{ x: number; y: number; height: number } | null>(null);
+  const menuOpen = $derived(menuAt !== null);
+  const menuRow = $derived(result.entries[focus.row]);
+
+  function openRowMenu() {
+    const el = document.querySelectorAll('.rowgroup .tr')[focus.row];
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    menuAt = { x: r.x + 24, y: r.y, height: r.height };
+  }
 
   /** The Table speaks in row KEYS (`register#seq`), which is the id a row is addressed by. */
   const selectedKeys = $derived(new Set([...selected].map((seq) => `${id}#${seq}`)));
@@ -442,6 +466,30 @@
        ONLY INDEXED FIELDS ARE OFFERED. A filter on an unindexed field is a promise the storage
        cannot keep at five thousand rows, and a control that gets slower the more rows you have is a
        control that breaks exactly when the register becomes worth filtering. -->
+  <RowMenu
+    open={menuOpen}
+    at={menuAt}
+    label={copy.rowMenu}
+    onclose={() => (menuAt = null)}
+  >
+    {#if menuRow}
+      {@const seq = menuRow.seq}
+      <a class="mi" role="menuitem" href="/r/{id}/{seq}">
+        <span class="mi-name">{copy.openRow}</span><Kbd keys="↵" />
+      </a>
+      <button class="mi" role="menuitem" type="button" onclick={() => (peeked = seq)}>
+        <span class="mi-name">{copy.peek}</span><Kbd keys="p" />
+      </button>
+      <button class="mi" role="menuitem" type="button" onclick={() => void copyId(seq)}>
+        <span class="mi-name">{copy.copyId}</span><Kbd keys="y" />
+      </button>
+      <hr class="mi-rule" />
+      <button class="mi" role="menuitem" type="button" onclick={() => archive(seq)}>
+        <span class="mi-name">{copy.archive}</span><Kbd keys="⌫" />
+      </button>
+    {/if}
+  </RowMenu>
+
   <!-- The new-row drawer. Every control in it comes from the register's own field declarations —
        see RowForm — so a pack that adds a field gets a form field, and nobody writes a second copy
        of the schema in markup. -->
@@ -518,6 +566,42 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+  }
+
+  /* The menu rows: the same 34px, the same tint-on-hover, and each printing the key it stands in
+     for — so using the menu teaches the key that replaces it. */
+  .mi {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    inline-size: 100%;
+    min-block-size: 34px;
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-ui);
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .mi:hover,
+  .mi:focus-visible {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    color: var(--ink);
+  }
+
+  .mi-name {
+    flex: 1;
+  }
+
+  .mi-rule {
+    margin: 4px 0;
+    border: 0;
+    border-block-start: 1px solid var(--line);
   }
 
   .picked {
@@ -667,7 +751,43 @@
       padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
 
-    .picked {
+    /* The menu rows: the same 34px, the same tint-on-hover, and each printing the key it stands in
+     for — so using the menu teaches the key that replaces it. */
+  .mi {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    inline-size: 100%;
+    min-block-size: 34px;
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-ui);
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .mi:hover,
+  .mi:focus-visible {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    color: var(--ink);
+  }
+
+  .mi-name {
+    flex: 1;
+  }
+
+  .mi-rule {
+    margin: 4px 0;
+    border: 0;
+    border-block-start: 1px solid var(--line);
+  }
+
+  .picked {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
