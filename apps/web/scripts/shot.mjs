@@ -8,6 +8,17 @@
  *
  *   node scripts/shot.mjs                       every route, both schemes, 1440
  *   node scripts/shot.mjs /decide/SG31 390      one route at one width
+ *
+ * On Git Bash, prefix a route argument with `MSYS_NO_PATHCONV=1` or the shell rewrites `/p/kiln`
+ * into the Windows path `P:/kiln` before node ever sees it.
+ *
+ * TWO THINGS IN THESE IMAGES ARE THE CAPTURE, NOT THE APP, and both have cost me a bug report:
+ * an off-screen rowgroup photographs empty (see below), and ANY `position: fixed` element — the
+ * launcher, a toast — renders at its VIEWPORT position on top of a full-page capture that is four
+ * times the viewport tall. The launcher therefore appears to sit over the middle of a long list
+ * and cover a row. It does not: scrolled to the bottom at 390 the last card clears it by 37px and
+ * at 1440 by 89px, which is `.body`'s own `padding-block-end` doing its job. Measure geometry
+ * before believing a screenshot, which is the whole reason 22 §10 keeps pixels out of the gates.
  */
 
 import { mkdir } from 'node:fs/promises';
