@@ -124,18 +124,21 @@
       </section>
 
       <aside class="side">
-        <h2 class="side-title">This row</h2>
+        <!-- "This row" said what you are already looking at, and "Spoken id" and "Version" are
+             both the record's own vocabulary: one is the thing you say out loud, which is what the
+             row is called, and the other is a compare-and-set counter that means nothing to a
+             reader and changes on every write. The id stays, because it is the handle you paste
+             into an agent. The counter goes; the History underneath is the version, in words. -->
+        <h2 class="side-title"><Icon name="info" size="s" />Details</h2>
         <dl class="meta">
-          <dt>Spoken id</dt>
+          <dt>Id</dt>
           <dd class="mono">{id}#{row.seq}</dd>
-          <dt>Version</dt>
-          <dd class="mono">{row.version}</dd>
-          <dt>Created</dt>
+          <dt>Added</dt>
           <dd>{relative(row.created.slice(0, 10), NOW)} by {row.by}</dd>
         </dl>
 
         {#if history.length}
-          <h2 class="side-title">History</h2>
+          <h2 class="side-title"><Icon name="history" size="s" />History</h2>
           <ol class="history">
             {#each history as e}
               <li>
@@ -251,6 +254,9 @@
   }
 
   .side-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     margin-block-end: var(--sp-2);
     color: var(--ink2);
     font-family: var(--font-ui);

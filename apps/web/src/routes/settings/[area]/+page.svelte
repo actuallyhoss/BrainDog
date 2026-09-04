@@ -158,10 +158,14 @@
             {#each pen as p}
               <li>
                 <div class="line">
-                  <span class="seq">{p.origin}</span>
+                  <span class="seq"><Icon name="doc" size="s" /></span>
                   <span class="line-main">
                     <span class="line-title">{p.title}</span>
-                    <span class="line-detail">{copy.holdingPen} Derived from {p.requires[0]}.</span>
+                    <!-- `register.people` is the requirement's own qualified id. What a reader
+                         wants is which of their lists it was built from. -->
+                    <span class="line-detail">
+                      {copy.holdingPen} Built from your {REGISTERS[String(p.requires[0] ?? '').replace('register.', '')]?.name ?? 'rows'}.
+                    </span>
                   </span>
                   <span class="line-amount"></span>
                   <span class="line-when">
@@ -182,7 +186,10 @@
                 <span class="seq">{p.id}</span>
                 <span class="line-main"><span class="line-title">{p.name}</span></span>
                 <span class="line-amount"><Chip label={p.level} tone={p.level === 'owner' ? 'good' : undefined} /></span>
-                <span class="line-when">{REGISTERS ? Object.keys(REGISTERS).length : 0} registers</span>
+                <!-- This printed the TOTAL number of lists in the record on every person's row,
+                     identical for all of them, which reads as a per-person figure and is not one.
+                     What the column is for is what this person can reach. -->
+                <span class="line-when">{p.level === 'owner' ? 'Everything' : 'Read only'}</span>
               </div>
             </li>
           {/each}
@@ -208,7 +215,7 @@
       </Section>
     {/if}
 
-    <p class="mock">{copy.mockNotice} {PACKS.length} packs, {Object.keys(REGISTERS).length} registers.</p>
+    <p class="mock">{copy.mockNotice} {PACKS.length} packs, {Object.keys(REGISTERS).length} lists.</p>
   </div>
 </div>
 

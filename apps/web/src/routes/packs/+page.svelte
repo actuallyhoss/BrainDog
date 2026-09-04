@@ -13,7 +13,7 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PACKS } from '$lib/record/api.ts';
+  import { PAGES, REGISTERS, PACKS } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -40,8 +40,12 @@
           </header>
           <p class="pack-blurb">{pack.blurb}</p>
           <ul class="pack-gives">
-            {#each pack.registers as r}<li><Icon name="rows" size="s" />{r}</li>{/each}
-            {#each pack.pages as p}<li><Icon name="doc" size="s" />{p}</li>{/each}
+            <!-- Names, not ids. A pack's feature list said `obligations` and `money` where the rest
+                 of the product says Obligations and Overview, on the one screen whose whole job is
+                 to tell somebody what they are about to install. A pack that is NOT installed names
+                 things this record does not have yet, so the id is the honest fallback there. -->
+            {#each pack.registers as r}<li><Icon name="rows" size="s" />{REGISTERS[r]?.name ?? r}</li>{/each}
+            {#each pack.pages as p}<li><Icon name="doc" size="s" />{PAGES[p]?.title ?? p}</li>{/each}
           </ul>
           <footer class="pack-foot">
             <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>
@@ -54,8 +58,8 @@
 + page.${pack.pages[0] ?? '—'}         placed in nav, section "${pack.name}"
 + 1 example row, marked example, deletable in one click
 
-nav order is read ONCE, at install, and never re-read.
-an update that would move something is shown here and then ignored.`}</code></pre>
+nav order is read once, at install. A later update that would move
+something is shown here and then ignored.`}</code></pre>
           {/if}
         </article>
       {/each}
@@ -73,7 +77,7 @@ an update that would move something is shown here and then ignored.`}</code></pr
               <span class="line-detail">{pack.blurb}</span>
             </span>
             <span class="line-amount">
-              {#if pack.stars}<span class="stars">{pack.stars}★</span>{/if}
+              {#if pack.stars}<span class="stars"><Icon name="star" size="s" />{pack.stars}</span>{/if}
             </span>
             <span class="line-when"><Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The install plan would be shown before anything applied'), { intent: 'warn' })}>{copy.install}</Button></span>
           </div>
@@ -184,6 +188,9 @@ an update that would move something is shown here and then ignored.`}</code></pr
   }
 
   .stars {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     color: var(--dim);
     font-size: var(--t-xs);
   }

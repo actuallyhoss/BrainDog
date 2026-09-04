@@ -53,12 +53,17 @@
   {:else}
     {#each groups as [kind, rows]}
       <section>
-        <h2 class="group">{kind}<span class="group-n">{rows.length}</span></h2>
+        <!-- Results group by the list they came from, and every hit already carries that list's
+             glyph. The heading is where a person decides whether to keep reading this group. -->
+        <h2 class="group">
+          {#if rows[0]}<Icon name={rows[0].icon} size="s" />{/if}
+          {kind}<span class="group-n">{rows.length}</span>
+        </h2>
         <ul class="ledger">
           {#each rows as hit}
             <li>
               <a class="line line-short" href={hit.href}>
-                <span class="seq">{hit.spoken ?? ''}</span>
+                <span class="seq"><Icon name={hit.icon} size="s" />{hit.spoken ?? ''}</span>
                 <span class="line-main"><span class="line-title">{hit.title}</span></span>
                 <span class="line-amount"></span>
                 <span class="line-when">{hit.detail}</span>
@@ -94,6 +99,9 @@
   }
 
   .group {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
