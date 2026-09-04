@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 
 import {
   differs,
+  dropIndex,
   floorFor,
   moveAt,
   removeAt,
@@ -185,4 +186,44 @@ test('a secret field is never seeded into a block', () => {
 test('an unknown register or kind seeds nothing rather than half a block', () => {
   assert.equal(seedBlock('todo', 'nope'), null);
   assert.equal(seedBlock('nope', 'tasks'), null);
+});
+
+/* ── where a drop lands ──────────────────────────────────────────────────── */
+
+test('dropping below where you started accounts for the gap you left behind', () => {
+  // Held 0, released on the trailing edge of 3. After 0 is spliced out, 3 sits at 2, so the block
+  // belongs at 3 — not 4. Off by one here reads as the drag being imprecise, not as arithmetic.
+  assert.equal(dropIndex(0, 3, 'after'), 3);
+  assert.equal(dropIndex(0, 3, 'before'), 2);
+});
+
+test('dropping above where you started needs no correction', () => {
+  assert.equal(dropIndex(4, 1, 'before'), 1);
+  assert.equal(dropIndex(4, 1, 'after'), 2);
+});
+
+test('either edge of the block you are holding is a no-op', () => {
+  assert.equal(moveAt([{ i: 0, span: 12 }, { i: 1, span: 12 }, { i: 2, span: 12 }], 1, dropIndex(1, 1, 'before'))[1]?.i, 1);
+  assert.equal(moveAt([{ i: 0, span: 12 }, { i: 1, span: 12 }, { i: 2, span: 12 }], 1, dropIndex(1, 1, 'after'))[1]?.i, 1);
+});
+
+test('a drop lands exactly where the indicator was drawn, for every pair', () => {
+  // The property that matters: whatever edge the reader saw highlighted, the block ends up on that
+  // side of that block. Checked across every from/at/edge combination rather than by example.
+  const slots = [0, 1, 2, 3, 4].map((i) => ({ i, span: 12 }));
+  for (let from = 0; from < 5; from++) {
+    for (let at = 0; at < 5; at++) {
+      for (const edge of ['before', 'after'] as const) {
+        if (from === at) continue;
+        const out = moveAt(slots, from, dropIndex(from, at, edge));
+        const landed = out.findIndex((s) => s.i === from);
+        const target = out.findIndex((s) => s.i === at);
+        assert.equal(
+          edge === 'before' ? landed < target : landed > target,
+          true,
+          `held ${from}, released ${edge} ${at}, landed at ${landed} with the target at ${target}`,
+        );
+      }
+    }
+  }
 });

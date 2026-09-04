@@ -28,7 +28,7 @@
   import BlockBar from '$lib/ui/BlockBar.svelte';
   import AddBlock from '$lib/ui/AddBlock.svelte';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
-  import { spanOf as declaredSpan } from '$lib/record/arrange.ts';
+  import { COLUMNS, dropIndex, spanOf as declaredSpan } from '$lib/record/arrange.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
 
   const slug = $derived(route.params.slug ?? '');
@@ -116,6 +116,31 @@
 
   /** Held while a handle is down, so the drop target knows what is moving. */
   let dragging = $state<number | null>(null);
+
+  /* WHERE IT WILL LAND. A drag with no target shown is a drag you have to complete to find out
+     what it did, and then undo. The block under the pointer takes an accent edge on the side the
+     block will arrive, so the answer is on screen before the reader lets go.
+
+     Which edge depends on the block's own width, not on a fixed axis. A full-width block stacks,
+     so top and bottom are what "before" and "after" mean and the pointer's Y decides. A block
+     sharing its row reads left to right, so X decides. Using one axis for both puts the line on
+     the short edge of half the blocks on the page. */
+  let over = $state<{ at: number; edge: 'before' | 'after' } | null>(null);
+
+  function trackDrop(e: DragEvent, at: number, span: number) {
+    if (!arranging || dragging === null) return;
+    e.preventDefault();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const stacked = span >= COLUMNS;
+    const past = stacked ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2;
+    over = { at, edge: past ? 'after' : 'before' };
+  }
+
+  function drop() {
+    if (dragging !== null && over) arrangement.move(dragging, dropIndex(dragging, over.at, over.edge));
+    dragging = null;
+    over = null;
+  }
 
   let adding = $state(false);
 
@@ -356,14 +381,15 @@
             data-cursor={!arranging && !showSource && at === cursor ? '' : undefined}
             role={arranging ? 'listitem' : 'region'}
             data-dragging={dragging === at ? '' : undefined}
+            data-drop={over && over.at === at && dragging !== at ? over.edge : undefined}
+            data-stacked={slot.span >= COLUMNS ? '' : undefined}
             draggable={arranging}
             ondragstart={() => (dragging = at)}
-            ondragend={() => (dragging = null)}
-            ondragover={(e) => arranging && e.preventDefault()}
+            ondragend={() => ((dragging = null), (over = null))}
+            ondragover={(e) => trackDrop(e, at, slot.span)}
             ondrop={(e) => {
               e.preventDefault();
-              if (dragging !== null) arrangement.move(dragging, at);
-              dragging = null;
+              drop();
             }}
             onkeydown={(e) => {
               /* `⌥↑` / `⌥↓` — WCAG 2.5.7's single-pointer alternative, and it calls the same
@@ -460,6 +486,8 @@
     /* Required, not decorative: the tracks are `minmax(0, 1fr)` and a grid item without it refuses
        to shrink below its content, so one wide table pushes the whole row past the page. */
     min-inline-size: 0;
+    /* The landing line is positioned against this. */
+    position: relative;
   }
 
   /* A hairline under every block header. It is the cheapest structure available: it says where a
@@ -565,6 +593,51 @@
     outline-offset: var(--sp-2);
     border-radius: var(--r-sm);
     cursor: grab;
+  }
+
+  /* THE LANDING LINE. A 3px accent bar on the edge the held block will arrive at, drawn with an
+     outline-style pseudo-element so it sits over the block's own border rather than moving it —
+     a border that appears on hover reflows the grid under the pointer, which makes a drag feel
+     like it is fighting you. `inset-inline` / `inset-block` so it mirrors under rtl for free. */
+  .block-slot[data-drop]::after {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    background: var(--accent);
+    border-radius: 999px;
+    pointer-events: none;
+  }
+
+  /* Side by side: a vertical line on the leading or trailing edge. */
+  .block-slot[data-drop='before']::after,
+  .block-slot[data-drop='after']::after {
+    inset-block: calc(var(--sp-2) * -1);
+    inline-size: 3px;
+  }
+
+  .block-slot[data-drop='before']::after {
+    inset-inline-start: calc(var(--sp-3) * -1);
+  }
+
+  .block-slot[data-drop='after']::after {
+    inset-inline-end: calc(var(--sp-3) * -1);
+  }
+
+  /* Full width: it stacks, so the line goes across the top or the bottom instead. */
+  .block-slot[data-stacked][data-drop='before']::after,
+  .block-slot[data-stacked][data-drop='after']::after {
+    inset-inline: calc(var(--sp-2) * -1);
+    inset-block: auto;
+    inline-size: auto;
+    block-size: 3px;
+  }
+
+  .block-slot[data-stacked][data-drop='before']::after {
+    inset-block-start: calc(var(--sp-3) * -1);
+  }
+
+  .block-slot[data-stacked][data-drop='after']::after {
+    inset-block-end: calc(var(--sp-3) * -1);
   }
 
   /* The one moving. Half-visible rather than hidden, so the row you are dragging out of does not

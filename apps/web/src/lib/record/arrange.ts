@@ -37,6 +37,23 @@ export function moveAt(slots: readonly Slot[], from: number, to: number): Slot[]
   return next;
 }
 
+/**
+ * Where a drop actually lands, given what you picked up and which edge you released it on.
+ *
+ * THE OFF-BY-ONE HERE IS THE WHOLE FUNCTION. `moveAt` splices the held block out before it splices
+ * it back in, so every index after the one you took shifts down by one — and "drop it after block
+ * four", when block four is below where you started, means index four rather than five. Getting
+ * this wrong does not throw. It puts the block one place from where the reader let go of it, which
+ * they will read as the drag being imprecise rather than as arithmetic.
+ *
+ * Dropping either side of the block you are already holding is a no-op, and `moveAt` treats it as
+ * one.
+ */
+export const dropIndex = (from: number, at: number, edge: 'before' | 'after'): number => {
+  const to = edge === 'after' ? at + 1 : at;
+  return from < to ? to - 1 : to;
+};
+
 export const removeAt = (slots: readonly Slot[], at: number): Slot[] => slots.filter((_, n) => n !== at);
 
 export const setSpanAt = (slots: readonly Slot[], at: number, span: number): Slot[] =>
