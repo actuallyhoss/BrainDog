@@ -29,9 +29,19 @@ import {
   NEWS,
   VAULT,
 } from './data.ts';
+import { runway } from './forecast.ts';
 import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 export const CURRENCY = 'GBP';
+
+/**
+ * The cash the walk starts from, in minor units.
+ *
+ * A STAND-IN, and it is named up here so that it reads as one. The record does not hold a bank
+ * balance yet, and a runway seeded from a number nobody declared is a forecast that looks like a
+ * fact. When an account row exists this becomes a lookup and nothing else changes.
+ */
+const OPENING = 4_200_000;
 
 /** One locale for collation, so a list is in the same order for everybody looking at one record. */
 const LOCALE = 'en-GB';
@@ -471,6 +481,37 @@ export function metric(id: string): Metric {
         href: '/r/obligations?f=state:in:open,part&f=due:before:today',
       };
     }
+    /* THE RUNWAY, which is the only figure in the product that is about the future.
+       It seeds from what is liquid, applies every dated movement in order, and reports the first
+       day the balance goes under — with the row that did it, because "you run out on 14 November"
+       is a number you look at and "the Fenwick renewal is what does it" is one you act on.
+
+       `OPENING` is a stand-in for a cash position the record does not hold yet. It is named here
+       rather than buried in the walk so the day a real balance arrives there is one line to change,
+       and so nobody mistakes it for something the record knows. */
+    case 'runway': {
+      const walk = runway(OPENING);
+      if (!walk.crossed) {
+        return {
+          id,
+          label: 'Runway',
+          value: `Over ${walk.horizon} days`,
+          note: 'nothing dated takes it under',
+          tone: 'good',
+          href: '/p/money',
+        };
+      }
+      return {
+        id,
+        label: 'Runway',
+        value: `${walk.days} days`,
+        /* The row, not just the date. A forecast that names only a day leaves the reader to find
+           out which movement caused it, and that is the only actionable half of the fact. */
+        note: `${fmtDay(walk.crossed.day)} · ${walk.crossed.label}`,
+        tone: walk.days !== null && walk.days < 45 ? 'bad' : 'warn',
+        href: walk.crossed.href,
+      };
+    }
     case 'renews-30d': {
       const rows = services.filter((e) => e.fields.state !== 'cancelled' && days(e.fields.renews) <= 30);
       return {
@@ -611,11 +652,57 @@ export type BlockResult = PageBlock & {
   metrics?: Metric[] | undefined;
 };
 
+/**
+ * The cash walk, shaped as an ordinary table block.
+ *
+ * Four columns, and the fourth is the reason the walk is drawn at all: the balance after each
+ * movement. A list of dated amounts is the same information the register already has; the running
+ * figure beside them is what makes it a forecast.
+ *
+ * The row that crosses carries the `bad` tone, so the eye lands on the day rather than on the
+ * biggest number — those are rarely the same row, and the big number is the distraction.
+ */
+function runwayBlock(b: PageBlock): BlockResult {
+  const walk = runway(OPENING, b.limit ? b.limit * 12 : 180);
+  const columns = [
+    { field: 'day', label: 'When', width: 'minmax(10ch,auto)', align: 'start' as const, truncate: 'end' as const },
+    { field: 'what', label: 'What', width: 'minmax(16ch,1fr)', align: 'start' as const, truncate: 'end' as const },
+    { field: 'delta', label: 'In and out', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
+    { field: 'balance', label: 'Balance', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
+  ];
+  const steps = walk.steps.slice(0, b.limit ?? 12);
+  return {
+    ...b,
+    register: undefined,
+    columns,
+    entries: [],
+    rows: steps.map((s, i) => ({
+      /* The key is the movement, not the index: two charges on one day from one service are
+         different rows, and a keyed list that reuses an index re-renders the wrong one. */
+      key: `${s.day}-${s.source}-${s.href}-${i}`,
+      cells: [fmtDay(s.day), s.label, money(s.delta, CURRENCY), money(s.balance, CURRENCY)],
+      href: s.href,
+      tone: s.balance < 0 ? ('bad' as const) : undefined,
+    })),
+    total: walk.steps.length,
+    drawn: b.drawn ?? true,
+    stale_at: new Date(NOW).toISOString(),
+    metrics: undefined,
+  };
+}
+
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
   const decl = PAGES[slug];
   if (!decl) return null;
 
   const blocks = decl.blocks.map((b): BlockResult => {
+    /* A BLOCK MAY BE SOURCED FROM A WALK, NOT ONLY A REGISTER. 05 §2 defers a `forecast` KIND to
+       post-v1 and says the primitive layer is what exists so that it can be drawn without one, so
+       this adds a source rather than a kind: `forecast.runway` fills an ordinary `table` with the
+       cash walk. Nothing about the block is new, and the day a real `forecast` kind ships, the
+       declaration that changes is the kind, not the query. */
+    if (b.source === 'forecast.runway') return runwayBlock(b);
+
     const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : undefined;
     const all = register ? (ROWS[register] ?? []) : [];
     const entries = register ? filterForBlock(register, all, b) : [];

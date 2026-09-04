@@ -538,7 +538,22 @@ export const PAGES: Record<string, PageDecl> = {
           { metric: 'owed-to-you', label: 'Owed to you' },
           { metric: 'due-30d', label: 'Due in 30 days' },
           { metric: 'overdue', label: 'Overdue' },
+          { metric: 'runway', label: 'Runway' },
         ],
+      },
+      /* THE ONLY BLOCK ON ANY PAGE THAT IS ABOUT THE FUTURE. Sourced from the walk rather than from
+         a register (08 §2.3's `running`): what is liquid, then every dated movement in order, and
+         the balance after each. 05 §2 defers a `forecast` KIND to post-v1 and says the primitive
+         layer exists so it can be drawn without one, so this is an ordinary table over a different
+         source. The day the kind ships, the kind changes and the query does not. */
+      {
+        kind: 'table',
+        heading: 'What is coming',
+        span: 12,
+        columns: [{ field: 'day' }, { field: 'what' }, { field: 'delta' }, { field: 'balance' }],
+        source: 'forecast.runway',
+        limit: 12,
+        empty: 'Nothing dated in the next six months.',
       },
       {
         kind: 'table',
