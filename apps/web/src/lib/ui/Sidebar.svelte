@@ -168,7 +168,10 @@
     {#if pen.length}
       <!-- A holding pen. An update that adds a page lands HIDDEN and nothing moves; re-showing one
            returns it to its stored order, never to the end of the list (19 §3). -->
+      <!-- The one row in this rail that had no glyph, sitting between groups that all have one.
+           This file's own header argues against exactly that. -->
       <a class="pen" href="/settings/navigation">
+        <Icon name="alert" size="s" />
         <span class="pen-text">{pen.length === 1 ? copy.suggestedPage : `${pen.length} suggested pages.`}</span>
         <span class="pen-action">{copy.review}</span>
       </a>
@@ -461,6 +464,7 @@
   }
 
   .pen {
+    gap: var(--sp-2);
     display: flex;
     align-items: center;
     gap: var(--sp-2);

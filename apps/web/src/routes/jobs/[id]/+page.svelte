@@ -53,10 +53,14 @@
         <!-- A tool call and its result are ONE row. Two rows per call doubles a transcript nobody
              wanted to read in the first place. -->
         <button type="button" class="line line-short" onclick={() => toggle(e.seq)} aria-expanded={open.has(e.seq)}>
-          <span class="seq">{e.tool}</span>
+          <span class="seq" data-open={open.has(e.seq) ? '' : undefined}>
+            <Icon name="chevronDown" size="s" />{e.tool}
+          </span>
           <span class="line-main"><span class="line-title">{e.input}</span></span>
           <span class="line-amount out" data-ok={e.ok ? '' : undefined}>
-            {e.ok ? e.out : 'failed'}
+            <!-- `data-ok` was the only thing separating a result from a failure, which is colour
+                 carrying meaning alone. -->
+            <Icon name={e.ok ? 'check' : 'ban'} size="s" />{e.ok ? e.out : 'failed'}
           </span>
           <span class="line-when">{e.seq}</span>
         </button>
@@ -151,5 +155,19 @@
     .detail {
       padding-inline-start: var(--sp-4);
     }
+  }
+
+  .seq :global(svg) {
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .seq[data-open] :global(svg) {
+    transform: rotate(180deg);
+  }
+
+  .out {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
   }
 </style>

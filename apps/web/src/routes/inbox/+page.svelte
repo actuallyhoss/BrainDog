@@ -40,7 +40,11 @@
             aria-expanded={open === item.id}
             onclick={() => (open = open === item.id ? null : item.id)}
           >
-            <span class="seq">{item.from.split('@')[1]}</span>
+            <!-- A row that expands should say so. `aria-expanded` told a screen reader and nothing
+                 told anybody else. -->
+            <span class="seq" data-open={open === item.id ? '' : undefined}>
+              <Icon name="chevronDown" size="s" />{item.from.split('@')[1]}
+            </span>
             <span class="line-main">
               <span class="line-title">{item.subject}</span>
               <span class="line-detail">{item.from}</span>
@@ -159,5 +163,15 @@
     .body {
       padding-inline-start: var(--sp-4);
     }
+  }
+
+  /* The chevron turns rather than swapping glyph: one shape, one rotation, and the motion says the
+     row opened even when the content below it is off-screen. */
+  .seq :global(svg) {
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .seq[data-open] :global(svg) {
+    transform: rotate(180deg);
   }
 </style>

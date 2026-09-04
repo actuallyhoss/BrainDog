@@ -12,6 +12,7 @@
   revocable.
 -->
 <script lang="ts">
+  import Icon from '$lib/ui/Icon.svelte';
   import { titleOf } from '$lib/title.ts';
   import { Block, Table } from 'braindog-render/svelte';
   import { page as state } from '$app/state';
@@ -111,6 +112,9 @@
   }
 
   .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
     margin-inline-start: auto;
     padding: 2px var(--sp-3);
     background: var(--sunk);

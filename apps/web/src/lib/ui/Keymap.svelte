@@ -5,6 +5,7 @@
   list. A cheat sheet maintained by hand is a cheat sheet that is wrong by the second release.
 -->
 <script lang="ts">
+  import Icon from './Icon.svelte';
   import { BINDINGS, SCOPE_ORDER, type Scope } from '../a11y/keys.svelte.ts';
   import { copy } from '../copy.ts';
   import Kbd from './Kbd.svelte';
@@ -18,12 +19,22 @@
     nav: copy.scopeNav,
   };
 
+  /* One glyph per scope, so the six groups read as six places rather than six paragraphs. */
+  const GLYPH = {
+    document: 'home',
+    grid: 'rows',
+    page: 'doc',
+    gate: 'decide',
+    palette: 'search',
+    nav: 'settings',
+  } as const;
+
   const groups = SCOPE_ORDER.map((scope) => [scope, BINDINGS.filter((b) => b.scope === scope)] as const);
 </script>
 
 {#each groups as [scope, bindings]}
   <section class="scope">
-    <h3 class="scope-title">{TITLE[scope]}</h3>
+    <h3 class="scope-title"><Icon name={GLYPH[scope]} size="s" />{TITLE[scope]}</h3>
     <dl class="keys">
       {#each bindings as binding}
         <dt><Kbd keys={binding.key} /></dt>
@@ -39,6 +50,9 @@
   }
 
   .scope-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     margin-block-end: var(--sp-2);
     color: var(--dim);
     font-family: var(--font-ui);
