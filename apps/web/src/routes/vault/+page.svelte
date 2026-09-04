@@ -14,6 +14,7 @@
   browser history and in URL-bar autocomplete (19 §5).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { NOW, VAULT } from '$lib/record/api.ts';
@@ -24,6 +25,8 @@
 
   const stale = $derived(VAULT.filter((c) => c.stale).length);
 </script>
+
+<svelte:head><title>{titleOf(copy.vault)}</title></svelte:head>
 
 <PageHead title={copy.vault} count={VAULT.length}>
   {#snippet actions()}

@@ -10,6 +10,7 @@
   approve four schema reviews before they have seen one of their own rows is worse than a tour.
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PACKS } from '$lib/record/api.ts';
@@ -23,6 +24,8 @@
 
   let diff = $state<string | null>(null);
 </script>
+
+<svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
 <PageHead title={copy.packs} />
 

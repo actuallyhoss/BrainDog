@@ -20,9 +20,11 @@ const GATES = [
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
-  // Needs a build. It reports and exits 0 when there is not one, so `pnpm gates` is useful on a
-  // fresh checkout; CI builds first, and then it is a real gate.
+  // Needs a build. Both report and exit 0 when there is not one, so `pnpm gates` is useful on a
+  // fresh checkout; CI builds first, and then they are real gates.
   ['bundle', ['node', [join(here, 'bundle.mjs')]]],
+  // Last because it is the slow one: a real browser, every route, both schemes, two widths.
+  ['a11y', ['node', [join(here, 'a11y.mjs')]]],
 ];
 
 let failed = 0;

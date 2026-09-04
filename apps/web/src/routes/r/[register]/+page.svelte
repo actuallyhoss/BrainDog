@@ -13,6 +13,7 @@
   DOM construction (13 §4.3).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { MISSING } from 'braindog-render';
@@ -306,11 +307,13 @@
   );
 </script>
 
+<svelte:head><title>{titleOf(decl?.name)}</title></svelte:head>
+
 <svelte:window {onkeydown} />
 
 {#if !decl}
   <div class="page">
-    <Empty kind="error" title="Couldn't load {id}." rid="r7k2m9qd4x">
+    <Empty kind="error" heading title="Couldn't load {id}." rid="r7k2m9qd4x">
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>

@@ -16,6 +16,7 @@
   keystrokes would rubber-stamp the machine's answer with a reason typed under its influence (19 §4).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED, NOW, QUESTIONS } from '$lib/record/api.ts';
@@ -110,11 +111,13 @@
   }
 </script>
 
+<svelte:head><title>{titleOf(question?.title, copy.decide)}</title></svelte:head>
+
 <svelte:window {onkeydown} />
 
 {#if !question}
   <div class="page">
-    <Empty kind="no-results" title="Couldn't find {page.params.id}." rid="r7k2m9qd4x">
+    <Empty kind="no-results" heading title="Couldn't find {page.params.id}." rid="r7k2m9qd4x">
       {#snippet actions()}<Button href="/decide">Back to Decide</Button>{/snippet}
     </Empty>
   </div>

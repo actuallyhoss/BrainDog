@@ -11,6 +11,7 @@
   has a `#1`. Type `tasks#125`.
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -41,6 +42,8 @@
   });
 </script>
 
+<svelte:head><title>{titleOf(target ? raw : `Nothing answers to “${raw}”`)}</title></svelte:head>
+
 {#if !target}
   <div class="page">
     <!-- `no-results`, not `error`. Nothing failed here — a string was typed and it does not name a
@@ -50,6 +53,7 @@
          the resolver did make a call, and a request id is free to keep. -->
     <Empty
       kind="no-results"
+      heading
       title={bare ? `“${raw}” could be a row in any register.` : `Nothing answers to “${raw}”.`}
       body={bare
         ? 'Every register has a #1, so a bare number never resolves on its own. Qualify it — obligations#4, tasks#7.'

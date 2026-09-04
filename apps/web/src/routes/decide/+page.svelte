@@ -6,6 +6,7 @@
   and makes the order arguable, which is the point (19 §2).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED, NOW, metric } from '$lib/record/api.ts';
@@ -19,6 +20,8 @@
   const open = $derived([...data.questions].sort((a, b) => a.rank - b.rank));
   const target = metric('open-questions');
 </script>
+
+<svelte:head><title>{titleOf(copy.decide)}</title></svelte:head>
 
 <PageHead
   title={copy.decide}

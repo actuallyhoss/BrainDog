@@ -10,6 +10,7 @@
   stop resolving. Change the display name instead; it is free.
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
@@ -59,11 +60,13 @@
   };
 </script>
 
+<svelte:head><title>{titleOf(row && decl && String(row.fields[decl.title] ?? ""), decl?.name)}</title></svelte:head>
+
 {#if !decl || !row}
   <div class="page">
     <!-- A URL naming a row that is not there is a MISS, not a failure: nothing broke, the address is
          just wrong. `error` is reserved for a call that did not come back. -->
-    <Empty kind="no-results" title="Couldn't find {id}#{seq}." rid="r7k2m9qd4x">
+    <Empty kind="no-results" heading title="Couldn't find {id}#{seq}." rid="r7k2m9qd4x">
       {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
     </Empty>
   </div>

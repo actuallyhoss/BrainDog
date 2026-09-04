@@ -12,6 +12,7 @@
   teaches, in one glance, that the app is empty and none of it is for you.
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { parse, relative, TONES } from 'braindog-render';
   import { Block } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
@@ -55,6 +56,8 @@
     return parse(['```stat', ...rows, '```'].join('\n'));
   });
 </script>
+
+<svelte:head><title>{titleOf(copy.home)}</title></svelte:head>
 
 <PageHead kicker={data.index.name} title={today}>
   {#snippet actions()}

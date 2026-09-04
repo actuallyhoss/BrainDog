@@ -7,6 +7,7 @@
   text nodes, never parsed (50 §8).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -18,6 +19,8 @@
 
   let open = $state<string | null>(INBOX[0]?.id ?? null);
 </script>
+
+<svelte:head><title>{titleOf(copy.inbox)}</title></svelte:head>
 
 <PageHead
   title={copy.inbox}

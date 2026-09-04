@@ -13,6 +13,7 @@
   found across eleven precedents (19 §4).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
@@ -85,6 +86,8 @@
     });
   }
 </script>
+
+<svelte:head><title>{titleOf(area.replace(/^./, (c) => c.toUpperCase()), copy.settings)}</title></svelte:head>
 
 <PageHead kicker={copy.settings} title={area.replace(/^./, (c) => c.toUpperCase())} />
 

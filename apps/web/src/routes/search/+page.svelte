@@ -5,6 +5,7 @@
   search is what you reach for when you know a word and not a place (19 §2).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -25,6 +26,8 @@
     return [...out];
   });
 </script>
+
+<svelte:head><title>{titleOf(q && `“${q}”`, copy.search)}</title></svelte:head>
 
 <PageHead title={copy.search} count={q ? hits.length : undefined} />
 

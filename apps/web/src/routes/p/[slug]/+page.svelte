@@ -11,6 +11,7 @@
   simultaneous assertive announcements is a denial of service on a screen-reader user (19 §6).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { KINDS, isKind } from 'braindog-render';
   import { Block, Table } from 'braindog-render/svelte';
   import { goto } from '$app/navigation';
@@ -283,11 +284,13 @@
   );
 </script>
 
+<svelte:head><title>{titleOf(result?.page?.title)}</title></svelte:head>
+
 <svelte:window {onkeydown} />
 
 {#if !result}
   <div class="page">
-    <Empty kind="error" title="Couldn't load {slug}." rid="r7k2m9qd4x">
+    <Empty kind="error" heading title="Couldn't load {slug}." rid="r7k2m9qd4x">
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>
@@ -462,19 +465,24 @@
     align-items: center;
     gap: var(--sp-2);
     margin-inline-start: auto;
-    color: var(--dim);
+    color: var(--ink2);
     font-family: var(--font-id);
     font-size: var(--t-xs);
     text-decoration: none;
   }
 
   .block-source:hover {
-    color: var(--ink2);
+    color: var(--ink);
   }
 
+  /* TWO ALTITUDES, BUILT UPWARD FROM THE FLOOR. The register name is the louder half and the
+     predicate the quieter one, and the obvious way to say that — `--dim` on both, then
+     `opacity: 0.8` on the predicate — put it under the contrast floor in light. `--dim` is solved
+     to CLEAR that floor, so any opacity on top of it spends the whole margin the theme just
+     bought; the theme was right and this call site was wrong. Raising the register name says the
+     same thing and costs nothing, because the ceiling has room and the floor does not. */
   .block-where {
     color: var(--dim);
-    opacity: 0.8;
   }
 
   .block-empty {

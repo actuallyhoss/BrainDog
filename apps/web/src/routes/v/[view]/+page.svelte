@@ -10,6 +10,7 @@
   predicate; how it is sorted is how you happen to be looking at it today.
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { Table } from 'braindog-render/svelte';
@@ -60,11 +61,13 @@
   }
 </script>
 
+<svelte:head><title>{titleOf(view?.name, 'View')}</title></svelte:head>
+
 <svelte:window {onkeydown} />
 
 {#if !view || !decl}
   <div class="page">
-    <Empty kind="error" title="No view called {key}." body="A saved view is a register and a predicate name, joined by a dot." rid="r7k2m9qd4x">
+    <Empty kind="error" heading title="No view called {key}." body="A saved view is a register and a predicate name, joined by a dot." rid="r7k2m9qd4x">
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>

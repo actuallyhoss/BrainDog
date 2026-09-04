@@ -17,6 +17,7 @@
   And there is no skip, because a record with zero registers has no legal screen.
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -37,6 +38,8 @@
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
 </script>
+
+<svelte:head><title>{titleOf('Start')}</title></svelte:head>
 
 <div class="start">
   <div class="frame">

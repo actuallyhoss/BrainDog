@@ -23,9 +23,20 @@
     rid,
     actions,
     agentPrompt,
+    heading = false,
   }: {
     kind: EmptyKind;
     title: string;
+    /**
+     * `true` when this empty state IS the page.
+     *
+     * A not-found route renders nothing but this, so its title is the page's only heading and has
+     * to be the `h1` — a document with no level-one heading gives a screen reader nothing to jump
+     * to and nothing to announce, and every one of these pages was a `<p>`. Inside a block or a
+     * section it stays a paragraph, because the block already has the heading and a second `h1`
+     * halfway down the page is worse than none.
+     */
+    heading?: boolean;
     body?: string | undefined;
     /** Quoted VERBATIM. "38 rows, none matching `overdue`" is the whole of the state. */
     query?: string | undefined;
@@ -39,7 +50,11 @@
 </script>
 
 <div class="empty" data-kind={kind}>
-  <p class="empty-title">{title}</p>
+  {#if heading}
+    <h1 class="empty-title">{title}</h1>
+  {:else}
+    <p class="empty-title">{title}</p>
+  {/if}
   {#if body}<p class="empty-body">{body}</p>{/if}
   {#if query}<p class="empty-query"><code>{query}</code></p>{/if}
   {#if rid}<p class="empty-rid">Request <code>{rid}</code></p>{/if}

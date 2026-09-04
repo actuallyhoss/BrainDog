@@ -74,11 +74,18 @@
     sort?.field === field ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
 </script>
 
-<!-- A labelled region with tabindex 0, so a keyboard user can scroll the grid itself. The linter is
-     right in general and wrong here: a scrollable region MUST be focusable or a keyboard user cannot
-     reach the scrollbar, and the APG grid pattern requires exactly this wrapper. -->
+<!-- A labelled, focusable scroll container. `tabindex="0"` is the part that matters and the linter
+     is right in general and wrong here: a scrollable region MUST be focusable or a keyboard user
+     cannot reach the scrollbar, and the APG grid pattern requires exactly this wrapper.
+
+     `group` AND NOT `region`, which it used to be. `region` is a landmark, and a host that wraps
+     each block in its own labelled `<section>` — which is a landmark too, and correctly so — then
+     has two landmarks with identical roles and identical names nested one inside the other. A
+     screen-reader user gets the same destination twice in the landmark list and no way to tell
+     which is which. `group` keeps the accessible name on focus, keeps the scrolling, and stops
+     claiming to be a place you can navigate to, which the section above it already is. -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="table-region" role="region" tabindex="0" aria-label={label ?? 'Rows'}>
+<div class="table-region" role="group" tabindex="0" aria-label={label ?? 'Rows'}>
   <div
     class="table"
     role="grid"

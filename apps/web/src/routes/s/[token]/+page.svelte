@@ -12,6 +12,7 @@
   revocable.
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { Block, Table } from 'braindog-render/svelte';
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -29,6 +30,8 @@
   const token = $derived(state.params.token ?? '');
 </script>
 
+<svelte:head><title>{titleOf('Shared')}</title></svelte:head>
+
 <div class="shared">
   <header class="bar">
     <a class="brand" href="/">
@@ -39,7 +42,7 @@
   </header>
 
   {#if !result}
-    <Empty kind="no-permission" title="This link has been revoked." body="Whoever shared it can send a new one.">
+    <Empty kind="no-permission" heading title="This link has been revoked." body="Whoever shared it can send a new one.">
       {#snippet actions()}<Button onclick={() => toasts.push(copy.notWritten('Whoever shared this would be asked'), { intent: 'warn' })}>{copy.requestAccess}</Button>{/snippet}
     </Empty>
   {:else}

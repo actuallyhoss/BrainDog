@@ -10,6 +10,7 @@
   authorisation path the agent API does not have (22 §5).
 -->
 <script lang="ts">
+  import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { JOB } from '$lib/record/api.ts';
@@ -30,6 +31,8 @@
 
   const last = $derived(JOB.events.at(-1));
 </script>
+
+<svelte:head><title>{titleOf(JOB.kind, 'Job')}</title></svelte:head>
 
 <PageHead kicker="Job" title={JOB.kind} id={JOB.id}>
   {#snippet actions()}
