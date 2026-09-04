@@ -10,6 +10,8 @@
   directly above a table containing one obligation due in 30 days (19 §6).
 -->
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import type { IconName } from './icons.ts';
   import type { Snippet } from 'svelte';
 
   let {
@@ -20,8 +22,11 @@
     actions,
     filters,
     id,
+    icon,
   }: {
     title: string;
+    /** The glyph the register or page already declares. The rail draws it; the page dropped it. */
+    icon?: IconName | undefined;
     count?: number | undefined;
     total?: number | undefined;
     kicker?: string | undefined;
@@ -42,6 +47,10 @@
            FLEX direction too and swung our own id chip to the other side of the heading. Chrome
            keeps the UI's direction; data follows its own. See the note in `blocks.css`. -->
       <h1 class="title">
+        <!-- Every register and page declares an icon, the rail has always drawn it, and the page's
+             own header threw it away — so the one heading that names the thing you are looking at
+             was the only place it did not appear. -->
+        {#if icon}<span class="title-icon"><Icon name={icon} size="l" /></span>{/if}
         <span dir="auto">{title}</span>
         {#if id}<span class="title-id">{id}</span>{/if}
       </h1>
@@ -100,6 +109,13 @@
     gap: var(--sp-2);
     font-size: var(--t-xl);
     letter-spacing: -0.026em;
+  }
+
+  .title-icon {
+    display: grid;
+    place-items: center;
+    align-self: center;
+    color: var(--dim);
   }
 
   .title-id {

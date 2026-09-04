@@ -54,6 +54,8 @@ const ROUTES = [
   '/audit',
   '/search?q=invoice',
   '/jobs/j_7Q2F',
+  '/t/2',
+  '/t/3',
   '/v/obligations.overdue',
   '/s/9f2a7c41d8b3',
   '/nowhere',

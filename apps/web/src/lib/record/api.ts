@@ -602,6 +602,24 @@ export function boot() {
       icon: iconFor(p.icon, 'doc'),
     }));
 
+  /* OPEN TRACKS IN THE RAIL, under their own heading. A track is a thing you are in the middle of,
+     so the whole point is getting back into it — and a thread you have to go and find through a
+     list is a thread you stop keeping. Only the open ones, and capped: a rail that grows without
+     bound is a rail that stops being a rail. Holding and finished tracks live in the list. */
+  const RAIL_TRACKS = 5;
+  for (const [n, t] of (ROWS.tracks ?? [])
+    .filter((t) => t.fields.state === 'open')
+    .slice(0, RAIL_TRACKS)
+    .entries())
+    nav.push({
+      id: `track-${t.seq}`,
+      title: String(t.fields.name),
+      href: `/t/${t.seq}`,
+      section: 'Tracks',
+      order: 10 + n,
+      icon: 'rows',
+    });
+
   return {
     index: {
       slug: 'the-studio',
