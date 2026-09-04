@@ -156,6 +156,8 @@ export const copy = {
         ? 'A date range is not built yet. Sort on the column instead.'
         : 'Search matches this field.',
   displayOptions: 'Display',
+  selected: 'selected',
+  clear: 'Clear',
   clearFilters: 'Clear filters',
   saveAsView: 'Save as a view',
   export: 'Export',

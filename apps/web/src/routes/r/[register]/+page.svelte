@@ -122,7 +122,41 @@
   function onkeydown(e: KeyboardEvent) {
     const el = document.activeElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    /* THE CHORDS COME FIRST, and the blanket `if (modifier) return` above them was eating four of
+       them: `⌘Home`, `⌘End`, `⌘a`, `⌥V` and `⌥B` were all registered in the keymap, printed on `?`,
+       and dropped one line into the handler. A guard written to protect the BARE letters was
+       protecting them from keys that are not bare. */
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key === 'Home') {
+      e.preventDefault();
+      focus = { row: 0, col: focus.col };
+      return;
+    }
+    if (mod && e.key === 'End') {
+      e.preventDefault();
+      focus = { row: rows.length - 1, col: focus.col };
+      return;
+    }
+    if (mod && e.key.toLowerCase() === 'a') {
+      /* All LOADED, never all matching. A select-all reaching rows the DOM has never held is a
+         count you cannot verify by looking — the same argument as 13 §4.3's 2,000-row cap, from the
+         other side. */
+      e.preventDefault();
+      selected = new Set(result.entries.slice(0, DOM_CAP).map((r) => r.seq));
+      return;
+    }
+    if (e.altKey && e.key.toLowerCase() === 'v') {
+      e.preventDefault();
+      toasts.push(copy.notWritten('The filter would be saved as a named view on this register'), { intent: 'warn' });
+      return;
+    }
+    if (e.altKey && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      toasts.push(copy.notWritten('This filter would be bound as a block on a page'), { intent: 'warn' });
+      return;
+    }
+    if (mod || e.altKey) return;
 
     if (e.key === 'j' || e.key === 'ArrowDown') {
       e.preventDefault();
@@ -158,7 +192,71 @@
         archive(row.seq);
         focus = { ...focus, row: Math.min(focus.row, result.entries.length - 2) };
       }
+    } else if (e.key === 'Home') {
+      /* Bare `Home`/`End` are ROW ends; with the modifier they are REGISTER ends. The distinction is
+         the whole reason both exist — a grid where Home jumps to row one is a grid where you cannot
+         get back to the first column without arrowing across it. */
+      e.preventDefault();
+      focus = { ...focus, col: 0 };
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focus = { ...focus, col: columns.length - 1 };
+    } else if (e.key === 'n') {
+      e.preventDefault();
+      createOpen = true;
+    } else if (e.key === 'o') {
+      /* The RELATED register: the one the focused cell points at. A `ref` cell knows its target, so
+         `o` follows it; on any other cell there is nothing related and nothing happens. */
+      const field = columns[focus.col]?.field;
+      const to = field ? decl?.fields.find((f) => f.id === field)?.to : undefined;
+      if (to) {
+        e.preventDefault();
+        void goto(`/r/${to}`);
+      }
+    } else if (e.key === 'x' || e.key === 'X') {
+      /* `X` and not `x` when shift is down — `e.key` carries the SHIFTED character, so a check for
+         the lowercase letter alone silently drops every `⇧x`. */
+      const row = result.entries[focus.row];
+      if (row) {
+        e.preventDefault();
+        toggleSelect(row.seq, e.shiftKey);
+      }
+    } else if (e.key === 'Escape' && selected.size > 0) {
+      e.preventDefault();
+      selected = new Set();
+    } else if (e.key === 'e' || e.key === 'F2') {
+      e.preventDefault();
+      toasts.push(copy.notWritten('The cell would open for editing in place'), { intent: 'warn' });
     }
+  }
+
+  /**
+   * Selection, and it is CLIENT STATE that never leaves.
+   *
+   * `x` toggles, `⇧x` extends from the last one touched, `⌘a` takes everything loaded, `Esc` clears.
+   * The anchor is the last SIMPLE toggle rather than the last change, which is what makes a run of
+   * `⇧x` presses extend the same range instead of walking it.
+   */
+  let selected = $state(new Set<number>());
+  let anchor = 0;
+
+  /** The Table speaks in row KEYS (`register#seq`), which is the id a row is addressed by. */
+  const selectedKeys = $derived(new Set([...selected].map((seq) => `${id}#${seq}`)));
+
+  function toggleSelect(seq: number, extend: boolean) {
+    const at = result.entries.findIndex((r) => r.seq === seq);
+    if (extend) {
+      const [from, to] = anchor <= at ? [anchor, at] : [at, anchor];
+      const next = new Set(selected);
+      for (const row of result.entries.slice(from, to + 1)) next.add(row.seq);
+      selected = next;
+      return;
+    }
+    anchor = at;
+    const next = new Set(selected);
+    if (next.has(seq)) next.delete(seq);
+    else next.add(seq);
+    selected = next;
   }
 
   const emptyKind = $derived(
@@ -181,6 +279,15 @@
     total={result.total}
   >
     {#snippet actions()}
+      <!-- The selection says its own size and how to drop it. A selection you cannot see the size
+           of is a selection you will not trust a bulk action with. -->
+      {#if selected.size > 0}
+        <span class="picked">
+          <span class="picked-n num">{selected.size}</span>
+          {copy.selected}
+          <button type="button" class="picked-clear" onclick={() => (selected = new Set())}>{copy.clear}</button>
+        </span>
+      {/if}
       <Button weight="quiet" onclick={() => (filterOpen = true)}>
         <Icon name="filter" size="s" />
         {copy.filter}
@@ -276,6 +383,7 @@
           cap={DOM_CAP}
           label={decl.name}
           {sort}
+          selected={selectedKeys}
           bind:focus
           onactivate={(row) => goto(`/r/${id}/${row.key.split('#')[1]}`)}
           onsort={(field) =>
@@ -412,6 +520,35 @@
     gap: var(--sp-2);
   }
 
+  .picked {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 0 var(--sp-3);
+    min-block-size: var(--ctl-h);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--r-md);
+    color: var(--accent-text);
+    font-size: var(--t-ui);
+    white-space: nowrap;
+  }
+
+  .picked-n {
+    font-weight: 700;
+  }
+
+  .picked-clear {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+    cursor: pointer;
+  }
+
   .bar-hint {
     display: flex;
     align-items: center;
@@ -530,7 +667,36 @@
       padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
 
-    .bar-hint {
+    .picked {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 0 var(--sp-3);
+    min-block-size: var(--ctl-h);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--r-md);
+    color: var(--accent-text);
+    font-size: var(--t-ui);
+    white-space: nowrap;
+  }
+
+  .picked-n {
+    font-weight: 700;
+  }
+
+  .picked-clear {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+    cursor: pointer;
+  }
+
+  .bar-hint {
       display: none;
     }
   }

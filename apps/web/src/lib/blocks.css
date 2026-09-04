@@ -612,6 +612,18 @@
     box-shadow: inset 2px 0 0 0 var(--accent);
   }
 
+  /* A SELECTED row is tinted, and a focused one keeps its band. They are different facts — "one of
+     the four I am about to act on" and "where the keyboard is" — and they are drawn with different
+     channels so both can be true at once.
+
+     AFTER the focus rule, deliberately. `[data-focused]` sets a background of its own, so with the
+     selection rule written above it the focused row silently lost its tint: select three, walk to
+     the third, and the count said three while two were shaded. The band survives either way because
+     it is a box-shadow. */
+  .rowgroup .tr[aria-selected='true'] {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
   .tr[data-intent] .td {
     color: var(--ink2);
   }
