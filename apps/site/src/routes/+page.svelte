@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-  <title>BrainDog — everything about your business that isn't code</title>
+  <title>BrainDog</title>
   <meta name="description" content={site.hero.body} />
 </svelte:head>
 

@@ -76,6 +76,27 @@ export const dirOf = (register: string, field: string): 'auto' | undefined =>
   isProse(register, field) ? 'auto' : undefined;
 
 /**
+ * The fields a PERSON sees, which is not the same list as the fields a register declares.
+ *
+ * Two kinds come out. A `secret` is never rendered anywhere, which was already true. And the two
+ * fields named by `identity` are the row's MARK and its frozen accent hue: machinery that exists so
+ * a thing can be recognised at a glance, chosen once at create and never hand-picked (13 §2.1b).
+ *
+ * They were being listed like any other field, so creating a project asked for "Mark" and "Hue" in
+ * two text boxes, and the row page printed them as values. `labelOf` is what made it look
+ * deliberate rather than broken: it capitalises a field id into a plausible English word, so an
+ * internal column arrives wearing a label and nothing about the screen says it should not be there.
+ *
+ * The identity is drawn, not typed. There is nothing to ask and nothing to read.
+ */
+export function readableFields(register: string): FieldDecl[] {
+  const reg = REGISTERS[register];
+  if (!reg) return [];
+  const internal = new Set([reg.identity?.mark, reg.identity?.accent].filter(Boolean));
+  return reg.fields.filter((f) => f.type !== 'secret' && !internal.has(f.id));
+}
+
+/**
  * Formatting is decided for the reader, not at the call site. A `ref` reads as the title of the row
  * it points at, because a person says "Halden", not "people#1".
  */
@@ -659,7 +680,15 @@ export const registerOf = (id: string): RegisterDecl | undefined => REGISTERS[id
 export const entry = (register: string, seq: number): Entry | undefined =>
   (ROWS[register] ?? []).find((e) => e.seq === seq);
 
-export type SearchHit = { title: string; detail: string; href: string; kind: string; spoken?: string };
+export type SearchHit = {
+  title: string;
+  detail: string;
+  href: string;
+  kind: string;
+  /** The glyph its own register or question type declares, so the palette need not guess. */
+  icon: IconName;
+  spoken?: string;
+};
 
 export function search(q: string, limit = 24): SearchHit[] {
   const needle = q.trim().toLowerCase();
@@ -672,17 +701,20 @@ export function search(q: string, limit = 24): SearchHit[] {
       if (!title.toLowerCase().includes(needle)) continue;
       hits.push({
         title,
-        detail: `${r.name} · ${display(id, r.state ?? '', e.fields[r.state ?? '']) ?? ''}`,
+        /* The register's own name is the GROUP heading these rows sit under, so repeating it on
+           every row said the same word twice, eight times down the list. */
+        detail: display(id, r.state ?? '', e.fields[r.state ?? '']) ?? '',
         href: `/r/${id}/${e.seq}`,
         kind: r.name,
-        spoken: `${id}#${e.seq}`,
+        icon: iconFor(r.icon, 'rows'),
+        spoken: `#${e.seq}`,
       });
       if (hits.length >= limit) return hits;
     }
 
   for (const q2 of [...QUESTIONS, ...DECIDED])
     if (q2.title.toLowerCase().includes(needle) || q2.id.toLowerCase() === needle)
-      hits.push({ title: q2.title, detail: q2.decided ? 'Decided' : 'Open question', href: `/decide/${q2.id}`, kind: 'Decide', spoken: q2.id });
+      hits.push({ title: q2.title, detail: q2.decided ? 'Decided' : 'Open question', href: `/decide/${q2.id}`, kind: 'Decide', icon: 'decide', spoken: q2.id });
 
   return hits.slice(0, limit);
 }

@@ -302,11 +302,11 @@
           <Icon name="plus" size="s" />
           {copy.addBlock}
         </Button>
-        <Button weight="bare" onclick={() => arrangement.cancel()}>{copy.arrangeCancel}</Button>
-        <Button weight="primary" onclick={commitArrange}>{copy.arrangeDone}</Button>
+        <Button weight="bare" onclick={() => arrangement.cancel()}><Icon name="close" size="s" />{copy.arrangeCancel}</Button>
+        <Button weight="primary" onclick={commitArrange}><Icon name="check" size="s" />{copy.arrangeDone}</Button>
       {:else}
         <Button weight="bare" href="?src={showSource ? '0' : '1'}">
-          <Icon name="copy" size="s" />
+          <Icon name="code" size="s" />
           {showSource ? 'Page' : 'Source'}
           <Kbd keys="⇧E" />
         </Button>

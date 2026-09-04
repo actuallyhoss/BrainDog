@@ -30,7 +30,7 @@ export const site = {
   hero: {
     title: "Everything about your business that isn't code.",
     body:
-      'Money owed, renewals, hosting, credentials, decisions and the reasons for them — in one typed ' +
+      'Money owed, renewals, hosting, credentials, decisions and the reasons for them. One typed ' +
       'record every agent you use can read and write, and that renders itself as a web app.',
     primary: 'Start a record',
     secondary: 'Read the design',
@@ -45,7 +45,7 @@ export const site = {
         'A register declares its fields and their types, and every row obeys them. Money is an integer in ' +
         'minor units with its own currency, so two currencies can never be added by accident. A date is a ' +
         'date. A reference to another row is a reference, not a name someone retyped.',
-      note: 'The grid is a CSS grid with declared column tracks — not a <table> — because at eight columns and five thousand rows table layout stops being free.',
+      note: 'The grid is a CSS grid with declared column tracks, not a <table>, because at eight columns and five thousand rows table layout stops being free.',
     },
     agents: {
       kicker: 'For your agents',
@@ -77,7 +77,7 @@ export const site = {
       title: 'The screens are data too.',
       body:
         'A page is a declaration: which blocks, over which query, in which order and how wide. Editing one ' +
-        'is editing a row, so it versions, diffs and reverts like everything else — and a pack can ship a ' +
+        'is editing a row, so it versions, diffs and reverts like everything else, and a pack can ship a ' +
         'page the same way it ships a register.',
       note: 'Sixteen block kinds over eight primitives. A pack may invent a kind; it may never write a colour, a font or a spacing value.',
     },
@@ -95,7 +95,7 @@ export const site = {
       kicker: 'Arrange it',
       title: 'Order and span. Nothing else.',
       body:
-        'Drag to reorder, or move with the keyboard — the same operation either way. Set a width in twelfths. ' +
+        'Drag to reorder, or move with the keyboard. It is the same operation either way. Set a width in twelfths. ' +
         'That is the whole vocabulary, and it is why you cannot make one of these pages ugly: spacing, type, ' +
         'colour, radius and density all come from the theme, so there is no word for ugly to say.',
       note: 'Each kind knows the narrowest it survives, and the control refuses below it rather than clamping. A table at a third of a page is not a narrow table, it is an unreadable one.',
@@ -112,7 +112,7 @@ export const site = {
       kicker: 'Your data',
       title: 'The record is a file you own.',
       body:
-        'Export is one signed file with every row, every declaration and every event in it — not a CSV per ' +
+        'Export is one signed file with every row, every declaration and every event in it. Not a CSV per ' +
         'table with the relationships thrown away. Self-hosting runs the same code from the same file, so ' +
         'leaving is a copy rather than a migration.',
     },

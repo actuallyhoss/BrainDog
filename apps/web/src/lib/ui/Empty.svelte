@@ -13,6 +13,9 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
+  import Icon from './Icon.svelte';
+  import type { IconName } from './icons.ts';
+
   export type EmptyKind = 'no-data-yet' | 'no-results' | 'cleared' | 'no-permission' | 'error';
 
   let {
@@ -47,9 +50,21 @@
         the right place to say so. */
     agentPrompt?: string | undefined;
   } = $props();
+
+  /* One glyph per kind. Five states were designed as five different things and then drawn as one
+     paragraph in five colours, so the difference between "nothing here yet" and "you cannot see
+     this" was carried by the sentence alone. */
+  const GLYPH: Record<EmptyKind, IconName> = {
+    'no-data-yet': 'plus',
+    'no-results': 'search',
+    cleared: 'check',
+    'no-permission': 'lock',
+    error: 'alert',
+  };
 </script>
 
 <div class="empty" data-kind={kind}>
+  <span class="empty-glyph" aria-hidden="true"><Icon name={GLYPH[kind]} size="l" /></span>
   {#if heading}
     <h1 class="empty-title">{title}</h1>
   {:else}
@@ -79,6 +94,30 @@
 
   /* Nothing is centred: centring one line in a row of left-aligned ones is worse than not marking
      it at all, and a tight empty state inside a block's own frame keeps the page's shape (19 §6). */
+  /* It takes the kind's tone where there is one, and the plain edge where there is not. Absence is
+     not an alarm: `no-data-yet` and `no-results` are ordinary and must not arrive in the danger
+     colour just because they are empty. */
+  .empty-glyph {
+    display: grid;
+    place-items: center;
+    inline-size: 40px;
+    block-size: 40px;
+    margin-block-end: var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--dim);
+  }
+
+  .empty[data-kind='error'] .empty-glyph {
+    border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+    color: var(--danger);
+  }
+
+  .empty[data-kind='cleared'] .empty-glyph {
+    border-color: color-mix(in srgb, var(--earn) 40%, var(--line));
+    color: var(--earn);
+  }
+
   .empty-title {
     color: var(--ink);
     font-family: var(--font-display);

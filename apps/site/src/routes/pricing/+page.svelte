@@ -15,7 +15,7 @@
 </script>
 
 <svelte:head>
-  <title>Pricing — BrainDog</title>
+  <title>Pricing · BrainDog</title>
   <meta name="description" content={p.body} />
 </svelte:head>
 

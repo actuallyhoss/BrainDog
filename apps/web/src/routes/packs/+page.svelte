@@ -40,8 +40,8 @@
           </header>
           <p class="pack-blurb">{pack.blurb}</p>
           <ul class="pack-gives">
-            {#each pack.registers as r}<li><Icon name="packs" size="s" />{r}</li>{/each}
-            {#each pack.pages as p}<li><Icon name="home" size="s" />{p}</li>{/each}
+            {#each pack.registers as r}<li><Icon name="rows" size="s" />{r}</li>{/each}
+            {#each pack.pages as p}<li><Icon name="doc" size="s" />{p}</li>{/each}
           </ul>
           <footer class="pack-foot">
             <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>

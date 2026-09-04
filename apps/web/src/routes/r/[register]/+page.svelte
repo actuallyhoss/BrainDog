@@ -20,7 +20,7 @@
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, toRows, type Filter } from '$lib/record/api.ts';
+  import { REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, readableFields, toRows, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -337,7 +337,7 @@
         <Icon name="filter" size="s" />
         {copy.filter}
       </Button>
-      <Button weight="primary" onclick={() => (createOpen = true)}>{copy.newRow} {decl.one}</Button>
+      <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{copy.newRow} {decl.one}</Button>
     {/snippet}
   </PageHead>
 
@@ -370,7 +370,7 @@
       {/each}
 
       {#if q || filters.length}
-        <Button weight="bare" href="/r/{id}">{copy.clearFilters}</Button>
+        <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
       {/if}
 
       <span class="bar-hint">
@@ -454,7 +454,7 @@
   <Sheet
     open={peeked !== null}
     title={String(peekedEntry?.fields[decl.title] ?? '')}
-    id="{id}#{peeked ?? ''}"
+    id="#{peeked ?? ''}"
     onclose={() => (peeked = null)}
   >
     {#if peekedEntry}
@@ -468,20 +468,20 @@
 
            Labels go through `labelOf` for the same reason: the drawer was printing raw field ids. -->
       <dl class="peek">
-        {#each decl.fields as f}
+        {#each readableFields(id) as f}
           <dt>{labelOf(f)}</dt>
           <dd dir={dirOf(id, f.id)}>{display(id, f.id, peekedEntry.fields[f.id]) ?? MISSING}</dd>
         {/each}
       </dl>
     {/if}
     {#snippet footer()}
-      <Button weight="primary" href="/r/{id}/{peeked}">{copy.openRow}</Button>
-      <Button weight="bare" onclick={() => (peeked = null)}>{copy.close}</Button>
+      <Button weight="primary" href="/r/{id}/{peeked}"><Icon name="external" size="s" />{copy.openRow}</Button>
+      <Button weight="bare" onclick={() => (peeked = null)}><Icon name="close" size="s" />{copy.close}</Button>
     {/snippet}
   </Sheet>
 
   <!-- Display options: what YOU see, never what the record says. `v`. -->
-  <Sheet bind:open={displayOpen} title={copy.display} id={id}>
+  <Sheet bind:open={displayOpen} title={copy.display}>
     <p class="display-note">{copy.displayNote}</p>
     <div class="filter-groups">
       <fieldset class="filter-group">
@@ -512,7 +512,7 @@
     </div>
 
     {#snippet footer()}
-      <Button weight="primary" onclick={() => (displayOpen = false)}>{copy.done}</Button>
+      <Button weight="primary" onclick={() => (displayOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
       {#if hidden.size > 0}
         <Button weight="bare" onclick={() => (hidden = new Set())}>{copy.showAll}</Button>
       {/if}
@@ -534,17 +534,24 @@
   >
     {#if menuRow}
       {@const seq = menuRow.seq}
+      <!-- A glyph per verb. The rail's menu has always had them and this one never did, so four
+           rows of identical grey text carried the whole distinction between opening a row and
+           throwing it away. -->
       <a class="mi" role="menuitem" href="/r/{id}/{seq}">
+        <Icon name="external" size="s" />
         <span class="mi-name">{copy.openRow}</span><Kbd keys="↵" />
       </a>
       <button class="mi" role="menuitem" type="button" onclick={() => (peeked = seq)}>
+        <Icon name="eye" size="s" />
         <span class="mi-name">{copy.peek}</span><Kbd keys="p" />
       </button>
       <button class="mi" role="menuitem" type="button" onclick={() => void copyId(seq)}>
+        <Icon name="copy" size="s" />
         <span class="mi-name">{copy.copyId}</span><Kbd keys="y" />
       </button>
       <hr class="mi-rule" />
       <button class="mi" role="menuitem" type="button" onclick={() => archive(seq)}>
+        <Icon name="archive" size="s" />
         <span class="mi-name">{copy.archive}</span><Kbd keys="⌫" />
       </button>
     {/if}
@@ -553,7 +560,7 @@
   <!-- The new-row drawer. Every control in it comes from the register's own field declarations —
        see RowForm — so a pack that adds a field gets a form field, and nobody writes a second copy
        of the schema in markup. -->
-  <Sheet bind:open={createOpen} title="{copy.newRow} {decl.one}" id={id}>
+  <Sheet bind:open={createOpen} title="{copy.newRow} {decl.one}">
     <RowForm register={id} />
     {#snippet footer()}
       <Button
@@ -569,7 +576,7 @@
     {/snippet}
   </Sheet>
 
-  <Sheet bind:open={filterOpen} title={copy.filter} id={id}>
+  <Sheet bind:open={filterOpen} title={copy.filter}>
     {#if filterable.length === 0}
       <p class="filter-none">{copy.noFilters}</p>
     {:else}

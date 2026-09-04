@@ -45,7 +45,7 @@
   </label>
 
   {#if !q}
-    <p class="prompt">Type to search every register at once. A spoken id — <code>D41</code>, <code>SG31</code>, <code>tasks#7</code> — resolves straight to its row.</p>
+    <p class="prompt">Type to search every register at once. A spoken id, such as <code>D41</code>, <code>SG31</code>, <code>tasks#7</code>, resolves straight to its row.</p>
   {:else if hits.length === 0}
     <Empty kind="no-results" title="Nothing matching “{q}”." query={q}>
       {#snippet actions()}<a class="clear" href="/search">Clear</a>{/snippet}

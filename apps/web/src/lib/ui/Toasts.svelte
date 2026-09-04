@@ -17,6 +17,13 @@
 
   /** The newest is nearest the corner, so the stack grows away from the thumb rather than under it. */
   const stack = $derived([...toasts.items].reverse());
+
+  /* A GLYPH, NOT A DOT. The dot was a bare disc of the intent colour, which is the one thing the
+     product forbids everywhere else: `Chip` refuses to render an intent without a glyph, and the
+     renderer emits one for every tone it draws. The toast stack was the single place colour
+     carried the meaning on its own (13 §2.3), and it did it because the icon set had `check` and
+     `alert` but nothing for `bad` or `info`. It has both now. */
+  const GLYPH = { good: 'check', warn: 'alert', bad: 'ban' } as const;
 </script>
 
 <div
@@ -31,7 +38,9 @@
 >
   {#each stack as toast (toast.id)}
     <div class="toast" data-intent={toast.intent}>
-      {#if toast.intent}<span class="dot" aria-hidden="true"></span>{/if}
+      {#if toast.intent}
+        <span class="tone" aria-hidden="true"><Icon name={GLYPH[toast.intent]} size="s" /></span>
+      {/if}
       <span class="text">{toast.text}</span>
       {#if toast.undo}
         <button type="button" class="undo" onclick={() => toasts.run(toast.id)}>{copy.undo}</button>
@@ -91,12 +100,11 @@
     }
   }
 
-  .dot {
-    inline-size: 8px;
-    block-size: 8px;
+  .tone {
+    display: grid;
+    place-items: center;
     flex: none;
-    border-radius: 999px;
-    background: var(--tone-fill, var(--edge));
+    color: var(--tone, var(--dim));
   }
 
   .text {

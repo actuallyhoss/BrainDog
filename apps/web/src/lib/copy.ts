@@ -49,7 +49,7 @@ export const copy = {
      indistinguishable from a broken one, so every action that cannot happen here says what it
      would have done and that it did not happen — once, in the toast, not as a disabled state.
      A disabled control tells you a thing exists and refuses to say why it will not work. */
-  notWritten: (what: string) => `${what} — but nothing was written. This is a mock-up of the record.`,
+  notWritten: (what: string) => `${what}, but nothing was written. This is a mock-up of the record.`,
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
   showMe: 'Show me',
   thatIs: 'that is',
@@ -60,9 +60,9 @@ export const copy = {
   willAdd: (kind: string, span: number) =>
     `Adds one ${kind} at the end of the page, ${span} of 12 columns wide. You can move and resize it there.`,
   bound: (kind: string, page: string) =>
-    `Added a ${kind} to ${page}. Nothing was written — this is a mock-up.`,
+    `Added a ${kind} to ${page}. Nothing was written; this is a mock-up.`,
   blockLink: 'a link to this block',
-  blockAdded: (kind: string) => `Added a ${kind}. Nothing was written — this is a mock-up.`,
+  blockAdded: (kind: string) => `Added a ${kind}. Nothing was written; this is a mock-up.`,
 
   /* The picker groups by PURPOSE, because somebody adding a block knows they want to show a list
      and does not know that `todo` and `timeline` share a primitive while `chips` does not. */
@@ -80,7 +80,7 @@ export const copy = {
     bar: 'amounts side by side, biggest first',
     gauge: 'one number against its target',
     chips: 'a few short facts in a row',
-    spec: 'label, value, note — the workhorse',
+    spec: 'label, value, note. The workhorse',
     params: 'settings and their values',
     todo: 'things to do, with a date',
     steps: 'a sequence, numbered',
@@ -95,7 +95,7 @@ export const copy = {
     stat: 'two or three figures across the top',
   } as Record<string, string>,
   arrangedNotSaved: (title: string) =>
-    `${title} rearranged here. Nothing was written — this is a mock-up of the record.`,
+    `${title} rearranged here. Nothing was written; this is a mock-up of the record.`,
   arrangeNothing: 'Nothing moved.',
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
@@ -114,7 +114,7 @@ export const copy = {
   deferAction: 'Park it',
   wakeOn: 'Wake me on',
   deferNote: 'It leaves Decide and comes back on that date.',
-  deferred: (on: string) => `Parked until ${on}. Nothing was written — this is a mock-up.`,
+  deferred: (on: string) => `Parked until ${on}. Nothing was written; this is a mock-up.`,
   required: 'required',
   nothingToUndo: 'Nothing to undo.',
   archived: (id: string) => `Archived ${id}.`,
@@ -210,7 +210,7 @@ export const copy = {
   commands: 'Commands',
   destinations: 'Go to',
   records: 'Rows',
-  pages: 'Pages and registers',
+  pages: 'Pages and lists',
   askBrainDog: 'Ask BrainDog',
 
   /* the vault */
@@ -262,28 +262,44 @@ export const copy = {
      sentence and the reason there are five of them now instead of three. */
   firstLede: "Everything about your business that isn't code.",
   firstBody:
-    'Money, the estate it runs on, the people, the projects, and the decisions and the reasons for ' +
-    'them — typed, versioned, and readable by every agent you use.',
+    'Money, the estate it runs on, the people, the projects, and the decisions behind ' +
+    'them. Typed, versioned, and readable by every agent you use.',
   firstQuestion: 'Where do you want to start?',
-  firstHint: 'One real row is enough. The rest of the record arrives as you need it, and you can delete this one.',
+  firstHint: 'One real row is enough. You can delete it later.',
   firstChoices: [
-    { key: 'obligations', label: 'Money', body: 'What you owe, and what you are owed.', field: 'What is it, and how much?' },
-    { key: 'services', label: 'The estate', body: 'Domains, hosting, subscriptions, licences.', field: 'What renews, and when?' },
-    { key: 'people', label: 'People', body: 'Clients, contractors, and who does what.', field: 'Who is it, and what are they for?' },
-    { key: 'things', label: 'Projects', body: 'The things you run, and the plan for each.', field: 'What is it, and what is it for?' },
-    { key: 'decisions', label: 'Decisions', body: 'The ones you keep re-making, and why.', field: 'What do you keep re-deciding?' },
+    { key: 'obligations', icon: 'money', label: 'Money', body: 'What you owe, and what you are owed.', field: 'What is it, and how much?' },
+    { key: 'services', icon: 'calendar', label: 'The estate', body: 'Domains, hosting, subscriptions, licences.', field: 'What renews, and when?' },
+    { key: 'people', icon: 'people', label: 'People', body: 'Clients, contractors, and who does what.', field: 'Who is it, and what are they for?' },
+    { key: 'things', icon: 'thing', label: 'Projects', body: 'The things you run, and the plan for each.', field: 'What is it, and what is it for?' },
+    { key: 'decisions', icon: 'decide', label: 'Decisions', body: 'The ones you keep re-making, and why.', field: 'What do you keep re-deciding?' },
   ],
 
+  /* THE OTHER WAY IN, and it is offered rather than buried. PostHog's install flow leads with
+     `npx @posthog/wizard` and treats the in-product path as the alternative, which is the right
+     read of who is arriving: somebody who already has an agent open would rather finish there than
+     type rows into a browser.
+
+     It stays an OFFER and never a requirement. First run has to work on a fresh self-host with
+     nothing configured (19 §6), so nothing below this line is a step. */
+  agentTitle: 'Set it up in your agent',
+  agentBody:
+    'The record is an MCP server. Add it once and the agent you already have can create the ' +
+    'registers, fill the first rows, and read the record from then on.',
+  agentCommand: 'claude mcp add --transport http braindog https://mcp.brain.dog',
+  agentNote: 'Codex, Cursor and anything else that speaks MCP take the same URL.',
+  agentCopy: 'Copy the command',
+  agentCopied: 'Copied. Paste it where your agent is running.',
+
   /* the vocabulary, defined on first use, in place, once */
-  defRegister: 'a typed collection — obligations, domains, people',
+
   defRow: 'one thing in a register. It has a number you can say',
   defPack: 'a file that adds registers and pages. Readable text; nothing runs',
   defPage: 'a screen made of blocks. It is a row, so you can change it',
-  defBlock: 'one thing on a page — a table, a figure, a note',
+  defBlock: 'one thing on a page: a table, a figure, a note',
   defTone: 'what a value means: good, watch, wrong, note',
 
   /** Names the source block so tabbing into it says which page's declaration it is. */
-  declarationOf: (page: string) => `Declaration for ${page}`,
+  declarationOf: (page: string) => `Source of ${page}`,
 
   /* the keymap sheet */
   keymap: 'Keyboard',

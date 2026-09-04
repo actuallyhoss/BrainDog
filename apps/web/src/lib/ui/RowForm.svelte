@@ -19,7 +19,7 @@
   says so.
 -->
 <script lang="ts">
-  import { CURRENCY, REGISTERS, ROWS, labelOf } from '../record/api.ts';
+  import { CURRENCY, REGISTERS, ROWS, labelOf, readableFields } from '../record/api.ts';
   import type { FieldDecl } from '../record/schema.ts';
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
@@ -29,7 +29,7 @@
   const decl = $derived(REGISTERS[register]);
 
   /** `secret` never appears. Not disabled, not greyed — absent, with the reason said once. */
-  const fields = $derived((decl?.fields ?? []).filter((f) => f.type !== 'secret'));
+  const fields = $derived(readableFields(register));
 
   /** The rows a `ref` can point at, titled the way a person says them. */
   function options(f: FieldDecl): { value: number; label: string }[] {

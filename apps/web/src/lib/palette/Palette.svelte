@@ -21,7 +21,7 @@
   import { goto } from '$app/navigation';
   import { copy } from '../copy.ts';
   import { overlays } from '../a11y/keys.svelte.ts';
-  import { REGISTERS, search, type NavEntry, type SearchHit } from '../record/api.ts';
+  import { REGISTERS, ROWS, iconFor, search, type NavEntry, type SearchHit } from '../record/api.ts';
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';
   import type { IconName } from '../ui/Icon.svelte';
@@ -54,7 +54,7 @@
     { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, keys: 'g ,', icon: 'settings' },
     { id: 'c-audit', title: copy.audit, href: '/audit', group: copy.destinations, icon: 'clock' },
     { id: 'c-shot', title: copy.screenshotOn, href: '/settings/appearance', group: copy.commands, icon: 'monitor' },
-    { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, keys: '?', icon: 'settings' },
+    { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, keys: '?', icon: 'keyboard' },
   ];
 
   /** 34 §4's two regexes: a prefixed spoken id, and `register#seq`. `#125` is plain text. */
@@ -87,17 +87,24 @@
     }
 
     if (prefix === null || prefix === '/') {
+      /* EVERY ROW WEARS ITS OWN GLYPH. The ten commands each carried a real one and then every
+         other row in the palette fell back to the same arrow, which is the one surface where a
+         person is scanning a mixed list at speed and the glyph is the only thing separating a page
+         from a list from a row. Both declarations already name an icon; the rail has been drawing
+         them all along and this was throwing them away. */
       for (const entry of nav)
         if (entry.title.toLowerCase().includes(needle))
-          out.push({ id: `p-${entry.id}`, title: entry.title, detail: `${entry.section} page`, href: entry.href, group: copy.pages, icon: 'arrow' });
+          out.push({ id: `p-${entry.id}`, title: entry.title, detail: `${entry.section} page`, href: entry.href, group: copy.pages, icon: entry.icon });
       for (const r of Object.values(REGISTERS))
         if (r.name.toLowerCase().includes(needle))
-          out.push({ id: `r-${r.id}`, title: r.name, detail: copy.defRegister, href: `/r/${r.id}`, group: copy.pages, icon: 'arrow' });
+          /* The count, not a definition of the word "register". A row that explains the app's own
+             vocabulary is a row nobody needed, and it was doing it in every search. */
+          out.push({ id: `r-${r.id}`, title: r.name, detail: `${(ROWS[r.id] ?? []).length} rows`, href: `/r/${r.id}`, group: copy.pages, icon: iconFor(r.icon, 'rows') });
     }
 
     if ((prefix === null || prefix === '#') && text.length > 1)
       for (const hit of search(text, 8) as SearchHit[])
-        out.push({ id: `h-${hit.href}`, title: hit.title, detail: hit.detail, href: hit.href, group: copy.records, spoken: hit.spoken, icon: 'arrow' });
+        out.push({ id: `h-${hit.href}`, title: hit.title, detail: hit.detail, href: hit.href, group: copy.records, spoken: hit.spoken, icon: hit.icon });
 
     return out.slice(0, 20);
   });

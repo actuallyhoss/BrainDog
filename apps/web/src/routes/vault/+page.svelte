@@ -46,7 +46,7 @@
           </span>
           <span class="line-amount">
             <Button weight="bare">
-              <Icon name="vault" size="s" />
+              <Icon name="eye" size="s" />
               {copy.reveal}
             </Button>
           </span>

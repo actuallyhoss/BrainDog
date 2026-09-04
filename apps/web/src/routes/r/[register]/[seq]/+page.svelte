@@ -26,8 +26,10 @@
     entry,
     identityOf,
     labelOf,
+    readableFields,
     values,
   } from '$lib/record/api.ts';
+  import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -48,8 +50,11 @@
 
   /* A `document` is an argument, not a figure, so it never sits in the field list beside a date and
      a currency — it gets the room prose needs (05 §7.1). */
-  const documents = $derived((decl?.fields ?? []).filter((f) => f.type === 'document'));
-  const shortFields = $derived((decl?.fields ?? []).filter((f) => f.type !== 'document'));
+  /* `readableFields` and not `decl.fields`: a register's identity mark and its frozen hue are
+     machinery, and listing them here printed "Mark  ▲" and "Hue  271" as though they were facts
+     about the project rather than the reason it has a triangle beside its name. */
+  const documents = $derived(readableFields(id).filter((f) => f.type === 'document'));
+  const shortFields = $derived(readableFields(id).filter((f) => f.type !== 'document'));
 
   const resolved = values();
   const resolve = (path: string) => resolved[path] ?? null;
@@ -73,7 +78,7 @@
 {:else}
   <PageHead kicker={decl.name} title={String(row.fields[decl.title] ?? '')} id="#{row.seq}">
     {#snippet actions()}
-      <Button weight="bare">{copy.copyId}<Kbd keys="y" /></Button>
+      <Button weight="bare"><Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" /></Button>
       <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>Edit</Button>
     {/snippet}
   </PageHead>

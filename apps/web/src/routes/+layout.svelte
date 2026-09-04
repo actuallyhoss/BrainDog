@@ -273,13 +273,17 @@
   }
 
   /* A RED CIRCLE. The mark reversed out of its own colour, 52px, bottom-right, and nothing else in
-     it — no label, no count, no chevron. It is the product's own drawing, so the drawing is the
-     whole affordance; a word beside it would be explaining a logo.
+     it: no label, no count, no chevron. It is the product's own drawing, so the drawing is the
+     whole affordance, and a word beside it would be explaining a logo.
 
-     The only control in the app that floats, and therefore the only place a shadow is allowed to
-     exist. Everything else is flat because everything else is IN the page; this is over it, and a
-     thing over the page that casts nothing reads as stuck to the glass. It uses the generated
-     elevation ladder rather than a number invented here. */
+     NO SHADOW. It had one, on the argument that a floating thing which casts nothing reads as
+     stuck to the glass. That argument is fine in the abstract and wrong in this app: nothing else
+     here casts a shadow, so the one that did read as a control borrowed from a different product
+     rather than as the one thing allowed to float. A solid disc of the only saturated colour on
+     the screen already sits above everything; it does not need help.
+
+     It lifts on hover instead. Motion says "this is a control" without adding a material the rest
+     of the interface does not have. */
   .launcher {
     position: fixed;
     inset-block-end: var(--sp-5);
@@ -293,23 +297,20 @@
     background: var(--brand);
     border: 0;
     border-radius: 999px;
-    box-shadow: var(--e2);
     color: var(--accent-ink);
     cursor: pointer;
     transition:
       transform var(--d-state) var(--ease-out),
-      box-shadow var(--d-state) var(--ease-out);
+      background var(--d-state) var(--ease-out);
   }
 
   .launcher:hover {
-    box-shadow: var(--e3);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
   }
 
   .launcher:active {
     transition-duration: var(--d-press);
-    transform: none;
-    box-shadow: var(--e1);
+    transform: translateY(0);
   }
 
   @media (prefers-reduced-motion: reduce) {

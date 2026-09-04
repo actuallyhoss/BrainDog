@@ -62,6 +62,33 @@ export const PATHS = {
   arrowUp: 'M12 19V5m-6 6 6-6 6 6',
   arrowDown: 'M12 5v14m6-6-6 6-6-6',
   grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+
+  /* Verbs. Every one of these was being drawn by a glyph that already meant something else, by a
+     literal character typed into the markup, or by nothing at all. A set where `close` has to mean
+     both "dismiss this" and "remove this block" is a set that has run out. */
+  edit: 'M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17zM15 6l3 3',
+  trash: 'M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7M10 11v5M14 11v5',
+  archive: 'M3 6h18v4H3zM5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9M10 14h4',
+  eye: 'M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z',
+  download: 'M12 4v11m-4-4 4 4 4-4M4 19h16',
+  refresh: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
+  star: 'm12 4 2.4 5 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z',
+
+  /* The other two intents. `good` had `check` and `warn` had `alert`; `bad` and `info` had nothing,
+     which is why the toast stack fell back to a bare coloured dot and broke the rule that colour
+     never carries meaning on its own (13 §2.3). */
+  ban: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM5.6 5.6l12.8 12.8',
+  info: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 11v5M12 7.5v.01',
+
+  /* Nouns that were being said with a borrowed word. `settings` was carrying Settings, More and
+     Keymap at once; `clock` was carrying both "a time" and "the log"; `copy` was carrying both "to
+     the clipboard" and "show me the source". */
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  keyboard: 'M2 6h20v12H2zM6 9.5v.01M9.5 9.5v.01M13 9.5v.01M16.5 9.5v.01M7 14h10',
+  code: 'm9 8-5 4 5 4M15 8l5 4-5 4',
+  history: 'M4 12a8 8 0 1 0 2.3-5.6M4 4v5h5M12 8v4l3 2',
+  lock: 'M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3',
+  key: 'M14.5 9.5a4 4 0 1 1-1.6 3.2L7 19H4v-3l6.3-6.3a4 4 0 0 1 4.2-.2zM16.5 7.5v.01',
 } as const;
 
 export type IconName = keyof typeof PATHS;

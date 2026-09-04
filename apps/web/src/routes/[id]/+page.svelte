@@ -56,7 +56,7 @@
       heading
       title={bare ? `“${raw}” could be a row in any register.` : `Nothing answers to “${raw}”.`}
       body={bare
-        ? 'Every register has a #1, so a bare number never resolves on its own. Qualify it — obligations#4, tasks#7.'
+        ? 'Every register has a #1, so a bare number never resolves on its own. Qualify it: obligations#4, tasks#7.'
         : 'A spoken id is a letter prefix and a number, or a register and a sequence.'}
       rid="r7k2m9qd4x"
     >

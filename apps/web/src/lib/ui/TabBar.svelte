@@ -37,7 +37,7 @@
     <span>{copy.inbox}</span>
   </a>
   <button type="button" class="tab tap" onclick={onmore}>
-    <Icon name="settings" size="l" /><span>{copy.more}</span>
+    <Icon name="more" size="l" /><span>{copy.more}</span>
   </button>
 </nav>
 

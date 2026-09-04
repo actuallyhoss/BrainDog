@@ -26,19 +26,22 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
 
+  /* Twelve rows with a glyph each, because this rail's own CSS says it "IS the same thing" as the
+     app's rail, and the app's rail has never had a row without one. A list of twelve bare words is
+     the hardest kind of nav to scan: nothing tells you where you are except reading all of them. */
   const AREAS = [
-    'appearance',
-    'identity',
-    'recovery',
-    'people',
-    'agents',
-    'ingest',
-    'keyboard',
-    'navigation',
-    'notifications',
-    'backups',
-    'billing',
-    'export',
+    { id: 'appearance', label: 'Appearance', icon: 'sun' },
+    { id: 'identity', label: 'Identity', icon: 'people' },
+    { id: 'recovery', label: 'Recovery', icon: 'key' },
+    { id: 'people', label: 'People & sharing', icon: 'people' },
+    { id: 'agents', label: 'Agents', icon: 'session' },
+    { id: 'ingest', label: 'Ingest', icon: 'inbox' },
+    { id: 'keyboard', label: 'Keyboard', icon: 'keyboard' },
+    { id: 'navigation', label: 'Navigation', icon: 'rows' },
+    { id: 'notifications', label: 'Notifications', icon: 'bell' },
+    { id: 'backups', label: 'Backups', icon: 'archive' },
+    { id: 'billing', label: 'Billing', icon: 'money' },
+    { id: 'export', label: 'Export', icon: 'download' },
   ] as const;
 
   const area = $derived(page.params.area ?? 'appearance');
@@ -94,8 +97,9 @@
 <div class="shell">
   <nav class="areas" aria-label={copy.settings}>
     {#each AREAS as a}
-      <a class="area" href="/settings/{a}" aria-current={a === area ? 'page' : undefined}>
-        {a === 'people' ? 'People & sharing' : a.replace(/^./, (c) => c.toUpperCase())}
+      <a class="area" href="/settings/{a.id}" aria-current={a.id === area ? 'page' : undefined}>
+        <Icon name={a.icon} size="s" />
+        {a.label}
       </a>
     {/each}
   </nav>
@@ -231,6 +235,7 @@
     min-block-size: 32px;
     display: flex;
     align-items: center;
+    gap: var(--sp-3);
     padding: 0 var(--sp-3);
     border-radius: var(--r-md);
     color: var(--ink2);

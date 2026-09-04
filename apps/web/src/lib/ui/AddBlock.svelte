@@ -96,7 +96,7 @@
   });
 </script>
 
-<Sheet bind:open title={copy.addBlock} id={slug}>
+<Sheet bind:open title={copy.addBlock} >
   {#each PURPOSES as purpose}
     {@const group = tiles.filter((t) => t.spec?.purpose === purpose)}
     {#if group.length}

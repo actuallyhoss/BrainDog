@@ -21,6 +21,9 @@
   import { copy } from '$lib/copy.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import type { IconName } from '$lib/ui/icons.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
 
   /* The five live in `copy.ts` with every other sentence in the product, so the scope this screen
      claims can be checked against the rest of it in one pass rather than found in a component. */
@@ -35,6 +38,11 @@
   }
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
+
+  async function copyCommand() {
+    await navigator.clipboard?.writeText(copy.agentCommand).catch(() => {});
+    toasts.push(copy.agentCopied);
+  }
 </script>
 
 <svelte:head><title>{titleOf('Start')}</title></svelte:head>
@@ -56,18 +64,34 @@
 
       <div class="choices" role="group" aria-label={copy.firstQuestion}>
         {#each CHOICES as c, i}
+          <!-- The register id used to sit on the right of every row. It is the app's own vocabulary
+               explained to somebody who has not agreed to learn it yet, on the one screen where
+               they have the least reason to care, and it made five plain choices look like a
+               schema review. The glyph does the work the id was pretending to do. -->
           <button type="button" class="choice" onclick={() => pick(c.key)}>
-            <span class="choice-n">{i + 1}</span>
+            <span class="choice-icon"><Icon name={c.icon as IconName} size="m" /></span>
             <span class="choice-main">
               <span class="choice-label">{c.label}</span>
               <span class="choice-body">{c.body}</span>
             </span>
-            <span class="choice-register">{c.key}</span>
+            <kbd class="choice-n">{i + 1}</kbd>
           </button>
         {/each}
       </div>
 
       <p class="hint">{copy.firstHint}</p>
+
+      <section class="agent" aria-labelledby="agent-h">
+        <h2 class="agent-h" id="agent-h"><Icon name="session" size="m" />{copy.agentTitle}</h2>
+        <p class="agent-body">{copy.agentBody}</p>
+        <div class="agent-cmd">
+          <code>{copy.agentCommand}</code>
+          <button type="button" class="agent-copy" onclick={copyCommand} aria-label={copy.agentCopy}>
+            <Icon name="copy" size="s" />
+          </button>
+        </div>
+        <p class="agent-note">{copy.agentNote}</p>
+      </section>
     {:else}
       <h1 class="question step">{choice.field}</h1>
 
@@ -91,15 +115,21 @@
 </div>
 
 <style>
+  /* `minmax(0, …)` and not `place-items: center`. A centred grid item sizes its track to
+     `max-content`, and the one line of `nowrap` monospace in the agent card is wider than a phone —
+     so the track grew to fit it and took the whole page sideways at 320 and 360. The gate caught it
+     the same minute I wrote it, which is what the gate is for. */
   .start {
     display: grid;
-    place-items: center;
+    grid-template-columns: minmax(0, min(560px, 100%));
+    justify-content: center;
+    align-content: center;
     min-block-size: 100dvh;
     padding: var(--sp-5);
   }
 
   .frame {
-    inline-size: min(560px, 100%);
+    min-inline-size: 0;
   }
 
   .head {
@@ -195,16 +225,30 @@
     background: color-mix(in srgb, var(--ink) 4%, transparent);
   }
 
+  /* The number is a KEY, so it is drawn as one. A bare circled digit reads as a step in a sequence
+     you have to do in order; these are five alternatives and only one gets picked. */
   .choice-n {
-    inline-size: 20px;
-    block-size: 20px;
+    min-inline-size: 20px;
+    padding: 2px 6px;
+    background: var(--sunk);
     border: 1px solid var(--edge);
-    border-radius: 999px;
+    border-radius: var(--r-sm);
     color: var(--dim);
     font-family: var(--font-id);
     font-size: var(--t-xs);
-    line-height: 18px;
     text-align: center;
+  }
+
+  /* The glyph, in the accent, because it was the only colour on the screen that was missing and
+     five rows of grey text is most of what made this look like a form. */
+  .choice-icon {
+    display: grid;
+    place-items: center;
+    inline-size: 34px;
+    block-size: 34px;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent-text);
   }
 
   .choice-main {
@@ -228,11 +272,6 @@
     font-size: var(--t-sm);
   }
 
-  .choice-register {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-  }
 
   .form {
     display: flex;
@@ -269,11 +308,95 @@
     margin-block-start: var(--sp-2);
   }
 
+  /* No rule above it any more. It belongs to the list it follows, and the card below now does the
+     separating — a divider plus a card is two dividers. */
   .hint {
-    margin-block-start: var(--sp-4);
-    padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    margin-block-start: var(--sp-3);
     color: var(--dim);
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
+  }
+
+  /* ── the agent path ──────────────────────────────────────────────────── */
+
+  /* A CARD, not a rule with text under it. Below a divider reads as a footnote — the thing you put
+     after the real content — and this is the path somebody with an agent already open should take
+     first. Tinted with the accent rather than the surface ladder, because it is an alternative to
+     the list above it and not the next step down from it. */
+  .agent {
+    margin-block-start: var(--sp-6);
+    padding: var(--sp-4) var(--sp-4) var(--sp-5);
+    background: color-mix(in srgb, var(--accent) 7%, var(--s1));
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+    border-radius: var(--r-md);
+  }
+
+  .agent-h {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .agent-h :global(svg) {
+    color: var(--accent-text);
+  }
+
+  .agent-h {
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+    letter-spacing: -0.012em;
+  }
+
+  .agent-body {
+    margin-block-start: var(--sp-2);
+    max-inline-size: 56ch;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+  }
+
+  .agent-cmd {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+    background: var(--bg);
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+    border-radius: var(--r-sm);
+  }
+
+  .agent-cmd code {
+    flex: 1;
+    min-inline-size: 0;
+    overflow-x: auto;
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  .agent-copy {
+    display: grid;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    flex: none;
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--dim);
+    cursor: pointer;
+  }
+
+  .agent-copy:hover {
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    color: var(--ink);
+  }
+
+  .agent-note {
+    margin-block-start: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-xs);
   }
 </style>

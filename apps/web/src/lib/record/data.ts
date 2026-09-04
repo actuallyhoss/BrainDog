@@ -50,13 +50,13 @@ export const REGISTERS: Record<string, RegisterDecl> = {
     done: ['paid', 'written_off'],
     pack: 'money-core',
     fields: [
-      { id: 'what', type: 'text', required: true },
+      { id: 'what', label: 'Description', type: 'text', required: true },
       { id: 'party', type: 'ref', to: 'people', indexed: true },
       { id: 'direction', type: 'enum', values: ['owed_by_me', 'owed_to_me'], indexed: true, required: true },
       { id: 'amount', type: 'money', required: true },
       { id: 'due', type: 'day', indexed: true, required: true },
       { id: 'state', type: 'enum', values: ['open', 'part', 'paid', 'written_off'], indexed: true, required: true },
-      { id: 'thing', type: 'ref', to: 'things', indexed: true },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', indexed: true },
       { id: 'note', type: 'text' },
     ],
   },
@@ -74,21 +74,21 @@ export const REGISTERS: Record<string, RegisterDecl> = {
     fields: [
       { id: 'name', type: 'text', required: true },
       { id: 'provider', type: 'text', indexed: true },
-      { id: 'kind', type: 'enum', values: ['domain', 'hosting', 'saas', 'certificate'], indexed: true, required: true },
+      { id: 'kind', label: 'Type', type: 'enum', values: ['domain', 'hosting', 'saas', 'certificate'], indexed: true, required: true },
       { id: 'renews', type: 'day', indexed: true, required: true },
       { id: 'cost', type: 'money', required: true },
       { id: 'cycle', type: 'enum', values: ['monthly', 'yearly', 'two_yearly'], required: true },
       { id: 'state', type: 'enum', values: ['live', 'lapsing', 'cancelled'], indexed: true, required: true },
-      { id: 'points_at', type: 'text' },
-      { id: 'thing', type: 'ref', to: 'things', indexed: true },
+      { id: 'points_at', label: 'Target', type: 'text' },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', indexed: true },
     ],
   },
   things: {
     id: 'things',
     icon: 'thing',
-    name: 'Things',
-    one: 'thing',
-    holds: 'the things you run, and the plan for each',
+    name: 'Projects',
+    one: 'project',
+    holds: 'what you are building, and the plan for each',
     title: 'name',
     mobile: ['name', 'lane', 'revenue'],
     state: 'lane',
@@ -98,7 +98,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
     identity: { mark: 'mark', accent: 'hue' },
     fields: [
       { id: 'name', type: 'text', required: true },
-      { id: 'lane', type: 'enum', values: ['building', 'earning', 'parked', 'retired'], indexed: true, required: true },
+      { id: 'lane', label: 'Status', type: 'enum', values: ['building', 'earning', 'parked', 'retired'], indexed: true, required: true },
       { id: 'revenue', type: 'money' },
       { id: 'since', type: 'day' },
       { id: 'mark', type: 'text' },
@@ -145,17 +145,17 @@ export const REGISTERS: Record<string, RegisterDecl> = {
     state: 'state',
     done: ['ended'],
     fields: [
-      { id: 'doing', type: 'text', required: true },
+      { id: 'doing', label: 'Task', type: 'text', required: true },
       { id: 'agent', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], indexed: true, required: true },
       { id: 'state', type: 'enum', values: ['live', 'idle', 'ended'], indexed: true, required: true },
-      { id: 'thing', type: 'ref', to: 'things', indexed: true },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', indexed: true },
       /* THE PIN. A session pinned to a track is how context survives the session that made it:
          close the window, come back on Tuesday, open the track, and the thread is all there — what
          each agent was doing, in order, next to the updates that say how it was going. Without it
          an agent session is a thing that happened once and then could not be found again. */
       { id: 'track', type: 'ref', to: 'tracks', indexed: true },
-      { id: 'last_seen', type: 'instant', indexed: true },
-      { id: 'wrote', type: 'int' },
+      { id: 'last_seen', label: 'Last seen', type: 'instant', indexed: true },
+      { id: 'wrote', label: 'Writes', type: 'int' },
       { id: 'host', type: 'text' },
     ],
   },
@@ -193,7 +193,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
     fields: [
       { id: 'name', type: 'text', required: true },
       { id: 'state', type: 'enum', values: ['open', 'holding', 'done', 'dropped'], indexed: true, required: true },
-      { id: 'thing', type: 'ref', to: 'things', indexed: true },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', indexed: true },
       { id: 'opened', type: 'day', indexed: true },
       { id: 'note', type: 'document' },
     ],
@@ -223,12 +223,12 @@ export const REGISTERS: Record<string, RegisterDecl> = {
     mobile: ['body', 'health', 'at'],
     pack: 'work',
     fields: [
-      { id: 'body', type: 'document', required: true },
+      { id: 'body', label: 'Update', type: 'document', required: true },
       { id: 'health', type: 'enum', values: ['on_track', 'at_risk', 'off_track'], indexed: true, required: true },
       { id: 'track', type: 'ref', to: 'tracks', indexed: true, required: true },
       { id: 'by', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], indexed: true, required: true },
-      { id: 'at', type: 'instant', indexed: true, required: true },
-      { id: 'supersedes', type: 'ref', to: 'updates' },
+      { id: 'at', label: 'When', type: 'instant', indexed: true, required: true },
+      { id: 'supersedes', label: 'Replaces', type: 'ref', to: 'updates' },
     ],
   },
 
@@ -244,10 +244,10 @@ export const REGISTERS: Record<string, RegisterDecl> = {
     done: ['done', 'dropped'],
     pack: 'work',
     fields: [
-      { id: 'what', type: 'text', required: true },
+      { id: 'what', label: 'Description', type: 'text', required: true },
       { id: 'state', type: 'enum', values: ['open', 'doing', 'blocked', 'done', 'dropped'], indexed: true, required: true },
-      { id: 'thing', type: 'ref', to: 'things', indexed: true },
-      { id: 'by', type: 'day', indexed: true },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', indexed: true },
+      { id: 'by', label: 'Due', type: 'day', indexed: true },
       /* Usually unset, and the schema has to be the thing that says so — the prose two documents
          away saying "most tasks carry no track" is what lost last time (10 §7). */
       { id: 'track', type: 'ref', to: 'tracks', indexed: true },
