@@ -113,10 +113,19 @@
     animation: slide-in var(--d-enter) var(--ease-spring);
   }
 
+  /* NO `opacity: 0` IN THE START STATE, and this is a failure-mode decision rather than a taste one.
+     
+     Measured: `getAnimations()` on this dialog reported `playState: running` with an unresolved
+     start time for up to 900ms after `showModal()` — a CSS animation stays pending until its first
+     rendered frame, and a dialog entering the top layer with forty rows of content inside it can
+     wait a while for one. With `opacity: 0` in the `from`, that pause is a second of nothing where
+     the reader asked for a panel.
+     
+     A stalled slide is a panel 24px to the right of where it belongs. A stalled fade is no panel.
+     Whatever the start state is, it has to be a state somebody could read. */
   @keyframes slide-in {
     from {
       transform: translateX(24px);
-      opacity: 0;
     }
   }
 
@@ -201,7 +210,6 @@
     @keyframes rise {
       from {
         transform: translateY(24px);
-        opacity: 0;
       }
     }
   }

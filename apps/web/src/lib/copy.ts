@@ -166,6 +166,11 @@ export const copy = {
         ? 'A date range is not built yet. Sort on the column instead.'
         : 'Search matches this field.',
   displayOptions: 'Display',
+  display: 'Display',
+  displayNote: 'What you see on this grid. It stays on this device and changes nothing in the record.',
+  columns: 'Columns',
+  always: 'always',
+  showAll: 'Show them all',
   rowMenu: 'Actions for this row',
   archive: 'Archive',
   selected: 'selected',

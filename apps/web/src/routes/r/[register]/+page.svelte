@@ -50,7 +50,23 @@
     }),
   );
 
-  const columns = $derived(columnsFor(id));
+  /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
+  let createOpen = $state(false);
+  let displayOpen = $state(false);
+
+  /**
+   * Which columns this register shows, and it is PER REGISTER and PER READER.
+   *
+   * 50 §5.2 names it `prefs.columns[register]` — a view preference, not a declaration. The
+   * difference matters: `columns:` on a page block is what everyone sees and travels in a pack;
+   * this is what YOU see on the grid, and it never leaves your device. Two people looking at the
+   * same register may want different columns and neither is editing the record.
+   *
+   * The title column is not offerable. A register whose title is hidden is a list of ids.
+   */
+  let hidden = $state(new Set<string>());
+
+  const columns = $derived(columnsFor(id).filter((c) => !hidden.has(c.field)));
   const found = $derived(list(id, { filters, q, ...(sort ? { sort } : {}) }));
   const result = $derived({
     ...found,
@@ -86,7 +102,6 @@
   let focus = $state({ row: 0, col: 1 });
   let peeked = $state<number | null>(null);
   let filterOpen = $state(false);
-  let createOpen = $state(false);
 
   /**
    * Archived rows, in the mock-up, held in the page rather than in the record.
@@ -190,6 +205,9 @@
     } else if (e.key === 'f') {
       e.preventDefault();
       filterOpen = true;
+    } else if (e.key === 'v') {
+      e.preventDefault();
+      displayOpen = true;
     } else if (e.key === 'y') {
       const row = result.entries[focus.row];
       if (row) {
@@ -459,6 +477,45 @@
     {/snippet}
   </Sheet>
 
+  <!-- Display options: what YOU see, never what the record says. `v`. -->
+  <Sheet bind:open={displayOpen} title={copy.display} id={id}>
+    <p class="display-note">{copy.displayNote}</p>
+    <div class="filter-groups">
+      <fieldset class="filter-group">
+        <legend class="filter-legend">{copy.columns}</legend>
+        <div class="filter-values">
+          {#each columnsFor(id) as c}
+            {@const locked = c.field === 'seq' || c.field === decl.title}
+            <button
+              type="button"
+              class="filter-value"
+              data-on={!hidden.has(c.field) ? '' : undefined}
+              aria-pressed={!hidden.has(c.field) ? 'true' : 'false'}
+              disabled={locked}
+              onclick={() => {
+                const next = new Set(hidden);
+                if (next.has(c.field)) next.delete(c.field);
+                else next.add(c.field);
+                hidden = next;
+              }}
+            >
+              <span class="filter-box" aria-hidden="true">{hidden.has(c.field) ? '' : '✓'}</span>
+              {c.label}
+              {#if locked}<span class="locked">{copy.always}</span>{/if}
+            </button>
+          {/each}
+        </div>
+      </fieldset>
+    </div>
+
+    {#snippet footer()}
+      <Button weight="primary" onclick={() => (displayOpen = false)}>{copy.done}</Button>
+      {#if hidden.size > 0}
+        <Button weight="bare" onclick={() => (hidden = new Set())}>{copy.showAll}</Button>
+      {/if}
+    {/snippet}
+  </Sheet>
+
   <!-- The filter drawer. The bar above holds the enum filters because they are the ones worth a
        permanent control; everything else declared `indexed:` lives here, so the bar stays one line
        on a register with eight filterable fields.
@@ -719,6 +776,23 @@
   .filter-value[data-on] .filter-box {
     background: var(--accent);
     border-color: var(--accent);
+  }
+
+  .display-note {
+    margin-block-end: var(--sp-4);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .locked {
+    margin-inline-start: auto;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .filter-value:disabled {
+    cursor: default;
+    opacity: 0.75;
   }
 
   .filter-kind,

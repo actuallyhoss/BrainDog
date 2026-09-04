@@ -177,10 +177,11 @@
     inset-inline-end: 0;
   }
 
+  /* No `opacity: 0` in a start state — see Sheet.svelte. A stalled animation must leave something
+     readable behind, and a menu 4px too high is readable. */
   @keyframes menu-in {
     from {
       transform: translateY(-4px);
-      opacity: 0;
     }
   }
 

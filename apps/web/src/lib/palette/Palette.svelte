@@ -233,10 +233,12 @@
     animation: pop var(--d-enter) var(--ease-spring);
   }
 
+  /* No `opacity: 0` in a start state — see Sheet.svelte. The palette is the one surface somebody
+     reaches for a hundred times a day, and it is the one that can least afford to be invisible while
+     an animation waits for its first frame. */
   @keyframes pop {
     from {
       transform: translateY(-8px) scale(0.985);
-      opacity: 0;
     }
   }
 

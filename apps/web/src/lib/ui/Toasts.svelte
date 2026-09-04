@@ -77,10 +77,11 @@
     animation: toast-in var(--d-enter) var(--ease-spring);
   }
 
+  /* No `opacity: 0` in a start state — see Sheet.svelte. A toast that never fades in is still a
+     toast; a toast stuck at zero opacity is a report nobody got. */
   @keyframes toast-in {
     from {
       transform: translateY(6px);
-      opacity: 0;
     }
   }
 
