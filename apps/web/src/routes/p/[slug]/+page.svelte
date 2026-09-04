@@ -168,7 +168,50 @@
         e.preventDefault();
         void copyBlockLink(slotIndex);
       }
+    } else if (e.key === 'Enter') {
+      /* ENTER THE BLOCK: move real focus inside it, so the block's own keys take over.
+         
+         This is the whole reason the two altitudes exist. `j`/`k` walk blocks and the letters are
+         bare; once focus is inside a `role="grid"`, `j`/`k` walk ROWS and the same bare letters are
+         the grid's. WCAG 2.1.4's focus exception is what makes bare single letters legal at all, and
+         it is satisfied by focus actually being somewhere rather than by a variable saying it is. */
+      const held = blocks[cursor];
+      if (!held) return;
+      e.preventDefault();
+      enter(held.slot.i);
+    } else if (e.key === 'Escape') {
+      /* LEAVE IT. Focus returns to the document and the cursor stays where it was, so Escape is a
+         step back out rather than a reset — a mode you leave by losing your place is a mode people
+         stop entering. */
+      const inside = document.activeElement;
+      if (inside instanceof HTMLElement && inside !== document.body) {
+        e.preventDefault();
+        inside.blur();
+      }
     }
+  }
+
+  /**
+   * The first thing inside a block that can take focus.
+   *
+   * A `table` block's region is `tabindex="0"` and is the right target; a `bar`'s hole row is a
+   * button; a `note` has nothing focusable at all and the block is simply scrolled to, because
+   * moving focus to a paragraph and announcing it is worse than not moving.
+   */
+  function enter(slotIndex: number) {
+    const section = document.getElementById(`b-${slotIndex + 1}`);
+    /* The block's BODY, not its bar. The bar carries a link to the register, which is the first
+       focusable descendant of the section — so an unscoped query put `↵` on "open the register",
+       which is the `o` key's job and the opposite of entering. */
+    const body = section?.querySelector<HTMLElement>('.block, .table-region');
+    const target =
+      body?.matches('[tabindex]:not([tabindex="-1"])') === true
+        ? body
+        : (body?.querySelector<HTMLElement>(
+            '[role="grid"], a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])',
+          ) ?? null);
+    if (target) target.focus();
+    else section?.scrollIntoView({ block: 'nearest' });
   }
 
   /** Scrolls the cursor into view under the sticky head. `.block-slot` already carries the margin. */
@@ -264,11 +307,17 @@
           {showSource ? 'Page' : 'Source'}
           <Kbd keys="⇧E" />
         </Button>
+        <!-- ARRANGING IS A DESKTOP SURFACE. 13 §10: "Authoring: read and approve, do not author. The
+             page builder and pack builder are desktop surfaces." A drag-to-reorder mode on a phone
+             is a mode where every gesture competes with the scroll, and the button is absent rather
+             than disabled — a control that exists and refuses is worse than one that does not. -->
         {#if !showSource}
-          <Button weight="quiet" onclick={beginArrange}>
-            <Icon name="grid" size="s" />
-            {copy.arrange}
-          </Button>
+          <span class="arrange-slot">
+            <Button weight="quiet" onclick={beginArrange}>
+              <Icon name="grid" size="s" />
+              {copy.arrange}
+            </Button>
+          </span>
         {/if}
       {/if}
     {/snippet}
@@ -510,6 +559,43 @@
 
     .block-slot {
       grid-column: auto;
+    }
+
+    .arrange-slot {
+      display: none;
+    }
+
+    /* The query a block was drawn from is PROVENANCE, and on a phone it is two lines of monospace
+       above every block competing with the block's own heading. It is a desktop affordance for the
+       same reason the source link beside it is. */
+    .block-where {
+      display: none;
+    }
+  }
+
+  /* A stat's cells are declared, so the block cannot infer how many to draw (05 §4) — but the HOST
+     may restack what it was given, and three figures across a 358px phone breaks `GBP 4,050.00`
+     into two lines. Home already does this for its own stat; a declared page needs it too. */
+  @media (width < 640px) {
+    .block-slot :global(.grid) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .block-slot :global(.cell + .cell) {
+      border-inline-start: 0;
+      border-block-start: 1px solid var(--line);
+    }
+  }
+
+  /* No keyboard to press it with, so no chord to advertise.
+     
+     BOTH QUERIES, because they answer different questions and neither is sufficient. `pointer:
+     coarse` is the honest test — 05 §6, size follows the pointer and never the width — but a
+     touchscreen laptop reports coarse with a keyboard attached, and a phone in a headless browser
+     may not report it at all. The width query is the blunt one that catches the phone. */
+  @media (pointer: coarse), (width < 640px) {
+    .block-source :global(.kbd) {
+      display: none;
     }
   }
 </style>
