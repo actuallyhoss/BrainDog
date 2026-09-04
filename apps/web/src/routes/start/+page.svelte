@@ -85,7 +85,11 @@
         <h2 class="agent-h" id="agent-h"><Icon name="session" size="m" />{copy.agentTitle}</h2>
         <p class="agent-body">{copy.agentBody}</p>
         <div class="agent-cmd">
-          <code>{copy.agentCommand}</code>
+          <!-- Focusable, because at 390 the command is wider than the card and scrolls. A scrolling
+               box a keyboard cannot reach is a box a keyboard cannot read (WCAG 2.1.1) — the same
+               fix the sheet body and the declaration block already carry. -->
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <code tabindex="0" aria-label={copy.agentCopy}>{copy.agentCommand}</code>
           <button type="button" class="agent-copy" onclick={copyCommand} aria-label={copy.agentCopy}>
             <Icon name="copy" size="s" />
           </button>
