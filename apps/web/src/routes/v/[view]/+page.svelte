@@ -15,7 +15,7 @@
   import { page } from '$app/state';
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { REGISTERS, columnsFor, list, toRows, type Filter } from '$lib/record/api.ts';
+  import { iconFor, REGISTERS, columnsFor, list, toRows, type Filter } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -72,7 +72,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead kicker="{decl.name} · saved view" title={view.name} count={result.matched} total={result.total}>
+  <PageHead icon={iconFor(decl.icon, 'rows')} kicker="{decl.name} · saved view" title={view.name} count={result.matched} total={result.total}>
     {#snippet actions()}
       <Button weight="bare" href="/r/{view.register}">Open the register<Kbd keys="o" /></Button>
       <Button weight="quiet" onclick={() => (binding = true)}>{copy.bindBlock}<Kbd keys="⌥B" /></Button>

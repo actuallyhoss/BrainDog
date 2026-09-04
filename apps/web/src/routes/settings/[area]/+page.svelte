@@ -92,7 +92,7 @@
 
 <svelte:head><title>{titleOf(area.replace(/^./, (c) => c.toUpperCase()), copy.settings)}</title></svelte:head>
 
-<PageHead kicker={copy.settings} title={area.replace(/^./, (c) => c.toUpperCase())} />
+<PageHead icon="settings" kicker={copy.settings} title={area.replace(/^./, (c) => c.toUpperCase())} />
 
 <div class="shell">
   <nav class="areas" aria-label={copy.settings}>

@@ -55,10 +55,8 @@ export const copy = {
   thatIs: 'that is',
   asA: 'Draw it as',
   onPage: 'On the page',
-  noDestination: (register: string) =>
-    `No page requires ${register} yet, so there is nowhere for this to live. A page declares which registers it reads.`,
-  willAdd: (kind: string, span: number) =>
-    `Adds one ${kind} at the end of the page, ${span} of 12 columns wide. You can move and resize it there.`,
+  noDestination: (register: string) => `No page shows ${register} yet.`,
+  willAdd: (kind: string, span: number) => `Adds a ${kind} to the end of the page, ${span} of 12 wide.`,
   bound: (kind: string, page: string) =>
     `Added a ${kind} to ${page}. Nothing was written; this is a mock-up.`,
   blockLink: 'a link to this block',
@@ -109,11 +107,9 @@ export const copy = {
   /* Deferring. A defer without a date is a dismissal wearing a nicer word, so both fields are
      required and the button says what will exist afterwards. */
   deferTitle: 'Why not yet, and when',
-  deferWhy: 'You are parking this question, not answering it.',
   deferHint: 'What has to happen first',
   deferAction: 'Park it',
   wakeOn: 'Wake me on',
-  deferNote: 'It leaves Decide and comes back on that date.',
   deferred: (on: string) => `Parked until ${on}. Nothing was written; this is a mock-up.`,
   required: 'required',
   nothingToUndo: 'Nothing to undo.',
@@ -143,7 +139,7 @@ export const copy = {
   commit: 'Commit the decision',
   defer: 'Defer',
   decidedBy: 'Decided by',
-  immutable: 'Decided rows are append-only. This one cannot be edited, including by you.',
+  immutable: 'A decision cannot be edited once it is made.',
   noQuestions: 'Nothing to decide.',
   lastDecided: 'The last one was decided',
 
@@ -155,19 +151,19 @@ export const copy = {
   addRow: 'Add',
   noneChosen: 'None',
   yes: 'Yes',
-  secretsLiveInTheVault: 'A key or a token goes in the Vault, never in a row. The row records what it opens.',
+  secretsLiveInTheVault: 'Keys and tokens go in the Vault. A row records what one opens.',
   savedNothing: 'Nothing was written. This is a mock-up of the record, not the record.',
-  noFilters: 'This register declares no indexed fields, so there is nothing to filter on yet.',
+  noFilters: 'Nothing here can be filtered yet.',
   /* What a field CAN be filtered on, said plainly, instead of a disabled range control. */
   filterKind: (type: string) =>
     type === 'money' || type === 'int' || type === 'decimal'
-      ? 'A range control for numbers is not built yet. Sort on the column instead.'
+      ? 'Sort on the column instead.'
       : type === 'day' || type === 'instant'
-        ? 'A date range is not built yet. Sort on the column instead.'
+        ? 'Sort on the column instead.'
         : 'Search matches this field.',
   displayOptions: 'Display',
   display: 'Display',
-  displayNote: 'What you see on this grid. It stays on this device and changes nothing in the record.',
+  displayNote: 'Only affects your view of this list.',
   columns: 'Columns',
   always: 'always',
   showAll: 'Show them all',
@@ -227,7 +223,7 @@ export const copy = {
   install: 'Install',
   uninstall: 'Uninstall',
   installDiff: 'What this adds',
-  packBlurb: 'A pack is a file that adds registers and pages. Readable text; nothing runs.',
+  packBlurb: 'A pack adds ready-made lists and pages. Readable text; nothing runs.',
 
   /* settings */
   appearance: 'Appearance',
@@ -244,7 +240,7 @@ export const copy = {
   densityComfortable: 'Comfortable',
   densityRoomy: 'Roomy',
   characterKeys: 'Character keys',
-  characterKeysHint: 'Single letters act on the focused grid. Turn them off and every modifier chord still works.',
+  characterKeysHint: 'Single letters act on the focused list.',
   on: 'On',
   off: 'Off',
 

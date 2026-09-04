@@ -59,7 +59,7 @@
 
 <svelte:head><title>{titleOf(copy.home)}</title></svelte:head>
 
-<PageHead kicker={data.index.name} title={today}>
+<PageHead icon="home" kicker={data.index.name} title={today}>
   {#snippet actions()}
     <a class="to-decide" href="/decide">
       <span class="to-decide-n num">{data.questions.length}</span>
@@ -80,8 +80,11 @@
       <ul class="ledger">
         {#each data.questions as q}
           <li>
+            <!-- THREE ROW TYPES INTERLEAVE IN THIS ONE LIST — a question, a lapsing service and
+                 an obligation — and the only thing separating them was the shape of the id. A glyph
+                 per type says what each row IS before the eye reaches the words. -->
             <a class="line line-tall" href="/decide/{q.id}">
-              <span class="seq">{q.id}</span>
+              <span class="seq"><Icon name="decide" size="s" />{q.id}</span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{q.cost}</span>
@@ -95,7 +98,7 @@
         {#each lapsing as s}
           <li>
             <a class="line" href="/r/services/{s.seq}">
-              <span class="seq">services#{s.seq}</span>
+              <span class="seq"><Icon name="service" size="s" />#{s.seq}</span>
               <span class="line-main">
                 <span class="line-title">{s.fields.name} is lapsing</span>
               </span>
@@ -113,7 +116,7 @@
           {@const owed = e.fields.direction === 'owed_to_me'}
           <li>
             <a class="line" href="/r/obligations/{e.seq}">
-              <span class="seq">#{e.seq}</span>
+              <span class="seq"><Icon name="obligation" size="s" />#{e.seq}</span>
               <span class="line-main">
                 <span class="line-title">{e.fields.what}</span>
               </span>

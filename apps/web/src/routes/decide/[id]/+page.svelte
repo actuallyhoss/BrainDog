@@ -122,7 +122,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead kicker={copy.decide} title={question.title} id={question.id} />
+  <PageHead icon="decide" kicker={copy.decide} title={question.title} id={question.id} />
 
   <div class="page">
     {#if question.decided}
@@ -175,7 +175,6 @@
             {copy.deferTitle}
             <span class="commit-required">{copy.required}</span>
           </h2>
-          <p class="commit-choice">{copy.deferWhy}</p>
           <textarea
             bind:this={field}
             bind:value={reason}
@@ -200,7 +199,6 @@
               {copy.deferAction}
             </Button>
             <Button weight="bare" onclick={() => (deferring = false)}>{copy.arrangeCancel}</Button>
-            <span class="commit-note">{copy.deferNote}</span>
           </div>
         </section>
       {:else if committing}

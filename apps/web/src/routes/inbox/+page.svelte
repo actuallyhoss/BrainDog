@@ -22,7 +22,7 @@
 
 <svelte:head><title>{titleOf(copy.inbox)}</title></svelte:head>
 
-<PageHead
+<PageHead icon="inbox"
   title={copy.inbox}
   count={INBOX.length}
 />

@@ -17,7 +17,7 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { page as readPage, values, type BlockResult } from '$lib/record/api.ts';
+  import { REGISTERS, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
   import { toSegments } from '$lib/record/blocks.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -56,6 +56,20 @@
      accidental drag that rewrites a row is the kind of edit nobody can attribute later. */
   const arrangement = new Arrangement();
   const arranging = $derived(arrangement.editing);
+
+  /**
+   * The block's predicate, minus the clause that restates the page.
+   *
+   * A project page filters every block by the same project, so every block header repeated `thing
+   * is Kiln` under a heading on the page called Kiln. It is the one clause the reader is certainly
+   * not missing, and it was the longest.
+   */
+  const whereOf = (block: { where?: string | undefined }): string =>
+    (block.where ?? '')
+      .split(',')
+      .map((c) => c.trim())
+      .filter((c) => c && !(result && c.toLowerCase().endsWith(result.page.title.toLowerCase())))
+      .join(', ');
 
   /**
    * The blocks in the order and at the widths currently in force, each carrying the index it had in
@@ -320,7 +334,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead kicker={result.page.nav?.section} title={result.page.title}>
+  <PageHead icon={iconFor(result.page.icon, 'doc')} kicker={result.page.nav?.section} title={result.page.title}>
     {#snippet actions()}
       {#if arranging}
         <Button weight="quiet" onclick={() => (adding = true)}>
@@ -418,9 +432,17 @@
             <header class="block-bar">
               <h2 class="block-name" id="h-{slot.i + 1}">{block.heading ?? block.kind}</h2>
               {#if block.register}
+                <!-- THE REGISTER'S NAME, not its id. This line is provenance a person reads, and
+                     it was printing `obligations` where the rest of the product says Obligations —
+                     the data model's spelling, on every block, on every page.
+
+                     The predicate stays, because without it a reader has no way to know the list is
+                     filtered and may take a block of four rows for the whole register. But the
+                     clause that names the page you are already on is dropped: "thing is Kiln" under
+                     a heading on the Kiln page is the one fact the reader cannot be missing. -->
                 <a class="block-source" href="/r/{block.register}">
-                  {block.register}
-                  {#if block.where}<span class="block-where">{block.where}</span>{/if}
+                  {REGISTERS[block.register]?.name ?? block.register}
+                  {#if whereOf(block)}<span class="block-where">{whereOf(block)}</span>{/if}
                   <Kbd keys="o" />
                 </a>
               {/if}

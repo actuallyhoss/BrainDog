@@ -29,7 +29,7 @@
 
 <svelte:head><title>{titleOf(q && `“${q}”`, copy.search)}</title></svelte:head>
 
-<PageHead title={copy.search} count={q ? hits.length : undefined} />
+<PageHead icon="search" title={copy.search} count={q ? hits.length : undefined} />
 
 <div class="page">
   <label class="field field-lg">

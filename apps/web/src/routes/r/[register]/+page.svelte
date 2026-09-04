@@ -20,7 +20,7 @@
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, readableFields, toRows, type Filter } from '$lib/record/api.ts';
+  import { iconFor, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, readableFields, toRows, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -318,7 +318,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead
+  <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
     count={result.matched}
     total={result.total}

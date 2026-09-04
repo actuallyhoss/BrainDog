@@ -72,7 +72,17 @@
 
   /* The id is a COLUMN, not a badge. These are strings a person says out loud, so they line up the
      way line numbers line up in a ledger — one fixed width, one face, one quiet ink. */
+  /* A ROW, because the id may be preceded by a type glyph. `Icon` renders a block-level `svg`, so
+     without this the mark stacks on top of the id and every line grows a second line.
+
+     The glyph is quiet on purpose: it says WHICH KIND of row this is, on a home page that
+     interleaves three of them in one list, and three columns of accent down the left would make
+     the one red thing on the screen mean nothing. */
   .seq {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
     color: var(--dim);
     font-family: var(--font-id);
     font-size: var(--t-xs);
@@ -80,6 +90,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .seq > :global(svg) {
+    flex: none;
   }
 
   .line-main {

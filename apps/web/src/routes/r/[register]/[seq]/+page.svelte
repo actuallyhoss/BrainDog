@@ -16,7 +16,7 @@
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import {
+  import { iconFor,
     AUDIT,
     CURRENCY,
     NOW,
@@ -76,7 +76,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead kicker={decl.name} title={String(row.fields[decl.title] ?? '')} id="#{row.seq}">
+  <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={decl.name} title={String(row.fields[decl.title] ?? '')} id="#{row.seq}">
     {#snippet actions()}
       <Button weight="bare"><Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" /></Button>
       <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>Edit</Button>

@@ -23,7 +23,7 @@
 
 <svelte:head><title>{titleOf(copy.decide)}</title></svelte:head>
 
-<PageHead
+<PageHead icon="decide"
   title={copy.decide}
   count={open.length}
 />

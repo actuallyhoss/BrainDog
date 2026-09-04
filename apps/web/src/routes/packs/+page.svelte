@@ -27,7 +27,7 @@
 
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
-<PageHead title={copy.packs} />
+<PageHead icon="packs" title={copy.packs} />
 
 <div class="page">
   <Section title={copy.installed} count={installed.length}>

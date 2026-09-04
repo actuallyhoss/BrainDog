@@ -28,7 +28,7 @@
 
 <svelte:head><title>{titleOf(copy.vault)}</title></svelte:head>
 
-<PageHead title={copy.vault} count={VAULT.length}>
+<PageHead icon="vault" title={copy.vault} count={VAULT.length}>
   {#snippet actions()}
     {#if stale}<Chip label="{stale} not rotated in six months" tone="warn" />{/if}
   {/snippet}

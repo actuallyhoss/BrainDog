@@ -34,7 +34,7 @@
 
 <svelte:head><title>{titleOf(JOB.kind, 'Job')}</title></svelte:head>
 
-<PageHead kicker="Job" title={JOB.kind} id={JOB.id}>
+<PageHead icon="session" kicker="Job" title={JOB.kind} id={JOB.id}>
   {#snippet actions()}
     <Chip label={JOB.status} tone={JOB.status === 'failed' ? 'bad' : JOB.status === 'running' ? 'info' : 'good'} />
     <Button weight="quiet" tone="bad" onclick={() => toasts.push(copy.notWritten('The job would stop at its next step'), { intent: 'warn' })}><Icon name="stop" size="s" />Stop</Button>

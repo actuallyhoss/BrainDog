@@ -14,7 +14,29 @@
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { AUDIT, NOW } from '$lib/record/api.ts';
+  import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import type { IconName } from '$lib/ui/icons.ts';
+
+  /**
+   * What an event kind is called, and what it looks like.
+   *
+   * `entry.create` and `declaration.set` are the write path's own vocabulary. They are precise and
+   * they are not English, and this is the one screen a person opens to answer "what happened",
+   * which is a question in English. The id stays the thing the log is keyed on; the word beside it
+   * is what the reader came for.
+   */
+  const KIND: Record<string, { word: string; icon: IconName }> = {
+    'entry.create': { word: 'Created', icon: 'plus' },
+    'entry.update': { word: 'Changed', icon: 'edit' },
+    'entry.archive': { word: 'Archived', icon: 'archive' },
+    'question.open': { word: 'Asked', icon: 'decide' },
+    'question.decide': { word: 'Decided', icon: 'check' },
+    'declaration.set': { word: 'Page changed', icon: 'doc' },
+    'pack.install': { word: 'Installed', icon: 'packs' },
+  };
+
+  const kindOf = (k: string) => KIND[k] ?? { word: k.replace(/[.]/g, ' '), icon: 'doc' as IconName };
 
   /**
    * Where a target goes when you click it.
@@ -35,7 +57,7 @@
 
 <svelte:head><title>{titleOf(copy.audit)}</title></svelte:head>
 
-<PageHead
+<PageHead icon="history"
   title={copy.audit}
   count={AUDIT.length}
 />
@@ -53,7 +75,7 @@
                  (WCAG 2.1.1). Making the row's subject reachable is the fix that a reader also
                  wanted anyway — an audit line names a row, and the next question is always what
                  that row says now. -->
-            <span class="line-title"><span class="kind">{e.kind}</span>
+            <span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
               <a class="target" href={href(e.target)}>{e.target}</a></span>
           </span>
           <span class="line-amount note">{e.note}</span>
@@ -63,8 +85,8 @@
     {/each}
   </ul>
   <p class="foot">
-    Version {AUDIT[0]?.version.toLocaleString('en')} · the record's monotonic counter is
-    <code>MAX(event.rowid)</code>, so the log and the version are the same fact.
+    Version {AUDIT[0]?.version.toLocaleString('en')}. The log and the version are the same fact, so
+    a version number is a place in this list.
   </p>
 </div>
 
@@ -81,9 +103,13 @@
     grid-template-columns: 10ch minmax(0, 22ch) minmax(0, 1fr) 9ch;
   }
 
+  /* A word and a glyph, not an identifier. It is still the quiet half of the line, because the
+     interesting part is what changed rather than the verb that changed it. */
   .kind {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
   }
 
@@ -114,12 +140,6 @@
     font-size: var(--t-xs);
   }
 
-  .foot code {
-    padding: 1px 5px;
-    background: var(--sunk);
-    border-radius: 3px;
-    font-family: var(--font-id);
-  }
 
   @media (width < 900px) {
     .page {
