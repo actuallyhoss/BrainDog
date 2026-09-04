@@ -33,6 +33,9 @@ import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './sche
 
 export const CURRENCY = 'GBP';
 
+/** One locale for collation, so a list is in the same order for everybody looking at one record. */
+const LOCALE = 'en-GB';
+
 /* ── values ──────────────────────────────────────────────────────────────── */
 
 const decl = (register: string, field: string): FieldDecl | undefined =>
@@ -257,6 +260,12 @@ export function sortRows(register: string, entries: Entry[], field: string, dir:
     if (x === y) return a.seq - b.seq;
     if (x === null || x === undefined) return 1;
     if (y === null || y === undefined) return -1;
+    /* TEXT COLLATES, everything else compares. `<` on strings compares UTF-16 code units, so every
+       capital sorts above every lowercase — "Zebra" before "apple" — and anything accented lands
+       after "z", which puts "Ökonkwo" at the bottom of a column of party names. Numbers and ISO
+       days are left alone: money is an integer and must compare by magnitude, and `2026-07-27` is
+       chronological already precisely because it is written to sort as text. */
+    if (typeof x === 'string' && typeof y === 'string') return x.localeCompare(y, LOCALE) * sign;
     return (x < y ? -1 : 1) * sign;
   });
 }

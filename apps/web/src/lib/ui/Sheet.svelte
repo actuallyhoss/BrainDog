@@ -50,9 +50,31 @@
     open = false;
     onclose?.();
   }
+
+  /**
+   * Click the backdrop to close.
+   *
+   * A modal `<dialog>` does not do this on its own, and the absence reads as the app being stuck:
+   * the surface behind is visibly dimmed and visibly inert, so the first thing anybody tries is
+   * clicking it, and nothing happening is the only feedback they get. Esc has always worked, which
+   * is exactly why this went unnoticed by whoever wrote it.
+   *
+   * The test is GEOMETRY, not `e.target === el`. A click on the dialog's own padding also targets
+   * the dialog, so identity would close the panel when somebody clicks the gap beside its title.
+   * `e.detail > 0` keeps real pointer clicks only: activating a button with the keyboard dispatches
+   * a click whose coordinates are (0, 0), which is outside every rect on screen.
+   */
+  function onbackdrop(e: MouseEvent) {
+    if (!el || e.detail === 0) return;
+    const r = el.getBoundingClientRect();
+    const outside =
+      e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    if (outside) close();
+  }
+
 </script>
 
-<dialog bind:this={el} class="sheet" oncancel={(e) => (e.preventDefault(), close())} onclose={close}>
+<dialog bind:this={el} class="sheet" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), close())} onclose={close}>
   <header class="sheet-head">
     <div>
       <h2 class="sheet-title">

@@ -203,7 +203,14 @@ for (const file of files) {
       if (COLOUR_PROPS.has(d.prop) && LITERAL.test(bare) && !ALLOWED_VALUES.has(bare))
         findings.push({ where, rule: 'colour-literal', text: `${d.prop}: ${d.value}` });
 
-      if (d.prop === 'outline' && /\bnone\b/.test(d.value))
+      /* `outline: none` is banned, WITH ONE ESCAPE, because a gate that cannot express a real
+         exception is a gate somebody switches off wholesale. The escape is a written
+         justification in the source — a `focus-ok:` comment on the declaration or the line above
+         it — so the rule stops being "never" and becomes "say why, in the file, where the next
+         person reads it". The only honest reason is that something else visibly shows focus, and
+         the one real case is a caret in a text field: it is the platform's own focus indicator,
+         and every command palette ever shipped relies on it. */
+      if (d.prop === 'outline' && /\bnone\b/.test(d.value) && !justified(text, d.at))
         findings.push({ where, rule: 'outline-none', text: `${d.prop}: ${d.value}` });
 
       if (PHYSICAL.has(d.prop) && !PHYSICAL_OK.has(d.prop))
@@ -224,11 +231,23 @@ for (const u of used)
   if (!declared.has(u.name))
     findings.push({ where: u.where, rule: 'unknown-property', text: `var(${u.name})` });
 
+/**
+ * Is this declaration annotated with a `focus-ok:` reason?
+ *
+ * A window either side rather than exact line arithmetic: the marker belongs on the declaration or
+ * in the comment immediately above it, and 240 characters back reaches both without needing to
+ * reconstruct line boundaries. A `focus-ok:` further away than that is not beside the thing it
+ * excuses, which is the whole point of requiring it.
+ */
+function justified(text, at) {
+  return /focus-ok:/.test(text.slice(Math.max(0, at - 240), at + 120));
+}
+
 const RULES = {
   'colour-literal': 'a component may name only the semantic layer, never a colour',
   'unknown-property': 'this resolves to nothing, inherits, and is invisible until dark mode',
   'physical-property': 'logical properties only — this breaks under dir="rtl"',
-  'outline-none': 'the focus ring is not removable',
+  'outline-none': 'the focus ring is not removable without a `focus-ok:` reason beside it',
   'faint-on-text': 'faint clears the large-text floor only; not below 24px',
 };
 

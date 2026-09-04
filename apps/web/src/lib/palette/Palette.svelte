@@ -150,9 +150,30 @@
       if (top) q = (parsed.prefix ?? '') + top.title;
     }
   }
+
+  /**
+   * Click the backdrop to close.
+   *
+   * A modal `<dialog>` does not do this on its own, and the absence reads as the app being stuck:
+   * the surface behind is visibly dimmed and visibly inert, so the first thing anybody tries is
+   * clicking it, and nothing happening is the only feedback they get. Esc has always worked, which
+   * is exactly why this went unnoticed by whoever wrote it.
+   *
+   * The test is GEOMETRY, not `e.target === el`. A click on the dialog's own padding also targets
+   * the dialog, so identity would close the panel when somebody clicks the gap beside its title.
+   * `e.detail > 0` keeps real pointer clicks only: activating a button with the keyboard dispatches
+   * a click whose coordinates are (0, 0), which is outside every rect on screen.
+   */
+  function onbackdrop(e: MouseEvent) {
+    if (!el || e.detail === 0) return;
+    const r = el.getBoundingClientRect();
+    const outside =
+      e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    if (outside) open = false;
+  }
 </script>
 
-<dialog bind:this={el} class="palette" oncancel={(e) => (e.preventDefault(), (open = false))} onclose={() => (open = false)}>
+<dialog bind:this={el} class="palette" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), (open = false))} onclose={() => (open = false)}>
   <div class="p-head">
     <Icon name="search" size="m" />
     <input
@@ -253,11 +274,17 @@
     padding: var(--sp-3) var(--sp-4);
     border-block-end: 1px solid var(--line);
     color: var(--dim);
+    transition: border-color var(--d-state) var(--ease-out);
   }
 
-  /* No `outline: none`. The ring stays: the dialog's own border is the frame, and the ring is what
-     tells a keyboard user where the caret went. `outline: none` in first-party CSS is a CI failure,
-     and this file had it (13 §7). */
+  /* The state change the input gave up. It is the row that looks like a field, so it is the row
+     that should say it is live — and a border warming to the accent is a change a person reads
+     without it reading as an error. */
+  .p-head:focus-within {
+    border-block-end-color: var(--accent);
+    color: var(--ink2);
+  }
+
   .p-input {
     flex: 1;
     min-inline-size: 0;
@@ -266,6 +293,22 @@
     background: none;
     color: var(--ink);
     font-size: var(--t-md);
+  }
+
+  /* A 2px ring plus a 4px halo drawn around a transparent, borderless input inside an already-modal
+     dialog is a white box floating in the middle of the panel around nothing — it frames the text,
+     not a control, because there is no control there to frame. The blinking caret is the platform's
+     own focus indicator for a text field and is what every command palette relies on; this dialog
+     opens with focus here and traps it, so there is nowhere else for focus to have gone.
+
+     The ring is not simply deleted, though. It moves to `.p-head`, which is the thing that actually
+     looks like a field, as a border tint rather than an outline — so there is still a visible
+     change of state, it just belongs to the right box. */
+  .p-input:focus-visible {
+    /* focus-ok: the caret indicates focus here, and `.p-head:focus-within` above carries the state
+       change for the field the reader actually sees. */
+    outline: none;
+    box-shadow: none;
   }
 
   .p-input::placeholder {

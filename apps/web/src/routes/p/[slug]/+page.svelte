@@ -437,13 +437,22 @@
      `align-items: start` so a half-width block beside a tall one keeps its own height instead of
      stretching to match — a stat tile stretched to the height of the table next to it is a stat
      tile with a hundred pixels of nothing under the figure. */
+  /* THE CAP IS FOR THE PROSE, NOT FOR THE PAGE. It used to be 1180px flat, which fitted a 1440
+     laptop exactly and then stopped: at 1920 it left 496px of the main column empty, and at 2560 it
+     left 1136px — half the screen, on a page whose whole job is to put four things side by side.
+
+     A limit is still right, because a twelfth of 2560px is not a column anybody scans, and a table
+     row two and a half thousand pixels wide is a row the eye loses on the way back. But the thing
+     that actually needs a measure is running text, and `.measure` already caps that at 72ch inside
+     the block that has it. So the page gets the width a dashboard can use and prose keeps its own
+     limit, rather than every block on every page paying for the one that reads like a paragraph. */
   .page {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     align-items: start;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--sp-6) var(--sp-9);
-    max-inline-size: 1180px;
+    max-inline-size: 1560px;
   }
 
   .block-slot {
@@ -453,18 +462,30 @@
     min-inline-size: 0;
   }
 
+  /* A hairline under every block header. It is the cheapest structure available: it says where a
+     block starts without drawing a box around it, so the page keeps its flatness and stops reading
+     as one long list. The source link sits on the same line, so the rule also ties the two halves
+     of the header together instead of leaving them floating at opposite ends of the block. */
   .block-bar {
     display: flex;
     align-items: baseline;
     gap: var(--sp-3);
-    margin-block-end: var(--sp-2);
+    margin-block-end: var(--sp-4);
+    padding-block-end: var(--sp-2);
+    border-block-end: 1px solid var(--line);
   }
 
+  /* A BLOCK NAME IS A HEADING AND SHOULD LOOK LIKE ONE. At `--t-ui` and weight 500 in `--ink2` it
+     was the same size, weight and colour as the body text underneath it, so a page of six blocks
+     read as one undifferentiated column and the eye had nothing to jump between. It is the second
+     level of the page's hierarchy — under the page title, over everything in the block — and now
+     it is sized and weighted like it. */
   .block-name {
-    color: var(--ink2);
+    color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
-    font-weight: 500;
+    font-size: var(--t-md);
+    font-weight: 600;
+    letter-spacing: -0.012em;
   }
 
   /* Every block header names its source, and `o` opens that register PRE-FILTERED to the block's
