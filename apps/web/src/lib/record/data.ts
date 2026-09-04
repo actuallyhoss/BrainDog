@@ -505,7 +505,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'timeline',
         heading: 'Next ninety days',
-        span: 6,
+        span: 12,
         columns: [{ field: 'renews' }, { field: 'name' }, { field: 'provider' }],
         source: 'register.services',
         empty: 'Nothing renews in the next ninety days.',
@@ -513,7 +513,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'table',
         heading: 'Everything',
-        span: 6,
+        span: 12,
         source: 'register.services',
         columns: [
           { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)', link: true },
@@ -596,7 +596,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'table',
         heading: 'Money',
-        span: 7,
+        span: 8,
         source: 'register.obligations',
         where: 'thing is Kiln',
         columns: [
@@ -612,7 +612,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'spec',
         heading: 'Keeping it alive',
-        span: 5,
+        span: 4,
         columns: [{ field: 'name' }, { field: 'cost' }, { field: 'renews' }],
         source: 'register.services',
         where: 'thing is Kiln',

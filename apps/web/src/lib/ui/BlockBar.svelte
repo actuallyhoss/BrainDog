@@ -19,6 +19,7 @@
   let {
     kind,
     span,
+    columns,
     at,
     count,
     onmove,
@@ -27,6 +28,8 @@
   }: {
     kind: string;
     span: number;
+    /** How many columns the block declares — a table's width floor is a property of the block. */
+    columns: number;
     at: number;
     count: number;
     onmove: (to: number) => void;
@@ -34,7 +37,7 @@
     onremove: () => void;
   } = $props();
 
-  const steps = $derived(stepsFor(kind));
+  const steps = $derived(stepsFor(kind, columns));
 </script>
 
 <div class="bar">

@@ -53,8 +53,8 @@ export const differs = (a: readonly Slot[], b: readonly Slot[]): boolean =>
  * cannot express a non-member. A `Third` button that silently gives you a half is a button that has
  * taught you the wrong thing about your own page.
  */
-export const stepsFor = (kind: string): number[] => {
-  const floor = isKind(kind) ? KINDS[kind].minSpan : 4;
+export const stepsFor = (kind: string, columns = 0): number[] => {
+  const floor = floorFor(kind, columns);
   return STEPS.filter((s) => s >= floor);
 };
 
@@ -68,8 +68,25 @@ export const stepsFor = (kind: string): number[] => {
 export const spanLabel = (span: number): string =>
   span === 12 ? 'Full' : span === 6 ? 'Half' : span === 4 ? 'Third' : `${span}/12`;
 
-/** A declared span, clamped to what the kind can survive. Packs are written by strangers. */
-export const spanOf = (kind: string, declared: number | undefined): number => {
-  const floor = isKind(kind) ? KINDS[kind].minSpan : 4;
-  return Math.min(COLUMNS, Math.max(floor, declared ?? COLUMNS));
+/**
+ * The narrowest span a block survives, which for a table is a function of its own column count.
+ *
+ * `minSpan` on the kind is a floor for the KIND. It is not enough for a `table`, because a table's
+ * width requirement is a property of the block: three columns at span 6 is comfortable and five
+ * columns at span 6 truncates every one of them — measured on the estate page, where `Renews`
+ * disappeared entirely and `Nordhaven Registry` became `Nordhave…` in a 6-column slot.
+ *
+ * Two of twelve per declared column is the rule, floored at the kind's own minimum. It is a
+ * heuristic and it is written down as one: a column is about 14ch of content plus padding, and a
+ * twelfth of the 1180px page is about 90px. Better than a constant, and honest about being a guess.
+ */
+export const floorFor = (kind: string, columns = 0): number => {
+  const base = isKind(kind) ? KINDS[kind].minSpan : 4;
+  const primitive = isKind(kind) ? KINDS[kind].primitive : undefined;
+  if (primitive !== 'table' || columns === 0) return base;
+  return Math.min(COLUMNS, Math.max(base, columns * 2));
 };
+
+/** A declared span, clamped to what the block can survive. Packs are written by strangers. */
+export const spanOf = (kind: string, declared: number | undefined, columns = 0): number =>
+  Math.min(COLUMNS, Math.max(floorFor(kind, columns), declared ?? COLUMNS));

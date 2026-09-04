@@ -48,7 +48,7 @@
    * clamping, because a control that silently corrects you teaches nothing; this clamp is for
    * declarations that never went through that control.
    */
-  const spanOf = (block: BlockResult) => declaredSpan(block.kind, block.span);
+  const spanOf = (block: BlockResult) => declaredSpan(block.kind, block.span, block.columns.length);
 
   /* ── arranging ─────────────────────────────────────────────────────────────
      A MODE, not an always-on affordance. Drag handles on a page you are reading are noise, and an
@@ -125,8 +125,12 @@
    * not one of them did anything — the `<Kbd>` chips beside the block bars were advertisements for
    * bindings that did not exist. A keymap that lists a key which does nothing is worse than one
    * that omits it: the reader tries it, nothing happens, and now they distrust the whole sheet.
+   *
+   * It starts at -1, meaning NOWHERE. A cursor drawn on the first block before anybody has pressed
+   * a key is a selection state nobody chose, and every page opened with a red band down its first
+   * figure.
    */
-  let cursor = $state(0);
+  let cursor = $state(-1);
 
   function onkeydown(e: KeyboardEvent) {
     const el = document.activeElement;
@@ -316,6 +320,7 @@
               <BlockBar
                 kind={block.kind}
                 span={slot.span}
+                columns={block.columns.length}
                 {at}
                 count={laid.length}
                 onmove={(to) => arrangement.move(at, to)}

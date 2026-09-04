@@ -13,7 +13,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { differs, moveAt, removeAt, setSpanAt, spanLabel, spanOf, stepsFor, type Slot } from './arrange.ts';
+import {
+  differs,
+  floorFor,
+  moveAt,
+  removeAt,
+  setSpanAt,
+  spanLabel,
+  spanOf,
+  stepsFor,
+  type Slot,
+} from './arrange.ts';
 import { BINDABLE, seedBlock } from './seed.ts';
 import { REGISTERS } from './data.ts';
 
@@ -89,6 +99,24 @@ test('an unknown kind gets the conservative floor rather than throwing', () => {
   // A pack a stranger wrote may name a kind this build has never heard of. The rail is not allowed
   // to fail to render because of it.
   assert.deepEqual(stepsFor('some-pack-kind'), [12, 6, 4]);
+});
+
+test("a table's floor grows with its own column count", () => {
+  // Measured on the estate page: five declared columns in a 6-of-12 slot truncated every one of
+  // them and dropped `Renews` entirely. The floor for a table is a property of the BLOCK, not of
+  // the kind — three columns is comfortable at a half, five is not.
+  assert.equal(floorFor('table', 3), 6);
+  assert.equal(floorFor('table', 5), 10);
+  assert.equal(floorFor('table', 8), 12, 'never past the twelve there are');
+  assert.equal(floorFor('table', 0), 6, 'with nothing declared, the kind floor stands');
+  // Only the table primitive. A `todo` with three columns is three cells in a row, not three
+  // tracks that have to fit side by side.
+  assert.equal(floorFor('todo', 5), 3);
+});
+
+test("the width control offers nothing below a table's own floor", () => {
+  assert.deepEqual(stepsFor('table', 5), [12]);
+  assert.deepEqual(stepsFor('table', 3), [12, 6]);
 });
 
 test('a declared span is clamped up to the kind floor, never down past 12', () => {
