@@ -3,11 +3,18 @@
   <head>
     <!-- FIRST, always. The only thing that stops the white UA canvas painting before the stylesheet
          parses, and the thing that governs UA scrollbars and form controls (28 §5 mechanism 1). -->
-    <!-- `en-GB`, not `en`. The document language is what a native `<input type="date">` reads to
-         decide whether to prompt for `dd/mm/yyyy` or `mm/dd/yyyy`, and it was showing the American
-         order beside a table rendering `27 Jul 2026` for the same field. A date control that asks
-         for a different order than the one displayed two inches away is a data-entry bug waiting
-         to be entered. -->
+    <!-- `en-GB`, not `en`. It governs hyphenation, spellcheck dictionaries and how a screen reader
+         pronounces the page.
+
+         IT DOES NOT GOVERN THE DATE INPUT, and an earlier version of this comment said it did.
+         Measured: with `lang="en-GB"` on the document AND `en-GB` as the browser locale, Chromium
+         still renders `<input type="date">` as `mm/dd/yyyy` — the format follows the browser's own
+         UI language and nothing the page can set.
+
+         Which turns out to be correct behaviour rather than a bug to fix. A native date input shows
+         each reader the order their own browser is set to, so it always matches what they read
+         dates in; and the app's own rendered dates spell the month as a word — `27 Jul 2026` — so
+         they are unambiguous in every locale and there is no pair to disagree. -->
     <meta name="color-scheme" content="light dark" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />

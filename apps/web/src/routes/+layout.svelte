@@ -33,6 +33,7 @@
   import Mark from '$lib/ui/Mark.svelte';
   import TabBar from '$lib/ui/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import Palette from '$lib/palette/Palette.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
@@ -50,6 +51,7 @@
   let paletteOpen = $state(false);
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
+  let railOff = $state(false);
   const go = new GoPrefix();
 
   /** `ponytail:` a constant in the mock-up. The live channel is `lib/data/live.ts` in the real app:
@@ -72,6 +74,25 @@
     if (mod && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       paletteOpen = true;
+      return;
+    }
+
+    /* `⌘\` — the rail folds to nothing and the work takes the width. Not a narrow icon rail:
+       19 §3's whole argument is that this nav is a QUERY over `page` rows whose length varies per
+       customer, and a strip of unlabelled icons is where a variable-length sectioned list goes to
+       become unreadable. Hidden, with `g` and the palette still reaching everything. */
+    if (mod && e.key === '\\') {
+      e.preventDefault();
+      railOff = !railOff;
+      return;
+    }
+
+    /* `⌘Z` — the newest undo the toast stack is still offering. The stack IS the undo history here,
+       which is the honest shape for it: an undo that outlives its own toast is an undo with no
+       label, and 02 §8 makes the unit a `batch` rather than a keystroke anyway. */
+    if (mod && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (!toasts.undoLast()) toasts.push(copy.nothingToUndo);
       return;
     }
     if (typing()) return;
@@ -120,7 +141,7 @@
 {#if bare}
   <main id="main">{@render children()}</main>
 {:else}
-  <div class="shell">
+  <div class="shell" data-rail={railOff ? 'off' : undefined}>
     <div class="rail-slot">
       <Sidebar
         nav={data.nav}
@@ -228,6 +249,10 @@
     grid-template-columns: auto minmax(0, 1fr);
     block-size: 100dvh;
     overflow: hidden;
+  }
+
+  .shell[data-rail='off'] .rail-slot {
+    display: none;
   }
 
   .body {

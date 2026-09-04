@@ -105,6 +105,18 @@ export const copy = {
      successfully", which reports on the software rather than on the record. */
   toasts: 'Recent actions',
   undo: 'Undo',
+
+  /* Deferring. A defer without a date is a dismissal wearing a nicer word, so both fields are
+     required and the button says what will exist afterwards. */
+  deferTitle: 'Why not yet, and when',
+  deferWhy: 'You are parking this question, not answering it.',
+  deferHint: 'What has to happen first',
+  deferAction: 'Park it',
+  wakeOn: 'Wake me on',
+  deferNote: 'It leaves Decide and comes back on that date.',
+  deferred: (on: string) => `Parked until ${on}. Nothing was written — this is a mock-up.`,
+  required: 'required',
+  nothingToUndo: 'Nothing to undo.',
   archived: (id: string) => `Archived ${id}.`,
   restored: (id: string) => `Restored ${id}.`,
   marked: (id: string, state: string) => `${id} is ${state}.`,
@@ -130,7 +142,6 @@ export const copy = {
   reasonNudge: 'That will not mean anything in six weeks. Keep it anyway?',
   commit: 'Commit the decision',
   defer: 'Defer',
-  deferHint: 'A reason and a date to come back.',
   decidedBy: 'Decided by',
   immutable: 'Decided rows are append-only. This one cannot be edited, including by you.',
   noQuestions: 'Nothing to decide.',
@@ -142,7 +153,6 @@ export const copy = {
   done: 'Done',
   /* Verb + Noun, never "Save" or "Submit": the button says what will exist afterwards. */
   addRow: 'Add',
-  required: 'required',
   noneChosen: 'None',
   yes: 'Yes',
   secretsLiveInTheVault: 'A key or a token goes in the Vault, never in a row. The row records what it opens.',

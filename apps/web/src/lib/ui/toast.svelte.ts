@@ -52,6 +52,20 @@ class Toasts {
     this.#timers.delete(id);
   }
 
+  /**
+   * `⌘Z`: run the NEWEST offer that has one.
+   *
+   * Newest and not oldest, because undo is a stack and the thing you meant is the thing you just
+   * did. It skips toasts that only report — pressing undo after "copied" should reach past it to
+   * the archive you are actually thinking of, not do nothing and leave you pressing it again.
+   */
+  undoLast(): boolean {
+    const held = [...this.items].reverse().find((t) => t.undo);
+    if (!held) return false;
+    this.run(held.id);
+    return true;
+  }
+
   /** Runs the undo and takes the toast with it: the offer was single-use and is now spent. */
   run(id: number) {
     this.items.find((t) => t.id === id)?.undo?.();

@@ -25,12 +25,24 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
 
   const question = $derived([...QUESTIONS, ...DECIDED].find((q) => q.id === page.params.id));
 
   /** Highlighted, not chosen. The two are different states and the interface says so. */
   let highlighted = $state<string | null>(null);
   let committing = $state<string | null>(null);
+  /**
+   * Deferring is a DECISION about when, and it takes a reason like every other one.
+   *
+   * 20 §3's rule is that a choice is immutable and carries a mandatory reason; a defer is a choice
+   * to not choose yet, and the thing worth recording is why. "Waiting on Halden's answer" six weeks
+   * later is the difference between a question you parked and a question you forgot.
+   *
+   * The wake date is required too, because a defer without one is a dismissal wearing a nicer word.
+   */
+  let deferring = $state(false);
+  let wake = $state('');
   let reason = $state('');
   let field = $state<HTMLTextAreaElement>();
 
@@ -38,7 +50,18 @@
 
   function choose(key: string) {
     committing = key;
+    deferring = false;
     reason = '';
+    queueMicrotask(() => field?.focus());
+  }
+
+  function defer() {
+    deferring = true;
+    committing = null;
+    reason = '';
+    /* Seeded a fortnight out — 21 A5, seeds not blanks. A date picker opened on nothing makes the
+       person do arithmetic before they can say the thing they already know. */
+    wake = new Date(NOW + 14 * 86_400_000).toISOString().slice(0, 10);
     queueMicrotask(() => field?.focus());
   }
 
@@ -62,6 +85,16 @@
     if (e.key === 'Enter' && highlighted) {
       e.preventDefault();
       choose(highlighted);
+      return;
+    }
+    if (e.key === 'd' && !committing && !deferring) {
+      e.preventDefault();
+      defer();
+      return;
+    }
+    if (e.key === 'Escape' && deferring) {
+      e.preventDefault();
+      deferring = false;
       return;
     }
     if (e.key === 'Escape' && committing) {
@@ -133,7 +166,41 @@
         </div>
       </section>
 
-      {#if committing}
+      {#if deferring}
+        <section class="commit">
+          <h2 class="commit-title">
+            {copy.deferTitle}
+            <span class="commit-required">{copy.required}</span>
+          </h2>
+          <p class="commit-choice">{copy.deferWhy}</p>
+          <textarea
+            bind:this={field}
+            bind:value={reason}
+            class="commit-field"
+            rows="2"
+            placeholder={copy.deferHint}
+            spellcheck="true"
+          ></textarea>
+          <label class="commit-wake">
+            {copy.wakeOn}
+            <input class="commit-date" type="date" bind:value={wake} />
+          </label>
+          <div class="commit-actions">
+            <Button
+              weight="primary"
+              disabled={!reason.trim() || !wake}
+              onclick={() => {
+                deferring = false;
+                toasts.push(copy.deferred(wake), { intent: 'warn' });
+              }}
+            >
+              {copy.deferAction}
+            </Button>
+            <Button weight="bare" onclick={() => (deferring = false)}>{copy.arrangeCancel}</Button>
+            <span class="commit-note">{copy.deferNote}</span>
+          </div>
+        </section>
+      {:else if committing}
         <section class="commit">
           <h2 class="commit-title">
             {copy.yourReason}
@@ -312,6 +379,26 @@
     border: 1px solid var(--accent);
     border-radius: var(--r-md);
     box-shadow: var(--raise);
+  }
+
+  .commit-wake {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .commit-date {
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
   }
 
   .commit-title {
