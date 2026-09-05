@@ -208,7 +208,7 @@ test('the record says when it next has something to do, which is one alarm per c
   // The alternative is a cron worker fanning out across every tenant, waking records that have
   // nothing to do in order to ask them.
   const { k, sql } = await record();
-  assert.deepEqual(k.pending(), { nextDueMs: null, outboxPending: false });
+  assert.deepEqual(k.pending(), { nextDueMs: null, outboxPending: false, queued: false });
 
   value(k.create('obligations', { what: 'a', due: day(30) }, { actor: 'p_1' }));
   const at = k.pending().nextDueMs;

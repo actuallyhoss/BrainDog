@@ -110,6 +110,10 @@ function qualifier(field: string, type: string, value: unknown, put: (v: string 
   return half === undefined ? '' : ` AND ${extract(field, type, `.${q.part}`)} = ${put(String(half))}`;
 }
 
+/** Forty bytes. Past it a `LIKE` pattern reaches a platform ceiling that differs between hosts. */
+const CONTAINS_MAX = 40;
+const byteLength = (text: string): number => new TextEncoder().encode(text).length;
+
 const refuse = (code: string, fix: string, at?: string, allowed?: readonly string[]): Refusal => ({
   code,
   fix,
@@ -217,10 +221,14 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     };
 
     switch (op) {
+      /* THE THREE WAYS A VALUE IS ABSENT. A write stores none of them — `null`, `''` and `[]` all
+         remove the key — but an IMPORT carries whatever the other record held, and a row written
+         by an older build may carry an empty string. `IS NULL` alone read those as present, so a
+         `where: note is empty` missed exactly the rows somebody was looking for. */
       case 'empty':
-        return `(${path} IS NULL)`;
+        return `(${path} IS NULL OR ${path} = '' OR ${path} = '[]')`;
       case 'present':
-        return `(${path} IS NOT NULL)`;
+        return `(${path} IS NOT NULL AND ${path} <> '' AND ${path} <> '[]')`;
 
       case 'is':
       case 'not': {
@@ -236,9 +244,25 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            bound it to the amount's `?`, which made every money comparison match nothing — a filter
            that silently returned an empty list rather than a wrong one, which is the failure this
            whole package is built to avoid. */
-        const cmp = `${path} = ${put(bound)}`;
-        const qualified = qualifier(field, decl.type, value, put);
-        return op === 'is' ? `(${cmp}${qualified})` : `(${path} IS NULL OR NOT (${cmp}${qualified}))`;
+        if (op === 'is') {
+          const cmp = `${path} = ${put(bound)}`;
+          return `(${cmp}${qualifier(field, decl.type, value, put)})`;
+        }
+
+        /* AND A FOREIGN-CURRENCY ROW IS NOT A MATCH EVEN UNDER NEGATION. `NOT(amount = 10000 AND
+           currency = 'GBP')` is TRUE of a EUR row, so `fee is not GBP 100` returned every euro
+           invoice in the record — a filter that quietly matched everything, which is the failure
+           this module exists to prevent. The currency is asserted OUTSIDE the negation: a row in
+           another currency is not the thing being talked about at all.
+
+           THE QUALIFIER IS BOUND FIRST BECAUSE IT IS WRITTEN FIRST. `put` pushes in call order and
+           the placeholders are read in string order, so computing the amount first here would bind
+           the currency to the amount's `?` — the mistake the `is` branch above records. */
+        const currency = qualifier(field, decl.type, value, put);
+        const negated = `${path} = ${put(bound)}`;
+        return currency
+          ? `(${path} IS NULL OR (${currency.slice(' AND '.length)} AND NOT (${negated})))`
+          : `(${path} IS NULL OR NOT (${negated}))`;
       }
 
       case 'in':
@@ -257,9 +281,17 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         /* EVERY VALUE CARRIES ITS OWN QUALIFIER. `in` was compiled as a bare `IN (…)` over the
            amounts, so 24,000 EUR matched a list holding 24,000 GBP — the exact mistake the `is`
            branch was written to prevent, in the branch beside it. One clause per value, ORed. */
-        const each = list.map((v, i) => `(${path} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
-        const any = each.join(' OR ');
-        return op === 'in' ? `(${any})` : `(${path} IS NULL OR NOT (${any}))`;
+        if (op === 'in') {
+          const each = list.map((v, i) => `(${path} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
+          return `(${each.join(' OR ')})`;
+        }
+
+        /* `not_in` KEEPS THE CURRENCY AND NEGATES THE AMOUNTS, for the reason `not` does — and the
+           currency clauses are bound first because they are written first. */
+        const currencies = list.map((v) => qualifier(field, decl.type, v, put)).filter(Boolean);
+        const same = currencies.length ? `(${[...new Set(currencies.map((q) => q.slice(' AND '.length)))].join(' OR ')}) AND ` : '';
+        const amounts = list.map((_, i) => `${path} = ${put(bounds[i]!)}`).join(' OR ');
+        return `(${path} IS NULL OR (${same}NOT (${amounts})))`;
       }
 
       case 'gt':
@@ -305,10 +337,27 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
           bad.push(refuse('VALUE_MALFORMED', `${field} ${op} takes a string.`, field));
           return '';
         }
-        /* ESCAPED, and the escape declared. A value containing `%` would otherwise match anything —
-           a search for "50%" returning every row, which reads as a search that found a lot. */
+        /* `contains` IS `instr`, NEVER `LIKE`, and the difference is a parity bug rather than a
+           preference. One platform caps a `LIKE` pattern at fifty bytes and the other at fifty
+           thousand, so a forty-nine character `contains` works on a laptop and fails in production
+           — the exact shape of failure this package exists to make impossible. `instr` has no
+           pattern, so it has no ceiling, and it needs no escape: a value containing `%` is a value.
+           `starts` and `ends` keep `LIKE`, because a prefix IS a pattern; their literals are held
+           to the same forty bytes so neither can reach a platform's limit. */
+        if (byteLength(value) > CONTAINS_MAX) {
+          bad.push(
+            refuse(
+              'CONTAINS_TOO_LONG',
+              `${field} ${op} takes at most ${CONTAINS_MAX} bytes, and this one is ${byteLength(value)}.`,
+              field,
+            ),
+          );
+          return '';
+        }
+        if (op === 'contains') return `(${path} IS NOT NULL AND instr(lower(${path}), lower(${put(value)})) > 0)`;
+
         const escaped = value.replace(/[\\%_]/g, (c) => `\\${c}`);
-        const pattern = op === 'contains' ? `%${escaped}%` : op === 'starts' ? `${escaped}%` : `%${escaped}`;
+        const pattern = op === 'starts' ? `${escaped}%` : `%${escaped}`;
         return `(${path} IS NOT NULL AND ${path} LIKE ${put(pattern)} ESCAPE '\\')`;
       }
 
@@ -373,7 +422,10 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
     const op = OPERATORS.find((o) => o in leaf);
     if (!op || !operatorAllowed(op, type)) return false;
     const value = leaf[op];
-    const absent = raw === undefined || raw === null;
+    /* THE THREE WAYS A VALUE IS ABSENT, and the compiler says the same three. A write stores none
+       of them, but an import carries whatever the other record held. */
+    const absent =
+      raw === undefined || raw === null || raw === '' || (Array.isArray(raw) && raw.length === 0);
 
     switch (op) {
       case 'empty':
@@ -382,12 +434,18 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
         return !absent;
       case 'is':
         return !absent && same(raw, value, type);
+      /* AND A FOREIGN-CURRENCY ROW IS NOT A MATCH EVEN UNDER NEGATION: it is not the thing being
+         talked about. `NOT(amount = 10000 AND currency = 'GBP')` was true of every euro row. */
       case 'not':
-        return absent || !same(raw, value, type);
+        return absent || (sameQualifier(type, raw, value) && !same(raw, value, type));
       case 'in':
         return !absent && Array.isArray(value) && value.some((v) => same(raw, v, type));
       case 'not_in':
-        return absent || !(Array.isArray(value) && value.some((v) => same(raw, v, type)));
+        return (
+          absent ||
+          !Array.isArray(value) ||
+          (value.some((v) => sameQualifier(type, raw, v)) && !value.some((v) => same(raw, v, type)))
+        );
       case 'gt':
       case 'gte':
       case 'lt':

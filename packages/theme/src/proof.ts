@@ -7,7 +7,11 @@ import { HOUSE, HIGH_CONTRAST } from './index.ts';
 import { INKS, INTENTS, SURFACES, type Built, type Scheme, parseColour } from './build.ts';
 import { contrast, separation, toHex, rgbToLch } from './color.ts';
 import { validate, refusals, warnings } from './checks.ts';
-import { toCSS, A11Y_FORCED_COLORS } from './css.ts';
+import { toCSS, forcedColors } from './css.ts';
+
+/* THE CLASSES THE RENDERER ACTUALLY EMITS, handed in rather than imported: the theme package
+   has no workspace dependencies, and that is what makes it a seam. */
+const FORCED = forcedColors(['panel', 'grid', 'rows', 'prop', 'inline', 'list', 'table', 'media']);
 
 const pad = (s: string, n: number) => s.padEnd(n);
 const num = (n: number) => n.toFixed(2).padStart(6);
@@ -69,7 +73,7 @@ for (const built of [HOUSE, HIGH_CONTRAST]) {
   separability(built, 'light');
 }
 
-const css = toCSS(HOUSE, HIGH_CONTRAST) + A11Y_FORCED_COLORS;
+const css = toCSS(HOUSE, HIGH_CONTRAST) + FORCED;
 const findings = [...validate(HOUSE, css), ...validate(HIGH_CONTRAST, css)];
 const bad = refusals(findings);
 const warn = warnings(findings);

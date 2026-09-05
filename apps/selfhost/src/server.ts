@@ -22,8 +22,14 @@ import type { Param, Row, Scheduler, Sql } from '@braindog/ports';
 
 /** The `Sql` port over `node:sqlite`. The one thing this file exists to supply. */
 function openSqlite(path: string): Sql & { close(): void } {
-  const db = new DatabaseSync(path);
+  /* FOREIGN KEYS OFF, and it is not a preference. `node:sqlite` defaults this ON and a Durable
+     Object leaves SQLite's default OFF — so `decision.supersedes REFERENCES decision(id)` is
+     enforced here and nowhere else, which is a behavioural fork between the two hosts on the write
+     path. The DDL's own comment beside that column says "documentary; not enforced". */
+  const db = new DatabaseSync(path, { enableForeignKeyConstraints: false });
   db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA synchronous = NORMAL');
+  db.exec('PRAGMA busy_timeout = 5000');
   let depth = 0;
   return {
     close: () => db.close(),
@@ -245,7 +251,14 @@ export async function start(options: {
   };
 
   const scheduler = nodeScheduler(run, poll);
-  api = await createRecordApi({ sql, clock: { now: () => Date.now() }, scheduler });
+  /* WHAT THIS PROCESS CAN ACTUALLY DELIVER. With no `deliver`, nothing leaves — jobs queue and
+     wait, which is honest — and the doorbell should not ring about them on every write. */
+  api = await createRecordApi({
+    sql,
+    clock: { now: () => Date.now() },
+    scheduler,
+    delivers: options.deliver ? EVERY_KIND : [],
+  });
 
   const refused = api.kernel.refused();
   if (refused) {

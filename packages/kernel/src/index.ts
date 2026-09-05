@@ -206,7 +206,17 @@ export type Kernel = ReturnType<typeof makeKernel>;
  * of that for the cases where a handful of constants is the whole truth. A ninth declaration kind
  * would have been a departure from the eight the specification names.
  */
-export type RecordOptions = { lookups?: Record<string, Record<string, number>> | undefined };
+export type RecordOptions = {
+  lookups?: Record<string, Record<string, number>> | undefined;
+  /**
+   * The outbox kinds this deployment can deliver. Absent is all of them.
+   *
+   * THE DOORBELL RINGS FOR WORK SOMEBODY CAN DO. Without it, one `infer.draft` on a deployment with
+   * no Spark made every subsequent write for the life of the record ring the queue and buy a lease
+   * pass that claimed nothing.
+   */
+  delivers?: readonly OutboxKind[] | undefined;
+};
 
 export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
   const { state } = await applyMigrations(sql, clock);
@@ -1043,14 +1053,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          an ordinary pair — each wrote the minimum it had seen BEFORE the other's rows existed.
          Whichever resumed last won, and in the probe that wrote an alarm four months later than the
          earliest pending row. The alarm was then simply late, by however long the gap was. */
-      const work = pendingWork(sql);
+      const work = pendingWork(sql, opts.delivers);
       if (work.nextDueMs === null) {
         if (armed !== null) await scheduler.clear();
       } else if (armed !== work.nextDueMs) await scheduler.set(work.nextDueMs);
     } finally {
       /* And the doorbell asks again too: a job queued while this tail was parked is a job the ring
          is about. */
-      if (pendingWork(sql).outboxPending) await scheduler.wake();
+      if (pendingWork(sql, opts.delivers).outboxPending) await scheduler.wake();
     }
   }
 
@@ -1235,7 +1245,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * customer buys: the alternative is a cron worker fanning out across every tenant, waking
      * records that have nothing to do in order to ask them.
      */
-    pending: () => pendingWork(sql),
+    pending: () => pendingWork(sql, opts.delivers),
 
     /** The reminders that are due, oldest first. What the alarm hands to whatever sends them. */
     due: (limit?: number) => due(sql, clock.now(), limit),

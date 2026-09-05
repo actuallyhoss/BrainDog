@@ -349,7 +349,11 @@ test('with no deliverer, jobs queue and wait — which is honest rather than los
     running.api.kernel.outbox('notify.email', {});
     await running.scheduler.wake();
     await running.poll();
-    assert.equal(running.api.kernel.pending().outboxPending, true, 'a job vanished with nothing to deliver it');
+    /* THE ROW IS KEPT AND THE BELL IS SILENT. A job with no deliverer waits — that is honest, and
+       it is still there when one arrives — but ringing about it on every write afterwards is a
+       queue message and a lease pass that claims nothing, for the life of the record. */
+    assert.equal(running.api.kernel.pending().queued, true, 'a job vanished with nothing to deliver it');
+    assert.equal(running.api.kernel.pending().outboxPending, false, 'the doorbell rang about work nobody can do');
   } finally {
     await running.close();
     rmSync(dir, { recursive: true, force: true });

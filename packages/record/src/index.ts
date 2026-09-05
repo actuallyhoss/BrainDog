@@ -36,6 +36,7 @@ import {
   type Kernel,
   FORMAT_VERSION,
   TRAVELS,
+  type OutboxKind,
   carryingOf,
   headline,
   type GovernRegister,
@@ -159,10 +160,12 @@ export type RecordDeps = {
    * omits it has a record whose reminders never fire.
    */
   scheduler?: Scheduler | undefined;
+  /** The outbox kinds this deployment can deliver. The doorbell rings for those and no others. */
+  delivers?: readonly OutboxKind[] | undefined;
 };
 
 export async function createRecordApi(deps: RecordDeps) {
-  const kernel = await openRecord(deps.sql, deps.clock);
+  const kernel = await openRecord(deps.sql, deps.clock, deps.delivers === undefined ? {} : { delivers: deps.delivers });
   return { ...api(kernel, deps.scheduler), kernel };
 }
 

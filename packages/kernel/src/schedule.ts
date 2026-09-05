@@ -215,10 +215,34 @@ export function reschedule(
  * ONE ALARM PER CUSTOMER, which is what an object per customer buys: the alternative is a cron
  * worker fanning out across every tenant, waking records that have nothing to do to ask them.
  */
-export const pendingWork = (sql: Sql): { nextDueMs: number | null; outboxPending: boolean } => {
+export const pendingWork = (
+  sql: Sql,
+  /**
+   * The kinds this deployment can actually deliver. Absent is all of them.
+   *
+   * THE DOORBELL RINGS FOR WORK SOMEBODY CAN DO. A kind no host on this deployment delivers —
+   * `infer.draft` without a Spark, `pull.fetch` without a runner — sits `pending` for ever, and
+   * without this filter `outboxPending` was then true for ever: every write for the life of the
+   * record sent a queue message and bought a lease pass that claimed nothing. The row is still
+   * there and still visible; what stops is the bell.
+   */
+  delivers?: readonly string[] | undefined,
+): { nextDueMs: number | null; outboxPending: boolean; queued: boolean } => {
   const next = sql.one<{ d: string | null }>("SELECT min(due_at) AS d FROM schedule WHERE state = 'pending'")?.d ?? null;
-  const queued = sql.one("SELECT 1 AS x FROM outbox WHERE state = 'pending' LIMIT 1");
-  return { nextDueMs: next ? Date.parse(next) : null, outboxPending: Boolean(queued) };
+  /* `queued` IS EVERY WAITING ROW AND `outboxPending` IS THE ONES SOMEBODY CAN SEND. The two are
+     separate on purpose: a job with no deliverer is KEPT — that is the honest behaviour, and the
+     row is still there when a deliverer arrives — and the bell is what stops. */
+  const queued = Boolean(sql.one("SELECT 1 AS x FROM outbox WHERE state = 'pending' LIMIT 1"));
+  const deliverable = delivers
+    ? delivers.length > 0 &&
+      Boolean(
+        sql.one(
+          `SELECT 1 AS x FROM outbox WHERE state = 'pending' AND kind IN (${delivers.map(() => '?').join(', ')}) LIMIT 1`,
+          ...delivers,
+        ),
+      )
+    : queued;
+  return { nextDueMs: next ? Date.parse(next) : null, outboxPending: deliverable, queued };
 };
 
 /** The reminders that are due, oldest first. What the alarm hands to whatever sends them. */

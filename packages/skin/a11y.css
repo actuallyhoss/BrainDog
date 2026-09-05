@@ -58,16 +58,21 @@
      `none`, so sunk, bg, s1, s2 and s3 all become Canvas: a five-level ladder becomes one level and
      every block boundary in the product disappears. The elevation ladder cannot rescue it, because
      the shadows are gone too. Each boundary is re-expressed as a border (28 §2.5, check L). */
+  /* THE LIST IS THE EIGHT PRIMITIVES, and it was written from a mental model of the app instead:
+     `.prop`, `.inline` and `.list` were missing, so `bar`, `gauge`, `chips`, `todo`, `steps` and
+     `timeline` — six of the sixteen kinds — lost every boundary under Windows High Contrast, while
+     `.card`, `.field` and `.sheet` were in it and are classes the renderer never emits. The eight
+     are `panel grid rows prop inline list table media` (`PRIMITIVE_CLASSES`, braindog-render). */
   @media (forced-colors: active) {
     .panel,
     .grid,
     .rows,
+    .prop,
+    .inline,
+    .list,
     .table,
     .media,
     .block,
-    .card,
-    .field,
-    .sheet,
     .rail,
     .chip {
       border: 1px solid CanvasText;

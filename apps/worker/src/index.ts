@@ -96,6 +96,10 @@ export class Record$ extends DurableObject<Env> {
           sql: storageSql(this.ctx.storage),
           clock: { now: () => Date.now() },
           scheduler: this.#alarm,
+          /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
+             do. A kind with no deliverer sits `pending` for ever — which is honest — and without
+             this every write afterwards rang the queue about it. */
+          delivers: DELIVERS,
         });
       });
       /* ARM FROM WHAT THE RECORD ALREADY HOLDS. An object is evicted between requests and its alarm
@@ -262,16 +266,6 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
   }
 }
 
-/**
- * Which record the one self-host person is, when there is no bearer.
- *
- * A BROWSER SESSION IS THE OTHER HALF OF THIS and it is not built: sessions, passkeys and magic
- * links live in the Directory (ADR-061) and are the next thing. Until they are, an unauthenticated
- * request is the owner — which is right for a single-person deployment and is exactly the line to
- * change when the session arrives, because everything below it already takes the person from here.
- */
-const SELF = 'p_self';
-
 /** Where a call came from, for the "last used" line on a token listing. */
 const surfaceOf = (url: URL): string => (url.pathname.includes('/mcp') ? 'mcp' : 'api');
 
@@ -311,15 +305,29 @@ export default {
     const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1];
     const seen = bearer ? await record.verify(bearer, surfaceOf(url)) : null;
     if (bearer && !seen)
-      return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'That bearer is not one this record knows.' } }, 401);
+      return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is not one this record knows.' } }, 401);
 
     /* A BEARER NAMES ITS OWN RECORD AND THE PATH NAMES ONE TOO, and a mismatch is not an accident:
        it is a token for one customer pointed at another's URL. `verify` refuses a bearer whose
        record half is not this object's, so reaching here means the two agree. */
+    /* NOTHING GETS IN WITHOUT SAYING WHO IT IS. This Worker resolves a slug through a Directory of
+       MANY records; an unauthenticated request falling back to a constant person is that person's
+       access on whichever record the URL named, which on a multi-tenant host is not a default, it
+       is a hole. A self-host has one person on one machine and can have one; this cannot.
+
+       BROWSER SESSIONS ARE THE OTHER HALF and they are not built — sessions, passkeys and magic
+       links live in the Directory (ADR-061). Until they are, a bearer is the only way in, and
+       saying so is better than letting everybody in while the sentence explains why. */
+    if (!seen)
+      return json(
+        { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record needs a bearer. Mint one from the app.' } },
+        401,
+      );
+
     /* THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT. The Directory said which record the NAME meant
        and nothing more — a level read from there is a level `invite` and `remove` do not write, so
        removing somebody would not have stopped them writing. */
-    const person = seen?.person_id ?? SELF;
+    const person = seen.person_id;
     const held = await record.access(person);
     if (!held) return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: `You are not on ${routed.slug}.` } }, 403);
     const level = held.level as 'read' | 'append' | 'write' | 'decide' | 'owner';

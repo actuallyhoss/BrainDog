@@ -30,7 +30,11 @@ import {
   parseColour,
 } from './build.ts';
 import { refusals, validate } from './checks.ts';
-import { toCSS, A11Y_FORCED_COLORS } from './css.ts';
+import { toCSS, forcedColors } from './css.ts';
+
+/* THE CLASSES THE RENDERER ACTUALLY EMITS, handed in rather than imported: the theme package
+   has no workspace dependencies, and that is what makes it a seam. */
+const FORCED = forcedColors(['panel', 'grid', 'rows', 'prop', 'inline', 'list', 'table', 'media']);
 
 /* ── the arithmetic ───────────────────────────────────────────────────────── */
 
@@ -108,7 +112,7 @@ test('APCA reports a polarity-aware score and WCAG does not', () => {
 
 for (const built of [HOUSE, HIGH_CONTRAST]) {
   test(`theme.${built.id} passes its own sixteen checks`, () => {
-    const bad = refusals(validate(built, toCSS(HOUSE, HIGH_CONTRAST) + A11Y_FORCED_COLORS));
+    const bad = refusals(validate(built, toCSS(HOUSE, HIGH_CONTRAST) + FORCED));
     assert.deepEqual(
       bad.map((f) => f.fix),
       [],
@@ -228,8 +232,8 @@ test('the stylesheet emits both schemes and cannot reach the a11y layer', () => 
 test('the forced-colors block restores every boundary the ladder loses', () => {
   // Under forced-colors the five surfaces all become Canvas and box-shadow computes to none, so a
   // five-level ladder becomes one level and every block boundary disappears (28 §2.5).
-  assert.match(A11Y_FORCED_COLORS, /CanvasText/);
-  assert.match(A11Y_FORCED_COLORS, /forced-color-adjust: none/);
+  assert.match(FORCED, /CanvasText/);
+  assert.match(FORCED, /forced-color-adjust: none/);
 });
 
 /* ── a control is a component, in every state it has ─────────────────────── */
@@ -276,7 +280,7 @@ test('every accent state clears 4.5:1 against its own label', () => {
 test('and the checks would SAY so — a floor nothing measures is not a floor', () => {
   // Both roles poked below their floor, so the two new assertions are held by the gate and not only
   // by this file. `accent-edge` answers to D, the interaction states to Q.
-  const css = toCSS(HOUSE, HIGH_CONTRAST) + A11Y_FORCED_COLORS;
+  const css = toCSS(HOUSE, HIGH_CONTRAST) + FORCED;
   assert.equal(refusals(validate(HOUSE, css)).length, 0, 'the house theme does not pass its own checks');
 
   const broken = {

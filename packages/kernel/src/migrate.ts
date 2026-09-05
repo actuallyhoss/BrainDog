@@ -23,6 +23,9 @@ export const MIGRATIONS: readonly Migration[] = [{ version: 1, slug: 'kernel', s
 
 /** `PRAGMA user_version` at v1 — the `.dog` format revision, `30-BLUEPRINT` §11. */
 export const FORMAT_VERSION = 1 as const;
+
+/** `DOG!` — the four bytes at offset 68 of every `.dog` file, and what `file(1)` reads. */
+export const APPLICATION_ID = 0x444f4721;
 export const KERNEL_MIGRATION = MIGRATIONS.length;
 
 /**
@@ -118,7 +121,13 @@ export async function applyMigrations(
            on the record row, which are the two an export actually reads. */
         try {
           sql.exec(`PRAGMA user_version = ${n}`);
-          if (m.version === 1) sql.exec('PRAGMA application_id = 1145193761');
+          /* `0x444F4721`, WHICH IS THE BYTES `DOG!` — written in hex because that is the only form
+             in which it can be checked by reading it. `03 §2`'s own table gives the hex and a
+             DECIMAL beside it that disagrees: 1145193761 is `0x44424521`, the bytes `DBE!`, and it
+             is the decimal three documents copied. The hex is the one a magic number is chosen for
+             and the one `file(1)` prints, so the hex wins, and writing it as hex is what stops the
+             next transcription being wrong the same way. */
+          if (m.version === 1) sql.exec(`PRAGMA application_id = ${APPLICATION_ID}`);
         } catch {
           /* the two rows below are the ones that travel */
         }

@@ -151,7 +151,12 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     const wants = then.some((a) => 'notify' in a || 'create' in a || 'suggest' in a);
     const key = onceKey(rule, fired.entry);
     if (key !== null) {
-      if (!deps.schedule(key, { rule: rule.rule, entry: fired.entry.id, batch: fired.batch }, wants)) {
+      /* `false`, ALWAYS: the marker is a CLAIM and not a job. Inserting it `pending` because the
+         rule notifies made the drain claim it, find no `rule` handler, and dead-letter it into a
+         system suggestion reading "Nothing in this record handles a rule row" — one per firing, for
+         the customer to dismiss. Exactly-once is the unique index on `(kind, key)`, and nothing
+         about it needs a turn. */
+      if (!deps.schedule(key, { rule: rule.rule, entry: fired.entry.id, batch: fired.batch }, false)) {
         out.suppressed.push(rule.rule);
         continue;
       }

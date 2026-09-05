@@ -167,7 +167,13 @@ test('AND THE QUALIFIER TRAVELS THROUGH EVERY OPERATOR, not only the two written
   // branch beside it. `between` was wrong in BOTH renderings, so comparing them flagged nothing:
   // a shared bug is invisible to a test that only checks the two against each other.
   assert.deepEqual(both({ field: 'amount', in: [{ amount: 24_000, currency: 'GBP' }] }), ['b']);
-  assert.deepEqual(both({ field: 'amount', not_in: [{ amount: 24_000, currency: 'GBP' }] }), ['a', 'c', 'd', 'e']);
+  /* AND A FOREIGN-CURRENCY ROW IS NOT A MATCH EVEN UNDER NEGATION — `34-GRAMMARS` §1.5. `c` holds
+     EUR 240.00, and it is not "an amount that is not GBP 240.00": it is not the thing being talked
+     about at all, the same way `is` does not match it. The alternative reads as an answer about
+     euros to a question asked in sterling. */
+  assert.deepEqual(both({ field: 'amount', not_in: [{ amount: 24_000, currency: 'GBP' }] }), ['a', 'd', 'e']);
+  assert.deepEqual(both({ field: 'amount', not: { amount: 24_000, currency: 'GBP' } }), ['a', 'd', 'e']);
+  assert.deepEqual(both({ field: 'amount', not: { amount: 24_000, currency: 'EUR' } }), ['d'], 'only the row with no amount');
   assert.deepEqual(
     both({ field: 'amount', between: [{ amount: 20_000, currency: 'GBP' }, { amount: 30_000, currency: 'GBP' }] }),
     ['b'],
@@ -309,4 +315,44 @@ test('COMPILE AND EVALUATE ANSWER THE SAME QUESTION, over every predicate above'
     { field: 'n', not: 0 },
   ];
   for (const p of predicates) both(p);
+});
+
+/* ── two backends, one answer ────────────────────────────────── */
+
+test('`contains` IS `instr` AND NEVER `LIKE`, because a LIKE pattern has two different ceilings', () => {
+  /* One platform caps a `LIKE` pattern at fifty bytes and the other at fifty thousand, so a
+     forty-nine character `contains` works on a laptop and fails in production — which is the shape
+     of failure a two-host product must not have in its most-used operator. */
+  const c = compile({ field: 'what', contains: 'invoice' }, SCHEMA);
+  assert.match(c.sql, /instr\(lower\(/);
+  assert.equal(c.sql.includes('LIKE'), false, 'contains still compiles to LIKE');
+
+  // A `%` in the value is a `%`, not a wildcard, and needs no escape now there is no pattern.
+  assert.deepEqual(both({ field: 'what', contains: '50%' }), ['e']);
+
+  // A prefix IS a pattern, so those keep LIKE — and every literal is held under one ceiling.
+  assert.match(compile({ field: 'what', starts: 'Inv' }, SCHEMA).sql, /LIKE/);
+  assert.equal(compile({ field: 'what', contains: 'x'.repeat(41) }, SCHEMA).bad[0]?.code, 'CONTAINS_TOO_LONG');
+  assert.equal(compile({ field: 'what', starts: 'x'.repeat(41) }, SCHEMA).bad[0]?.code, 'CONTAINS_TOO_LONG');
+  assert.equal(compile({ field: 'what', contains: 'x'.repeat(40) }, SCHEMA).bad.length, 0);
+});
+
+test('AND `empty` IS THE THREE WAYS A VALUE IS ABSENT, because an import carries what it carries', () => {
+  /* A write stores none of them — null, '' and [] all remove the key — but a row that arrived in a
+     `.dog` file, or was written by an older build, may hold an empty string. `IS NULL` alone read
+     those as PRESENT, so `note is empty` missed exactly the rows somebody was looking for. */
+  const rows = [
+    { id: 'x', fields: { what: 'a', tags: [] } },
+    { id: 'y', fields: { what: 'a', note: '' } },
+    { id: 'z', fields: { what: 'a', note: 'said' } },
+  ];
+  const schema = { register: 'r', fields: { what: { type: 'text' }, note: { type: 'text' }, tags: { type: 'list' } } };
+
+  assert.deepEqual(rows.filter((r) => evaluate({ field: 'note', empty: true }, r.fields, schema)).map((r) => r.id), ['x', 'y']);
+  assert.deepEqual(rows.filter((r) => evaluate({ field: 'note', present: true }, r.fields, schema)).map((r) => r.id), ['z']);
+  assert.deepEqual(rows.filter((r) => evaluate({ field: 'tags', empty: true }, r.fields, schema)).map((r) => r.id), ['x', 'y', 'z']);
+
+  const c = compile({ field: 'note', empty: true }, schema);
+  assert.match(c.sql, /= ''/);
+  assert.match(c.sql, /= '\[\]'/);
 });

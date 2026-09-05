@@ -23,6 +23,27 @@ export const PRIMITIVES = [
 
 export type Primitive = (typeof PRIMITIVES)[number];
 
+/**
+ * The class each primitive draws with, and the ONE place the mapping is written.
+ *
+ * A THEME HAS TO KNOW THESE NAMES and must not import this package to learn them — it has no
+ * workspace dependencies, which is what makes it a seam rather than a layer. So the names are
+ * EXPORTED here and handed in there, and the one gap that mattered is why: the forced-colours
+ * boundary list was hand-written against a mental model of the app, so `.prop`, `.inline` and
+ * `.list` were missing — six of sixteen kinds lost every boundary under Windows High Contrast —
+ * while `.card`, `.field` and `.sheet` were in it and are classes nothing emits.
+ */
+export const PRIMITIVE_CLASSES: Record<Primitive, string> = {
+  panel: 'panel',
+  grid: 'grid',
+  rows: 'rows',
+  proportional: 'prop',
+  inline: 'inline',
+  list: 'list',
+  table: 'table',
+  media: 'media',
+};
+
 /** An integer a pack's manifest compares against. The record refuses an install when its own is lower. */
 export const PRIMITIVES_VERSION = 1;
 

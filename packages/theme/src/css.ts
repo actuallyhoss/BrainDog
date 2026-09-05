@@ -72,8 +72,8 @@ export function toCSS(house: Built, highContrast: Built): string {
  * boundary in the product disappears. The ladder cannot rescue it, because the shadows are gone too.
  * Lives in `@layer a11y`, which no theme can reach.
  */
-export const A11Y_FORCED_COLORS = `@media (forced-colors: active) {
-    .panel, .grid, .rows, .table, .media, .block, .card, .field, .sheet {
+export const forcedColors = (classes: readonly string[]): string => `@media (forced-colors: active) {
+    ${[...new Set([...classes, 'block'])].map((c) => `.${c}`).join(', ')} {
       border: 1px solid CanvasText;
     }
     [data-intent] { forced-color-adjust: none; }
