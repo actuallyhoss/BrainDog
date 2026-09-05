@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CURRENCY, dirOf, display, isProse, labelOf, metric } from './api.ts';
+import { CURRENCY, applyFilters, dirOf, display, isProse, labelOf, metric } from './api.ts';
 import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
@@ -218,4 +218,62 @@ test('the three money tiles are disjoint, so a row is in at most one', () => {
     return d >= 0 && d <= 30;
   });
   assert.equal(overdue.filter((e) => due30.includes(e)).length, 0, 'a row is counted by two tiles at once');
+});
+
+/* ── a tile and its link must agree ──────────────────────────────────────── */
+
+/** The rows a metric's own href actually opens, read the way the register route reads it. */
+function opened(href: string): { register: string; rows: number } {
+  const url = new URL(href, 'http://x');
+  const register = url.pathname.split('/')[2] ?? '';
+  const filters = url.searchParams.getAll('f').map((raw) => {
+    const [field = '', op = 'is', values = ''] = raw.split(':');
+    return { field, op, values: values.split(',') };
+  });
+  return { register, rows: applyFilters(register, ROWS[register] ?? [], filters).length };
+}
+
+test('every metric href opens rows, rather than an empty grid or the whole register', () => {
+  // The failure was silent and total: `applyFilters` string-compared dates, so `due:before:today`
+  // was true of every row and `due:before:+30d` of none. Overdue said two and opened eighteen;
+  // "Due in 30 days" and "Renews in 30 days" opened nothing at all. A figure you cannot click
+  // through to is a figure you cannot check.
+  const ids = ['kiln-open', 'kiln-owed', 'kiln-cost', 'owed-to-you', 'due-30d', 'overdue', 'renews-30d', 'lapsing'];
+  for (const id of ids) {
+    const m = metric(id);
+    if (!m.href) continue;
+    const { register, rows } = opened(m.href);
+    const all = (ROWS[register] ?? []).length;
+    assert.ok(rows > 0, `${m.label} links to an empty grid`);
+    assert.ok(rows < all, `${m.label} links to the whole register, which is not a filter`);
+  }
+});
+
+test('a href that counts rows opens exactly that many', () => {
+  // The three whose note is a count can be checked exactly. The rest report money, and the count is
+  // asserted above only for being neither zero nor everything.
+  for (const [id, n] of [['overdue', 2], ['lapsing', 1]] as const) {
+    const m = metric(id);
+    assert.ok(m.href);
+    assert.equal(opened(m.href).rows, n, `${m.label} says ${n} and opens a different number`);
+  }
+});
+
+test('a relative date survives a URL, where + means space', () => {
+  // `f=due:before:+30d` arrives as ' 30d' because a query string decodes `+` to a space, so every
+  // relative window in a link resolved to nothing. Encoded, it has to round-trip.
+  const m = metric('due-30d');
+  const href = m.href ?? '';
+  assert.ok(href.includes('%2B'), 'a relative date in a href must be percent-encoded');
+  const url = new URL(href, 'http://x');
+  assert.ok(url.searchParams.getAll('f').some((f) => /:\+\d+d$/.test(f)), 'the + did not survive decoding');
+});
+
+test('a ref may be written as a name or as its number, and both resolve', () => {
+  // A declaration says `thing is Kiln` because that is what a person reads; a URL says `thing:is:1`
+  // because a link should not break when a row is renamed.
+  const byName = applyFilters('tasks', ROWS.tasks ?? [], [{ field: 'thing', op: 'is', values: ['Kiln'] }]);
+  const bySeq = applyFilters('tasks', ROWS.tasks ?? [], [{ field: 'thing', op: 'is', values: ['1'] }]);
+  assert.ok(byName.length > 0);
+  assert.equal(byName.length, bySeq.length);
 });

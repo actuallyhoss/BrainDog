@@ -149,7 +149,11 @@ function allowed(register: string, field: string): string[] | null {
   if (f.type === 'ref' && f.to) {
     const title = REGISTERS[f.to]?.title;
     if (!title) return null;
-    return (ROWS[f.to] ?? []).map((e) => norm(String(e.fields[title] ?? ''))).filter(Boolean);
+    /* Titles AND sequence numbers. A declaration says `thing is Kiln` because that is what a person
+       reads, but a URL says `thing:is:1` because a link should not break when a row is renamed —
+       and `matches` already accepts either spelling. Allowing only one of them here refused the
+       other at compile time, which turned every Kiln metric's link into an empty grid. */
+    return (ROWS[f.to] ?? []).flatMap((e) => [norm(String(e.fields[title] ?? '')), String(e.seq)]).filter(Boolean);
   }
   return null;
 }

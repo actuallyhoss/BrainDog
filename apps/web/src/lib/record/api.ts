@@ -272,16 +272,37 @@ export function toRows(register: string, entries: Entry[], columns: Column[]): T
 
 export type Filter = { field: string; op: string; values: string[] };
 
+/**
+ * The URL's filter chips, as a `where` sentence.
+ *
+ * There were two filter languages in this product and they disagreed. `where.ts` resolves dates,
+ * checks enum values and matches on what the screen shows; `applyFilters` did four raw string
+ * comparisons, so `due before today` asked whether `'2026-10-01' < 'today'` — true for every row,
+ * because `'2'` sorts before `'t'` — and `due before +30d` was false for every row for the same
+ * reason in the other direction.
+ *
+ * The consequence was three money tiles linking to a list that contradicted them: Overdue said two
+ * rows and opened eighteen; "Due in 30 days" and "Renews in 30 days" both opened nothing at all.
+ * A figure you cannot click through to is a figure you cannot check.
+ *
+ * A chip is a control and a sentence is a declaration, so both spellings stay — but there is one
+ * evaluator underneath, and it is the one with the tests.
+ */
+export const whereOf = (filters: Filter[]): string =>
+  filters
+    .map((f) =>
+      f.op === 'in'
+        ? `${f.field} is ${f.values.join(' or ')}`
+        : f.op === 'before' || f.op === 'after'
+          ? `${f.field} ${f.op} ${f.values[0] ?? ''}`
+          : `${f.field} is ${f.values[0] ?? ''}`,
+    )
+    .join(', ');
+
 export function applyFilters(register: string, entries: Entry[], filters: Filter[], q?: string): Entry[] {
-  let out = entries;
-  for (const f of filters)
-    out = out.filter((e) => {
-      const v = e.fields[f.field];
-      if (f.op === 'in') return f.values.includes(String(v));
-      if (f.op === 'before') return typeof v === 'string' && v < f.values[0]!;
-      if (f.op === 'after') return typeof v === 'string' && v > f.values[0]!;
-      return String(v) === f.values[0];
-    });
+  const w = compile(register, whereOf(filters));
+  let out = filters.length ? entries.filter((e) => matches(e, w, NOW)) : entries;
+
   if (q) {
     const needle = q.toLowerCase();
     out = out.filter((e) =>
@@ -441,7 +462,7 @@ export function metric(id: string): Metric {
         value: integer(rows.length),
         note: late > 0 ? `${late} past its date` : 'none past its date',
         tone: late > 0 ? 'warn' : 'good',
-        href: '/r/tasks?f=thing:is:1&f=state:in:open,doing',
+        href: '/r/tasks?f=thing:is:1&f=state:in:open,doing,blocked',
       };
     }
     case 'kiln-owed': {
@@ -454,7 +475,7 @@ export function metric(id: string): Metric {
         value: money(total, CURRENCY),
         note: `${rows.length} open · ${late} past terms`,
         tone: late > 0 ? 'bad' : 'good',
-        href: '/r/obligations?f=thing:is:1',
+        href: '/r/obligations?f=thing:is:1&f=direction:is:owed_to_me&f=state:in:open,part',
       };
     }
     case 'kiln-cost': {
@@ -465,7 +486,7 @@ export function metric(id: string): Metric {
         label: 'Costs a year',
         value: money(total, CURRENCY),
         note: `${rows.length} live`,
-        href: '/r/services?f=thing:is:1',
+        href: '/r/services?f=thing:is:1&f=state:in:live,lapsing',
       };
     }
     case 'owed-to-you': {
@@ -495,7 +516,7 @@ export function metric(id: string): Metric {
         value: money(total, CURRENCY),
         note: `target ≤ ${money(2_500_000, CURRENCY)}`,
         tone: total > 2_500_000 ? 'warn' : 'good',
-        href: '/r/obligations?f=direction:is:owed_by_me&f=due:before:+30d',
+        href: '/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:after:yesterday&f=due:before:%2B31d',
       };
     }
     /* ONE DIRECTION, like the two tiles it sits beside. This added receivables to payables and
@@ -556,14 +577,19 @@ export function metric(id: string): Metric {
       };
     }
     case 'renews-30d': {
-      const rows = services.filter((e) => e.fields.state !== 'cancelled' && days(e.fields.renews) <= 30);
+      /* Bounded BELOW, like `due-30d`. `<= 30` counted everything already lapsed too, so the tile
+         said seven and its own link opened six — and one of the seven had renewed four days ago,
+         which is not a thing that renews in thirty days. A window with one end is not a window. */
+      const rows = services.filter(
+        (e) => e.fields.state !== 'cancelled' && days(e.fields.renews) >= 0 && days(e.fields.renews) <= 30,
+      );
       return {
         id,
         label: 'Renews in 30 days',
         value: String(rows.length),
         note: `of ${services.filter((e) => e.fields.state !== 'cancelled').length} live`,
         tone: rows.length > 6 ? 'warn' : undefined,
-        href: '/r/services?f=renews:before:+30d',
+        href: '/r/services?f=state:in:live,lapsing&f=renews:after:yesterday&f=renews:before:%2B31d',
       };
     }
     case 'estate-year': {
