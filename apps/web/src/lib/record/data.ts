@@ -37,6 +37,19 @@ const stamp = (offsetHours: number): string => new Date(NOW + offsetHours * 3_60
 
 /* ── registers ────────────────────────────────────────────────────────────── */
 
+/**
+ * Named factor tables, for the one row-level multiplication a metric needs.
+ *
+ * 08 §2.5's `lookup` shape, with a literal table instead of an `fx` register — the pattern is the
+ * same and so is the reason: a service's `cost` is per CYCLE, so a yearly domain and a monthly
+ * bucket are two different units, and adding them gives a number that is not about anything. The
+ * factor was written out longhand in one metric and omitted from another, and Kiln's annual cost
+ * came out 9.25 times too low. One table, named, read by whatever declares it.
+ */
+export const LOOKUPS: Record<string, Record<string, number>> = {
+  per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 },
+};
+
 export const REGISTERS: Record<string, RegisterDecl> = {
   obligations: {
     id: 'obligations',

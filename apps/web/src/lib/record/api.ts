@@ -31,6 +31,8 @@ import {
 } from './data.ts';
 import { runway } from './forecast.ts';
 import { compile, explain, matches } from './where.ts';
+import { METRICS } from './declared.ts';
+import { meetsTarget, read, targetLine } from './metrics.ts';
 import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 export const CURRENCY = 'GBP';
@@ -295,9 +297,15 @@ export const whereOf = (filters: Filter[]): string =>
     .map((f) =>
       f.op === 'in'
         ? `${f.field} is ${f.values.join(' or ')}`
-        : f.op === 'before' || f.op === 'after'
-          ? `${f.field} ${f.op} ${f.values[0] ?? ''}`
-          : `${f.field} is ${f.values[0] ?? ''}`,
+        : /* `not-in`, so a URL can say everything the SENTENCE can. Without it a declared metric
+             whose predicate negates — `state is not cancelled` — had no link that opened its own
+             rows, and the alternative was writing out the enum's complement, which breaks the
+             moment a pack adds a value to it. */
+          f.op === 'not-in'
+          ? `${f.field} is not ${f.values.join(' or ')}`
+          : f.op === 'before' || f.op === 'after'
+            ? `${f.field} ${f.op} ${f.values[0] ?? ''}`
+            : `${f.field} is ${f.values[0] ?? ''}`,
     )
     .join(', ');
 
@@ -502,192 +510,81 @@ const perYear = (e: Entry): number =>
 const days = (iso: unknown) =>
   typeof iso === 'string' ? (Date.parse(`${iso}T12:00:00Z`) - NOW) / 86_400_000 : Infinity;
 
+/**
+ * A figure, read from its DECLARATION.
+ *
+ * This was a twelve-case `switch` with `const KILN = 1` inside it, which is why there was exactly
+ * one project page and why `stat` was unusable on any page an agent writes. The documents are in
+ * `declared.ts` and the evaluator is in `metrics.ts`; what is left here is the two figures the
+ * record computes rather than stores, and the translation from a reading into a tile.
+ *
+ * The NOTE is the target and the comparison, which is what 08 §2.2 says a figure is for: "EGP
+ * 6,240,000 · target ≤ 5,000,000 · up 18% on the 30 days before it" is three facts and the second
+ * is the one you act on. A bare figure is a number you look at.
+ */
 export function metric(id: string): Metric {
-  const obligations = ROWS.obligations ?? [];
-  const services = ROWS.services ?? [];
+  /* THE RUNWAY, the only figure in the product that is about the future, and 08 §2.3's `running`
+     aggregation — a cumulative reducer with a stop condition. It seeds from what is liquid, applies
+     every dated movement in order, and reports the first day the balance goes under, with the row
+     that did it: "you run out on 14 November" is a number you look at, and "the Fenwick renewal is
+     what does it" is one you act on.
 
-  /* The Kiln metrics are the same three shapes, narrowed by one `ref`. That is the whole trick of a
-     project page: nothing about it is a new kind of thing, it is the register's own numbers with a
-     `thing is Kiln` on the front. `KILN` is `things#1`. */
-  const KILN = 1;
-  const tasks = ROWS.tasks ?? [];
-
-  switch (id) {
-    case 'kiln-open': {
-      const rows = tasks.filter((e) => e.fields.thing === KILN && e.fields.state !== 'done' && e.fields.state !== 'dropped');
-      const late = rows.filter((e) => days(e.fields.by) < 0).length;
-      return {
-        id,
-        label: 'Open',
-        value: integer(rows.length),
-        note: late > 0 ? `${late} past its date` : 'none past its date',
-        tone: late > 0 ? 'warn' : 'good',
-        href: '/r/tasks?f=thing:is:1&f=state:in:open,doing,blocked',
-      };
-    }
-    case 'kiln-owed': {
-      const rows = obligations.filter((e) => open(e) && e.fields.thing === KILN && e.fields.direction === 'owed_to_me');
-      const total = rows.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
-      const late = rows.filter((e) => days(e.fields.due) < 0).length;
-      return {
-        id,
-        label: 'Owed to you',
-        value: money(total, CURRENCY),
-        note: `${rows.length} open · ${late} past terms`,
-        tone: late > 0 ? 'bad' : 'good',
-        href: '/r/obligations?f=thing:is:1&f=direction:is:owed_to_me&f=state:in:open,part',
-      };
-    }
-    case 'kiln-cost': {
-      const rows = services.filter((e) => e.fields.thing === KILN && e.fields.state !== 'cancelled');
-      const total = rows.reduce((a, e) => a + perYear(e), 0);
-      return {
-        id,
-        label: 'Costs a year',
-        value: money(total, CURRENCY),
-        note: `${rows.length} live`,
-        href: '/r/services?f=thing:is:1&f=state:in:live,lapsing',
-      };
-    }
-    case 'owed-to-you': {
-      const rows = obligations.filter((e) => open(e) && e.fields.direction === 'owed_to_me');
-      const total = rows.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
-      const late = rows.filter((e) => days(e.fields.due) < 0).length;
-      return {
-        id,
-        label: 'Owed to you',
-        value: money(total, CURRENCY),
-        note: `${rows.length} open · ${late} past terms`,
-        tone: late > 0 ? 'warn' : 'good',
-        href: '/r/obligations?f=direction:is:owed_to_me&f=state:in:open,part',
-      };
-    }
-    case 'due-30d': {
-      /* Bounded BELOW as well. `<= 30` counted everything already late too, so an overdue bill was
-         in this tile and in Overdue at once and the two could not be added. A window with one end
-         is a window that grows for ever. */
-      const rows = obligations.filter(
-        (e) => open(e) && e.fields.direction === 'owed_by_me' && days(e.fields.due) >= 0 && days(e.fields.due) <= 30,
-      );
-      const total = rows.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
-      return {
-        id,
-        label: 'Due in 30 days',
-        value: money(total, CURRENCY),
-        note: `target ≤ ${money(2_500_000, CURRENCY)}`,
-        tone: total > 2_500_000 ? 'warn' : 'good',
-        href: '/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:after:yesterday&f=due:before:%2B31d',
-      };
-    }
-    /* ONE DIRECTION, like the two tiles it sits beside. This added receivables to payables and
-       painted the sum in the alarm colour: GBP 17,740.00 was GBP 7,200 you are owed plus GBP 10,540
-       you owe. Those are not the same problem and the sum is not a quantity — one is chasing, the
-       other is a penalty.
-
-       It is the money you OWE and have not paid, because that is the half the other two do not
-       cover: `owed-to-you` already reports its own late count, and `due-30d` is the same direction
-       but still ahead of you. The three are now disjoint and add up. */
-    case 'overdue': {
-      const rows = obligations.filter((e) => open(e) && e.fields.direction === 'owed_by_me' && days(e.fields.due) < 0);
-      const total = rows.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
-      const owedToYou = obligations.filter((e) => open(e) && e.fields.direction === 'owed_to_me' && days(e.fields.due) < 0);
-      return {
-        id,
-        label: 'Overdue',
-        value: money(total, CURRENCY),
-        note:
-          rows.length === 0
-            ? 'nothing late'
-            : owedToYou.length
-              ? `${rows.length} you owe · ${owedToYou.length} you are owed`
-              : `${rows.length} rows · target 0`,
-        tone: rows.length === 0 ? 'good' : 'bad',
-        href: '/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today',
-      };
-    }
-    /* THE RUNWAY, which is the only figure in the product that is about the future.
-       It seeds from what is liquid, applies every dated movement in order, and reports the first
-       day the balance goes under — with the row that did it, because "you run out on 14 November"
-       is a number you look at and "the Fenwick renewal is what does it" is one you act on.
-
-       `OPENING` is a stand-in for a cash position the record does not hold yet. It is named here
-       rather than buried in the walk so the day a real balance arrives there is one line to change,
-       and so nobody mistakes it for something the record knows. */
-    case 'runway': {
-      const walk = runway(OPENING);
-      if (!walk.crossed) {
-        return {
-          id,
-          label: 'Runway',
-          value: `Over ${walk.horizon} days`,
-          note: 'nothing dated takes it under',
-          tone: 'good',
-          href: '/p/money',
-        };
-      }
+     `OPENING` is a stand-in for a cash position the record does not hold yet. It is named rather
+     than buried in the walk so the day a real balance arrives there is one line to change. */
+  if (id === 'runway') {
+    const walk = runway(OPENING);
+    if (!walk.crossed)
       return {
         id,
         label: 'Runway',
-        value: `${walk.days} days`,
-        /* The row, not just the date. A forecast that names only a day leaves the reader to find
-           out which movement caused it, and that is the only actionable half of the fact. */
-        note: `${fmtDay(walk.crossed.day)} · ${walk.crossed.label}`,
-        tone: walk.days !== null && walk.days < 45 ? 'bad' : 'warn',
-        href: walk.crossed.href,
+        value: `Over ${walk.horizon} days`,
+        note: 'nothing dated takes it under',
+        tone: 'good',
+        href: '/p/money',
       };
-    }
-    case 'renews-30d': {
-      /* Bounded BELOW, like `due-30d`. `<= 30` counted everything already lapsed too, so the tile
-         said seven and its own link opened six — and one of the seven had renewed four days ago,
-         which is not a thing that renews in thirty days. A window with one end is not a window. */
-      const rows = services.filter(
-        (e) => e.fields.state !== 'cancelled' && days(e.fields.renews) >= 0 && days(e.fields.renews) <= 30,
-      );
-      return {
-        id,
-        label: 'Renews in 30 days',
-        value: String(rows.length),
-        note: `of ${services.filter((e) => e.fields.state !== 'cancelled').length} live`,
-        tone: rows.length > 6 ? 'warn' : undefined,
-        href: '/r/services?f=state:in:live,lapsing&f=renews:after:yesterday&f=renews:before:%2B31d',
-      };
-    }
-    case 'estate-year': {
-      const total = services
-        .filter((e) => e.fields.state !== 'cancelled')
-        .reduce((a, e) => a + perYear(e), 0);
-      /* 300_000, not 30_000. The target was written a zero short, so a GBP 2,906.80 estate was
-         measured against GBP 300.00 and the tile read `warn` for a reason nobody could act on. A
-         target that is absurd next to its own figure is a target people stop reading. */
-      const target = 300_000;
-      /* THE LINK CARRIES THE SAME FILTER THE FIGURE DOES. A bare `/r/services` opened sixteen rows
-         summing GBP 3,254.80 under a tile reading GBP 2,906.80 and `good` — the difference being a
-         cancelled service, absent from the figure and enough on its own to cross the target. */
-      return { id, label: 'Cost per year', value: money(Math.round(total), CURRENCY), note: `target ≤ ${money(target, CURRENCY)}`, tone: total > target ? 'warn' : 'good', href: '/r/services?f=state:is:live%20or%20lapsing' };
-    }
-    case 'lapsing': {
-      const rows = services.filter((e) => e.fields.state === 'lapsing');
-      return {
-        id,
-        label: 'Lapsing',
-        value: String(rows.length),
-        note: rows.length === 0 ? 'all renewing' : 'auto-renew is off',
-        tone: rows.length === 0 ? 'good' : 'bad',
-        href: '/r/services?f=state:is:lapsing',
-      };
-    }
-    case 'open-questions':
-      return {
-        id,
-        label: 'Open questions',
-        value: String(QUESTIONS.length),
-        note: 'target ≤ 3',
-        tone: QUESTIONS.length > 3 ? 'warn' : 'good',
-        href: '/decide',
-      };
-    default:
-      return { id, label: id, value: MISSING, note: 'no such metric' };
+    return {
+      id,
+      label: 'Runway',
+      value: `${walk.days} days`,
+      note: `${fmtDay(walk.crossed.day)} · ${walk.crossed.label}`,
+      tone: walk.days !== null && walk.days < 45 ? 'bad' : 'warn',
+      href: walk.crossed.href,
+    };
   }
+
+  if (id === 'open-questions')
+    return {
+      id,
+      label: 'Open questions',
+      value: String(QUESTIONS.length),
+      note: 'target ≤ 3',
+      tone: QUESTIONS.length > 3 ? 'warn' : 'good',
+      href: '/decide',
+    };
+
+  const decl = METRICS[id];
+  if (!decl) return { id, label: id, value: MISSING, note: 'no metric is declared under that name', tone: 'warn', href: '/p/money' };
+
+  const reading = read(decl);
+  if (reading.refusals.length)
+    return { id, label: decl.name, value: MISSING, note: reading.refusals[0] ?? '', tone: 'warn', href: '/p/money' };
+
+  const met = meetsTarget(decl, reading.value);
+  /* The delta reads as a MOVEMENT and not as a sign: "up 18% on the 30d before" is a sentence, and
+     `+18%` beside a target is two numbers a reader has to tell apart. */
+  const move =
+    reading.delta === null
+      ? ''
+      : ` · ${reading.delta >= 0 ? 'up' : 'down'} ${Math.abs(reading.delta * 100).toFixed(0)}% ${reading.why}`;
+
+  return {
+    id,
+    label: decl.name,
+    value: reading.shown,
+    note: `${targetLine(decl)}${move}`,
+    tone: met === null ? undefined : met ? 'good' : 'warn',
+    href: reading.href,
+  };
 }
 
 /** The values a page's `{{path}}` interpolations resolve to, pre-resolved server-side (22 §5). */

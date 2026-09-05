@@ -1,0 +1,259 @@
+/**
+ * A metric, DECLARED.
+ *
+ * `08-METRICS-AND-ANALYTICS` §2 specifies the whole document — source, predicate, aggregation,
+ * format, target, window, comparison — and the implementation was a twelve-case `switch` with
+ * `const KILN = 1` inside it. Two consequences, and the second is the expensive one:
+ *
+ *   - there was exactly one project page, because a second project meant a thirteenth case;
+ *   - `stat` was unusable on any page an agent writes, because every figure it can show was a
+ *     branch in a function an agent cannot reach.
+ *
+ * WHAT IS BUILT HERE IS THE DOCUMENT, NOT THE WHOLE GRAMMAR. The spec's eleven aggregations,
+ * `group_by`, `bucket`, `snapshot` and the series source are post-v1 shapes with no consumer in
+ * this build; what is here is the part every existing tile needed — six aggregations, the closed
+ * `ratio`/`diff` combinator, a row-level product through a named lookup, the two required fields,
+ * and the comparison gate. A declaration that reaches for the rest is refused by name rather than
+ * ignored, which is the rule the rest of this package already follows.
+ *
+ * THE TWO REQUIRED FIELDS ARE REQUIRED. §2.2, in bold: a number with no target is decoration, and a
+ * number with no comparison window is a number you cannot act on. Both are refused here with that
+ * sentence, because every dashboard product makes them optional and every dashboard product is full
+ * of numbers nobody acts on.
+ *
+ * AND THE LINK IS DERIVED. A tile's href used to be typed beside its predicate, so the two drifted —
+ * measured twice: a tile counting five states whose link listed three, and a figure excluding
+ * cancelled services whose link included them. One predicate now produces both the figure and the
+ * URL, so they cannot disagree.
+ */
+
+import { integer, money } from 'braindog-render';
+
+import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
+import { compile, explain, matches } from './where.ts';
+import type { Entry } from './schema.ts';
+
+/* ── the document ────────────────────────────────────────────────────────── */
+
+/** The six this build reads. `median`, `last`, `running` and `trend` are §2.3 and series-only. */
+export type Aggregation =
+  | { sum: Operand }
+  | { count: string }
+  | { avg: Operand }
+  | { min: string }
+  | { max: string }
+  | { distinct: string };
+
+/**
+ * A field, or a row-level product of a field and a named lookup.
+ *
+ * §2.5's shape, with a literal table instead of an `fx` register: a service's `cost` is per CYCLE,
+ * so a yearly domain and a monthly bucket are two different units and adding them produces a number
+ * that is not about anything. That factor used to be written out longhand in one metric and omitted
+ * from another, and Kiln's annual cost came out 9.25 times too low.
+ */
+export type Operand = string | { product: [string, { lookup: string; by: string }] };
+
+export type Value =
+  | Aggregation
+  | { ratio: { of: Aggregation; per: Aggregation } }
+  | { diff: { of: Aggregation; per: Aggregation } };
+
+export type MetricDecl = {
+  metric: string;
+  name: string;
+  /** `register.<id>`, or one of the two figures the record computes rather than stores. */
+  source: string;
+  /** The sentence grammar, the same one a block's `where:` reads. */
+  where?: string;
+  value: Value;
+  /** `money.<CUR>` · `int` · `decimal` · `pct` · `days`. */
+  format: string;
+  /** What good looks like. Money is minor units, like everywhere else. */
+  target: { lte: number } | { gte: number };
+  /** The comparison shift: `compare` re-evaluates the predicate with `asOf = now − W`. */
+  window: string;
+  compare?: 'previous' | 'none';
+};
+
+/* ── evaluating one ──────────────────────────────────────────────────────── */
+
+export type Reading = {
+  /** `null` when the metric could not be read; `refusals` says why. */
+  value: number | null;
+  shown: string;
+  rows: number;
+  /** The proportional change against the shifted window, or `null` when it is not comparable. */
+  delta: number | null;
+  /** Why there is no delta, in words, so an absent comparison is not an absent explanation. */
+  why: string;
+  refusals: string[];
+  href: string;
+};
+
+const DAY_MS = 86_400_000;
+const WINDOW = /^(\d{1,4})([dwm])$/;
+
+/** A window as milliseconds, or `null` when it is not one. */
+export function windowMs(w: string): number | null {
+  const m = WINDOW.exec(w.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n * (m[2] === 'd' ? DAY_MS : m[2] === 'w' ? 7 * DAY_MS : 30 * DAY_MS);
+}
+
+const registerOf = (source: string): string | null =>
+  source.startsWith('register.') ? source.slice('register.'.length) : null;
+
+/** One operand, on one row. `null` when the row does not carry it — absent is not zero. */
+function operand(e: Entry, op: Operand): number | null {
+  if (typeof op === 'string') {
+    const raw = e.fields[op];
+    if (raw === null || raw === undefined || raw === '') return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+  const [field, { lookup, by }] = op.product;
+  const base = operand(e, field);
+  const factor = LOOKUPS[lookup]?.[String(e.fields[by] ?? '')];
+  return base === null || factor === undefined ? null : base * factor;
+}
+
+function aggregate(rows: Entry[], agg: Aggregation): number | null {
+  if ('count' in agg)
+    return agg.count === 'id' ? rows.length : rows.filter((e) => operand(e, agg.count) !== null).length;
+  if ('distinct' in agg) return new Set(rows.map((e) => String(e.fields[agg.distinct] ?? ''))).size;
+
+  const field = 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : agg.max;
+  const values = rows.map((e) => operand(e, field)).filter((n): n is number => n !== null);
+  if ('sum' in agg) return values.reduce((a, n) => a + n, 0);
+  // An average, a minimum and a maximum OF NOTHING is not zero. `null` renders as the em dash.
+  if (values.length === 0) return null;
+  if ('avg' in agg) return values.reduce((a, n) => a + n, 0) / values.length;
+  if ('min' in agg) return Math.min(...values);
+  return Math.max(...values);
+}
+
+function evaluateValue(rows: Entry[], value: Value): number | null {
+  if ('ratio' in value || 'diff' in value) {
+    const pair = 'ratio' in value ? value.ratio : value.diff;
+    const of = aggregate(rows, pair.of);
+    const per = aggregate(rows, pair.per);
+    if (of === null || per === null) return null;
+    /* A ZERO DENOMINATOR IS NOT A NUMBER. §2.2's last row: never `0`, never infinity, never `NaN` —
+       the em dash, and the numerator is still on the row behind it. */
+    if ('ratio' in value) return per === 0 ? null : of / per;
+    return of - per;
+  }
+  return aggregate(rows, value);
+}
+
+/** How a figure is written. The format is declared, so two tiles of one number look the same. */
+export function format(shape: string, n: number | null): string {
+  if (n === null) return '—';
+  if (shape.startsWith('money.')) return money(Math.round(n), shape.slice('money.'.length));
+  switch (shape) {
+    case 'int':
+      return integer(Math.round(n));
+    case 'pct':
+      return `${(n * 100).toLocaleString('en', { maximumFractionDigits: 1 })}%`;
+    case 'days':
+      return `${Math.round(n)} days`;
+    case 'decimal':
+      return n.toLocaleString('en', { maximumFractionDigits: 2 });
+    default:
+      return String(n);
+  }
+}
+
+/**
+ * The URL that opens the rows a figure was computed over.
+ *
+ * A negation becomes `not-in` rather than the enum's complement: the complement is only writable
+ * when the field declares its values, and a URL that silently lists them is a URL that breaks when
+ * a pack adds one.
+ */
+export function hrefFor(decl: MetricDecl): string {
+  const register = registerOf(decl.source);
+  if (!register) return '/p/money';
+  const w = compile(register, decl.where);
+  const chips = w.clauses.map((c) =>
+    'values' in c
+      ? `${c.field}:${c.op === 'is not' ? 'not-in' : 'in'}:${c.values.map(encodeURIComponent).join(',')}`
+      : `${c.field}:${c.op}:${encodeURIComponent(c.day)}`,
+  );
+  return chips.length ? `/r/${register}?${chips.map((f) => `f=${f}`).join('&')}` : `/r/${register}`;
+}
+
+/** Does this predicate mention time at all? Without one, the shifted window is the same rows. */
+const dated = (where: string | undefined, register: string): boolean =>
+  compile(register, where).clauses.some((c) => !('values' in c));
+
+/**
+ * Read one metric, and the comparison with it.
+ *
+ * §2.4's gate, where it applies: a delta is present only when the window spans at least seven days,
+ * both windows have rows, and the prior has at least half the current's count. The fourth condition
+ * is this build's own and follows from the mechanism — the shifted window is the SAME PREDICATE
+ * against a moved clock, so a predicate with no dated clause compares a set with itself and the
+ * delta is structurally zero. Reporting that as "no change" would be a fact about the arithmetic
+ * dressed as a fact about the business.
+ */
+export function read(decl: MetricDecl, now: number = NOW): Reading {
+  const refusals: string[] = [];
+  if (!decl.target) refusals.push(`${decl.metric}: a number with no target is decoration`);
+  if (!decl.window)
+    refusals.push(`${decl.metric}: a number with no comparison window is a number you cannot act on`);
+
+  const register = registerOf(decl.source);
+  if (!register) refusals.push(`${decl.metric}: source ${decl.source} is not a register this build reads`);
+  else if (!REGISTERS[register]) refusals.push(`${decl.metric}: there is no register called ${register}`);
+
+  const shift = decl.window ? windowMs(decl.window) : null;
+  if (decl.window && shift === null)
+    refusals.push(`${decl.metric}: ${decl.window} is not a window — write 30d, 4w or 3m`);
+
+  if (register && REGISTERS[register])
+    refusals.push(...explain(compile(register, decl.where)).map((r) => `${decl.metric}: ${r}`));
+
+  if (refusals.length || !register)
+    return { value: null, shown: '—', rows: 0, delta: null, why: refusals[0] ?? '', refusals, href: '/p/money' };
+
+  const w = compile(register, decl.where);
+  const all = ROWS[register] ?? [];
+  const rows = all.filter((e) => matches(e, w, now));
+  const value = evaluateValue(rows, decl.value);
+
+  let delta: number | null = null;
+  let why = '';
+  if (decl.compare === 'none' || shift === null) why = 'no comparison asked for';
+  else if (shift < 7 * DAY_MS) why = 'a window under seven days is noise';
+  else if (!dated(decl.where, register)) why = 'the predicate does not mention time, so the window moves nothing';
+  else {
+    const before = all.filter((e) => matches(e, w, now - shift));
+    if (rows.length === 0 || before.length === 0) why = 'one of the two windows is empty';
+    else if (before.length * 2 < rows.length) why = 'the window before has under half the rows';
+    else {
+      const prior = evaluateValue(before, decl.value);
+      if (prior === null || prior === 0 || value === null) why = 'the window before has nothing to compare against';
+      else {
+        delta = (value - prior) / Math.abs(prior);
+        why = `on the ${decl.window} before`;
+      }
+    }
+  }
+
+  return { value, shown: format(decl.format, value), rows: rows.length, delta, why, refusals: [], href: hrefFor(decl) };
+}
+
+/** Is the figure on the right side of what was declared as good? */
+export function meetsTarget(decl: MetricDecl, value: number | null): boolean | null {
+  if (value === null) return null;
+  return 'lte' in decl.target ? value <= decl.target.lte : value >= decl.target.gte;
+}
+
+/** The target, in the same words the figure is written in. */
+export const targetLine = (decl: MetricDecl): string =>
+  'lte' in decl.target
+    ? `target ≤ ${format(decl.format, decl.target.lte)}`
+    : `target ≥ ${format(decl.format, decl.target.gte)}`;
