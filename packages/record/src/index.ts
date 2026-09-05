@@ -666,6 +666,25 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       return tail(kernel.retire([args.id]));
     },
 
+    /**
+     * Run one installed rule over the rows that are already there.
+     *
+     * THERE IS NO UNDO, BY DESIGN. Sixty writes is not a thing to reverse from a button — the DRY
+     * RUN is the undo, and it is the same walk with nothing written, which is why `dry` is a
+     * parameter rather than a second method: two code paths would be two answers.
+     *
+     * AND IT ONLY FILLS GAPS. A row whose field the rule would set already has a value is left alone
+     * and counted, because somebody put it there and the write path says a mechanism does not
+     * overwrite what a person set.
+     */
+    async ruleApply(args: { id: string; dry?: boolean; limit?: number }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.id) return no('REQUIRED_MISSING', 'Which rule?', { at: 'id' });
+      const out = kernel.applyRule(args.id, { ...(args.dry === undefined ? {} : { dry: args.dry }), ...(args.limit === undefined ? {} : { limit: args.limit }) });
+      return args.dry ? out : tail(out);
+    },
+
     /* ── ADMIN: WHO IS ON THE RECORD ───────────────────── */
 
     /** Everybody on it, with what they hold and where. A read: a colleague list is not a secret. */

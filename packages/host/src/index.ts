@@ -51,6 +51,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'uninstallPack', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'setDeclaration', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
   { name: 'retireDeclaration', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
+  { name: 'ruleApply', writes: true, what: 'Run one rule over the rows already there. `dry` first: there is no undo.' },
   { name: 'members', writes: false, what: 'Who is on this record, at what level, and where.' },
   { name: 'invite', writes: true, what: 'Put somebody on, or move them. A level per register.' },
   { name: 'removeMember', writes: true, what: 'Take somebody off. Never the last owner.' },
@@ -170,6 +171,7 @@ export type RecordSurface = {
   uninstallPack(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
+  ruleApply(args: never, ctx: never): Promise<Result<unknown>>;
   members(ctx: never): Promise<Result<unknown>>;
   invite(args: never, ctx: never): Promise<Result<unknown>>;
   removeMember(args: never, ctx: never): Promise<Result<unknown>>;
@@ -209,6 +211,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),
     retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),
+    ruleApply: (a, ctx) => api.ruleApply(a as never, ctx as never),
     members: (_a, ctx) => api.members(ctx as never),
     invite: (a, ctx) => api.invite(a as never, ctx as never),
     removeMember: (a, ctx) => api.removeMember(a as never, ctx as never),

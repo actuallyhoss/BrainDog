@@ -68,7 +68,7 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { carryingOf, headline, nextOccurrence, noteEvent, runDigest, sectionsOf, type DigestDecl, type DigestDeps } from './digest.ts';
-import { CREATE_CEILING, dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
+import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
@@ -104,7 +104,7 @@ export { GRANT_KINDS, spanMs } from './vault.ts';
 export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, carryingOf, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
-export { CREATE_CEILING, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
+export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { BODY_KINDS, GOVERNANCE } from './govern.ts';
 export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
@@ -1275,6 +1275,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * afraid of.
      */
     dryRun: (candidate: RuleDecl, limit?: number): Result<DryRun> => dryRun(rulesDeps(), candidate, limit),
+
+    /**
+     * Run one installed rule over the rows that are already there.
+     *
+     * A RULE FIRES ON A WRITE, so a rule written today has never seen the four hundred rows written
+     * before it. Without this, turning one on means editing every one of those rows by hand.
+     */
+    applyRule: (id: string, opts: { dry?: boolean; limit?: number } = {}): Result<RuleApplied> => {
+      const row = sql.one<{ body: string }>(
+        "SELECT body FROM declaration WHERE id = ? AND kind = 'rule' AND superseded_at IS NULL AND retired = 0",
+        id.startsWith('rule.') ? id : `rule.${id}`,
+      );
+      if (!row) return no<RuleApplied>('OUT_OF_BOUNDS', `There is no rule called ${id}.`, { at: 'id' });
+      const rule = JSON.parse(row.body) as RuleDecl;
+      return opts.dry ? applyRule(rulesDeps(), rule, opts) : transaction(() => applyRule(rulesDeps(), rule, opts));
+    },
 
     /**
      * The cash walk: what is liquid now, then every dated movement in order, until it goes under.

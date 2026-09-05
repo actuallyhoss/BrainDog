@@ -799,3 +799,65 @@ test('A RULE CAN ASK RATHER THAN ACT, and the question goes through the gate', a
   assert.equal(value<unknown[]>(k.governance('suggestion')).length, 1);
   sql.close();
 });
+
+/* ── the bulk recategorise ────────────────────────────────── */
+
+test('A RULE FIRES ON A WRITE, so a new one has never seen the rows written before it', async () => {
+  /* Without a bulk apply, turning a rule on means editing four hundred rows by hand to make it fire.
+     This is the predecessor's recategorise, and it is a separate verb for that reason. */
+  const { k, sql } = await record();
+  for (const what of ['a', 'b', 'c'])
+    value<Entry>(k.create('obligations', { what, party: 'Acme', state: 'open' }, { actor: 'p_1' }));
+
+  assert.ok((await k.install([rule({ rule: 'chase', register: 'obligations', when: 'state is open', then: [{ set: { field: 'chase', to: 'call {{party}}' } }] })])).ok);
+  assert.equal(k.get('obligations#1')?.fields.chase, undefined, 'the rows written first were not touched');
+
+  // The dry run first, because there is no undo.
+  const dry = value<{ matched: number; applied: number; sample: { would: string[] }[] }>(k.applyRule('chase', { dry: true }));
+  assert.equal(dry.matched, 3);
+  assert.equal(dry.applied, 0, 'a dry run wrote something');
+  assert.deepEqual(dry.sample[0]?.would, ['set chase to call Acme']);
+  assert.equal(k.get('obligations#1')?.fields.chase, undefined);
+
+  const done = value<{ matched: number; applied: number; kept: number }>(k.applyRule('chase'));
+  assert.equal(done.applied, 3);
+  assert.equal(k.get('obligations#1')?.fields.chase, 'call Acme');
+  assert.equal(k.get('obligations#3')?.fields.chase, 'call Acme');
+  sql.close();
+});
+
+test('AND IT ONLY FILLS GAPS, because somebody put the value that is already there', async () => {
+  /* The write path says a mechanism may not overwrite what a person set, and a bulk apply that
+     ignored that would be the one way round it. */
+  const { k, sql } = await record();
+  value<Entry>(k.create('obligations', { what: 'a', party: 'Acme', chase: 'already said', state: 'open' }, { actor: 'p_1' }));
+  value<Entry>(k.create('obligations', { what: 'b', party: 'Acme', state: 'open' }, { actor: 'p_1' }));
+  assert.ok((await k.install([rule({ rule: 'chase', register: 'obligations', when: 'state is open', then: [{ set: { field: 'chase', to: 'call {{party}}' } }] })])).ok);
+
+  const out = value<{ matched: number; applied: number; kept: number }>(k.applyRule('chase'));
+  assert.equal(out.kept, 1);
+  assert.equal(out.applied, 1);
+  assert.equal(k.get('obligations#1')?.fields.chase, 'already said');
+  assert.equal(k.get('obligations#2')?.fields.chase, 'call Acme');
+  sql.close();
+});
+
+test('and it is a page, not a `while` nobody can stop', async () => {
+  const { k, sql } = await record();
+  k.transaction(() => {
+    for (let i = 0; i < 12; i++) k.create('obligations', { what: `x${i}`, party: 'Acme', state: 'open' }, { actor: 'p_1' });
+  });
+  assert.ok((await k.install([rule({ rule: 'chase', register: 'obligations', when: 'state is open', then: [{ set: { field: 'chase', to: 'call' } }] })])).ok);
+
+  const first = value<{ matched: number; applied: number; remaining: number }>(k.applyRule('chase', { limit: 5 }));
+  assert.equal(first.applied, 5);
+  assert.equal(first.remaining, 7);
+
+  const second = value<{ applied: number; remaining: number }>(k.applyRule('chase', { limit: 100 }));
+  assert.equal(second.applied, 7, 'the second page did not pick up where the first left off');
+  assert.equal(second.remaining, 0);
+
+  assert.equal(value<{ matched: number }>(k.applyRule('chase')).matched, 0, 'a third run had something left to do');
+  assert.equal(k.applyRule('nothing').ok, false);
+  sql.close();
+});

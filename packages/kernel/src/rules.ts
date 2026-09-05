@@ -24,6 +24,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
+import { ok } from '@braindog/ports';
 import { compile, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
@@ -620,4 +621,94 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
     }
   }
   return out;
+}
+
+/* ── the bulk recategorise ────────────────────────────────────────────────── */
+
+export type Applied = {
+  rule: string;
+  /** Rows the rule matched and had not already fired on. */
+  matched: number;
+  /** Rows it actually changed. `0` when `dry`. */
+  applied: number;
+  /** Rows it matched and left alone, because the field it sets already has a value. */
+  kept: number;
+  /** Matched rows past the ceiling. Run it again to take the next page. */
+  remaining: number;
+  /** What it did, in the words a person would use, for the first twenty. */
+  sample: { spoken: string; would: string[] }[];
+  refusals: Refusal[];
+};
+
+/** One page of a bulk apply. Past it, run it again — a `while` nobody can stop is not a feature. */
+const PAGE = 200;
+const MOST = 1000;
+
+/**
+ * Run one rule over the rows that are already there.
+ *
+ * THE PREDECESSOR'S BULK RECATEGORISE, and the reason it is a separate verb: a rule fires on a
+ * write, so a rule written today has never seen the four hundred rows written before it. Without
+ * this, turning one on means editing every one of those rows by hand to make it fire.
+ *
+ * IT ONLY FILLS GAPS. A row whose field the rule would set ALREADY HAS A VALUE is left alone, and
+ * counted, because somebody put that value there — the write path's own PINNED rule says a mechanism
+ * may not overwrite what a person set, and a bulk apply that ignored it would be the one way round
+ * it.
+ *
+ * AND THERE IS NO UNDO, BY DESIGN. Sixty writes is not a thing to reverse from a button; the DRY RUN
+ * is the undo, and it is the same walk with nothing written. That is why `dry` is a parameter here
+ * rather than a second method: two code paths would be two answers.
+ */
+export function applyRule(deps: RulesDeps, rule: RuleDecl, opts: { dry?: boolean; limit?: number } = {}): Result<Applied> {
+  const schema = deps.schemaOf(rule.register);
+  if (!schema)
+    return { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${rule.register}.`, at: 'register' } };
+
+  const said = predicateOf(rule.when, schema, deps.ctx);
+  if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
+
+  const limit = Math.min(Math.max(1, Math.floor(opts.limit ?? PAGE)), MOST);
+  const out: Applied = { rule: rule.rule, matched: 0, applied: 0, kept: 0, remaining: 0, sample: [], refusals: [] };
+
+  /* THE FIELD IT SETS, if it sets one. A rule that only tags or notifies has no gap to fill, so
+     every row it matches is one it would act on. */
+  const mine = (Array.isArray(rule.then) ? rule.then : []).find((a) => 'set' in a) as { set?: { field: string } } | undefined;
+  const field = mine?.set?.field ?? null;
+
+  /* ONE RULE, and the pass is the ordinary one. Filtering the declarations rather than copying the
+     action loop is what stops this becoming a second definition of what a rule does. */
+  const only: RulesDeps = { ...deps, rules: (register) => deps.rules(register).filter((r) => r.rule === rule.rule) };
+
+  for (const { id } of deps.sql.all<{ id: string }>(
+    'SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY seq',
+    rule.register,
+  )) {
+    const entry = deps.entry(id);
+    if (!entry || !matches(deps, schema, rule, entry)) continue;
+
+    /* A ROW WHOSE FIELD ALREADY HAS A VALUE IS LEFT ALONE. Somebody put it there, and the write
+       path's PINNED rule says a mechanism may not overwrite what a person set — a bulk apply that
+       ignored that would be the one way round it. */
+    if (field !== null && entry.fields[field] !== undefined && entry.fields[field] !== null && entry.fields[field] !== '') {
+      out.kept++;
+      continue;
+    }
+
+    out.matched++;
+    if (out.matched > limit) {
+      out.remaining++;
+      continue;
+    }
+
+    const spoken = entry.seq === null ? entry.id : `${entry.register}#${entry.seq}`;
+    if (out.sample.length < 20) out.sample.push({ spoken, would: describe(deps, rule, entry) });
+    if (opts.dry) continue;
+
+    const outcome = runRules(only, { entry, register: rule.register, batch: deps.mint(), actor: `rule:${rule.rule}` });
+    out.refusals.push(...outcome.refused);
+    if (outcome.fired.length) out.applied++;
+  }
+
+  return ok(out);
 }
