@@ -666,6 +666,40 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       return tail(kernel.retire([args.id]));
     },
 
+    /* ── ADMIN: AGENT TOKENS ──────────────────────────── */
+
+    /**
+     * Mint one.
+     *
+     * THE SECRET IS IN THE ANSWER AND NOWHERE ELSE. What the record keeps is its hash, so a copy of
+     * the database is a copy of hashes rather than a set of working keys — and nothing in this
+     * product can show you a token you made last month, which is the point.
+     *
+     * A TOKEN IS ALWAYS SOMEBODY'S. It writes as the person who minted it and can never do more
+     * than they can; the intersection is checked on every call, so a colleague whose access is
+     * removed does not keep writing through a token they were issued last year.
+     */
+    async createToken(args: { scope: Scope; label?: string; days?: number }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return tail(await kernel.createToken(actorOf(ctx), args ?? ({} as never)));
+    },
+
+    /** Every token, with a revoke button's worth of information and never the hash. */
+    async listTokens(ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.listTokens());
+    },
+
+    /** Revoke one. The second call says the same as the first. */
+    async revokeToken(args: { id: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.id) return no('REQUIRED_MISSING', 'Which token?', { at: 'id' });
+      return tail(kernel.revokeToken(actorOf(ctx), args.id));
+    },
+
     /* ── ADMIN: THE RECORD AS A FILE ───────────────────── */
 
     /**

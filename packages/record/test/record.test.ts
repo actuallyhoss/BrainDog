@@ -519,3 +519,78 @@ test('TAKE YOUR RECORD AND GO, and it comes back in', async () => {
   sql.close();
   fresh.sql.close();
 });
+
+/* ── agent tokens ───────────────────────────────────────── */
+
+test('THE SECRET EXISTS ONCE, IN THE ANSWER, and is stored nowhere', async () => {
+  /* What the record keeps is `sha256(secret)`, so a copy of the database is a copy of hashes and not
+     a set of working keys. A product that can show you a token you made last month is a product
+     whose database is a keyring. */
+  const { api, sql } = await record();
+  assert.ok(
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok,
+  );
+
+  const made = value<{ id: string; bearer: string; expires_at: string }>(
+    await api.createToken({ scope: 'propose', label: 'the drafting agent' }, owner),
+  );
+  assert.match(made.bearer, /^rec_01JZ8QK3F7R2M9V4XN6TCB5HAD\./);
+  assert.ok(made.bearer.length > 40);
+
+  // The row holds a hash and the listing shows neither it nor the secret.
+  const rows = sql.all<{ hash: string }>('SELECT hash FROM token');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.hash.length, 64);
+  assert.equal(made.bearer.includes(rows[0]!.hash), false);
+
+  const listed = value<Record<string, unknown>[]>(await api.listTokens(owner));
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0]?.scope, 'propose');
+  assert.equal(listed[0]?.label, 'the drafting agent');
+  assert.equal('hash' in listed[0]!, false, 'the listing carries the hash');
+
+  // And ninety days by default, said rather than assumed.
+  assert.equal(Date.parse(made.expires_at) - NOW, 90 * 86_400_000);
+  sql.close();
+});
+
+test('AND A BEARER IS THE ONLY WAY ONE IS RECOGNISED', async () => {
+  const { api, sql } = await record();
+  assert.ok(
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok,
+  );
+  const made = value<{ id: string; bearer: string }>(await api.createToken({ scope: 'write' }, owner));
+
+  const seen = value<{ id: string; person_id: string; scope: string }>(await api.kernel.verifyToken(made.bearer, 'mcp'));
+  assert.equal(seen.id, made.id);
+  assert.equal(seen.person_id, 'p_1');
+  assert.equal(seen.scope, 'write');
+  assert.equal(sql.one<{ last_surface: string }>('SELECT last_surface FROM token')?.last_surface, 'mcp');
+
+  /* THE SAME ANSWER EITHER WAY. A different sentence for "a token, but not for this record" would
+     tell whoever is guessing which half they got right. */
+  for (const bad of ['nonsense', 'rec_other.abc', `${made.bearer}x`, 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD.', ''])
+    assert.equal((await api.kernel.verifyToken(bad)).ok, false, `${bad} verified`);
+
+  // Revoked is gone, and revoking twice says the same as revoking once.
+  value(await api.revokeToken({ id: made.id }, owner));
+  assert.equal((await api.kernel.verifyToken(made.bearer)).ok, false, 'a revoked token still works');
+  assert.ok((await api.revokeToken({ id: made.id }, owner)).ok);
+  assert.equal((await api.revokeToken({ id: 'nothing' }, owner)).ok, false);
+  sql.close();
+});
+
+test('and there is no `admin` scope to ask for, nor a token that mints one', async () => {
+  const { api, sql } = await record();
+  assert.ok(
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok,
+  );
+  assert.equal((await api.createToken({ scope: 'admin' as never }, owner)).ok, false);
+  assert.equal((await api.createToken({ scope: 'write', days: 400 }, owner)).ok, false);
+  assert.equal((await api.createToken({ scope: 'write', days: 0 }, owner)).ok, false);
+
+  // And no token mints a token, which is how one would otherwise outlive its own revocation.
+  assert.equal((await api.createToken({ scope: 'read' }, token('write'))).ok, false);
+  assert.equal((await api.listTokens(token('read'))).ok, false);
+  sql.close();
+});

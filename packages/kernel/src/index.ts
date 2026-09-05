@@ -40,6 +40,18 @@ import {
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import {
+  SCOPES,
+  createToken,
+  listTokens,
+  revokeToken,
+  verifyToken,
+  type Minted,
+  type Scope,
+  type TokenDeps,
+  type TokenRow,
+  type Verified,
+} from './token.ts';
+import {
   decide,
   getGovernance,
   listGovernance,
@@ -94,6 +106,8 @@ export { CHANNELS, carryingOf, headline, inQuietHours, localParts, nextOccurrenc
 export { CREATE_CEILING, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { BODY_KINDS, GOVERNANCE } from './govern.ts';
+export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
+export type { Minted, Scope, TokenRow, Verified } from './token.ts';
 export type { Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, extract as extractField, shapeOf } from './ingest.ts';
 export { SIGNALS, analyse, observe } from './observe.ts';
@@ -986,6 +1000,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     write: (register, patch, actor, batch) => write(register, null, patch, { actor, batch }),
   });
 
+  /**
+   * What a token needs beyond SQL.
+   *
+   * THE HASH AND THE RANDOMNESS ARE THE HOST'S, injected rather than imported, because the record
+   * has no crypto of its own and a fixture has to be deterministic. `crypto` is on the platform in
+   * both hosts and in Node, so this is a seam rather than a dependency.
+   */
+  const tokenDeps = (): TokenDeps => ({
+    sql,
+    nowMs: clock.now(),
+    mint,
+    recordId: () => recordIdentity(sql)?.id ?? null,
+    digest: async (text: string) => {
+      const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+      return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+    },
+    random: (n: number) => crypto.getRandomValues(new Uint8Array(n)),
+  });
+
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
@@ -1411,6 +1444,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     seenAt: (person: string): string | null =>
       sql.one<{ seen_at: string | null }>("SELECT seen_at FROM member WHERE person_id = ? AND register = '*'", person)
         ?.seen_at ?? null,
+
+    /* ── agent tokens ───────────────────────────────────── */
+
+    /** Mint one. The secret exists once, in the answer, and is stored nowhere. */
+    createToken: (person: string, args: { scope: Scope; label?: string; days?: number }): Promise<Result<Minted>> =>
+      Promise.resolve(tokenDeps()).then((deps) => transaction(() => createToken(deps, person, args))),
+
+    /** Every token, with a revoke button's worth of information and nothing a hash needs. */
+    listTokens: (): TokenRow[] => listTokens(sql),
+
+    /** Revoke one, idempotently. */
+    revokeToken: (person: string, id: string): Result<TokenRow> => transaction(() => revokeToken(tokenDeps(), person, id)),
+
+    /** A bearer, checked. The one way a token is recognised, and there is no other. */
+    verifyToken: (bearer: string, surface?: string): Promise<Result<Verified>> =>
+      verifyToken(tokenDeps(), bearer, surface),
 
     /* ── the decision gate ─────────────────────────────────── */
 
