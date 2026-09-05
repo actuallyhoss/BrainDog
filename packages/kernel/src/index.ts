@@ -42,6 +42,7 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { evaluateMetric, predicateOf, scorePrediction, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps } from './digest.ts';
+import { marker, runRules, type Fired, type RuleDecl, type RulesDeps, type RulesOutcome } from './rules.ts';
 import {
   bindGrant,
   getGrant,
@@ -73,6 +74,8 @@ export { GRANT_KINDS, spanMs } from './vault.ts';
 export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
+export { fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
+export type { Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
 export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Value } from './metrics.ts';
@@ -127,6 +130,13 @@ export type WriteContext = {
   version?: number;
   /** Groups the events of one write, and of a rule's re-entry into it. */
   batch?: string;
+  /**
+   * Whether the rules pass runs after this write. `false` is what a rule's own write carries.
+   *
+   * A RULE IS ONE STEP. One rule cannot trigger another, so nothing here loops — every product that
+   * allowed it grew a depth limit and then a graph explorer to explain the depth limit.
+   */
+  cascade?: boolean;
 };
 
 const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
@@ -505,8 +515,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const entry = byId(id, true)!;
         reproject(entry);
         rediary(entry);
-        appendEvent({ kind: 'create', target: id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
-        return ok(entry);
+        const batch = appendEvent({ kind: 'create', target: id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
+        return ok(rules(entry, register, w, batch));
       }
 
       sql.exec(
@@ -521,9 +531,28 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       reproject(entry);
       rediary(entry);
       const kind = deleting ? (deletedAt ? 'delete' : 'restore') : nextState !== current.state ? 'state' : 'edit';
-      appendEvent({ kind, target: current.id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
-      return ok(entry);
+      const batch = appendEvent({ kind, target: current.id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
+      return ok(rules(entry, register, w, batch));
     });
+  }
+
+  /**
+   * Step nine of the write path: the rules pass.
+   *
+   * INSIDE THE SAME TRANSACTION, so a rule's write and the write that triggered it commit together
+   * or neither does — a row tagged `late` by a rule whose own write then failed would be a row
+   * carrying a fact about a write that did not happen.
+   *
+   * The BATCH is the triggering write's event id, shared by everything it caused, so "undo this
+   * expansion" is one query rather than an archaeology of timestamps.
+   */
+  function rules(entry: Entry, register: string, w: WriteContext, batch: string): Entry {
+    if (w.cascade === false) return entry;
+    if (!sql.one("SELECT 1 AS x FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")) return entry;
+    runRules(rulesDeps(), { entry, register, batch, actor: w.actor });
+    /* The row as the rules left it. A caller that wrote `state: open` and got back a row a rule
+       moved to `late` is being told the truth about what is in the record. */
+    return byId(entry.id, true) ?? entry;
   }
 
   /**
@@ -668,6 +697,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       tz: recordIdentity(sql)?.tz ?? 'UTC',
     };
   };
+
+  /**
+   * What the rules pass reads and writes through.
+   *
+   * `write` IS THE SAME WRITE PATH, re-entered. That is the whole design: a rule is a caller like
+   * any other, wearing its own name, and every check a person's write answers to it answers to too.
+   */
+  const rulesDeps = (): RulesDeps => ({
+    sql,
+    rules: (register) =>
+      sql
+        .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")
+        .map((r) => JSON.parse(r.body) as RuleDecl)
+        .filter((r) => r.register === register),
+    schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
+    ctx: evalContext(),
+    /* CASCADE OFF. A rule's write does not run the rules pass again, so one rule cannot trigger
+       another and nothing here loops — every product that allowed it grew a depth limit and then a
+       graph explorer to explain the depth limit. */
+    write: (register, spoken, patch, actor, batch) => write(register, spoken, patch, { actor, batch, cascade: false }),
+    note: (entry, actor, text, batch) =>
+      void appendEvent({ kind: 'note', target: entry.id, register: entry.register, actor, note: text, at: instant(clock.now()), batch }),
+    schedule: (key, payload, pending) => marker(sql, mint, clock.now(), key, payload, pending),
+    mint,
+    nowMs: clock.now(),
+  });
 
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });

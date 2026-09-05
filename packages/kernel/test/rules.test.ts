@@ -1,0 +1,310 @@
+/**
+ * Rules: a declaration that says what happens when a row looks a certain way.
+ *
+ * A RULE IS A DOCUMENT, NOT CODE — which is the difference between a product whose behaviour a
+ * person can read and one whose behaviour is in a repository they do not have. What is asserted here
+ * is mostly the boundaries: a rule cannot go around the record's own rules, cannot start a second
+ * pass with its own write, cannot set a field an earlier rule already set, and cannot notify twice
+ * about one row.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { fillTemplate, openRecord, orderRules, type Declaration, type Entry, type Kernel } from '../src/index.ts';
+import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
+
+const NOW = Date.UTC(2026, 8, 5, 12);
+const DAY = 86_400_000;
+
+const OBLIGATIONS: Declaration = {
+  id: 'register.obligations',
+  kind: 'register',
+  body: {
+    id: 'obligations',
+    name: 'Obligations',
+    title: 'what',
+    state: 'state',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'party', type: 'text', index: true },
+      { id: 'amount', type: 'money' },
+      { id: 'due', type: 'day', index: true },
+      { id: 'chase', type: 'text' },
+      { id: 'owner', type: 'ref', to: 'people' },
+      { id: 'tags', type: 'list', of: 'text' },
+      {
+        id: 'state',
+        type: 'enum',
+        values: ['open', 'late', 'paid'],
+        index: true,
+        transitions: { open: { to: ['late', 'paid'] }, late: { to: ['paid'] }, paid: { to: [] } },
+      },
+    ],
+  } as never,
+};
+
+const PEOPLE: Declaration = {
+  id: 'register.people',
+  kind: 'register',
+  body: { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never,
+};
+
+const rule = (body: Record<string, unknown>): Declaration => ({
+  id: `rule.${body.rule as string}`,
+  kind: 'rule',
+  body: body as never,
+});
+
+const day = (offset: number) => new Date(NOW + offset * DAY).toISOString().slice(0, 10);
+
+type Clockish = ReturnType<typeof fixedClock>;
+
+async function record(...rules: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
+  assert.ok((await k.install([OBLIGATIONS, PEOPLE, ...rules])).ok);
+  return { k, sql, clock };
+}
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+const notes = (sql: NodeSql) => sql.all<{ actor: string; note: string }>("SELECT actor, note FROM event WHERE kind = 'note' ORDER BY rowid");
+
+/* ── it fires ────────────────────────────────────────────────────────────── */
+
+test('A RULE IS A DECLARATION, and the row it is about comes back as the rule left it', async () => {
+  const { k, sql } = await record(
+    rule({ rule: 'late', register: 'obligations', when: 'state is open, due before today', then: [{ move: 'late' }, { tag: 'chased' }] }),
+  );
+
+  const made = value<Entry>(k.create('obligations', { what: 'Invoice 41', due: day(-3), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(made.state, 'late', 'the caller was handed a row that is not what the record holds');
+  assert.deepEqual(made.fields.tags, ['chased']);
+
+  // The rule's write wears its own name, and shares the triggering write's batch.
+  const events = sql.all<{ actor: string; kind: string; batch: string | null }>('SELECT actor, kind, batch FROM event ORDER BY rowid');
+  assert.deepEqual(events.map((e) => e.actor), ['p_1', 'rule:late']);
+  assert.equal(events[1]?.batch, events[0] ? sql.one<{ id: string }>('SELECT id FROM event ORDER BY rowid LIMIT 1')?.id : null);
+  sql.close();
+});
+
+test('and a row the rule does not describe is left alone', async () => {
+  const { k, sql } = await record(
+    rule({ rule: 'late', register: 'obligations', when: 'state is open, due before today', then: [{ move: 'late' }] }),
+  );
+  const future = value<Entry>(k.create('obligations', { what: 'Later', due: day(30), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(future.state, 'open');
+  sql.close();
+});
+
+/* ── it cannot go around the record ──────────────────────────────────────── */
+
+test('A RULE ANSWERS TO THE TRANSITIONS THE REGISTER DECLARES, like anybody else', async () => {
+  /* A rule is not a way around the record's rules; it is a caller like any other wearing its own
+     name. `paid` declares no transitions out, so a rule that tries to move one is refused — and the
+     triggering write is NOT undone by the refusal. */
+  const { k, sql } = await record(
+    rule({ rule: 'reopen', register: 'obligations', when: 'state is paid', then: [{ move: 'open' }] }),
+  );
+  const paid = value<Entry>(k.create('obligations', { what: 'Settled', due: day(-1), state: 'paid' }, { actor: 'p_1' }));
+  assert.equal(paid.state, 'paid', 'a rule walked out of a terminal state');
+  assert.ok(k.get('obligations#1'), 'the triggering write was undone by a rule refusing');
+  sql.close();
+});
+
+test('ONE PASS, IN ORDER, AND EACH RULE SEES WHAT THE ONE BEFORE IT DID', async () => {
+  /* Which is why `stop` exists and why the `set` precedence is per pass rather than per rule. It is
+     a chain and not a loop: the order is fixed, every rule runs at most once, and a rule's own write
+     starts no second pass — every product that allowed that grew a depth limit and then a graph
+     explorer to explain the depth limit. */
+  const { k, sql } = await record(
+    rule({ rule: 'a', register: 'obligations', when: 'state is open', priority: 10, then: [{ move: 'late' }] }),
+    rule({ rule: 'b', register: 'obligations', when: 'state is late', priority: 20, then: [{ tag: 'second' }] }),
+  );
+  const made = value<Entry>(k.create('obligations', { what: 'x', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(made.state, 'late');
+  assert.deepEqual(made.fields.tags, ['second'], 'the later rule did not see the earlier one’s work');
+
+  /* AND IT IS BOUNDED. One write by the person and one by each rule — four events would mean a rule
+     ran on a rule's write, which is the thing that cannot terminate. */
+  const events = sql.all<{ actor: string }>('SELECT actor FROM event ORDER BY rowid').map((e) => e.actor);
+  assert.deepEqual(events, ['p_1', 'rule:a', 'rule:b']);
+  sql.close();
+});
+
+test('and a rule that would re-match its own change fires once, not forever', async () => {
+  // `a` moves an open row to late; a rule ordered AFTER it that also matches `open` never sees one.
+  const { k, sql } = await record(
+    rule({ rule: 'a', register: 'obligations', when: 'state is open', priority: 10, then: [{ move: 'late' }] }),
+    rule({ rule: 'z', register: 'obligations', when: 'state is open', priority: 20, then: [{ tag: 'again' }] }),
+  );
+  const made = value<Entry>(k.create('obligations', { what: 'x', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(made.state, 'late');
+  assert.equal(made.fields.tags, undefined, 'a rule matched a state its predecessor had already left');
+  sql.close();
+});
+
+/* ── one `set` per field ─────────────────────────────────────────────────── */
+
+test('TWO RULES SETTING ONE FIELD IS A DISAGREEMENT, and the FIRST one wins', async () => {
+  /* Resolving it by running both leaves whichever ran last — an order nobody declared. Priority
+     first, then the longest literal, so a specific rule beats a general one without being numbered. */
+  const { k, sql } = await record(
+    rule({ rule: 'general', register: 'obligations', when: 'state is open', then: [{ set: { field: 'chase', to: 'a letter' } }] }),
+    rule({
+      rule: 'specific',
+      register: 'obligations',
+      when: 'state is open, party is Halden Type Co',
+      then: [{ set: { field: 'chase', to: 'a phone call' } }],
+    }),
+  );
+  const made = value<Entry>(
+    k.create('obligations', { what: 'x', party: 'Halden Type Co', due: day(-1), state: 'open' }, { actor: 'p_1' }),
+  );
+  assert.equal(made.fields.chase, 'a phone call', 'the general rule beat the specific one');
+  sql.close();
+});
+
+test('and priority beats the literal, because that is what it is for', () => {
+  const ordered = orderRules([
+    { rule: 'b', register: 'r', then: [], when: 'party is a very long literal indeed' },
+    { rule: 'a', register: 'r', then: [], when: 'x is y', priority: 10 },
+    { rule: 'c', register: 'r', then: [], when: 'x is y' },
+  ]);
+  assert.deepEqual(ordered.map((r) => r.rule), ['a', 'b', 'c']);
+});
+
+/* ── once_per ────────────────────────────────────────────────────────────── */
+
+test('A `notify` WITHOUT `once_per` IS REFUSED, because it would fire on every write of the row', async () => {
+  const { k, sql } = await record(
+    rule({ rule: 'shout', register: 'obligations', when: 'state is open', then: [{ notify: { say: 'look' } }] }),
+  );
+  value(k.create('obligations', { what: 'x', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(notes(sql).length, 0, 'a rule notified on every write');
+  sql.close();
+});
+
+test('and with one, it fires ONCE for the row however many times the row is written', async () => {
+  const { k, sql } = await record(
+    rule({
+      rule: 'chase',
+      register: 'obligations',
+      when: 'state is open, due before today',
+      once_per: ['entry'],
+      then: [{ notify: { say: '{{what}} is {{ago:due}}' } }],
+    }),
+  );
+  value(k.create('obligations', { what: 'Invoice 41', due: day(-3), state: 'open' }, { actor: 'p_1' }));
+  value(k.update('obligations', 'obligations#1', { chase: 'a' }, { actor: 'p_1' }));
+  value(k.update('obligations', 'obligations#1', { chase: 'b' }, { actor: 'p_1' }));
+
+  const said = notes(sql);
+  assert.equal(said.length, 1, `it notified ${said.length} times about one row`);
+  assert.equal(said[0]?.actor, 'rule:chase');
+  assert.equal(said[0]?.note, 'Invoice 41 is 3 days ago');
+
+  // The marker is a schedule row, because that table already carries exactly-once as an index.
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'rule'").length, 1);
+  sql.close();
+});
+
+test('a second row of the same register gets its own firing', async () => {
+  const { k, sql } = await record(
+    rule({
+      rule: 'chase',
+      register: 'obligations',
+      when: 'state is open',
+      once_per: ['entry'],
+      then: [{ notify: { say: '{{what}}' } }],
+    }),
+  );
+  value(k.create('obligations', { what: 'One', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'Two', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+  assert.deepEqual(notes(sql).map((n) => n.note), ['One', 'Two']);
+  sql.close();
+});
+
+/* ── link ────────────────────────────────────────────────────────────────── */
+
+test('`link` TAKES EXACTLY ONE MATCH OR NOTHING, because two is a question about which', async () => {
+  const { k, sql } = await record(
+    rule({
+      rule: 'assign',
+      register: 'obligations',
+      when: 'state is open',
+      then: [{ link: { field: 'owner', to: { register: 'people', by: 'name', value: '{{party}}' } } }],
+    }),
+  );
+  value(k.create('people', { name: 'Halden' }, { actor: 'p_1' }));
+  const one = value<Entry>(k.create('obligations', { what: 'x', party: 'Halden', due: day(1), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(one.fields.owner, k.get('people#1')?.id);
+
+  // A second row bearing the name, and the link is skipped rather than guessing.
+  value(k.create('people', { name: 'Halden' }, { actor: 'p_1' }));
+  const two = value<Entry>(k.create('obligations', { what: 'y', party: 'Halden', due: day(1), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(two.fields.owner, undefined, 'a rule picked one of two rows bearing the name');
+
+  // And a name no row bears is nothing, not a broken reference.
+  const none = value<Entry>(k.create('obligations', { what: 'z', party: 'Nobody', due: day(1), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(none.fields.owner, undefined);
+  sql.close();
+});
+
+/* ── the sentence a rule writes ──────────────────────────────────────────── */
+
+test('THE SENTENCE IS THE ONE SOMEBODY READS IN SIX WEEKS, and a missing value is an em dash', () => {
+  // A sentence with a hole in it reads as a bug; one with a dash reads as a fact.
+  const row = {
+    id: '01ABC',
+    register: 'obligations',
+    seq: 41,
+    fields: { what: 'Invoice 41', amount: { amount: 480_000, currency: 'GBP' }, due: '2026-09-08', tags: ['a', 'b'] },
+  } as never as Entry;
+
+  assert.equal(fillTemplate('{{what}} is {{money:amount}}', row, NOW), 'Invoice 41 is GBP 4800.00');
+  assert.equal(fillTemplate('{{id}}', row, NOW), 'obligations#41');
+  assert.equal(fillTemplate('{{until:due}}', row, NOW), 'in 3 days');
+  assert.equal(fillTemplate('{{tags}}', row, NOW), 'a, b');
+  assert.equal(fillTemplate('{{party}}', row, NOW), '—');
+  assert.equal(fillTemplate('{{amount}}', row, NOW), 'GBP 4800.00', 'money says its currency however it is asked for');
+});
+
+/* ── stop ────────────────────────────────────────────────────────────────── */
+
+test('`stop` ENDS THE PASS, and the rule that said so still applies its own patch', async () => {
+  const { k, sql } = await record(
+    rule({ rule: 'a', register: 'obligations', when: 'state is open', priority: 10, then: [{ tag: 'first' }, { stop: true }] }),
+    rule({ rule: 'b', register: 'obligations', when: 'state is open', priority: 20, then: [{ tag: 'second' }] }),
+  );
+  const made = value<Entry>(k.create('obligations', { what: 'x', due: day(1), state: 'open' }, { actor: 'p_1' }));
+  assert.deepEqual(made.fields.tags, ['first']);
+  sql.close();
+});
+
+/* ── a rule that cannot be read ──────────────────────────────────────────── */
+
+test('A RULE WHOSE PREDICATE THE REGISTER CANNOT ANSWER FIRES ON NOTHING', async () => {
+  /* The other direction — firing on everything — is what a broken predicate does when nobody checks
+     it, and a rule that tags every row is a rule whose author will not find out for a month. */
+  const { k, sql } = await record(
+    rule({ rule: 'broken', register: 'obligations', when: 'colour is red', then: [{ tag: 'oops' }] }),
+  );
+  const made = value<Entry>(k.create('obligations', { what: 'x', due: day(1), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(made.fields.tags, undefined, 'a rule nobody can read tagged a row');
+  sql.close();
+});
+
+test('and a record with no rules at all pays nothing for the pass', async () => {
+  const { k, sql } = await record();
+  const made = value<Entry>(k.create('obligations', { what: 'x', due: day(1), state: 'open' }, { actor: 'p_1' }));
+  assert.equal(made.state, 'open');
+  assert.equal(sql.all('SELECT 1 FROM event').length, 1, 'the pass wrote something on a record with no rules');
+  sql.close();
+});
