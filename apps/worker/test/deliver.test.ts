@@ -103,6 +103,14 @@ test('A WEBHOOK GOES TO AN HTTPS ADDRESS ON A PUBLIC HOST, and the check is here
     'https://172.16.0.1/x',
     'https://172.31.255.255/x',
     'https://[::1]/x',
+    // The fully qualified forms of the two names this check exists to block.
+    'https://localhost./',
+    'https://metadata.google.internal./',
+    // And the IPv6 literals that reach loopback without being the string `[::1]`.
+    'https://[::ffff:127.0.0.1]/',
+    'https://[0:0:0:0:0:ffff:7f00:1]/',
+    'https://[::]/',
+    'https://[fe80::1]/',
     'file:///etc/passwd',
     'not a url',
   ])

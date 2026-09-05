@@ -35,7 +35,9 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
 
 const hostFor = (k: Kernel): Host => ({
   count: (register) => k.count(register),
-  install: (batch) => k.install(batch as never),
+  stage: (batch) => k.stageInstall(batch as never),
+  transaction: (fn) => k.transaction(fn),
+  reload: () => k.reload(),
   retire: (ids) => k.retire(ids),
   seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_seed', cascade: false }) as never,
   remember: (row) => k.rememberPack(row),

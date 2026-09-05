@@ -244,24 +244,40 @@ export function createDirectory(sql: Sql, clock: Clock) {
       sql.one<{ level: Level }>('SELECT level FROM dir_member WHERE record = ? AND person = ?', record, person)?.level ?? null,
 
     /** Add somebody, or move them. */
-    join: (record: string, person: string, level: Level): Result<null> => {
-      if (!(LEVELS as readonly string[]).includes(level))
-        return no<null>('ENUM_VALUE_UNKNOWN', `${level} is not a level.`, { at: 'level', allowed: LEVELS });
-      if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ?', record))
-        return no<null>('OUT_OF_BOUNDS', `There is no record ${record}.`, { at: 'record' });
-      if (!sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', person))
-        return no<null>('OUT_OF_BOUNDS', `There is no person ${person}.`, { at: 'person' });
+    join: (record: string, person: string, level: Level): Result<null> =>
+      sql.transactionSync(() => {
+        if (!(LEVELS as readonly string[]).includes(level))
+          return no<null>('ENUM_VALUE_UNKNOWN', `${level} is not a level.`, { at: 'level', allowed: LEVELS });
+        /* AND A CLOSED RECORD TAKES NOBODY. Its name is released and its storage is the platform's
+           to delete; adding somebody mints access to a record whose name may already have been
+           handed back, and `levelOf` is what the Worker builds a caller's context from. */
+        if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ? AND closed_at IS NULL', record))
+          return no<null>('OUT_OF_BOUNDS', `There is no open record ${record}.`, { at: 'record' });
+        if (!sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', person))
+          return no<null>('OUT_OF_BOUNDS', `There is no person ${person}.`, { at: 'person' });
 
-      sql.exec(
-        `INSERT INTO dir_member (person, record, level, added_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT (person, record) DO UPDATE SET level = excluded.level`,
-        person,
-        record,
-        level,
-        at(),
-      );
-      return ok(null);
-    },
+        /* THE LAST OWNER CANNOT BE DEMOTED EITHER. `leave` refused to remove them and this moved
+           them, which is the same record with nobody who can grant access to it — and the only way
+           out of that is somebody with a database. */
+        const now = sql.one<{ level: Level }>('SELECT level FROM dir_member WHERE record = ? AND person = ?', record, person)?.level;
+        if (now === 'owner' && level !== 'owner') {
+          const owners = Number(
+            sql.one<{ n: number }>("SELECT count(*) AS n FROM dir_member WHERE record = ? AND level = 'owner'", record)?.n ?? 0,
+          );
+          if (owners <= 1)
+            return no<null>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'level' });
+        }
+
+        sql.exec(
+          `INSERT INTO dir_member (person, record, level, added_at) VALUES (?, ?, ?, ?)
+           ON CONFLICT (person, record) DO UPDATE SET level = excluded.level`,
+          person,
+          record,
+          level,
+          at(),
+        );
+        return ok(null);
+      }),
 
     /**
      * Remove somebody.

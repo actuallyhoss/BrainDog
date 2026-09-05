@@ -233,12 +233,37 @@ export async function installDeclarations(
   batch: readonly Declaration[],
   transaction: <T>(fn: () => T) => T,
 ): Promise<Result<Installed[]>> {
+  const staged = await stageDeclarations(batch);
+  if (!staged.ok) return { ok: false, refusal: staged.refusal };
+  return staged.value(sql, now, transaction);
+}
+
+/**
+ * Validate and hash a batch, and hand back the WRITE as a synchronous function.
+ *
+ * THE HASHING IS THE ONLY ASYNC PART, and separating it is what lets a caller put the write inside
+ * a transaction it already opened. An install that hashes inside its own transaction cannot be
+ * joined to anything — and a pack install that could not join them retired one declaration and
+ * installed another from a call that returned a refusal.
+ */
+export async function stageDeclarations(
+  batch: readonly Declaration[],
+): Promise<Result<(sql: Sql, now: number, transaction: <T>(fn: () => T) => T) => Result<Installed[]>>> {
   for (const decl of batch) {
     const wrong = validate(decl);
     if (wrong) return { ok: false, refusal: wrong };
   }
-
   const sums = await Promise.all(batch.map((d) => digest(jcs(d.body))));
+  return ok((sql, now, transaction) => applyDeclarations(sql, now, batch, sums, transaction));
+}
+
+function applyDeclarations(
+  sql: Sql,
+  now: number,
+  batch: readonly Declaration[],
+  sums: readonly string[],
+  transaction: <T>(fn: () => T) => T,
+): Result<Installed[]> {
   const at = instant(now);
 
   try {

@@ -55,6 +55,8 @@ export type DigestDecl = {
 
 export type DigestPart = {
   heading: string;
+  /** `register.<id>` or `metric.<id>` — what this section read, so a caller can be held to it. */
+  source: string;
   as: string;
   rows: Entry[];
   reading?: Reading;
@@ -102,6 +104,7 @@ export function sectionsOf(deps: DigestDeps, decl: DigestDecl): DigestPart[] {
   if (decl.sections.length > MAX_SECTIONS)
     out.push({
       heading: 'Not sent',
+      source: '',
       as: 'note',
       rows: [],
       refusals: [
@@ -115,7 +118,7 @@ export function sectionsOf(deps: DigestDeps, decl: DigestDecl): DigestPart[] {
 
   for (const section of decl.sections.slice(0, MAX_SECTIONS)) {
     const as = section.as ?? 'table';
-    const base: DigestPart = { heading: section.heading, as, rows: [], refusals: [] };
+    const base: DigestPart = { heading: section.heading, source: section.source, as, rows: [], refusals: [] };
 
     if (section.source.startsWith('metric.')) {
       const found = deps.metric(section.source.slice('metric.'.length));
@@ -170,9 +173,19 @@ export type Sent = { sections: number; channels: Channel[]; skipped: boolean };
  * row in an inbox table, because the event on the record IS the notification and a second table
  * holding the same fact is a second thing that can be wrong about it.
  */
+/**
+ * The sections worth sending, and the ONE place that is decided.
+ *
+ * A REFUSED SECTION IS CARRYING SOMETHING. It says the figure could not be computed, which is the
+ * one thing whoever declared it needs to know — and a second copy of this filter that forgot it
+ * made a "today" screen say the digest was carrying nothing on the morning the digest went out.
+ */
+export const carryingOf = (sections: readonly DigestPart[]): DigestPart[] =>
+  sections.filter((s) => s.rows.length > 0 || s.reading || s.refusals.length > 0);
+
 export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
   const sections = sectionsOf(deps, decl);
-  const carrying = sections.filter((s) => s.rows.length > 0 || s.reading || s.refusals.length > 0);
+  const carrying = carryingOf(sections);
 
   /* NOT SENT, and the schedule still moves on. A digest that skipped is not a digest that failed:
      the next one is due at the same hour next week either way. */

@@ -23,7 +23,7 @@
  * what a pack DECLARES rather than about what it might do.
  */
 
-import type { Result } from '@braindog/ports';
+import type { Refusal, Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { KINDS, digest, jcs, type DeclKind, type Json } from '@braindog/kernel';
 
@@ -124,7 +124,19 @@ export type Retired = { pack: string; declarations: number; rows_kept: Record<st
  */
 export type Host = {
   count: (register: string) => number;
-  install: (batch: readonly { id: string; kind: string; body: Json; pack?: string }[]) => Promise<Result<unknown>>;
+  /**
+   * Validate and hash the batch, and hand back the write as a synchronous function.
+   *
+   * TWO CALLS RATHER THAN ONE, because the write has to happen inside the transaction below it.
+   * Hashing is the only asynchronous part of an install, and an install that hashed inside its own
+   * transaction could not be joined to the retire, the seeds and the pack row — which is how a
+   * refused install left one declaration retired and another live.
+   */
+  stage: (batch: readonly { id: string; kind: string; body: Json; pack?: string }[]) => Promise<Result<() => Result<unknown>>>;
+  /** The caller's transaction. A throw inside it rolls back; a returned value commits. */
+  transaction: <T>(fn: () => T) => T;
+  /** Rebuild whatever the host caches from the declarations, once the transaction has committed. */
+  reload: () => void;
   retire: (ids: readonly string[]) => Result<unknown>;
   seed: (register: string, fields: Record<string, Json>, note: string | undefined) => Result<unknown>;
   /** The `pack` row, and the ids it claims — read on uninstall. */
@@ -234,12 +246,18 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
        here is what this function is called. */
     const { register: _named, ...rest } = body as Record<string, Json>;
     const stored = kind === 'register' ? ({ id: name, ...rest } as Record<string, Json>) : body;
-    declarations.push({ kind, id: declId, body: stored, canonical: jcs(stored) });
+    const canonical = canonicalise(stored);
+    if (canonical === null) return malformed(`${declId} holds something this record cannot write down.`, declId);
+    declarations.push({ kind, id: declId, body: stored, canonical });
   }
 
   const registers = new Map(declarations.filter((d) => d.kind === 'register').map((d) => [d.body.id as string, d.body]));
   const seeds: Seed[] = [];
   const seeded = new Set<string>();
+  /* A MAPPING IS THE NATURAL YAML MISTAKE, and treating it as no seeds at all meant an install that
+     quietly planted nothing while the plan reported `seeds: 0` and looked correct. */
+  if (doc.seeds !== undefined && !Array.isArray(doc.seeds))
+    return malformed('Seeds are a list of examples, one per register.', 'seeds');
   for (const seed of Array.isArray(doc.seeds) ? doc.seeds : []) {
     if (!isObject(seed) || typeof seed.register !== 'string' || !isObject(seed.fields))
       return malformed('A seed is a register and the fields of one example row.', 'seeds');
@@ -260,6 +278,15 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
         `${seed.register} has an example row and no tags field, so its examples could not be told from its real rows.`,
         { at: 'tags' },
       );
+    /* AND A SEED IS LOOKED AT TOO. The declarations were checked and the seeds were not, so a
+       `token:` in an example row went into the pack's own checksum — shared with the file — and
+       landed as a live row. The guard is about what is in the pack, not about where in it. */
+    const leaked = credential(seed.fields);
+    if (leaked)
+      return no<Pack>('SECRET_IN_PACK', `${seed.register}'s example row carries a ${leaked}, and a pack is a file people share.`, {
+        at: leaked,
+      });
+
     seeds.push({
       register: seed.register,
       fields: seed.fields,
@@ -271,15 +298,23 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   /* `provides` IS OMITTED FROM THE HASH because it is derived from the declarations that are
      already in it — hashing both would let one pack have two checksums for one file. */
   const { provides: _provides, ...hashed } = manifest;
-  const canonical = jcs({ manifest: hashed as unknown as Json, declarations: declarations.map((d) => d.body), seeds } as Json);
+  const canonical = canonicalise({ manifest: hashed, declarations: declarations.map((d) => d.body), seeds });
+  if (canonical === null) return malformed('This pack holds something the record cannot write down.');
   return ok({ manifest, declarations, seeds, canonical, checksum: await digest(canonical), source });
 }
 
 /** The first credential-shaped key anywhere in a declaration, or `null`. */
-function credential(body: Json): string | null {
+function credential(body: Json, seen: WeakSet<object> = new WeakSet()): string | null {
+  /* A SEEN-SET, because `normalise` takes an `unknown` and a caller in this process can hand it a
+     body that points at itself. A stack overflow out of a function that returns a `Result` is the
+     one thing this package promises does not happen. */
+  if (typeof body === 'object' && body !== null) {
+    if (seen.has(body)) return null;
+    seen.add(body);
+  }
   if (Array.isArray(body)) {
     for (const item of body) {
-      const found = credential(item);
+      const found = credential(item, seen);
       if (found) return found;
     }
     return null;
@@ -287,10 +322,19 @@ function credential(body: Json): string | null {
   if (!isObject(body)) return null;
   for (const [key, value] of Object.entries(body)) {
     if (SECRETS.has(key.toLowerCase()) && typeof value === 'string' && value.trim()) return key;
-    const found = credential(value);
+    const found = credential(value, seen);
     if (found) return found;
   }
   return null;
+}
+
+/** `jcs`, and a body it cannot serialise is a malformed pack rather than a throw. */
+function canonicalise(value: unknown): string | null {
+  try {
+    return jcs(value as Json);
+  } catch {
+    return null;
+  }
 }
 
 /* ── the plan ────────────────────────────────────────────────────────────── */
@@ -301,29 +345,52 @@ export function satisfies(version: string | null, range: string): boolean {
   const want = range.trim();
   if (!want || want === '*' || want === 'x') return true;
 
-  const parts = (v: string): number[] => v.split('-')[0]!.split('.').map((n) => Number(n) || 0);
-  const [ma, mi, pa] = parts(version);
-  const cmp = (a: string): number => {
-    const [x, y, z] = parts(a);
-    return ma! - x! || mi! - y! || pa! - z!;
+  /* A PRERELEASE IS BELOW ITS RELEASE, and stripping it made `1.0.0-alpha` satisfy `>=1.0.0` — a
+     dependency check that admits the version somebody marked as not ready. */
+  const parts = (v: string): [number, number, number, string] => {
+    const [core = '', tag = ''] = v.split('-');
+    const [a, b, c] = core.split('.');
+    return [Number(a) || 0, Number(b) || 0, Number(c) || 0, tag];
   };
+  const order = (a: [number, number, number, string], b: [number, number, number, string]): number =>
+    a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || (a[3] === b[3] ? 0 : a[3] === '' ? 1 : b[3] === '' ? -1 : a[3] < b[3] ? -1 : 1);
+
+  const has = parts(version);
+  const cmp = (a: string): number => order(has, parts(a));
 
   if (want.startsWith('>=')) return cmp(want.slice(2)) >= 0;
-  if (want.startsWith('>')) return cmp(want.slice(1)) > 0;
   if (want.startsWith('<=')) return cmp(want.slice(2)) <= 0;
+  if (want.startsWith('>')) return cmp(want.slice(1)) > 0;
   if (want.startsWith('<')) return cmp(want.slice(1)) < 0;
   if (want.startsWith('^')) {
-    const [x] = parts(want.slice(1));
-    return ma === x && cmp(want.slice(1)) >= 0;
+    /* CARET IS "COMPATIBLE", and below 1.0.0 that means the MINOR is the compatibility boundary:
+       `^0.1.0` does not admit `0.9.0`, because nothing below one promises anything across minors. */
+    const floor = parts(want.slice(1));
+    if (cmp(want.slice(1)) < 0) return false;
+    return floor[0] === 0 ? has[0] === 0 && has[1] === floor[1] : has[0] === floor[0];
   }
-  if (want.endsWith('.x')) return ma === parts(want)[0];
+  if (want.startsWith('~')) {
+    const floor = parts(want.slice(1));
+    if (cmp(want.slice(1)) < 0) return false;
+    return has[0] === floor[0] && has[1] === floor[1];
+  }
+  if (want.endsWith('.x')) return has[0] === parts(want)[0];
+  /* AND A RANGE THIS DOES NOT UNDERSTAND IS NOT A VERSION. Falling through to an exact compare read
+     `~1.2.0` as the version `0.2.0` — refusing the right dependency and accepting the wrong one. */
+  if (!/^\d/.test(want)) return false;
   return cmp(want) === 0;
 }
 
-const order = (a: string, b: string): number => {
-  const pa = a.split('-')[0]!.split('.').map(Number);
-  const pb = b.split('-')[0]!.split('.').map(Number);
-  return (pa[0]! - pb[0]!) || (pa[1]! - pb[1]!) || (pa[2]! - pb[2]!);
+/** Which of two versions is later. Prerelease sorts below its own release. */
+const newer = (a: string, b: string): number => {
+  const parts = (v: string): [number, number, number, string] => {
+    const [core = '', tag = ''] = v.split('-');
+    const [x, y, z] = core.split('.');
+    return [Number(x) || 0, Number(y) || 0, Number(z) || 0, tag];
+  };
+  const [a0, a1, a2, at] = parts(a);
+  const [b0, b1, b2, bt] = parts(b);
+  return a0 - b0 || a1 - b1 || a2 - b2 || (at === bt ? 0 : at === '' ? 1 : bt === '' ? -1 : at < bt ? -1 : 1);
 };
 
 /**
@@ -398,7 +465,7 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
       source: pack.source,
     },
     installed_version: was,
-    direction: was === null ? 'install' : was === pack.manifest.version ? 'reinstall' : order(pack.manifest.version, was) > 0 ? 'upgrade' : 'downgrade',
+    direction: was === null ? 'install' : was === pack.manifest.version ? 'reinstall' : newer(pack.manifest.version, was) > 0 ? 'upgrade' : 'downgrade',
     requires: { format, primitives, packs: needs },
     adds,
     changes,
@@ -536,38 +603,74 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
     );
   }
 
-  const put = await host.install(pack.declarations.map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })));
-  if (!put.ok) return { ok: false, refusal: put.refusal };
+  const staged = await host.stage(
+    pack.declarations.map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
+  );
+  if (!staged.ok) return { ok: false, refusal: staged.refusal };
 
-  if (diff.retires.length) {
-    const gone = host.retire(diff.retires.map((r) => r.id));
-    if (!gone.ok) return { ok: false, refusal: gone.refusal };
-  }
-
-  /* THE SEEDS GO THROUGH THE WRITE PATH, so a seed that the register would refuse is refused here
-     rather than becoming a row nothing else in the product could have made. */
-  for (const seed of pack.seeds) {
-    const made = host.seed(seed.register, seed.fields, seed.note);
-    if (!made.ok) return { ok: false, refusal: made.refusal };
-  }
-
+  /* ONE TRANSACTION, AND A REFUSAL ROLLS IT BACK. Declarations, retires, seeds and the pack row
+     land together or not at all. Four separate commits meant a seed the register refused left the
+     record at the new shape with the ledger still saying the old version — and the next plan of the
+     identical document then reported an upgrade with an empty diff, which is the most confident
+     wrong answer this module can give. */
   const { provides: _provides, ...manifest } = pack.manifest;
-  host.remember({
-    id: pack.manifest.pack,
-    version: pack.manifest.version,
-    source: pack.source.kind,
-    ref: pack.source.ref ?? null,
-    manifest: jcs(manifest as unknown as Json),
-    checksum: pack.checksum,
-  });
+  try {
+    return host.transaction((): Result<Applied> => {
+      const put = staged.value();
+      if (!put.ok) throw new Rolled(put.refusal);
+      /* THE CACHE IS REBUILT BEFORE THE SEEDS, and inside the transaction: a seed is a write like
+         any other, and the write path refuses a register it has not been told about yet. */
+      host.reload();
 
-  return ok({
-    pack: pack.manifest.pack,
-    version: pack.manifest.version,
-    declarations: pack.declarations.length,
-    seeds: pack.seeds.length,
-    retired: diff.retires.length,
-  });
+      if (diff.retires.length) {
+        const gone = host.retire(diff.retires.map((r) => r.id));
+        if (!gone.ok) throw new Rolled(gone.refusal);
+      }
+
+      /* THE SEEDS GO THROUGH THE WRITE PATH, so a seed the register would refuse is refused here
+         rather than becoming a row nothing else in the product could have made. */
+      for (const seed of pack.seeds) {
+        const made = host.seed(seed.register, seed.fields, seed.note);
+        if (!made.ok) throw new Rolled(made.refusal);
+      }
+
+      host.remember({
+        id: pack.manifest.pack,
+        version: pack.manifest.version,
+        source: pack.source.kind,
+        ref: pack.source.ref ?? null,
+        manifest: jcs(manifest as unknown as Json),
+        checksum: pack.checksum,
+      });
+
+      return ok({
+        pack: pack.manifest.pack,
+        version: pack.manifest.version,
+        declarations: pack.declarations.length,
+        seeds: pack.seeds.length,
+        retired: diff.retires.length,
+      });
+    });
+  } catch (e) {
+    if (e instanceof Rolled) return { ok: false, refusal: e.refusal };
+    throw e;
+  } finally {
+    /* THE CACHE IS REBUILT EITHER WAY. On success it holds what landed; on a rollback it has to
+       forget what it saw during the attempt, or the write path answers about registers that were
+       undone. */
+    host.reload();
+  }
+}
+
+/** Thrown so the caller's transaction rolls back, and turned into a refusal outside it. */
+class Rolled extends Error {
+  /* A FIELD AND NOT A PARAMETER PROPERTY: `erasableSyntaxOnly` is on, and this file is stripped
+     rather than compiled. */
+  refusal: Refusal;
+  constructor(refusal: Refusal) {
+    super(refusal.code);
+    this.refusal = refusal;
+  }
 }
 
 /**

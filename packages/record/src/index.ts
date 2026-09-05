@@ -35,6 +35,8 @@ import {
   type Entry,
   type Kernel,
   FORMAT_VERSION,
+  carryingOf,
+  headline,
   type GovernRegister,
   type Patch,
   type Proposal,
@@ -231,7 +233,9 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
    */
   const packHost = (ctx: CallContext): Host => ({
     count: (register) => kernel.count(register),
-    install: (batch) => kernel.install(batch as never),
+    stage: (batch) => kernel.stageInstall(batch as never),
+    transaction: (fn) => kernel.transaction(fn),
+    reload: () => kernel.reload(),
     retire: (ids) => kernel.retire(ids),
     seed: (register, fields, note) =>
       kernel.create(register, { ...fields, tags: exampleTag(fields) }, {
@@ -452,7 +456,19 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     async digestToday(args: { digest?: string }, ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(kernel.digestToday(args?.digest));
+
+      /* AND IT IS HELD TO THE CALLER'S CEILING. `boot` hides a register this caller cannot reach and
+         `list` refuses it — and then a digest section over it handed the rows across. A section is a
+         read of a register like any other, and it answers to the same ceiling. */
+      return ok(
+        kernel.digestToday(args?.digest).map((d) => {
+          const sections = d.sections.filter((s) => {
+            const register = s.source.startsWith('register.') ? s.source.slice('register.'.length) : null;
+            return register === null || !reaches(ctx, register);
+          });
+          return { ...d, sections, carrying: carryingOf(sections).length, headline: headline(d.name, carryingOf(sections)) };
+        }),
+      );
     },
 
     /**
@@ -470,7 +486,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       if (stop) return { ok: false as const, refusal: stop };
       if (ctx.principal.kind !== 'person')
         return no('PERSON_REQUIRED', 'A read mark belongs to a person, and a token is not one.', { at: 'principal' });
-      return ok({ at: kernel.markRead(ctx.principal.id, Date.now()), seen_at: kernel.seenAt(ctx.principal.id) });
+      return ok({ at: kernel.markRead(ctx.principal.id), seen_at: kernel.seenAt(ctx.principal.id) });
     },
 
     /**

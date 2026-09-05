@@ -184,3 +184,31 @@ test('and the directory survives being opened twice over the same storage', asyn
   assert.deepEqual(second.resolve('the-studio'), { record: made.record, slug: 'the-studio' });
   sql.close();
 });
+
+test('AND THE LAST OWNER CANNOT BE DEMOTED EITHER, which `leave` alone did not stop', async () => {
+  /* `leave` refused to remove them and `join` moved them, which is the same record with nobody who
+     can grant access to it — and the only way out of that is somebody with a database. */
+  const { d, sql } = directory();
+  const made = studio(d);
+
+  assert.equal(refusal(d.join(made.record, made.person, 'read')).code, 'LEVEL_REQUIRED');
+  assert.equal(d.levelOf(made.record, made.person), 'owner');
+
+  // With a second owner it is an ordinary change.
+  const bo = value<Person>(d.person$('bo@example.com'));
+  value(d.join(made.record, bo.id, 'owner'));
+  value(d.join(made.record, made.person, 'read'));
+  assert.equal(d.levelOf(made.record, made.person), 'read');
+  sql.close();
+});
+
+test('and a closed record takes nobody, because its name may already be somebody else’s problem', async () => {
+  const { d, sql } = directory();
+  const made = studio(d);
+  const bo = value<Person>(d.person$('bo@example.com'));
+  value(d.close(made.record));
+
+  assert.equal(refusal(d.join(made.record, bo.id, 'owner')).at, 'record');
+  assert.equal(d.levelOf(made.record, bo.id), null, 'somebody was given owner on a closed record');
+  sql.close();
+});

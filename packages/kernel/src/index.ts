@@ -24,7 +24,7 @@ import { attempt } from './tx.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { compile, type Predicate, type Schema } from '@braindog/where';
-import { installDeclarations, retireDeclarations, type Declaration } from './declare.ts';
+import { installDeclarations, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 import { exportDogl, importDogl, type Section } from './dogl.ts';
 import {
@@ -54,7 +54,7 @@ import {
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
-import { headline, nextOccurrence, noteEvent, runDigest, sectionsOf, type DigestDecl, type DigestDeps, type DigestPart } from './digest.ts';
+import { carryingOf, headline, nextOccurrence, noteEvent, runDigest, sectionsOf, type DigestDecl, type DigestDeps } from './digest.ts';
 import { CREATE_CEILING, dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
@@ -90,7 +90,7 @@ export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provis
 export { GRANT_KINDS, spanMs } from './vault.ts';
 export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
-export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
+export { CHANNELS, carryingOf, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
 export { CREATE_CEILING, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { BODY_KINDS, GOVERNANCE } from './govern.ts';
@@ -1371,14 +1371,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
       return decls.map((decl) => {
         const sections = sectionsOf(deps, decl);
+        /* THE SAME FILTER THE SCHEDULED DIGEST USES, and the headline is over the SAME list. A
+           second copy of it made the screen say the digest was carrying nothing on the morning the
+           digest went out, with a headline the email did not have. */
+        const carrying = carryingOf(sections);
         return {
           digest: decl.digest,
           name: decl.name ?? decl.digest,
-          headline: headline(decl.name ?? decl.digest, sections),
+          headline: headline(decl.name ?? decl.digest, carrying),
           sections,
-          /* CARRYING, NOT ALL. A section with nothing in it is a line that says "nothing", and a
-             digest of six of those is the thing people mute. */
-          carrying: sections.filter((s: DigestPart) => s.rows.length > 0 || s.reading !== undefined).length,
+          carrying: carrying.length,
         };
       });
     },
@@ -1390,8 +1392,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * wakes up and reports where it had got to. And it is NOT an event: a read is not a write to
      * the record, or every glance at a screen would be a line in somebody's history.
      */
-    markRead: (person: string, atMs: number): number => {
-      const at = instant(atMs);
+    markRead: (person: string): number => {
+      /* THE RECORD'S CLOCK, and it matters more here than anywhere. The mark is guarded by `MAX()`,
+         so a value stamped from a wall clock ahead of the record's is a mark no later read can ever
+         move — pinned in the future for as long as the record lags. */
+      const at = instant(clock.now());
       return transaction(() => {
         sql.exec(
           "UPDATE member SET seen_at = MAX(COALESCE(seen_at, ''), ?) WHERE person_id = ? AND register = '*'",
@@ -1554,6 +1559,27 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const out = await installDeclarations(sql, clock.now(), batch, transaction);
       if (out.ok) reload();
       return out;
+    },
+
+    /**
+     * Validate and hash a batch, and hand back the write as a SYNCHRONOUS function.
+     *
+     * FOR A CALLER THAT NEEDS THE WRITE INSIDE A TRANSACTION IT OWNS. A pack install writes
+     * declarations, retires the ones the pack dropped, plants its seeds and records the pack row —
+     * and half of that is a record whose pages name registers it does not have. Hashing is the only
+     * asynchronous part, so it happens here and the write happens where the caller says.
+     *
+     * The cache is rebuilt by the caller through `reload()`; a staged write that is not reloaded is
+     * a register the write path still refuses.
+     */
+    async stageInstall(batch: readonly Declaration[]) {
+      const refused = schemaRefusal(state);
+      if (refused) return refused as Result<() => Result<unknown>>;
+      const cannot = unreadable(batch);
+      if (cannot) return { ok: false as const, refusal: cannot };
+      const staged = await stageDeclarations(batch);
+      if (!staged.ok) return { ok: false as const, refusal: staged.refusal };
+      return ok(() => staged.value(sql, clock.now(), transaction));
     },
 
     retire(ids: readonly string[]) {

@@ -61,7 +61,9 @@ function fakeHost(over: Partial<Host> = {}): Host & { log: string[] } {
   return {
     log,
     count: () => 0,
-    install: async (batch) => (log.push(`install:${batch.length}`), { ok: true, value: null }),
+    stage: async (batch) => (log.push(`stage:${batch.length}`), { ok: true, value: () => (log.push('install'), { ok: true, value: null }) }),
+    transaction: (fn) => fn(),
+    reload: () => log.push('reload'),
     retire: (ids) => (log.push(`retire:${ids.join(',')}`), { ok: true, value: null }),
     seed: (register) => (log.push(`seed:${register}`), { ok: true, value: { id: 'x' } }),
     remember: (row) => log.push(`pack:${row.id}@${row.version}`),
@@ -250,7 +252,7 @@ test('A PLAN IS A PROMISE ABOUT ONE MOMENT, and installing a different one is re
   const done = value<{ declarations: number; seeds: number }>(await install(pack, diff, host, diff.planHash));
   assert.equal(done.declarations, 2);
   assert.equal(done.seeds, 1);
-  assert.deepEqual(host.log, ['install:2', 'seed:obligations', 'pack:studio-books@1.2.0']);
+  assert.deepEqual(host.log, ['stage:2', 'install', 'reload', 'seed:obligations', 'pack:studio-books@1.2.0', 'reload']);
 });
 
 test('AND ROWS ARE NEVER THE PRICE OF AN UPGRADE', async () => {
@@ -319,4 +321,82 @@ test('TAKING A PACK OUT KEEPS THE ROWS, and says how many are left where', async
   assert.deepEqual(host.log, ['retire:register.obligations,rule.chase', 'forget:studio-books']);
 
   assert.equal(refusal(uninstall('nothing', fakeHost())).code, 'OUT_OF_BOUNDS');
+});
+
+test('AND A REFUSED INSTALL CHANGES NOTHING, which four separate commits could not promise', async () => {
+  /* A seed the register refused used to land after the declarations and the retires had already
+     committed: one declaration retired and another live, from a call that returned a refusal — and
+     the pack row still saying the old version, so the next plan of the identical document reported
+     an upgrade with an empty diff. */
+  const pack = await packOf();
+  const diff = await plan(pack, EMPTY);
+
+  const rolled: string[] = [];
+  const host = fakeHost({
+    transaction: <T,>(fn: () => T): T => {
+      try {
+        return fn();
+      } catch (e) {
+        rolled.push('rollback');
+        throw e;
+      }
+    },
+    seed: () => ({ ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'obligations needs what.', at: 'what' } }),
+  });
+
+  assert.equal(refusal(await install(pack, diff, host, diff.planHash)).code, 'REQUIRED_MISSING');
+  assert.deepEqual(rolled, ['rollback'], 'the transaction was not rolled back');
+  assert.equal(host.log.includes('pack:studio-books@1.2.0'), false, 'the pack row was written by a refused install');
+});
+
+test('A SEED IS LOOKED AT TOO, and a token in an example row went into the pack’s own checksum', async () => {
+  /* The declarations were checked and the seeds were not, so a `token:` in an example row was
+     hashed with the file, shared with it, and landed as a live row. */
+  const doc = DOC({
+    declarations: [
+      { register: 'connections', name: 'Connections', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'tags', type: 'list', of: 'text' }] },
+    ],
+    seeds: [{ register: 'connections', fields: { what: 'HSBC feed', token: 'sk-live-41' } }],
+  });
+  const out = refusal(await normalise(doc));
+  assert.equal(out.code, 'SECRET_IN_PACK');
+  assert.match(out.fix, /example row carries a token/);
+});
+
+test('and `seeds` written as a mapping is a sentence rather than no seeds at all', async () => {
+  // The natural YAML mistake. It used to yield a pack with zero seeds and an install that planted
+  // nothing while the plan reported `seeds: 0` and looked correct.
+  const out = refusal(await normalise(DOC({ seeds: { obligations: { what: 'x' } } })));
+  assert.equal(out.code, 'PACK_MALFORMED');
+  assert.equal(out.at, 'seeds');
+});
+
+test('AND A RANGE THIS DOES NOT UNDERSTAND IS NOT A VERSION', async () => {
+  /* `~1.2.0` fell through to an exact compare, and `Number('~1') || 0` made the range the VERSION
+     `0.2.0` — refusing the right dependency and accepting the wrong one. */
+  assert.equal(satisfies('1.2.3', '~1.2.0'), true);
+  assert.equal(satisfies('0.2.0', '~1.2.0'), false);
+  assert.equal(satisfies('1.3.0', '~1.2.0'), false);
+  assert.equal(satisfies('1.2.0', '?!nonsense'), false, 'a range nobody wrote became a version');
+
+  // A prerelease is below its release, or a dependency check admits what somebody marked unready.
+  assert.equal(satisfies('1.0.0-alpha', '>=1.0.0'), false);
+  assert.equal(satisfies('1.0.0-alpha', '1.0.0'), false);
+  assert.equal(satisfies('2.0.0-rc.1', '^2.0.0'), false);
+  assert.equal(satisfies('1.0.0', '>=1.0.0-alpha'), true);
+
+  // And below one, the minor is the compatibility boundary, because nothing there promises anything.
+  assert.equal(satisfies('0.9.0', '^0.1.0'), false);
+  assert.equal(satisfies('0.1.4', '^0.1.0'), true);
+  assert.equal(satisfies('1.10.0', '>=1.9.0'), true, 'the compare is numeric, not lexical');
+});
+
+test('and a body this record cannot write down is a refusal, never a throw', async () => {
+  // `normalise` takes an `unknown`, and the house rule is that a refusal is a value.
+  const circular: Record<string, unknown> = { register: 'loops', name: 'L', title: 'what', fields: [] };
+  circular.self = circular;
+  assert.equal(refusal(await normalise(DOC({ declarations: [circular], seeds: [] }))).code, 'PACK_MALFORMED');
+
+  const big = { register: 'bigs', name: 'B', title: 'what', fields: [], size: 1n };
+  assert.equal(refusal(await normalise(DOC({ declarations: [big], seeds: [] }))).code, 'PACK_MALFORMED');
 });

@@ -136,15 +136,15 @@ test('A REFUSED SECTION IS AN EM DASH IN THE NOTIFICATION, not a zero', () => {
      announced as nothing owed. The email said why and the notification said zero, and the
      notification is the one somebody reads first. */
   const line = headline('Weekly', [
-    { heading: 'Owed to you', as: 'stat', rows: [], refusals: [{ code: 'MIXED_CURRENCY', fix: 'two currencies' }] },
-    { heading: 'Bills', as: 'table', rows: [{ seq: 1 }, { seq: 2 }] as never, refusals: [] },
+    { heading: 'Owed to you', source: 'metric.owed', as: 'stat', rows: [], refusals: [{ code: 'MIXED_CURRENCY', fix: 'two currencies' }] },
+    { heading: 'Bills', source: 'register.bills', as: 'table', rows: [{ seq: 1 }, { seq: 2 }] as never, refusals: [] },
   ]);
   assert.equal(line, 'Weekly: Owed to you — · Bills 2');
 });
 
 test('and a table with no declared columns still escapes a pipe', () => {
   const text = render('W', [
-    { heading: 'Rows', as: 'table', rows: [{ seq: 1, fields: { what: 'a | b' } }] as never, refusals: [] },
+    { heading: 'Rows', source: 'register.rows', as: 'table', rows: [{ seq: 1, fields: { what: 'a | b' } }] as never, refusals: [] },
   ]);
   assert.match(text, /a \\\| b/, 'a value with a pipe in it split into two columns');
 });

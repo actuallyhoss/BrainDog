@@ -401,6 +401,9 @@ test('A READ MARK BELONGS TO A PERSON, and is never an event', async () => {
 
   const out = value<{ seen_at: string | null }>(await api.markRead(owner));
   assert.ok(out.seen_at, 'nothing was marked');
+  /* THE RECORD'S CLOCK. The mark is guarded by `MAX()`, so one stamped from a wall clock ahead of
+     the record's is a mark no later read can ever move. */
+  assert.equal(out.seen_at, new Date(NOW).toISOString(), 'the mark came from the wall clock');
   assert.equal(sql.all('SELECT 1 FROM event').length, before, 'a read became a write to the record');
 
   const tried = await api.markRead(token('write'));
@@ -412,5 +415,43 @@ test('A READ MARK BELONGS TO A PERSON, and is never an event', async () => {
 test('and what the digest would say is asked for without sending it', async () => {
   const { api, sql } = await record();
   assert.deepEqual(value<unknown[]>(await api.digestToday({}, token('read'))), [], 'a record with no digest declared says nothing');
+  sql.close();
+});
+
+test('AND A DIGEST IS HELD TO THE CALLER’S CEILING, like the list it is made of', async () => {
+  /* `boot` hides a register a caller cannot reach and `list` refuses it — and then a digest section
+     over that register handed the rows across. */
+  const { api, sql } = await record();
+  assert.ok(
+    (
+      await api.kernel.install([
+        {
+          id: 'digest.monday',
+          kind: 'digest',
+          body: {
+            digest: 'monday',
+            name: 'Monday',
+            schedule: { at: '08:00' },
+            channels: ['in-app'],
+            sections: [
+              { heading: 'Obligations', source: 'register.obligations' },
+              { heading: 'Notes', source: 'register.notes' },
+            ],
+          } as never,
+        },
+      ])
+    ).ok,
+  );
+  value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }, owner));
+  value(await api.create({ register: 'notes', fields: { body: 'the vault combination' } }, owner));
+
+  const all = value<{ sections: { heading: string }[] }[]>(await api.digestToday({}, owner));
+  assert.deepEqual(all[0]?.sections.map((s) => s.heading), ['Obligations', 'Notes']);
+
+  const held = value<{ sections: { heading: string }[]; carrying: number }[]>(
+    await api.digestToday({}, { ...owner, registers: ['obligations'] }),
+  );
+  assert.deepEqual(held[0]?.sections.map((s) => s.heading), ['Obligations'], 'a section handed over a register the caller cannot list');
+  assert.equal(held[0]?.carrying, 1);
   sql.close();
 });
