@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CURRENCY, applyFilters, columnsFor, dirOf, display, isProse, labelOf, metric, page, search, toRows } from './api.ts';
+import { CURRENCY, applyFilters, backlinks, columnsFor, dirOf, display, isProse, labelOf, metric, page, search, toRows } from './api.ts';
 import { toSegments } from './blocks.ts';
 import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
@@ -461,4 +461,76 @@ test('exactly one field per register may be the deadline, and it is declared', (
     assert.ok(deadlines.length <= 1, `${id} declares ${deadlines.length} deadlines`);
     for (const f of deadlines) assert.equal(f.type, 'day', `${id}.${f.id} is a deadline and not a day`);
   }
+});
+
+/* ── the other direction of a ref ────────────────────────────────────────── */
+
+test('A ROW CAN SEE WHAT POINTS AT IT', () => {
+  // `ref` declares `to:` and nothing declared the inverse, so the record could say "this invoice is
+  // for Halden" and Halden's page could not say "these nine invoices are yours" — which is the half
+  // somebody opens a person for. Nothing was added to the data model: the inverse of every ref is
+  // already stated once, on the field that declares it.
+  const person = backlinks('people', 1);
+  assert.ok(person.length > 0, 'a person with invoices has no incoming relations');
+  const obligations = person.find((b) => b.register === 'obligations');
+  assert.ok(obligations);
+  assert.equal(
+    obligations.total,
+    (ROWS.obligations ?? []).filter((e) => e.fields.party === 1).length,
+    'the count is not the number of rows that point here',
+  );
+});
+
+test('every incoming link opens exactly the rows it counted', () => {
+  for (const register of Object.keys(REGISTERS))
+    for (const seq of [1, 2]) {
+      for (const rel of backlinks(register, seq)) {
+        const url = new URL(rel.href, 'http://x');
+        const filters = url.searchParams.getAll('f').map((raw) => {
+          const [field = '', op = 'is', v = ''] = raw.split(':');
+          return { field, op, values: v.split(',') };
+        });
+        const opened = applyFilters(rel.register, ROWS[rel.register] ?? [], filters).length;
+        assert.equal(opened, rel.total, `${register}#${seq} → ${rel.name}·${rel.label} says ${rel.total} and opens ${opened}`);
+      }
+    }
+});
+
+test('the relations are separate, because two fields can point at one place', () => {
+  // An update's `track` is what it is about and its `supersedes` is what it replaces. Collapsing
+  // them into "Updates (7)" would be a number nobody could act on.
+  const seen = new Set<string>();
+  for (const rel of backlinks('tracks', 1)) {
+    const key = `${rel.register}.${rel.label}`;
+    assert.ok(!seen.has(key), `${key} appeared twice`);
+    seen.add(key);
+  }
+  for (const [id, r] of Object.entries(REGISTERS)) {
+    const refs = r.fields.filter((f) => f.type === 'ref');
+    for (const f of refs) {
+      if (!f.to) continue;
+      const target = (ROWS[f.to] ?? [])[0];
+      if (!target) continue;
+      const rels = backlinks(f.to, target.seq);
+      const mine = rels.filter((x) => x.register === id);
+      // At most one entry per field, never one merged entry for the register.
+      assert.ok(mine.length <= refs.length, `${id} produced more relations than it declares refs`);
+    }
+  }
+});
+
+test('a row is never its own backlink, and a register with nothing pointing at it says nothing', () => {
+  assert.deepEqual(backlinks('obligations', 1), [], 'nothing points at an obligation, so there is nothing to show');
+  for (const rel of backlinks('updates', 1))
+    assert.ok(!(rel.register === 'updates' && rel.rows.some((r) => r.key === 'updates#1')), 'a row listed itself');
+});
+
+test('the busiest relation is first, because it is why the page was opened', () => {
+  const rels = backlinks('things', 1);
+  assert.ok(rels.length > 1, 'a project with one incoming relation proves nothing here');
+  for (let i = 1; i < rels.length; i++) assert.ok(rels[i - 1]!.total >= rels[i]!.total, 'the relations are not ordered');
+});
+
+test('the pointing field is not a column, because every row in the list has the same value for it', () => {
+  for (const rel of backlinks('people', 1)) assert.ok(!rel.columns.some((c) => c.field === 'party'));
 });

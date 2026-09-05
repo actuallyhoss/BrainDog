@@ -19,6 +19,7 @@
   import { iconFor,
     AUDIT,
     CURRENCY,
+    backlinks,
     NOW,
     REGISTERS,
     display,
@@ -37,11 +38,18 @@
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
+  import { Table } from 'braindog-render/svelte';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
   const decl = $derived(REGISTERS[id]);
   const row = $derived(entry(id, seq));
+
+  /* WHAT POINTS AT THIS ROW. A `ref` declares `to:` and nothing declared the other direction, so a
+     person's page could not show the invoices that are theirs — which is the half somebody opens a
+     person for. Nothing was added to the data model: the inverse of every ref is already stated
+     once, on the field that declares it. */
+  const incoming = $derived(row ? backlinks(id, seq) : []);
 
   const history = $derived(AUDIT.filter((e) => e.target === `${id}#${seq}`));
 
@@ -121,6 +129,26 @@
             </article>
           {/if}
         {/each}
+
+        {#each incoming as rel}
+          <!-- One section per RELATION, not per register: two fields of one register can point at
+               the same place and mean different things — an update's `track` is what it is about
+               and its `supersedes` is what it replaces. -->
+          <section class="incoming">
+            <h2 class="incoming-title">
+              <Icon name={rel.icon} size="s" />
+              {rel.name}
+              <span class="incoming-label">{rel.label.toLowerCase()}</span>
+              <span class="incoming-count num">{rel.total}</span>
+            </h2>
+            <Table columns={rel.columns} rows={rel.rows} total={rel.total} label="{rel.name} · {rel.label}" />
+            {#if rel.total > rel.rows.length}
+              <a class="incoming-more" href={rel.href}>
+                All {rel.total} <Icon name="chevron" size="s" />
+              </a>
+            {/if}
+          </section>
+        {/each}
       </section>
 
       <aside class="side">
@@ -155,6 +183,47 @@
 {/if}
 
 <style>
+  .incoming {
+    margin-block-start: var(--sp-6);
+  }
+
+  .incoming-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-3);
+    color: var(--dim);
+    font-family: var(--font-ui);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* The FIELD's label, quieter than the register's name: "Obligations · party" reads as one heading
+     with the relation in it, where two words of equal weight read as two headings.
+     Quieter by WEIGHT AND CASE, not by colour: `faint` clears the large-text floor only, and this
+     line is 11px — a rule the css-rules gate holds, and rightly, since the whole heading is small. */
+  .incoming-label {
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+
+  .incoming-count {
+    margin-inline-start: auto;
+    color: var(--ink2);
+  }
+
+  .incoming-more {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-2);
+    color: var(--accent-text);
+    font-size: var(--t-sm);
+  }
+
   .page {
     padding: var(--sp-5) var(--sp-6) var(--sp-9);
     max-inline-size: 1140px;

@@ -414,6 +414,64 @@ export const sessionsFor = (seq: number): Entry[] =>
     .filter((x) => Number(x.fields.track) === seq)
     .sort((a, b) => String(b.fields.last_seen).localeCompare(String(a.fields.last_seen)));
 
+/* ── what points AT this row ──────────────────────────────────────────────
+   A `ref` declares `to:` and nothing declares the other direction, so the record could say "this
+   invoice is for Halden" and a person's page could not say "these four invoices are Halden's" —
+   which is the half somebody opens a person for. There is nothing to add to the data model: the
+   inverse of every `ref` is already stated, once, on the field that declares it. */
+
+export type Backlink = {
+  register: string;
+  /** The register's own name, and the field's label — "Obligations · Party", not "obligations". */
+  name: string;
+  label: string;
+  icon: IconName;
+  total: number;
+  /** The first few, ready to draw. The rest are behind `href`. */
+  rows: TableRow[];
+  columns: Column[];
+  href: string;
+};
+
+/**
+ * Every row in the record that points at this one, grouped by the relation that points.
+ *
+ * GROUPED BY FIELD AND NOT BY REGISTER, because two fields of one register can point at the same
+ * place and mean different things: an update's `track` is what it is about and its `supersedes` is
+ * what it replaces. Collapsing them into "Updates (7)" would be a number nobody could act on.
+ *
+ * A register is skipped when it points at itself through the row itself — a row is not its own
+ * backlink — and the scan is over `ROWS`, which is already in memory.
+ */
+export function backlinks(register: string, seq: number, show = 5): Backlink[] {
+  const out: Backlink[] = [];
+
+  for (const [id, r] of Object.entries(REGISTERS))
+    for (const f of r.fields) {
+      if (f.type !== 'ref' || f.to !== register) continue;
+      const hits = (ROWS[id] ?? []).filter((e) => Number(e.fields[f.id]) === seq && !(id === register && e.seq === seq));
+      if (hits.length === 0) continue;
+
+      /* The pointing field is dropped from the columns: every row in this list has the same value
+         for it, which is the row you are already looking at. */
+      const columns = columnsFor(id).filter((c) => c.field !== f.id).slice(0, 3);
+      out.push({
+        register: id,
+        name: r.name,
+        label: labelOf(f),
+        icon: iconFor(r.icon, 'rows'),
+        total: hits.length,
+        rows: toRows(id, hits.slice(0, show), columns),
+        columns,
+        href: `/r/${id}?f=${f.id}:is:${seq}`,
+      });
+    }
+
+  /* Most first: on a person, "Obligations 12" is the reason you opened the page and "Tasks 1" is
+     not, and a list in declaration order buries the first behind the second. */
+  return out.sort((a, b) => b.total - a.total);
+}
+
 /* ── metrics ─────────────────────────────────────────────────────────────
    A metric with no target is decoration, and a metric with no comparison window cannot be acted on.
    Each one below carries both, and the mixed-currency case is refused at install, not at render. */
