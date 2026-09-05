@@ -332,3 +332,48 @@ test('PREVIEW BEFORE PROPOSE, which is the tool an agent needs most', async () =
   assert.ok(refusal(await mcp.call('dry_run', {}, owner)).code);
   sql.close();
 });
+
+/* ── the resources, which are not tools and that is the point ─────── */
+
+test('A PAGE WAS INVISIBLE TO EVERY AGENT, and that is what ADR-018 calls a design error', async () => {
+  /* Its rule is that any screen needing an endpoint no agent can call is a design error — and the
+     web app's page read is `page({ slug })`, which no tool reaches. The fix is a resource rather
+     than a ninth tool, because a page is a read surface with a stable address and cacheable
+     content, and the tool list is in every turn of every session. */
+  const { mcp, sql } = await agent();
+
+  const list = value<{ uri: string; ttlMs: number }[]>(await mcp.resources(owner));
+  const uris = list.map((r) => r.uri);
+  assert.ok(uris.includes('braindog:whoami'));
+  assert.ok(uris.includes('braindog:boot'));
+  assert.ok(uris.includes('braindog:schema/obligations'), 'a register has no schema resource');
+
+  // `whoami` is asked every time; a register's shape changes when a pack is installed and not
+  // between one.
+  assert.equal(list.find((r) => r.uri === 'braindog:whoami')?.ttlMs, 0);
+  assert.equal(list.find((r) => r.uri === 'braindog:schema/obligations')?.ttlMs, 3_600_000);
+
+  // And every one of them reads.
+  assert.ok(value<{ kind: string }>(await mcp.read('braindog:whoami', owner)).kind);
+  assert.ok(value<{ registers: unknown[] }>(await mcp.read('braindog:boot', owner)).registers);
+  assert.ok(value<{ fields: unknown[] }>(await mcp.read('braindog:schema/obligations', owner)).fields);
+  assert.ok(Array.isArray(value<unknown[]>(await mcp.read('braindog:decisions', owner))));
+  assert.ok(Array.isArray(value<unknown[]>(await mcp.read('braindog:digest/today', owner))));
+  sql.close();
+});
+
+test('and a uri is parsed rather than resolved, because a stranger writes one', async () => {
+  const { mcp, sql } = await agent();
+  for (const uri of ['braindog:schema/../../x', 'braindog:nothing', 'schema/obligations', 'braindog:', 'braindog:page'])
+    assert.equal(refusal(await mcp.read(uri, owner)).code, 'ROUTE_UNKNOWN', `${uri} resolved to something`);
+  sql.close();
+});
+
+test('and a caller sees the registers they may touch and not the ones they may not', async () => {
+  // A list of names is itself information, so the resource list is scoped like `boot` is.
+  const { mcp, sql } = await agent();
+  const scoped = value<{ uri: string }[]>(await mcp.resources({ ...owner, registers: ['obligations'] }));
+  assert.ok(scoped.some((r) => r.uri === 'braindog:schema/obligations'));
+  assert.equal(scoped.some((r) => r.uri.startsWith('braindog:schema/') && r.uri !== 'braindog:schema/obligations'), false);
+  sql.close();
+});

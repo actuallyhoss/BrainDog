@@ -7,12 +7,16 @@
  * vocabulary carries the load: `list` takes a predicate rather than there being fourteen filter
  * tools.
  *
- * NINE, AND WHICH NINE IS WORTH STATING. `10-MCP` §5 names eight — `record_index` · `search` · `get`
- * · `list` · `create` · `update` · `propose` · `log`. `propose` is not here because suggestions are
- * not built yet, and a tool that refuses everything is worse than a tool that is absent. `schema`
- * and `history` are here and are RESOURCES in that document; this build serves no resources, and an
- * agent that cannot read a register's fields writes a refused row, which costs more than the tool
- * does. When resources exist, those two leave.
+ * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource is a
+ * read surface with a stable address and cacheable content; the list of them is fetched when it is
+ * wanted and cached by its own `ttlMs`, so the per-register variability — one `schema/<register>`
+ * each — costs nothing in a turn that does not ask for it. `page` and `metric` are resources for
+ * that reason and for one more: ADR-018 says a screen needing an endpoint no agent can call is a
+ * design error, and the web app's page read was exactly that until they existed.
+ *
+ * `schema` AND `history` ARE STILL TOOLS AS WELL, and that is deliberate rather than a leftover: an
+ * agent that cannot read a register's fields writes a refused row, and a refused row costs more
+ * than the tool does.
  *
  * `record_index` IS THE FIRST CALL AND IT IS CHEAP ON PURPOSE. An agent that has to guess a register
  * name writes a refused call, and a refused call costs more than the orientation would have.
@@ -25,6 +29,36 @@
 
 import type { Result } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
+
+/**
+ * A read surface with a stable address and cacheable content — which is the definition of a
+ * resource, and the reason these are not tools.
+ *
+ * THEY CLOSE A HOLE ADR-018 WOULD HAVE CALLED A DESIGN ERROR. Its rule is that any screen needing an
+ * endpoint no agent can call is a design error, and the web app's page read is `page({ slug })`,
+ * which no tool reaches. Every declared page and every figure on it was invisible to every agent.
+ *
+ * AND THE FIX IS NOT A NINTH TOOL. The tool list is in every turn of every session; a resource list
+ * is fetched when it is wanted and cached by its `ttlMs`. That is the whole distinction, and it is
+ * what keeps the per-register variability — one `schema/<register>` each — out of the budget the
+ * tool count spends.
+ *
+ * EVERY RESOURCE IS BACKED BY A METHOD, so the permission ladder is the same one. One with no
+ * method behind it would be a second read path with a second set of checks.
+ */
+export type Resource = {
+  /** `braindog:<path>`. The address a client caches against. */
+  uri: string;
+  name: string;
+  description: string;
+  /** How long a client may hold it. `0` is "ask every time" — what `whoami` is. */
+  ttlMs: number;
+};
+
+/** An hour. A register's shape changes when a pack is installed, and not between one. */
+const HOUR = 3_600_000;
+/** A minute. Long enough to stop a burst, short enough that a figure is not yesterday's. */
+const MINUTE = 60_000;
 
 export type Tool = {
   name: string;
@@ -310,8 +344,84 @@ export function tools(api: RecordApi) {
     },
   };
 
+  /**
+   * What this caller can read, at this moment.
+   *
+   * THE REGISTER SCHEMAS ARE THE ONLY VARIABLE PART, and they are scoped: a caller sees the
+   * registers they may touch and not the ones they may not, because a list of names is itself
+   * information. Everything else is fixed, which is what makes the list cacheable at all.
+   */
+  const resources = async (ctx: CallContext): Promise<Result<Resource[]>> => {
+    const boot = await api.boot(ctx);
+    if (!boot.ok) return { ok: false, refusal: boot.refusal };
+
+    const out: Resource[] = [
+      { uri: 'braindog:whoami', name: 'whoami', description: 'Who you are to this record, and which verbs you reach.', ttlMs: 0 },
+      { uri: 'braindog:boot', name: 'boot', description: 'What this record holds, and how many rows are in each register.', ttlMs: MINUTE },
+      { uri: 'braindog:digest/today', name: 'digest/today', description: 'What the digest would say if it went now.', ttlMs: MINUTE },
+      { uri: 'braindog:decisions', name: 'decisions', description: 'What has been proposed and not yet answered.', ttlMs: MINUTE },
+    ];
+
+    for (const register of boot.value.registers)
+      out.push({
+        uri: `braindog:schema/${register.id}`,
+        name: `schema/${register.id}`,
+        description: `What ${register.name} holds: its fields, their types, and what each may take.`,
+        ttlMs: HOUR,
+      });
+
+    const pages = await api.pages(ctx);
+    if (pages.ok)
+      for (const page of pages.value)
+        out.push({
+          uri: `braindog:page/${page.slug}`,
+          name: `page/${page.slug}`,
+          description: `${page.title}, with every block run: rows and figures, never markup.`,
+          ttlMs: MINUTE,
+        });
+
+    return { ok: true, value: out };
+  };
+
+  /**
+   * Read one.
+   *
+   * THE URI IS PARSED AND NEVER PASSED THROUGH. `braindog:schema/../../x` is a path a stranger can
+   * write, and the segment after the first slash is an argument to a method rather than a path on a
+   * disk — so it is split, not resolved.
+   */
+  const read = async (uri: string, ctx: CallContext): Promise<Result<unknown>> => {
+    const path = uri.startsWith('braindog:') ? uri.slice('braindog:'.length) : '';
+    const cut = path.indexOf('/');
+    const head = cut < 0 ? path : path.slice(0, cut);
+    const rest = cut < 0 ? '' : path.slice(cut + 1);
+
+    if (head === 'whoami' && !rest) return api.whoami(ctx);
+    if (head === 'boot' && !rest) return api.boot(ctx);
+    if (head === 'decisions' && !rest) return api.governance({ register: 'suggestion' } as never, ctx);
+    if (head === 'digest' && rest === 'today') return api.digestToday({} as never, ctx);
+    /* AND THE ARGUMENT IS CHECKED AGAINST A GRAMMAR before it is one. `schema/../../x` reaching the
+       method would be refused there too, but by a sentence about a register nobody has — which
+       reads like a fact about the record rather than about the address that was asked for. */
+    const named = /^[a-z][a-z0-9_-]{0,63}$/.test(rest);
+    if (head === 'schema' && named) return api.schema({ register: rest }, ctx);
+    if (head === 'page' && named) return api.page({ slug: rest }, ctx);
+    if (head === 'metric' && named) return api.metric({ id: rest } as never, ctx);
+
+    return {
+      ok: false,
+      refusal: {
+        code: 'ROUTE_UNKNOWN',
+        fix: `There is nothing at ${uri}. Read braindog:boot for what this record holds.`,
+        at: 'uri',
+      },
+    };
+  };
+
   return {
     list: () => TOOLS,
+    resources,
+    read,
     async call(name: string, args: Record<string, unknown>, ctx: CallContext): Promise<Result<unknown>> {
       const tool = run[name];
       if (!tool)
