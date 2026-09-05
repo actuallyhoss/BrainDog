@@ -328,7 +328,7 @@ test('and one whose field was cleared is dropped too', async () => {
 test('a kind nothing handles fails ONCE and says so, rather than pretending for eight hours', async () => {
   const { k, sql } = await record();
   sql.exec(
-    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_1', ?, 'digest', 'weekly', '{}', 'pending', 0)",
+    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_1', ?, 'analyse', 'weekly', '{}', 'pending', 0)",
     new Date(NOW - MINUTE).toISOString(),
   );
   const drained = await k.drain();
@@ -336,7 +336,7 @@ test('a kind nothing handles fails ONCE and says so, rather than pretending for 
   assert.equal(sql.one<{ state: string }>("SELECT state FROM schedule WHERE id = 's_1'")?.state, 'failed');
 
   const item = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion')!.body) as { question: string };
-  assert.match(item.question, /digest/);
+  assert.match(item.question, /analyse/);
   sql.close();
 });
 

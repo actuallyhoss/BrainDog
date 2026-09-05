@@ -41,6 +41,7 @@ import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
+import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps } from './digest.ts';
 import {
   bindGrant,
   getGrant,
@@ -71,6 +72,8 @@ export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provis
 export { GRANT_KINDS, spanMs } from './vault.ts';
 export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
+export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
+export type { Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
 export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
@@ -635,6 +638,37 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     ctx: evalContext(),
   });
 
+  /**
+   * What a digest reads through.
+   *
+   * The same callbacks the page layer takes, plus the two things only a record can answer: who the
+   * owners are, and what time it is where the customer is.
+   */
+  const digestDeps = (): DigestDeps => {
+    const deps = pageDeps();
+    return {
+      metric: deps.metric,
+      read: deps.read,
+      list: deps.list,
+      schemaOf: deps.schemaOf,
+      ctx: deps.ctx,
+      /* THE OWNERS, BY ADDRESS. A digest with nowhere to go is not sent rather than sent to the
+         first person the record can name — which on a shared record would be somebody else. */
+      owners: () =>
+        sql
+          .all<{ email: string | null }>(
+            "SELECT p.email FROM member m JOIN person p ON p.id = m.person_id WHERE m.register = '*' AND m.level = 'owner' AND p.email IS NOT NULL AND p.suspended_at IS NULL",
+          )
+          .map((r) => String(r.email))
+          .filter(Boolean),
+      outbox: (kind, payload) => void enqueue(sql, mint, clock.now(), kind, payload),
+      note: (actor, text) => noteEvent(sql, mint, clock.now(), actor, text),
+      mint,
+      nowMs: clock.now(),
+      tz: recordIdentity(sql)?.tz ?? 'UTC',
+    };
+  };
+
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
@@ -668,10 +702,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /**
    * What each kind of schedule row does when its time comes.
    *
-   * The eight that are not here — `digest`, `rule`, `purge`, `rotate`, `pull`, `analyse`, `score`,
-   * `snapshot` — each wait on a subsystem this record does not have yet. A row of one of those kinds
-   * fails ONCE with a sentence naming the kind rather than walking eight hours of a ladder, which is
-   * the honest behaviour: it says the record cannot do this, instead of looking like it is trying.
+   * The four that are not here — `rule`, `pull`, `analyse` and `snapshot` — each wait on a subsystem
+   * this record does not have yet. A row of one of those kinds fails ONCE with a sentence naming the
+   * kind rather than walking eight hours of a ladder, which is the honest behaviour: it says the
+   * record cannot do this, instead of looking like it is trying.
    */
   const HANDLERS: Partial<Record<ScheduleKind, Handler>> = {
     retry: retryHandler(sql),
@@ -697,6 +731,30 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const out = scorePrediction(sql, prediction, evalContext(), { mint, nowAt: instant(clock.now()) });
       if (!out.ok) throw new TypeError(out.refusal.fix);
       return null;
+    },
+
+    /**
+     * The digest comes due: assemble it, queue it, and set the next one.
+     *
+     * BATCH BY DEFAULT. Almost nothing needs to reach somebody the moment it happens, and a product
+     * that pushes each fact as it arrives is a product people mute.
+     */
+    digest: (row) => {
+      const { declaration } = JSON.parse(row.payload) as { declaration?: string };
+      const found = declaration
+        ? sql.one<{ body: string }>(
+            "SELECT body FROM declaration WHERE id = ? AND kind = 'digest' AND superseded_at IS NULL AND retired = 0",
+            declaration,
+          )
+        : null;
+      /* A DIGEST WHOSE DECLARATION IS GONE IS DROPPED, like a reminder whose row was deleted: the
+         thing it was about is not true any more, and firing it anyway is the failure the whole
+         derived-schedule design exists to avoid. */
+      if (!found) return null;
+
+      const decl = JSON.parse(found.body) as DigestDecl;
+      runDigest(digestDeps(), decl);
+      return nextOccurrence(decl.schedule, clock.now(), recordIdentity(sql)?.tz ?? 'UTC');
     },
 
     /* A credential due for rotation. It says the id and the kind and never the label — a
