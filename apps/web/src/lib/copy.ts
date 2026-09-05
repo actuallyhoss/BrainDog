@@ -38,6 +38,11 @@ export const copy = {
   width: 'Width',
   moveUp: 'Move up',
   moveDown: 'Move down',
+  /* The nav's own two, which the arrange verbs above do not cover: a rail is sectioned, so "top"
+     means the top of the section, and "hide" is the nav's word for removing a row without deleting
+     the page behind it (19 §3). */
+  moveToTop: 'Move to top',
+  hide: 'Hide',
   removeBlock: 'Remove this block',
   addBlock: 'Add a block',
 

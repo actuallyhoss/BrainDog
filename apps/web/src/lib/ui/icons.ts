@@ -28,6 +28,8 @@ export const PATHS = {
   check: 'm5 12 5 5L19 6',
   filter: 'M3 5h18l-7 8.2V20l-4-2.2v-4.6z',
   copy: 'M9 9h10v10H9zM15 9V5H5v10h4',
+  /** A chain, for a URL. `copy` is two sheets of paper and is the id — the two are different verbs. */
+  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 1 0-5.7-5.7L11.5 7M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 1 0 5.7 5.7L12.5 17',
   clock: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zm0-14v5l3 2',
   alert: 'M12 4 2.5 20h19zM12 10v4',
   sun: 'M12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zM12 2v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',

@@ -100,6 +100,24 @@
     }
   }
 
+  /**
+   * The LINK, not the id. `⇧Y` has been on the `?` sheet since the registry was written and was
+   * bound nowhere: `e.key` for shift-Y is `'Y'`, so the `'y'` branch never saw it and the sheet was
+   * advertising a key that did nothing. A cheat sheet is only a cheat sheet if it is true.
+   *
+   * Two outcomes, same as `copyId`, and the toast says which — the clipboard is absent over plain
+   * HTTP and in a sandboxed frame.
+   */
+  async function copyLink(seq: number) {
+    const url = `${location.origin}/r/${id}/${seq}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toasts.push(copy.copied(url));
+    } catch {
+      toasts.push(copy.copyRefused, { intent: 'warn' });
+    }
+  }
+
   let focus = $state({ row: 0, col: 1 });
   let peeked = $state<number | null>(null);
   let filterOpen = $state(false);
@@ -171,6 +189,14 @@
     if (e.altKey && e.key.toLowerCase() === 'b') {
       e.preventDefault();
       toasts.push(copy.notWritten('This filter would be bound as a block on a page'), { intent: 'warn' });
+      return;
+    }
+    if (e.shiftKey && e.key === 'Y') {
+      const row = result.entries[focus.row];
+      if (row) {
+        e.preventDefault();
+        void copyLink(row.seq);
+      }
       return;
     }
     if (e.shiftKey && e.key === 'F10') {
@@ -548,6 +574,10 @@
       <button class="mi" role="menuitem" type="button" onclick={() => void copyId(seq)}>
         <Icon name="copy" size="s" />
         <span class="mi-name">{copy.copyId}</span><Kbd keys="y" />
+      </button>
+      <button class="mi" role="menuitem" type="button" onclick={() => void copyLink(seq)}>
+        <Icon name="link" size="s" />
+        <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
       </button>
       <hr class="mi-rule" />
       <button class="mi" role="menuitem" type="button" onclick={() => archive(seq)}>

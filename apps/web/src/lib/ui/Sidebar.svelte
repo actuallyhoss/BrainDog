@@ -35,6 +35,9 @@
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
   import Icon, { type IconName } from './Icon.svelte';
   import Menu from './Menu.svelte';
+  import RowMenu from './RowMenu.svelte';
+  import Kbd from './Kbd.svelte';
+  import { toasts } from './toast.svelte.ts';
 
   let {
     nav,
@@ -54,14 +57,101 @@
     inbox?: number | undefined;
   } = $props();
 
+  /**
+   * ── REORDER WITHOUT A MOUSE ────────────────────────────────────────────────
+   *
+   * WCAG 2.2 SC 2.5.7, and 19 §3 spells out the answer: pointer drag, `⌥↑`/`⌥↓` to move the focused
+   * item, and Move up / Move down / Move to top / Hide in a context menu reachable by `⇧F10` or the
+   * context-menu key. The `?` sheet has advertised the whole scope since the registry was written
+   * and none of it was bound to anything — a cheat sheet is only a cheat sheet if it is true.
+   *
+   * The arrangement is a LIST OF HREFS, and position is stored independently of visibility because
+   * 19 §3 asks for that by name: hiding an item and showing it again returns it to its stored place,
+   * never to the end. Empty means "as declared", so a record that has never been rearranged carries
+   * no arrangement at all rather than a copy of its own defaults.
+   */
+  let arrangement = $state<string[]>([]);
+
+  const ordered = $derived.by(() => {
+    const base = [...nav].sort((a, b) => a.order - b.order);
+    if (arrangement.length === 0) return base;
+    const rank = new Map(arrangement.map((href, i) => [href, i]));
+    return base
+      .map((e, i) => ({ e, at: rank.get(e.href) ?? Number.MAX_SAFE_INTEGER, i }))
+      .sort((a, b) => a.at - b.at || a.i - b.i)
+      .map((x) => x.e);
+  });
+
   const sections = $derived.by(() => {
     const out = new Map<string, NavEntry[]>();
-    for (const e of [...nav].sort((a, b) => a.order - b.order)) {
+    for (const e of ordered) {
       if (!out.has(e.section)) out.set(e.section, []);
       out.get(e.section)!.push(e);
     }
     return [...out];
   });
+
+  /**
+   * Move one item, one place, WITHIN ITS SECTION.
+   *
+   * The neighbour is the next entry that shares the section rather than the next entry in the list:
+   * sections are a grouping over one ordered list, so two of them can interleave, and swapping with
+   * a positional neighbour would move an item into a heading it does not belong under.
+   */
+  function move(href: string, delta: number) {
+    const list = ordered;
+    const from = list.findIndex((e) => e.href === href);
+    const me = list[from];
+    if (!me) return;
+    let to = from + delta;
+    while (to >= 0 && to < list.length && list[to]!.section !== me.section) to += delta;
+    if (to < 0 || to >= list.length) return;
+    const next = [...list];
+    next[from] = next[to]!;
+    next[to] = me;
+    arrangement = next.map((e) => e.href);
+    focusItem(href);
+  }
+
+  /** To the top OF ITS SECTION, which is the only top an item in a sectioned list has. */
+  function toTop(href: string) {
+    const list = ordered;
+    const me = list.find((e) => e.href === href);
+    if (!me) return;
+    const rest = list.filter((e) => e.href !== href);
+    const at = rest.findIndex((e) => e.section === me.section);
+    rest.splice(at === -1 ? rest.length : at, 0, me);
+    arrangement = rest.map((e) => e.href);
+    focusItem(href);
+  }
+
+  /* The keyboard moved the item; focus has to move with it or the next press acts on whatever row
+     slid into the place under the caret. */
+  function focusItem(href: string) {
+    queueMicrotask(() => rail?.querySelector<HTMLElement>(`[data-nav="${CSS.escape(href)}"]`)?.focus());
+  }
+
+  let rail = $state<HTMLElement>();
+  let menuAt = $state<{ x: number; y: number; height: number } | null>(null);
+  let menuFor = $state<NavEntry | null>(null);
+
+  function openMenu(entry: NavEntry, el: HTMLElement) {
+    const r = el.getBoundingClientRect();
+    menuAt = { x: r.left, y: r.top, height: r.height };
+    menuFor = entry;
+  }
+
+  function onItemKey(e: KeyboardEvent, entry: NavEntry) {
+    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      move(entry.href, e.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
+    if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
+      e.preventDefault();
+      openMenu(entry, e.currentTarget as HTMLElement);
+    }
+  }
 
   const here = (href: string) => page.url.pathname === href;
   const under = (href: string) => page.url.pathname.startsWith(href);
@@ -69,7 +159,7 @@
   void ({} as RegisterDecl);
 </script>
 
-<nav class="rail" aria-label="Record">
+<nav class="rail" aria-label="Record" bind:this={rail}>
   <!-- No lockup. The mark is the red circle in the bottom-right corner, where it is an affordance
        rather than a caption, and the record switcher takes the space it used to occupy. The name of
        the thing you are inside is worth more here than the name of the software you are inside: you
@@ -138,9 +228,15 @@
             <a
               class="item tap"
               href={entry.href}
+              data-nav={entry.href}
               aria-current={here(entry.href) ? 'page' : undefined}
               style={entry.hue === undefined ? undefined : `--hue:${entry.hue}`}
               data-hued={entry.hue === undefined ? undefined : ''}
+              onkeydown={(e) => onItemKey(e, entry)}
+              oncontextmenu={(e) => {
+                e.preventDefault();
+                openMenu(entry, e.currentTarget);
+              }}
             >
               <Icon name={entry.icon} size="m" />
               <span class="item-name">{entry.title}</span>
@@ -197,6 +293,47 @@
       </a>
     </li>
   </ul>
+
+  <!-- EVERY ITEM IS A KEY THAT ALREADY EXISTS, the same rule the row menu follows: the menu is not
+       a second set of capabilities, it is the same set, discoverable by looking. Hide is the one
+       that says what it would have done instead of doing it — the mock has nowhere to bring a
+       hidden item back from, and an irreversible control in a mock-up is a trap. -->
+  <RowMenu
+    open={menuFor !== null}
+    at={menuAt}
+    label={menuFor ? `${menuFor.title} in your nav` : 'Nav item'}
+    onclose={() => {
+      const back = menuFor?.href;
+      menuFor = null;
+      if (back) focusItem(back);
+    }}
+  >
+    {#if menuFor}
+      {@const entry = menuFor}
+      <button class="mi" role="menuitem" type="button" onclick={() => move(entry.href, -1)}>
+        <Icon name="arrowUp" size="s" />
+        <span class="mi-name">{copy.moveUp}</span><Kbd keys="⌥↑" />
+      </button>
+      <button class="mi" role="menuitem" type="button" onclick={() => move(entry.href, 1)}>
+        <Icon name="arrowDown" size="s" />
+        <span class="mi-name">{copy.moveDown}</span><Kbd keys="⌥↓" />
+      </button>
+      <button class="mi" role="menuitem" type="button" onclick={() => toTop(entry.href)}>
+        <Icon name="star" size="s" />
+        <span class="mi-name">{copy.moveToTop}</span>
+      </button>
+      <hr class="mi-rule" />
+      <button
+        class="mi"
+        role="menuitem"
+        type="button"
+        onclick={() => toasts.push(copy.notWritten(`${entry.title} would be hidden from your nav`), { intent: 'warn' })}
+      >
+        <Icon name="ban" size="s" />
+        <span class="mi-name">{copy.hide}</span>
+      </button>
+    {/if}
+  </RowMenu>
 </nav>
 
 <style>
