@@ -21,7 +21,7 @@
 
 import { KINDS, isKind } from 'braindog-render';
 
-import { REGISTERS } from './data.ts';
+import { REGISTERS, ROWS } from './data.ts';
 import type { FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 
 /** What each cell of a kind wants, in order. `any` takes the first field left. */
@@ -33,8 +33,12 @@ type Want = 'title' | 'number' | 'date' | 'enum' | 'ref' | 'text' | 'any';
  */
 const WANTS: Record<string, Want[]> = {
   bar: ['ref', 'number'],
-  gauge: ['title', 'number', 'text'],
-  chips: ['title', 'number', 'enum'],
+  /* A gauge groups nothing and projects nothing: it sums one column against a target. The first
+     column only names the figure, so it wants the title and the second wants the number. */
+  gauge: ['title', 'number'],
+  /* An ENUM FIRST, because chips group and count by their first column. Bound to the title, every
+     chip is a count of one wearing a whole row's name in small caps — which is what it did. */
+  chips: ['enum'],
   spec: ['title', 'number', 'date'],
   params: ['title', 'text', 'text'],
   todo: ['title', 'date'],
@@ -102,12 +106,30 @@ export function seedBlock(kind: string, register: string): PageBlock | null {
   if (!decl || !wants || !isKind(kind)) return null;
   const spec = KINDS[kind];
 
+  const columns = fill(decl, wants).slice(0, Math.max(spec.cells, wants.length));
+
+  /* A GAUGE WITHOUT A TARGET DRAWS NOTHING, and a preview that draws nothing teaches somebody that
+     the kind is broken. There is no target in the record — a budget is a decision, not a column —
+     so the seed proposes one from the rows it is about to show: double the current sum, rounded, so
+     the bar lands near half and the shape reads as a gauge rather than as full or empty. It is a
+     starting number to be edited, which is what everything else in a seeded block is too. */
+  const target =
+    kind === 'gauge'
+      ? (() => {
+          const of = columns[1]?.field;
+          if (!of) return undefined;
+          const sum = (ROWS[register] ?? []).reduce((a, e) => a + Number(e.fields[of] ?? 0), 0);
+          return sum > 0 ? Math.round(sum * 2) : undefined;
+        })()
+      : undefined;
+
   return {
     kind,
     heading: decl.name,
     span: spec.minSpan,
     source: `register.${register}`,
-    columns: fill(decl, wants).slice(0, Math.max(spec.cells, wants.length)),
+    columns,
+    ...(target === undefined ? {} : { target }),
     limit: 6,
     /* Mandatory on every source-bound block (06 §1.1), and it renders on day one — which is exactly
        when a register is empty, so it is written for that day rather than for a full one. */

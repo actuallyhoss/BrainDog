@@ -125,8 +125,19 @@ export function display(register: string, field: string, value: unknown): string
     case 'int':
       return integer(Number(value));
     case 'decimal':
-    case 'duration':
-      return `${value}${f.unit ? ` ${f.unit}` : ''}`;
+    case 'duration': {
+      /* ROUNDED, because these get summed. `0.2 + 3 + 0.2` is 3.4000000000000004 in binary
+         floating point, and a bar chart totalling three tasks' effort printed exactly that. Money
+         never has this problem — it is an integer in minor units — but a decimal is a decimal, so
+         the display has to be the thing that decides how many places a person sees.
+
+         Three places is the ceiling and trailing zeros are dropped, so `3.4` stays `3.4` and does
+         not become `3.400`. `toLocaleString` also groups the thousands, which a raw template did
+         not: `1200 d` was a number nobody reads as one thousand two hundred. */
+      const n = Number(value);
+      const shown = Number.isFinite(n) ? n.toLocaleString('en-GB', { maximumFractionDigits: 3 }) : String(value);
+      return `${shown}${f.unit ? ` ${f.unit}` : ''}`;
+    }
     case 'bool':
       return value ? 'yes' : 'no';
     case 'enum':

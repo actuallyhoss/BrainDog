@@ -27,7 +27,7 @@
   import { Block } from 'braindog-render/svelte';
 
   import { copy } from '../copy.ts';
-  import { page as readPage, values } from '../record/api.ts';
+  import { REGISTERS, page as readPage, values } from '../record/api.ts';
   import { toSegments } from '../record/blocks.ts';
   import { BINDABLE, seedBlock } from '../record/seed.ts';
   import type { PageBlock } from '../record/schema.ts';
@@ -60,6 +60,7 @@
    */
   const tiles = $derived.by(() => {
     const result = readPage(slug);
+    const decl = REGISTERS[register];
     return BINDABLE.map((kind) => {
       const seed = seedBlock(kind, register);
       const preview = (isKind(kind) ? KINDS[kind].rows : undefined) ?? 3;
@@ -75,12 +76,19 @@
                undeclared column. */
             columns: (seed.columns ?? []).map((c) => ({
               field: c.field,
-              label: c.field,
+              /* The register's own name, not the field id. A gauge takes its label from
+                 `columns[0].label`, so `label: c.field` printed `what` on the tile — an id, in the
+                 picker, which is the one screen where somebody is deciding what a kind even is. */
+              label: c.label ?? decl?.name ?? c.field,
               width: 'minmax(8ch,1fr)',
               align: 'start' as const,
               truncate: 'end' as const,
             })),
             metrics: undefined,
+            /* THE SEED'S TARGET, or a gauge previews as "— of —" and teaches somebody the kind is
+               broken. `bound` is a real block off this page and carries no target, so spreading it
+               and overriding only the kind loses the one field the seeded gauge added. */
+            ...(seed.target === undefined ? {} : { target: seed.target }),
             /* Capped by the KIND, not by a number chosen here. `gauge` takes one row and `quote`
                takes one; three seeded rows against a one-row cap degrades to a visible fence, so
                the tile for the one kind that shows a single figure was showing a parse error. */
@@ -186,10 +194,12 @@
     gap: var(--sp-2);
   }
 
+  /* The UI face, not the id face. It was monospace when it printed `bar` and `spec`, which was
+     right for an identifier and wrong for "Bar chart" — a name set in code type reads as a value
+     you must copy exactly rather than as a thing you can pick. */
   .tile-kind {
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-size: var(--t-ui);
     font-weight: 600;
   }
 
