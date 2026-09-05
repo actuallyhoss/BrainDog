@@ -28,6 +28,9 @@ const GATES = [
      both apps are held to it, which is where the shapes actually cross. */
   ['typecheck', PNPM],
   ['clean-room', ['node', [join(here, 'clean-room.mjs')]]],
+  /* The banned surface: one kernel, three runtimes, and a source file that imports a driver has
+     chosen one of them. Cheap and early, beside the other greps. */
+  ['stack', ['node', [join(here, 'stack.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],

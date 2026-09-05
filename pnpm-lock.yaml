@@ -80,6 +80,14 @@ importers:
         specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.0)
 
+  packages/kernel:
+    dependencies:
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../ports
+
+  packages/ports: {}
+
   packages/render:
     dependencies:
       svelte:
