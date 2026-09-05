@@ -81,6 +81,48 @@ export const httpStatus = (code: string): number => STATUS[code] ?? 500;
 export type Handler = (args: Record<string, unknown>, ctx: unknown) => Promise<Result<unknown>>;
 
 /**
+ * The handlers, built once from the record's surface.
+ *
+ * THE WIRING IS SHARED, not just the table. A test could assert that two hosts wire the same routes;
+ * this makes it impossible for them not to — the Worker and the self-host both call this, so a route
+ * cannot exist in one and not the other, and "the product behaves differently depending on where you
+ * run it" stops being a thing anybody has to remember.
+ *
+ * It takes the surface structurally rather than importing `@braindog/record`, so `host` stays under
+ * `record` in the package graph (`31-STACK` §2) and the acyclicity argument still holds.
+ */
+export type RecordSurface = {
+  boot(ctx: never): Promise<Result<unknown>>;
+  version(ctx: never): Promise<Result<unknown>>;
+  schema(args: never, ctx: never): Promise<Result<unknown>>;
+  get(args: never, ctx: never): Promise<Result<unknown>>;
+  list(args: never, ctx: never): Promise<Result<unknown>>;
+  history(args: never, ctx: never): Promise<Result<unknown>>;
+  create(args: never, ctx: never): Promise<Result<unknown>>;
+  update(args: never, ctx: never): Promise<Result<unknown>>;
+};
+
+export function handlersFor(api: RecordSurface): Record<string, Handler> {
+  const handlers: Record<string, Handler> = {
+    boot: (_a, ctx) => api.boot(ctx as never),
+    version: (_a, ctx) => api.version(ctx as never),
+    schema: (a, ctx) => api.schema(a as never, ctx as never),
+    get: (a, ctx) => api.get(a as never, ctx as never),
+    list: (a, ctx) => api.list(a as never, ctx as never),
+    history: (a, ctx) => api.history(a as never, ctx as never),
+    create: (a, ctx) => api.create(a as never, ctx as never),
+    update: (a, ctx) => api.update(a as never, ctx as never),
+  };
+  /* The table and the wiring, checked against each other where they are both in scope — so adding a
+     route to one without the other throws at start rather than 404ing in production. */
+  for (const route of ROUTES)
+    if (!handlers[route.name]) throw new TypeError(`${route.name} is in the route table and has no handler`);
+  for (const name of Object.keys(handlers))
+    if (!BY_NAME.has(name)) throw new TypeError(`${name} has a handler and is not in the route table`);
+  return handlers;
+}
+
+/**
  * Answer one request against a set of handlers.
  *
  * ONE SHAPE FOR EVERY ANSWER — `{ ok, value }` or `{ ok, refusal }` — because a client that has to

@@ -92,6 +92,22 @@ importers:
         specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.0)
 
+  apps/worker:
+    dependencies:
+      '@braindog/host':
+        specifier: workspace:*
+        version: link:../../packages/host
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../../packages/ports
+      '@braindog/record':
+        specifier: workspace:*
+        version: link:../../packages/record
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 4.20250913.0
+        version: 4.20250913.0
+
   packages/host:
     dependencies:
       '@braindog/ports':
@@ -154,6 +170,9 @@ importers:
         version: link:../ports
 
 packages:
+
+  '@cloudflare/workers-types@4.20250913.0':
+    resolution: {integrity: sha512-JjrYEvRn7cyALxwoFTw3XChaQneHSJOXqz2t5iKEpNzAnC2iPQU75rtTK/gw03Jjy4SHY5aEBh/uqQePtonZlA==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -635,6 +654,8 @@ packages:
     resolution: {integrity: sha512-msJxIvYDYcoNL+PJsu+7qmpDWsYmAxTY+2TNYXXF0hzBzBk0BMecOqDOG/EckUoKCuKwObfbugIl8QpqHDXeFA==}
 
 snapshots:
+
+  '@cloudflare/workers-types@4.20250913.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

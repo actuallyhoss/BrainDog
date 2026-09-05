@@ -15,7 +15,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
-import { ROUTES, serveApi, type Handler } from '@braindog/host';
+import { handlersFor, serveApi, type Handler } from '@braindog/host';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import type { Param, Row, Sql } from '@braindog/ports';
 
@@ -74,20 +74,9 @@ export async function start(options: { file: string; port: number; token?: strin
     exit(1);
   }
 
-  /* Every route in the shared table, and nothing else. A route here that is not there is a product
-     that behaves differently depending on where a customer runs it. */
-  const handlers: Record<string, Handler> = {
-    boot: (_a, ctx) => api.boot(ctx as CallContext),
-    version: (_a, ctx) => api.version(ctx as CallContext),
-    schema: (a, ctx) => api.schema(a as never, ctx as CallContext),
-    get: (a, ctx) => api.get(a as never, ctx as CallContext),
-    list: (a, ctx) => api.list(a as never, ctx as CallContext),
-    history: (a, ctx) => api.history(a as never, ctx as CallContext) as never,
-    create: (a, ctx) => api.create(a as never, ctx as CallContext),
-    update: (a, ctx) => api.update(a as never, ctx as CallContext),
-  };
-  for (const route of ROUTES)
-    if (!handlers[route.name]) throw new TypeError(`${route.name} is in the route table and not wired here`);
+  /* THE WIRING IS SHARED, not copied. Both hosts call `handlersFor`, so a route cannot exist in one
+     and not the other — and it throws at start rather than 404ing in production. */
+  const handlers = handlersFor(api);
 
   const server = createServer((req, res) => void answer(req, res, handlers, api, options.token));
   await new Promise<void>((resolve) => server.listen(options.port, resolve));

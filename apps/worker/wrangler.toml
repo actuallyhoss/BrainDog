@@ -1,0 +1,13 @@
+# One deployment for every customer; a record is addressed, never provisioned.
+name = "braindog"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[[durable_objects.bindings]]
+name = "RECORD"
+class_name = "Record$"
+
+# SQLite-backed, which is what buys FTS5, point-in-time recovery and an alarm per customer.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Record$"]
