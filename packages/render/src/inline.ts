@@ -34,10 +34,19 @@ const EVIDENCE = ['verified', 'inferred', 'estimate', 'unknown'] as const;
 /** Lexically: `segment ('.' segment)*`, a segment `[A-Za-z][A-Za-z0-9_-]*` or `register#digits`. */
 const PATH = /^[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?(?:\.[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?)*$/;
 
-/** `https:`, `mailto:`, `#anchor` and same-origin paths render as links. Everything else is text. */
+/**
+ * `https:`, `mailto:`, `#anchor` and same-origin paths render as links. Everything else is text.
+ *
+ * A LEADING SLASH IS NOT THE TEST FOR SAME-ORIGIN. `//evil.com/x` starts with one, carries no
+ * scheme, and is a protocol-relative URL: the browser fills in the current page's scheme and the
+ * link goes to somebody else's host wearing the shape of an internal path. `/\evil.com` is the same
+ * thing — the URL parser treats a backslash in the authority position as a slash. Both were passing
+ * here, out of a record whose text is written by agents.
+ */
 export function safeHref(href: string): string | null {
   const h = href.trim();
-  if (h.startsWith('#') || h.startsWith('/')) return h;
+  if (h.startsWith('#')) return h;
+  if (h.startsWith('/')) return /^\/[/\\]/.test(h) ? null : h;
   if (/^https:\/\//i.test(h) || /^mailto:/i.test(h)) return h;
   return null;
 }

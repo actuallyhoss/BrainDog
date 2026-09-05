@@ -34,3 +34,20 @@ export type TableRow = {
   tone?: Tone | undefined;
   href?: string | undefined;
 };
+
+/**
+ * The rows in groups, for the chunked `content-visibility` the measurement above bought.
+ *
+ * Here rather than inside the component because the step is the one number in that file that can be
+ * wrong in a way nothing catches: `chunk={0}` is `i += 0`, a loop with no end, running during
+ * render. The tab froze with no error and nothing on screen to say which component did it.
+ *
+ * The step is also the row index's unit — `aria-rowindex` is `group * step + i` — so the two cannot
+ * be allowed to disagree, which is the second reason this is one function.
+ */
+export function chunkRows<T>(rows: readonly T[], size: number): { step: number; groups: T[][] } {
+  const step = Number.isFinite(size) ? Math.max(1, Math.floor(size)) : 1;
+  const groups: T[][] = [];
+  for (let i = 0; i < rows.length; i += step) groups.push(rows.slice(i, i + step));
+  return { step, groups };
+}

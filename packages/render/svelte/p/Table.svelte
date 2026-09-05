@@ -25,7 +25,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { Column, TableRow } from '../types.ts';
+  import { chunkRows, type Column, type TableRow } from '../types.ts';
 
   let {
     columns,
@@ -59,11 +59,10 @@
   } = $props();
 
   const tracks = $derived(columns.map((c) => c.width).join(' '));
-  const chunks = $derived.by(() => {
-    const out: TableRow[][] = [];
-    for (let i = 0; i < rows.length; i += chunk) out.push(rows.slice(i, i + chunk));
-    return out;
-  });
+  /* One function for the groups AND the step they are counted in, because `aria-rowindex` is
+     `group * step + i` and the two disagreeing is a table that announces a different row than the
+     one on screen. It is also where `chunk={0}` stops being an endless loop during render. */
+  const grouped = $derived(chunkRows(rows, chunk));
 
   /** Roving tabindex: exactly one cell is reachable by Tab, every other is -1. */
   const isFocused = (r: number, c: number) => focus?.row === r && focus?.col === c;
@@ -108,7 +107,7 @@
       {/each}
     </div>
 
-    {#each chunks as group, g}
+    {#each grouped.groups as group, g}
       <!-- contain-intrinsic-size is set from the row height so the scrollbar is honest before the
            rows in this group have ever been laid out. Every box is reserved: CLS <= 0.02. -->
       <div
@@ -117,7 +116,7 @@
         style="contain-intrinsic-size: auto calc({group.length} * var(--row-h))"
       >
         {#each group as row, i}
-          {@const index = g * chunk + i}
+          {@const index = g * grouped.step + i}
           <div
             class="tr"
             role="row"
