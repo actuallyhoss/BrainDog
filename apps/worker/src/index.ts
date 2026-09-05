@@ -24,10 +24,21 @@ import { handlersFor, serveApi } from '@braindog/host';
 import { createRecordApi, type CallContext, type RecordApi } from '@braindog/record';
 import type { Param, Row, Scheduler, Sql } from '@braindog/ports';
 
+import { createDirectory, type Directory as Dir, type Level } from '@braindog/record/directory';
+
 import { alarmScheduler } from './alarm.ts';
+import { DELIVERS, makeDeliver } from './deliver.ts';
 import { recordPath } from './route.ts';
 
-type Env = { RECORD: DurableObjectNamespace<Record$> };
+type EmailBinding = { send(message: { to: string; subject: string; text: string }): Promise<void> };
+
+type Env = {
+  RECORD: DurableObjectNamespace<Record$>;
+  DIRECTORY: DurableObjectNamespace<Directory$>;
+  /** The doorbell. Its message is `{ record }` and never a payload — 51 §13 D16. */
+  INGRESS: Queue<{ record: string }>;
+  EMAIL?: EmailBinding;
+};
 
 /** The `Sql` port over the Durable Object's own SQLite. Storage in the same thread as the code. */
 function storageSql(storage: DurableObjectStorage): Sql {
@@ -59,8 +70,18 @@ function storageSql(storage: DurableObjectStorage): Sql {
 export class Record$ extends DurableObject<Env> {
   #api: Promise<RecordApi> | null = null;
 
-  /** The `Scheduler` port over this object's own alarm. One per customer, and this is the one. */
-  #alarm: Scheduler = alarmScheduler(this.ctx.storage);
+  /**
+   * The `Scheduler` port over this object's own alarm. One per customer, and this is the one.
+   *
+   * AND ITS DOORBELL RINGS THE QUEUE. `wake()` is the one piece of I/O a record performs, and it
+   * carries the object's own id and nothing else: a message that copied a notification would be a
+   * second copy of something that may have changed by the time it is read. A lost message costs
+   * latency and never a notification, because the row is still `pending` and the next wake drains
+   * it — the outbox is the source of truth and the queue is a doorbell.
+   */
+  #alarm: Scheduler = alarmScheduler(this.ctx.storage, () =>
+    this.env.INGRESS.send({ record: this.ctx.id.toString() }),
+  );
 
   /**
    * The migration runs under `blockConcurrencyWhile`, which is the platform's word for "no request
@@ -99,6 +120,28 @@ export class Record$ extends DurableObject<Env> {
     await api.kernel.drain(this.#alarm);
   }
 
+  /**
+   * Claim outbox jobs for the Worker to deliver.
+   *
+   * THE LEASE IS THE RECORD'S AND THE DELIVERY IS THE HOST'S, and the seam is exactly here. The
+   * record holds the ladder, the attempt count and the dead letter; the Worker holds the network
+   * and the credentials. Doing the I/O inside the object would give the record a reason to hold a
+   * key, and `ADR-062` is the argument for why it must not.
+   */
+  async lease(n = 10): Promise<{ id: string; kind: string; payload: string; attempts: number; leasedUntil: string }[]> {
+    const api = await this.#record();
+    return api.kernel.leaseOutbox(DELIVERS, n);
+  }
+
+  /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
+  async ack(done: { id: string; state: 'done' | 'failed'; error?: string }): Promise<void> {
+    const api = await this.#record();
+    api.kernel.ackOutbox(done);
+    /* THE TAIL, because a failed ack writes a `retry` row and nothing else here would notice it —
+       on an idle record `pendingWork()` would say there is work and the alarm would say `null`. */
+    await api.kernel.tail(this.#alarm);
+  }
+
   override async fetch(request: Request): Promise<Response> {
     const api = await this.#record();
 
@@ -124,11 +167,81 @@ export class Record$ extends DurableObject<Env> {
 }
 
 /**
- * The slug in the path is the record. `/r/the-studio/api/list` is one object and one method.
+ * The Directory: one object for the whole installation.
  *
- * A real deployment resolves a slug to a `rec_id` through the Directory object first (ADR-061), so a
- * renamed record keeps its storage. That hop is the next iteration; the shape of this file does not
- * change when it arrives, because the only thing it alters is the string handed to `idFromName`.
+ * ONE INSTANCE, ALWAYS `idFromName('directory')`. It is the tenant map — which name means which
+ * record, and which records a person reaches — and two of them would be two maps that disagree.
+ * The throughput of a single writer is the documented ceiling (ADR-061); sharding by email prefix
+ * is the documented next step, and neither is a thing to build before the first customer.
+ *
+ * IT HOLDS NO RECORD LOGIC, and its schema is `@braindog/record/directory` so the self-host runs
+ * the same file over `directory.sqlite`.
+ */
+export class Directory$ extends DurableObject<Env> {
+  #dir: Dir | null = null;
+
+  #directory(): Dir {
+    this.#dir ??= createDirectory(storageSql(this.ctx.storage), { now: () => Date.now() });
+    return this.#dir;
+  }
+
+  /** Which record this name means, or `null` if it means none. The hop, and the whole of it. */
+  resolve(slug: string): { record: string; slug: string } | null {
+    return this.#directory().resolve(slug);
+  }
+
+  /** What this person may do with this record, or `null`. The Worker turns it into a `CallContext`. */
+  levelOf(record: string, person: string): Level | null {
+    return this.#directory().levelOf(record, person);
+  }
+}
+
+/**
+ * One pass over one record's outbox: lease, deliver, ack.
+ *
+ * ONE PASS AND NOT A LOOP. The ack rings the doorbell again when anything is left, so a queue that
+ * keeps filling is drained by the doorbell rather than by a `while` nobody can stop — and a
+ * consumer that looped would hold one invocation open across a customer's entire backlog.
+ */
+async function drainOutbox(env: Env, id: string): Promise<void> {
+  const record = env.RECORD.get(env.RECORD.idFromString(id));
+  const deliver = makeDeliver({
+    ...(env.EMAIL === undefined ? {} : { email: (m: { to: string; subject: string; text: string }) => env.EMAIL!.send(m) }),
+    post: async (url: string, body: string) => {
+      const out = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+        body,
+      });
+      return { ok: out.ok, status: out.status };
+    },
+  });
+
+  for (const job of await record.lease()) {
+    try {
+      await deliver(job as never);
+      await record.ack({ id: job.id, state: 'done' });
+    } catch (e) {
+      /* THE MESSAGE AND NEVER THE PAYLOAD. A digest is somebody's overdue invoices; an error line
+         that quoted one has published it to wherever logs go. */
+      await record.ack({ id: job.id, state: 'failed', error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+}
+
+const json = (body: unknown, status: number): Response =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
+
+/**
+ * The slug in the path is a NAME, and the Directory says which record it means.
+ *
+ * `idFromName(rec_id)` AND NEVER `idFromName(slug)` (ADR-061). The address is the record id, so
+ * renaming is one row in the Directory and nothing else — no migration, no copy, and no window in
+ * which half the writes go to the old object. Addressing the storage by the name would make a
+ * rename a data migration, which is why nobody who does it ever renames anything.
+ *
+ * AND A NAME THAT HAS BEEN RELEASED RESOLVES TO NOTHING. Every stale link still says the old name;
+ * handing it to the next person who asks is how one of them reads another customer's record.
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -136,21 +249,50 @@ export default {
     const routed = recordPath(url.pathname);
 
     if (!routed)
-      return new Response(
-        JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record is at /r/<slug>/api/<method>.' } }),
-        { status: 404, headers: { 'content-type': 'application/json; charset=utf-8' } },
-      );
+      return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record is at /r/<slug>/api/<method>.' } }, 404);
 
-    /* NAMING IS PROVISIONING: this line is the whole of creating a customer. */
-    const record = env.RECORD.get(env.RECORD.idFromName(routed.slug));
+    const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+    const named = await directory.resolve(routed.slug);
+    if (!named)
+      return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no record called ${routed.slug}.` } }, 404);
 
+    /* The Worker authenticates and the record authorises. In a real deployment the person id comes
+       from a verified session or bearer; here it is the one self-host person, and the seam is one
+       line. What the Directory contributes is the LEVEL — membership is not a fact a record can
+       check about a caller it has never seen. */
+    const person = 'p_self';
+    const level = await directory.levelOf(named.record, person);
+    if (!level)
+      return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: `You are not on ${routed.slug}.` } }, 403);
+
+    const record = env.RECORD.get(env.RECORD.idFromName(named.record));
     const inner = new Request(`${url.origin}${routed.rest}${url.search}`, request);
-    /* The Worker authenticates and the record authorises. In a real deployment this context is
-       built from a verified session or token; here it is the owner, and the seam is one function. */
     inner.headers.set(
       'x-braindog-ctx',
-      JSON.stringify({ principal: { kind: 'person', id: 'p_self', level: 'owner' } } satisfies CallContext),
+      JSON.stringify({ principal: { kind: 'person', id: person, level } } satisfies CallContext),
     );
     return record.fetch(inner);
+  },
+
+  /**
+   * The doorbell rang.
+   *
+   * THE MESSAGE IS A NAME AND NOT A JOB. It says which record has something to send; the outbox
+   * says what. A message delivered twice does one pass over a lease that is already taken and
+   * finds nothing — which is why the queue can be at-least-once and the notification is still
+   * sent once.
+   */
+  async queue(batch: MessageBatch<{ record: string }>, env: Env): Promise<void> {
+    /* DE-DUPLICATED WITHIN THE BATCH. Twenty writes to one record in a second ring twenty times,
+       and twenty passes over one outbox is nineteen round trips for nothing. */
+    for (const id of new Set(batch.messages.map((m) => m.body.record))) {
+      try {
+        await drainOutbox(env, id);
+      } catch (e) {
+        /* One record's failure is not the batch's. The rows are still `pending` and the next
+           doorbell drains them. */
+        console.error('drain', id, e instanceof Error ? e.message : String(e));
+      }
+    }
   },
 };

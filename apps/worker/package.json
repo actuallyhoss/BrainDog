@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "@braindog/host": "workspace:*",
+    "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*"
   },

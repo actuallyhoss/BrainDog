@@ -7,7 +7,34 @@ compatibility_date = "2026-09-01"
 name = "RECORD"
 class_name = "Record$"
 
+# One instance for the whole installation, always idFromName('directory'). It is the tenant map:
+# which name means which record, and which records a person reaches. Two of them would be two maps
+# that disagree — ADR-061.
+[[durable_objects.bindings]]
+name = "DIRECTORY"
+class_name = "Directory$"
+
 # SQLite-backed, which is what buys FTS5, point-in-time recovery and an alarm per customer.
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["Record$"]
+new_sqlite_classes = ["Record$", "Directory$"]
+
+# The doorbell. A record writes an outbox row and rings this; the consumer leases, delivers and
+# acks. The message is `{ record }` and never a payload — a queue that copied a notification would
+# carry a second copy of something that may have changed by the time it is read.
+[[queues.producers]]
+queue = "braindog-ingress"
+binding = "INGRESS"
+
+[[queues.consumers]]
+queue = "braindog-ingress"
+max_batch_size = 25
+max_batch_timeout = 5
+# Cloudflare's own retry, over the record's ladder — this one covers a consumer that crashed. A
+# delivery that failed is `ackOutbox`, which is the record's, and conflating them produces either a
+# retry storm or a job that is never retried at all.
+max_retries = 3
+
+# Outbound email. The record never holds it: `ADR-062` puts every credential in the host.
+[[send_email]]
+name = "EMAIL"

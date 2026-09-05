@@ -104,8 +104,21 @@ test('THE COMPATIBILITY DATE IS AN ASSERTION, not a sentence in a document', () 
   assert.ok(date, 'wrangler.toml declares no compatibility_date');
   assert.ok(date && date >= '2026-02-24', `compatibility_date is ${date}, and deleteAll() leaves the alarm behind before 2026-02-24`);
 
-  // And the object is SQLite-backed, which is what buys FTS5, point-in-time recovery and the alarm.
-  assert.match(toml, /new_sqlite_classes\s*=\s*\["Record\$"\]/, 'the record object is not SQLite-backed');
+  // And both objects are SQLite-backed, which is what buys FTS5, point-in-time recovery and the
+  // alarm — the Directory needs none of those and shares the class of storage anyway, because a
+  // second kind of object is a second set of platform behaviours to hold in mind.
+  const classes = /new_sqlite_classes\s*=\s*\[([^\]]*)\]/.exec(toml)?.[1] ?? '';
+  for (const name of ['Record$', 'Directory$'])
+    assert.ok(classes.includes(`"${name}"`), `${name} is not SQLite-backed`);
+
+  // The doorbell is a producer AND a consumer of one queue: the record rings it and the Worker
+  // answers. Declaring only the producer is a queue nobody drains, which looks like a record whose
+  // notifications simply never arrive.
+  assert.match(toml, /\[\[queues\.producers\]\][\s\S]*binding = "INGRESS"/, 'nothing rings the doorbell');
+  assert.match(toml, /\[\[queues\.consumers\]\]/, 'nothing answers the doorbell');
+  const producer = /\[\[queues\.producers\]\][^[]*?queue = "([^"]+)"/.exec(toml)?.[1];
+  const consumer = /\[\[queues\.consumers\]\][^[]*?queue = "([^"]+)"/.exec(toml)?.[1];
+  assert.equal(producer, consumer, 'the doorbell rings one queue and is answered on another');
 });
 
 /* ── the router ────────────────────────────────────────────────── */
