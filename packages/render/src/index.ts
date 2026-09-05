@@ -34,6 +34,7 @@ export {
   exponentOf,
   formatTyped,
   integer,
+  magnitudeOf,
   money,
   pct,
   quantity,

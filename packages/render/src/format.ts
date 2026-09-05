@@ -44,11 +44,39 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-/** Measured at noon UTC of the day named, so a timezone cannot move a due date by one (36 §13 D15). */
+/**
+ * Measured at noon UTC of the day named, so a timezone cannot move a due date by one (36 §13 D15).
+ *
+ * THE SHAPE IS NOT THE CHECK. `Date.UTC` normalises rather than refusing, so `2026-02-30` matched
+ * the pattern, rolled forward and rendered "2 Mar 2026" — a date that is not the one in the record
+ * and not marked as anything, on a field somebody diaries against. The round trip is the check: a
+ * day that does not come back out as the day that went in was never a day.
+ */
 function noon(iso: string): number | null {
   const m = DAY.exec(iso);
   if (!m) return null;
-  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const t = Date.UTC(y, mo - 1, d, 12);
+  const back = new Date(t);
+  return back.getUTCFullYear() === y && back.getUTCMonth() === mo - 1 && back.getUTCDate() === d ? t : null;
+}
+
+/**
+ * The number inside a formatted cell, for the one thing that has to read a string it just wrote:
+ * the length of a bar.
+ *
+ * `String(cell).replace(/[^\d.-]/g, '')` was the version here and in the Svelte primitive, and it
+ * threw the sign away, because `money()` writes a real minus (U+2212) and a hyphen is what that
+ * class keeps. `GBP −1,299.00` came back as 1299 and drew a bar the length of the same amount owed
+ * the other way. A magnitude that reads its own output has to read the WHOLE of it.
+ *
+ * NaN for a cell with no number in it, never 0: a bar at zero claims the value is zero.
+ */
+const NUMBER = /-?\d[\d,]*(?:\.\d+)?/;
+
+export function magnitudeOf(cell: string): number {
+  const m = NUMBER.exec(cell.replaceAll(MINUS, '-'));
+  return m ? Number(m[0].replaceAll(',', '')) : NaN;
 }
 
 export function day(iso: string): string {
@@ -109,8 +137,11 @@ export function formatTyped(form: TypedForm, arg: string, now?: number): string 
       const m = /^(-?[\d.]+)\s*(.*)$/.exec(a);
       return m && !Number.isNaN(Number(m[1])) ? quantity(Number(m[1]), m[2]!.trim()) : null;
     }
+    /* `Number('')` is 0, so `{{pct:}}` rendered `0%` — a measurement, printed, of a thing nobody
+       measured. That is this module's own rule in bold, broken by a falsy check. An empty argument
+       and a non-finite one are both "not a percentage", and the caller draws the author's text. */
     case 'pct':
-      return Number.isNaN(Number(a)) ? null : pct(Number(a));
+      return a === '' || !Number.isFinite(Number(a)) ? null : pct(Number(a));
     case 'ref':
       return /^[a-z][a-z0-9_]*#\d+$/.test(a) ? ref(a) : null;
   }

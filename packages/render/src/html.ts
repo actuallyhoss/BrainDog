@@ -16,7 +16,7 @@
 
 import { KINDS, TONES, type Kind } from './kinds.ts';
 import { inline, text as plain, type Inline, type InlineOptions } from './inline.ts';
-import { MISSING } from './format.ts';
+import { MISSING, magnitudeOf } from './format.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
 export type RenderOptions = InlineOptions & {
@@ -145,24 +145,24 @@ function rows(b: Block, o: RenderOptions): string {
 function proportional(b: Block, o: RenderOptions): string {
   if (b.kind === 'gauge') {
     const r = b.rows[0] ?? { cells: [] };
-    const value = Number(String(r.cells[1] ?? '').replace(/[^\d.-]/g, ''));
-    const target = Number(String(r.cells[2] ?? '').replace(/[^\d.-]/g, ''));
+    const value = magnitudeOf(String(r.cells[1] ?? ''));
+    const target = magnitudeOf(String(r.cells[2] ?? ''));
     const m = Number.isFinite(value) && Number.isFinite(target) && target !== 0 ? value / target : 0;
     return `<div class="prop"><div class="prop-row"${toneAttrs(r.tone)}>${cell('prop-label', r.cells[0], o)}<span class="prop-track" style="--magnitude:${magnitude(m)}"></span><span class="prop-value num">${escape(r.cells[1] ?? MISSING)}</span><span class="prop-note num">of ${escape(r.cells[2] ?? MISSING)}</span>${toneGlyph(r.tone)}</div></div>`;
   }
-  // A bar scales to its largest NON-HOLE row. A bar row whose value is not a number keeps its words
-  // and loses its bar: a bar at zero claims the value IS zero (05 §7.4).
-  // An empty cell is not zero. `Number('')` is 0, which would draw a full-width bar for a value
-  // nobody has, and a bar at zero claims the value IS zero (05 §7.4).
-  const numeric = (r: Row) => {
-    const digits = String(r.cells[1] ?? '').replace(/[^\d.-]/g, '');
-    return digits === '' ? NaN : Number(digits);
-  };
+  /* A bar scales to its largest NON-HOLE row. A row whose value is not a number keeps its words and
+     loses its bar, and an empty cell is not a number: a bar at zero claims the value IS zero
+     (05 §7.4). Both readings come out of `magnitudeOf`, which is also what the Svelte primitive
+     uses — two copies of it gave two answers for the same cell. */
+  const numeric = (r: Row) => magnitudeOf(String(r.cells[1] ?? ''));
   const scale = Math.max(0, ...b.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite));
   const body = b.rows
     .map((r) => {
       const v = numeric(r);
-      const drawable = Number.isFinite(v) && !r.hole && scale > 0;
+      /* A NEGATIVE VALUE LOSES ITS BAR, like a value that is not a number. The scale has one
+         side, so the only bar it could draw for a credit is a bar of length zero, and a bar at zero
+         claims the value IS zero. The number is still printed, with its sign. */
+      const drawable = Number.isFinite(v) && v >= 0 && !r.hole && scale > 0;
       const track = drawable ? `<span class="prop-track" style="--magnitude:${magnitude(v / scale)}"></span>` : '';
       const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${escape(r.cells[1] ?? MISSING)}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
       return r.hole

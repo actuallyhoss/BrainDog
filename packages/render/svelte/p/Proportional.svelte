@@ -3,20 +3,20 @@
 
   `bar` scales to its largest NON-HOLE row; `gauge` to value / target, clamped at 1. A row whose
   value is not a number keeps its words and loses its bar, because a bar at zero claims the value IS
-  zero. A hole sits last, in `warn`, outside the scale, and is the only row that is a button — the
+  zero — and a NEGATIVE value is the same case, because the scale has one side and the only bar it
+  could draw for a credit is a bar of length zero. A hole sits last, in `warn`, outside the scale, and is the only row that is a button — the
   85%-uncategorised row would otherwise take the top of the chart and make every real category a
   one-pixel stub: the chart unreadable because of the thing it reports (05 §7.5).
 -->
 <script lang="ts">
-  import { inline, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { inline, magnitudeOf, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import Text from '../Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
-  const numeric = (r: Row) => {
-    const digits = String(r.cells[1] ?? '').replace(/[^\d.-]/g, '');
-    return digits === '' ? NaN : Number(digits);
-  };
+  /* ONE parser, shared with `toHTML`. Two copies of it meant two answers for the same cell, and
+     both of them lost the minus sign a formatted amount is written with. */
+  const numeric = (r: Row) => magnitudeOf(String(r.cells[1] ?? ''));
   const fixed = (v: number) => Math.max(0, Math.min(1, v)).toFixed(2);
 
   const scale = $derived(Math.max(0, ...block.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite)));
@@ -24,7 +24,7 @@
     const r = block.rows[0];
     if (!r) return 0;
     const v = numeric(r);
-    const t = Number(String(r.cells[2] ?? '').replace(/[^\d.-]/g, ''));
+    const t = magnitudeOf(String(r.cells[2] ?? ''));
     return Number.isFinite(v) && Number.isFinite(t) && t !== 0 ? v / t : 0;
   });
 </script>
@@ -44,7 +44,7 @@
   {:else}
     {#each block.rows as row}
       {@const v = numeric(row)}
-      {@const drawable = Number.isFinite(v) && !row.hole && scale > 0}
+      {@const drawable = Number.isFinite(v) && v >= 0 && !row.hole && scale > 0}
       <svelte:element
         this={row.hole ? 'button' : 'div'}
         class="prop-row"
