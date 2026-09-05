@@ -16,6 +16,16 @@
  */
 
 import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
+import { PRIMITIVES_VERSION } from 'braindog-render';
+import {
+  install,
+  normalise,
+  plan,
+  uninstall,
+  type Host,
+  type Installed,
+  type PackSource,
+} from '@braindog/declare';
 import { no, ok } from '@braindog/ports';
 import {
   fill,
@@ -24,6 +34,7 @@ import {
   type CreateRecordArgs,
   type Entry,
   type Kernel,
+  FORMAT_VERSION,
   type GovernRegister,
   type Patch,
   type Proposal,
@@ -178,6 +189,68 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
         at: 'principal',
       };
     return allows(ctx, 'owner');
+  };
+
+  /**
+   * The ADMIN gate: an owner, in a browser, and no token of any kind.
+   *
+   * IT IS THE VAULT'S ARGUMENT APPLIED TO SHAPE. A pack changes what the record IS — the registers,
+   * the pages, the rules that run while nobody is looking — and ADR-060 says there is no `admin`
+   * scope to issue for that. The refusal names the thing that IS missing rather than a bigger token
+   * somebody would then go looking for.
+   */
+  const admin = (ctx: CallContext): Refusal | null => {
+    if (ctx.principal.kind === 'token')
+      return {
+        code: 'NEEDS_BROWSER_SESSION',
+        fix: 'Open this from the app; a token cannot change what this record is.',
+        at: 'principal',
+      };
+    return allows(ctx, 'owner');
+  };
+
+  /** The declaration state a plan is built against. */
+  const installedState = (): Installed => ({
+    format: FORMAT_VERSION,
+    primitives: PRIMITIVES_VERSION,
+    record_version: kernel.version(),
+    packs: kernel.packs(),
+    declarations: kernel.declarations() as Installed['declarations'],
+    rows: kernel.census(),
+  });
+
+  /**
+   * The four functions a pack install needs from the record, with the caller bound.
+   *
+   * THE SEEDS GO THROUGH THE WRITE PATH like every other row — coerced, validated, refused by the
+   * register's own rules — and with `cascade: false`, because a pack's example rows firing a
+   * customer's notification rules on the day they install it is the worst first impression there is.
+   */
+  const packHost = (ctx: CallContext): Host => ({
+    count: (register) => kernel.count(register),
+    install: (batch) => kernel.install(batch as never),
+    retire: (ids) => kernel.retire(ids),
+    seed: (register, fields, note) =>
+      kernel.create(register, { ...fields, tags: exampleTag(fields) }, {
+        actor: actorOf(ctx),
+        cascade: false,
+        ...(note === undefined ? {} : { note }),
+      } as never),
+    remember: (row) => kernel.rememberPack(row),
+    forget: (id) => kernel.forgetPack(id),
+    claimed: (pack) => kernel.packClaims(pack),
+  });
+
+  /**
+   * The `example` marker, which IS the value `example` in a register's own `tags` field.
+   *
+   * A SEEDED ROW NOBODY CAN TELL FROM A REAL ONE IS A ROW NOBODY DELETES. The marker is a value in
+   * a declared field rather than a column, because a column would be a thing every register carries
+   * for the sake of the few that are seeded.
+   */
+  const exampleTag = (fields: Record<string, unknown>): string[] => {
+    const already = Array.isArray(fields.tags) ? (fields.tags as unknown[]).map(String) : [];
+    return already.includes('example') ? already : [...already, 'example'];
   };
 
   /** Who the write path records. A token writes as the PERSON who holds it, never as itself. */
@@ -400,6 +473,57 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
         return put;
       }
       return out;
+    },
+
+    /* ── ADMIN: PACKS ───────────────────────────────── */
+
+    /**
+     * What installing this pack would do to this record. It writes nothing.
+     *
+     * A BROWSER SESSION AND AN OWNER, and no token of any scope (ADR-060). A pack changes what a
+     * record IS, and there is no scope that can be issued for that — saying `SCOPE_INSUFFICIENT`
+     * would send somebody looking for a bigger token, and there is not one.
+     */
+    async planPack(args: { doc: unknown; source?: PackSource }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+
+      const pack = await normalise(args?.doc, args?.source ?? { kind: 'local' });
+      if (!pack.ok) return pack;
+      return ok({ diff: await plan(pack.value, installedState()), pack: pack.value.manifest });
+    },
+
+    /**
+     * Apply the plan somebody approved, and nothing else.
+     *
+     * THE HASH IS THE APPROVAL. `planHash` carries the record's version and the pack's checksum, so
+     * a record that moved and a pack that was edited between the plan and the install are both
+     * `PLAN_STALE` — and the second one is the case no version number can see.
+     */
+    async installPack(args: { doc: unknown; source?: PackSource; planHash: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.planHash) return no('REQUIRED_MISSING', 'Read the plan first; installing is approving one.', { at: 'planHash' });
+
+      const pack = await normalise(args.doc, args.source ?? { kind: 'local' });
+      if (!pack.ok) return pack;
+      const diff = await plan(pack.value, installedState());
+      return tail(await install(pack.value, diff, packHost(ctx), args.planHash));
+    },
+
+    /** Take one back out. Its declarations are retired and its rows are kept, which is the point. */
+    async uninstallPack(args: { id: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
+      return tail(uninstall(args.id, packHost(ctx)));
+    },
+
+    /** What is installed, and at what version. A read, because a list of names is not a change. */
+    async packs(ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.packs());
     },
 
     /* ── VAULT ────────────────────────────────────────────────── */

@@ -294,7 +294,11 @@ export async function installDeclarations(
       );
 
       if (decl.kind === 'register') {
-        const register = decl.body.id as string;
+        /* `ownId`, NOT `body.id`. A register may say `register: obligations` as well as `id:` —
+           `ownId` has admitted both since it was written and `validate` checks through it — and
+           reading the one key here meant the documented form installed with an UNDEFINED register:
+           no indexes, and a state mirror update bound to nothing. */
+        const register = ownId(decl);
         const fields = (decl.body.fields ?? []) as unknown as FieldLike[];
 
         /* DROPPED BEFORE THEY ARE CREATED. `CREATE INDEX IF NOT EXISTS` alone meant an index

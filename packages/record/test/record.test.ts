@@ -246,3 +246,100 @@ test('and a read token can see the queue, because a proposal nobody can see was 
   assert.ok((await api.governance({ register: 'decision' }, person('read'))).ok);
   sql.close();
 });
+
+/* ── packs ───────────────────────────────────────────────────── */
+
+const PACK = (over: Record<string, unknown> = {}) => ({
+  pack: 'studio-books',
+  version: '1.0.0',
+  summary: 'What a small studio owes.',
+  author: 'Halden',
+  license: 'MIT',
+  declarations: [
+    {
+      register: 'invoices',
+      name: 'Invoices',
+      title: 'what',
+      fields: [
+        { id: 'what', type: 'text', required: true },
+        { id: 'due', type: 'day', index: true },
+        { id: 'tags', type: 'list', of: 'text' },
+      ],
+    },
+  ],
+  seeds: [{ register: 'invoices', fields: { what: 'Invoice 41', due: '2026-10-01' } }],
+  ...over,
+});
+
+test('A PACK IS PLANNED, APPROVED AND INSTALLED, and the plan is what happened', async () => {
+  /* Installing a pack changes what a record IS. The honest way to do that is to say exactly what
+     will change and let a person approve it — and the hash is what makes approving it mean
+     something. */
+  const { api, sql } = await record();
+
+  const planned = value<{ diff: { planHash: string; adds: { id: string }[]; seeds: { count: number } } }>(
+    await api.planPack({ doc: PACK() }, owner),
+  );
+  assert.deepEqual(planned.diff.adds.map((a) => a.id), ['register.invoices']);
+  assert.equal(planned.diff.seeds.count, 1);
+  assert.equal(api.kernel.register('invoices'), undefined, 'planning installed something');
+
+  const done = value<{ pack: string; declarations: number; seeds: number }>(
+    await api.installPack({ doc: PACK(), planHash: planned.diff.planHash }, owner),
+  );
+  assert.equal(done.pack, 'studio-books');
+  assert.equal(done.declarations, 1);
+  assert.equal(done.seeds, 1);
+
+  assert.ok(api.kernel.register('invoices'), 'the register did not arrive');
+  assert.deepEqual(
+    value<{ id: string; version: string }[]>(await api.packs(owner)).map((p) => ({ id: p.id, version: p.version })),
+    [{ id: 'studio-books', version: '1.0.0' }],
+  );
+
+  // The seed is a row like any other, and it wears the marker that says it is an example.
+  assert.equal(api.kernel.count('invoices'), 1);
+  assert.deepEqual(api.kernel.get('invoices#1')?.fields.tags, ['example']);
+
+  // Its index is real, which is the half of an install nobody checks.
+  assert.ok(sql.all("SELECT 1 FROM sqlite_master WHERE name = 'entry_i_invoices__due'").length, 'the declared index is not there');
+
+  // And the plan is stale the moment the record moves.
+  const again = await api.installPack({ doc: PACK(), planHash: planned.diff.planHash }, owner);
+  assert.equal(again.ok, false);
+  assert.equal((again as { refusal: { code: string } }).refusal.code, 'PLAN_STALE');
+  sql.close();
+});
+
+test('and taking it out keeps the rows, which is the whole reason it is safe to try one', async () => {
+  const { api, sql } = await record();
+  const planned = value<{ diff: { planHash: string } }>(await api.planPack({ doc: PACK() }, owner));
+  value(await api.installPack({ doc: PACK(), planHash: planned.diff.planHash }, owner));
+  value(await api.create({ register: 'invoices', fields: { what: 'Invoice 42' } }, owner));
+
+  const out = value<{ declarations: number; rows_kept: Record<string, number> }>(await api.uninstallPack({ id: 'studio-books' }, owner));
+  assert.equal(out.declarations, 1);
+  assert.deepEqual(out.rows_kept, { invoices: 2 });
+  assert.deepEqual(value<unknown[]>(await api.packs(owner)), []);
+  assert.equal(sql.all("SELECT 1 FROM entry WHERE register = 'invoices' AND deleted_at IS NULL").length, 2, 'the rows went with the pack');
+  assert.equal(sql.all("SELECT 1 FROM sqlite_master WHERE name = 'entry_i_invoices__due'").length, 0, 'the index outlived the declaration');
+  sql.close();
+});
+
+test('AND NO TOKEN CHANGES WHAT A RECORD IS, whatever its scope', async () => {
+  /* ADR-060: there is no `admin` scope to issue. The refusal names the thing that IS missing rather
+     than a bigger token somebody would then go looking for. */
+  const { api, sql } = await record();
+  for (const scope of ['read', 'propose', 'write'] as const) {
+    const tried = await api.planPack({ doc: PACK() }, token(scope));
+    assert.equal(tried.ok, false, `a ${scope} token planned a pack`);
+    assert.equal((tried as { refusal: { code: string } }).refusal.code, 'NEEDS_BROWSER_SESSION');
+  }
+  // Nor a person below owner, in a browser or not.
+  const below = await api.installPack({ doc: PACK(), planHash: 'x' }, person('decide'));
+  assert.equal((below as { refusal: { code: string } }).refusal.code, 'LEVEL_REQUIRED');
+
+  // But reading which packs are installed is a read.
+  assert.ok((await api.packs(token('read'))).ok);
+  sql.close();
+});

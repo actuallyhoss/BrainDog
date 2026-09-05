@@ -1511,6 +1511,84 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     registers: () => registers,
     register: (id: string) => registers.get(id),
+
+    /**
+     * The declaration state, as a plan is built from it.
+     *
+     * ACTIVE ROWS ONLY, and `body` as the JCS text it was stored as — a plan compares checksums and
+     * bodies, and re-serialising an object to compare it is how two identical declarations come out
+     * different because one was parsed by a different build.
+     */
+    declarations: () =>
+      sql.all<{ id: string; version: number; kind: string; pack_id: string | null; body: string; checksum: string }>(
+        'SELECT id, version, kind, pack_id, body, checksum FROM declaration WHERE superseded_at IS NULL AND retired = 0 ORDER BY id',
+      ),
+
+    /** The `pack` rows: what is installed, and at which version. */
+    packs: () => sql.all<{ id: string; version: string }>('SELECT id, version FROM pack ORDER BY id'),
+
+    /** Live rows per register, which is what makes an orphan countable before it is one. */
+    census: (): Record<string, number> =>
+      Object.fromEntries(
+        sql
+          .all<{ register: string; n: number }>(
+            'SELECT register, count(*) AS n FROM entry WHERE deleted_at IS NULL GROUP BY register',
+          )
+          .map((r) => [r.register, Number(r.n)]),
+      ),
+
+    /** A `pack` row, written when its declarations have landed. */
+    rememberPack: (row: { id: string; version: string; source: string; ref: string | null; manifest: string; checksum: string }) =>
+      transaction(() => {
+        sql.exec(
+          `INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (id) DO UPDATE SET version = excluded.version, source = excluded.source,
+             source_ref = excluded.source_ref, manifest = excluded.manifest, checksum = excluded.checksum`,
+          row.id,
+          row.version,
+          row.source,
+          row.ref,
+          row.manifest,
+          instant(clock.now()),
+          row.checksum,
+        );
+        sql.exec(
+          "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, 'system', 'install', ?, 'pack', ?)",
+          mint(),
+          instant(clock.now()),
+          `pack:${row.id}`,
+          row.version,
+        );
+      }),
+
+    /** And the row goes when the pack does. The declarations are retired; the rows are not. */
+    forgetPack: (id: string) =>
+      transaction(() => {
+        sql.exec('DELETE FROM pack WHERE id = ?', id);
+        sql.exec(
+          "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, 'system', 'uninstall', ?, 'pack', NULL)",
+          mint(),
+          instant(clock.now()),
+          `pack:${id}`,
+        );
+        /* ITS SCHEDULE ROWS GO WITH IT. A digest for a page nobody has any more is a notification
+           about nothing, arriving every Monday for ever. */
+        sql.exec(
+          `DELETE FROM schedule WHERE state IN ('pending', 'paused') AND kind IN ('digest', 'pull', 'snapshot')
+           AND key IN (SELECT substr(id, instr(id, '.') + 1) FROM declaration WHERE pack_id = ?)`,
+          id,
+        );
+      }),
+
+    /** Which declarations a pack claims. Read before it is taken out. */
+    packClaims: (id: string) =>
+      sql
+        .all<{ id: string }>(
+          'SELECT id FROM declaration WHERE pack_id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY id',
+          id,
+        )
+        .map((r) => r.id),
     refused: () => state.refusal,
     get,
     list,

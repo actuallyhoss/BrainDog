@@ -43,6 +43,10 @@ export const ROUTES: readonly Route[] = [
   { name: 'governance', writes: false, what: 'What has been proposed, what was decided, and what was predicted.' },
   { name: 'propose', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
   { name: 'decide', writes: true, what: 'Answer one, with the reason. No token reaches this.' },
+  { name: 'packs', writes: false, what: 'Which packs this record has, and at what version.' },
+  { name: 'planPack', writes: false, what: 'What installing a pack would do to this record. It writes nothing.' },
+  { name: 'installPack', writes: true, what: 'Apply the plan somebody approved. A browser session only.' },
+  { name: 'uninstallPack', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'create', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'update', writes: true, what: 'Change a row, against the version you read.' },
 ];
@@ -142,6 +146,10 @@ export type RecordSurface = {
   governance(args: never, ctx: never): Promise<Result<unknown>>;
   propose(args: never, ctx: never): Promise<Result<unknown>>;
   decide(args: never, ctx: never): Promise<Result<unknown>>;
+  packs(ctx: never): Promise<Result<unknown>>;
+  planPack(args: never, ctx: never): Promise<Result<unknown>>;
+  installPack(args: never, ctx: never): Promise<Result<unknown>>;
+  uninstallPack(args: never, ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
 };
@@ -163,6 +171,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     governance: (a, ctx) => api.governance(a as never, ctx as never),
     propose: (a, ctx) => api.propose(a as never, ctx as never),
     decide: (a, ctx) => api.decide(a as never, ctx as never),
+    packs: (_a, ctx) => api.packs(ctx as never),
+    planPack: (a, ctx) => api.planPack(a as never, ctx as never),
+    installPack: (a, ctx) => api.installPack(a as never, ctx as never),
+    uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
   };
