@@ -50,14 +50,10 @@ async function record(decls: RegisterDecl[] = [OBLIGATIONS]): Promise<{ k: Kerne
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
-  for (const decl of decls)
-    sql.exec(
-      "INSERT INTO declaration (id, version, kind, pack_id, body, checksum, retired, superseded_at, created_at) VALUES (?, 1, 'register', NULL, ?, 'x', 0, NULL, ?)",
-      `register.${decl.id}`,
-      JSON.stringify(decl),
-      new Date(NOW).toISOString(),
-    );
-  k.reload();
+  /* Through the real install, not an INSERT: a test that reaches around the code it is testing is a
+     test that passes after the code stops working. */
+  const out = await k.install(decls.map((d) => ({ id: `register.${d.id}`, kind: 'register' as const, body: d as never })));
+  assert.ok(out.ok, out.ok ? '' : out.refusal.fix);
   return { k, sql };
 }
 

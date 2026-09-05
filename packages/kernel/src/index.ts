@@ -23,11 +23,14 @@ import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } fro
 import { ulids, type Mint } from './ids.ts';
 import { applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { compile, type Predicate, type Schema } from '@braindog/where';
+import { installDeclarations, retireDeclarations, type Declaration } from './declare.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
+export { digest, indexesFor, indexName, jcs, validate as validateDeclaration, KINDS } from './declare.ts';
+export type { Declaration, DeclKind, Installed } from './declare.ts';
 
 /* ── what a register says about itself ───────────────────────────────────── */
 
@@ -456,6 +459,30 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     transaction,
     allocate,
     reload,
+
+    /**
+     * Install declarations, then rebuild the cache.
+     *
+     * The cache is rebuilt HERE and not by the caller, because a declaration installed and not
+     * reloaded is a register the write path still refuses — a failure that looks like the install
+     * silently not working.
+     */
+    async install(batch: readonly Declaration[]) {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+      const out = await installDeclarations(sql, clock.now(), batch, transaction);
+      if (out.ok) reload();
+      return out;
+    },
+
+    retire(ids: readonly string[]) {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+      const out = retireDeclarations(sql, ids, transaction);
+      if (out.ok) reload();
+      return out;
+    },
+
     registers: () => registers,
     register: (id: string) => registers.get(id),
     refused: () => state.refusal,
