@@ -19,6 +19,19 @@
  * AND A FAILURE DOWNGRADES RATHER THAN DISCARDS. A value the register refuses means the arrival goes
  * to `review` with the reason on it, not that the bytes go away. The person who set the pattern up
  * is the only one who can fix it, and they cannot fix what they cannot see.
+ *
+ * CONFIDENCE IS DERIVED, AND `writes.confidence` IS ONLY A CEILING. A pattern says at most how far
+ * it is trusted; what actually happened to the fields says the rest, and the lower of the two wins.
+ * `exact` writes rows. `proposed` and `needs-review` write NOTHING and open a `rowset` suggestion
+ * with the extraction on it — because every pattern a model proposed files at `needs-review`, and a
+ * pattern nobody has approved yet writing rows into somebody's ledger is the one failure this whole
+ * design exists to prevent.
+ *
+ * AND A SHAPE NOBODY HAS A PATTERN FOR EARNS ONE DRAFT AT ITS THIRD ARRIVAL, outside the
+ * transaction. Not one per payload: a model call per arrival is a bill that scales with a stranger's
+ * sending rate, and two of anything is a coincidence. Three is the smallest number of examples a
+ * pattern can be written from and the smallest that is not a coincidence, which is why it is the
+ * same three.
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
@@ -32,13 +45,21 @@ import { attempt } from './tx.ts';
 export const CHANNELS = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
+/** The three, worst first — which is the order they are compared in. */
+export const CONFIDENCES = ['needs-review', 'proposed', 'exact'] as const;
+export type Confidence = (typeof CONFIDENCES)[number];
+
+/** The lower of two confidences. A ceiling can only ever bring one down. */
+const worse = (a: Confidence, b: Confidence): Confidence =>
+  CONFIDENCES.indexOf(a) <= CONFIDENCES.indexOf(b) ? a : b;
+
 /** The nine, and the anchors any of them may carry. */
 export type Extractor =
   | { after: string }
   | { before: string }
   | { between: [string, string] }
   | { text: { after?: string; before?: string; between?: [string, string] } }
-  | { money: { currency?: string; after?: string; before?: string; between?: [string, string] } }
+  | { money: { currency?: string; sep?: string; after?: string; before?: string; between?: [string, string] } }
   | { date: { format: string; after?: string; before?: string; between?: [string, string] } }
   | { int: { after?: string; before?: string; between?: [string, string] } }
   | { decimal: { sep?: string; after?: string; before?: string; between?: [string, string] } }
@@ -53,7 +74,12 @@ export type IngestDecl = {
   extract: Record<string, Extractor>;
   writes: {
     register: string;
-    confidence?: 'exact' | 'proposed' | 'needs-review';
+    /**
+     * A CEILING, NEVER A PROMISE. The extraction's own outcome is the other half, and the lower of
+     * the two is what happens. Default `exact`; a pattern a model proposed files at `needs-review`
+     * until a person has looked at what it would have written.
+     */
+    confidence?: Confidence;
     /**
      * What makes two arrivals the same thing.
      *
@@ -78,9 +104,13 @@ export type Arrived = {
   raw: string;
   /** The ingest that matched, or `null` — which is not an error and is the reason `inbox_raw` exists. */
   ingest: string | null;
-  state: 'matched' | 'untriaged' | 'review' | 'skipped';
+  state: 'matched' | 'untriaged' | 'review' | 'skipped' | 'proposed';
   wrote: string[];
   reason?: string;
+  /** What the extraction was worth, once the pattern's ceiling had been applied. */
+  confidence?: Confidence;
+  /** The `rowset` somebody has to answer, when nothing was written. */
+  suggestion?: string;
 };
 
 export type IngestDeps = {
@@ -90,6 +120,8 @@ export type IngestDeps = {
   write: (register: string, spoken: string | null, patch: Record<string, unknown>, actor: string) => Result<Entry>;
   find: (register: string, by: string, value: string) => string | null;
   mint: () => string;
+  /** `SG<n>` for the suggestion an unwritten extraction opens. */
+  allocate: (name: string) => number;
   nowMs: number;
 };
 
@@ -171,6 +203,19 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       );
     };
 
+    const note = (kind: string, actor: string, target: string, targetKind: string, to: string | null): void => {
+      deps.sql.exec(
+        'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        deps.mint(),
+        at,
+        actor,
+        kind,
+        target,
+        targetKind,
+        to,
+      );
+    };
+
     if (!matched) {
       /* UNTRIAGED IS NOT AN ERROR. It is the state a payload is in before anybody has said what it
          means, and the reason `inbox_raw` exists at all: an ingest pipeline whose answer to "I do not
@@ -189,13 +234,39 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       else extracted[field] = value;
     }
 
+    /* THE CEILING IS PART OF THE DECLARATION AND THE OUTCOME IS PART OF THE PAYLOAD, and the lower of
+       the two is what happens. Checked here rather than only at install, because a declaration can
+       arrive through a `.dog` import as well as through the linter. */
+    const ceiling = matched.writes.confidence ?? 'exact';
+    if (!(CONFIDENCES as readonly string[]).includes(ceiling))
+      return no<Arrived>('ENUM_VALUE_UNKNOWN', `${String(ceiling)} is not a confidence.`, {
+        at: 'writes.confidence',
+        allowed: CONFIDENCES,
+      });
+
+    /* A FIELD THE PATTERN COULD NOT READ IS `needs-review`, and everything else this vocabulary can
+       do reads cleanly or returns nothing — there is no combinator here that chooses or defaults, so
+       there is no honest third outcome to derive. */
+    const confidence = worse(missed.length ? 'needs-review' : 'exact', ceiling);
+
     /* A FAILURE DOWNGRADES RATHER THAN DISCARDS. The bytes stay, the reason is on them, and the
-       person who wrote the pattern is the only one who can fix it — which they cannot do if the
-       record decided quietly that this one did not count. */
-    if (missed.length) {
-      const reason = `${matched.ingest} could not read ${missed.join(', ')} out of this one.`;
-      store('review', reason);
-      return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason });
+       extraction goes in front of a person as a `rowset` they can accept — which is the only thing
+       that makes a pattern nobody has approved yet safe to leave switched on. */
+    if (confidence !== 'exact') {
+      const state = confidence === 'proposed' ? 'proposed' : 'review';
+      const reason = missed.length
+        ? `${matched.ingest} could not read ${missed.join(', ')} out of this one.`
+        : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
+      store(state, reason);
+      note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', confidence);
+
+      const suggestion = openRowset(deps, at, {
+        ingest: matched.ingest,
+        register: matched.writes.register,
+        rows: [extracted],
+        question: `${reason} Accept it into ${matched.writes.register}, or fix the pattern.`,
+      });
+      return ok<Arrived>({ raw, ingest: matched.ingest, state, wrote: [], reason, confidence, suggestion });
     }
 
     const key = matched.writes.key ?? [];
@@ -216,7 +287,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason });
     }
 
-    store('matched', null);
+    note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'exact');
 
     const wrote = deps.write(
       matched.writes.register,
@@ -224,10 +295,32 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       extracted,
       `ingest:${matched.ingest}`,
     );
-    /* ALL ROWS OR NONE, per arrival. The transaction is the record's, so a refusal here rolls the
-       raw back with it — and the caller gets the sentence rather than a raw row whose receipt says
-       nothing was written and cannot say why. */
-    if (!wrote.ok) return { ok: false as const, refusal: wrote.refusal };
+
+    /* A REGISTER'S REFUSAL DOWNGRADES LIKE ANY OTHER FAILURE. Returning the refusal would roll the
+       raw back with it — the bytes gone, and nobody able to fix the pattern from a row that does not
+       exist. It is the same answer the unreadable-field branch above gives, for the same reason, and
+       it is what keeps the `write.refused` observation the write left behind. */
+    if (!wrote.ok) {
+      const reason = `${matched.writes.register} refused what ${matched.ingest} read: ${wrote.refusal.fix}`;
+      store('review', reason);
+      const suggestion = openRowset(deps, at, {
+        ingest: matched.ingest,
+        register: matched.writes.register,
+        rows: [extracted],
+        question: `${reason} Fix it here, or fix the pattern.`,
+      });
+      return ok<Arrived>({
+        raw,
+        ingest: matched.ingest,
+        state: 'review',
+        wrote: [],
+        reason,
+        confidence: 'needs-review',
+        suggestion,
+      });
+    }
+
+    store('matched', null);
 
     /* ONE RECEIPT PER ARRIVAL, its `wrote` filled by the record. A skipped arrival has none, which
        is what makes "what did this actually do" answerable by the row's existence. */
@@ -237,11 +330,113 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       raw,
       matched.ingest,
       JSON.stringify([wrote.value.id]),
-      matched.writes.confidence ?? 'exact',
+      confidence,
       at,
     );
+    note('extract', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', '1');
 
-    return ok<Arrived>({ raw, ingest: matched.ingest, state: 'matched', wrote: [wrote.value.id] });
+    return ok<Arrived>({ raw, ingest: matched.ingest, state: 'matched', wrote: [wrote.value.id], confidence });
+  });
+}
+
+/**
+ * The `rowset` an unwritten extraction opens.
+ *
+ * OPENED BY THE INGEST, NOT BY `system`. Whoever reads it needs to know which pattern produced it —
+ * "accept this, or fix the pattern" is not a question anybody can answer without the pattern's name.
+ */
+function openRowset(
+  deps: IngestDeps,
+  at: string,
+  item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string },
+): string {
+  const id = `SG${deps.allocate('suggestion')}`;
+  deps.sql.exec(
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'rowset', ?, 'open', ?, ?)",
+    id,
+    JSON.stringify({ register: item.register, rows: item.rows, ingest: item.ingest }),
+    `ingest:${item.ingest}`,
+    at,
+  );
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', ?)",
+    deps.mint(),
+    at,
+    `ingest:${item.ingest}`,
+    `suggestion:${id}`,
+    item.question.slice(0, 280),
+  );
+  return id;
+}
+
+/* ── 3′: the shape nobody wrote a pattern for ──────────────────────────── */
+
+/** How many of one shape it takes to earn a draft. Three examples, and three is not a coincidence. */
+export const PROPOSE_AT = 3;
+const WINDOW_DAYS = 30;
+/** The most raws one of these counts. Past it the count is already over the threshold. */
+const SCAN = 500;
+
+/**
+ * Which shape an unmatched arrival belongs to.
+ *
+ * THE ADDRESS AND NOT THE DISPLAY NAME. A bank that sends as `CIB` on Monday and `CIB Alerts` on
+ * Tuesday is one sender, and a shape key that disagreed would split three examples into three ones
+ * and never propose anything at all.
+ */
+export function shapeOf(channel: Channel, headers: Record<string, string>): string {
+  const h = lower(headers);
+  const who = (h.from ?? '').trim() || (h.to ?? '').trim();
+  const address = (/<([^>]+)>/.exec(who)?.[1] ?? who).trim().toLowerCase();
+  return address ? `${channel}:${address}` : channel;
+}
+
+export type ProposeDeps = {
+  sql: Sql;
+  nowMs: number;
+  outbox: (payload: unknown) => string;
+};
+
+/**
+ * `3′` — the one draft an unmatched shape earns, OUTSIDE the arrival's transaction.
+ *
+ * AT THE THIRD AND ONLY AT THE THIRD. Not one per payload, because a model call per arrival is a
+ * bill that scales with a stranger's sending rate; and not again at the fourth, because the draft
+ * for this shape is already queued and a second is the same question asked twice. If nobody answered
+ * it, that is a thing a person retries from the raw inbox — retrying a model call automatically
+ * bills twice for one payload.
+ *
+ * THE DRAFT CARRIES IDS AND NOT BODIES. Whoever drafts reads the three raws itself; copying them
+ * here would put an untrusted stranger's text into a queue that is summarised in front of a person.
+ */
+export function propose(deps: ProposeDeps, channel: Channel, headers: Record<string, string>): string | null {
+  const shape = shapeOf(channel, headers);
+  const since = instant(deps.nowMs - WINDOW_DAYS * 86_400_000);
+
+  const seen = deps.sql
+    .all<{ id: string; headers: string | null }>(
+      /* `rowid` BREAKS THE TIE, because a burst arrives inside one millisecond and `ts` alone then
+         orders them by nothing in particular — which would hand a person three examples in an order
+         that is not the order they came in. */
+      "SELECT id, headers FROM inbox_raw WHERE state = 'untriaged' AND channel = ? AND ts >= ? ORDER BY ts DESC, rowid DESC LIMIT ?",
+      channel,
+      since,
+      SCAN,
+    )
+    .filter((r) => shapeOf(channel, JSON.parse(r.headers ?? '{}') as Record<string, string>) === shape);
+
+  if (seen.length !== PROPOSE_AT) return null;
+
+  /* OLDEST FIRST, because three examples read in the order they arrived is what a person checks the
+     proposal against — and the query above had to be newest-first to bound its scan. */
+  const examples = seen.map((r) => r.id).reverse();
+  return deps.outbox({
+    shape,
+    channel,
+    n: PROPOSE_AT,
+    window: `${WINDOW_DAYS}d`,
+    examples,
+    why: `${PROPOSE_AT} payloads shaped like ${shape} arrived in thirty days and no pattern matched any of them.`,
   });
 }
 
@@ -265,7 +460,10 @@ export function extract(deps: IngestDeps, form: Extractor, text: string): Json |
     /* THE NUMBER IS PARSED AND THE CURRENCY IS DECLARED. Reading a currency out of a payload means
        guessing from a symbol, and `$` is at least five currencies — so the pattern says which, and a
        pattern that does not is a pattern that cannot be trusted with money. */
-    const n = number(anchored);
+    /* AND THE THOUSANDS SEPARATOR IS DECLARED HERE TOO. `decimal` took one and `money` did not, so
+       every European amount was read a thousand times too small — €1.234,56 became €1.23 — which is
+       the worst possible place for that bug because the row still looks plausible. */
+    const n = number(anchored, form.money.sep);
     if (n === null || !form.money.currency) return null;
     return { amount: Math.round(n * 100), currency: form.money.currency };
   }
@@ -327,7 +525,10 @@ function slice(form: Record<string, unknown>, text: string): string | null {
 
 /** The first number in a run of text, with its separators. `null` when there is none. */
 function number(text: string, sep = ','): number | null {
-  const m = /-?\d[\d\s.,']*/.exec(text);
+  /* ONE NUMBER, AND A SPACE ONLY WHERE A GROUP OF THREE FOLLOWS IT. A character class that took any
+     whitespace read `EGP 250 2 items` as 250,200 — the digits of the next word glued on, and a
+     ledger row nobody reads twice. */
+  const m = /-?\d+(?:[\s'.,]\d{3})*(?:[.,]\d+)?/.exec(text);
   if (!m) return null;
   /* THE THOUSANDS SEPARATOR IS DECLARED AND THE DECIMAL POINT IS WHAT IS LEFT. Guessing between
      `1.234` as one thousand and as one-and-a-bit is how an extractor is wrong by a thousand times
@@ -337,11 +538,18 @@ function number(text: string, sep = ','): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * BOUNDED AT BOTH ENDS, or `DD/MM/YY` reads `03/04/2026` as the third of April 2020.
+ *
+ * The round-trip check below passes that happily — 2020-04-03 is a real day — and a due date six
+ * years in the past sorts before everything for ever. A format is a claim about the whole run of
+ * digits, not about its first two.
+ */
 const FORMATS: Record<string, RegExp> = {
-  'DD/MM/YY': /(\d{2})\/(\d{2})\/(\d{2})/,
-  'DD/MM/YYYY': /(\d{2})\/(\d{2})\/(\d{4})/,
-  'MM/DD/YYYY': /(\d{2})\/(\d{2})\/(\d{4})/,
-  'YYYY-MM-DD': /(\d{4})-(\d{2})-(\d{2})/,
+  'DD/MM/YY': /(?<!\d)(\d{2})\/(\d{2})\/(\d{2})(?!\d)/,
+  'DD/MM/YYYY': /(?<!\d)(\d{2})\/(\d{2})\/(\d{4})(?!\d)/,
+  'MM/DD/YYYY': /(?<!\d)(\d{2})\/(\d{2})\/(\d{4})(?!\d)/,
+  'YYYY-MM-DD': /(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)/,
 };
 
 /**

@@ -280,20 +280,176 @@ test('THE FIRST MATCHING PATTERN WINS, and the second is not merged into it', as
   sql.close();
 });
 
-test('and the pipeline is one transaction: a refused write leaves no raw behind', async () => {
-  /* All rows or none, per arrival. The transaction is the record's, so a refusal rolls the raw back
-     with it — rather than leaving a raw row whose receipt says nothing was written and cannot say
-     why. */
+test('A REGISTER REFUSING WHAT A PATTERN READ DOWNGRADES IT, and never discards the bytes', async () => {
+  /* The header of the module says the raw is stored first and always, twice. Returning the refusal
+     rolled the raw back with it — the payload gone, and nobody able to fix the pattern from a row
+     that does not exist. */
   const { k, sql } = await record(
     HSBC({
       extract: { amount: { money: { after: 'EGP', currency: 'EGP' } } },
       writes: { register: 'transactions' },
     }),
   );
-  const out = send(k);
-  assert.equal(out.ok, false, 'a row with no required field was written');
-  assert.equal(sql.all('SELECT 1 FROM inbox_raw').length, 0);
+  const out = value<Arrived>(send(k));
+  assert.equal(out.state, 'review');
+  assert.equal(out.confidence, 'needs-review');
+  assert.equal(out.wrote.length, 0);
+  assert.match(out.reason ?? '', /merchant/, 'the reason does not say which field the register refused');
+
+  assert.equal(k.count('transactions'), 0, 'a row with no required field was written');
+  const raw = sql.one<{ state: string; reason: string }>('SELECT state, reason FROM inbox_raw')!;
+  assert.equal(raw.state, 'review');
+
+  // And what it read is in front of somebody, which is the only thing that makes it fixable.
+  const sg = sql.one<{ id: string; body: string; opened_by: string }>("SELECT id, body, opened_by FROM suggestion")!;
+  assert.equal(sg.id, out.suggestion);
+  assert.equal(sg.opened_by, 'ingest:hsbc-sms');
+  assert.deepEqual(JSON.parse(sg.body), {
+    register: 'transactions',
+    rows: [{ amount: { amount: 131_624, currency: 'EGP' } }],
+    ingest: 'hsbc-sms',
+  });
+
+  // And the observation the write left behind survives, or the record cannot tell a bad
+  // declaration from a bad afternoon.
+  assert.equal(
+    sql.one<{ subject: string }>("SELECT subject FROM observation WHERE kind = 'write.refused'")?.subject,
+    'transactions.merchant:REQUIRED_MISSING',
+  );
+  sql.close();
+});
+
+/* ── the ceiling ────────────────────────────────────────────────── */
+
+test('A PATTERN NOBODY HAS APPROVED WRITES NOTHING, however cleanly it read', async () => {
+  /* Every pattern a model proposes files at `needs-review`, and one of those writing rows into
+     somebody's ledger is the single failure this whole design exists to prevent. */
+  const { k, sql } = await record(HSBC({ writes: { register: 'transactions', confidence: 'needs-review' } }));
+  const out = value<Arrived>(send(k));
+
+  assert.equal(out.state, 'review');
+  assert.equal(out.confidence, 'needs-review');
+  assert.deepEqual(out.wrote, []);
+  assert.equal(k.count('transactions'), 0, 'an unapproved pattern wrote a row');
+  assert.equal(sql.all('SELECT 1 FROM ingest_receipt').length, 0, 'nothing was written, so nothing has a receipt');
+
+  // The extraction is not thrown away: it is the thing somebody accepts or corrects.
+  const body = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion')!.body) as {
+    register: string;
+    rows: Record<string, unknown>[];
+    ingest: string;
+  };
+  assert.equal(body.register, 'transactions');
+  assert.equal(body.rows[0]?.merchant, 'Halden Coffee');
+  assert.equal(body.ingest, 'hsbc-sms');
+  sql.close();
+});
+
+test('and `proposed` parks the arrival in its own state, so the two are told apart', async () => {
+  const { k, sql } = await record(HSBC({ writes: { register: 'transactions', confidence: 'proposed' } }));
+  const out = value<Arrived>(send(k));
+
+  assert.equal(out.state, 'proposed');
+  assert.equal(out.confidence, 'proposed');
+  assert.equal(sql.one<{ state: string }>('SELECT state FROM inbox_raw')?.state, 'proposed');
+  assert.match(out.reason ?? '', /proposed rather than written/);
   assert.equal(k.count('transactions'), 0);
+  sql.close();
+});
+
+test('THE CEILING ONLY EVER BRINGS IT DOWN: an unreadable field beats an `exact` declaration', async () => {
+  // Confidence is derived and the ceiling caps it. A pattern cannot promise its way past a miss.
+  const { k, sql } = await record(HSBC());
+  const out = value<Arrived>(k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: 'Your card ending 4471 was debited at Halden Coffee on 03/04/26.', sha256: 'b2' }));
+  assert.equal(out.state, 'review');
+  assert.equal(out.confidence, 'needs-review');
+  assert.match(out.reason ?? '', /could not read amount/);
+
+  // And a confidence outside the three is refused rather than stored.
+  const bad = await record(HSBC({ writes: { register: 'transactions', confidence: 'probably' } }));
+  const r = bad.k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'c3' });
+  assert.equal(r.ok, false);
+  assert.equal((r as { refusal: { code: string; at?: string } }).refusal.code, 'ENUM_VALUE_UNKNOWN');
+  sql.close();
+  bad.sql.close();
+});
+
+test('and the ingest is on the ledger under its own name, twice', async () => {
+  // `match` says a pattern claimed this payload; `extract` says it wrote. Neither is a person.
+  const { k, sql } = await record(HSBC());
+  value<Arrived>(send(k));
+  assert.deepEqual(
+    sql
+      .all<{ kind: string; actor: string }>("SELECT kind, actor FROM event WHERE kind IN ('match','extract') ORDER BY rowid")
+      .map((r) => ({ kind: r.kind, actor: r.actor })),
+    [
+      { kind: 'match', actor: 'ingest:hsbc-sms' },
+      { kind: 'extract', actor: 'ingest:hsbc-sms' },
+    ],
+  );
+  sql.close();
+});
+
+/* ── 3′: the shape nobody wrote a pattern for ─────────────────────────── */
+
+test('AN UNMATCHED SHAPE EARNS ONE DRAFT AT ITS THIRD ARRIVAL, and never one per payload', async () => {
+  /* A model call per arrival is a bill that scales with a stranger's sending rate. Three is the
+     smallest number of examples a pattern can be written from and the smallest that is not a
+     coincidence, which is why it is the same three. */
+  const { k, sql } = await record();
+  const cib = (n: number, from = 'CIB Alerts <alerts@cib.eg>') =>
+    value<Arrived>(k.arrive({ channel: 'email', headers: { From: from, Subject: 'Debit' }, body: `payment ${n}`, sha256: `x${n}` }));
+
+  assert.equal(cib(1).state, 'untriaged');
+  assert.equal(cib(2).state, 'untriaged');
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 0, 'two of anything is a coincidence');
+
+  cib(3);
+  const rows = sql.all<{ kind: string; payload: string }>('SELECT kind, payload FROM outbox');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.kind, 'infer.draft');
+  const draft = JSON.parse(rows[0]!.payload) as { shape: string; n: number; examples: string[]; window: string };
+  assert.equal(draft.shape, 'email:alerts@cib.eg');
+  assert.equal(draft.n, 3);
+  assert.equal(draft.window, '30d');
+
+  // Ids, oldest first, and never the bodies: a stranger's text does not go into a queue that is
+  // summarised in front of a person.
+  assert.equal(draft.examples.length, 3);
+  assert.deepEqual(
+    draft.examples,
+    sql.all<{ id: string }>('SELECT id FROM inbox_raw ORDER BY rowid').map((r) => r.id),
+  );
+  assert.equal(JSON.stringify(draft).includes('payment'), false);
+
+  // And the fourth asks the same question again, which is one bill for nothing.
+  cib(4);
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 1);
+  sql.close();
+});
+
+test('and the display name is not the shape, or three examples are three shapes', async () => {
+  // A bank that sends as `CIB` on Monday and `CIB Alerts` on Tuesday is one sender.
+  const { k, sql } = await record();
+  const names = ['CIB <alerts@cib.eg>', 'CIB Alerts <ALERTS@cib.eg>', 'alerts@cib.eg'];
+  names.forEach((from, i) =>
+    k.arrive({ channel: 'email', headers: { From: from, Subject: 'Debit' }, body: `p${i}`, sha256: `y${i}` }),
+  );
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 1, 'one sender was read as three');
+
+  // And what it noticed about itself is the same shape, so the weekly analyser agrees with 3'.
+  assert.equal(
+    sql.one<{ subject: string; n: number }>("SELECT subject, n FROM observation WHERE kind = 'ingest.unmatched'")?.n,
+    3,
+  );
+  sql.close();
+});
+
+test('and a matched payload proposes nothing, because there is nothing to propose', async () => {
+  const { k, sql } = await record(HSBC());
+  value<Arrived>(send(k));
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 0);
+  assert.equal(sql.all("SELECT 1 FROM observation WHERE kind = 'ingest.unmatched'").length, 0);
   sql.close();
 });
 
@@ -307,6 +463,7 @@ test('the function is a function, and it reads the record it was handed', async 
       write: () => ({ ok: false, refusal: { code: 'X', fix: 'x' } }),
       find: () => null,
       mint: () => '01ABCDEFGHJKMNPQRSTVWXYZ99',
+      allocate: () => 1,
       nowMs: NOW,
     },
     { channel: 'paste', body: 'anything', sha256: 'p1' },
@@ -314,4 +471,42 @@ test('the function is a function, and it reads the record it was handed', async 
   );
   assert.equal(value<Arrived>(out).state, 'untriaged');
   sql.close();
+});
+
+/* ── what the transforms get wrong when nobody looks ──────────────────── */
+
+test('MONEY DECLARES ITS THOUSANDS SEPARATOR, or every European amount is a thousandth of itself', async () => {
+  /* `decimal` took a `sep` and `money` did not, so €1.234,56 was written as €1.23 — the worst place
+     for that bug, because the row still looks plausible. */
+  const { k, sql } = await record();
+  const deps = { find: () => null } as never;
+
+  assert.deepEqual(extractField(deps, { money: { after: 'EUR', currency: 'EUR', sep: '.' } }, 'EUR 1.234,56'), {
+    amount: 123_456,
+    currency: 'EUR',
+  });
+  assert.deepEqual(extractField(deps, { money: { after: 'EUR', currency: 'EUR', sep: '.' } }, 'EUR 1.234.567,89'), {
+    amount: 123_456_789,
+    currency: 'EUR',
+  });
+  assert.deepEqual(extractField(deps, { money: { after: 'EGP', currency: 'EGP' } }, 'EGP 1,316.24'), {
+    amount: 131_624,
+    currency: 'EGP',
+  });
+
+  // And a number stops at the number: the next token's digits are not part of this one.
+  assert.deepEqual(extractField(deps, { money: { after: 'EGP', currency: 'EGP' } }, 'EGP 250 2 items'), {
+    amount: 25_000,
+    currency: 'EGP',
+  });
+  void k;
+  sql.close();
+});
+
+test('and a declared DD/MM/YY does not read the first half of a four-digit year', async () => {
+  // `03/04/2026` came back as 2020-04-03 — a real day, six years early, sorting before everything.
+  assert.equal(ingestDay('paid 03/04/2026', 'DD/MM/YY'), null);
+  assert.equal(ingestDay('paid 03/04/2026', 'DD/MM/YYYY'), '2026-04-03');
+  assert.equal(ingestDay('paid 03/04/26', 'DD/MM/YY'), '2026-04-03');
+  assert.equal(ingestDay('ref 12026-04-03', 'YYYY-MM-DD'), null);
 });

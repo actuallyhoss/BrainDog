@@ -44,7 +44,7 @@ import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, ty
 import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps } from './digest.ts';
 import { dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
-import { arrive, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
+import { arrive, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import {
@@ -80,12 +80,12 @@ export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
 export { dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
-export { CHANNELS as INGEST_CHANNELS, arrive, day as ingestDay, extract as extractField } from './ingest.ts';
+export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, extract as extractField, shapeOf } from './ingest.ts';
 export { SIGNALS, analyse, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 export type { Analysis, Finding, Observation, Signal } from './observe.ts';
-export type { Arrival, Arrived, Extractor, IngestDecl, IngestDeps } from './ingest.ts';
+export type { Arrival, Arrived, Confidence, Extractor, IngestDecl, IngestDeps } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
@@ -1060,8 +1060,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * write. The same payload twice produces the same record twice, and a payload nobody wrote a
      * pattern for is a row somebody can see rather than a silence.
      */
-    arrive: (arrival: Arrival): Result<Arrived> =>
-      arrive(
+    arrive: (arrival: Arrival): Result<Arrived> => {
+      const out = arrive(
         {
           sql,
           ingests: () =>
@@ -1077,11 +1077,29 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
               value,
             )?.id ?? null,
           mint,
+          allocate,
           nowMs: clock.now(),
         } satisfies IngestDeps,
         arrival,
         transaction,
-      ),
+      );
+
+      /* 3′ — OUTSIDE THE ARRIVAL'S TRANSACTION, and deliberately. What is queued here is a model
+         call somebody will pay for; the payload is already stored, and a draft that could roll the
+         bytes back would make the record's memory depend on whether a proposal was worth making. */
+      if (out.ok && out.value.state === 'untriaged') {
+        const headers = arrival.headers ?? {};
+        transaction(() => {
+          observe(sql, clock.now(), [{ kind: 'ingest.unmatched', subject: shapeOf(arrival.channel, headers) }]);
+          propose(
+            { sql, nowMs: clock.now(), outbox: (payload) => enqueue(sql, mint, clock.now(), 'infer.draft', payload) },
+            arrival.channel,
+            headers,
+          );
+        });
+      }
+      return out;
+    },
 
     /**
      * Record what happened, pre-aggregated by day.
