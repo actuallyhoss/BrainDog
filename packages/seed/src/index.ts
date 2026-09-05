@@ -750,6 +750,424 @@ export const METRICS: Record<string, SeedMetric> = {
   },
 };
 
+
+/* ── the pages it ships with ────────────────────────────────────── */
+
+/**
+ * A page is a DOCUMENT, and its blocks are queries.
+ *
+ * Nothing here is a component. A page names blocks, a block names a kind, a source, a predicate and
+ * some columns, and what draws it is a renderer that has never heard of money or of projects — which
+ * is what makes a page an agent writes indistinguishable from one that shipped.
+ *
+ * ONE DECLARATION, ONE PAGE PER ROW. A page that declares `for:` is a TEMPLATE: every `{{field}}` in
+ * it resolves against one row of that register, so four projects are four pages over one document
+ * rather than four documents with the name typed into every predicate, every metric id and every
+ * heading.
+ *
+ * They live in the SEED for the reason the registers and the metrics do: a page is a document the
+ * RECORD holds — it travels in a `.dog` file, it versions when it changes, and a person can point at
+ * the version that was live when a figure was screenshotted. A page only the browser could read was
+ * a page the record could not carry.
+ */
+export type SeedPage = Record<string, unknown> & { page: string };
+
+export const PAGES: Record<string, SeedPage> = {
+  money: {
+    page: 'money',
+    title: 'Overview',
+    nav: { section: 'Money', order: 10 },
+    icon: 'money',
+    requires: ['register.obligations', 'register.people'],
+    pack: 'money-core',
+    blocks: [
+      {
+        kind: 'stat',
+        heading: 'Right now',
+        span: 12,
+        cells: [
+          { metric: 'owed-to-you', label: 'Owed to you' },
+          { metric: 'due-30d', label: 'Due in 30 days' },
+          { metric: 'overdue', label: 'Overdue' },
+          { metric: 'runway', label: 'Runway' },
+        ],
+      },
+      {
+        /* Where the money sits, in one line. Grouped and counted, so this is four chips whatever
+           the register grows to — the shape stays readable at thirty-eight rows and at three
+           thousand, which a table of them does not. */
+        kind: 'chips',
+        heading: 'Where it sits',
+        span: 12,
+        columns: [{ field: 'state' }],
+        source: 'register.obligations',
+        empty: 'Nothing owed either way.',
+      },
+      /* THE ONLY BLOCK ON ANY PAGE THAT IS ABOUT THE FUTURE. Sourced from the walk rather than from
+         a register (08 §2.3's `running`): what is liquid, then every dated movement in order, and
+         the balance after each. 05 §2 defers a `forecast` KIND to post-v1 and says the primitive
+         layer exists so it can be drawn without one, so this is an ordinary table over a different
+         source. The day the kind ships, the kind changes and the query does not. */
+      {
+        kind: 'table',
+        heading: 'What is coming',
+        span: 12,
+        columns: [{ field: 'day' }, { field: 'what' }, { field: 'delta' }, { field: 'balance' }],
+        source: 'forecast.runway',
+        limit: 12,
+        empty: 'Nothing dated in the next six months.',
+      },
+      {
+        kind: 'table',
+        heading: 'Who owes you',
+        span: 12,
+        source: 'register.obligations',
+        where: 'direction is owed to me, state is open or part',
+        columns: [
+          { field: 'seq', label: '#', width: '9ch', align: 'end' },
+          { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'party', label: 'Party', width: 'minmax(12ch,20ch)' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
+          { field: 'due', label: 'Due', width: '15ch', align: 'end' },
+        ],
+        order: [{ field: 'due', dir: 'asc' }],
+        empty: 'Nothing outstanding.',
+        limit: 50,
+      },
+      {
+        kind: 'note',
+        tone: 'bad',
+        heading: 'Late',
+        span: 5,
+        body: 'One invoice is {{ago:obligations.oldest_overdue}} past its terms. UK statutory interest is 8% above base, and the clause is in the Halden contract.',
+        drawn: true,
+      },
+      {
+        kind: 'bar',
+        heading: 'Owed by you, by counterparty',
+        span: 7,
+        columns: [{ field: 'party' }, { field: 'amount' }],
+        source: 'register.obligations',
+        where: 'direction is owed by me, state is open',
+        empty: 'You owe nobody anything.',
+      },
+      {
+        kind: 'table',
+        heading: 'Who you owe',
+        span: 12,
+        source: 'register.obligations',
+        where: 'direction is owed by me, state is open or part',
+        columns: [
+          { field: 'seq', label: '#', width: '9ch', align: 'end' },
+          { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
+          { field: 'due', label: 'Due', width: '15ch', align: 'end' },
+        ],
+        order: [{ field: 'due', dir: 'asc' }],
+        empty: 'Nothing outstanding.',
+        limit: 50,
+      },
+    ],
+  },
+  estate: {
+    page: 'estate',
+    title: 'Renewals',
+    nav: { section: 'Estate', order: 10 },
+    icon: 'calendar',
+    requires: ['register.services'],
+    pack: 'estate',
+    blocks: [
+      {
+        kind: 'stat',
+        heading: 'At a glance',
+        span: 12,
+        cells: [
+          { metric: 'renews-30d', label: 'Renews in 30 days' },
+          { metric: 'estate-year', label: 'Cost per year' },
+          { metric: 'lapsing', label: 'Lapsing' },
+        ],
+      },
+      {
+        kind: 'gauge',
+        heading: 'Monthly spend',
+        span: 5,
+        /* First column names the thing, second is the one that gets summed.
+
+           `cycle is monthly` is not a nicety. `cost` is per CYCLE, so summing a yearly domain and a
+           monthly bucket adds two different units and produces a number that is not about anything.
+           A gauge over one cycle is a real figure; a gauge over all of them is arithmetic that
+           happens to complete. */
+        columns: [{ field: 'name', label: 'Every month' }, { field: 'cost' }],
+        source: 'register.services',
+        where: 'state is live, cycle is monthly',
+        target: 22_000,
+        empty: 'Nothing on a monthly plan.',
+      },
+      {
+        kind: 'chips',
+        heading: 'What it is made of',
+        span: 7,
+        /* Grouped and counted by the first column, so this is six chips rather than fifteen. */
+        columns: [{ field: 'kind' }],
+        source: 'register.services',
+        empty: 'Nothing here yet.',
+      },
+      {
+        kind: 'timeline',
+        heading: 'Next ninety days',
+        span: 6,
+        /* WRITTEN DOWN, because it used to live in the reader as a filter keyed on
+           register-and-kind. The heading says ninety days and now the declaration does too. */
+        /* BOUNDED AT BOTH ENDS. A window with an upper bound and no lower one sorts a renewal that
+           already lapsed to the top of a list headed "Next ninety days" — the same defect the two
+           30-day money tiles were bounded below to fix. `after yesterday` is exclusive, so today
+           still counts. */
+        where: 'state is not cancelled, renews after yesterday, renews before +90d',
+        columns: [{ field: 'renews' }, { field: 'name' }, { field: 'provider' }],
+        source: 'register.services',
+        order: [{ field: 'renews', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing renews in the next ninety days.',
+      },
+      {
+        kind: 'params',
+        heading: 'What each domain points at',
+        /* SIX, and it has to be six. `params` is a `rows` primitive, so `floorFor` widens it to two
+           twelfths per declared column — three columns is a floor of 6 — and a declaration of 5 was
+           silently clamped up. Its row partner was 7, the row came to 13, and the page wrapped into
+           two rows with a five-twelfth hole in one and a six-twelfth hole in the other. */
+        span: 6,
+        columns: [{ field: 'name' }, { field: 'points_at' }, { field: 'provider' }],
+        source: 'register.services',
+        where: 'kind is domain',
+        order: [{ field: 'name', dir: 'asc' }],
+        limit: 6,
+        empty: 'No domains.',
+      },
+      {
+        kind: 'table',
+        heading: 'Everything',
+        span: 12,
+        source: 'register.services',
+        columns: [
+          { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)', link: true },
+          { field: 'provider', label: 'Provider', width: 'minmax(12ch,18ch)' },
+          { field: 'kind', label: 'Kind', width: '13ch' },
+          { field: 'cost', label: 'Cost', width: '13ch', align: 'end' },
+          { field: 'renews', label: 'Renews', width: '15ch', align: 'end' },
+        ],
+        order: [{ field: 'renews', dir: 'asc' }],
+        empty: 'Nothing here yet.',
+        limit: 50,
+      },
+      {
+        kind: 'note',
+        tone: 'warn',
+        heading: 'Points at nothing',
+        span: 12,
+        body: 'Two domains resolve to nothing and still renew. `tallow.example` costs {{money:1400 GBP}} a year to point at an empty page.',
+        drawn: true,
+      },
+    ],
+  },
+  /**
+   * A PROJECT PAGE: every block filtered to one thing.
+   *
+   * This is the shape the whole widget idea was really asking for, and it needs no new machinery —
+   * it is an ordinary `page` row whose blocks all carry `where: thing is Kiln`. Open the project and
+   * the page is about the project: what is open on it, who is working on it right now, what it is
+   * owed, what it costs to keep alive.
+   *
+   * The SESSIONS block is the interesting one. "A Claude Code widget I can code into" cannot be a
+   * block that runs code — 04 §7 has no interpreter to reach and 22 §3 names and rejects the three
+   * ways people try. It does not need to be. A session is a typed row (02 §1), so the widget is an
+   * ordinary register-bound block, and the instruction you type is an ordinary WRITE — which is the
+   * product's own thesis stated back at it: the record is the coordinator, and it is better than a
+   * model because it cannot be persuaded (23 §12).
+   *
+   * Spans read left to right: the stat takes the row, then work and agents sit side by side,
+   * then money and the estate.
+   */
+  /**
+   * ONE DECLARATION, FOUR PAGES. This was `kiln:`, with the name typed into six predicates, three
+   * metric ids and five sentences — and a second project meant a second copy of all of it. The
+   * `{{name}}` is the row's own field, resolved once per project the `for:` predicate admits, and
+   * the slug comes from the row's title so `/p/kiln` is still `/p/kiln`.
+   *
+   * `parked` and `retired` projects get no page. A rail with a page for something nobody is working
+   * on is a rail you stop reading.
+   */
+  project: {
+    page: 'project',
+    title: '{{name}}',
+    for: { register: 'things', where: 'lane is building or earning' },
+    nav: { section: 'Projects', order: 10 },
+    icon: 'thing',
+    requires: ['register.tasks', 'register.sessions', 'register.obligations', 'register.services'],
+    blocks: [
+      {
+        kind: 'stat',
+        heading: 'At a glance',
+        span: 12,
+        cells: [
+          { metric: 'project-open:{{name}}', label: 'Open' },
+          { metric: 'project-owed:{{name}}', label: 'Owed to you' },
+          { metric: 'project-cost:{{name}}', label: 'Costs a year' },
+        ],
+      },
+      {
+        kind: 'todo',
+        heading: 'What is open',
+        span: 5,
+        columns: [{ field: 'what' }, { field: 'by' }],
+        source: 'register.tasks',
+        where: 'thing is {{name}}, state is open or doing',
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing open on {{name}}.',
+      },
+      {
+        kind: 'timeline',
+        heading: 'Agents',
+        span: 7,
+        columns: [{ field: 'last_seen' }, { field: 'doing' }, { field: 'agent' }],
+        source: 'register.sessions',
+        where: 'thing is {{name}}',
+        order: [{ field: 'last_seen', dir: 'desc' }],
+        limit: 6,
+        empty: 'No agent has touched {{name}}.',
+      },
+      {
+        kind: 'table',
+        heading: 'Money',
+        /* EIGHT, which is what four columns of a `table` need. Declared at 6 it was clamped up
+           anyway — `floorFor` gives a table two twelfths a column so its cells do not truncate — so
+           the declaration was a number that never reached the screen. Its row partner is the 4. */
+        span: 8,
+        source: 'register.obligations',
+        where: 'thing is {{name}}',
+        /* THE DIRECTION IS A COLUMN, because this block holds both and its own `empty:` says so.
+           Four columns of `# | What | Amount | Due` drew a receivable and seven payables in one
+           unsigned column: read down it and Kiln looks like GBP 25,530.00 of something, where the
+           net is minus GBP 23,610.00. Nothing else in the row carried the sign — the tone comes from
+           state and date, which are the same for both directions. */
+        /* Four columns, so the block still fits beside the 4 next to it. `#` is the one that goes:
+           `what` already links to the row, and a direction the reader cannot see is worse than a
+           number they cannot say out loud. */
+        columns: [
+          { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'direction', label: 'Which way', width: '13ch' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
+          { field: 'due', label: 'Due', width: '15ch', align: 'end' },
+        ],
+        order: [{ field: 'due', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing owed either way on {{name}}.',
+      },
+      {
+        kind: 'spec',
+        heading: 'Keeping it alive',
+        /* Two cells, not three. A third column pushes this block's own floor to six, and six beside
+           the eight the money table needs is fourteen of twelve — the row would wrap and leave a
+           gap. The renewal date is what the Renewals page is for. */
+        span: 4,
+        columns: [{ field: 'name' }, { field: 'cost' }],
+        source: 'register.services',
+        where: 'thing is {{name}}',
+        limit: 6,
+        empty: '{{name}} runs on nothing you pay for.',
+      },
+      {
+        /* A `code` block is authored rather than projected: `body` is the whole of it, verbatim.
+           It is on a project page because the question "how do I point an agent at this one" is
+           asked once per project and answered nowhere else. */
+        kind: 'code',
+        heading: 'Work on this from an agent',
+        span: 12,
+        body:
+          'braindog.list tasks where thing is {{name}} and state is open\n' +
+          'braindog.set tasks#7 state: doing\n' +
+          'braindog.update track 1 health: on_track body: "Six instances queued."',
+      },
+    ],
+  },
+
+  work: {
+    page: 'work',
+    title: 'Board',
+    nav: { section: 'Work', order: 10 },
+    icon: 'board',
+    requires: ['register.tasks'],
+    pack: 'work',
+    blocks: [
+      {
+        kind: 'board',
+        heading: 'By state',
+        span: 12,
+        columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
+        source: 'register.tasks',
+        empty: 'Nothing open.',
+      },
+      {
+        kind: 'steps',
+        heading: 'What has to happen first',
+        /* Twelve, because there is nothing beside it. A five-twelfth block between two full-width
+           ones is not a narrow card, it is a row that is seven twelfths empty. */
+        span: 12,
+        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
+        source: 'register.tasks',
+        where: 'state is open',
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 5,
+        empty: 'Nothing waiting.',
+      },
+      {
+        kind: 'table',
+        heading: 'Everything open',
+        span: 12,
+        source: 'register.tasks',
+        /* The heading says open. It used to be the only place that said so — the filter was keyed on
+           register-and-kind inside the reader, and a heading is not evaluated. */
+        where: 'state is not done or dropped',
+        columns: [
+          { field: 'seq', label: '#', width: '9ch', align: 'end' },
+          { field: 'what', label: 'What', width: 'minmax(20ch,1fr)', link: true },
+          { field: 'thing', label: 'Thing', width: 'minmax(10ch,16ch)' },
+          { field: 'state', label: 'State', width: '12ch' },
+          { field: 'by', label: 'By', width: '15ch', align: 'end' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        empty: 'Nothing open.',
+        limit: 50,
+      },
+    ],
+  },
+  /** Emerged from the data and NOT placed: it sits in the holding pen until a person moves it. The
+      system never writes nav order after first install (06 §3, 29 §3). */
+  people: {
+    page: 'people',
+    title: 'People',
+    icon: 'people',
+    requires: ['register.people'],
+    origin: 'derived',
+    placed: false,
+    blocks: [
+      {
+        kind: 'table',
+        heading: 'Everyone',
+        source: 'register.people',
+        columns: [
+          { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)', link: true },
+          { field: 'role', label: 'Role', width: '14ch' },
+          { field: 'rate', label: 'Day rate', width: '14ch', align: 'end' },
+          { field: 'email', label: 'Email', width: 'minmax(16ch,1fr)' },
+        ],
+        empty: 'Nobody yet.',
+      },
+    ],
+  },
+};
+
 /* ── installing it ────────────────────────────────────────────────────────── */
 
 /**
@@ -760,6 +1178,20 @@ export const METRICS: Record<string, SeedMetric> = {
  */
 export const declarations = (): Declaration[] =>
   Object.values(REGISTERS).map((body) => ({ id: `register.${body.id}`, kind: 'register' as const, body: body as never }));
+
+/**
+ * The pages and the metrics, as declarations.
+ *
+ * A REGISTER AND A PAGE ARE THE SAME KIND OF THING — a document with an id and a body — and they
+ * install through the same call for the same reason a batch is a batch: a page that names a register
+ * and the register itself must arrive together, or the record is briefly inconsistent and "briefly"
+ * is however long the second call takes to fail.
+ */
+export const pageDeclarations = (): Declaration[] =>
+  Object.values(PAGES).map((body) => ({ id: `page.${body.page}`, kind: 'page' as const, body: body as never }));
+
+export const metricDeclarations = (): Declaration[] =>
+  Object.values(METRICS).map((body) => ({ id: `metric.${body.metric}`, kind: 'metric' as const, body: body as never }));
 
 /** Which fields of which register are refs, and to what. Read from the declarations, never listed. */
 const refsOf = (register: string): Map<string, string> =>
@@ -788,7 +1220,7 @@ export function forWrite(register: string, fields: Fields): Record<string, unkno
   return out;
 }
 
-export type Seeded = { registers: number; rows: number };
+export type Seeded = { registers: number; rows: number; pages: number; metrics: number };
 
 /**
  * Install the declarations, then write every row.
@@ -800,7 +1232,7 @@ export type Seeded = { registers: number; rows: number };
 export const ORDER = ['things', 'people', 'tracks', 'obligations', 'services', 'tasks', 'sessions', 'updates'] as const;
 
 export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Result<Seeded>> {
-  const installed = await kernel.install(declarations());
+  const installed = await kernel.install([...declarations(), ...pageDeclarations(), ...metricDeclarations()]);
   if (!installed.ok) return installed as Result<Seeded>;
 
   let rows = 0;
@@ -811,5 +1243,5 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
       rows++;
     }
 
-  return { ok: true, value: { registers: Object.keys(REGISTERS).length, rows } };
+  return { ok: true, value: { registers: Object.keys(REGISTERS).length, rows, pages: Object.keys(PAGES).length, metrics: Object.keys(METRICS).length } };
 }

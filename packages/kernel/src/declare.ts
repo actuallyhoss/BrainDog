@@ -111,6 +111,16 @@ const bad = (code: string, fix: string, at?: string, allowed?: readonly string[]
 });
 
 /**
+ * What a declaration calls itself.
+ *
+ * A REGISTER SAYS `id`, A PAGE SAYS `page`, A METRIC SAYS `metric`, and all three are the same
+ * field wearing the word a person would use in that document. Requiring `id` everywhere would mean
+ * a page carrying its own name twice, and the copy that drifted would be the one nobody reads.
+ */
+export const ownId = (decl: Declaration): string =>
+  String((decl.body.id as string | undefined) ?? (decl.body[decl.kind] as string | undefined) ?? '');
+
+/**
  * Check a declaration before it is installed, because an id becomes SQL.
  *
  * The register id and every field id are inlined into index names and `json_extract` paths — the one
@@ -120,15 +130,16 @@ const bad = (code: string, fix: string, at?: string, allowed?: readonly string[]
 export function validate(decl: Declaration): Refusal | null {
   if (!KINDS.includes(decl.kind))
     return bad('DECLARATION_INVALID', `${decl.kind} is not a kind of declaration.`, 'kind', KINDS);
-  if (decl.id !== `${decl.kind}.${decl.body.id as string}`)
+  const own = ownId(decl);
+  if (decl.id !== `${decl.kind}.${own}`)
     return bad(
       'DECLARATION_INVALID',
-      `A declaration's id is its kind and its own id: ${decl.kind}.${String(decl.body.id)}, not ${decl.id}.`,
+      `A declaration's id is its kind and its own id: ${decl.kind}.${String(own)}, not ${decl.id}.`,
       'id',
     );
   if (decl.kind !== 'register') return null;
 
-  const id = decl.body.id;
+  const id = own;
   if (typeof id !== 'string' || !IDENT.test(id))
     return bad(
       'DECLARATION_INVALID',
