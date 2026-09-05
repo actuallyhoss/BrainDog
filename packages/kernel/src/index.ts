@@ -25,6 +25,7 @@ import { applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { compile, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, retireDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
+import { exportDogl, importDogl, type Section } from './dogl.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
@@ -32,6 +33,8 @@ export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
+export { TRAVELS, decode, encode, projection, tables } from './dogl.ts';
+export type { ImportReport, Section, TableShape } from './dogl.ts';
 export type { Hit } from './fts.ts';
 export type { Declaration, DeclKind, Installed } from './declare.ts';
 
@@ -505,6 +508,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     reload,
     search,
     rebuildFts,
+
+    /** The record as a file: `.dogl` lines, header first, `local` left behind. */
+    export: (opts: { sections?: readonly Section[] } = {}) => exportDogl(sql, transaction, opts),
+
+    /**
+     * A file into an empty record, then the index rebuilt from the rows it now holds.
+     *
+     * The rebuild is here rather than in the import because it depends on the DECLARATIONS the file
+     * just brought — a search index built before them would index nothing and look like it worked.
+     */
+    import(lines: Iterable<string>) {
+      const out = importDogl(sql, transaction, lines);
+      if (out.ok) {
+        reload();
+        rebuildFts();
+      }
+      return out;
+    },
 
     /**
      * Install declarations, then rebuild the cache.
