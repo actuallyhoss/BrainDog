@@ -146,6 +146,17 @@ export class Record$ extends DurableObject<Env> {
     return out.ok ? out.value : null;
   }
 
+  /**
+   * What this person may do inside this record, or `null` if they are not on it.
+   *
+   * THE RECORD'S OWN `member` TABLE, which is the table `invite` writes and the one that travels in
+   * a `.dog` file. `registers` is the ceiling and `null` is all of them.
+   */
+  async access(person: string): Promise<{ level: string; registers: string[] | null; levels: Record<string, string> } | null> {
+    const api = await this.#record();
+    return api.kernel.access(person);
+  }
+
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
   async ack(done: { id: string; state: 'done' | 'failed'; error?: string }): Promise<void> {
     const api = await this.#record();
@@ -203,9 +214,18 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().resolve(slug);
   }
 
-  /** What this person may do with this record, or `null`. The Worker turns it into a `CallContext`. */
-  levelOf(record: string, person: string): Level | null {
-    return this.#directory().levelOf(record, person);
+  /**
+   * Which records this person can reach at all. The switcher's index, and not an authorisation.
+   *
+   * WHAT THEY MAY DO INSIDE ONE IS THE RECORD'S OWN TABLE. Reading the level from here made `invite`
+   * and `remove` write a table no authorisation path read — so removing somebody did not stop them
+   * writing, and a bookkeeper given `read` on the payroll register wrote to it.
+   */
+  reaches(person: string): { record: string; slug: string | null; level: Level }[] {
+    return this.#directory()
+      .recordsOf(person)
+      .filter((m) => !m.closed)
+      .map((m) => ({ record: m.record, slug: m.slug, level: m.level }));
   }
 }
 
@@ -296,10 +316,13 @@ export default {
     /* A BEARER NAMES ITS OWN RECORD AND THE PATH NAMES ONE TOO, and a mismatch is not an accident:
        it is a token for one customer pointed at another's URL. `verify` refuses a bearer whose
        record half is not this object's, so reaching here means the two agree. */
+    /* THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT. The Directory said which record the NAME meant
+       and nothing more — a level read from there is a level `invite` and `remove` do not write, so
+       removing somebody would not have stopped them writing. */
     const person = seen?.person_id ?? SELF;
-    const level = await directory.levelOf(named.record, person);
-    if (!level)
-      return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: `You are not on ${routed.slug}.` } }, 403);
+    const held = await record.access(person);
+    if (!held) return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: `You are not on ${routed.slug}.` } }, 403);
+    const level = held.level as 'read' | 'append' | 'write' | 'decide' | 'owner';
 
     /* THE INTERSECTION IS THE RECORD'S TO COMPUTE. What goes over is both halves — the token's
        scope and the person's level — because a token says what its holder may do with their access
@@ -309,7 +332,16 @@ export default {
       : { kind: 'person', id: person, level };
 
     const inner = new Request(`${url.origin}${routed.rest}${url.search}`, request);
-    inner.headers.set('x-braindog-ctx', JSON.stringify({ principal } satisfies CallContext));
+    /* AND THE REGISTER CEILING TRAVELS WITH IT, or a person invited to one register reaches every
+       one of them — which is the whole of what "invite the bookkeeper" was supposed to mean. */
+    inner.headers.set(
+      'x-braindog-ctx',
+      JSON.stringify({
+        principal,
+        ...(held.registers === null ? {} : { registers: held.registers }),
+        ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
+      } satisfies CallContext),
+    );
     /* AND THE BEARER DOES NOT TRAVEL FURTHER. The record has no use for it and every hop a
        credential takes is another place it can be logged. */
     inner.headers.delete('authorization');

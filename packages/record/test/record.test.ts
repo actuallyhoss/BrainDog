@@ -672,3 +672,58 @@ test('and no token invites anybody, and a register nobody has is refused', async
   assert.ok((await api.members(token('read'))).ok);
   sql.close();
 });
+
+/* ── what a host asks before it lets anybody in ────────────────── */
+
+test('THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT, and removing them stops them', async () => {
+  /* The level used to come from the Directory, which `invite` and `remove` never write — so removal
+     did not revoke and a bookkeeper given `read` on the payroll register wrote to it. */
+  const { api, sql } = await studio();
+  /* NO LEVEL ON THE RECORD, which is how somebody is invited to ONE register and nothing else. */
+  value(await api.invite({ person: 'p_2', registers: { obligations: 'read' } }, owner));
+
+  const bo = api.kernel.access('p_2')!;
+  assert.equal(bo.level, 'read');
+  assert.deepEqual(bo.registers, ['obligations'], 'the ceiling was not armed, so one register meant every one');
+  assert.deepEqual(bo.levels, { obligations: 'read' });
+
+  // The whole record, for somebody who holds it.
+  assert.deepEqual(api.kernel.access('p_1'), { level: 'owner', registers: null, levels: {} });
+
+  // And nothing at all for somebody who is not on it, before AND after they are taken off.
+  assert.equal(api.kernel.access('p_9'), null);
+  value(await api.removeMember({ person: 'p_2' }, owner));
+  assert.equal(api.kernel.access('p_2'), null, 'removal did not revoke');
+  sql.close();
+});
+
+test('and somebody with only a named register holds nothing on the record itself', async () => {
+  // "No access to the record" and "read on the record" are different, and a listing that showed
+  // them the same would have somebody revoke the wrong one.
+  const { api, sql } = await studio();
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_3', 'obligations', 'write')");
+
+  const listed = value<{ person_id: string; level: string | null }[]>(await api.members(owner));
+  assert.equal(listed.find((m) => m.person_id === 'p_3')?.level, null);
+  assert.deepEqual(api.kernel.access('p_3'), { level: 'write', registers: ['obligations'], levels: { obligations: 'write' } });
+  sql.close();
+});
+
+test('AND AN EXPORT OF NOTHING IS NOT AN EXPORT', async () => {
+  /* `sections: "data"` — the easy JSON mistake — and `sections: []` both came back `ok` with a
+     structurally valid `.dog` file containing every table header and no rows: a backup of nothing
+     that looks like a backup. */
+  const { api, sql } = await record();
+  value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }, owner));
+
+  for (const sections of ['data', [], ['DATA'], [123], ['local'], {}])
+    assert.equal((await api.export({ sections } as never, owner)).ok, false, `${JSON.stringify(sections)} was allowed`);
+
+  const good = value<string[]>(await api.export({ sections: ['header', 'data'] }, owner));
+  assert.ok(good.some((l) => l.includes('Invoice 41')));
+
+  // And a line that is not a line is a refusal rather than a throw.
+  assert.equal((await api.import({ lines: [null] } as never, owner)).ok, false);
+  assert.equal((await api.import({ lines: [1] } as never, owner)).ok, false);
+  sql.close();
+});

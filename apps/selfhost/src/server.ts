@@ -71,16 +71,37 @@ async function contextFor(
      given less than everything — which is the difference between a scope and a password. */
   if (sent?.includes('.')) {
     const seen = await api.kernel.verifyToken(sent, 'api');
-    if (seen.ok)
-      return {
-        principal: { kind: 'token', id: seen.value.id, scope: seen.value.scope, person: seen.value.person_id, level: 'owner' },
-      };
+    if (!seen.ok) return null;
+
+    /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant. `owner` here meant a token
+       belonging to a colleague invited at `read` came back as an owner — and that a token outlived
+       the removal of the person who holds it, which is the one thing this whole path exists to
+       prevent. */
+    const held = api.kernel.access(seen.value.person_id);
+    if (!held) return null;
+    return {
+      principal: {
+        kind: 'token',
+        id: seen.value.id,
+        scope: seen.value.scope,
+        person: seen.value.person_id,
+        level: held.level,
+      },
+      ...(held.registers === null ? {} : { registers: held.registers }),
+      ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
+    };
   }
 
+  /* A BEARER THAT DID NOT VERIFY IS REFUSED, and does not fall through to the branch below. It
+     used to: revoking a scoped token PROMOTED it, because the same header that had been a `read`
+     agent became an unauthenticated request and an unauthenticated request was the owner. */
+  if (sent?.includes('.')) return null;
+
   /* AND THEN THE ONE SHARED SECRET, which is what a single-person deployment on one machine has
-     instead of a sign-in. Absent, everything is the owner: `30-BLUEPRINT` §10's `BRAINDOG_TOKEN`
-     row is explicit that a self-host is one person's record on one machine. */
-  if (!token) return { principal: { kind: 'person', id: 'p_self', level: 'owner' } };
+     instead of a sign-in. `undefined` and not falsy: an empty `BRAINDOG_TOKEN` in a compose file is
+     a value somebody set, and reading it as "no token wanted" opens the server rather than locking
+     it. */
+  if (token === undefined) return { principal: { kind: 'person', id: 'p_self', level: 'owner' } };
   return sent === token ? { principal: { kind: 'person', id: 'p_self', level: 'owner' } } : null;
 }
 

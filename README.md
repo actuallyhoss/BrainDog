@@ -7,20 +7,38 @@ for you if you want. It renders itself as a web app.
 
 ---
 
-> ## Status: the frontend is built. The write path is not.
+> ## Status: the record is built, and it writes.
 >
 > **[docs/](docs/)** is the complete 0→1 engineering scope and remains the source of truth: nothing
 > here is designed twice, and every decision below cites the document it comes from.
 >
-> What exists is the whole browser client against a synthetic record — every screen, every keyboard
-> path, the block dialect, the theme generator, the forecast and the MCP-facing shapes — with **no
-> write path**. Pressing a destructive control raises a toast that says nothing was written. See
-> [apps/web/README.md](apps/web/README.md).
+> **What exists.** The kernel — one write path, an append-only ledger whose `MAX(rowid)` IS the
+> record's version, sixteen types with their refusals, a predicate grammar with two renderings held
+> to each other by a differential test, full-text search, a per-customer schedule with ten kinds and
+> an outbox with nine. On top of it: metrics and their stored series, declared pages, rules
+> (including a bounded row generator and a bulk apply), the cash walk, ingest with a closed transform
+> vocabulary, the vault index, the decision gate, packs, agent tokens, membership, and `.dog` export
+> and import that round-trip byte for byte.
 >
-> Guarded by seven gates and 104 unit tests: a clean-room tripwire, a CSS rule checker, a colour
-> literal grep, a byte-comparison of the generated theme, a bundle budget, a **layout** gate that
-> reads its own test widths out of the stylesheets, and an **accessibility** gate that drives nine
-> interactive states across both apps.
+> Reachable three ways from one route table, so they cannot drift: **HTTP**, an **MCP** server —
+> sixteen tools and a resource surface, so a page is not invisible to an agent — and a **typed
+> client**. Hosted as a Cloudflare Worker — a SQLite
+> Durable Object per customer, a `Directory` object holding the tenant map, a queue as the outbox
+> doorbell — or as one Node process over `node:sqlite`, from the same packages.
+>
+> The browser client is the whole app against a synthetic record: every screen, every keyboard path,
+> the block dialect, the theme generator and the forecast. Swapping its one data file for the typed
+> client is the remaining wiring.
+>
+> **857 tests and nine gates**: a clean-room tripwire, a stack gate (no `node:`, no `cloudflare:`, no
+> `fetch`, no `Buffer` under `packages/*/src`), a CSS rule checker, a colour-literal grep, a
+> byte-comparison of the generated theme, a bundle budget, a layout gate that reads its own test
+> widths out of the stylesheets, an accessibility gate that drives every interactive state across
+> both apps, and a workspace typecheck under `exactOptionalPropertyTypes` and `erasableSyntaxOnly`.
+>
+> Every test is named after the failure it prevents rather than the function it covers, which is why
+> five adversarial audit passes have found sixty-five reproducible defects in this code and every
+> one of them has a test standing where it was.
 
 **Start here: [docs/00-README.md](docs/00-README.md)** for the design, or
 **[apps/web/README.md](apps/web/README.md)** for what is running.
@@ -66,6 +84,58 @@ into every new session.
 
 The app is **AGPL-3.0-only**. Self-hosting is free and *complete* — that word is an architectural
 constraint, not marketing: see [docs/01-ARCHITECTURE.md §4](docs/01-ARCHITECTURE.md).
+
+## Adding to it without forking it
+
+Everything a business's shape is made of is a **declaration** — a document, not code. A register, a
+page, a rule, a metric, an ingest, a digest, a theme. Eight kinds, and a pack is a file of them.
+
+```yaml
+pack: studio-books
+version: 1.0.0
+summary: What a small studio owes and is owed.
+author: you
+license: MIT
+
+declarations:
+  - register: obligations           # the first key IS the kind
+    name: Obligations
+    title: what
+    fields:
+      - { id: what,   type: text, required: true }
+      - { id: amount, type: money }
+      - { id: due,    type: day, index: true }
+      - { id: tags,   type: list, of: text }
+      - { id: state,  type: enum, values: [open, paid], index: true }
+
+  - metric: still-open
+    source: register.obligations
+    where: state is open, due before today
+    value: { count: id }
+    target: { lte: 5 }
+
+  - rule: chase
+    register: obligations
+    when: state is open, due before today
+    once_per: [entry]
+    then:
+      - { tag: late }
+      - { notify: { say: "{{what}} is {{ago:due}}" } }
+
+seeds:
+  - register: obligations
+    fields: { what: Invoice 41, due: 2026-10-01 }
+```
+
+`planPack` tells you exactly what installing it would do — what it adds, what it changes, what it
+would retire and how many rows are under that, which rules would generate rows and with what
+ceiling, which connectors would leave the record, which rules would interrupt somebody — and
+`installPack` applies **that** plan and refuses a different one. Taking a pack out retires its
+declarations and **keeps every row**.
+
+What a pack cannot do is the reason it is safe to install one from a stranger: it declares shape and
+seeds examples, and has no verb that reads a row. There is no script, so there is no sandbox to
+secure. A credential in one is refused at the door, by key name, at any depth.
 
 ## The one rule the platform rests on
 

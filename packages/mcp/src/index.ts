@@ -370,15 +370,39 @@ export function tools(api: RecordApi) {
         ttlMs: HOUR,
       });
 
+    /* AND A PAGE IS HELD TO THE CEILING TOO. Its rows are withheld either way, but a slug and a
+       title are information: `The Payroll Page` in a listing tells a caller what a register they
+       cannot read is called. */
+    const seen: string[] = [];
     const pages = await api.pages(ctx);
     if (pages.ok)
-      for (const page of pages.value)
+      for (const page of pages.value) {
+        const drawn = await api.page({ slug: page.slug }, ctx);
+        if (!drawn.ok) continue;
+        const blocks =
+          (drawn.value as { blocks?: { refusals?: { code: string }[]; readings?: { metric: string }[] }[] }).blocks ?? [];
+        if (blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => r.code === 'FORBIDDEN'))) continue;
+        /* THE FIGURES A PAGE NAMES, taken from what it actually drew rather than from a second read
+           of the declaration — so a metric an agent is offered is one this page really carries. */
+        for (const block of blocks) for (const reading of block.readings ?? []) seen.push(reading.metric);
         out.push({
           uri: `braindog:page/${page.slug}`,
           name: `page/${page.slug}`,
           description: `${page.title}, with every block run: rows and figures, never markup.`,
           ttlMs: MINUTE,
         });
+      }
+
+    /* AND THE FIGURES A PAGE DRAWS. The file's own header says `page` and `metric` are the two
+       resources that close ADR-018's hole, and only one of them was listed — so an agent could read
+       what a page says and not the figure it names. */
+    for (const id of [...new Set(seen)])
+      out.push({
+        uri: `braindog:metric/${id}`,
+        name: `metric/${id}`,
+        description: `The figure ${id}, with its target and how it compares.`,
+        ttlMs: MINUTE,
+      });
 
     return { ok: true, value: out };
   };
@@ -406,7 +430,9 @@ export function tools(api: RecordApi) {
     const named = /^[a-z][a-z0-9_-]{0,63}$/.test(rest);
     if (head === 'schema' && named) return api.schema({ register: rest }, ctx);
     if (head === 'page' && named) return api.page({ slug: rest }, ctx);
-    if (head === 'metric' && named) return api.metric({ id: rest } as never, ctx);
+    /* `metric`, NOT `id`. The tool path got the name right and the resource did not, and the cast
+       hid it — so every metric resource answered `REQUIRED_MISSING` about an argument it was sent. */
+    if (head === 'metric' && named) return api.metric({ metric: rest } as never, ctx);
 
     return {
       ok: false,

@@ -35,6 +35,7 @@ import {
   type Entry,
   type Kernel,
   FORMAT_VERSION,
+  TRAVELS,
   carryingOf,
   headline,
   type GovernRegister,
@@ -63,6 +64,15 @@ export type Principal =
 
 export type CallContext = {
   principal: Principal;
+  /**
+   * What this caller holds on named registers, when it differs from their record level.
+   *
+   * THE OVERRIDE, NOT THE CEILING. `registers` says which registers exist for this caller at all;
+   * this says what they may DO with one of them — and the two are separate because "read the record
+   * and write this one" and "see only this one" are different invitations.
+   */
+  levels?: Readonly<Record<string, Level>> | undefined;
+
   /** Which registers this caller may touch at all. `'*'` is every one the record declares. */
   registers?: readonly string[] | '*';
   /** Groups the events of everything one call causes. */
@@ -174,8 +184,17 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     return out;
   };
   /** Every method starts here: the ladder, then the ceiling, then the work. */
-  const guard = (ctx: CallContext, need: Need, register?: string): Refusal | null =>
-    allows(ctx, need) ?? (register ? reaches(ctx, register) : null);
+  const guard = (ctx: CallContext, need: Need, register?: string): Refusal | null => {
+    /* THE REGISTER'S OWN LEVEL WHEN IT HAS ONE, which is what makes a level per register a rule
+       rather than a decoration. A bookkeeper with `read` on the record and `write` on one register
+       is the point; so is an owner held to `read` on the one that carries the payroll. */
+    const held = register === undefined ? undefined : ctx.levels?.[register];
+    const at: CallContext =
+      held === undefined || ctx.principal.kind === 'system'
+        ? ctx
+        : { ...ctx, principal: { ...ctx.principal, level: held } };
+    return allows(at, need) ?? (register ? reaches(ctx, register) : null);
+  };
 
   /**
    * The vault gate: a person at `owner`, and never a bearer of any kind.
@@ -703,7 +722,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * AN INVITATION IS THE WHOLE OF WHAT THEY HOLD, not a patch: a register left out of a second one
      * is a register taken away, revoked out loud rather than left standing.
      */
-    async invite(args: { person: string; email?: string; name?: string; level: Level; registers?: Record<string, Level> }, ctx: CallContext) {
+    async invite(args: { person: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level> }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       return tail(kernel.invite(actorOf(ctx), args ?? ({} as never)));
@@ -767,6 +786,20 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     async export(args: { sections?: readonly string[] }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
+
+      /* A SECTION NOBODY HAS IS NOT AN EMPTY EXPORT. `sections: "data"` — the easy JSON mistake —
+         and `sections: []` both used to come back `ok` with a structurally valid `.dog` file
+         containing every table header and no rows: a backup of nothing that looks like a backup. */
+      if (args?.sections !== undefined) {
+        if (!Array.isArray(args.sections) || args.sections.length === 0)
+          return no('VALUE_MALFORMED', `Sections are a list, and one of ${TRAVELS.join(', ')}.`, { at: 'sections' });
+        const wrong = args.sections.find((x) => !(TRAVELS as readonly unknown[]).includes(x));
+        if (wrong !== undefined)
+          return no('ENUM_VALUE_UNKNOWN', `${String(wrong)} is not a section of a .dog file.`, {
+            at: 'sections',
+            allowed: TRAVELS,
+          });
+      }
       return kernel.export(args?.sections ? { sections: args.sections as never } : {});
     },
 
@@ -781,6 +814,10 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!Array.isArray(args?.lines)) return no('REQUIRED_MISSING', 'An import is the lines of a .dog file.', { at: 'lines' });
+      /* AND EVERY ONE OF THEM IS A LINE. `[null]` cleared the array check and then threw out of the
+         reader — across the boundary this package promises nothing throws over. */
+      if (!args.lines.every((line) => typeof line === 'string'))
+        return no('VALUE_MALFORMED', 'A .dog file is lines of text, and one of these is not.', { at: 'lines' });
       return tail(kernel.import(args.lines));
     },
 

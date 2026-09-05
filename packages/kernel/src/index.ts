@@ -39,7 +39,7 @@ import {
   type ScheduleKind,
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
-import { invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps } from './members.ts';
+import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps } from './members.ts';
 import {
   SCOPES,
   createToken,
@@ -1471,10 +1471,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Everybody on it, with what they hold and where. */
     members: (): Member[] => members(sql),
 
+    /**
+     * What one person may do inside this record, or `null` if they are not on it.
+     *
+     * THE ONE THING A HOST ASKS BEFORE IT LETS ANYBODY IN. It is the record's own table rather than
+     * the Directory's, because that is the table `invite` writes and the one that travels in a
+     * `.dog` file — and reading the level from anywhere else made removing somebody a change that
+     * did not stop them writing.
+     */
+    access: (person: string) => access(sql, person),
+
     /** Put somebody on, or move them. An invitation is the whole of what they hold, not a patch. */
     invite: (
       by: string,
-      args: { person: string; email?: string; name?: string; level: MemberLevel; registers?: Record<string, MemberLevel> },
+      args: { person: string; email?: string; name?: string; level?: MemberLevel; registers?: Record<string, MemberLevel> },
     ): Result<Member> => transaction(() => invite(memberDeps(), by, args)),
 
     /** Take somebody off. Never the last owner, and their person row stays. */

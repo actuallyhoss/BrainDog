@@ -377,3 +377,41 @@ test('and a caller sees the registers they may touch and not the ones they may n
   assert.equal(scoped.some((r) => r.uri.startsWith('braindog:schema/') && r.uri !== 'braindog:schema/obligations'), false);
   sql.close();
 });
+
+const OVERDUE = {
+  id: 'metric.overdue',
+  kind: 'metric' as const,
+  body: {
+    metric: 'overdue',
+    name: 'Overdue',
+    source: 'register.obligations',
+    where: 'state is open',
+    value: { count: 'id' },
+    target: { lte: 5 },
+    window: '30d',
+    compare: 'none',
+    format: 'int',
+  } as never,
+};
+
+const MONEY = {
+  id: 'page.money',
+  kind: 'page' as const,
+  body: {
+    page: 'money',
+    title: 'Money',
+    blocks: [{ as: 'stat', cells: [{ metric: 'overdue', label: 'Overdue' }] }],
+  } as never,
+};
+
+test('AND A METRIC RESOURCE READS A METRIC, which the cast was hiding', async () => {
+  /* The tool path sent `metric` and the resource sent `id`, and `as never` hid it — so every metric
+     resource answered `REQUIRED_MISSING` about an argument it had been sent. */
+  const { mcp, api, sql } = await agent();
+  assert.ok((await api.kernel.install([OVERDUE, MONEY])).ok);
+  const listed = value<{ uri: string }[]>(await mcp.resources(owner));
+  const uri = listed.find((r) => r.uri.startsWith('braindog:metric/'))?.uri;
+  assert.ok(uri, 'no metric is listed, and a page names figures an agent cannot read');
+  assert.ok(value<{ value: unknown }>(await mcp.read(uri!, owner)));
+  sql.close();
+});

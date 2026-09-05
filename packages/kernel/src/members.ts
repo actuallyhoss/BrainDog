@@ -31,8 +31,8 @@ export type Member = {
   person_id: string;
   email: string | null;
   name: string | null;
-  /** What they hold on the record as a whole. */
-  level: Level;
+  /** What they hold on the record as a whole, or `null` when they hold only named registers. */
+  level: Level | null;
   /** Register ids where they hold something OTHER than their record level. */
   scoped: { register: string; level: Level }[];
   seen_at: string | null;
@@ -45,6 +45,44 @@ export type MemberDeps = {
   mint: () => string;
   hasRegister: (register: string) => boolean;
 };
+
+/**
+ * What one person may do inside this record, or `null` if they are not on it.
+ *
+ * THE AUTHORITY, AND THE ONE PLACE IT LIVES. The Directory says which records somebody can reach at
+ * all — the switcher's index — and this says what they may do inside one. Reading the level from
+ * the Directory instead meant `invite` and `remove` wrote a table no authorisation path ever read:
+ * removing somebody did not stop them writing, and a bookkeeper given `read` on the payroll register
+ * wrote to it.
+ *
+ * `registers` IS THE CEILING AND `null` IS "ALL OF THEM". A person with a register-scoped row holds
+ * that register and nothing else — which is what makes "invite the bookkeeper to one register"
+ * true rather than decorative.
+ */
+export function access(
+  sql: Sql,
+  person: string,
+): { level: Level; registers: string[] | null; levels: Record<string, Level> } | null {
+  const rows = sql.all<{ register: string; level: Level }>(
+    'SELECT register, level FROM member WHERE person_id = ?',
+    person,
+  );
+  const whole = rows.find((r) => r.register === RECORD);
+  const scoped = rows.filter((r) => r.register !== RECORD);
+  if (!whole && scoped.length === 0) return null;
+
+  /* SOMEBODY WITH ONLY SCOPED ROWS HOLDS NOTHING ON THE RECORD ITSELF, and the level they hold is
+     the highest of the registers they were given — held to those registers by the ceiling. */
+  const level = whole?.level ?? scoped.map((r) => r.level).sort((a, b) => LEVELS.indexOf(b) - LEVELS.indexOf(a))[0]!;
+  /* AND THE PER-REGISTER LEVELS TRAVEL, or the whole feature is decorative: a bookkeeper with
+     `read` on the record and `write` on one register is the point, and so is an owner held to
+     `read` on the one register that carries the payroll. */
+  return {
+    level,
+    registers: whole ? null : scoped.map((r) => r.register),
+    levels: Object.fromEntries(scoped.map((r) => [r.register, r.level])),
+  };
+}
 
 /** Everybody on the record, with what they hold and where. */
 export function members(sql: Sql): Member[] {
@@ -68,7 +106,10 @@ export function members(sql: Sql): Member[] {
         person_id: row.person_id,
         email: person?.email ?? null,
         name: person?.name ?? null,
-        level: 'read',
+        /* `null` UNTIL A `*` ROW SAYS OTHERWISE. "No access to the record itself" and "read on the
+           record" are different things, and a listing that showed them the same would have somebody
+           revoke the wrong one. */
+        level: null,
         scoped: [],
         seen_at: null,
         suspended_at: person?.suspended_at ?? null,
@@ -93,11 +134,18 @@ export function members(sql: Sql): Member[] {
 export function invite(
   deps: MemberDeps,
   by: string,
-  args: { person: string; email?: string; name?: string; level: Level; registers?: Record<string, Level> },
+  args: { person: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level> },
 ): Result<Member> {
   if (!args?.person) return no<Member>('REQUIRED_MISSING', 'Who?', { at: 'person' });
-  if (!(LEVELS as readonly string[]).includes(args.level))
+  /* A LEVEL ON THE RECORD IS OPTIONAL, and leaving it out is how somebody is invited to ONE
+     register and nothing else — which is the whole of what "invite the bookkeeper" means. What is
+     not optional is holding SOMETHING: an invitation to nothing is not an invitation. */
+  if (args.level !== undefined && !(LEVELS as readonly string[]).includes(args.level))
     return no<Member>('ENUM_VALUE_UNKNOWN', `${String(args.level)} is not a level.`, { at: 'level', allowed: LEVELS });
+  if (args.level === undefined && Object.keys(args.registers ?? {}).length === 0)
+    return no<Member>('REQUIRED_MISSING', 'An invitation says what somebody may reach, on the record or on a register.', {
+      at: 'level',
+    });
 
   for (const [register, level] of Object.entries(args.registers ?? {})) {
     if (!deps.hasRegister(register))
@@ -127,7 +175,18 @@ export function invite(
     args.name ?? null,
   );
 
-  const wanted = new Map<string, Level>([[RECORD, args.level], ...Object.entries(args.registers ?? {})]);
+  const wanted = new Map<string, Level>([
+    ...(args.level === undefined ? [] : ([[RECORD, args.level]] as [string, Level][])),
+    ...Object.entries(args.registers ?? {}),
+  ]);
+  /* A LEVEL LEFT OFF THE RECORD TAKES THE ROW WITH IT, for the same reason a register left out of
+     the list does: an invitation is the whole of what somebody holds. */
+  if (args.level === undefined && now !== undefined) {
+    if (now === 'owner' && owners(deps.sql) <= 1)
+      return no<Member>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'level' });
+    deps.sql.exec('DELETE FROM member WHERE person_id = ? AND register = ?', args.person, RECORD);
+    event(deps, instant(deps.nowMs), by, 'access.revoke', args.person, RECORD, now);
+  }
   for (const [register, level] of wanted) {
     const had = deps.sql.one<{ level: Level }>(
       'SELECT level FROM member WHERE person_id = ? AND register = ?',
