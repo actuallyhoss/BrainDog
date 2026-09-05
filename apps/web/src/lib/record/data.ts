@@ -54,7 +54,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
       { id: 'party', type: 'ref', to: 'people', indexed: true },
       { id: 'direction', type: 'enum', values: ['owed_by_me', 'owed_to_me'], indexed: true, required: true },
       { id: 'amount', type: 'money', required: true },
-      { id: 'due', type: 'day', indexed: true, required: true },
+      { id: 'due', type: 'day', indexed: true, deadline: true, required: true },
       { id: 'state', type: 'enum', values: ['open', 'part', 'paid', 'written_off'], indexed: true, required: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', indexed: true },
       { id: 'note', type: 'text' },
@@ -75,7 +75,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
       { id: 'name', type: 'text', required: true },
       { id: 'provider', type: 'text', indexed: true },
       { id: 'kind', label: 'Type', type: 'enum', values: ['domain', 'hosting', 'saas', 'certificate'], indexed: true, required: true },
-      { id: 'renews', type: 'day', indexed: true, required: true },
+      { id: 'renews', type: 'day', indexed: true, deadline: true, required: true },
       { id: 'cost', type: 'money', required: true },
       { id: 'cycle', type: 'enum', values: ['monthly', 'yearly', 'two_yearly'], required: true },
       { id: 'state', type: 'enum', values: ['live', 'lapsing', 'cancelled'], indexed: true, required: true },
@@ -247,7 +247,7 @@ export const REGISTERS: Record<string, RegisterDecl> = {
       { id: 'what', label: 'Description', type: 'text', required: true },
       { id: 'state', type: 'enum', values: ['open', 'doing', 'blocked', 'done', 'dropped'], indexed: true, required: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', indexed: true },
-      { id: 'by', label: 'Due', type: 'day', indexed: true },
+      { id: 'by', label: 'Due', type: 'day', indexed: true, deadline: true },
       /* Usually unset, and the schema has to be the thing that says so — the prose two documents
          away saying "most tasks carry no track" is what lost last time (10 §7). */
       { id: 'track', type: 'ref', to: 'tracks', indexed: true },
@@ -786,9 +786,17 @@ export const PAGES: Record<string, PageDecl> = {
         span: 8,
         source: 'register.obligations',
         where: 'thing is Kiln',
+        /* THE DIRECTION IS A COLUMN, because this block holds both and its own `empty:` says so.
+           Four columns of `# | What | Amount | Due` drew a receivable and seven payables in one
+           unsigned column: read down it and Kiln looks like GBP 25,530.00 of something, where the
+           net is minus GBP 23,610.00. Nothing else in the row carried the sign — the tone comes from
+           state and date, which are the same for both directions. */
+        /* Four columns, so the block still fits beside the 4 next to it. `#` is the one that goes:
+           `what` already links to the row, and a direction the reader cannot see is worse than a
+           number they cannot say out loud. */
         columns: [
-          { field: 'seq', label: '#', width: '9ch', align: 'end' },
           { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'direction', label: 'Which way', width: '13ch' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
         ],

@@ -249,7 +249,9 @@ function toneOf(register: string, e: Entry): TableRow['tone'] {
   if (!r) return undefined;
   const state = r.state ? String(e.fields[r.state] ?? '') : '';
   if (r.done?.includes(state)) return 'good';
-  const dated = r.fields.find((f) => f.type === 'day' && f.indexed);
+  /* DECLARED, not guessed. This was "the first indexed `day` field", which for `tracks` is `opened`
+     — always in the past — so every open track came out `bad`. */
+  const dated = r.fields.find((f) => f.type === 'day' && f.deadline);
   if (!dated) return undefined;
   const value = e.fields[dated.id];
   if (typeof value !== 'string') return undefined;
@@ -992,16 +994,31 @@ export type SearchHit = {
   spoken?: string;
 };
 
+/**
+ * Everything in the record whose title contains what was typed.
+ *
+ * THE CUT IS TAKEN ACROSS THE SOURCES, NOT INSIDE THE FIRST ONE. This returned from inside the
+ * register loop the moment it hit the cap, and the palette asks for eight — so `obligations`, first
+ * in declaration order, took the whole budget every time. Measured: `re` returned 8 hits, all
+ * Obligations, out of 21 across People, Sessions, Tracks, Updates, Tasks and Decide; `a` returned 8
+ * of 82. Typing `re` could not reach a task, and nothing on screen said the list was partial.
+ *
+ * So every source is collected, then ROUND-ROBINED: one hit from each in turn until the cap. A
+ * register with three hundred matching rows now costs the others one slot each rather than all of
+ * them, which is the only behaviour that makes a palette over eight registers usable.
+ */
 export function search(q: string, limit = 24): SearchHit[] {
   const needle = q.trim().toLowerCase();
   if (!needle) return [];
-  const hits: SearchHit[] = [];
 
-  for (const [id, r] of Object.entries(REGISTERS))
+  const groups: SearchHit[][] = [];
+
+  for (const [id, r] of Object.entries(REGISTERS)) {
+    const group: SearchHit[] = [];
     for (const e of ROWS[id] ?? []) {
       const title = String(e.fields[r.title] ?? '');
       if (!title.toLowerCase().includes(needle)) continue;
-      hits.push({
+      group.push({
         title,
         /* The register's own name is the GROUP heading these rows sit under, so repeating it on
            every row said the same word twice, eight times down the list. */
@@ -1011,14 +1028,29 @@ export function search(q: string, limit = 24): SearchHit[] {
         icon: iconFor(r.icon, 'rows'),
         spoken: `#${e.seq}`,
       });
-      if (hits.length >= limit) return hits;
     }
+    if (group.length) groups.push(group);
+  }
 
+  const questions: SearchHit[] = [];
   for (const q2 of [...QUESTIONS, ...DECIDED])
     if (q2.title.toLowerCase().includes(needle) || q2.id.toLowerCase() === needle)
-      hits.push({ title: q2.title, detail: q2.decided ? 'Decided' : 'Open question', href: `/decide/${q2.id}`, kind: 'Decide', icon: 'decide', spoken: q2.id });
+      questions.push({ title: q2.title, detail: q2.decided ? 'Decided' : 'Open question', href: `/decide/${q2.id}`, kind: 'Decide', icon: 'decide', spoken: q2.id });
+  /* Questions FIRST in the rotation: a decision waiting on you is the one thing in the record that
+     is about today, and it is the one source that can never be more than a handful of rows. */
+  if (questions.length) groups.unshift(questions);
 
-  return hits.slice(0, limit);
+  const hits: SearchHit[] = [];
+  for (let round = 0; hits.length < limit; round++) {
+    const before = hits.length;
+    for (const group of groups) {
+      const hit = group[round];
+      if (hit) hits.push(hit);
+      if (hits.length >= limit) break;
+    }
+    if (hits.length === before) break;
+  }
+  return hits;
 }
 
 export { AUDIT, INBOX, JOB, NOW, PACKS, PAGES, QUESTIONS, DECIDED, REGISTERS, ROWS, NEWS, TODAY, VAULT, PEOPLE_ACCESS };

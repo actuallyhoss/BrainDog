@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CURRENCY, applyFilters, dirOf, display, isProse, labelOf, metric, page } from './api.ts';
+import { CURRENCY, applyFilters, columnsFor, dirOf, display, isProse, labelOf, metric, page, search, toRows } from './api.ts';
 import { toSegments } from './blocks.ts';
 import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
@@ -402,4 +402,63 @@ test('a ref may be written as a name or as its number, and both resolve', () => 
   const bySeq = applyFilters('tasks', ROWS.tasks ?? [], [{ field: 'thing', op: 'is', values: ['1'] }]);
   assert.ok(byName.length > 0);
   assert.equal(byName.length, bySeq.length);
+});
+
+/* ── the palette, which is the whole of search ───────────────────────────── */
+
+test('THE CUT IS TAKEN ACROSS THE SOURCES, NOT INSIDE THE FIRST ONE', () => {
+  // `search` returned from inside the register loop the moment it hit the cap, and the palette asks
+  // for eight — so `obligations`, first in declaration order, took the whole budget every time.
+  // Typing `re` returned 8 hits, all Obligations, out of 21 across six other sources, and nothing on
+  // screen said the list was partial. `tasks` is last in declaration order, so it was lost most.
+  for (const q of ['re', 'in', 'a']) {
+    const hits = search(q, 8);
+    const sources = new Set(hits.map((h) => h.kind));
+    assert.ok(hits.length > 0, `${q} found nothing`);
+    assert.ok(sources.size >= 4, `${q}: 8 hits came from ${sources.size} source(s): ${[...sources].join(', ')}`);
+  }
+});
+
+test('a source with more matches than the cap costs the others one slot, not all of them', () => {
+  const all = search('a', 9999);
+  const byKind = new Map<string, number>();
+  for (const h of all) byKind.set(h.kind, (byKind.get(h.kind) ?? 0) + 1);
+  const biggest = [...byKind].sort((x, y) => y[1] - x[1])[0];
+  assert.ok(biggest && biggest[1] > 8, 'no source has enough matches to swamp the list');
+  const hits = search('a', 8);
+  assert.ok(hits.filter((h) => h.kind === biggest[0]).length <= 2, `${biggest[0]} still took the list`);
+});
+
+test('the cap is honoured, and nothing is returned twice', () => {
+  const hits = search('e', 8);
+  assert.equal(hits.length, 8);
+  assert.equal(new Set(hits.map((h) => h.href)).size, hits.length);
+});
+
+/* ── a date is not a deadline ────────────────────────────────────────────── */
+
+test('A ROW IS ONLY LATE AGAINST A DATE THAT MEANS A DEADLINE', () => {
+  // The tone came from the first indexed `day` field the register happened to declare. `tracks`
+  // declares `opened`, which is always in the past, so every unfinished track was drawn in the
+  // alarm colour — a track whose newest update says "on track", painted as an emergency, with the
+  // finished one as the only row that was not red.
+  const rows = toRows('tracks', ROWS.tracks ?? [], columnsFor('tracks'));
+  assert.ok(rows.length > 2);
+  assert.equal(rows.filter((r) => r.tone === 'bad').length, 0, 'a track is being drawn as overdue');
+});
+
+test('and a register that declares one still reports it', () => {
+  for (const register of ['obligations', 'tasks', 'services']) {
+    const rows = toRows(register, ROWS[register] ?? [], columnsFor(register));
+    assert.ok(rows.some((r) => r.tone === 'bad' || r.tone === 'warn'), `${register} lost its deadline tone`);
+  }
+});
+
+test('exactly one field per register may be the deadline, and it is declared', () => {
+  // Two would make the tone depend on declaration order, which is how this broke in the first place.
+  for (const [id, r] of Object.entries(REGISTERS)) {
+    const deadlines = r.fields.filter((f) => f.deadline);
+    assert.ok(deadlines.length <= 1, `${id} declares ${deadlines.length} deadlines`);
+    for (const f of deadlines) assert.equal(f.type, 'day', `${id}.${f.id} is a deadline and not a day`);
+  }
 });

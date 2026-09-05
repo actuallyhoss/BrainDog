@@ -32,6 +32,16 @@ export type FieldDecl = {
   values?: readonly string[];
   /** Only indexed fields may be filtered on, and only eight are offered (50 §5.2). */
   indexed?: boolean;
+  /**
+   * This day is a DEADLINE: a date the row is measured against, so past it is late.
+   *
+   * Opt-in, and it has to be, because the row's tone was taken from the first indexed `day` field
+   * the register happened to declare. `tracks` declares `opened`, which is always in the past, so
+   * every unfinished track was drawn in the alarm colour and the only row that was not red was the
+   * finished one — a track whose newest update says "on track", painted as an emergency. A date and
+   * a deadline are different things and only the declaration knows which this is.
+   */
+  deadline?: boolean;
   required?: boolean;
   /** `ref` only: the register it points at. */
   to?: string;
