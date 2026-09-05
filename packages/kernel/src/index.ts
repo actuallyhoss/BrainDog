@@ -16,7 +16,7 @@
  * the rows that made it rather than a reconstruction.
  */
 
-import type { Clock, Result, Scheduler, Sql } from '@braindog/ports';
+import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } from './coerce.ts';
@@ -291,6 +291,62 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         .map((f) => [f.id, { type: f.type, ...(f.values ? { values: f.values } : {}), ...(f.to ? { to: f.to } : {}) }]),
     ),
   });
+
+  /**
+   * A rule or a metric whose predicate cannot be read, refused at INSTALL.
+   *
+   * A RULE THAT CANNOT BE READ FIRES ON NOTHING, deliberately — the other direction, firing on
+   * everything, is what a broken predicate does when nobody checks it. But nothing refused the
+   * DECLARATION, so `when: 'level gt 40'` installed cleanly and the rule then did nothing for ever,
+   * with no event, no refusal and no way to find out short of noticing that rows are not being
+   * tagged. Silence is the one failure this record does not accept anywhere else.
+   *
+   * BEFORE THE INSTALL, AND AGAINST THE BATCH FIRST, because a rule and the register it is about
+   * usually arrive together and the cache is only rebuilt afterwards.
+   *
+   * `REF_UNKNOWN` IS NOT A DECLARATION ERROR. `owner is Kiln` names a row that may be written
+   * tomorrow; every other refusal here is about the grammar or the shape, and those are facts about
+   * the declaration whenever it is read.
+   */
+  function unreadable(batch: readonly Declaration[]): Refusal | null {
+    const shape = (register: string): Schema | null => {
+      const arriving = batch.find((d) => d.kind === 'register' && (d.body as { id?: unknown }).id === register);
+      if (arriving) {
+        const fields = ((arriving.body as { fields?: unknown }).fields ?? []) as (FieldDecl & { retired?: boolean })[];
+        return {
+          register,
+          fields: Object.fromEntries(
+            fields
+              .filter((f) => !f.retired)
+              .map((f) => [f.id, { type: f.type, ...(f.values ? { values: f.values } : {}), ...(f.to ? { to: f.to } : {}) }]),
+          ),
+        };
+      }
+      return registers.has(register) ? schemaOf(register) : null;
+    };
+
+    for (const decl of batch) {
+      const body = decl.body as Record<string, unknown>;
+      const source = typeof body.source === 'string' ? body.source : '';
+      const register =
+        decl.kind === 'rule'
+          ? body.register
+          : decl.kind === 'metric' && source.startsWith('register.')
+            ? source.slice('register.'.length)
+            : undefined;
+      const where = decl.kind === 'rule' ? body.when : decl.kind === 'metric' ? body.where : undefined;
+      if (typeof register !== 'string' || where === undefined) continue;
+
+      const schema = shape(register);
+      if (!schema)
+        return { code: 'REGISTER_UNKNOWN', fix: `${decl.id} is about ${register}, and there is no such register.`, at: 'register' };
+
+      const said = predicateOf(where as Predicate | string, schema, evalContext());
+      const stop = said.bad.find((b) => b.code !== 'REF_UNKNOWN');
+      if (stop) return { ...stop, fix: `${decl.id} cannot be read: ${stop.fix}` };
+    }
+    return null;
+  }
 
   function list(q: {
     register: string;
@@ -1260,6 +1316,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     async install(batch: readonly Declaration[]) {
       const refused = schemaRefusal(state);
       if (refused) return refused;
+      const cannot = unreadable(batch);
+      if (cannot) return { ok: false as const, refusal: cannot };
       const out = await installDeclarations(sql, clock.now(), batch, transaction);
       if (out.ok) reload();
       return out;

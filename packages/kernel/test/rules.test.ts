@@ -290,12 +290,35 @@ test('`stop` ENDS THE PASS, and the rule that said so still applies its own patc
 
 /* ── a rule that cannot be read ──────────────────────────────────────────── */
 
-test('A RULE WHOSE PREDICATE THE REGISTER CANNOT ANSWER FIRES ON NOTHING', async () => {
-  /* The other direction — firing on everything — is what a broken predicate does when nobody checks
-     it, and a rule that tags every row is a rule whose author will not find out for a month. */
-  const { k, sql } = await record(
-    rule({ rule: 'broken', register: 'obligations', when: 'colour is red', then: [{ tag: 'oops' }] }),
+test('A RULE WHOSE PREDICATE THE REGISTER CANNOT ANSWER IS REFUSED AT INSTALL', async () => {
+  /* It fires on nothing, deliberately — the other direction, firing on everything, is what a broken
+     predicate does when nobody checks it. But firing on nothing for ever, with no event and no
+     refusal, is silence, and silence is the one failure this record does not accept anywhere else. */
+  const { k, sql } = await record();
+  const out = await k.install([rule({ rule: 'broken', register: 'obligations', when: 'colour is red', then: [{ tag: 'oops' }] })]);
+  assert.equal(out.ok, false);
+  assert.match((out as { refusal: { fix: string } }).refusal.fix, /rule\.broken cannot be read/);
+
+  // A rule about a register nobody has is the same class of silence.
+  const gone = await k.install([rule({ rule: 'nowhere', register: 'ghosts', when: 'state is open', then: [{ tag: 'x' }] })]);
+  assert.equal(gone.ok, false);
+  assert.equal((gone as { refusal: { code: string } }).refusal.code, 'REGISTER_UNKNOWN');
+
+  // And a ref by name is not a declaration error: the row it names may be written tomorrow.
+  assert.ok((await k.install([rule({ rule: 'mine', register: 'obligations', when: 'owner is Nobody Yet', then: [{ tag: 'x' }] })])).ok);
+  sql.close();
+});
+
+test('and one that got in behind the linter still fires on nothing rather than on everything', async () => {
+  // A `.dog` import writes declarations straight into the table, so the pass keeps its own guard.
+  const { k, sql } = await record();
+  sql.exec(
+    `INSERT INTO declaration (id, version, kind, pack_id, body, checksum, retired, superseded_at, created_at)
+     VALUES ('rule.broken', 1, 'rule', NULL, ?, 'x', 0, NULL, ?)`,
+    JSON.stringify({ rule: 'broken', register: 'obligations', when: 'colour is red', then: [{ tag: 'oops' }] }),
+    new Date(NOW).toISOString(),
   );
+  assert.ok((await k.install([])).ok, 'reload');
   const made = value<Entry>(k.create('obligations', { what: 'x', due: day(1), state: 'open' }, { actor: 'p_1' }));
   assert.equal(made.fields.tags, undefined, 'a rule nobody can read tagged a row');
   sql.close();
