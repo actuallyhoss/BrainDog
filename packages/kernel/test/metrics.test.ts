@@ -217,8 +217,14 @@ test('a shape this build does not read is named rather than answered as the ungr
   // `group_by` and `bucket` were ignored in silence, and the figure that came back was the UNGROUPED
   // one — drawn under a heading that says it is grouped, which is worse than an em dash.
   const { k, sql } = await record();
-  for (const value of [{ last: 'amount' }, { median: 'amount' }, { sum: { product: ['amount', {}] } }])
+  for (const value of [{ last: 'amount' }, { median: 'amount' }, { group_by: 'party' }])
     assert.equal(refusal(k.metric({ ...OVERDUE, value: value as never })).code, 'UNIMPLEMENTED');
+
+  // A product naming a table the record was not given is named too, rather than read as factor one.
+  assert.equal(
+    refusal(k.metric({ ...OVERDUE, value: { sum: { product: ['amount', { lookup: 'per_year', by: 'state' }] } } })).code,
+    'LOOKUP_UNKNOWN',
+  );
 
   assert.equal(refusal(k.metric({ ...OVERDUE, value: { sum: 'nonesuch' } })).code, 'FIELD_UNKNOWN');
   assert.equal(refusal(k.metric({ ...OVERDUE, source: 'series.revenue' })).code, 'SOURCE_UNKNOWN');
@@ -392,4 +398,78 @@ test('a target is a bound however it is written', () => {
   assert.deepEqual(targetOf('>=20'), { gte: 20 });
   assert.deepEqual(targetOf('> 20'), { gte: 20 });
   assert.deepEqual(targetOf('20'), { gte: 20 });
+});
+
+/* ── the row-level product ────────────────────────────────────── */
+
+const CYCLES: Declaration = {
+  id: 'register.services',
+  kind: 'register',
+  body: {
+    id: 'services',
+    name: 'Services',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'cost', type: 'money' },
+      { id: 'cycle', type: 'enum', values: ['monthly', 'yearly', 'two_yearly'] },
+    ],
+  } as never,
+};
+
+async function services(lookups?: Record<string, Record<string, number>>) {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW), { lookups: lookups ?? { per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 } } });
+  assert.ok((await k.install([CYCLES])).ok);
+  for (const row of [
+    { name: 'Object storage', cost: gbp(4_100), cycle: 'monthly' },
+    { name: 'kiln.example', cost: gbp(1_400), cycle: 'yearly' },
+    { name: 'A two-year one', cost: gbp(3_000), cycle: 'two_yearly' },
+  ])
+    assert.ok(k.create('services', row, { actor: 'p_1' }).ok);
+  return { k, sql };
+}
+
+const ANNUAL: MetricDecl = {
+  metric: 'estate-year',
+  name: 'Estate, a year',
+  source: 'register.services',
+  value: { sum: { product: ['cost', { lookup: 'per_year', by: 'cycle' }] } },
+  target: { lte: 100_000 },
+  window: '90d',
+  compare: 'none',
+  format: 'money.GBP',
+};
+
+test('A COST PER CYCLE IS ANNUALISED PER ROW, before the sum', async () => {
+  /* `cost` is per CYCLE, so a yearly domain and a monthly subscription are two different units and
+     adding them straight gives a number that is not about anything. Written out longhand in one
+     metric and omitted from another, this came out 9.25 times too low under the word "year". */
+  const { k, sql } = await services();
+  const read = value<Reading>(k.metric(ANNUAL));
+
+  const naive = 4_100 + 1_400 + 3_000;
+  const annual = 4_100 * 12 + 1_400 * 1 + 3_000 * 0.5;
+  assert.equal(read.value, annual, `${read.value} is not the annualised figure`);
+  assert.notEqual(read.value, naive, 'the cycle factor is missing again');
+  assert.equal(read.unit, 'GBP');
+  sql.close();
+});
+
+test('A ROW THE TABLE HAS NO FACTOR FOR IS EXCLUDED AND NAMED, never multiplied by one', async () => {
+  // Factor one is the answer that made this 9.25 times too low. A figure missing one row is a
+  // refusal; a figure with one row counted wrongly is a number nobody can spot.
+  const { k, sql } = await services({ per_year: { monthly: 12, yearly: 1 } });
+  const out = refusal(k.metric(ANNUAL));
+  assert.equal(out.code, 'LOOKUP_MISSING');
+  assert.match(out.fix, /two_yearly/);
+  assert.deepEqual(out.allowed, ['monthly', 'yearly']);
+  sql.close();
+});
+
+test('and the product is rounded per row, because minor units are integers', async () => {
+  const { k, sql } = await services();
+  const read = value<Reading>(k.metric(ANNUAL));
+  assert.equal(Number.isInteger(read.value), true, `${read.value} is not a whole number of minor units`);
+  sql.close();
 });

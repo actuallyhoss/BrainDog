@@ -27,8 +27,19 @@ import { compile, jsonPath, parseWhere, type Predicate, type Schema } from '@bra
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
+/**
+ * A row-level multiplication, before the sum.
+ *
+ * `08` §2.5's shape with a NAMED FACTOR TABLE instead of an `fx` register, and the reason is the
+ * same either way: a service's `cost` is per CYCLE, so a yearly domain and a monthly subscription
+ * are two different units and adding them gives a number that is not about anything. Written out
+ * longhand in one metric and omitted from another, this came out 9.25 times too low under the word
+ * "year". One table, named, read by whatever declares it.
+ */
+export type Product = { product: [string, { lookup: string; by: string }] };
+
 export type Aggregation =
-  | { sum: string }
+  | { sum: string | Product }
   | { count: string }
   | { avg: string }
   | { min: string }
@@ -83,7 +94,7 @@ export function windowMs(text: string): number | null {
 }
 
 /** The published shapes with no consumer here, each named rather than ignored. */
-const UNREAD = ['last', 'delta', 'median', 'product', 'group_by', 'bucket', 'running', 'trend', 'lookup'] as const;
+const UNREAD = ['last', 'delta', 'median', 'group_by', 'bucket', 'running', 'trend'] as const;
 
 export type EvalContext = {
   nowMs: number;
@@ -91,6 +102,8 @@ export type EvalContext = {
   schemaOf: (register: string) => Schema | null;
   /** A ref written by name: `thing is Kiln`. Absent means a sentence cannot name one. */
   refByTitle?: ((register: string, title: string) => string | null) | undefined;
+  /** The named factor tables a `product` reads. Absent means a `lookup` cannot be resolved. */
+  lookups?: Record<string, Record<string, number>> | undefined;
 };
 
 /**
@@ -148,11 +161,14 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const fields = aggregationsOf(decl.value);
   if (fields.length === 0) at('VALUE_MALFORMED', 'a value is an aggregation, a ratio or a diff', 'value');
   if (schema)
-    for (const f of fields)
-      if (f.field !== 'id' && !Object.hasOwn(schema.fields, f.field))
-        at('FIELD_UNKNOWN', `${register} has no field called ${f.field}`, 'value');
-      else if (!AGGREGATIONS.includes(f.kind as (typeof AGGREGATIONS)[number]))
+    for (const f of fields) {
+      for (const id of [f.field, f.by].filter((x): x is string => typeof x === 'string'))
+        if (id !== 'id' && !Object.hasOwn(schema.fields, id)) at('FIELD_UNKNOWN', `${register} has no field called ${id}`, 'value');
+      if (!AGGREGATIONS.includes(f.kind as (typeof AGGREGATIONS)[number]))
         at('UNIMPLEMENTED', `${f.kind} is not an aggregation this build reads`, 'value');
+      if (f.lookup && !ctx.lookups?.[f.lookup]) at('LOOKUP_UNKNOWN', `there is no factor table called ${f.lookup}`, 'value');
+      if (f.lookup && f.kind !== 'sum') at('UNIMPLEMENTED', `a product is summed, and ${f.kind} is not a sum`, 'value');
+    }
 
   const said = schema ? predicateOf(decl.where, schema, ctx) : { predicate: undefined, bad: [] };
   refusals.push(...said.bad);
@@ -160,7 +176,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 
   if (refusals.length || !schema) return { ok: false, refusal: refusals[0]! };
 
-  const now = read(sql, said.predicate, schema, decl);
+  const now = read(sql, said.predicate, schema, decl, ctx.lookups);
   if (!now.ok) return now;
 
   /* THE COMPARISON IS THE SAME PREDICATE AGAINST A MOVED CLOCK, which is why a predicate with no
@@ -177,7 +193,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
        structural check below knows the window moves nothing. */
     const shifted = predicateOf(decl.where, schema, { ...ctx, nowMs: ctx.nowMs - shift });
     const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
-    const before = read(sql, shifted.predicate, schema, decl);
+    const before = read(sql, shifted.predicate, schema, decl, ctx.lookups);
 
     if (!before.ok) why = before.refusal.fix;
     else if (!moved) {
@@ -208,7 +224,13 @@ export const meets = (value: number, target: { lte: number } | { gte: number }):
 
 type Read = Omit<Reading, 'delta' | 'why' | 'met'>;
 
-function read(sql: Sql, predicate: Predicate | undefined, schema: Schema, decl: MetricDecl): Result<Read> {
+function read(
+  sql: Sql,
+  predicate: Predicate | undefined,
+  schema: Schema,
+  decl: MetricDecl,
+  lookups?: Record<string, Record<string, number>> | undefined,
+): Result<Read> {
   const w = compile(predicate, schema);
   if (w.bad.length) return { ok: false, refusal: w.bad[0]! };
 
@@ -217,8 +239,8 @@ function read(sql: Sql, predicate: Predicate | undefined, schema: Schema, decl: 
 
   if ('ratio' in decl.value || 'diff' in decl.value) {
     const pair = 'ratio' in decl.value ? decl.value.ratio : decl.value.diff;
-    const of = one(sql, schema, pair.of, where, params);
-    const per = one(sql, schema, pair.per, where, params);
+    const of = one(sql, schema, pair.of, where, params, lookups);
+    const per = one(sql, schema, pair.per, where, params, lookups);
     if (!of.ok) return of;
     if (!per.ok) return per;
     const a = of.value.value;
@@ -229,12 +251,21 @@ function read(sql: Sql, predicate: Predicate | undefined, schema: Schema, decl: 
     return ok({ value, unit: 'ratio' in decl.value ? null : of.value.unit, rows: of.value.rows, refusals: [] });
   }
 
-  return one(sql, schema, decl.value, where, params);
+  return one(sql, schema, decl.value, where, params, lookups);
 }
 
 /** One aggregation, as one SELECT. Money groups by currency; everything else is a scalar. */
-function one(sql: Sql, schema: Schema, agg: Aggregation, where: string, params: (string | number)[]): Result<Read> {
-  const [kind, field] = Object.entries(agg)[0] as [string, string];
+function one(
+  sql: Sql,
+  schema: Schema,
+  agg: Aggregation,
+  where: string,
+  params: (string | number)[],
+  lookups?: Record<string, Record<string, number>> | undefined,
+): Result<Read> {
+  const [kind, operand] = Object.entries(agg)[0] as [string, string | Product];
+  const product = typeof operand === 'object' && operand !== null ? operand.product : null;
+  const field = product ? product[0] : (operand as string);
   const rows = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, ...params)?.n ?? 0);
 
   if (kind === 'count')
@@ -267,9 +298,66 @@ function one(sql: Sql, schema: Schema, agg: Aggregation, where: string, params: 
 
   const fn = kind === 'sum' ? 'sum' : kind === 'avg' ? 'avg' : kind === 'min' ? 'min' : 'max';
 
+  /* THE FACTOR IS PART OF THE ROW, so the multiplication happens before the sum and inside SQL. A
+     CASE over the named table rather than a join, because the table is a handful of constants a
+     declaration wrote down — and a row whose `by` value the table does not know is EXCLUDED and
+     named, never multiplied by one. Factor one is the answer that made this 9.25 times too low. */
+  if (product) {
+    const table = lookups?.[product[1].lookup] ?? {};
+    const byExpr = `json_extract(fields, '${jsonPath(product[1].by)}')`;
+    const marks = Object.keys(table).map(() => '?').join(', ') || 'NULL';
+    const missing = sql
+      .all<{ v: string | null }>(
+        `SELECT DISTINCT ${byExpr} AS v FROM entry WHERE ${where} AND ${expr} IS NOT NULL AND (${byExpr} IS NULL OR ${byExpr} NOT IN (${marks}))`,
+        ...params,
+        ...Object.keys(table),
+      )
+      .map((r) => r.v ?? '(unset)');
+    if (missing.length)
+      return no<Read>(
+        'LOOKUP_MISSING',
+        `${product[1].lookup} has no factor for ${missing.join(', ')}, and a row multiplied by one is a wrong number rather than a missing one.`,
+        { at: product[1].by, allowed: Object.keys(table) },
+      );
+
+    /* SINGLE-QUOTED AND DOUBLED, because SQLite reads a double-quoted word as an IDENTIFIER — so
+       `WHEN "monthly"` is a column that does not exist rather than the string it looks like. The
+       keys come from a declaration, so the quote is escaped rather than assumed absent. */
+    const cases = Object.entries(table)
+      .map(([k, v]) => `WHEN '${k.replaceAll("'", "''")}' THEN ${Number(v)}`)
+      .join(' ');
+    /* ROUNDED PER ROW, because minor units are integers: a half-penny that survives the sum is a
+       total that does not match the rows it is a total of. */
+    const times = `CAST(round(${expr} * (CASE ${byExpr} ${cases} ELSE NULL END)) AS INTEGER)`;
+    return aggregate(sql, field, type, times, where, params, kind);
+  }
+
   /* MONEY AND QUANTITY CARRY THEIR UNIT INTO THE GROUP BY. The rule is one line — two currencies are
      never added — and this is the line that would have added them: one SUM over a column of amounts
      is a figure of the right size in whatever unit happened to be commonest. */
+  return aggregate(sql, field, type, expr, where, params, kind, fn, rows);
+}
+
+/**
+ * `sum`, `avg`, `min` or `max` over one expression.
+ *
+ * MONEY AND QUANTITY CARRY THEIR UNIT INTO THE GROUP BY. The rule is one line — two currencies are
+ * never added — and this is the line that would have added them: one SUM over a column of amounts
+ * is a figure of the right size in whatever unit happened to be commonest.
+ */
+function aggregate(
+  sql: Sql,
+  field: string,
+  type: string,
+  expr: string,
+  where: string,
+  params: (string | number)[],
+  kind: string,
+  fn = 'sum',
+  known?: number,
+): Result<Read> {
+  const rows = known ?? Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, ...params)?.n ?? 0);
+
   if (type === 'money' || type === 'quantity') {
     const unitExpr = `json_extract(fields, '${jsonPath(field)}.${type === 'money' ? 'currency' : 'unit'}')`;
     const groups = sql.all<{ u: string | null; v: number | null; n: number }>(
@@ -297,10 +385,14 @@ function one(sql: Sql, schema: Schema, agg: Aggregation, where: string, params: 
 }
 
 /** Every aggregation a value expression reads, with the field each names. */
-function aggregationsOf(value: Value): { kind: string; field: string }[] {
-  const flat = (agg: Aggregation): { kind: string; field: string }[] => {
+function aggregationsOf(value: Value): { kind: string; field: string; by?: string; lookup?: string }[] {
+  const flat = (agg: Aggregation): { kind: string; field: string; by?: string; lookup?: string }[] => {
     const entry = Object.entries(agg)[0];
-    return entry && typeof entry[1] === 'string' ? [{ kind: entry[0], field: entry[1] }] : [];
+    if (!entry) return [];
+    const [kind, operand] = entry;
+    if (typeof operand === 'string') return [{ kind, field: operand }];
+    const p = (operand as Product | undefined)?.product;
+    return Array.isArray(p) && typeof p[0] === 'string' ? [{ kind, field: p[0], by: p[1]?.by, lookup: p[1]?.lookup }] : [];
   };
   if ('ratio' in value) return [...flat(value.ratio.of), ...flat(value.ratio.per)];
   if ('diff' in value) return [...flat(value.diff.of), ...flat(value.diff.per)];

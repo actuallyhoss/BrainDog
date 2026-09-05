@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@braindog/kernel": "workspace:*",
-    "@braindog/ports": "workspace:*"
+    "@braindog/ports": "workspace:*",
+    "@braindog/where": "workspace:*"
   },
   "scripts": {
     "test": "node --test test/*.test.ts",

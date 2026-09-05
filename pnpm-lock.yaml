@@ -182,6 +182,9 @@ importers:
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports
+      '@braindog/where':
+        specifier: workspace:*
+        version: link:../where
 
   packages/skin:
     devDependencies:

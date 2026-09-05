@@ -129,12 +129,22 @@ const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', '
 
 export type Kernel = ReturnType<typeof makeKernel>;
 
-export async function openRecord(sql: Sql, clock: Clock): Promise<Kernel> {
+/**
+ * What a record is opened with, beyond its storage and its clock.
+ *
+ * THE FACTOR TABLES ARE HANDED IN rather than stored, because `08` §2.5's mechanism is an `fx`
+ * REGISTER — rows in the record, read by a lookup — and a named literal table is the small version
+ * of that for the cases where a handful of constants is the whole truth. A ninth declaration kind
+ * would have been a departure from the eight the specification names.
+ */
+export type RecordOptions = { lookups?: Record<string, Record<string, number>> | undefined };
+
+export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
   const { state } = await applyMigrations(sql, clock);
-  return makeKernel(sql, clock, state);
+  return makeKernel(sql, clock, state, opts);
 }
 
-function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
+function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOptions) {
   const mint: Mint = ulids(() => clock.now());
   let depth = 0;
 
@@ -238,12 +248,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
    * an import is most of them.
    */
   /** What a predicate is checked against: the register's own fields, and nothing else. */
+  /**
+   * The register as a predicate reads it.
+   *
+   * `to` TRAVELS WITH A REF, because a sentence names one BY NAME — `thing is Kiln` — and the parser
+   * needs to know which register to look the name up in. Leaving it out made every ref in a sentence
+   * a refusal saying "there is no row called Kiln", which is true of nothing and helpful to nobody.
+   */
   const schemaOf = (register: string): Schema => ({
     register,
     fields: Object.fromEntries(
       (registers.get(register)?.fields ?? [])
         .filter((f) => !f.retired)
-        .map((f) => [f.id, { type: f.type, ...(f.values ? { values: f.values } : {}) }]),
+        .map((f) => [f.id, { type: f.type, ...(f.values ? { values: f.values } : {}), ...(f.to ? { to: f.to } : {}) }]),
     ),
   });
 
@@ -576,10 +593,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
   /** What the evaluator needs beyond SQL: the clock, and the shape of a register. */
   const evalContext = (): EvalContext => ({
     nowMs: clock.now(),
-    schemaOf: (register) => {
-      const r = registers.get(register);
-      return r ? { register, fields: Object.fromEntries(r.fields.map((f) => [f.id, f])) } : null;
-    },
+    lookups: opts.lookups ?? {},
+    schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     /* A ref is written by NAME in a sentence — `thing is Kiln` — because that is what a person says.
        The title field is the register's own, so the lookup is one indexed read per name. */
     refByTitle: (register, title) => {
