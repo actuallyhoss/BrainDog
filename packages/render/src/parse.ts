@@ -130,21 +130,41 @@ function readRows(kind: Kind, body: string[]): { rows: Row[]; over?: string } {
 }
 
 /**
+ * The lines of a document, each carrying where its text sits in the source.
+ *
+ * A DOCUMENT WRITTEN ON WINDOWS PARSED AS ONE PROSE BLOB. Splitting on `\n` alone left a carriage
+ * return on the end of every line, and `.` in JavaScript matches any character EXCEPT a line
+ * terminator — of which `\r` is one — so a fence line never matched `FENCE`, no fence was ever
+ * recognised, and every block in the file was rendered as the text of its own source.
+ *
+ * The terminator is taken off the text and its LENGTH is kept in the offsets, so `[start, end)`
+ * still addresses the bytes the author typed. All three terminators are accepted, because a
+ * document that arrives over an API is not a document somebody chose the line endings of.
+ */
+function linesOf(src: string): { text: string; start: number; end: number }[] {
+  const out: { text: string; start: number; end: number }[] = [];
+  const eol = /\r\n|\r|\n/g;
+  let at = 0;
+  for (let m = eol.exec(src); m; m = eol.exec(src)) {
+    out.push({ text: src.slice(at, m.index), start: at, end: m.index });
+    at = m.index + m[0].length;
+  }
+  out.push({ text: src.slice(at), start: at, end: src.length });
+  return out;
+}
+
+/**
  * Segment a document. Total: it never throws, and every byte of the input lands in exactly one
  * segment, so an editor can splice `[start, end)` back over the source.
  */
 export function parse(src: string): Segment[] {
   const out: Segment[] = [];
-  const lines = src.split('\n');
+  const source = linesOf(src);
+  const lines = source.map((l) => l.text);
 
-  // Offsets are computed once so a segment can address the raw string it came from.
-  const offset: number[] = [];
-  let at = 0;
-  for (const line of lines) {
-    offset.push(at);
-    at += line.length + 1;
-  }
-  const endOf = (i: number) => (i < lines.length ? offset[i]! + lines[i]!.length : src.length);
+  // Offsets are the source's, not the text's: a stripped `\r` still occupies a byte.
+  const offset = source.map((l) => l.start);
+  const endOf = (i: number) => (i < source.length ? source[i]!.end : src.length);
 
   let prose: string[] = [];
   let proseAt = 0;
