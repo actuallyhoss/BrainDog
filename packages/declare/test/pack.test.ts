@@ -174,15 +174,20 @@ test('and it says what a pack would DO, before anybody has to read the file', as
   assert.ok(diff.warnings.some((w) => w.say.includes('arrives empty')));
 });
 
-test('AND A REGISTER WITH AN EXAMPLE AND NO `tags` IS SAID OUT LOUD', async () => {
+test('AND A REGISTER WITH AN EXAMPLE AND NO `tags` IS REFUSED AT THE DOOR', async () => {
   /* The `example` marker IS the value `example` in a `list<text>` field called `tags`. A seeded
      register without one is a record whose examples cannot be told from its real rows, and nobody
-     deletes what they cannot identify. */
+     deletes what they cannot identify — so it is refused where a sentence fits rather than halfway
+     through an install. */
   const doc = DOC({
     declarations: [{ register: 'obligations', name: 'O', title: 'what', fields: [{ id: 'what', type: 'text' }] }],
   });
-  const diff = await plan(value<Pack>(await normalise(doc)), EMPTY);
-  assert.ok(diff.warnings.some((w) => w.say.includes('cannot be told from its real rows')));
+  const out = refusal(await normalise(doc));
+  assert.equal(out.code, 'FIELD_UNKNOWN');
+  assert.equal(out.at, 'tags');
+
+  // And a register nobody seeds needs none.
+  assert.ok((await normalise(DOC({ declarations: doc.declarations, seeds: [] }))).ok);
 });
 
 test('and an upgrade names what changes and what goes', async () => {

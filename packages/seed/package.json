@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@braindog/declare": "workspace:*",
     "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/where": "workspace:*"

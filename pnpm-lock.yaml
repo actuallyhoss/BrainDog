@@ -194,6 +194,9 @@ importers:
 
   packages/seed:
     dependencies:
+      '@braindog/declare':
+        specifier: workspace:*
+        version: link:../declare
       '@braindog/kernel':
         specifier: workspace:*
         version: link:../kernel

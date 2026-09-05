@@ -30,7 +30,19 @@ import { KINDS, digest, jcs, type DeclKind, type Json } from '@braindog/kernel';
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 
 const PACK_ID = /^[a-z][a-z0-9-]{1,63}$/;
-const NAME = /^[a-z][a-z0-9_]{0,31}$/;
+/**
+ * A REGISTER'S NAME BECOMES SQL AND EVERY OTHER NAME BECOMES AN ADDRESS, and that is the whole of
+ * why there are two grammars here rather than one.
+ *
+ * A register id is inlined into an index name and a `json_extract` path — the one place in this
+ * product where an identifier is not a bound parameter — so its grammar is a security boundary and
+ * a hyphen has no business in it. A page, a metric, a rule and a digest are addressed by name in a
+ * URL and in a document, never in SQL, and every example in the corpus writes them with hyphens:
+ * `due-30d`, `spend-by-channel`, `mean-days-to-pay`. One grammar for both would have to pick, and
+ * picking the strict one would refuse the product's own pages.
+ */
+const REGISTER_NAME = /^[a-z][a-z0-9_]{0,31}$/;
+const NAME = /^[a-z][a-z0-9_-]{0,63}$/;
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$/;
 
 export const PACK_SOURCES = ['kennel', 'url', 'git', 'paste', 'local'] as const;
@@ -196,8 +208,14 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
         'declarations',
       );
     const name = body[kind];
-    if (typeof name !== 'string' || !NAME.test(name))
-      return malformed(`${String(name)} is not a ${kind} id: lower-case letters, digits and single underscores.`, kind);
+    const grammar = kind === 'register' ? REGISTER_NAME : NAME;
+    if (typeof name !== 'string' || !grammar.test(name))
+      return malformed(
+        kind === 'register'
+          ? `${String(name)} is not a register id: lower-case letters, digits and single underscores. A register id becomes SQL.`
+          : `${String(name)} is not a ${kind} id: lower-case letters, digits, underscores and hyphens.`,
+        kind,
+      );
 
     const wrong = credential(body);
     if (wrong)
@@ -219,7 +237,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     declarations.push({ kind, id: declId, body: stored, canonical: jcs(stored) });
   }
 
-  const registers = new Set(declarations.filter((d) => d.kind === 'register').map((d) => d.body.id as string));
+  const registers = new Map(declarations.filter((d) => d.kind === 'register').map((d) => [d.body.id as string, d.body]));
   const seeds: Seed[] = [];
   const seeded = new Set<string>();
   for (const seed of Array.isArray(doc.seeds) ? doc.seeds : []) {
@@ -231,6 +249,17 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
       return malformed(`${id} seeds ${seed.register}, which it does not declare.`, 'seeds');
     if (seeded.has(seed.register)) return malformed(`${id} seeds ${seed.register} twice.`, 'seeds');
     seeded.add(seed.register);
+
+    /* A SEEDED REGISTER DECLARES `tags`, or its examples cannot be told from its real rows — and
+       nobody deletes what they cannot identify. The `example` marker is a value in that field
+       rather than a column, so the field has to exist before the marker can. */
+    const fields = ((registers.get(seed.register) as { fields?: { id?: string }[] } | undefined)?.fields ?? []).map((f) => f.id);
+    if (!fields.includes('tags'))
+      return no<Pack>(
+        'FIELD_UNKNOWN',
+        `${seed.register} has an example row and no tags field, so its examples could not be told from its real rows.`,
+        { at: 'tags' },
+      );
     seeds.push({
       register: seed.register,
       fields: seed.fields,
@@ -447,8 +476,6 @@ function warningsOf(pack: Pack): { at: string; say: string }[] {
 
   for (const [id, body] of registers) {
     const fields = ((body as { fields?: { id?: string; type?: string }[] }).fields ?? []).map((f) => f.id);
-    if (seeded.has(id) && !fields.includes('tags'))
-      out.push({ at: `register.${id}`, say: `${id} has an example row and no tags field, so its examples cannot be told from its real rows.` });
     if (!seeded.has(id)) out.push({ at: `register.${id}`, say: `${id} arrives empty, so nothing on a page that reads it will draw.` });
   }
   return out;

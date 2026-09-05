@@ -329,6 +329,25 @@ export const REGISTERS: Record<string, SeedRegister> = {
   },
 };
 
+/**
+ * EVERY REGISTER CARRIES `tags`, added here rather than repeated eight times above.
+ *
+ * THE `example` MARKER IS A VALUE IN IT. A pack's seeded rows are marked `example` so they can be
+ * told from real ones and deleted, and `02-DATA-MODEL` §1 puts that marker in a `list<text>` field
+ * inside `fields` rather than in a column — a column would be a thing every register carries for
+ * the sake of the few that are seeded. The `tag` and `untag` rule actions name no field for the
+ * same reason, so this one conventional field is what both of them mean.
+ *
+ * IT IS ADDED AT DECLARATION AND NOT IN THE LITERAL, because the literal above is what a person
+ * reads to know what a register HOLDS, and `tags` is what the record does to a row rather than
+ * something the studio wrote down.
+ */
+const withTags = (body: SeedRegister): Record<string, unknown> =>
+  body.fields.some((f) => f.id === 'tags')
+    ? { ...body }
+    : { ...body, fields: [...body.fields, { id: 'tags', type: 'list', of: 'text' }] };
+
+
 /* ── things, and their frozen identity hues ───────────────────────────────
    The hue is chosen at create by the theme's `nextAccentHue` and written once. The kernel never
    computes it: a hue seven degrees from `earn` is an intent, not a mark. */
@@ -1198,7 +1217,7 @@ export const PAGES: Record<string, SeedPage> = {
  * the two words the kernel needs to file it — not a translation with a chance to be wrong.
  */
 export const declarations = (): Declaration[] =>
-  Object.values(REGISTERS).map((body) => ({ id: `register.${body.id}`, kind: 'register' as const, body: body as never }));
+  Object.values(REGISTERS).map((body) => ({ id: `register.${body.id}`, kind: 'register' as const, body: withTags(body) as never }));
 
 /**
  * The pages and the metrics, as declarations.
@@ -1240,6 +1259,64 @@ export function forWrite(register: string, fields: Fields): Record<string, unkno
   }
   return out;
 }
+
+/**
+ * The seed's declarations as a PACK DOCUMENT.
+ *
+ * THE ONLY CONTENT THIS PRODUCT SHIPS, run through the format it asks everybody else to use. A pack
+ * format that works on the fixtures in its own tests and falls over on a register with transitions,
+ * a metric with a product and a page with a template is a format nobody finds out about until
+ * somebody else writes one — so the differential test is against this, not against a toy.
+ *
+ * ITS SEEDS ARE ONE ROW EACH, and the demo dataset is not in it. A pack's `seeds:` are examples —
+ * one per register, tagged so they can be told from real rows and deleted. Forty cross-linked rows
+ * are a demonstration, which is `installSeed`'s job and a different thing.
+ */
+export function packDocument(): Record<string, unknown> {
+  return {
+    pack: 'braindog-starter',
+    version: '1.0.0',
+    summary: 'What a small studio owes, is owed, runs on and is working on.',
+    author: 'BrainDog',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    /* THE KIND IS THE FIRST KEY. A register stores its name as `id` and a document writes it as
+       `register:`, which is the one difference between the two forms of the same declaration. */
+    declarations: [
+      ...Object.values(REGISTERS).map((body) => {
+        const { id, ...rest } = withTags(body) as { id: string } & Record<string, unknown>;
+        return { register: id, ...rest };
+      }),
+      ...Object.values(PAGES),
+      ...Object.values(METRICS),
+    ],
+    /* A REGISTER WHOSE REQUIRED FIELD IS A REF CANNOT BE SEEDED BY A PACK. A pack's seeds are one
+       row per register with no order between them, so a `ref` in one would resolve against whatever
+       happened to be written first — a different row on a different day. `updates` needs a `track`,
+       so it arrives empty and the demonstration is what fills it. */
+    seeds: ORDER.filter((register) => (ROWS[register] ?? []).length > 0 && !needsARef(register)).map((register) => ({
+      register,
+      fields: forWrite(register, exampleRow(register)),
+    })),
+  };
+}
+
+/**
+ * One row of a register, with every ref taken out.
+ *
+ * A SEED CANNOT POINT AT A ROW THAT DOES NOT EXIST, and a pack's seeds are one row per register
+ * with no order between them — so a `ref` in one would resolve against whatever happened to be
+ * written first, which is a different row on a different day.
+ */
+/** Whether a register cannot be filled without pointing at another row. */
+const needsARef = (register: string): boolean =>
+  (REGISTERS[register]?.fields ?? []).some((f) => f.type === 'ref' && f.required === true);
+
+const exampleRow = (register: string): Fields => {
+  const refs = new Set((REGISTERS[register]?.fields ?? []).filter((f) => f.type === 'ref').map((f) => f.id));
+  const first = (ROWS[register] ?? [])[0] ?? {};
+  return Object.fromEntries(Object.entries(first).filter(([key]) => !refs.has(key)));
+};
 
 export type Seeded = { registers: number; rows: number; pages: number; metrics: number };
 
