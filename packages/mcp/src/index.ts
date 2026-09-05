@@ -125,6 +125,32 @@ export const TOOLS: readonly Tool[] = [
     writes: false,
   },
   {
+    name: 'governance',
+    description:
+      'What has been proposed and not yet answered, what was decided and why, and what was predicted. Open suggestions unless you ask for more.',
+    input: obj({
+      register: str('suggestion (the default), decision, or prediction.'),
+      id: str('One row, by its SG or D number.'),
+      status: str('open (the default), resolved, or all.'),
+      limit: { type: 'integer', description: 'At most 200.' },
+    }),
+    writes: false,
+  },
+  {
+    name: 'propose',
+    description:
+      'Put a question in front of a person, with what you would do about it. It changes NOTHING by itself, which is what makes it the verb to use when you are not sure.',
+    input: obj(
+      {
+        question: str('What is being asked, in one sentence a person can answer.'),
+        body_kind: str('options · rowset · pattern · change'),
+        body: { type: 'object', description: 'The body for that kind. options needs at least two, each with id, label and because.' },
+      },
+      ['question', 'body_kind', 'body'],
+    ),
+    writes: true,
+  },
+  {
     name: 'create',
     description: 'Add a row to a register. The record allocates its number and hands it back.',
     input: obj(
@@ -232,6 +258,18 @@ export function tools(api: RecordApi) {
      * tagged four hundred rows is a rule nobody can undo by hand.
      */
     dry_run: (args, ctx) => api.dryRun({ rule: (args.rule ?? {}) as never }, ctx),
+
+    governance: (args, ctx) => api.governance(args as never, ctx),
+
+    /**
+     * AND THERE IS NO `decide` TOOL, deliberately.
+     *
+     * `decide` is a rung no token reaches (ADR-060), so a tool for it could only ever return a
+     * refusal — and a tool that always refuses is a tool an agent spends its turns discovering. An
+     * agent may put a question in front of a person. It may not answer its own question, and that is
+     * not a scope anybody can be issued.
+     */
+    propose: (args, ctx) => api.propose(args as never, ctx),
 
     create: (args, ctx) =>
       api.create(

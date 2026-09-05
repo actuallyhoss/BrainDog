@@ -20,6 +20,7 @@ import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } from './coerce.ts';
+import { attempt } from './tx.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { compile, type Predicate, type Schema } from '@braindog/where';
@@ -38,6 +39,18 @@ import {
   type ScheduleKind,
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
+import {
+  decide,
+  getGovernance,
+  listGovernance,
+  propose as openSuggestion,
+  reopen,
+  type Decided,
+  type GovernDeps,
+  type GovernRegister,
+  type Proposal,
+  type Verdict,
+} from './govern.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
@@ -80,6 +93,8 @@ export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
 export { dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
+export { BODY_KINDS, GOVERNANCE } from './govern.ts';
+export type { Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, extract as extractField, shapeOf } from './ingest.ts';
 export { SIGNALS, analyse, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
@@ -843,6 +858,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return row ? (JSON.parse(row.body) as PullDecl) : null;
   };
 
+  /**
+   * What the gate needs: the counters, and the write path for the rows an accepted `rowset` writes.
+   *
+   * `cascade: true` ON THOSE ROWS, because a row accepted at the gate is a row like any other — the
+   * register's rules apply to it, and a rowset that went in with the rules switched off would be a
+   * back door into the record wearing a decision's name.
+   */
+  const governDeps = (): GovernDeps => ({
+    sql,
+    nowMs: clock.now(),
+    mint,
+    allocate,
+    hasRegister: (register) => registers.has(register),
+    write: (register, patch, actor, batch) => write(register, null, patch, { actor, batch }),
+  });
+
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
@@ -1205,7 +1236,38 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Take a grant out of service and destroy the bytes. The row stays: what it opened is a fact. */
     revokeGrant: (id: string, actor: string): Result<null> => revokeGrant(sql, vaultDeps(actor), id, transaction),
 
-    /* ── the outbox: work that must leave the record ────────────────────── */
+    /* ── the decision gate ─────────────────────────────────── */
+
+    /**
+     * The governance rows, read like a register.
+     *
+     * THE RECORD OPENS SUGGESTIONS FROM THREE PLACES and until this existed nothing could read one.
+     * A proposal nobody can see is a proposal that was never made.
+     */
+    governance: (register: GovernRegister, opts: { status?: string; limit?: number } = {}) =>
+      listGovernance({ sql, nowMs: clock.now() }, register, opts),
+
+    /** One governance row, or `null` — a missing one is a value, not a refusal. */
+    governanceRow: (register: GovernRegister, id: string) => getGovernance(sql, register, id),
+
+    /** Open a suggestion. The body is checked here, so the person answering it never finds it broken. */
+    propose: (p: Proposal, actor: string): Result<{ id: string }> =>
+      transaction(() => openSuggestion(governDeps(), actor, p)),
+
+    /**
+     * Answer one.
+     *
+     * THE CHANGE AND THE DECISION ARE ONE TRANSACTION, so "undo this decision" is one query. A
+     * `pattern` or a `change` comes back with the declaration to install, because installing is
+     * asynchronous and a decision that resolved before its change landed would be a lie.
+     */
+    decide: (id: string, verdict: Verdict, actor: string): Result<Decided> =>
+      attempt(sql, transaction, () => decide(governDeps(), id, verdict, actor)),
+
+    /** Put one back in the queue, for the change the gate accepted and could not land. */
+    reopen: (id: string): void => transaction(() => reopen(governDeps(), id)),
+
+    /* ── the outbox: work that must leave the record ────────────────── */
 
     /**
      * Queue one job, in the caller's transaction.

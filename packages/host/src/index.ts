@@ -40,6 +40,9 @@ export const ROUTES: readonly Route[] = [
   { name: 'metric', writes: false, what: 'One figure, with its target and how it compares.' },
   { name: 'listGrants', writes: false, what: 'What each credential opens. Never the credential.' },
   { name: 'dryRun', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.' },
+  { name: 'governance', writes: false, what: 'What has been proposed, what was decided, and what was predicted.' },
+  { name: 'propose', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
+  { name: 'decide', writes: true, what: 'Answer one, with the reason. No token reaches this.' },
   { name: 'create', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'update', writes: true, what: 'Change a row, against the version you read.' },
 ];
@@ -136,6 +139,9 @@ export type RecordSurface = {
   metric(args: never, ctx: never): Promise<Result<unknown>>;
   listGrants(ctx: never): Promise<Result<unknown>>;
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
+  governance(args: never, ctx: never): Promise<Result<unknown>>;
+  propose(args: never, ctx: never): Promise<Result<unknown>>;
+  decide(args: never, ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
 };
@@ -154,6 +160,9 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     metric: (a, ctx) => api.metric(a as never, ctx as never),
     listGrants: (_a, ctx) => api.listGrants(ctx as never),
     dryRun: (a, ctx) => api.dryRun(a as never, ctx as never),
+    governance: (a, ctx) => api.governance(a as never, ctx as never),
+    propose: (a, ctx) => api.propose(a as never, ctx as never),
+    decide: (a, ctx) => api.decide(a as never, ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
   };

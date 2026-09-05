@@ -199,3 +199,50 @@ test('the record’s version moves with a write and not with a read', async () =
   assert.ok(value<number>(await api.version(owner)) > before);
   sql.close();
 });
+
+/* ── the decision gate ───────────────────────────────────── */
+
+const PROPOSAL = {
+  question: 'File the two invoices that arrived overnight?',
+  body_kind: 'rowset' as const,
+  body: { register: 'obligations', rows: [{ what: 'Invoice 41', state: 'open' }] },
+};
+
+test('AN AGENT MAY ASK AND MAY NOT ANSWER, and that is not a scope anybody can be issued', async () => {
+  /* ADR-060: no token reaches `decide`. An agent that can propose and not write is an agent whose
+     mistakes are a queue rather than a diff — and one that could answer its own question would be
+     an agent with a rubber stamp. */
+  const { api, sql } = await record();
+
+  const made = await api.propose(PROPOSAL, token('propose'));
+  assert.ok(made.ok, 'propose is the rung the token ladder has for exactly this');
+
+  const id = (made as { value: { id: string } }).value.id;
+  for (const scope of ['read', 'propose', 'write'] as const) {
+    const tried = await api.decide({ id, decide: { option: 'accept', reason: 'go on' } }, token(scope));
+    assert.equal(tried.ok, false, `a ${scope} token decided`);
+    /* AND THE REFUSAL NAMES A PERSON, not a bigger token. `SCOPE_INSUFFICIENT` would send whoever
+       read it looking for a scope that does not exist. */
+    assert.equal((tried as { refusal: { code: string } }).refusal.code, 'PERSON_REQUIRED');
+  }
+  assert.equal(api.kernel.count('obligations'), 0);
+
+  // A person at `decide` answers it, and the rows land.
+  const done = await api.decide({ id, decide: { option: 'accept', reason: 'both are ours' } }, person('decide'));
+  assert.ok(done.ok, done.ok ? '' : (done as { refusal: { fix: string } }).refusal.fix);
+  assert.equal(api.kernel.count('obligations'), 1);
+  sql.close();
+});
+
+test('and a read token can see the queue, because a proposal nobody can see was never made', async () => {
+  const { api, sql } = await record();
+  await api.propose(PROPOSAL, owner);
+
+  const open = await api.governance({}, token('read'));
+  assert.ok(open.ok);
+  assert.equal((open as { value: unknown[] }).value.length, 1);
+
+  // And a person at `read` too — the gate is about answering, not about looking.
+  assert.ok((await api.governance({ register: 'decision' }, person('read'))).ok);
+  sql.close();
+});

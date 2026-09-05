@@ -56,9 +56,11 @@ const refusal = (r: unknown) => {
 
 test('THE COUNT IS THE DESIGN, and it is the document’s list minus what is not built', () => {
   /* The tool list is in every turn of every session, so one more tool costs every conversation for
-     ever. `10-MCP` §5 names eight; `propose` is absent because suggestions are not built and a tool
-     that refuses everything is worse than one that is not there, and `schema` and `history` are
-     present because that document serves them as resources and this build serves none.
+     ever. `10-MCP` §5 names eight, and all eight are here now that the decision gate is built —
+     `propose` earns its place the moment there is something on the other end of it. `schema` and
+     `history` are present because that document serves them as resources and this build serves
+     none, and `decide` is ABSENT because no token reaches that rung: a tool that could only ever
+     refuse is a tool an agent spends its turns discovering.
 
      The four added since are the record's own reading of itself — `pages`, `page`, `metric` and
      `credentials` — and each earns its place by being a question an agent asks that `list` cannot
@@ -67,7 +69,8 @@ test('THE COUNT IS THE DESIGN, and it is the document’s list minus what is not
   const named = TOOLS.map((t) => t.name);
   for (const wanted of ['record_index', 'search', 'get', 'list', 'create', 'update', 'log'])
     assert.ok(named.includes(wanted), `${wanted} is in 10-MCP §5 and not here`);
-  assert.ok(!named.includes('propose'), 'a tool that refuses everything is worse than an absent one');
+  assert.ok(named.includes('propose'), 'the one verb an agent has when it is not sure');
+  assert.ok(!named.includes('decide'), 'a tool that refuses everything is worse than an absent one');
 
   /* AND NO TOOL READS A CREDENTIAL. The vault needs a person in a browser and an agent holding a
      token is neither; `credentials` is the INDEX, which is what makes "check nothing expires next
@@ -75,7 +78,7 @@ test('THE COUNT IS THE DESIGN, and it is the document’s list minus what is not
   for (const forbidden of ['openGrant', 'open_grant', 'credential', 'secret'])
     assert.ok(!named.includes(forbidden), `${forbidden} would read a credential`);
 
-  assert.equal(TOOLS.length, 14);
+  assert.equal(TOOLS.length, 16);
   assert.equal(new Set(named).size, TOOLS.length, 'two tools share a name');
   for (const t of TOOLS) {
     assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
@@ -93,7 +96,7 @@ test('the whole tool list is small enough to sit in every turn', () => {
 test('a tool says whether it writes, so a client can tell its user before it runs', () => {
   assert.deepEqual(
     TOOLS.filter((t) => t.writes).map((t) => t.name),
-    ['create', 'update', 'log'],
+    ['propose', 'create', 'update', 'log'],
   );
 });
 

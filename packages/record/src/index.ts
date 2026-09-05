@@ -24,9 +24,12 @@ import {
   type CreateRecordArgs,
   type Entry,
   type Kernel,
+  type GovernRegister,
   type Patch,
+  type Proposal,
   type RegisterDecl,
   type RuleDecl,
+  type Verdict,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
@@ -331,6 +334,72 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       if (!args?.rule?.register || !Array.isArray(args.rule.then))
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
       return kernel.dryRun(args.rule, args.limit);
+    },
+
+    /* ── THE DECISION GATE ─────────────────────────── */
+
+    /**
+     * The governance rows: what has been proposed, what was decided, what was predicted.
+     *
+     * A READ, and not scoped by register, because a suggestion is about the record rather than about
+     * one register — and one that the person who has to answer it cannot see is a proposal that was
+     * never made.
+     */
+    async governance(args: { register?: string; id?: string; status?: string; limit?: number }, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const register = (args?.register ?? 'suggestion') as GovernRegister;
+      if (args?.id) {
+        const row = kernel.governanceRow(register, String(args.id));
+        return ok(row);
+      }
+      return kernel.governance(register, {
+        ...(args?.status === undefined ? {} : { status: String(args.status) }),
+        ...(args?.limit === undefined ? {} : { limit: Number(args.limit) }),
+      });
+    },
+
+    /**
+     * Open one.
+     *
+     * `propose` IS ITS OWN RUNG, and it is the whole reason the token ladder has three. An agent that
+     * can propose and not write is an agent whose mistakes are a queue rather than a diff.
+     */
+    async propose(args: Proposal, ctx: CallContext) {
+      const stop = guard(ctx, 'propose');
+      if (stop) return { ok: false as const, refusal: stop };
+      return kernel.propose(args, actorOf(ctx));
+    },
+
+    /**
+     * Answer one.
+     *
+     * `decide` IS A RUNG NO TOKEN REACHES (ADR-060). An agent may put a question in front of a
+     * person; it may not answer its own question, and that is not a scope somebody can be issued.
+     * An accepted `pattern` or `change` is installed here, after the gate has said yes and before
+     * the suggestion is resolved — a decision that resolved before its change landed would be a lie.
+     */
+    async decide(args: { id: string; decide?: { option: string; reason: string }; defer?: { until: string; why: string }; resolved_as?: 'wont-fix' | 'incorrect'; reason?: string }, ctx: CallContext) {
+      const stop = guard(ctx, 'decide');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.id) return no('REQUIRED_MISSING', 'Which suggestion?', { at: 'id' });
+
+      const verdict = (
+        args.decide ? { decide: args.decide } : args.defer ? { defer: args.defer } : { resolved_as: args.resolved_as, reason: args.reason }
+      ) as Verdict;
+      const out = kernel.decide(args.id, verdict, actorOf(ctx));
+      if (!out.ok || !out.value.install) return out;
+
+      /* THE DECLARATION LANDS BEFORE THE ANSWER DOES. If it will not install, the gate's own
+         transaction has already committed — so the suggestion is reopened rather than left resolved
+         with nothing behind it. */
+      const decl = out.value.install as { id?: string; kind?: string; body?: unknown };
+      const put = await kernel.install([decl as never]);
+      if (!put.ok) {
+        kernel.reopen(out.value.suggestion);
+        return put;
+      }
+      return out;
     },
 
     /* ── VAULT ────────────────────────────────────────────────── */
