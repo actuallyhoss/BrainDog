@@ -24,8 +24,16 @@ import { jsonPath } from '@braindog/where';
 import type { Json } from './coerce.ts';
 import { instant } from './migrate.ts';
 
-/** `34-GRAMMARS` §4. It is checked before an id is inlined into an index name or a JSON path. */
-const IDENT = /^[a-z][a-z0-9_]{0,31}$/;
+/**
+ * `34-GRAMMARS` §4. Checked before an id is inlined into an index name or a JSON path.
+ *
+ * A DOUBLE UNDERSCORE IS NOT AN IDENTIFIER, and the reason is one line below: `__` is the separator
+ * in an index name (`entry_i_<register>__<field>`), so a register called `a__b` makes
+ * `entry_i_a__b__code` mean two different things — and the code that decides which of a register's
+ * indexes to drop then drops somebody else's. A name that cannot be parsed back is a name that will
+ * be parsed back wrongly.
+ */
+const IDENT = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/;
 
 export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest'] as const;
 export type DeclKind = (typeof KINDS)[number];
@@ -122,7 +130,11 @@ export function validate(decl: Declaration): Refusal | null {
 
   const id = decl.body.id;
   if (typeof id !== 'string' || !IDENT.test(id))
-    return bad('DECLARATION_INVALID', `A register id is ${IDENT.source}. ${String(id)} is not.`, 'id');
+    return bad(
+      'DECLARATION_INVALID',
+      `A register id is lower-case letters, digits and single underscores, starting with a letter. ${String(id)} is not.`,
+      'id',
+    );
 
   const fields = decl.body.fields;
   if (!Array.isArray(fields) || fields.length === 0)
@@ -138,9 +150,29 @@ export function validate(decl: Declaration): Refusal | null {
     if (typeof f?.id === 'string' && f.id.startsWith('_'))
       return bad('DECLARATION_INVALID', `${f.id} starts with an underscore, which the kernel keeps for itself.`, f.id);
     if (typeof f?.id !== 'string' || !IDENT.test(f.id))
-      return bad('DECLARATION_INVALID', `A field id is ${IDENT.source}. ${String(f?.id)} is not.`, 'fields');
+      return bad(
+        'DECLARATION_INVALID',
+        `A field id is lower-case letters, digits and single underscores, starting with a letter. ${String(f?.id)} is not.`,
+        'fields',
+      );
     if (seen.has(f.id)) return bad('DECLARATION_INVALID', `${id} declares ${f.id} twice.`, f.id);
     seen.add(f.id);
+  }
+
+  /* A `unique:` ON A PARTED TYPE WAS BUILT AS TWO PLAIN INDEXES. `money` and `quantity` are objects,
+     so they index in two halves — and `f.unique && !part` is never true for either, which meant the
+     UNIQUE came out of `indexesFor` as an ordinary index wearing the `entry_u_` name. The rule the
+     declaration made was enforced nowhere, and the write path's clash check then bound the whole
+     object as a parameter and threw a raw TypeError out of `create`, across the boundary this
+     package promises nothing throws over. Refused at the declaration, where a sentence fits. */
+  for (const raw of fields) {
+    const f = raw as unknown as FieldLike;
+    if (f.unique && PARTS[f.type])
+      return bad(
+        'DECLARATION_INVALID',
+        `${id}.${f.id} is a ${f.type}, which the record stores in two halves — so it cannot be unique. Make a text field that carries what you mean by "the same one".`,
+        f.id,
+      );
   }
 
   const title = decl.body.title;
@@ -152,6 +184,20 @@ export function validate(decl: Declaration): Refusal | null {
     return bad('DECLARATION_INVALID', `${id} names ${String(state)} as its state, and has no such field.`, 'state', [...seen]);
 
   return null;
+}
+
+/**
+ * Which register an index name belongs to, or `null` when it is not one of ours.
+ *
+ * `entry_<kind>_<register>__<field>[__<part>]`, split on the SEPARATOR rather than trimmed by a
+ * prefix — `__` is what divides the register from the field, and a register id may itself contain a
+ * single underscore.
+ */
+export function registerOfIndex(name: string): string | null {
+  const m = /^entry_[iuk]_(.*)$/.exec(name);
+  if (!m?.[1]) return null;
+  const at = m[1].indexOf('__');
+  return at <= 0 ? null : m[1].slice(0, at);
 }
 
 /** Thrown inside the transaction so it rolls back, and turned into a refusal outside it. */
@@ -198,14 +244,22 @@ export async function installDeclarations(
 
     for (const [i, decl] of batch.entries()) {
       const checksum = sums[i]!;
-      const active = sql.one<{ version: number; checksum: string }>(
-        'SELECT version, checksum FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0',
+      /* EVERY LIVE ROW, retired or not. Filtering `retired = 0` here meant a retired declaration was
+         never stamped `superseded_at` when its successor arrived, so a register retired and then
+         reinstalled had TWO rows claiming to be current — and a `.dog` replay, which rebuilds the
+         schema by reading them, could not say which shape a two-year-old event was written under. */
+      const active = sql.one<{ version: number; checksum: string; retired: number }>(
+        'SELECT version, checksum, retired FROM declaration WHERE id = ? AND superseded_at IS NULL ORDER BY version DESC LIMIT 1',
         decl.id,
       );
 
       /* THE SAME BYTES ARE NOT A NEW VERSION. Otherwise every deploy bumps every register and the
          version number stops being a fact about the shape. */
-      if (active && active.checksum === checksum) {
+      /* UNLESS THE ACTIVE ROW IS RETIRED. Reinstalling a retired declaration is how a register comes
+         back, and its bytes are usually identical to the ones it went away with — so the same-bytes
+         short-circuit would have returned `changed: false` and left it retired, with its indexes
+         still gone. A version is the honest answer there: the shape has a new period of being live. */
+      if (active && active.checksum === checksum && !active.retired) {
         out.push({ id: decl.id, version: active.version, changed: false });
         continue;
       }
@@ -237,15 +291,17 @@ export async function installDeclarations(
            index kept refusing duplicates, retire the field entirely and both its indexes stayed.
            The record enforced a rule the declaration no longer makes.
 
-           The prefix is matched in TypeScript rather than with LIKE, because `_` is a LIKE wildcard
-           and a register id may contain one — `entry_i_invoice__%` would also match the indexes of a
-           register called `invoiced`, and dropping another register's indexes is a silent slowdown
-           nobody would connect to this install. */
-        const mine = [`entry_i_${register}__`, `entry_u_${register}__`];
+           THE NAME IS PARSED, NOT PREFIX-MATCHED. Two attempts at this were wrong in the same
+           direction. `LIKE 'entry_i_a__%'` is wrong because `_` is a LIKE wildcard; matching the
+           string prefix in TypeScript is wrong because `__` is also the separator — a register id
+           may contain an underscore, so `entry_i_a__b__code` (register `a__b`, field `b__code`?
+           no: register `a__b`) starts with register `a`'s prefix. Installing `a` dropped `a__b`'s
+           indexes, and the unchanged-checksum short-circuit meant reinstalling `a__b` never put
+           them back: a silent full scan nobody could connect to either install. */
         for (const row of sql.all<{ name: string }>(
           "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'entry'",
         ))
-          if (mine.some((prefix) => row.name.startsWith(prefix))) sql.exec(`DROP INDEX IF EXISTS ${row.name}`);
+          if (registerOfIndex(row.name) === register) sql.exec(`DROP INDEX IF EXISTS ${row.name}`);
 
         /* A UNIQUE INDEX OVER ROWS THAT ALREADY CLASH is a refusal, not an exception. SQLite raises
            a constraint error at CREATE, which escaped `install` as a throw. */
@@ -298,6 +354,16 @@ export function retireDeclarations(sql: Sql, ids: readonly string[], transaction
       );
       if (!hit) continue;
       sql.exec('UPDATE declaration SET retired = 1 WHERE id = ? AND version = ?', id, hit.version);
+      /* AND ITS INDEXES GO WITH IT. A retired register whose unique index stayed behind went on
+         refusing duplicates in a register that, as far as every reader is concerned, is not there —
+         a refusal citing a rule nobody can look up. */
+      if (id.startsWith('register.')) {
+        const register = id.slice('register.'.length);
+        for (const row of sql.all<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'entry'",
+        ))
+          if (registerOfIndex(row.name) === register) sql.exec(`DROP INDEX IF EXISTS ${row.name}`);
+      }
       n++;
     }
     return n === 0 && ids.length > 0

@@ -191,6 +191,13 @@ export function importDogl(
   lines: Iterable<string>,
 ): { ok: true; value: ImportReport } | { ok: false; refusal: { code: string; fix: string } } {
   const shapes = new Map(tables(sql).map((t) => [t.name, t]));
+  /* MATERIALISED ONCE. `lines` is an `Iterable`, and a generator read twice is empty the second
+     time — so the header scan below would have eaten a streamed file and left the import with
+     nothing to read. */
+  const all = [...lines];
+  /* A file says which record it is by carrying that record's own row, and the tables that name who
+     may open it ride on that. */
+  const carriesRecord = all.some((l) => l.startsWith('#table record '));
 
   /* A FILE FROM A NEWER BUILD IS NOT READ, IT IS REFUSED. Reading it would mean writing rows whose
      columns this build does not know into a record it then claims is a complete copy — and the
@@ -242,7 +249,7 @@ export function importDogl(
 
   function read(): ImportReport {
   return transaction(() => {
-    for (const raw of lines) {
+    for (const raw of all) {
       const line = raw.trimEnd();
       if (!line) continue;
 
@@ -270,6 +277,10 @@ export function importDogl(
          applied its own before it could read a file at all, and adopting somebody else's would be
          claiming a history that did not happen here. */
       if (SKIPPED.has(table.name)) continue;
+      /* A MEMBERSHIP WITHOUT THE RECORD IT IS ABOUT IS NOT A MEMBERSHIP. A file that carries the
+         governance section and no `record` row is a pack or an audit copy, and adopting its members
+         would hand somebody an owner-level grant on a record they were never given. */
+      if (NEEDS_IDENTITY.has(table.name) && !carriesRecord) continue;
 
       const values = parseRow(line, table.name);
       if (table.name === 'dog_meta') {
@@ -329,6 +340,16 @@ function parseRow(line: string, table: string): unknown[] {
  * a record that has only those has never been written to.
  */
 const SEEDED = new Set(['migration', 'record', 'entry_fts', 'entry_vec']);
+
+/**
+ * Tables that say WHO may open this record, and therefore only travel with the record itself.
+ *
+ * A governance-only export carried them, and `notEmpty` waves the `record` row through as identity
+ * — so importing one record's governance into another made the source's owner an owner of the
+ * target, in a file that was never about that record. A section is a way to leave data behind, not
+ * a way to hand somebody a membership.
+ */
+const NEEDS_IDENTITY = new Set(['member', 'person', 'vault_key']);
 
 function notEmpty(sql: Sql, shapes: Map<string, TableShape>): string | null {
   const found: string[] = [];

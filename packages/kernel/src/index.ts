@@ -44,7 +44,7 @@ export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statemen
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
-export { digest, indexesFor, indexName, jcs, validate as validateDeclaration, KINDS } from './declare.ts';
+export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
 export { TRAVELS, decode, encode, projection, tables } from './dogl.ts';
 export { atMs, expandRepeat, offsetMs, remindersFor } from './schedule.ts';
@@ -549,14 +549,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
   async function tail(scheduler: Scheduler): Promise<void> {
-    const work = pendingWork(sql);
     try {
       const armed = await scheduler.get();
+      /* READ AFTER THE AWAIT, not before it. Reading the minimum first and then awaiting meant two
+         overlapping tails — a drain's `finally` and a request's write, which on a Durable Object is
+         an ordinary pair — each wrote the minimum it had seen BEFORE the other's rows existed.
+         Whichever resumed last won, and in the probe that wrote an alarm four months later than the
+         earliest pending row. The alarm was then simply late, by however long the gap was. */
+      const work = pendingWork(sql);
       if (work.nextDueMs === null) {
         if (armed !== null) await scheduler.clear();
       } else if (armed !== work.nextDueMs) await scheduler.set(work.nextDueMs);
     } finally {
-      if (work.outboxPending) await scheduler.wake();
+      /* And the doorbell asks again too: a job queued while this tail was parked is a job the ring
+         is about. */
+      if (pendingWork(sql).outboxPending) await scheduler.wake();
     }
   }
 
@@ -685,7 +692,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
       purge(sql, opts.cutoffMs ?? clock.now() - 30 * 86_400_000, clock.now(), transaction, mint, opts.limit),
 
     /** Claim up to `n` jobs of these kinds. One statement, so a double drain finds nothing. */
-    leaseOutbox: (kinds: readonly OutboxKind[], n = 10) => transaction(() => lease(sql, clock.now(), kinds, n)),
+    leaseOutbox: (kinds: readonly OutboxKind[], n = 10) => transaction(() => lease(sql, ackDeps(), kinds, n)),
 
     /** Finish one. `failed` walks the ladder; the eighth failure is `dead` and opens an item. */
     ackOutbox: (args: Ack) => transaction(() => ack(sql, ackDeps(), args)),

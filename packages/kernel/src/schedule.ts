@@ -66,7 +66,15 @@ export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizo
   const out: number[] = [];
 
   const start = new Date(anchor);
-  for (let n = 0; out.length < (repeat.count ?? 500) && n < 5000; n++) {
+
+  /* THE BUDGET IS SPENT FORWARD, NOT BACKWARD. The walk began at the anchor and stopped at `count`
+     (or 500), so a daily repeat anchored more than about five hundred days ago produced five hundred
+     occurrences that had all already happened — and `remindersFor`, which drops anything past,
+     derived NOTHING. A yearly subscription set up in 2019 simply stopped reminding anybody, silently.
+     `from` is the first index whose occurrence is not behind us, computed rather than walked to. */
+  const from = repeat.count === undefined ? skipPast(anchor, repeat, now) : 0;
+
+  for (let n = from; out.length < (repeat.count ?? 500) && n < from + 5000; n++) {
     let at: number;
     if (repeat.freq === 'day') at = anchor + n * interval * DAY_MS;
     else if (repeat.freq === 'week') at = anchor + n * interval * 7 * DAY_MS;
@@ -85,6 +93,28 @@ export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizo
     out.push(shiftWorkday(at, repeat.workday));
   }
   return out;
+}
+
+/**
+ * How many occurrences are already behind us.
+ *
+ * Arithmetic rather than a walk, because the whole point is not to spend five hundred iterations
+ * getting to today. It is deliberately an UNDERESTIMATE for the calendar frequencies — clamping a
+ * 31st into February shortens a month, so the count is floored and the loop steps the last one or
+ * two — and it is never applied when the repeat declares its own `count`, where every occurrence is
+ * one of a numbered series somebody asked for.
+ */
+function skipPast(anchor: number, repeat: Repeat, now: number): number {
+  if (anchor >= now) return 0;
+  const interval = Math.max(1, Math.floor(repeat.interval ?? 1));
+  const behind = now - anchor;
+  if (repeat.freq === 'day') return Math.floor(behind / (interval * DAY_MS));
+  if (repeat.freq === 'week') return Math.floor(behind / (interval * 7 * DAY_MS));
+  const from = new Date(anchor);
+  const to = new Date(now);
+  const months = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
+  const step = repeat.freq === 'month' ? interval : interval * 12;
+  return Math.max(0, Math.floor((months - 1) / step));
 }
 
 /** A weekend moved to the Friday before or the Monday after, when the declaration asks. */

@@ -196,6 +196,12 @@ export async function start(options: {
         api.kernel.ackOutbox({ id: job.id, state: 'failed', error: e instanceof Error ? e.message : String(e) });
       }
     }
+
+    /* AND THEN THE TAIL, because a failed ack arms a `retry` row and nothing else here would notice.
+       Without this an idle record sat with `pendingWork()` reporting work to do and no alarm set:
+       the retry waited for an unrelated write, and the fifteen-second belt did not rescue it because
+       a lease never takes a `failed` row. */
+    if (jobs.length > 0) await api.kernel.tail(scheduler);
   };
 
   const scheduler = nodeScheduler(run, poll);

@@ -81,20 +81,54 @@ export function enqueue(sql: Sql, mint: () => string, nowMs: number, kind: Outbo
  * the same email twice. An expired lease is claimable again — a worker that died holding rows must
  * not take them with it — which is the belt that makes the doorbell losable.
  */
-export function lease(sql: Sql, nowMs: number, kinds: readonly OutboxKind[], n: number): OutboxRow[] {
+export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: number): OutboxRow[] {
   const wanted = kinds.filter((k) => (OUTBOX_KINDS as readonly string[]).includes(k));
   if (wanted.length === 0 || n <= 0) return [];
   const limit = Math.min(Math.floor(n), 100);
-
+  const nowMs = deps.nowMs;
   const marks = wanted.map(() => '?').join(', ');
+
+  /* AN EXPIRED LEASE THAT HAS RUN OUT OF LADDER IS DEAD, and this runs first so the claim below
+     cannot hand it out again. Without it a deliverer that never acks — crashed, or simply slower
+     than the sixty-second window — was handed the same job forever: forty deliveries in the probe,
+     `attempts` still 0, no ceiling and no visible item. The file's own promise is that the eighth
+     failure is visible. */
+  for (const row of sql.all<{ id: string; kind: string; payload: string; attempts: number }>(
+    `SELECT id, kind, payload, attempts FROM outbox
+     WHERE state = 'leased' AND leased_until < ? AND attempts + 1 >= ?`,
+    iso(nowMs),
+    CEILING,
+  )) {
+    /* `attempts + 1` because the reclaim below is what would record THIS expiry, and the ladder ends
+       at eight recorded failures however they were recorded — eight acks, eight abandoned leases, or
+       any mixture. A job handed out a ninth time is a ninth delivery attempt of something that has
+       already been given eight. */
+    /* The expiry is recorded on the row as well as in the item, or the two disagree about how many
+       attempts were made and the row reads as though it died one short. */
+    sql.exec("UPDATE outbox SET state = 'dead', leased_until = NULL, attempts = attempts + 1 WHERE id = ?", row.id);
+    deadLetter(sql, deps, {
+      id: row.id,
+      kind: row.kind,
+      payload: row.payload,
+      attempts: row.attempts + 1,
+      error: 'the lease expired without an ack, eight times',
+    });
+  }
+
   const rows = sql.all<{ id: string; kind: OutboxKind; payload: string; attempts: number; leased_until: string }>(
-    `UPDATE outbox SET state = 'leased', leased_until = CASE
-       WHEN kind LIKE 'notify.%' THEN ?
-       WHEN kind LIKE 'infer.%' THEN ?
-       ELSE ? END
+    `UPDATE outbox SET state = 'leased',
+       /* A RECLAIM IS AN ATTEMPT. A lease that expired means somebody was handed this job and never
+          said what happened to it, which is a failure — and counting it is the only thing that makes
+          the ceiling reachable on that path. A first claim is not. */
+       attempts = attempts + (CASE WHEN state = 'leased' THEN 1 ELSE 0 END),
+       leased_until = CASE
+         WHEN kind LIKE 'notify.%' THEN ?
+         WHEN kind LIKE 'infer.%' THEN ?
+         ELSE ? END
      WHERE id IN (
        SELECT id FROM outbox
-       WHERE kind IN (${marks}) AND (state = 'pending' OR (state = 'leased' AND leased_until < ?))
+       WHERE kind IN (${marks})
+         AND (state = 'pending' OR (state = 'leased' AND leased_until < ? AND attempts + 1 < ${CEILING}))
        ORDER BY created LIMIT ?)
      RETURNING id, kind, payload, attempts, leased_until`,
     iso(nowMs + NOTIFY_LEASE_MS),
@@ -106,6 +140,9 @@ export function lease(sql: Sql, nowMs: number, kinds: readonly OutboxKind[], n: 
   );
   return rows.map((r) => ({ id: r.id, kind: r.kind, payload: r.payload, attempts: r.attempts, leasedUntil: r.leased_until }));
 }
+
+/** Eight attempts, and the eighth is visible. One number, read by both ladders. */
+export const CEILING = 8;
 
 /** The backoff both ladders use: doubling minutes, capped at six hours. */
 export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 60_000, 6 * 3_600_000);
@@ -159,7 +196,7 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
   const attempts = Number(after?.attempts ?? row.attempts + 1);
   const error = args.error ?? 'no reason given';
 
-  if (attempts < 8) {
+  if (attempts < CEILING) {
     /* THE RETRY IS A SCHEDULE ROW, not a flag on this one. `UNIQUE (kind, key)` makes it idempotent:
        two failures of the same job cannot arm two retries, and the key says what it is about. */
     sql.exec(

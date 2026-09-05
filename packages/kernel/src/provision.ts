@@ -63,22 +63,26 @@ export function createRecord(
 
   const existing = sql.one<{ id: string; slug: string }>('SELECT id, slug FROM record WHERE singleton = 1');
   /* AN OBJECT IS ADDRESSED, NOT CREATED, so a second create is the ordinary case — a retried signup,
-     a queue that delivered twice. It is the same record or it is a mistake, and the difference is
-     worth a sentence rather than a silent overwrite of somebody's name. */
-  if (existing)
-    return existing.id === args.id
-      ? ok({ id: existing.id, slug: existing.slug })
-      : no<Provisioned>(
-          'ALREADY_KNOWN',
-          `This object already holds ${existing.slug} (${existing.id}). A record is created once, and this is not it.`,
-          { at: 'id' },
-        );
+     a queue that delivered twice, a record just restored from a file. It is the same record or it is
+     a mistake, and the difference is worth a sentence rather than a silent overwrite of a name. */
+  if (existing && existing.id !== args.id)
+    return no<Provisioned>(
+      'ALREADY_KNOWN',
+      `This object already holds ${existing.slug} (${existing.id}). A record is created once, and this is not it.`,
+      { at: 'id' },
+    );
 
   const at = instant(now);
 
   return transaction(() => {
+    /* THE SAME ID STILL WRITES ITS OWNER. This returned early on a matching id and skipped the whole
+       transaction, so "restore this file and make me the owner" reported `ok` and wrote no `person`
+       and no `member` row — the new owner was locked out of a record that said it had been created
+       for them. The name, slug, timezone and locale are re-stated too: a create that names them and
+       silently keeps the file's is the same failure a step later. */
     sql.exec(
-      'INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (singleton) DO UPDATE SET slug = excluded.slug, name = excluded.name, locale = excluded.locale, tz = excluded.tz`,
       args.id,
       args.slug,
       args.name,
