@@ -625,6 +625,80 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       return ok(kernel.packs());
     },
 
+    /**
+     * One declaration, set from the app.
+     *
+     * THE SAME LINT A PACK GETS. A rule edited in a text box and a rule installed from a file are
+     * the same declaration, and letting the in-app path skip the checks would mean the two disagree
+     * about what is legal — with the app being the one that lets a broken rule through.
+     *
+     * IT BELONGS TO NO PACK. `pack_id` is null, so a later `uninstall` of anything cannot take it,
+     * and a pack that claims the same id is a `PROVIDES_CONFLICT` rather than a silent overwrite.
+     */
+    async setDeclaration(args: { body: unknown }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+
+      /* WRAPPED AS A ONE-DECLARATION PACK, because that is where the reading of a document lives.
+         A second parser for the in-app form would be a second grammar. */
+      const one = await normalise(
+        {
+          pack: 'in-app',
+          version: '0.0.0',
+          summary: 'One declaration, set from the app.',
+          author: 'this record',
+          license: 'none',
+          declarations: [args?.body],
+        },
+        { kind: 'local' },
+      );
+      if (!one.ok) return one;
+
+      const decl = one.value.declarations[0]!;
+      return tail(await kernel.install([{ id: decl.id, kind: decl.kind, body: decl.body as never }]));
+    },
+
+    /** Retire one. Its rows stay; a declaration is a shape, not the things under it. */
+    async retireDeclaration(args: { id: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.id) return no('REQUIRED_MISSING', 'Which declaration?', { at: 'id' });
+      return tail(kernel.retire([args.id]));
+    },
+
+    /* ── ADMIN: THE RECORD AS A FILE ───────────────────── */
+
+    /**
+     * Take your record and go.
+     *
+     * THE WHOLE PROMISE, IN ONE METHOD. A `.dog` file is the record: line per row, checkable with
+     * `sed` and `sha256sum`, and it imports into a fresh record and comes back out identical. A
+     * product whose export is a JSON dump nobody can re-import has an export button and not an exit.
+     *
+     * `local` DOES NOT TRAVEL. Tokens, device grants and failed logins are facts about one
+     * installation rather than about the record, and carrying them would move somebody's
+     * credentials to a machine they did not authorise.
+     */
+    async export(args: { sections?: readonly string[] }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return kernel.export(args?.sections ? { sections: args.sections as never } : {});
+    },
+
+    /**
+     * A file into an empty record.
+     *
+     * EMPTY, AND THAT IS THE WHOLE OF THE RULE. Importing into a record that already holds rows
+     * would merge two businesses by primary key, and there is no answer to what that should do that
+     * is better than refusing.
+     */
+    async import(args: { lines?: readonly string[] }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!Array.isArray(args?.lines)) return no('REQUIRED_MISSING', 'An import is the lines of a .dog file.', { at: 'lines' });
+      return tail(kernel.import(args.lines));
+    },
+
     /* ── VAULT ────────────────────────────────────────────────── */
 
     /** Every grant, in the order a person reads them. Sealed bytes never leave through here. */

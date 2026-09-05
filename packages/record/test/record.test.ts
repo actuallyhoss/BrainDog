@@ -455,3 +455,67 @@ test('AND A DIGEST IS HELD TO THE CALLER’S CEILING, like the list it is made o
   assert.equal(held[0]?.carrying, 1);
   sql.close();
 });
+
+/* ── one declaration, and the whole record as a file ────────────── */
+
+test('A DECLARATION SET FROM THE APP GETS THE LINT A PACK GETS', async () => {
+  /* A rule edited in a text box and a rule installed from a file are the same declaration. Letting
+     the in-app path skip the checks means the two disagree about what is legal, with the app being
+     the one that lets a broken rule through. */
+  const { api, sql } = await record();
+
+  const good = await api.setDeclaration(
+    { body: { rule: 'chase', register: 'obligations', when: 'state is open', once_per: ['entry'], then: [{ notify: { say: 'x' } }] } },
+    owner,
+  );
+  assert.ok(good.ok, good.ok ? '' : (good as { refusal: { fix: string } }).refusal.fix);
+
+  // The same refusals a pack would earn, by the same code.
+  const unreadable = await api.setDeclaration({ body: { rule: 'broken', register: 'obligations', when: 'colour is red', then: [] } }, owner);
+  assert.equal(unreadable.ok, false);
+  const secret = await api.setDeclaration({ body: { ingest: 'hsbc', channel: 'pull', auth: { token: 'sk-live-41' } } }, owner);
+  assert.equal((secret as { refusal: { code: string } }).refusal.code, 'SECRET_IN_PACK');
+  const nameless = await api.setDeclaration({ body: { name: 'x' } }, owner);
+  assert.equal((nameless as { refusal: { code: string } }).refusal.code, 'PACK_MALFORMED');
+
+  // It belongs to no pack, so no uninstall can take it.
+  assert.equal(api.kernel.declarations().find((d) => d.id === 'rule.chase')?.pack_id, null);
+
+  // And no token sets one, whatever its scope.
+  assert.equal((await api.setDeclaration({ body: {} }, token('write'))).ok, false);
+  sql.close();
+});
+
+test('TAKE YOUR RECORD AND GO, and it comes back in', async () => {
+  /* A `.dog` file IS the record. A product whose export is a dump nobody can re-import has an
+     export button and not an exit. */
+  const { api, sql } = await record();
+  value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41', amount: { amount: 41_00, currency: 'GBP' }, state: 'open' } }, owner));
+  value(await api.log({ register: 'obligations', seq: 1, note: 'Chased by phone.' }, owner));
+
+  const lines = value<string[]>(await api.export({}, owner));
+  assert.ok(lines.length > 0);
+
+  /* EMPTY MEANS EMPTY, declarations included: the file carries the shape as well as the rows, and
+     a record that already had a shape would be two shapes merged by primary key. */
+  const blank = openSqlite();
+  const fresh = { api: await createRecordApi({ sql: blank, clock: fixedClock(NOW) }), sql: blank };
+  const back = await fresh.api.import({ lines }, owner);
+  assert.ok(back.ok, back.ok ? '' : (back as { refusal: { code: string; fix: string } }).refusal.fix);
+
+  assert.equal(fresh.api.kernel.get('obligations#1')?.fields.what, 'Invoice 41');
+  assert.deepEqual(fresh.api.kernel.get('obligations#1')?.fields.amount, { amount: 41_00, currency: 'GBP' });
+
+  // And out again identically, which is the property that makes the file worth keeping.
+  const again = value<string[]>(await fresh.api.export({}, owner));
+  assert.deepEqual(again.filter((l) => !l.startsWith('dog_sig')), lines.filter((l) => !l.startsWith('dog_sig')));
+
+  // An import into a record that already holds rows is a merge nobody asked for.
+  assert.equal((await api.import({ lines }, owner)).ok, false);
+  assert.equal((await api.import({}, owner)).ok, false);
+
+  // And no token takes the record off the machine.
+  assert.equal((await api.export({}, token('write'))).ok, false);
+  sql.close();
+  fresh.sql.close();
+});

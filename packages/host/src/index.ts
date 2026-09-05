@@ -49,6 +49,10 @@ export const ROUTES: readonly Route[] = [
   { name: 'planPack', writes: false, what: 'What installing a pack would do to this record. It writes nothing.' },
   { name: 'installPack', writes: true, what: 'Apply the plan somebody approved. A browser session only.' },
   { name: 'uninstallPack', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
+  { name: 'setDeclaration', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
+  { name: 'retireDeclaration', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
+  { name: 'export', writes: false, what: 'The record as a file: line per row, and it imports back.' },
+  { name: 'import', writes: true, what: 'A file into an EMPTY record. Anything else is a merge nobody asked for.' },
   { name: 'markRead', writes: true, what: 'How far you have read. A person only, and never an event.' },
   { name: 'log', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
   { name: 'create', writes: true, what: 'Add a row. The record allocates its number.' },
@@ -158,6 +162,10 @@ export type RecordSurface = {
   planPack(args: never, ctx: never): Promise<Result<unknown>>;
   installPack(args: never, ctx: never): Promise<Result<unknown>>;
   uninstallPack(args: never, ctx: never): Promise<Result<unknown>>;
+  setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
+  retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
+  export(args: never, ctx: never): Promise<Result<unknown>>;
+  import(args: never, ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
 };
@@ -187,6 +195,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     planPack: (a, ctx) => api.planPack(a as never, ctx as never),
     installPack: (a, ctx) => api.installPack(a as never, ctx as never),
     uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),
+    setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),
+    retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),
+    export: (a, ctx) => api.export(a as never, ctx as never),
+    import: (a, ctx) => api.import(a as never, ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
   };
