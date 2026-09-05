@@ -367,6 +367,68 @@ test('a damaged file is a refusal and not an exception, and it writes nothing', 
   source.sql.close();
 });
 
+test('A RECORD OPENED FROM A FILE KNOWS WHAT IT IS CALLED', async () => {
+  /* The header used to be skipped wholesale on import, so a record opened from a file could not say
+     its own name or timezone — and rendered every digest in UTC. Three of the four header tables
+     are still skipped, for three different reasons; `dog_meta` is the record's identity, and opening
+     a file into an empty record means becoming that record. */
+  const source = await filled();
+  value(
+    source.k.createRecord({
+      id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD',
+      slug: 'the-studio',
+      name: 'The Studio',
+      tz: 'Europe/London',
+      locale: 'en-GB',
+      owner: { id: 'p_1', email: 'me@example.test', name: 'Sam' },
+    }),
+  );
+  const lines = value<string[]>(await source.k.export());
+
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(k.import(lines));
+
+  assert.equal(k.identity()?.slug, 'the-studio', 'the record row did not travel');
+  assert.equal(k.identity()?.tz, 'Europe/London');
+  assert.equal(sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'record_slug'")?.value, 'the-studio');
+
+  // The three that are about the FILE rather than the record are rebuilt, not adopted.
+  assert.ok(sql.all('SELECT 1 FROM dog_section').length > 20, 'the section map was cleared by the import');
+  assert.equal(sql.all('SELECT 1 FROM dog_sig').length, 0);
+
+  // And the second export equals the first, which is what says the identity round-trips.
+  assert.deepEqual(value<string[]>(await k.export()), lines);
+
+  /* The manifest is written BY the export and describes the rows this record now holds, so the file's
+     copy of it was never adopted — which is the whole reason it is skipped. */
+  assert.ok(
+    sql.one<{ sha256: string }>("SELECT sha256 FROM dog_manifest WHERE table_name = 'entry'"),
+    'the manifest was not rebuilt by the export',
+  );
+  sql.close();
+  source.sql.close();
+});
+
+test('a file from a build that reads a newer format is refused, not half read', async () => {
+  // Reading it would mean writing rows whose columns this build does not know into a record it then
+  // calls a complete copy — and the customer finds out by opening it and finding a table missing.
+  const source = await filled();
+  const lines = value<string[]>(await source.k.export());
+  const at = lines.findIndex((l) => l.startsWith('["format"'));
+  assert.ok(at > 0, `no format line in the header: ${lines.slice(0, 6).join(' / ')}`);
+
+  const future = [...lines.slice(0, at), '["format","9"]', ...lines.slice(at + 1)];
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const out = k.import(future) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.equal(out.ok, false, 'a file from a newer build was read as if this build had written it');
+  assert.match(out.refusal?.fix ?? '', /format 9/);
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 0, 'a refused import wrote rows');
+  sql.close();
+  source.sql.close();
+});
+
 /* ── the values survive ──────────────────────────────────────────────────── */
 
 test('every kind of value comes back as itself', async () => {

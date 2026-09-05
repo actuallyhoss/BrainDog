@@ -192,6 +192,12 @@ export function importDogl(
 ): { ok: true; value: ImportReport } | { ok: false; refusal: { code: string; fix: string } } {
   const shapes = new Map(tables(sql).map((t) => [t.name, t]));
 
+  /* A FILE FROM A NEWER BUILD IS NOT READ, IT IS REFUSED. Reading it would mean writing rows whose
+     columns this build does not know into a record it then claims is a complete copy — and the
+     customer would find out by opening a record with a table missing from it. The reverse is fine:
+     an older file has fewer columns, and the positional read already handles that. */
+  const readsFormat = Number(sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'format'")?.value ?? 1);
+
   /* EMPTY MEANS EVERY TABLE THE FILE WOULD TOUCH, not just `entry`.
      Counting entries alone let a record that held registers, decisions and grants but no rows call
      itself empty — and then the first `declaration` line cleared `declaration` while the target's
@@ -249,15 +255,28 @@ export function importDogl(
       }
       if (line.startsWith('#')) continue;
       if (!table || header.length === 0) continue;
-      /* The header travels with the file and is rebuilt on open, so importing it would write the
-         manifest of the FILE over the manifest of the record being built from it.
+      /* THREE HEADER TABLES ARE SKIPPED AND ONE IS NOT, and the difference is what each is about.
+         `dog_manifest` describes the FILE, and writing it over the record being built from that file
+         would put a hash of the wrong rows in the next export. `dog_section` is the schema's own map
+         of itself, rebuilt by the migration. `dog_sig` is a signature over bytes that are not these.
 
-         `migration` travels too and is not imported, for a different reason: the ledger is a fact
-         about the database it is in — which migrations were applied to THESE bytes, and when. The
-         target applied its own before it could read a file at all. It is in the file so a reader can
-         see which schema wrote it, and adopting somebody else's would be claiming a history that
-         did not happen here. */
-      if (table.section === 'header' || table.name === 'migration') continue;
+         `dog_meta` is the record's IDENTITY — its id, its slug, its name, its timezone — and opening
+         a file into an empty record means becoming that record. An earlier shape skipped the whole
+         header, so a record opened from a file could not say what it was called and rendered every
+         digest in UTC.
+
+         `migration` travels too and is not imported, for a third reason: the ledger is a fact about
+         the database it is in — which migrations were applied to THESE bytes, and when. The target
+         applied its own before it could read a file at all, and adopting somebody else's would be
+         claiming a history that did not happen here. */
+      if (SKIPPED.has(table.name)) continue;
+
+      const values = parseRow(line, table.name);
+      if (table.name === 'dog_meta') {
+        const [key, value] = values as [string, string];
+        if (key === 'format' && Number(value) > readsFormat)
+          throw new BadLine(`This file is format ${value} and this build reads ${readsFormat}.`);
+      }
 
       /* AN EMPTY RECORD IS NOT AN EMPTY DATABASE. The migration seeds rows — the two counters, the
          section map — and the file supersedes them: a `counter` from the seed would restart the
@@ -265,7 +284,6 @@ export function importDogl(
          clears it. `entry` is already empty by the check above; this is about the seed. */
       if (!touched.has(table.name)) sql.exec(`DELETE FROM ${table.name}`);
 
-      const values = parseRow(line, table.name);
       /* THE FILE'S COLUMNS, not this build's. A file written by an older version has fewer, and
          reading it positionally against today's list would put a value in the wrong column —
          silently, and in a record of what somebody is owed. */
@@ -282,6 +300,13 @@ export function importDogl(
   });
   }
 }
+
+/**
+ * The tables in the file that are about the FILE rather than about the record.
+ *
+ * `dog_meta` is deliberately not here: see the note at the skip.
+ */
+const SKIPPED = new Set(['dog_section', 'dog_manifest', 'dog_sig', 'migration']);
 
 /** Thrown when a row line is not a JSON array, so the transaction rolls back and the caller gets a sentence. */
 class BadLine extends Error {}

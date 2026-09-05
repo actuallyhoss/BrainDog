@@ -21,7 +21,7 @@ import { no, ok } from '@braindog/ports';
 
 import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } from './coerce.ts';
 import { ulids, type Mint } from './ids.ts';
-import { applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
+import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { compile, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, retireDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
@@ -38,6 +38,7 @@ import {
   type ScheduleKind,
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
+import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
@@ -52,6 +53,7 @@ export type { ImportReport, Section, TableShape } from './dogl.ts';
 export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
+export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
 export type { Declaration, DeclKind, Installed } from './declare.ts';
@@ -568,6 +570,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
    */
   const HANDLERS: Partial<Record<ScheduleKind, Handler>> = {
     retry: retryHandler(sql),
+
+    /* THE HOURLY SWEEP. A hundred rows at a time, and the next hour takes the next hundred — so a
+       record that deleted ten thousand rows in one afternoon is swept without holding a write lock
+       on the one thread it has. */
+    purge: () => {
+      purge(sql, clock.now() - 30 * 86_400_000, clock.now(), transaction, mint);
+      return clock.now() + 3_600_000;
+    },
+
     reminder: (row) => {
       const p = JSON.parse(row.payload) as { entry?: string; register?: string; field?: string; at?: string };
       const entry = p.entry ? byId(p.entry) : null;
@@ -645,6 +656,33 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
      * needs the world to hear about it inserts a row here and commits; something else delivers it.
      */
     outbox: (kind: OutboxKind, payload: unknown) => transaction(() => enqueue(sql, mint, clock.now(), kind, payload)),
+
+    /* ── provisioning ────────────────────────────────────────── */
+
+    /**
+     * Say what this record is: its name, its owner, its timezone, and the header a file carries.
+     *
+     * NAMING IS PROVISIONING — the object already exists the moment it is addressed. This is the
+     * four rows that say WHICH record it is, in one transaction, because a record with an owner and
+     * no timezone renders every digest in the wrong day.
+     */
+    createRecord(args: CreateRecordArgs): Result<Provisioned> {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+      return createRecord(sql, clock.now(), FORMAT_VERSION, args, transaction, mint);
+    },
+
+    /** What this record calls itself, or `null` before anybody has said. */
+    identity: () => recordIdentity(sql),
+
+    /**
+     * The sweep, by hand. The hourly `purge` row calls the same function.
+     *
+     * A soft delete is not a delete and is not forever either: thirty days is the window in which
+     * "undo" is a real word, and after it a record that only grows makes every scan pay.
+     */
+    purge: (opts: { cutoffMs?: number; limit?: number } = {}) =>
+      purge(sql, opts.cutoffMs ?? clock.now() - 30 * 86_400_000, clock.now(), transaction, mint, opts.limit),
 
     /** Claim up to `n` jobs of these kinds. One statement, so a double drain finds nothing. */
     leaseOutbox: (kinds: readonly OutboxKind[], n = 10) => transaction(() => lease(sql, clock.now(), kinds, n)),

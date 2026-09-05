@@ -17,7 +17,7 @@
 
 import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { openRecord, type Entry, type Kernel, type Patch, type RegisterDecl } from '@braindog/kernel';
+import { openRecord, type CreateRecordArgs, type Entry, type Kernel, type Patch, type RegisterDecl } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
@@ -230,6 +230,19 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
           ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
         }),
       );
+    },
+
+    /**
+     * Say what this record is. INTERNAL: the host calls it, and it is not in `ROUTES`.
+     *
+     * IT TAKES NO `CallContext` AND THAT IS THE POINT. It runs before there is anybody to check
+     * against — the `member('*', 'owner')` row it writes is the row every later permission check
+     * reads — so a ladder here would either refuse the first call or be a ladder with a hole in it.
+     * What keeps it safe is that it is unroutable: `handlersFor` builds from the shared table, and
+     * this is not in it.
+     */
+    async createRecord(args: CreateRecordArgs) {
+      return tail(kernel.createRecord(args));
     },
 
     /** A row's history: the writes that made it, each with who and when. */
