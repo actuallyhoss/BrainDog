@@ -36,7 +36,7 @@
 
 import { money, parse, relative } from 'braindog-render';
 import { KINDS, isKind } from 'braindog-render';
-import { CURRENCY, NOW, display, type BlockResult } from './api.ts';
+import { CURRENCY, NOW, REGISTERS, display, type BlockResult } from './api.ts';
 
 /** A bar over a register groups its rows and sums them — the one place a page does arithmetic. */
 function barRows(block: BlockResult): string[] {
@@ -103,6 +103,29 @@ function gaugeRows(block: BlockResult): string[] {
 }
 
 /**
+ * A board's columns follow the ENUM'S DECLARED ORDER, not the order rows happen to arrive in.
+ *
+ * The renderer takes its columns from the first cell of each row in sequence, which is correct for a
+ * primitive that cannot know what the values mean. The host does know: `state` declares
+ * `open, doing, blocked, done, dropped`, and that list is the workflow. Left to arrival order the
+ * board read OPEN · BLOCKED · DOING · DONE — a board whose columns are not in the order work moves
+ * through them is a board you have to read twice to use once.
+ *
+ * Values the enum does not declare sort last, in the order they turned up, rather than being
+ * dropped: a row in an unknown state is a row somebody needs to see.
+ */
+function boardOrder(block: BlockResult): BlockResult {
+  const field = block.columns[0]?.field;
+  const values = field ? REGISTERS[block.register ?? '']?.fields.find((f) => f.id === field)?.values : undefined;
+  if (!field || !values) return block;
+  const rank = (e: (typeof block.entries)[number]) => {
+    const i = values.indexOf(String(e.fields[field] ?? ''));
+    return i === -1 ? values.length : i;
+  };
+  return { ...block, entries: [...block.entries].sort((a, b) => rank(a) - rank(b)) };
+}
+
+/**
  * The general path: one row per entry, one cell per declared column, formatted.
  *
  * The tone travels with the row rather than being a fourth column, because a kind's arity does not
@@ -146,7 +169,7 @@ export function toSegments(block: BlockResult) {
       : block.kind === 'gauge'
         ? gaugeRows(block)
       : block.register && block.columns.length > 0 && spec
-        ? projectRows(block, spec.cells)
+        ? projectRows(block.kind === 'board' ? boardOrder(block) : block, spec.cells)
         : block.body
           ? [block.body]
           : [];
