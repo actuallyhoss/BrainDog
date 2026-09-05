@@ -55,15 +55,27 @@ const refusal = (r: unknown) => {
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
 test('THE COUNT IS THE DESIGN, and it is the document’s list minus what is not built', () => {
-  // The tool list is in every turn of every session, so one more tool costs every conversation for
-  // ever. `10-MCP` §5 names eight; `propose` is absent because suggestions are not built and a tool
-  // that refuses everything is worse than one that is not there, and `schema` and `history` are
-  // present because that document serves them as resources and this build serves none.
+  /* The tool list is in every turn of every session, so one more tool costs every conversation for
+     ever. `10-MCP` §5 names eight; `propose` is absent because suggestions are not built and a tool
+     that refuses everything is worse than one that is not there, and `schema` and `history` are
+     present because that document serves them as resources and this build serves none.
+
+     The four added since are the record's own reading of itself — `pages`, `page`, `metric` and
+     `credentials` — and each earns its place by being a question an agent asks that `list` cannot
+     answer: what does this record draw, what does this figure say, and what would break if this
+     machine were lost. */
   const named = TOOLS.map((t) => t.name);
   for (const wanted of ['record_index', 'search', 'get', 'list', 'create', 'update', 'log'])
     assert.ok(named.includes(wanted), `${wanted} is in 10-MCP §5 and not here`);
   assert.ok(!named.includes('propose'), 'a tool that refuses everything is worse than an absent one');
-  assert.equal(TOOLS.length, 9);
+
+  /* AND NO TOOL READS A CREDENTIAL. The vault needs a person in a browser and an agent holding a
+     token is neither; `credentials` is the INDEX, which is what makes "check nothing expires next
+     week" a thing an agent can do without anything being readable that should not be. */
+  for (const forbidden of ['openGrant', 'open_grant', 'credential', 'secret'])
+    assert.ok(!named.includes(forbidden), `${forbidden} would read a credential`);
+
+  assert.equal(TOOLS.length, 13);
   assert.equal(new Set(named).size, TOOLS.length, 'two tools share a name');
   for (const t of TOOLS) {
     assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
@@ -251,5 +263,42 @@ test('and a query of punctuation finds nothing rather than erroring', async () =
   const { sql, mcp } = await agent();
   for (const q of ['"', '-', '   ', 'NEAR(a b)'])
     assert.ok(Array.isArray(value(await mcp.call('search', { q }, owner))), `${q} threw`);
+  sql.close();
+});
+
+/* ── the four the record added ───────────────────────────────────── */
+
+test('AN AGENT CAN ASK WHAT THE RECORD DRAWS, and read one page of it', async () => {
+  const { mcp, sql } = await agent();
+  const pages = await mcp.call('pages', {}, owner);
+  assert.ok(pages.ok, pages.ok ? '' : pages.refusal.fix);
+  assert.deepEqual(pages.value, [], 'this record declares no pages');
+
+  const missing = await mcp.call('page', { slug: 'nonsense' }, owner);
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.equal(missing.refusal.code, 'PAGE_UNKNOWN');
+
+  // And a slug that is not a string is a refusal rather than a crash, like every other argument.
+  const bad = await mcp.call('page', {}, owner);
+  assert.equal(bad.ok, false);
+  sql.close();
+});
+
+test('and what each credential OPENS, which is never the credential', async () => {
+  // There is no tool that reads one and there is not going to be. What an agent can have is the
+  // index, which is what makes "check nothing expires next week" possible without anything leaking.
+  const { mcp, sql } = await agent();
+  const out = await mcp.call('credentials', {}, owner);
+  assert.ok(out.ok, out.ok ? '' : out.refusal.fix);
+  assert.deepEqual(out.value, []);
+  assert.ok(!JSON.stringify(out).includes('ciphertext'));
+  sql.close();
+});
+
+test('a figure comes back with its target, and one that is not declared is named', async () => {
+  const { mcp, sql } = await agent();
+  const out = await mcp.call('metric', { metric: 'nonesuch' }, owner);
+  assert.equal(out.ok, false);
+  if (!out.ok) assert.equal(out.refusal.code, 'METRIC_UNKNOWN');
   sql.close();
 });

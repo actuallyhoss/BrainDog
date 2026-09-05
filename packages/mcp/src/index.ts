@@ -91,6 +91,33 @@ export const TOOLS: readonly Tool[] = [
     writes: false,
   },
   {
+    name: 'pages',
+    description: 'The pages this record can draw, by slug. A project page is one declaration per row, so there are more of these than there are declarations.',
+    input: obj({}),
+    writes: false,
+  },
+  {
+    name: 'page',
+    description:
+      'One page: every block run, as rows and figures rather than markup. A block the record could not draw says why, and the rest of the page still comes back.',
+    input: obj({ slug: str('A slug from pages.') }, ['slug']),
+    writes: false,
+  },
+  {
+    name: 'metric',
+    description:
+      'One figure, with the target it is measured against and how it compares to the window before. Add a parameter after a colon for a metric about one thing: project-owed:Kiln.',
+    input: obj({ metric: str('A metric id, optionally with :parameter.') }, ['metric']),
+    writes: false,
+  },
+  {
+    name: 'credentials',
+    description:
+      'What each credential OPENS — its label, what it reaches, its kind, when it was last used and when it is due for rotation. Never the credential itself, which no tool can read.',
+    input: obj({}),
+    writes: false,
+  },
+  {
     name: 'create',
     description: 'Add a row to a register. The record allocates its number and hands it back.',
     input: obj(
@@ -176,6 +203,21 @@ export function tools(api: RecordApi) {
       const at = parse(args.spoken);
       return at ? api.history(at, ctx) : badSpoken();
     },
+
+    pages: (_args, ctx) => api.pages(ctx),
+    page: (args, ctx) => api.page({ slug: String(args.slug ?? '') }, ctx),
+    metric: (args, ctx) => api.metric({ metric: String(args.metric ?? '') }, ctx),
+
+    /**
+     * WHAT A KEY OPENS, NEVER THE KEY.
+     *
+     * There is no tool that reads a credential and there is not going to be one: the vault needs a
+     * person in a browser, and an agent holding a token is neither. What an agent CAN have is the
+     * index — "the Stripe live key reaches stripe.com, was last opened in June, is due for rotation
+     * in eleven days" — which is what makes "check nothing is about to expire" a thing it can do
+     * without anything being readable that should not be.
+     */
+    credentials: (_args, ctx) => api.listGrants(ctx),
 
     create: (args, ctx) =>
       api.create(
