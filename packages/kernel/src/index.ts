@@ -26,6 +26,7 @@ import { compile, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, retireDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 import { exportDogl, importDogl, type Section } from './dogl.ts';
+import { due, pendingWork, reschedule, type Remindable } from './schedule.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
@@ -34,6 +35,8 @@ export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
 export { TRAVELS, decode, encode, projection, tables } from './dogl.ts';
+export { atMs, expandRepeat, offsetMs, remindersFor } from './schedule.ts';
+export type { Remindable, Repeat, Reminder } from './schedule.ts';
 export type { ImportReport, Section, TableShape } from './dogl.ts';
 export type { Hit } from './fts.ts';
 export type { Declaration, DeclKind, Installed } from './declare.ts';
@@ -404,6 +407,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
         );
         const entry = byId(id, true)!;
         reproject(entry);
+        rediary(entry);
         appendEvent({ kind: 'create', target: id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
         return ok(entry);
       }
@@ -418,6 +422,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
       );
       const entry = byId(current.id, true)!;
       reproject(entry);
+      rediary(entry);
       const kind = deleting ? (deletedAt ? 'delete' : 'restore') : nextState !== current.state ? 'state' : 'edit';
       appendEvent({ kind, target: current.id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
       return ok(entry);
@@ -430,6 +435,26 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
    * An index updated afterwards is wrong for however long "afterwards" takes, and the window is
    * exactly when somebody is looking for the thing they just wrote.
    */
+  /**
+   * Reminders in step with the row, in the same transaction, on every write.
+   *
+   * Nobody sets a reminder: a field declares `remind:` and the record derives the rows, so a due date
+   * that moves takes its reminders with it. Every product where the reminder is a separate object
+   * has the same failure — the invoice slips a week, the reminder does not, and it fires about a
+   * date that is no longer true.
+   */
+  function rediary(entry: Entry): void {
+    const decl = registers.get(entry.register);
+    if (!decl) return;
+    reschedule(
+      sql,
+      mint,
+      { id: entry.id, register: entry.register, fields: entry.fields, deleted: entry.deleted_at !== null },
+      decl.fields as readonly Remindable[],
+      clock.now(),
+    );
+  }
+
   function reproject(entry: Entry): void {
     const decl = registers.get(entry.register);
     if (!decl || decl.series) return;
@@ -508,6 +533,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     reload,
     search,
     rebuildFts,
+
+    /**
+     * When the record next has something to do. ONE ALARM PER CUSTOMER, which is what an object per
+     * customer buys: the alternative is a cron worker fanning out across every tenant, waking
+     * records that have nothing to do in order to ask them.
+     */
+    pending: () => pendingWork(sql),
+
+    /** The reminders that are due, oldest first. What the alarm hands to whatever sends them. */
+    due: (limit?: number) => due(sql, clock.now(), limit),
 
     /** The record as a file: `.dogl` lines, header first, `local` left behind. */
     export: (opts: { sections?: readonly Section[] } = {}) => exportDogl(sql, transaction, opts),
