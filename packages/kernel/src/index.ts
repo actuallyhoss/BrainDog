@@ -24,7 +24,7 @@ import { attempt } from './tx.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { compile, type Predicate, type Schema } from '@braindog/where';
-import { installDeclarations, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
+import { installDeclarations, jcs, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 import { exportDogl, importDogl, type Section } from './dogl.ts';
 import {
@@ -142,6 +142,14 @@ export type RegisterDecl = {
     derived?: boolean;
     retired?: boolean;
     default?: Json;
+    /**
+     * Never write this field's VALUES into the ledger, only that it changed.
+     *
+     * `secret` AND `money` ARE ON THE LIST WITHOUT ASKING. An audit log is read by everybody who
+     * can read the record, and a per-field history of what somebody was paid is a salary disclosed
+     * to the whole team by the feature that exists to make the record trustworthy.
+     */
+    redact?: boolean;
   })[];
   /** The enum field mirrored onto `entry.state`, when the register has one. */
   state?: string;
@@ -174,6 +182,14 @@ export type WriteContext = {
   version?: number;
   /** Groups the events of one write, and of a rule's re-entry into it. */
   batch?: string;
+  /**
+   * The caller's own id for this write.
+   *
+   * A REPLAY RETURNS THE ORIGINAL RESULT rather than writing again. An agent that retries a request
+   * whose answer it did not receive is the ordinary case, and without this the retry is a second
+   * row — the duplicate-invoice failure, from the client side.
+   */
+  opId?: string;
   /**
    * Whether the rules pass runs after this write. `false` is what a rule's own write carries.
    *
@@ -576,6 +592,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
   function writing(register: string, ref: string | null, patch: Patch, w: WriteContext): Result<Entry> {
     return transaction(() => {
+      /* STEP ZERO: A REPLAY RETURNS WHAT THE FIRST ATTEMPT RETURNED.
+       *
+       * An agent that retries a request whose answer it did not receive is the ORDINARY case — a
+       * dropped socket, a timeout, a queue redelivery — and without this the retry is a second row.
+       * That is the duplicate-invoice failure from the client's side, and `sha256` on the bytes
+       * cannot catch it because the second attempt is a different request with the same intent.
+       *
+       * The id is the caller's, written on the FIRST event row of a write and held unique there, so
+       * the replay is one indexed read and the answer is the row as it is now. */
+      if (w.opId !== undefined) {
+        const already = sql.one<{ target: string }>('SELECT target FROM event WHERE op_id = ?', w.opId);
+        if (already) {
+          const was = byId(already.target.replace(/^entry:/, ''), true);
+          if (was) return ok(was);
+        }
+      }
       const decl = registers.get(register);
       if (!decl)
         return no<Entry>('REGISTER_UNKNOWN', `There is no register called ${register}.`, {
@@ -735,7 +767,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const entry = byId(id, true)!;
         reproject(entry);
         rediary(entry);
-        const batch = appendEvent({ kind: 'create', target: id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
+        /* A `create` ROW CARRIES THE WHOLE SHAPE, with `field` null and `to_v` the row as JCS — so
+           a replay reconstructs what was written without joining anything, and the redacted fields
+           are the string `--redacted--` INSIDE that JSON rather than absent from it. */
+        const batch = appendEvent({
+          kind: 'create',
+          target: id,
+          register,
+          actor: w.actor,
+          note: w.note,
+          at: now,
+          batch: w.batch,
+          field: null,
+          to: Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, shown(register, k, v) ?? null])) as Json,
+          ...(w.opId === undefined ? {} : { opId: w.opId }),
+        });
         return ok(rules(entry, register, w, batch));
       }
 
@@ -750,8 +796,66 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const entry = byId(current.id, true)!;
       reproject(entry);
       rediary(entry);
-      const kind = deleting ? (deletedAt ? 'delete' : 'restore') : nextState !== current.state ? 'state' : 'edit';
-      const batch = appendEvent({ kind, target: current.id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
+
+      /* ONE ROW PER CHANGED FIELD, and this is the difference between a history and an activity
+         feed. A ledger that says a row was edited and not WHAT changed cannot answer the only
+         question anybody asks of it — and "append-only" is worth nothing if what was appended is
+         "something happened". `state` is its own kind because a move is the one edit a register
+         declares rules about; `tag` and `untag` are their own because a list changes by element. */
+      const first = deleting
+        ? deletedAt
+          ? 'delete'
+          : 'restore'
+        : nextState !== current.state && decl.state
+          ? 'state'
+          : 'edit';
+
+      let batch = '';
+      const write = (kind: string, field: string | null, from: Json | undefined, to: Json | undefined): void => {
+        const id = appendEvent({
+          kind,
+          target: current.id,
+          register,
+          actor: w.actor,
+          at: now,
+          /* THE NOTE GOES ON THE FIRST ROW ONLY. It is one thing somebody said about one write, not
+             a thing they said about each field. */
+          ...(batch === '' && w.note !== undefined ? { note: w.note } : {}),
+          batch: w.batch ?? (batch === '' ? undefined : batch),
+          field,
+          ...(from === undefined ? {} : { from }),
+          ...(to === undefined ? {} : { to }),
+          ...(batch === '' && w.opId !== undefined ? { opId: w.opId } : {}),
+        });
+        if (batch === '') batch = w.batch ?? id;
+      };
+
+      if (deleting) write(first, null, undefined, undefined);
+      else {
+        for (const key of touched) {
+          const was = current.fields[key];
+          const is = merged[key];
+          if (JSON.stringify(was ?? null) === JSON.stringify(is ?? null)) continue;
+
+          /* A LIST CHANGES BY ELEMENT. `tags` going from two to three is one `tag` row naming the
+             one that arrived, not an `edit` naming both arrays — which is what makes "when was this
+             tagged late" a question with an answer. */
+          if (key === 'tags' || (known.get(key)?.type === 'list' && known.get(key)?.of === 'text')) {
+            const before = new Set(Array.isArray(was) ? was.map(String) : []);
+            const after = new Set(Array.isArray(is) ? is.map(String) : []);
+            for (const value of after) if (!before.has(value)) write('tag', key, undefined, value);
+            for (const value of before) if (!after.has(value)) write('untag', key, value, undefined);
+            continue;
+          }
+
+          const kind = decl.state && key === decl.state ? 'state' : 'edit';
+          write(kind, key, shown(register, key, was) ?? null, shown(register, key, is) ?? null);
+        }
+        /* A WRITE THAT CHANGED NOTHING IS STILL A WRITE somebody made — a note against a row, or a
+           re-send of the same values — and the ledger says so rather than swallowing it. */
+        if (batch === '') write(first, null, undefined, undefined);
+      }
+
       return ok(rules(entry, register, w, batch));
     });
   }
@@ -827,23 +931,54 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     note?: string | undefined;
     at: string;
     batch?: string | undefined;
+    field?: string | null | undefined;
+    from?: Json | undefined;
+    to?: Json | undefined;
+    opId?: string | undefined;
   }): string {
     const id = mint();
     /* `target` carries its KIND — `entry:01J…` — because an event is about a row, a decision, a pack
        or a declaration, and a bare id would make "everything about this" a search of four tables. */
     sql.exec(
-      'INSERT INTO event (id, ts, actor, kind, target, target_kind, note, batch) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note, batch, op_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id,
       e.at,
       e.actor,
       e.kind,
       `entry:${e.target}`,
       'entry',
+      e.field ?? null,
+      e.from === undefined ? null : written(e.from),
+      e.to === undefined ? null : written(e.to),
       e.note ?? null,
       e.batch ?? null,
+      e.opId ?? null,
     );
     return id;
   }
+
+  /** A value as the ledger stores it. `null` is "there was no prior value" and is not a string. */
+  const written = (value: Json): string | null => (value === null ? null : jcs(value));
+
+  /**
+   * Which fields never have their VALUES written down, only the fact that they changed.
+   *
+   * `secret` AND `money` ALWAYS. An audit log is read by everybody who can read the record, and a
+   * per-field history of what somebody was paid is a salary disclosed to the whole team by the
+   * feature that exists to make the record trustworthy. Any other field joins the list with
+   * `redact: true` on its declaration.
+   *
+   * WHAT IS KEPT IS WHO, WHEN AND WHICH FIELD — fully auditable — and what is dropped is only the
+   * number. `--redacted--` rather than an absent row, so the difference between "not recorded" and
+   * "recorded and withheld" is visible.
+   */
+  const REDACTED = '--redacted--';
+  const redacts = (register: string, field: string): boolean => {
+    const decl = registers.get(register)?.fields.find((f) => f.id === field);
+    return decl ? decl.type === 'secret' || decl.type === 'money' || decl.redact === true : false;
+  };
+  const shown = (register: string, field: string, value: Json | undefined): Json | undefined =>
+    value === undefined ? undefined : redacts(register, field) ? REDACTED : value;
 
   /** What the evaluator needs beyond SQL: the clock, and the shape of a register. */
   const evalContext = (): EvalContext => ({
@@ -1199,12 +1334,51 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
   };
 
-  /** Every event about one row, oldest first: the row's history is the rows that made it. */
+  /**
+   * Every event about one row, oldest first: the row's history is the rows that made it.
+   *
+   * AND IT SAYS WHAT CHANGED. `field`, `from_v` and `to_v` are what make this a history rather than
+   * an activity feed — "edited" is not an answer to any question anybody asks of an audit log, and
+   * "append-only" is worth nothing if what was appended is that something happened.
+   */
   const history = (target: string) =>
-    sql.all<{ id: string; ts: string; actor: string; kind: string; note: string | null }>(
-      'SELECT id, ts, actor, kind, note FROM event WHERE target = ? ORDER BY rowid',
-      `entry:${target}`,
-    );
+    sql
+      .all<{
+        id: string;
+        ts: string;
+        actor: string;
+        kind: string;
+        field: string | null;
+        from_v: string | null;
+        to_v: string | null;
+        note: string | null;
+        batch: string | null;
+      }>(
+        'SELECT id, ts, actor, kind, field, from_v, to_v, note, batch FROM event WHERE target = ? ORDER BY rowid',
+        `entry:${target}`,
+      )
+      .map((e) => ({
+        id: e.id,
+        ts: e.ts,
+        actor: e.actor,
+        kind: e.kind,
+        field: e.field,
+        /* PARSED, because a caller reading a history should not have to know it is stored as JCS —
+           and a value that will not parse comes back as the text it is rather than as a throw. */
+        from: read(e.from_v),
+        to: read(e.to_v),
+        note: e.note,
+        batch: e.batch,
+      }));
+
+  const read = (value: string | null): Json | null => {
+    if (value === null) return null;
+    try {
+      return JSON.parse(value) as Json;
+    } catch {
+      return value;
+    }
+  };
 
   /**
    * Rows whose text matches, best first.

@@ -87,10 +87,23 @@ test('A RULE IS A DECLARATION, and the row it is about comes back as the rule le
   assert.equal(made.state, 'late', 'the caller was handed a row that is not what the record holds');
   assert.deepEqual(made.fields.tags, ['chased']);
 
-  // The rule's write wears its own name, and shares the triggering write's batch.
-  const events = sql.all<{ actor: string; kind: string; batch: string | null }>('SELECT actor, kind, batch FROM event ORDER BY rowid');
-  assert.deepEqual(events.map((e) => e.actor), ['p_1', 'rule:late']);
-  assert.equal(events[1]?.batch, events[0] ? sql.one<{ id: string }>('SELECT id FROM event ORDER BY rowid LIMIT 1')?.id : null);
+  /* THE RULE'S WRITE WEARS ITS OWN NAME, shares the triggering write's batch, and lands as ONE ROW
+     PER CHANGED FIELD — a `state` because the register declares one, and a `tag` naming the value
+     that arrived rather than an `edit` naming two arrays. */
+  const events = sql.all<{ actor: string; kind: string; field: string | null; from_v: string | null; to_v: string | null; batch: string | null }>(
+    'SELECT actor, kind, field, from_v, to_v, batch FROM event ORDER BY rowid',
+  );
+  assert.deepEqual(
+    events.map((e) => `${e.actor}/${e.kind}/${e.field ?? '—'}`),
+    ['p_1/create/—', 'rule:late/state/state', 'rule:late/tag/tags'],
+  );
+  assert.equal(events[1]?.from_v, '"open"');
+  assert.equal(events[1]?.to_v, '"late"');
+  assert.equal(events[2]?.to_v, '"chased"', 'the tag row does not name the tag');
+
+  const trigger = sql.one<{ id: string }>('SELECT id FROM event ORDER BY rowid LIMIT 1')?.id;
+  assert.equal(events[1]?.batch, trigger);
+  assert.equal(events[2]?.batch, trigger, 'the two rows a rule wrote are not one batch');
   sql.close();
 });
 

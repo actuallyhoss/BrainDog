@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, type Kernel, type RegisterDecl } from '../src/index.ts';
+import { openRecord, type Entry, type Kernel, type RegisterDecl } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -25,6 +25,8 @@ const OBLIGATIONS: RegisterDecl = {
     { id: 'amount', type: 'money' },
     { id: 'due', type: 'day' },
     { id: 'ref', type: 'text', unique: true },
+    { id: 'party', type: 'text' },
+    { id: 'tags', type: 'list', of: 'text' },
     { id: 'opened', type: 'day', immutable: true },
     {
       id: 'state',
@@ -405,5 +407,90 @@ test('and a deleted row stays out of a filtered list too', async () => {
   );
   assert.equal(out.rows.length, 1);
   assert.equal(out.matched, 1, 'the count included a deleted row');
+  sql.close();
+});
+
+/* ── a history, and not an activity feed ───────────────────────── */
+
+test('THE LEDGER SAYS WHAT CHANGED, one row per field, or it is not a history', async () => {
+  /* "Edited" is not an answer to any question anybody asks of an audit log, and append-only is
+     worth nothing when what was appended is that something happened. */
+  const { k, sql } = await record();
+  const made = value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open', party: 'Acme' }, { actor: 'p_1' }));
+
+  /* A `create` CARRIES THE WHOLE SHAPE: field null, `to_v` the row as written. */
+  const born = k.history(made.id)[0]!;
+  assert.equal(born.kind, 'create');
+  assert.equal(born.field, null);
+  assert.deepEqual(born.to, { what: 'Invoice 41', state: 'open', party: 'Acme' });
+
+  value<Entry>(k.update('obligations', 'obligations#1', { party: 'Ravensworth', state: 'paid' }, { actor: 'p_2', note: 'Settled by phone.' }));
+  const after = k.history(made.id).slice(1);
+
+  assert.deepEqual(
+    after.map((e) => `${e.kind}/${e.field}/${JSON.stringify(e.from)}→${JSON.stringify(e.to)}`),
+    ['edit/party/"Acme"→"Ravensworth"', 'state/state/"open"→"paid"'],
+  );
+  /* THE NOTE IS ON THE FIRST ROW ONLY: it is one thing somebody said about one write, not a thing
+     they said about each field. */
+  assert.equal(after[0]?.note, 'Settled by phone.');
+  assert.equal(after[1]?.note, null);
+  assert.equal(after[1]?.batch, after[0]?.id, 'the two rows of one write are not one batch');
+  sql.close();
+});
+
+test('AND A LIST CHANGES BY ELEMENT, so "when was this tagged late" has an answer', async () => {
+  const { k, sql } = await record();
+  const made = value<Entry>(k.create('obligations', { what: 'a', state: 'open', tags: ['urgent'] }, { actor: 'p_1' }));
+  value<Entry>(k.update('obligations', 'obligations#1', { tags: ['urgent', 'late'] }, { actor: 'p_1' }));
+  value<Entry>(k.update('obligations', 'obligations#1', { tags: ['late'] }, { actor: 'p_1' }));
+
+  assert.deepEqual(
+    k.history(made.id).slice(1).map((e) => `${e.kind}/${JSON.stringify(e.to ?? e.from)}`),
+    ['tag/"late"', 'untag/"urgent"'],
+  );
+  sql.close();
+});
+
+test('AND A MONEY FIELD IS ON THE REDACTION LIST WITHOUT ASKING', async () => {
+  /* An audit log is read by everybody who can read the record, and a per-field history of what
+     somebody was paid is a salary disclosed to the whole team by the feature that exists to make
+     the record trustworthy. Who, when and which field are kept; the number is not. */
+  const { k, sql } = await record();
+  const made = value<Entry>(k.create('obligations', { what: 'a', state: 'open', amount: { amount: 90_000, currency: 'GBP' } }, { actor: 'p_1' }));
+
+  assert.equal((k.history(made.id)[0]!.to as Record<string, unknown>).amount, '--redacted--');
+  assert.equal((k.history(made.id)[0]!.to as Record<string, unknown>).what, 'a', 'a text field was redacted too');
+
+  value<Entry>(k.update('obligations', 'obligations#1', { amount: { amount: 12_000, currency: 'GBP' } }, { actor: 'p_1' }));
+  const changed = k.history(made.id).at(-1)!;
+  assert.equal(changed.field, 'amount', 'which field changed is not recorded');
+  assert.equal(changed.from, '--redacted--');
+  assert.equal(changed.to, '--redacted--');
+
+  // And the number is nowhere in the ledger, which is the whole point.
+  assert.equal(sql.all("SELECT 1 FROM event WHERE to_v LIKE '%90000%' OR from_v LIKE '%90000%'").length, 0);
+  sql.close();
+});
+
+test('A RETRY IS ONE ROW, because an agent whose answer was lost sends it again', async () => {
+  /* A dropped socket, a timeout, a queue redelivery — the ordinary case. Without the caller's own
+     id the second attempt is a second row, which is the duplicate-invoice failure from the client
+     side, and hashing the bytes cannot catch it: the retry is a different request with one intent. */
+  const { k, sql } = await record();
+  const first = value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1', opId: 'op-a' }));
+  const again = value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1', opId: 'op-a' }));
+
+  assert.equal(again.id, first.id, 'a retry wrote a second row');
+  assert.equal(k.count('obligations'), 1);
+  assert.equal(sql.all("SELECT 1 FROM event WHERE op_id = 'op-a'").length, 1, 'the id landed twice');
+
+  // And the replay answers with the row AS IT IS NOW, not as it was — which is what a caller wants.
+  value<Entry>(k.update('obligations', 'obligations#1', { state: 'paid' }, { actor: 'p_2' }));
+  assert.equal(value<Entry>(k.create('obligations', { what: 'x' }, { actor: 'p_1', opId: 'op-a' })).fields.state, 'paid');
+
+  // A different id is a different write.
+  value<Entry>(k.create('obligations', { what: 'Invoice 42', state: 'open' }, { actor: 'p_1', opId: 'op-b' }));
+  assert.equal(k.count('obligations'), 2);
   sql.close();
 });

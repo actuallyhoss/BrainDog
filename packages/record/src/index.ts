@@ -338,7 +338,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * permission, because the risk is different: a wrong new row is visible and a wrong edit to an
      * old one is not.
      */
-    async create(args: { register: string; fields: Patch; note?: string }, ctx: CallContext): Promise<Result<Entry>> {
+    async create(args: { register: string; fields: Patch; note?: string; op_id?: string }, ctx: CallContext): Promise<Result<Entry>> {
       const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false, refusal: stop };
       return tail(
@@ -346,12 +346,15 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
           actor: actorOf(ctx),
           ...(args.note === undefined ? {} : { note: args.note }),
           ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+          /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
+             without its own id the record has no way to know the second is the first. */
+          ...(args.op_id === undefined ? {} : { opId: args.op_id }),
         }),
       );
     },
 
     async update(
-      args: { register: string; seq: number; patch: Patch; version?: number; note?: string },
+      args: { register: string; seq: number; patch: Patch; version?: number; note?: string; op_id?: string },
       ctx: CallContext,
     ): Promise<Result<Entry>> {
       const stop = guard(ctx, 'write', args.register);
@@ -362,6 +365,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
           ...(args.version === undefined ? {} : { version: args.version }),
           ...(args.note === undefined ? {} : { note: args.note }),
           ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+          ...(args.op_id === undefined ? {} : { opId: args.op_id }),
         }),
       );
     },
