@@ -108,6 +108,19 @@ importers:
         specifier: 4.20250913.0
         version: 4.20250913.0
 
+  packages/client:
+    dependencies:
+      '@braindog/host':
+        specifier: workspace:*
+        version: link:../host
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../ports
+    devDependencies:
+      '@braindog/selfhost':
+        specifier: workspace:*
+        version: link:../../apps/selfhost
+
   packages/host:
     dependencies:
       '@braindog/ports':
