@@ -46,6 +46,7 @@ import { dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } 
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
+import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import {
   bindGrant,
   getGrant,
@@ -81,6 +82,8 @@ export { dryRun, fill as fillTemplate, marker, order as orderRules, runRules } f
 export { runway } from './forecast.ts';
 export { CHANNELS as INGEST_CHANNELS, arrive, day as ingestDay, extract as extractField } from './ingest.ts';
 export { SIGNALS, analyse, observe } from './observe.ts';
+export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
+export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 export type { Analysis, Finding, Observation, Signal } from './observe.ts';
 export type { Arrival, Arrived, Extractor, IngestDecl, IngestDeps } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
@@ -766,6 +769,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       outbox: (payload) => void enqueue(sql, mint, clock.now(), 'infer.draft', payload),
     });
 
+  /** What a connector needs beyond SQL: who this record is, and the one insertion path to the outbox. */
+  const pullDeps = (): PullDeps => ({
+    sql,
+    recordId: recordIdentity(sql)?.id ?? 'self',
+    nowMs: clock.now(),
+    mint,
+    outbox: (payload) => enqueue(sql, mint, clock.now(), 'pull.fetch', payload),
+  });
+
+  /** The connector declaration a `pull` row is about, or `null` when it has been retired. */
+  const pullDecl = (ingest: string): PullDecl | null => {
+    const row = sql.one<{ body: string }>(
+      "SELECT body FROM declaration WHERE id = ? AND kind = 'ingest' AND superseded_at IS NULL AND retired = 0",
+      `ingest.${ingest}`,
+    );
+    return row ? (JSON.parse(row.body) as PullDecl) : null;
+  };
+
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
@@ -883,6 +904,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       /* NEXT AT FIVE PAST MIDNIGHT, so the day it is about is finished and nothing else is competing
          for the alarm. */
       return nextOccurrence({ at: '00:05' }, clock.now(), recordIdentity(sql)?.tz ?? 'UTC');
+    },
+
+    /**
+     * A connector's turn comes round.
+     *
+     * THE RECORD NEVER MAKES THE CALL. One outbox row carrying the ingest, its cursor and the id of
+     * the grant the runner should open — and nothing else. The runner fetches, unwraps the
+     * credential somewhere the record cannot reach, and hands each page back.
+     */
+    pull: (row) => {
+      const { ingest } = JSON.parse(row.payload) as { ingest?: string };
+      /* A CONNECTOR WHOSE DECLARATION IS GONE IS DROPPED, like every other derived row: the thing it
+         was about is not true any more. */
+      const decl = ingest ? pullDecl(ingest) : null;
+      if (!decl) return null;
+      const out = firePull(pullDeps(), row.payload, decl);
+      /* `kept` when it paused itself: the drain writing `done` over that pause would quietly resume a
+         connector whose credential is gone. */
+      return out.paused ? 'kept' : out.nextMs;
     },
 
     /* A credential due for rotation. It says the id and the kind and never the label — a
@@ -1054,6 +1094,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** Look at what the record has noticed, and propose at most one thing. */
     analyse: (): Analysis => analyseNow(),
+
+    /**
+     * A connector run comes back.
+     *
+     * `paused` IS A STATE, NOT A FAILURE. A 401 is a fact about the key rather than a transient
+     * error, and eight exponential retries against a bank's auth endpoint is how an account gets
+     * locked.
+     */
+    applyPull: (finish: { ingest: string; outcome: 'ok' | 'paused'; cursor?: string; dueAtMs?: number; error?: string }) =>
+      transaction(() => applyPull(pullDeps(), finish)),
 
     /** One block, without a page around it — what a `draw` tool hands an agent. */
     block: (decl: PageBlock): BlockResult => readBlock(pageDeps(), decl),

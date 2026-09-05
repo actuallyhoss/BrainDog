@@ -255,8 +255,12 @@ export type Claimed = { id: string; kind: string; key: string; payload: string; 
  * The return value is the next `due_at` in milliseconds for a row that recurs, or `null` for a
  * one-shot. A throw is a failure, and the ladder below catches it — which is the only way a handler
  * gets to be written as if nothing goes wrong.
+ *
+ * `'kept'` IS FOR A HANDLER THAT SET THE STATE ITSELF. A paused connector is its own `pull` row at
+ * `state = 'paused'`, and a handler that returned `null` for it would have the drain write `done`
+ * straight over the pause — quietly un-pausing a connector whose credential was just rejected.
  */
-export type Handler = (row: Claimed) => number | null;
+export type Handler = (row: Claimed) => number | null | 'kept';
 
 export type Drained = { claimed: number; done: number; failed: number; dead: number };
 
@@ -304,7 +308,7 @@ export function drainSchedule(
       continue;
     }
 
-    let next: number | null;
+    let next: number | null | 'kept';
     try {
       next = handler(row);
     } catch (e) {
@@ -313,7 +317,10 @@ export function drainSchedule(
       continue;
     }
 
-    if (next === null) sql.exec("UPDATE schedule SET state = 'done' WHERE id = ?", row.id);
+    if (next === 'kept') {
+      /* The handler moved the row itself, and writing over it here is how a pause becomes a
+         `done` — which is a connector quietly resuming after its credential was rejected. */
+    } else if (next === null) sql.exec("UPDATE schedule SET state = 'done' WHERE id = ?", row.id);
     else
       sql.exec(
         "UPDATE schedule SET state = 'pending', due_at = ?, attempts = 0 WHERE id = ?",

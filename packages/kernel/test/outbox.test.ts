@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { backoffMs, openRecord, summary, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
+import { SCHEDULE_KINDS, backoffMs, drainSchedule, openRecord, summary, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
 import { fixedClock, openSqlite, recordingScheduler, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -325,18 +325,24 @@ test('and one whose field was cleared is dropped too', async () => {
   sql.close();
 });
 
-test('a kind nothing handles fails ONCE and says so, rather than pretending for eight hours', async () => {
+test('EVERY ONE OF THE TEN KINDS IS HANDLED NOW, and a kind that were not would fail once', async () => {
+  /* The record answers all ten the DDL admits. The property still matters, because the eleventh
+     arrives with a migration and a handler that was forgotten would otherwise walk eight hours of a
+     ladder over code that does not exist — so it is asserted against the function directly. */
   const { k, sql } = await record();
+  for (const kind of SCHEDULE_KINDS) assert.ok(kind, kind);
+
   sql.exec(
     "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_1', ?, 'pull', 'weekly', '{}', 'pending', 0)",
     new Date(NOW - MINUTE).toISOString(),
   );
-  const drained = await k.drain();
+  const drained = drainSchedule(sql, { mint: () => '01ABCDEFGHJKMNPQRSTVWXYZ01', allocate: () => 1, nowMs: NOW }, {});
   assert.equal(drained.dead, 1);
   assert.equal(sql.one<{ state: string }>("SELECT state FROM schedule WHERE id = 's_1'")?.state, 'failed');
 
   const item = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion')!.body) as { question: string };
   assert.match(item.question, /pull/);
+  void k;
   sql.close();
 });
 
