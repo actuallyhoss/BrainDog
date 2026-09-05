@@ -29,7 +29,7 @@
   import { copy } from '../copy.ts';
   import { REGISTERS, page as readPage, values } from '../record/api.ts';
   import { toSegments } from '../record/blocks.ts';
-  import { BINDABLE, seedBlock } from '../record/seed.ts';
+  import { bindableFor, seedBlock } from '../record/seed.ts';
   import type { PageBlock } from '../record/schema.ts';
   import Sheet from './Sheet.svelte';
 
@@ -61,11 +61,31 @@
   const tiles = $derived.by(() => {
     const result = readPage(slug);
     const decl = REGISTERS[register];
-    return BINDABLE.map((kind) => {
+    return bindableFor(register).map((kind) => {
       const seed = seedBlock(kind, register);
       const preview = (isKind(kind) ? KINDS[kind].rows : undefined) ?? 3;
       let segments: ReturnType<typeof toSegments> = [];
       const bound = result?.blocks.find((b) => b.register === register);
+      /* An AUTHORED seed previews from its own rows and must not be handed a register — a block
+         with both a source and authored rows is refused, so the preview would be the refusal. */
+      if (seed?.authored) {
+        try {
+          segments = toSegments({
+            ...(bound ?? {}),
+            ...seed,
+            register: undefined,
+            columns: [],
+            entries: [],
+            matched: [],
+            rows: [],
+            metrics: undefined,
+            refusals: [],
+          } as never);
+        } catch {
+          segments = [];
+        }
+        return { kind, seed, segments, spec: isKind(kind) ? KINDS[kind] : undefined };
+      }
       if (seed && bound) {
         try {
           segments = toSegments({

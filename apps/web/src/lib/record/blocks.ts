@@ -181,12 +181,31 @@ function projectRows(block: BlockResult, cells: number): string[] {
         ? relative(raw.slice(0, 10), NOW)
         : display(block.register ?? '', field, raw)) ?? '';
     });
-    const tone = KINDS[block.kind as keyof typeof KINDS]?.tone && row.tone ? ` | ${row.tone}` : '';
+    /**
+     * THE TICK, for a kind that has one.
+     *
+     * `todo` and its parser have always read `[ ]` and `[x]` at the head of a line; the projection
+     * never wrote one, so a register-bound todo drew a list of tasks with no checkboxes at all and
+     * no way to tell a finished row from an open one. Nothing had to be added to the declaration to
+     * fix it: a register already says which of its states are terminal, in `done:`, and that is the
+     * same list `toneOf` reads to paint a finished row.
+     */
+    const spec = KINDS[block.kind as keyof typeof KINDS];
+    const out = values.map(escapeCell);
+    if (spec?.checkbox && entry) {
+      const reg = REGISTERS[block.register ?? ''];
+      const state = reg?.state ? String(entry.fields[reg.state] ?? '') : '';
+      /* AFTER the escaping, never through it: the brackets are dialect and the name is data, and a
+         task called `ship a | b` must still be one cell. */
+      out[0] = `[${reg?.done?.includes(state) ? 'x' : ' '}] ${out[0] ?? ''}`;
+    }
+
+    const tone = spec?.tone && row.tone ? ` | ${row.tone}` : '';
     /* ESCAPED, like the authored path. A value is a string somebody typed, and one `|` in it made
        the row one cell too wide, failed the arity check, and degraded the WHOLE BLOCK to a fence
        the app then dropped on the floor. `redirect | kiln.example` in a domain's target field was
        enough to delete the block it appeared in. */
-    return `${values.map(escapeCell).join(' | ')}${tone}`;
+    return `${out.join(' | ')}${tone}`;
   });
 }
 

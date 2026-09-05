@@ -11,11 +11,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { draw } from './blocks.ts';
+import { draw, toSegments } from './blocks.ts';
 import { page } from './api.ts';
 import { PAGES } from './data.ts';
 import { KINDS } from 'braindog-render';
 import type { BlockResult } from './api.ts';
+import type { PageBlock } from './schema.ts';
 
 /**
  * A block bound to a register, with whatever the test wants to change about it.
@@ -176,4 +177,39 @@ test('a key this build does not read is named, not ignored', () => {
   // does not render when the figure is zero — drew every time.
   const block = declared({ when: { metric: 'overdue', gt: 0 } });
   assert.ok(block.refusals.some((r) => r.startsWith('when:')), '`when:` was silently ignored');
+});
+
+/* ── a bound `todo` has a tick ───────────────────────────────────────────── */
+
+test('A REGISTER-BOUND `todo` CAN SHOW A TICK, and it comes from the register', () => {
+  // `todo` and the parser have always read `[ ]` and `[x]` at the head of a line; the projection
+  // never wrote one, so a bound todo drew a list with no checkboxes at all and no way to tell a
+  // finished row from an open one. Nothing was added to the declaration: a register already says
+  // which of its states are terminal, in `done:`.
+  const rows = (where: string) => {
+    const decl = { kind: 'todo', heading: 'T', span: 3, source: 'register.tasks', columns: [{ field: 'what' }, { field: 'by' }], where, limit: 4, empty: 'x' };
+    /* `blocks` is `readonly` on the declaration and this is a mock whose seed is module state, so
+       the cast is the honest way to add one for the length of a test. */
+    const blocks = PAGES.money?.blocks as PageBlock[] | undefined;
+    assert.ok(blocks);
+    blocks.push(decl as unknown as PageBlock);
+    try {
+      const block = page('money')?.blocks.at(-1);
+      assert.ok(block);
+      return toSegments(block).flatMap((s) => ('rows' in s ? (s.rows as { cells: string[]; done?: boolean }[]) : []));
+    } finally {
+      blocks.pop();
+    }
+  };
+
+  const done = rows('state is done');
+  assert.ok(done.length > 0, 'the seed needs a finished task for this to mean anything');
+  for (const r of done) assert.equal(r.done, true, `${r.cells[0]} is done and is drawn unticked`);
+
+  const open = rows('state is open');
+  assert.ok(open.length > 0);
+  for (const r of open) assert.equal(r.done, false, `${r.cells[0]} is open and is drawn ticked`);
+
+  // And the tick is not left in the text.
+  for (const r of [...done, ...open]) assert.ok(!r.cells[0]?.startsWith('['), `${r.cells[0]} kept its brackets`);
 });

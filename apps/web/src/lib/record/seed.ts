@@ -28,25 +28,64 @@ import type { FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 type Want = 'title' | 'number' | 'date' | 'enum' | 'ref' | 'text' | 'any';
 
 /**
- * Cell wants per kind. Only the kinds a register can fill are here — `note`, `quote`, `code` and
- * `tree` are authored rather than bound, and `stat` takes metrics rather than fields.
+ * Cell wants per kind. Only the kinds a register can fill are here — `note`, `quote`, `code`, `tree`
+ * and `comparison` are authored rather than bound, and `stat` takes metrics rather than fields.
+ *
+ * `comparison` left this table because 05 §2 says `table` is "the one kind bound to a `source:`
+ * register" and defines `comparison` as "a small table you write yourself". Bound, it drew nothing
+ * at all — `KINDS.comparison.cells` is 0, because its width comes from its header row, so the
+ * projection produced zero cells per row and the block was an empty rectangle with no refusal. It
+ * is offered as an authored seed instead, which is the shape it was always meant to have.
  */
-const WANTS: Record<string, Want[]> = {
-  bar: ['ref', 'number'],
+const WANTS: Record<string, Slot[]> = {
+  bar: [{ want: 'ref' }, { want: 'number', hard: true }],
   /* A gauge groups nothing and projects nothing: it sums one column against a target. The first
      column only names the figure, so it wants the title and the second wants the number. */
-  gauge: ['title', 'number'],
+  gauge: [{ want: 'title' }, { want: 'number', hard: true }],
   /* An ENUM FIRST, because chips group and count by their first column. Bound to the title, every
      chip is a count of one wearing a whole row's name in small caps — which is what it did. */
-  chips: ['enum'],
-  spec: ['title', 'number', 'date'],
-  params: ['title', 'text', 'text'],
-  todo: ['title', 'date'],
-  steps: ['title', 'text', 'enum'],
-  timeline: ['date', 'title', 'ref'],
-  board: ['enum', 'title', 'ref'],
-  comparison: ['title', 'number', 'date'],
-  table: ['title', 'number', 'date'],
+  chips: [{ want: 'enum', hard: true }],
+  spec: [{ want: 'title' }, { want: 'number' }, { want: 'date' }],
+  params: [{ want: 'title' }, { want: 'text' }, { want: 'text' }],
+  todo: [{ want: 'title' }, { want: 'date' }],
+  steps: [{ want: 'title' }, { want: 'text' }, { want: 'enum' }],
+  timeline: [{ want: 'date', hard: true }, { want: 'title' }, { want: 'ref' }],
+  board: [{ want: 'enum', hard: true }, { want: 'title' }, { want: 'ref' }],
+  table: [{ want: 'title' }, { want: 'number' }, { want: 'date' }],
+};
+
+/**
+ * A cell's want, and whether a fallback may cover it.
+ *
+ * `fill` used to fall back to any unspent field for every want, which is how a `bar` over a register
+ * with no numeric column came out as `NaN` per group — a chart of nothing, drawn, offered by the
+ * picker. A number slot filled with text is precisely what 21 §3.4 says cannot happen, and the
+ * reason it gives is the one that applies here: it is not offered.
+ *
+ * HARD IS PER SLOT, NOT PER TYPE. `bar` and `gauge` SUM their number and `table` and `spec` PRINT
+ * theirs, so the same want is load-bearing in one kind and a nicety in another — making `number`
+ * hard everywhere took `table` away from every register with no money in it, which is most of them.
+ * A slot is hard when the kind READS it: summed, grouped into columns, or laid on a time axis.
+ */
+type Slot = { want: Want; hard?: boolean };
+
+/**
+ * The five kinds that are not projections of anything, seeded with rows somebody can edit.
+ *
+ * 21 A5 is "seeds, not blanks", and it does not say "seeds for the bindable ones". These were
+ * unreachable from the picker entirely: it lists what a register can fill, so five of the sixteen
+ * kinds could not be added to a page at all.
+ */
+const AUTHORED: Record<string, { cells: string[] }[]> = {
+  note: [{ cells: ['What this page is for, in a sentence somebody else could act on.'] }],
+  quote: [{ cells: ['The sentence worth keeping, as it was said.', 'Who said it, and when'] }],
+  comparison: [
+    { cells: ['Option', 'Cost', 'What it gives up'] },
+    { cells: ['Stay as we are', 'Nothing', 'The problem'] },
+    { cells: ['Move', 'Two weeks', 'The next two weeks'] },
+  ],
+  code: [{ cells: ['npx braindog pull --register obligations'] }],
+  tree: [{ cells: ['the-studio'] }, { cells: ['  obligations'] }, { cells: ['  services'] }],
 };
 
 const NUMERIC = new Set(['money', 'int', 'decimal', 'duration']);
@@ -78,19 +117,40 @@ function matches(field: FieldDecl, want: Want, decl: RegisterDecl): boolean {
  * block that says the same thing twice, and the author would have to notice and fix it — which is
  * exactly the correction a seed exists to avoid.
  */
-function fill(decl: RegisterDecl, wants: Want[]): { field: string }[] {
+function fill(decl: RegisterDecl, slots: Slot[]): { field: string }[] | null {
   const spent = new Set<string>();
-  return wants.map((want) => {
-    const hit =
-      decl.fields.find((f) => !spent.has(f.id) && f.type !== 'secret' && matches(f, want, decl)) ??
-      decl.fields.find((f) => !spent.has(f.id) && f.type !== 'secret');
-    if (hit) spent.add(hit.id);
-    return { field: hit?.id ?? decl.title };
-  });
+  const out: { field: string }[] = [];
+  for (const { want, hard } of slots) {
+    const exact = decl.fields.find((f) => !spent.has(f.id) && f.type !== 'secret' && matches(f, want, decl));
+    /* NO FALLBACK ON A HARD SLOT. The whole kind is unavailable for this register instead, which is
+       the only honest answer: there is no field here that can be the number a bar adds up. */
+    const hit = exact ?? (hard ? undefined : decl.fields.find((f) => !spent.has(f.id) && f.type !== 'secret'));
+    if (!hit) {
+      if (hard) return null;
+      /* A soft want with nothing left falls to the title, and the loop CONTINUES: returning here
+         would hand back a short column list, and a kind drawn with fewer cells than its arity is a
+         row whose values are one column to the left of their headings. */
+      out.push({ field: decl.title });
+      continue;
+    }
+    spent.add(hit.id);
+    out.push({ field: hit.id });
+  }
+  return out;
 }
 
-/** Kinds the picker offers for a register-bound page. The rest are authored, not bound. */
-export const BINDABLE = Object.keys(WANTS);
+/** Every kind the picker can seed: bound to a register, or authored with example rows. */
+export const BINDABLE = [...Object.keys(WANTS), ...Object.keys(AUTHORED)];
+
+/**
+ * The kinds THIS register can actually fill, which is not the same list for every register.
+ *
+ * The picker used to offer all of them and hand back nothing for the ones that could not be filled:
+ * `seedBlock` returned null, the tile rendered its description, and clicking it did nothing at all.
+ * A control that cannot work should not be on the screen — 21 §3.4 again.
+ */
+export const bindableFor = (register: string): string[] =>
+  BINDABLE.filter((kind) => seedBlock(kind, register) !== null);
 
 /**
  * A block, bound and drawing, at the width its kind is happiest at.
@@ -101,12 +161,26 @@ export const BINDABLE = Object.keys(WANTS);
  * better at.
  */
 export function seedBlock(kind: string, register: string): PageBlock | null {
-  const decl = REGISTERS[register];
-  const wants = WANTS[kind];
-  if (!decl || !wants || !isKind(kind)) return null;
+  if (!isKind(kind)) return null;
   const spec = KINDS[kind];
 
-  const columns = fill(decl, wants).slice(0, Math.max(spec.cells, wants.length));
+  /* An authored kind takes no register and asks the fields nothing. It still arrives drawing. */
+  const authored = AUTHORED[kind];
+  if (authored)
+    return {
+      kind,
+      heading: REGISTERS[register]?.name ?? 'Untitled',
+      span: spec.minSpan,
+      authored,
+    };
+
+  const decl = REGISTERS[register];
+  const wants = WANTS[kind];
+  if (!decl || !wants) return null;
+
+  const filled = fill(decl, wants);
+  if (!filled) return null;
+  const columns = filled.slice(0, Math.max(spec.cells, wants.length));
 
   /* A GAUGE WITHOUT A TARGET DRAWS NOTHING, and a preview that draws nothing teaches somebody that
      the kind is broken. There is no target in the record — a budget is a decision, not a column —

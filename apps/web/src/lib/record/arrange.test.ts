@@ -25,7 +25,7 @@ import {
   stepsFor,
   type Slot,
 } from './arrange.ts';
-import { BINDABLE, seedBlock } from './seed.ts';
+import { BINDABLE, bindableFor, seedBlock } from './seed.ts';
 import { REGISTERS } from './data.ts';
 
 const slots = (...spans: number[]): Slot[] => spans.map((span, i) => ({ i, span }));
@@ -139,10 +139,46 @@ test('precise widths keep their own number instead of rounding to a button', () 
 
 /* ── seeding, which is 21 A5 ──────────────────────────────────────────────── */
 
-test('every bindable kind seeds against every register without throwing', () => {
-  for (const kind of BINDABLE)
-    for (const register of Object.keys(REGISTERS))
+test('every kind the picker offers for a register really seeds against it', () => {
+  // `bindableFor`, not `BINDABLE`: the picker used to list every kind and hand back nothing for the
+  // ones a register could not fill — the tile rendered its description and clicking it did nothing.
+  for (const register of Object.keys(REGISTERS))
+    for (const kind of bindableFor(register))
       assert.ok(seedBlock(kind, register), `${kind} over ${register} produced nothing`);
+});
+
+test('A KIND WHOSE HARD SLOT CANNOT BE FILLED IS NOT OFFERED', () => {
+  // `fill` used to fall back to any unspent field, so a `bar` over a register with no numeric column
+  // was seeded with a text field and drew `NaN` for every group — a chart of nothing, in the picker,
+  // one click away. 21 §3.4: a non-programmer cannot put text in a number slot BECAUSE IT IS NOT
+  // OFFERED, and the same rule is what makes the seed right rather than merely present.
+  const numberless = Object.keys(REGISTERS).filter(
+    (id) => !(REGISTERS[id]?.fields ?? []).some((f) => ['money', 'int', 'decimal', 'duration'].includes(f.type)),
+  );
+  assert.ok(numberless.length > 0, 'every register has a number, so this test proves nothing');
+  for (const register of numberless) {
+    for (const kind of ['bar', 'gauge']) {
+      assert.equal(seedBlock(kind, register), null, `${kind} was seeded over ${register}, which has no number`);
+      assert.ok(!bindableFor(register).includes(kind), `${kind} is still offered for ${register}`);
+    }
+    // And the kinds that only PRINT a number are still offered, because printing one is not summing
+    // it — making `number` hard everywhere took `table` away from most of the record.
+    for (const kind of ['table', 'spec']) assert.ok(bindableFor(register).includes(kind), `${kind} was withdrawn from ${register}`);
+  }
+});
+
+test('the five kinds that are not projections are seeded as authored rows', () => {
+  // They were unreachable: the picker lists what a register can fill, so `note`, `quote`,
+  // `comparison`, `code` and `tree` could not be added to a page at all. `comparison` is the one
+  // that used to be offered bound, and drew zero rows — its width comes from a header row, so a
+  // projection of `cells: 0` produced nothing and the block was an empty rectangle with no refusal.
+  for (const kind of ['note', 'quote', 'comparison', 'code', 'tree']) {
+    const seed = seedBlock(kind, 'obligations');
+    assert.ok(seed, `${kind} seeds nothing`);
+    assert.ok((seed.authored?.length ?? 0) > 0, `${kind} seeded no rows`);
+    assert.equal(seed.source, undefined, `${kind} seeded a source as well as rows, which is refused`);
+    assert.ok(bindableFor('obligations').includes(kind), `${kind} is not offered`);
+  }
 });
 
 test('a seed arrives bound, not blank', () => {
@@ -177,7 +213,7 @@ test('a secret field is never seeded into a block', () => {
       (REGISTERS[register]?.fields ?? []).filter((f) => f.type === 'secret').map((f) => f.id),
     );
     if (secrets.size === 0) continue;
-    for (const kind of BINDABLE)
+    for (const kind of bindableFor(register))
       for (const column of seedBlock(kind, register)?.columns ?? [])
         assert.ok(!secrets.has(column.field), `${kind} over ${register} seeded the secret ${column.field}`);
   }
