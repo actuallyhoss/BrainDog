@@ -17,12 +17,14 @@ import {
   evaluateMetric,
   meets,
   openRecord,
+  snapshot,
   targetOf,
   windowMs,
   type Declaration,
   type Kernel,
   type MetricDecl,
   type Reading,
+  type Snapshot,
 } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -471,5 +473,86 @@ test('and the product is rounded per row, because minor units are integers', asy
   const { k, sql } = await services();
   const read = value<Reading>(k.metric(ANNUAL));
   assert.equal(Number.isInteger(read.value), true, `${read.value} is not a whole number of minor units`);
+  sql.close();
+});
+
+/* ── a figure, kept ────────────────────────────────────────────────── */
+
+const OPEN: MetricDecl = {
+  metric: 'still-open',
+  name: 'Still open',
+  source: 'register.obligations',
+  where: 'state is open, due before today',
+  value: { count: 'id' },
+  target: { lte: 5 },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+};
+
+const ctxOf = (k: Kernel, nowMs: number) => ({
+  nowMs,
+  schemaOf: (register: string) => {
+    const r = k.register(register);
+    return r ? { register, fields: Object.fromEntries(r.fields.map((f) => [f.id, f as never])) } : null;
+  },
+});
+
+test('A METRIC IS A QUESTION AND A SERIES IS ITS ANSWERS', async () => {
+  /* Everything else the record computes is computed fresh. This is the one thing it remembers,
+     because "is this getting better" cannot be asked of a number that only exists now. */
+  const { k, sql } = await record();
+  const out = value<Snapshot>(snapshot(sql, OPEN, ctxOf(k, NOW), { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 10));
+
+  assert.equal(out.wrote, 1, 'yesterday was not written');
+  assert.ok(out.backfilled > 0, 'a series that starts today has no shape for a month');
+
+  const points = sql.all<{ at: string; value: number; unit: string; source: string }>(
+    "SELECT at, value, unit, source FROM metric_point WHERE series = 'still-open' ORDER BY at",
+  );
+  assert.equal(points.length, out.wrote + out.backfilled);
+  assert.equal(points.at(-1)?.at, new Date(NOW - DAY).toISOString().slice(0, 10), 'today was written');
+  assert.equal(points[0]?.source, 'register.obligations');
+  sql.close();
+});
+
+test('AND THE PREDICATE MOVES WITH THE DAY, which is what makes a stored figure worth keeping', async () => {
+  /* `due before today` resolves against the day being snapshotted. A backfill that asked today's
+     question of every past day would store thirty copies of one number. */
+  const { k, sql } = await record();
+  value<Snapshot>(snapshot(sql, OPEN, ctxOf(k, NOW), { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 60));
+
+  const values = sql.all<{ value: number }>("SELECT value FROM metric_point WHERE series = 'still-open' ORDER BY at").map((r) => r.value);
+  assert.ok(new Set(values).size > 1, `every day stored the same figure: ${[...new Set(values)].join(', ')}`);
+  // Earlier days have fewer rows overdue, because fewer of them were overdue yet.
+  assert.ok(values[0]! < values.at(-1)!, 'the series does not move in the direction the rows do');
+  sql.close();
+});
+
+test('YESTERDAY IS OVERWRITTEN AND EVERY EARLIER DAY IS KEPT', async () => {
+  // A snapshot that ran twice in one day should agree with itself rather than refuse; a backfill
+  // that overwrote would rewrite history every night.
+  const { k, sql } = await record();
+  const ctx = ctxOf(k, NOW);
+  value<Snapshot>(snapshot(sql, OPEN, ctx, { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 10));
+
+  const before = sql.all<{ at: string; value: number }>("SELECT at, value FROM metric_point ORDER BY at");
+  sql.exec("UPDATE metric_point SET value = 999 WHERE at = ?", before[0]!.at);
+
+  const again = value<Snapshot>(snapshot(sql, OPEN, ctx, { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 10));
+  assert.equal(again.backfilled, 0, 'the backfill rewrote days it had already written');
+  assert.equal(sql.one<{ value: number }>('SELECT value FROM metric_point WHERE at = ?', before[0]!.at)?.value, 999);
+  assert.equal(sql.all('SELECT 1 FROM metric_point').length, before.length, 'a second run doubled the series');
+  sql.close();
+});
+
+test('and a day the metric could not answer is NO ROW, not a zero', async () => {
+  /* A series with a zero on every day nothing happened cannot tell "nothing" from "no answer", and
+     the difference is the whole of a trend. */
+  const { k, sql } = await record();
+  const avg: MetricDecl = { ...OPEN, metric: 'avg-effort', value: { avg: 'effort' }, target: { lte: 100_000 } };
+  const out = value<Snapshot>(snapshot(sql, avg, ctxOf(k, NOW), { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 90));
+  assert.ok(out.missing > 0, 'a day with nothing to average stored a number anyway');
+  assert.equal(sql.all("SELECT 1 FROM metric_point WHERE series = 'avg-effort' AND value = 0").length, 0);
   sql.close();
 });

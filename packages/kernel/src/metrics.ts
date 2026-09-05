@@ -98,6 +98,15 @@ const UNREAD = ['last', 'delta', 'median', 'group_by', 'bucket', 'running', 'tre
 
 export type EvalContext = {
   nowMs: number;
+  /**
+   * Read the record as it was at this instant instead of now.
+   *
+   * IT MOVES THE PREDICATE, NOT THE ROWS. `due before today` resolves against `asOf`, so a snapshot
+   * of last Tuesday is the question this metric asks, asked on Tuesday — which is the only kind of
+   * historical figure worth storing. Reconstructing the ROWS as they were would need a replay of
+   * every event and would still be a different question.
+   */
+  asOfMs?: number | undefined;
   /** The register's declared fields, so a predicate and a field expression check against one shape. */
   schemaOf: (register: string) => Schema | null;
   /** A ref written by name: `thing is Kiln`. Absent means a sentence cannot name one. */
@@ -120,7 +129,7 @@ export function predicateOf(
 ): { predicate: Predicate | undefined; bad: Refusal[] } {
   if (typeof where !== 'string') return { predicate: where, bad: [] };
   return parseWhere(where, schema, {
-    nowMs: ctx.nowMs,
+    nowMs: ctx.asOfMs ?? ctx.nowMs,
     ...(ctx.refByTitle === undefined ? {} : { refByTitle: ctx.refByTitle }),
   });
 }
@@ -519,4 +528,76 @@ export function targetOf(text: string): { lte: number } | { gte: number } | null
   if (t.startsWith('>=') || t.startsWith('≥')) return bound('gte', t.replace(/^(>=|≥)/, ''));
   if (t.startsWith('>')) return bound('gte', t.slice(1));
   return bound('gte', t);
+}
+
+/* ── a figure, kept ────────────────────────────────────────────────── */
+
+export type Snapshot = { series: string; wrote: number; backfilled: number; missing: number };
+
+/**
+ * Yesterday's reading, written down.
+ *
+ * A METRIC IS A QUESTION AND A SERIES IS ITS ANSWERS. Everything else the record computes is
+ * computed fresh; this is the one thing it remembers, because "is this getting better" cannot be
+ * asked of a number that only exists now.
+ *
+ * YESTERDAY, NEVER TODAY. Today's figure is still moving — an invoice paid this afternoon changes
+ * it — and a stored point that later disagrees with the same question asked again is worse than no
+ * point at all. Today is appended live by the reader and flagged as partial.
+ *
+ * AND IT BACKFILLS, thirty days, once. A series that starts the day somebody turned it on has no
+ * shape for a month, and the record already holds the rows every one of those days is a question
+ * about. The backfill never overwrites: a day that has a point keeps it.
+ */
+export function snapshot(
+  sql: Sql,
+  decl: MetricDecl,
+  ctx: EvalContext,
+  deps: { nowAt: string; tz: string },
+  backfillDays = 30,
+): Result<Snapshot> {
+  const DAY = 86_400_000;
+  const yesterday = ctx.nowMs - DAY;
+
+  const at = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+  const endOf = (ms: number): number => Date.parse(`${at(ms)}T23:59:59.999Z`);
+
+  const write = (dayMs: number, overwrite: boolean): 'wrote' | 'kept' | 'missing' => {
+    const day = at(dayMs);
+    if (!overwrite && sql.one("SELECT 1 AS x FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?", decl.metric, day))
+      return 'kept';
+
+    const read = evaluateMetric(sql, decl, { ...ctx, asOfMs: endOf(dayMs) });
+    /* A NULL VALUE IS NO ROW. A series with a zero on every day nothing happened is a series that
+       cannot tell "nothing" from "no answer", and the difference is the whole of a trend. */
+    if (!read.ok || read.value.value === null) return 'missing';
+
+    sql.exec(
+      `INSERT INTO metric_point (series, grain, at, value, unit, n, source, wrote_at) VALUES (?, 'day', ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (series, grain, at) DO UPDATE SET value = excluded.value, unit = excluded.unit, n = excluded.n, wrote_at = excluded.wrote_at`,
+      decl.metric,
+      day,
+      Math.round(read.value.value),
+      read.value.unit ?? '',
+      read.value.rows,
+      decl.source,
+      deps.nowAt,
+    );
+    return 'wrote';
+  };
+
+  /* YESTERDAY IS OVERWRITTEN, because a snapshot that ran twice in one day should agree with itself
+     rather than refuse the second time. Every earlier day is kept. */
+  const today = write(yesterday, true);
+  let backfilled = 0;
+  let missing = today === 'missing' ? 1 : 0;
+
+  for (let n = 1; n <= backfillDays; n++) {
+    const out = write(yesterday - n * DAY, false);
+    if (out === 'wrote') backfilled++;
+    if (out === 'missing') missing++;
+  }
+
+  void deps.tz;
+  return ok({ series: decl.metric, wrote: today === 'wrote' ? 1 : 0, backfilled, missing });
 }

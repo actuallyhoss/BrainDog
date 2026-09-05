@@ -39,7 +39,7 @@ import {
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
-import { evaluateMetric, predicateOf, scorePrediction, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps } from './digest.ts';
 import { dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
@@ -74,7 +74,7 @@ export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
-export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, targetOf, windowMs } from './metrics.ts';
+export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
 export { dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
@@ -87,7 +87,7 @@ export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
-export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Value } from './metrics.ts';
+export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
@@ -866,6 +866,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     analyse: () => {
       analyseNow();
       return clock.now() + 7 * 86_400_000;
+    },
+
+    /**
+     * Yesterday's reading, written down.
+     *
+     * A METRIC IS A QUESTION AND A SERIES IS ITS ANSWERS. Everything else the record computes is
+     * computed fresh; this is the one thing it remembers, because "is this getting better" cannot
+     * be asked of a number that only exists now.
+     */
+    snapshot: (row) => {
+      const { metric } = JSON.parse(row.payload) as { metric?: string };
+      const decl = metric ? pageDeps().metric(metric) : null;
+      if (!decl) return null;
+      snapshot(sql, decl, evalContext(), { nowAt: instant(clock.now()), tz: recordIdentity(sql)?.tz ?? 'UTC' });
+      /* NEXT AT FIVE PAST MIDNIGHT, so the day it is about is finished and nothing else is competing
+         for the alarm. */
+      return nextOccurrence({ at: '00:05' }, clock.now(), recordIdentity(sql)?.tz ?? 'UTC');
     },
 
     /* A credential due for rotation. It says the id and the kind and never the label — a
