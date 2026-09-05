@@ -67,7 +67,10 @@
                   <code class="pattern-code">{item.suggestion}</code>
                   <div class="pattern-actions">
                     <Button weight="primary" onclick={() => toasts.push(copy.notWritten('The rule would be written and tested against the last 30 days'), { intent: 'warn' })}>Make it a rule</Button>
-                    <Button weight="bare">Not this one</Button>
+                    <Button
+                      weight="bare"
+                      onclick={() => toasts.push(copy.notWritten('This arrival would be left for a different pattern'))}
+                    >Not this one</Button>
                   </div>
                 </div>
               {:else}
@@ -76,7 +79,10 @@
 
               <div class="actions">
                 <Button onclick={() => toasts.push(copy.notWritten('A row would be created from this arrival'), { intent: 'warn' })}>Create a row</Button>
-                <Button weight="bare">Archive</Button>
+                <Button
+                  weight="bare"
+                  onclick={() => toasts.push(copy.notWritten('This arrival would be archived, and its bytes kept'))}
+                >Archive</Button>
               </div>
             </div>
           {/if}

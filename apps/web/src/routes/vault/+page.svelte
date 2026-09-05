@@ -16,6 +16,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { copy } from '$lib/copy.ts';
   import { NOW, VAULT } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -45,7 +46,16 @@
             <span class="line-detail">{copy.opens}: {c.opens}</span>
           </span>
           <span class="line-amount">
-            <Button weight="bare">
+            <!-- IT SAYS WHAT IT WOULD DO. A reveal is the one action in this product that is
+                 audited with your name on it, and a button that does nothing under a warning
+                 saying so teaches somebody the warning is decorative. -->
+            <Button
+              weight="bare"
+              onclick={() =>
+                toasts.push(copy.notWritten(`${c.label} would be decrypted once and the read logged against you`), {
+                  intent: 'warn',
+                })}
+            >
               <Icon name="eye" size="s" />
               {copy.reveal}
             </Button>

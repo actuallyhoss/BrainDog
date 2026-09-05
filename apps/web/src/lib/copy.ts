@@ -309,8 +309,20 @@ export const copy = {
     { key: 'services', icon: 'calendar', label: 'The estate', body: 'Domains, hosting, subscriptions, licences.', field: 'What renews, and when?' },
     { key: 'people', icon: 'people', label: 'People', body: 'Clients, contractors, and who does what.', field: 'Who is it, and what are they for?' },
     { key: 'things', icon: 'thing', label: 'Projects', body: 'The things you run, and the plan for each.', field: 'What is it, and what is it for?' },
-    { key: 'decisions', icon: 'decide', label: 'Decisions', body: 'The ones you keep re-making, and why.', field: 'What do you keep re-deciding?' },
+    /* `tasks` AND NOT `decisions`. A decision is not a register — it is what the gate writes when
+       somebody answers a question — so the fifth card named a register the record does not have,
+       and the only reason nobody found out is that the form below never ran. */
+    { key: 'tasks', icon: 'task', label: 'Work', body: 'What is on, what is next, and who has it.', field: 'What needs doing?' },
   ],
+
+  /** The label above the first field. Written per choice, because "Your first money" is not English. */
+  firstField: {
+    obligations: 'Your first invoice',
+    services: 'Your first renewal',
+    people: 'The first person',
+    things: 'Your first project',
+    tasks: 'The first thing to do',
+  } as Record<string, string>,
 
   /* THE OTHER WAY IN, and it is offered rather than buried. PostHog's install flow leads with
      `npx @posthog/wizard` and treats the in-product path as the alternative, which is the right

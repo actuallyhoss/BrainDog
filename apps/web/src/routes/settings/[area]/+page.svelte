@@ -15,6 +15,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
+  import * as pref from '$lib/pref.ts';
   import { copy } from '$lib/copy.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -46,17 +47,24 @@
 
   const area = $derived(page.params.area ?? 'appearance');
 
-  const set = (key: string, value: string) => document.documentElement.setAttribute(`data-${key}`, value);
+  /* SET IT AND REMEMBER IT, in one call. These were two things and the second was never written:
+     every preference in this product was lost on refresh, and a setting that does not survive a
+     reload is a setting somebody changes once and then stops trusting. */
+  const set = (key: 'scheme' | 'text' | 'density', value: string) => pref.apply(key, value);
 
-  let scheme = $state<'light' | 'system' | 'dark'>('system');
-  let text = $state<'sm' | 'base' | 'md'>('base');
-  let density = $state<'compact' | 'comfortable' | 'roomy'>('comfortable');
-  let chars = $state(true);
+  /* SEEDED FROM WHAT IS REMEMBERED, so the controls show the state the page is already in rather
+     than the default the state happens to start at. */
+  const held = pref.read();
+  let scheme = $state<'light' | 'system' | 'dark'>(held.scheme ?? 'system');
+  let text = $state<'sm' | 'base' | 'md'>(held.text ?? 'base');
+  let density = $state<'compact' | 'comfortable' | 'roomy'>(held.density ?? 'comfortable');
+  let chars = $state(held.chars ?? true);
 
   function pickScheme(v: 'light' | 'system' | 'dark') {
     scheme = v;
-    if (v === 'system') document.documentElement.removeAttribute('data-scheme');
-    else set('scheme', v);
+    /* `system` IS AN ANSWER AND NOT AN ABSENCE, so it is written down: removing the attribute
+       without recording the choice would make the next visit read a stale `dark` from the cookie. */
+    pref.apply('scheme', v === 'system' ? null : v);
   }
 
   const pen = $derived(
@@ -80,6 +88,12 @@
    * reversible and does not deserve a confirm — 23 §4: every extra confirm devalues the one gate
    * that matters.
    */
+  /* AND THE CHARACTER KEYS TOO. It is the one preference that changes what the keyboard DOES, so
+     forgetting it is the one somebody notices within a minute. */
+  $effect(() => {
+    pref.write({ chars });
+  });
+
   let placed = $state<PageDecl[]>([]);
 
   function promote(decl: PageDecl) {
@@ -197,7 +211,19 @@
       </Section>
     {:else if area === 'export'}
       <Section title="Your data">
-        <div class="row-actions"><Button>Export the record</Button><Button weight="bare">Verify a `.dog`</Button></div>
+        <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
+             product's central promise: take your record and go. They say what they would do. -->
+        <div class="row-actions">
+          <Button
+            onclick={() =>
+              toasts.push(copy.notWritten('The whole record would be written to a .dog file, line per row'))}
+          >Export the record</Button>
+          <Button
+            weight="bare"
+            onclick={() =>
+              toasts.push(copy.notWritten('A .dog file would be checked against its own manifest and signature'))}
+          >Verify a `.dog`</Button>
+        </div>
       </Section>
       <Section title="Danger">
         <div class="danger">

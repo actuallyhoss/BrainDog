@@ -15,10 +15,20 @@ import { NOW, PAGES, ROWS } from './data.ts';
 import { page } from './api.ts';
 import { magnitudeOf } from 'braindog-render';
 
+/**
+ * The legs the record declares, read from the shipped page rather than retyped.
+ *
+ * WHAT THE WALK READS IS DECLARED, so a test that hardcoded two registers would be testing a
+ * different function from the one the product runs.
+ */
+const LEGS = Object.values(PAGES)
+  .flatMap((p) => p.blocks)
+  .find((b) => b.source === 'forecast.runway')!.from!;
+
 /* ── the walk ────────────────────────────────────────────────────────────── */
 
 test('the walk starts from what is liquid and ends somewhere else', () => {
-  const r = runway(1_000_000);
+  const r = runway(1_000_000, LEGS);
   assert.equal(r.from, 1_000_000);
   assert.ok(r.steps.length > 0, 'the seed has dated movements, so the walk cannot be empty');
 });
@@ -26,7 +36,7 @@ test('the walk starts from what is liquid and ends somewhere else', () => {
 test('every step carries the balance after it, and they chain', () => {
   // The point of returning the sequence rather than the answer: each row has to be readable as
   // "and this is where you were after that one".
-  const r = runway(500_000);
+  const r = runway(500_000, LEGS);
   let acc = r.from;
   for (const s of r.steps) {
     acc += s.delta;
@@ -37,7 +47,7 @@ test('every step carries the balance after it, and they chain', () => {
 test('the walk is in date order, and an outgoing on a day comes before an incoming', () => {
   // A balance that dips under at breakfast and recovers by lunchtime has still bounced. Ordering
   // receipts first on a shared day produces the same closing figure and hides the crossing.
-  const r = runway(500_000);
+  const r = runway(500_000, LEGS);
   for (let i = 1; i < r.steps.length; i++) {
     const a = r.steps[i - 1]!, b = r.steps[i]!;
     assert.ok(a.day <= b.day, `${a.day} came before ${b.day}`);
@@ -48,14 +58,14 @@ test('the walk is in date order, and an outgoing on a day comes before an incomi
 test('a recurring service is charged once per cycle across the window, not once in total', () => {
   // The failure this catches is silent and always in the same direction: too cheap. A monthly
   // service inside a 180-day window is six charges, and reading the stored date once is one.
-  const short = runway(0, 40).steps.filter((s) => s.source === 'service').length;
-  const long = runway(0, 400).steps.filter((s) => s.source === 'service').length;
+  const short = runway(0, LEGS, 40).steps.filter((s) => s.source === 'services').length;
+  const long = runway(0, LEGS, 400).steps.filter((s) => s.source === 'services').length;
   assert.ok(long > short, `${long} service charges over 400 days against ${short} over 40`);
 });
 
 test('a longer horizon is a superset: it never loses a movement', () => {
-  const near = runway(0, 60).steps.map((s) => `${s.day} ${s.label}`);
-  const far = new Set(runway(0, 365).steps.map((s) => `${s.day} ${s.label}`));
+  const near = runway(0, LEGS, 60).steps.map((s) => `${s.day} ${s.label}`);
+  const far = new Set(runway(0, LEGS, 365).steps.map((s) => `${s.day} ${s.label}`));
   for (const s of near) assert.ok(far.has(s), `${s} vanished when the horizon grew`);
 });
 
@@ -70,7 +80,7 @@ test('AN OVERDUE OBLIGATION IS STILL A MOVEMENT, and it moves today', () => {
   );
   assert.ok(late.length > 0, 'the seed needs an overdue obligation for this to mean anything');
 
-  const steps = runway(0, 365).steps;
+  const steps = runway(0, LEGS, 365).steps;
   for (const row of late) {
     const step = steps.find((s) => s.href === `/r/obligations/${row.seq}`);
     assert.ok(step, `${row.fields.what} is overdue, open, and not in the walk`);
@@ -83,19 +93,19 @@ test('AN OVERDUE OBLIGATION IS STILL A MOVEMENT, and it moves today', () => {
 test('and counting it changes the answer, in the direction it should', () => {
   // Net overdue on the seed is negative, so admitting it can only shorten the runway. A test that
   // just says "the number changed" would pass if the sign were wrong.
-  const withThem = runway(4_200_000);
+  const withThem = runway(4_200_000, LEGS);
   assert.ok(withThem.days !== null);
   assert.ok(withThem.days < 116, `runway is ${withThem.days} days; dropping the overdue rows gave 116`);
 });
 
 test('a large enough opening balance never crosses', () => {
-  const r = runway(500_000_000);
+  const r = runway(500_000_000, LEGS);
   assert.equal(r.crossed, null);
   assert.equal(r.days, null);
 });
 
 test('crossing is the FIRST step under zero, and it names the row that did it', () => {
-  const r = runway(0);
+  const r = runway(0, LEGS);
   assert.ok(r.crossed, 'starting from nothing, the first outgoing must cross');
   assert.ok(r.crossed.balance < 0);
   assert.ok(r.crossed.href.startsWith('/r/'), 'the crossing has to be openable, or it is just a date');
@@ -107,7 +117,7 @@ test('crossing is the FIRST step under zero, and it names the row that did it', 
 });
 
 test('the walk never divides, so a balance cannot drift by a penny', () => {
-  for (const s of runway(1_234_567).steps) assert.ok(Number.isInteger(s.balance), `${s.balance} is not minor units`);
+  for (const s of runway(1_234_567, LEGS).steps) assert.ok(Number.isInteger(s.balance), `${s.balance} is not minor units`);
 });
 
 test('the crossing is ONE row, and the rest of the year is not the same colour', () => {
@@ -250,7 +260,7 @@ test('a cancelled service is never charged again', () => {
   const cancelled = (ROWS.services ?? []).filter((s) => s.fields.state === 'cancelled');
   assert.ok(cancelled.length > 0, 'the seed needs a cancelled service for this to mean anything');
   const names = new Set(cancelled.map((s) => String(s.fields.name)));
-  for (const step of runway(0, 400).steps) {
+  for (const step of runway(0, LEGS, 400).steps) {
     assert.ok(!names.has(step.label), `${step.label} is cancelled and is still being charged`);
   }
 });
@@ -267,8 +277,8 @@ test('a monthly charge falls in every month, including February', () => {
   // `setUTCMonth` overflows: 31 Jan stepped to 3 Mar, so February had no charge and March had two.
   const jan31 = (ROWS.services ?? []).length; // touch the seed so the import is not unused
   assert.ok(jan31 >= 0);
-  const months = runway(0, 365)
-    .steps.filter((s) => s.source === 'service')
+  const months = runway(0, LEGS, 365)
+    .steps.filter((s) => s.source === 'services')
     .map((s) => s.day.slice(0, 7));
   const counts = new Map<string, number>();
   for (const m of months) counts.set(m, (counts.get(m) ?? 0) + 1);

@@ -24,6 +24,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { goto } from '$app/navigation';
+  import { NOW } from '$lib/record/api.ts';
 
   /* The five live in `copy.ts` with every other sentence in the product, so the scope this screen
      claims can be checked against the rest of it in one pass rather than found in a component. */
@@ -31,6 +33,10 @@
 
   let picked = $state<string | null>(null);
   let field = $state<HTMLInputElement>();
+  let what = $state('');
+  /* FROM THE RECORD'S CLOCK, not a literal. A hardcoded date is a PAST date within weeks, on the
+     one screen where a wrong default is the first thing anybody sees. */
+  let due = $state(new Date(NOW + 28 * 86_400_000).toISOString().slice(0, 10));
 
   function pick(key: string) {
     picked = key;
@@ -38,6 +44,23 @@
   }
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
+
+  /**
+   * The first row.
+   *
+   * IT SAYS WHAT IT WOULD HAVE WRITTEN AND GOES WHERE THE ROW WOULD BE. This app is a mock-up of
+   * the record and has no write path; the rule it keeps everywhere else is that an action which
+   * cannot happen says so once, in the toast, rather than doing nothing — because a control that
+   * does nothing is indistinguishable from a broken one. This is the highest-stakes control in the
+   * product and it was the one that broke that rule.
+   */
+  function commit(event: SubmitEvent) {
+    event.preventDefault();
+    const said = what.trim();
+    if (!said || !choice) return;
+    toasts.push(copy.notWritten(`${said} would be the first row in ${choice.label}`));
+    void goto(`/r/${choice.key}`);
+  }
 
   async function copyCommand() {
     await navigator.clipboard?.writeText(copy.agentCommand).catch(() => {});
@@ -99,14 +122,22 @@
     {:else}
       <h1 class="question step">{choice.field}</h1>
 
-      <form class="form" onsubmit={(e) => e.preventDefault()}>
-        <label class="label" for="first">Your first {choice.label.toLowerCase().replace(/^the /, '').replace(/s$/, '')}</label>
-        <input bind:this={field} id="first" class="input" type="text" placeholder="" spellcheck="false" />
+      <!--
+        THE ONE CONTROL THAT MATTERS COMMITS. It had no handler at all — no toast, no route, no row,
+        and the input was not even bound — which is this app's own rule broken at the highest-stakes
+        moment: a control that does nothing is indistinguishable from a broken one, so every action
+        that cannot happen here says what it WOULD have done, once, in the toast. Sixteen other
+        controls obey that; the first-run commit did not.
+      -->
+      <form class="form" onsubmit={commit}>
+        <label class="label" for="first">{copy.firstField[choice.key] ?? `Your first ${choice.label}`}</label>
+        <input bind:this={field} bind:value={what} id="first" class="input" type="text" spellcheck="false" required />
 
         <label class="label" for="due">Due</label>
-        <!-- Pre-filled to a plausible value they can overwrite. Their first act is typing one true
-             fact about their own business, and it takes under thirty seconds. -->
-        <input id="due" class="input" type="date" value="2026-10-01" />
+        <!-- Pre-filled from the record's own clock, not from a literal: a hardcoded date is a
+             past date within weeks, on the one screen where a wrong default is the first thing
+             somebody sees. -->
+        <input bind:value={due} id="due" class="input" type="date" />
 
         <div class="actions">
           <Button weight="primary" type="submit">Add it</Button>

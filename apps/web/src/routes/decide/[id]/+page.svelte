@@ -234,8 +234,10 @@
         </section>
       {:else}
         <div class="third">
-          <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped. -->
-          <Button weight="bare" tone="info">{copy.defer}<Kbd keys="d" /></Button>
+          <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped.
+               It had no handler, so the one control that stops a gate being cleared by dismissing
+               things did nothing — while `d` on the keyboard opened the same flow correctly. -->
+          <Button weight="bare" tone="info" onclick={defer}>{copy.defer}<Kbd keys="d" /></Button>
           <span class="third-note">{copy.deferHint}</span>
         </div>
       {/if}

@@ -64,7 +64,16 @@ export function currencyFor(register: string, field: string): string | null {
  * balance yet, and a runway seeded from a number nobody declared is a forecast that looks like a
  * fact. When an account row exists this becomes a lookup and nothing else changes.
  */
-const OPENING = 4_200_000;
+/**
+ * The `forecast.runway` block the record declares, or `null`.
+ *
+ * ONE DECLARATION, READ BY BOTH. The tile and the block were two walks over two openings, and the
+ * only way two figures about one future stay in step is for there to be one of them.
+ */
+const declaredWalk = (): PageBlock | null => {
+  for (const decl of Object.values(PAGES)) for (const b of decl.blocks) if (b.source === 'forecast.runway') return b;
+  return null;
+};
 
 /** One locale for collation, so a list is in the same order for everybody looking at one record. */
 const LOCALE = 'en-GB';
@@ -583,16 +592,19 @@ export function metric(id: string): Metric {
      that did it: "you run out on 14 November" is a number you look at, and "the Fenwick renewal is
      what does it" is one you act on.
 
-     `OPENING` is a stand-in for a cash position the record does not hold yet. It is named rather
-     than buried in the walk so the day a real balance arrives there is one line to change. */
+     AND IT WALKS WHAT THE PAGE DECLARES. The tile used a module constant of GBP 42,000 while the
+     Money page's own `forecast.runway` block said GBP 5,000 — two figures about the same future,
+     8.4 times apart, neither saying which balance it rested on. There is one declaration now, and
+     the note says the figure it starts from. */
   if (id === 'runway') {
-    const walk = runway(OPENING);
+    const block = declaredWalk();
+    const walk = runway(block?.opening ?? 0, block?.from ?? []);
     if (!walk.crossed)
       return {
         id,
         label: 'Runway',
         value: `Over ${walk.horizon} days`,
-        note: 'nothing dated takes it under',
+        note: `nothing dated takes ${money(walk.from, walk.currency ?? 'GBP')} under`,
         tone: 'good',
         href: '/p/money',
       };
@@ -817,7 +829,11 @@ export type BlockResult = PageBlock & {
  * biggest number — those are rarely the same row, and the big number is the distraction.
  */
 function runwayBlock(b: PageBlock): BlockResult {
-  const walk = runway(OPENING, b.limit ? b.limit * 12 : 180);
+  /* THE DECLARATION, NOT A CONSTANT. This read a module-level `OPENING` of GBP 42,000 while its own
+     page said GBP 5,000 — so the tile and the block it sat beside disagreed by 8.4 times, in the
+     one figure this product computes about the future. A block with no `opening:` gets none, and
+     the walk says so rather than inventing a balance. */
+  const walk = runway(b.opening ?? 0, b.from ?? [], b.limit ? b.limit * 12 : 180);
   const columns = [
     { field: 'day', label: 'When', width: 'minmax(10ch,auto)', align: 'start' as const, truncate: 'end' as const },
     { field: 'what', label: 'What', width: 'minmax(16ch,1fr)', align: 'start' as const, truncate: 'end' as const },

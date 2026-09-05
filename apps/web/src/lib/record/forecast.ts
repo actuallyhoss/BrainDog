@@ -22,9 +22,9 @@
  * off by a penny is a balance nobody trusts again.
  */
 
-import { NOW, ROWS } from './data.ts';
+import { NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf, currencyOf } from './money.ts';
-import { resolveDay } from './where.ts';
+import { compile, matches, resolveDay } from './where.ts';
 import type { Entry } from './schema.ts';
 
 /** One movement on one day, and the balance after it. */
@@ -36,7 +36,8 @@ export type Step = {
   delta: number;
   /** The running balance after this step, in minor units. */
   balance: number;
-  source: 'obligation' | 'service';
+  /** The register the movement came from. It is the leg's own name, not a word from a fixed pair. */
+  source: string;
   href: string;
 };
 
@@ -79,6 +80,29 @@ const CYCLE_MONTHS: Record<string, number> = { monthly: 1, yearly: 12, two_yearl
  * Dates advance by calendar month rather than by 30 days, so a monthly renewal on the 31st does not
  * drift backwards through the year.
  */
+/**
+ * The days one row's movement lands on inside the window.
+ *
+ * BY THE CYCLE THE LEG DECLARES. A leg with no `every` is a one-off; one with it reads the row's own
+ * cycle field through the leg's table of months, so a quarterly plan is a declaration change rather
+ * than a code change.
+ */
+function occurrences(row: Entry, leg: Leg, first: string, until: number): { day: string; at: number }[] {
+  const start = noon(first);
+  if (!Number.isFinite(start)) return [];
+  const months = leg.every ? (leg.every.months[String(row.fields[leg.every.field] ?? '')] ?? 0) : 0;
+  if (!months || !Number.isInteger(months)) return start <= until ? [{ day: first, at: start }] : [];
+
+  const out: { day: string; at: number }[] = [];
+  for (let n = 0; n < 64; n++) {
+    const at = new Date(start);
+    at.setUTCMonth(at.getUTCMonth() + months * n);
+    if (at.getTime() > until) break;
+    out.push({ day: at.toISOString().slice(0, 10), at: at.getTime() });
+  }
+  return out;
+}
+
 function renewals(service: Entry, until: number): { day: string; at: number }[] {
   const first = String(service.fields.renews ?? '');
   if (!first) return [];
@@ -114,64 +138,69 @@ function renewals(service: Entry, until: number): { day: string; at: number }[] 
  * A `part` obligation counts in full. It is the honest direction for a balance you are asking not to
  * go under: the part already paid is not in the opening figure either.
  */
-export function runway(opening: number, horizon = 180): Runway {
+/** What one leg of a walk reads. It is the declaration's own shape, not a second one. */
+export type Leg = {
+  register: string;
+  on: string;
+  amount: string;
+  where?: string;
+  incoming?: { field: string; is: string };
+  every?: { field: string; months: Readonly<Record<string, number>> };
+};
+
+/**
+ * The cash walk: what is liquid now, then every dated movement in order, until it goes under.
+ *
+ * WHAT IT READS IS DECLARED, NOT WIRED. This walked `ROWS.obligations` and `ROWS.services` by name,
+ * under a page declaration that said which registers to read and was ignored \u2014 so a customer whose
+ * money lives in registers of their own got a cash walk over somebody else's, or none. A forecast
+ * that knows the word `obligations` is a forecast that works for one record.
+ *
+ * A `part` obligation counts in full. It is the honest direction for a balance you are asking not to
+ * go under: the part already paid is not in the opening figure either.
+ */
+export function runway(opening: number, legs: readonly Leg[], horizon = 180): Runway {
   const until = NOW + horizon * DAY_MS;
   const movements: { at: number; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
 
-  for (const row of ROWS.obligations ?? []) {
-    const state = String(row.fields.state ?? '');
-    if (state !== 'open' && state !== 'part') continue;
-    const due = String(row.fields.due ?? '');
-    const at = noon(due);
-    if (!Number.isFinite(at) || at > until) continue;
+  for (const leg of legs) {
+    const decl = REGISTERS[leg.register];
+    for (const row of ROWS[leg.register] ?? []) {
+      /* THE SAME PREDICATE EVERY OTHER READ USES, compiled from the leg's own sentence — so a leg
+         saying `state is open or part` means what the same words mean on a page. */
+      if (leg.where && !matches(row, compile(leg.register, leg.where), NOW)) continue;
 
-    /* AN OVERDUE OBLIGATION IS STILL A MOVEMENT. This dropped anything dated before today, on the
-       argument that an overdue invoice is a fact about the present rather than a movement still to
-       come. That is true of a PAID one, and the walk already filters to open and part — so what it
-       actually dropped was four rows of money that has not moved yet, and the tile read 116 days
-       where the truth is 93, naming a different row as the one that does it.
-       The date is clamped to today rather than kept, so the walk stays in order and a balance that
-       is already gone is gone at the top of it; the label says which rows those are. */
-    const late = at < NOW;
-    const day = late ? new Date(NOW).toISOString().slice(0, 10) : due;
-    const owed = String(row.fields.direction ?? '') === 'owed_to_me';
-    const amount = amountOf(row.fields.amount) ?? 0;
-    const currency = currencyOf(row.fields.amount);
-    if (currency) seen.add(currency);
-    movements.push({
-      at: late ? NOW : at,
-      step: {
-        day,
-        label: `${String(row.fields.what ?? '')}${late ? ' · overdue' : ''}`,
-        delta: owed ? amount : -amount,
-        source: 'obligation',
-        href: `/r/obligations/${row.seq}`,
-      },
-    });
-  }
+      const amount = amountOf(row.fields[leg.amount]) ?? 0;
+      if (amount === 0) continue;
+      const currency = currencyOf(row.fields[leg.amount]);
+      if (currency) seen.add(currency);
 
-  for (const row of ROWS.services ?? []) {
-    /* `cancelled`, which is a state the register actually declares. This guarded on `ended` — a
-       value nothing holds — so the guard never fired once and every cancelled subscription was
-       charged for ever. `Old CI plan` was cancelled and still took GBP 174.00 out of the forecast
-       over six months, as the first row of the money page's own "What is coming". Every other
-       consumer in the app already spelled it `cancelled`. */
-    if (String(row.fields.state ?? '') === 'cancelled') continue;
-    const cost = amountOf(row.fields.cost) ?? 0;
-    const currency = currencyOf(row.fields.cost);
-    if (currency) seen.add(currency);
-    for (const r of renewals(row, until))
-      movements.push({
-        at: r.at,
-        step: {
-          day: r.day,
-          label: String(row.fields.name ?? ''),
-          delta: -cost,
-          source: 'service',
-          href: `/r/services/${row.seq}`,
-        },
-      });
+      const on = String(row.fields[leg.on] ?? '').slice(0, 10);
+      if (!on) continue;
+
+      /* WHICH VALUES MEAN MONEY ARRIVING is on the leg. Absent, every row of it is an outgoing \u2014
+         which is what a subscription is, and what made the second leg readable as a declaration. */
+      const incoming = leg.incoming ? row.fields[leg.incoming.field] === leg.incoming.is : false;
+      const label = String(row.fields[decl?.title ?? leg.on] ?? '');
+
+      for (const r of occurrences(row, leg, on, until)) {
+        /* AN OVERDUE MOVEMENT IS STILL A MOVEMENT, clamped to today rather than dropped: the walk
+           stays in order, a balance that is already gone is gone at the top of it, and the label
+           says which rows those are. Dropping them read 116 days where the truth was 93. */
+        const late = r.at < NOW;
+        movements.push({
+          at: late ? NOW : r.at,
+          step: {
+            day: late ? new Date(NOW).toISOString().slice(0, 10) : r.day,
+            label: `${label}${late ? ' \u00b7 overdue' : ''}`,
+            delta: incoming ? amount : -amount,
+            source: leg.register,
+            href: `/r/${leg.register}/${row.seq}`,
+          },
+        });
+      }
+    }
   }
 
   /* ONE CURRENCY OR NO WALK. A crossing day computed from two currencies is a real-looking date on

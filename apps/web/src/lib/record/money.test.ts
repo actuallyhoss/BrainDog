@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { currencyFor, display, page } from './api.ts';
+import { PAGES } from './data.ts';
 import { toSegments } from './blocks.ts';
 import { NOW, ROWS } from './data.ts';
 import { amountOf, currencyOf, merge, total } from './money.ts';
@@ -27,6 +28,12 @@ const gbp = (amount: number) => ({ amount, currency: 'GBP' });
 const eur = (amount: number) => ({ amount, currency: 'EUR' });
 
 /* ── the arithmetic ──────────────────────────────────────────────────────── */
+
+/* The legs the record declares. A test that hardcoded two registers would be testing a different
+   function from the one the product runs. */
+const LEGS = Object.values(PAGES)
+  .flatMap((p) => p.blocks)
+  .find((b) => b.source === 'forecast.runway')!.from!;
 
 test('a total of one currency is a total; a total of two is a REFUSAL', () => {
   const one = total([gbp(100), gbp(250), null, gbp(50)]);
@@ -170,12 +177,12 @@ test('A BAR WITH A MIXED GROUP SAYS SO IN THAT GROUP, and the others still read'
 
 test('THE CASH WALK REFUSES RATHER THAN INVENTING A CROSSING DAY', () => {
   // A crossing computed from two currencies is a real-looking date on which nothing happens.
-  const clean = runway(500_000);
+  const clean = runway(500_000, LEGS);
   assert.ok(clean.steps.length > 0);
   assert.equal(clean.currency, 'GBP');
 
   withEuro('obligations', 'amount', overduePayable, () => {
-    const walk = runway(500_000);
+    const walk = runway(500_000, LEGS);
     assert.deepEqual(walk.mixed, ['EUR', 'GBP']);
     assert.deepEqual(walk.steps, [], 'the walk added two currencies and produced a crossing anyway');
     assert.equal(walk.crossed, null);

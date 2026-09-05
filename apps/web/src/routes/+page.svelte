@@ -49,8 +49,14 @@
 
   /* Home writes the dialect and the renderer draws it, exactly as an agent would — one code path
      from the first `<figure>` down, and no bespoke chart component to keep in step. */
+  const cells = $derived(['owed-to-you', 'due-30d', 'overdue'].map((id) => metric(id)));
+
+  /* A FIGURE IS A DOOR. `hrefFor` derives a tile's address from the same predicate the figure is
+     computed over, so the tile and the list it opens cannot disagree — and until now that
+     derivation shipped behind a `div` nobody could press. */
+  const stripOpts = $derived({ cellHref: (i: number) => cells[i]?.href ?? null });
+
   const strip = $derived.by(() => {
-    const cells = ['owed-to-you', 'due-30d', 'overdue'].map((id) => metric(id));
     const rows = cells.map((m) => `${m.label} | ${m.value} | ${m.note}${m.tone ? ` | ${m.tone}` : ''}`);
     // No heading in the fence: the section above it already names the band, and a block that
     // repeats its own section title is the same sentence twice.
@@ -152,7 +158,7 @@
   <aside class="secondary">
     <Section title="Right now">
       {#each strip as segment}
-        {#if segment.type === 'block'}<Block block={segment} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
+        {#if segment.type === 'block'}<Block block={segment} opts={stripOpts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
       {/each}
     </Section>
 

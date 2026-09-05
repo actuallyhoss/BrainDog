@@ -516,7 +516,13 @@
               <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
             {:else}
               {#each drawn.segments as segment}
-                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
+                <!-- A FIGURE IS A DOOR, and the address is the metric's own: `hrefFor` derives it
+                     from the same predicate the figure is computed over, so a tile and the list it
+                     opens cannot disagree. -->
+                {#if segment.type === 'block'}<Block
+                    block={segment}
+                    opts={{ ...opts, cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
+                  />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}
           </div>

@@ -27,6 +27,7 @@
   import '$lib/ui/rows.css';
   import '$lib/ui/controls.css';
 
+  import * as pref from '$lib/pref.ts';
   import { copy } from '$lib/copy.ts';
   import { GoPrefix, overlays, typing } from '$lib/a11y/keys.svelte.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
@@ -51,7 +52,10 @@
   let paletteOpen = $state(false);
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
-  let railOff = $state(false);
+  /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
+     and `app.html` has always read this cookie before first paint, so a remembered fold costs no
+     flash. Nothing wrote it until now. */
+  let railOff = $state(pref.read().sidebar === false);
   const go = new GoPrefix();
 
   /** `ponytail:` a constant in the mock-up. The live channel is `lib/data/live.ts` in the real app:
@@ -87,6 +91,7 @@
     if (mod && e.key === '\\') {
       e.preventDefault();
       railOff = !railOff;
+      pref.write({ sidebar: !railOff });
       return;
     }
 

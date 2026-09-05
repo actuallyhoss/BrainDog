@@ -33,9 +33,22 @@
     {/each}
   </div>
 {:else}
+  <!--
+    A FIGURE IS A DOOR WHEN THE HOST KNOWS WHERE ITS ROWS ARE. "Overdue · GBP 2,340.00" is a number
+    somebody immediately wants the four rows behind, and the derivation that guarantees the tile and
+    the list cannot disagree is worth nothing behind something unclickable. Where there is no
+    address it stays a `div`: a link to nowhere is worse than no link.
+  -->
   <div class="grid" style="--cells:{block.rows.length}">
-    {#each block.rows as row}
-      <div class="cell" data-intent={row.tone}>
+    {#each block.rows as row, i}
+      {@const href = opts.cellHref?.(i) ?? null}
+      <svelte:element
+        this={href ? 'a' : 'div'}
+        class="cell"
+        class:cell-open={href}
+        {href}
+        data-intent={row.tone}
+      >
         <span class="cell-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
         <span class="cell-figure num">
           {#if row.cells[1]}<Text nodes={inline(row.cells[1], opts)} {opts} />{:else}{MISSING}{/if}
@@ -44,7 +57,7 @@
         {#if row.tone}
           <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
         {/if}
-      </div>
+      </svelte:element>
     {/each}
   </div>
 {/if}

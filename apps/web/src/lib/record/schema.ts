@@ -168,6 +168,37 @@ export type PageBlock = {
    */
   authored?: readonly { cells: readonly string[]; tone?: 'good' | 'warn' | 'bad' | 'info' }[];
 
+  /**
+   * `forecast.runway` only: what is liquid TODAY, in minor units.
+   *
+   * SOMEBODY HAS TO SUPPLY IT. A runway seeded from a balance nobody declared is a forecast that
+   * looks like a fact and is a guess — and the block was reading a module constant of GBP 42,000
+   * while its own declaration said GBP 5,000, so the tile and the page it sat on disagreed by 8.4
+   * times, in the one figure this product computes about the future.
+   */
+  opening?: number;
+
+  /**
+   * `forecast.runway` only: which registers the walk reads, and what each one contributes.
+   *
+   * DECLARED, NOT WIRED. A forecast that knew the word `obligations` is a forecast that works for
+   * one record — which is exactly what it was: the declaration was in the page and the walk
+   * ignored it, so a customer whose money lives in a register of their own got a cash walk over
+   * somebody else's registers or none at all.
+   */
+  from?: readonly {
+    register: string;
+    /** The date field the movement happens on. */
+    on: string;
+    /** The money field. Its currency is the walk's, and two of them is a refusal. */
+    amount: string;
+    where?: string;
+    /** Which values of a field mean money ARRIVING. Absent means every row is an outgoing. */
+    incoming?: { field: string; is: string };
+    /** A movement that recurs: a field naming a cycle, and a table of months per cycle. */
+    every?: { field: string; months: Readonly<Record<string, number>> };
+  }[];
+
   /** Mandatory on every source-bound block. An empty state that says nothing is a dead end, and a
       record is MOSTLY empty on day one (06 §1). */
   empty?: string;

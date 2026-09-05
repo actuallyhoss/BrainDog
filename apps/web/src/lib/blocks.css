@@ -214,6 +214,23 @@
     border-inline-start: 1px solid var(--line);
   }
 
+  /* A FIGURE THAT IS A DOOR SAYS SO WITHOUT SHOUTING. Underlining a tile would make a dashboard
+     look like a list of links; what it gets is the same hover surface every other openable thing in
+     the product gets, and the focus ring the sheet already defines. The colour does not change,
+     because the figure's tone is what its colour is FOR. */
+  a.cell {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  a.cell:hover {
+    background: var(--s1);
+  }
+
+  a.cell:active {
+    background: var(--s2);
+  }
+
   .cell-label {
     grid-area: label;
     color: var(--dim);

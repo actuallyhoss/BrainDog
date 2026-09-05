@@ -22,6 +22,16 @@ import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 export type RenderOptions = InlineOptions & {
   /** Turn a spoken id into an address. A link the host cannot resolve renders as plain text. */
   link?: (spoken: string) => string | null;
+  /**
+   * Where a figure's rows are, by its position in the block. `null` is "nowhere to go".
+   *
+   * A FIGURE THAT IS NOT A DOOR IS A DEAD END. "Overdue · GBP 2,340.00" is a number somebody
+   * immediately wants the four rows behind, and every stat tile in this product was a `<div>` — so
+   * the one derivation that guarantees a tile and its list cannot disagree shipped behind something
+   * unclickable. It is per-INDEX rather than per-metric because the dialect is text: a block's rows
+   * are in the order its cells named them, and that order is the only handle there is.
+   */
+  cellHref?: (index: number) => string | null;
 };
 
 export const escape = (s: string): string =>
