@@ -665,6 +665,9 @@ export const PAGES: Record<string, PageDecl> = {
         kind: 'timeline',
         heading: 'Next ninety days',
         span: 6,
+        /* WRITTEN DOWN, because it used to live in the reader as a filter keyed on
+           register-and-kind. The heading says ninety days and now the declaration does too. */
+        where: 'state is not cancelled, renews before +90d',
         columns: [{ field: 'renews' }, { field: 'name' }, { field: 'provider' }],
         source: 'register.services',
         order: [{ field: 'renews', dir: 'asc' }],
@@ -851,6 +854,9 @@ export const PAGES: Record<string, PageDecl> = {
         heading: 'Everything open',
         span: 12,
         source: 'register.tasks',
+        /* The heading says open. It used to be the only place that said so — the filter was keyed on
+           register-and-kind inside the reader, and a heading is not evaluated. */
+        where: 'state is not done or dropped',
         columns: [
           { field: 'seq', label: '#', width: '9ch', align: 'end' },
           { field: 'what', label: 'What', width: 'minmax(20ch,1fr)', link: true },

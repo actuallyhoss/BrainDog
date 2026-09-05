@@ -115,6 +115,16 @@ export function resolveDay(word: string, now: number): string | null {
 
 const CLAUSE = /^\s*([a-z][a-z0-9_]*)\s+(is not|is|before|after)\s+(.+?)\s*$/i;
 
+/**
+ * The operators `21-AUTHORING` §4.2 publishes and this build does not read.
+ *
+ * They matter because they PARSE. `amount is at least 10000` is a well-formed clause whose value is
+ * the string "at least 10000", so it compiled, matched nothing, and drew the author's own "nothing
+ * matched" sentence — the state `blocks.ts` exists to keep separate from a filter that was not
+ * understood.
+ */
+const UNIMPLEMENTED = ['at least', 'at most', 'more than', 'less than', 'contains', 'starts', 'starts with', 'ends', 'ends with', 'empty', 'present', 'between', 'in', 'not in'];
+
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
 
 /**
@@ -170,13 +180,24 @@ export function compile(register: string, where: string | undefined): Where {
   const clauses: Clause[] = [];
   const bad: string[] = [];
 
+  /* A SENTENCE, AND `docs/06-PAGES` §1.1 SHOWS A TREE. Both spellings are in the docs — §1's worked
+     example writes `where: { all: [{ field: 'state', in: [...] }] }`, and `21-AUTHORING` §4.5 says
+     the sentence is "read-only, never parsed" — so an agent following either one is following the
+     documentation. The tree arrived here as an object, `.split` threw, and the throw took the whole
+     page. It is a refusal now, and it says which spelling this build reads. */
+  if (where !== undefined && typeof where !== 'string')
+    return { register, clauses, bad: ['where: takes a sentence — `state is open, due before +30d` — not a predicate tree'] };
+
   for (const raw of (where ?? '').split(',')) {
     const text = raw.trim();
     if (!text) continue;
 
     const m = CLAUSE.exec(text);
     if (!m) {
-      bad.push(`${text} — not a predicate`);
+      /* THE REFUSAL NAMES THE FOUR THAT WORK. `21-AUTHORING` §4.2 publishes eleven operators and
+         four are implemented, so "not a predicate" told an agent it was wrong and nothing about
+         what to write — which is the one thing 10 §7's fourth rule asks a refusal to do. */
+      bad.push(`${text} — not a predicate. This build reads: is · is not · before · after`);
       continue;
     }
     const [, name, op, rest] = m as unknown as [string, string, string, string];
@@ -199,8 +220,28 @@ export function compile(register: string, where: string | undefined): Where {
 
     /* ` or ` and not `|`, because the person reading this is reading a sentence. */
     const values = rest.split(/\s+or\s+/i).map((v) => v.trim()).filter(Boolean);
+
     const set = allowed(register, field);
     const unknown = set ? values.filter((v) => !set.includes(norm(v))) : [];
+
+    /* AN OPERATOR IN THE VALUE SLOT IS AN OPERATOR, NOT A VALUE, and it is checked only AFTER the
+       declared values, so an enum that really holds the word `present` still resolves.
+
+       `amount is at least 10000` parsed as `is` against the literal string "at least 10000", found
+       no field holding those words, matched nothing, and drew the author's own "nothing matched"
+       sentence — which is the one state `blocks.ts` exists to keep separate from a filter that was
+       not understood. These are the operators `21-AUTHORING` §4.2 publishes and this build does not
+       read, so an agent writing from the docs is told so instead of being handed an empty block. */
+    const reach = (set ? unknown : values).find((v) =>
+      UNIMPLEMENTED.some((w) => v.toLowerCase().startsWith(`${w} `) || v.toLowerCase() === w),
+    );
+    if (reach) {
+      bad.push(
+        `${text} — "${UNIMPLEMENTED.filter((w) => reach.toLowerCase().startsWith(w)).sort((a, b) => b.length - a.length)[0]}" is not an operator this build reads. It reads: is · is not · before · after`,
+      );
+      continue;
+    }
+
     if (unknown.length) {
       bad.push(`${text} — ${field} has no value ${unknown.join(' or ')}`);
       continue;

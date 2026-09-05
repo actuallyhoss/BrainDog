@@ -117,6 +117,45 @@ test('a row with no value for a dated field is not silently included', () => {
   for (const e of rows) assert.equal(matches(e, w, NOW), false);
 });
 
+/* ── the refusal names what to write instead ─────────────────────────────── */
+
+test('the predicate TREE the docs also show is refused, not thrown on', () => {
+  // `06-PAGES` §1 writes `where: { all: [...] }` and `21-AUTHORING` §4.5 says the sentence is the
+  // read-only restatement of it. An agent following either is following the documentation, and the
+  // object reached `.split`, threw, and took the whole page with it.
+  const w = compile('obligations', { all: [{ field: 'state', in: ['open'] }] } as unknown as string);
+  assert.equal(w.clauses.length, 0);
+  assert.match(w.bad[0] ?? '', /sentence/);
+  assert.match(w.bad[0] ?? '', /state is open/, 'a refusal that does not show the shape is a dead end');
+});
+
+test('an operator the build does not read is named as an operator, not matched as a value', () => {
+  // `21-AUTHORING` §4.2 publishes eleven and four are implemented. `amount is at least 10000` parsed
+  // as `is` against the literal string "at least 10000", matched nothing, and drew the author's own
+  // "nothing matched" sentence — the one state that must be kept apart from a filter that failed.
+  for (const [text, word] of [
+    ['amount is at least 10000', 'at least'],
+    ['note is empty', 'empty'],
+    ['amount is between 1 and 2', 'between'],
+  ] as const) {
+    const w = compile('obligations', text);
+    assert.ok(w.bad.length, `${text} was accepted`);
+    assert.match(w.bad[0] ?? '', new RegExp(word));
+    assert.match(w.bad[0] ?? '', /is not/, 'the refusal has to say what does work');
+  }
+});
+
+test('and an operator word that is a real value is still a value', () => {
+  // The check runs after the declared set, so an enum that genuinely holds one of those words
+  // resolves. `state is open` is the case that matters, and `present`/`in` are the ones at risk.
+  assert.deepEqual(compile('obligations', 'state is open').bad, []);
+  assert.deepEqual(compile('services', 'state is live').bad, []);
+});
+
+test('an unparseable clause says which four operators exist', () => {
+  assert.match(compile('obligations', 'what contains invoice').bad[0] ?? '', /is · is not · before · after/);
+});
+
 /* ── shape ───────────────────────────────────────────────────────────────── */
 
 test('whitespace and case are not part of the grammar', () => {

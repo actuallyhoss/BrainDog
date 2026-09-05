@@ -813,11 +813,57 @@ function runwayBlock(b: PageBlock): BlockResult {
   };
 }
 
+/**
+ * Every key a block declaration may carry, so one it cannot is named rather than ignored.
+ *
+ * A list, not a type check: a declaration arrives as JSON from a pack somebody else wrote, and
+ * TypeScript is not there at the moment it is read. `when:` is the one 06 §1.1 documents and this
+ * build does not have — an agent writing the doc's own worked example got a block that always drew.
+ */
+const READS = new Set([
+  'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
+  'target', 'authored', 'empty', 'tone', 'body', 'drawn',
+]);
+
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
   const decl = PAGES[slug];
   if (!decl) return null;
 
+  /**
+   * SIX QUERIES, SIX INDEPENDENT FAILURES. The page route states that invariant at the top of its
+   * own file, and it was not true of the read underneath it: `readPage` maps every block in one
+   * call, so anything that threw in one of them took the whole page with it. A `where:` written as
+   * the predicate tree `docs/06-PAGES` §1.1 specifies did exactly that — `.split` on an object —
+   * and a page of five correct blocks rendered as nothing at all.
+   *
+   * A block that throws becomes a block that refuses, in the surface `draw()` already draws. The
+   * message is the thrown one because a declaration is written by somebody who can act on it.
+   */
   const blocks = decl.blocks.map((b): BlockResult => {
+    try {
+      return readBlock(b);
+    } catch (e) {
+      return {
+        ...b,
+        register: undefined,
+        columns: [],
+        entries: [],
+        matched: [],
+        refusals: [`${e instanceof Error ? e.message : String(e)} — this block could not be read`],
+        rows: [],
+        total: 0,
+        drawn: b.drawn ?? true,
+        stale_at: new Date(NOW).toISOString(),
+        metrics: undefined,
+      };
+    }
+  });
+
+  return { page: decl, blocks, values: values() };
+}
+
+function readBlock(b: PageBlock): BlockResult {
+  {
     /* A BLOCK MAY BE SOURCED FROM A WALK, NOT ONLY A REGISTER. 05 §2 defers a `forecast` KIND to
        post-v1 and says the primitive layer is what exists so that it can be drawn without one, so
        this adds a source rather than a kind: `forecast.runway` fills an ordinary `table` with the
@@ -830,6 +876,28 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
     const { entries: matched, refusals } = register
       ? filterForBlock(register, all, b)
       : { entries: [], refusals: [] };
+
+    /* WHAT THE DECLARATION SAID THAT THIS BUILD DOES NOT READ.
+       Three shapes reached here and were answered with an empty block, which is the state reserved
+       for "it asked and the answer was nothing":
+         - a `source:` that resolves to neither a register nor the walk. 06 §1.1 documents
+           `metric.<id>` and `block.<n>` and neither is implemented.
+         - a field in `columns:` that the register does not declare. The same typo in `where:` says
+           "there is no field called amounnt"; in `columns:` it drew a row of blank cells.
+         - a key the type does not carry at all — `when:` is in 06 §1.1 and is not read anywhere.
+       All three are the block's own error, so they go where `explain()` goes. */
+    const said = [...refusals];
+    if (b.source && !register) said.push(`source: ${b.source} — this build reads register.<id> and forecast.runway`);
+    if (register) {
+      /* `seq` is a column and not a field: it is on the ROW rather than in its fields, and `toRows`
+         renders it as `#4`. Any pack may name it, so it belongs in the set a column may resolve to
+         even though no register declares it. */
+      const declared = new Set(['seq', ...(REGISTERS[register]?.fields ?? []).map((f) => f.id)]);
+      for (const c of b.columns ?? [])
+        if (!declared.has(c.field)) said.push(`columns: there is no field called ${c.field} on ${register}`);
+    }
+    for (const key of Object.keys(b))
+      if (!READS.has(key)) said.push(`${key}: is not a key this build reads`);
     /* `limit:` is a READING cap, not a query cap: it says how much of the answer fits on the page.
        The kinds that reduce are handed the whole answer (see `matched`), so a sum is a sum. */
     const entries = matched.slice(0, b.limit ?? 50);
@@ -848,16 +916,14 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
       columns,
       entries,
       matched,
-      refusals,
+      refusals: said,
       rows: toRows(register ?? '', entries, columns),
       total: matched.length,
       drawn: b.drawn ?? true,
       stale_at: new Date(NOW).toISOString(),
       metrics: b.cells?.map((c) => ({ ...metric(c.metric), label: c.label })),
     };
-  });
-
-  return { page: decl, blocks, values: values() };
+  }
 }
 
 /** The mock's stand-in for a compiled `where:`. The real one is one JSON tree, seven consumers. */
@@ -871,15 +937,19 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): { ent
   const predicate = b.where ? compile(register, b.where) : null;
   let out = predicate ? entries.filter((e) => matches(e, predicate, NOW)) : entries;
 
-  /* Two windows that are a KIND'S OWN DEFAULT rather than a predicate somebody wrote. A timeline of
-     renewals means the ones coming up, and a table of tasks means the ones still open — neither is
-     a filter a reader chose, so neither belongs in `where:` where it would have to be repeated on
-     every declaration that uses the kind. */
-  if (register === 'services' && b.kind === 'timeline')
-    out = out.filter((e) => e.fields.state !== 'cancelled' && days(e.fields.renews) <= 90);
-  if (register === 'tasks' && b.kind === 'table')
-    out = out.filter((e) => e.fields.state !== 'done' && e.fields.state !== 'dropped');
+  /* THERE WERE TWO HIDDEN WINDOWS HERE, keyed on register-and-kind: a `timeline` over services
+     dropped cancelled rows and anything past ninety days, and a `table` over tasks dropped done and
+     dropped ones. The argument was that they are the kind's own default rather than a filter a
+     reader chose. The argument is wrong, and it is wrong in the way this file spends most of its
+     comments warning about: the same `where:` over the same register returned different rows
+     depending on the kind, with nothing in the declaration saying so, and an agent asking a `table`
+     for closed tasks got back `total: 0` and its own "nothing matched" sentence.
 
+     Both are now written where they can be read, on the two declarations that wanted them, and both
+     produce exactly the row counts the code did — 12 and 11. A default that cannot be seen is not a
+     default, it is a second filter.
+
+*/
   const order = b.order?.[0];
   return {
     entries: order ? sortRows(register, out, order.field, order.dir) : out,
