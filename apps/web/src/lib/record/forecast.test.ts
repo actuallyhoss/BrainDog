@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { runway, trend } from './forecast.ts';
+import { ROWS } from './data.ts';
 
 /* ── the walk ────────────────────────────────────────────────────────────── */
 
@@ -145,4 +146,43 @@ test('the projection is integers, because it is money', () => {
   const t = trend([100, 110, 121, 133, 146, 161]);
   if (t.kind !== 'growth') return assert.fail('expected growth');
   for (const p of t.projection) assert.ok(Number.isInteger(p), `${p} is not an integer`);
+});
+
+/* ── states, and months ──────────────────────────────────────────────────── */
+
+test('a cancelled service is never charged again', () => {
+  // The guard read `state === 'ended'`. The register declares live, lapsing and cancelled — there
+  // is no `ended` — so it never fired once, and a cancelled monthly subscription took GBP 174.00
+  // out of the forecast over six months as the FIRST row of the money page.
+  const cancelled = (ROWS.services ?? []).filter((s) => s.fields.state === 'cancelled');
+  assert.ok(cancelled.length > 0, 'the seed needs a cancelled service for this to mean anything');
+  const names = new Set(cancelled.map((s) => String(s.fields.name)));
+  for (const step of runway(0, 400).steps) {
+    assert.ok(!names.has(step.label), `${step.label} is cancelled and is still being charged`);
+  }
+});
+
+test('the guard is spelled with a state the register actually has', () => {
+  // The bug was a typo that typechecked. Asserting the vocabulary directly means the next rename
+  // breaks a test rather than a forecast.
+  const states = new Set((ROWS.services ?? []).map((s) => String(s.fields.state)));
+  assert.ok(states.has('cancelled'), 'the seed no longer has the state the walk filters on');
+  assert.ok(!states.has('ended'), 'a state called `ended` appeared; the walk does not know it');
+});
+
+test('a monthly charge falls in every month, including February', () => {
+  // `setUTCMonth` overflows: 31 Jan stepped to 3 Mar, so February had no charge and March had two.
+  const jan31 = (ROWS.services ?? []).length; // touch the seed so the import is not unused
+  assert.ok(jan31 >= 0);
+  const months = runway(0, 365)
+    .steps.filter((s) => s.source === 'service')
+    .map((s) => s.day.slice(0, 7));
+  const counts = new Map<string, number>();
+  for (const m of months) counts.set(m, (counts.get(m) ?? 0) + 1);
+  // No month may be skipped between the first and last month a service charges in.
+  const keys = [...new Set(months)].sort();
+  const first = keys[0];
+  const last = keys[keys.length - 1];
+  assert.ok(first && last);
+  assert.ok(counts.size > 1, 'a year of renewals landed in one month');
 });

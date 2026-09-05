@@ -406,6 +406,18 @@ export type Metric = {
 };
 
 const open = (e: Entry) => e.fields.state === 'open' || e.fields.state === 'part';
+
+/**
+ * A service's cost over a YEAR, whatever cycle it bills on.
+ *
+ * `cost` is per cycle, so adding a yearly domain to a monthly bucket adds two different units and
+ * produces a number that is not about anything. This was written out longhand in one metric and
+ * omitted entirely from another, so the estate's annual cost was right and Kiln's was 9.25 times
+ * too low — GBP 112.00 against a true GBP 1,036.00, on a project page, under the word "year".
+ * One factor, in one place, so the two cannot drift again.
+ */
+const perYear = (e: Entry): number =>
+  Number(e.fields.cost ?? 0) * (e.fields.cycle === 'monthly' ? 12 : e.fields.cycle === 'two_yearly' ? 0.5 : 1);
 const days = (iso: unknown) =>
   typeof iso === 'string' ? (Date.parse(`${iso}T12:00:00Z`) - NOW) / 86_400_000 : Infinity;
 
@@ -447,7 +459,7 @@ export function metric(id: string): Metric {
     }
     case 'kiln-cost': {
       const rows = services.filter((e) => e.fields.thing === KILN && e.fields.state !== 'cancelled');
-      const total = rows.reduce((a, e) => a + Number(e.fields.cost ?? 0), 0);
+      const total = rows.reduce((a, e) => a + perYear(e), 0);
       return {
         id,
         label: 'Costs a year',
@@ -470,7 +482,12 @@ export function metric(id: string): Metric {
       };
     }
     case 'due-30d': {
-      const rows = obligations.filter((e) => open(e) && e.fields.direction === 'owed_by_me' && days(e.fields.due) <= 30);
+      /* Bounded BELOW as well. `<= 30` counted everything already late too, so an overdue bill was
+         in this tile and in Overdue at once and the two could not be added. A window with one end
+         is a window that grows for ever. */
+      const rows = obligations.filter(
+        (e) => open(e) && e.fields.direction === 'owed_by_me' && days(e.fields.due) >= 0 && days(e.fields.due) <= 30,
+      );
       const total = rows.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
       return {
         id,
@@ -481,16 +498,30 @@ export function metric(id: string): Metric {
         href: '/r/obligations?f=direction:is:owed_by_me&f=due:before:+30d',
       };
     }
+    /* ONE DIRECTION, like the two tiles it sits beside. This added receivables to payables and
+       painted the sum in the alarm colour: GBP 17,740.00 was GBP 7,200 you are owed plus GBP 10,540
+       you owe. Those are not the same problem and the sum is not a quantity — one is chasing, the
+       other is a penalty.
+
+       It is the money you OWE and have not paid, because that is the half the other two do not
+       cover: `owed-to-you` already reports its own late count, and `due-30d` is the same direction
+       but still ahead of you. The three are now disjoint and add up. */
     case 'overdue': {
-      const rows = obligations.filter((e) => open(e) && days(e.fields.due) < 0);
+      const rows = obligations.filter((e) => open(e) && e.fields.direction === 'owed_by_me' && days(e.fields.due) < 0);
       const total = rows.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
+      const owedToYou = obligations.filter((e) => open(e) && e.fields.direction === 'owed_to_me' && days(e.fields.due) < 0);
       return {
         id,
         label: 'Overdue',
         value: money(total, CURRENCY),
-        note: rows.length === 0 ? 'nothing late' : `${rows.length} rows · target 0`,
+        note:
+          rows.length === 0
+            ? 'nothing late'
+            : owedToYou.length
+              ? `${rows.length} you owe · ${owedToYou.length} you are owed`
+              : `${rows.length} rows · target 0`,
         tone: rows.length === 0 ? 'good' : 'bad',
-        href: '/r/obligations?f=state:in:open,part&f=due:before:today',
+        href: '/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today',
       };
     }
     /* THE RUNWAY, which is the only figure in the product that is about the future.
@@ -538,7 +569,7 @@ export function metric(id: string): Metric {
     case 'estate-year': {
       const total = services
         .filter((e) => e.fields.state !== 'cancelled')
-        .reduce((a, e) => a + Number(e.fields.cost ?? 0) * (e.fields.cycle === 'monthly' ? 12 : e.fields.cycle === 'two_yearly' ? 0.5 : 1), 0);
+        .reduce((a, e) => a + perYear(e), 0);
       /* 300_000, not 30_000. The target was written a zero short, so a GBP 2,906.80 estate was
          measured against GBP 300.00 and the tile read `warn` for a reason nobody could act on. A
          target that is absurd next to its own figure is a target people stop reading. */

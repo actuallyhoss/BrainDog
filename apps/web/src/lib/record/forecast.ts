@@ -23,6 +23,7 @@
  */
 
 import { NOW, ROWS } from './data.ts';
+import { resolveDay } from './where.ts';
 import type { Entry } from './schema.ts';
 
 /** One movement on one day, and the balance after it. */
@@ -74,13 +75,20 @@ function renewals(service: Entry, until: number): { day: string; at: number }[] 
   const months = CYCLE_MONTHS[String(service.fields.cycle ?? '')] ?? 0;
   const out: { day: string; at: number }[] = [];
 
-  const start = new Date(`${first}T12:00:00Z`);
+  const start = Date.parse(`${first}T12:00:00Z`);
+  if (!Number.isFinite(start)) return [];
+
   for (let n = 0; n < 64; n++) {
-    const d = new Date(start);
-    d.setUTCMonth(d.getUTCMonth() + months * n);
-    const at = d.getTime();
+    /* `resolveDay` rather than `setUTCMonth`, because `setUTCMonth` OVERFLOWS. A monthly service
+       renewing on the 31st stepped 31 Jan → 3 Mar → 31 Mar → 1 May: nothing in February, two
+       charges in March. The comment here used to claim the opposite. `where.ts` already solved
+       this for predicates and clamps to the last day of the month intended, so it is the same
+       arithmetic in one place rather than two that disagree. */
+    const day = months === 0 ? iso(start) : resolveDay(`+${months * n}m`, start);
+    if (!day) break;
+    const at = Date.parse(`${day}T12:00:00Z`);
     if (at > until) break;
-    if (at >= NOW) out.push({ day: iso(at), at });
+    if (at >= NOW) out.push({ day, at });
     if (!months) break;
   }
   return out;
@@ -120,7 +128,12 @@ export function runway(opening: number, horizon = 180): Runway {
   }
 
   for (const row of ROWS.services ?? []) {
-    if (String(row.fields.state ?? '') === 'ended') continue;
+    /* `cancelled`, which is a state the register actually declares. This guarded on `ended` — a
+       value nothing holds — so the guard never fired once and every cancelled subscription was
+       charged for ever. `Old CI plan` was cancelled and still took GBP 174.00 out of the forecast
+       over six months, as the first row of the money page's own "What is coming". Every other
+       consumer in the app already spelled it `cancelled`. */
+    if (String(row.fields.state ?? '') === 'cancelled') continue;
     for (const r of renewals(row, until))
       movements.push({
         at: r.at,

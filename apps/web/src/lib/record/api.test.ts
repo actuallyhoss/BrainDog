@@ -18,8 +18,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CURRENCY, dirOf, display, isProse, labelOf } from './api.ts';
-import { REGISTERS, ROWS, VAULT } from './data.ts';
+import { CURRENCY, dirOf, display, isProse, labelOf, metric } from './api.ts';
+import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
 
@@ -169,4 +169,53 @@ test('an unknown field is treated as prose, because that failure is the safe one
 test('dirOf emits the attribute only where it is wanted', () => {
   assert.equal(dirOf('obligations', 'what'), 'auto');
   assert.equal(dirOf('obligations', 'amount'), undefined);
+});
+
+/* ── the money tiles, which are the numbers somebody acts on ─────────────── */
+
+test('a per-year figure is annualised, not summed across cycles', () => {
+  // `cost` is per CYCLE. Summing a yearly domain and a monthly bucket adds two units: Kiln's
+  // "Costs a year" printed GBP 112.00 where the answer is GBP 1,036.00, under the word "year".
+  const kiln = metric('kiln-cost');
+  assert.match(kiln.label, /year/i);
+  const monthlyKiln = (ROWS.services ?? []).filter((s) => s.fields.thing === 1 && s.fields.cycle === 'monthly');
+  assert.ok(monthlyKiln.length > 0, 'the seed needs a monthly Kiln service for this to bite');
+  const naive = (ROWS.services ?? [])
+    .filter((s) => s.fields.thing === 1 && s.fields.state !== 'cancelled')
+    .reduce((a, s) => a + Number(s.fields.cost ?? 0), 0);
+  assert.notEqual(kiln.value, `${CURRENCY} ${(naive / 100).toFixed(2)}`, 'the cycle factor is missing again');
+});
+
+test('Overdue is one direction, because two directions do not add up', () => {
+  // It summed receivables and payables and painted the total in the alarm colour. Chasing money you
+  // are owed and failing to pay a bill are not the same problem and their sum is not a quantity.
+  const late = (dir: string) =>
+    (ROWS.obligations ?? []).filter(
+      (e) =>
+        (e.fields.state === 'open' || e.fields.state === 'part') &&
+        e.fields.direction === dir &&
+        String(e.fields.due) < new Date(NOW).toISOString().slice(0, 10),
+    );
+  const owe = late('owed_by_me').reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
+  const owed = late('owed_to_me').reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
+  assert.ok(owe > 0 && owed > 0, 'the seed needs late rows in both directions for this to mean anything');
+
+  const tile = metric('overdue');
+  assert.equal(tile.value, display('obligations', 'amount', owe));
+  assert.notEqual(tile.value, display('obligations', 'amount', owe + owed));
+  assert.match(tile.href ?? '', /direction/, 'the link must carry the same direction the figure does');
+});
+
+test('the three money tiles are disjoint, so a row is in at most one', () => {
+  // "Due in 30 days" counted everything already late as well, so an overdue bill was in it AND in
+  // Overdue. Two tiles that overlap cannot be read together, and these three sit in one row.
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const rows = (ROWS.obligations ?? []).filter((e) => e.fields.state === 'open' || e.fields.state === 'part');
+  const overdue = rows.filter((e) => e.fields.direction === 'owed_by_me' && String(e.fields.due) < today);
+  const due30 = rows.filter((e) => {
+    if (e.fields.direction !== 'owed_by_me') return false;
+    const d = (Date.parse(`${String(e.fields.due)}T12:00:00Z`) - NOW) / 86_400_000;
+    return d >= 0 && d <= 30;
+  });
+  assert.equal(overdue.filter((e) => due30.includes(e)).length, 0, 'a row is counted by two tiles at once');
 });
