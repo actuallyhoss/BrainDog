@@ -39,6 +39,18 @@ import {
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
+import {
+  bindGrant,
+  getGrant,
+  listGrants,
+  openGrant,
+  revokeGrant,
+  rotateDue,
+  type BindGrantArgs,
+  type GrantRow,
+  type SealedGrant,
+  type VaultDeps,
+} from './vault.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
@@ -54,6 +66,8 @@ export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
+export { GRANT_KINDS, spanMs } from './vault.ts';
+export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
 export type { Declaration, DeclKind, Installed } from './declare.ts';
@@ -548,6 +562,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
+  /** The same, plus who is asking and which record this is — the two halves of a `grant.read` row. */
+  const vaultDeps = (actor: string): VaultDeps => ({
+    mint,
+    nowMs: clock.now(),
+    actor,
+    recordId: recordIdentity(sql)?.id ?? null,
+  });
+
   async function tail(scheduler: Scheduler): Promise<void> {
     try {
       const armed = await scheduler.get();
@@ -585,6 +607,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
       purge(sql, clock.now() - 30 * 86_400_000, clock.now(), transaction, mint);
       return clock.now() + 3_600_000;
     },
+
+    /* A credential due for rotation. It says the id and the kind and never the label — a
+       notification naming "Stripe, live" tells whoever can see it which one is worth taking. */
+    rotate: (row) => rotateDue(sql, vaultDeps('system'), row.payload),
 
     reminder: (row) => {
       const p = JSON.parse(row.payload) as { entry?: string; register?: string; field?: string; at?: string };
@@ -653,6 +679,29 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
 
     /** The reminders that are due, oldest first. What the alarm hands to whatever sends them. */
     due: (limit?: number) => due(sql, clock.now(), limit),
+
+    /* ── the vault: what a key opens, never the key ───────────────────── */
+
+    /** Every grant, in the order a person reads them. Sealed bytes never leave through here. */
+    grants: (): GrantRow[] => listGrants(sql),
+    grant: (id: string): GrantRow | null => getGrant(sql, id),
+
+    /** Mint a grant, or rotate one — which differ by one column and a version number. */
+    bindGrant: (args: BindGrantArgs, actor: string): Result<GrantRow> =>
+      bindGrant(sql, vaultDeps(actor), args, transaction),
+
+    /**
+     * Hand the sealed bytes out, and count the reading.
+     *
+     * THE KERNEL CANNOT OPEN THEM. It assembles the ciphertext, the wrapped record key and the AAD
+     * and hands all three to whoever asked — which is what makes "we cannot read your record" a fact
+     * about the code rather than a promise about our intentions.
+     */
+    openGrant: (args: { id: string; kek_id?: string | undefined }, actor: string): Result<SealedGrant> =>
+      openGrant(sql, vaultDeps(actor), args, transaction),
+
+    /** Take a grant out of service and destroy the bytes. The row stays: what it opened is a fact. */
+    revokeGrant: (id: string, actor: string): Result<null> => revokeGrant(sql, vaultDeps(actor), id, transaction),
 
     /* ── the outbox: work that must leave the record ────────────────────── */
 

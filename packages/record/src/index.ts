@@ -17,7 +17,15 @@
 
 import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { openRecord, type CreateRecordArgs, type Entry, type Kernel, type Patch, type RegisterDecl } from '@braindog/kernel';
+import {
+  openRecord,
+  type BindGrantArgs,
+  type CreateRecordArgs,
+  type Entry,
+  type Kernel,
+  type Patch,
+  type RegisterDecl,
+} from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
@@ -148,6 +156,25 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
   const guard = (ctx: CallContext, need: Need, register?: string): Refusal | null =>
     allows(ctx, need) ?? (register ? reaches(ctx, register) : null);
 
+  /**
+   * The vault gate: a person at `owner`, and never a bearer of any kind.
+   *
+   * NO TOKEN REACHES THE VAULT, AND IT IS NOT A SCOPE PROBLEM. An agent holding a write token can do
+   * everything else this record does; it cannot read a credential, because a credential read by a
+   * process is a credential that has left the room. Saying `SCOPE_INSUFFICIENT` would send somebody
+   * looking for a bigger token, and there is not one — so the refusal names the thing that IS
+   * missing: a person, in a browser, signed in.
+   */
+  const vault = (ctx: CallContext): Refusal | null => {
+    if (ctx.principal.kind === 'token')
+      return {
+        code: 'NEEDS_BROWSER_SESSION',
+        fix: 'Open this from the app; a token cannot reach the vault.',
+        at: 'principal',
+      };
+    return allows(ctx, 'owner');
+  };
+
   /** Who the write path records. A token writes as the PERSON who holds it, never as itself. */
   const actorOf = (ctx: CallContext): string =>
     ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
@@ -230,6 +257,36 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
           ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
         }),
       );
+    },
+
+    /* ── VAULT ────────────────────────────────────────────────── */
+
+    /** Every grant, in the order a person reads them. Sealed bytes never leave through here. */
+    async listGrants(ctx: CallContext) {
+      const stop = vault(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.grants());
+    },
+
+    /** Mint a grant, or rotate one. */
+    async bindGrant(args: BindGrantArgs, ctx: CallContext) {
+      const stop = vault(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return tail(kernel.bindGrant(args, actorOf(ctx)));
+    },
+
+    /** The sealed bytes, and the reading counted. The record cannot open them. */
+    async openGrant(args: { id: string; kek_id?: string | undefined }, ctx: CallContext) {
+      const stop = vault(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return kernel.openGrant(args, actorOf(ctx));
+    },
+
+    /** Out of service, and the bytes destroyed. The row stays: what it opened is a fact. */
+    async revokeGrant(args: { id: string }, ctx: CallContext) {
+      const stop = vault(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return tail(kernel.revokeGrant(args.id, actorOf(ctx)));
     },
 
     /**

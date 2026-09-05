@@ -1,0 +1,426 @@
+/**
+ * The vault: what a key opens, never the key.
+ *
+ * THE RECORD NEVER DECRYPTS. It holds sealed bytes and the fingerprint of the key that wrapped them,
+ * and it has no way to open either — the unwrapping key lives somewhere the record cannot reach. That
+ * is what makes "we cannot read your record" a fact about the code rather than a promise about our
+ * intentions, and it is the reason every function here hands ciphertext straight back out.
+ *
+ * SO WHAT THE RECORD ACTUALLY HOLDS IS AN INDEX. `label`, `opens`, `kind`, `bytes`, `hint`, `scopes`
+ * — a person can read "Stripe, live · stripe.com · api_token · a 64-character token" and know what
+ * they have without anybody being able to use it. The rows are worth having on their own: the
+ * question "what would break if this machine were lost" is answerable from them.
+ *
+ * TWO VERSIONS, AND THE SCHEMA SAYS SO. A rotation keeps exactly one prior copy — enough to finish
+ * the requests already in flight when the key changed, and not a history of every credential the
+ * customer has ever held. `prev_ciphertext` and `prev_nonce` are two columns, not a table.
+ *
+ * NEITHER THE LABEL NOR WHAT IT OPENS GOES IN AN EVENT. A `grant.read` row says the id and the kind
+ * and nothing else: an audit trail that names "Stripe, live" for every read is an audit trail that
+ * tells whoever can read events exactly which credential is worth stealing.
+ */
+
+import type { Result, Sql } from '@braindog/ports';
+import { no, ok } from '@braindog/ports';
+
+import { instant } from './migrate.ts';
+import { attempt } from './tx.ts';
+
+/** The columns a person may see. `ciphertext`, `nonce` and the two `prev_` are absent by design. */
+const VISIBLE =
+  'id, label, opens, kind, version, kdf, wrapped_by, scopes, kek_id, bytes, hint, opened, last_opened, created_at, expires_at, rotate_every, stale_at, rotated_at, revoked_at';
+
+export type GrantKind = 'api_token' | 'password' | 'ssh_key' | 'recovery_codes' | 'note';
+export const GRANT_KINDS: readonly GrantKind[] = ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'];
+
+export type GrantRow = {
+  id: string;
+  label: string;
+  opens: string;
+  kind: GrantKind;
+  version: number;
+  kdf: string;
+  wrapped_by: string;
+  scopes: string | null;
+  kek_id: string;
+  bytes: number | null;
+  hint: string | null;
+  opened: number;
+  last_opened: string | null;
+  created_at: string;
+  expires_at: string | null;
+  rotate_every: string | null;
+  stale_at: string | null;
+  rotated_at: string | null;
+  revoked_at: string | null;
+};
+
+/** What the host needs to unwrap. The kernel assembles it and cannot use it. */
+export type SealedGrant = {
+  id: string;
+  version: number;
+  ciphertext: Uint8Array;
+  nonce: Uint8Array;
+  kdf: string;
+  wrapped_by: string;
+  kek_id: string;
+  /**
+   * `record_id ‖ grant_id ‖ version`, additional authenticated data.
+   *
+   * IT BINDS THE CIPHERTEXT TO THIS ROW OF THIS RECORD. Without it, sealed bytes lifted from one
+   * grant and pasted into another decrypt cleanly — and the version in it is why a stale copy of a
+   * rotated credential fails rather than quietly working.
+   */
+  aad: string;
+  /** The record's own wrapped key, so the host can unwrap without a second round trip. */
+  key: { wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null; salt: Uint8Array | null };
+};
+
+export type BindGrantArgs = {
+  /** Absent mints a grant; present rotates the one named, keeping exactly one prior version. */
+  id?: string;
+  label: string;
+  /** What the key OPENS — a host, an account, a machine. Never the key. */
+  opens: string;
+  kind: GrantKind;
+  ciphertext: Uint8Array;
+  nonce: Uint8Array;
+  kdf: string;
+  wrapped_by: 'kek' | 'passphrase';
+  kek_id: string;
+  /** The PROVEN scopes, from a bind-time probe. Absent keeps what the row already claimed. */
+  scopes?: string | null;
+  bytes?: number | null;
+  /** "a 64-character token", "a 3.2 KB env file" — what it is, unopened. */
+  hint?: string | null;
+  expires_at?: string | null;
+  /** `90d`, `1y` — puts a `rotate` row in the schedule. */
+  rotate_every?: string | null;
+};
+
+export type VaultDeps = {
+  mint: () => string;
+  nowMs: number;
+  /**
+   * Who is asking. A token writes as the PERSON who holds it, never as itself — and the whole point
+   * of the `grant.read` row is that it names somebody.
+   */
+  actor: string;
+  /** The record's own id, which is the first third of the AAD. */
+  recordId: string | null;
+};
+
+const ID = /^g_[0-9A-HJKMNP-TV-Z]{26}$/;
+
+/** Every grant, in the order a person reads them. Sealed bytes never leave through here. */
+export const listGrants = (sql: Sql): GrantRow[] => sql.all<GrantRow>(`SELECT ${VISIBLE} FROM grant ORDER BY label`);
+
+export const getGrant = (sql: Sql, id: string): GrantRow | null =>
+  sql.one<GrantRow>(`SELECT ${VISIBLE} FROM grant WHERE id = ?`, id) ?? null;
+
+/**
+ * Mint a grant, or rotate one.
+ *
+ * ONE FUNCTION, because the two differ by one column and a version number, and a record that took
+ * two paths to the same row is a record where one of them forgets the schedule.
+ */
+export function bindGrant(
+  sql: Sql,
+  deps: VaultDeps,
+  args: BindGrantArgs,
+  transaction: <T>(fn: () => T) => T,
+): Result<GrantRow> {
+  if (!GRANT_KINDS.includes(args.kind))
+    return no<GrantRow>('ENUM_VALUE_UNKNOWN', `${args.kind} is not a kind of grant.`, {
+      at: 'kind',
+      allowed: GRANT_KINDS,
+    });
+  if (!args.label.trim()) return no<GrantRow>('REQUIRED_MISSING', 'A grant has a label a person would say.', { at: 'label' });
+  if (!args.opens.trim())
+    return no<GrantRow>('REQUIRED_MISSING', 'A grant says what it opens — a host, an account, a machine.', { at: 'opens' });
+  if (args.ciphertext.length === 0)
+    return no<GrantRow>('REQUIRED_MISSING', 'A grant carries sealed bytes. Seal them before binding.', { at: 'ciphertext' });
+  /* THE HINT IS NOT THE SECRET. It is read on a screen by whoever the record belongs to, and a hint
+     long enough to be the thing it hints at is a credential written down in plain text. */
+  if (args.hint && args.hint.length > 60)
+    return no<GrantRow>('OUT_OF_BOUNDS', 'A hint says what the thing IS, unopened — sixty characters, not the value.', {
+      at: 'hint',
+    });
+  if (args.id !== undefined && !ID.test(args.id))
+    return no<GrantRow>('VALUE_MALFORMED', `A grant id is g_ plus a 26-character ULID. ${args.id} is not.`, { at: 'id' });
+
+  /* THE SPANS ARE CHECKED BEFORE THE FIRST WRITE. `attempt` below would roll a late refusal back
+     anyway — that is what it is for — but a refusal that arrives before anything was tried is the
+     one that needs no machinery to be correct. */
+  if (args.rotate_every && spanMs(args.rotate_every) === null)
+    return no<GrantRow>('VALUE_MALFORMED', `${args.rotate_every} is not a span — write 90d, 12w or 1y.`, {
+      at: 'rotate_every',
+    });
+  if (args.expires_at && !Number.isFinite(dayMs(args.expires_at)))
+    return no<GrantRow>('VALUE_MALFORMED', `${args.expires_at} is not a date.`, { at: 'expires_at' });
+
+  const at = instant(deps.nowMs);
+
+  return attempt(transaction, () => {
+    const id = args.id ?? `g_${deps.mint()}`;
+    const rotating = args.id !== undefined;
+
+    if (rotating) {
+      /* ONE PRIOR VERSION, and the schema is what says so: two columns rather than a table. Enough
+         to finish the requests already in flight when the key changed, and not a history of every
+         credential the customer has ever held. */
+      const moved = sql.all<{ id: string }>(
+        `UPDATE grant SET prev_ciphertext = ciphertext, prev_nonce = nonce,
+           ciphertext = ?, nonce = ?, version = version + 1, kdf = ?, wrapped_by = ?, kek_id = ?,
+           bytes = ?, hint = ?, label = ?, opens = ?,
+           scopes = COALESCE(?, scopes), rotated_at = ?, stale_at = NULL
+         WHERE id = ? AND revoked_at IS NULL
+         RETURNING id`,
+        args.ciphertext,
+        args.nonce,
+        args.kdf,
+        args.wrapped_by,
+        args.kek_id,
+        args.bytes ?? null,
+        args.hint ?? null,
+        args.label,
+        args.opens,
+        args.scopes ?? null,
+        at,
+        id,
+      );
+      /* A REVOKED GRANT IS NOT ROTATABLE, and the refusal says which of the two it is: an id that
+         never existed and one that was deliberately taken out of service are different mistakes. */
+      if (moved.length === 0)
+        return sql.one('SELECT 1 AS x FROM grant WHERE id = ?', id)
+          ? no<GrantRow>('GRANT_REVOKED', `${id} was revoked. A revoked grant is not rotated; bind a new one.`, { at: 'id' })
+          : no<GrantRow>('OUT_OF_BOUNDS', `There is no grant ${id}.`, { at: 'id' });
+      event(sql, deps, 'grant.rotate', id, args.kind);
+    } else {
+      sql.exec(
+        `INSERT INTO grant (id, label, opens, kind, version, ciphertext, nonce, kdf, wrapped_by, scopes, kek_id, bytes, hint, opened, created_at, expires_at, rotate_every)
+         VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+        id,
+        args.label,
+        args.opens,
+        args.kind,
+        args.ciphertext,
+        args.nonce,
+        args.kdf,
+        args.wrapped_by,
+        args.scopes ?? null,
+        args.kek_id,
+        args.bytes ?? null,
+        args.hint ?? null,
+        at,
+        args.expires_at ?? null,
+        args.rotate_every ?? null,
+      );
+      event(sql, deps, 'grant.add', id, args.kind);
+    }
+
+    /* THE REMINDERS ARE DERIVED FROM THE ROW, like every other one in the record: nobody sets them,
+       and a `rotate_every` that changes moves them. Both are re-derived on every bind, so a rotation
+       that shortens the cycle does not leave the old one armed beside the new. */
+    sql.exec("DELETE FROM schedule WHERE kind = 'rotate' AND state = 'pending' AND key IN (?, ?)", `grant:${id}`, `grant:${id}:expires`);
+
+    const every = args.rotate_every ?? (rotating ? getGrant(sql, id)?.rotate_every ?? null : null);
+    const span = every ? spanMs(every) : null;
+    if (span !== null) arm(sql, deps, `grant:${id}`, deps.nowMs + span, { grant: id });
+
+    const expires = args.expires_at ?? (rotating ? getGrant(sql, id)?.expires_at ?? null : null);
+    if (expires) {
+      /* FORTY-EIGHT HOURS BEFORE, because a credential that expires at midnight and is announced at
+         midnight is announced to nobody. */
+      arm(sql, deps, `grant:${id}:expires`, dayMs(expires) - 48 * 3_600_000, { grant: id, urgent: true });
+    }
+
+    /* A ROTATION THAT CHANGES THE CYCLE has to write it, or the reminder above is armed for a span
+       the row does not claim — and a person reading the row would see the old one. */
+    if (rotating && args.rotate_every !== undefined)
+      sql.exec('UPDATE grant SET rotate_every = ? WHERE id = ?', args.rotate_every, id);
+    if (rotating && args.expires_at !== undefined)
+      sql.exec('UPDATE grant SET expires_at = ? WHERE id = ?', args.expires_at, id);
+
+    const row = getGrant(sql, id);
+    return row ? ok(row) : no<GrantRow>('OUT_OF_BOUNDS', `There is no grant ${id}.`, { at: 'id' });
+  });
+}
+
+/**
+ * Hand the sealed bytes out, and count the reading.
+ *
+ * EVERY DECRYPT IS COUNTED AND VISIBLE. `opened` and `last_opened` are columns rather than an
+ * inference from the event log, because "how often is this actually used" is the question that
+ * decides whether a credential should still exist — and WHO opened it is the `grant.read` event,
+ * never a column, because a column holds one answer and the question is a list.
+ */
+export function openGrant(
+  sql: Sql,
+  deps: VaultDeps,
+  args: { id: string; kek_id?: string | undefined },
+  transaction: <T>(fn: () => T) => T,
+): Result<SealedGrant> {
+  const row = sql.one<{
+    id: string;
+    kind: GrantKind;
+    version: number;
+    ciphertext: Uint8Array | null;
+    nonce: Uint8Array | null;
+    kdf: string;
+    wrapped_by: string;
+    kek_id: string;
+    revoked_at: string | null;
+  }>('SELECT id, kind, version, ciphertext, nonce, kdf, wrapped_by, kek_id, revoked_at FROM grant WHERE id = ?', args.id);
+
+  if (!row) return no<SealedGrant>('OUT_OF_BOUNDS', `There is no grant ${args.id}.`, { at: 'id' });
+  if (row.revoked_at)
+    return no<SealedGrant>('GRANT_REVOKED', `${args.id} was revoked on ${row.revoked_at.slice(0, 10)}, and its bytes are gone.`, {
+      at: 'id',
+    });
+  if (!row.ciphertext || !row.nonce)
+    return no<SealedGrant>('GRANT_REVOKED', `${args.id} carries no sealed bytes.`, { at: 'id' });
+
+  const key = sql.one<{
+    wrapped: Uint8Array;
+    nonce: Uint8Array;
+    wrapped_by: string;
+    kek_id: string | null;
+    salt: Uint8Array | null;
+  }>("SELECT wrapped, nonce, wrapped_by, kek_id, salt FROM vault_key WHERE purpose = 'record'");
+  if (!key)
+    return no<SealedGrant>('OUT_OF_BOUNDS', 'This record has no wrapped key, so nothing in it can be opened.', {
+      at: 'id',
+    });
+
+  /* A ROTATED WRAPPING KEY READS AS `WRONG_KEY`, NEVER AS CORRUPTION. They look identical from
+     inside a failed decrypt, and the difference is everything: one is "try the other key" and the
+     other is "your credentials are gone". */
+  if (key.wrapped_by === 'kek' && args.kek_id !== undefined && key.kek_id !== args.kek_id)
+    return no<SealedGrant>('WRONG_KEY', `This record is wrapped by ${key.kek_id}, and you offered ${args.kek_id}.`, {
+      at: 'kek_id',
+    });
+
+  return attempt(transaction, () => {
+    sql.exec('UPDATE grant SET opened = opened + 1, last_opened = ? WHERE id = ?', instant(deps.nowMs), args.id);
+    event(sql, deps, 'grant.read', args.id, row.kind);
+    return ok({
+      id: row.id,
+      version: row.version,
+      ciphertext: row.ciphertext!,
+      nonce: row.nonce!,
+      kdf: row.kdf,
+      wrapped_by: row.wrapped_by,
+      kek_id: row.kek_id,
+      aad: `${deps.recordId ?? 'self'}‖${row.id}‖${row.version}`,
+      key,
+    });
+  });
+}
+
+/**
+ * Take a grant out of service, and destroy the bytes.
+ *
+ * THE ROW STAYS AND THE CIPHERTEXT GOES. What the key opened is a fact worth keeping — "this used to
+ * reach the production database" is the sentence somebody needs a year later — and the sealed value
+ * is the thing that must not survive. Both prior versions go too: a revocation that left the
+ * previous copy behind would be a revocation in name.
+ */
+export function revokeGrant(sql: Sql, deps: VaultDeps, id: string, transaction: <T>(fn: () => T) => T): Result<null> {
+  return attempt(transaction, () => {
+    const row = sql.one<{ kind: GrantKind }>('SELECT kind FROM grant WHERE id = ? AND revoked_at IS NULL', id);
+    if (!row)
+      return sql.one('SELECT 1 AS x FROM grant WHERE id = ?', id)
+        ? no<null>('GRANT_REVOKED', `${id} was already revoked.`, { at: 'id' })
+        : no<null>('OUT_OF_BOUNDS', `There is no grant ${id}.`, { at: 'id' });
+
+    sql.exec(
+      'UPDATE grant SET ciphertext = NULL, nonce = NULL, prev_ciphertext = NULL, prev_nonce = NULL, revoked_at = ? WHERE id = ?',
+      instant(deps.nowMs),
+      id,
+    );
+    /* And the reminders it derived, because a rotation reminder about a revoked credential is a
+       notification asking somebody to do something that cannot be done. */
+    sql.exec(
+      "DELETE FROM schedule WHERE kind = 'rotate' AND state = 'pending' AND key IN (?, ?)",
+      `grant:${id}`,
+      `grant:${id}:expires`,
+    );
+    event(sql, deps, 'grant.revoke', id, row.kind);
+    return ok(null);
+  });
+}
+
+/**
+ * A `rotate` row firing: say that a credential is due, without saying which one it is.
+ *
+ * `credential g_01J… (api_token) is due for rotation` — the id and the kind, never the label and
+ * never what it opens. A notification that names "Stripe, live" is a notification that tells
+ * whoever can see it exactly which credential is worth taking.
+ */
+export function rotateDue(sql: Sql, deps: VaultDeps, payload: string): number | null {
+  const { grant } = JSON.parse(payload) as { grant?: string };
+  if (!grant) return null;
+  const row = sql.one<{ kind: GrantKind; rotate_every: string | null; revoked_at: string | null }>(
+    'SELECT kind, rotate_every, revoked_at FROM grant WHERE id = ?',
+    grant,
+  );
+  /* A GRANT THAT IS GONE IS NOT REMINDED ABOUT. Same rule as a reminder whose row was deleted: the
+     thing the reminder is about is not true any more, and firing it anyway is the failure the whole
+     derived-reminder design exists to avoid. */
+  if (!row || row.revoked_at) return null;
+
+  sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, 'system', 'note', ?, 'grant', ?)",
+    deps.mint(),
+    instant(deps.nowMs),
+    `grant:${grant}`,
+    `credential ${grant} (${row.kind}) is due for rotation`,
+  );
+
+  const span = row.rotate_every ? spanMs(row.rotate_every) : null;
+  return span === null ? null : deps.nowMs + span;
+}
+
+/* ── the small parts ─────────────────────────────────────────────────────── */
+
+const SPAN = /^(\d{1,4})([dwmy])$/;
+
+/** `90d`, `12w`, `1y` as milliseconds. `null` when it is not a span, which is a refusal. */
+export function spanMs(text: string): number | null {
+  const m = SPAN.exec(text.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  const DAY = 86_400_000;
+  return n * (m[2] === 'd' ? DAY : m[2] === 'w' ? 7 * DAY : m[2] === 'm' ? 30 * DAY : 365 * DAY);
+}
+
+/** A day or an instant as milliseconds, measured at noon so a timezone cannot move a date by one. */
+const dayMs = (text: string): number => Date.parse(text.length === 10 ? `${text}T12:00:00Z` : text);
+
+/** One schedule row, through the same `ON CONFLICT` every other insertion uses. */
+function arm(sql: Sql, deps: VaultDeps, key: string, dueMs: number, payload: unknown): void {
+  /* A DATE ALREADY PAST IS STILL ARMED. A credential that expired last week is more urgent than one
+     expiring next month, not less — and dropping it is how a lapsed key goes unmentioned. */
+  sql.exec(
+    `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES (?, ?, 'rotate', ?, ?, 'pending', 0)
+     ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0`,
+    deps.mint(),
+    instant(dueMs),
+    key,
+    JSON.stringify(payload),
+  );
+}
+
+/** The id and the kind. Never the label, never what it opens. */
+function event(sql: Sql, deps: VaultDeps, kind: string, id: string, grantKind: GrantKind): void {
+  sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, ?, ?, 'grant', ?)",
+    deps.mint(),
+    instant(deps.nowMs),
+    deps.actor,
+    kind,
+    `grant:${id}`,
+    `${id} ${grantKind}`,
+  );
+}
