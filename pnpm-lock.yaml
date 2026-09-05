@@ -21,6 +21,18 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  apps/selfhost:
+    dependencies:
+      '@braindog/host':
+        specifier: workspace:*
+        version: link:../../packages/host
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../../packages/ports
+      '@braindog/record':
+        specifier: workspace:*
+        version: link:../../packages/record
+
   apps/site:
     dependencies:
       svelte:
