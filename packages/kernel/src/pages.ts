@@ -23,6 +23,7 @@ import type { Predicate, Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
 import { predicateOf, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { runway, type Leg, type Runway } from './forecast.ts';
 
 export type PageBlock = {
   kind: string;
@@ -34,6 +35,10 @@ export type PageBlock = {
   cells?: { metric: string; label?: string }[];
   order?: { field: string; dir?: 'asc' | 'desc' }[];
   limit?: number;
+  /** `forecast.runway` only: what is liquid today, and the legs the walk reads. */
+  opening?: number;
+  from?: Leg[];
+  horizon?: number;
   empty?: string;
   target?: number;
 };
@@ -55,6 +60,8 @@ export type BlockResult = PageBlock & {
   matched: number;
   /** A `stat` block's figures, in the order its cells named them. */
   readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal }[];
+  /** A `forecast.runway` block's walk. */
+  walk?: Runway;
   /** What this block could not do. Non-empty means the block drew nothing. */
   refusals: Refusal[];
 };
@@ -72,6 +79,8 @@ export type PageDeps = {
   schemaOf: (register: string) => Schema | null;
   /** The field that titles a row of this register — what a template's slug is made from. */
   titleOf: (register: string) => string | null;
+  /** The cash walk, when a block names it. */
+  runway: (opening: number, legs: readonly Leg[], horizon?: number) => Runway | null;
   ctx: EvalContext;
 };
 
@@ -215,9 +224,25 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      other declaration and is simply handed back. Refusing it would be the record insisting that a
      paragraph is a query. */
   if (!block.source) return base;
-  /* A COMPUTED SOURCE IS NOT REFUSED AND NOT ANSWERED HERE. The cash walk is a reading over two
-     registers rather than a query against one, and the block layer's job is to say honestly that it
-     did not run it — an empty table that looks like an empty register would be worse. */
+  /* A COMPUTED SOURCE IS A READING OVER SEVERAL REGISTERS rather than a query against one, and what
+     it reads is DECLARED on the block: a forecast that knew the word "obligations" would be a
+     forecast that works for one record. */
+  if (block.source === 'forecast.runway') {
+    if (typeof block.opening !== 'number' || !Array.isArray(block.from))
+      return {
+        ...base,
+        refusals: [
+          {
+            code: 'REQUIRED_MISSING',
+            fix: 'A cash walk names what is liquid today (`opening:`) and the legs it reads (`from:`). A runway seeded from a balance nobody declared is a forecast that looks like a fact.',
+            at: 'opening',
+          },
+        ],
+      };
+    const walk = deps.runway(block.opening, block.from, block.horizon);
+    if (!walk) return { ...base, refusals: [{ code: 'UNIMPLEMENTED', fix: 'This record does not compute a cash walk.', at: 'source' }] };
+    return { ...base, walk, matched: walk.steps.length, refusals: walk.refusals };
+  }
   if (COMPUTED.has(block.source))
     return { ...base, refusals: [{ code: 'UNIMPLEMENTED', fix: `${block.source} is computed, and this record does not compute it yet.`, at: 'source' }] };
 
@@ -243,14 +268,19 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     .map((c) => c.field)
     .filter((f) => f !== 'seq' && !Object.hasOwn(schema.fields, f));
 
-  return {
-    ...base,
-    rows: listed.value.rows,
-    matched: listed.value.matched,
-    refusals: unknown.length
-      ? [{ code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }]
-      : [],
-  };
+  /* A REFUSAL MEANS THE BLOCK DREW NOTHING, which is what `BlockResult` says and what it was not
+     doing: it returned the rows AND the refusal, so a renderer that drew the rows and ignored the
+     sentence would show a table with a column of blanks where a field nobody declared should be —
+     which reads as "no value" rather than as "no such thing". */
+  if (unknown.length)
+    return {
+      ...base,
+      refusals: [
+        { code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) },
+      ],
+    };
+
+  return { ...base, rows: listed.value.rows, matched: listed.value.matched };
 }
 
 /* ── the small parts ─────────────────────────────────────────────────────── */

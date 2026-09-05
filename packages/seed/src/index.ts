@@ -814,6 +814,27 @@ export const PAGES: Record<string, SeedPage> = {
         span: 12,
         columns: [{ field: 'day' }, { field: 'what' }, { field: 'delta' }, { field: 'balance' }],
         source: 'forecast.runway',
+        /* WHAT THE WALK READS IS DECLARED, not wired: a forecast that knew the word "obligations"
+           would be a forecast that works for one record. `opening` is what is liquid today, and it
+           is a number somebody has to supply — a runway seeded from a balance nobody declared is a
+           forecast that looks like a fact and is a guess. */
+        opening: 500_000,
+        from: [
+          {
+            register: 'obligations',
+            on: 'due',
+            amount: 'amount',
+            where: 'state is open or part',
+            incoming: { field: 'direction', is: 'owed_to_me' },
+          },
+          {
+            register: 'services',
+            on: 'renews',
+            amount: 'cost',
+            where: 'state is not cancelled',
+            every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
+          },
+        ],
         limit: 12,
         empty: 'Nothing dated in the next six months.',
       },

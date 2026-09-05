@@ -43,6 +43,7 @@ import { evaluateMetric, predicateOf, scorePrediction, type EvalContext, type Me
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps } from './digest.ts';
 import { dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
+import { runway, type Leg, type Runway } from './forecast.ts';
 import {
   bindGrant,
   getGrant,
@@ -75,6 +76,8 @@ export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, targetOf, windowM
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
 export { dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
+export { runway } from './forecast.ts';
+export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
@@ -664,6 +667,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     titleOf: (register) => registers.get(register)?.title ?? null,
+    runway: (opening, legs, horizon) => {
+      const out = runway(
+        { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
+        opening,
+        legs,
+        horizon,
+      );
+      return out.ok ? out.value : null;
+    },
     ctx: evalContext(),
   });
 
@@ -922,6 +934,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * afraid of.
      */
     dryRun: (candidate: RuleDecl, limit?: number): Result<DryRun> => dryRun(rulesDeps(), candidate, limit),
+
+    /**
+     * The cash walk: what is liquid now, then every dated movement in order, until it goes under.
+     *
+     * What it reads is DECLARED rather than wired: a forecast that knew the word "obligations" would
+     * be a forecast that works for one record.
+     */
+    runway: (opening: number, legs: readonly Leg[], horizon?: number): Result<Runway> =>
+      runway(
+        { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
+        opening,
+        legs,
+        horizon,
+      ),
 
     /** One block, without a page around it — what a `draw` tool hands an agent. */
     block: (decl: PageBlock): BlockResult => readBlock(pageDeps(), decl),

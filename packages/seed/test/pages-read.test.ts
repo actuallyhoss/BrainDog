@@ -166,15 +166,29 @@ test('and a project page reads its metrics ABOUT THAT PROJECT', async () => {
 
 /* ── one block's refusal is one block ────────────────────────────────────── */
 
-test('ONE BLOCK REFUSING DOES NOT TAKE THE PAGE WITH IT', async () => {
-  // A page that fails whole is a page a person cannot use to find out what is wrong with it.
+test('EVERY BLOCK ON THE MONEY PAGE DRAWS, including the one about the future', async () => {
   const { k, sql } = await seeded();
   const money = page(k, 'money');
   const refused = money.blocks.filter((b) => b.refusals.length > 0);
-  const drawn = money.blocks.filter((b) => b.rows.length > 0 || (b.readings ?? []).length > 0);
+  assert.deepEqual(refused.map((b) => `${b.heading}: ${b.refusals[0]?.fix}`), []);
 
-  assert.ok(refused.length > 0, 'nothing refused, so this test proves nothing');
-  assert.ok(drawn.length > refused.length, 'a refusal took the page with it');
+  const walk = money.blocks.find((b) => b.source === 'forecast.runway')!;
+  assert.ok(walk.walk, 'the cash walk did not run');
+  assert.ok(walk.walk.steps.length > 0, 'the walk found no movements');
+  assert.equal(walk.walk.currency, 'GBP');
+  sql.close();
+});
+
+test('ONE BLOCK REFUSING DOES NOT TAKE THE PAGE WITH IT', async () => {
+  // A page that fails whole is a page a person cannot use to find out what is wrong with it.
+  const { k, sql } = await seeded();
+  const broken = k.block({ kind: 'table', source: 'register.obligations', columns: [{ field: 'colour' }] });
+  assert.equal(broken.refusals[0]?.code, 'FIELD_UNKNOWN');
+  assert.deepEqual(broken.rows, []);
+
+  // And the page around a block like that still draws the others.
+  const money = page(k, 'money');
+  assert.ok(money.blocks.filter((b) => b.rows.length > 0 || (b.readings ?? []).length > 0 || b.walk).length >= 4);
   sql.close();
 });
 
@@ -182,7 +196,7 @@ test('NOTHING ON ANY PAGE REFUSES FOR A REASON THAT IS NOT ON THE LIST', async (
   /* The list is short and every entry is a thing this build genuinely does not do yet. A tenth code
      appearing here means a page is drawing less than it declares and nobody noticed — which is the
      failure the whole layer keeps running into. */
-  const EXPECTED = new Set(['UNIMPLEMENTED']);
+  const EXPECTED = new Set<string>([]);
   const { k, sql } = await seeded();
   const unexpected: string[] = [];
 
