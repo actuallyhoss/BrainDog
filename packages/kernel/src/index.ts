@@ -39,6 +39,7 @@ import {
   type ScheduleKind,
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
+import { invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps } from './members.ts';
 import {
   SCOPES,
   createToken,
@@ -107,6 +108,8 @@ export { CREATE_CEILING, dryRun, fill as fillTemplate, marker, order as orderRul
 export { runway } from './forecast.ts';
 export { BODY_KINDS, GOVERNANCE } from './govern.ts';
 export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
+export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
+export type { Member } from './members.ts';
 export type { Minted, Scope, TokenRow, Verified } from './token.ts';
 export type { Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, extract as extractField, shapeOf } from './ingest.ts';
@@ -1000,6 +1003,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     write: (register, patch, actor, batch) => write(register, null, patch, { actor, batch }),
   });
 
+  const memberDeps = (): MemberDeps => ({ sql, nowMs: clock.now(), mint, hasRegister: (r) => registers.has(r) });
+
   /**
    * What a token needs beyond SQL.
    *
@@ -1444,6 +1449,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     seenAt: (person: string): string | null =>
       sql.one<{ seen_at: string | null }>("SELECT seen_at FROM member WHERE person_id = ? AND register = '*'", person)
         ?.seen_at ?? null,
+
+    /* ── who is on the record ────────────────────────────── */
+
+    /** Everybody on it, with what they hold and where. */
+    members: (): Member[] => members(sql),
+
+    /** Put somebody on, or move them. An invitation is the whole of what they hold, not a patch. */
+    invite: (
+      by: string,
+      args: { person: string; email?: string; name?: string; level: MemberLevel; registers?: Record<string, MemberLevel> },
+    ): Result<Member> => transaction(() => invite(memberDeps(), by, args)),
+
+    /** Take somebody off. Never the last owner, and their person row stays. */
+    removeMember: (by: string, person: string): Result<null> => transaction(() => remove(memberDeps(), by, person)),
 
     /* ── agent tokens ───────────────────────────────────── */
 

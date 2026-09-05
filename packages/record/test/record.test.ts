@@ -594,3 +594,81 @@ test('and there is no `admin` scope to ask for, nor a token that mints one', asy
   assert.equal((await api.listTokens(token('read'))).ok, false);
   sql.close();
 });
+
+/* ── who is on the record ────────────────────────────────── */
+
+const studio = async () => {
+  const made = await record();
+  assert.ok(
+    made.api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.com' } }).ok,
+  );
+  return made;
+};
+
+test('A LEVEL PER REGISTER, or inviting a bookkeeper means showing them everything', async () => {
+  /* And what people do then is not invite the bookkeeper. */
+  const { api, sql } = await studio();
+
+  const bo = value<{ person_id: string; level: string; email: string | null; scoped: { register: string; level: string }[] }>(
+    await api.invite({ person: 'p_2', email: 'bo@example.com', name: 'Bo', level: 'read', registers: { obligations: 'write' } }, owner),
+  );
+  assert.equal(bo.level, 'read');
+  assert.deepEqual(bo.scoped, [{ register: 'obligations', level: 'write' }]);
+  assert.equal(bo.email, 'bo@example.com');
+
+  const all = value<{ person_id: string }[]>(await api.members(owner));
+  assert.deepEqual(all.map((m) => m.person_id).sort(), ['p_1', 'p_2']);
+
+  /* ONE EVENT PER REGISTER, because `access.grant` is how anybody later answers "when did they get
+     to see this", and one event naming a list is a string somebody has to parse. */
+  const grants = sql
+    .all<{ field: string; to_v: string }>("SELECT field, to_v FROM event WHERE kind = 'access.grant' ORDER BY rowid")
+    .map((e) => `${e.field}:${e.to_v}`);
+  assert.deepEqual(grants, ['*:read', 'obligations:write']);
+  sql.close();
+});
+
+test('AND AN INVITATION IS THE WHOLE OF WHAT SOMEBODY HOLDS, not a patch', async () => {
+  const { api, sql } = await studio();
+  value(await api.invite({ person: 'p_2', level: 'read', registers: { obligations: 'write', notes: 'read' } }, owner));
+
+  const again = value<{ scoped: { register: string }[] }>(await api.invite({ person: 'p_2', level: 'read', registers: { obligations: 'write' } }, owner));
+  assert.deepEqual(again.scoped.map((r) => r.register), ['obligations'], 'a register left out was left standing');
+  assert.equal(
+    sql.one<{ field: string }>("SELECT field FROM event WHERE kind = 'access.revoke'")?.field,
+    'notes',
+    'a register taken away was taken away quietly',
+  );
+  sql.close();
+});
+
+test('and a record keeps one owner, whichever way you try to leave it without one', async () => {
+  const { api, sql } = await studio();
+
+  assert.equal((await api.invite({ person: 'p_1', level: 'write' }, owner)).ok, false, 'the last owner was demoted');
+  assert.equal((await api.removeMember({ person: 'p_1' }, owner)).ok, false, 'the last owner was removed');
+
+  value(await api.invite({ person: 'p_2', level: 'owner' }, owner));
+  value(await api.removeMember({ person: 'p_1' }, owner));
+  assert.deepEqual(value<{ person_id: string }[]>(await api.members(owner)).map((m) => m.person_id), ['p_2']);
+
+  /* THE PERSON ROW STAYS. Every event they ever wrote names them, and a history whose actors cannot
+     be resolved reads as a list of identifiers. */
+  assert.equal(sql.all("SELECT 1 FROM person WHERE id = 'p_1'").length, 1);
+
+  // Removing somebody who is not there is the state they asked for.
+  assert.ok((await api.removeMember({ person: 'p_9' }, owner)).ok);
+  sql.close();
+});
+
+test('and no token invites anybody, and a register nobody has is refused', async () => {
+  const { api, sql } = await studio();
+  assert.equal((await api.invite({ person: 'p_2', level: 'read' }, token('write'))).ok, false);
+  assert.equal((await api.invite({ person: 'p_2', level: 'admin' as never }, owner)).ok, false);
+  assert.equal((await api.invite({ person: 'p_2', level: 'read', registers: { ghosts: 'read' } }, owner)).ok, false);
+  assert.equal(sql.all("SELECT 1 FROM member WHERE person_id = 'p_2'").length, 0, 'a refused invitation left a row');
+
+  // But the colleague list is a read: it is not a secret who is on a record you are on.
+  assert.ok((await api.members(token('read'))).ok);
+  sql.close();
+});

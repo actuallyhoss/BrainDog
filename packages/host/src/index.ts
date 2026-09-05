@@ -51,6 +51,9 @@ export const ROUTES: readonly Route[] = [
   { name: 'uninstallPack', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'setDeclaration', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
   { name: 'retireDeclaration', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
+  { name: 'members', writes: false, what: 'Who is on this record, at what level, and where.' },
+  { name: 'invite', writes: true, what: 'Put somebody on, or move them. A level per register.' },
+  { name: 'removeMember', writes: true, what: 'Take somebody off. Never the last owner.' },
   { name: 'listTokens', writes: false, what: 'Every agent token, with when it was last used. Never the token.' },
   { name: 'createToken', writes: true, what: 'Mint one. The secret is in the answer and is stored nowhere.' },
   { name: 'revokeToken', writes: true, what: 'Revoke one. The second call says the same as the first.' },
@@ -167,6 +170,9 @@ export type RecordSurface = {
   uninstallPack(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
+  members(ctx: never): Promise<Result<unknown>>;
+  invite(args: never, ctx: never): Promise<Result<unknown>>;
+  removeMember(args: never, ctx: never): Promise<Result<unknown>>;
   listTokens(ctx: never): Promise<Result<unknown>>;
   createToken(args: never, ctx: never): Promise<Result<unknown>>;
   revokeToken(args: never, ctx: never): Promise<Result<unknown>>;
@@ -203,6 +209,9 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),
     retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),
+    members: (_a, ctx) => api.members(ctx as never),
+    invite: (a, ctx) => api.invite(a as never, ctx as never),
+    removeMember: (a, ctx) => api.removeMember(a as never, ctx as never),
     listTokens: (_a, ctx) => api.listTokens(ctx as never),
     createToken: (a, ctx) => api.createToken(a as never, ctx as never),
     revokeToken: (a, ctx) => api.revokeToken(a as never, ctx as never),

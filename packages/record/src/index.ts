@@ -666,6 +666,38 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       return tail(kernel.retire([args.id]));
     },
 
+    /* ── ADMIN: WHO IS ON THE RECORD ───────────────────── */
+
+    /** Everybody on it, with what they hold and where. A read: a colleague list is not a secret. */
+    async members(ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.members());
+    },
+
+    /**
+     * Put somebody on the record, or move them.
+     *
+     * A LEVEL PER REGISTER, because the alternative is a product where inviting a bookkeeper means
+     * showing them everything — and what people do then is not invite the bookkeeper.
+     *
+     * AN INVITATION IS THE WHOLE OF WHAT THEY HOLD, not a patch: a register left out of a second one
+     * is a register taken away, revoked out loud rather than left standing.
+     */
+    async invite(args: { person: string; email?: string; name?: string; level: Level; registers?: Record<string, Level> }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return tail(kernel.invite(actorOf(ctx), args ?? ({} as never)));
+    },
+
+    /** Take somebody off. Never the last owner, and every register they held is revoked out loud. */
+    async removeMember(args: { person: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.person) return no('REQUIRED_MISSING', 'Who?', { at: 'person' });
+      return tail(kernel.removeMember(actorOf(ctx), args.person));
+    },
+
     /* ── ADMIN: AGENT TOKENS ──────────────────────────── */
 
     /**
