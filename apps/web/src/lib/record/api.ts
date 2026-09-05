@@ -801,7 +801,10 @@ function runwayBlock(b: PageBlock): BlockResult {
       key: `${s.day}-${s.source}-${s.href}-${i}`,
       cells: [fmtDay(s.day), s.label, money(s.delta, CURRENCY), money(s.balance, CURRENCY)],
       href: s.href,
-      tone: s.balance < 0 ? ('bad' as const) : undefined,
+      /* THE CROSSING IS ONE ROW. Painting every row after it the same colour buries the fact the
+         walk exists to produce: the day you go under. Everything after it is still under, which is
+         `warn` — a state, not an event. */
+      tone: s === walk.crossed ? ('bad' as const) : s.balance < 0 ? ('warn' as const) : undefined,
     })),
     total: walk.steps.length,
     drawn: b.drawn ?? true,

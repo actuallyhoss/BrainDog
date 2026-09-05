@@ -664,7 +664,7 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'timeline',
         heading: 'Next ninety days',
-        span: 7,
+        span: 6,
         columns: [{ field: 'renews' }, { field: 'name' }, { field: 'provider' }],
         source: 'register.services',
         order: [{ field: 'renews', dir: 'asc' }],
@@ -674,7 +674,11 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'params',
         heading: 'What each domain points at',
-        span: 5,
+        /* SIX, and it has to be six. `params` is a `rows` primitive, so `floorFor` widens it to two
+           twelfths per declared column — three columns is a floor of 6 — and a declaration of 5 was
+           silently clamped up. Its row partner was 7, the row came to 13, and the page wrapped into
+           two rows with a five-twelfth hole in one and a six-twelfth hole in the other. */
+        span: 6,
         columns: [{ field: 'name' }, { field: 'points_at' }, { field: 'provider' }],
         source: 'register.services',
         where: 'kind is domain',
@@ -769,7 +773,10 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'table',
         heading: 'Money',
-        span: 6,
+        /* EIGHT, which is what four columns of a `table` need. Declared at 6 it was clamped up
+           anyway — `floorFor` gives a table two twelfths a column so its cells do not truncate — so
+           the declaration was a number that never reached the screen. Its row partner is the 4. */
+        span: 8,
         source: 'register.obligations',
         where: 'thing is Kiln',
         columns: [
@@ -829,7 +836,9 @@ export const PAGES: Record<string, PageDecl> = {
       {
         kind: 'steps',
         heading: 'What has to happen first',
-        span: 5,
+        /* Twelve, because there is nothing beside it. A five-twelfth block between two full-width
+           ones is not a narrow card, it is a row that is seven twelfths empty. */
+        span: 12,
         columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
         source: 'register.tasks',
         where: 'state is open',

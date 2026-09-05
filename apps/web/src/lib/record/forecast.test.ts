@@ -11,7 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { runway, trend } from './forecast.ts';
-import { ROWS } from './data.ts';
+import { PAGES, ROWS } from './data.ts';
+import { page } from './api.ts';
 
 /* ── the walk ────────────────────────────────────────────────────────────── */
 
@@ -84,6 +85,34 @@ test('crossing is the FIRST step under zero, and it names the row that did it', 
 
 test('the walk never divides, so a balance cannot drift by a penny', () => {
   for (const s of runway(1_234_567).steps) assert.ok(Number.isInteger(s.balance), `${s.balance} is not minor units`);
+});
+
+test('the crossing is ONE row, and the rest of the year is not the same colour', () => {
+  // The walk exists to produce a day. Painting every row after it `bad` too says "everything from
+  // here is an emergency", which is both true and useless: the eye has nothing to land on, and the
+  // one row worth acting on looks like all the others.
+  //
+  // The block is widened for the length of the test because its heading is "What is coming" and
+  // twelve movements is what that heading promises — the crossing at day 116 is named by the Runway
+  // tile, not by this table. What is under test is the mapping, so the window has to reach it.
+  const decl = PAGES.money?.blocks.find((b) => b.source === 'forecast.runway');
+  assert.ok(decl, 'the money page has no cash walk');
+  const before = decl.limit;
+  decl.limit = 60;
+  try {
+    const block = page('money')?.blocks.find((b) => b.source === 'forecast.runway');
+    assert.ok(block);
+    const at = block.rows.findIndex((r) => r.tone === 'bad');
+    assert.ok(at >= 0, 'the widened window does not reach the crossing, so nothing is being tested');
+    assert.equal(block.rows.filter((r) => r.tone === 'bad').length, 1, 'more than one row is drawn as the crossing');
+    for (const r of block.rows.slice(at + 1)) assert.equal(r.tone, 'warn', 'a row after the crossing lost its state');
+    for (const r of block.rows.slice(0, at)) assert.equal(r.tone, undefined, 'a row before the crossing was coloured');
+  } finally {
+    // Put it back exactly as it was, including not being set: an optional property assigned
+    // `undefined` is not an absent one.
+    if (before === undefined) delete (decl as { limit?: number }).limit;
+    else decl.limit = before;
+  }
 });
 
 /* ── the fit ─────────────────────────────────────────────────────────────── */
