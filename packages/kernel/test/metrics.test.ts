@@ -101,7 +101,7 @@ test('THE FIGURE IS THE SUM OF THE ROWS THE SAME PREDICATE LISTS', async () => {
   const { k, sql } = await record();
   const read = value<Reading>(k.metric(OVERDUE));
 
-  const listed = k.list({ register: 'obligations', where: OVERDUE.where!, limit: 100 });
+  const listed = k.list({ register: 'obligations', ...(OVERDUE.where === undefined ? {} : { where: OVERDUE.where }), limit: 100 });
   assert.ok(listed.ok);
   const truth = listed.value.rows.reduce((a, e) => a + (e.fields.amount as { amount: number }).amount, 0);
 
@@ -247,17 +247,38 @@ test('a window is a window, and a comparison under a week is noise', async () =>
   sql.close();
 });
 
-test('and a comparison of a set with itself says so rather than reporting no change', async () => {
-  /* The shifted window is the SAME PREDICATE against a moved clock. A predicate with no dated clause
-     compares a set with itself, and the delta is then structurally zero — reporting that as "no
-     change" would be a fact about the arithmetic dressed as a fact about the business. */
+test('AND A COMPARISON OF A SET WITH ITSELF SAYS SO rather than reporting no change', async () => {
+  /* The shifted window is the same sentence against a MOVED CLOCK. A predicate with no dated clause
+     resolves to the same tree at both ends, so the delta would be structurally zero — and reporting
+     that as "steady" is a fact about the arithmetic dressed as a fact about the business, which is
+     worse than saying nothing because somebody would act on it. */
   const { k, sql } = await record();
   const undated = value<Reading>(k.metric({ ...OVERDUE, where: { field: 'direction', is: 'owed_to_me' } }));
-  assert.equal(undated.delta, 0, 'an undated predicate is the same set at both ends');
+  assert.equal(undated.delta, null);
+  assert.equal(undated.why, 'the predicate does not mention time, so the window moves nothing');
 
   // A dated one moves, and the delta is a real movement.
-  const dated = value<Reading>(k.metric({ ...OVERDUE, window: '30d', compare: 'previous' }));
-  assert.ok(dated.delta === null || Number.isFinite(dated.delta));
+  const dated = value<Reading>(k.metric({ ...OVERDUE, where: 'direction is owed to me, due before today' }));
+  assert.notEqual(dated.why, 'the predicate does not mention time, so the window moves nothing');
+  sql.close();
+});
+
+test('A SENTENCE IS A PREDICATE, in a metric and in a list, and both read the same rows', async () => {
+  // A declaration is written as `direction is owed to me, state is open`. One form the record
+  // accepts and the other it does not would make `where:` two languages.
+  const { k, sql } = await record();
+  const said = 'direction is owed to me, state is open or part, due before today';
+  const read = value<Reading>(k.metric({ ...OVERDUE, where: said }));
+  assert.equal(read.value, 720_000, 'the sentence read different rows from the tree');
+
+  const listed = k.list({ register: 'obligations', where: said, limit: 100 });
+  assert.ok(listed.ok, listed.ok ? '' : listed.refusal.fix);
+  assert.equal(listed.value.rows.length, 2);
+
+  // And a sentence the register cannot answer is refused, in both.
+  assert.equal(refusal(k.metric({ ...OVERDUE, where: 'state is not done' })).code, 'ENUM_VALUE_UNKNOWN');
+  const badList = k.list({ register: 'obligations', where: 'state is not done', limit: 100 });
+  assert.equal(badList.ok, false);
   sql.close();
 });
 

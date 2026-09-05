@@ -475,3 +475,8 @@ function same(a: unknown, b: unknown, type: string): boolean {
     );
   return a === b;
 }
+
+/* ── the sentence form ───────────────────────────────────────────────────── */
+
+export { parseWhere, resolveDay } from './sentence.ts';
+export type { Parsed, SentenceDeps } from './sentence.ts';

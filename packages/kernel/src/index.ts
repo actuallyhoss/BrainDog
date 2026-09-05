@@ -39,7 +39,7 @@ import {
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
-import { evaluateMetric, scorePrediction, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { evaluateMetric, predicateOf, scorePrediction, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import {
   bindGrant,
   getGrant,
@@ -249,7 +249,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
 
   function list(q: {
     register: string;
-    where?: Predicate;
+    /**
+     * Structured, or as the sentence a person and an agent write.
+     *
+     * BOTH FORMS OR IT IS TWO LANGUAGES. `direction is owed to me, state is open` is what goes in a
+     * declaration; the tree is what the compiler reads. One accepted here and the other not would
+     * make a block's `where:` and a caller's `where:` different things with the same name.
+     */
+    where?: Predicate | string;
     limit?: number;
     cursor?: string | null;
     includeDeleted?: boolean;
@@ -259,10 +266,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     if (!registers.has(q.register))
       return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
 
+    const schema = schemaOf(q.register);
+    const said = predicateOf(q.where, schema, evalContext());
+    if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
+
     /* A PREDICATE THAT COULD NOT BE READ RUNS NOTHING. Returning the register would be a list that
        looks filtered and is not, which is the one failure a declarative surface must not have —
        especially when the thing writing most predicates is an agent that cannot see the screen. */
-    const c = compile(q.where, schemaOf(q.register));
+    const c = compile(said.predicate, schema);
     if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
 
     /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote: `cursor=5` is a number
@@ -568,6 +579,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     schemaOf: (register) => {
       const r = registers.get(register);
       return r ? { register, fields: Object.fromEntries(r.fields.map((f) => [f.id, f])) } : null;
+    },
+    /* A ref is written by NAME in a sentence — `thing is Kiln` — because that is what a person says.
+       The title field is the register's own, so the lookup is one indexed read per name. */
+    refByTitle: (register, title) => {
+      const decl = registers.get(register);
+      if (!decl) return null;
+      const row = sql.one<{ id: string }>(
+        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${decl.title}') = ? LIMIT 1`,
+        register,
+        title,
+      );
+      return row?.id ?? null;
     },
   });
 

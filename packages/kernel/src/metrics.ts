@@ -23,7 +23,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { compile, jsonPath, type Predicate, type Schema } from '@braindog/where';
+import { compile, jsonPath, parseWhere, type Predicate, type Schema } from '@braindog/where';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
@@ -42,7 +42,14 @@ export type MetricDecl = {
   name: string;
   /** `register.<id>`. A `series.<id>` source reads `metric_point`, which this build does not. */
   source: string;
-  where?: Predicate | undefined;
+  /**
+   * The predicate, structured or as a sentence.
+   *
+   * BOTH, because a declaration is written by a person or an agent as `direction is owed to me,
+   * state is open` and read by the compiler as a tree. One form the record accepts and the other it
+   * does not would make `where:` two languages.
+   */
+  where?: Predicate | string | undefined;
   value: Value;
   /** Required. A number with no target is decoration. */
   target?: { lte: number } | { gte: number } | undefined;
@@ -82,7 +89,28 @@ export type EvalContext = {
   nowMs: number;
   /** The register's declared fields, so a predicate and a field expression check against one shape. */
   schemaOf: (register: string) => Schema | null;
+  /** A ref written by name: `thing is Kiln`. Absent means a sentence cannot name one. */
+  refByTitle?: ((register: string, title: string) => string | null) | undefined;
 };
+
+/**
+ * The predicate a declaration meant, whichever form it wrote it in.
+ *
+ * A SENTENCE IS RESOLVED AGAINST THE REGISTER AND THE CLOCK, so `due before +30d` is an absolute
+ * date by the time the compiler sees it — which is what makes it a comparison rather than a string
+ * comparison that happens to be true of everything.
+ */
+export function predicateOf(
+  where: Predicate | string | undefined,
+  schema: Schema,
+  ctx: EvalContext,
+): { predicate: Predicate | undefined; bad: Refusal[] } {
+  if (typeof where !== 'string') return { predicate: where, bad: [] };
+  return parseWhere(where, schema, {
+    nowMs: ctx.nowMs,
+    ...(ctx.refByTitle === undefined ? {} : { refByTitle: ctx.refByTitle }),
+  });
+}
 
 /**
  * Read one metric.
@@ -126,11 +154,13 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
       else if (!AGGREGATIONS.includes(f.kind as (typeof AGGREGATIONS)[number]))
         at('UNIMPLEMENTED', `${f.kind} is not an aggregation this build reads`, 'value');
 
-  if (schema && decl.where) refusals.push(...compile(decl.where, schema).bad);
+  const said = schema ? predicateOf(decl.where, schema, ctx) : { predicate: undefined, bad: [] };
+  refusals.push(...said.bad);
+  if (schema && said.predicate) refusals.push(...compile(said.predicate, schema).bad);
 
-  if (refusals.length || !schema) return { ok: false, refusal: refusals[0] ?? refusals[0]! };
+  if (refusals.length || !schema) return { ok: false, refusal: refusals[0]! };
 
-  const now = read(sql, decl, schema, ctx.nowMs);
+  const now = read(sql, said.predicate, schema, decl);
   if (!now.ok) return now;
 
   /* THE COMPARISON IS THE SAME PREDICATE AGAINST A MOVED CLOCK, which is why a predicate with no
@@ -141,9 +171,21 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (decl.compare === 'none' || shift === null) why = 'no comparison asked for';
   else if (shift < 7 * DAY) why = 'a window under seven days is noise';
   else {
-    const before = read(sql, decl, schema, ctx.nowMs - shift);
+    /* THE COMPARISON IS THE SAME SENTENCE AGAINST A MOVED CLOCK. `due before today` resolves to a
+       different day when `now` moves back a month, which is what makes the two windows different
+       sets — and a predicate with no dated clause resolves to the SAME tree, which is how the
+       structural check below knows the window moves nothing. */
+    const shifted = predicateOf(decl.where, schema, { ...ctx, nowMs: ctx.nowMs - shift });
+    const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
+    const before = read(sql, shifted.predicate, schema, decl);
+
     if (!before.ok) why = before.refusal.fix;
-    else if (now.value.rows === 0 || before.value.rows === 0) why = 'one of the two windows is empty';
+    else if (!moved) {
+      /* A SET COMPARED WITH ITSELF IS NOT NO CHANGE. The delta would be structurally zero, and
+         reporting that as "steady" is a fact about the arithmetic dressed as a fact about the
+         business — which is worse than saying nothing, because somebody would act on it. */
+      why = 'the predicate does not mention time, so the window moves nothing';
+    } else if (now.value.rows === 0 || before.value.rows === 0) why = 'one of the two windows is empty';
     else if (before.value.rows * 2 < now.value.rows) why = 'the window before has under half the rows';
     else if (before.value.value === null || now.value.value === null || before.value.value === 0)
       why = 'the window before has nothing to compare against';
@@ -166,13 +208,12 @@ export const meets = (value: number, target: { lte: number } | { gte: number }):
 
 type Read = Omit<Reading, 'delta' | 'why' | 'met'>;
 
-function read(sql: Sql, decl: MetricDecl, schema: Schema, nowMs: number): Result<Read> {
-  const w = compile(decl.where, schema);
+function read(sql: Sql, predicate: Predicate | undefined, schema: Schema, decl: MetricDecl): Result<Read> {
+  const w = compile(predicate, schema);
   if (w.bad.length) return { ok: false, refusal: w.bad[0]! };
 
   const where = `register = ? AND deleted_at IS NULL AND ${w.sql}`;
   const params: (string | number)[] = [schema.register, ...w.params];
-  void nowMs;
 
   if ('ratio' in decl.value || 'diff' in decl.value) {
     const pair = 'ratio' in decl.value ? decl.value.ratio : decl.value.diff;
