@@ -75,6 +75,8 @@ export type RulesDeps = {
   write: (register: string, spoken: string | null, patch: Record<string, unknown>, actor: string, batch: string) => Result<Entry>;
   note: (entry: Entry, actor: string, text: string, batch: string) => void;
   schedule: (key: string, payload: unknown, pending: boolean) => boolean;
+  /** One row by its id, hydrated — what a dry run walks without writing anything. */
+  entry: (id: string) => Entry | null;
   mint: () => string;
   nowMs: number;
 };
@@ -280,4 +282,144 @@ export function marker(sql: Sql, mint: () => string, nowMs: number, key: string,
     pending ? 'pending' : 'done',
   );
   return true;
+}
+
+/* ── what it would do ─────────────────────────────────────────── */
+
+export type DryRun = {
+  /** Rows the candidate's `when` selects at all. */
+  matches: number;
+  /** Rows it walked. A ceiling, so a register of a million does not become a request of a million. */
+  rows: number;
+  /** Rows where it is the first to set its field — or where it sets none, and simply fires. */
+  won: number;
+  /** Rows where an earlier rule had already set that field. */
+  lost: number;
+  /** Which rule took them, by name. This is the whole answer to "why did nothing happen". */
+  takenBy: Record<string, number>;
+  /** Rows whose `once_per` marker already exists, so it would fire on none of them again. */
+  suppressed: number;
+  /** The first twenty, with what it would do to each. */
+  sample: { spoken: string; would: string[]; reason?: string }[];
+};
+
+/**
+ * What a rule WOULD do, without doing any of it.
+ *
+ * THIS IS THE FEATURE, not a debugging aid. A rule is a thing that changes rows while nobody is
+ * looking, and the honest way to introduce one is to say "this matches 38 rows, wins on 31, loses 7
+ * to `chase-late`, and here are the first twenty with what it would do" — BEFORE it is turned on.
+ * Every product that ships rules without this ships a feature people are afraid of.
+ *
+ * IT RANKS THE CANDIDATE AMONG THE REAL RULES, with the id it would have. Which rules run before it
+ * is the whole of what it will and will not get to do, and a preview that ignored the others would
+ * be a preview of a record with one rule in it.
+ *
+ * NO WRITES, and not merely that they are skipped: nothing here calls the write path at all, so
+ * there is no path by which a preview becomes a change.
+ */
+export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Result<DryRun> {
+  const schema = deps.schemaOf(candidate.register);
+  if (!schema)
+    return {
+      ok: false,
+      refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${candidate.register}.`, at: 'register' },
+    };
+
+  const said = predicateOf(candidate.when, schema, deps.ctx);
+  if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
+
+  /* The candidate takes its place among the others by the same ordering the pass uses — replacing a
+     rule of its own name, because previewing a CHANGE to a live rule is the common case. */
+  const others = deps.rules(candidate.register).filter((r) => r.rule !== candidate.rule);
+  const ranked = order([...others, candidate]);
+  const setField = (r: RuleDecl): string | null => {
+    for (const a of r.then) if ('set' in a) return a.set.field;
+    return null;
+  };
+  const mine = setField(candidate);
+
+  const out: DryRun = { matches: 0, rows: 0, won: 0, lost: 0, takenBy: {}, suppressed: 0, sample: [] };
+
+  const rows = deps.sql.all<{ id: string }>(
+    'SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY seq LIMIT ?',
+    candidate.register,
+    Math.max(1, Math.floor(limit)),
+  );
+
+  for (const { id } of rows) {
+    const entry = deps.entry(id);
+    if (!entry) continue;
+    out.rows++;
+    if (!matches(deps, schema, candidate, entry)) continue;
+    out.matches++;
+
+    /* WHO GOT THERE FIRST. Walking the rules ahead of the candidate with the same precedence the
+       pass uses is the only way to answer "why did nothing happen" with a name rather than a shrug. */
+    let taken: string | null = null;
+    if (mine)
+      for (const r of ranked) {
+        if (r.rule === candidate.rule) break;
+        if (setField(r) === mine && matches(deps, schema, r, entry)) {
+          taken = r.rule;
+          break;
+        }
+      }
+
+    if (taken) {
+      out.lost++;
+      out.takenBy[taken] = (out.takenBy[taken] ?? 0) + 1;
+    } else out.won++;
+
+    let suppressed = false;
+    if (candidate.once_per?.length) {
+      const key = `${candidate.rule}:${candidate.once_per
+        .map((t) => (t === 'entry' ? entry.id : String(entry.fields[t] ?? '')))
+        .join(':')}`;
+      suppressed = Boolean(deps.sql.one("SELECT 1 AS x FROM schedule WHERE kind = 'rule' AND key = ?", key));
+      if (suppressed) out.suppressed++;
+    }
+
+    if (out.sample.length < 20)
+      out.sample.push({
+        spoken: entry.seq === null ? entry.id : `${entry.register}#${entry.seq}`,
+        would: taken || suppressed ? [] : describe(deps, candidate, entry),
+        ...(taken
+          ? { reason: `${taken} sets ${mine} first` }
+          : suppressed
+            ? { reason: 'it has already fired for this row' }
+            : {}),
+      });
+  }
+
+  return { ok: true, value: out };
+}
+
+/** What the actions would come to on one row, in the words a person would use. */
+function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
+  const out: string[] = [];
+  for (const a of rule.then) {
+    if ('tag' in a) out.push(`tag ${a.tag}`);
+    else if ('untag' in a) out.push(`untag ${a.untag}`);
+    else if ('set' in a) out.push(`set ${a.set.field} to ${fill(a.set.to, entry, deps.nowMs)}`);
+    else if ('move' in a) out.push(`move to ${a.move}`);
+    else if ('note' in a) out.push(`note ${fill(a.note, entry, deps.nowMs)}`);
+    else if ('notify' in a) out.push(`notify ${fill(a.notify.say, entry, deps.nowMs)}`);
+    else if ('stop' in a) out.push('stop');
+    else if ('link' in a) {
+      /* A LINK THAT CANNOT BE MADE IS NAMED HERE, because the preview is where somebody finds out
+         that half their rows name a party nobody has a row for. */
+      const found = deps.sql.all<{ id: string }>(
+        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${a.link.to.by}') = ? LIMIT 2`,
+        a.link.to.register,
+        fill(a.link.to.value, entry, deps.nowMs),
+      );
+      out.push(
+        found.length === 1
+          ? `link ${a.link.field}`
+          : `link ${a.link.field} — ${found.length === 0 ? 'nothing bears that name' : 'two rows bear that name'}`,
+      );
+    }
+  }
+  return out;
 }

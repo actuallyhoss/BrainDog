@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fillTemplate, openRecord, orderRules, type Declaration, type Entry, type Kernel } from '../src/index.ts';
+import { fillTemplate, openRecord, orderRules, type Declaration, type DryRun, type Entry, type Kernel, type RuleDecl } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -306,5 +306,125 @@ test('and a record with no rules at all pays nothing for the pass', async () => 
   const made = value<Entry>(k.create('obligations', { what: 'x', due: day(1), state: 'open' }, { actor: 'p_1' }));
   assert.equal(made.state, 'open');
   assert.equal(sql.all('SELECT 1 FROM event').length, 1, 'the pass wrote something on a record with no rules');
+  sql.close();
+});
+
+/* ── what it would do ─────────────────────────────────────────── */
+
+const CANDIDATE: RuleDecl = {
+  rule: 'chase',
+  register: 'obligations',
+  when: 'state is open, due before today',
+  then: [{ set: { field: 'chase', to: 'a letter' } }, { tag: 'late' }],
+};
+
+test('A DRY RUN SAYS WHAT A RULE WOULD DO, BEFORE ANYBODY TURNS IT ON', async () => {
+  /* A rule changes rows while nobody is looking. The honest way to introduce one is to say "this
+     matches three rows, wins on two, loses one to `already`" — and every product that ships rules
+     without this ships a feature people are afraid of. */
+  const { k, sql } = await record();
+  value(k.create('obligations', { what: 'Late one', due: day(-3), state: 'open' }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'Late two', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'Not yet', due: day(30), state: 'open' }, { actor: 'p_1' }));
+
+  const out = value<DryRun>(k.dryRun(CANDIDATE));
+  assert.equal(out.rows, 3);
+  assert.equal(out.matches, 2, 'the preview matched the rows the predicate does not');
+  assert.equal(out.won, 2);
+  assert.equal(out.lost, 0);
+  assert.deepEqual(
+    out.sample.map((s) => s.spoken),
+    ['obligations#1', 'obligations#2'],
+  );
+  assert.deepEqual(out.sample[0]?.would, ['set chase to a letter', 'tag late']);
+
+  /* AND NOTHING WAS WRITTEN. Not "the writes were skipped" — nothing here calls the write path at
+     all, so there is no path by which a preview becomes a change. */
+  assert.equal(k.get('obligations#1')?.fields.chase, undefined);
+  assert.equal(sql.all('SELECT 1 FROM event').length, 3, 'the preview wrote an event');
+  sql.close();
+});
+
+test('and it says WHICH RULE takes the rows it loses, which is the answer to "why did nothing happen"', async () => {
+  const { k, sql } = await record(
+    rule({
+      rule: 'already',
+      register: 'obligations',
+      when: 'state is open, party is Halden Type Co',
+      then: [{ set: { field: 'chase', to: 'a phone call' } }],
+    }),
+  );
+  value(k.create('obligations', { what: 'a', party: 'Halden Type Co', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'b', party: 'Somebody else', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+
+  const out = value<DryRun>(k.dryRun(CANDIDATE));
+  assert.equal(out.matches, 2);
+  assert.equal(out.won, 1);
+  assert.equal(out.lost, 1);
+  assert.deepEqual(out.takenBy, { already: 1 });
+
+  const lost = out.sample.find((s) => s.reason);
+  assert.match(lost?.reason ?? '', /already sets chase first/);
+  assert.deepEqual(lost?.would, [], 'a row it loses still shows what it would do');
+  sql.close();
+});
+
+test('a preview of a CHANGE to a live rule ranks against the others, not against itself', async () => {
+  // Previewing an edit is the common case, and a rule competing with its own old version would lose
+  // every row to a rule that is about to stop existing.
+  const { k, sql } = await record(
+    rule({ rule: 'chase', register: 'obligations', when: 'state is open', then: [{ set: { field: 'chase', to: 'the old way' } }] }),
+  );
+  value(k.create('obligations', { what: 'a', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+
+  const out = value<DryRun>(k.dryRun(CANDIDATE));
+  assert.equal(out.won, 1, 'the candidate lost to the version of itself it is replacing');
+  assert.deepEqual(out.takenBy, {});
+  sql.close();
+});
+
+test('and a row it has already fired on says so rather than counting as a win', async () => {
+  const { k, sql } = await record(
+    rule({
+      rule: 'chase',
+      register: 'obligations',
+      when: 'state is open',
+      once_per: ['entry'],
+      then: [{ notify: { say: 'x' } }],
+    }),
+  );
+  value(k.create('obligations', { what: 'a', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+
+  const out = value<DryRun>(
+    k.dryRun({ rule: 'chase', register: 'obligations', when: 'state is open', once_per: ['entry'], then: [{ notify: { say: 'x' } }] }),
+  );
+  assert.equal(out.suppressed, 1);
+  assert.match(out.sample[0]?.reason ?? '', /already fired/);
+  sql.close();
+});
+
+test('A LINK THAT CANNOT BE MADE IS NAMED IN THE PREVIEW, because that is where somebody finds out', async () => {
+  const { k, sql } = await record();
+  value(k.create('obligations', { what: 'a', party: 'Nobody', due: day(-1), state: 'open' }, { actor: 'p_1' }));
+
+  const out = value<DryRun>(
+    k.dryRun({
+      rule: 'assign',
+      register: 'obligations',
+      when: 'state is open',
+      then: [{ link: { field: 'owner', to: { register: 'people', by: 'name', value: '{{party}}' } } }],
+    }),
+  );
+  assert.match(out.sample[0]?.would[0] ?? '', /nothing bears that name/);
+  sql.close();
+});
+
+test('a candidate the register cannot answer is refused rather than previewed as nothing', async () => {
+  const { k, sql } = await record();
+  const out = k.dryRun({ rule: 'x', register: 'obligations', when: 'colour is red', then: [{ tag: 'a' }] });
+  assert.equal(out.ok, false);
+  const other = k.dryRun({ rule: 'x', register: 'nothing', when: 'a is b', then: [] });
+  assert.equal(other.ok, false);
+  if (!other.ok) assert.equal(other.refusal.code, 'REGISTER_UNKNOWN');
   sql.close();
 });

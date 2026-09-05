@@ -42,7 +42,7 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { evaluateMetric, predicateOf, scorePrediction, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps } from './digest.ts';
-import { marker, runRules, type Fired, type RuleDecl, type RulesDeps, type RulesOutcome } from './rules.ts';
+import { dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import {
   bindGrant,
   getGrant,
@@ -74,8 +74,8 @@ export { GRANT_KINDS, spanMs } from './vault.ts';
 export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
-export { fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
-export type { Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
+export { dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
+export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
 export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Value } from './metrics.ts';
@@ -720,6 +720,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     note: (entry, actor, text, batch) =>
       void appendEvent({ kind: 'note', target: entry.id, register: entry.register, actor, note: text, at: instant(clock.now()), batch }),
     schedule: (key, payload, pending) => marker(sql, mint, clock.now(), key, payload, pending),
+    entry: (id) => byId(id),
     mint,
     nowMs: clock.now(),
   });
@@ -911,6 +912,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** One metric document by its id, so a caller can fill a parameter and read it. */
     metricDecl: (id: string): MetricDecl | null => pageDeps().metric(id),
+
+    /**
+     * What a rule WOULD do, without doing any of it.
+     *
+     * THE FEATURE, not a debugging aid. A rule changes rows while nobody is looking, and the honest
+     * way to introduce one is to say "this matches 38 rows, wins on 31, loses 7 to `chase-late`"
+     * BEFORE it is turned on. Every product that ships rules without this ships a feature people are
+     * afraid of.
+     */
+    dryRun: (candidate: RuleDecl, limit?: number): Result<DryRun> => dryRun(rulesDeps(), candidate, limit),
 
     /** One block, without a page around it — what a `draw` tool hands an agent. */
     block: (decl: PageBlock): BlockResult => readBlock(pageDeps(), decl),
