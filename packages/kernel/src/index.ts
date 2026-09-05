@@ -754,6 +754,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
       const decl = JSON.parse(found.body) as DigestDecl;
       runDigest(digestDeps(), decl);
+      /* A SCHEDULE THAT IS NOT A SCHEDULE ENDS THE ROW rather than arming it for an hour nobody
+         asked for. `null` is one-shot here, and the declaration is what needs fixing. */
       return nextOccurrence(decl.schedule, clock.now(), recordIdentity(sql)?.tz ?? 'UTC');
     },
 

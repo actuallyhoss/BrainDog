@@ -7,13 +7,17 @@
  * before the refusal, and reports failure while having succeeded partially. That is the worst
  * available shape: the caller believes nothing happened.
  *
- * `attempt` closes it. A refusal returned from inside is carried out through a throw the driver
- * understands, the transaction rolls back, and the refusal is returned as if nothing had been tried
- * — because nothing was. Validation before the first write is still better; this is what makes the
- * order stop mattering.
+ * A SAVEPOINT, NOT A TRANSACTION, and that is the whole difference between this working and looking
+ * like it works. The kernel's `transaction` is re-entrant: at depth greater than zero it calls the
+ * function directly and opens nothing, so a throw carried out through it reaches nobody who could
+ * roll anything back. An earlier version of this file relied on exactly that and rolled back only
+ * at the top level — a safety net that was not there in the one case it was written for, a caller
+ * doing `k.transaction(() => k.bindGrant(…))`.
+ *
+ * Validation before the first write is still better; this is what makes the order stop mattering.
  */
 
-import type { Result } from '@braindog/ports';
+import type { Result, Sql } from '@braindog/ports';
 
 /** Carries a refusal out through a rollback. Never escapes this file. */
 class Refused extends Error {
@@ -24,15 +28,37 @@ class Refused extends Error {
   }
 }
 
-export function attempt<T>(transaction: <R>(fn: () => R) => R, fn: () => Result<T>): Result<T> {
+let depth = 0;
+
+export function attempt<T>(sql: Sql, transaction: <R>(fn: () => R) => R, fn: () => Result<T>): Result<T> {
+  /* The name is unique per nesting level, because SQLite savepoints are a stack and releasing the
+     wrong one releases everything above it. */
+  const name = `dog_attempt_${++depth}`;
   try {
     return transaction(() => {
-      const out = fn();
-      if (!out.ok) throw new Refused(out);
+      sql.exec(`SAVEPOINT ${name}`);
+      let out: Result<T>;
+      try {
+        out = fn();
+      } catch (e) {
+        /* A REAL THROW ROLLS BACK TOO, and then keeps going up: the outer transaction is entitled to
+           abort on it, and swallowing it here would leave a half-written record looking whole. */
+        sql.exec(`ROLLBACK TO ${name}`);
+        sql.exec(`RELEASE ${name}`);
+        throw e;
+      }
+      if (!out.ok) {
+        sql.exec(`ROLLBACK TO ${name}`);
+        sql.exec(`RELEASE ${name}`);
+        return out;
+      }
+      sql.exec(`RELEASE ${name}`);
       return out;
     });
   } catch (e) {
     if (e instanceof Refused) return e.result as Result<T>;
     throw e;
+  } finally {
+    depth--;
   }
 }

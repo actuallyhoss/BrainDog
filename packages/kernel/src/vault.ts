@@ -161,11 +161,22 @@ export function bindGrant(
 
   const at = instant(deps.nowMs);
 
-  return attempt(transaction, () => {
+  return attempt(sql, transaction, () => {
     const id = args.id ?? `g_${deps.mint()}`;
     const rotating = args.id !== undefined;
 
     if (rotating) {
+      /* A DIFFERENT KIND IS A DIFFERENT GRANT. The rotate UPDATE writes fourteen columns and `kind`
+         is not one of them, so a rotation that named another kind kept the row's and wrote the
+         caller's into the audit event — a trail saying an SSH key was rotated where a token was. */
+      const held = sql.one<{ kind: GrantKind }>('SELECT kind FROM grant WHERE id = ?', id);
+      if (held && held.kind !== args.kind)
+        return no<GrantRow>(
+          'IMMUTABLE_FIELD',
+          `${id} is a ${held.kind}. A ${args.kind} is a different grant, not a rotation of this one.`,
+          { at: 'kind', allowed: [held.kind] },
+        );
+
       /* ONE PRIOR VERSION, and the schema is what says so: two columns rather than a table. Enough
          to finish the requests already in flight when the key changed, and not a history of every
          credential the customer has ever held. */
@@ -224,11 +235,14 @@ export function bindGrant(
        that shortens the cycle does not leave the old one armed beside the new. */
     sql.exec("DELETE FROM schedule WHERE kind = 'rotate' AND state = 'pending' AND key IN (?, ?)", `grant:${id}`, `grant:${id}:expires`);
 
-    const every = args.rotate_every ?? (rotating ? getGrant(sql, id)?.rotate_every ?? null : null);
+    /* AN EXPLICIT `null` IS A CHANGE, not an omission. `??` read "take this cycle off" as "leave it
+       alone", so the column went to NULL and the old reminder stayed armed — the row saying no cycle
+       while the schedule held one derived from the cycle just removed. */
+    const every = args.rotate_every !== undefined ? args.rotate_every : rotating ? (getGrant(sql, id)?.rotate_every ?? null) : null;
     const span = every ? spanMs(every) : null;
     if (span !== null) arm(sql, deps, `grant:${id}`, deps.nowMs + span, { grant: id });
 
-    const expires = args.expires_at ?? (rotating ? getGrant(sql, id)?.expires_at ?? null : null);
+    const expires = args.expires_at !== undefined ? args.expires_at : rotating ? (getGrant(sql, id)?.expires_at ?? null) : null;
     if (expires) {
       /* FORTY-EIGHT HOURS BEFORE, because a credential that expires at midnight and is announced at
          midnight is announced to nobody. */
@@ -296,12 +310,19 @@ export function openGrant(
   /* A ROTATED WRAPPING KEY READS AS `WRONG_KEY`, NEVER AS CORRUPTION. They look identical from
      inside a failed decrypt, and the difference is everything: one is "try the other key" and the
      other is "your credentials are gone". */
-  if (key.wrapped_by === 'kek' && args.kek_id !== undefined && key.kek_id !== args.kek_id)
-    return no<SealedGrant>('WRONG_KEY', `This record is wrapped by ${key.kek_id}, and you offered ${args.kek_id}.`, {
-      at: 'kek_id',
-    });
+  /* THE CHECK IS NOT OPT-OUT. Omitting `kek_id` skipped it entirely, so the guard on a credential
+     path was satisfied by not asking — which is the wrong default for anything, and this is the
+     wrongest place for it. */
+  if (key.wrapped_by === 'kek' && key.kek_id !== (args.kek_id ?? null))
+    return no<SealedGrant>(
+      'WRONG_KEY',
+      args.kek_id === undefined
+        ? `This record is wrapped by ${key.kek_id}, and you offered no key.`
+        : `This record is wrapped by ${key.kek_id}, and you offered ${args.kek_id}.`,
+      { at: 'kek_id' },
+    );
 
-  return attempt(transaction, () => {
+  return attempt(sql, transaction, () => {
     sql.exec('UPDATE grant SET opened = opened + 1, last_opened = ? WHERE id = ?', instant(deps.nowMs), args.id);
     event(sql, deps, 'grant.read', args.id, row.kind);
     return ok({
@@ -327,7 +348,7 @@ export function openGrant(
  * previous copy behind would be a revocation in name.
  */
 export function revokeGrant(sql: Sql, deps: VaultDeps, id: string, transaction: <T>(fn: () => T) => T): Result<null> {
-  return attempt(transaction, () => {
+  return attempt(sql, transaction, () => {
     const row = sql.one<{ kind: GrantKind }>('SELECT kind FROM grant WHERE id = ? AND revoked_at IS NULL', id);
     if (!row)
       return sql.one('SELECT 1 AS x FROM grant WHERE id = ?', id)

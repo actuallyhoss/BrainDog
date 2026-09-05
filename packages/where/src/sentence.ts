@@ -56,7 +56,19 @@ const WORDS = ['today', 'tomorrow', 'yesterday', 'bom', 'eom', 'boy', 'eoy'] as 
  * adding to the month number rolls it into 3 March and nobody means that by "a month".
  */
 export function resolveDay(word: string, nowMs: number): string | null {
-  if (ISO.test(word)) return word;
+  /* THE SHAPE IS NOT THE CHECK. `2026-13-45` matched the pattern and was then compared as a string,
+     so `due before 2026-13-45` was true of every row — the "clause that quietly matches everything"
+     this module exists to prevent, reached through its own date test. `Date.UTC` normalises rather
+     than refusing, so the round trip is what says the day is real. */
+  if (ISO.test(word)) {
+    /* `Date.parse` of an impossible day is `NaN`, and `.toISOString()` on that THROWS — so the
+       finiteness check comes first. A round trip is what distinguishes a day that exists from one
+       the pattern merely admits: `2026-02-30` parses to 2 March in the lenient forms and to nothing
+       in the strict one, and neither answer is the day somebody wrote. */
+    const ms = Date.parse(`${word}T12:00:00Z`);
+    if (!Number.isFinite(ms)) return null;
+    return new Date(ms).toISOString().slice(0, 10) === word ? word : null;
+  }
 
   const d = new Date(nowMs);
   switch (word) {
@@ -173,10 +185,13 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       continue;
     }
 
-    const negated = rest.startsWith('not ');
-    const said = (negated ? rest.slice(4) : rest).trim();
+    /* `is not` WITH NOTHING AFTER IT IS NOT A SEARCH FOR THE WORD `not`. `startsWith('not ')` needs
+       the space, so a bare trailing `not` fell through and became `note is 'not'` — a clause that
+       parses, runs, and quietly means something nobody wrote. */
+    const negated = rest === 'not' || rest.startsWith('not ');
+    const said = (negated ? rest.slice(3) : rest).trim();
     if (!said) {
-      bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence} — is what?`, at: field });
+      bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence} — is${negated ? ' not' : ''} what?`, at: field });
       continue;
     }
 
@@ -206,6 +221,14 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
   }
 
   if (bad.length) return { predicate: undefined, bad };
+  /* A SENTENCE MADE ONLY OF SEPARATORS IS NOT "EVERYTHING". `,,,` produced `{all: []}`, which the
+     compiler renders as `1 = 1` — somebody wrote a filter and got the whole register. An empty
+     STRING means no filter and is handled at the top; this is a filter that failed to say anything. */
+  if (clauses.length === 0)
+    return {
+      predicate: undefined,
+      bad: [{ code: 'WHERE_MALFORMED', fix: `${text} says nothing a register can answer.`, at: 'where' }],
+    };
   return { predicate: clauses.length === 1 ? clauses[0] : { all: clauses }, bad };
 }
 

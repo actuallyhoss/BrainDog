@@ -302,7 +302,11 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       if (stop) return { ok: false as const, refusal: stop };
       if (typeof args?.metric !== 'string' || !args.metric)
         return no('REQUIRED_MISSING', 'A figure is asked for by its id, optionally with a parameter after a colon.', { at: 'metric' });
-      const [id, param] = args.metric.split(':');
+      /* The FIRST colon separates: a parameter may contain one, and splitting on every colon read
+         `project-owed:C:\Repos` as a project called `C`. */
+      const at = args.metric.indexOf(':');
+      const id = at < 0 ? args.metric : args.metric.slice(0, at);
+      const param = at < 0 ? undefined : args.metric.slice(at + 1);
       const decl = kernel.metricDecl(id ?? '');
       if (!decl)
         return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });

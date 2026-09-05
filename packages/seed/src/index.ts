@@ -1232,6 +1232,21 @@ export type Seeded = { registers: number; rows: number; pages: number; metrics: 
 export const ORDER = ['things', 'people', 'tracks', 'obligations', 'services', 'tasks', 'sessions', 'updates'] as const;
 
 export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Result<Seeded>> {
+  /* ONCE, AND THE SECOND TIME SAYS SO. Run twice, this doubled every register — and reported the
+     same counts both times, so nothing in the return value said what had happened. Worse, the second
+     run's refs resolved to the FIRST run's rows, so the duplicates silently cross-linked to the
+     originals and the money figures doubled under an unchanged-looking report. */
+  for (const register of ORDER)
+    if (kernel.count(register) > 0)
+      return {
+        ok: false,
+        refusal: {
+          code: 'RECORD_NOT_EMPTY',
+          fix: `This record already holds ${kernel.count(register)} rows in ${register}. The seed opens an empty record.`,
+          at: register,
+        },
+      };
+
   const installed = await kernel.install([...declarations(), ...pageDeclarations(), ...metricDeclarations()]);
   if (!installed.ok) return installed as Result<Seeded>;
 

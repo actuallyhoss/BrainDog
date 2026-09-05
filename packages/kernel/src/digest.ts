@@ -84,6 +84,9 @@ export type DigestDeps = {
 /** How many rows of a register a section carries. A digest is a summary, not a report. */
 const SECTION_LIMIT = 50;
 
+/** And how many sections. Twelve headings is already more than anybody reads on a Monday. */
+const MAX_SECTIONS = 12;
+
 /**
  * Build the sections, drop the ones that asked to be dropped when empty.
  *
@@ -93,7 +96,24 @@ const SECTION_LIMIT = 50;
 export function sectionsOf(deps: DigestDeps, decl: DigestDecl): DigestPart[] {
   const out: DigestPart[] = [];
 
-  for (const section of decl.sections.slice(0, 12)) {
+  /* TWELVE SECTIONS, AND THE THIRTEENTH SAYS SO. They used to be sliced off in silence, which is a
+     digest quietly without the thing somebody added last — and the person who added it is the one
+     least likely to notice its absence. */
+  if (decl.sections.length > MAX_SECTIONS)
+    out.push({
+      heading: 'Not sent',
+      as: 'note',
+      rows: [],
+      refusals: [
+        {
+          code: 'OUT_OF_BOUNDS',
+          fix: `This digest declares ${decl.sections.length} sections and a digest carries ${MAX_SECTIONS}. The rest are not here.`,
+          at: 'sections',
+        },
+      ],
+    });
+
+  for (const section of decl.sections.slice(0, MAX_SECTIONS)) {
     const as = section.as ?? 'table';
     const base: DigestPart = { heading: section.heading, as, rows: [], refusals: [] };
 
@@ -199,7 +219,14 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
 /** The one line an in-app note carries: the headings and their counts, under 280 characters. */
 export function headline(name: string, sections: DigestPart[]): string {
   const parts = sections.map((s) =>
-    s.reading ? `${s.heading} ${s.reading.value === null ? '—' : s.reading.value}` : `${s.heading} ${s.rows.length}`,
+    /* A REFUSED SECTION IS AN EM DASH, NOT A ZERO. It fell through to `rows.length`, so a money
+       figure the record had refused to compute was announced as nothing owed — the email said why
+       and the notification said zero, and the notification is the one somebody reads first. */
+    s.refusals.length
+      ? `${s.heading} —`
+      : s.reading
+        ? `${s.heading} ${s.reading.value === null ? '—' : s.reading.value}`
+        : `${s.heading} ${s.rows.length}`,
   );
   return `${name}: ${parts.join(' · ')}`.slice(0, 280);
 }
@@ -221,10 +248,12 @@ export function render(name: string, sections: DigestPart[]): string {
     out.push('', '```table');
     if (columns.length) out.push(columns.map((c) => c.label ?? c.field).join(' | '));
     for (const row of s.rows)
+      /* BOTH BRANCHES THROUGH `cell`. The fallback interpolated raw, so a value with a pipe in it
+         split into two columns — in the one branch that exists because nobody said which columns. */
       out.push(
         columns.length
           ? columns.map((c) => cell(row, c.field)).join(' | ')
-          : `${row.seq ?? ''} | ${String(Object.values(row.fields)[0] ?? '')}`,
+          : `${cell(row, 'seq')} | ${cell(row, Object.keys(row.fields)[0] ?? '')}`,
       );
     out.push('```', '');
   }
@@ -256,20 +285,42 @@ const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
  * already carries the zone data; the walk asks it what the local parts of a candidate instant are
  * and steps a day at a time, which is at most eight steps and always right across a transition.
  */
-export function nextOccurrence(schedule: { day?: string; at: string }, fromMs: number, tz: string): number {
-  const [hh, mm] = schedule.at.split(':').map((n) => Number(n));
-  const wanted = DAYS.indexOf((schedule.day ?? '').toLowerCase());
+export function nextOccurrence(schedule: { day?: string; at: string }, fromMs: number, tz: string): number | null {
+  /* THE TIME IS CHECKED, not defaulted. `Number('8am')` is `NaN` and `NaN ?? 8` is `NaN`, so a
+     malformed `at` silently became "twenty-four hours from now" — a weekly digest arriving at a
+     different hour every week, with nothing anywhere saying why. */
+  const m = /^(\d{1,2}):(\d{2})$/.exec(schedule.at.trim());
+  const hh = m ? Number(m[1]) : NaN;
+  const mm = m ? Number(m[2]) : NaN;
+  if (!Number.isInteger(hh) || hh > 23 || !Number.isInteger(mm) || mm > 59) return null;
+
+  const wanted = schedule.day === undefined ? -1 : DAYS.indexOf(schedule.day.toLowerCase());
+  if (schedule.day !== undefined && wanted < 0) return null;
 
   for (let step = 0; step <= 8; step++) {
     const probe = fromMs + step * 86_400_000;
     const parts = localParts(probe, tz);
     if (wanted >= 0 && parts.weekday !== wanted) continue;
-    /* The local wall-clock time, converted back by the offset the runtime reports for that instant
-       — so an hour that does not exist on a spring-forward morning lands on the next one that does. */
-    const at = probe + ((hh ?? 8) - parts.hour) * 3_600_000 + ((mm ?? 0) - parts.minute) * 60_000 - parts.second * 1000;
+
+    /* THE OFFSET IS RE-READ AT THE ANSWER, not only at the probe. The arithmetic converts a local
+       wall-clock time using the offset in force at the PROBE, and a transition between the two moves
+       the result by an hour — in both directions, so a Sunday digest landed at 07:00 in October and
+       09:00 in March. One correction is enough: the residual is the difference between the two
+       offsets, and two transitions cannot fall inside one day. */
+    let at = probe + (hh - parts.hour) * 3_600_000 + (mm - parts.minute) * 60_000 - parts.second * 1000;
+    const landed = localParts(at, tz);
+    const drift = (hh - landed.hour) * 3_600_000 + (mm - landed.minute) * 60_000 - landed.second * 1000;
+    /* A SPRING-FORWARD HOUR DOES NOT EXIST, and correcting into it would loop. When the corrected
+       instant still does not read as the wanted time, the hour was skipped and the first one that
+       does exist is the honest answer — which is what the uncorrected value already is. */
+    if (drift !== 0) {
+      const corrected = at + drift;
+      const after = localParts(corrected, tz);
+      if (after.hour === hh && after.minute === mm && (wanted < 0 || after.weekday === wanted)) at = corrected;
+    }
     if (at > fromMs) return at;
   }
-  return fromMs + 86_400_000;
+  return null;
 }
 
 /** The local parts of an instant, from the runtime's own zone data. */

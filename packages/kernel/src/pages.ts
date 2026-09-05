@@ -85,27 +85,66 @@ const COMPUTED = new Set(['forecast.runway']);
  * `/p/kiln` is a URL somebody can type and one that survives the row being renumbered; `/p/things-1`
  * is neither.
  */
-export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; row?: Entry }[] {
-  const out: { slug: string; decl: PageDecl; row?: Entry }[] = [];
+export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] {
+  const out: { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] = [];
+  const taken = new Set<string>();
+
+  /**
+   * A slug nothing else has.
+   *
+   * TWO ROWS WITH THE SAME TITLE USED TO GIVE TWO PAGES AT ONE ADDRESS, and only the first was
+   * reachable — while its own filled predicate (`name is Kiln`) matched BOTH, so the page for one
+   * project showed the other's rows under its own name. A punctuation-only title slugged to the
+   * empty string, and every one of those collided there.
+   */
+  const claim = (name: string, register: string, seq: number | null): string => {
+    const base = slugify(name) || `${register}-${seq ?? 0}`;
+    if (!taken.has(base)) {
+      taken.add(base);
+      return base;
+    }
+    const unique = `${base}-${seq ?? taken.size}`;
+    taken.add(unique);
+    return unique;
+  };
 
   for (const decl of deps.pages()) {
     if (!decl.for) {
-      out.push({ slug: decl.page, decl });
+      out.push({ slug: claim(decl.page, 'page', null), decl });
       continue;
     }
-    const schema = deps.schemaOf(decl.for.register);
-    if (!schema) continue;
-    const said = predicateOf(decl.for.where, schema, deps.ctx);
-    if (said.bad.length) continue;
-    const listed = deps.list({ register: decl.for.register, where: said.predicate, limit: 200 });
-    if (!listed.ok) continue;
 
+    /* A TEMPLATE THAT CANNOT BE EXPANDED IS STILL A PAGE, and it says why. These were `continue`d,
+       so a declaration with a typo in its `for.where` was reported as a page that does not exist —
+       to the person who had just written it. */
+    const refuse = (refusal: Refusal): void => {
+      out.push({ slug: claim(decl.page, 'page', null), decl, refusal });
+    };
+
+    const schema = deps.schemaOf(decl.for.register);
+    if (!schema) {
+      refuse({ code: 'REGISTER_UNKNOWN', fix: `${decl.page} is a page per row of ${decl.for.register}, and there is no such register.`, at: 'for' });
+      continue;
+    }
+    const said = predicateOf(decl.for.where, schema, deps.ctx);
+    if (said.bad.length) {
+      refuse(said.bad[0]!);
+      continue;
+    }
+    const listed = deps.list({ register: decl.for.register, where: said.predicate, limit: 200 });
+    if (!listed.ok) {
+      refuse(listed.refusal);
+      continue;
+    }
     const title = deps.titleOf(decl.for.register);
-    if (!title) continue;
+    if (!title) {
+      refuse({ code: 'REQUIRED_MISSING', fix: `${decl.for.register} names no title field, so its pages have no name.`, at: 'for' });
+      continue;
+    }
+
     for (const row of listed.value.rows) {
       const name = String(row.fields[title] ?? '');
-      if (!name) continue;
-      out.push({ slug: slugify(name), decl: fill(decl, row) as PageDecl, row });
+      out.push({ slug: claim(name, decl.for.register, row.seq), decl: fill(decl, row) as PageDecl, row });
     }
   }
   return out;
@@ -119,6 +158,11 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
       at: 'slug',
       allowed: resolvePages(deps).map((p) => p.slug),
     });
+
+  /* A PAGE THAT COULD NOT BE EXPANDED IS A PAGE WITH ONE SENTENCE ON IT, not a 404. The person
+     reading it is usually the person who wrote the declaration. */
+  if (found.refusal)
+    return ok({ ...found.decl, page: found.slug, blocks: [{ kind: 'note', rows: [], matched: 0, refusals: [found.refusal] }] });
 
   return ok({
     ...found.decl,
@@ -142,6 +186,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
       ...base,
       readings: (block.cells ?? []).map((cell) => {
         const decl = deps.metric(cell.metric.split(':')[0] ?? '');
+
         if (!decl)
           return {
             ...cell,
@@ -154,7 +199,10 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
           };
         /* The declaration with its parameter filled: `project-owed:Kiln` is one document read about
            one project, which is what makes a project page a declaration rather than a case. */
-        const param = cell.metric.split(':')[1];
+        /* THE FIRST COLON SEPARATES, and everything after it is the parameter — a project called
+           `C:\Repos` is a project, and splitting on every colon read it as `C`. */
+        const at = cell.metric.indexOf(':');
+        const param = at < 0 ? undefined : cell.metric.slice(at + 1);
         const read = deps.read(param === undefined ? decl : (fill(decl, null, param) as MetricDecl));
         return read.ok ? { ...cell, reading: read.value } : { ...cell, reading: null, refusal: read.refusal };
       }),
@@ -181,7 +229,11 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   const said = predicateOf(block.where, schema, deps.ctx);
   if (said.bad.length) return { ...base, refusals: said.bad };
 
-  const listed = deps.list({ register, where: said.predicate, limit: Math.max(1, block.limit ?? 50) });
+  /* A LIMIT OF ZERO DRAWS NOTHING, which is what it says. `Math.max(1, …)` turned it into one row —
+     a block declaring it wanted no rows and getting one is a block nobody can write. */
+  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  if (limit === 0) return { ...base, matched: 0 };
+  const listed = deps.list({ register, where: said.predicate, limit });
   if (!listed.ok) return { ...base, refusals: [listed.refusal] };
 
   /* THE COLUMNS ARE CHECKED AGAINST THE REGISTER. A column naming a field nobody declared renders as
@@ -218,10 +270,16 @@ export const slugify = (text: string): string =>
  * the fields somebody remembered is a substitution that leaves `{{name}}` on a screen.
  */
 export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
+  /* ESCAPED THE WAY JSON ESCAPES, not by replacing the one character somebody remembered. A title
+     with a backslash, a newline or a tab in it made `JSON.parse` throw — out of `resolvePages`,
+     which every page listing calls, so ONE row called `C:\Repos` made every page in the record
+     unlistable. `JSON.stringify` of the value, minus its quotes, is the escaping the format already
+     has, and it covers the ones nobody thinks of. */
+  const escaped = (value: string): string => JSON.stringify(value).slice(1, -1);
   const text = JSON.stringify(doc).replace(/\{\{(\w+)\}\}/g, (whole, key: string) => {
-    if (key === 'it') return param ?? whole;
+    if (key === 'it') return param === undefined ? whole : escaped(param);
     const value = row?.fields[key];
-    return value === null || value === undefined ? whole : String(value).replaceAll('"', '\\"');
+    return value === null || value === undefined ? whole : escaped(String(value));
   });
   return JSON.parse(text);
 }

@@ -269,7 +269,8 @@ test('A WEEKLY DIGEST LANDS ON ITS DAY, at its hour, in the record’s timezone'
   /* A table of offsets is a table that is wrong the next time a government moves one. The runtime
      carries the zone data; the walk asks it what the local parts of a candidate instant are. */
   const saturday = Date.UTC(2026, 8, 5, 12);
-  const next = nextOccurrence({ day: 'mon', at: '08:00' }, saturday, 'Europe/London');
+  const next = nextOccurrence({ day: 'mon', at: '08:00' }, saturday, 'Europe/London')!;
+  assert.ok(next !== null);
   const parts = localParts(next, 'Europe/London');
   assert.equal(parts.weekday, 1, 'a Monday digest did not land on a Monday');
   assert.equal(parts.hour, 8);
@@ -278,7 +279,8 @@ test('A WEEKLY DIGEST LANDS ON ITS DAY, at its hour, in the record’s timezone'
 });
 
 test('and a daily one lands every day, at that hour where the customer is', () => {
-  const at = nextOccurrence({ at: '08:00' }, NOW, 'Pacific/Auckland');
+  const at = nextOccurrence({ at: '08:00' }, NOW, 'Pacific/Auckland')!;
+  assert.ok(at !== null);
   assert.equal(localParts(at, 'Pacific/Auckland').hour, 8);
   assert.ok(at > NOW);
 

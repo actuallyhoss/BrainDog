@@ -154,8 +154,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const schema = register ? ctx.schemaOf(register) : null;
   if (register && !schema) at('REGISTER_UNKNOWN', `there is no register called ${register}`, 'source');
 
-  for (const word of UNREAD)
-    if (JSON.stringify(decl.value).includes(`"${word}"`))
+  /* THE KEYS, NOT A SUBSTRING OF THE JSON. `includes('"trend"')` cannot tell a key from a value, so
+     a register with a field called `trend` could never be summed — refused for being a shape this
+     build does not read, which it was not. */
+  for (const word of keysOf(decl.value))
+    if ((UNREAD as readonly string[]).includes(word))
       at('UNIMPLEMENTED', `${word} is a published shape this build does not read, so its figure would be the ungrouped one`, 'value');
 
   const fields = aggregationsOf(decl.value);
@@ -243,6 +246,16 @@ function read(
     const per = one(sql, schema, pair.per, where, params, lookups);
     if (!of.ok) return of;
     if (!per.ok) return per;
+    /* AND THE TWO HALVES AGAINST EACH OTHER. Each was checked for a mixed currency INSIDE itself and
+       neither against the other, so GBP − USD came out as a number labelled GBP — the same failure
+       this file's header is written against, arrived at through the guard against it. */
+    if (of.value.unit !== per.value.unit)
+      return no<Read>(
+        'MIXED_CURRENCY',
+        `one half of this figure is in ${of.value.unit ?? 'no unit'} and the other in ${per.value.unit ?? 'no unit'}, and two currencies are never subtracted either`,
+        { at: 'value' },
+      );
+
     const a = of.value.value;
     const b = per.value.value;
     /* A ZERO DENOMINATOR IS NOT A NUMBER. Never `0`, never infinity, never `NaN` — the em dash, and
@@ -384,6 +397,13 @@ function aggregate(
   return ok({ value: out?.v === null || out?.v === undefined ? null : Number(out.v), unit: null, rows, refusals: [] });
 }
 
+/** Every key anywhere in a value expression. A field NAME is a value and never appears here. */
+function keysOf(value: unknown): string[] {
+  if (value === null || typeof value !== 'object') return [];
+  if (Array.isArray(value)) return value.flatMap(keysOf);
+  return Object.entries(value as Record<string, unknown>).flatMap(([k, v]) => [k, ...keysOf(v)]);
+}
+
 /** Every aggregation a value expression reads, with the field each names. */
 function aggregationsOf(value: Value): { kind: string; field: string; by?: string; lookup?: string }[] {
   const flat = (agg: Aggregation): { kind: string; field: string; by?: string; lookup?: string }[] => {
@@ -448,8 +468,16 @@ export function scorePrediction(
   }, ctx);
   if (!reading.ok) return reading;
 
+  /* A TARGET THAT IS NOT A BOUND IS A REFUSAL, not a verdict. Writing `scored_at` here would settle
+     the question permanently on arithmetic nobody meant. */
+  const bound = targetOf(row.target);
+  if (!bound)
+    return no<Scored>('VALUE_MALFORMED', `${id}'s target is ${JSON.stringify(row.target)}, which is not a bound.`, {
+      at: 'target',
+    });
+
   const observed = reading.value.value;
-  const met = observed === null ? null : meets(observed, targetOf(row.target));
+  const met = observed === null ? null : meets(observed, bound);
 
   sql.exec(
     'UPDATE prediction SET scored_at = ?, observed = ?, met = ? WHERE id = ?',
@@ -470,16 +498,25 @@ export function scorePrediction(
 }
 
 /**
- * The target as a bound.
+ * The target as a bound, or `null` when it is not one.
  *
  * `<= 20` and `20` are the same claim written two ways, and a prediction written as a bare number
  * means "at least this" — which is what `gte` is. A leading operator says otherwise.
+ *
+ * IT RETURNS `null` RATHER THAN A BOUND OF `NaN`. `Number('')` is zero, so an empty target used to
+ * read as "at least nothing" — met by every figure, scored once, and never revisited because
+ * `scored_at` was set. A prediction that cannot be wrong is not a prediction.
  */
-export function targetOf(text: string): { lte: number } | { gte: number } {
+export function targetOf(text: string): { lte: number } | { gte: number } | null {
   const t = text.trim();
-  if (t.startsWith('<=') || t.startsWith('≤')) return { lte: Number(t.replace(/^(<=|≤)/, '')) };
-  if (t.startsWith('<')) return { lte: Number(t.slice(1)) };
-  if (t.startsWith('>=') || t.startsWith('≥')) return { gte: Number(t.replace(/^(>=|≥)/, '')) };
-  if (t.startsWith('>')) return { gte: Number(t.slice(1)) };
-  return { gte: Number(t) };
+  const bound = (op: 'lte' | 'gte', rest: string): { lte: number } | { gte: number } | null => {
+    const n = Number(rest.trim());
+    if (rest.trim() === '' || !Number.isFinite(n)) return null;
+    return op === 'lte' ? { lte: n } : { gte: n };
+  };
+  if (t.startsWith('<=') || t.startsWith('≤')) return bound('lte', t.replace(/^(<=|≤)/, ''));
+  if (t.startsWith('<')) return bound('lte', t.slice(1));
+  if (t.startsWith('>=') || t.startsWith('≥')) return bound('gte', t.replace(/^(>=|≥)/, ''));
+  if (t.startsWith('>')) return bound('gte', t.slice(1));
+  return bound('gte', t);
 }

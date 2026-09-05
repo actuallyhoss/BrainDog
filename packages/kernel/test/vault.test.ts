@@ -113,7 +113,7 @@ test('AN EVENT NAMES THE GRANT AND ITS KIND, and never the label or what it open
      which credential is worth taking — and events are readable at a lower level than the vault. */
   const { k, sql } = await vault();
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
-  value(k.openGrant({ id: made.id }, 'p_1'));
+  value(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1'));
   value(k.bindGrant({ ...STRIPE, id: made.id, ciphertext: b(30), nonce: b(40) }, 'p_1'));
   value(k.revokeGrant(made.id, 'p_1'));
 
@@ -140,8 +140,8 @@ test('every opening is counted, and WHO opened it is the event rather than a col
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
 
   clock.set(NOW + DAY);
-  value(k.openGrant({ id: made.id }, 'p_1'));
-  value(k.openGrant({ id: made.id }, 'p_2'));
+  value(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1'));
+  value(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_2'));
 
   const row = k.grant(made.id)!;
   assert.equal(row.opened, 2);
@@ -168,7 +168,7 @@ test('OPENING A GRANT HANDS BACK SEALED BYTES AND THE KEY THAT WRAPS THEM, both 
      credential fails rather than quietly working. */
   assert.equal(out.aad, `${ID}‖${made.id}‖1`);
   const rotated = value<GrantRow>(k.bindGrant({ ...STRIPE, id: made.id, ciphertext: b(30), nonce: b(40) }, 'p_1'));
-  assert.equal(value<SealedGrant>(k.openGrant({ id: made.id }, 'p_1')).aad, `${ID}‖${made.id}‖2`);
+  assert.equal(value<SealedGrant>(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1')).aad, `${ID}‖${made.id}‖2`);
   assert.equal(rotated.version, 2);
   sql.close();
 });
@@ -182,6 +182,14 @@ test('A ROTATED WRAPPING KEY IS `WRONG_KEY`, never corruption', async () => {
   assert.equal(out.code, 'WRONG_KEY');
   assert.match(out.fix, /kek_2f/);
   assert.equal(k.grant(made.id)?.opened, 0, 'a refused open was counted as one');
+
+  /* AND OMITTING THE KEY IS NOT PASSING THE CHECK. It used to skip the comparison entirely, so the
+     one guard on a credential path was satisfied by not asking — the wrong default anywhere, and the
+     wrongest place for it. */
+  const silent = refusal(k.openGrant({ id: made.id }, 'p_1'));
+  assert.equal(silent.code, 'WRONG_KEY');
+  assert.match(silent.fix, /offered no key/);
+  assert.equal(k.grant(made.id)?.opened, 0);
   sql.close();
 });
 
@@ -226,10 +234,10 @@ test('REVOKING DESTROYS THE BYTES AND KEEPS THE ROW, because what it opened is a
   assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'rotate' AND state = 'pending'").length, 0);
 
   // Neither opened nor rotated after that, and the refusal says which of the two it is.
-  assert.equal(refusal(k.openGrant({ id: made.id }, 'p_1')).code, 'GRANT_REVOKED');
+  assert.equal(refusal(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1')).code, 'GRANT_REVOKED');
   assert.equal(refusal(k.bindGrant({ ...STRIPE, id: made.id }, 'p_1')).code, 'GRANT_REVOKED');
   assert.equal(refusal(k.revokeGrant(made.id, 'p_1')).code, 'GRANT_REVOKED');
-  assert.equal(refusal(k.openGrant({ id: 'g_01JZ8QK3F7R2M9V4XN6TCB5HAD' }, 'p_1')).code, 'OUT_OF_BOUNDS');
+  assert.equal(refusal(k.openGrant({ id: 'g_01JZ8QK3F7R2M9V4XN6TCB5HAD', kek_id: 'kek_2f' }, 'p_1')).code, 'OUT_OF_BOUNDS');
   sql.close();
 });
 
@@ -327,7 +335,7 @@ test('A GRANT TRAVELS IN A `.dog` FILE, SEALED, and comes back as itself', async
   const there = k.grants()[0]!;
   assert.equal(there.label, 'Stripe, live');
   assert.equal(there.hint, 'a 64-character token');
-  const sealed = value<SealedGrant>(k.openGrant({ id: there.id }, 'p_1'));
+  const sealed = value<SealedGrant>(k.openGrant({ id: there.id, kek_id: 'kek_2f' }, 'p_1'));
   assert.deepEqual(Array.from(sealed.ciphertext), Array.from(b(10)), 'the sealed bytes did not survive the file');
   assert.equal(sealed.aad, `${ID}‖${there.id}‖1`, 'the AAD names a different record than the file said');
   sql.close();
