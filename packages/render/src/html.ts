@@ -220,7 +220,14 @@ function table(b: Block, o: RenderOptions): string {
 function media(b: Block): string {
   const body = b.rows.map((r) => escape(r.cells[0] ?? '')).join('\n');
   const lang = b.kind === 'code' && b.heading ? ` data-lang="${escape(b.heading)}"` : '';
-  return `<pre class="media"${lang}><code>${body}</code></pre>`;
+  /* FOCUSABLE, because a `pre` does not wrap: on a phone it is always the widest thing on the
+     page and always scrolls sideways, and a scrolling box a keyboard cannot focus is a box a
+     keyboard cannot read (WCAG 2.1.1). This is the third place in the product where that was
+     true; the other two were fixed at the call site, and this one is fixed here because a host
+     cannot reach inside a primitive to add an attribute and every host would need the same one.
+     Named, so tabbing to it announces what it is instead of reading a line of code at you. */
+  const label = b.heading ? escape(b.heading) : b.kind === 'tree' ? 'Tree' : 'Code';
+  return `<pre class="media"${lang} tabindex="0" role="group" aria-label="${label}"><code>${body}</code></pre>`;
 }
 
 const PRIMITIVE_RENDERERS = { panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;

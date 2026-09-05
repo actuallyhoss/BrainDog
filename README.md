@@ -7,13 +7,23 @@ for you if you want. It renders itself as a web app.
 
 ---
 
-> ## Status: design only. Nothing is built.
+> ## Status: the frontend is built. The write path is not.
 >
-> This repository currently contains **[docs/](docs/)** — the complete 0→1 engineering scope — and
-> no implementation. Nothing should be written until the shape in [docs/15-ROADMAP.md §1b](docs/15-ROADMAP.md) is
-> agreed.
+> **[docs/](docs/)** is the complete 0→1 engineering scope and remains the source of truth: nothing
+> here is designed twice, and every decision below cites the document it comes from.
+>
+> What exists is the whole browser client against a synthetic record — every screen, every keyboard
+> path, the block dialect, the theme generator, the forecast and the MCP-facing shapes — with **no
+> write path**. Pressing a destructive control raises a toast that says nothing was written. See
+> [apps/web/README.md](apps/web/README.md).
+>
+> Guarded by seven gates and 104 unit tests: a clean-room tripwire, a CSS rule checker, a colour
+> literal grep, a byte-comparison of the generated theme, a bundle budget, a **layout** gate that
+> reads its own test widths out of the stylesheets, and an **accessibility** gate that drives nine
+> interactive states across both apps.
 
-**Start here: [docs/00-README.md](docs/00-README.md)**
+**Start here: [docs/00-README.md](docs/00-README.md)** for the design, or
+**[apps/web/README.md](apps/web/README.md)** for what is running.
 
 ---
 

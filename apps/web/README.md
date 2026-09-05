@@ -16,7 +16,7 @@ that file are the real ones.
 
 ---
 
-## The nineteen screens
+## The screens
 
 | | |
 |---|---|
@@ -26,11 +26,71 @@ that file are the real ones.
 | `/r/obligations` · `/r/obligations/1` | a register, and a row |
 | `/v/obligations.overdue` | a saved view — a named predicate |
 | `/p/money` · `?src=1` | a declared page, and its declaration as text |
-| `/vault` · `/packs` · `/settings/appearance` · `/audit` · `/search` | the rest of the spine |
+| `/t/2` | a track: what has been said on it, who is working on it, what is open |
+| `/vault` · `/packs` · `/settings/appearance` · `/audit` | the rest of the spine |
 | `/start` | the first run: one row, typed by hand |
 | `/jobs/j_7Q2F` | a tier-C run's transcript |
 | `/s/<token>` | a shared page: signed, read-only, and a landing page |
 | `/SG31` | the spoken-id resolver |
+
+---
+
+## Building a page, which is the thing an agent does
+
+A page is a row. It declares blocks; each block names a KIND, a SOURCE and a PREDICATE, and nothing
+else — no x, no y, no height, no colour. That is why a page cannot be made ugly and why an agent can
+write one without a designer: the only vocabulary is *what*, *from where*, *narrowed how*, and *how
+wide*.
+
+```ts
+{
+  kind: 'gauge',                 // one of sixteen, below
+  heading: 'Monthly spend',
+  span: 5,                       // twelfths. 1–12, and each kind refuses below its own floor
+  source: 'register.services',
+  where: 'state is live, cycle is monthly',
+  columns: [{ field: 'name' }, { field: 'cost' }],
+  target: 22_000,                // gauge only, in minor units
+  empty: 'Nothing on a monthly plan.',
+}
+```
+
+### The sixteen kinds, by what they are FOR
+
+| purpose | kinds |
+|---|---|
+| **say** | `note` `quote` |
+| **figure** | `stat` `bar` `gauge` `chips` |
+| **list** | `spec` `params` `comparison` `table` |
+| **plan** | `todo` `steps` `timeline` `board` |
+| **media** | `code` `tree` |
+
+They sit on eight primitives, so a pack may add a kind without anybody touching this app. Three of
+them do arithmetic rather than projecting a row each — `bar` groups and sums, `chips` groups and
+counts, `gauge` sums one column against a declared `target:` — because "six domains, three hosting"
+is what the shape is for, and fifteen pills is not.
+
+### `where:`, which is evaluated and not pattern-matched
+
+```
+state is open                     one value
+state is open or doing            any of several
+state is not done                 negated
+thing is Kiln                     a ref, BY NAME
+direction is owed to me           an enum, IN WORDS
+due before 2026-10-01             a day, exclusive
+due after today                   a day, relative to the record clock
+state is live, cycle is monthly   clauses are ANDed on the comma
+```
+
+Values are matched against **what the screen shows**, not what the column stores: `display()` turns
+`owed_to_me` into "owed to me" and a ref into the title of the row it points at. The stored form and
+the readable form are the same thing, or the predicate is a second language to learn.
+
+**An unparseable predicate matches nothing.** It used to be five `String.includes` checks, and
+everything outside them was ignored — so a block drew the whole register and looked exactly like a
+block that had filtered. An agent cannot see that. An empty block is a question; a full one is a
+wrong answer that looks right. `src/lib/record/where.ts`, and its tests.
 
 ---
 

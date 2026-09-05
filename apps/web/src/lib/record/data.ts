@@ -784,6 +784,18 @@ export const PAGES: Record<string, PageDecl> = {
         limit: 6,
         empty: 'Kiln runs on nothing you pay for.',
       },
+      {
+        /* A `code` block is authored rather than projected: `body` is the whole of it, verbatim.
+           It is on a project page because the question "how do I point an agent at this one" is
+           asked once per project and answered nowhere else. */
+        kind: 'code',
+        heading: 'Work on this from an agent',
+        span: 12,
+        body:
+          'braindog.list tasks where thing is Kiln and state is open\n' +
+          'braindog.set tasks#7 state: doing\n' +
+          'braindog.update track 1 health: on_track body: "Six instances queued."',
+      },
     ],
   },
 

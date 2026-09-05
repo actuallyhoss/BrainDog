@@ -19,4 +19,15 @@
   );
 </script>
 
-<pre class="media" data-lang={block.kind === 'code' ? block.heading : undefined}><code>{body}</code></pre>
+<!-- FOCUSABLE, and the same in `html.ts`: the two renderers are held to one accessibility tree.
+     A `pre` does not wrap, so on a phone it is always the widest thing on the page and always
+     scrolls sideways, and a scrolling box a keyboard cannot focus is a box a keyboard cannot read
+     (WCAG 2.1.1). Named, so tabbing to it announces what it is rather than reading a line of code
+     at somebody. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<pre
+  class="media"
+  data-lang={block.kind === 'code' ? block.heading : undefined}
+  tabindex="0"
+  role="group"
+  aria-label={block.heading || (block.kind === 'tree' ? 'Tree' : 'Code')}><code>{body}</code></pre>
