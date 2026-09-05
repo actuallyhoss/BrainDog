@@ -22,7 +22,10 @@ import { DurableObject } from 'cloudflare:workers';
 
 import { handlersFor, serveApi } from '@braindog/host';
 import { createRecordApi, type CallContext, type RecordApi } from '@braindog/record';
-import type { Param, Row, Sql } from '@braindog/ports';
+import type { Param, Row, Scheduler, Sql } from '@braindog/ports';
+
+import { alarmScheduler } from './alarm.ts';
+import { recordPath } from './route.ts';
 
 type Env = { RECORD: DurableObjectNamespace<Record$> };
 
@@ -56,6 +59,9 @@ function storageSql(storage: DurableObjectStorage): Sql {
 export class Record$ extends DurableObject<Env> {
   #api: Promise<RecordApi> | null = null;
 
+  /** The `Scheduler` port over this object's own alarm. One per customer, and this is the one. */
+  #alarm: Scheduler = alarmScheduler(this.ctx.storage);
+
   /**
    * The migration runs under `blockConcurrencyWhile`, which is the platform's word for "no request
    * is answered until this finishes". A record that answers a read while its schema is half applied
@@ -65,11 +71,32 @@ export class Record$ extends DurableObject<Env> {
     this.#api ??= (async () => {
       let api!: RecordApi;
       await this.ctx.blockConcurrencyWhile(async () => {
-        api = await createRecordApi({ sql: storageSql(this.ctx.storage), clock: { now: () => Date.now() } });
+        api = await createRecordApi({
+          sql: storageSql(this.ctx.storage),
+          clock: { now: () => Date.now() },
+          scheduler: this.#alarm,
+        });
       });
+      /* ARM FROM WHAT THE RECORD ALREADY HOLDS. An object is evicted between requests and its alarm
+         survives that — but a record restored from a backup, or one whose alarm a `deleteAll` took
+         with it, would otherwise wait for a write it may never get. */
+      if (!api.kernel.refused()) await api.kernel.tail(this.#alarm);
       return api;
     })();
     return this.#api;
+  }
+
+  /**
+   * The alarm fired: drain everything due, then re-arm.
+   *
+   * RE-ARMING IS IN A `finally` INSIDE `drain`, and that is the single most important line in this
+   * subsystem: a handler that throws before re-arming stops the customer's entire schedule forever,
+   * and nothing anywhere says so. A hundred claimed rows leave the minimum still in the past, so the
+   * alarm is set to now and the next fire drains the rest.
+   */
+  override async alarm(): Promise<void> {
+    const api = await this.#record();
+    await api.kernel.drain(this.#alarm);
   }
 
   override async fetch(request: Request): Promise<Response> {
@@ -106,18 +133,18 @@ export class Record$ extends DurableObject<Env> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const [, prefix, slug, ...rest] = url.pathname.split('/');
+    const routed = recordPath(url.pathname);
 
-    if (prefix !== 'r' || !slug)
+    if (!routed)
       return new Response(
         JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record is at /r/<slug>/api/<method>.' } }),
         { status: 404, headers: { 'content-type': 'application/json; charset=utf-8' } },
       );
 
     /* NAMING IS PROVISIONING: this line is the whole of creating a customer. */
-    const record = env.RECORD.get(env.RECORD.idFromName(slug));
+    const record = env.RECORD.get(env.RECORD.idFromName(routed.slug));
 
-    const inner = new Request(`${url.origin}/${rest.join('/')}${url.search}`, request);
+    const inner = new Request(`${url.origin}${routed.rest}${url.search}`, request);
     /* The Worker authenticates and the record authorises. In a real deployment this context is
        built from a verified session or token; here it is the owner, and the seam is one function. */
     inner.headers.set(
