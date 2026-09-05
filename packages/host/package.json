@@ -1,0 +1,15 @@
+{
+  "name": "@braindog/host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@braindog/ports": "workspace:*",
+    "@braindog/record": "workspace:*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
