@@ -59,9 +59,28 @@ function openSqlite(path: string): Sql & { close(): void } {
  * second level. What there IS is the same `CallContext` the hosted product builds, so every
  * permission check below this line is the same code.
  */
-function contextFor(request: Request, token: string | undefined): CallContext | null {
-  if (!token) return { principal: { kind: 'person', id: 'p_self', level: 'owner' } };
+async function contextFor(
+  request: Request,
+  token: string | undefined,
+  api: Awaited<ReturnType<typeof createRecordApi>>,
+): Promise<CallContext | null> {
   const sent = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+
+  /* AN AGENT TOKEN IS TRIED FIRST, and it is the same table and the same check the Worker uses. A
+     self-host that recognised only one shared string would be a deployment where an agent cannot be
+     given less than everything — which is the difference between a scope and a password. */
+  if (sent?.includes('.')) {
+    const seen = await api.kernel.verifyToken(sent, 'api');
+    if (seen.ok)
+      return {
+        principal: { kind: 'token', id: seen.value.id, scope: seen.value.scope, person: seen.value.person_id, level: 'owner' },
+      };
+  }
+
+  /* AND THEN THE ONE SHARED SECRET, which is what a single-person deployment on one machine has
+     instead of a sign-in. Absent, everything is the owner: `30-BLUEPRINT` §10's `BRAINDOG_TOKEN`
+     row is explicit that a self-host is one person's record on one machine. */
+  if (!token) return { principal: { kind: 'person', id: 'p_self', level: 'owner' } };
   return sent === token ? { principal: { kind: 'person', id: 'p_self', level: 'owner' } } : null;
 }
 
@@ -262,7 +281,7 @@ async function answer(
     ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
   });
 
-  const ctx = contextFor(request, token);
+  const ctx = await contextFor(request, token, api);
   const out = ctx
     ? await serveApi(request, handlers, ctx)
     : new Response(JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This record needs its token.' } }), {
@@ -272,7 +291,6 @@ async function answer(
 
   res.writeHead(out.status, Object.fromEntries(out.headers));
   res.end(Buffer.from(await out.arrayBuffer()));
-  void api;
 }
 
 /* One file, one port, one token. Everything else is the record. */

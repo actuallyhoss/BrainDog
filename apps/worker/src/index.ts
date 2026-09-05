@@ -133,6 +133,19 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.leaseOutbox(DELIVERS, n);
   }
 
+  /**
+   * A bearer, checked against this record's own table.
+   *
+   * THE RECORD VERIFIES AND THE WORKER ROUTES, and the split is the whole of why the bearer carries
+   * the record id: only the object holding that table can say whether the hash is in it, and asking
+   * anywhere else would be a search across every customer.
+   */
+  async verify(bearer: string, surface: string): Promise<{ id: string; person_id: string; scope: string } | null> {
+    const api = await this.#record();
+    const out = await api.kernel.verifyToken(bearer, surface);
+    return out.ok ? out.value : null;
+  }
+
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
   async ack(done: { id: string; state: 'done' | 'failed'; error?: string }): Promise<void> {
     const api = await this.#record();
@@ -229,6 +242,19 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
   }
 }
 
+/**
+ * Which record the one self-host person is, when there is no bearer.
+ *
+ * A BROWSER SESSION IS THE OTHER HALF OF THIS and it is not built: sessions, passkeys and magic
+ * links live in the Directory (ADR-061) and are the next thing. Until they are, an unauthenticated
+ * request is the owner — which is right for a single-person deployment and is exactly the line to
+ * change when the session arrives, because everything below it already takes the person from here.
+ */
+const SELF = 'p_self';
+
+/** Where a call came from, for the "last used" line on a token listing. */
+const surfaceOf = (url: URL): string => (url.pathname.includes('/mcp') ? 'mcp' : 'api');
+
 const json = (body: unknown, status: number): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
 
@@ -256,21 +282,37 @@ export default {
     if (!named)
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no record called ${routed.slug}.` } }, 404);
 
-    /* The Worker authenticates and the record authorises. In a real deployment the person id comes
-       from a verified session or bearer; here it is the one self-host person, and the seam is one
-       line. What the Directory contributes is the LEVEL — membership is not a fact a record can
-       check about a caller it has never seen. */
-    const person = 'p_self';
+    const record = env.RECORD.get(env.RECORD.idFromName(named.record));
+
+    /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. This
+       resolves WHO is asking and at what LEVEL; every check about what they may do with it is
+       inside `createRecordApi`, in one place, so the CLI and the MCP server answer to the same
+       ladder as the browser. */
+    const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1];
+    const seen = bearer ? await record.verify(bearer, surfaceOf(url)) : null;
+    if (bearer && !seen)
+      return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'That bearer is not one this record knows.' } }, 401);
+
+    /* A BEARER NAMES ITS OWN RECORD AND THE PATH NAMES ONE TOO, and a mismatch is not an accident:
+       it is a token for one customer pointed at another's URL. `verify` refuses a bearer whose
+       record half is not this object's, so reaching here means the two agree. */
+    const person = seen?.person_id ?? SELF;
     const level = await directory.levelOf(named.record, person);
     if (!level)
       return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: `You are not on ${routed.slug}.` } }, 403);
 
-    const record = env.RECORD.get(env.RECORD.idFromName(named.record));
+    /* THE INTERSECTION IS THE RECORD'S TO COMPUTE. What goes over is both halves — the token's
+       scope and the person's level — because a token says what its holder may do with their access
+       and never what access they have. */
+    const principal: CallContext['principal'] = seen
+      ? { kind: 'token', id: seen.id, scope: seen.scope as 'read' | 'propose' | 'write', person, level }
+      : { kind: 'person', id: person, level };
+
     const inner = new Request(`${url.origin}${routed.rest}${url.search}`, request);
-    inner.headers.set(
-      'x-braindog-ctx',
-      JSON.stringify({ principal: { kind: 'person', id: person, level } } satisfies CallContext),
-    );
+    inner.headers.set('x-braindog-ctx', JSON.stringify({ principal } satisfies CallContext));
+    /* AND THE BEARER DOES NOT TRAVEL FURTHER. The record has no use for it and every hop a
+       credential takes is another place it can be logged. */
+    inner.headers.delete('authorization');
     return record.fetch(inner);
   },
 

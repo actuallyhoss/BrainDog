@@ -52,6 +52,7 @@ async function server(token?: string) {
 
   return {
     call,
+    running,
     file,
     dir,
     port: at,
@@ -196,6 +197,34 @@ test('with a token set, a request without it is refused before it reaches the re
     const res = await fetch(`http://127.0.0.1:${s.port}/api/boot`);
     assert.equal(res.status, 401);
     assert.equal(((await res.json()) as Answer).refusal?.code, 'FORBIDDEN');
+
+    /* AND AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A deployment that
+       recognised only one shared string is one where an agent cannot be given less than everything,
+       which is the difference between a scope and a password. */
+    assert.ok(
+      s.running.api.kernel.createRecord({
+        id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD',
+        slug: 'the-studio',
+        name: 'The Studio',
+        tz: 'UTC',
+        locale: 'en',
+        owner: { id: 'p_1' },
+      }).ok,
+    );
+    const minted = await s.running.api.createToken({ scope: 'read' }, { principal: { kind: 'person', id: 'p_1', level: 'owner' } });
+    assert.ok(minted.ok, 'the token was not minted');
+    const bearer = (minted as { value: { bearer: string } }).value.bearer;
+
+    const asAgent = await fetch(`http://127.0.0.1:${s.port}/api/boot`, { headers: { authorization: `Bearer ${bearer}` } });
+    assert.equal(asAgent.status, 200, 'an agent token was not recognised');
+
+    // And a read token writes nothing, which is the whole reason to issue one.
+    const wrote = await fetch(`http://127.0.0.1:${s.port}/api/create`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${bearer}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ register: 'obligations', fields: { what: 'x' } }),
+    });
+    assert.equal(wrote.status, 403);
   } finally {
     await s.close();
     s.clean();
