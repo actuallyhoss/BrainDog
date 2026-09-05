@@ -30,6 +30,7 @@ import {
   VAULT,
 } from './data.ts';
 import { runway } from './forecast.ts';
+import { matches, parseWhere } from './where.ts';
 import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 export const CURRENCY = 'GBP';
@@ -527,7 +528,11 @@ export function metric(id: string): Metric {
       const total = services
         .filter((e) => e.fields.state !== 'cancelled')
         .reduce((a, e) => a + Number(e.fields.cost ?? 0) * (e.fields.cycle === 'monthly' ? 12 : e.fields.cycle === 'two_yearly' ? 0.5 : 1), 0);
-      return { id, label: 'Cost per year', value: money(Math.round(total), CURRENCY), note: `target ≤ ${money(30_000, CURRENCY)}`, tone: total > 30_000 ? 'warn' : 'good', href: '/r/services' };
+      /* 300_000, not 30_000. The target was written a zero short, so a GBP 2,906.80 estate was
+         measured against GBP 300.00 and the tile read `warn` for a reason nobody could act on. A
+         target that is absurd next to its own figure is a target people stop reading. */
+      const target = 300_000;
+      return { id, label: 'Cost per year', value: money(Math.round(total), CURRENCY), note: `target ≤ ${money(target, CURRENCY)}`, tone: total > target ? 'warn' : 'good', href: '/r/services' };
     }
     case 'lapsing': {
       const rows = services.filter((e) => e.fields.state === 'lapsing');
@@ -765,25 +770,21 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
 
 /** The mock's stand-in for a compiled `where:`. The real one is one JSON tree, seven consumers. */
 function filterForBlock(register: string, entries: Entry[], b: PageBlock): Entry[] {
-  let out = entries;
-  if (b.where?.includes('owed to me')) out = out.filter((e) => e.fields.direction === 'owed_to_me');
-  if (b.where?.includes('owed by me')) out = out.filter((e) => e.fields.direction === 'owed_by_me');
-  if (b.where?.includes('state is open')) out = out.filter(open);
+  /* THE PREDICATE IS EVALUATED, not pattern-matched. This was five `String.includes` checks, and
+     anything outside them passed every row through a filter that looked like it had worked — the
+     one failure a declarative surface must not have, because the thing writing most of these
+     declarations is an agent and an agent cannot see it. See `where.ts`. */
+  let out = b.where ? entries.filter((e) => matches(register, e, parseWhere(b.where), NOW)) : entries;
 
-  /* `thing is <name>` — the one predicate a project page is made of. Resolved by NAME rather than
-     by seq, because the declaration a person reads says `thing is Kiln` and not `thing is 1`, and
-     the whole argument for the `where:` grammar is that the stored form is the readable form. */
-  const named = /thing is ([A-Za-z][A-Za-z0-9 &.'-]*)/.exec(b.where ?? '')?.[1]?.trim();
-  if (named) {
-    const seq = (ROWS.things ?? []).find((t) => String(t.fields.name) === named)?.seq;
-    out = out.filter((e) => e.fields.thing === seq);
-  }
-  if (b.where?.includes('state is open or doing'))
-    out = out.filter((e) => e.fields.state === 'open' || e.fields.state === 'doing');
-
+  /* Two windows that are a KIND'S OWN DEFAULT rather than a predicate somebody wrote. A timeline of
+     renewals means the ones coming up, and a table of tasks means the ones still open — neither is
+     a filter a reader chose, so neither belongs in `where:` where it would have to be repeated on
+     every declaration that uses the kind. */
   if (register === 'services' && b.kind === 'timeline')
     out = out.filter((e) => e.fields.state !== 'cancelled' && days(e.fields.renews) <= 90);
-  if (register === 'tasks' && b.kind === 'table') out = out.filter((e) => e.fields.state !== 'done' && e.fields.state !== 'dropped');
+  if (register === 'tasks' && b.kind === 'table')
+    out = out.filter((e) => e.fields.state !== 'done' && e.fields.state !== 'dropped');
+
   const order = b.order?.[0];
   return order ? sortRows(register, out, order.field, order.dir) : out;
 }

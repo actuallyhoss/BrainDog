@@ -180,9 +180,6 @@
 
   <ul class="group foot">
     <li>
-      <a class="item tap" href="/search" aria-current={under('/search') ? 'page' : undefined}>
-        <Icon name="search" size="m" /><span class="item-name">{copy.search}</span>
-      </a>
     </li>
     <li>
       <a class="item tap" href="/packs" aria-current={under('/packs') ? 'page' : undefined}>

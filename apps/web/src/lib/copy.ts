@@ -74,6 +74,33 @@ export const copy = {
 
   /* One line per kind, in the picker. What it is FOR, never how it is drawn — "the money you are
      owed, biggest first" tells you whether you want it; "a horizontal proportional bar" does not. */
+  /**
+   * WHAT EACH KIND IS CALLED, as opposed to what it is keyed on.
+   *
+   * The block picker and the arrange bar printed `bar`, `spec`, `gauge`, `params` — the dialect's
+   * own identifiers, to somebody choosing between them. An id is what an agent writes into a
+   * declaration; a name is what a person picks from a list. They are not the same job and this
+   * product has both readers.
+   */
+  kindNames: {
+    bar: 'Bar chart',
+    gauge: 'Gauge',
+    chips: 'Facts in a row',
+    spec: 'Label and value',
+    params: 'Settings',
+    todo: 'To-do list',
+    steps: 'Numbered steps',
+    timeline: 'Timeline',
+    board: 'Board',
+    comparison: 'Comparison table',
+    table: 'Table of rows',
+    note: 'Note',
+    quote: 'Quote',
+    code: 'Code',
+    tree: 'Tree',
+    stat: 'Figures',
+  } as Record<string, string>,
+
   kinds: {
     bar: 'amounts side by side, biggest first',
     gauge: 'one number against its target',

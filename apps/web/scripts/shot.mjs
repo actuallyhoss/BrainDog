@@ -43,7 +43,6 @@ const ROUTES = [
   ['settings', '/settings/appearance'],
   ['start', '/start'],
   ['audit', '/audit'],
-  ['search', '/search?q=invoice'],
   ['job', '/jobs/j_7Q2F'],
   ['view', '/v/obligations.overdue'],
   ['shared', '/s/9f2a7c41d8b3'],

@@ -111,6 +111,13 @@ export type PageBlock = {
   cells?: readonly { metric: string; label: string }[];
   order?: readonly { field: string; dir: 'asc' | 'desc' }[];
   limit?: number;
+  /**
+   * `gauge` only: the number the sum is measured against.
+   *
+   * It is on the DECLARATION and not in the rows because a budget is a decision somebody made, not
+   * a figure the register holds. A gauge with no target draws nothing rather than inventing one.
+   */
+  target?: number;
   /** Mandatory on every source-bound block. An empty state that says nothing is a dead end, and a
       record is MOSTLY empty on day one (06 §1). */
   empty?: string;

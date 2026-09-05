@@ -43,7 +43,7 @@
 <div class="bar">
   <span class="handle" aria-hidden="true"><Icon name="drag" size="s" /></span>
 
-  <span class="kind">{kind}</span>
+  <span class="kind">{copy.kindNames[kind] ?? kind}</span>
 
   <div class="widths" role="group" aria-label={copy.width}>
     {#each steps as step}

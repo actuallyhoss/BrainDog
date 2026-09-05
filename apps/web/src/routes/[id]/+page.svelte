@@ -19,6 +19,7 @@
   import { DECIDED, QUESTIONS, REGISTERS, entry } from '$lib/record/api.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
 
   const raw = $derived(decodeURIComponent(page.params.id ?? ''));
 
@@ -61,7 +62,7 @@
       rid="r7k2m9qd4x"
     >
       {#snippet actions()}
-        <Button weight="primary" href="/search?q={encodeURIComponent(raw)}">{copy.search}</Button>
+        <Button weight="primary" href="/"><Icon name="search" size="s" />{copy.search}</Button>
         <Button href="/">{copy.home}</Button>
       {/snippet}
     </Empty>

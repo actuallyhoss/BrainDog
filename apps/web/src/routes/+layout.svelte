@@ -59,7 +59,10 @@
   const live: 'open' | 'polling' | 'offline' = 'open';
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
-  const GOTO: Record<string, string> = { h: '/', d: '/decide', i: '/inbox', s: '/search', v: '/vault', p: '/packs', ',': '/settings/appearance' };
+  /* No `g s`. Search is not a place you go, it is the thing under the launcher and behind `/` and
+     `⌘K` — a second door to one room, with its own nav row and its own URL, was the room looking
+     like two rooms. */
+  const GOTO: Record<string, string> = { h: '/', d: '/decide', i: '/inbox', v: '/vault', p: '/packs', ',': '/settings/appearance' };
 
   function onkeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
@@ -191,7 +194,6 @@
   <nav class="more-nav">
     {#each data.nav as entry}<a href={entry.href} onclick={() => (moreOpen = false)}>{entry.title}</a>{/each}
     <hr />
-    <a href="/search" onclick={() => (moreOpen = false)}>{copy.search}</a>
     <a href="/packs" onclick={() => (moreOpen = false)}>{copy.packs}</a>
     <a href="/vault" onclick={() => (moreOpen = false)}>{copy.vault}</a>
     <a href="/settings/appearance" onclick={() => (moreOpen = false)}>{copy.settings}</a>

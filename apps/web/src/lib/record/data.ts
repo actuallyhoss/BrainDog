@@ -626,12 +626,50 @@ export const PAGES: Record<string, PageDecl> = {
         ],
       },
       {
+        kind: 'gauge',
+        heading: 'Monthly spend',
+        span: 5,
+        /* First column names the thing, second is the one that gets summed.
+
+           `cycle is monthly` is not a nicety. `cost` is per CYCLE, so summing a yearly domain and a
+           monthly bucket adds two different units and produces a number that is not about anything.
+           A gauge over one cycle is a real figure; a gauge over all of them is arithmetic that
+           happens to complete. */
+        columns: [{ field: 'name', label: 'Every month' }, { field: 'cost' }],
+        source: 'register.services',
+        where: 'state is live, cycle is monthly',
+        target: 22_000,
+        empty: 'Nothing on a monthly plan.',
+      },
+      {
+        kind: 'chips',
+        heading: 'What it is made of',
+        span: 7,
+        /* Grouped and counted by the first column, so this is six chips rather than fifteen. */
+        columns: [{ field: 'kind' }],
+        source: 'register.services',
+        empty: 'Nothing here yet.',
+      },
+      {
         kind: 'timeline',
         heading: 'Next ninety days',
-        span: 12,
+        span: 7,
         columns: [{ field: 'renews' }, { field: 'name' }, { field: 'provider' }],
         source: 'register.services',
+        order: [{ field: 'renews', dir: 'asc' }],
+        limit: 8,
         empty: 'Nothing renews in the next ninety days.',
+      },
+      {
+        kind: 'params',
+        heading: 'What each domain points at',
+        span: 5,
+        columns: [{ field: 'name' }, { field: 'points_at' }, { field: 'provider' }],
+        source: 'register.services',
+        where: 'kind is domain',
+        order: [{ field: 'name', dir: 'asc' }],
+        limit: 6,
+        empty: 'No domains.',
       },
       {
         kind: 'table',
@@ -764,6 +802,17 @@ export const PAGES: Record<string, PageDecl> = {
         columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
         source: 'register.tasks',
         empty: 'Nothing open.',
+      },
+      {
+        kind: 'steps',
+        heading: 'What has to happen first',
+        span: 5,
+        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
+        source: 'register.tasks',
+        where: 'state is open',
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 5,
+        empty: 'Nothing waiting.',
       },
       {
         kind: 'table',

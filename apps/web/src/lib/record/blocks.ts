@@ -57,6 +57,52 @@ function barRows(block: BlockResult): string[] {
 }
 
 /**
+ * A chips row over a register: GROUP AND COUNT.
+ *
+ * Chips are "a few short facts in a row", and a fact per row is not a few — a register of fifteen
+ * services drawn one chip each is a paragraph of pills. What the shape is for is the summary: seven
+ * domains, three hosting, one certificate. So it groups by the first declared column and counts,
+ * the same move `bar` makes with a sum.
+ *
+ * The first cell is the pill's dot, which is drawn or not drawn and never read; the figure and the
+ * word are the fact. A chip with either missing is dropped by the renderer, because a number with
+ * no noun is not a fact and a coloured dot on its own is unreadable to a tenth of people.
+ */
+function chipsRows(block: BlockResult): string[] {
+  const by = block.columns[0]?.field ?? '';
+  const counts = new Map<string, number>();
+  for (const e of block.entries) {
+    const key = display(block.register ?? '', by, e.fields[by]) ?? 'Unset';
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1]).map(([key, n]) => ` | ${n} | ${key}`);
+}
+
+/**
+ * A gauge over a register: ONE SUM, against a declared target.
+ *
+ * A gauge reads `rows[0]` and nothing else, so pointed at a register it drew whichever row happened
+ * to sort first and captioned it with a neighbouring column — a real number, about the wrong thing,
+ * next to a word that was not a target. That is worse than no gauge.
+ *
+ * It sums the second declared column across every row the block's `where` admits, and measures it
+ * against `target:`, which is on the declaration because there is nowhere else it could come from:
+ * a budget is a decision somebody made, not a figure in the rows.
+ */
+function gaugeRows(block: BlockResult): string[] {
+  const of = block.columns[1]?.field ?? '';
+  const total = block.entries.reduce((a, e) => a + Number(e.fields[of] ?? 0), 0);
+  const target = block.target;
+  if (target === undefined) return [];
+  const label = block.columns[0]?.label ?? block.heading ?? '';
+  const fmt = (n: number) => display(block.register ?? '', of, n) ?? String(n);
+  /* The tone is the reading, and it is the whole point of a gauge: over the line is `bad`, close to
+     it is `warn`, under it is nothing at all — a gauge that is fine should not be coloured. */
+  const tone = total > target ? ' | bad' : total > target * 0.85 ? ' | warn' : '';
+  return [`${label} | ${fmt(total)} | ${fmt(target)}${tone}`];
+}
+
+/**
  * The general path: one row per entry, one cell per declared column, formatted.
  *
  * The tone travels with the row rather than being a fourth column, because a kind's arity does not
@@ -95,6 +141,10 @@ export function toSegments(block: BlockResult) {
     ? block.metrics.map((m) => `${m.label} | ${m.value} | ${m.note}${m.tone ? ` | ${m.tone}` : ''}`)
     : block.kind === 'bar'
       ? barRows(block)
+      : block.kind === 'chips'
+        ? chipsRows(block)
+      : block.kind === 'gauge'
+        ? gaugeRows(block)
       : block.register && block.columns.length > 0 && spec
         ? projectRows(block, spec.cells)
         : block.body

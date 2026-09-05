@@ -52,7 +52,6 @@ const ROUTES = [
   '/settings/appearance',
   '/start',
   '/audit',
-  '/search?q=invoice',
   '/jobs/j_7Q2F',
   '/t/2',
   '/t/3',

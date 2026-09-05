@@ -84,7 +84,7 @@
       <span class="row-label">{copy.asA}</span>
       <select class="row-input" bind:value={kind}>
         {#each kinds as k}
-          <option value={k}>{k}: {copy.kinds[k] ?? ''}</option>
+          <option value={k}>{copy.kindNames[k] ?? k}</option>
         {/each}
       </select>
     </label>

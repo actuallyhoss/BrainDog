@@ -48,7 +48,6 @@
     { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, keys: 'g h', icon: 'home' },
     { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, keys: 'g d', icon: 'decide' },
     { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, keys: 'g i', icon: 'inbox' },
-    { id: 'c-search', title: copy.search, href: '/search', group: copy.destinations, keys: 'g s', icon: 'search' },
     { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, keys: 'g v', icon: 'vault' },
     { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, keys: 'g p', icon: 'packs' },
     { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, keys: 'g ,', icon: 'settings' },

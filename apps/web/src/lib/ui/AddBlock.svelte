@@ -114,7 +114,7 @@
                 }}
               >
                 <span class="tile-head">
-                  <span class="tile-kind">{tile.kind}</span>
+                  <span class="tile-kind">{copy.kindNames[tile.kind] ?? tile.kind}</span>
                   <span class="tile-what">{copy.kinds[tile.kind] ?? ''}</span>
                 </span>
                 <span class="tile-draw" aria-hidden="true">
@@ -125,7 +125,7 @@
                   {:else}
                     <!-- The documented degrade: the description in the same slot, so the row of
                          tiles keeps its shape. Never a wireframe and never an icon. -->
-                    <span class="tile-fallback">{copy.kinds[tile.kind] ?? tile.kind}</span>
+                    <span class="tile-fallback">{copy.kindNames[tile.kind] ?? tile.kind}</span>
                   {/if}
                 </span>
               </button>
