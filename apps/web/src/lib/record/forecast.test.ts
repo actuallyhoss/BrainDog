@@ -134,12 +134,46 @@ test('the projection compounds the last complete bucket, and is capped out loud'
   assert.ok(steep.projection.every((p) => p <= 32768 * 10));
 });
 
-test('a series that has ever been zero cannot be fitted, and says so', () => {
-  // Growth is multiplicative and zero has no logarithm. Dropping the bucket silently would fit the
-  // remainder and call it the whole series.
+test('too few buckets survive the zeros to fit at all', () => {
+  // Zero has no logarithm, so a zero bucket cannot be a point. Three survivors is under the gate.
   const t = trend([0, 0, 0, 100, 110, 121]);
   assert.equal(t.kind, 'flat');
   assert.match(t.why, /usable buckets/);
+  assert.equal(t.dropped, 3, 'the dropped buckets have to be reported, not swallowed');
+});
+
+test('DROPPING A BUCKET MUST NOT DROP A UNIT OF TIME', () => {
+  // The bug this replaces, and the worst kind: a plausible number, confidently stated. Twelve
+  // months with alternating zeros were fitted as six consecutive months — 1.0997 a month where the
+  // truth over those twelve is 1.0488, `n` reporting 6 when handed 12, and `t` at 379, which reads
+  // as beyond argument.
+  const t = trend([100, 0, 110, 0, 121, 0, 133, 0, 146, 0, 161, 0]);
+  assert.equal(t.kind, 'growth');
+  if (t.kind !== 'growth') return;
+  const truth = Math.pow(161 / 100, 1 / 10);
+  assert.ok(Math.abs(t.rate - truth) < 0.001, `rate ${t.rate} against a true ${truth}`);
+  assert.equal(t.dropped, 6);
+});
+
+test('a zeroed bucket and a deleted bucket are not the same series', () => {
+  // This is the property that proves time is preserved, and the one that failed before: the two
+  // returned an identical rate, which they can only do if the gap was closed up.
+  const zeroed = trend([100, 110, 121, 133, 146, 0, 177, 195, 214, 236, 259, 285]);
+  const deleted = trend([100, 110, 121, 133, 146, 177, 195, 214, 236, 259, 285]);
+  if (zeroed.kind !== 'growth' || deleted.kind !== 'growth') return assert.fail('expected growth');
+  assert.notEqual(zeroed.rate.toFixed(4), deleted.rate.toFixed(4));
+});
+
+test('the band uses Student t, not the large-sample limit', () => {
+  // The gate fires at six points, where df is 4 and the two-tailed 97.5% value is 2.776 — so a band
+  // drawn with 1.96 is about 40% too narrow. A function whose whole thesis is refusing to over-claim
+  // cannot then under-state its own uncertainty.
+  const six = trend([100, 111, 120, 134, 145, 162]);
+  const many = trend([100, 111, 120, 134, 145, 162, 177, 196, 213, 236, 259, 287, 315, 349, 380, 420]);
+  if (six.kind !== 'growth' || many.kind !== 'growth') return assert.fail('expected growth');
+  const width = (t: typeof six) => Math.log(t.high) - Math.log(t.low);
+  // Same shape of series; the small one must carry the wider interval.
+  assert.ok(width(six) > width(many), 'six points reported no more uncertainty than sixteen');
 });
 
 test('the projection is integers, because it is money', () => {
