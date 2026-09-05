@@ -119,14 +119,13 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
   for (const rule of order(deps.rules(fired.register))) {
     if (!matches(deps, schema, rule, fired.entry)) continue;
 
-    /* THE MARKER FIRST, so a rule that will notify does not notify twice for one row. It is a
-       schedule row because that table already carries exactly-once as a unique index, and a second
-       uniqueness mechanism is a second thing that can disagree with the first. */
+    /* THE MARKER IS CLAIMED FIRST AND KEPT LAST. Claimed here, because the schedule table's unique
+       index is what makes "once" hold against two passes at once and a second mechanism would be a
+       second thing that can disagree with the first — and released below if the write is refused,
+       because a rule that could not do anything has not fired. */
     const wants = rule.then.some((a) => 'notify' in a);
-    if (rule.once_per?.length) {
-      const key = `${rule.rule}:${rule.once_per
-        .map((t) => (t === 'entry' ? fired.entry.id : String(fired.entry.fields[t] ?? '')))
-        .join(':')}`;
+    const key = onceKey(rule, fired.entry);
+    if (key !== null) {
       if (!deps.schedule(key, { rule: rule.rule, entry: fired.entry.id, batch: fired.batch }, wants)) {
         out.suppressed.push(rule.rule);
         continue;
@@ -145,6 +144,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
 
     const patch: Record<string, unknown> = {};
     const did: string[] = [];
+    const said: string[] = [];
     let stop = false;
 
     for (const action of rule.then) {
@@ -180,10 +180,12 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
           did.push(`link ${action.link.field}`);
         }
       } else if ('note' in action) {
-        deps.note(fired.entry, `rule:${rule.rule}`, fill(action.note, fired.entry), fired.batch);
+        /* HELD UNTIL THE WRITE HAS HAPPENED. A rule whose write the register then refuses has not
+           done anything, and a notification about what it did not do is worse than silence. */
+        said.push(fill(action.note, fired.entry));
         did.push('note');
       } else if ('notify' in action) {
-        deps.note(fired.entry, `rule:${rule.rule}`, fill(action.notify.say, fired.entry), fired.batch);
+        said.push(fill(action.notify.say, fired.entry));
         did.push('notify');
       } else if ('stop' in action) {
         stop = true;
@@ -193,18 +195,23 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     if (Object.keys(patch).length > 0) {
       /* RE-ENTRANT, and that is the point: `immutable_when`, a transition the register forbids, a
          required field — all of them apply to a rule exactly as they apply to a person. A refusal is
-         collected and the pass continues; the triggering write is never undone by a rule's refusal. */
-      const wrote = deps.write(
-        fired.register,
-        fired.entry.seq === null ? null : `${fired.register}#${fired.entry.seq}`,
-        patch,
-        `rule:${rule.rule}`,
-        fired.batch,
-      );
-      if (!wrote.ok) out.refused.push(wrote.refusal);
-      else fired.entry = wrote.value;
+         collected and the pass continues; the triggering write is never undone by a rule's refusal.
+
+         AND IT NAMES THE ROW BY ITS OWN ID. `<register>#<seq>` is not a name a SERIES row has — its
+         `seq` is null — and passing null asked the write path to CREATE, so a rule on a series
+         register left the row it fired on untouched and made a second one holding only the patch. */
+      const wrote = deps.write(fired.register, fired.entry.id, patch, `rule:${rule.rule}`, fired.batch);
+      if (!wrote.ok) {
+        out.refused.push(wrote.refusal);
+        /* THE MARKER GOES BACK. Keeping it would mark a rule that did nothing as having fired for
+           this row for ever — fix the data and it never runs again, with no signal anywhere. */
+        if (key !== null) deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ?", key);
+        continue;
+      }
+      fired.entry = wrote.value;
     }
 
+    for (const text of said) deps.note(fired.entry, `rule:${rule.rule}`, text, fired.batch);
     if (did.length) out.fired.push({ rule: rule.rule, actions: did });
     if (stop) {
       out.stopped = true;
@@ -271,6 +278,30 @@ const isQuantity = (v: unknown): v is { value: number; unit: string } =>
   typeof v === 'object' && v !== null && 'value' in v && 'unit' in v;
 
 /** The `rule` schedule row's marker, through the one insertion path. `false` means suppressed. */
+/**
+ * The `once_per` key, and the ONE place it is spelled.
+ *
+ * JSON RATHER THAN `join(':')`, because a separator that can appear in a value is not a separator:
+ * `(Acme, INV:2026)` and `(Acme:INV, 2026)` came to one key, and one of those two rows never fired.
+ *
+ * AND A TOKEN THE ROW HAS NO VALUE FOR FALLS BACK TO THE ROW. Every row missing every named field
+ * used to share the single key `<rule>::`, so the rule fired for the first of them and was
+ * suppressed for all the rest for ever. Once-per-row is the safe reading: it still dedupes, and it
+ * cannot collapse two rows onto one key.
+ *
+ * `null` MEANS THE RULE DECLARED NO `once_per` — which is a different thing from a key it could not
+ * compute, and the caller treats the two differently.
+ */
+export function onceKey(rule: RuleDecl, entry: Entry): string | null {
+  if (!rule.once_per?.length) return null;
+  const parts = rule.once_per.map((t) => {
+    if (t === 'entry') return entry.id;
+    const value = entry.fields[t];
+    return value === undefined || value === null || value === '' ? entry.id : String(value);
+  });
+  return JSON.stringify([rule.rule, ...parts]);
+}
+
 export function marker(sql: Sql, mint: () => string, nowMs: number, key: string, payload: unknown, pending: boolean): boolean {
   if (sql.one("SELECT 1 AS x FROM schedule WHERE kind = 'rule' AND key = ?", key)) return false;
   sql.exec(
@@ -340,6 +371,10 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Resu
   const mine = setField(candidate);
 
   const out: DryRun = { matches: 0, rows: 0, won: 0, lost: 0, takenBy: {}, suppressed: 0, sample: [] };
+  /* THE KEYS THIS WALK WOULD MINT, not only the ones already in the table. Three rows sharing a
+     party is one notification, and a preview whose whole job is to say what will happen promised
+     three — which is the preview being wrong about the feature it exists to explain. */
+  const minted = new Set<string>();
 
   const rows = deps.sql.all<{ id: string }>(
     'SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY seq LIMIT ?',
@@ -371,13 +406,14 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Resu
       out.takenBy[taken] = (out.takenBy[taken] ?? 0) + 1;
     } else out.won++;
 
-    let suppressed = false;
-    if (candidate.once_per?.length) {
-      const key = `${candidate.rule}:${candidate.once_per
-        .map((t) => (t === 'entry' ? entry.id : String(entry.fields[t] ?? '')))
-        .join(':')}`;
-      suppressed = Boolean(deps.sql.one("SELECT 1 AS x FROM schedule WHERE kind = 'rule' AND key = ?", key));
+    let suppressed: string | null = null;
+    const key = onceKey(candidate, entry);
+    if (key !== null) {
+      if (minted.has(key)) suppressed = 'an earlier row in this preview takes the same once_per key';
+      else if (deps.sql.one("SELECT 1 AS x FROM schedule WHERE kind = 'rule' AND key = ?", key))
+        suppressed = 'it has already fired for this key';
       if (suppressed) out.suppressed++;
+      else minted.add(key);
     }
 
     if (out.sample.length < 20)
@@ -387,7 +423,7 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Resu
         ...(taken
           ? { reason: `${taken} sets ${mine} first` }
           : suppressed
-            ? { reason: 'it has already fired for this row' }
+            ? { reason: suppressed }
             : {}),
       });
   }

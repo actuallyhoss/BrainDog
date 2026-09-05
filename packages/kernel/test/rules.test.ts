@@ -428,3 +428,131 @@ test('a candidate the register cannot answer is refused rather than previewed as
   if (!other.ok) assert.equal(other.refusal.code, 'REGISTER_UNKNOWN');
   sql.close();
 });
+
+/* ── four ways a rule did the wrong thing quietly ───────────────────── */
+
+const READINGS: Declaration = {
+  id: 'register.readings',
+  kind: 'register',
+  body: {
+    id: 'readings',
+    name: 'Readings',
+    series: true,
+    title: 'what',
+    fields: [
+      { id: 'what', type: 'text' },
+      { id: 'level', type: 'int' },
+      { id: 'tags', type: 'list', of: 'text' },
+    ],
+  } as never,
+};
+
+test('A RULE ON A SERIES REGISTER EDITS THE ROW IT FIRED ON, and does not make a second one', async () => {
+  /* A series row has no `<register>#<seq>` to be named by, and passing null asked the write path to
+     CREATE — so the matched row was untouched and a junk row holding only the patch appeared beside
+     it. `dryRun` said it had fired, which is how it stayed invisible. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok(
+    (
+      await k.install([
+        READINGS,
+        rule({ rule: 'hot', register: 'readings', when: { field: 'level', gt: 40 }, then: [{ tag: 'hot' }] }),
+      ])
+    ).ok,
+  );
+
+  const made = value<Entry>(k.create('readings', { what: 'temp', level: 42 }, { actor: 'p_1' }));
+  const rows = sql.all<{ id: string; fields: string }>("SELECT id, fields FROM entry WHERE register = 'readings'");
+  assert.equal(rows.length, 1, 'the rule created a second row instead of editing the one it fired on');
+  assert.deepEqual(JSON.parse(rows[0]!.fields).tags, ['hot']);
+  assert.equal(rows[0]!.id, made.id);
+  sql.close();
+});
+
+test('A REFUSED RULE IS NOT MARKED AS FIRED, or it never runs again once the data is fixed', async () => {
+  /* The marker went in before the write was attempted. A rule that did nothing was marked done for
+     ever — and the preview then asserted "it has already fired for this row". */
+  const { k, sql } = await record(
+    rule({
+      rule: 'deadline',
+      register: 'obligations',
+      when: 'state is open',
+      once_per: ['entry'],
+      then: [{ notify: { say: 'chase {{what}}' } }, { set: { field: 'due', to: 'not a day' } }],
+    }),
+  );
+  const made = value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
+  assert.equal(made.fields.due, undefined);
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'rule'").length, 0, 'a rule that wrote nothing was marked as fired');
+
+  // And it did not announce what it had not done.
+  assert.deepEqual(notes(sql).filter((n) => n.actor === 'rule:deadline'), []);
+
+  // Fix the rule, and it fires — which it could not do while the marker stood.
+  const out = value<DryRun>(
+    k.dryRun({ rule: 'deadline', register: 'obligations', when: 'state is open', once_per: ['entry'], then: [{ notify: { say: 'x' } }] }),
+  );
+  assert.equal(out.suppressed, 0);
+  assert.equal(out.won, 1);
+  sql.close();
+});
+
+test('THE ONCE_PER KEY CANNOT BE FORGED BY A COLON, and a row missing the field is its own key', async () => {
+  /* `join(':')` made `(Acme, INV:2026)` and `(Acme:INV, 2026)` one key, and every row missing every
+     named field shared the single key `chase::` — four rows, two notifications. */
+  const { k, sql } = await record(
+    rule({
+      rule: 'chase',
+      register: 'obligations',
+      when: 'state is open',
+      once_per: ['party', 'chase'],
+      then: [{ notify: { say: 'chase {{what}}' } }],
+    }),
+  );
+  const rows = [
+    { what: 'A', party: 'Acme', chase: 'INV:2026' },
+    { what: 'B', party: 'Acme:INV', chase: '2026' },
+    { what: 'C' },
+    { what: 'D' },
+  ];
+  for (const r of rows) value<Entry>(k.create('obligations', { ...r, state: 'open' }, { actor: 'p_1' }));
+
+  assert.deepEqual(
+    notes(sql).map((n) => n.note),
+    ['chase A', 'chase B', 'chase C', 'chase D'],
+  );
+
+  // And the key still dedupes: the same pair twice is one notification.
+  value<Entry>(k.create('obligations', { what: 'E', party: 'Acme', chase: 'INV:2026', state: 'open' }, { actor: 'p_1' }));
+  assert.equal(notes(sql).length, 4);
+  sql.close();
+});
+
+test('and the preview counts the collisions among the rows it is previewing', async () => {
+  /* Three rows sharing a party is one notification. The preview promised three — wrong about the
+     one feature it exists to explain. */
+  const { k, sql } = await record();
+  for (const what of ['x0', 'x1', 'x2'])
+    value<Entry>(k.create('obligations', { what, party: 'Acme', state: 'open' }, { actor: 'p_1' }));
+
+  const candidate: RuleDecl = {
+    rule: 'chase',
+    register: 'obligations',
+    when: 'state is open',
+    once_per: ['party'],
+    then: [{ notify: { say: 'chase {{what}}' } }],
+  } as RuleDecl;
+  const out = value<DryRun>(k.dryRun(candidate));
+
+  assert.equal(out.matches, 3);
+  assert.equal(out.suppressed, 2);
+  assert.deepEqual(out.sample.map((r) => r.would.length), [1, 0, 0]);
+  assert.match(out.sample[1]?.reason ?? '', /an earlier row in this preview/);
+
+  // And the pass agrees with the preview, which is the whole point of having one.
+  assert.ok((await k.install([rule(candidate as never)])).ok);
+  value<Entry>(k.create('obligations', { what: 'x3', party: 'Acme', state: 'open' }, { actor: 'p_1' }));
+  assert.equal(notes(sql).length, 1);
+  sql.close();
+});
