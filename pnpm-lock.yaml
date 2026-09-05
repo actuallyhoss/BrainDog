@@ -98,6 +98,15 @@ importers:
         specifier: workspace:*
         version: link:../where
 
+  packages/mcp:
+    dependencies:
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../ports
+      '@braindog/record':
+        specifier: workspace:*
+        version: link:../record
+
   packages/ports: {}
 
   packages/record:

@@ -1,0 +1,216 @@
+/**
+ * The eight tools, from an agent's side of the wire.
+ *
+ * Two things are being asserted, and the second is the unusual one. The first is that each tool does
+ * what it says. The second is that its REFUSALS TEACH: the caller is a model that will try again
+ * immediately, so the difference between a good refusal and a bad one is whether the second attempt
+ * works. Every test below that expects a refusal also checks the sentence names what to send.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { TOOLS, tools } from '../src/index.ts';
+import { createRecordApi, type CallContext } from '@braindog/record';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+
+const NOW = Date.UTC(2026, 8, 5, 12);
+const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+const reader: CallContext = { principal: { kind: 'token', id: 't', scope: 'read', person: 'p_1', level: 'owner' } };
+
+const OBLIGATIONS = {
+  id: 'register.obligations',
+  kind: 'register' as const,
+  body: {
+    id: 'obligations',
+    name: 'Obligations',
+    title: 'what',
+    state: 'state',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'amount', type: 'money' },
+      { id: 'state', type: 'enum', values: ['open', 'paid'] },
+    ],
+  } as never,
+};
+
+async function agent() {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  assert.ok((await api.kernel.install([OBLIGATIONS])).ok);
+  return { sql, mcp: tools(api), api };
+}
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code}: ${x.refusal?.fix}`);
+  return x.value;
+};
+const refusal = (r: unknown) => {
+  const x = r as { ok: boolean; refusal: { code: string; fix: string; allowed?: readonly string[] } };
+  assert.ok(!x.ok, 'the call was allowed');
+  return x.refusal;
+};
+
+/* ── the surface itself ──────────────────────────────────────────────────── */
+
+test('EIGHT TOOLS, AND THE NUMBER IS THE DESIGN', () => {
+  // The tool list is in every turn of every session, so a ninth tool costs every conversation for
+  // ever. What a bigger surface buys is convenience for the caller; what it costs is attention,
+  // permanently. `list` takes a predicate rather than there being fourteen filter tools.
+  assert.equal(TOOLS.length, 8);
+  assert.equal(new Set(TOOLS.map((t) => t.name)).size, 8, 'two tools share a name');
+  for (const t of TOOLS) {
+    assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
+    assert.ok(t.description.length < 200, `${t.name} is long, and it is in every turn`);
+  }
+});
+
+test('the whole tool list is small enough to sit in every turn', () => {
+  // `10-MCP` §6 budgets 1,800 tokens for the list plus instructions. Four characters to a token is
+  // the rough conversion, so the JSON is the thing to keep under about 7,000 characters.
+  const size = JSON.stringify(TOOLS).length;
+  assert.ok(size < 7000, `the tool list is ${size} characters, which is most of the budget`);
+});
+
+test('a tool says whether it writes, so a client can tell its user before it runs', () => {
+  assert.deepEqual(
+    TOOLS.filter((t) => t.writes).map((t) => t.name),
+    ['create', 'update', 'log'],
+  );
+});
+
+/* ── they do what they say ───────────────────────────────────────────────── */
+
+test('record_index is the first call, and it says what to call next', async () => {
+  const { mcp, sql } = await agent();
+  const index = value<{ registers: { id: string; count: number }[]; version: number }>(
+    await mcp.call('record_index', {}, owner),
+  );
+  assert.deepEqual(index.registers.map((r) => r.id), ['obligations']);
+  assert.equal(index.registers[0]?.count, 0);
+  assert.equal(typeof index.version, 'number');
+  sql.close();
+});
+
+test('a row is addressed the way a person says it, and made and read and changed', async () => {
+  const { mcp, sql } = await agent();
+  const made = value<{ seq: number; version: number }>(
+    await mcp.call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open' }, note: 'From the PDF' }, owner),
+  );
+  assert.equal(made.seq, 1);
+
+  const read = value<{ fields: Record<string, unknown> }>(await mcp.call('get', { spoken: 'obligations#1' }, owner));
+  assert.equal(read.fields.what, 'Invoice 41');
+
+  value(await mcp.call('update', { spoken: 'obligations#1', patch: { state: 'paid' }, version: made.version }, owner));
+  assert.equal(value<{ state: string }>(await mcp.call('get', { spoken: 'obligations#1' }, owner)).state, 'paid');
+
+  const events = value<{ kind: string; note: string | null }[]>(await mcp.call('history', { spoken: 'obligations#1' }, owner));
+  assert.deepEqual(events.map((e) => e.kind), ['create', 'state']);
+  assert.equal(events[0]?.note, 'From the PDF');
+  sql.close();
+});
+
+test('list takes a predicate, which is why there are not fourteen filter tools', async () => {
+  const { mcp, sql } = await agent();
+  for (const [what, state] of [['a', 'open'], ['b', 'paid'], ['c', 'open']] as const)
+    value(await mcp.call('create', { register: 'obligations', fields: { what, state } }, owner));
+
+  const open = value<{ rows: unknown[]; matched: number }>(
+    await mcp.call('list', { register: 'obligations', where: { field: 'state', is: 'open' } }, owner),
+  );
+  assert.equal(open.matched, 2);
+
+  const both = value<{ matched: number }>(
+    await mcp.call('list', { register: 'obligations', where: { any: [{ field: 'state', is: 'open' }, { field: 'what', is: 'b' }] } }, owner),
+  );
+  assert.equal(both.matched, 3);
+  sql.close();
+});
+
+test('a note changes nothing and is still a write, so it lands in the history', async () => {
+  const { mcp, sql } = await agent();
+  value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
+  const before = value<{ fields: Record<string, unknown>; version: number }>(await mcp.call('get', { spoken: 'obligations#1' }, owner));
+
+  value(await mcp.call('log', { spoken: 'obligations#1', note: 'Chased on the call.' }, owner));
+  const after = value<{ fields: Record<string, unknown> }>(await mcp.call('get', { spoken: 'obligations#1' }, owner));
+  assert.deepEqual(after.fields, before.fields, 'a note changed the row');
+
+  const events = value<{ note: string | null }[]>(await mcp.call('history', { spoken: 'obligations#1' }, owner));
+  assert.equal(events.at(-1)?.note, 'Chased on the call.');
+  sql.close();
+});
+
+/* ── the refusals teach ──────────────────────────────────────────────────── */
+
+test('A REFUSAL NAMES WHAT TO SEND INSTEAD, because the caller will try again immediately', async () => {
+  const { mcp, sql } = await agent();
+
+  const noRegister = refusal(await mcp.call('list', { register: 'atlantis' }, owner));
+  assert.equal(noRegister.code, 'REGISTER_UNKNOWN');
+  assert.ok(noRegister.allowed?.includes('obligations'), 'it did not say which registers exist');
+
+  const noField = refusal(await mcp.call('create', { register: 'obligations', fields: { nope: 1 } }, owner));
+  assert.equal(noField.code, 'FIELD_UNKNOWN');
+  assert.ok(noField.allowed?.includes('what'));
+
+  const noValue = refusal(await mcp.call('create', { register: 'obligations', fields: { what: 'a', state: 'done' } }, owner));
+  assert.equal(noValue.code, 'ENUM_VALUE_UNKNOWN');
+  assert.deepEqual(noValue.allowed, ['open', 'paid']);
+
+  const badPredicate = refusal(await mcp.call('list', { register: 'obligations', where: { field: 'nope', is: 1 } }, owner));
+  assert.equal(badPredicate.code, 'FIELD_UNKNOWN');
+  assert.ok(badPredicate.allowed?.length);
+
+  const noTool = refusal(await mcp.call('delete_everything', {}, owner));
+  assert.equal(noTool.code, 'ROUTE_UNKNOWN');
+  assert.equal(noTool.allowed?.length, 8);
+  sql.close();
+});
+
+test('an address that is not one says what an address looks like', async () => {
+  const { mcp, sql } = await agent();
+  for (const spoken of ['41', 'obligations', 'Obligations#41', undefined, 42])
+    assert.match(refusal(await mcp.call('get', { spoken }, owner)).fix, /register#number/, String(spoken));
+  sql.close();
+});
+
+test('a stale write is refused with the sentence that says what to do about it', async () => {
+  const { mcp, sql } = await agent();
+  value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
+  value(await mcp.call('update', { spoken: 'obligations#1', patch: { what: 'b' } }, owner));
+  const stale = refusal(await mcp.call('update', { spoken: 'obligations#1', patch: { what: 'c' }, version: 1 }, owner));
+  assert.equal(stale.code, 'VERSION_STALE');
+  assert.match(stale.fix, /Read it again/);
+  sql.close();
+});
+
+test('an empty note is refused rather than written, because a note is for the next reader', async () => {
+  const { mcp, sql } = await agent();
+  value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
+  assert.equal(refusal(await mcp.call('log', { spoken: 'obligations#1', note: '   ' }, owner)).code, 'REQUIRED_MISSING');
+  sql.close();
+});
+
+/* ── the permission is the record's, not the tool layer's ────────────────── */
+
+test('a read token reads through every tool and writes through none', async () => {
+  // The tool layer holds no checks of its own: a second set would be a second set to keep in step,
+  // and the one that drifted would be the one an agent reads.
+  const { mcp, sql } = await agent();
+  value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
+
+  value(await mcp.call('record_index', {}, reader));
+  value(await mcp.call('list', { register: 'obligations' }, reader));
+  value(await mcp.call('get', { spoken: 'obligations#1' }, reader));
+
+  for (const [name, args] of [
+    ['create', { register: 'obligations', fields: { what: 'b' } }],
+    ['update', { spoken: 'obligations#1', patch: { what: 'b' } }],
+    ['log', { spoken: 'obligations#1', note: 'x' }],
+  ] as const)
+    assert.equal(refusal(await mcp.call(name, args, reader)).code, 'SCOPE_INSUFFICIENT', name);
+  sql.close();
+});
