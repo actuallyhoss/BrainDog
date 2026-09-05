@@ -97,10 +97,12 @@
         <span
           class="th"
           role="columnheader"
-          aria-sort={ariaSort(column.field)}
+          aria-sort={column.hideLabel ? undefined : ariaSort(column.field)}
           data-align={column.align ?? 'start'}
         >
-          {#if onsort}
+          {#if column.hideLabel}
+            <span class="th-name">{column.label}</span>
+          {:else if onsort}
             <button type="button" class="th-sort tap" onclick={() => onsort(column.field)}>{column.label}</button>
           {:else}{column.label}{/if}
         </span>

@@ -24,6 +24,7 @@
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import RowMenu from '$lib/ui/RowMenu.svelte';
@@ -67,7 +68,22 @@
    */
   let hidden = $state(new Set<string>());
 
-  const columns = $derived(columnsFor(id).filter((c) => !hidden.has(c.field)));
+/**
+   * A LEADING COLUMN FOR THE SELECTION, and it is a column rather than a decoration on the id.
+   *
+   * The selection model was keyboard-only: `x`, `⇧x`, `⌘a`, `Esc` and nothing else — no way to pick
+   * a row with a mouse or a finger at all, on the one screen that is a list of rows. It could not
+   * go inside the `#` cell, which is 9ch wide because the spoken id is what that column is FOR and
+   * it truncates in the middle; a checkbox in front of it would take the prefix.
+   *
+   * The control is `tabindex="-1"` on purpose. A grid is a composite widget with exactly one tab
+   * stop — at 500 rows a focusable control per row is 500 tab stops — so the keyboard path stays
+   * `x`, which the `?` sheet already advertises, and the pointer path is this.
+   */
+  const columns = $derived([
+    { field: 'select', label: copy.select, hideLabel: true, width: '3ch', align: 'start' as const, truncate: 'never' as const },
+    ...columnsFor(id).filter((c) => !hidden.has(c.field)),
+  ]);
   const found = $derived(list(id, { filters, q, ...(sort ? { sort } : {}) }));
   const result = $derived({
     ...found,
@@ -118,7 +134,9 @@
     }
   }
 
-  let focus = $state({ row: 0, col: 1 });
+  /* Column 2, not 1: 0 is the picker and 1 is the spoken id, so the caret starts on the first cell
+     that says what the row IS. It was 1 when the id was the leading column. */
+  let focus = $state({ row: 0, col: 2 });
   let peeked = $state<number | null>(null);
   let filterOpen = $state(false);
 
@@ -328,6 +346,41 @@
     selected = next;
   }
 
+  /* ── the verbs a selection is FOR ──────────────────────────────────────────
+     The anchor-extend model was implemented, drawn, and consumed by nothing: a selection you can
+     make and cannot use is a mode you enter and cannot leave usefully. Three verbs, and the first
+     of them is the one that actually works here — a mock has no write path, and the rule for that
+     is the app's own: say what it would have done, once, in the toast. */
+
+  const picked = $derived(result.entries.filter((e) => selected.has(e.seq)));
+
+  async function copyIds() {
+    const text = picked.map((e) => `${id}#${e.seq}`).join(' ');
+    try {
+      await navigator.clipboard.writeText(text);
+      toasts.push(copy.copied(`${picked.length} ${picked.length === 1 ? 'id' : 'ids'}`));
+    } catch {
+      toasts.push(copy.copyRefused, { intent: 'warn' });
+    }
+  }
+
+  function archiveSelected() {
+    const seqs = [...selected];
+    archived = new Set([...archived, ...seqs]);
+    selected = new Set();
+    toasts.push(copy.archived(`${seqs.length} ${decl?.name.toLowerCase() ?? 'rows'}`), {
+      undo: () => {
+        const next = new Set(archived);
+        for (const seq of seqs) next.delete(seq);
+        archived = next;
+        selected = new Set(seqs);
+      },
+    });
+  }
+
+  /** The register's own states, so the menu is the vocabulary rather than a list typed here. */
+  const states = $derived(decl?.fields.find((f) => f.id === decl.state)?.values ?? []);
+
   const emptyKind = $derived(
     result.total === 0 ? 'no-data-yet' : q || filters.length ? 'no-results' : 'cleared',
   );
@@ -350,15 +403,6 @@
     total={result.total}
   >
     {#snippet actions()}
-      <!-- The selection says its own size and how to drop it. A selection you cannot see the size
-           of is a selection you will not trust a bulk action with. -->
-      {#if selected.size > 0}
-        <span class="picked">
-          <span class="picked-n num">{selected.size}</span>
-          {copy.selected}
-          <button type="button" class="picked-clear" onclick={() => (selected = new Set())}>{copy.clear}</button>
-        </span>
-      {/if}
       <Button weight="quiet" onclick={() => (filterOpen = true)}>
         <Icon name="filter" size="s" />
         {copy.filter}
@@ -446,6 +490,41 @@
         {/each}
       </ul>
 
+      <!-- THE VERBS, above the rows they act on and nowhere else. It appears with the selection and
+           goes with it: a permanently visible bulk bar is a row of disabled controls, which tells
+           you a thing exists and refuses to say why it will not work. -->
+      {#if selected.size > 0}
+        <div class="picked-bar" role="toolbar" aria-label="{selected.size} {copy.selected}">
+          <span class="picked-n num">{selected.size}</span>
+          <span class="picked-word">{copy.selected}</span>
+          <Button weight="quiet" onclick={() => void copyIds()}>
+            <Icon name="copy" size="s" />{copy.copyIds}
+          </Button>
+          {#if states.length}
+            <Menu label={copy.setState}>
+              {#snippet trigger()}<span class="picked-verb"><Icon name="edit" size="s" />{copy.setState}</span>{/snippet}
+              {#each states as state}
+                <button
+                  class="mi"
+                  role="menuitem"
+                  type="button"
+                  onclick={() =>
+                    toasts.push(copy.notWritten(`${selected.size} rows would be set to ${state.replace(/_/g, ' ')}`), {
+                      intent: 'warn',
+                    })}
+                >
+                  <span class="mi-name">{state.replace(/_/g, ' ')}</span>
+                </button>
+              {/each}
+            </Menu>
+          {/if}
+          <Button weight="quiet" onclick={archiveSelected}>
+            <Icon name="archive" size="s" />{copy.archiveSelected}
+          </Button>
+          <button type="button" class="picked-clear" onclick={() => (selected = new Set())}>{copy.clear}</button>
+        </div>
+      {/if}
+
       <div class="table-slot">
         <Table
           {columns}
@@ -463,7 +542,22 @@
           {#snippet cellSnippet(row, column, value)}
             {@const seq = Number(row.key.split('#')[1])}
             {@const ident = identityOf(id, column.field, entry(id, seq)?.fields[column.field])}
-            {#if ident}
+            {#if column.field === 'select'}
+              <button
+                type="button"
+                class="pick"
+                tabindex="-1"
+                data-on={selected.has(seq) ? '' : undefined}
+                aria-label="{selected.has(seq) ? copy.deselect : copy.select} {display(id, decl.title, entry(id, seq)?.fields[decl.title]) ?? `#${seq}`}"
+                onclick={(e) => {
+                  /* The cell activates the row. Without this, picking one opened it. */
+                  e.stopPropagation();
+                  toggleSelect(seq, e.shiftKey);
+                }}
+              >
+                {#if selected.has(seq)}<Icon name="check" size="s" />{/if}
+              </button>
+            {:else if ident}
               <IdentityMark identity={ident} />
             {:else if value === null}
               <span class="missing">—</span>
@@ -701,22 +795,55 @@
     border-block-start: 1px solid var(--line);
   }
 
-  .picked {
-    display: inline-flex;
+  /* Above the rows it acts on, and only while there is a selection: a permanently visible bulk bar
+     is a row of disabled controls, which tells you a thing exists and refuses to say why it will
+     not work. It wraps rather than scrolls, so the verbs survive a phone. */
+  .picked-bar {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-    padding: 0 var(--sp-3);
-    min-block-size: var(--ctl-h);
+    margin-block-end: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
     border-radius: var(--r-md);
     color: var(--accent-text);
     font-size: var(--t-ui);
-    white-space: nowrap;
+  }
+
+  .picked-word {
+    margin-inline-end: var(--sp-2);
+  }
+
+  .picked-verb {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
   }
 
   .picked-n {
     font-weight: 700;
+  }
+
+  /* The pointer's way in. It is `tabindex="-1"` — a grid has one tab stop — so it never takes focus
+     and never needs a focus ring; the keyboard path is `x`, which the `?` sheet advertises. */
+  .pick {
+    display: grid;
+    place-items: center;
+    inline-size: 16px;
+    block-size: 16px;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--accent-ink);
+    cursor: pointer;
+  }
+
+  .pick[data-on] {
+    background: var(--accent);
+    border-color: var(--accent-edge);
   }
 
   .picked-clear {
@@ -865,71 +992,9 @@
       padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
 
-    /* The menu rows: the same 34px, the same tint-on-hover, and each printing the key it stands in
-     for — so using the menu teaches the key that replaces it. */
-  .mi {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    inline-size: 100%;
-    min-block-size: 34px;
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-ui);
-    text-align: start;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
-    color: var(--ink);
-  }
-
-  .mi-name {
-    flex: 1;
-  }
-
-  .mi-rule {
-    margin: 4px 0;
-    border: 0;
-    border-block-start: 1px solid var(--line);
-  }
-
-  .picked {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: 0 var(--sp-3);
-    min-block-size: var(--ctl-h);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: var(--r-md);
-    color: var(--accent-text);
-    font-size: var(--t-ui);
-    white-space: nowrap;
-  }
-
-  .picked-n {
-    font-weight: 700;
-  }
-
-  .picked-clear {
-    background: none;
-    border: 0;
-    padding: 0;
-    color: inherit;
-    font: inherit;
-    text-decoration: underline;
-    text-underline-offset: 0.18em;
-    cursor: pointer;
-  }
-
+    /* Only ONE rule belongs in this block, and thirty lines of `.mi` and `.picked` were pasted in
+       beside it — identical to the top-level ones, at the wrong indentation, re-declaring what was
+       already true. Dead weight in the bundle, and a media query that lies about what it changes. */
   .bar-hint {
       display: none;
     }

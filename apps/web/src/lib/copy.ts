@@ -203,6 +203,16 @@ export const copy = {
   archive: 'Archive',
   selected: 'selected',
   clear: 'Clear',
+  /* The picker's two labels, written out rather than built by concatenation — the screenshot
+     allow-list only keeps text a developer typed into source. */
+  select: 'Select',
+  deselect: 'Deselect',
+  /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
+     and not leave usefully, which is what this one was: implemented, drawn, and consumed by
+     nothing. Verb + Noun, like every other action here. */
+  copyIds: 'Copy ids',
+  setState: 'Set state',
+  archiveSelected: 'Archive',
   clearFilters: 'Clear filters',
   saveAsView: 'Save as a view',
   export: 'Export',

@@ -621,6 +621,18 @@
     letter-spacing: 0;
   }
 
+  /* A column whose cells are a control, not a value: the header keeps its NAME and does not show
+     it. An empty header is an unnamed button in the tab order and an empty `columnheader` in the
+     tree — two findings the accessibility gate raised the moment one existed. */
+  .th-name {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .th-sort {
     padding: 0;
     border: 0;

@@ -17,6 +17,16 @@ export type Column = {
    * header and the body in step. The reason the fast path exists is that pages are declared (22 §4).
    */
   width: string;
+  /**
+   * The header carries the name and does not SHOW it.
+   *
+   * For a column whose cells are a control rather than a value — a row picker — where a visible
+   * heading would be a word wider than the column and a heading nobody reads. The name is still
+   * there, because a column header with no name is an unnamed button in the tab order and an empty
+   * `columnheader` in the tree, which is what the accessibility gate found the moment one existed.
+   * A column like that is never sortable: there is nothing to sort by.
+   */
+  hideLabel?: boolean | undefined;
   /** Quantities, dates and counts end; text and refs start (13 §4.2). */
   align?: 'start' | 'end' | undefined;
   /**
