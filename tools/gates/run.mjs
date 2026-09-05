@@ -15,7 +15,18 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
 
+/**
+ * `pnpm` on Windows is a `.cmd` shim, and Node refuses to spawn one without a shell (EINVAL, the
+ * fix for CVE-2024-27980). It is the only gate that is not a plain script, and its argv is a
+ * constant, so it is the only one given a shell.
+ */
+const PNPM = ['pnpm', ['-r', 'run', 'typecheck'], { shell: true }];
+
 const GATES = [
+  /* FIRST, because a type error invalidates every gate under it — and because two of them reached a
+     commit while the seven browser-and-grep gates all reported green. `pnpm -r` so the packages and
+     both apps are held to it, which is where the shapes actually cross. */
+  ['typecheck', PNPM],
   ['clean-room', ['node', [join(here, 'clean-room.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
@@ -28,18 +39,19 @@ const GATES = [
   ['a11y', ['node', [join(here, 'a11y.mjs')]]],
 ];
 
-let failed = 0;
+const failed = [];
 
-for (const [name, [cmd, args]] of GATES) {
+for (const [name, [cmd, args, opts]] of GATES) {
   process.stdout.write(`\n▸ ${name}\n`);
-  const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: false });
-  if (r.status !== 0) failed++;
+  const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: false, ...opts });
+  if (r.status !== 0) failed.push(name);
 }
 
+// NAMED, not counted. "1 of 8 gates failed" over a screen of eight gates' output is a search.
 console.log(
-  failed === 0
+  failed.length === 0
     ? `\n  ${GATES.length} gates passed.\n`
-    : `\n  ${failed} of ${GATES.length} gates failed.\n`,
+    : `\n  ${failed.length} of ${GATES.length} gates failed: ${failed.join(', ')}.\n`,
 );
 
-if (failed) process.exitCode = 1;
+if (failed.length) process.exitCode = 1;

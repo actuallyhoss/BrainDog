@@ -19,6 +19,7 @@ import { toSegments } from './blocks.ts';
 import { page } from './api.ts';
 import { ROWS } from './data.ts';
 import type { BlockResult } from './api.ts';
+import type { Fields } from './schema.ts';
 
 /** The minimum a `BlockResult` needs to be rendered, with no register behind it. */
 const authored = (kind: string, rows: { cells: string[]; tone?: 'good' | 'warn' | 'bad' | 'info' }[]): BlockResult =>
@@ -28,11 +29,18 @@ const authored = (kind: string, rows: { cells: string[]; tone?: 'good' | 'warn' 
     authored: rows,
     columns: [],
     entries: [],
+    matched: [],
     rows: [],
     total: 0,
     drawn: true,
     stale_at: '2026-09-05T00:00:00.000Z',
   }) as unknown as BlockResult;
+
+/** Put a field back exactly as it was, including not being there at all. */
+const restore = (fields: Fields, key: string, was: Fields[string] | undefined): void => {
+  if (was === undefined) delete fields[key];
+  else fields[key] = was;
+};
 
 /** Every cell of every row the parser gave back. */
 const cellsOf = (block: BlockResult): string[][] =>
@@ -123,7 +131,7 @@ test('a pipe in a register value does not delete the block', () => {
       'the value did not survive the round trip intact',
     );
   } finally {
-    row.fields.points_at = before;
+    restore(row.fields, 'points_at', before);
   }
 });
 
@@ -142,6 +150,6 @@ test('a backslash in a register value survives too', () => {
     const cells = segs.flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : [])).map((r) => r.cells);
     assert.ok(cells.some((c) => c.some((v) => v === value)), 'the backslash did not round-trip');
   } finally {
-    row.fields.points_at = before;
+    restore(row.fields, 'points_at', before);
   }
 });

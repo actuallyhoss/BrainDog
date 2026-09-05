@@ -38,17 +38,36 @@ import { money, parse, relative } from 'braindog-render';
 import { KINDS, isKind } from 'braindog-render';
 import { CURRENCY, NOW, REGISTERS, display, type BlockResult } from './api.ts';
 
+/**
+ * The rest of the groups, as one group.
+ *
+ * `limit:` on a kind that reduces means HOW MANY BARS, not how many rows to read — nobody writing
+ * `limit: 8` on a bar is asking for the total of eight rows. So the groups are cut, not the rows,
+ * and the cut is cut at the bottom with the remainder carried: a chart captioned "by counterparty"
+ * that quietly leaves out twelve counterparties is a chart about a subset nobody chose.
+ */
+const REST = 'Everything else';
+
+function cut<T>(groups: [string, number][], limit: number | undefined): [string, number][] {
+  if (limit === undefined || groups.length <= limit) return groups;
+  const kept = groups.slice(0, Math.max(1, limit - 1));
+  const rest = groups.slice(kept.length).reduce((a, [, n]) => a + n, 0);
+  return [...kept, [REST, rest]];
+}
+
 /** A bar over a register groups its rows and sums them — the one place a page does arithmetic. */
 function barRows(block: BlockResult): string[] {
   const by = block.columns[0]?.field ?? 'party';
   const of = block.columns[1]?.field ?? 'amount';
   const totals = new Map<string, number>();
-  for (const e of block.entries) {
+  /* `matched`, NOT `entries`. The block draws the first `limit:` rows and it ADDS UP all of them:
+     summing the page instead of the answer is a figure that is wrong by however many rows did not
+     fit, silently, and it is the same number of pixels either way. */
+  for (const e of block.matched) {
     const key = display(block.register ?? '', by, e.fields[by]) ?? 'Nobody in particular';
     totals.set(key, (totals.get(key) ?? 0) + Number(e.fields[of] ?? 0));
   }
-  return [...totals]
-    .sort((a, b) => b[1] - a[1])
+  return cut([...totals].sort((a, b) => b[1] - a[1]), block.limit)
     /* The SUM is formatted through the summed field's own type, not always as money. A bar over
        `effort` in days printed `GBP 0.02` — the total was 2.4 days, run through a money formatter
        that reads its input as minor units. A block that can be bound to any register cannot assume
@@ -85,11 +104,13 @@ const escapeCell = (c: string): string =>
 function chipsRows(block: BlockResult): string[] {
   const by = block.columns[0]?.field ?? '';
   const counts = new Map<string, number>();
-  for (const e of block.entries) {
+  for (const e of block.matched) {
     const key = display(block.register ?? '', by, e.fields[by]) ?? 'Unset';
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return [...counts].sort((a, b) => b[1] - a[1]).map(([key, n]) => ` | ${n} | ${escapeCell(key)}`);
+  return cut([...counts].sort((a, b) => b[1] - a[1]), block.limit).map(
+    ([key, n]) => ` | ${n} | ${escapeCell(key)}`,
+  );
 }
 
 /**
@@ -105,7 +126,7 @@ function chipsRows(block: BlockResult): string[] {
  */
 function gaugeRows(block: BlockResult): string[] {
   const of = block.columns[1]?.field ?? '';
-  const total = block.entries.reduce((a, e) => a + Number(e.fields[of] ?? 0), 0);
+  const total = block.matched.reduce((a, e) => a + Number(e.fields[of] ?? 0), 0);
   const target = block.target;
   if (target === undefined) return [];
   const label = block.columns[0]?.label ?? block.heading ?? '';

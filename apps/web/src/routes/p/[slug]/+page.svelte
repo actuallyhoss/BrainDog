@@ -283,7 +283,7 @@
   function resolveExtra(block: PageBlock): BlockResult {
     const template = result?.blocks.find((b) => b.register === block.source?.replace('register.', ''));
     return {
-      ...(template ?? { rows: [], entries: [], total: 0, drawn: true, stale_at: '' }),
+      ...(template ?? { rows: [], entries: [], matched: [], total: 0, drawn: true, stale_at: '' }),
       ...block,
       columns: (block.columns ?? []).map((c) => ({
         field: c.field,

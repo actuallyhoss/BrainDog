@@ -747,7 +747,17 @@ export function boot() {
 export type BlockResult = PageBlock & {
   rows: TableRow[];
   columns: Column[];
+  /** The rows this block DRAWS: the matched set cut to `limit:`, aligned one-to-one with `rows`. */
   entries: Entry[];
+  /**
+   * The rows the predicate ADMITTED, uncut.
+   *
+   * `bar`, `chips` and `gauge` do arithmetic, and arithmetic over the first page of a register is a
+   * wrong number rather than a short list: the cut is about how much a reader can take in, and a
+   * total is one line however many rows went into it. Every kind that projects a row each reads
+   * `entries`; every kind that reduces reads this.
+   */
+  matched: Entry[];
   total: number;
   drawn: boolean;
   /** Machine-readable, and every block that renders a query result carries one: staleness is a
@@ -781,6 +791,7 @@ function runwayBlock(b: PageBlock): BlockResult {
     register: undefined,
     columns,
     entries: [],
+    matched: [],
     rows: steps.map((s, i) => ({
       /* The key is the movement, not the index: two charges on one day from one service are
          different rows, and a keyed list that reuses an index re-renders the wrong one. */
@@ -810,7 +821,10 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
 
     const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : undefined;
     const all = register ? (ROWS[register] ?? []) : [];
-    const entries = register ? filterForBlock(register, all, b) : [];
+    const matched = register ? filterForBlock(register, all, b) : [];
+    /* `limit:` is a READING cap, not a query cap: it says how much of the answer fits on the page.
+       The kinds that reduce are handed the whole answer (see `matched`), so a sum is a sum. */
+    const entries = matched.slice(0, b.limit ?? 50);
     const columns = b.columns
       ? b.columns.map((c) => ({
           field: c.field,
@@ -824,9 +838,10 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
       ...b,
       register,
       columns,
-      entries: entries.slice(0, b.limit ?? 50),
-      rows: toRows(register ?? '', entries.slice(0, b.limit ?? 50), columns),
-      total: entries.length,
+      entries,
+      matched,
+      rows: toRows(register ?? '', entries, columns),
+      total: matched.length,
       drawn: b.drawn ?? true,
       stale_at: new Date(NOW).toISOString(),
       metrics: b.cells?.map((c) => ({ ...metric(c.metric), label: c.label })),

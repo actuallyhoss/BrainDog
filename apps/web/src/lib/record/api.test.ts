@@ -18,7 +18,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CURRENCY, applyFilters, dirOf, display, isProse, labelOf, metric } from './api.ts';
+import { CURRENCY, applyFilters, dirOf, display, isProse, labelOf, metric, page } from './api.ts';
+import { toSegments } from './blocks.ts';
 import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
@@ -218,6 +219,100 @@ test('the three money tiles are disjoint, so a row is in at most one', () => {
     return d >= 0 && d <= 30;
   });
   assert.equal(overdue.filter((e) => due30.includes(e)).length, 0, 'a row is counted by two tiles at once');
+});
+
+/* ── a total is a total, however many rows went into it ──────────────────── */
+
+/**
+ * Run `fn` with `n` extra open obligations owed by you, then put the register back.
+ *
+ * The seed has fewer rows than the cut, which is why this defect was invisible: it only appears on a
+ * register that has outgrown one page, and every register does.
+ */
+function withExtra<T>(n: number, amount: number, fn: () => T): T {
+  const before = [...(ROWS.obligations ?? [])];
+  const next = before.length + 1;
+  ROWS.obligations = [
+    ...before,
+    ...Array.from({ length: n }, (_, i) => ({
+      seq: next + i,
+      fields: { what: `Filler ${i}`, party: 3, direction: 'owed_by_me', amount, due: '2026-12-01', state: 'open', thing: null, note: '' },
+      version: 1,
+      created: '2026-01-01T00:00:00.000Z',
+      by: 'test',
+    })),
+  ];
+  try {
+    return fn();
+  } finally {
+    ROWS.obligations = before;
+  }
+}
+
+const barOf = (slug: string, heading: string) => page(slug)?.blocks.find((b) => b.heading === heading);
+
+test('A BAR ADDS UP THE ANSWER, NOT THE FIRST PAGE OF IT', () => {
+  // `limit:` is how much a reader can take in. Applied before the sum it is how much of the money
+  // exists, and the figure is wrong by however many rows did not fit — with nothing on screen that
+  // says so, because a total is one line either way.
+  withExtra(80, 100_000, () => {
+    const block = barOf('money', 'Owed by you, by counterparty');
+    assert.ok(block, 'the bar is gone; this test is about the bar');
+    assert.ok(block.matched.length > 50, `only ${block.matched.length} rows matched, so the cut was never reached`);
+    const truth = block.matched.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
+    const drawn = toSegments(block)
+      .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
+      .reduce((a, r) => a + Number((r.cells[1] ?? '').replace(/[^0-9.]/g, '')) * 100, 0);
+    assert.ok(Math.abs(drawn - truth) < 200, `the bars add to ${drawn} where the rows add to ${truth}`);
+  });
+});
+
+test('the rows it DRAWS are still cut, because that half was never the bug', () => {
+  withExtra(80, 100_000, () => {
+    const block = barOf('money', 'Owed by you, by counterparty');
+    assert.ok(block);
+    assert.ok(block.entries.length <= (block.limit ?? 50), 'the reading cap stopped applying');
+    assert.ok(block.matched.length > block.entries.length, 'nothing was cut, so nothing is being tested');
+    assert.equal(block.total, block.matched.length, 'the count under the block counts the drawn rows');
+  });
+});
+
+test('a gauge sums past the cut too', () => {
+  const block = page('estate')?.blocks.find((b) => b.kind === 'gauge');
+  assert.ok(block, 'the estate page has no gauge');
+  const of = block.columns[1]?.field ?? '';
+  const truth = block.matched.reduce((a, e) => a + Number(e.fields[of] ?? 0), 0);
+  const drawn = toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
+  assert.equal(drawn.length, 1, 'a gauge is one row');
+  assert.ok(Math.abs(Number((drawn[0]?.cells[1] ?? '').replace(/[^0-9.]/g, '')) * 100 - truth) < 200);
+});
+
+test('chips count every matching row, and the counts add to the matched total', () => {
+  withExtra(80, 100_000, () => {
+    const block = page('money')?.blocks.find((b) => b.kind === 'chips');
+    assert.ok(block);
+    const counted = toSegments(block)
+      .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
+      .reduce((a, r) => a + Number(r.cells[1] ?? 0), 0);
+    assert.equal(counted, block.matched.length);
+  });
+});
+
+test('when there are more groups than fit, the rest is CARRIED, not dropped', () => {
+  // The other way to get a wrong total: cut the bars instead of the rows and the figure is short by
+  // the tail. A named remainder keeps the sum whole and says out loud that there is more.
+  const block = barOf('money', 'Owed by you, by counterparty');
+  assert.ok(block);
+  const rowsOf = (b: typeof block) =>
+    toSegments(b).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
+  const whole = rowsOf(block);
+  assert.ok(whole.length >= 3, 'the seed needs at least three counterparties for this to mean anything');
+  const capped = rowsOf({ ...block, limit: 2 });
+  assert.equal(capped.length, 2);
+  assert.equal(capped[1]?.cells[0], 'Everything else');
+  const sum = (rows: { cells: string[] }[]) =>
+    rows.reduce((a, r) => a + Number((r.cells[1] ?? '').replace(/[^0-9.]/g, '')), 0);
+  assert.ok(Math.abs(sum(capped) - sum(whole)) < 2, `${sum(capped)} against ${sum(whole)}`);
 });
 
 /* ── a tile and its link must agree ──────────────────────────────────────── */
