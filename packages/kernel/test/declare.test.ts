@@ -237,3 +237,159 @@ test('indexesFor names what it builds, and skips a retired field', async () => {
   assert.ok(built.every((s) => s.includes('deleted_at IS NULL')), 'an index over deleted rows is pages nobody touches');
   assert.ok(!built.some((s) => s.includes('__d')), 'a retired field was indexed');
 });
+
+/* ── the indexes belong to the declaration ────────────────────────── */
+
+const indexesOn = (sql: NodeSql, register: string): string[] =>
+  sql
+    .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'entry' ORDER BY name")
+    .map((r) => r.name)
+    .filter((n) => n.startsWith(`entry_i_${register}__`) || n.startsWith(`entry_u_${register}__`));
+
+const withFields = (fields: unknown[]): Declaration => ({
+  ...OBLIGATIONS,
+  body: { ...OBLIGATIONS.body, fields } as never,
+});
+
+test('AN INDEX IS DROPPED WHEN THE DECLARATION STOPS ASKING FOR IT', async () => {
+  /* `CREATE INDEX IF NOT EXISTS` and nothing else meant the indexes outlived the declaration: take
+     `unique:` off a field and the unique index went on refusing duplicates the register now allows.
+     The record enforced a rule nobody had written down any more. */
+  const { k, sql } = await record();
+  value(await k.install([OBLIGATIONS]));
+  assert.ok(indexesOn(sql, 'obligations').includes(indexName('u', 'obligations', 'ref')), 'the unique index was never built');
+  value(k.create('obligations', { what: 'a', ref: 'INV-1' }, { actor: 'p_1' }));
+  assert.equal(refusal(k.create('obligations', { what: 'b', ref: 'INV-1' }, { actor: 'p_1' })).code, 'ALREADY_KNOWN');
+
+  // The same register, with `ref` no longer unique and `due` no longer indexed.
+  value(
+    await k.install([
+      withFields([
+        { id: 'what', type: 'text', required: true },
+        { id: 'amount', type: 'money', index: true },
+        { id: 'due', type: 'day' },
+        { id: 'ref', type: 'text' },
+        { id: 'state', type: 'enum', values: ['open', 'paid'], index: true },
+      ]),
+    ]),
+  );
+
+  const after = indexesOn(sql, 'obligations');
+  assert.ok(!after.includes(indexName('u', 'obligations', 'ref')), 'a unique index outlived the `unique:` that asked for it');
+  assert.ok(!after.includes(indexName('i', 'obligations', 'due')), 'an index outlived the `index:` that asked for it');
+  assert.ok(after.includes(indexName('i', 'obligations', 'amount', 'amount')), 'an index that is still declared was dropped');
+
+  // And the rule the declaration no longer makes is no longer enforced.
+  value(k.create('obligations', { what: 'b', ref: 'INV-1' }, { actor: 'p_1' }));
+  sql.close();
+});
+
+test('and a retired field takes its indexes with it', async () => {
+  const { k, sql } = await record();
+  value(await k.install([OBLIGATIONS]));
+  value(
+    await k.install([
+      withFields([
+        { id: 'what', type: 'text', required: true },
+        { id: 'amount', type: 'money', index: true, retired: true },
+        { id: 'due', type: 'day', index: true },
+        { id: 'ref', type: 'text', unique: true },
+        { id: 'state', type: 'enum', values: ['open', 'paid'], index: true },
+      ]),
+    ]),
+  );
+  const after = indexesOn(sql, 'obligations');
+  assert.ok(!after.some((n) => n.includes('__amount')), `a retired field kept its indexes: ${after.join(', ')}`);
+  sql.close();
+});
+
+test('a `unique:` over rows that already clash is REFUSED, not thrown', async () => {
+  // SQLite raises a constraint error at CREATE INDEX, which escaped `install` as an exception — a
+  // caller reading `Result` never saw it coming, and the sentence it needed was "two rows say INV-1".
+  const { k, sql } = await record();
+  value(
+    await k.install([
+      withFields([
+        { id: 'what', type: 'text', required: true },
+        { id: 'ref', type: 'text' },
+        { id: 'state', type: 'enum', values: ['open', 'paid'] },
+      ]),
+    ]),
+  );
+  value(k.create('obligations', { what: 'a', ref: 'INV-1' }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'b', ref: 'INV-1' }, { actor: 'p_1' }));
+
+  const out = refusal(
+    await k.install([
+      withFields([
+        { id: 'what', type: 'text', required: true },
+        { id: 'ref', type: 'text', unique: true },
+        { id: 'state', type: 'enum', values: ['open', 'paid'] },
+      ]),
+    ]),
+  );
+  assert.equal(out.code, 'UNIQUE_VIOLATION');
+  assert.match(out.fix, /obligations[.]ref/);
+  assert.match(out.fix, /INV-1/, 'the refusal does not name the value two rows share');
+  // And the refused install left nothing behind: the declaration did not version.
+  assert.equal(k.register('obligations')?.fields.find((f) => f.id === 'ref')?.unique, undefined);
+  assert.equal(k.count('obligations'), 2, 'a refused install touched the rows');
+  sql.close();
+});
+
+/* ── the state mirror ────────────────────────────────────────── */
+
+test('MOVING `state:` TO ANOTHER FIELD RE-MIRRORS THE ROWS THAT ALREADY EXIST', async () => {
+  /* `entry.state` is a copy of one field, written on write. A declaration that named a different
+     field left every existing row carrying the OLD field's value — so the index on `state` and a
+     `where:` over the field itself answered differently. Two readings of one record, both confident,
+     is the worst shape a bug can take here. */
+  const { k, sql } = await record();
+  value(
+    await k.install([
+      withFields([
+        { id: 'what', type: 'text', required: true },
+        { id: 'state', type: 'enum', values: ['open', 'paid'] },
+        { id: 'stage', type: 'enum', values: ['draft', 'sent'] },
+      ]),
+    ]),
+  );
+  value(k.create('obligations', { what: 'a', state: 'open', stage: 'sent' }, { actor: 'p_1' }));
+  assert.equal(sql.one<{ state: string }>('SELECT state FROM entry')?.state, 'open');
+
+  const moved: Declaration = {
+    ...OBLIGATIONS,
+    body: {
+      ...OBLIGATIONS.body,
+      state: 'stage',
+      fields: [
+        { id: 'what', type: 'text', required: true },
+        { id: 'state', type: 'enum', values: ['open', 'paid'] },
+        { id: 'stage', type: 'enum', values: ['draft', 'sent'] },
+      ],
+    } as never,
+  };
+  value(await k.install([moved]));
+  assert.equal(sql.one<{ state: string }>('SELECT state FROM entry')?.state, 'sent', 'the mirror still holds the old field');
+
+  // And a register that stops naming a state clears the column rather than leaving a stale word.
+  value(
+    await k.install([
+      {
+        ...OBLIGATIONS,
+        body: {
+          id: 'obligations',
+          name: 'Obligations',
+          title: 'what',
+          fields: [
+            { id: 'what', type: 'text', required: true },
+            { id: 'state', type: 'enum', values: ['open', 'paid'] },
+            { id: 'stage', type: 'enum', values: ['draft', 'sent'] },
+          ],
+        } as never,
+      },
+    ]),
+  );
+  assert.equal(sql.one<{ state: string | null }>('SELECT state FROM entry')?.state, null);
+  sql.close();
+});

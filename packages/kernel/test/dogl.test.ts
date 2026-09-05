@@ -31,7 +31,7 @@ const OBLIGATIONS: Declaration = {
       { id: 'what', type: 'text', required: true, search: true },
       { id: 'party', type: 'text', search: true },
       { id: 'amount', type: 'money', index: true },
-      { id: 'due', type: 'day', index: true },
+      { id: 'due', type: 'day', index: true, remind: ['-7d'] },
       { id: 'state', type: 'enum', values: ['open', 'paid'] },
     ],
   } as never,
@@ -53,11 +53,80 @@ const value = <T>(r: unknown): T => {
 async function filled() {
   const { k, sql } = await record();
   value(k.create('obligations', { what: 'Invoice 41 — brand', party: 'Halden', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', state: 'open' }, { actor: 'p_1', note: 'From the PDF' }));
-  value(k.create('obligations', { what: 'Retainer, August', party: 'Pell & Vine', amount: { amount: 24_000, currency: 'GBP' }, state: 'paid' }, { actor: 'p_2' }));
+  value(
+    k.create(
+      'obligations',
+      { what: 'Retainer, August', party: 'Pell & Vine', amount: { amount: 24_000, currency: 'GBP' }, due: '2026-12-01', state: 'paid' },
+      { actor: 'p_2' },
+    ),
+  );
   value(k.create('obligations', { what: 'Gone', party: 'Nobody' }, { actor: 'p_1' }));
   value(k.update('obligations', 'obligations#3', { deleted_at: '2026-09-05' }, { actor: 'p_1' }));
   value(k.update('obligations', 'obligations#1', { state: 'paid' }, { actor: 'rule:settle', note: 'Cleared on the statement' }));
+  everythingElse(sql);
   return { k, sql };
+}
+
+/**
+ * One row in every OTHER travelling table.
+ *
+ * Without this the round-trip proved almost nothing: the fixture filled `entry`, `event`,
+ * `declaration` and `counter`, so an export that silently dropped grants, members, metric points,
+ * predictions or the vault keys would have passed every assertion in this file — and a customer
+ * would have found out by opening their copy and discovering their credentials index was gone.
+ *
+ * These are written with SQL rather than through the kernel because most of them have no kernel
+ * write path yet, and the question this file asks is about the FORMAT, not about how a row got
+ * there.
+ */
+function everythingElse(sql: NodeSql): void {
+  const b = (n: number) => new Uint8Array([n, n + 1, 0, 255]);
+  sql.exec(
+    "INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum) VALUES ('freelance', '1.2.0', 'kennel', NULL, '{\"name\":\"Freelance\"}', '2026-01-04T09:00:00.000Z', 'abc123')",
+  );
+  sql.exec("INSERT INTO person (id, email, name, suspended_at) VALUES ('p_1', 'h@example.test', 'Halden', NULL)");
+  sql.exec(
+    "INSERT INTO metric_point (series, grain, at, value, unit, n, source, wrote_at) VALUES ('revenue', 'month', '2026-08', 72000, 'GBP', 3, 'obligations', '2026-09-01T00:00:00.000Z')",
+  );
+  sql.exec(
+    "INSERT INTO inbox_raw (id, ts, channel, headers, body, sha256, state, reason) VALUES ('in_1', '2026-08-02T10:00:00.000Z', 'email', '{\"from\":\"halden\"}', 'Invoice attached', 'deadbeef', 'matched', NULL)",
+  );
+  sql.exec(
+    "INSERT INTO ingest_receipt (id, raw_id, ingest_id, wrote, confidence, ts) VALUES ('ir_1', 'in_1', 'ingest.invoices', '[\"obligations#1\"]', 'exact', '2026-08-02T10:00:01.000Z')",
+  );
+  sql.exec(
+    "INSERT INTO decision (id, question, answer, reason, decided_by, ts, supersedes) VALUES ('D1', 'Do we chase at 30 days?', 'Yes', 'Two clients paid only after a reminder.', 'p_1', '2026-08-10T00:00:00.000Z', NULL)",
+  );
+  sql.exec(
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, resolved_as, defer_until, defer_why) VALUES ('SG1', 'options', '{\"options\":[]}', 'open', 'system', '2026-08-11T00:00:00.000Z', NULL, NULL, NULL)",
+  );
+  sql.exec(
+    "INSERT INTO prediction (id, for_decl, claim, measure, baseline, unit, target, window, score_at, scored_at, observed, met, on_miss) VALUES ('pr_1', 'register.obligations', 'Chasing halves the wait', '{\"source\":\"obligations\"}', 41, 'days', '20', '90d', '2026-11-10T00:00:00.000Z', NULL, NULL, NULL, 'suggest')",
+  );
+  sql.exec("INSERT INTO member (person_id, register, level, seen_at) VALUES ('p_1', '*', 'owner', '2026-09-01T00:00:00.000Z')");
+  sql.exec(
+    'INSERT INTO grant (id, label, opens, kind, version, ciphertext, nonce, kdf, wrapped_by, kek_id, bytes, hint, created_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'g_1',
+    'Stripe, live',
+    'stripe.com',
+    'api_token',
+    b(7),
+    b(9),
+    'hkdf',
+    'kek',
+    'kek_2f',
+    64,
+    'a 64-char token',
+    '2026-01-01T00:00:00.000Z',
+  );
+  sql.exec(
+    "INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id, salt, rewrapped_at) VALUES ('record', ?, ?, 'kek', 'kek_2f', NULL, NULL)",
+    b(3),
+    b(5),
+  );
+  sql.exec(
+    "INSERT INTO outbox (id, created, kind, payload, state, attempts) VALUES ('ob_1', '2026-09-05T12:00:00.000Z', 'notify.email', '{\"to\":\"p_1\"}', 'pending', 0)",
+  );
 }
 
 /* ── the file is stable ──────────────────────────────────────────────────── */
@@ -67,8 +136,8 @@ test('TWO EXPORTS OF AN UNCHANGED RECORD ARE THE SAME BYTES', async () => {
   // instead of `diff`. When the file is signed, the time lives in the signature — where a time that
   // is about the ACT rather than the CONTENT belongs.
   const { k, sql } = await filled();
-  const first = await k.export();
-  const second = await k.export();
+  const first = value<string[]>(await k.export());
+  const second = value<string[]>(await k.export());
   assert.deepEqual(second, first);
   assert.ok(!first.join('\n').includes('exported_at'), 'the file carries a timestamp of its own making');
   sql.close();
@@ -76,9 +145,9 @@ test('TWO EXPORTS OF AN UNCHANGED RECORD ARE THE SAME BYTES', async () => {
 
 test('and a write changes them, which is the other half of that being useful', async () => {
   const { k, sql } = await filled();
-  const before = await k.export();
+  const before = value<string[]>(await k.export());
   value(k.create('obligations', { what: 'One more' }, { actor: 'p_1' }));
-  assert.notDeepEqual(await k.export(), before);
+  assert.notDeepEqual(value<string[]>(await k.export()), before);
   sql.close();
 });
 
@@ -88,7 +157,7 @@ test('A TABLE’S HASH IS CHECKABLE WITH sed AND sha256sum AND NOTHING ELSE', as
   // The whole argument for lines over a zip of JSON: somebody who does not trust us can verify a
   // table without a tool of ours.
   const { k, sql } = await filled();
-  const lines = await k.export();
+  const lines = value<string[]>(await k.export());
 
   const claimed = new Map(
     sql.all<{ table_name: string; rows: number; sha256: string }>('SELECT table_name, rows, sha256 FROM dog_manifest').map((r) => [
@@ -125,7 +194,7 @@ test('the header travels, the local section does not', async () => {
   // A lockout counter and a device grant are facts about one machine, and a record that carried them
   // would import somebody else's failed logins.
   const { k, sql } = await filled();
-  const lines = await k.export();
+  const lines = value<string[]>(await k.export());
   const named = lines.filter((l) => l.startsWith('#table ')).map((l) => l.slice(7).split(' ')[0]);
 
   for (const wanted of ['dog_meta', 'dog_section', 'dog_manifest', 'entry', 'event', 'declaration', 'counter', 'dog_sig'])
@@ -144,7 +213,7 @@ test('a section can be left out, and the header still travels', async () => {
   // Data without origin is a clean handover; origin without data is an audit. Both are cheap because
   // the sections are addressable.
   const { k, sql } = await filled();
-  const clean = await k.export({ sections: ['data'] });
+  const clean = value<string[]>(await k.export({ sections: ['data'] }));
   const named = clean.filter((l) => l.startsWith('#table ')).map((l) => l.slice(7).split(' ')[0]);
   assert.ok(named.includes('entry'), 'the data went missing');
   assert.ok(named.includes('dog_meta'), 'the header has to travel whatever else does');
@@ -157,14 +226,14 @@ test('a section can be left out, and the header still travels', async () => {
 
 test('EXPORT · IMPORT · EXPORT PRODUCES THE SAME FILE, which is the only proof it is complete', async () => {
   const source = await filled();
-  const first = await source.k.export();
+  const first = value<string[]>(await source.k.export());
 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   const report = value<{ tables: number; rows: number }>(k.import(first));
   assert.ok(report.rows > 5, `only ${report.rows} rows arrived`);
 
-  const second = await k.export();
+  const second = value<string[]>(await k.export());
   /* The ledger is the one table that does not round-trip across machines: it is a fact about the
      database it is in, and the target applied its own migrations before it could read a file at all.
      Here both were applied by the same build at the same clock, so the lines are identical anyway —
@@ -176,7 +245,7 @@ test('EXPORT · IMPORT · EXPORT PRODUCES THE SAME FILE, which is the only proof
 
 test('and everything the record could answer before, it answers after', async () => {
   const source = await filled();
-  const lines = await source.k.export();
+  const lines = value<string[]>(await source.k.export());
 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
@@ -211,7 +280,7 @@ test('AN IMPORT OPENS A FILE INTO AN EMPTY RECORD, and refuses anything else', a
   // who knows. A tool that guessed would be wrong quietly, which for a record of what somebody is
   // owed is the worst failure available.
   const source = await filled();
-  const lines = await source.k.export();
+  const lines = value<string[]>(await source.k.export());
   const target = await filled();
 
   const out = target.k.import(lines) as { ok: boolean; refusal?: { code: string; fix: string } };
@@ -221,6 +290,81 @@ test('AN IMPORT OPENS A FILE INTO AN EMPTY RECORD, and refuses anything else', a
   assert.equal(target.k.count('obligations'), 2, 'a refused import wrote rows anyway');
   source.sql.close();
   target.sql.close();
+});
+
+test('every travelling table arrives, and not one of them quietly stays behind', async () => {
+  // The fixture puts a row in every table that travels, so this is the assertion that a dropped
+  // table is caught. The earlier fixture filled four of them, which meant an export that lost the
+  // grants — a customer's whole credentials index — passed every test in this file.
+  const source = await filled();
+  const lines = value<string[]>(await source.k.export());
+
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(k.import(lines));
+
+  const travelling = source.sql
+    .all<{ table_name: string; section: string }>('SELECT table_name, section FROM dog_section')
+    .filter((r) => r.section !== 'local' && r.section !== 'header' && r.table_name !== 'migration');
+
+  for (const { table_name } of travelling) {
+    const before = source.sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${table_name}`)?.n ?? 0;
+    const after = sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${table_name}`)?.n ?? 0;
+    assert.equal(after, before, `${table_name}: ${before} rows went in and ${after} came out`);
+    if (table_name !== 'entry_fts' && table_name !== 'entry_vec' && table_name !== 'record')
+      assert.ok(Number(before) > 0, `${table_name} is empty in the fixture, so this proves nothing about it`);
+  }
+
+  // And a blob is still a blob, not the base64 of one.
+  const grant = sql.one<{ ciphertext: Uint8Array; kek_id: string }>('SELECT ciphertext, kek_id FROM grant');
+  assert.deepEqual(Array.from(grant?.ciphertext ?? []), [7, 8, 0, 255], 'the sealed bytes did not survive the file');
+  assert.equal(grant?.kek_id, 'kek_2f');
+  sql.close();
+  source.sql.close();
+});
+
+test('A RECORD WITH NO ROWS BUT ITS OWN GOVERNANCE IS NOT EMPTY', async () => {
+  // The emptiness check used to count entries only. A record holding registers, decisions and grants
+  // and no rows called itself empty — and then the first `declaration` line cleared the declarations
+  // while the decisions and grants stood, which is the half-merge the refusal exists to prevent.
+  const source = await filled();
+  const lines = value<string[]>(await source.k.export());
+
+  const sql = openSqlite();
+  const target = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await target.install([OBLIGATIONS])).ok);
+  sql.exec(
+    "INSERT INTO decision (id, question, answer, reason, decided_by, ts) VALUES ('D9', 'q', 'a', 'r', 'p_1', '2026-01-01T00:00:00.000Z')",
+  );
+  assert.equal(target.count('obligations'), 0, 'the target does hold rows, so this tests the old check');
+
+  const out = target.import(lines) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.equal(out.ok, false, 'a record holding a register and a decision was called empty');
+  assert.equal(out.refusal?.code, 'RECORD_NOT_EMPTY');
+  assert.match(out.refusal?.fix ?? '', /declaration|decision/, 'the refusal does not say what is in the way');
+  assert.ok(target.register('obligations'), 'the refused import destroyed the register anyway');
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM decision')?.n, 1);
+  sql.close();
+  source.sql.close();
+});
+
+test('a damaged file is a refusal and not an exception, and it writes nothing', async () => {
+  const source = await filled();
+  const lines = value<string[]>(await source.k.export());
+  const at = lines.findIndex((l) => l.startsWith('[') && l.includes('obligations'));
+  assert.ok(at > 0, 'no row line to damage');
+
+  for (const damage of [lines[at]!.slice(0, 20), '{"not":"an array"}']) {
+    const broken = [...lines.slice(0, at), damage, ...lines.slice(at + 1)];
+    const sql = openSqlite();
+    const k = await openRecord(sql, fixedClock(NOW));
+    const out = k.import(broken) as { ok: boolean; refusal?: { code: string; fix: string } };
+    assert.equal(out.ok, false, `\`${damage.slice(0, 24)}…\` was imported as if it were a row`);
+    assert.equal(out.refusal?.code, 'MALFORMED_FILE');
+    assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 0, 'a failed import left rows behind');
+    sql.close();
+  }
+  source.sql.close();
 });
 
 /* ── the values survive ──────────────────────────────────────────────────── */
@@ -234,7 +378,7 @@ test('every kind of value comes back as itself', async () => {
       { actor: 'p_1' },
     ),
   );
-  const lines = await k.export();
+  const lines = value<string[]>(await k.export());
 
   const to = openSqlite();
   const k2 = await openRecord(to, fixedClock(NOW));
@@ -251,7 +395,7 @@ test('the shape is read from the schema, so a table nobody listed still travels'
   // A list of tables in the format code would be a second copy of the schema, and the copy that
   // drifted would be the one deciding what a customer's file contains.
   const { k, sql } = await filled();
-  const lines = await k.export();
+  const lines = value<string[]>(await k.export());
   const named = new Set(lines.filter((l) => l.startsWith('#table ')).map((l) => l.slice(7).split(' ')[0]));
   const travelling = sql
     .all<{ table_name: string; section: string }>('SELECT table_name, section FROM dog_section')

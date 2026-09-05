@@ -190,23 +190,52 @@ export function importDogl(
   transaction: <T>(fn: () => T) => T,
   lines: Iterable<string>,
 ): { ok: true; value: ImportReport } | { ok: false; refusal: { code: string; fix: string } } {
-  const existing = sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n ?? 0;
-  if (Number(existing) > 0)
+  const shapes = new Map(tables(sql).map((t) => [t.name, t]));
+
+  /* EMPTY MEANS EVERY TABLE THE FILE WOULD TOUCH, not just `entry`.
+     Counting entries alone let a record that held registers, decisions and grants but no rows call
+     itself empty — and then the first `declaration` line cleared `declaration` while the target's
+     own decisions and grants survived beside the file's. That is exactly the per-row merge the
+     refusal below says nobody should make, performed silently and half-way. */
+  const held = notEmpty(sql, shapes);
+  if (held)
     return {
       ok: false,
       refusal: {
         code: 'RECORD_NOT_EMPTY',
-        fix: 'An import opens a file into an empty record. Merging two records is a decision per row, and it is not this tool’s to make.',
+        fix: `An import opens a file into an empty record, and this one already holds ${held}. Merging two records is a decision per row, and it is not this tool’s to make.`,
       },
     };
 
-  const shapes = new Map(tables(sql).map((t) => [t.name, t]));
   let table: TableShape | null = null;
   let header: string[] = [];
   let rows = 0;
   const touched = new Set<string>();
 
-  const out = transaction(() => {
+  let out: ImportReport;
+  try {
+    out = read();
+  } catch (e) {
+    /* A FILE IS UNTRUSTED INPUT. A truncated line, a row that violates a constraint, a column whose
+       value is the wrong type — all of them arrived here as a thrown Error, which a caller reading
+       `Result` never sees coming. The transaction had already rolled back; the only thing missing
+       was a sentence saying so. */
+    return {
+      ok: false,
+      refusal: {
+        code: e instanceof BadLine ? 'MALFORMED_FILE' : 'IMPORT_FAILED',
+        fix:
+          e instanceof BadLine
+            ? `${e.message} The file is damaged; re-export it from the record it came from.`
+            : `The file could not be read into this record: ${e instanceof Error ? e.message : String(e)}. Nothing was written.`,
+      },
+    };
+  }
+
+  return { ok: true, value: out };
+
+  function read(): ImportReport {
+  return transaction(() => {
     for (const raw of lines) {
       const line = raw.trimEnd();
       if (!line) continue;
@@ -236,7 +265,7 @@ export function importDogl(
          clears it. `entry` is already empty by the check above; this is about the seed. */
       if (!touched.has(table.name)) sql.exec(`DELETE FROM ${table.name}`);
 
-      const values = JSON.parse(line) as unknown[];
+      const values = parseRow(line, table.name);
       /* THE FILE'S COLUMNS, not this build's. A file written by an older version has fewer, and
          reading it positionally against today's list would put a value in the wrong column —
          silently, and in a record of what somebody is owed. */
@@ -251,6 +280,47 @@ export function importDogl(
     }
     return { tables: touched.size, rows };
   });
+  }
+}
 
-  return { ok: true, value: out };
+/** Thrown when a row line is not a JSON array, so the transaction rolls back and the caller gets a sentence. */
+class BadLine extends Error {}
+
+function parseRow(line: string, table: string): unknown[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    throw new BadLine(`A row under #table ${table} is not JSON.`);
+  }
+  if (!Array.isArray(parsed)) throw new BadLine(`A row under #table ${table} is not an array of values.`);
+  return parsed;
+}
+
+/**
+ * What this record already holds, in the words a person would use — or `null` when it holds nothing.
+ *
+ * The seed is not content: the migration writes `dog_section`, `dog_meta` and two counters at 1, and
+ * a record that has only those has never been written to.
+ */
+const SEEDED = new Set(['migration', 'record', 'entry_fts', 'entry_vec']);
+
+function notEmpty(sql: Sql, shapes: Map<string, TableShape>): string | null {
+  const found: string[] = [];
+  for (const [name, shape] of shapes) {
+    /* `record` is identity rather than content — one row saying what this record is called. Opening
+       a file into an empty record adopts the file's identity, which is the point; the seeded
+       counters are likewise not content. `migration` is a fact about this database and never
+       imported at all, and the two shadow tables are derived from `entry`. */
+    if (shape.section === 'header' || SEEDED.has(name)) continue;
+    const n = Number(
+      sql.one<{ n: number }>(
+        name === 'counter'
+          ? "SELECT count(*) AS n FROM counter WHERE next > 1 OR name NOT IN ('decision', 'suggestion')"
+          : `SELECT count(*) AS n FROM ${name}`,
+      )?.n ?? 0,
+    );
+    if (n > 0) found.push(`${n} ${name}`);
+  }
+  return found.length ? found.join(', ') : null;
 }

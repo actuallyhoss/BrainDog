@@ -76,6 +76,12 @@ const NUMERIC_SUBPATH: Record<string, string> = { money: '.amount', quantity: '.
 const extract = (field: string, type: string, part = ''): string =>
   `json_extract(fields, '${jsonPath(field)}${part || NUMERIC_SUBPATH[type] || ''}')`;
 
+/** The half of a compound value that is not its number: a currency, a unit. */
+const QUALIFIER: Record<string, { part: string; key: string }> = {
+  money: { part: 'currency', key: 'currency' },
+  quantity: { part: 'unit', key: 'unit' },
+};
+
 const ORDERED = new Set(['int', 'decimal', 'duration', 'money', 'quantity', 'day', 'instant']);
 const TEXTUAL = new Set(['text', 'document', 'url', 'email', 'enum', 'ref', 'secret']);
 
@@ -88,6 +94,20 @@ function operatorAllowed(op: Operator, type: string): boolean {
   if (op === 'contains' || op === 'starts' || op === 'ends') return TEXTUAL.has(type);
   if (op === 'has' || op === 'lacks') return type === 'list';
   return false;
+}
+
+/**
+ * The clause that keeps a compound value whole.
+ *
+ * A money value is an amount AND a currency; a quantity is a number AND a unit. Comparing only the
+ * numbers is the exact mistake minor units exist to make impossible, and it was being made
+ * everywhere except `is` and the ordered operators.
+ */
+function qualifier(field: string, type: string, value: unknown, put: (v: string | number) => string): string {
+  const q = QUALIFIER[type];
+  if (!q || typeof value !== 'object' || value === null) return '';
+  const half = (value as Record<string, unknown>)[q.key];
+  return half === undefined ? '' : ` AND ${extract(field, type, `.${q.part}`)} = ${put(String(half))}`;
 }
 
 const refuse = (code: string, fix: string, at?: string, allowed?: readonly string[]): Refusal => ({
@@ -126,7 +146,12 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
          nothing, which is what the two words mean, and guessing either way would be a filter that
          silently passed or silently blocked. */
       if (kids.length === 0) return q === 'any' ? '0 = 1' : '1 = 1';
-      const joined = kids.join(q === 'any' ? ' OR ' : ' AND ');
+      /* `none` IS `NOT ANY`, and the difference bites the moment there are two children: joining
+         with AND makes it "not all", which passes every row that fails only one of them. Both
+         `34-GRAMMARS` §1.1 and `evaluate` below say NOT-OR, and this said NOT-AND — invisible in
+         the tests because every `none` case in them had exactly one child, where the two joins are
+         the same string. */
+      const joined = kids.join(q === 'all' ? ' AND ' : ' OR ');
       return q === 'none' ? `NOT (${joined})` : `(${joined})`;
     }
 
@@ -151,7 +176,11 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
       return '';
     }
 
-    const decl = schema.fields[field];
+    /* `Object.hasOwn`, NOT a truthiness check: `constructor` is a real field id by the grammar and
+       resolves against `Object.prototype`, so `{field: 'constructor', is: 'x'}` compiled to a clause
+       that matched nothing — a filter that quietly returned an empty list, which is the failure this
+       whole module exists to prevent. */
+    const decl = Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
     if (!decl) {
       bad.push(
         refuse('FIELD_UNKNOWN', `${schema.register} has no field called ${field}.`, field, Object.keys(schema.fields)),
@@ -208,8 +237,8 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            that silently returned an empty list rather than a wrong one, which is the failure this
            whole package is built to avoid. */
         const cmp = `${path} = ${put(bound)}`;
-        const money = decl.type === 'money' ? ` AND ${extract(field, decl.type, '.currency')} = ${put(String((value as Money).currency))}` : '';
-        return op === 'is' ? `(${cmp}${money})` : `(${path} IS NULL OR NOT (${cmp}${money}))`;
+        const qualified = qualifier(field, decl.type, value, put);
+        return op === 'is' ? `(${cmp}${qualified})` : `(${path} IS NULL OR NOT (${cmp}${qualified}))`;
       }
 
       case 'in':
@@ -225,8 +254,12 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
           bad.push(refuse('VALUE_MALFORMED', `${field} was given a value it cannot hold.`, field));
           return '';
         }
-        const placeholders = bounds.map(put).join(', ');
-        return op === 'in' ? `(${path} IN (${placeholders}))` : `(${path} IS NULL OR ${path} NOT IN (${placeholders}))`;
+        /* EVERY VALUE CARRIES ITS OWN QUALIFIER. `in` was compiled as a bare `IN (…)` over the
+           amounts, so 24,000 EUR matched a list holding 24,000 GBP — the exact mistake the `is`
+           branch was written to prevent, in the branch beside it. One clause per value, ORed. */
+        const each = list.map((v, i) => `(${path} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
+        const any = each.join(' OR ');
+        return op === 'in' ? `(${any})` : `(${path} IS NULL OR NOT (${any}))`;
       }
 
       case 'gt':
@@ -241,9 +274,9 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
           return '';
         }
         const sign = op === 'gt' ? '>' : op === 'gte' ? '>=' : op === 'lt' || op === 'before' ? '<' : op === 'lte' ? '<=' : '>';
-        // Bound first, currency second, in the order the placeholders appear. See `is` above.
+        // Bound first, qualifier second, in the order the placeholders appear. See `is` above.
         const cmp = `${path} ${sign} ${put(bound)}`;
-        const money = decl.type === 'money' ? ` AND ${extract(field, decl.type, '.currency')} = ${put(String((value as Money).currency))}` : '';
+        const money = qualifier(field, decl.type, value, put);
         /* A ROW WITH NO VALUE IS NOT BEFORE ANYTHING. `IS NOT NULL` is explicit rather than relying
            on SQLite's null comparison, because the same predicate is answered by `evaluate` in
            JavaScript, where `undefined < x` is false and `undefined > x` is also false — two
@@ -259,7 +292,10 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
           bad.push(refuse('WHERE_MALFORMED', `${field} between takes two values, low first.`, field));
           return '';
         }
-        return `(${path} IS NOT NULL AND ${path} >= ${put(lo)} AND ${path} <= ${put(hi)})`;
+        /* The bounds carry their currency too: `between 20,000 and 30,000 USD` matched a GBP row and
+           a EUR row in BOTH renderings, so nothing flagged it — a shared bug is invisible to a test
+           that only compares the two. */
+        return `(${path} IS NOT NULL AND ${path} >= ${put(lo)} AND ${path} <= ${put(hi)}${qualifier(field, decl.type, pair[0], put)})`;
       }
 
       case 'contains':
@@ -320,7 +356,7 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
 
     const leaf = node as Record<string, unknown>;
     const field = typeof leaf.field === 'string' ? leaf.field : '';
-    const decl = schema.fields[field];
+    const decl = Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
     if (!decl) return false;
 
     const raw = fields[field];
@@ -362,7 +398,7 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
         const a = comparable(raw);
         const b = comparable(value);
         if (a === null || b === null) return false;
-        if (type === 'money' && (raw as Money).currency !== (value as Money).currency) return false;
+        if (!sameQualifier(type, raw, value)) return false;
         if (op === 'gt' || op === 'after') return a > b;
         if (op === 'gte') return a >= b;
         if (op === 'lt' || op === 'before') return a < b;
@@ -373,14 +409,22 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
         const a = comparable(raw);
         const lo = comparable(value[0]);
         const hi = comparable(value[1]);
+        /* THE BOUNDS CARRY THEIR CURRENCY TOO. Without this, `between 20,000 and 30,000 USD` matched
+           a GBP row and a EUR row — and it was wrong in BOTH renderings, so comparing them against
+           each other flagged nothing. A shared mistake is the one a differential test cannot see. */
+        if (!sameQualifier(type, raw, value[0])) return false;
         return a !== null && lo !== null && hi !== null && a >= lo && a <= hi;
       }
+      /* CASE-FOLDED, because SQLite's LIKE is and `34-GRAMMARS` §1.2 says the operator is. This was
+         `includes` on the raw strings, so a rule evaluated mid-write and the list drawn afterwards
+         disagreed about the same row — the exact failure this module's header names, in the module
+         that names it. */
       case 'contains':
-        return !absent && typeof raw === 'string' && typeof value === 'string' && raw.includes(value);
+        return !absent && typeof raw === 'string' && typeof value === 'string' && fold(raw).includes(fold(value));
       case 'starts':
-        return !absent && typeof raw === 'string' && typeof value === 'string' && raw.startsWith(value);
+        return !absent && typeof raw === 'string' && typeof value === 'string' && fold(raw).startsWith(fold(value));
       case 'ends':
-        return !absent && typeof raw === 'string' && typeof value === 'string' && raw.endsWith(value);
+        return !absent && typeof raw === 'string' && typeof value === 'string' && fold(raw).endsWith(fold(value));
       case 'has':
         return Array.isArray(raw) && raw.some((v) => v === value);
       case 'lacks':
@@ -391,6 +435,22 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
   };
 
   return one(where);
+}
+
+/** ASCII case folding, which is what SQLite's LIKE does and therefore what the operator means. */
+const fold = (s: string): string => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+
+/**
+ * Do a stored value and an operand agree about the half that is not the number?
+ *
+ * A currency for money, a unit for a quantity. Every comparison of a compound value has to ask this,
+ * and the ones that did not were comparing 24,000 GBP with 24,000 EUR and calling them equal.
+ */
+function sameQualifier(type: string, a: unknown, b: unknown): boolean {
+  const q = QUALIFIER[type];
+  if (!q) return true;
+  if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
+  return (a as Record<string, unknown>)[q.key] === (b as Record<string, unknown>)[q.key];
 }
 
 /** Equality, by type: money is equal when both halves are, because a number is not an amount. */

@@ -209,6 +209,29 @@ test('an immutable field is set once', async () => {
   sql.close();
 });
 
+test('AN IMMUTABLE FIELD ACCEPTS THE VALUE IT ALREADY HOLDS, whatever shape that value is', async () => {
+  /* The check compared the RAW patch against the STORED coerced value with `!==`. An object is never
+     `===` another object, so an immutable `money` could never be re-sent — which locked out every
+     client that does a read-modify-write of the whole field set, on a row it had not changed. */
+  const { k, sql } = await record([{ ...OBLIGATIONS, fields: [...OBLIGATIONS.fields, { id: 'agreed', type: 'money', immutable: true }] } as RegisterDecl]);
+  value(k.create('obligations', { what: 'a', agreed: { amount: 48_000, currency: 'GBP' }, opened: '2026-01-01' }, { actor: 'p_1' }));
+
+  // The same money, sent again, is not a change.
+  value(k.update('obligations', 'obligations#1', { agreed: { amount: 48_000, currency: 'GBP' } }, { actor: 'p_1' }));
+  // And a value that only coercion makes equal is not a change either.
+  value(k.update('obligations', 'obligations#1', { opened: '2026-01-01' }, { actor: 'p_1' }));
+
+  // A different currency at the same amount IS a change, and the same amount is not the same money.
+  assert.equal(
+    refusal(k.update('obligations', 'obligations#1', { agreed: { amount: 48_000, currency: 'EUR' } }, { actor: 'p_1' })).code,
+    'IMMUTABLE_FIELD',
+  );
+  // And clearing it is a change, which the reference comparison let through.
+  assert.equal(refusal(k.update('obligations', 'obligations#1', { agreed: null }, { actor: 'p_1' })).code, 'IMMUTABLE_FIELD');
+  assert.deepEqual(k.get('obligations#1')?.fields.agreed, { amount: 48_000, currency: 'GBP' });
+  sql.close();
+});
+
 test('a transition the register forbids is refused, and says where the row may go', async () => {
   const { k, sql } = await record();
   value(k.create('obligations', { what: 'a', state: 'open' }, { actor: 'p_1' }));

@@ -231,9 +231,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     const c = compile(q.where, schemaOf(q.register));
     if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
 
-    const limit = Math.min(Math.max(1, q.limit ?? 50), 500);
-    const deleted = q.includeDeleted ? '' : ' AND deleted_at IS NULL';
-    const [at, afterId] = (q.cursor ?? '').split('|');
+    /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote: `cursor=5` is a number
+       by the time `serveApi` has JSON-decoded it, and `.split` on a number threw a TypeError out of
+       the route — as did `limit=abc`, which bound NaN to a LIMIT. A refusal is a value here; an
+       exception is not. */
+    const limit = Math.min(Math.max(1, Math.floor(Number(q.limit)) || 50), 500);
+    const deleted = q.includeDeleted === true ? '' : ' AND deleted_at IS NULL';
+    const [at, afterId] = (typeof q.cursor === 'string' ? q.cursor : '').split('|');
     const page = at
       ? sql.all<Record<string, unknown>>(
           `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) AND (updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
@@ -299,6 +303,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
           { at: 'version' },
         );
 
+      /* Read before the checks, because uniqueness on a restore depends on it. */
+      const deleting = patch.deleted_at !== undefined;
+
       const known = new Map(decl.fields.filter((f) => !f.retired).map((f) => [f.id, f]));
       const merged: Record<string, Json> = { ...(current?.fields ?? {}) };
       const touched: string[] = [];
@@ -321,11 +328,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
           });
         if (field.derived)
           return no<Entry>('IMMUTABLE_FIELD', `${key} is derived, so the record computes it.`, { at: key });
-        if (field.immutable && current && current.fields[key] !== undefined && current.fields[key] !== value)
-          return no<Entry>('IMMUTABLE_FIELD', `${key} is set once and cannot be changed.`, { at: key });
-
         touched.push(key);
         if (value === null) {
+          if (field.immutable && current && current.fields[key] !== undefined)
+            return no<Entry>('IMMUTABLE_FIELD', `${key} is set once, so it cannot be cleared either.`, { at: key });
           delete merged[key];
           continue;
         }
@@ -335,6 +341,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
           grantExists: (id) => Boolean(sql.one('SELECT 1 AS x FROM grant WHERE id = ?', id)),
         });
         if (!out.ok) return { ok: false, refusal: out.refusal };
+
+        /* AFTER COERCION, AND STRUCTURALLY. This compared the RAW patch value against the STORED
+           coerced one by identity, so an immutable `money` could never be re-sent — an object is
+           never `===` another object — and any client doing a read-modify-write of the whole field
+           set was permanently locked out of the row. `'5'` against a stored `5` had the same
+           problem in the other direction. */
+        if (
+          field.immutable &&
+          current &&
+          current.fields[key] !== undefined &&
+          JSON.stringify(current.fields[key]) !== JSON.stringify(out.value)
+        )
+          return no<Entry>('IMMUTABLE_FIELD', `${key} is set once and cannot be changed.`, { at: key });
         // Absent is one thing, not three: null, "" and [] all remove the key (K2).
         if (isAbsent(out.value)) delete merged[key];
         else merged[key] = out.value;
@@ -354,7 +373,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
             allowed: f.values ?? [],
           });
 
-        if (value !== undefined && f.unique && touched.includes(f.id)) {
+        /* A RESTORE TOUCHES NOTHING AND CHANGES EVERYTHING. The row was invisible to the partial
+           unique index while it was deleted, so another row may have taken its value — and bringing
+           it back raised a raw SQLite constraint error out of the write path and out of `serveApi`,
+           which is a promise this package makes in bold two files away. */
+        const restoring = deleting && patch.deleted_at === null && current?.deleted_at !== null;
+        if (value !== undefined && f.unique && (touched.includes(f.id) || restoring)) {
           const clash = sql.one<{ seq: number | null; id: string }>(
             `SELECT seq, id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${f.id}') = ? AND id <> ?`,
             register,
@@ -378,17 +402,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
         const field = known.get(decl.state);
         const from = current.state ?? '';
         const legal = (field as { transitions?: Record<string, { to: string[] }> } | undefined)?.transitions?.[from];
-        if (legal && nextState && !legal.to.includes(nextState))
+        /* CLEARING THE STATE IS A MOVE, and skipping the check for it was a two-step way around
+           every transition the register declares: clear it, and the next write starts from `''`,
+           for which no transition is declared, so anything is legal. A row cannot leave a state it
+           is not allowed to leave by passing through nothing. */
+        if (legal && !legal.to.includes(nextState ?? ''))
           return no<Entry>(
             'TRANSITION_ILLEGAL',
-            `${register}#${current.seq} cannot go from ${from} to ${nextState}.`,
+            nextState === null
+              ? `${register}#${current.seq} is ${from}, and clearing a state is a move like any other.`
+              : `${register}#${current.seq} cannot go from ${from} to ${nextState}.`,
             { at: decl.state, allowed: legal.to },
           );
       }
 
       /* ── persist ── */
       const now = instant(clock.now());
-      const deleting = patch.deleted_at !== undefined;
       const deletedAt = deleting ? (patch.deleted_at === null ? null : now) : (current?.deleted_at ?? null);
 
       if (!current) {
@@ -544,8 +573,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     /** The reminders that are due, oldest first. What the alarm hands to whatever sends them. */
     due: (limit?: number) => due(sql, clock.now(), limit),
 
-    /** The record as a file: `.dogl` lines, header first, `local` left behind. */
-    export: (opts: { sections?: readonly Section[] } = {}) => exportDogl(sql, transaction, opts),
+    /**
+     * The record as a file: `.dogl` lines, header first, `local` left behind.
+     *
+     * Gated on the schema refusal like every other method, which it was not: a record whose schema
+     * disagrees with the code was still exportable, and the export rewrote its manifest — putting a
+     * hash of rows nobody can safely read into the file a customer keeps.
+     */
+    export(opts: { sections?: readonly Section[] } = {}) {
+      const refused = schemaRefusal(state);
+      if (refused) return Promise.resolve(refused as Result<string[]>);
+      return exportDogl(sql, transaction, opts).then((lines) => ok(lines));
+    },
 
     /**
      * A file into an empty record, then the index rebuilt from the rows it now holds.
@@ -554,6 +593,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
      * just brought — a search index built before them would index nothing and look like it worked.
      */
     import(lines: Iterable<string>) {
+      /* The one destructive path that was not gated. `migrate.ts` says in bold that the refusal is
+         sticky and every `Result`-returning method short-circuits on it; this one wrote seven rows
+         into a record whose schema the code cannot read. */
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
       const out = importDogl(sql, transaction, lines);
       if (out.ok) {
         reload();

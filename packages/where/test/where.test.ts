@@ -30,7 +30,7 @@ const SCHEMA: Schema = {
 type Row = { id: string; fields: Record<string, unknown> };
 
 const ROWS: Row[] = [
-  { id: 'a', fields: { what: 'Invoice 41 — brand', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', n: 3, state: 'open', tags: ['urgent', 'design'] } },
+  { id: 'a', fields: { what: 'Invoice 41 — brand', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', n: 3, state: 'open', tags: ['urgent', 'design'], effort: { value: 2, unit: 'days' } } },
   { id: 'b', fields: { what: 'Retainer, August', amount: { amount: 24_000, currency: 'GBP' }, due: '2026-10-01', n: 9, state: 'paid', tags: ['retainer'] } },
   { id: 'c', fields: { what: 'Hosting', amount: { amount: 24_000, currency: 'EUR' }, due: '2026-09-05', n: 0, state: 'part', tags: [] } },
   { id: 'd', fields: { what: 'No amount at all', state: 'open' } },
@@ -131,6 +131,60 @@ test('all, any and none', () => {
   assert.deepEqual(both({ all: [{ field: 'state', is: 'open' }, { field: 'due', before: '2026-09-06' }] }), ['a']);
   assert.deepEqual(both({ any: [{ field: 'state', is: 'paid' }, { field: 'n', gte: 3 }] }), ['a', 'b']);
   assert.deepEqual(both({ none: [{ field: 'state', is: 'open' }] }), ['b', 'c']);
+});
+
+test('NONE IS NOT-ANY, AND WITH ONE CHILD YOU CANNOT TELL', () => {
+  // Every `none` case in this file had exactly one child, where `NOT (a)` and `NOT (a OR b)` are the
+  // same string — so `compile` joined with AND, meaning "not ALL", and passed every row that failed
+  // only one of the two. Two children is the smallest case that can tell them apart, and the sweep
+  // at the bottom of this file went twenty-three predicates without one.
+  const none = both({ none: [{ field: 'state', is: 'open' }, { field: 'n', gt: 0 }] });
+  const any = both({ any: [{ field: 'state', is: 'open' }, { field: 'n', gt: 0 }] });
+  assert.deepEqual(
+    none,
+    ROWS.map((r) => r.id).filter((id) => !any.includes(id)),
+    'none is not the complement of any',
+  );
+  assert.ok(none.length > 0 && none.length < ROWS.length, 'the fixture makes this vacuous');
+  // Three children, in case two happened to agree.
+  both({ none: [{ field: 'state', is: 'open' }, { field: 'n', gt: 0 }, { field: 'due', empty: true }] });
+});
+
+test('THE THREE STRING OPERATORS ARE CASE-FOLDED IN BOTH RENDERINGS', () => {
+  // SQLite's LIKE is ASCII case-insensitive and `evaluate` used `includes`, so a rule firing
+  // mid-write and the list drawn afterwards disagreed about the same row — the failure this
+  // module's own header names.
+  assert.deepEqual(both({ field: 'what', contains: 'invoice' }), ['a']);
+  assert.deepEqual(both({ field: 'what', contains: 'INVOICE' }), ['a']);
+  assert.deepEqual(both({ field: 'what', starts: 'RETAINER' }), ['b']);
+  assert.deepEqual(both({ field: 'what', ends: 'DEPOSIT' }), ['e']);
+  assert.deepEqual(both({ field: 'what', contains: 'HoStInG' }), ['c']);
+});
+
+test('AND THE QUALIFIER TRAVELS THROUGH EVERY OPERATOR, not only the two written first', () => {
+  // `in`, `not_in` and `between` compiled to bare comparisons of the amounts, so 24,000 EUR matched
+  // a list holding 24,000 GBP — the exact mistake the `is` branch was written to prevent, in the
+  // branch beside it. `between` was wrong in BOTH renderings, so comparing them flagged nothing:
+  // a shared bug is invisible to a test that only checks the two against each other.
+  assert.deepEqual(both({ field: 'amount', in: [{ amount: 24_000, currency: 'GBP' }] }), ['b']);
+  assert.deepEqual(both({ field: 'amount', not_in: [{ amount: 24_000, currency: 'GBP' }] }), ['a', 'c', 'd', 'e']);
+  assert.deepEqual(
+    both({ field: 'amount', between: [{ amount: 20_000, currency: 'GBP' }, { amount: 30_000, currency: 'GBP' }] }),
+    ['b'],
+    'a EUR row is inside a GBP range',
+  );
+  // And a quantity's unit, which never travelled at all.
+  assert.deepEqual(both({ field: 'effort', is: { value: 2, unit: 'days' } }), ['a']);
+  assert.deepEqual(both({ field: 'effort', is: { value: 2, unit: 'hours' } }), [], 'two days matched two hours');
+});
+
+test('a field id that is a property of every object is still not a field', () => {
+  // `constructor` passes the identifier grammar and resolves against `Object.prototype`, so it
+  // compiled to a clause that matched nothing — a filter that quietly returned an empty list, which
+  // is the failure this module exists to prevent.
+  const c = compile({ field: 'constructor', is: 'x' }, SCHEMA);
+  assert.equal(c.bad[0]?.code, 'FIELD_UNKNOWN');
+  assert.equal(evaluate({ field: 'constructor', is: 'x' }, ROWS[0]!.fields, SCHEMA), false);
 });
 
 test('an empty group is not an empty question', () => {
@@ -237,6 +291,22 @@ test('COMPILE AND EVALUATE ANSWER THE SAME QUESTION, over every predicate above'
     { all: [{ field: 'state', is: 'open' }, { field: 'tags', has: 'urgent' }] },
     { any: [{ field: 'due', empty: true }, { field: 'n', gte: 9 }] },
     { none: [{ field: 'amount', present: true }] },
+    /* THE ONES THE FIRST SWEEP DID NOT REACH, and each was a real disagreement: a `none` with more
+       than one child, the three string operators against a different case, and every operator that
+       compares a compound value. A sweep is only as wide as its list. */
+    { none: [{ field: 'state', is: 'open' }, { field: 'n', gt: 0 }] },
+    { none: [{ field: 'due', empty: true }, { field: 'tags', has: 'urgent' }, { field: 'n', lt: 1 }] },
+    { field: 'what', contains: 'INVOICE' },
+    { field: 'what', starts: 'hOsT' },
+    { field: 'what', ends: 'DEPOSIT' },
+    { field: 'amount', in: [{ amount: 24_000, currency: 'GBP' }, { amount: 48_000, currency: 'GBP' }] },
+    { field: 'amount', not_in: [{ amount: 24_000, currency: 'EUR' }] },
+    { field: 'amount', between: [{ amount: 20_000, currency: 'GBP' }, { amount: 60_000, currency: 'GBP' }] },
+    { field: 'effort', present: true },
+    { field: 'effort', is: { value: 2, unit: 'days' } },
+    { field: 'effort', is: { value: 2, unit: 'hours' } },
+    { field: 'n', is: 0 },
+    { field: 'n', not: 0 },
   ];
   for (const p of predicates) both(p);
 });

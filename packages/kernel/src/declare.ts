@@ -154,6 +154,14 @@ export function validate(decl: Declaration): Refusal | null {
   return null;
 }
 
+/** Thrown inside the transaction so it rolls back, and turned into a refusal outside it. */
+class UniqueClash extends Error {
+  /** `<register>.<field>` — the first word of the message, which is where the caller should look. */
+  get at(): string {
+    return this.message.split(' ')[0] ?? '';
+  }
+}
+
 export type Installed = { id: string; version: number; changed: boolean };
 
 /**
@@ -176,6 +184,15 @@ export async function installDeclarations(
   const sums = await Promise.all(batch.map((d) => digest(jcs(d.body))));
   const at = instant(now);
 
+  try {
+    return install();
+  } catch (e) {
+    if (e instanceof UniqueClash)
+      return no<Installed[]>('UNIQUE_VIOLATION', `${e.message} Fix them, then install again.`, { at: e.at });
+    throw e;
+  }
+
+  function install(): Result<Installed[]> {
   return transaction(() => {
     const out: Installed[] = [];
 
@@ -211,15 +228,57 @@ export async function installDeclarations(
         at,
       );
 
-      if (decl.kind === 'register')
-        for (const statement of indexesFor(decl.body.id as string, (decl.body.fields ?? []) as unknown as FieldLike[]))
-          sql.exec(statement);
+      if (decl.kind === 'register') {
+        const register = decl.body.id as string;
+        const fields = (decl.body.fields ?? []) as unknown as FieldLike[];
+
+        /* DROPPED BEFORE THEY ARE CREATED. `CREATE INDEX IF NOT EXISTS` alone meant an index
+           outlived the declaration that asked for it: take `unique:` off a field and the unique
+           index kept refusing duplicates, retire the field entirely and both its indexes stayed.
+           The record enforced a rule the declaration no longer makes.
+
+           The prefix is matched in TypeScript rather than with LIKE, because `_` is a LIKE wildcard
+           and a register id may contain one — `entry_i_invoice__%` would also match the indexes of a
+           register called `invoiced`, and dropping another register's indexes is a silent slowdown
+           nobody would connect to this install. */
+        const mine = [`entry_i_${register}__`, `entry_u_${register}__`];
+        for (const row of sql.all<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'entry'",
+        ))
+          if (mine.some((prefix) => row.name.startsWith(prefix))) sql.exec(`DROP INDEX IF EXISTS ${row.name}`);
+
+        /* A UNIQUE INDEX OVER ROWS THAT ALREADY CLASH is a refusal, not an exception. SQLite raises
+           a constraint error at CREATE, which escaped `install` as a throw. */
+        for (const f of fields) {
+          if (!f.unique || f.retired) continue;
+          const clash = sql.one<{ v: string; c: number }>(
+            `SELECT json_extract(fields, '${jsonPath(f.id)}') AS v, count(*) AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND v IS NOT NULL GROUP BY v HAVING c > 1 ORDER BY c DESC LIMIT 1`,
+            register,
+          );
+          if (clash) throw new UniqueClash(`${register}.${f.id} cannot be unique: ${clash.c} rows already say ${JSON.stringify(clash.v)}.`);
+        }
+
+        for (const statement of indexesFor(register, fields)) sql.exec(statement);
+
+        /* THE MIRROR IS RE-DERIVED, because `entry.state` is a copy of one field and a copy that is
+           only written on write goes stale the moment the declaration names a different field. The
+           index on `state` and a `where:` over the field itself would then answer differently, which
+           is the worst kind of wrong: two readings of one record, both confident. */
+        const stateField = typeof decl.body.state === 'string' ? decl.body.state : null;
+        sql.exec(
+          stateField
+            ? `UPDATE entry SET state = json_extract(fields, '${jsonPath(stateField)}') WHERE register = ?`
+            : 'UPDATE entry SET state = NULL WHERE register = ?',
+          register,
+        );
+      }
 
       out.push({ id: decl.id, version, changed: true });
     }
 
     return ok(out);
   });
+  }
 }
 
 /**
