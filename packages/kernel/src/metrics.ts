@@ -23,7 +23,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { compile, jsonPath, parseWhere, type Predicate, type Schema } from '@braindog/where';
+import { compile, jsonPath, parseWhere, resolveDay, type Predicate, type Schema } from '@braindog/where';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
@@ -127,11 +127,66 @@ export function predicateOf(
   schema: Schema,
   ctx: EvalContext,
 ): { predicate: Predicate | undefined; bad: Refusal[] } {
-  if (typeof where !== 'string') return { predicate: where, bad: [] };
+  const nowMs = ctx.asOfMs ?? ctx.nowMs;
+  if (typeof where !== 'string') return resolveRelative(where, schema, nowMs);
   return parseWhere(where, schema, {
-    nowMs: ctx.asOfMs ?? ctx.nowMs,
+    nowMs,
     ...(ctx.refByTitle === undefined ? {} : { refByTitle: ctx.refByTitle }),
   });
+}
+
+/** The operators that carry a day. `empty` and `present` carry a boolean and are left alone. */
+const DATED = ['is', 'not', 'in', 'not_in', 'gt', 'gte', 'lt', 'lte', 'before', 'after', 'between'] as const;
+
+/**
+ * The same resolution the sentence gets, for the predicate somebody wrote as JSON.
+ *
+ * `{ field: 'due', before: 'today' }` REACHED SQL AS THE WORD, and `'2026-…' < 'today'` is a string
+ * comparison that is true of every date there has ever been — so the figure was the whole register
+ * and looked like an answer. It is the clause that quietly matches everything, arrived at through
+ * the one form of the grammar nobody was resolving.
+ *
+ * IT IS ALSO WHAT MAKES `asOf` MEAN ANYTHING HERE. Without it a backfilled month is thirty copies of
+ * today's number, written down as history that never happened.
+ */
+function resolveRelative(
+  where: Predicate | undefined,
+  schema: Schema,
+  nowMs: number,
+): { predicate: Predicate | undefined; bad: Refusal[] } {
+  if (!where || typeof where !== 'object') return { predicate: where, bad: [] };
+  const bad: Refusal[] = [];
+
+  const one = (field: string, value: unknown): unknown => {
+    if (typeof value !== 'string') return value;
+    const day = resolveDay(value, nowMs);
+    if (day === null) {
+      bad.push({ code: 'WHERE_MALFORMED', fix: `${field} is a day, and ${value} is not one.`, at: field });
+      return value;
+    }
+    return day;
+  };
+
+  const walk = (node: Predicate): Predicate => {
+    for (const q of ['all', 'any', 'none'] as const) {
+      const kids = (node as Record<string, unknown>)[q];
+      if (Array.isArray(kids)) return { ...node, [q]: kids.map((k) => walk(k as Predicate)) } as Predicate;
+    }
+
+    const leaf = node as Record<string, unknown>;
+    const field = typeof leaf.field === 'string' ? leaf.field : null;
+    if (!field || !Object.hasOwn(schema.fields, field) || schema.fields[field]?.type !== 'day') return node;
+
+    const op = DATED.find((o) => o in leaf);
+    if (!op) return node;
+    const value = leaf[op];
+    return {
+      ...leaf,
+      [op]: Array.isArray(value) ? value.map((v) => one(field, v)) : one(field, value),
+    } as Predicate;
+  };
+
+  return { predicate: walk(where), bad };
 }
 
 /**

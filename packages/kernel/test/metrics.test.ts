@@ -556,3 +556,45 @@ test('and a day the metric could not answer is NO ROW, not a zero', async () => 
   assert.equal(sql.all("SELECT 1 FROM metric_point WHERE series = 'avg-effort' AND value = 0").length, 0);
   sql.close();
 });
+
+/* ── the other rendering of the same predicate ───────────────────────── */
+
+const OPEN_JSON: MetricDecl = {
+  ...OPEN,
+  metric: 'still-open-json',
+  where: { all: [{ field: 'state', is: 'open' }, { field: 'due', before: 'today' }] },
+};
+
+test('A PREDICATE WRITTEN AS JSON SAYS `today` TOO, and it used to reach SQL as the word', async () => {
+  /* `'2026-…' < 'today'` is a string comparison true of every date there has ever been, so the
+     figure was the whole register and looked like an answer. The clause that quietly matches
+     everything, reached through the one form of the grammar nobody was resolving. */
+  const { k, sql } = await record();
+  const sentence = value<Reading>(evaluateMetric(sql, OPEN, ctxOf(k, NOW)));
+  const json = value<Reading>(evaluateMetric(sql, OPEN_JSON, ctxOf(k, NOW)));
+  assert.equal(json.value, sentence.value, 'the two renderings of one predicate disagree');
+  assert.ok((json.value ?? 0) < k.count('obligations'), 'the JSON form matched every row in the register');
+  sql.close();
+});
+
+test('and `asOf` moves it, so a backfill is history rather than thirty copies of today', async () => {
+  const { k, sql } = await record();
+  const out = value<Snapshot>(snapshot(sql, OPEN_JSON, ctxOf(k, NOW), { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 60));
+  assert.equal(out.missing, 0);
+
+  const values = sql
+    .all<{ value: number }>("SELECT value FROM metric_point WHERE series = 'still-open-json' ORDER BY at")
+    .map((r) => r.value);
+  assert.ok(new Set(values).size > 1, `every day stored the same figure: ${[...new Set(values)].join(', ')}`);
+  assert.ok(values[0]! < values.at(-1)!, 'the series does not move in the direction the rows do');
+  sql.close();
+});
+
+test('and a day the grammar does not admit is refused in JSON as it is in a sentence', async () => {
+  // `2026-13-45` matched the shape and was then compared as a string, so it was true of every row.
+  const { k, sql } = await record();
+  const bad = evaluateMetric(sql, { ...OPEN_JSON, where: { field: 'due', before: '2026-13-45' } }, ctxOf(k, NOW));
+  assert.equal(bad.ok, false);
+  assert.equal((bad as { refusal: { code: string } }).refusal.code, 'WHERE_MALFORMED');
+  sql.close();
+});

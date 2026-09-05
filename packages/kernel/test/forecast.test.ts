@@ -205,3 +205,90 @@ test('A MONTHLY CHARGE ON THE 31st DOES NOT DRIFT BACKWARDS THROUGH THE YEAR', a
   assert.deepEqual(walk.steps.slice(0, 4).map((s) => s.day), ['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30']);
   sql.close();
 });
+
+/* ── the three ways it went quietly wrong ──────────────────────────── */
+
+const INSTANTS: Declaration = {
+  id: 'register.renewals',
+  kind: 'register',
+  body: {
+    id: 'renewals',
+    name: 'Renewals',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'cost', type: 'money' },
+      { id: 'renews_at', type: 'instant' },
+      { id: 'state', type: 'enum', values: ['live', 'cancelled'], index: true },
+    ],
+  } as never,
+};
+
+test('A DATE FIELD THAT HOLDS AN INSTANT IS STILL A DATE, and not a leg that silently vanishes', async () => {
+  /* `day` holds ten characters and `instant` holds twenty-four, and nothing stops a leg naming
+     either. Concatenating a time onto a time is NaN, and a £500 outgoing left a walk that then said
+     "you never run out" with zero refusals — which is the worst answer this module can give. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([INSTANTS])).ok);
+  assert.ok(k.create('renewals', { name: 'Kiln', cost: gbp(50_000), renews_at: `${day(5)}T09:30:00.000Z`, state: 'live' }, { actor: 'p_1' }).ok);
+
+  const out = value<Runway>(k.runway(10_000, [{ register: 'renewals', on: 'renews_at', amount: 'cost', where: 'state is live' }], 60));
+  assert.equal(out.steps.length, 1, 'the leg vanished');
+  assert.equal(out.steps[0]?.day, day(5), 'the step is labelled by a day, whichever the field held');
+  assert.equal(out.crossed?.balance, -40_000);
+  assert.deepEqual(out.refusals, []);
+  sql.close();
+});
+
+test('and a date it cannot read at all is one sentence, not a silence', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([OBLIGATIONS])).ok);
+  for (const what of ['A', 'B'])
+    assert.ok(k.create('obligations', { what, amount: gbp(1000), due: day(3), state: 'open' }, { actor: 'p_1' }).ok);
+  // A day nobody can read, put in behind the register's back — which is what an import can do.
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.due', 'sometime') WHERE register = 'obligations'");
+
+  const out = value<Runway>(k.runway(10_000, [{ register: 'obligations', on: 'due', amount: 'amount', where: 'state is open' }], 60));
+  assert.equal(out.steps.length, 0);
+  assert.equal(out.refusals.length, 1);
+  assert.match(out.refusals[0]!.fix, /2 rows of obligations have a due this walk could not read/);
+  sql.close();
+});
+
+test('THE CAP REFUSES RATHER THAN TRUNCATING, because most of the money is not a crossing day', async () => {
+  /* Two thousand and one obligations: the walk used to count two thousand of them, drop the rest,
+     and still report a crossing day — the one number here that must never be approximately right. */
+  const { k, sql } = await record();
+  k.transaction(() => {
+    for (let i = 0; i < 2001; i++) k.create('obligations', { what: `Bill ${i}`, amount: gbp(1000), due: day(1 + (i % 40)), state: 'open' }, { actor: 'p_1' });
+  });
+
+  const out = value<Runway>(k.runway(10_000, [LEGS[0]!], 90));
+  assert.equal(out.steps.length, 0, 'it walked a subset');
+  assert.equal(out.crossed, null);
+  assert.equal(out.refusals[0]?.code, 'OUT_OF_BOUNDS');
+  assert.match(out.refusals[0]!.fix, /narrow what this leg reads/);
+  sql.close();
+});
+
+test('and a cycle that is not a whole number of months is refused, not rounded onto one day', async () => {
+  /* `Math.round(months * n)` collapsed successive occurrences: a fortnightly £100 declared as `0.5`
+     charged twice on the sixth of three months and nothing in between. */
+  const { k, sql } = await record();
+  assert.ok(k.create('services', { name: 'Kiln', cost: gbp(10_000), cycle: 'monthly', renews: day(1), state: 'live' }, { actor: 'p_1' }).ok);
+
+  const out = value<Runway>(
+    k.runway(100_000, [{ register: 'services', on: 'renews', amount: 'cost', every: { field: 'cycle', months: { monthly: 0.5, yearly: 12 } } }], 120),
+  );
+  assert.equal(out.steps.length, 0);
+  assert.equal(out.refusals[0]?.code, 'VALUE_MALFORMED');
+  assert.match(out.refusals[0]!.fix, /a cycle is a whole number of months/);
+
+  // And a whole one still walks, unchanged.
+  const fine = value<Runway>(k.runway(100_000, [LEGS[1]!], 120));
+  assert.equal(fine.steps.length, 4);
+  assert.deepEqual([...new Set(fine.steps.map((x) => x.day))].length, 4, 'two charges landed on one day');
+  sql.close();
+});

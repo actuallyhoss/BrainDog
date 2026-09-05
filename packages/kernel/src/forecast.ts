@@ -72,7 +72,17 @@ export type ForecastDeps = {
 
 const DAY_MS = 86_400_000;
 const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
-const noon = (day: string): number => Date.parse(`${day}T12:00:00Z`);
+/**
+ * Noon on a day — and a day that already carries a time is that time.
+ *
+ * A `day` FIELD HOLDS TEN CHARACTERS AND AN `instant` FIELD HOLDS TWENTY-FOUR, and nothing stops a
+ * leg naming either. Concatenating a `T12:00:00Z` onto an instant is `NaN`, `occurrences` returns
+ * nothing, and a £500 outgoing vanishes out of a walk that then says "you never run out".
+ */
+const noon = (day: string): number => Date.parse(day.length === 10 ? `${day}T12:00:00Z` : day);
+
+/** The ten characters a step is labelled by, whichever of the two the field held. */
+const dayOf = (value: string): string => value.slice(0, 10);
 
 /**
  * Walk the legs.
@@ -80,6 +90,9 @@ const noon = (day: string): number => Date.parse(`${day}T12:00:00Z`);
  * `opening` is what is liquid TODAY and it is a number somebody has to supply: a runway seeded from
  * a balance nobody declared is a forecast that looks like a fact and is a guess.
  */
+/** The most rows one leg may carry. Past it the walk refuses rather than answering from a subset. */
+const CAP = 2000;
+
 export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[], horizonDays = 180): Result<Runway> {
   const until = deps.ctx.nowMs + horizonDays * DAY_MS;
   const refusals: Refusal[] = [];
@@ -103,13 +116,38 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
       continue;
     }
 
+    /* A CYCLE IS A WHOLE NUMBER OF MONTHS, checked once for the leg rather than per row. A fraction
+       collapses successive occurrences onto one day through `Math.round`, so a fortnightly £100
+       declared as `0.5` charges twice on the sixth of three months and nothing in between. */
+    const fraction = leg.every ? Object.entries(leg.every.months).find(([, n]) => !Number.isInteger(n)) : undefined;
+    if (fraction) {
+      refusals.push({
+        code: 'VALUE_MALFORMED',
+        fix: `${leg.register} declares a cycle of ${fraction[1]} months for ${fraction[0]}, and a cycle is a whole number of months.`,
+        at: 'every',
+      });
+      continue;
+    }
+
     const title = deps.titleOf(leg.register) ?? leg.on;
+    /* THE CAP REFUSES, IT DOES NOT TRUNCATE. A walk that quietly dropped the five hundredth
+       obligation would still report a crossing day, and a crossing day computed from most of the
+       money is the one number in this module that must never be approximately right. */
     const rows = deps.sql.all<{ id: string }>(
-      `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND (${w.sql}) LIMIT 2000`,
+      `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND (${w.sql}) ORDER BY rowid LIMIT ${CAP + 1}`,
       leg.register,
       ...w.params,
     );
+    if (rows.length > CAP) {
+      refusals.push({
+        code: 'OUT_OF_BOUNDS',
+        fix: `${leg.register} matches more than ${CAP.toLocaleString('en-GB')} rows, which is more than one walk can carry — narrow what this leg reads.`,
+        at: 'where',
+      });
+      continue;
+    }
 
+    let unreadable = 0;
     for (const { id } of rows) {
       const entry = deps.hydrate(id);
       if (!entry) continue;
@@ -120,11 +158,15 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
 
       const first = String(entry.fields[leg.on] ?? '');
       if (!first) continue;
+      if (!Number.isFinite(noon(first))) {
+        unreadable++;
+        continue;
+      }
       const incoming = leg.incoming ? entry.fields[leg.incoming.field] === leg.incoming.is : false;
       const label = String(entry.fields[title] ?? entry.id);
       const spoken = entry.seq === null ? entry.id : `${leg.register}#${entry.seq}`;
 
-      for (const { day, at } of occurrences(deps, entry, leg, first, until)) {
+      for (const { day, at } of occurrences(deps, entry, leg, dayOf(first), until)) {
         /* CLAMPED TO TODAY, not dropped. The walk stays in order and a balance that is already gone
            is gone at the top of it; the label says which rows those are. */
         const late = at < deps.ctx.nowMs;
@@ -140,6 +182,16 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         });
       }
     }
+
+    /* ONE SENTENCE PER LEG, not one per row. A leg whose date field holds something this walk cannot
+       read is money missing from the answer, and money missing in silence is the failure the
+       refusals list exists for. */
+    if (unreadable)
+      refusals.push({
+        code: 'VALUE_MALFORMED',
+        fix: `${unreadable} ${unreadable === 1 ? 'row' : 'rows'} of ${leg.register} have a ${leg.on} this walk could not read, and their money is not in it.`,
+        at: 'on',
+      });
   }
 
   const mixed = seen.size > 1 ? [...seen].sort() : [];
