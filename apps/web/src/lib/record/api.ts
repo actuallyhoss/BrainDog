@@ -222,7 +222,7 @@ export function columnsFor(register: string): Column[] {
   const r = REGISTERS[register];
   if (!r) return [];
   const wanted = new Set<string>([r.title, ...r.mobile, ...(r.state ? [r.state] : [])]);
-  for (const f of r.fields) if (f.indexed) wanted.add(f.id);
+  for (const f of r.fields) if (f.index) wanted.add(f.id);
 
   const cols: Column[] = [
     // The spoken id truncates in the MIDDLE if it ever has to, keeping prefix and suffix.

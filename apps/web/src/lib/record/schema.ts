@@ -31,7 +31,7 @@ export type FieldDecl = {
   /** `enum` only. An unknown value at install is ENUM_VALUE_UNKNOWN. */
   values?: readonly string[];
   /** Only indexed fields may be filtered on, and only eight are offered (50 §5.2). */
-  indexed?: boolean;
+  index?: boolean;
   /**
    * This day is a DEADLINE: a date the row is measured against, so past it is late.
    *

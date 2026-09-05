@@ -68,6 +68,20 @@ test('an int is grouped', () => {
   assert.equal(display('sessions', 'wrote', 12_400), '12,400');
 });
 
+test('THE DEFAULT COLUMNS INCLUDE EVERY `index:` FIELD, and the word is the one the record uses', () => {
+  /* This read `f.indexed` while the declaration said `index:`, which is one letter and no error:
+     `undefined` is falsy, so the grid quietly fell back to the title and the three mobile fields and
+     the filter bar offered nothing. Nothing failed — there was just less of the register on screen
+     than the register declares. */
+  for (const [id, decl] of Object.entries(REGISTERS)) {
+    const shown = new Set(columnsFor(id).map((c) => c.field));
+    for (const f of decl.fields)
+      if (f.index) assert.ok(shown.has(f.id), `${id}.${f.id} is declared index: and is not a column`);
+  }
+  // And there is at least one, or the assertion above is vacuous.
+  assert.ok(Object.values(REGISTERS).some((r) => r.fields.some((f) => f.index)), 'no register declares an index');
+});
+
 test('a duration carries its declared unit', () => {
   assert.equal(display('tasks', 'effort', 3), '3 d');
 });

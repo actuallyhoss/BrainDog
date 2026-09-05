@@ -154,7 +154,7 @@
 
   /** Only INDEXED fields are offered, in declaration order, at most eight. A filter on an unindexed
       field is a promise the storage cannot keep at 5,000 rows. */
-  const filterable = $derived((decl?.fields ?? []).filter((f) => f.indexed).slice(0, 8));
+  const filterable = $derived((decl?.fields ?? []).filter((f) => f.index).slice(0, 8));
 
   function setParam(mutate: (p: URLSearchParams) => void) {
     const next = new URLSearchParams(page.url.searchParams);

@@ -66,6 +66,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@braindog/seed':
+        specifier: workspace:*
+        version: link:../../packages/seed
       svelte:
         specifier: 5.57.0
         version: 5.57.0
@@ -170,6 +173,15 @@ importers:
       svelte:
         specifier: ^5
         version: 5.57.0
+
+  packages/seed:
+    dependencies:
+      '@braindog/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../ports
 
   packages/skin:
     devDependencies:
