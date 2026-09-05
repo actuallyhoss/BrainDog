@@ -178,7 +178,7 @@ test('dirOf emits the attribute only where it is wanted', () => {
 test('a per-year figure is annualised, not summed across cycles', () => {
   // `cost` is per CYCLE. Summing a yearly domain and a monthly bucket adds two units: Kiln's
   // "Costs a year" printed GBP 112.00 where the answer is GBP 1,036.00, under the word "year".
-  const kiln = metric('kiln-cost');
+  const kiln = metric('project-cost:Kiln');
   assert.match(kiln.label, /year/i);
   const monthlyKiln = (ROWS.services ?? []).filter((s) => s.fields.thing === 1 && s.fields.cycle === 'monthly');
   assert.ok(monthlyKiln.length > 0, 'the seed needs a monthly Kiln service for this to bite');
@@ -335,7 +335,7 @@ test('every metric href opens rows, rather than an empty grid or the whole regis
   // was true of every row and `due:before:+30d` of none. Overdue said two and opened eighteen;
   // "Due in 30 days" and "Renews in 30 days" opened nothing at all. A figure you cannot click
   // through to is a figure you cannot check.
-  const ids = ['kiln-open', 'kiln-owed', 'kiln-cost', 'owed-to-you', 'due-30d', 'overdue', 'renews-30d', 'lapsing'];
+  const ids = METRICS;
   for (const id of ids) {
     const m = metric(id);
     if (!m.href) continue;
@@ -347,7 +347,7 @@ test('every metric href opens rows, rather than an empty grid or the whole regis
 });
 
 /** Every metric, so a new one cannot be added without being held to the same rule. */
-const METRICS = ['kiln-open', 'kiln-owed', 'kiln-cost', 'owed-to-you', 'due-30d', 'overdue', 'renews-30d', 'lapsing'];
+const METRICS = ['project-open:Kiln', 'project-owed:Kiln', 'project-cost:Kiln', 'owed-to-you', 'due-30d', 'overdue', 'renews-30d', 'lapsing'];
 
 const figure = (v: string) => Number(v.replace(/[^0-9.]/g, ''));
 

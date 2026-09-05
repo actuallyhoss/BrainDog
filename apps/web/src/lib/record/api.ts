@@ -30,9 +30,10 @@ import {
   VAULT,
 } from './data.ts';
 import { runway } from './forecast.ts';
+import { resolvePages } from './pages.ts';
 import { compile, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
-import { meetsTarget, read, targetLine } from './metrics.ts';
+import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
 import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 export const CURRENCY = 'GBP';
@@ -562,8 +563,15 @@ export function metric(id: string): Metric {
       href: '/decide',
     };
 
-  const decl = METRICS[id];
-  if (!decl) return { id, label: id, value: MISSING, note: 'no metric is declared under that name', tone: 'warn', href: '/p/money' };
+  /* `project-owed:Kiln` — the document, and the thing it is about. The parameter is everything after
+     the FIRST colon, because a project can be called anything and a name with a colon in it is a
+     name, not two ids. */
+  const at = id.indexOf(':');
+  const base = at === -1 ? id : id.slice(0, at);
+  const template = METRICS[base];
+  if (!template)
+    return { id, label: id, value: MISSING, note: 'no metric is declared under that name', tone: 'warn', href: '/p/money' };
+  const decl = at === -1 ? template : withParam(template, id.slice(at + 1));
 
   const reading = read(decl);
   if (reading.refusals.length)
@@ -643,8 +651,17 @@ export const hueOf = (id: { register: string; seq: number } | undefined): number
   return Number.isFinite(hue) ? hue : undefined;
 };
 
+/**
+ * Every page there is, which is not the same as every page DECLARED.
+ *
+ * A declaration carrying `for:` is a template and becomes one page per row it admits — four
+ * projects over one `project` declaration, where before there was a `kiln` page and no way to have
+ * a second. Resolved on read rather than cached, because the rows it depends on are the record.
+ */
+export const pages = (): Record<string, PageDecl> => resolvePages(PAGES);
+
 export function boot() {
-  const nav: NavEntry[] = Object.values(PAGES)
+  const nav: NavEntry[] = Object.values(pages())
     .filter((p) => p.nav && p.placed !== false)
     .map((p) => ({
       id: p.page,
@@ -688,7 +705,7 @@ export function boot() {
     },
     nav,
     /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */
-    pen: Object.values(PAGES).filter((p) => p.placed === false),
+    pen: Object.values(pages()).filter((p) => p.placed === false),
     me: {
       person: 'you',
       level: 'owner' as const,
@@ -793,7 +810,7 @@ const READS = new Set([
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
-  const decl = PAGES[slug];
+  const decl = pages()[slug];
   if (!decl) return null;
 
   /**

@@ -64,11 +64,23 @@
    * is Kiln` under a heading on the page called Kiln. It is the one clause the reader is certainly
    * not missing, and it was the longest.
    */
+  /**
+   * The predicate a reader sees, MINUS the clause that names the page they are already on.
+   *
+   * "thing is Kiln" under a heading on the Kiln page is the one fact the reader cannot be missing,
+   * and the rest of the predicate has to stay or a block of four rows reads as the whole register.
+   *
+   * The clause is now identified rather than guessed. This used to drop any clause whose text ENDED
+   * with the page title, which is a string heuristic standing in for a fact the declaration did not
+   * carry — and it was the admission that the name should never have been typed into the predicate.
+   * A resolved page knows its own parameter, so the comparison is exact.
+   */
+  const param = $derived(result?.page.param);
   const whereOf = (block: { where?: string | undefined }): string =>
     (block.where ?? '')
       .split(',')
       .map((c) => c.trim())
-      .filter((c) => c && !(result && c.toLowerCase().endsWith(result.page.title.toLowerCase())))
+      .filter((c) => c && !(param && c.toLowerCase() === `thing is ${param.title.toLowerCase()}`))
       .join(', ');
 
   /**

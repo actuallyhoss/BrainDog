@@ -168,6 +168,23 @@ export type PageDecl = {
    * that means something specific — WHICH PROJECT — rather than something general.
    */
   identity?: { register: string; seq: number };
+  /**
+   * ONE DECLARATION, ONE PAGE PER ROW.
+   *
+   * A project page is the register's own numbers with a `thing is Kiln` on the front — which was
+   * written in a comment above the old metric switch and was false in the code under it. Four
+   * projects meant four page rows with the name typed into every predicate, every metric id and
+   * every heading, and the page route stripped the repeated clause back out with a string
+   * heuristic, which is the admission that the clause should never have been typed.
+   *
+   * A page that declares `for:` is a TEMPLATE. Every `{{field}}` in it — in a title, a predicate, a
+   * heading, an empty state, a metric id — resolves against one row of that register, and the
+   * template becomes one page per row the `where` admits. The slug comes from the row's own title,
+   * so `/p/kiln` is still `/p/kiln`.
+   */
+  for?: { register: string; where?: string };
+  /** Filled in by the resolver on a page that came from a template. */
+  param?: { register: string; seq: number; title: string };
   page: string;
   title: string;
   nav?: { section: string; order: number };

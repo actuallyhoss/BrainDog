@@ -6,10 +6,12 @@
  * a table rather than a branch in a function, and a second project page is a second declaration
  * rather than a thirteenth case.
  *
- * TWO SHAPES REPEAT, AND THAT IS THE ARGUMENT. `owed-to-you` and `kiln-owed` are the same document
- * with one clause added; `estate-year` and `kiln-cost` likewise. A project page is the register's
- * own numbers with a `thing is Kiln` on the front, and nothing about it is a new kind of thing —
- * which was true in the comment above the old `switch` and false in the code underneath it.
+ * TWO SHAPES REPEAT, AND THAT IS THE ARGUMENT. `owed-to-you` and `project-owed` are the same
+ * document with one clause added; `estate-year` and `project-cost` likewise. A project page is the
+ * register's own numbers with a `thing is Kiln` on the front, and nothing about it is a new kind of
+ * thing — which was true in the comment above the old `switch` and false in the code underneath it.
+ * The three project documents carry `{{it}}` rather than a name, so four projects are four pages
+ * over one declaration instead of twelve documents.
  *
  * THE HREF IS NOT HERE. It is derived from `source` and `where`, so a tile and the list it opens
  * cannot disagree — they used to be typed beside each other and drifted twice.
@@ -101,13 +103,17 @@ export const METRICS: Record<string, MetricDecl> = {
     compare: 'none',
   },
 
-  /* ── the same three, narrowed by one ref ──────────────────────────────── */
+  /* ── the same three, narrowed by one ref ──────────────────────────────────
+     PARAMETERISED, not copied. These were `kiln-open`, `kiln-owed` and `kiln-cost` with the name
+     typed into each predicate, so a second project meant three more documents. `{{it}}` is filled
+     from the id — `project-open:Portage` — which is what makes one project page a declaration
+     rather than a thirteenth case. */
 
-  'kiln-open': {
-    metric: 'kiln-open',
+  'project-open': {
+    metric: 'project-open',
     name: 'Open',
     source: 'register.tasks',
-    where: 'thing is Kiln, state is not done or dropped',
+    where: 'thing is {{it}}, state is not done or dropped',
     value: { count: 'id' },
     format: 'int',
     target: { lte: 5 },
@@ -115,11 +121,11 @@ export const METRICS: Record<string, MetricDecl> = {
     compare: 'none',
   },
 
-  'kiln-owed': {
-    metric: 'kiln-owed',
+  'project-owed': {
+    metric: 'project-owed',
     name: 'Owed to you',
     source: 'register.obligations',
-    where: `${OPEN}, direction is owed to me, thing is Kiln`,
+    where: `${OPEN}, direction is owed to me, thing is {{it}}`,
     value: { sum: 'amount' },
     format: 'money.GBP',
     target: { lte: 1_000_000 },
@@ -127,11 +133,11 @@ export const METRICS: Record<string, MetricDecl> = {
     compare: 'none',
   },
 
-  'kiln-cost': {
-    metric: 'kiln-cost',
+  'project-cost': {
+    metric: 'project-cost',
     name: 'Costs a year',
     source: 'register.services',
-    where: 'thing is Kiln, state is not cancelled',
+    where: 'thing is {{it}}, state is not cancelled',
     value: { sum: { product: ['cost', { lookup: 'per_year', by: 'cycle' }] } },
     format: 'money.GBP',
     target: { lte: 120_000 },

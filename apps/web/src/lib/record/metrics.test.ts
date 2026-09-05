@@ -14,9 +14,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { METRICS } from './declared.ts';
-import { format, hrefFor, meetsTarget, read, windowMs, type MetricDecl } from './metrics.ts';
+import { format, hrefFor, isTemplate, meetsTarget, read, windowMs, withParam, type MetricDecl } from './metrics.ts';
 import { applyFilters, metric } from './api.ts';
 import { NOW, ROWS } from './data.ts';
+
+/** The documents that are metrics as they stand. A template is one until it has its parameter. */
+const CONCRETE = Object.entries(METRICS).filter(([, d]) => !isTemplate(d));
 
 /** The rows a href opens, read the way the register route reads it. */
 function opened(href: string): number {
@@ -32,7 +35,7 @@ function opened(href: string): number {
 /* ── nothing moved ───────────────────────────────────────────────────────── */
 
 test('every declared metric reads, and none of them refuses', () => {
-  for (const [id, decl] of Object.entries(METRICS)) {
+  for (const [id, decl] of CONCRETE) {
     const r = read(decl);
     assert.deepEqual(r.refusals, [], `${id}: ${r.refusals[0]}`);
     assert.notEqual(r.value, null, `${id} read nothing`);
@@ -48,9 +51,11 @@ test('THE FIGURES ARE THE ONES THE SWITCH PRODUCED', () => {
     ['renews-30d', '6'],
     ['lapsing', '1'],
     ['estate-year', 'GBP 2,906.80'],
-    ['kiln-open', '5'],
-    ['kiln-owed', 'GBP 4,050.00'],
-    ['kiln-cost', 'GBP 1,036.00'],
+    /* The three project figures, now read through the parameter rather than through three documents
+       with the name typed into each. Same numbers as the `kiln-*` documents they replace. */
+    ['project-open:Kiln', '5'],
+    ['project-owed:Kiln', 'GBP 4,050.00'],
+    ['project-cost:Kiln', 'GBP 1,036.00'],
   ] as const) {
     assert.equal(metric(id).value, want, `${id} moved`);
   }
@@ -60,7 +65,7 @@ test('the annualised ones are annualised, through the lookup and not by hand', (
   // `cost` is per CYCLE, so a yearly domain and a monthly bucket are two different units. That
   // factor was written out longhand in one metric and omitted from another, and Kiln's annual cost
   // came out 9.25 times too low — GBP 112.00 against a true GBP 1,036.00, under the word "year".
-  const kiln = read(METRICS['kiln-cost']!);
+  const kiln = read(withParam(METRICS['project-cost']!, 'Kiln'));
   const raw = (ROWS.services ?? [])
     .filter((e) => e.fields.thing === 1 && e.fields.state !== 'cancelled')
     .reduce((a, e) => a + Number(e.fields.cost ?? 0), 0);
@@ -101,10 +106,16 @@ test('EVERY TILE OPENS EXACTLY THE ROWS IT COUNTED', () => {
   // The href used to be typed beside the predicate and drifted twice: a tile counting five states
   // whose link listed three, and a figure excluding cancelled services whose link included them.
   // One predicate now produces both, so they cannot disagree.
-  for (const [id, decl] of Object.entries(METRICS)) {
+  for (const [id, decl] of CONCRETE) {
     const r = read(decl);
     assert.equal(opened(r.href), r.rows, `${id} counted ${r.rows} and opens ${opened(r.href)}`);
   }
+  // And a resolved template, which is where a parameter could have escaped into the URL unencoded.
+  for (const name of ['Kiln', 'Marlow & Co', 'Portage'])
+    for (const base of ['project-open', 'project-owed', 'project-cost']) {
+      const r = read(withParam(METRICS[base]!, name));
+      assert.equal(opened(r.href), r.rows, `${base}:${name} counted ${r.rows} and opens ${opened(r.href)}`);
+    }
 });
 
 test('a negation survives the URL, because the sentence grammar has one', () => {
@@ -120,7 +131,7 @@ test('a negation survives the URL, because the sentence grammar has one', () => 
 test('a delta is present only when the two windows can be compared', () => {
   // §2.4's gate. Every absence carries its reason, because a comparison that is missing without one
   // reads as a comparison that came out at zero.
-  for (const [id, decl] of Object.entries(METRICS)) {
+  for (const [id, decl] of CONCRETE) {
     const r = read(decl);
     if (r.delta === null) assert.ok(r.why.length > 8, `${id} has no delta and no reason`);
     else assert.match(r.why, /before/);

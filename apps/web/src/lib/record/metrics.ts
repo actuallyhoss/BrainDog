@@ -199,6 +199,24 @@ const dated = (where: string | undefined, register: string): boolean =>
  * delta is structurally zero. Reporting that as "no change" would be a fact about the arithmetic
  * dressed as a fact about the business.
  */
+/**
+ * A metric id, with its parameter: `project-owed:Kiln`.
+ *
+ * The one substitution a metric document takes, and it is deliberately not a template language:
+ * `{{it}}` is the thing the metric is about, filled from the id. It is what makes a project page a
+ * declaration rather than a thirteenth case — three documents cover four projects and the fifth,
+ * where before there were three per project, each with the name typed into its predicate.
+ *
+ * A parameter is never a predicate: it lands in the value slot of a clause the document already
+ * wrote, and `compile` still checks it against the register — so `project-owed:Atlantis` is refused
+ * by name rather than reported as nothing owed.
+ */
+export const isTemplate = (decl: MetricDecl): boolean => (decl.where ?? '').includes('{{');
+
+export function withParam(decl: MetricDecl, it: string): MetricDecl {
+  return decl.where === undefined ? decl : { ...decl, metric: `${decl.metric}:${it}`, where: decl.where.replaceAll('{{it}}', it) };
+}
+
 export function read(decl: MetricDecl, now: number = NOW): Reading {
   const refusals: string[] = [];
   if (!decl.target) refusals.push(`${decl.metric}: a number with no target is decoration`);
@@ -208,6 +226,11 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const register = registerOf(decl.source);
   if (!register) refusals.push(`${decl.metric}: source ${decl.source} is not a register this build reads`);
   else if (!REGISTERS[register]) refusals.push(`${decl.metric}: there is no register called ${register}`);
+
+  /* A TEMPLATE IS NOT A METRIC UNTIL IT HAS ITS PARAMETER. Read as it stands, `thing is {{it}}`
+     would fail the register's value check and report "thing has no value {{it}}" — technically
+     true and useless. It is named for what it is instead. */
+  if (isTemplate(decl)) refusals.push(`${decl.metric}: is a template — read it as ${decl.metric}:<name>`);
 
   const shift = decl.window ? windowMs(decl.window) : null;
   if (decl.window && shift === null)

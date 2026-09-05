@@ -750,10 +750,19 @@ export const PAGES: Record<string, PageDecl> = {
    * Spans read left to right: the stat takes the row, then work and agents sit side by side,
    * then money and the estate.
    */
-  kiln: {
-    page: 'kiln',
-    title: 'Kiln',
-    identity: { register: 'things', seq: 1 },
+  /**
+   * ONE DECLARATION, FOUR PAGES. This was `kiln:`, with the name typed into six predicates, three
+   * metric ids and five sentences — and a second project meant a second copy of all of it. The
+   * `{{name}}` is the row's own field, resolved once per project the `for:` predicate admits, and
+   * the slug comes from the row's title so `/p/kiln` is still `/p/kiln`.
+   *
+   * `parked` and `retired` projects get no page. A rail with a page for something nobody is working
+   * on is a rail you stop reading.
+   */
+  project: {
+    page: 'project',
+    title: '{{name}}',
+    for: { register: 'things', where: 'lane is building or earning' },
     nav: { section: 'Projects', order: 10 },
     icon: 'thing',
     requires: ['register.tasks', 'register.sessions', 'register.obligations', 'register.services'],
@@ -763,9 +772,9 @@ export const PAGES: Record<string, PageDecl> = {
         heading: 'At a glance',
         span: 12,
         cells: [
-          { metric: 'kiln-open', label: 'Open' },
-          { metric: 'kiln-owed', label: 'Owed to you' },
-          { metric: 'kiln-cost', label: 'Costs a year' },
+          { metric: 'project-open:{{name}}', label: 'Open' },
+          { metric: 'project-owed:{{name}}', label: 'Owed to you' },
+          { metric: 'project-cost:{{name}}', label: 'Costs a year' },
         ],
       },
       {
@@ -774,10 +783,10 @@ export const PAGES: Record<string, PageDecl> = {
         span: 5,
         columns: [{ field: 'what' }, { field: 'by' }],
         source: 'register.tasks',
-        where: 'thing is Kiln, state is open or doing',
+        where: 'thing is {{name}}, state is open or doing',
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
-        empty: 'Nothing open on Kiln.',
+        empty: 'Nothing open on {{name}}.',
       },
       {
         kind: 'timeline',
@@ -785,10 +794,10 @@ export const PAGES: Record<string, PageDecl> = {
         span: 7,
         columns: [{ field: 'last_seen' }, { field: 'doing' }, { field: 'agent' }],
         source: 'register.sessions',
-        where: 'thing is Kiln',
+        where: 'thing is {{name}}',
         order: [{ field: 'last_seen', dir: 'desc' }],
         limit: 6,
-        empty: 'No agent has touched Kiln.',
+        empty: 'No agent has touched {{name}}.',
       },
       {
         kind: 'table',
@@ -798,7 +807,7 @@ export const PAGES: Record<string, PageDecl> = {
            the declaration was a number that never reached the screen. Its row partner is the 4. */
         span: 8,
         source: 'register.obligations',
-        where: 'thing is Kiln',
+        where: 'thing is {{name}}',
         /* THE DIRECTION IS A COLUMN, because this block holds both and its own `empty:` says so.
            Four columns of `# | What | Amount | Due` drew a receivable and seven payables in one
            unsigned column: read down it and Kiln looks like GBP 25,530.00 of something, where the
@@ -815,7 +824,7 @@ export const PAGES: Record<string, PageDecl> = {
         ],
         order: [{ field: 'due', dir: 'asc' }],
         limit: 8,
-        empty: 'Nothing owed either way on Kiln.',
+        empty: 'Nothing owed either way on {{name}}.',
       },
       {
         kind: 'spec',
@@ -826,9 +835,9 @@ export const PAGES: Record<string, PageDecl> = {
         span: 4,
         columns: [{ field: 'name' }, { field: 'cost' }],
         source: 'register.services',
-        where: 'thing is Kiln',
+        where: 'thing is {{name}}',
         limit: 6,
-        empty: 'Kiln runs on nothing you pay for.',
+        empty: '{{name}} runs on nothing you pay for.',
       },
       {
         /* A `code` block is authored rather than projected: `body` is the whole of it, verbatim.
@@ -838,7 +847,7 @@ export const PAGES: Record<string, PageDecl> = {
         heading: 'Work on this from an agent',
         span: 12,
         body:
-          'braindog.list tasks where thing is Kiln and state is open\n' +
+          'braindog.list tasks where thing is {{name}} and state is open\n' +
           'braindog.set tasks#7 state: doing\n' +
           'braindog.update track 1 health: on_track body: "Six instances queued."',
       },
