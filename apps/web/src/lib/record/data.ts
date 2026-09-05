@@ -541,6 +541,17 @@ export const PAGES: Record<string, PageDecl> = {
           { metric: 'runway', label: 'Runway' },
         ],
       },
+      {
+        /* Where the money sits, in one line. Grouped and counted, so this is four chips whatever
+           the register grows to — the shape stays readable at thirty-eight rows and at three
+           thousand, which a table of them does not. */
+        kind: 'chips',
+        heading: 'Where it sits',
+        span: 12,
+        columns: [{ field: 'state' }],
+        source: 'register.obligations',
+        empty: 'Nothing owed either way.',
+      },
       /* THE ONLY BLOCK ON ANY PAGE THAT IS ABOUT THE FUTURE. Sourced from the walk rather than from
          a register (08 §2.3's `running`): what is liquid, then every dated movement in order, and
          the balance after each. 05 §2 defers a `forecast` KIND to post-v1 and says the primitive
