@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ROUTES, httpStatus, serveApi, type Handler } from '../src/index.ts';
+import { ROUTES, handlersFor, httpStatus, serveApi } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -39,17 +39,9 @@ async function host() {
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   assert.ok((await api.kernel.install([OBLIGATIONS])).ok);
 
-  /* Every route in the table is wired, which is the invariant the whole package is for. */
-  const handlers: Record<string, Handler> = {
-    boot: (_a, ctx) => api.boot(ctx as CallContext),
-    version: (_a, ctx) => api.version(ctx as CallContext),
-    schema: (a, ctx) => api.schema(a as never, ctx as CallContext),
-    get: (a, ctx) => api.get(a as never, ctx as CallContext),
-    list: (a, ctx) => api.list(a as never, ctx as CallContext),
-    history: (a, ctx) => api.history(a as never, ctx as CallContext) as never,
-    create: (a, ctx) => api.create(a as never, ctx as CallContext),
-    update: (a, ctx) => api.update(a as never, ctx as CallContext),
-  };
+  /* Through `handlersFor`, which is what both hosts call — a test that built its own map would be
+     testing a third wiring nobody ships. */
+  const handlers = handlersFor(api);
 
   const call = async (name: string, body?: unknown, ctx: CallContext = owner) => {
     const request = body
@@ -63,9 +55,12 @@ async function host() {
 }
 
 test('EVERY ROUTE IN THE TABLE IS WIRED, which is the whole reason the table is data', async () => {
+  // `handlersFor` throws if the two ever disagree, so this asserts the shape it produced rather than
+  // re-checking the check. What it adds is the sentence: a route nobody can read about is a route
+  // nobody calls.
   const { handlers, sql } = await host();
+  assert.equal(Object.keys(handlers).length, ROUTES.length);
   for (const route of ROUTES) assert.ok(handlers[route.name], `${route.name} is declared and not wired`);
-  for (const name of Object.keys(handlers)) assert.ok(ROUTES.some((r) => r.name === name), `${name} is wired and not declared`);
   assert.ok(ROUTES.every((r) => r.what.length > 20), 'a route with no sentence is a route nobody can call');
   sql.close();
 });

@@ -1,11 +1,18 @@
 /**
  * The eight tools, which are the whole of what an agent sees.
  *
- * EIGHT, AND THE NUMBER IS THE DESIGN. `10-MCP` §6 puts a budget on it — the tool list is in every
- * turn of every session, so a ninth tool costs every conversation for ever. What a bigger surface
- * would buy is convenience for the caller; what it costs is attention, in every turn, permanently.
- * So the eight are the shapes an agent actually needs and the record's own vocabulary carries the
- * rest: `list` takes a predicate, not fourteen filter tools.
+ * THE COUNT IS THE DESIGN. `10-MCP` §6 puts a budget on it — the tool list is in every turn of every
+ * session, so one more tool costs every conversation for ever. What a bigger surface buys is
+ * convenience for the caller; what it costs is attention, permanently. So the record's own
+ * vocabulary carries the load: `list` takes a predicate rather than there being fourteen filter
+ * tools.
+ *
+ * NINE, AND WHICH NINE IS WORTH STATING. `10-MCP` §5 names eight — `record_index` · `search` · `get`
+ * · `list` · `create` · `update` · `propose` · `log`. `propose` is not here because suggestions are
+ * not built yet, and a tool that refuses everything is worse than a tool that is absent. `schema`
+ * and `history` are here and are RESOURCES in that document; this build serves no resources, and an
+ * agent that cannot read a register's fields writes a refused row, which costs more than the tool
+ * does. When resources exist, those two leave.
  *
  * `record_index` IS THE FIRST CALL AND IT IS CHEAP ON PURPOSE. An agent that has to guess a register
  * name writes a refused call, and a refused call costs more than the orientation would have.
@@ -69,6 +76,12 @@ export const TOOLS: readonly Tool[] = [
       },
       ['register'],
     ),
+    writes: false,
+  },
+  {
+    name: 'search',
+    description: 'Rows whose text matches, across every register you can see. Every word is a prefix.',
+    input: obj({ q: str('What to look for. Plain words; the operators are not read.'), limit: { type: 'integer', description: '1 to 100. Default 20.' } }, ['q']),
     writes: false,
   },
   {
@@ -155,6 +168,9 @@ export function tools(api: RecordApi) {
         },
         ctx,
       ),
+
+    search: (args, ctx) =>
+      api.search({ q: String(args.q ?? ''), ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx),
 
     history: async (args, ctx) => {
       const at = parse(args.spoken);

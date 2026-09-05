@@ -208,6 +208,32 @@ function api(kernel: Kernel) {
       return ok(row ? kernel.history(row.id) : []);
     },
 
+    /**
+     * Rows whose text matches, across every register the caller may see.
+     *
+     * The ceiling is passed DOWN rather than applied to the answer: a caller filtered afterwards
+     * gets a short page whenever the matches were mostly in a register they cannot see, and cannot
+     * tell that from there having been no matches.
+     */
+    async search(args: { q: string; limit?: number }, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop } as Result<never>;
+      const ceiling = ctx.registers ?? '*';
+      const registers = ceiling === '*' ? undefined : [...ceiling];
+      const hits = kernel.search(String(args.q ?? ''), {
+        ...(registers ? { registers } : {}),
+        ...(args.limit === undefined ? {} : { limit: args.limit }),
+      });
+      return ok(
+        hits.flatMap((hit) => {
+          const row = kernel.get(hit.id);
+          if (!row) return [];
+          const title = kernel.register(row.register)?.title;
+          return [{ register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank: hit.rank }];
+        }),
+      );
+    },
+
     /** The record's version: what changed since is a range scan from here. */
     async version(ctx: CallContext): Promise<Result<number>> {
       const stop = guard(ctx, 'read');

@@ -33,6 +33,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'get', writes: false, what: 'One row, by the number a person says out loud.' },
   { name: 'list', writes: false, what: 'Rows of one register, narrowed by a predicate, newest first.' },
   { name: 'history', writes: false, what: 'The writes that made one row, in order, each with who and when.' },
+  { name: 'search', writes: false, what: 'Rows whose text matches, across every register you can see, best first.' },
   { name: 'version', writes: false, what: "The record's version, so a client can ask what changed since." },
   { name: 'create', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'update', writes: true, what: 'Change a row, against the version you read.' },
@@ -98,6 +99,7 @@ export type RecordSurface = {
   get(args: never, ctx: never): Promise<Result<unknown>>;
   list(args: never, ctx: never): Promise<Result<unknown>>;
   history(args: never, ctx: never): Promise<Result<unknown>>;
+  search(args: never, ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
 };
@@ -110,6 +112,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     get: (a, ctx) => api.get(a as never, ctx as never),
     list: (a, ctx) => api.list(a as never, ctx as never),
     history: (a, ctx) => api.history(a as never, ctx as never),
+    search: (a, ctx) => api.search(a as never, ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
   };

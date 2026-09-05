@@ -54,12 +54,17 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('EIGHT TOOLS, AND THE NUMBER IS THE DESIGN', () => {
-  // The tool list is in every turn of every session, so a ninth tool costs every conversation for
-  // ever. What a bigger surface buys is convenience for the caller; what it costs is attention,
-  // permanently. `list` takes a predicate rather than there being fourteen filter tools.
-  assert.equal(TOOLS.length, 8);
-  assert.equal(new Set(TOOLS.map((t) => t.name)).size, 8, 'two tools share a name');
+test('THE COUNT IS THE DESIGN, and it is the document’s list minus what is not built', () => {
+  // The tool list is in every turn of every session, so one more tool costs every conversation for
+  // ever. `10-MCP` §5 names eight; `propose` is absent because suggestions are not built and a tool
+  // that refuses everything is worse than one that is not there, and `schema` and `history` are
+  // present because that document serves them as resources and this build serves none.
+  const named = TOOLS.map((t) => t.name);
+  for (const wanted of ['record_index', 'search', 'get', 'list', 'create', 'update', 'log'])
+    assert.ok(named.includes(wanted), `${wanted} is in 10-MCP §5 and not here`);
+  assert.ok(!named.includes('propose'), 'a tool that refuses everything is worse than an absent one');
+  assert.equal(TOOLS.length, 9);
+  assert.equal(new Set(named).size, TOOLS.length, 'two tools share a name');
   for (const t of TOOLS) {
     assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
     assert.ok(t.description.length < 200, `${t.name} is long, and it is in every turn`);
@@ -166,7 +171,7 @@ test('A REFUSAL NAMES WHAT TO SEND INSTEAD, because the caller will try again im
 
   const noTool = refusal(await mcp.call('delete_everything', {}, owner));
   assert.equal(noTool.code, 'ROUTE_UNKNOWN');
-  assert.equal(noTool.allowed?.length, 8);
+  assert.equal(noTool.allowed?.length, TOOLS.length);
   sql.close();
 });
 
@@ -212,5 +217,39 @@ test('a read token reads through every tool and writes through none', async () =
     ['log', { spoken: 'obligations#1', note: 'x' }],
   ] as const)
     assert.equal(refusal(await mcp.call(name, args, reader)).code, 'SCOPE_INSUFFICIENT', name);
+  sql.close();
+});
+
+/* ── search ──────────────────────────────────────────────────────────────── */
+
+test('search finds a row by any of its searchable fields, and the words are prefixes', async () => {
+  const { sql, api, mcp } = await agent();
+  await api.kernel.install([
+    {
+      id: 'register.people',
+      kind: 'register',
+      body: {
+        id: 'people',
+        name: 'People',
+        title: 'name',
+        fields: [{ id: 'name', type: 'text', required: true, search: true }],
+      } as never,
+    },
+  ]);
+  value(await mcp.call('create', { register: 'people', fields: { name: 'Halden Studio' } }, owner));
+
+  const hits = value<{ register: string; seq: number; title: string }[]>(await mcp.call('search', { q: 'hal' }, owner));
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0]?.register, 'people');
+  assert.equal(hits[0]?.title, 'Halden Studio', 'a hit that does not say what it is makes the agent fetch it to find out');
+  sql.close();
+});
+
+test('and a query of punctuation finds nothing rather than erroring', async () => {
+  // The words a person types are not FTS5 syntax. Passed through raw, a typed quote is a syntax
+  // error and a typed minus is an exclusion nobody asked for.
+  const { sql, mcp } = await agent();
+  for (const q of ['"', '-', '   ', 'NEAR(a b)'])
+    assert.ok(Array.isArray(value(await mcp.call('search', { q }, owner))), `${q} threw`);
   sql.close();
 });

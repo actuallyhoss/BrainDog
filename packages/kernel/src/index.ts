@@ -24,12 +24,15 @@ import { ulids, type Mint } from './ids.ts';
 import { applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { compile, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, retireDeclarations, type Declaration } from './declare.ts';
+import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, validate as validateDeclaration, KINDS } from './declare.ts';
+export { ftsQuery, projectedText } from './fts.ts';
+export type { Hit } from './fts.ts';
 export type { Declaration, DeclKind, Installed } from './declare.ts';
 
 /* ── what a register says about itself ───────────────────────────────────── */
@@ -397,6 +400,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
           deletedAt,
         );
         const entry = byId(id, true)!;
+        reproject(entry);
         appendEvent({ kind: 'create', target: id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
         return ok(entry);
       }
@@ -410,10 +414,29 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
         current.id,
       );
       const entry = byId(current.id, true)!;
+      reproject(entry);
       const kind = deleting ? (deletedAt ? 'delete' : 'restore') : nextState !== current.state ? 'state' : 'edit';
       appendEvent({ kind, target: current.id, register, actor: w.actor, note: w.note, at: now, batch: w.batch });
       return ok(entry);
     });
+  }
+
+  /**
+   * Put a row's searchable line in step with the row, IN THE SAME TRANSACTION.
+   *
+   * An index updated afterwards is wrong for however long "afterwards" takes, and the window is
+   * exactly when somebody is looking for the thing they just wrote.
+   */
+  function reproject(entry: Entry): void {
+    const decl = registers.get(entry.register);
+    if (!decl || decl.series) return;
+    const row = sql.one<{ rowid: number }>('SELECT rowid FROM entry WHERE id = ?', entry.id);
+    if (!row) return;
+    project(
+      sql,
+      { rowid: row.rowid, id: entry.id, register: entry.register, deleted: entry.deleted_at !== null },
+      projectedText(decl.fields, entry.fields),
+    );
   }
 
   /**
@@ -455,10 +478,33 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
       `entry:${target}`,
     );
 
+  /**
+   * Rows whose text matches, best first.
+   *
+   * The register ceiling is applied inside the query, not to its results: filtering afterwards gives
+   * a caller a short page whenever the matches were mostly in a register they cannot see, and they
+   * cannot tell that from there having been no matches.
+   */
+  function search(q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}): Hit[] {
+    return ftsSearch(sql, q, opts);
+  }
+
+  /** Every live row's line, from nothing. What an import runs once at the end. */
+  const rebuildFts = (): number =>
+    transaction(() =>
+      rebuild(
+        sql,
+        (register) => registers.get(register)?.fields,
+        (register) => Boolean(registers.get(register)?.series),
+      ),
+    );
+
   return {
     transaction,
     allocate,
     reload,
+    search,
+    rebuildFts,
 
     /**
      * Install declarations, then rebuild the cache.
