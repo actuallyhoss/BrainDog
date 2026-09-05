@@ -299,7 +299,9 @@ test('a list pages, newest first, and the cursor loses nothing on a shared milli
   let cursor: string | null = null;
   let pages = 0;
   do {
-    const page: { rows: { id: string }[]; cursor: string | null } = k.list({ register: 'obligations', limit: 10, cursor });
+    const at: string | null = cursor;
+    type Page = { rows: { id: string }[]; cursor: string | null };
+    const page: Page = value<Page>(k.list({ register: 'obligations', limit: 10, cursor: at }));
     for (const row of page.rows) {
       assert.ok(!seen.has(row.id), 'a row came back on two pages');
       seen.add(row.id);
@@ -317,9 +319,9 @@ test('a list is one register, and a deleted row is not in it', async () => {
   value(k.create('obligations', { what: 'a' }, { actor: 'p_1' }));
   value(k.create('points', { at: '2026-09-05T00:00:00Z' }, { actor: 'p_1' }));
   value(k.update('obligations', 'obligations#1', { deleted_at: '2026-09-05' }, { actor: 'p_1' }));
-  assert.equal(k.list({ register: 'obligations' }).rows.length, 0);
-  assert.equal(k.list({ register: 'obligations', includeDeleted: true }).rows.length, 1);
-  assert.equal(k.list({ register: 'points' }).rows.length, 1);
+  assert.equal(value<{ rows: unknown[] }>(k.list({ register: 'obligations' })).rows.length, 0);
+  assert.equal(value<{ rows: unknown[] }>(k.list({ register: 'obligations', includeDeleted: true })).rows.length, 1);
+  assert.equal(value<{ rows: unknown[] }>(k.list({ register: 'points' })).rows.length, 1);
   sql.close();
 });
 
@@ -333,5 +335,56 @@ test('a record whose schema disagrees with the code refuses every write', async 
   const k = await openRecord(sql, clock);
   assert.ok(k.refused(), 'the refusal did not stick');
   assert.equal(refusal(k.create('obligations', { what: 'a' }, { actor: 'p_1' })).code, 'SCHEMA_MISMATCH');
+  sql.close();
+});
+
+/* ── the predicate, over real rows ───────────────────────────────────────── */
+
+test('A LIST TAKES A PREDICATE, and it is checked against the register before it runs', async () => {
+  const { k, sql } = await record();
+  value(k.create('obligations', { what: 'Invoice 41', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', state: 'open' }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'Retainer', amount: { amount: 24_000, currency: 'GBP' }, due: '2026-10-01', state: 'paid' }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'Hosting', amount: { amount: 24_000, currency: 'EUR' }, due: '2026-09-05', state: 'open' }, { actor: 'p_1' }));
+
+  const open = value<{ rows: { seq: number }[]; matched: number }>(
+    k.list({ register: 'obligations', where: { field: 'state', is: 'open' } }),
+  );
+  assert.deepEqual(open.rows.map((r) => r.seq).sort(), [1, 3]);
+  assert.equal(open.matched, 2, 'the matched count is the whole answer, not the page');
+
+  // Two currencies are two quantities: the same NUMBER in EUR is a different amount.
+  const gbp = value<{ rows: { seq: number }[] }>(
+    k.list({ register: 'obligations', where: { field: 'amount', is: { amount: 24_000, currency: 'GBP' } } }),
+  );
+  assert.deepEqual(gbp.rows.map((r) => r.seq), [2]);
+  sql.close();
+});
+
+test('a predicate the register cannot answer is REFUSED, not run as if it matched nothing', async () => {
+  // A list that looks filtered and is not is the one failure a declarative surface must not have,
+  // and the thing writing most predicates is an agent that cannot see the screen.
+  const { k, sql } = await record();
+  value(k.create('obligations', { what: 'a' }, { actor: 'p_1' }));
+
+  const unknown = refusal(k.list({ register: 'obligations', where: { field: 'nope', is: 'x' } }));
+  assert.equal(unknown.code, 'FIELD_UNKNOWN');
+  assert.ok(unknown.allowed?.includes('what'));
+
+  const badValue = refusal(k.list({ register: 'obligations', where: { field: 'state', is: 'done' } }));
+  assert.equal(badValue.code, 'ENUM_VALUE_UNKNOWN');
+  assert.deepEqual(badValue.allowed, ['open', 'part', 'paid', 'written_off']);
+  sql.close();
+});
+
+test('and a deleted row stays out of a filtered list too', async () => {
+  const { k, sql } = await record();
+  value(k.create('obligations', { what: 'a', state: 'open' }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'b', state: 'open' }, { actor: 'p_1' }));
+  value(k.update('obligations', 'obligations#2', { deleted_at: '2026-09-05' }, { actor: 'p_1' }));
+  const out = value<{ rows: unknown[]; matched: number }>(
+    k.list({ register: 'obligations', where: { field: 'state', is: 'open' } }),
+  );
+  assert.equal(out.rows.length, 1);
+  assert.equal(out.matched, 1, 'the count included a deleted row');
   sql.close();
 });

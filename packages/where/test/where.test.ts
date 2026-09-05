@@ -1,0 +1,242 @@
+/**
+ * The predicate, and the two renderings of it.
+ *
+ * The test that matters most is the last section: `compile` and `evaluate` are asked the same
+ * question about the same rows, and their answers are compared row by row. Two renderings that
+ * disagree are worse than one that is slow, and they disagree QUIETLY — a rule that fires mid-write
+ * and a list that draws afterwards, differing about one row, is a bug nobody can reproduce.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+
+import { compile, evaluate, jsonPath, type Predicate, type Schema } from '../src/index.ts';
+
+const SCHEMA: Schema = {
+  register: 'obligations',
+  fields: {
+    what: { type: 'text' },
+    amount: { type: 'money' },
+    due: { type: 'day' },
+    effort: { type: 'quantity' },
+    n: { type: 'int' },
+    open: { type: 'bool' },
+    state: { type: 'enum', values: ['open', 'part', 'paid', 'written_off'] },
+    tags: { type: 'list' },
+  },
+};
+
+type Row = { id: string; fields: Record<string, unknown> };
+
+const ROWS: Row[] = [
+  { id: 'a', fields: { what: 'Invoice 41 — brand', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', n: 3, state: 'open', tags: ['urgent', 'design'] } },
+  { id: 'b', fields: { what: 'Retainer, August', amount: { amount: 24_000, currency: 'GBP' }, due: '2026-10-01', n: 9, state: 'paid', tags: ['retainer'] } },
+  { id: 'c', fields: { what: 'Hosting', amount: { amount: 24_000, currency: 'EUR' }, due: '2026-09-05', n: 0, state: 'part', tags: [] } },
+  { id: 'd', fields: { what: 'No amount at all', state: 'open' } },
+  { id: 'e', fields: { what: '50% deposit', amount: { amount: 100_000, currency: 'GBP' }, due: '2026-12-31', n: 1, state: 'open', tags: ['deposit'] } },
+];
+
+/** The same rows, in SQLite, so `compile` can be run against them for real. */
+function db() {
+  const d = new DatabaseSync(':memory:');
+  d.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, fields TEXT, deleted_at TEXT)');
+  for (const row of ROWS)
+    d.prepare('INSERT INTO entry (id, register, fields, deleted_at) VALUES (?, ?, ?, NULL)').run(
+      row.id,
+      'obligations',
+      JSON.stringify(row.fields),
+    );
+  return d;
+}
+
+const bySql = (where: Predicate | undefined): string[] => {
+  const c = compile(where, SCHEMA);
+  assert.deepEqual(c.bad, [], c.bad[0]?.fix);
+  const d = db();
+  const out = d.prepare(`SELECT id FROM entry WHERE ${c.sql} ORDER BY id`).all(...(c.params as never[])) as { id: string }[];
+  d.close();
+  return out.map((r) => r.id);
+};
+
+const byJs = (where: Predicate | undefined): string[] =>
+  ROWS.filter((r) => evaluate(where, r.fields, SCHEMA)).map((r) => r.id);
+
+/** Both renderings, and they must agree — which is the whole point of there being one grammar. */
+const both = (where: Predicate | undefined): string[] => {
+  const sql = bySql(where);
+  const js = byJs(where);
+  assert.deepEqual(js, sql, `the two renderings disagree: SQL ${sql.join(',')} vs JS ${js.join(',')}`);
+  return sql;
+};
+
+/* ── the operators ───────────────────────────────────────────────────────── */
+
+test('is and not, and a row with no value is not "not" nothing — it is not anything', () => {
+  assert.deepEqual(both({ field: 'state', is: 'open' }), ['a', 'd', 'e']);
+  // `d` has a state; `not paid` includes it. A row with NO value for the field is included too,
+  // because a field nobody set is not equal to anything.
+  assert.deepEqual(both({ field: 'state', not: 'paid' }), ['a', 'c', 'd', 'e']);
+  assert.deepEqual(both({ field: 'due', not: '2026-10-01' }), ['a', 'c', 'd', 'e']);
+});
+
+test('in and not_in', () => {
+  assert.deepEqual(both({ field: 'state', in: ['open', 'part'] }), ['a', 'c', 'd', 'e']);
+  assert.deepEqual(both({ field: 'state', not_in: ['paid', 'written_off'] }), ['a', 'c', 'd', 'e']);
+});
+
+test('the ordered ones, and a row with no value is before nothing and after nothing', () => {
+  // A missing date in an overdue list is a row somebody would act on for no reason.
+  assert.deepEqual(both({ field: 'due', before: '2026-09-06' }), ['a', 'c']);
+  assert.deepEqual(both({ field: 'due', after: '2026-09-06' }), ['b', 'e']);
+  assert.deepEqual(both({ field: 'n', gte: 3 }), ['a', 'b']);
+  assert.deepEqual(both({ field: 'n', lt: 3 }), ['c', 'e']);
+  assert.deepEqual(both({ field: 'due', between: ['2026-09-01', '2026-12-31'] }), ['b', 'c', 'e']);
+});
+
+test('the textual ones, and a percent sign in the value is a percent sign', () => {
+  // A search for "50%" that matched every row would read as a search that found a lot.
+  assert.deepEqual(both({ field: 'what', contains: 'Invoice' }), ['a']);
+  assert.deepEqual(both({ field: 'what', starts: 'Retainer' }), ['b']);
+  assert.deepEqual(both({ field: 'what', ends: 'deposit' }), ['e']);
+  assert.deepEqual(both({ field: 'what', contains: '50%' }), ['e']);
+  assert.deepEqual(both({ field: 'what', contains: '%' }), ['e'], 'the wildcard leaked out of the value');
+});
+
+test('empty and present are about the FIELD, not about its value', () => {
+  assert.deepEqual(both({ field: 'amount', empty: true }), ['d']);
+  assert.deepEqual(both({ field: 'amount', present: true }), ['a', 'b', 'c', 'e']);
+  // Zero is a number somebody measured, and it is present.
+  assert.deepEqual(both({ field: 'n', present: true }), ['a', 'b', 'c', 'e']);
+});
+
+test('has and lacks look inside a list', () => {
+  assert.deepEqual(both({ field: 'tags', has: 'urgent' }), ['a']);
+  assert.deepEqual(both({ field: 'tags', lacks: 'urgent' }), ['b', 'c', 'd', 'e']);
+});
+
+/* ── money carries its currency ──────────────────────────────────────────── */
+
+test('A MONEY COMPARISON CARRIES ITS CURRENCY, because two currencies are two quantities', () => {
+  // `b` and `c` hold the same NUMBER — 24,000 — in GBP and EUR. Comparing the numbers is the exact
+  // mistake minor units exist to make impossible.
+  assert.deepEqual(both({ field: 'amount', is: { amount: 24_000, currency: 'GBP' } }), ['b']);
+  assert.deepEqual(both({ field: 'amount', is: { amount: 24_000, currency: 'EUR' } }), ['c']);
+  assert.deepEqual(both({ field: 'amount', gte: { amount: 24_000, currency: 'GBP' } }), ['a', 'b', 'e']);
+});
+
+/* ── groups ──────────────────────────────────────────────────────────────── */
+
+test('all, any and none', () => {
+  assert.deepEqual(both({ all: [{ field: 'state', is: 'open' }, { field: 'due', before: '2026-09-06' }] }), ['a']);
+  assert.deepEqual(both({ any: [{ field: 'state', is: 'paid' }, { field: 'n', gte: 3 }] }), ['a', 'b']);
+  assert.deepEqual(both({ none: [{ field: 'state', is: 'open' }] }), ['b', 'c']);
+});
+
+test('an empty group is not an empty question', () => {
+  // `all: []` is true of everything and `any: []` of nothing, which is what the two words mean.
+  // Guessing either way is a filter that silently passes or silently blocks.
+  assert.equal(both({ all: [] }).length, ROWS.length);
+  assert.equal(both({ any: [] }).length, 0);
+  assert.equal(both(undefined).length, ROWS.length);
+});
+
+test('groups nest', () => {
+  assert.deepEqual(
+    both({
+      all: [
+        { field: 'state', not: 'paid' },
+        { any: [{ field: 'n', gte: 3 }, { field: 'amount', empty: true }] },
+      ],
+    }),
+    ['a', 'd'],
+  );
+});
+
+/* ── it refuses rather than matching nothing ─────────────────────────────── */
+
+test('A FIELD THE REGISTER DOES NOT HAVE IS REFUSED, and the refusal lists what it does', () => {
+  const c = compile({ field: 'nope', is: 'x' }, SCHEMA);
+  assert.equal(c.bad[0]?.code, 'FIELD_UNKNOWN');
+  assert.ok(c.bad[0]?.allowed?.includes('what'));
+});
+
+test('a value the enum does not have is refused — the failure that motivated the evaluator', () => {
+  // `state is not done` on a register with no `done` state was true of every row, so a filter that
+  // looked like it had worked returned the whole register.
+  const c = compile({ field: 'state', not: 'done' }, SCHEMA);
+  assert.equal(c.bad[0]?.code, 'ENUM_VALUE_UNKNOWN');
+  assert.deepEqual(c.bad[0]?.allowed, ['open', 'part', 'paid', 'written_off']);
+  // And inside a list, every value is checked, not only the first.
+  assert.equal(compile({ field: 'state', in: ['open', 'done'] }, SCHEMA).bad[0]?.code, 'ENUM_VALUE_UNKNOWN');
+});
+
+test('an operator the type cannot take is refused by name', () => {
+  assert.equal(compile({ field: 'what', gt: 3 }, SCHEMA).bad[0]?.code, 'WHERE_OPERATOR_UNSUPPORTED');
+  assert.equal(compile({ field: 'amount', contains: 'x' }, SCHEMA).bad[0]?.code, 'WHERE_OPERATOR_UNSUPPORTED');
+  assert.equal(compile({ field: 'what', has: 'x' }, SCHEMA).bad[0]?.code, 'WHERE_OPERATOR_UNSUPPORTED');
+});
+
+test('a leaf with no test, and a grammar shape this build does not read, are both named', () => {
+  assert.equal(compile({ field: 'what' } as never, SCHEMA).bad[0]?.code, 'WHERE_MALFORMED');
+  for (const shape of [{ matches: 'x' }, { predicate: 'p' }, { field: 'what', near: { text: 'x' } }, { field: 'what', is: 'x', via: 'party' }])
+    assert.match(compile(shape as never, SCHEMA).bad[0]?.code ?? '', /WHERE_UNSUPPORTED/, JSON.stringify(shape));
+});
+
+test('a refused predicate compiles to something that matches NOTHING', () => {
+  // Belt and braces: a caller that ignores `bad` must not get the whole register.
+  const c = compile({ field: 'nope', is: 'x' }, SCHEMA);
+  assert.ok(c.bad.length);
+  const d = db();
+  const rows = d.prepare(`SELECT id FROM entry WHERE ${c.sql}`).all(...(c.params as never[]));
+  d.close();
+  assert.equal(rows.length, 0, 'a refused predicate passed rows through');
+});
+
+/* ── nothing is inlined ──────────────────────────────────────────────────── */
+
+test('EVERY VALUE IS BOUND, and the only thing inlined is a field id that matched the grammar', () => {
+  const c = compile(
+    { all: [{ field: 'what', contains: "'; DROP TABLE entry; --" }, { field: 'state', is: 'open' }] },
+    SCHEMA,
+  );
+  assert.deepEqual(c.bad, []);
+  assert.ok(!c.sql.includes('DROP'), 'a value reached the SQL');
+  assert.ok(c.params.some((p) => String(p).includes('DROP')), 'the value was not bound');
+  // The field ids are the only identifiers in the string, and each matched `^[a-z][a-z0-9_]{0,31}$`.
+  for (const m of c.sql.matchAll(/\$\.([a-z0-9_]+)/g)) assert.ok(SCHEMA.fields[m[1]!], `${m[1]} is not a field`);
+  assert.equal(jsonPath('what'), '$.what');
+});
+
+/* ── and the two renderings agree, over everything ───────────────────────── */
+
+test('COMPILE AND EVALUATE ANSWER THE SAME QUESTION, over every predicate above', () => {
+  // Each `both()` above already compares them. This one sweeps a wider set in one go, because the
+  // disagreement that matters is the one nobody wrote a test for.
+  const predicates: Predicate[] = [
+    { field: 'state', is: 'open' },
+    { field: 'state', not: 'open' },
+    { field: 'state', in: ['open', 'paid'] },
+    { field: 'state', not_in: ['open'] },
+    { field: 'due', before: '2026-09-05' },
+    { field: 'due', after: '2026-09-05' },
+    { field: 'due', empty: true },
+    { field: 'due', present: true },
+    { field: 'n', gt: 0 },
+    { field: 'n', gte: 0 },
+    { field: 'n', lt: 9 },
+    { field: 'n', lte: 9 },
+    { field: 'n', between: [1, 3] },
+    { field: 'what', contains: 'o' },
+    { field: 'what', starts: 'H' },
+    { field: 'what', ends: 't' },
+    { field: 'amount', gt: { amount: 24_000, currency: 'GBP' } },
+    { field: 'amount', is: { amount: 24_000, currency: 'EUR' } },
+    { field: 'tags', has: 'design' },
+    { field: 'tags', lacks: 'design' },
+    { all: [{ field: 'state', is: 'open' }, { field: 'tags', has: 'urgent' }] },
+    { any: [{ field: 'due', empty: true }, { field: 'n', gte: 9 }] },
+    { none: [{ field: 'amount', present: true }] },
+  ];
+  for (const p of predicates) both(p);
+});

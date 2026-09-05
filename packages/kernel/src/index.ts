@@ -22,6 +22,7 @@ import { no, ok } from '@braindog/ports';
 import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } from './coerce.ts';
 import { ulids, type Mint } from './ids.ts';
 import { applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
+import { compile, type Predicate, type Schema } from '@braindog/where';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
@@ -190,32 +191,68 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
    * the timestamp alone loses every row that shares a millisecond with the page boundary, which on
    * an import is most of them.
    */
-  function list(q: { register: string; limit?: number; cursor?: string | null; includeDeleted?: boolean }): {
-    rows: Entry[];
-    cursor: string | null;
-  } {
+  /** What a predicate is checked against: the register's own fields, and nothing else. */
+  const schemaOf = (register: string): Schema => ({
+    register,
+    fields: Object.fromEntries(
+      (registers.get(register)?.fields ?? [])
+        .filter((f) => !f.retired)
+        .map((f) => [f.id, { type: f.type, ...(f.values ? { values: f.values } : {}) }]),
+    ),
+  });
+
+  function list(q: {
+    register: string;
+    where?: Predicate;
+    limit?: number;
+    cursor?: string | null;
+    includeDeleted?: boolean;
+  }): Result<{ rows: Entry[]; cursor: string | null; matched: number }> {
+    const refused = schemaRefusal(state);
+    if (refused) return refused;
+    if (!registers.has(q.register))
+      return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+
+    /* A PREDICATE THAT COULD NOT BE READ RUNS NOTHING. Returning the register would be a list that
+       looks filtered and is not, which is the one failure a declarative surface must not have —
+       especially when the thing writing most predicates is an agent that cannot see the screen. */
+    const c = compile(q.where, schemaOf(q.register));
+    if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
+
     const limit = Math.min(Math.max(1, q.limit ?? 50), 500);
     const deleted = q.includeDeleted ? '' : ' AND deleted_at IS NULL';
     const [at, afterId] = (q.cursor ?? '').split('|');
-    const rows = at
+    const page = at
       ? sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
+          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) AND (updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
           q.register,
+          ...c.params,
           at,
           at,
           afterId ?? '',
           limit + 1,
         )
       : sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} ORDER BY updated_at DESC, id DESC LIMIT ?`,
+          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) ORDER BY updated_at DESC, id DESC LIMIT ?`,
           q.register,
+          ...c.params,
           limit + 1,
         );
 
-    const page = rows.slice(0, limit).map(hydrate);
-    const more = rows.length > limit;
-    const last = page.at(-1);
-    return { rows: page, cursor: more && last ? `${last.updated_at}|${last.id}` : null };
+    /* The MATCHED count is the whole answer, not the page: a reader who cannot see how many rows a
+       filter admitted cannot tell a short list from a narrow one. */
+    const matched = Number(
+      sql.one<{ n: number }>(
+        `SELECT count(*) AS n FROM entry WHERE register = ?${deleted} AND (${c.sql})`,
+        q.register,
+        ...c.params,
+      )?.n ?? 0,
+    );
+
+    const rows = page.slice(0, limit).map(hydrate);
+    const more = page.length > limit;
+    const last = rows.at(-1);
+    return ok({ rows, matched, cursor: more && last ? `${last.updated_at}|${last.id}` : null });
   }
 
   /** `MAX(event.rowid)`, which is the record's version: what changed since is a range scan. */

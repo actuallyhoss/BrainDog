@@ -85,6 +85,9 @@ importers:
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports
+      '@braindog/where':
+        specifier: workspace:*
+        version: link:../where
 
   packages/ports: {}
 
@@ -101,6 +104,12 @@ importers:
         version: link:../theme
 
   packages/theme: {}
+
+  packages/where:
+    dependencies:
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../ports
 
 packages:
 
