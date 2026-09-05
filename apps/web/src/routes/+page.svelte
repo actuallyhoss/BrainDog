@@ -14,7 +14,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { parse, relative, TONES } from 'braindog-render';
-  import { Block } from 'braindog-render/svelte';
+  import { Block, Degraded } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { CURRENCY, NOW, ROWS, metric } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -147,7 +147,7 @@
   <aside class="secondary">
     <Section title="Right now">
       {#each strip as segment}
-        {#if segment.type === 'block'}<Block block={segment} />{/if}
+        {#if segment.type === 'block'}<Block block={segment} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
       {/each}
     </Section>
 

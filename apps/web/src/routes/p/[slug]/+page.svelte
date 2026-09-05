@@ -13,7 +13,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { KINDS, isKind } from 'braindog-render';
-  import { Block, Table } from 'braindog-render/svelte';
+  import { Block, Degraded, Table } from 'braindog-render/svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -458,7 +458,7 @@
               {/if}
             {:else}
               {#each toSegments(block) as segment}
-                {#if segment.type === 'block'}<Block block={segment} {opts} />{/if}
+                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}
           </div>

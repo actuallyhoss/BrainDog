@@ -53,7 +53,10 @@ function barRows(block: BlockResult): string[] {
        `effort` in days printed `GBP 0.02` — the total was 2.4 days, run through a money formatter
        that reads its input as minor units. A block that can be bound to any register cannot assume
        the thing it is adding up is currency. */
-    .map(([key, total]) => `${key} | ${display(block.register ?? '', of, total) ?? money(total, CURRENCY)} | `);
+    .map(
+      ([key, total]) =>
+        `${escapeCell(key)} | ${escapeCell(display(block.register ?? '', of, total) ?? money(total, CURRENCY))} | `,
+    );
 }
 
 /**
@@ -86,7 +89,7 @@ function chipsRows(block: BlockResult): string[] {
     const key = display(block.register ?? '', by, e.fields[by]) ?? 'Unset';
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return [...counts].sort((a, b) => b[1] - a[1]).map(([key, n]) => ` | ${n} | ${key}`);
+  return [...counts].sort((a, b) => b[1] - a[1]).map(([key, n]) => ` | ${n} | ${escapeCell(key)}`);
 }
 
 /**
@@ -110,7 +113,7 @@ function gaugeRows(block: BlockResult): string[] {
   /* The tone is the reading, and it is the whole point of a gauge: over the line is `bad`, close to
      it is `warn`, under it is nothing at all — a gauge that is fine should not be coloured. */
   const tone = total > target ? ' | bad' : total > target * 0.85 ? ' | warn' : '';
-  return [`${label} | ${fmt(total)} | ${fmt(target)}${tone}`];
+  return [`${escapeCell(label)} | ${fmt(total)} | ${fmt(target)}${tone}`];
 }
 
 /**
@@ -158,7 +161,11 @@ function projectRows(block: BlockResult, cells: number): string[] {
         : display(block.register ?? '', field, raw)) ?? '';
     });
     const tone = KINDS[block.kind as keyof typeof KINDS]?.tone && row.tone ? ` | ${row.tone}` : '';
-    return `${values.join(' | ')}${tone}`;
+    /* ESCAPED, like the authored path. A value is a string somebody typed, and one `|` in it made
+       the row one cell too wide, failed the arity check, and degraded the WHOLE BLOCK to a fence
+       the app then dropped on the floor. `redirect | kiln.example` in a domain's target field was
+       enough to delete the block it appeared in. */
+    return `${values.map(escapeCell).join(' | ')}${tone}`;
   });
 }
 
@@ -191,7 +198,9 @@ export function toSegments(block: BlockResult) {
             }`,
         )
       : block.metrics
-    ? block.metrics.map((m) => `${m.label} | ${m.value} | ${m.note}${m.tone ? ` | ${m.tone}` : ''}`)
+    ? block.metrics.map(
+        (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${m.tone ? ` | ${m.tone}` : ''}`,
+      )
     : block.kind === 'bar'
       ? barRows(block)
       : block.kind === 'chips'

@@ -14,7 +14,7 @@
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
   import { titleOf } from '$lib/title.ts';
-  import { Block, Table } from 'braindog-render/svelte';
+  import { Block, Degraded, Table } from 'braindog-render/svelte';
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -67,7 +67,7 @@
                    heading and then nothing — a section title over an empty body, which tells the
                    reader something is there and then shows them it is not. -->
               {#each toSegments(block) as segment}
-                {#if segment.type === 'block'}<Block block={segment} {opts} />{/if}
+                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}
           </section>

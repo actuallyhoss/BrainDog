@@ -24,7 +24,7 @@
 -->
 <script lang="ts">
   import { KINDS, isKind } from 'braindog-render';
-  import { Block } from 'braindog-render/svelte';
+  import { Block, Degraded } from 'braindog-render/svelte';
 
   import { copy } from '../copy.ts';
   import { REGISTERS, page as readPage, values } from '../record/api.ts';
@@ -128,7 +128,7 @@
                 <span class="tile-draw" aria-hidden="true">
                   {#if tile.segments.length}
                     {#each tile.segments as segment}
-                      {#if segment.type === 'block'}<Block block={segment} {opts} />{/if}
+                      {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
                     {/each}
                   {:else}
                     <!-- The documented degrade: the description in the same slot, so the row of

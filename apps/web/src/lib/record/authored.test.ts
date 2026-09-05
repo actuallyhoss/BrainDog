@@ -16,6 +16,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { toSegments } from './blocks.ts';
+import { page } from './api.ts';
+import { ROWS } from './data.ts';
 import type { BlockResult } from './api.ts';
 
 /** The minimum a `BlockResult` needs to be rendered, with no register behind it. */
@@ -97,4 +99,49 @@ test('a block that declares BOTH a source and authored rows renders neither', ()
     register: 'obligations',
   } as unknown as BlockResult;
   assert.deepEqual(cellsOf(both), []);
+});
+
+/* ── a value somebody typed cannot break the block it is in ──────────────── */
+
+test('a pipe in a register value does not delete the block', () => {
+  // The dialect separates cells on `|`, so one pipe in a free-text field made the row a cell too
+  // wide, failed the arity check, and degraded the WHOLE BLOCK to a fence the app then dropped on
+  // the floor. `redirect | kiln.example` in a domain's target field deleted the block it was in.
+  const row = (ROWS.services ?? []).find((r) => r.fields.kind === 'domain');
+  assert.ok(row, 'the seed needs a domain for this to mean anything');
+  const before = row.fields.points_at;
+  row.fields.points_at = 'redirect | kiln.example';
+  try {
+    const block = page('estate')?.blocks.find((b) => b.heading?.includes('points at'));
+    assert.ok(block);
+    const segs = toSegments(block);
+    assert.deepEqual([...new Set(segs.map((x) => x.type))], ['block'], 'the block degraded');
+    const cells = segs.flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : [])).map((r) => r.cells);
+    assert.ok(cells.length > 0, 'the rows vanished');
+    assert.ok(
+      cells.some((c) => c.some((v) => v === 'redirect | kiln.example')),
+      'the value did not survive the round trip intact',
+    );
+  } finally {
+    row.fields.points_at = before;
+  }
+});
+
+test('a backslash in a register value survives too', () => {
+  // `String.raw` because a plain literal drops an unknown escape: 'C:\Repos' IS 'C:Repos' in
+  // JavaScript, so the obvious version of this test compares a string to itself and proves nothing.
+  const value = String.raw`C:\\Repos\\kiln`;
+  assert.ok(value.includes('\\'), 'the fixture has to actually contain a backslash');
+  const row = (ROWS.services ?? []).find((r) => r.fields.kind === 'domain');
+  assert.ok(row);
+  const before = row.fields.points_at;
+  row.fields.points_at = value;
+  try {
+    const block = page('estate')?.blocks.find((b) => b.heading?.includes('points at'));
+    const segs = toSegments(block!);
+    const cells = segs.flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : [])).map((r) => r.cells);
+    assert.ok(cells.some((c) => c.some((v) => v === value)), 'the backslash did not round-trip');
+  } finally {
+    row.fields.points_at = before;
+  }
 });
