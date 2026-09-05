@@ -21,6 +21,7 @@ import assert from 'node:assert/strict';
 import { CURRENCY, applyFilters, dirOf, display, isProse, labelOf, metric, page } from './api.ts';
 import { toSegments } from './blocks.ts';
 import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
+import type { Entry } from './schema.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
 
@@ -318,14 +319,15 @@ test('when there are more groups than fit, the rest is CARRIED, not dropped', ()
 /* ── a tile and its link must agree ──────────────────────────────────────── */
 
 /** The rows a metric's own href actually opens, read the way the register route reads it. */
-function opened(href: string): { register: string; rows: number } {
+function opened(href: string): { register: string; entries: Entry[]; rows: number } {
   const url = new URL(href, 'http://x');
   const register = url.pathname.split('/')[2] ?? '';
   const filters = url.searchParams.getAll('f').map((raw) => {
     const [field = '', op = 'is', values = ''] = raw.split(':');
     return { field, op, values: values.split(',') };
   });
-  return { register, rows: applyFilters(register, ROWS[register] ?? [], filters).length };
+  const entries = applyFilters(register, ROWS[register] ?? [], filters);
+  return { register, entries, rows: entries.length };
 }
 
 test('every metric href opens rows, rather than an empty grid or the whole register', () => {
@@ -344,13 +346,42 @@ test('every metric href opens rows, rather than an empty grid or the whole regis
   }
 });
 
-test('a href that counts rows opens exactly that many', () => {
-  // The three whose note is a count can be checked exactly. The rest report money, and the count is
-  // asserted above only for being neither zero nor everything.
-  for (const [id, n] of [['overdue', 2], ['lapsing', 1]] as const) {
-    const m = metric(id);
+/** Every metric, so a new one cannot be added without being held to the same rule. */
+const METRICS = ['kiln-open', 'kiln-owed', 'kiln-cost', 'owed-to-you', 'due-30d', 'overdue', 'renews-30d', 'lapsing'];
+
+const figure = (v: string) => Number(v.replace(/[^0-9.]/g, ''));
+
+test('a tile that shows a COUNT opens exactly that many rows', () => {
+  // Not two of them, all of them. The mismatch this catches was a tile counting `blocked` while its
+  // link listed three states: 5 on the tile, 4 in the list, and no way to tell which was the answer.
+  const counts = METRICS.map((id) => metric(id)).filter((m) => /^[\d,]+$/.test(m.value));
+  assert.ok(counts.length >= 3, 'the count tiles have gone missing, so this test is vacuous');
+  for (const m of counts) {
     assert.ok(m.href);
-    assert.equal(opened(m.href).rows, n, `${m.label} says ${n} and opens a different number`);
+    assert.equal(opened(m.href).rows, figure(m.value), `${m.label} says ${m.value} and opens a different number`);
+  }
+});
+
+test('a tile that shows MONEY adds up to the rows it opens', () => {
+  // Same rule, on the half that was never checked: the figure has to be the sum of the rows the link
+  // produces. A service's tile is annualised — `cost` is per cycle, and the tile says "a year" — so
+  // that is the second reading allowed, and no third one is.
+  const money = METRICS.map((id) => metric(id)).filter((m) => m.value.startsWith(CURRENCY));
+  assert.ok(money.length >= 4, 'the money tiles have gone missing, so this test is vacuous');
+  for (const m of money) {
+    assert.ok(m.href);
+    const { register, entries } = opened(m.href);
+    const field = register === 'services' ? 'cost' : 'amount';
+    const plain = entries.reduce((a, e) => a + Number(e.fields[field] ?? 0), 0);
+    const annual = entries.reduce(
+      (a, e) => a + Number(e.fields.cost ?? 0) * (e.fields.cycle === 'monthly' ? 12 : e.fields.cycle === 'two_yearly' ? 0.5 : 1),
+      0,
+    );
+    const tile = Math.round(figure(m.value) * 100);
+    assert.ok(
+      tile === plain || tile === Math.round(annual),
+      `${m.label} shows ${m.value}; the rows it opens add to ${plain} (${Math.round(annual)} a year)`,
+    );
   }
 });
 

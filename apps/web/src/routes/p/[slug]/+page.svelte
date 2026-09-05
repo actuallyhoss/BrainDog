@@ -18,7 +18,7 @@
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { REGISTERS, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
-  import { toSegments } from '$lib/record/blocks.ts';
+  import { draw } from '$lib/record/blocks.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -381,6 +381,7 @@
         <!-- `drawn: false` means the server evaluated `when:` and said no. A page that shows a
              warning that does not apply teaches people to ignore warnings (06 §1). -->
         {#if block.drawn}
+          {@const drawn = draw(block)}
           <!-- A `div` that takes `region` or `listitem`, and NOT a `<section>`. A section is already
                a region landmark once it is named, and ARIA does not let one be a `listitem` — so
                while arranging, every block on the page carried a role its element could not have.
@@ -448,16 +449,21 @@
               {/if}
             </header>
 
-            {#if block.kind === 'table'}
-              {#if block.rows.length === 0}
-                <!-- Never hidden and never centred: the page's shape is information, and a page that
-                     silently shrinks teaches that blocks come and go (19 §6). -->
-                <p class="block-empty">{block.empty}</p>
-              {:else}
-                <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
-              {/if}
+            <!-- Never hidden and never centred: the page's shape is information, and a page that
+                 silently shrinks teaches that blocks come and go (19 §6). ONE surface for all
+                 sixteen kinds, so "nothing matched" and "this block is broken" are told apart. -->
+            {#if drawn.refusal}
+              <Empty
+                compact
+                kind={drawn.refusal.kind}
+                title={drawn.refusal.title}
+                body={drawn.refusal.body}
+                lines={drawn.refusal.lines}
+              />
+            {:else if block.kind === 'table'}
+              <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
             {:else}
-              {#each toSegments(block) as segment}
+              {#each drawn.segments as segment}
                 {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}
@@ -563,15 +569,6 @@
      same thing and costs nothing, because the ceiling has room and the floor does not. */
   .block-where {
     color: var(--dim);
-  }
-
-  .block-empty {
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--dim);
-    font-size: var(--t-ui);
   }
 
   .source {

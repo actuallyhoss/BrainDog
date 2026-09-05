@@ -27,6 +27,8 @@
     actions,
     agentPrompt,
     heading = false,
+    lines,
+    compact = false,
   }: {
     kind: EmptyKind;
     title: string;
@@ -49,6 +51,16 @@
     /** The highest-value line in the product: the buyer already has agents, and an empty register is
         the right place to say so. */
     agentPrompt?: string | undefined;
+    /** One line per thing that was wrong, each already a whole sentence. */
+    lines?: string[] | undefined;
+    /**
+     * Inside a frame that already has one.
+     *
+     * A block draws its own border and heading, so the full card here would be a box in a box and a
+     * second title under the first. Compact keeps the glyph and the words and drops the frame —
+     * the same five designed states rather than a sixth shape that drifts from them.
+     */
+    compact?: boolean;
   } = $props();
 
   /* One glyph per kind. Five states were designed as five different things and then drawn as one
@@ -63,7 +75,7 @@
   };
 </script>
 
-<div class="empty" data-kind={kind}>
+<div class="empty" data-kind={kind} class:compact>
   <span class="empty-glyph" aria-hidden="true"><Icon name={GLYPH[kind]} size="l" /></span>
   {#if heading}
     <h1 class="empty-title">{title}</h1>
@@ -71,6 +83,11 @@
     <p class="empty-title">{title}</p>
   {/if}
   {#if body}<p class="empty-body">{body}</p>{/if}
+  {#if lines?.length}
+    <ul class="empty-lines">
+      {#each lines as line}<li>{line}</li>{/each}
+    </ul>
+  {/if}
   {#if query}<p class="empty-query"><code>{query}</code></p>{/if}
   {#if rid}<p class="empty-rid">Request <code>{rid}</code></p>{/if}
   {#if agentPrompt}
@@ -124,6 +141,36 @@
     font-size: var(--t-lg);
     font-weight: 600;
     letter-spacing: -0.015em;
+  }
+
+  /* The refusals, as a list, because they are several separate facts and a joined sentence reads as
+     one. Monospaced: every one of them quotes a clause somebody wrote. */
+  .empty-lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    list-style: none;
+  }
+
+  .empty.compact {
+    padding: var(--sp-3) 0 var(--sp-2);
+    background: none;
+    border: 0;
+  }
+
+  .empty.compact .empty-glyph {
+    inline-size: 28px;
+    block-size: 28px;
+    margin-block-end: var(--sp-2);
+  }
+
+  .empty.compact .empty-title {
+    font-size: var(--t-md);
   }
 
   .empty-body,

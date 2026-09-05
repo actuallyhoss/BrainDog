@@ -30,7 +30,7 @@ import {
   VAULT,
 } from './data.ts';
 import { runway } from './forecast.ts';
-import { compile, matches } from './where.ts';
+import { compile, explain, matches } from './where.ts';
 import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 export const CURRENCY = 'GBP';
@@ -758,6 +758,8 @@ export type BlockResult = PageBlock & {
    * `entries`; every kind that reduces reads this.
    */
   matched: Entry[];
+  /** What the `where:` could not understand, in words. Empty when it understood all of it. */
+  refusals: string[];
   total: number;
   drawn: boolean;
   /** Machine-readable, and every block that renders a query result carries one: staleness is a
@@ -792,6 +794,7 @@ function runwayBlock(b: PageBlock): BlockResult {
     columns,
     entries: [],
     matched: [],
+    refusals: [],
     rows: steps.map((s, i) => ({
       /* The key is the movement, not the index: two charges on one day from one service are
          different rows, and a keyed list that reuses an index re-renders the wrong one. */
@@ -821,7 +824,9 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
 
     const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : undefined;
     const all = register ? (ROWS[register] ?? []) : [];
-    const matched = register ? filterForBlock(register, all, b) : [];
+    const { entries: matched, refusals } = register
+      ? filterForBlock(register, all, b)
+      : { entries: [], refusals: [] };
     /* `limit:` is a READING cap, not a query cap: it says how much of the answer fits on the page.
        The kinds that reduce are handed the whole answer (see `matched`), so a sum is a sum. */
     const entries = matched.slice(0, b.limit ?? 50);
@@ -840,6 +845,7 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
       columns,
       entries,
       matched,
+      refusals,
       rows: toRows(register ?? '', entries, columns),
       total: matched.length,
       drawn: b.drawn ?? true,
@@ -852,7 +858,7 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
 }
 
 /** The mock's stand-in for a compiled `where:`. The real one is one JSON tree, seven consumers. */
-function filterForBlock(register: string, entries: Entry[], b: PageBlock): Entry[] {
+function filterForBlock(register: string, entries: Entry[], b: PageBlock): { entries: Entry[]; refusals: string[] } {
   /* THE PREDICATE IS EVALUATED, not pattern-matched. This was five `String.includes` checks, and
      anything outside them passed every row through a filter that looked like it had worked — the
      one failure a declarative surface must not have, because the thing writing most of these
@@ -872,7 +878,14 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): Entry
     out = out.filter((e) => e.fields.state !== 'done' && e.fields.state !== 'dropped');
 
   const order = b.order?.[0];
-  return order ? sortRows(register, out, order.field, order.dir) : out;
+  return {
+    entries: order ? sortRows(register, out, order.field, order.dir) : out,
+    /* CARRIED OUT, not swallowed. A predicate that could not be understood matches nothing, which
+       is the safe answer and an invisible one: the block drew a heading over a blank rectangle and
+       whoever wrote the declaration — usually an agent — learned nothing. 10 §7's fourth rule is
+       that the refusal is the teacher. */
+    refusals: predicate ? explain(predicate) : [],
+  };
 }
 
 export function list(register: string, opts: { filters?: Filter[]; q?: string; sort?: { field: string; dir: 'asc' | 'desc' } } = {}) {

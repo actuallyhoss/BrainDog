@@ -235,3 +235,71 @@ export function toSegments(block: BlockResult) {
           : [];
   return parse(['```' + head, ...rows, '```'].join('\n'));
 }
+
+/**
+ * ── WHY A BLOCK IS BLANK ─────────────────────────────────────────────────────
+ *
+ * `empty:` was rendered for `table` and for nothing else, so fifteen of the sixteen kinds drew a
+ * heading over a blank rectangle and said nothing at all. That reads as a bug in the product rather
+ * than as an answer, and it is the worst of the three cases that reach it:
+ *
+ *   1. THE FILTER WAS NOT UNDERSTOOD. `compile()` refuses a clause it cannot resolve and `matches`
+ *      then admits no row, which is the safe answer and an invisible one. Whoever wrote the
+ *      declaration — usually an agent, which cannot see the screen — learns nothing and writes it
+ *      the same way again. 10 §7's fourth rule is that the refusal is the teacher, so the words
+ *      `explain()` already produces are put on the page.
+ *   2. THE DECLARATION CONTRADICTS ITSELF: a source and authored rows, where picking one would be a
+ *      silent decision about where the block's content comes from.
+ *   3. IT ASKED AND THE ANSWER WAS NOTHING. The ordinary case, and the author's own `empty:`
+ *      sentence is the right words for it — "You owe nobody anything" is a result, not a fault.
+ *
+ * One and two are the block's own error and take the `error` state; three is `no-results`. The
+ * difference is the whole point: a reader must be able to tell "nothing matched" from "this block
+ * is broken", and both were drawn as the same emptiness.
+ */
+export type Refusal = {
+  kind: 'no-results' | 'error';
+  title: string;
+  body?: string;
+  /** One line per clause that did not resolve, verbatim from `explain()`. */
+  lines?: string[];
+};
+
+/** Everything a surface needs to draw one block: the segments, or the reason there are none. */
+export function draw(block: BlockResult): { segments: ReturnType<typeof parse>; refusal: Refusal | null } {
+  if (block.authored?.length && block.register)
+    return {
+      segments: [],
+      refusal: {
+        kind: 'error',
+        title: 'This block declares both a source and rows of its own.',
+        body: 'Keep one. `source:` reads a register; `authored:` is written out by hand.',
+      },
+    };
+
+  if (block.refusals.length)
+    return {
+      segments: [],
+      refusal: {
+        kind: 'error',
+        title: 'This block’s filter was not understood, so it matched nothing.',
+        lines: block.refusals,
+      },
+    };
+
+  /* A `table` is drawn by the grid rather than through the dialect, so its rows are the check. */
+  if (block.kind === 'table')
+    return {
+      segments: [],
+      refusal: block.rows.length
+        ? null
+        : { kind: 'no-results', title: block.empty ?? 'Nothing here yet.' },
+    };
+
+  const segments = toSegments(block);
+  const blank = segments.every((s) => s.type === 'block' && s.rows.length === 0);
+  return {
+    segments,
+    refusal: blank ? { kind: 'no-results', title: block.empty ?? 'Nothing here yet.' } : null,
+  };
+}

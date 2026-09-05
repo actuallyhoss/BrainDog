@@ -19,7 +19,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { page as readPage, values } from '$lib/record/api.ts';
-  import { toSegments } from '$lib/record/blocks.ts';
+  import { draw } from '$lib/record/blocks.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -53,20 +53,19 @@
 
       {#each result.blocks as block}
         {#if block.drawn}
+          {@const drawn = draw(block)}
           <section class="block-slot">
             <h2 class="block-name">{block.heading ?? block.kind}</h2>
-            {#if block.kind === 'table'}
-              {#if block.rows.length === 0}
-                <p class="block-empty">{block.empty}</p>
-              {:else}
-                <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
-              {/if}
+            <!-- EVERY kind, through the same conversion the page route uses. This branch used to
+                 read `{:else if block.metrics}`, so a `note` or a `bar` on a shared page drew its
+                 heading and then nothing — a section title over an empty body, which tells the
+                 reader something is there and then shows them it is not. -->
+            {#if drawn.refusal}
+              <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines} />
+            {:else if block.kind === 'table'}
+              <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
             {:else}
-              <!-- EVERY kind, through the same conversion the page route uses. This branch used to
-                   read `{:else if block.metrics}`, so a `note` or a `bar` on a shared page drew its
-                   heading and then nothing — a section title over an empty body, which tells the
-                   reader something is there and then shows them it is not. -->
-              {#each toSegments(block) as segment}
+              {#each drawn.segments as segment}
                 {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}
@@ -152,15 +151,6 @@
     font-family: var(--font-ui);
     font-size: var(--t-ui);
     font-weight: 500;
-  }
-
-  .block-empty {
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--dim);
-    font-size: var(--t-ui);
   }
 
   .foot {
