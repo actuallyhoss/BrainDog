@@ -39,6 +39,7 @@ import {
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
+import { evaluateMetric, scorePrediction, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import {
   bindGrant,
   getGrant,
@@ -67,6 +68,8 @@ export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
+export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, targetOf, windowMs } from './metrics.ts';
+export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
@@ -559,6 +562,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     return id;
   }
 
+  /** What the evaluator needs beyond SQL: the clock, and the shape of a register. */
+  const evalContext = (): EvalContext => ({
+    nowMs: clock.now(),
+    schemaOf: (register) => {
+      const r = registers.get(register);
+      return r ? { register, fields: Object.fromEntries(r.fields.map((f) => [f.id, f])) } : null;
+    },
+  });
+
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
@@ -606,6 +618,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     purge: () => {
       purge(sql, clock.now() - 30 * 86_400_000, clock.now(), transaction, mint);
       return clock.now() + 3_600_000;
+    },
+
+    /**
+     * A prediction comes due.
+     *
+     * A DECISION THAT PREDICTED NOTHING CANNOT BE WRONG. The claim is checked against the measure it
+     * named, once — `scored_at` is what makes a re-entered alarm find nothing to do rather than
+     * overwrite a verdict with a later reading.
+     */
+    score: (row) => {
+      const { prediction } = JSON.parse(row.payload) as { prediction?: string };
+      if (!prediction) return null;
+      const out = scorePrediction(sql, prediction, evalContext(), { mint, nowAt: instant(clock.now()) });
+      if (!out.ok) throw new TypeError(out.refusal.fix);
+      return null;
     },
 
     /* A credential due for rotation. It says the id and the kind and never the label — a
@@ -679,6 +706,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
 
     /** The reminders that are due, oldest first. What the alarm hands to whatever sends them. */
     due: (limit?: number) => due(sql, clock.now(), limit),
+
+    /**
+     * One number, with its target and its comparison.
+     *
+     * The predicate is compiled to SQL by the same function a `list` uses, so a tile and the page it
+     * links to read the same rows — the alternative is two definitions of "overdue" that agree until
+     * somebody edits one.
+     */
+    metric: (decl: MetricDecl): Result<Reading> => evaluateMetric(sql, decl, evalContext()),
 
     /* ── the vault: what a key opens, never the key ───────────────────── */
 
