@@ -13,7 +13,7 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PAGES, REGISTERS, PACKS } from '$lib/record/api.ts';
+  import { PAGES, REGISTERS, PACKS, pages } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -45,7 +45,7 @@
                  to tell somebody what they are about to install. A pack that is NOT installed names
                  things this record does not have yet, so the id is the honest fallback there. -->
             {#each pack.registers as r}<li><Icon name="rows" size="s" />{REGISTERS[r]?.name ?? r}</li>{/each}
-            {#each pack.pages as p}<li><Icon name="doc" size="s" />{PAGES[p]?.title ?? p}</li>{/each}
+            {#each pack.pages as p}<li><Icon name="doc" size="s" />{pages()[p]?.title ?? PAGES[p]?.title ?? p}</li>{/each}
           </ul>
           <footer class="pack-foot">
             <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>

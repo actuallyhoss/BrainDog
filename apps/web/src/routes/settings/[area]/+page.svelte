@@ -18,7 +18,7 @@
   import { copy } from '$lib/copy.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PACKS, PAGES, PEOPLE_ACCESS, REGISTERS } from '$lib/record/api.ts';
+  import { PACKS, PAGES, PEOPLE_ACCESS, REGISTERS, pages } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -60,7 +60,7 @@
   }
 
   const pen = $derived(
-    Object.values(PAGES).filter((p) => p.placed === false && !placed.some((x) => x.page === p.page)),
+    Object.values(pages()).filter((p) => p.placed === false && !placed.some((x) => x.page === p.page)),
   );
 
   /**

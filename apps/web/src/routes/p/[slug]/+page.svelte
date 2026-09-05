@@ -17,9 +17,10 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { REGISTERS, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
+  import { NOW, REGISTERS, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
   import { draw } from '$lib/record/blocks.ts';
-  import type { PageBlock } from '$lib/record/schema.ts';
+  import type { PageBlock, PageDecl } from '$lib/record/schema.ts';
+  import { PAGES } from '$lib/record/data.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -37,7 +38,12 @@
   const resolved = values();
 
   /** Every `{{path}}` is resolved server-side and handed over; a missing value is an em dash. */
-  const opts = { resolve: (path: string) => resolved[path] ?? null };
+  /* NOW IS THE RECORD'S CLOCK, not the browser's. `inline` defaults it to `Date.now()`, so every
+     `{{ago:}}` in prose was formatted against the wall clock while every other date on the screen
+     came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
+     the same row, two clicks apart. In production that reads differently on two devices and drifts
+     a day further every day. */
+  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW };
 
   /**
    * The declared span, clamped to what the KIND can survive.
@@ -310,29 +316,63 @@
     } as BlockResult;
   }
 
+  /**
+   * THE DECLARATION, WHICH IS THE TEMPLATE AND NOT THE RESULT OF IT.
+   *
+   * This printed `result.page` — the RESOLVED page — so a project's source view showed six
+   * predicates with `Kiln` typed into them and no `for:` anywhere: exactly the shape that was
+   * deleted when the four project pages became one declaration. An agent reading this to learn the
+   * dialect would copy back the thing the record no longer has.
+   *
+   * And it printed seven keys of a block. `cells`, `columns`, `order`, `target`, `body` and
+   * `authored` were all dropped, so the same agent would copy a `stat` with no metrics and a `code`
+   * block with no code — a page of empty blocks, from a screen labelled "source".
+   */
+  const source = $derived(result ? (result.page.param ? PAGES[templateOf(result.page)] : PAGES[result.page.page]) ?? result.page : undefined);
+
+  /** Which declaration a resolved page came from: the one template whose expansion produced it. */
+  function templateOf(page: PageDecl): string {
+    for (const [key, decl] of Object.entries(PAGES))
+      if (decl.for && decl.for.register === page.param?.register) return key;
+    return page.page;
+  }
+
+  const line = (indent: string, key: string, value: unknown): string =>
+    value === undefined || value === null || value === '' ? '' : `${indent}${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`;
+
   const declaration = $derived(
-    result
+    source
       ? [
-          `page: ${result.page.page}`,
-          `title: ${result.page.title}`,
-          result.page.nav ? `nav: { section: ${result.page.nav.section}, order: ${result.page.nav.order} }` : '',
-          `requires: [${result.page.requires.join(', ')}]`,
+          `page: ${source.page}`,
+          `title: ${source.title}`,
+          source.for
+            ? `for: { register: ${source.for.register}${source.for.where ? `, where: ${source.for.where}` : ''} }`
+            : '',
+          source.nav ? `nav: { section: ${source.nav.section}, order: ${source.nav.order} }` : '',
+          `requires: [${source.requires.join(', ')}]`,
           '',
           'blocks:',
-          ...result.page.blocks.flatMap((b) => [
+          ...source.blocks.flatMap((b) => [
             `  - kind: ${b.kind}`,
-            b.heading ? `    heading: ${b.heading}` : '',
+            line('    ', 'heading', b.heading),
             b.span && b.span !== 12 ? `    span: ${b.span}` : '',
-            b.source ? `    source: ${b.source}` : '',
-            b.where ? `    where: ${b.where}` : '',
+            line('    ', 'source', b.source),
+            line('    ', 'where', b.where),
+            b.columns?.length ? `    columns: [${b.columns.map((c) => c.field).join(', ')}]` : '',
+            b.cells?.length ? `    cells: [${b.cells.map((c) => c.metric).join(', ')}]` : '',
+            b.order?.length ? `    order: [${b.order.map((o) => `${o.field} ${o.dir}`).join(', ')}]` : '',
+            line('    ', 'target', b.target),
+            line('    ', 'limit', b.limit),
             b.empty ? `    empty: "${b.empty}"` : '',
-            b.limit ? `    limit: ${b.limit}` : '',
+            b.authored?.length ? `    authored: ${b.authored.length} rows` : '',
+            b.body ? `    body: |\n${b.body.split('\n').map((l) => `      ${l}`).join('\n')}` : '',
           ]),
         ]
           .filter(Boolean)
           .join('\n')
       : '',
   );
+
 </script>
 
 <svelte:head><title>{titleOf(result?.page?.title)}</title></svelte:head>

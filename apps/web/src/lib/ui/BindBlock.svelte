@@ -26,7 +26,7 @@
   import { KINDS, isKind } from 'braindog-render';
 
   import { copy } from '../copy.ts';
-  import { PAGES } from '../record/data.ts';
+  import { pages } from '../record/api.ts';
   import { BINDABLE, seedBlock } from '../record/seed.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -55,7 +55,10 @@
    * the query builder's: there is no invalid state because the invalid choice is absent.
    */
   const destinations = $derived(
-    Object.values(PAGES).filter((p) => p.requires.includes(`register.${register}`) && p.nav),
+    /* `pages()`, not `PAGES`: the declared set holds TEMPLATES, so this offered a destination
+       called `{{name}}` — a page that does not exist, while the three that do sat in the rail
+       beside it. A template is not somewhere you can put a block; the pages it resolves to are. */
+    Object.values(pages()).filter((p) => p.requires.includes(`register.${register}`) && p.nav),
   );
 
   let toPage = $state('');

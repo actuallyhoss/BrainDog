@@ -213,6 +213,50 @@ const dated = (where: string | undefined, register: string): boolean =>
  */
 export const isTemplate = (decl: MetricDecl): boolean => (decl.where ?? '').includes('{{');
 
+/** The six aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */
+const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
+
+/** Every key a metric document may carry here, so one it may not is named rather than ignored. */
+const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare']);
+
+/** The formats this build writes. A format it does not know printed the bare number. */
+const READS_FORMAT = ['int', 'pct', 'days', 'decimal'];
+
+/**
+ * What the declaration asked for that this build cannot do — named, never ignored.
+ *
+ * The rule the rest of this package follows, applied to the file that claimed to follow it: a
+ * declaration reaching for a published feature that is not implemented gets a sentence, because the
+ * alternative is a figure that is quietly about something else.
+ */
+export function unreadable(decl: MetricDecl): string[] {
+  const out: string[] = [];
+
+  for (const key of Object.keys(decl))
+    if (!READS_KEY.has(key))
+      out.push(`${key}: is published in 08 and not read by this build — the figure would be the ungrouped one`);
+
+  const value = decl.value as Record<string, unknown> | undefined;
+  if (!value || typeof value !== 'object') out.push('value: is missing');
+  else if (!('ratio' in value) && !('diff' in value)) {
+    const named = Object.keys(value);
+    if (!named.some((k) => READS_AGGREGATION.includes(k)))
+      out.push(`value: ${named.join(', ') || 'nothing'} — this build reads ${READS_AGGREGATION.join(' · ')}`);
+  } else {
+    const pair = ('ratio' in value ? value.ratio : value.diff) as { of?: object; per?: object } | undefined;
+    for (const side of ['of', 'per'] as const) {
+      const agg = pair?.[side];
+      if (!agg || !Object.keys(agg).some((k) => READS_AGGREGATION.includes(k)))
+        out.push(`value.${side}: this build reads ${READS_AGGREGATION.join(' · ')}`);
+    }
+  }
+
+  if (decl.format && !decl.format.startsWith('money.') && !READS_FORMAT.includes(decl.format))
+    out.push(`format: ${decl.format} — this build writes money.<CUR> · ${READS_FORMAT.join(' · ')}`);
+
+  return out;
+}
+
 export function withParam(decl: MetricDecl, it: string): MetricDecl {
   return decl.where === undefined ? decl : { ...decl, metric: `${decl.metric}:${it}`, where: decl.where.replaceAll('{{it}}', it) };
 }
@@ -231,6 +275,23 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
      would fail the register's value check and report "thing has no value {{it}}" — technically
      true and useless. It is named for what it is instead. */
   if (isTemplate(decl)) refusals.push(`${decl.metric}: is a template — read it as ${decl.metric}:<name>`);
+
+  /* THE SHAPE OF THE TARGET, not only its presence. `docs/08` writes it three times as
+     `{ lte: { amount, currency } }`, and a target of an object compared with `<=` is neither true
+     nor false — it printed `target ≤ GBP NaN` under a `warn` glyph, with no refusal at all. That is
+     the exact class this file exists to prevent, in the file that prevents it. */
+  const bound = decl.target && ('lte' in decl.target ? decl.target.lte : decl.target.gte);
+  if (decl.target && typeof bound !== 'number')
+    refusals.push(
+      `${decl.metric}: target takes a number in the figure's own units — { lte: 400000 } for money in minor units, not { lte: { amount, currency } }`,
+    );
+
+  /* AND THE AGGREGATION. `08` §2.2 publishes eleven and this build reads six; the other five reached
+     the field picker as `undefined` and threw a TypeError, which the page then reported as "this
+     block's filter was not understood" — the filter was fine. `group_by`, `bucket` and `snapshot`
+     are published too, and were ignored in silence, which is worse: the figure that came back was
+     the UNGROUPED one, drawn under a heading that says it is grouped. */
+  refusals.push(...unreadable(decl).map((r) => `${decl.metric}: ${r}`));
 
   const shift = decl.window ? windowMs(decl.window) : null;
   if (decl.window && shift === null)

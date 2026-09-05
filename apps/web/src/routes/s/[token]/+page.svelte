@@ -18,7 +18,7 @@
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { page as readPage, values } from '$lib/record/api.ts';
+  import { NOW, page as readPage, values } from '$lib/record/api.ts';
   import { draw } from '$lib/record/blocks.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -26,7 +26,12 @@
 
   const result = readPage('money');
   const resolved = values();
-  const opts = { resolve: (path: string) => resolved[path] ?? null };
+  /* NOW IS THE RECORD'S CLOCK, not the browser's. `inline` defaults it to `Date.now()`, so every
+     `{{ago:}}` in prose was formatted against the wall clock while every other date on the screen
+     came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
+     the same row, two clicks apart. In production that reads differently on two devices and drifts
+     a day further every day. */
+  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW };
 
   const token = $derived(state.params.token ?? '');
 </script>

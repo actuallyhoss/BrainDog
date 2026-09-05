@@ -210,3 +210,58 @@ test('A SECOND PROJECT PAGE IS A DECLARATION, NOT A THIRTEENTH CASE', () => {
   const gone = read(project('Atlantis'), NOW);
   assert.ok(gone.refusals.length, 'a metric over a project that does not exist read as nothing');
 });
+
+/* ── what the document asked for and this build cannot do ────────────────── */
+
+test('A TARGET THIS BUILD CANNOT COMPARE IS REFUSED, not compared anyway', () => {
+  // `docs/08` writes `target: { lte: { amount, currency } }` three times. An object compared with
+  // `<=` is neither true nor false, so the tile printed `target ≤ GBP NaN` under a warn glyph — a
+  // tone that is a fact about NaN, not about the business — and refused nothing. That is the exact
+  // class this file exists to prevent, happening inside it.
+  const r = read({ ...METRICS.overdue!, target: { lte: { amount: 400_000, currency: 'GBP' } } as never });
+  assert.ok(r.refusals.length, 'an object target was accepted');
+  assert.match(r.refusals[0] ?? '', /number in the figure/);
+  assert.equal(r.shown, '—');
+});
+
+test('an aggregation this build does not read is NAMED, and does not throw', () => {
+  // `08` §2.2 publishes eleven and six are implemented. The other five reached the field picker as
+  // `undefined` and threw a TypeError — which a page then reported as "this block's filter was not
+  // understood", with the filter perfectly fine.
+  for (const value of [{ median: 'amount' }, { last: 'amount' }, { delta: 'amount' }, { running: { sum: 'amount' } }, { trend: 'amount' }]) {
+    const r = read({ ...METRICS.overdue!, value: value as never });
+    assert.ok(r.refusals.length, `${Object.keys(value)[0]} was accepted`);
+    assert.match(r.refusals[0] ?? '', /this build reads/);
+  }
+});
+
+test('and inside a ratio too, on either side', () => {
+  for (const pair of [{ of: { median: 'amount' }, per: { count: 'id' } }, { of: { sum: 'amount' }, per: { trend: 'x' } }]) {
+    const r = read({ ...METRICS.overdue!, value: { ratio: pair } as never });
+    assert.ok(r.refusals.length);
+    assert.match(r.refusals[0] ?? '', /value\.(of|per)/);
+  }
+});
+
+test('a published key this build ignores is named, because ignoring it changes the figure', () => {
+  // `group_by` and `bucket` are `08` §2.1; `snapshot` is §2.6. Ignored, they returned the UNGROUPED
+  // figure under a heading that says it is grouped, with no refusal and a `good` tone.
+  for (const extra of [{ group_by: 'kind' }, { bucket: 'month' }, { snapshot: { grain: 'day', into: 'series.x' } }]) {
+    const r = read({ ...METRICS.overdue!, ...extra } as never);
+    assert.ok(r.refusals.length, `${Object.keys(extra)[0]} was ignored`);
+    assert.match(r.refusals[0] ?? '', /not read by this build/);
+  }
+});
+
+test('a format this build cannot write is refused rather than printing the bare number', () => {
+  const r = read({ ...METRICS.overdue!, format: 'duration' });
+  assert.ok(r.refusals.length);
+  assert.match(r.refusals[0] ?? '', /money\.<CUR>/);
+});
+
+test('and everything the record actually ships still reads', () => {
+  for (const [id, decl] of CONCRETE) assert.deepEqual(read(decl).refusals, [], `${id} broke`);
+  for (const name of ['Kiln', 'Portage'])
+    for (const base of ['project-open', 'project-owed', 'project-cost'])
+      assert.deepEqual(read(withParam(METRICS[base]!, name)).refusals, [], `${base}:${name} broke`);
+});

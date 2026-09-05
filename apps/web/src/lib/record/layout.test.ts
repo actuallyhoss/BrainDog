@@ -16,7 +16,11 @@ import assert from 'node:assert/strict';
 
 import { COLUMNS, spanOf } from './arrange.ts';
 import { page } from './api.ts';
-import { PAGES } from './data.ts';
+import { pages } from './api.ts';
+
+/* `pages()`, NOT `PAGES`. The declared set holds a TEMPLATE, and `page('project')` is null — so the
+   moment the project pages became one declaration this whole file iterated four pages and asserted
+   nothing about the three that multiply per row. A guard over the wrong list is not a guard. */
 
 /** The spans a page really lays out with, in order. */
 const effective = (slug: string): { heading: string; declared: number | undefined; span: number }[] =>
@@ -44,7 +48,7 @@ const rows = (spans: number[]): number[] => {
 };
 
 test('EVERY DECLARED PAGE TILES, WITH NO HOLE ABOVE THE LAST ROW', () => {
-  for (const slug of Object.keys(PAGES)) {
+  for (const slug of Object.keys(pages())) {
     const laid = effective(slug);
     const filled = rows(laid.map((b) => b.span));
     for (let i = 0; i < filled.length - 1; i++)
@@ -59,7 +63,7 @@ test('EVERY DECLARED PAGE TILES, WITH NO HOLE ABOVE THE LAST ROW', () => {
 test('and no page declares a span the block cannot survive', () => {
   // The clamp stays, because a pack is written by a stranger. What must not happen is OUR pages
   // relying on it: a declaration that is silently widened is a declaration that is wrong.
-  for (const slug of Object.keys(PAGES))
+  for (const slug of Object.keys(pages()))
     for (const b of effective(slug))
       if (b.declared !== undefined)
         assert.equal(b.span, b.declared, `${slug}: ${b.heading} declares ${b.declared} and is drawn at ${b.span}`);

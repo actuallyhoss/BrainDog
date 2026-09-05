@@ -20,7 +20,7 @@
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { iconFor, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, readableFields, toRows, type Filter } from '$lib/record/api.ts';
+  import { iconFor, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -162,14 +162,39 @@
     goto(`?${next}`, { replaceState: false, noScroll: true, keepFocus: true });
   }
 
+/**
+   * A value is SELECTED when the filter includes it, and a `not-in` filter includes nothing.
+   *
+   * The test used to be `values.includes(value)` with no regard for the operator, so the URL a
+   * declared metric hands the reader — `?f=state:not-in:cancelled`, the one that opens "Cost per
+   * year" — drew `cancelled` as the value being shown. Fifteen live rows on screen, and the control
+   * above them saying the one word none of them held.
+   */
+  const isOn = (field: string, value: string): boolean => {
+    const f = filters.find((x) => x.field === field);
+    if (!f) return false;
+    /* A SEGMENT SAYS WHAT YOU ARE LOOKING AT, so under a `not-in` filter it is on when the value is
+       NOT excluded — which is what the grid underneath it shows. Reading `values.includes` for both
+       operators drew `cancelled` as the selected state on the one URL a metric tile hands the
+       reader, with fifteen live rows under it and not one cancelled. */
+    return f.op === 'not-in' ? !f.values.includes(value) : f.values.includes(value);
+  };
+
+  /**
+   * Toggling KEEPS THE OPERATOR. It always wrote `:in:`, so one press on a neighbouring segment of a
+   * `not-in` filter turned exclusion into inclusion and pulled the excluded rows back in — silently,
+   * and in the direction that adds rows to a figure somebody had just clicked through to check.
+   */
   const toggleFilter = (field: string, value: string) =>
     setParam((p) => {
       const existing = p.getAll('f').filter((v) => !v.startsWith(`${field}:`));
-      const current = filters.find((f) => f.field === field)?.values ?? [];
+      const at = filters.find((f) => f.field === field);
+      const op = at?.op ?? 'in';
+      const current = at?.values ?? [];
       const values = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
       p.delete('f');
       for (const v of existing) p.append('f', v);
-      if (values.length) p.append('f', `${field}:in:${values.join(',')}`);
+      if (values.length) p.append('f', `${field}:${op}:${values.join(',')}`);
     });
 
   function onkeydown(e: KeyboardEvent) {
@@ -352,6 +377,14 @@
      of them is the one that actually works here — a mock has no write path, and the rule for that
      is the app's own: say what it would have done, once, in the toast. */
 
+  /**
+   * THE SELECTION, CUT TO THE ANSWER ON SCREEN.
+   *
+   * `selected` is a set of numbers and nothing pruned it when the filter or the query changed, so a
+   * reader could tick five rows, search, see two ticks and a toolbar saying five, press Archive, and
+   * archive three rows they could not see. Every verb and every count reads this, not the set: what
+   * a bulk action acts on is what the reader is looking at.
+   */
   const picked = $derived(result.entries.filter((e) => selected.has(e.seq)));
 
   async function copyIds() {
@@ -365,7 +398,7 @@
   }
 
   function archiveSelected() {
-    const seqs = [...selected];
+    const seqs = picked.map((e) => e.seq);
     archived = new Set([...archived, ...seqs]);
     selected = new Set();
     toasts.push(copy.archived(`${seqs.length} ${decl?.name.toLowerCase() ?? 'rows'}`), {
@@ -431,7 +464,7 @@
       {#each filterable.filter((f) => f.type === 'enum') as f}
         <div class="segmented" role="group" aria-label={f.id}>
           {#each f.values ?? [] as value}
-            {@const on = filters.find((x) => x.field === f.id)?.values.includes(value)}
+            {@const on = isOn(f.id, value)}
             <button type="button" class="segment" data-on={on ? '' : undefined} onclick={() => toggleFilter(f.id, value)}>
               {value.replace(/_/g, ' ')}
             </button>
@@ -452,7 +485,7 @@
       <Empty
         kind={emptyKind}
         title={emptyKind === 'no-results'
-          ? `${result.total} rows, none matching “${q || filters.map((f) => f.values.join(', ')).join(' ')}”.`
+          ? `${result.total} rows, none matching “${q || whereOf(filters)}”.`
           : emptyKind === 'cleared'
             ? 'Nothing outstanding.'
             : `Nothing in ${decl.name} yet.`}
@@ -493,9 +526,9 @@
       <!-- THE VERBS, above the rows they act on and nowhere else. It appears with the selection and
            goes with it: a permanently visible bulk bar is a row of disabled controls, which tells
            you a thing exists and refuses to say why it will not work. -->
-      {#if selected.size > 0}
-        <div class="picked-bar" role="toolbar" aria-label="{selected.size} {copy.selected}">
-          <span class="picked-n num">{selected.size}</span>
+      {#if picked.length > 0}
+        <div class="picked-bar" role="toolbar" aria-label="{picked.length} {copy.selected}">
+          <span class="picked-n num">{picked.length}</span>
           <span class="picked-word">{copy.selected}</span>
           <Button weight="quiet" onclick={() => void copyIds()}>
             <Icon name="copy" size="s" />{copy.copyIds}
@@ -509,7 +542,7 @@
                   role="menuitem"
                   type="button"
                   onclick={() =>
-                    toasts.push(copy.notWritten(`${selected.size} rows would be set to ${state.replace(/_/g, ' ')}`), {
+                    toasts.push(copy.notWritten(`${picked.length} rows would be set to ${state.replace(/_/g, ' ')}`), {
                       intent: 'warn',
                     })}
                 >
@@ -711,7 +744,7 @@
             {#if f.type === 'enum'}
               <div class="filter-values">
                 {#each f.values ?? [] as value}
-                  {@const on = filters.find((x) => x.field === f.id)?.values.includes(value)}
+                  {@const on = isOn(f.id, value)}
                   <button
                     type="button"
                     class="filter-value"

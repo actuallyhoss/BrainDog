@@ -125,7 +125,7 @@
           {#if row.fields[f.id]}
             <article class="document-slot">
               <h2 class="doc-label">{labelOf(f)}</h2>
-              <Document src={String(row.fields[f.id])} opts={{ resolve, link }} />
+              <Document src={String(row.fields[f.id])} opts={{ resolve, link, now: NOW }} />
             </article>
           {/if}
         {/each}

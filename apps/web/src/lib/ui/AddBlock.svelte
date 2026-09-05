@@ -27,7 +27,7 @@
   import { Block, Degraded } from 'braindog-render/svelte';
 
   import { copy } from '../copy.ts';
-  import { REGISTERS, page as readPage, values } from '../record/api.ts';
+  import { NOW, REGISTERS, page as readPage, values } from '../record/api.ts';
   import { toSegments } from '../record/blocks.ts';
   import { bindableFor, seedBlock } from '../record/seed.ts';
   import type { PageBlock } from '../record/schema.ts';
@@ -47,7 +47,12 @@
   } = $props();
 
   const resolved = values();
-  const opts = { resolve: (path: string) => resolved[path] ?? null };
+  /* NOW IS THE RECORD'S CLOCK, not the browser's. `inline` defaults it to `Date.now()`, so every
+     `{{ago:}}` in prose was formatted against the wall clock while every other date on the screen
+     came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
+     the same row, two clicks apart. In production that reads differently on two devices and drifts
+     a day further every day. */
+  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW };
 
   const PURPOSES = ['figure', 'list', 'plan', 'say', 'media'] as const;
 
