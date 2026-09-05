@@ -118,6 +118,26 @@ export type PageBlock = {
    * a figure the register holds. A gauge with no target draws nothing rather than inventing one.
    */
   target?: number;
+  /**
+   * ROWS SOMEBODY WROTE, for the kinds that are not bound to a register.
+   *
+   * 05 §2 is explicit that `table` is "the one kind bound to a `source:` register rather than to
+   * authored rows" — so authored rows are the NORM in the dialect and the register-bound block is
+   * the exception. The declaration had no way to carry them, which made three of the sixteen kinds
+   * undeliverable: `comparison` is defined as "a small table you write yourself", and a `quote` and
+   * a `tree` are by definition not projections of anything.
+   *
+   * It is `authored:` and not `rows:` because the two are different halves of the same idea and the
+   * name should say which half. The author writes `authored`; the evaluator produces `rows`. A
+   * register-bound block has the second and not the first, and one of these kinds has the first and
+   * not the second — a block with both is a declaration that cannot decide where its content comes
+   * from, and the evaluator refuses it rather than picking.
+   *
+   * Cells are an array rather than a pipe-delimited string so that nobody has to escape a
+   * separator, and so the arity can be checked against the kind before anything renders.
+   */
+  authored?: readonly { cells: readonly string[]; tone?: 'good' | 'warn' | 'bad' | 'info' }[];
+
   /** Mandatory on every source-bound block. An empty state that says nothing is a dead end, and a
       record is MOSTLY empty on day one (06 §1). */
   empty?: string;

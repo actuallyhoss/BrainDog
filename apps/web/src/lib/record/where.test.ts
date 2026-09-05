@@ -13,10 +13,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { NOW, ROWS } from './data.ts';
-import { matches, parseWhere } from './where.ts';
+import { compile, explain, matches, resolveDay } from './where.ts';
 
-const keep = (register: string, where: string) =>
-  (ROWS[register] ?? []).filter((e) => matches(register, e, parseWhere(where), NOW));
+const keep = (register: string, where: string) => {
+  const w = compile(register, where);
+  return (ROWS[register] ?? []).filter((e) => matches(e, w, NOW));
+};
 
 const all = (register: string) => (ROWS[register] ?? []).length;
 
@@ -25,7 +27,7 @@ const all = (register: string) => (ROWS[register] ?? []).length;
 test('a predicate it cannot parse matches NOTHING, never everything', () => {
   const out = keep('services', 'this is not a predicate at all');
   assert.equal(out.length, 0, 'an unparseable filter passed rows through');
-  assert.deepEqual(parseWhere('nonsense here').bad, ['nonsense here']);
+  assert.match(compile('services', 'nonsense here').bad[0] ?? '', /not a predicate/);
 });
 
 test('one bad clause poisons the whole predicate rather than being skipped', () => {
@@ -111,7 +113,8 @@ test('a row with no value for a dated field is not silently included', () => {
   // A missing date is not "before" anything. Counting it would put rows with no due date into an
   // overdue list, which is the sort of thing somebody acts on.
   const rows = (ROWS.tasks ?? []).filter((t) => !t.fields.by);
-  for (const e of rows) assert.equal(matches('tasks', e, parseWhere('by before today'), NOW), false);
+  const w = compile('tasks', 'by before today');
+  for (const e of rows) assert.equal(matches(e, w, NOW), false);
 });
 
 /* ── shape ───────────────────────────────────────────────────────────────── */
@@ -122,4 +125,69 @@ test('whitespace and case are not part of the grammar', () => {
 
 test('an unknown field matches nothing rather than everything', () => {
   assert.equal(keep('services', 'nope is live').length, 0);
+});
+
+/* ── operands are CHECKED, not just parsed ───────────────────────────────── */
+
+test('a date operand that is not a date is refused, not compared as a string', () => {
+  // Every one of these parsed cleanly in the first version and then string-compared: `'2026-08-01'
+  // > '-7d'` is true because '2' sorts after '-', so a "this week" block drew the whole register.
+  for (const bad of ['-7d ago', 'soon', 'last tuesday', 'next month']) {
+    const w = compile('obligations', `due after ${bad}`);
+    assert.ok(w.bad.length, `${bad} was accepted as a date`);
+    assert.equal(keep('obligations', `due after ${bad}`).length, 0);
+  }
+});
+
+test('the temporal literals resolve, and are not all the same day', () => {
+  const days = ['today', 'tomorrow', 'yesterday', 'bom', 'eom', 'boy', 'eoy', '+30d', '-7d', '+2w', '+1m'];
+  const seen = new Set<string>();
+  for (const d of days) {
+    const out = resolveDay(d, NOW);
+    assert.ok(out && /^\d{4}-\d{2}-\d{2}$/.test(out), `${d} did not resolve`);
+    seen.add(out);
+  }
+  assert.ok(seen.size >= 9, 'several literals collapsed onto the same day');
+});
+
+test('a month is a calendar month, and it clamps rather than overflowing', () => {
+  // One month after 31 January is the last day of February. Adding to the month number rolls into
+  // March, which is not what anybody means by "in a month".
+  const jan31 = Date.parse('2026-01-31T12:00:00Z');
+  assert.equal(resolveDay('+1m', jan31), '2026-02-28');
+  assert.equal(resolveDay('-1m', Date.parse('2026-03-31T12:00:00Z')), '2026-02-28');
+});
+
+test('a relative window actually narrows, in the direction it says', () => {
+  const soon = keep('obligations', 'due before +30d');
+  const later = keep('obligations', 'due before +365d');
+  assert.ok(soon.length > 0, '+30d matched nothing, which is the old failure in the other direction');
+  assert.ok(soon.length < later.length, 'a wider window did not admit more rows');
+  assert.ok(later.length <= all('obligations'));
+});
+
+test('a value the field cannot hold is refused, and says which', () => {
+  // `done` is a TASK state. Obligations have none, so `state is not done` was true of all 38 —
+  // a negation over a typo passing the whole register through.
+  const w = compile('obligations', 'state is not done');
+  assert.ok(w.bad.length, 'an impossible value was accepted');
+  assert.match(w.bad[0] ?? '', /state has no value done/);
+  assert.equal(keep('obligations', 'state is not done').length, 0);
+});
+
+test('a ref value that names no row is refused', () => {
+  const w = compile('tasks', 'thing is Atlantis');
+  assert.ok(w.bad.length);
+  assert.equal(keep('tasks', 'thing is Atlantis').length, 0);
+});
+
+test('every value in an `or` is checked, not just the first', () => {
+  const w = compile('obligations', 'state is open or nonsense');
+  assert.ok(w.bad.length, 'a bad value hid behind a good one');
+});
+
+test('explain says what was wrong, because the refusal is the teacher', () => {
+  const w = compile('obligations', 'state is not done, due after soon');
+  assert.equal(explain(w).length, 2);
+  for (const line of explain(w)) assert.ok(line.length > 10, 'a refusal that explains nothing is a dead end');
 });

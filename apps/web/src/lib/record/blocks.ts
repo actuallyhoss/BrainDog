@@ -57,6 +57,17 @@ function barRows(block: BlockResult): string[] {
 }
 
 /**
+ * One cell, safe to put between pipes.
+ *
+ * The dialect reads `\\|` as a literal pipe and `\\\\` as a literal backslash, so both have to be
+ * escaped and the backslash has to go FIRST — escaping the pipe first would then double the
+ * backslash it just introduced and turn one literal pipe into a backslash followed by a column
+ * break. Doing it here means an author never has to know the rule.
+ */
+const escapeCell = (c: string): string =>
+  c.replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+
+/**
  * A chips row over a register: GROUP AND COUNT.
  *
  * Chips are "a few short facts in a row", and a fact per row is not a few — a register of fifteen
@@ -160,7 +171,26 @@ export function toSegments(block: BlockResult) {
   const head = `${block.kind}${block.tone ? ` |  | ${block.tone}` : ''}`;
   const spec = isKind(block.kind) ? KINDS[block.kind] : undefined;
 
-  const rows = block.metrics
+  /* AUTHORED ROWS COME FIRST, and a block that declares both a source and authored rows is refused
+     rather than resolved. Picking one would be a silent decision about where a block's content
+     comes from, made on behalf of whoever wrote the declaration — and the whole argument for the
+     `where:` evaluator was that a declaration must not be quietly reinterpreted.
+
+     The cells are joined with the dialect's own separator here rather than by the author, so a cell
+     containing a pipe is escaped once, in one place, instead of being a rule everybody has to know.
+     A tone is a trailing cell, which is what the parser expects and what `KINDS[kind].tone` gates. */
+  const conflicted = Boolean(block.authored?.length) && Boolean(block.register);
+
+  const rows = conflicted
+    ? []
+    : block.authored?.length
+      ? block.authored.map(
+          (r) =>
+            `${r.cells.map(escapeCell).join(' | ')}${
+              r.tone && spec?.tone ? ` | ${r.tone}` : ''
+            }`,
+        )
+      : block.metrics
     ? block.metrics.map((m) => `${m.label} | ${m.value} | ${m.note}${m.tone ? ` | ${m.tone}` : ''}`)
     : block.kind === 'bar'
       ? barRows(block)

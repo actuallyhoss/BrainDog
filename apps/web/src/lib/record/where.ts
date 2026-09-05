@@ -1,97 +1,129 @@
 /**
  * `where:` — the predicate a block, a view or an agent writes to narrow a register.
  *
- * IT USED TO BE FIVE `String.includes` CHECKS. `owed to me`, `owed by me`, `state is open`, `thing
- * is <name>`, `state is open or doing` — and every other predicate anybody wrote was silently
- * ignored. Not refused, not flagged: the block drew the whole register and looked exactly like a
- * block that had filtered. `state is live, cycle is monthly` returned fifteen rows and a total that
- * was about nothing.
+ * IT USED TO BE FIVE `String.includes` CHECKS, and every predicate outside them was silently
+ * ignored: the block drew the whole register and looked exactly like a block that had filtered.
+ * That is the worst failure a declarative surface can have, and worst here, because the thing
+ * writing most of these declarations is an agent and an agent cannot see it.
  *
- * That is the worst failure a declarative surface can have, because the thing writing most of these
- * declarations is an agent. An agent cannot see that its filter did nothing. It writes a page, the
- * page renders, every number on it is wrong, and the only person who could notice is the one who
- * trusted the agent to get it right.
+ * PARSING IS NOT ENOUGH, WHICH IS THE SECOND LESSON. The first version of this file parsed the
+ * grammar and stopped, so a clause that was well-formed and meaningless passed straight through.
+ * Measured against the real record, all four of these parse cleanly and all four are wrong:
  *
- * THE GRAMMAR, and it is small on purpose:
+ *     due after -7d        →  38 of 38     the operand was compared as a string, and '2' > '-'
+ *     due before eom       →  38 of 38     same
+ *     due before +30d      →   0 of 38     same, in the other direction
+ *     state is not done    →  38 of 38     `done` is a TASK state; obligations have none, so
+ *                                          "is not done" was true of every one of them
+ *
+ * A grammar check tells you a sentence is a sentence. It does not tell you the sentence is about
+ * anything. So a predicate is COMPILED against the register it will run on — fields resolved, dates
+ * recognised, enum values and ref titles checked — and anything that cannot be resolved goes in
+ * `bad` and matches nothing.
+ *
+ * THE GRAMMAR, small on purpose:
  *
  *     state is open                     one value
  *     state is open or doing            any of several
  *     state is not done                 negated
  *     thing is Kiln                     a ref, BY NAME
  *     direction is owed to me           an enum, IN WORDS
- *     due before 2026-10-01             a day, exclusive
- *     due after today                   a day, relative
- *     state is live, cycle is monthly    clauses are ANDed
+ *     due before 2026-10-01             a day
+ *     due after today                   a temporal literal
+ *     due before +30d                   a relative day: ± a number, then d, w or m
+ *     renews before eom                 end of month. Also bom, boy, eoy, tomorrow, yesterday
+ *     state is live, cycle is monthly   clauses are ANDed on the comma
  *
  * VALUES ARE MATCHED AGAINST WHAT THE UI SHOWS, not against what the column stores. `display()`
- * turns `owed_to_me` into "owed to me" and turns a ref into the title of the row it points at, so
- * `direction is owed to me` and `thing is Kiln` both work without a special case for either. That is
- * not a convenience — it is the whole argument for having a readable predicate at all: the stored
- * form and the readable form have to be the same thing, or the declaration is a second language
- * somebody has to learn.
+ * turns `owed_to_me` into "owed to me" and a ref into the title of the row it points at, so
+ * `direction is owed to me` and `thing is Kiln` both work with no special case for either. The
+ * stored form and the readable form have to be the same thing, or the predicate is a second
+ * language somebody has to learn.
  *
- * An UNPARSEABLE clause matches nothing and says so through `explain`. A filter that cannot be
- * understood must not quietly pass every row: an empty block is a question, and a full one is a
- * wrong answer that looks right.
+ * The temporal literals are the set `02-DATA-MODEL` §6 already settled on, not a set invented here.
  */
 
 import { display } from './api.ts';
-import { REGISTERS } from './data.ts';
+import { REGISTERS, ROWS } from './data.ts';
 import type { Entry } from './schema.ts';
 
 export type Clause =
   | { field: string; op: 'is' | 'is not'; values: string[] }
   | { field: string; op: 'before' | 'after'; day: string };
 
-export type Where = { clauses: Clause[]; bad: string[] };
+export type Where = {
+  /** The register it was compiled against. A value means nothing without one. */
+  register: string;
+  clauses: Clause[];
+  /** Everything that could not be resolved, in words somebody can act on. */
+  bad: string[];
+};
 
-/** `today` and an ISO day are the only two date forms, because a block is read, not computed. */
-const dayOf = (word: string, now: number): string =>
-  word === 'today' ? new Date(now).toISOString().slice(0, 10) : word;
+const DAY_MS = 86_400_000;
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const RELATIVE = /^([+-])(\d{1,4})([dwm])$/;
 
-const CLAUSE =
-  /^\s*([a-z][a-z0-9_]*)\s+(is not|is|before|after)\s+(.+?)\s*$/i;
+const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
 /**
- * Parses a predicate into clauses, keeping whatever it could not understand.
+ * A temporal literal resolved against the record's clock, or `null` if it is not one.
  *
- * Splitting on the comma is safe because no value in this grammar contains one: values are enum
- * words, a row's title, or a date. A title with a comma in it would need quoting, and the day the
- * grammar needs quoting is the day it has outgrown being readable.
+ * `null` IS THE WHOLE POINT. The previous version returned any unrecognised word verbatim and then
+ * string-compared it, so `due after -7d` asked whether `'2026-08-01' > '-7d'` — true, because `'2'`
+ * sorts after `'-'` — and a "this week" block drew the entire register. Failing to recognise an
+ * operand has to be a refusal, not a comparison against a word.
+ *
+ * Months clamp rather than overflow: one month after 31 January is the last day of February, not
+ * the third of March, because the second is not what anybody means.
  */
-export function parseWhere(where: string | undefined): Where {
-  const clauses: Clause[] = [];
-  const bad: string[] = [];
-  for (const raw of (where ?? '').split(',')) {
-    const text = raw.trim();
-    if (!text) continue;
-    const m = CLAUSE.exec(text);
-    if (!m) {
-      bad.push(text);
-      continue;
-    }
-    const [, field, op, rest] = m as unknown as [string, string, string, string];
-    if (op === 'before' || op === 'after') {
-      clauses.push({ field, op, day: rest.trim() });
-    } else {
-      clauses.push({
-        field,
-        op: op === 'is not' ? 'is not' : 'is',
-        /* ` or ` and not `|`, because the person reading this is reading a sentence. */
-        values: rest.split(/\s+or\s+/i).map((v) => v.trim()).filter(Boolean),
-      });
-    }
+export function resolveDay(word: string, now: number): string | null {
+  if (ISO.test(word)) return word;
+
+  const d = new Date(now);
+  switch (word) {
+    case 'today':
+      return iso(now);
+    case 'tomorrow':
+      return iso(now + DAY_MS);
+    case 'yesterday':
+      return iso(now - DAY_MS);
+    case 'bom':
+      return iso(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1, 12));
+    case 'eom':
+      return iso(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 12));
+    case 'boy':
+      return iso(Date.UTC(d.getUTCFullYear(), 0, 1, 12));
+    case 'eoy':
+      return iso(Date.UTC(d.getUTCFullYear(), 11, 31, 12));
+    default:
+      break;
   }
-  return { clauses, bad };
+
+  const m = RELATIVE.exec(word);
+  if (!m) return null;
+  const n = Number(m[2]) * (m[1] === '-' ? -1 : 1);
+  if (m[3] === 'd') return iso(now + n * DAY_MS);
+  if (m[3] === 'w') return iso(now + n * 7 * DAY_MS);
+
+  /* Months by calendar, and CLAMPED. Adding to `getUTCMonth` on the 31st rolls into the month after
+     the one intended, so day 0 of the following month is taken instead: the last day of the month a
+     person actually named. */
+  const first = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1, 12));
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0, 12)).getUTCDate();
+  return iso(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d.getUTCDate(), last), 12));
 }
+
+const CLAUSE = /^\s*([a-z][a-z0-9_]*)\s+(is not|is|before|after)\s+(.+?)\s*$/i;
+
+const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
 
 /**
  * The declared field a clause names, matched without regard to case, or `null`.
  *
- * AN UNKNOWN FIELD MATCHES NOTHING, whatever the operator. That is not pedantry: `state is not live`
- * on a register with no `state` found no value, concluded the row was therefore not live, and
- * returned TRUE for every row — a negation over a typo passing the whole register through a filter
- * that looked like it worked. The same class of silent pass the whole file exists to prevent.
+ * AN UNKNOWN FIELD RESOLVES TO NOTHING, whatever the operator. `state is not live` on a register
+ * with no `state` found no value, concluded the row was therefore not live, and returned true for
+ * every row — a negation over a typo passing the whole register through a filter that looked like
+ * it had worked.
  */
 const fieldOf = (register: string, name: string): string | null => {
   const want = name.toLowerCase();
@@ -99,43 +131,113 @@ const fieldOf = (register: string, name: string): string | null => {
 };
 
 /** Both spellings of a value: what the column stores, and what a reader sees. */
-const formsOf = (register: string, field: string, value: unknown): string[] => {
-  const shown = display(register, field, value);
-  return [String(value ?? ''), shown ?? ''].map((v) => v.toLowerCase().replace(/_/g, ' ')).filter(Boolean);
-};
+const formsOf = (register: string, field: string, value: unknown): string[] =>
+  [String(value ?? ''), display(register, field, value) ?? ''].map(norm).filter(Boolean);
+
+/**
+ * Every value a field can actually hold, or `null` when the set is open.
+ *
+ * An enum declares its values, so `state is not done` on a register whose states are open, part,
+ * paid and written off is a typo — and it was returning every row, because nothing held `done` so
+ * nothing was excluded. A `ref` is closed too, by the titles in the register it points at. Text,
+ * money and dates are open, and are not checked.
+ */
+function allowed(register: string, field: string): string[] | null {
+  const f = REGISTERS[register]?.fields.find((x) => x.id === field);
+  if (!f) return null;
+  if (f.type === 'enum') return (f.values ?? []).map(norm);
+  if (f.type === 'ref' && f.to) {
+    const title = REGISTERS[f.to]?.title;
+    if (!title) return null;
+    return (ROWS[f.to] ?? []).map((e) => norm(String(e.fields[title] ?? ''))).filter(Boolean);
+  }
+  return null;
+}
+
+/**
+ * Parse a predicate AND check it against the register it will run on.
+ *
+ * Splitting on the comma is safe for the values this grammar holds — enum words, a row's title, a
+ * date. A title containing a comma is a known limitation rather than a silent one: the halves fail
+ * to resolve and land in `bad`, so the block empties and says why rather than quietly filtering on
+ * half a name.
+ */
+export function compile(register: string, where: string | undefined): Where {
+  const clauses: Clause[] = [];
+  const bad: string[] = [];
+
+  for (const raw of (where ?? '').split(',')) {
+    const text = raw.trim();
+    if (!text) continue;
+
+    const m = CLAUSE.exec(text);
+    if (!m) {
+      bad.push(`${text} — not a predicate`);
+      continue;
+    }
+    const [, name, op, rest] = m as unknown as [string, string, string, string];
+
+    const field = fieldOf(register, name);
+    if (!field) {
+      bad.push(`${text} — there is no field called ${name}`);
+      continue;
+    }
+
+    if (op === 'before' || op === 'after') {
+      const word = rest.trim();
+      if (resolveDay(word, Date.now()) === null) {
+        bad.push(`${text} — ${word} is not a date`);
+        continue;
+      }
+      clauses.push({ field, op, day: word });
+      continue;
+    }
+
+    /* ` or ` and not `|`, because the person reading this is reading a sentence. */
+    const values = rest.split(/\s+or\s+/i).map((v) => v.trim()).filter(Boolean);
+    const set = allowed(register, field);
+    const unknown = set ? values.filter((v) => !set.includes(norm(v))) : [];
+    if (unknown.length) {
+      bad.push(`${text} — ${field} has no value ${unknown.join(' or ')}`);
+      continue;
+    }
+    clauses.push({ field, op: op === 'is not' ? 'is not' : 'is', values });
+  }
+
+  return { register, clauses, bad };
+}
 
 /** Does one row satisfy every clause? */
-export function matches(register: string, entry: Entry, w: Where, now: number): boolean {
-  // An unparseable clause matches nothing, rather than passing every row and looking like a filter.
+export function matches(entry: Entry, w: Where, now: number): boolean {
+  // Anything unresolved matches NOTHING. An empty block is a question; a full one is a wrong answer
+  // that looks right.
   if (w.bad.length) return false;
 
   return w.clauses.every((c) => {
-    const field = fieldOf(register, c.field);
-    if (!field) return false;
-    const raw = entry.fields[field];
+    const raw = entry.fields[c.field];
 
     /* `'values' in c` rather than a check on `op`: the discriminant is spread across two literals
        per member, and the `in` operator narrows a union on the property that actually differs. */
     if ('values' in c) {
-      const forms = formsOf(register, field, raw);
-      const wanted = c.values.map((v) => v.toLowerCase().replace(/_/g, ' '));
-      const hit = wanted.some((v) => forms.includes(v));
+      const forms = formsOf(w.register, c.field, raw);
+      const hit = c.values.map(norm).some((v) => forms.includes(v));
       return c.op === 'is' ? hit : !hit;
     }
 
     // A missing date is not "before" anything. Counting it would put rows with no due date into an
     // overdue list, which is a list somebody acts on.
     if (typeof raw !== 'string' || !raw) return false;
-    const own = raw.slice(0, 10);
-    const day = dayOf(c.day, now);
-    return c.op === 'before' ? own < day : own > day;
+    const day = resolveDay(c.day, now);
+    if (day === null) return false;
+    return c.op === 'before' ? raw.slice(0, 10) < day : raw.slice(0, 10) > day;
   });
 }
 
 /**
- * What a predicate could not understand, for a surface that wants to say so.
+ * What a predicate could not understand, in words a person or an agent can act on.
  *
- * Nothing shows this yet, and it exists so that the day a declaration is written by hand or by an
- * agent there is something to show them other than an empty block.
+ * This is the half that makes a refusal useful rather than merely safe. `10-MCP` §7's fourth rule is
+ * that the refusal is the teacher: an agent handed an empty block learns nothing, and an agent told
+ * "state has no value done" fixes it on the next call.
  */
 export const explain = (w: Where): string[] => w.bad;

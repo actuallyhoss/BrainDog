@@ -30,7 +30,7 @@ import {
   VAULT,
 } from './data.ts';
 import { runway } from './forecast.ts';
-import { matches, parseWhere } from './where.ts';
+import { compile, matches } from './where.ts';
 import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 export const CURRENCY = 'GBP';
@@ -785,7 +785,10 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): Entry
      anything outside them passed every row through a filter that looked like it had worked — the
      one failure a declarative surface must not have, because the thing writing most of these
      declarations is an agent and an agent cannot see it. See `where.ts`. */
-  let out = b.where ? entries.filter((e) => matches(register, e, parseWhere(b.where), NOW)) : entries;
+  /* Compiled ONCE, not per row: resolving fields, dates and enum values against the register is
+     work that does not change between rows, and doing it inside the filter made it O(rows). */
+  const predicate = b.where ? compile(register, b.where) : null;
+  let out = predicate ? entries.filter((e) => matches(e, predicate, NOW)) : entries;
 
   /* Two windows that are a KIND'S OWN DEFAULT rather than a predicate somebody wrote. A timeline of
      renewals means the ones coming up, and a table of tasks means the ones still open — neither is
