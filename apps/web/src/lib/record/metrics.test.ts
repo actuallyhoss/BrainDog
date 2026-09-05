@@ -17,6 +17,7 @@ import { METRICS } from './declared.ts';
 import { format, hrefFor, isTemplate, meetsTarget, read, windowMs, withParam, type MetricDecl } from './metrics.ts';
 import { applyFilters, metric } from './api.ts';
 import { NOW, ROWS } from './data.ts';
+import { amountOf } from './money.ts';
 
 /** The documents that are metrics as they stand. A template is one until it has its parameter. */
 const CONCRETE = Object.entries(METRICS).filter(([, d]) => !isTemplate(d));
@@ -68,7 +69,7 @@ test('the annualised ones are annualised, through the lookup and not by hand', (
   const kiln = read(withParam(METRICS['project-cost']!, 'Kiln'));
   const raw = (ROWS.services ?? [])
     .filter((e) => e.fields.thing === 1 && e.fields.state !== 'cancelled')
-    .reduce((a, e) => a + Number(e.fields.cost ?? 0), 0);
+    .reduce((a, e) => a + (amountOf(e.fields.cost) ?? 0), 0);
   assert.ok(kiln.value !== null && kiln.value > raw * 2, `${kiln.value} is not an annualised figure`);
 });
 

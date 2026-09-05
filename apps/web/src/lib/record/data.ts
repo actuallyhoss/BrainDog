@@ -7,16 +7,9 @@
  * has and the record does not yet: the declared pages, the open questions, the inbox, the vault
  * index, the packs, the news, the audit trail and the job.
  *
- * TWO SHAPES ARE ADAPTED ON THE WAY IN, and both are debts rather than designs:
- *
- *   - MONEY. The record holds `{ amount, currency }`; this app holds a bare integer and pairs it
- *     with one `CURRENCY` constant at render. That constant is exactly the assumption the rule
- *     forbids — two currencies are never added, and a global default is how they get added — so it
- *     goes when the app reads the record instead of this file.
- *   - DURATION. The record holds integer seconds; this app holds days as a decimal, which is why
- *     `0.2 + 3 + 0.2` needed a rounding rule in `display`. Seconds would not have.
- *
- * Both are named in `loop/BACKLOG.md` under the item that swaps `api.ts` for the client.
+ * THE ROWS ARRIVE AS THE RECORD HOLDS THEM. Money is `{ amount, currency }` and a duration is
+ * integer seconds, both the way the write path stores them — so what this file hands the app is the
+ * shape the client will hand it later, and swapping one for the other changes no reader.
  */
 
 import { ROWS as SEED_ROWS, REGISTERS as SEED_REGISTERS, day, stamp } from '@braindog/seed';
@@ -48,24 +41,15 @@ export const REGISTERS = SEED_REGISTERS as unknown as Record<string, RegisterDec
  * `seq` IS THE POSITION, because that is what the record does: rows are numbered as they arrive,
  * and the seed writes them in order. Everything in this file that says `party: 1` is saying
  * `people#1`, and it still is.
+ *
+ * The values themselves are untouched — an `undefined` is dropped, which is what a write path does
+ * with an absent field, and nothing else is converted.
  */
 function entriesOf(register: string): Entry[] {
-  const money = new Set(
-    (SEED_REGISTERS[register]?.fields ?? []).filter((f) => f.type === 'money').map((f) => f.id),
-  );
-  const durations = new Set(
-    (SEED_REGISTERS[register]?.fields ?? []).filter((f) => f.type === 'duration').map((f) => f.id),
-  );
-
   return (SEED_ROWS[register] ?? []).map((raw, i) => {
     const seq = i + 1;
     const fields: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(raw)) {
-      if (value === undefined) continue;
-      if (money.has(key) && value !== null) fields[key] = (value as { amount: number }).amount;
-      else if (durations.has(key) && typeof value === 'number') fields[key] = value / 86_400;
-      else fields[key] = value;
-    }
+    for (const [key, value] of Object.entries(raw)) if (value !== undefined) fields[key] = value;
     return { seq, fields: fields as Fields, version: 1 + (seq % 4), created: stamp(-seq * 37), by: 'you' };
   });
 }

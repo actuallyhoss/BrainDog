@@ -23,6 +23,7 @@
  */
 
 import { NOW, ROWS } from './data.ts';
+import { amountOf, currencyOf } from './money.ts';
 import { resolveDay } from './where.ts';
 import type { Entry } from './schema.ts';
 
@@ -42,6 +43,15 @@ export type Step = {
 export type Runway = {
   /** What it started from, in minor units. */
   from: number;
+  /**
+   * The one currency the whole walk is in, and the codes it saw when it was not one.
+   *
+   * A CASH WALK IS ONE CURRENCY OR IT IS NOTHING. It adds invoices to subscriptions to an opening
+   * balance; add two currencies and the crossing day is invented — a real-looking date, on which
+   * nothing happens. So `mixed` non-empty means there are no steps: the caller shows the sentence.
+   */
+  currency: string | null;
+  mixed: readonly string[];
   steps: Step[];
   /** The first step whose balance goes under, or null if none does inside the horizon. */
   crossed: Step | null;
@@ -107,6 +117,7 @@ function renewals(service: Entry, until: number): { day: string; at: number }[] 
 export function runway(opening: number, horizon = 180): Runway {
   const until = NOW + horizon * DAY_MS;
   const movements: { at: number; step: Omit<Step, 'balance'> }[] = [];
+  const seen = new Set<string>();
 
   for (const row of ROWS.obligations ?? []) {
     const state = String(row.fields.state ?? '');
@@ -125,12 +136,15 @@ export function runway(opening: number, horizon = 180): Runway {
     const late = at < NOW;
     const day = late ? new Date(NOW).toISOString().slice(0, 10) : due;
     const owed = String(row.fields.direction ?? '') === 'owed_to_me';
+    const amount = amountOf(row.fields.amount) ?? 0;
+    const currency = currencyOf(row.fields.amount);
+    if (currency) seen.add(currency);
     movements.push({
       at: late ? NOW : at,
       step: {
         day,
         label: `${String(row.fields.what ?? '')}${late ? ' · overdue' : ''}`,
-        delta: owed ? Number(row.fields.amount ?? 0) : -Number(row.fields.amount ?? 0),
+        delta: owed ? amount : -amount,
         source: 'obligation',
         href: `/r/obligations/${row.seq}`,
       },
@@ -144,18 +158,27 @@ export function runway(opening: number, horizon = 180): Runway {
        over six months, as the first row of the money page's own "What is coming". Every other
        consumer in the app already spelled it `cancelled`. */
     if (String(row.fields.state ?? '') === 'cancelled') continue;
+    const cost = amountOf(row.fields.cost) ?? 0;
+    const currency = currencyOf(row.fields.cost);
+    if (currency) seen.add(currency);
     for (const r of renewals(row, until))
       movements.push({
         at: r.at,
         step: {
           day: r.day,
           label: String(row.fields.name ?? ''),
-          delta: -Number(row.fields.cost ?? 0),
+          delta: -cost,
           source: 'service',
           href: `/r/services/${row.seq}`,
         },
       });
   }
+
+  /* ONE CURRENCY OR NO WALK. A crossing day computed from two currencies is a real-looking date on
+     which nothing happens, and there is no screen on which anybody would notice. */
+  const mixed = seen.size > 1 ? [...seen].sort() : [];
+  const currency = mixed.length ? null : ([...seen][0] ?? null);
+  if (mixed.length) return { from: opening, currency, mixed, steps: [], crossed: null, days: null, horizon };
 
   /* A zero never reaches the walk. A free certificate renews like everything else and moves the
      balance by nothing, so it is a row that costs a line and says nothing — and in a list whose
@@ -179,6 +202,8 @@ export function runway(opening: number, horizon = 180): Runway {
 
   return {
     from: opening,
+    currency,
+    mixed,
     steps,
     crossed,
     days: crossed ? Math.round((noon(crossed.day) - NOW) / DAY_MS) : null,

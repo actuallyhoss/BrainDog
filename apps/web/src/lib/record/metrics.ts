@@ -30,6 +30,7 @@
 import { integer, money } from 'braindog-render';
 
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
+import { amountOf, currencyOf, mixedFix } from './money.ts';
 import { compile, explain, matches } from './where.ts';
 import type { Entry } from './schema.ts';
 
@@ -107,17 +108,45 @@ const registerOf = (source: string): string | null =>
 
 /** One operand, on one row. `null` when the row does not carry it — absent is not zero. */
 function operand(e: Entry, op: Operand): number | null {
-  if (typeof op === 'string') {
-    const raw = e.fields[op];
-    if (raw === null || raw === undefined || raw === '') return null;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
-  }
+  /* `amountOf` RATHER THAN `Number`, because money is `{ amount, currency }` and `Number({…})` is
+     `NaN` — which this used to turn into `null`, so every money metric read as "—" with no refusal
+     and no way to tell that from "no rows matched". */
+  if (typeof op === 'string') return amountOf(e.fields[op]);
   const [field, { lookup, by }] = op.product;
   const base = operand(e, field);
   const factor = LOOKUPS[lookup]?.[String(e.fields[by] ?? '')];
   return base === null || factor === undefined ? null : base * factor;
 }
+
+/**
+ * The currencies the field an aggregation reads is written in.
+ *
+ * A SUM IS THE PLACE TWO CURRENCIES MEET. The predicate does not care, the count does not care, and
+ * then one line adds them — and what comes out is a number of the right size in the wrong unit,
+ * under a code the declaration chose rather than the rows did.
+ */
+function currenciesOf(rows: Entry[], agg: Aggregation): Set<string> {
+  const field =
+    'count' in agg ? agg.count : 'distinct' in agg ? agg.distinct : 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : agg.max;
+  const id = typeof field === 'string' ? field : field.product[0];
+  const seen = new Set<string>();
+  if (typeof id !== 'string') return seen;
+  for (const e of rows) {
+    const c = currencyOf(e.fields[id]);
+    if (c) seen.add(c);
+  }
+  return seen;
+}
+
+/** Every currency any operand of this value expression reads. */
+export function currenciesRead(rows: Entry[], value: Value): Set<string> {
+  if ('ratio' in value) return pairCurrencies(rows, value.ratio);
+  if ('diff' in value) return pairCurrencies(rows, value.diff);
+  return currenciesOf(rows, value);
+}
+
+const pairCurrencies = (rows: Entry[], pair: { of: Aggregation; per: Aggregation }): Set<string> =>
+  new Set([...currenciesOf(rows, pair.of), ...currenciesOf(rows, pair.per)]);
 
 function aggregate(rows: Entry[], agg: Aggregation): number | null {
   if ('count' in agg)
@@ -306,6 +335,26 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const w = compile(register, decl.where);
   const all = ROWS[register] ?? [];
   const rows = all.filter((e) => matches(e, w, now));
+
+  /* TWO CURRENCIES ARE NEVER ADDED, and this is the line that would have added them. A tile is one
+     figure with one code beside it; a sum across two is a number of the right size in the wrong
+     unit, and there is no screen on which anybody notices. */
+  const seen = currenciesRead(rows, decl.value);
+  if (seen.size > 1) {
+    const why = `${decl.metric}: ${mixedFix([...seen].sort())}`;
+    return { value: null, shown: '—', rows: rows.length, delta: null, why, refusals: [why], href: hrefFor(decl) };
+  }
+
+  /* AND THE FORMAT IS CHECKED AGAINST THEM. `format: money.GBP` is a declaration about how to write
+     the figure; the rows are what it is a figure OF. When they disagree the declaration is wrong,
+     and printing the rows' number under the declaration's code is the quiet version of that. */
+  const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
+  const held = [...seen][0];
+  if (declared && held && declared !== held) {
+    const why = `${decl.metric}: the rows are in ${held} and the format says ${declared}`;
+    return { value: null, shown: '—', rows: rows.length, delta: null, why, refusals: [why], href: hrefFor(decl) };
+  }
+
   const value = evaluateValue(rows, decl.value);
 
   let delta: number | null = null;

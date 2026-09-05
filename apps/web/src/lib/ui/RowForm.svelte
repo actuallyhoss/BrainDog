@@ -19,7 +19,7 @@
   says so.
 -->
 <script lang="ts">
-  import { CURRENCY, REGISTERS, ROWS, labelOf, readableFields } from '../record/api.ts';
+  import { REGISTERS, ROWS, currencyFor, labelOf, readableFields } from '../record/api.ts';
   import type { FieldDecl } from '../record/schema.ts';
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
@@ -73,10 +73,11 @@
         </select>
       {:else if f.type === 'money'}
         <div class="field money">
-          <!-- The currency is a property of the RECORD, so it is printed rather than typed. Every
-               figure in this product is an integer in minor units with its own currency beside it,
-               and a free-text currency box is how two of them end up added together. -->
-          <span class="money-unit">{CURRENCY}</span>
+          <!-- The currency is printed rather than typed, and it is READ FROM THE FIELD'S OWN ROWS
+               rather than from a constant. A free-text currency box is how two of them end up added
+               together; a constant is how one of them ends up wearing the other's code. A field
+               whose rows disagree shows no code at all, which is the honest state of that field. -->
+          {#if currencyFor(register, f.id)}<span class="money-unit">{currencyFor(register, f.id)}</span>{/if}
           <input class="field-input num" id={id(f)} type="text" inputmode="decimal" placeholder="0.00" />
         </div>
       {:else if f.type === 'day'}

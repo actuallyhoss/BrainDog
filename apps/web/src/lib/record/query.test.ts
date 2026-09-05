@@ -109,7 +109,7 @@ test('search matches what is on the screen, not what is in the row', () => {
   // A DELIBERATE CHOICE with a real consequence: the query runs against `display()`, so a person
   // who reads "GBP 4,800.00" and types "4,800" finds it. Typing the stored minor units does not,
   // and should not — nobody has ever read 480000 off this screen.
-  const money = rows({ amount: 480_000 }, { amount: 96_000 });
+  const money = rows({ amount: { amount: 480_000, currency: 'GBP' } }, { amount: { amount: 96_000, currency: 'GBP' } });
   assert.deepEqual(seqs(applyFilters('obligations', money, [], '4,800')), [1]);
   assert.deepEqual(seqs(applyFilters('obligations', money, [], '480000')), []);
 });

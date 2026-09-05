@@ -16,7 +16,8 @@
   import { parse, relative, TONES } from 'braindog-render';
   import { Block, Degraded } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { CURRENCY, NOW, ROWS, metric } from '$lib/record/api.ts';
+  import { NOW, ROWS, metric } from '$lib/record/api.ts';
+  import { amountOf, currencyOf } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Money from '$lib/ui/Money.svelte';
@@ -102,7 +103,7 @@
               <span class="line-main">
                 <span class="line-title">{s.fields.name} is lapsing</span>
               </span>
-              <span class="line-amount"><Money minor={Number(s.fields.cost)} currency={CURRENCY} /></span>
+              <span class="line-amount"><Money minor={amountOf(s.fields.cost) ?? 0} currency={currencyOf(s.fields.cost) ?? ''} /></span>
               <span class="line-when" data-intent="bad">
                 <span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>
                 {relative(String(s.fields.renews), NOW)}
@@ -121,7 +122,11 @@
                 <span class="line-title">{e.fields.what}</span>
               </span>
               <span class="line-amount">
-                <Money minor={Number(e.fields.amount)} currency={CURRENCY} weight={owed ? 'strong' : 'normal'} />
+                <Money
+                  minor={amountOf(e.fields.amount) ?? 0}
+                  currency={currencyOf(e.fields.amount) ?? ''}
+                  weight={owed ? 'strong' : 'normal'}
+                />
               </span>
               <span class="line-when" data-intent={late ? 'bad' : undefined}>
                 <!-- Colour never carries meaning alone, so the date that is red is also the date

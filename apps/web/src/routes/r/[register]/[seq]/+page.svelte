@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
+  import { amountOf, currencyOf } from '$lib/record/money.ts';
   import { relative } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
@@ -18,7 +19,6 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { iconFor,
     AUDIT,
-    CURRENCY,
     backlinks,
     NOW,
     REGISTERS,
@@ -103,7 +103,7 @@
                 {#if value === null || value === undefined || value === ''}
                   <span class="missing">—</span>
                 {:else if f.type === 'money'}
-                  <Money minor={Number(value)} currency={CURRENCY} weight="strong" />
+                  <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />
                 {:else if f.id === decl.state}
                   <Chip label={String(value).replace(/_/g, ' ')} {tone} />
                 {:else if identityOf(id, f.id, value)}

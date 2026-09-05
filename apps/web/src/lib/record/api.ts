@@ -11,6 +11,8 @@
  */
 
 import { day as fmtDay, money, relative, integer, MISSING } from 'braindog-render';
+
+import { amountOf, currencyOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { PATHS, type IconName } from '../ui/icons.ts';
 import {
@@ -36,7 +38,24 @@ import { METRICS } from './declared.ts';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
 import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
-export const CURRENCY = 'GBP';
+/**
+ * The currency the rows of one money field are in, or `null` when they are not all one.
+ *
+ * THIS REPLACED A CONSTANT, and the constant was the bug. `CURRENCY = 'GBP'` was pinned to every
+ * money value on every screen, so a euro invoice would have rendered as sterling — the right digits
+ * under the wrong code, on the one kind of figure somebody acts on. A currency is a property of a
+ * VALUE; this function exists only for the places that need one when there is no value yet, like an
+ * empty field on a form, and it answers from the rows rather than from a preference.
+ */
+export function currencyFor(register: string, field: string): string | null {
+  const seen = new Set<string>();
+  for (const row of ROWS[register] ?? []) {
+    const c = currencyOf(row.fields[field]);
+    if (c) seen.add(c);
+    if (seen.size > 1) return null;
+  }
+  return [...seen][0] ?? null;
+}
 
 /**
  * The cash the walk starts from, in minor units.
@@ -114,21 +133,43 @@ export function readableFields(register: string): FieldDecl[] {
  * Formatting is decided for the reader, not at the call site. A `ref` reads as the title of the row
  * it points at, because a person says "Halden", not "people#1".
  */
+/** Money when the walk knows its currency, and the bare integer when there is nothing to say. */
+const moneyOr = (minor: number, currency: string | null): string => (currency === null ? integer(minor) : money(minor, currency));
+
+/** What a `duration`'s declared unit is worth in the seconds the record stores. */
+const SECONDS: Record<string, number> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };
+
 export function display(register: string, field: string, value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
   const f = decl(register, field);
   if (!f) return String(value);
   switch (f.type) {
-    case 'money':
-      return money(Number(value), CURRENCY);
+    case 'money': {
+      /* THE VALUE CARRIES ITS OWN CURRENCY. A money field that came back as a bare number is a row
+         written before the field was money, or a caller that dropped half the value — either way the
+         honest answer is the digits with no code rather than the digits under a guessed one. */
+      const c = currencyOf(value);
+      const a = amountOf(value);
+      if (a === null) return null;
+      return c === null ? integer(a) : money(a, c);
+    }
     case 'day':
       return `${fmtDay(String(value))}`;
     case 'instant':
       return relative(String(value).slice(0, 10), NOW);
     case 'int':
       return integer(Number(value));
-    case 'decimal':
     case 'duration': {
+      /* SECONDS IN, THE DECLARED UNIT OUT. The record holds one unit and the field says how to say
+         it, which is the only arrangement in which two durations can be added: `0.2` on its own is
+         a number of something, and adding it to `3` needs both to have meant the same thing. */
+      const seconds = Number(value);
+      if (!Number.isFinite(seconds)) return String(value);
+      const unit = f.unit ?? 's';
+      const per = SECONDS[unit] ?? 1;
+      return `${(seconds / per).toLocaleString('en-GB', { maximumFractionDigits: 3 })} ${unit}`;
+    }
+    case 'decimal': {
       /* ROUNDED, because these get summed. `0.2 + 3 + 0.2` is 3.4000000000000004 in binary
          floating point, and a bar chart totalling three tasks' effort printed exactly that. Money
          never has this problem — it is an integer in minor units — but a decimal is a decimal, so
@@ -341,6 +382,18 @@ export function sortRows(register: string, entries: Entry[], field: string, dir:
        days are left alone: money is an integer and must compare by magnitude, and `2026-07-27` is
        chronological already precisely because it is written to sort as text. */
     if (typeof x === 'string' && typeof y === 'string') return x.localeCompare(y, LOCALE) * sign;
+    /* MONEY IS AN OBJECT, and `{} < {}` is false both ways round — so a column of money sorted into
+       whatever order the rows arrived in, which looks exactly like a sort that worked. Within one
+       currency it compares by magnitude; across two it groups by code first, because there is no
+       order between them and pretending otherwise is the same lie as adding them. */
+    const mx = amountOf(x);
+    const my = amountOf(y);
+    if (mx !== null && my !== null) {
+      const cx = currencyOf(x) ?? '';
+      const cy = currencyOf(y) ?? '';
+      if (cx !== cy) return cx.localeCompare(cy) * sign;
+      return (mx - my) * sign;
+    }
     return (x < y ? -1 : 1) * sign;
   });
 }
@@ -772,18 +825,21 @@ function runwayBlock(b: PageBlock): BlockResult {
     { field: 'balance', label: 'Balance', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
   ];
   const steps = walk.steps.slice(0, b.limit ?? 12);
+  /* A WALK THE RECORD CANNOT MAKE IS A SENTENCE, not an empty table. A cash walk over two currencies
+     produces a crossing day that looks real and is invented. */
+  const refusals = walk.mixed.length ? [`The cash walk needs one currency: ${mixedFix(walk.mixed)}.`] : [];
   return {
     ...b,
     register: undefined,
     columns,
     entries: [],
     matched: [],
-    refusals: [],
+    refusals,
     rows: steps.map((s, i) => ({
       /* The key is the movement, not the index: two charges on one day from one service are
          different rows, and a keyed list that reuses an index re-renders the wrong one. */
       key: `${s.day}-${s.source}-${s.href}-${i}`,
-      cells: [fmtDay(s.day), s.label, money(s.delta, CURRENCY), money(s.balance, CURRENCY)],
+      cells: [fmtDay(s.day), s.label, moneyOr(s.delta, walk.currency), moneyOr(s.balance, walk.currency)],
       href: s.href,
       /* THE CROSSING IS ONE ROW. Painting every row after it the same colour buries the fact the
          walk exists to produce: the day you go under. Everything after it is still under, which is

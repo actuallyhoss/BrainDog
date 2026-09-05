@@ -36,7 +36,8 @@
 
 import { money, parse, relative } from 'braindog-render';
 import { KINDS, isKind } from 'braindog-render';
-import { CURRENCY, NOW, REGISTERS, display, type BlockResult } from './api.ts';
+import { NOW, REGISTERS, display, type BlockResult } from './api.ts';
+import { asMoney, merge, mixedFix, total, type Total } from './money.ts';
 
 /**
  * The rest of the groups, as one group.
@@ -48,34 +49,52 @@ import { CURRENCY, NOW, REGISTERS, display, type BlockResult } from './api.ts';
  */
 const REST = 'Everything else';
 
-function cut<T>(groups: [string, number][], limit: number | undefined): [string, number][] {
+function cut(groups: [string, number][], limit: number | undefined): [string, number][] {
   if (limit === undefined || groups.length <= limit) return groups;
   const kept = groups.slice(0, Math.max(1, limit - 1));
   const rest = groups.slice(kept.length).reduce((a, [, n]) => a + n, 0);
   return [...kept, [REST, rest]];
 }
 
+/** The same cut over money totals, where the remainder merges rather than adds. */
+function cutTotals(groups: (readonly [string, Total])[], limit: number | undefined): (readonly [string, Total])[] {
+  if (limit === undefined || groups.length <= limit) return groups;
+  const kept = groups.slice(0, Math.max(1, limit - 1));
+  return [...kept, [REST, merge(groups.slice(kept.length).map(([, t]) => t))] as const];
+}
+
 /** A bar over a register groups its rows and sums them — the one place a page does arithmetic. */
 function barRows(block: BlockResult): string[] {
   const by = block.columns[0]?.field ?? 'party';
   const of = block.columns[1]?.field ?? 'amount';
-  const totals = new Map<string, number>();
+  const grouped = new Map<string, unknown[]>();
   /* `matched`, NOT `entries`. The block draws the first `limit:` rows and it ADDS UP all of them:
      summing the page instead of the answer is a figure that is wrong by however many rows did not
      fit, silently, and it is the same number of pixels either way. */
   for (const e of block.matched) {
     const key = display(block.register ?? '', by, e.fields[by]) ?? 'Nobody in particular';
-    totals.set(key, (totals.get(key) ?? 0) + Number(e.fields[of] ?? 0));
+    const list = grouped.get(key) ?? [];
+    list.push(e.fields[of]);
+    grouped.set(key, list);
   }
-  return cut([...totals].sort((a, b) => b[1] - a[1]), block.limit)
+
+  /* THE BAR IS PER GROUP, AND SO IS THE CURRENCY CHECK. One client billed in two currencies is one
+     bar whose length is a number about nothing — and it sits in a chart beside bars that are real,
+     which is the version of this nobody catches. */
+  const totals = [...grouped].map(([key, values]) => [key, total(values)] as const);
+  return cutTotals(
+    totals.sort((a, b) => b[1].amount - a[1].amount),
+    block.limit,
+  ).map(([key, sum]) => {
     /* The SUM is formatted through the summed field's own type, not always as money. A bar over
        `effort` in days printed `GBP 0.02` — the total was 2.4 days, run through a money formatter
        that reads its input as minor units. A block that can be bound to any register cannot assume
        the thing it is adding up is currency. */
-    .map(
-      ([key, total]) =>
-        `${escapeCell(key)} | ${escapeCell(display(block.register ?? '', of, total) ?? money(total, CURRENCY))} | `,
-    );
+    const shown = sum.mixed.length
+      ? mixedFix(sum.mixed)
+      : (display(block.register ?? '', of, asMoney(sum.amount, sum.currency)) ?? String(sum.amount));
+    return `${escapeCell(key)} | ${escapeCell(shown)} | `;
+  });
 }
 
 /**
@@ -126,15 +145,19 @@ function chipsRows(block: BlockResult): string[] {
  */
 function gaugeRows(block: BlockResult): string[] {
   const of = block.columns[1]?.field ?? '';
-  const total = block.matched.reduce((a, e) => a + Number(e.fields[of] ?? 0), 0);
+  const sum = total(block.matched.map((e) => e.fields[of]));
   const target = block.target;
   if (target === undefined) return [];
   const label = block.columns[0]?.label ?? block.heading ?? '';
-  const fmt = (n: number) => display(block.register ?? '', of, n) ?? String(n);
+  /* A GAUGE OVER TWO CURRENCIES IS NOT A GAUGE. Its whole output is one figure measured against one
+     line, and neither of them means anything if the figure is a sum of two units. */
+  if (sum.mixed.length) return [`${escapeCell(label)} | ${escapeCell(mixedFix(sum.mixed))} |  | warn`];
+  const amount = sum.amount;
+  const fmt = (n: number) => display(block.register ?? '', of, asMoney(n, sum.currency)) ?? String(n);
   /* The tone is the reading, and it is the whole point of a gauge: over the line is `bad`, close to
      it is `warn`, under it is nothing at all — a gauge that is fine should not be coloured. */
-  const tone = total > target ? ' | bad' : total > target * 0.85 ? ' | warn' : '';
-  return [`${escapeCell(label)} | ${fmt(total)} | ${fmt(target)}${tone}`];
+  const tone = amount > target ? ' | bad' : amount > target * 0.85 ? ' | warn' : '';
+  return [`${escapeCell(label)} | ${fmt(amount)} | ${fmt(target)}${tone}`];
 }
 
 /**

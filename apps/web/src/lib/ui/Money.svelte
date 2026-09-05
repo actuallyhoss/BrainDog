@@ -12,12 +12,15 @@
   in the middle of the number (13 §3.2).
 -->
 <script lang="ts">
-  import { money } from 'braindog-render';
+  import { integer, money } from 'braindog-render';
 
   let { minor, currency, weight = 'normal' }: { minor: number; currency: string; weight?: 'normal' | 'strong' } = $props();
 
-  const text = $derived(money(minor, currency));
-  const split = $derived(text.indexOf(' '));
+  /* A VALUE WITH NO CODE PRINTS ITS DIGITS AND NO CODE. `money(n, '')` renders a leading space where
+     the code belongs, which reads as a code that failed to load rather than as a figure that never
+     had one — and the honest state of a money field with no currency is the second thing. */
+  const text = $derived(currency ? money(minor, currency) : integer(minor));
+  const split = $derived(currency ? text.indexOf(' ') : 0);
 </script>
 
 <span class="money" data-weight={weight}>

@@ -18,32 +18,49 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CURRENCY, applyFilters, backlinks, columnsFor, dirOf, display, isProse, labelOf, metric, page, search, toRows } from './api.ts';
+import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, isProse, labelOf, metric, page, search, toRows } from './api.ts';
+import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
 
+const gbp = (amount: number) => ({ amount, currency: 'GBP' });
+
 test('money is divided out of minor units, with its code', () => {
-  assert.equal(display('obligations', 'amount', 480_000), 'GBP 4,800.00');
-  assert.equal(display('obligations', 'amount', 1), 'GBP 0.01');
-  assert.equal(display('obligations', 'amount', 100), 'GBP 1.00');
+  assert.equal(display('obligations', 'amount', gbp(480_000)), 'GBP 4,800.00');
+  assert.equal(display('obligations', 'amount', gbp(1)), 'GBP 0.01');
+  assert.equal(display('obligations', 'amount', gbp(100)), 'GBP 1.00');
+});
+
+test('A MONEY VALUE CARRIES ITS OWN CURRENCY, and the screen prints that one', () => {
+  /* This read one `CURRENCY = 'GBP'` constant for every money field on every screen, so a euro
+     invoice would have rendered as sterling — the right digits under the wrong code, on the one kind
+     of figure somebody acts on. */
+  assert.equal(display('obligations', 'amount', { amount: 480_000, currency: 'EUR' }), 'EUR 4,800.00');
+  assert.equal(display('obligations', 'amount', { amount: 4_800, currency: 'JPY' }), 'JPY 4,800');
+});
+
+test('and a money field with no currency prints the digits rather than a guessed code', () => {
+  // A row written before the field was money, or a caller that dropped half the value. Digits with
+  // no code is honest; digits under an invented one is not.
+  assert.equal(display('obligations', 'amount', 480_000), '480,000');
 });
 
 test('a money field never renders the raw integer', () => {
   for (const minor of [1, 99, 100, 480_000, 1_910_000]) {
-    const out = display('obligations', 'amount', minor);
+    const out = display('obligations', 'amount', gbp(minor));
     assert.ok(out, 'a value was given, so a string is owed');
     assert.notEqual(out, String(minor), `${minor} reached the screen as minor units`);
-    assert.ok(out.startsWith(`${CURRENCY} `), `${out} lost its currency code`);
+    assert.ok(out.startsWith('GBP '), `${out} lost its currency code`);
   }
 });
 
 test('zero is a number, not nothing', () => {
   // `0` is falsy and the guard at the top of `display` tests for null/undefined/'' precisely so
   // that a real zero — a service that costs nothing — still prints.
-  assert.equal(display('obligations', 'amount', 0), 'GBP 0.00');
+  assert.equal(display('obligations', 'amount', gbp(0)), 'GBP 0.00');
 });
 
 test('null, undefined and empty are absent rather than zero', () => {
@@ -82,8 +99,12 @@ test('THE DEFAULT COLUMNS INCLUDE EVERY `index:` FIELD, and the word is the one 
   assert.ok(Object.values(REGISTERS).some((r) => r.fields.some((f) => f.index)), 'no register declares an index');
 });
 
-test('a duration carries its declared unit', () => {
-  assert.equal(display('tasks', 'effort', 3), '3 d');
+test('A DURATION IS STORED IN SECONDS AND SAID IN ITS DECLARED UNIT', () => {
+  /* `0.2` on its own is a number of something, and adding it to `3` needs both to have meant the
+     same thing. Seconds is the one unit; the field says how to say it. */
+  assert.equal(display('tasks', 'effort', 3 * 86_400), '3 d');
+  assert.equal(display('tasks', 'effort', 17_280), '0.2 d');
+  assert.equal(display('tasks', 'effort', 0), '0 d');
 });
 
 test('a ref reads as the title of the row it points at', () => {
@@ -198,8 +219,8 @@ test('a per-year figure is annualised, not summed across cycles', () => {
   assert.ok(monthlyKiln.length > 0, 'the seed needs a monthly Kiln service for this to bite');
   const naive = (ROWS.services ?? [])
     .filter((s) => s.fields.thing === 1 && s.fields.state !== 'cancelled')
-    .reduce((a, s) => a + Number(s.fields.cost ?? 0), 0);
-  assert.notEqual(kiln.value, `${CURRENCY} ${(naive / 100).toFixed(2)}`, 'the cycle factor is missing again');
+    .reduce((a, s) => a + (amountOf(s.fields.cost) ?? 0), 0);
+  assert.notEqual(kiln.value, `GBP ${(naive / 100).toFixed(2)}`, 'the cycle factor is missing again');
 });
 
 test('Overdue is one direction, because two directions do not add up', () => {
@@ -212,13 +233,13 @@ test('Overdue is one direction, because two directions do not add up', () => {
         e.fields.direction === dir &&
         String(e.fields.due) < new Date(NOW).toISOString().slice(0, 10),
     );
-  const owe = late('owed_by_me').reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
-  const owed = late('owed_to_me').reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
+  const owe = late('owed_by_me').reduce((a, e) => a + (amountOf(e.fields.amount) ?? 0), 0);
+  const owed = late('owed_to_me').reduce((a, e) => a + (amountOf(e.fields.amount) ?? 0), 0);
   assert.ok(owe > 0 && owed > 0, 'the seed needs late rows in both directions for this to mean anything');
 
   const tile = metric('overdue');
-  assert.equal(tile.value, display('obligations', 'amount', owe));
-  assert.notEqual(tile.value, display('obligations', 'amount', owe + owed));
+  assert.equal(tile.value, display('obligations', 'amount', gbp(owe)));
+  assert.notEqual(tile.value, display('obligations', 'amount', gbp(owe + owed)));
   assert.match(tile.href ?? '', /direction/, 'the link must carry the same direction the figure does');
 });
 
@@ -251,7 +272,9 @@ function withExtra<T>(n: number, amount: number, fn: () => T): T {
     ...before,
     ...Array.from({ length: n }, (_, i) => ({
       seq: next + i,
-      fields: { what: `Filler ${i}`, party: 3, direction: 'owed_by_me', amount, due: '2026-12-01', state: 'open', thing: null, note: '' },
+      /* MONEY, not a bare integer: a filler row written as a number would make every total this
+         test reads a MIXED one, and the bar would show the refusal rather than the figure. */
+      fields: { what: `Filler ${i}`, party: 3, direction: 'owed_by_me', amount: gbp(amount), due: '2026-12-01', state: 'open', thing: null, note: '' },
       version: 1,
       created: '2026-01-01T00:00:00.000Z',
       by: 'test',
@@ -274,7 +297,7 @@ test('A BAR ADDS UP THE ANSWER, NOT THE FIRST PAGE OF IT', () => {
     const block = barOf('money', 'Owed by you, by counterparty');
     assert.ok(block, 'the bar is gone; this test is about the bar');
     assert.ok(block.matched.length > 50, `only ${block.matched.length} rows matched, so the cut was never reached`);
-    const truth = block.matched.reduce((a, e) => a + Number(e.fields.amount ?? 0), 0);
+    const truth = block.matched.reduce((a, e) => a + (amountOf(e.fields.amount) ?? 0), 0);
     const drawn = toSegments(block)
       .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
       .reduce((a, r) => a + Number((r.cells[1] ?? '').replace(/[^0-9.]/g, '')) * 100, 0);
@@ -296,7 +319,7 @@ test('a gauge sums past the cut too', () => {
   const block = page('estate')?.blocks.find((b) => b.kind === 'gauge');
   assert.ok(block, 'the estate page has no gauge');
   const of = block.columns[1]?.field ?? '';
-  const truth = block.matched.reduce((a, e) => a + Number(e.fields[of] ?? 0), 0);
+  const truth = block.matched.reduce((a, e) => a + (amountOf(e.fields[of]) ?? 0), 0);
   const drawn = toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
   assert.equal(drawn.length, 1, 'a gauge is one row');
   assert.ok(Math.abs(Number((drawn[0]?.cells[1] ?? '').replace(/[^0-9.]/g, '')) * 100 - truth) < 200);
@@ -380,15 +403,15 @@ test('a tile that shows MONEY adds up to the rows it opens', () => {
   // Same rule, on the half that was never checked: the figure has to be the sum of the rows the link
   // produces. A service's tile is annualised — `cost` is per cycle, and the tile says "a year" — so
   // that is the second reading allowed, and no third one is.
-  const money = METRICS.map((id) => metric(id)).filter((m) => m.value.startsWith(CURRENCY));
+  const money = METRICS.map((id) => metric(id)).filter((m) => /^[A-Z]{3} /.test(m.value));
   assert.ok(money.length >= 4, 'the money tiles have gone missing, so this test is vacuous');
   for (const m of money) {
     assert.ok(m.href);
     const { register, entries } = opened(m.href);
     const field = register === 'services' ? 'cost' : 'amount';
-    const plain = entries.reduce((a, e) => a + Number(e.fields[field] ?? 0), 0);
+    const plain = entries.reduce((a, e) => a + (amountOf(e.fields[field]) ?? 0), 0);
     const annual = entries.reduce(
-      (a, e) => a + Number(e.fields.cost ?? 0) * (e.fields.cycle === 'monthly' ? 12 : e.fields.cycle === 'two_yearly' ? 0.5 : 1),
+      (a, e) => a + (amountOf(e.fields.cost) ?? 0) * (e.fields.cycle === 'monthly' ? 12 : e.fields.cycle === 'two_yearly' ? 0.5 : 1),
       0,
     );
     const tile = Math.round(figure(m.value) * 100);

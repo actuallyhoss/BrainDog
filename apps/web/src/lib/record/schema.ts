@@ -45,6 +45,10 @@ export type FieldDecl = {
   required?: boolean;
   /** `ref` only: the register it points at. */
   to?: string;
+  /**
+   * How a `duration` is SAID. It is stored as integer seconds, because seconds is one unit and
+   * `0.2` is a number of some unit the field forgot to name.
+   */
   unit?: string;
 };
 
@@ -83,7 +87,23 @@ export type RegisterDecl = {
   pack?: string;
 };
 
-export type Fields = Record<string, string | number | boolean | null>;
+/**
+ * A money value: an integer in minor units, WITH ITS OWN CURRENCY.
+ *
+ * The pair is the type, and it is one object rather than two fields for the reason the rule exists:
+ * an amount that can be separated from its currency is an amount that will be, and the separation
+ * is never noticed — a sum of eight sterling invoices and one euro one is a number, and it looks
+ * exactly like a right one.
+ */
+export type MoneyValue = { amount: number; currency: string };
+
+export const isMoney = (v: unknown): v is MoneyValue =>
+  typeof v === 'object' &&
+  v !== null &&
+  typeof (v as MoneyValue).amount === 'number' &&
+  typeof (v as MoneyValue).currency === 'string';
+
+export type Fields = Record<string, string | number | boolean | MoneyValue | null>;
 
 export type Entry = {
   /** The number you can say out loud. Per-register, and it is why renaming a register is refused. */
