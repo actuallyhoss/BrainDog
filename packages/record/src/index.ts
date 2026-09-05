@@ -26,6 +26,7 @@ import {
   type Kernel,
   type Patch,
   type RegisterDecl,
+  type RuleDecl,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
@@ -315,6 +316,21 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       const beyond = register ? reaches(ctx, register) : null;
       if (beyond) return { ok: false as const, refusal: beyond };
       return kernel.metric(filled);
+    },
+
+    /**
+     * What a rule WOULD do, without doing any of it.
+     *
+     * A READ, and scoped like one: the sample it returns names rows, so a caller who cannot reach
+     * the register cannot preview a rule against it. Nothing in it calls the write path — which is
+     * what makes it safe to hand to whoever is writing the rule rather than only to an owner.
+     */
+    async dryRun(args: { rule: RuleDecl; limit?: number }, ctx: CallContext) {
+      const stop = guard(ctx, 'read', args?.rule?.register);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.rule?.register || !Array.isArray(args.rule.then))
+        return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
+      return kernel.dryRun(args.rule, args.limit);
     },
 
     /* ── VAULT ────────────────────────────────────────────────── */

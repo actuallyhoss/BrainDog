@@ -62,8 +62,8 @@ test('THE COUNT IS THE DESIGN, and it is the document’s list minus what is not
 
      The four added since are the record's own reading of itself — `pages`, `page`, `metric` and
      `credentials` — and each earns its place by being a question an agent asks that `list` cannot
-     answer: what does this record draw, what does this figure say, and what would break if this
-     machine were lost. */
+     answer: what does this record draw, what does this figure say, what would break if this machine
+     were lost, and — the one an agent needs most — what would this rule do if I turned it on. */
   const named = TOOLS.map((t) => t.name);
   for (const wanted of ['record_index', 'search', 'get', 'list', 'create', 'update', 'log'])
     assert.ok(named.includes(wanted), `${wanted} is in 10-MCP §5 and not here`);
@@ -75,7 +75,7 @@ test('THE COUNT IS THE DESIGN, and it is the document’s list minus what is not
   for (const forbidden of ['openGrant', 'open_grant', 'credential', 'secret'])
     assert.ok(!named.includes(forbidden), `${forbidden} would read a credential`);
 
-  assert.equal(TOOLS.length, 13);
+  assert.equal(TOOLS.length, 14);
   assert.equal(new Set(named).size, TOOLS.length, 'two tools share a name');
   for (const t of TOOLS) {
     assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
@@ -300,5 +300,32 @@ test('a figure comes back with its target, and one that is not declared is named
   const out = await mcp.call('metric', { metric: 'nonesuch' }, owner);
   assert.equal(out.ok, false);
   if (!out.ok) assert.equal(out.refusal.code, 'METRIC_UNKNOWN');
+  sql.close();
+});
+
+test('PREVIEW BEFORE PROPOSE, which is the tool an agent needs most', async () => {
+  /* An agent writing a rule cannot look at the screen afterwards, and a rule that quietly tagged
+     four hundred rows is a rule nobody can undo by hand. */
+  const { mcp, sql } = await agent();
+  value(await mcp.call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }, owner));
+
+  const out = value<{ matches: number; won: number; sample: { would: string[] }[] }>(
+    await mcp.call(
+      'dry_run',
+      { rule: { rule: 'late', register: 'obligations', when: 'state is open', then: [{ tag: 'chased' }] } },
+      owner,
+    ),
+  );
+  assert.equal(out.matches, 1);
+  assert.equal(out.won, 1);
+  assert.deepEqual(out.sample[0]?.would, ['tag chased']);
+
+  // And it wrote nothing, which is the whole reason it can be handed to whoever is writing the rule.
+  assert.equal(sql.all("SELECT 1 FROM event WHERE actor LIKE 'rule:%'").length, 0);
+  assert.equal(value<{ fields: Record<string, unknown> }>(await mcp.call('get', { spoken: 'obligations#1' }, owner)).fields.tags, undefined);
+
+  // A rule about a register nobody has is a refusal, not a preview of nothing.
+  assert.ok(refusal(await mcp.call('dry_run', { rule: { rule: 'x', register: 'nothing', then: [] } }, owner)).code);
+  assert.ok(refusal(await mcp.call('dry_run', {}, owner)).code);
   sql.close();
 });

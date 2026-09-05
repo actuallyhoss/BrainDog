@@ -118,6 +118,13 @@ export const TOOLS: readonly Tool[] = [
     writes: false,
   },
   {
+    name: 'dry_run',
+    description:
+      'What a rule would do, before anybody turns it on: how many rows it matches, how many it wins, which rule takes the rest, and a sample. It writes nothing.',
+    input: obj({ rule: { type: 'object', description: 'A rule declaration: register, when, then.' } }, ['rule']),
+    writes: false,
+  },
+  {
     name: 'create',
     description: 'Add a row to a register. The record allocates its number and hands it back.',
     input: obj(
@@ -218,6 +225,13 @@ export function tools(api: RecordApi) {
      * without anything being readable that should not be.
      */
     credentials: (_args, ctx) => api.listGrants(ctx),
+
+    /**
+     * PREVIEW BEFORE PROPOSE. An agent writing a rule is exactly the caller who most needs to see
+     * what it would do first — it cannot look at the screen afterwards, and a rule that quietly
+     * tagged four hundred rows is a rule nobody can undo by hand.
+     */
+    dry_run: (args, ctx) => api.dryRun({ rule: (args.rule ?? {}) as never }, ctx),
 
     create: (args, ctx) =>
       api.create(
