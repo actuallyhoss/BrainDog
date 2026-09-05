@@ -35,9 +35,23 @@ export const ROUTES: readonly Route[] = [
   { name: 'history', writes: false, what: 'The writes that made one row, in order, each with who and when.' },
   { name: 'search', writes: false, what: 'Rows whose text matches, across every register you can see, best first.' },
   { name: 'version', writes: false, what: "The record's version, so a client can ask what changed since." },
+  { name: 'pages', writes: false, what: 'Every page this record can draw, templates expanded.' },
+  { name: 'page', writes: false, what: 'One page, with every block run: rows and figures, never markup.' },
+  { name: 'metric', writes: false, what: 'One figure, with its target and how it compares.' },
+  { name: 'listGrants', writes: false, what: 'What each credential opens. Never the credential.' },
   { name: 'create', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'update', writes: true, what: 'Change a row, against the version you read.' },
 ];
+
+/**
+ * The three vault methods that touch sealed material are DELIBERATELY NOT HERE.
+ *
+ * `45-SPEC-RECORD` puts VAULT behind a browser session, and neither host can yet tell one from a
+ * bearer token — so routing `openGrant` would make a credential reachable by anything holding a
+ * token, which is the one thing this product says it does not do. `listGrants` is here because it
+ * carries what a key OPENS and never the key. The others arrive when a host can prove a session.
+ */
+export const UNROUTED = ['openGrant', 'bindGrant', 'revokeGrant', 'createRecord'] as const;
 
 const BY_NAME = new Map(ROUTES.map((r) => [r.name, r]));
 
@@ -75,6 +89,22 @@ const STATUS: Record<string, number> = {
   SCHEMA_NEWER: 503,
   ROUTE_UNKNOWN: 404,
   BODY_MALFORMED: 400,
+  PAGE_UNKNOWN: 404,
+  METRIC_UNKNOWN: 404,
+  SOURCE_UNKNOWN: 422,
+  LOOKUP_UNKNOWN: 422,
+  LOOKUP_MISSING: 422,
+  MIXED_CURRENCY: 422,
+  OPERATOR_UNSUPPORTED: 422,
+  REF_UNKNOWN: 422,
+  GRANT_REVOKED: 409,
+  WRONG_KEY: 409,
+  /* A BROWSER SESSION IS NOT A SCOPE PROBLEM, so it is not a 403 that reads as "get a bigger token".
+     401 says the credential you have is not the KIND that reaches this. */
+  NEEDS_BROWSER_SESSION: 401,
+  UNIMPLEMENTED: 501,
+  OUT_OF_BOUNDS: 404,
+  INTERNAL: 500,
 };
 
 export const httpStatus = (code: string): number => STATUS[code] ?? 500;
@@ -100,6 +130,10 @@ export type RecordSurface = {
   list(args: never, ctx: never): Promise<Result<unknown>>;
   history(args: never, ctx: never): Promise<Result<unknown>>;
   search(args: never, ctx: never): Promise<Result<unknown>>;
+  pages(ctx: never): Promise<Result<unknown>>;
+  page(args: never, ctx: never): Promise<Result<unknown>>;
+  metric(args: never, ctx: never): Promise<Result<unknown>>;
+  listGrants(ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
 };
@@ -113,6 +147,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     list: (a, ctx) => api.list(a as never, ctx as never),
     history: (a, ctx) => api.history(a as never, ctx as never),
     search: (a, ctx) => api.search(a as never, ctx as never),
+    pages: (_a, ctx) => api.pages(ctx as never),
+    page: (a, ctx) => api.page(a as never, ctx as never),
+    metric: (a, ctx) => api.metric(a as never, ctx as never),
+    listGrants: (_a, ctx) => api.listGrants(ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
   };
@@ -185,7 +223,19 @@ export async function serveApi(
     }
   }
 
-  const out = await handler(args, ctx);
+  /* NOTHING THROWS ACROSS THIS BOUNDARY, and this is where that promise is kept. A handler that
+     throws — an argument nobody coerced, a driver error, a bug — used to escape here, and the caller
+     never wrote a response at all: the socket stayed open, the request hung, and on the self-host
+     the SERVER then never closed. A crash is a 500 with a sentence, not a connection nobody ends. */
+  let out: Result<unknown>;
+  try {
+    out = await handler(args, ctx);
+  } catch (e) {
+    return json(500, {
+      ok: false,
+      refusal: { code: 'INTERNAL', fix: `${name} could not be answered: ${e instanceof Error ? e.message : String(e)}.` },
+    });
+  }
   return out.ok ? json(200, out) : json(httpStatus(out.refusal.code), out);
 }
 

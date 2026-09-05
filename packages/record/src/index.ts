@@ -18,6 +18,7 @@
 import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import {
+  fill,
   openRecord,
   type BindGrantArgs,
   type CreateRecordArgs,
@@ -257,6 +258,59 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
           ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
         }),
       );
+    },
+
+    /* ── pages and figures ─────────────────────────────────────── */
+
+    /** Every page a person could open, templates expanded into one page per row. */
+    async pages(ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.pages());
+    },
+
+    /**
+     * One page, with every block run.
+     *
+     * A PAGE IS SCOPED LIKE ANYTHING ELSE. A block over a register the caller cannot reach comes back
+     * refused rather than filled — and the page still draws, because one block's refusal is one
+     * block. A caller who can see three of five registers sees three blocks and two sentences.
+     */
+    async page(args: { slug: string }, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote, and `.split` on an
+         absent one threw a TypeError out of the route — a refusal is a value here, an exception is
+         not, and the exception did not even reach the client: the request simply hung. */
+      if (typeof args?.slug !== 'string' || !args.slug)
+        return no('REQUIRED_MISSING', 'A page is asked for by its slug.', { at: 'slug' });
+      const out = kernel.page(args.slug);
+      if (!out.ok) return out;
+      return ok({
+        ...out.value,
+        blocks: out.value.blocks.map((b) => {
+          const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : null;
+          const beyond = register ? reaches(ctx, register) : null;
+          return beyond ? { ...b, rows: [], matched: 0, refusals: [beyond] } : b;
+        }),
+      });
+    },
+
+    /** One figure, by the id a `stat` cell names. */
+    async metric(args: { metric: string }, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (typeof args?.metric !== 'string' || !args.metric)
+        return no('REQUIRED_MISSING', 'A figure is asked for by its id, optionally with a parameter after a colon.', { at: 'metric' });
+      const [id, param] = args.metric.split(':');
+      const decl = kernel.metricDecl(id ?? '');
+      if (!decl)
+        return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });
+      const filled = param === undefined ? decl : (fill(decl, null, param) as typeof decl);
+      const register = filled.source.startsWith('register.') ? filled.source.slice('register.'.length) : null;
+      const beyond = register ? reaches(ctx, register) : null;
+      if (beyond) return { ok: false as const, refusal: beyond };
+      return kernel.metric(filled);
     },
 
     /* ── VAULT ────────────────────────────────────────────────── */

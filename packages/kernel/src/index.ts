@@ -852,6 +852,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      */
     page: (slug: string): Result<PageResult> => readPage(pageDeps(), slug),
 
+    /** One metric document by its id, so a caller can fill a parameter and read it. */
+    metricDecl: (id: string): MetricDecl | null => pageDeps().metric(id),
+
     /** One block, without a page around it — what a `draw` tool hands an agent. */
     block: (decl: PageBlock): BlockResult => readBlock(pageDeps(), decl),
 

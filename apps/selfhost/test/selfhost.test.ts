@@ -117,9 +117,50 @@ test('EVERY ROUTE IN THE SHARED TABLE IS WIRED HERE TOO', async () => {
       const res = route.writes
         ? await s.call(route.name, { register: 'obligations', fields: { what: 'x' }, spoken: 'obligations#1', patch: {}, note: 'x' })
         : await s.call(`${route.name}?register=obligations&seq=1`);
-      assert.notEqual(res.status, 404, `${route.name} is in the table and not served`);
+      /* THE CODE, NOT THE STATUS. `page?slug=nonsense` is a legitimate 404 from a route that IS
+         served, and asserting on the status could not tell that from a route that is not — which is
+         the whole thing this test exists to catch. `ROUTE_UNKNOWN` is the one signal that means it. */
+      assert.notEqual(res.body.refusal?.code, 'ROUTE_UNKNOWN', `${route.name} is in the table and not served`);
       assert.notEqual(res.status, 405, `${route.name} disagrees with the table about its method`);
     }
+  } finally {
+    await s.close();
+    s.clean();
+  }
+});
+
+test('A HANDLER THAT THROWS IS A 500 WITH A SENTENCE, not a request that never ends', async () => {
+  /* This escaped `serveApi` and the caller never wrote a response at all: the socket stayed open,
+     the request hung, and the server then never closed either — one bad argument taking the whole
+     process with it. A crash is an answer here like everything else is. */
+  const s = await server();
+  try {
+    const res = await s.call('metric');
+    assert.equal(res.body.refusal?.code, 'REQUIRED_MISSING', 'an absent argument should be refused rather than crash');
+    assert.equal(res.status, 422);
+
+    const page = await s.call('page');
+    assert.equal(page.body.refusal?.code, 'REQUIRED_MISSING');
+  } finally {
+    await s.close();
+    s.clean();
+  }
+});
+
+test('the new reads answer, and a page names the blocks it could not draw', async () => {
+  const s = await server();
+  try {
+    const pages = await s.call('pages');
+    assert.equal(pages.status, 200);
+    assert.deepEqual(pages.body.value, [], 'this record declares no pages');
+
+    const grants = await s.call('listGrants');
+    assert.equal(grants.status, 200, 'the vault index is a read like any other');
+    assert.deepEqual(grants.body.value, []);
+
+    const missing = await s.call('page?slug=nonsense');
+    assert.equal(missing.status, 404);
+    assert.equal(missing.body.refusal?.code, 'PAGE_UNKNOWN');
   } finally {
     await s.close();
     s.clean();
