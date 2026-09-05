@@ -600,7 +600,10 @@ export function metric(id: string): Metric {
          measured against GBP 300.00 and the tile read `warn` for a reason nobody could act on. A
          target that is absurd next to its own figure is a target people stop reading. */
       const target = 300_000;
-      return { id, label: 'Cost per year', value: money(Math.round(total), CURRENCY), note: `target ≤ ${money(target, CURRENCY)}`, tone: total > target ? 'warn' : 'good', href: '/r/services' };
+      /* THE LINK CARRIES THE SAME FILTER THE FIGURE DOES. A bare `/r/services` opened sixteen rows
+         summing GBP 3,254.80 under a tile reading GBP 2,906.80 and `good` — the difference being a
+         cancelled service, absent from the figure and enough on its own to cross the target. */
+      return { id, label: 'Cost per year', value: money(Math.round(total), CURRENCY), note: `target ≤ ${money(target, CURRENCY)}`, tone: total > target ? 'warn' : 'good', href: '/r/services?f=state:is:live%20or%20lapsing' };
     }
     case 'lapsing': {
       const rows = services.filter((e) => e.fields.state === 'lapsing');
@@ -629,7 +632,14 @@ export function metric(id: string): Metric {
 
 /** The values a page's `{{path}}` interpolations resolve to, pre-resolved server-side (22 §5). */
 export function values(): Record<string, string> {
-  const overdue = (ROWS.obligations ?? []).filter((e) => open(e) && days(e.fields.due) < 0);
+  /* OWED TO YOU, and the direction is the whole of it. The only sentence that consumes this path is
+     about statutory interest on a receivable, and the minimum was taken over overdue rows in BOTH
+     directions — so the Money page printed the age of a bill YOU owe, in the alarm colour, under a
+     sentence about interest you can charge somebody else. Shown 2mo; the oldest overdue receivable
+     is 5w. A path is named after what it means or it means whatever the first caller assumed. */
+  const overdue = (ROWS.obligations ?? []).filter(
+    (e) => open(e) && e.fields.direction === 'owed_to_me' && days(e.fields.due) < 0,
+  );
   const oldest = overdue.map((e) => String(e.fields.due)).sort()[0];
   return {
     'obligations.oldest_overdue': oldest ?? '',

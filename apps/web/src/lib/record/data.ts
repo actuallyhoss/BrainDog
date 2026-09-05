@@ -667,7 +667,11 @@ export const PAGES: Record<string, PageDecl> = {
         span: 6,
         /* WRITTEN DOWN, because it used to live in the reader as a filter keyed on
            register-and-kind. The heading says ninety days and now the declaration does too. */
-        where: 'state is not cancelled, renews before +90d',
+        /* BOUNDED AT BOTH ENDS. A window with an upper bound and no lower one sorts a renewal that
+           already lapsed to the top of a list headed "Next ninety days" — the same defect the two
+           30-day money tiles were bounded below to fix. `after yesterday` is exclusive, so today
+           still counts. */
+        where: 'state is not cancelled, renews after yesterday, renews before +90d',
         columns: [{ field: 'renews' }, { field: 'name' }, { field: 'provider' }],
         source: 'register.services',
         order: [{ field: 'renews', dir: 'asc' }],

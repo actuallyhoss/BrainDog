@@ -11,8 +11,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { runway, trend } from './forecast.ts';
-import { PAGES, ROWS } from './data.ts';
+import { NOW, PAGES, ROWS } from './data.ts';
 import { page } from './api.ts';
+import { magnitudeOf } from 'braindog-render';
 
 /* ── the walk ────────────────────────────────────────────────────────────── */
 
@@ -58,11 +59,33 @@ test('a longer horizon is a superset: it never loses a movement', () => {
   for (const s of near) assert.ok(far.has(s), `${s} vanished when the horizon grew`);
 });
 
-test('nothing before today is in the walk', () => {
-  // An overdue invoice is a fact about the present, not a movement still to come. Counting it again
-  // in the future would double it.
-  const today = new Date().toISOString().slice(0, 10);
-  for (const s of runway(0, 365).steps) assert.ok(s.day >= today.slice(0, 4), 'a step predates the walk');
+test('AN OVERDUE OBLIGATION IS STILL A MOVEMENT, and it moves today', () => {
+  // It used to be dropped, on the argument that an overdue invoice is a fact about the present
+  // rather than a movement still to come. That is true of a PAID one — and the walk already filters
+  // to open and part, so what it dropped was four rows of money that has not moved yet. The Runway
+  // tile read 116 days where the truth is 93, and named a different row as the one that does it.
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const late = (ROWS.obligations ?? []).filter(
+    (e) => (e.fields.state === 'open' || e.fields.state === 'part') && String(e.fields.due) < today,
+  );
+  assert.ok(late.length > 0, 'the seed needs an overdue obligation for this to mean anything');
+
+  const steps = runway(0, 365).steps;
+  for (const row of late) {
+    const step = steps.find((s) => s.href === `/r/obligations/${row.seq}`);
+    assert.ok(step, `${row.fields.what} is overdue, open, and not in the walk`);
+    assert.equal(step.day, today, 'an overdue movement is dated in the past, so the walk is out of order');
+    assert.match(step.label, /overdue/, 'nothing on the row says why it is dated today');
+  }
+  for (const s of steps) assert.ok(s.day >= today, `${s.day} predates the walk`);
+});
+
+test('and counting it changes the answer, in the direction it should', () => {
+  // Net overdue on the seed is negative, so admitting it can only shorten the runway. A test that
+  // just says "the number changed" would pass if the sign were wrong.
+  const withThem = runway(4_200_000);
+  assert.ok(withThem.days !== null);
+  assert.ok(withThem.days < 116, `runway is ${withThem.days} days; dropping the overdue rows gave 116`);
 });
 
 test('a large enough opening balance never crosses', () => {
@@ -105,8 +128,15 @@ test('the crossing is ONE row, and the rest of the year is not the same colour',
     const at = block.rows.findIndex((r) => r.tone === 'bad');
     assert.ok(at >= 0, 'the widened window does not reach the crossing, so nothing is being tested');
     assert.equal(block.rows.filter((r) => r.tone === 'bad').length, 1, 'more than one row is drawn as the crossing');
-    for (const r of block.rows.slice(at + 1)) assert.equal(r.tone, 'warn', 'a row after the crossing lost its state');
-    for (const r of block.rows.slice(0, at)) assert.equal(r.tone, undefined, 'a row before the crossing was coloured');
+    /* `warn` is STILL UNDER, not "after the crossing" — the balance recovers when a receivable
+       lands, and a row back in the black is not a warning. Read from the drawn balance column, so
+       what is asserted is what somebody sees. */
+    block.rows.forEach((r, i) => {
+      if (i === at) return;
+      const balance = magnitudeOf(r.cells[3] ?? '');
+      assert.equal(r.tone, balance < 0 ? 'warn' : undefined, `row ${i} (${r.cells[1]}) carries the wrong tone`);
+    });
+    assert.ok(block.rows.some((r) => magnitudeOf(r.cells[3] ?? '') < 0), 'no row is under, so nothing is tested');
   } finally {
     // Put it back exactly as it was, including not being set: an optional property assigned
     // `undefined` is not an absent one.

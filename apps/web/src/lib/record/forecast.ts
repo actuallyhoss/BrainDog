@@ -111,15 +111,25 @@ export function runway(opening: number, horizon = 180): Runway {
   for (const row of ROWS.obligations ?? []) {
     const state = String(row.fields.state ?? '');
     if (state !== 'open' && state !== 'part') continue;
-    const day = String(row.fields.due ?? '');
-    const at = noon(day);
-    if (!Number.isFinite(at) || at < NOW || at > until) continue;
+    const due = String(row.fields.due ?? '');
+    const at = noon(due);
+    if (!Number.isFinite(at) || at > until) continue;
+
+    /* AN OVERDUE OBLIGATION IS STILL A MOVEMENT. This dropped anything dated before today, on the
+       argument that an overdue invoice is a fact about the present rather than a movement still to
+       come. That is true of a PAID one, and the walk already filters to open and part — so what it
+       actually dropped was four rows of money that has not moved yet, and the tile read 116 days
+       where the truth is 93, naming a different row as the one that does it.
+       The date is clamped to today rather than kept, so the walk stays in order and a balance that
+       is already gone is gone at the top of it; the label says which rows those are. */
+    const late = at < NOW;
+    const day = late ? new Date(NOW).toISOString().slice(0, 10) : due;
     const owed = String(row.fields.direction ?? '') === 'owed_to_me';
     movements.push({
-      at,
+      at: late ? NOW : at,
       step: {
         day,
-        label: String(row.fields.what ?? ''),
+        label: `${String(row.fields.what ?? '')}${late ? ' · overdue' : ''}`,
         delta: owed ? Number(row.fields.amount ?? 0) : -Number(row.fields.amount ?? 0),
         source: 'obligation',
         href: `/r/obligations/${row.seq}`,

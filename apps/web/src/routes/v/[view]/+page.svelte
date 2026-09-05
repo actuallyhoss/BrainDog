@@ -15,7 +15,7 @@
   import { page } from '$app/state';
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { iconFor, REGISTERS, columnsFor, list, toRows, type Filter } from '$lib/record/api.ts';
+  import { iconFor, REGISTERS, columnsFor, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -25,19 +25,28 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PAGES } from '$lib/record/data.ts';
 
-  /** A register's named predicate, never a free-form slug. */
-  const VIEWS: Record<string, { register: string; name: string; filters: Filter[]; says: string }> = {
+  /**
+   * A register's named predicate, never a free-form slug.
+   *
+   * THE SENTENCE IS DERIVED, NOT TYPED. It used to be a `says:` string beside the filters, and the
+   * two disagreed: Overdue printed "state is open or part, and due is before today" above a list
+   * that only filtered on state, so 28 rows were drawn under the word Overdue and 24 of them were
+   * not overdue — row four was due in four days. A printed predicate that is not the predicate is
+   * worse than none, because it is checkable and wrong.
+   */
+  const VIEWS: Record<string, { register: string; name: string; filters: Filter[] }> = {
     'obligations.overdue': {
       register: 'obligations',
       name: 'Overdue',
-      filters: [{ field: 'state', op: 'in', values: ['open', 'part'] }],
-      says: 'state is open or part, and due is before today',
+      filters: [
+        { field: 'state', op: 'in', values: ['open', 'part'] },
+        { field: 'due', op: 'before', values: ['today'] },
+      ],
     },
     'services.lapsing': {
       register: 'services',
       name: 'Lapsing',
       filters: [{ field: 'state', op: 'in', values: ['lapsing'] }],
-      says: 'state is lapsing',
     },
   };
 
@@ -84,14 +93,14 @@
     bind:open={binding}
     register={view.register}
     predicate={view.name}
-    says={view.says}
+    says={whereOf(view.filters)}
     onbind={(target, kind) => toasts.push(copy.bound(kind, PAGES[target]?.title ?? target), { intent: 'warn' })}
   />
 
   <div class="page">
     <p class="predicate">
       <span class="predicate-label">Filter</span>
-      <code>{view.says}</code>
+      <code>{whereOf(view.filters)}</code>
     </p>
 
     <Table
