@@ -91,6 +91,18 @@ importers:
 
   packages/ports: {}
 
+  packages/record:
+    dependencies:
+      '@braindog/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../ports
+      '@braindog/where':
+        specifier: workspace:*
+        version: link:../where
+
   packages/render:
     dependencies:
       svelte:
