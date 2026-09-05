@@ -19,6 +19,7 @@
 import type { Sql } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
+import { backoffMs, openChangeSuggestion, summary, type AckDeps } from './outbox.ts';
 
 const DAY_MS = 86_400_000;
 const OFFSET = /^([+-]?)(\d{1,4})([dwm])$/;
@@ -197,3 +198,135 @@ export const due = (sql: Sql, now: number, limit = 100) =>
     iso(now),
     limit,
   );
+
+/* ── the alarm handler ──────────────────────────────────────────── */
+
+/** The ten the DDL's `CHECK` admits. */
+export const SCHEDULE_KINDS = [
+  'digest',
+  'reminder',
+  'rule',
+  'retry',
+  'purge',
+  'rotate',
+  'pull',
+  'analyse',
+  'score',
+  'snapshot',
+] as const;
+
+export type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
+
+export type Claimed = { id: string; kind: string; key: string; payload: string; attempts: number; due_at: string };
+
+/**
+ * What one kind of row DOES when its time comes.
+ *
+ * The return value is the next `due_at` in milliseconds for a row that recurs, or `null` for a
+ * one-shot. A throw is a failure, and the ladder below catches it — which is the only way a handler
+ * gets to be written as if nothing goes wrong.
+ */
+export type Handler = (row: Claimed) => number | null;
+
+export type Drained = { claimed: number; done: number; failed: number; dead: number };
+
+const CEILING = 8;
+
+/**
+ * Fire everything that is due, once.
+ *
+ * CLAIM BEFORE WORK, IN ONE STATEMENT. An alarm handler can be re-entered — a platform guarantees
+ * delivery, not exactly-once — so the conditional `UPDATE` is what makes a second entry find nothing
+ * to do rather than send the same email twice.
+ *
+ * A HUNDRED AT A TIME. The whole due set is not drained in one wake if it is huge: the caller re-arms
+ * to the new minimum, which is still in the past, and fires again. That keeps any single invocation
+ * inside a CPU budget instead of discovering the ceiling in production.
+ *
+ * BACKOFF, CAPPED, AND THEN VISIBLE. Doubling minutes to six hours, and at the eighth attempt the row
+ * is `failed` and a suggestion opens. A reminder that silently gave up is worse than one that never
+ * existed — the person it was about has no way to know the difference, and acts as though it fired.
+ */
+export function drainSchedule(
+  sql: Sql,
+  deps: AckDeps,
+  handlers: Partial<Record<ScheduleKind, Handler>>,
+  limit = 100,
+): Drained {
+  const claimed = sql.all<Claimed>(
+    `UPDATE schedule SET state = 'firing'
+     WHERE id IN (SELECT id FROM schedule WHERE state = 'pending' AND due_at <= ? ORDER BY due_at LIMIT ?)
+     RETURNING id, kind, key, payload, attempts, due_at`,
+    new Date(deps.nowMs).toISOString(),
+    Math.max(0, Math.floor(limit)),
+  );
+
+  const out: Drained = { claimed: claimed.length, done: 0, failed: 0, dead: 0 };
+
+  for (const row of claimed) {
+    const handler = handlers[row.kind as ScheduleKind];
+    if (!handler) {
+      /* A KIND WITH NO HANDLER DOES NOT WALK THE LADDER. Retrying code that does not exist eight
+         times is not a retry — it is eight hours of pretending. The row fails once, and the
+         suggestion says which kind nothing answers to. */
+      fail(sql, deps, row, `Nothing in this record handles a ${row.kind} row.`, CEILING);
+      out.dead++;
+      continue;
+    }
+
+    let next: number | null;
+    try {
+      next = handler(row);
+    } catch (e) {
+      fail(sql, deps, row, e instanceof Error ? e.message : String(e), row.attempts + 1);
+      out.failed++;
+      continue;
+    }
+
+    if (next === null) sql.exec("UPDATE schedule SET state = 'done' WHERE id = ?", row.id);
+    else
+      sql.exec(
+        "UPDATE schedule SET state = 'pending', due_at = ?, attempts = 0 WHERE id = ?",
+        new Date(next).toISOString(),
+        row.id,
+      );
+    out.done++;
+  }
+
+  return out;
+}
+
+/** One rung of the ladder, or the end of it. */
+function fail(sql: Sql, deps: AckDeps, row: Claimed, error: string, attempts: number): void {
+  if (attempts < CEILING) {
+    sql.exec(
+      "UPDATE schedule SET state = 'pending', attempts = ?, due_at = ? WHERE id = ?",
+      attempts,
+      new Date(deps.nowMs + backoffMs(attempts)).toISOString(),
+      row.id,
+    );
+    return;
+  }
+  sql.exec("UPDATE schedule SET state = 'failed', attempts = ? WHERE id = ?", attempts, row.id);
+  openChangeSuggestion(sql, deps, {
+    declarationId: `kernel.schedule.${row.kind}`,
+    from: { kind: row.kind, key: row.key, error, attempts, payload: summary(row.payload) },
+    question: `A ${row.kind} due ${row.due_at.slice(0, 10)} could not run after ${attempts} attempts: ${error}. Retry it, or change what produces it.`,
+  });
+}
+
+/**
+ * `retry`: put an outbox job back where the deliverer can lease it.
+ *
+ * The whole retry ladder for the outbox is these four words. It is here rather than in the outbox
+ * because the schedule already owns backoff, the ceiling and the visible item — and a second copy
+ * of that in the outbox is how one notification ends up with two ladders and no owner.
+ */
+export const retryHandler =
+  (sql: Sql): Handler =>
+  (row) => {
+    const { outbox } = JSON.parse(row.payload) as { outbox?: string };
+    if (outbox)
+      sql.exec("UPDATE outbox SET state = 'pending', leased_until = NULL WHERE id = ? AND state = 'failed'", outbox);
+    return null;
+  };

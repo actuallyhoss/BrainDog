@@ -67,6 +67,42 @@ export function openSqlite(path = ':memory:'): NodeSql {
   return sql;
 }
 
+/**
+ * The `Scheduler` port, recording what it was asked to do.
+ *
+ * A stub rather than a spy on a real alarm, because what the tests are about is the INVARIANT — the
+ * alarm is the earliest pending row or it is not set — and that is a statement about the calls, not
+ * about a platform.
+ */
+export function recordingScheduler() {
+  let at: number | null = null;
+  const calls: string[] = [];
+  return {
+    calls,
+    get armed(): number | null {
+      return at;
+    },
+    get: () => {
+      calls.push('get');
+      return Promise.resolve(at);
+    },
+    set: (ms: number) => {
+      calls.push(`set:${ms}`);
+      at = ms;
+      return Promise.resolve();
+    },
+    clear: () => {
+      calls.push('clear');
+      at = null;
+      return Promise.resolve();
+    },
+    wake: () => {
+      calls.push('wake');
+      return Promise.resolve();
+    },
+  };
+}
+
 /** A clock a test can move. Real time in a test is a test that is slow and flaky in one move. */
 export const fixedClock = (ms: number) => {
   let at = ms;

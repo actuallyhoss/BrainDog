@@ -15,7 +15,7 @@
  * an RPC and an exception does not survive the trip with its sentence intact.
  */
 
-import type { Clock, Refusal, Result, Sql } from '@braindog/ports';
+import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { openRecord, type Entry, type Kernel, type Patch, type RegisterDecl } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
@@ -112,14 +112,38 @@ export function reaches(ctx: CallContext, register: string): Refusal | null {
 
 export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 
-export type RecordDeps = { sql: Sql; clock: Clock };
+export type RecordDeps = {
+  sql: Sql;
+  clock: Clock;
+  /**
+   * The alarm. Optional, because the record is testable and readable without one — but a host that
+   * omits it has a record whose reminders never fire.
+   */
+  scheduler?: Scheduler | undefined;
+};
 
 export async function createRecordApi(deps: RecordDeps) {
   const kernel = await openRecord(deps.sql, deps.clock);
-  return { ...api(kernel), kernel };
+  return { ...api(kernel, deps.scheduler), kernel };
 }
 
-function api(kernel: Kernel) {
+function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
+  /**
+   * After every write: re-arm the alarm, then ring the doorbell.
+   *
+   * HERE AND NOT IN THE HOST. An earlier shape hung this off the HTTP layer, which meant a write
+   * that arrived any other way — an MCP tool, a rule, a test, the self-host's own startup — derived
+   * its reminders and armed nothing. The alarm is a fact about the record, so it is re-derived where
+   * the record is written, and there is exactly one place that does it.
+   *
+   * It runs whether the write succeeded or was refused: a refusal changed nothing, so the tail is
+   * one read and no calls — and a tail that only ran on success is a tail somebody has to remember
+   * to think about.
+   */
+  const tail = async <T>(out: T): Promise<T> => {
+    if (scheduler) await kernel.tail(scheduler);
+    return out;
+  };
   /** Every method starts here: the ladder, then the ceiling, then the work. */
   const guard = (ctx: CallContext, need: Need, register?: string): Refusal | null =>
     allows(ctx, need) ?? (register ? reaches(ctx, register) : null);
@@ -183,7 +207,13 @@ function api(kernel: Kernel) {
     async create(args: { register: string; fields: Patch; note?: string }, ctx: CallContext): Promise<Result<Entry>> {
       const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false, refusal: stop };
-      return kernel.create(args.register, args.fields, { actor: actorOf(ctx), ...(args.note === undefined ? {} : { note: args.note }), ...(ctx.batch === undefined ? {} : { batch: ctx.batch }) });
+      return tail(
+        kernel.create(args.register, args.fields, {
+          actor: actorOf(ctx),
+          ...(args.note === undefined ? {} : { note: args.note }),
+          ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+        }),
+      );
     },
 
     async update(
@@ -192,12 +222,14 @@ function api(kernel: Kernel) {
     ): Promise<Result<Entry>> {
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
-      return kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
-        actor: actorOf(ctx),
-        ...(args.version === undefined ? {} : { version: args.version }),
-        ...(args.note === undefined ? {} : { note: args.note }),
-        ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-      });
+      return tail(
+        kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
+          actor: actorOf(ctx),
+          ...(args.version === undefined ? {} : { version: args.version }),
+          ...(args.note === undefined ? {} : { note: args.note }),
+          ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+        }),
+      );
     },
 
     /** A row's history: the writes that made it, each with who and when. */

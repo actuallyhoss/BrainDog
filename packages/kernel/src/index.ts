@@ -16,7 +16,7 @@
  * the rows that made it rather than a reconstruction.
  */
 
-import type { Clock, Result, Sql } from '@braindog/ports';
+import type { Clock, Result, Scheduler, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } from './coerce.ts';
@@ -26,7 +26,18 @@ import { compile, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, retireDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 import { exportDogl, importDogl, type Section } from './dogl.ts';
-import { due, pendingWork, reschedule, type Remindable } from './schedule.ts';
+import {
+  drainSchedule,
+  due,
+  pendingWork,
+  reschedule,
+  retryHandler,
+  type Drained,
+  type Handler,
+  type Remindable,
+  type ScheduleKind,
+} from './schedule.ts';
+import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
@@ -38,6 +49,10 @@ export { TRAVELS, decode, encode, projection, tables } from './dogl.ts';
 export { atMs, expandRepeat, offsetMs, remindersFor } from './schedule.ts';
 export type { Remindable, Repeat, Reminder } from './schedule.ts';
 export type { ImportReport, Section, TableShape } from './dogl.ts';
+export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';
+export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
+export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
+export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
 export type { Declaration, DeclKind, Installed } from './declare.ts';
 
@@ -528,6 +543,54 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
     return id;
   }
 
+  /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
+  const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
+
+  async function tail(scheduler: Scheduler): Promise<void> {
+    const work = pendingWork(sql);
+    try {
+      const armed = await scheduler.get();
+      if (work.nextDueMs === null) {
+        if (armed !== null) await scheduler.clear();
+      } else if (armed !== work.nextDueMs) await scheduler.set(work.nextDueMs);
+    } finally {
+      if (work.outboxPending) await scheduler.wake();
+    }
+  }
+
+  /**
+   * What each kind of schedule row does when its time comes.
+   *
+   * The eight that are not here — `digest`, `rule`, `purge`, `rotate`, `pull`, `analyse`, `score`,
+   * `snapshot` — each wait on a subsystem this record does not have yet. A row of one of those kinds
+   * fails ONCE with a sentence naming the kind rather than walking eight hours of a ladder, which is
+   * the honest behaviour: it says the record cannot do this, instead of looking like it is trying.
+   */
+  const HANDLERS: Partial<Record<ScheduleKind, Handler>> = {
+    retry: retryHandler(sql),
+    reminder: (row) => {
+      const p = JSON.parse(row.payload) as { entry?: string; register?: string; field?: string; at?: string };
+      const entry = p.entry ? byId(p.entry) : null;
+      /* THE ROW MOVED ON. A reminder is derived from a date, and the date is gone or the row is — so
+         the reminder is about nothing. Dropping it is right; firing it is the failure this whole
+         design exists to avoid. */
+      if (!entry || !p.field || entry.fields[p.field] === undefined) return null;
+
+      const decl = registers.get(entry.register);
+      const title = decl ? String(entry.fields[decl.title] ?? entry.id) : entry.id;
+      const say = `${title} · ${p.field} ${String(entry.fields[p.field])}`.slice(0, 120);
+      appendEvent({
+        kind: 'note',
+        target: entry.id,
+        register: entry.register,
+        actor: 'system',
+        note: say,
+        at: instant(clock.now()),
+      });
+      return null;
+    },
+  };
+
   /** Every event about one row, oldest first: the row's history is the rows that made it. */
   const history = (target: string) =>
     sql.all<{ id: string; ts: string; actor: string; kind: string; note: string | null }>(
@@ -572,6 +635,47 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState) {
 
     /** The reminders that are due, oldest first. What the alarm hands to whatever sends them. */
     due: (limit?: number) => due(sql, clock.now(), limit),
+
+    /* ── the outbox: work that must leave the record ────────────────────── */
+
+    /**
+     * Queue one job, in the caller's transaction.
+     *
+     * THE RECORD MAKES NO OUTBOUND CALL — that is the rule the object model rests on. A write that
+     * needs the world to hear about it inserts a row here and commits; something else delivers it.
+     */
+    outbox: (kind: OutboxKind, payload: unknown) => transaction(() => enqueue(sql, mint, clock.now(), kind, payload)),
+
+    /** Claim up to `n` jobs of these kinds. One statement, so a double drain finds nothing. */
+    leaseOutbox: (kinds: readonly OutboxKind[], n = 10) => transaction(() => lease(sql, clock.now(), kinds, n)),
+
+    /** Finish one. `failed` walks the ladder; the eighth failure is `dead` and opens an item. */
+    ackOutbox: (args: Ack) => transaction(() => ack(sql, ackDeps(), args)),
+
+    /**
+     * Fire everything that is due, once.
+     *
+     * The scheduler is optional because the kernel is testable without one, and it is passed rather
+     * than held because arming an alarm is an async storage operation on a Durable Object — it
+     * cannot sit inside `transactionSync`, so it runs after the transaction commits.
+     */
+    async drain(scheduler?: Scheduler, limit = 100): Promise<Drained> {
+      try {
+        return transaction(() => drainSchedule(sql, ackDeps(), HANDLERS, limit));
+      } finally {
+        /* IN A `finally`, ALWAYS. A handler that throws before re-arming stops the customer's entire
+           schedule forever, which is the single worst bug this subsystem can have. */
+        if (scheduler) await tail(scheduler);
+      }
+    },
+
+    /**
+     * Re-arm the alarm to the earliest pending row, then ring the doorbell.
+     *
+     * IDEMPOTENT, and in this order. The alarm is read before it is set, so a tail that changed
+     * nothing costs one read; the doorbell is last because it is the only I/O the record performs.
+     */
+    tail,
 
     /**
      * The record as a file: `.dogl` lines, header first, `local` left behind.

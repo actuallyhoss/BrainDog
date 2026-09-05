@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@braindog/host": "workspace:*",
+    "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*"
   },

@@ -42,6 +42,46 @@ export interface Clock {
   now(): number;
 }
 
+/**
+ * The alarm, as a port.
+ *
+ * ONE ALARM PER CUSTOMER, always set to the earliest pending row or not set at all. That invariant
+ * is what an object per customer buys: the alternative is a cron worker fanning out across every
+ * tenant, waking records that have nothing to do in order to ask them.
+ *
+ * `wake()` IS NOT PART OF THE ALARM — it is the outbox doorbell, and it is the one piece of I/O a
+ * record performs. A lost doorbell costs latency and never a notification, because the outbox row is
+ * still `pending` and the next request drains it.
+ */
+export interface Scheduler {
+  /** When the alarm is currently set for, or `null` if it is not set. */
+  get(): Promise<number | null>;
+  set(atMs: number): Promise<void>;
+  clear(): Promise<void>;
+  /** Tell whatever drains the outbox that there is something in it. Never carries the payload. */
+  wake(): Promise<void>;
+}
+
+/**
+ * The alarm, as a port.
+ *
+ * ONE ALARM PER CUSTOMER, always set to the earliest pending row or not set at all. That invariant
+ * is what an object per customer buys: the alternative is a cron worker fanning out across every
+ * tenant, waking records that have nothing to do in order to ask them.
+ *
+ * `wake()` IS NOT PART OF THE ALARM — it is the outbox doorbell, and it is the one piece of I/O a
+ * record performs. A lost doorbell costs latency and never a notification, because the outbox row is
+ * still `pending` and the next request drains it.
+ */
+export interface Scheduler {
+  /** When the alarm is currently set for, or `null` if it is not set. */
+  get(): Promise<number | null>;
+  set(atMs: number): Promise<void>;
+  clear(): Promise<void>;
+  /** Tell whatever drains the outbox that there is something in it. Never carries the payload. */
+  wake(): Promise<void>;
+}
+
 /** A page boundary: what a list hands back so the next call resumes where it stopped. */
 export type Cursor = string | null;
 

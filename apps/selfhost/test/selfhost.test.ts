@@ -160,3 +160,128 @@ test('with a token set, a request without it is refused before it reaches the re
     s.clean();
   }
 });
+
+/* ── the alarm and the doorbell ──────────────────────────────────── */
+
+const REMINDING = {
+  id: 'register.renewals',
+  kind: 'register' as const,
+  body: {
+    id: 'renewals',
+    name: 'Renewals',
+    title: 'what',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'on', type: 'day', remind: ['-7d'] },
+    ],
+  } as never,
+};
+
+const owner = { principal: { kind: 'person' as const, id: 'p_self', level: 'owner' as const } };
+const day = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
+
+test('A WRITE THAT MAKES A REMINDER ARMS THE ALARM, without being asked to', async () => {
+  // The invariant the whole subsystem rests on: the alarm is the earliest pending row or there is no
+  // alarm. A record that has to be told to arm has one path that forgets, and that path is silent.
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
+  const at = port++;
+  const running = await start({ file: join(dir, 'record.sqlite'), port: at, pollMs: 0 });
+  try {
+    assert.ok((await running.api.kernel.install([REMINDING])).ok);
+    assert.equal(await running.scheduler.get(), null, 'a record with nothing to do armed an alarm');
+
+    const res = await fetch(`http://127.0.0.1:${at}/api/create`, {
+      method: 'POST',
+      body: JSON.stringify({ register: 'renewals', fields: { what: 'brain.dog', on: day(30) } }),
+    });
+    assert.equal(res.status, 200);
+
+    const armed = await running.scheduler.get();
+    assert.ok(armed !== null, 'the write derived a reminder and armed nothing');
+    assert.equal(new Date(armed).toISOString().slice(0, 10), day(23), 'the alarm is set for the wrong reminder');
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting for a request', async () => {
+  // The failure this is about: a self-host switched off over a weekend, whose Monday reminders wait
+  // until somebody happens to touch the record — and then arrive stamped Monday, three days late.
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
+  const file = join(dir, 'record.sqlite');
+  const first = await start({ file, port: port++, pollMs: 0 });
+  try {
+    assert.ok((await first.api.kernel.install([REMINDING])).ok);
+    await first.api.create({ register: 'renewals', fields: { what: 'brain.dog', on: day(30) } }, owner);
+    assert.ok((await first.scheduler.get()) !== null);
+    /* The weekend, as one statement: the reminder's time came while nothing was running. */
+    first.sql.exec('UPDATE schedule SET due_at = ?', new Date(Date.now() - 60_000).toISOString());
+  } finally {
+    await first.close();
+  }
+
+  const again = await start({ file, port: port++, pollMs: 0 });
+  try {
+    const armed = await again.scheduler.get();
+    assert.ok(armed !== null, 'a reopened record armed nothing, so its schedule never restarts');
+    assert.ok(armed <= Date.now(), 'the alarm was set to the future for a reminder already due');
+
+    await again.drain();
+    const notes = again.api.kernel.history(again.api.kernel.get('renewals#1')!.id).filter((e) => e.kind === 'note');
+    assert.equal(notes.length, 1, 'the due reminder did not fire on reopen');
+    assert.equal(await again.scheduler.get(), null, 'the drained schedule left an alarm behind');
+  } finally {
+    await again.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('THE DOORBELL DELIVERS, AND A FAILED DELIVERY WALKS THE RECORD\'S LADDER AND NOT ITS OWN', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
+  const sent: string[] = [];
+  let fail = true;
+  const running = await start({
+    file: join(dir, 'record.sqlite'),
+    port: port++,
+    pollMs: 0,
+    deliver: async (job) => {
+      if (fail) throw new Error('smtp said 550');
+      sent.push(job.kind);
+    },
+  });
+  try {
+    running.api.kernel.outbox('notify.email', { to: 'p_self', subject: 'Invoice 41' });
+    await running.scheduler.wake();
+
+    // The delivery failed, so nothing was sent and a retry is armed — in the record's schedule.
+    assert.deepEqual(sent, []);
+    assert.ok(running.api.kernel.pending().nextDueMs !== null, 'a failed delivery armed no retry');
+
+    // The retry fires, the job goes back to `pending`, and this time it lands. Its two minutes are
+    // wound forward here rather than waited out — a test that sleeps is slow and flaky in one move.
+    fail = false;
+    running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'retry'", new Date(Date.now() - 1_000).toISOString());
+    await running.api.kernel.drain(running.scheduler);
+    await running.scheduler.wake();
+    assert.deepEqual(sent, ['notify.email'], 'the retried job was never delivered');
+    assert.equal(running.api.kernel.pending().outboxPending, false, 'a delivered job is still queued');
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('with no deliverer, jobs queue and wait — which is honest rather than lossy', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
+  const running = await start({ file: join(dir, 'record.sqlite'), port: port++, pollMs: 0 });
+  try {
+    running.api.kernel.outbox('notify.email', {});
+    await running.scheduler.wake();
+    await running.poll();
+    assert.equal(running.api.kernel.pending().outboxPending, true, 'a job vanished with nothing to deliver it');
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

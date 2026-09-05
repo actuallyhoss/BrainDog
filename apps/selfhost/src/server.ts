@@ -16,8 +16,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
 import { handlersFor, serveApi, type Handler } from '@braindog/host';
+import type { OutboxKind, OutboxRow } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
-import type { Param, Row, Sql } from '@braindog/ports';
+import type { Param, Row, Scheduler, Sql } from '@braindog/ports';
 
 /** The `Sql` port over `node:sqlite`. The one thing this file exists to supply. */
 function openSqlite(path: string): Sql & { close(): void } {
@@ -64,9 +65,141 @@ function contextFor(request: Request, token: string | undefined): CallContext | 
   return sent === token ? { principal: { kind: 'person', id: 'p_self', level: 'owner' } } : null;
 }
 
-export async function start(options: { file: string; port: number; token?: string | undefined }) {
+/**
+ * What delivers one outbox job. The self-host's whole outbound surface, in one function.
+ *
+ * A record makes no outbound call, so somebody has to — and on a self-host that somebody is this
+ * process, after the transaction committed. It returns nothing on success and throws on failure,
+ * because the retry ladder is the record's and a deliverer that decided its own retries would be the
+ * second ladder [09-ALARMS] spends a paragraph forbidding.
+ */
+export type Deliver = (job: OutboxRow) => Promise<void>;
+
+export type Started = Awaited<ReturnType<typeof start>>;
+
+/**
+ * The `Scheduler` port over `setTimeout`.
+ *
+ * IDENTICAL SEMANTICS TO THE DURABLE OBJECT'S ALARM, which is the point: one alarm, always set to
+ * the earliest pending row or not set at all. The Worker gets that from the platform and this gets
+ * it from a timer, and the code above the port cannot tell.
+ *
+ * `wake()` IS NOT A NO-OP HERE. An earlier way of thinking about this made it one — the poller
+ * shares the process, so what is there to wake? — and that is exactly wrong: sharing a process is
+ * not being woken, and a job that waits fifteen seconds for the next tick when the record already
+ * knows it is there is fifteen seconds of latency nobody chose.
+ */
+function nodeScheduler(run: () => Promise<void>, poll: () => Promise<void>): Scheduler & { stop(): void } {
+  /* Node's timer overflows past 2^31 ms and fires IMMEDIATELY, which for a yearly renewal reminder
+     would be a notification a year early rather than a year late. Clamped, and re-armed on arrival. */
+  const CEILING_MS = 2 ** 31 - 1;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let at: number | null = null;
+  let stopped = false;
+
+  const clear = (): void => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    at = null;
+  };
+
+  return {
+    get: () => Promise.resolve(at),
+    set(atMs: number) {
+      if (stopped) return Promise.resolve();
+      if (timer) clearTimeout(timer);
+      at = atMs;
+      const delay = Math.min(Math.max(0, atMs - Date.now()), CEILING_MS);
+      timer = setTimeout(() => {
+        timer = null;
+        at = null;
+        void run();
+      }, delay);
+      timer.unref?.();
+      return Promise.resolve();
+    },
+    clear: () => (clear(), Promise.resolve()),
+    wake: () => (stopped ? Promise.resolve() : poll()),
+    stop() {
+      stopped = true;
+      clear();
+    },
+  };
+}
+
+/** The kinds a self-host can be asked to deliver. The nine minus nothing: `deliver` decides. */
+const EVERY_KIND: OutboxKind[] = [
+  'notify.email',
+  'notify.push',
+  'notify.webhook',
+  'pull.fetch',
+  'export.r2',
+  'erase.r2',
+  'infer.embed',
+  'infer.prose',
+  'infer.draft',
+];
+
+export async function start(options: {
+  file: string;
+  port: number;
+  token?: string | undefined;
+  /** Omit it and nothing is delivered — jobs queue and wait, which is honest rather than lossy. */
+  deliver?: Deliver | undefined;
+  /** The belt under the doorbell: a tick that catches an abandoned lease. `0` turns it off. */
+  pollMs?: number;
+}) {
   const sql = openSqlite(options.file);
-  const api = await createRecordApi({ sql, clock: { now: () => Date.now() } });
+
+  /* The alarm and the record refer to each other: the record arms the alarm after every write, and
+     the alarm drains the record when it fires. The scheduler is built first and the record is what
+     it drains, which is why this one binding is written before the thing it names exists. */
+  let api!: Awaited<ReturnType<typeof createRecordApi>>;
+
+  /**
+   * Drain everything due, then re-arm.
+   *
+   * `drain` re-arms in a `finally` of its own, so a handler that throws cannot stop the schedule.
+   * The loop back into itself is the batch ceiling: a hundred claimed rows leave the minimum still
+   * in the past, and the alarm is set to now.
+   */
+  const run = async (): Promise<void> => {
+    try {
+      await api.kernel.drain(scheduler);
+    } catch (e) {
+      /* The alarm was re-armed before this reached here. Losing the process to an unhandled
+         rejection would take the server with it, and the row is still `pending`. */
+      console.error('drain:', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /**
+   * Lease, deliver, ack. One pass.
+   *
+   * ONE PASS AND NOT A LOOP, because the ack rings the doorbell again when anything is left — so a
+   * queue that keeps filling is drained by the doorbell rather than by a `while` nobody can stop.
+   */
+  const poll = async (): Promise<void> => {
+    if (!options.deliver) return;
+    let jobs: OutboxRow[];
+    try {
+      jobs = api.kernel.leaseOutbox(EVERY_KIND, 10);
+    } catch (e) {
+      console.error('lease:', e instanceof Error ? e.message : String(e));
+      return;
+    }
+    for (const job of jobs) {
+      try {
+        await options.deliver(job);
+        api.kernel.ackOutbox({ id: job.id, state: 'done' });
+      } catch (e) {
+        api.kernel.ackOutbox({ id: job.id, state: 'failed', error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+  };
+
+  const scheduler = nodeScheduler(run, poll);
+  api = await createRecordApi({ sql, clock: { now: () => Date.now() }, scheduler });
 
   const refused = api.kernel.refused();
   if (refused) {
@@ -78,9 +211,32 @@ export async function start(options: { file: string; port: number; token?: strin
      and not the other — and it throws at start rather than 404ing in production. */
   const handlers = handlersFor(api);
 
+  /* THE BELT UNDER THE DOORBELL. A lost wake costs latency and never a job, because the row is still
+     `pending` — and this tick is what makes that true. It is also what recovers a lease abandoned by
+     a process that died holding it. */
+  const ticker = options.pollMs === 0 ? null : setInterval(() => void poll(), options.pollMs ?? 15_000);
+  ticker?.unref?.();
+
+  /* Arm from what the record already holds. A record reopened after a week has reminders whose time
+     came while nothing was running, and an alarm nobody set is a schedule that never restarts. */
+  await api.kernel.tail(scheduler);
+
   const server = createServer((req, res) => void answer(req, res, handlers, api, options.token));
   await new Promise<void>((resolve) => server.listen(options.port, resolve));
-  return { server, api, sql, close: () => new Promise<void>((r) => server.close(() => (sql.close(), r()))) };
+  return {
+    server,
+    api,
+    sql,
+    scheduler,
+    drain: run,
+    poll,
+    close: () =>
+      new Promise<void>((r) => {
+        scheduler.stop();
+        if (ticker) clearInterval(ticker);
+        server.close(() => (sql.close(), r()));
+      }),
+  };
 }
 
 async function answer(
