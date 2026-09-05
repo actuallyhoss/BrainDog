@@ -343,3 +343,74 @@ test('AND NO TOKEN CHANGES WHAT A RECORD IS, whatever its scope', async () => {
   assert.ok((await api.packs(token('read'))).ok);
   sql.close();
 });
+
+/* ── the four a caller needs and could not ask for ───────────────── */
+
+test('AN AGENT CAN ASK WHAT IT MAY DO, instead of finding out by being refused', async () => {
+  /* An agent that cannot ask works the answer out one refusal at a time, in front of whoever is
+     watching, and the answer it works out that way is a guess it acts on for three more turns. */
+  const { api, sql } = await record();
+
+  const me = value<{ kind: string; level: string; scope: string | null; may: string[]; registers: string[] | null }>(
+    await api.whoami(owner),
+  );
+  assert.equal(me.kind, 'person');
+  assert.equal(me.level, 'owner');
+  assert.equal(me.scope, null);
+  assert.deepEqual(me.may, ['read', 'propose', 'append', 'write', 'decide', 'owner']);
+  assert.equal(me.registers, null, 'all of them and none of them must not be one value');
+
+  /* THE INTERSECTION, not the token's scope. A write token held by somebody with read access reads,
+     and reporting the scope alone would be reporting the half that is not binding. */
+  const held = value<{ scope: string | null; person: string | null; may: string[] }>(await api.whoami(token('write', 'read')));
+  assert.equal(held.scope, 'write');
+  assert.equal(held.person, 'p_1');
+  assert.deepEqual(held.may, ['read']);
+
+  const scoped = value<{ registers: string[] | null }>(await api.whoami({ ...owner, registers: ['obligations'] }));
+  assert.deepEqual(scoped.registers, ['obligations']);
+  sql.close();
+});
+
+test('A NOTE CHANGES NOTHING AND IS STILL A WRITE', async () => {
+  const { api, sql } = await record();
+  value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }, owner));
+
+  assert.ok((await api.log({ register: 'obligations', seq: 1, note: 'Chased by phone.' }, owner)).ok);
+  assert.equal(
+    sql.one<{ note: string; actor: string }>("SELECT note, actor FROM event WHERE kind = 'edit' ORDER BY rowid DESC LIMIT 1")?.note,
+    'Chased by phone.',
+  );
+  assert.equal(api.kernel.get('obligations#1')?.fields.state, 'open', 'a note changed a field');
+
+  // It answers to the same permission as the write it is.
+  assert.equal((await api.log({ register: 'obligations', seq: 1, note: 'x' }, person('read'))).ok, false);
+  assert.equal((await api.log({ register: 'obligations', seq: 1, note: '  ' }, owner)).ok, false);
+  assert.equal((await api.log({ register: 'obligations', seq: 1, note: 'x'.repeat(281) }, owner)).ok, false);
+  sql.close();
+});
+
+test('A READ MARK BELONGS TO A PERSON, and is never an event', async () => {
+  /* An agent polling a record has no attention to mark, and letting a token move it would mean a
+     person coming back to a record their own agent had marked as read. */
+  const { api, sql } = await record();
+  assert.ok(
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok,
+  );
+  const before = sql.all('SELECT 1 FROM event').length;
+
+  const out = value<{ seen_at: string | null }>(await api.markRead(owner));
+  assert.ok(out.seen_at, 'nothing was marked');
+  assert.equal(sql.all('SELECT 1 FROM event').length, before, 'a read became a write to the record');
+
+  const tried = await api.markRead(token('write'));
+  assert.equal(tried.ok, false);
+  assert.equal((tried as { refusal: { code: string } }).refusal.code, 'PERSON_REQUIRED');
+  sql.close();
+});
+
+test('and what the digest would say is asked for without sending it', async () => {
+  const { api, sql } = await record();
+  assert.deepEqual(value<unknown[]>(await api.digestToday({}, token('read'))), [], 'a record with no digest declared says nothing');
+  sql.close();
+});

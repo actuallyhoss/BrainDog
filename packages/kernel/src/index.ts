@@ -54,7 +54,7 @@ import {
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
-import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps } from './digest.ts';
+import { headline, nextOccurrence, noteEvent, runDigest, sectionsOf, type DigestDecl, type DigestDeps, type DigestPart } from './digest.ts';
 import { CREATE_CEILING, dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
@@ -1351,6 +1351,61 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** Take a grant out of service and destroy the bytes. The row stays: what it opened is a fact. */
     revokeGrant: (id: string, actor: string): Result<null> => revokeGrant(sql, vaultDeps(actor), id, transaction),
+
+    /**
+     * What a digest would say if it went now. It sends nothing.
+     *
+     * THE SAME ASSEMBLY THE SCHEDULED ONE USES, and it has to be: a "today" screen computed by a
+     * second code path is a screen that disagrees with the email on the day one of them is wrong,
+     * and the person reading both has no way to tell which. `sectionsOf` is the one assembly, and
+     * this is it without the outbox row on the end.
+     */
+    digestToday: (id?: string) => {
+      const deps = digestDeps();
+      const decls = sql
+        .all<{ id: string; body: string }>(
+          "SELECT id, body FROM declaration WHERE kind = 'digest' AND superseded_at IS NULL AND retired = 0 ORDER BY id",
+        )
+        .map((r) => JSON.parse(r.body) as DigestDecl)
+        .filter((d) => id === undefined || d.digest === id);
+
+      return decls.map((decl) => {
+        const sections = sectionsOf(deps, decl);
+        return {
+          digest: decl.digest,
+          name: decl.name ?? decl.digest,
+          headline: headline(decl.name ?? decl.digest, sections),
+          sections,
+          /* CARRYING, NOT ALL. A section with nothing in it is a line that says "nothing", and a
+             digest of six of those is the thing people mute. */
+          carrying: sections.filter((s: DigestPart) => s.rows.length > 0 || s.reading !== undefined).length,
+        };
+      });
+    },
+
+    /**
+     * The read mark: how far this person has read.
+     *
+     * `MAX()` ONLY, so a phone that was asleep for a week cannot move the mark backwards when it
+     * wakes up and reports where it had got to. And it is NOT an event: a read is not a write to
+     * the record, or every glance at a screen would be a line in somebody's history.
+     */
+    markRead: (person: string, atMs: number): number => {
+      const at = instant(atMs);
+      return transaction(() => {
+        sql.exec(
+          "UPDATE member SET seen_at = MAX(COALESCE(seen_at, ''), ?) WHERE person_id = ? AND register = '*'",
+          at,
+          person,
+        );
+        return Number(sql.one<{ v: number | null }>('SELECT MAX(rowid) AS v FROM event')?.v ?? 0);
+      });
+    },
+
+    /** How far this person had read, or `null` if they have not. */
+    seenAt: (person: string): string | null =>
+      sql.one<{ seen_at: string | null }>("SELECT seen_at FROM member WHERE person_id = ? AND register = '*'", person)
+        ?.seen_at ?? null,
 
     /* ── the decision gate ─────────────────────────────────── */
 

@@ -35,6 +35,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'history', writes: false, what: 'The writes that made one row, in order, each with who and when.' },
   { name: 'search', writes: false, what: 'Rows whose text matches, across every register you can see, best first.' },
   { name: 'version', writes: false, what: "The record's version, so a client can ask what changed since." },
+  { name: 'whoami', writes: false, what: 'Who you are to this record, and which verbs you reach.' },
+  { name: 'digestToday', writes: false, what: 'What the digest would say if it went now. It sends nothing.' },
   { name: 'pages', writes: false, what: 'Every page this record can draw, templates expanded.' },
   { name: 'page', writes: false, what: 'One page, with every block run: rows and figures, never markup.' },
   { name: 'metric', writes: false, what: 'One figure, with its target and how it compares.' },
@@ -47,6 +49,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'planPack', writes: false, what: 'What installing a pack would do to this record. It writes nothing.' },
   { name: 'installPack', writes: true, what: 'Apply the plan somebody approved. A browser session only.' },
   { name: 'uninstallPack', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
+  { name: 'markRead', writes: true, what: 'How far you have read. A person only, and never an event.' },
+  { name: 'log', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
   { name: 'create', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'update', writes: true, what: 'Change a row, against the version you read.' },
 ];
@@ -143,6 +147,10 @@ export type RecordSurface = {
   metric(args: never, ctx: never): Promise<Result<unknown>>;
   listGrants(ctx: never): Promise<Result<unknown>>;
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
+  whoami(ctx: never): Promise<Result<unknown>>;
+  digestToday(args: never, ctx: never): Promise<Result<unknown>>;
+  markRead(ctx: never): Promise<Result<unknown>>;
+  log(args: never, ctx: never): Promise<Result<unknown>>;
   governance(args: never, ctx: never): Promise<Result<unknown>>;
   propose(args: never, ctx: never): Promise<Result<unknown>>;
   decide(args: never, ctx: never): Promise<Result<unknown>>;
@@ -168,6 +176,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     metric: (a, ctx) => api.metric(a as never, ctx as never),
     listGrants: (_a, ctx) => api.listGrants(ctx as never),
     dryRun: (a, ctx) => api.dryRun(a as never, ctx as never),
+    whoami: (_a, ctx) => api.whoami(ctx as never),
+    digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
+    markRead: (_a, ctx) => api.markRead(ctx as never),
+    log: (a, ctx) => api.log(a as never, ctx as never),
     governance: (a, ctx) => api.governance(a as never, ctx as never),
     propose: (a, ctx) => api.propose(a as never, ctx as never),
     decide: (a, ctx) => api.decide(a as never, ctx as never),

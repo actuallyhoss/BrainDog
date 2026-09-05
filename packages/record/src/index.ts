@@ -70,6 +70,9 @@ export type CallContext = {
 /** What a method needs. The ladder is ordered, and the check is an index comparison. */
 export type Need = 'read' | 'propose' | 'append' | 'write' | 'decide' | 'owner';
 
+/** The ladder, in order, so `whoami` can say how far up it the caller reaches. */
+export const NEEDS: readonly Need[] = ['read', 'propose', 'append', 'write', 'decide', 'owner'];
+
 const TOKEN_REACH: Record<Scope, Need[]> = {
   read: ['read'],
   propose: ['read', 'propose'],
@@ -407,6 +410,86 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       if (!args?.rule?.register || !Array.isArray(args.rule.then))
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
       return kernel.dryRun(args.rule, args.limit);
+    },
+
+    /**
+     * Who the caller is, as the record sees them.
+     *
+     * THE FIRST CALL AN AGENT SHOULD MAKE, and the one every product forgets to ship. An agent that
+     * cannot ask what it may do finds out by being refused, one verb at a time, in front of whoever
+     * is watching — and the answer it works out that way is a guess it will still be acting on
+     * three turns later.
+     *
+     * IT SAYS THE INTERSECTION, not the token's scope. A write token held by somebody with read
+     * access reads, and reporting the scope alone would be reporting the half that is not binding.
+     */
+    async whoami(ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+
+      const p = ctx.principal;
+      const may = NEEDS.filter((need) => allows(ctx, need) === null);
+      return ok({
+        kind: p.kind,
+        id: p.kind === 'system' ? 'system' : p.id,
+        person: p.kind === 'token' ? p.person : p.kind === 'person' ? p.id : null,
+        level: p.kind === 'system' ? 'owner' : p.level,
+        scope: p.kind === 'token' ? p.scope : null,
+        /* WHICH REGISTERS, when the caller is held to some of them. `null` is "all of them", which
+           is a different answer from "none" and the two must never be one value. */
+        registers: ctx.registers ?? null,
+        may,
+      });
+    },
+
+    /**
+     * What a digest would say if it went now. It sends nothing.
+     *
+     * THE SAME ASSEMBLY THE SCHEDULED ONE USES. A "today" screen computed by a second code path is
+     * a screen that disagrees with the email on the day one of them is wrong, and the person
+     * reading both has no way to tell which.
+     */
+    async digestToday(args: { digest?: string }, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.digestToday(args?.digest));
+    },
+
+    /**
+     * How far this person has read.
+     *
+     * A PERSON, NOT A TOKEN. A read mark is a fact about somebody's attention, and an agent polling
+     * a record does not have any — letting a token move it would mean a person coming back to a
+     * record their own agent had marked as read.
+     *
+     * AND IT IS NOT AN EVENT. Every glance at a screen would otherwise be a line in somebody's
+     * history, and the history is the thing that has to stay worth reading.
+     */
+    async markRead(ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (ctx.principal.kind !== 'person')
+        return no('PERSON_REQUIRED', 'A read mark belongs to a person, and a token is not one.', { at: 'principal' });
+      return ok({ at: kernel.markRead(ctx.principal.id, Date.now()), seen_at: kernel.seenAt(ctx.principal.id) });
+    },
+
+    /**
+     * A note against a row.
+     *
+     * IT CHANGES NOTHING AND IS STILL A WRITE, because it is a thing somebody said and the record
+     * keeps what was said. It goes through `update` with an empty patch, so it answers to the same
+     * permission, lands in the same history, and cannot become a second way to write a field.
+     */
+    async log(args: { register: string; seq: number; note?: string }, ctx: CallContext) {
+      const note = String(args?.note ?? '').trim();
+      if (!note) return no('REQUIRED_MISSING', 'A note is one sentence, and this one is empty.', { at: 'note' });
+      /* THE LEDGER'S OWN CEILING. `event.note` is 280 characters because a note nobody reads is a
+         note nobody writes; cutting it silently would lose the half somebody meant. */
+      if (note.length > 280)
+        return no('OUT_OF_BOUNDS', `A note is at most 280 characters, and this one is ${note.length}.`, { at: 'note' });
+      const stop = guard(ctx, 'write', args.register);
+      if (stop) return { ok: false as const, refusal: stop };
+      return tail(kernel.update(args.register, `${args.register}#${args.seq}`, {}, { actor: actorOf(ctx), note }));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */
