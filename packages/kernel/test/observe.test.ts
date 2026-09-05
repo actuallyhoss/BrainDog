@@ -254,3 +254,57 @@ test('the `analyse` row recurs weekly rather than finishing', async () => {
   assert.equal(Date.parse(again.due_at) - (NOW + 1000), 7 * DAY);
   sql.close();
 });
+
+/* ── what the loop got wrong about itself ───────────────────────── */
+
+test('A BAD KIND HALFWAY THROUGH A BATCH KEEPS NONE OF IT', async () => {
+  /* The refusal is a value, so the transaction commits: `a` and `b` were counted, the caller was
+     told nothing happened, and the retry counted them again — which is the exact arithmetic every
+     threshold below is built on. */
+  const { k, sql } = await record();
+  assert.equal(
+    refusal(
+      k.observe([
+        { kind: 'search.empty', subject: 'a' },
+        { kind: 'search.empty', subject: 'b' },
+        { kind: 'not.a.signal' as never, subject: 'c' },
+      ]),
+    ).code,
+    'ENUM_VALUE_UNKNOWN',
+  );
+  assert.deepEqual(sql.all("SELECT subject FROM observation WHERE kind = 'search.empty'"), []);
+  sql.close();
+});
+
+test('AND A FINDING IT HAS ALREADY ASKED ABOUT IS NOT ASKED AGAIN EVERY WEEK', async () => {
+  // This runs weekly and nothing recorded that it had proposed: one finding, one bill, for ever.
+  const { k, sql } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  assert.equal(k.analyse().candidate?.subject, 'halden');
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 1);
+
+  assert.equal(k.analyse().candidate, null, 'it asked the same question twice');
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 1);
+
+  // And the next-best finding is taken instead, which is the same rule read the other way round.
+  seen(sql, 'ingest.unmatched', 'email:hsbc', [1, 2, 3]);
+  assert.equal(k.analyse().candidate?.subject, 'email:hsbc');
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 2);
+  sql.close();
+});
+
+test('and three open proposals is three, not four', async () => {
+  // The governor said `> 3` and the sentence above it said three.
+  const { k, sql } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  for (let i = 1; i <= 3; i++)
+    sql.exec(
+      "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'change', '{}', 'open', 'system', ?)",
+      `SG${i}`,
+      new Date(NOW).toISOString(),
+    );
+  const out = k.analyse();
+  assert.equal(out.candidate, null);
+  assert.match(out.suspended ?? '', /3 proposals are already open/);
+  sql.close();
+});

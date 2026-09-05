@@ -319,7 +319,16 @@ export function drainSchedule(
 
     if (next === 'kept') {
       /* The handler moved the row itself, and writing over it here is how a pause becomes a
-         `done` — which is a connector quietly resuming after its credential was rejected. */
+         `done` — which is a connector quietly resuming after its credential was rejected.
+
+         BUT IT IS CHECKED, because `'kept'` is the one return this loop takes on trust. A handler
+         that says it moved the row and leaves it at `firing` strands it: never claimable again, no
+         ladder, no failure, and `done` reported to whoever asked. */
+      if (sql.one<{ state: string }>('SELECT state FROM schedule WHERE id = ?', row.id)?.state === 'firing') {
+        fail(sql, deps, row, `A ${row.kind} handler said it had moved this row, and left it firing.`, row.attempts + 1);
+        out.failed++;
+        continue;
+      }
     } else if (next === null) sql.exec("UPDATE schedule SET state = 'done' WHERE id = ?", row.id);
     else
       sql.exec(

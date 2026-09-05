@@ -251,3 +251,42 @@ test('the function is a function, and it reads the record it was handed', async 
   void k;
   sql.close();
 });
+
+/* ── the row that fired, and no other ─────────────────────────── */
+
+test('A PAUSE STOPS THE CONNECTOR THAT FIRED, and does not strand it at `firing`', async () => {
+  /* It paused by the payload's ingest name while the drain had claimed a ROW. After a rename those
+     are two different rows: a connector not due for another half hour was paused, and the one that
+     actually fired was left at `firing` — never claimable again, no ladder, no failure, and `done`
+     reported to whoever asked. */
+  const { k, sql, clock } = await record(CONNECTOR({ grant: 'g_gone' }));
+  arm(sql, 'npm-downloads', NOW);
+  sql.exec("UPDATE schedule SET key = 'npm-dl-old' WHERE id = 's_1'");
+  sql.exec(
+    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_2', ?, 'pull', 'npm-downloads', ?, 'pending', 0)",
+    new Date(NOW + 30 * 60_000).toISOString(),
+    JSON.stringify({ ingest: 'npm-downloads' }),
+  );
+
+  clock.set(NOW + 1000);
+  const drained = await k.drain();
+  assert.equal(drained.claimed, 1);
+  assert.equal(drained.failed, 0);
+
+  const states = Object.fromEntries(
+    sql.all<{ id: string; state: string }>("SELECT id, state FROM schedule WHERE kind = 'pull'").map((r) => [r.id, r.state]),
+  );
+  assert.equal(states.s_1, 'paused', 'the row that fired was left at firing');
+  assert.equal(states.s_2, 'pending', 'a connector not due for half an hour was paused');
+  sql.close();
+});
+
+test('and a payload that is not JSON is a refusal, not an exception', async () => {
+  const { k, sql } = await record();
+  arm(sql);
+  sql.exec("UPDATE schedule SET payload = 'not json' WHERE id = 's_1'");
+  const out = k.applyPull({ ingest: 'npm-downloads', outcome: 'ok' });
+  assert.equal(out.ok, false);
+  assert.equal((out as { refusal: { code: string } }).refusal.code, 'VALUE_MALFORMED');
+  sql.close();
+});

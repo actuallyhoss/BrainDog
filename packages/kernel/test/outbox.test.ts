@@ -469,3 +469,26 @@ test('the doorbell rings only when there is something in the outbox', async () =
   assert.ok(!scheduler.calls.slice(before).includes('wake'), 'the doorbell rang for a drained outbox');
   sql.close();
 });
+
+test('AND `kept` IS CHECKED: a handler that says it moved the row and did not is a failure', async () => {
+  /* `kept` is the one return the drain takes on trust. A handler that leaves the row at `firing`
+     strands it — never claimable again, no ladder, no failure, and `done` reported to whoever
+     asked. */
+  const { sql } = await record();
+  sql.exec(
+    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_liar', ?, 'purge', 'hourly', '{}', 'pending', 0)",
+    new Date(NOW).toISOString(),
+  );
+
+  let n = 0;
+  const drained = drainSchedule(sql, { mint: () => `01ABCDEFGHJKMNPQRSTVWXYZ0${++n}`, allocate: () => n, nowMs: NOW }, {
+    purge: () => 'kept',
+  });
+  assert.equal(drained.done, 0);
+  assert.equal(drained.failed, 1);
+
+  const row = sql.one<{ state: string; attempts: number }>("SELECT state, attempts FROM schedule WHERE id = 's_liar'")!;
+  assert.equal(row.state, 'pending', 'the row is stranded at firing');
+  assert.equal(row.attempts, 1, 'it did not walk the ladder');
+  sql.close();
+});

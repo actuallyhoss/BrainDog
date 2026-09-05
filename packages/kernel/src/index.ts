@@ -919,7 +919,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          was about is not true any more. */
       const decl = ingest ? pullDecl(ingest) : null;
       if (!decl) return null;
-      const out = firePull(pullDeps(), row.payload, decl);
+      const out = firePull(pullDeps(), row, decl);
       /* `kept` when it paused itself: the drain writing `done` over that pause would quietly resume a
          connector whose credential is gone. */
       return out.paused ? 'kept' : out.nextMs;

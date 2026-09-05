@@ -60,14 +60,20 @@ export function observe(sql: Sql, nowMs: number, batch: readonly Observation[]):
       at: 'batch',
     });
 
-  const day = new Date(nowMs).toISOString().slice(0, 10);
-  let n = 0;
-  for (const row of batch) {
+  /* EVERY KIND FIRST, THEN ANY WRITE. The refusal is a VALUE, so the transaction it sits in commits
+     — which meant a bad kind halfway through a batch kept everything before it, told the caller
+     nothing had happened, and got the first half counted twice on the retry. That double count is
+     the exact arithmetic the detectors' thresholds are built on. */
+  for (const row of batch)
     if (!(SIGNALS as readonly string[]).includes(row.kind))
       return no<number>('ENUM_VALUE_UNKNOWN', `${row.kind} is not a signal this record observes.`, {
         at: 'kind',
         allowed: SIGNALS,
       });
+
+  const day = new Date(nowMs).toISOString().slice(0, 10);
+  let n = 0;
+  for (const row of batch) {
     if (!row.subject) continue;
     sql.exec(
       'INSERT INTO observation (kind, subject, day, n) VALUES (?, ?, ?, 1) ON CONFLICT (kind, subject, day) DO UPDATE SET n = n + 1',
@@ -193,9 +199,13 @@ export function analyse(deps: AnalyseDeps): Analysis {
   }
 
   /* ONE AT A TIME, and the one that cleared its threshold by the most. A list of eleven proposals is
-     a list nobody reads, and the second-best one will still be there next week. */
+     a list nobody reads, and the second-best one will still be there next week.
+
+     AND NOT ONE IT HAS ALREADY ASKED ABOUT. This runs weekly and nothing recorded that it had
+     proposed, so one finding became one model-call draft every seven days for ever. The next-best
+     finding is taken instead, which is the same rule read the other way round. */
   found.sort((a, b) => b.n / thresholdOf(b.signal) - a.n / thresholdOf(a.signal));
-  const candidate = found[0] ?? null;
+  const candidate = found.find((f) => !asked(deps, f)) ?? null;
 
   if (candidate)
     deps.outbox({ signal: candidate.signal, subject: candidate.subject, n: candidate.n, window: candidate.window, why: candidate.why });
@@ -204,6 +214,17 @@ export function analyse(deps: AnalyseDeps): Analysis {
 }
 
 const thresholdOf = (signal: Signal): number => DETECTORS.find((d) => d.signal === signal)?.n ?? 1;
+
+/** Whether this record has already queued a draft about this exact finding. `dead` does not count. */
+const asked = (deps: AnalyseDeps, f: Finding): boolean =>
+  Boolean(
+    deps.sql.one(
+      `SELECT 1 AS x FROM outbox WHERE kind = 'infer.draft' AND state <> 'dead'
+       AND json_extract(payload, '$.signal') = ? AND json_extract(payload, '$.subject') = ?`,
+      f.signal,
+      f.subject,
+    ),
+  );
 
 /**
  * The four reasons the analyser says nothing.
@@ -224,7 +245,8 @@ function governors(deps: AnalyseDeps): string | null {
   const open = Number(
     deps.sql.one<{ n: number }>("SELECT count(*) AS n FROM suggestion WHERE opened_by = 'system' AND status = 'open'")?.n ?? 0,
   );
-  if (open > 3) return `${open} proposals are already open and unanswered.`;
+  /* THREE, and the comment above says three: at `open === 3` this used to add a fourth. */
+  if (open >= 3) return `${open} proposals are already open and unanswered.`;
 
   /* THE BRAKE. A proposal class that keeps being wrong stops being proposed. Twenty scored
      predictions and fewer than three in five met means the analyser is not earning its place, and a

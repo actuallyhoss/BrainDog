@@ -122,7 +122,8 @@ export function checkInterval(decl: PullDecl): Result<number> {
  * vault, under a `grant.read` event, so a fetch that reads a credential is a fetch that is on the
  * record — and one that never happened cannot pretend it did.
  */
-export function firePull(deps: PullDeps, payload: string, decl: PullDecl | null): Fired {
+export function firePull(deps: PullDeps, row: { id: string; payload: string }, decl: PullDecl | null): Fired {
+  const payload = row.payload;
   const { ingest, cursor } = JSON.parse(payload) as { ingest?: string; cursor?: string };
   if (!ingest || !decl) return { ingest: ingest ?? '', outbox: null, nextMs: null, paused: false };
 
@@ -140,7 +141,11 @@ export function firePull(deps: PullDeps, payload: string, decl: PullDecl | null)
     /* THE CREDENTIAL IS GONE, so the connector is not going to work and saying so is the only useful
        thing left. Paused rather than failed: a failure walks a retry ladder against an auth endpoint,
        which is how an account gets locked. */
-    deps.sql.exec("UPDATE schedule SET state = 'paused' WHERE kind = 'pull' AND key = ?", ingest);
+    /* THE ROW THAT FIRED, BY ITS ID. Pausing by the payload's ingest name pauses whichever row
+       happens to carry that key — which after a rename is a different connector, not due for
+       another half hour — and leaves the row that actually fired stranded at `firing` for ever:
+       no ladder, no failure, and `done` reported. */
+    deps.sql.exec("UPDATE schedule SET state = 'paused' WHERE id = ?", row.id);
     deps.sql.exec(
       "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'note', ?, 'grant', ?)",
       deps.mint(),
@@ -181,7 +186,14 @@ export function applyPull(
   );
   if (!row) return no<null>('OUT_OF_BOUNDS', `There is no connector called ${finish.ingest}.`, { at: 'ingest' });
 
-  const payload = JSON.parse(row.payload) as Record<string, unknown>;
+  /* A REFUSAL IS A VALUE HERE TOO. A payload that is not JSON threw a `SyntaxError` straight out
+     through the `Result` contract, so the one caller written to branch on `ok` got an exception. */
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(row.payload) as Record<string, unknown>;
+  } catch {
+    return no<null>('VALUE_MALFORMED', `${finish.ingest} has a payload this record cannot read.`, { at: 'ingest' });
+  }
   if (finish.cursor !== undefined) payload.cursor = finish.cursor;
 
   if (finish.outcome === 'paused') {
