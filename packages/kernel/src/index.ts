@@ -55,7 +55,7 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps } from './digest.ts';
-import { dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
+import { CREATE_CEILING, dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
@@ -91,7 +91,7 @@ export { GRANT_KINDS, spanMs } from './vault.ts';
 export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
-export { dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
+export { CREATE_CEILING, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { BODY_KINDS, GOVERNANCE } from './govern.ts';
 export type { Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
@@ -164,6 +164,15 @@ export type WriteContext = {
    * allowed it grew a depth limit and then a graph explorer to explain the depth limit.
    */
   cascade?: boolean;
+  /**
+   * Field ids beginning `_`, written by the kernel and never by a caller.
+   *
+   * A GENERATED ROW HAS TO SAY WHAT GENERATED IT, or a rule that runs twice makes the size run
+   * twice. `_rule`, `_parent` and `_each` are the tuple under `entry_created_by`, and stamping them
+   * here rather than letting them through `patch` is what keeps "a caller may not write `_x`" true
+   * while the record still can.
+   */
+  stamp?: Record<string, Json>;
 };
 
 const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
@@ -359,6 +368,75 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const said = predicateOf(where as Predicate | string, schema, evalContext());
       const stop = said.bad.find((b) => b.code !== 'REF_UNKNOWN');
       if (stop) return { ...stop, fix: `${decl.id} cannot be read: ${stop.fix}` };
+
+      if (decl.kind === 'rule') {
+        const bad = undeclarable(decl.id, body as unknown as RuleDecl, shape);
+        if (bad) return bad;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * What a rule may not declare, refused where a sentence fits.
+   *
+   * A GENERATOR WITH NO CEILING is how a rules engine fills a ten-gigabyte object overnight, and a
+   * `create` that runs on every write of its parent is that failure once a day for ever. Both are
+   * facts about the declaration, so both belong here rather than at the thousandth row.
+   */
+  function undeclarable(id: string, rule: RuleDecl, shape: (register: string) => Schema | null): Refusal | null {
+    const risky = (rule.then ?? []).some((a) => 'notify' in a || 'create' in a || 'suggest' in a);
+    if (risky && !rule.once_per?.length)
+      return {
+        code: 'REQUIRED_MISSING',
+        fix: `${id} notifies, creates or suggests, and declares no once_per — so it would fire on every write of the row.`,
+        at: 'once_per',
+      };
+
+    for (const action of rule.then ?? []) {
+      if (!('create' in action)) continue;
+      const spec = action.create;
+
+      const target = shape(spec.register);
+      if (!target)
+        return { code: 'REGISTER_UNKNOWN', fix: `${id} creates rows in ${spec.register}, and there is no such register.`, at: 'register' };
+
+      const bound = Math.floor(Number(spec.bound));
+      if (!Number.isFinite(bound) || bound < 1 || bound > CREATE_CEILING)
+        return {
+          code: 'OUT_OF_BOUNDS',
+          fix: `${id} declares a bound of ${String(spec.bound)}, and a bound is between 1 and ${CREATE_CEILING}.`,
+          at: 'bound',
+        };
+
+      const each = spec.each ?? [];
+      /* TWO IS A MATRIX. Three is a cube, and nobody has ever wanted a cube. */
+      if (each.length > 2)
+        return { code: 'OUT_OF_BOUNDS', fix: `${id} crosses ${each.length} fields, and two is the most a matrix can be.`, at: 'each' };
+
+      const from = shape(rule.register);
+      let cardinality = 1;
+      for (const field of each) {
+        const kind = from?.fields[field] as { type?: string; values?: readonly string[] } | undefined;
+        if (!kind)
+          return { code: 'FIELD_UNKNOWN', fix: `${id} crosses ${field}, and ${rule.register} has no such field.`, at: 'each' };
+        if (kind.type !== 'list' && kind.type !== 'enum')
+          return {
+            code: 'WHERE_OPERATOR_UNSUPPORTED',
+            fix: `${id} crosses ${field}, which is a ${String(kind.type)} — only a list or an enum has values to cross.`,
+            at: 'each',
+          };
+        /* AGAINST THE DECLARED CARDINALITY WHERE IT IS KNOWABLE. An enum's values are in the
+           declaration, so a bound that its own axes can exceed is a bound that is wrong today
+           rather than at the thousandth row. */
+        cardinality *= kind.values?.length ?? 0;
+      }
+      if (cardinality > bound)
+        return {
+          code: 'OUT_OF_BOUNDS',
+          fix: `${id} can make ${cardinality} rows from what ${rule.register} declares, and its bound is ${bound}.`,
+          at: 'bound',
+        };
     }
     return null;
   }
@@ -592,6 +670,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const now = instant(clock.now());
       const deletedAt = deleting ? (patch.deleted_at === null ? null : now) : (current?.deleted_at ?? null);
 
+      /* STAMPED AFTER VALIDATION, because these are the kernel's own fields and no declaration
+         describes them — running them through the field loop would refuse every one. */
+      if (w.stamp) Object.assign(merged, w.stamp);
+
       if (!current) {
         const id = mint();
         const seq = decl.series ? null : allocate(`seq:${register}`);
@@ -820,6 +902,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        another and nothing here loops — every product that allowed it grew a depth limit and then a
        graph explorer to explain the depth limit. */
     write: (register, spoken, patch, actor, batch) => write(register, spoken, patch, { actor, batch, cascade: false }),
+    /* A GENERATED ROW RE-ENTERS THE WRITE PATH like any other: coerced, validated, transition-checked.
+       `cascade: false` is what stops a size run generating a size run. */
+    generate: (register, patch, actor, batch, stamp) =>
+      write(register, null, patch, { actor, batch, cascade: false, stamp }),
+    suggest: (question, options, actor) =>
+      openSuggestion(governDeps(), actor, {
+        question,
+        body_kind: 'options',
+        body: {
+          options: options.map((label, i) => ({ id: `o${i + 1}`, label, because: 'a rule put this in front of you' })),
+          requires_reason: true,
+        },
+      }),
     note: (entry, actor, text, batch) =>
       void appendEvent({ kind: 'note', target: entry.id, register: entry.register, actor, note: text, at: instant(clock.now()), batch }),
     schedule: (key, payload, pending) => marker(sql, mint, clock.now(), key, payload, pending),

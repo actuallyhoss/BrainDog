@@ -38,6 +38,16 @@ export type RuleAction =
   | { link: { field: string; to: { register: string; by: string; value: string } } }
   | { note: string }
   | { notify: { say: string; tone?: string; urgent?: boolean } }
+  /**
+   * A matrix of rows from one row — a size run, a rate card, a schedule of instalments.
+   *
+   * `bound` IS MANDATORY AND IS THE WHOLE ARGUMENT. A generator with no ceiling is how a rules
+   * engine fills a ten-gigabyte object overnight, and the ceiling has to be declared rather than
+   * derived because the record cannot know how many colours somebody will add next season.
+   */
+  | { create: { register: string; each?: string[]; bound: number; fields: Record<string, string> } }
+  /** A question for a person, through the gate. It changes nothing by itself. */
+  | { suggest: { question: string; options: string[] } }
   | { stop: true };
 
 export type RuleDecl = {
@@ -47,7 +57,7 @@ export type RuleDecl = {
   then: RuleAction[];
   /** Lower runs first. The default is a hundred, so a pack's rules sit either side of yours. */
   priority?: number;
-  /** Which tuple makes this rule's firing unique. Mandatory on `notify`. */
+  /** Which tuple makes this rule's firing unique. Mandatory on `notify`, `create` and `suggest`. */
   once_per?: string[];
 };
 
@@ -74,6 +84,16 @@ export type RulesDeps = {
   /** The write path, re-entered. `cascade: false` is what makes a rule one step. */
   write: (register: string, spoken: string | null, patch: Record<string, unknown>, actor: string, batch: string) => Result<Entry>;
   note: (entry: Entry, actor: string, text: string, batch: string) => void;
+  /** A generated row: the write path again, with the kernel's own `_rule`/`_parent`/`_each` stamped on. */
+  generate: (
+    register: string,
+    patch: Record<string, unknown>,
+    actor: string,
+    batch: string,
+    stamp: Record<string, string>,
+  ) => Result<Entry>;
+  /** A question through the gate. It writes a suggestion and changes nothing else. */
+  suggest: (question: string, options: string[], actor: string) => Result<{ id: string }>;
   schedule: (key: string, payload: unknown, pending: boolean) => boolean;
   /** One row by its id, hydrated — what a dry run walks without writing anything. */
   entry: (id: string) => Entry | null;
@@ -123,7 +143,10 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
        index is what makes "once" hold against two passes at once and a second mechanism would be a
        second thing that can disagree with the first — and released below if the write is refused,
        because a rule that could not do anything has not fired. */
-    const wants = rule.then.some((a) => 'notify' in a);
+    /* THE THREE THAT MUST BE ONCE. A `notify` on every write is how a person learns to ignore the
+       product; a `create` on every write is the same failure with a worse consequence; and a
+       `suggest` on every write fills the gate with the same question. */
+    const wants = rule.then.some((a) => 'notify' in a || 'create' in a || 'suggest' in a);
     const key = onceKey(rule, fired.entry);
     if (key !== null) {
       if (!deps.schedule(key, { rule: rule.rule, entry: fired.entry.id, batch: fired.batch }, wants)) {
@@ -145,6 +168,8 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     const patch: Record<string, unknown> = {};
     const did: string[] = [];
     const said: string[] = [];
+    const made: { register: string; each?: string[]; bound: number; fields: Record<string, string> }[] = [];
+    const asks: { question: string; options: string[] }[] = [];
     let stop = false;
 
     for (const action of rule.then) {
@@ -162,7 +187,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         /* THE EARLIER RULE WON, and this one says so rather than overwriting. */
         if (setFields.has(action.set.field)) continue;
         setFields.add(action.set.field);
-        patch[action.set.field] = fill(action.set.to, fired.entry);
+        patch[action.set.field] = fill(action.set.to, fired.entry, deps.nowMs);
         did.push(`set ${action.set.field}`);
       } else if ('move' in action) {
         patch.state = action.move;
@@ -173,7 +198,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         const found = deps.sql.all<{ id: string }>(
           `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${action.link.to.by}') = ? LIMIT 2`,
           action.link.to.register,
-          fill(action.link.to.value, fired.entry),
+          fill(action.link.to.value, fired.entry, deps.nowMs),
         );
         if (found.length === 1) {
           patch[action.link.field] = found[0]!.id;
@@ -182,11 +207,17 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       } else if ('note' in action) {
         /* HELD UNTIL THE WRITE HAS HAPPENED. A rule whose write the register then refuses has not
            done anything, and a notification about what it did not do is worse than silence. */
-        said.push(fill(action.note, fired.entry));
+        said.push(fill(action.note, fired.entry, deps.nowMs));
         did.push('note');
       } else if ('notify' in action) {
-        said.push(fill(action.notify.say, fired.entry));
+        said.push(fill(action.notify.say, fired.entry, deps.nowMs));
         did.push('notify');
+      } else if ('create' in action) {
+        made.push(action.create);
+        did.push(`create in ${action.create.register}`);
+      } else if ('suggest' in action) {
+        asks.push(action.suggest);
+        did.push('suggest');
       } else if ('stop' in action) {
         stop = true;
       }
@@ -212,6 +243,18 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     }
 
     for (const text of said) deps.note(fired.entry, `rule:${rule.rule}`, text, fired.batch);
+
+    /* THE EXPANSION IS LAST, and it shares the triggering write's batch — so "undo this expansion"
+       is one query rather than an archaeology of timestamps. */
+    for (const spec of made) {
+      const grew = expand(deps, rule, spec, fired);
+      if (grew.length) out.refused.push(...grew);
+    }
+    for (const ask of asks) {
+      const opened = deps.suggest(fill(ask.question, fired.entry, deps.nowMs), ask.options, `rule:${rule.rule}`);
+      if (!opened.ok) out.refused.push(opened.refusal);
+    }
+
     if (did.length) out.fired.push({ rule: rule.rule, actions: did });
     if (stop) {
       out.stopped = true;
@@ -278,6 +321,103 @@ const isQuantity = (v: unknown): v is { value: number; unit: string } =>
   typeof v === 'object' && v !== null && 'value' in v && 'unit' in v;
 
 /** The `rule` schedule row's marker, through the one insertion path. `false` means suppressed. */
+/** The ceiling on any one expansion, whatever a declaration says. */
+export const CREATE_CEILING = 500;
+
+/**
+ * One row becomes a matrix of rows.
+ *
+ * THE BOUND IS CHECKED BEFORE ANYTHING IS WRITTEN, and the whole expansion is refused rather than
+ * truncated. Half a size run is worse than none: the missing SKUs look like sizes nobody stocks,
+ * and the person who has to notice is the one placing the order.
+ *
+ * AND RE-RUNNING IS A NO-OP. Every generated row carries `_rule`, `_parent` and `_each` under one
+ * partial unique index, so the same tuple twice is one row — which means adding a colour next
+ * season creates only the new combinations, and that is the behaviour a size run actually wants.
+ * The key is the RULE and not the register: the worked example writes into an ordinary register,
+ * which has no `key:` of its own to be idempotent on.
+ */
+function expand(
+  deps: RulesDeps,
+  rule: RuleDecl,
+  spec: { register: string; each?: string[]; bound: number; fields: Record<string, string> },
+  fired: Fired,
+): Refusal[] {
+  const bound = Math.floor(spec.bound);
+  if (!Number.isFinite(bound) || bound < 1 || bound > CREATE_CEILING)
+    return [
+      {
+        code: 'OUT_OF_BOUNDS',
+        fix: `${rule.rule} declares a bound of ${String(spec.bound)}, and a bound is between 1 and ${CREATE_CEILING}.`,
+        at: 'bound',
+      },
+    ];
+
+  const axes = (spec.each ?? []).map((f) => asValues(fired.entry.fields[f]));
+  if (axes.length > 2)
+    return [
+      {
+        /* TWO IS A MATRIX. Three is a cube, and nobody has ever wanted a cube. */
+        code: 'OUT_OF_BOUNDS',
+        fix: `${rule.rule} crosses ${axes.length} fields, and two is the most a matrix can be.`,
+        at: 'each',
+      },
+    ];
+
+  const tuples: string[][] = axes.length === 0 ? [[]] : axes.length === 1 ? axes[0]!.map((a) => [a]) : axes[0]!.flatMap((a) => axes[1]!.map((b) => [a, b]));
+  if (tuples.length > bound)
+    return [
+      {
+        code: 'OUT_OF_BOUNDS',
+        fix: `${rule.rule} would make ${tuples.length} rows in ${spec.register}, and its bound is ${bound}. Nothing was created.`,
+        at: 'bound',
+      },
+    ];
+
+  const out: Refusal[] = [];
+  for (const tuple of tuples) {
+    const each = JSON.stringify(tuple);
+    /* A ROW THAT IS ALREADY THERE IS THE POINT, not a failure — which is why this is a read rather
+       than a caught constraint. Adding a colour next season creates only the new combinations, and
+       a re-run that reported forty refusals would make the feature unusable. */
+    if (
+      deps.sql.one(
+        `SELECT 1 AS x FROM entry WHERE json_extract(fields, '$._rule') = ?
+         AND json_extract(fields, '$._parent') = ? AND json_extract(fields, '$._each') = ?`,
+        rule.rule,
+        fired.entry.id,
+        each,
+      )
+    )
+      continue;
+
+    const fields: Record<string, unknown> = {};
+    for (const [id, template] of Object.entries(spec.fields))
+      fields[id] = fill(withEach(template, tuple), fired.entry, deps.nowMs);
+
+    const made = deps.generate(spec.register, fields, `rule:${rule.rule}`, fired.batch, {
+      _rule: rule.rule,
+      _parent: fired.entry.id,
+      _each: each,
+    });
+    if (!made.ok) out.push(made.refusal);
+  }
+  return out;
+}
+
+/**
+ * `{{each.0}}` and `{{each.1}}`, resolved before the ordinary template is.
+ *
+ * A SEPARATE PASS because the tuple is not a field on the row — it is the position in the matrix,
+ * which is the only thing the generated row knows that its parent does not.
+ */
+const withEach = (template: string, tuple: string[]): string =>
+  template.replace(/\{\{each\.(\d)\}\}/g, (_w, i: string) => tuple[Number(i)] ?? '');
+
+/** A `list` is its items, an `enum` is its one value, and anything else is nothing to cross. */
+const asValues = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map(String) : typeof value === 'string' && value ? [value] : [];
+
 /**
  * The `once_per` key, and the ONE place it is spelled.
  *

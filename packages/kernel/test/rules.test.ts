@@ -183,9 +183,21 @@ test('and priority beats the literal, because that is what it is for', () => {
 /* ── once_per ────────────────────────────────────────────────────────────── */
 
 test('A `notify` WITHOUT `once_per` IS REFUSED, because it would fire on every write of the row', async () => {
-  const { k, sql } = await record(
+  const { k, sql } = await record();
+  const out = await k.install([
     rule({ rule: 'shout', register: 'obligations', when: 'state is open', then: [{ notify: { say: 'look' } }] }),
+  ]);
+  assert.equal(out.ok, false);
+  assert.equal((out as { refusal: { at?: string } }).refusal.at, 'once_per');
+
+  // And one that got in behind the linter still says nothing, rather than saying it every write.
+  sql.exec(
+    `INSERT INTO declaration (id, version, kind, pack_id, body, checksum, retired, superseded_at, created_at)
+     VALUES ('rule.shout', 1, 'rule', NULL, ?, 'x', 0, NULL, ?)`,
+    JSON.stringify({ rule: 'shout', register: 'obligations', when: 'state is open', then: [{ notify: { say: 'look' } }] }),
+    new Date(NOW).toISOString(),
   );
+  assert.ok((await k.install([])).ok);
   value(k.create('obligations', { what: 'x', due: day(-1), state: 'open' }, { actor: 'p_1' }));
   assert.equal(notes(sql).length, 0, 'a rule notified on every write');
   sql.close();
@@ -577,5 +589,213 @@ test('and the preview counts the collisions among the rows it is previewing', as
   assert.ok((await k.install([rule(candidate as never)])).ok);
   value<Entry>(k.create('obligations', { what: 'x3', party: 'Acme', state: 'open' }, { actor: 'p_1' }));
   assert.equal(notes(sql).length, 1);
+  sql.close();
+});
+
+/* ── one row becomes a matrix of rows ────────────────────────── */
+
+const STYLES: Declaration = {
+  id: 'register.styles',
+  kind: 'register',
+  body: {
+    id: 'styles',
+    name: 'Styles',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'sizes', type: 'list', of: 'text' },
+      { id: 'colours', type: 'list', of: 'text' },
+      { id: 'season', type: 'enum', values: ['aw26', 'ss27'] },
+      { id: 'state', type: 'enum', values: ['draft', 'approved'], index: true },
+    ],
+  } as never,
+};
+
+const SKUS: Declaration = {
+  id: 'register.skus',
+  kind: 'register',
+  body: {
+    id: 'skus',
+    name: 'SKUs',
+    title: 'code',
+    fields: [
+      { id: 'code', type: 'text', required: true },
+      { id: 'style', type: 'text' },
+      { id: 'size', type: 'text' },
+      { id: 'colour', type: 'text' },
+      { id: 'state', type: 'enum', values: ['planned', 'live'] },
+    ],
+  } as never,
+};
+
+const EXPAND = (over: Record<string, unknown> = {}): Declaration =>
+  rule({
+    rule: 'expand-size-run',
+    register: 'styles',
+    when: 'state is approved',
+    once_per: ['entry', 'state'],
+    then: [
+      {
+        create: {
+          register: 'skus',
+          each: ['sizes', 'colours'],
+          bound: 60,
+          fields: { code: '{{name}} {{each.0}}/{{each.1}}', style: '{{id}}', size: '{{each.0}}', colour: '{{each.1}}', state: 'planned' },
+        },
+      },
+    ],
+    ...over,
+  });
+
+async function studio(...decls: Declaration[]): Promise<{ k: Kernel; sql: NodeSql }> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([STYLES, SKUS, ...decls])).ok);
+  return { k, sql };
+}
+
+test('A SIZE RUN IS A DECLARATION, and eight sizes by five colours is forty rows', async () => {
+  /* The gap this closes is not small: a fashion style IS a size run by a colourway matrix, and
+     before `create` the only way to make forty SKUs from one style was forty writes by hand. */
+  const { k, sql } = await studio(EXPAND());
+  value<Entry>(
+    k.create(
+      'styles',
+      { name: 'Halden', sizes: ['XS', 'S', 'M', 'L'], colours: ['ink', 'bone', 'moss'], state: 'approved' },
+      { actor: 'p_1' },
+    ),
+  );
+
+  assert.equal(k.count('skus'), 12);
+  assert.equal(k.get('skus#1')?.fields.code, 'Halden XS/ink');
+  assert.equal(k.get('skus#1')?.fields.size, 'XS');
+  assert.equal(k.get('skus#1')?.fields.colour, 'ink');
+  assert.equal(k.get('skus#1')?.fields.state, 'planned');
+  assert.equal(k.get('skus#1')?.fields.style, 'styles#1');
+
+  // Every generated row wears the rule's name and shares the triggering write's batch, so "undo
+  // this expansion" is one query rather than an archaeology of timestamps.
+  const events = sql.all<{ actor: string; batch: string | null }>(
+    "SELECT actor, batch FROM event WHERE kind = 'create' AND actor = 'rule:expand-size-run'",
+  );
+  assert.equal(events.length, 12);
+  assert.equal(new Set(events.map((e) => e.batch)).size, 1, 'the expansion is not one batch');
+  assert.equal(
+    events[0]?.batch,
+    sql.one<{ id: string }>("SELECT id FROM event WHERE actor = 'p_1' AND kind = 'create'")?.id,
+    'the batch is not the triggering write',
+  );
+  sql.close();
+});
+
+test('and re-running it makes only the combinations that are new', async () => {
+  /* The key is the RULE, not the register: the target is an ordinary register with no `key:` of its
+     own, and an earlier draft would have duplicated forty SKUs on the second run. */
+  const { k, sql } = await studio(EXPAND({ once_per: ['entry'] }));
+  value<Entry>(k.create('styles', { name: 'Halden', sizes: ['XS', 'S'], colours: ['ink'], state: 'approved' }, { actor: 'p_1' }));
+  assert.equal(k.count('skus'), 2);
+
+  // The marker is per row, so clear it the way a person re-running the rule would.
+  sql.exec("DELETE FROM schedule WHERE kind = 'rule'");
+  value<Entry>(k.update('styles', 'styles#1', { colours: ['ink', 'bone'] }, { actor: 'p_1' }));
+
+  assert.equal(k.count('skus'), 4, 'a re-run duplicated what was already there');
+  assert.deepEqual(
+    sql.all<{ code: string }>("SELECT json_extract(fields, '$.code') AS code FROM entry WHERE register = 'skus' ORDER BY seq").map((r) => r.code),
+    ['Halden XS/ink', 'Halden S/ink', 'Halden XS/bone', 'Halden S/bone'],
+  );
+  sql.close();
+});
+
+test('A GENERATOR WITH NO CEILING IS REFUSED AT INSTALL, and again at run time', async () => {
+  /* A generator with no ceiling is how a rules engine fills a ten-gigabyte object overnight. */
+  const { k, sql } = await studio();
+
+  for (const [over, at] of [
+    [{ bound: 0 }, 'bound'],
+    [{ bound: 501 }, 'bound'],
+    [{ each: ['sizes', 'colours', 'season'] }, 'each'],
+    [{ each: ['name'] }, 'each'],
+    [{ each: ['nothing'] }, 'each'],
+    [{ register: 'ghosts' }, 'register'],
+  ] as const) {
+    const decl = EXPAND();
+    const then = (decl.body as { then: { create: Record<string, unknown> }[] }).then;
+    Object.assign(then[0]!.create, over);
+    const out = await k.install([decl]);
+    assert.equal(out.ok, false, `${JSON.stringify(over)} installed`);
+    assert.equal((out as { refusal: { at?: string } }).refusal.at, at);
+  }
+
+  // And a bound its own declared axes can exceed is wrong today rather than at the thousandth row.
+  const overrun = EXPAND();
+  Object.assign((overrun.body as { then: { create: Record<string, unknown> }[] }).then[0]!.create, { each: ['season'], bound: 1 });
+  const out = await k.install([overrun]);
+  assert.equal(out.ok, false);
+  assert.match((out as { refusal: { fix: string } }).refusal.fix, /can make 2 rows/);
+
+  // A rule that creates and does not say once_per would run the generator on every write.
+  const loose = EXPAND();
+  delete (loose.body as Record<string, unknown>).once_per;
+  assert.equal((await k.install([loose])).ok, false);
+  sql.close();
+});
+
+test('and at run time the whole expansion is refused rather than truncated', async () => {
+  // Half a size run is worse than none: the missing SKUs look like sizes nobody stocks.
+  const { k, sql } = await studio(EXPAND({ then: [{ create: { register: 'skus', each: ['sizes', 'colours'], bound: 3, fields: { code: '{{each.0}}{{each.1}}' } } }] }));
+  value<Entry>(k.create('styles', { name: 'Halden', sizes: ['XS', 'S'], colours: ['ink', 'bone'], state: 'approved' }, { actor: 'p_1' }));
+  assert.equal(k.count('skus'), 0, 'it wrote a partial matrix');
+  sql.close();
+});
+
+test('AND A GENERATED ROW CANNOT GENERATE, which is what makes one step one step', async () => {
+  const { k, sql } = await studio(
+    EXPAND({ then: [{ create: { register: 'skus', each: ['sizes'], bound: 10, fields: { code: '{{each.0}}' } } }] }),
+    rule({
+      rule: 'onward',
+      register: 'skus',
+      when: 'state is planned',
+      once_per: ['entry'],
+      then: [{ create: { register: 'skus', bound: 5, fields: { code: 'runaway' } } }],
+    }),
+  );
+  value<Entry>(k.create('styles', { name: 'Halden', sizes: ['XS', 'S'], state: 'approved' }, { actor: 'p_1' }));
+  assert.equal(k.count('skus'), 2, 'a generated row started a second expansion');
+  sql.close();
+});
+
+/* ── and the question a rule can ask ─────────────────────────── */
+
+test('A RULE CAN ASK RATHER THAN ACT, and the question goes through the gate', async () => {
+  /* The difference between a rule that files a row and a rule that raises a question is the
+     difference between automation somebody trusts and automation somebody switches off. */
+  const { k, sql } = await record(
+    rule({
+      rule: 'unusual',
+      register: 'obligations',
+      when: 'state is open',
+      once_per: ['entry'],
+      then: [{ suggest: { question: 'Is {{what}} really ours?', options: ['Yes, keep it', 'No, delete it'] } }],
+    }),
+  );
+  value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
+
+  const open = value<Record<string, unknown>[]>(k.governance('suggestion'));
+  assert.equal(open.length, 1);
+  assert.equal(open[0]?.opened_by, 'rule:unusual');
+  assert.equal((open[0]?.body as { options: { label: string }[] }).options.length, 2);
+  assert.equal(
+    sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'suggest'")?.note,
+    'Is Invoice 41 really ours?',
+    'the question was not filled from the row',
+  );
+
+  // And it changed nothing, which is the whole point of asking.
+  assert.equal(k.get('obligations#1')?.fields.tags, undefined);
+
+  // Once, however many times the row is written.
+  value<Entry>(k.update('obligations', 'obligations#1', { party: 'Acme' }, { actor: 'p_1' }));
+  assert.equal(value<unknown[]>(k.governance('suggestion')).length, 1);
   sql.close();
 });
