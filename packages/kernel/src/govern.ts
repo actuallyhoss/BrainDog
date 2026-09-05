@@ -213,6 +213,10 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
       return { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}.`, at: 'body.register' };
     const rows = body.rows;
     if (!Array.isArray(rows) || rows.length === 0) return missing('rows');
+    /* A ROW IS AN OBJECT OF FIELDS. `null` cleared this check and then threw out of the write path
+       at the gate — the one boundary this package promises nothing throws over. */
+    if (rows.some((r) => typeof r !== 'object' || r === null || Array.isArray(r)))
+      return { code: 'VALUE_MALFORMED', fix: 'Every row is an object of field ids to values.', at: 'body.rows' };
     if (rows.length > MAX_ROWS)
       return {
         code: 'OUT_OF_BOUNDS',
@@ -275,6 +279,11 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       });
     if (!verdict.defer?.until || !verdict.defer?.why?.trim())
       return no<Decided>('REQUIRED_MISSING', 'Deferring says when to ask again, and why it can wait.', { at: 'defer' });
+    /* AND `when` IS A DATE. It is compared as a string against an instant, so `next Tuesday` sorts
+       after every date there will ever be — the suggestion leaves the open queue for ever while the
+       gate reports it as open. */
+    if (!Number.isFinite(Date.parse(verdict.defer.until)))
+      return no<Decided>('VALUE_MALFORMED', `${verdict.defer.until} is not a date. Write 2026-10-01.`, { at: 'until' });
     deps.sql.exec('UPDATE suggestion SET defer_until = ?, defer_why = ? WHERE id = ?', verdict.defer.until, verdict.defer.why, id);
     return ok({ decision: null, suggestion: id, status: 'open', wrote: [] });
   }
@@ -311,6 +320,11 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   if (!option?.trim()) return no<Decided>('REQUIRED_MISSING', 'A decision names what was chosen.', { at: 'option' });
 
   const body = parse(row.body);
+  /* A QUESTION THIS RECORD CANNOT READ IS NOT A QUESTION IT CAN ANSWER. It used to resolve as
+     `addressed` with a `D<n>` behind it and nothing written — the gate saying yes to something it
+     had not read. */
+  if (!body) return no<Decided>('VALUE_MALFORMED', `${id} carries a body this record cannot read.`, { at: 'body' });
+
   if (row.body_kind === 'options') {
     const ids = ((body.options ?? []) as { id?: string }[]).map((o) => o.id).filter((x): x is string => typeof x === 'string');
     if (!ids.includes(option))
@@ -319,6 +333,15 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         allowed: ids,
       });
   }
+
+  /* AND THE OTHER THREE KINDS TAKE ONE OF TWO WORDS. `Accept` with a capital, or `yes`, used to
+     fall past the `accept` branch and resolve the question having done nothing — the gate silently
+     answering yes and applying none of it. */
+  if (row.body_kind !== 'options' && option !== 'accept' && option !== 'reject')
+    return no<Decided>('ENUM_VALUE_UNKNOWN', `A ${row.body_kind} is accepted or rejected, and ${option} is neither.`, {
+      at: 'option',
+      allowed: ['accept', 'reject'],
+    });
 
   const wrote: string[] = [];
   let install: Record<string, unknown> | undefined;
@@ -367,8 +390,35 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
  * then will not install. The decision stands — somebody did answer — and the question comes back,
  * because a suggestion resolved with nothing behind it is the gate telling a lie.
  */
-export function reopen(deps: GovernDeps, id: string): void {
-  deps.sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL WHERE id = ?", id);
+export function reopen(deps: GovernDeps, id: string): Result<null> {
+  const row = deps.sql.one<{ status: string; resolved_as: string | null; body_kind: BodyKind }>(
+    'SELECT status, resolved_as, body_kind FROM suggestion WHERE id = ?',
+    id,
+  );
+  if (!row) return no<null>('OUT_OF_BOUNDS', `There is no suggestion called ${id}.`, { at: 'id' });
+
+  /* ONLY WHAT WAS ACCEPTED. Reopening a `wont-fix` resurrects a question somebody answered, and
+     nothing here undoes what an acceptance did. */
+  if (row.status !== 'resolved' || row.resolved_as !== 'addressed')
+    return no<null>('TRANSITION_ILLEGAL', `${id} is ${row.resolved_as ?? row.status}, and only an accepted one comes back.`, {
+      at: 'status',
+      allowed: ['addressed'],
+    });
+
+  /* AND ONLY THE TWO KINDS THIS EXISTS FOR. A `pattern` or a `change` is applied OUTSIDE the gate's
+     transaction, so it is the only acceptance that can fail after the question was resolved. An
+     accepted `rowset` wrote its rows in that transaction — reopening it would let a decision made
+     once be applied twice, and the second copy of forty rows is not a thing anybody undoes by hand. */
+  if (row.body_kind !== 'pattern' && row.body_kind !== 'change')
+    return no<null>('TRANSITION_ILLEGAL', `A ${row.body_kind} was applied when it was accepted, and does not come back.`, {
+      at: 'body_kind',
+      allowed: ['pattern', 'change'],
+    });
+
+  /* AND THE DEFERRAL GOES WITH IT. A reopened suggestion carrying a `defer_until` from last year
+     comes back invisible, which is the same as not coming back. */
+  deps.sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", id);
+  return ok(null);
 }
 
 /** The question is the `suggest` event's note, which is where it was written and the only copy. */
@@ -404,10 +454,11 @@ function event(
   );
 }
 
-const parse = (body: string): Record<string, unknown> => {
+const parse = (body: string): Record<string, unknown> | null => {
   try {
-    return JSON.parse(body) as Record<string, unknown>;
+    const out: unknown = JSON.parse(body);
+    return out && typeof out === 'object' && !Array.isArray(out) ? (out as Record<string, unknown>) : null;
   } catch {
-    return {};
+    return null;
   }
 };

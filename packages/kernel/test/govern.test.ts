@@ -50,7 +50,7 @@ const value = <T>(r: unknown): T => {
 };
 
 const refusal = (r: unknown) => {
-  const x = r as { ok: boolean; refusal: { code: string; fix: string; at?: string } };
+  const x = r as { ok: boolean; refusal: { code: string; fix: string; at?: string; allowed?: readonly string[] } };
   assert.equal(x.ok, false, 'this was supposed to be refused');
   return x.refusal;
 };
@@ -249,5 +249,91 @@ test('and one that will not install puts the question back', async () => {
   k.reopen(out.suggestion);
   assert.equal(k.governanceRow('suggestion', out.suggestion)?.status, 'open');
   assert.equal(k.governanceRow('suggestion', out.suggestion)?.resolved_as, null);
+  sql.close();
+});
+
+/* ── five ways the gate answered without reading ────────────────── */
+
+test('A BODY THIS RECORD CANNOT READ IS NOT A QUESTION IT CAN ANSWER', async () => {
+  /* It used to resolve as `addressed` with a `D<n>` behind it and nothing written — the gate saying
+     yes to something it had not read. */
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(rowset([{ what: 'x', state: 'open' }]), 'p_1'));
+  sql.exec("UPDATE suggestion SET body = '{not json' WHERE id = ?", made.id);
+
+  assert.equal(refusal(k.decide(made.id, { decide: { option: 'accept', reason: 'go on' } }, 'p_2')).code, 'VALUE_MALFORMED');
+  assert.equal(k.governanceRow('suggestion', made.id)?.status, 'open');
+  assert.equal(sql.all('SELECT 1 FROM decision').length, 0);
+
+  // And a row that is not an object is refused when it is FILED, not by throwing at the gate.
+  assert.equal(refusal(k.propose(rowset([null as never]), 'p_1')).at, 'body.rows');
+  assert.equal(refusal(k.propose(rowset(['a string' as never]), 'p_1')).at, 'body.rows');
+  sql.close();
+});
+
+test('AND `Accept` IS NOT `accept`: a non-options body takes one of two words', async () => {
+  /* Anything else fell past the branch that applies it and resolved the question having done
+     nothing — the gate silently answering yes and applying none of it. */
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(rowset([{ what: 'Invoice 41', state: 'open' }]), 'p_1'));
+
+  const tried = refusal(k.decide(made.id, { decide: { option: 'Accept', reason: 'go on' } }, 'p_2'));
+  assert.equal(tried.code, 'ENUM_VALUE_UNKNOWN');
+  assert.deepEqual(tried.allowed, ['accept', 'reject']);
+  assert.equal(k.count('obligations'), 0);
+  assert.equal(k.governanceRow('suggestion', made.id)?.status, 'open');
+
+  // And `reject` is an answer: recorded, applied to nothing.
+  const out = value<{ decision: string; wrote: string[] }>(k.decide(made.id, { decide: { option: 'reject', reason: 'not ours' } }, 'p_2'));
+  assert.equal(out.decision, 'D1');
+  assert.deepEqual(out.wrote, []);
+  assert.equal(k.count('obligations'), 0);
+  sql.close();
+});
+
+test('and deferring says a DATE, or the question leaves the queue for ever', async () => {
+  /* `defer_until` is compared as a string against an instant, so `next Tuesday` sorts after every
+     date there will ever be — gone from the open queue while the gate reports it as open. */
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(options, 'p_1'));
+  assert.equal(refusal(k.decide(made.id, { defer: { until: 'next Tuesday', why: 'busy' } }, 'p_2')).at, 'until');
+  assert.equal(value<unknown[]>(k.governance('suggestion')).length, 1, 'the question left the queue');
+  sql.close();
+});
+
+test('REOPEN IS FOR THE ONE CASE IT EXISTS FOR, and does not apply a decision twice', async () => {
+  /* An accepted `rowset` wrote its rows inside the gate's transaction. Reopening it let a decision
+     made once be applied twice, and the second copy of forty rows is not a thing anybody undoes by
+     hand. */
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(rowset([{ what: 'Invoice 41', state: 'open' }]), 'p_1'));
+  value(k.decide(made.id, { decide: { option: 'accept', reason: 'ours' } }, 'p_2'));
+  assert.equal(k.count('obligations'), 1);
+
+  assert.equal(refusal(k.reopen(made.id)).at, 'body_kind');
+  assert.equal(k.governanceRow('suggestion', made.id)?.status, 'resolved');
+  assert.equal(k.count('obligations'), 1, 'a decision was applied twice');
+
+  // Nor does a `wont-fix` come back, which would resurrect a question somebody answered.
+  const two = value<{ id: string }>(k.propose(options, 'p_1'));
+  value(k.decide(two.id, { resolved_as: 'wont-fix', reason: 'no' }, 'p_2'));
+  assert.equal(refusal(k.reopen(two.id)).code, 'TRANSITION_ILLEGAL');
+  assert.equal(refusal(k.reopen('SG99')).code, 'OUT_OF_BOUNDS');
+  sql.close();
+});
+
+test('and a reopened pattern comes back visible, deferral and all', async () => {
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(
+    k.propose({ question: 'Turn it on?', body_kind: 'pattern', body: { ingest: { id: 'rule.x', kind: 'rule', body: {} } } }, 'p_1'),
+  );
+  value(k.decide(made.id, { defer: { until: new Date(NOW + 400 * DAY).toISOString(), why: 'next year' } }, 'p_2'));
+  value(k.decide(made.id, { decide: { option: 'accept', reason: 'go on' } }, 'p_2'));
+  value(k.reopen(made.id));
+
+  const row = k.governanceRow('suggestion', made.id)!;
+  assert.equal(row.status, 'open');
+  assert.equal(row.defer_until, null, 'it came back invisible');
+  assert.equal(value<unknown[]>(k.governance('suggestion')).length, 1);
   sql.close();
 });

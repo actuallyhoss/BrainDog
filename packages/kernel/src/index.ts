@@ -359,15 +359,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             ? source.slice('register.'.length)
             : undefined;
       const where = decl.kind === 'rule' ? body.when : decl.kind === 'metric' ? body.where : undefined;
-      if (typeof register !== 'string' || where === undefined) continue;
+      if (typeof register !== 'string') continue;
 
       const schema = shape(register);
       if (!schema)
         return { code: 'REGISTER_UNKNOWN', fix: `${decl.id} is about ${register}, and there is no such register.`, at: 'register' };
 
-      const said = predicateOf(where as Predicate | string, schema, evalContext());
-      const stop = said.bad.find((b) => b.code !== 'REF_UNKNOWN');
-      if (stop) return { ...stop, fix: `${decl.id} cannot be read: ${stop.fix}` };
+      /* A MISSING `when` SKIPS THE PREDICATE CHECK AND NOTHING ELSE. It used to skip the whole
+         block, so a rule with no `when` — which is a legal rule, meaning "every row" — installed
+         with no bound, no `once_per`, three axes and a target register nobody has. */
+      if (where !== undefined) {
+        const said = predicateOf(where as Predicate | string, schema, evalContext());
+        const stop = said.bad.find((b) => b.code !== 'REF_UNKNOWN');
+        if (stop) return { ...stop, fix: `${decl.id} cannot be read: ${stop.fix}` };
+      }
 
       if (decl.kind === 'rule') {
         const bad = undeclarable(decl.id, body as unknown as RuleDecl, shape);
@@ -385,7 +390,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * facts about the declaration, so both belong here rather than at the thousandth row.
    */
   function undeclarable(id: string, rule: RuleDecl, shape: (register: string) => Schema | null): Refusal | null {
-    const risky = (rule.then ?? []).some((a) => 'notify' in a || 'create' in a || 'suggest' in a);
+    /* A RULE WITH NO `then` DOES NOTHING, and the pass then read `.some` of `undefined` and threw
+       the TRIGGERING WRITE out of the record — across a boundary this package promises nothing
+       throws over. Refused where a sentence fits. */
+    if (!Array.isArray(rule.then) || rule.then.length === 0)
+      return { code: 'REQUIRED_MISSING', fix: `${id} says when, and does not say what it would then do.`, at: 'then' };
+
+    const risky = rule.then.some((a) => 'notify' in a || 'create' in a || 'suggest' in a);
     if (risky && !rule.once_per?.length)
       return {
         code: 'REQUIRED_MISSING',
@@ -416,6 +427,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
       const from = shape(rule.register);
       let cardinality = 1;
+      let knowable = each.length > 0;
       for (const field of each) {
         const kind = from?.fields[field] as { type?: string; values?: readonly string[] } | undefined;
         if (!kind)
@@ -428,10 +440,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           };
         /* AGAINST THE DECLARED CARDINALITY WHERE IT IS KNOWABLE. An enum's values are in the
            declaration, so a bound that its own axes can exceed is a bound that is wrong today
-           rather than at the thousandth row. */
-        cardinality *= kind.values?.length ?? 0;
+           rather than at the thousandth row.
+
+           A `list` HAS NO DECLARED LENGTH, and multiplying by zero for it turned the whole check
+           off — including for `enum × list`, where half of it was knowable. Unknown means the
+           check does not apply, not that the product is nothing. */
+        if (kind.values?.length) cardinality *= kind.values.length;
+        else knowable = false;
       }
-      if (cardinality > bound)
+      if (knowable && cardinality > bound)
         return {
           code: 'OUT_OF_BOUNDS',
           fix: `${id} can make ${cardinality} rows from what ${rule.register} declares, and its bound is ${bound}.`,
@@ -1269,7 +1286,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       /* 3′ — OUTSIDE THE ARRIVAL'S TRANSACTION, and deliberately. What is queued here is a model
          call somebody will pay for; the payload is already stored, and a draft that could roll the
          bytes back would make the record's memory depend on whether a proposal was worth making. */
-      if (out.ok && out.value.state === 'untriaged') {
+      /* A REDELIVERY IS NOT AN ARRIVAL. Every webhook sender retries and most mail servers do too,
+         and the redelivery branch returns the state it had the first time — so reading the state
+         alone re-observed the payload and re-queued the draft, once per retry, which is exactly the
+         bill `3′` exists to ration. */
+      if (out.ok && out.value.state === 'untriaged' && !out.value.redelivered) {
         const headers = arrival.headers ?? {};
         transaction(() => {
           observe(sql, clock.now(), [{ kind: 'ingest.unmatched', subject: shapeOf(arrival.channel, headers) }]);
@@ -1360,7 +1381,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       attempt(sql, transaction, () => decide(governDeps(), id, verdict, actor)),
 
     /** Put one back in the queue, for the change the gate accepted and could not land. */
-    reopen: (id: string): void => transaction(() => reopen(governDeps(), id)),
+    reopen: (id: string): Result<null> => transaction(() => reopen(governDeps(), id)),
 
     /* ── the outbox: work that must leave the record ────────────────── */
 

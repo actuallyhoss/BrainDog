@@ -161,7 +161,7 @@ function resolveRelative(
     if (typeof value !== 'string') return value;
     const day = resolveDay(value, nowMs);
     if (day === null) {
-      bad.push({ code: 'WHERE_MALFORMED', fix: `${field} is a day, and ${value} is not one.`, at: field });
+      bad.push({ code: 'WHERE_MALFORMED', fix: `${field} is a date, and ${value} is not one.`, at: field });
       return value;
     }
     return day;
@@ -175,7 +175,12 @@ function resolveRelative(
 
     const leaf = node as Record<string, unknown>;
     const field = typeof leaf.field === 'string' ? leaf.field : null;
-    if (!field || !Object.hasOwn(schema.fields, field) || schema.fields[field]?.type !== 'day') return node;
+    /* AN `instant` IS A DATE HERE TOO, and it has to be: `before` and `after` are legal on both, and
+       the sentence grammar resolves both to a plain day. Resolving only one of them meant a JSON
+       predicate on an `instant` reached SQL as the word — and `'2026-09-15T…' < 'today'` is true of
+       every instant there has ever been. Two renderings of one grammar, and they agree. */
+    const type = field && Object.hasOwn(schema.fields, field) ? schema.fields[field]?.type : undefined;
+    if (!field || (type !== 'day' && type !== 'instant')) return node;
 
     const op = DATED.find((o) => o in leaf);
     if (!op) return node;

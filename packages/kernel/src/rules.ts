@@ -146,7 +146,8 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     /* THE THREE THAT MUST BE ONCE. A `notify` on every write is how a person learns to ignore the
        product; a `create` on every write is the same failure with a worse consequence; and a
        `suggest` on every write fills the gate with the same question. */
-    const wants = rule.then.some((a) => 'notify' in a || 'create' in a || 'suggest' in a);
+    const then = Array.isArray(rule.then) ? rule.then : [];
+    const wants = then.some((a) => 'notify' in a || 'create' in a || 'suggest' in a);
     const key = onceKey(rule, fired.entry);
     if (key !== null) {
       if (!deps.schedule(key, { rule: rule.rule, entry: fired.entry.id, batch: fired.batch }, wants)) {
@@ -172,7 +173,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     const asks: { question: string; options: string[] }[] = [];
     let stop = false;
 
-    for (const action of rule.then) {
+    for (const action of then) {
       if ('tag' in action) {
         const tags = new Set(asList(fired.entry.fields.tags));
         tags.add(action.tag);
@@ -246,14 +247,22 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
 
     /* THE EXPANSION IS LAST, and it shares the triggering write's batch — so "undo this expansion"
        is one query rather than an archaeology of timestamps. */
+    let happened = Object.keys(patch).length > 0 || said.length > 0;
     for (const spec of made) {
-      const grew = expand(deps, rule, spec, fired);
-      if (grew.length) out.refused.push(...grew);
+      const grown = expand(deps, rule, spec, fired);
+      if (grown.refusals.length) out.refused.push(...grown.refusals);
+      if (grown.grew) happened = true;
     }
     for (const ask of asks) {
       const opened = deps.suggest(fill(ask.question, fired.entry, deps.nowMs), ask.options, `rule:${rule.rule}`);
       if (!opened.ok) out.refused.push(opened.refusal);
+      else happened = true;
     }
+
+    /* AND THE MARKER GOES BACK IF NOTHING HAPPENED. A `create` whose axis was an empty list, or
+       whose bound refused it, kept its marker for ever — so filling in the sizes, or fixing the
+       bound, could never take effect. A rule that did nothing has not fired. */
+    if (key !== null && !happened) deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ?", key);
 
     if (did.length) out.fired.push({ rule: rule.rule, actions: did });
     if (stop) {
@@ -342,41 +351,43 @@ function expand(
   rule: RuleDecl,
   spec: { register: string; each?: string[]; bound: number; fields: Record<string, string> },
   fired: Fired,
-): Refusal[] {
+): { refusals: Refusal[]; grew: boolean } {
+  const nothing = (refusal: Refusal) => ({ refusals: [refusal], grew: false });
+
   const bound = Math.floor(spec.bound);
   if (!Number.isFinite(bound) || bound < 1 || bound > CREATE_CEILING)
-    return [
+    return nothing(
       {
         code: 'OUT_OF_BOUNDS',
         fix: `${rule.rule} declares a bound of ${String(spec.bound)}, and a bound is between 1 and ${CREATE_CEILING}.`,
         at: 'bound',
       },
-    ];
+    );
 
   const axes = (spec.each ?? []).map((f) => asValues(fired.entry.fields[f]));
   if (axes.length > 2)
-    return [
-      {
-        /* TWO IS A MATRIX. Three is a cube, and nobody has ever wanted a cube. */
-        code: 'OUT_OF_BOUNDS',
-        fix: `${rule.rule} crosses ${axes.length} fields, and two is the most a matrix can be.`,
-        at: 'each',
-      },
-    ];
+    return nothing({
+      /* TWO IS A MATRIX. Three is a cube, and nobody has ever wanted a cube. */
+      code: 'OUT_OF_BOUNDS',
+      fix: `${rule.rule} crosses ${axes.length} fields, and two is the most a matrix can be.`,
+      at: 'each',
+    });
 
   const tuples: string[][] = axes.length === 0 ? [[]] : axes.length === 1 ? axes[0]!.map((a) => [a]) : axes[0]!.flatMap((a) => axes[1]!.map((b) => [a, b]));
   if (tuples.length > bound)
-    return [
-      {
-        code: 'OUT_OF_BOUNDS',
-        fix: `${rule.rule} would make ${tuples.length} rows in ${spec.register}, and its bound is ${bound}. Nothing was created.`,
-        at: 'bound',
-      },
-    ];
+    return nothing({
+      code: 'OUT_OF_BOUNDS',
+      fix: `${rule.rule} would make ${tuples.length} rows in ${spec.register}, and its bound is ${bound}. Nothing was created.`,
+      at: 'bound',
+    });
 
   const out: Refusal[] = [];
+  let grew = false;
   for (const tuple of tuples) {
-    const each = JSON.stringify(tuple);
+    /* THE TARGET REGISTER IS PART OF THE TUPLE. Without it, two `create` actions in one rule shared
+       a key — the second one's read found the first one's row and skipped, so the rule wrote half
+       of what it declared and refused nothing. */
+    const each = JSON.stringify([spec.register, ...tuple]);
     /* A ROW THAT IS ALREADY THERE IS THE POINT, not a failure — which is why this is a read rather
        than a caught constraint. Adding a colour next season creates only the new combinations, and
        a re-run that reported forty refusals would make the feature unusable. */
@@ -401,8 +412,9 @@ function expand(
       _each: each,
     });
     if (!made.ok) out.push(made.refusal);
+    else grew = true;
   }
-  return out;
+  return { refusals: out, grew };
 }
 
 /**
@@ -505,7 +517,7 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Resu
   const others = deps.rules(candidate.register).filter((r) => r.rule !== candidate.rule);
   const ranked = order([...others, candidate]);
   const setField = (r: RuleDecl): string | null => {
-    for (const a of r.then) if ('set' in a) return a.set.field;
+    for (const a of Array.isArray(r.then) ? r.then : []) if ('set' in a) return a.set.field;
     return null;
   };
   const mine = setField(candidate);
@@ -532,14 +544,24 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Resu
     /* WHO GOT THERE FIRST. Walking the rules ahead of the candidate with the same precedence the
        pass uses is the only way to answer "why did nothing happen" with a name rather than a shrug. */
     let taken: string | null = null;
-    if (mine)
-      for (const r of ranked) {
-        if (r.rule === candidate.rule) break;
-        if (setField(r) === mine && matches(deps, schema, r, entry)) {
-          taken = r.rule;
-          break;
-        }
+    let why = '';
+    for (const r of ranked) {
+      if (r.rule === candidate.rule) break;
+      if (!matches(deps, schema, r, entry)) continue;
+      /* AN EARLIER `stop` ENDS THE PASS, and a preview that ignored it promised changes that never
+         happen — the preview being wrong about the pass it exists to explain. It is checked before
+         the field contest, because a rule that stops takes the row whether or not it sets anything. */
+      if ((Array.isArray(r.then) ? r.then : []).some((a) => 'stop' in a)) {
+        taken = r.rule;
+        why = `${r.rule} stops the pass first`;
+        break;
       }
+      if (mine && setField(r) === mine) {
+        taken = r.rule;
+        why = `${r.rule} sets ${mine} first`;
+        break;
+      }
+    }
 
     if (taken) {
       out.lost++;
@@ -561,7 +583,7 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Resu
         spoken: entry.seq === null ? entry.id : `${entry.register}#${entry.seq}`,
         would: taken || suppressed ? [] : describe(deps, candidate, entry),
         ...(taken
-          ? { reason: `${taken} sets ${mine} first` }
+          ? { reason: why }
           : suppressed
             ? { reason: suppressed }
             : {}),
@@ -574,7 +596,7 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Resu
 /** What the actions would come to on one row, in the words a person would use. */
 function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
   const out: string[] = [];
-  for (const a of rule.then) {
+  for (const a of Array.isArray(rule.then) ? rule.then : []) {
     if ('tag' in a) out.push(`tag ${a.tag}`);
     else if ('untag' in a) out.push(`untag ${a.untag}`);
     else if ('set' in a) out.push(`set ${a.set.field} to ${fill(a.set.to, entry, deps.nowMs)}`);

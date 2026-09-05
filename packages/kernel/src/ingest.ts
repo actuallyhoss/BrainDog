@@ -111,6 +111,14 @@ export type Arrived = {
   confidence?: Confidence;
   /** The `rowset` somebody has to answer, when nothing was written. */
   suggestion?: string;
+  /**
+   * These bytes arrived before, and the record kept what it did the first time.
+   *
+   * IT IS NOT THE SAME AS `state`. A redelivered unmatched payload comes back `untriaged`, and the
+   * caller that read only the state re-ran everything an arrival earns — including the model call
+   * `3′` exists to ration.
+   */
+  redelivered?: true;
 };
 
 export type IngestDeps = {
@@ -169,6 +177,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
         state: already.state as Arrived['state'],
         wrote: receipt ? (JSON.parse(receipt.wrote) as string[]) : [],
         reason: 'this arrived before, and the record kept what it did the first time',
+        redelivered: true,
       });
     }
 
@@ -413,12 +422,19 @@ export function propose(deps: ProposeDeps, channel: Channel, headers: Record<str
   const shape = shapeOf(channel, headers);
   const since = instant(deps.nowMs - WINDOW_DAYS * 86_400_000);
 
+  /* THE SHAPE IS IN THE QUERY, not in a filter over a page of rows. A cap applied per CHANNEL and
+     then filtered in JS meant that on a busy inbox the three examples of a NEW shape were truncated
+     out before the filter ran — so the shape that most needed a pattern was the one that never got
+     one, at the third arrival or ever after. The expression is the same `from`-then-`to` fallback
+     `shapeOf` computes, so the two cannot disagree. */
+  const WHO = "COALESCE(NULLIF(TRIM(json_extract(headers, '$.from')), ''), NULLIF(TRIM(json_extract(headers, '$.to')), ''), '')";
   const seen = deps.sql
     .all<{ id: string; headers: string | null }>(
       /* `rowid` BREAKS THE TIE, because a burst arrives inside one millisecond and `ts` alone then
          orders them by nothing in particular — which would hand a person three examples in an order
          that is not the order they came in. */
-      "SELECT id, headers FROM inbox_raw WHERE state = 'untriaged' AND channel = ? AND ts >= ? ORDER BY ts DESC, rowid DESC LIMIT ?",
+      `SELECT id, headers FROM inbox_raw WHERE state = 'untriaged' AND channel = ? AND ts >= ?
+       AND ${WHO} IS NOT NULL ORDER BY ts DESC, rowid DESC LIMIT ?`,
       channel,
       since,
       SCAN,
