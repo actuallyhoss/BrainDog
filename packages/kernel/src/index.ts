@@ -40,6 +40,7 @@ import {
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import {
   bindGrant,
   getGrant,
@@ -69,6 +70,8 @@ export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
 export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, targetOf, windowMs } from './metrics.ts';
+export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
+export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
 export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
@@ -609,6 +612,29 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
   });
 
+  /** What the page layer reads through. It runs queries it did not write, so it takes callbacks. */
+  const pageDeps = (): PageDeps => ({
+    pages: () =>
+      sql
+        .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'page' AND superseded_at IS NULL AND retired = 0")
+        .map((r) => JSON.parse(r.body) as PageDecl),
+    metric: (id) => {
+      const row = sql.one<{ body: string }>(
+        "SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0",
+        `metric.${id}`,
+      );
+      return row ? (JSON.parse(row.body) as MetricDecl) : null;
+    },
+    read: (decl) => evaluateMetric(sql, decl, evalContext()),
+    list: (q) => {
+      const out = list({ register: q.register, ...(q.where ? { where: q.where } : {}), ...(q.limit ? { limit: q.limit } : {}) });
+      return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched }) : out;
+    },
+    schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
+    titleOf: (register) => registers.get(register)?.title ?? null,
+    ctx: evalContext(),
+  });
+
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
@@ -753,6 +779,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * somebody edits one.
      */
     metric: (decl: MetricDecl): Result<Reading> => evaluateMetric(sql, decl, evalContext()),
+
+    /* ── pages ──────────────────────────────────────────────────── */
+
+    /** Every page a person could open, templates expanded into one page per row. */
+    pages: () => resolvePages(pageDeps()).map((p) => ({ slug: p.slug, title: p.decl.title })),
+
+    /**
+     * One page, with every block run.
+     *
+     * ONE BLOCK'S REFUSAL IS ONE BLOCK. A page whose third block names a field nobody declared shows
+     * the other four and says what happened in the third — a page that fails whole is a page nobody
+     * can use to find out what is wrong with it.
+     */
+    page: (slug: string): Result<PageResult> => readPage(pageDeps(), slug),
+
+    /** One block, without a page around it — what a `draw` tool hands an agent. */
+    block: (decl: PageBlock): BlockResult => readBlock(pageDeps(), decl),
 
     /* ── the vault: what a key opens, never the key ───────────────────── */
 
