@@ -73,9 +73,18 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   /* C · faint at the large-text floor. The usage half — no faint below 24px — is a css-rules rule. */
   out.push(...pairsAgainstSurfaces(p, ['faint'], 3, 'C', scheme));
 
-  /* D · edge and the four -fill roles */
+  /* D · the load-bearing boundaries and the four -fill roles.
+     `accent-edge` belongs here and not in a check of its own: it is the visual boundary of a filled
+     control, which is the same SC 1.4.11 requirement at the same floor as `edge`. It was drawn at
+     the call site as a mix of the accent and `sunk` and measured 1.33:1 against `s3` in dark. */
   out.push(
-    ...pairsAgainstSurfaces(p, ['edge', 'earn-fill', 'warn-fill', 'danger-fill', 'info-fill'], 3, 'D', scheme),
+    ...pairsAgainstSurfaces(
+      p,
+      ['edge', 'accent-edge', 'earn-fill', 'warn-fill', 'danger-fill', 'info-fill'],
+      3,
+      'D',
+      scheme,
+    ),
   );
 
   /* E · the focus ring against both neighbours, and the two tones nine apart */
@@ -160,6 +169,25 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
           code: 'THEME_VALUE_INVALID',
           fix: `theme — ${role} contains "${b}", which a token value may never hold.`,
         });
+  }
+
+  /* Q · a control's fill against ITS OWN LABEL, in every state it can be in.
+     The generator solves hover and press to clear 4.5 against `accent-ink` and then nobody checked
+     the answer. That is exactly the pair that failed before they were generated at all — a control
+     measured 4.16:1 against its label at the moment somebody is about to press it, in one scheme
+     only — so the state a person sees least often is the one worth asserting. */
+  for (const role of ['accent', 'accent-hover', 'accent-press'] as const) {
+    const c = contrast(rgb(p[role]), rgb(p['accent-ink']));
+    if (c < 4.5)
+      out.push({
+        check: 'Q',
+        scheme,
+        level: 'refuse',
+        code: 'CONTRAST_FLOOR',
+        measured: r2(c),
+        fix: `theme — ${role} is ${r2(c)}:1 against its own label in ${scheme}. A control needs 4.5:1 in every state, not only at rest.`,
+      });
+    else out.push({ check: 'Q', scheme, level: 'pass', measured: r2(c) });
   }
 
   /* K · hue-only encoding. A link must differ in LIGHTNESS from the two things it is most likely to

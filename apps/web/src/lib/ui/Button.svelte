@@ -1,10 +1,14 @@
 <!--
   One control, three weights.
 
-  Every filled control carries a 1px `edge` border. That is not decoration: SC 1.4.11 asks for 3:1
-  on a component's visual boundary, and an accent fill cannot be guaranteed 3:1 against every
-  surface in every installed theme. The border makes the boundary legal by construction, so the
-  theme generator does not have to constrain the accent's lightness to make it so.
+  Every filled control carries a 1px border, and it is not decoration: SC 1.4.11 asks for 3:1 on a
+  component's visual boundary, and an accent fill cannot be guaranteed it — measured on the house
+  palette, `accent` is 2.88:1 against `s3` in dark and `accent-press` is 1.88:1.
+
+  That border used to be drawn here as `color-mix(in srgb, var(--accent) 72%, var(--sunk))`, which
+  made the boundary the failing part: 1.91:1 against `s3` in dark at rest and 1.33:1 on hover. The
+  theme now solves `--accent-edge` against the worst surface in the accent's own hue, and check D
+  holds it to the same floor as `edge`. It is legal by construction rather than by assertion.
 
   The invisible hit box is `.tap`: targets are designed at 44 x 44 CSS px on BOTH axes, counting
   `::before`, because a chevron drawn as a 20px glyph inside a 44px box is a 20px target if the
@@ -90,8 +94,8 @@
      the one loud thing on a screen is the thing the product is called. */
   .btn[data-weight='primary'] {
     background: var(--accent);
-    border-color: color-mix(in srgb, var(--accent) 72%, var(--sunk));
-    box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 60%, var(--sunk));
+    border-color: var(--accent-edge);
+    box-shadow: inset 0 -1px 0 0 var(--accent-edge);
     color: var(--accent-ink);
   }
 
@@ -103,12 +107,11 @@
      away from the label in whichever direction that is, and are checked when they are generated. */
   .btn[data-weight='primary']:hover:not(:disabled) {
     background: var(--accent-hover);
-    border-color: color-mix(in srgb, var(--accent-hover) 58%, var(--sunk));
   }
 
   .btn[data-weight='primary']:active:not(:disabled) {
     background: var(--accent-press);
-    box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--accent-press) 60%, var(--sunk));
+    box-shadow: inset 0 1px 0 0 var(--accent-edge);
   }
 
   .btn[data-weight='bare'] {

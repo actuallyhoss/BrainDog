@@ -53,6 +53,7 @@ export type Role =
   | 'danger-fill'
   | 'info-fill'
   | 'accent'
+  | 'accent-edge'
   | 'accent-hover'
   | 'accent-press'
   | 'accent-text'
@@ -366,6 +367,23 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   const accentHover = [stepped(0.05), stepped(0.07), stepped(0.09)].find(clears) ?? accent;
   const accentPress = [stepped(0.1), stepped(0.13), stepped(0.16)].find(clears) ?? accentHover;
 
+  /* 4c · THE BOUNDARY OF A FILLED CONTROL, for the same reason and by the same argument.
+     SC 1.4.11 asks 3:1 on the visual boundary of a component, and an accent fill cannot be
+     guaranteed it: measured on the house palette, `accent` is 2.88:1 against `s3` in dark and
+     `accent-press` is 1.88:1. The button knew that — its own comment says the border is what makes
+     the boundary legal — and then drew that border as `color-mix(in srgb, var(--accent) 72%,
+     var(--sunk))`, which is the same one-formula-two-schemes mistake as the hover state: 1.91:1
+     against `s3` in dark at rest and 1.33:1 on hover. The boundary was the failing part.
+
+     So it is solved here, against the WORST surface, in the accent's own hue, so a primary control
+     still reads as one shape rather than as a fill inside a grey outline. Falling back to `edge`,
+     which is already proven at the same floor, because a boundary that cannot be legal in the
+     accent's hue must still be legal. */
+  const accentEdge =
+    [acc.C, acc.C * 0.6, Cink]
+      .map((C) => hex(solveL(profile.edge, C, acc.H, worst, dir)))
+      .find((c) => contrast(rgb(c), worst) >= 3) ?? edge;
+
   /* 5 · intents. Solved for text, then SEARCHED for separability — searched, never repaired.
      There is no "retry once with relaxed chroma": a two-stage grid over chroma and contrast
      targets, taking the FIRST palette that clears check F, so the answer is the most saturated
@@ -474,6 +492,7 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     'danger-fill': fill(INTENT_HUE.danger),
     'info-fill': fill(INTENT_HUE.info),
     accent,
+    'accent-edge': accentEdge,
     'accent-text': accentText,
     'accent-ink': accentInk,
     'accent-hover': accentHover,

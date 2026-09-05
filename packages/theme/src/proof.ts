@@ -38,7 +38,10 @@ function separability(built: Built, scheme: Scheme) {
     ['good', p.earn],
     ['warn', p.warn],
     ['bad', p.danger],
-    ['info', p.accent],
+    /* `p.info`, NOT `p.accent`. Check F measures the four INTENTS; this printed the accent under the
+       word `info` and called it the same table, so the artefact that exists to make the gate
+       checkable by a person could print a passing figure for a pair the gate refuses. */
+    ['info', p.info],
   ];
   console.log(`\n  ${scheme.toUpperCase()} — intent separability, delta-E 2000 after Brettel 1997 at severity 1.0`);
   console.log('  ' + pad('pair', 14) + pad('protan', 9) + pad('deutan', 9) + 'tritan');

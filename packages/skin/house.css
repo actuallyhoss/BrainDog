@@ -21,6 +21,7 @@
     --danger-fill: #DB0018;
     --info-fill: #2863FA;
     --accent: #CF413A;
+    --accent-edge: #E6564D;
     --accent-text: #971B1A;
     --accent-ink: #FFFFFF;
     --accent-hover: #BD2F2B;
@@ -55,6 +56,7 @@
       --danger-fill: #F42A2C;
       --info-fill: #457DFF;
       --accent: #CF413A;
+      --accent-edge: #D3453D;
       --accent-text: #FF8D80;
       --accent-ink: #FFFFFF;
       --accent-hover: #BD2F2B;
@@ -89,6 +91,7 @@
     --danger-fill: #DB0018;
     --info-fill: #2863FA;
     --accent: #CF413A;
+    --accent-edge: #E6564D;
     --accent-text: #971B1A;
     --accent-ink: #FFFFFF;
     --accent-hover: #BD2F2B;
@@ -122,6 +125,7 @@
     --danger-fill: #F42A2C;
     --info-fill: #457DFF;
     --accent: #CF413A;
+    --accent-edge: #D3453D;
     --accent-text: #FF8D80;
     --accent-ink: #FFFFFF;
     --accent-hover: #BD2F2B;
@@ -159,6 +163,7 @@
       --danger-fill: #BC0013;
       --info-fill: #2154D8;
       --accent: #CF413A;
+      --accent-edge: #C33530;
       --accent-text: #971B1A;
       --accent-ink: #FFFFFF;
       --accent-hover: #BD2F2B;
@@ -193,6 +198,7 @@
         --danger-fill: #FF5F55;
         --info-fill: #6092FF;
         --accent: #CF413A;
+        --accent-edge: #F7665B;
         --accent-text: #ED6E62;
         --accent-ink: #FFFFFF;
         --accent-hover: #BD2F2B;
@@ -227,6 +233,7 @@
       --danger-fill: #BC0013;
       --info-fill: #2154D8;
       --accent: #CF413A;
+      --accent-edge: #C33530;
       --accent-text: #971B1A;
       --accent-ink: #FFFFFF;
       --accent-hover: #BD2F2B;
@@ -260,6 +267,7 @@
       --danger-fill: #FF5F55;
       --info-fill: #6092FF;
       --accent: #CF413A;
+      --accent-edge: #F7665B;
       --accent-text: #ED6E62;
       --accent-ink: #FFFFFF;
       --accent-hover: #BD2F2B;
@@ -294,6 +302,7 @@
     --danger-fill: #BC0013;
     --info-fill: #2154D8;
     --accent: #CF413A;
+    --accent-edge: #C33530;
     --accent-text: #971B1A;
     --accent-ink: #FFFFFF;
     --accent-hover: #BD2F2B;
@@ -328,6 +337,7 @@
       --danger-fill: #FF5F55;
       --info-fill: #6092FF;
       --accent: #CF413A;
+      --accent-edge: #F7665B;
       --accent-text: #ED6E62;
       --accent-ink: #FFFFFF;
       --accent-hover: #BD2F2B;
@@ -362,6 +372,7 @@
     --danger-fill: #BC0013;
     --info-fill: #2154D8;
     --accent: #CF413A;
+    --accent-edge: #C33530;
     --accent-text: #971B1A;
     --accent-ink: #FFFFFF;
     --accent-hover: #BD2F2B;
@@ -395,6 +406,7 @@
     --danger-fill: #FF5F55;
     --info-fill: #6092FF;
     --accent: #CF413A;
+    --accent-edge: #F7665B;
     --accent-text: #ED6E62;
     --accent-ink: #FFFFFF;
     --accent-hover: #BD2F2B;

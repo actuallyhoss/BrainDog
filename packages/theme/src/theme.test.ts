@@ -231,3 +231,62 @@ test('the forced-colors block restores every boundary the ladder loses', () => {
   assert.match(A11Y_FORCED_COLORS, /CanvasText/);
   assert.match(A11Y_FORCED_COLORS, /forced-color-adjust: none/);
 });
+
+/* ── a control is a component, in every state it has ─────────────────────── */
+
+test('THE BOUNDARY OF A FILLED CONTROL CLEARS 3:1 ON EVERY SURFACE', () => {
+  // The button's own comment said a border is what makes an accent fill legal under SC 1.4.11, and
+  // then drew that border as `color-mix(in srgb, var(--accent) 72%, var(--sunk))` — one formula
+  // doing opposite things in the two schemes. Measured: 1.91:1 against `s3` in dark at rest and
+  // 1.33:1 on hover, while the fill it was meant to rescue was 2.88:1. The boundary was the
+  // failing part.
+  for (const built of [HOUSE, HIGH_CONTRAST])
+    for (const scheme of ['dark', 'light'] as const) {
+      const p = built.schemes[scheme];
+      for (const surface of SURFACES) {
+        const c = contrast(fromHex(p['accent-edge']), fromHex(p[surface]));
+        assert.ok(c >= 3, `${built.id} ${scheme}: accent-edge is ${c.toFixed(2)}:1 on ${surface}`);
+      }
+    }
+});
+
+test('and it stays in the accent’s hue, so a primary control is one shape', () => {
+  // The fallback is the neutral `edge`, which is legal and grey. Taking it silently would turn every
+  // primary button into a fill inside a grey outline, so the test says which one was used.
+  for (const scheme of ['dark', 'light'] as const) {
+    const p = HOUSE.schemes[scheme];
+    const gap = Math.abs(rgbToLch(fromHex(p['accent-edge'])).H - rgbToLch(fromHex(p.accent)).H);
+    assert.ok(Math.min(gap, 360 - gap) < 5, `${scheme}: the accent edge fell back to the neutral one`);
+  }
+});
+
+test('every accent state clears 4.5:1 against its own label', () => {
+  // Solved in the generator and, until check Q, never checked afterwards — which is how the version
+  // before it measured 4.16:1 at the moment somebody presses the control, in one scheme only.
+  for (const built of [HOUSE, HIGH_CONTRAST])
+    for (const scheme of ['dark', 'light'] as const) {
+      const p = built.schemes[scheme];
+      for (const role of ['accent', 'accent-hover', 'accent-press'] as const) {
+        const c = contrast(fromHex(p[role]), fromHex(p['accent-ink']));
+        assert.ok(c >= 4.5, `${built.id} ${scheme}: ${role} is ${c.toFixed(2)}:1 against its label`);
+      }
+    }
+});
+
+test('and the checks would SAY so — a floor nothing measures is not a floor', () => {
+  // Both roles poked below their floor, so the two new assertions are held by the gate and not only
+  // by this file. `accent-edge` answers to D, the interaction states to Q.
+  const css = toCSS(HOUSE, HIGH_CONTRAST) + A11Y_FORCED_COLORS;
+  assert.equal(refusals(validate(HOUSE, css)).length, 0, 'the house theme does not pass its own checks');
+
+  const broken = {
+    ...HOUSE,
+    schemes: {
+      ...HOUSE.schemes,
+      dark: { ...HOUSE.schemes.dark, 'accent-edge': HOUSE.schemes.dark.s3, 'accent-press': HOUSE.schemes.dark['accent-ink'] },
+    },
+  };
+  const found = refusals(validate(broken, css));
+  assert.ok(found.some((f) => f.check === 'D'), 'an invisible control boundary was not refused');
+  assert.ok(found.some((f) => f.check === 'Q'), 'a control that matches its own label was not refused');
+});
