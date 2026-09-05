@@ -45,6 +45,7 @@ import { nextOccurrence, noteEvent, runDigest, type DigestDecl, type DigestDeps 
 import { dryRun, marker, runRules, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
+import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import {
   bindGrant,
   getGrant,
@@ -79,6 +80,8 @@ export { CHANNELS, headline, inQuietHours, localParts, nextOccurrence, render, r
 export { dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { CHANNELS as INGEST_CHANNELS, arrive, day as ingestDay, extract as extractField } from './ingest.ts';
+export { SIGNALS, analyse, observe } from './observe.ts';
+export type { Analysis, Finding, Observation, Signal } from './observe.ts';
 export type { Arrival, Arrived, Extractor, IngestDecl, IngestDeps } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
@@ -365,6 +368,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     const refused = schemaRefusal(state);
     if (refused) return refused;
 
+    const out = writing(register, ref, patch, w);
+    /* THE ONE WRITE A REFUSAL MAKES. Ten of the same refusal in a month across three days means the
+       DECLARATION is wrong rather than one caller having a bad afternoon — and a record that threw
+       its refusals away could never notice the difference. It is outside the transaction the write
+       rolled back, or the observation would roll back with it. */
+    if (!out.ok && out.refusal.at)
+      observe(sql, clock.now(), [{ kind: 'write.refused', subject: `${register}.${out.refusal.at}:${out.refusal.code}` }]);
+    return out;
+  }
+
+  function writing(register: string, ref: string | null, patch: Patch, w: WriteContext): Result<Entry> {
     return transaction(() => {
       const decl = registers.get(register);
       if (!decl)
@@ -740,6 +754,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     nowMs: clock.now(),
   });
 
+  /** The weekly look at what the record has noticed. One draft at most, and the governors first. */
+  const analyseNow = (): Analysis =>
+    analyse({
+      sql,
+      nowMs: clock.now(),
+      mint,
+      allocate,
+      /* THE DRAFT RIDES THE OUTBOX like everything else that needs a model: the analyser's job ends
+         at "this crossed a threshold", and what to propose about it is somebody else's turn. */
+      outbox: (payload) => void enqueue(sql, mint, clock.now(), 'infer.draft', payload),
+    });
+
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
 
@@ -830,6 +856,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return nextOccurrence(decl.schedule, clock.now(), recordIdentity(sql)?.tz ?? 'UTC');
     },
 
+    /**
+     * The weekly analysis.
+     *
+     * A LOOP THAT CANNOT RUN AWAY. The governors are why this is safe to run every week: a record
+     * too new or too quiet says nothing, one with three unanswered proposals does not add a fourth,
+     * and one whose recent predictions were mostly wrong stops proposing until somebody has looked.
+     */
+    analyse: () => {
+      analyseNow();
+      return clock.now() + 7 * 86_400_000;
+    },
+
     /* A credential due for rotation. It says the id and the kind and never the label — a
        notification naming "Stripe, live" tells whoever can see it which one is worth taking. */
     rotate: (row) => rotateDue(sql, vaultDeps('system'), row.payload),
@@ -872,7 +910,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * cannot tell that from there having been no matches.
    */
   function search(q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}): Hit[] {
-    return ftsSearch(sql, q, opts);
+    const hits = ftsSearch(sql, q, opts);
+    /* A SEARCH THAT FOUND NOTHING IS THE ONE OBSERVATION WORTH MAKING ABOUT READING. It is the
+       record failing at the thing it exists for, in a way nobody reports — people try one more
+       phrasing and give up. Five of them over ninety days on three separate days is a register
+       somebody expected to exist. */
+    if (hits.length === 0 && q.trim()) observe(sql, clock.now(), [{ kind: 'search.empty', subject: q.trim().toLowerCase().slice(0, 60) }]);
+    return hits;
   }
 
   /** Every live row's line, from nothing. What an import runs once at the end. */
@@ -981,6 +1025,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         arrival,
         transaction,
       ),
+
+    /**
+     * Record what happened, pre-aggregated by day.
+     *
+     * NONE OF IT LEAVES THE OBJECT. Observations live in the customer's own record, which is why a
+     * search term is fine here — that wall is what keeps this from being surveillance with a
+     * dashboard.
+     */
+    observe: (batch: readonly Observation[]): Result<number> => transaction(() => observe(sql, clock.now(), batch)),
+
+    /** Look at what the record has noticed, and propose at most one thing. */
+    analyse: (): Analysis => analyseNow(),
 
     /** One block, without a page around it — what a `draw` tool hands an agent. */
     block: (decl: PageBlock): BlockResult => readBlock(pageDeps(), decl),
