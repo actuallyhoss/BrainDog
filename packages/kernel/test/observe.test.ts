@@ -165,10 +165,85 @@ test('THE BRAKE: a class of proposal that keeps being wrong stops being proposed
   assert.equal(out.candidate, null);
   assert.match(out.suspended ?? '', /40% of the last twenty predictions were met/);
 
-  // Said out loud, once: a brake nobody is told about is a feature that quietly stopped working.
+  // Said out loud, once per suspension: a brake nobody is told about is a feature that quietly
+  // stopped working.
   assert.equal(sql.all("SELECT 1 FROM event WHERE note LIKE '%predictions were met%'").length, 1);
   k.analyse();
   assert.equal(sql.all("SELECT 1 FROM event WHERE note LIKE '%predictions were met%'").length, 1);
+  sql.close();
+});
+
+test('AND IT STAYS ON UNTIL 70%, WHICH IS WHAT THE TWO THRESHOLDS ARE FOR', async () => {
+  /* 24 §4.7's 70/60, and both numbers are a Wilson interval rather than a feeling: at n=20 the 95%
+     lower bound is 0.481 at p̂=0.70 and 0.387 at p̂=0.60. With only the lower number a record
+     oscillating around 60% suspends, resumes at 61% and suspends again, and every flap is an
+     unexplained change in whether the loop speaks at all. */
+  const { k, sql, clock } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  const score = (met: number, at: number) => {
+    sql.exec('DELETE FROM prediction');
+    for (let i = 0; i < 20; i++)
+      sql.exec(
+        `INSERT INTO prediction (id, for_decl, claim, measure, baseline, unit, target, window, score_at, scored_at, met, on_miss)
+         VALUES (?, 'd', 'c', '{}', 0, 'n', '1', '30d', ?, ?, ?, 'suggest')`,
+        `pr_${at}_${i}`,
+        new Date(at).toISOString(),
+        new Date(at - i * 1000).toISOString(),
+        i < met ? 1 : 0,
+      );
+  };
+
+  score(8, NOW);
+  assert.match(k.analyse().suspended ?? '', /40% of the last twenty/);
+
+  // 65% is above the lower threshold and below the upper one. Before the hysteresis this resumed.
+  clock.advance(DAY);
+  score(13, NOW + DAY);
+  assert.match(k.analyse().suspended ?? '', /65% of the last twenty/, 'the brake released at 65%, which is what flapping is');
+
+  clock.advance(DAY);
+  score(15, NOW + 2 * DAY);
+  assert.equal(k.analyse().suspended, null, 'and 75% never released it');
+  sql.close();
+});
+
+test('and every suspension is announced, not only the first in the record\'s life', async () => {
+  /* The guard was a `LIKE` over all of `event`, which is append-only — so the first suspension was
+     announced and every later one was silent. The loop then stops proposing with nothing in the
+     digest, the audit log or the app to say why, and 24 §7's warning is about exactly that: if the
+     brake never seems to fire, everybody quietly assumes it cannot. */
+  const { k, sql, clock } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  const score = (met: number, at: number) => {
+    sql.exec('DELETE FROM prediction');
+    for (let i = 0; i < 20; i++)
+      sql.exec(
+        `INSERT INTO prediction (id, for_decl, claim, measure, baseline, unit, target, window, score_at, scored_at, met, on_miss)
+         VALUES (?, 'd', 'c', '{}', 0, 'n', '1', '30d', ?, ?, ?, 'suggest')`,
+        `pr_${at}_${i}`,
+        new Date(at).toISOString(),
+        new Date(at - i * 1000).toISOString(),
+        i < met ? 1 : 0,
+      );
+  };
+
+  score(8, NOW);
+  k.analyse();
+  clock.advance(30 * DAY);
+  score(19, NOW + 30 * DAY);
+  assert.equal(k.analyse().suspended, null, 'it never came back');
+
+  clock.advance(30 * DAY);
+  score(6, NOW + 60 * DAY);
+  k.analyse();
+  assert.equal(
+    sql.all("SELECT 1 FROM event WHERE note LIKE '%suspended until somebody has looked%'").length,
+    2,
+    'the second suspension was silent',
+  );
+  // And coming off is an event too: somebody told the loop stopped is owed the sentence saying it
+  // started again, and it is what makes the brake's state readable from the log.
+  assert.equal(sql.all("SELECT 1 FROM event WHERE note LIKE '%proposing has resumed%'").length, 1);
   sql.close();
 });
 
@@ -278,7 +353,7 @@ test('A BAD KIND HALFWAY THROUGH A BATCH KEEPS NONE OF IT', async () => {
 
 test('AND A FINDING IT HAS ALREADY ASKED ABOUT IS NOT ASKED AGAIN EVERY WEEK', async () => {
   // This runs weekly and nothing recorded that it had proposed: one finding, one bill, for ever.
-  const { k, sql } = await record();
+  const { k, sql, clock } = await record();
   seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
   assert.equal(k.analyse().candidate?.subject, 'halden');
   assert.equal(sql.all('SELECT 1 FROM outbox').length, 1);
@@ -287,9 +362,86 @@ test('AND A FINDING IT HAS ALREADY ASKED ABOUT IS NOT ASKED AGAIN EVERY WEEK', a
   assert.equal(sql.all('SELECT 1 FROM outbox').length, 1);
 
   // And the next-best finding is taken instead, which is the same rule read the other way round.
+  // A week later, because the rate governor is the other half of §4.3 and one proposal a week is
+  // what it caps: two findings in one Tuesday is the queue-flooding this product is built against.
+  clock.advance(8 * DAY);
   seen(sql, 'ingest.unmatched', 'email:hsbc', [1, 2, 3]);
   assert.equal(k.analyse().candidate?.subject, 'email:hsbc');
   assert.equal(sql.all('SELECT 1 FROM outbox').length, 2);
+  sql.close();
+});
+
+test('ONE PROPOSAL A WEEK, WHICH IS NOT THE SAME GOVERNOR AS THREE OPEN AT ONCE', async () => {
+  /* Three-at-once caps the QUEUE and this caps the RATE. A record that answers every proposal the
+     day it arrives never reaches three open and could be asked something new every hour — and a
+     caller invoking `analyse()` twice in a day got two drafts and two model bills, because the
+     second half of 24 §4.3 was documented and never built. */
+  const { k, sql, clock } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  assert.equal(k.analyse().candidate?.subject, 'halden');
+
+  // A different finding, the same week. Nothing is deduped here — it has never been asked.
+  seen(sql, 'ingest.unmatched', 'email:hsbc', [1, 2, 3]);
+  const soon = k.analyse();
+  assert.equal(soon.candidate, null);
+  assert.match(soon.suspended ?? '', /already been drafted this week/);
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 1);
+
+  clock.advance(8 * DAY);
+  assert.equal(k.analyse().candidate?.subject, 'email:hsbc');
+  sql.close();
+});
+
+test('and a finding still true a week later comes back, because the dedupe is not for ever', async () => {
+  /* `outbox` rows are never purged, so "have I asked about this?" meant "ever" — and a finding
+     proposed once and dismissed was never raised again however much worse it got. Twelve refused
+     writes and four hundred were the same to it, and nothing said the record had decided to stop
+     mentioning it. */
+  const { k, sql, clock } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  assert.equal(k.analyse().candidate?.subject, 'halden');
+
+  clock.advance(8 * DAY);
+  assert.equal(k.analyse().candidate?.subject, 'halden', 'a finding that is still true went unmentioned for ever');
+  sql.close();
+});
+
+test('A DEFERRED QUESTION IS NOT AN UNANSWERED ONE', async () => {
+  /* `listGovernance` excludes deferred rows from the queue and this governor did not, so three
+     questions deferred to next year left the gate showing nothing to answer while the analyser
+     reported three proposals open and stopped for a year. The operator sees an empty queue and a
+     silent loop and has no way to connect them. */
+  const { k, sql } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  for (let i = 1; i <= 3; i++)
+    sql.exec(
+      `INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, defer_until)
+       VALUES (?, 'change', '{}', 'open', 'system', ?, '2027-01-01')`,
+      `SG${i}`,
+      new Date(NOW).toISOString(),
+    );
+  assert.equal(k.analyse().candidate?.subject, 'halden', 'three deferred questions silenced the loop for a year');
+  sql.close();
+});
+
+test('THE OTHER BRAKE: three of a class marked incorrect stops that class', async () => {
+  /* It is the only brake a young record can reach. The scored-prediction brake needs twenty scored
+     predictions, which take a year of accepted changes — so until this existed, a class the owner
+     had said was wrong three times kept arriving, which is how a gate gets muted. */
+  const { k, sql } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  seen(sql, 'suggestion.incorrect', 'change', [1, 2, 3]);
+  const out = k.analyse();
+  assert.equal(out.candidate, null);
+  assert.match(out.suspended ?? '', /marked incorrect in ninety days/);
+  sql.close();
+});
+
+test('and two of a class is not three', async () => {
+  const { k, sql } = await record();
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  seen(sql, 'suggestion.incorrect', 'change', [1, 2]);
+  assert.equal(k.analyse().candidate?.subject, 'halden');
   sql.close();
 });
 

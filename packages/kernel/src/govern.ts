@@ -279,10 +279,13 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       });
     if (!verdict.defer?.until || !verdict.defer?.why?.trim())
       return no<Decided>('REQUIRED_MISSING', 'Deferring says when to ask again, and why it can wait.', { at: 'defer' });
-    /* AND `when` IS A DATE. It is compared as a string against an instant, so `next Tuesday` sorts
-       after every date there will ever be — the suggestion leaves the open queue for ever while the
-       gate reports it as open. */
-    if (!Number.isFinite(Date.parse(verdict.defer.until)))
+    /* AND `when` IS AN ISO DATE, because it is compared as a STRING against an instant. Checking
+       that it parses is not the same check and lets both failures through: `Oct 1 2026` parses and
+       sorts after every date there will ever be, so the question leaves the open queue for ever
+       while the gate keeps reporting it open; `10/01/2026` parses and sorts before today, so the
+       deferral is a silent no-op. Both are the outcome this check exists to prevent, which is why
+       it now tests the shape rather than the parse. */
+    if (!/^\d{4}-\d{2}-\d{2}/.test(verdict.defer.until) || !Number.isFinite(Date.parse(verdict.defer.until)))
       return no<Decided>('VALUE_MALFORMED', `${verdict.defer.until} is not a date. Write 2026-10-01.`, { at: 'until' });
     deps.sql.exec('UPDATE suggestion SET defer_until = ?, defer_why = ? WHERE id = ?', verdict.defer.until, verdict.defer.why, id);
     return ok({ decision: null, suggestion: id, status: 'open', wrote: [] });

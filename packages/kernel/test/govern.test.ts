@@ -298,6 +298,16 @@ test('and deferring says a DATE, or the question leaves the queue for ever', asy
   const made = value<{ id: string }>(k.propose(options, 'p_1'));
   assert.equal(refusal(k.decide(made.id, { defer: { until: 'next Tuesday', why: 'busy' } }, 'p_2')).at, 'until');
   assert.equal(value<unknown[]>(k.governance('suggestion')).length, 1, 'the question left the queue');
+
+  /* AND PARSING IS NOT THE CHECK. Both of these parse and neither sorts: one lands after every date
+     there will ever be, so the question is gone for good while the gate reports it open; the other
+     lands before today, so the deferral is a silent no-op and the question never left. */
+  for (const until of ['Oct 1 2026', '10/01/2026', '2026/10/01'])
+    assert.equal(refusal(k.decide(made.id, { defer: { until, why: 'busy' } }, 'p_2')).at, 'until', until);
+
+  // The shape that does sort is accepted, and it is the one the refusal names.
+  value(k.decide(made.id, { defer: { until: '2027-01-01', why: 'after the quarter closes' } }, 'p_2'));
+  assert.equal(value<unknown[]>(k.governance('suggestion')).length, 0);
   sql.close();
 });
 

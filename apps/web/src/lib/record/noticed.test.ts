@@ -57,3 +57,13 @@ test('a search.empty finding never lands on a register grid', () => {
   for (const register of ['retainer', 'services', 'things'])
     assert.equal(noticed(register), null);
 });
+
+test('AND NOTHING AT ALL WHILE THE ANALYSER IS SUSPENDED', () => {
+  /* A crossed threshold is not the whole test. `analyse()` has four governors and a brake in front
+     of it, and on a record under a fortnight old, or with three questions already open, or whose
+     proposals keep coming back wrong, the threshold is crossed and no proposal is ever coming.
+     Drawing the strip there is the failure this reader exists to avoid, one level up. */
+  assert.equal(noticed('obligations', 'this record is under a fortnight old.'), null);
+  assert.equal(noticed('obligations', '3 proposals are already open and unanswered.'), null);
+  assert.ok(noticed('obligations', null), 'and a running loop still speaks');
+});

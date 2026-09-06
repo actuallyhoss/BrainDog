@@ -218,6 +218,17 @@ export const OBSERVED: Counted[] = [
   { signal: 'search.empty', subject: 'retainer', total: 6, days: 4 },
 ];
 
+/**
+ * Why the analyser is not proposing anything, if it is not.
+ *
+ * IT IS THE GOVERNORS' ANSWER, NOT A SECOND OPINION. `analyse()` returns `suspended` — a record too
+ * new, three questions already open, a proposal already drafted this week, a class the owner has
+ * called wrong three times, or the brake — and a screen that announced a crossed threshold while
+ * that sentence was non-null would be promising a proposal the record has already decided not to
+ * make. `null` here is a record whose loop is running, which is what this fixture is.
+ */
+export const SUSPENDED: string | null = null;
+
 /* ── the audit log ───────────────────────────────────────────────────────── */
 
 export const AUDIT: AuditEvent[] = [

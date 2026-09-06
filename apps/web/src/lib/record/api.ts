@@ -24,6 +24,7 @@ import {
   PACKS,
   OBSERVED,
   PAGES,
+  SUSPENDED,
   PEOPLE_ACCESS,
   QUESTIONS,
   DECIDED,
@@ -153,8 +154,19 @@ const FIXES: Readonly<Record<string, string>> = {
  *
  * ONE, NOT ALL OF THEM. `findingsFrom` sorts by how far past its own threshold each finding is, so
  * the first is the worst; a strip listing four is a second inbox again.
+ *
+ * AND NOTHING AT ALL WHILE THE ANALYSER IS SUSPENDED. A crossed threshold is not the whole test:
+ * `analyse()` has four governors and a brake in front of it, and on a record under a fortnight old,
+ * or one with three questions already open, or one whose proposals keep coming back wrong, the
+ * threshold is crossed and no proposal is ever coming. Drawing the strip there is the exact failure
+ * this function was written to avoid — a screen announcing a pattern while the analyser proposes
+ * nothing — with the governors rather than the thresholds as the thing it forgot to ask.
+ *
+ * IT IS A PARAMETER because the live app will hand it `analyse().suspended` from the record itself.
+ * The default is the fixture, so the mock reads the same way the product will.
  */
-export function noticed(register: string): Noticed | null {
+export function noticed(register: string, suspended: string | null = SUSPENDED): Noticed | null {
+  if (suspended !== null) return null;
   const prefix = `${register}.`;
   const first = findingsFrom(OBSERVED).find((f) => f.signal === 'write.refused' && f.subject.startsWith(prefix));
   if (!first) return null;
