@@ -203,13 +203,49 @@ export function analyse(deps: AnalyseDeps): Analysis {
      AND NOT ONE IT HAS ALREADY ASKED ABOUT. This runs weekly and nothing recorded that it had
      proposed, so one finding became one model-call draft every seven days for ever. The next-best
      finding is taken instead, which is the same rule read the other way round. */
-  const candidate = found.find((f) => !asked(deps, f)) ?? null;
+  const best = found.find((f) => !asked(deps, f)) ?? null;
+
+  /**
+   * ONE PROPOSAL IN TEN IS DRAWN FROM BELOW THE THRESHOLD — 24 §4.3's third governor, and the note
+   * beside it says it is not optional.
+   *
+   * GREEDILY EXPLOITING YOUR OWN BEST CURRENT MODEL DEGENERATES FASTEST. An AIES 2019 result found
+   * that an ORACLE greedy policy degenerates faster than a noisy one, and that growing the candidate
+   * pool at least linearly is a NECESSARY condition for avoiding it. Without this the loop converges
+   * on its own first three good ideas and then has nothing left to say — which looks, from outside,
+   * exactly like a loop that has finished its work.
+   *
+   * DETERMINISTIC, NOT RANDOM. Every tenth draft this record has ever queued is the exploratory one,
+   * counted off the outbox rather than off a coin — so two runs of the same record propose the same
+   * thing, a test can reach the branch without stubbing anything, and nobody has to wonder whether
+   * the odd proposal they are looking at was a fluke.
+   *
+   * AND IT IS MARKED. `exploratory: true` rides on the payload, so the draft says which it is, the
+   * gate can show it, and the prediction it earns is scored the same way as any other — which is
+   * the whole point: an exploration nobody grades is a guess.
+   */
+  const drafted = Number(
+    deps.sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'infer.draft'")?.n ?? 0,
+  );
+  const exploring = (drafted + 1) % EXPLORE_EVERY === 0;
+  const below = exploring ? findingsFrom(counts.filter((c) => !found.some((f) => f.subject === c.subject)), true) : [];
+  const candidate = (exploring ? (below.find((f) => !asked(deps, f)) ?? best) : best) ?? null;
 
   if (candidate)
-    deps.outbox({ signal: candidate.signal, subject: candidate.subject, n: candidate.n, window: candidate.window, why: candidate.why });
+    deps.outbox({
+      signal: candidate.signal,
+      subject: candidate.subject,
+      n: candidate.n,
+      window: candidate.window,
+      why: candidate.why,
+      ...(exploring && below.some((f) => f.subject === candidate.subject) ? { exploratory: true } : {}),
+    });
 
   return { candidate, found, suspended: null };
 }
+
+/** One in ten, and the number is 24 §4.3's. */
+const EXPLORE_EVERY = 10;
 
 const thresholdOf = (signal: Signal): number => DETECTORS.find((d) => d.signal === signal)?.n ?? 1;
 
@@ -224,11 +260,18 @@ export type Counted = { signal: Signal; subject: string; total: number; days: nu
  * reached and a proposal that never comes, or the other way round — and both read as the product
  * being wrong about itself, which is worse than either.
  */
-export function findingsFrom(counts: readonly Counted[]): Finding[] {
+export function findingsFrom(counts: readonly Counted[], below = false): Finding[] {
   const found: Finding[] = [];
   for (const d of DETECTORS)
     for (const row of counts)
-      if (row.signal === d.signal && row.total >= d.n && row.days >= d.days)
+      /* `below` INVERTS THE COUNT AND KEEPS THE DISPERSION. An exploration is a signal that has not
+         yet cleared its threshold but is not noise either — half the count over the same number of
+         separate days. A burst is still not a pattern, whichever side of the line it is on. */
+      if (
+        row.signal === d.signal &&
+        row.days >= d.days &&
+        (below ? row.total >= Math.ceil(d.n / 2) && row.total < d.n : row.total >= d.n)
+      )
         found.push({
           signal: d.signal,
           subject: row.subject,

@@ -506,3 +506,101 @@ test('WINDOWS says how far back each detector looked', () => {
   assert.equal(WINDOWS['write.refused'], 30);
   assert.equal(WINDOWS['search.empty'], 90);
 });
+
+/* ── 24 §7's suite B, which the doc calls the one that matters ───────────── */
+
+test('A HUNDRED RECORD-YEARS WITH NO PLANTED PATTERN PROPOSE NOTHING', async () => {
+  /* *"100 simulated record-years … with no planted pattern → zero proposals."* Every threshold in
+     this file is a claim about SPECIFICITY — that ordinary use does not trip it — and the only way
+     to check a claim about noise is to feed it noise. Without this the numbers are a story about
+     the rule of three rather than a property of the code.
+
+     THE NOISE IS THE SHAPE ORDINARY USE HAS: a handful of signals a week, spread across many
+     subjects, with nothing repeated often enough or widely enough to be a habit. A record that
+     searched for eleven different things once each did not develop a pattern; a record that
+     searched for one thing eleven times did. */
+  const { k, sql, clock } = await record();
+  let seed = 20260905;
+  const next = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+
+  let proposed = 0;
+  for (let week = 0; week < 100 * 52; week++) {
+    clock.advance(7 * DAY);
+    const day = new Date(clock.now()).toISOString().slice(0, 10);
+
+    /* Three to eight signals a week, each about a different thing. `subject` is drawn from a wide
+       pool on purpose: what makes something a pattern is that it is the SAME thing, repeatedly. */
+    const many = 3 + Math.floor(next() * 6);
+    for (let i = 0; i < many; i++) {
+      const kind = ['search.empty', 'write.refused', 'ingest.unmatched', 'query.scan'][Math.floor(next() * 4)]!;
+      const subject = `noise-${Math.floor(next() * 4000)}`;
+      sql.exec(
+        'INSERT INTO observation (kind, subject, day, n) VALUES (?, ?, ?, 1) ON CONFLICT (kind, subject, day) DO UPDATE SET n = n + 1',
+        kind,
+        subject,
+        day,
+      );
+    }
+
+    if (k.analyse().candidate) proposed++;
+  }
+
+  assert.equal(proposed, 0, `${proposed} proposals came out of a hundred record-years of noise`);
+  sql.close();
+});
+
+test('and the same suite WITH a planted pattern proposes it', async () => {
+  /* The other half, and it is what makes the first half mean something: a test that passes because
+     the analyser never proposes anything is not a specificity test, it is a broken analyser. */
+  const { k, sql, clock } = await record();
+  clock.advance(7 * DAY);
+  const day = (n: number) => new Date(clock.now() - n * DAY).toISOString().slice(0, 10);
+  for (const n of [1, 2, 3, 4, 5])
+    sql.exec("INSERT INTO observation (kind, subject, day, n) VALUES ('search.empty', 'retainer', ?, 1)", day(n));
+
+  assert.equal(k.analyse().candidate?.subject, 'retainer');
+  sql.close();
+});
+
+test('ONE PROPOSAL IN TEN COMES FROM BELOW THE THRESHOLD', async () => {
+  /* 24 §4.3's third governor, and the note beside it says it is not optional: greedily exploiting
+     your own best current model degenerates FASTEST — an AIES 2019 result found an ORACLE greedy
+     policy degenerates faster than a noisy one. Without this the loop converges on its own first
+     three good ideas and then has nothing left to say, which from outside looks exactly like a loop
+     that has finished its work. */
+  const { k, sql, clock } = await record();
+
+  // One finding over the line, and one under it that would never otherwise be spoken about.
+  seen(sql, 'search.empty', 'halden', [1, 2, 3, 4, 5]);
+  seen(sql, 'search.empty', 'retainer', [1, 2, 3]);
+
+  const drawn: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    clock.advance(8 * DAY);
+    const out = k.analyse();
+    if (out.candidate) drawn.push(out.candidate.subject);
+  }
+
+  assert.ok(drawn.includes('retainer'), 'the below-threshold finding was never explored');
+  const payloads = sql
+    .all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'infer.draft' ORDER BY rowid")
+    .map((r) => JSON.parse(r.payload) as { subject: string; exploratory?: boolean });
+  const exploratory = payloads.filter((p) => p.exploratory);
+  assert.equal(exploratory.length, 1, 'the budget is one in ten, and this drew a different number');
+  assert.equal(exploratory[0]?.subject, 'retainer');
+  // MARKED, so the gate can say which it is and the prediction it earns is scored the same way.
+  assert.ok(payloads.filter((p) => !p.exploratory).length > 0, 'every draft was exploratory');
+  sql.close();
+});
+
+test('and a below-threshold finding is still not noise', async () => {
+  // Half the count over the same number of separate days: a burst is not a pattern, whichever side
+  // of the line it is on. One search on one day is not an exploration, it is a Tuesday.
+  const { k, sql, clock } = await record();
+  seen(sql, 'search.empty', 'once', [1]);
+  for (let i = 0; i < 10; i++) {
+    clock.advance(8 * DAY);
+    assert.equal(k.analyse().candidate, null, 'a single observation was explored');
+  }
+  sql.close();
+});
