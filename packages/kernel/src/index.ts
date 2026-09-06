@@ -1317,7 +1317,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     score: (row) => {
       const { prediction } = JSON.parse(row.payload) as { prediction?: string };
       if (!prediction) return null;
-      const out = scorePrediction(sql, prediction, evalContext(), { mint, nowAt: instant(clock.now()) });
+      const out = scorePrediction(sql, prediction, evalContext(), {
+        mint,
+        nowAt: instant(clock.now()),
+        propose: (p, actor) => openSuggestion(governDeps(), actor, p as never),
+      });
       if (!out.ok) throw new TypeError(fixOf(out));
       return null;
     },

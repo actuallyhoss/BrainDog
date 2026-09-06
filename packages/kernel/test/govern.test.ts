@@ -546,6 +546,16 @@ test('AND THE PREDICTION IT WRITES IS ONE THE SCORER CAN READ', async () => {
   assert.ok(scored?.scored_at, 'the prediction was never scored, so the brake can never engage');
   assert.equal(scored.observed, 1, 'one open obligation, which is not the zero it predicted');
   assert.equal(scored.met, 0);
+
+  /* AND A MISS COMES BACK TO A PERSON. `on_miss` was read out of the row and never used: the column
+     exists, the default is `suggest`, 24 §4.6 writes the sentence out, and the score was written
+     while nothing reached anybody. A loop that measures and does not report has measured for its own
+     benefit. */
+  const asked = sql.one<{ id: string; opened_by: string }>("SELECT id, opened_by FROM suggestion WHERE opened_by = 'system'");
+  assert.ok(asked, 'the prediction missed and nobody was told');
+  const question = sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${asked.id}`);
+  assert.match(question?.to_v ?? '', /Supersede that decision, or say why you are keeping it/);
+  assert.match(question?.to_v ?? '', /observed 1/);
   sql.close();
 });
 

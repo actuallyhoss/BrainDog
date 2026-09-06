@@ -527,7 +527,20 @@ export function scorePrediction(
   sql: Sql,
   id: string,
   ctx: EvalContext,
-  deps: { mint: () => string; nowAt: string },
+  deps: {
+    mint: () => string;
+    nowAt: string;
+    /**
+     * File the question a missed prediction earns.
+     *
+     * `on_miss` WAS READ OUT OF THE ROW AND NEVER USED. The column exists, the default is `suggest`,
+     * 24 §4.6 writes the sentence out — *"The CIB pattern you approved on 1 Sep predicted unmatched
+     * payloads would fall to ≤1. They are at 7. Supersede it, or say why you are keeping it."* — and
+     * the score was written and nothing came back to anybody. A loop that measures and does not
+     * report is a loop that has measured for its own benefit.
+     */
+    propose?: (p: { question: string; body_kind: string; body: Record<string, unknown> }, actor: string) => Result<{ id: string }>;
+  },
 ): Result<Scored> {
   const row = sql.one<{ id: string; claim: string; measure: string; target: string; window: string; on_miss: string }>(
     'SELECT id, claim, measure, target, window, on_miss FROM prediction WHERE id = ? AND scored_at IS NULL',
@@ -585,6 +598,26 @@ export function scorePrediction(
     `prediction:${id}`,
     JSON.stringify({ observed, met }),
   );
+
+  /* AND A MISS GOES IN FRONT OF A PERSON. `supersede` or `keep`, with a reason either way — because
+     the interesting half is the second one: a prediction that missed and a decision somebody still
+     stands behind is a fact about the world rather than about the change, and the reason is where
+     that gets said. `system` opens it; nobody can answer their own question here. */
+  if (met === false && row.on_miss === 'suggest' && deps.propose)
+    deps.propose(
+      {
+        question: `${row.claim} — predicted ${row.target}, observed ${observed === null ? 'nothing' : observed}. Supersede that decision, or say why you are keeping it.`,
+        body_kind: 'options',
+        body: {
+          options: [
+            { id: 'supersede', label: 'Supersede it', because: 'the change did not do what it promised' },
+            { id: 'keep', label: 'Keep it', because: 'the prediction was wrong about the world, not the change' },
+          ],
+          requires_reason: true,
+        },
+      },
+      'system',
+    );
 
   return ok({ id, observed, met });
 }
