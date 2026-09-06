@@ -904,6 +904,15 @@ export function boot() {
   };
 }
 
+/**
+ * How many rows a register holds at all.
+ *
+ * NOT HOW MANY A PREDICATE MATCHED, which is what every other count on this page is. `19 §6` names
+ * five empty states and says collapsing them into one is the failure — and telling "your filter
+ * matched nothing" from "there is nothing here yet" needs exactly this number.
+ */
+export const heldBy = (register: string): number => (ROWS[register] ?? []).length;
+
 export type BlockResult = PageBlock & {
   rows: TableRow[];
   columns: Column[];

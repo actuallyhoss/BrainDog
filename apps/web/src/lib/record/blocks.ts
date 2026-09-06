@@ -300,7 +300,7 @@ export function toSegments(block: BlockResult) {
  * is broken", and both were drawn as the same emptiness.
  */
 export type Refusal = {
-  kind: 'no-results' | 'error';
+  kind: 'no-results' | 'no-data-yet' | 'error';
   title: string;
   body?: string;
   /** One line per clause that did not resolve, verbatim from `explain()`. */
@@ -308,7 +308,40 @@ export type Refusal = {
 };
 
 /** Everything a surface needs to draw one block: the segments, or the reason there are none. */
-export function draw(block: BlockResult): { segments: ReturnType<typeof parse>; refusal: Refusal | null } {
+export function draw(
+  block: BlockResult,
+  /**
+   * What the block's register holds, when it holds nothing yet.
+   *
+   * `19 §6` NAMES FIVE EMPTY STATES AND SAYS COLLAPSING THEM INTO ONE IS THE FAILURE — and this
+   * drew `no-results` for two of them, under the literal words the section quotes as the mistake:
+   * "Nothing here yet." A filter that matched nothing and a register with nothing in it are
+   * different facts about the record, and the second one is the one somebody can DO something about.
+   *
+   * THE CALLER SUPPLIES THE FACTS AND THIS DECIDES THE STATE, because a register's row count and its
+   * declared `holds:` sentence come from the record and this file draws blocks.
+   */
+  held?: { rows: number; name: string; holds?: string } | undefined,
+): { segments: ReturnType<typeof parse>; refusal: Refusal | null } {
+  /**
+   * Nothing matched — and which kind of nothing.
+   *
+   * THE AUTHOR'S OWN `empty:` WINS WHEREVER THEY WROTE ONE. "You owe nobody anything" is a result
+   * rather than a fault, and it is a better sentence than anything derived can be.
+   */
+  const nothing = (): Refusal => {
+    if (block.empty) return { kind: 'no-results', title: block.empty };
+    if (held && held.rows === 0)
+      return {
+        kind: 'no-data-yet',
+        title: `Nothing in ${held.name} yet.`,
+        /* BE SPECIFIC ABOUT WHAT WILL BE HERE (19 §6). The register declares the sentence; every
+           register does, and one screen was reading it. */
+        ...(held.holds ? { body: `${held.name} holds ${held.holds}.` } : {}),
+      };
+    return { kind: 'no-results', title: 'Nothing matched.' };
+  };
+
   if (block.authored?.length && block.register)
     return {
       segments: [],
@@ -333,15 +366,13 @@ export function draw(block: BlockResult): { segments: ReturnType<typeof parse>; 
   if (block.kind === 'table')
     return {
       segments: [],
-      refusal: block.rows.length
-        ? null
-        : { kind: 'no-results', title: block.empty ?? 'Nothing here yet.' },
+      refusal: block.rows.length ? null : nothing(),
     };
 
   const segments = toSegments(block);
   const blank = segments.every((s) => s.type === 'block' && s.rows.length === 0);
   return {
     segments,
-    refusal: blank ? { kind: 'no-results', title: block.empty ?? 'Nothing here yet.' } : null,
+    refusal: blank ? nothing() : null,
   };
 }

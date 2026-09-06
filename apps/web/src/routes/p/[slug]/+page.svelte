@@ -18,7 +18,7 @@
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
-  import { NOW, REGISTERS, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
+  import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
   import { draw } from '$lib/record/blocks.ts';
   import type { PageBlock, PageDecl } from '$lib/record/schema.ts';
   import { PAGES } from '$lib/record/data.ts';
@@ -448,7 +448,15 @@
         <!-- `drawn: false` means the server evaluated `when:` and said no. A page that shows a
              warning that does not apply teaches people to ignore warnings (06 §1). -->
         {#if block.drawn}
-          {@const drawn = draw(block)}
+          <!-- WHAT THE BLOCK'S REGISTER HOLDS, when it holds nothing yet. 19 §6 names five empty
+               states and says collapsing them into one is the failure; a filter that matched nothing
+               and a register with nothing in it are different facts, and the second is the one
+               somebody can act on. -->
+          {@const held = block.register ? REGISTERS[block.register] : undefined}
+          {@const drawn = draw(
+            block,
+            held ? { rows: heldBy(block.register!), name: held.name, ...(held.holds ? { holds: held.holds } : {}) } : undefined,
+          )}
           <!-- A `div` that takes `region` or `listitem`, and NOT a `<section>`. A section is already
                a region landmark once it is named, and ARIA does not let one be a `listitem` — so
                while arranging, every block on the page carried a role its element could not have.
