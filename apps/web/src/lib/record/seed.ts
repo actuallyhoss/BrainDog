@@ -22,6 +22,15 @@
 import { KINDS, isKind } from 'braindog-render';
 
 import { REGISTERS, ROWS } from './data.ts';
+import { amountOf } from './money.ts';
+
+/**
+ * The kinds that REDUCE rather than project.
+ *
+ * A kind that draws one row per row cannot add two opposite things together; a kind that sums can,
+ * and did. `bar` groups and sums, `gauge` sums against a target, `stat` reads a figure.
+ */
+const AGGREGATES = new Set(['bar', 'gauge', 'stat']);
 import type { FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 
 /** What each cell of a kind wants, in order. `any` takes the first field left. */
@@ -182,27 +191,63 @@ export function seedBlock(kind: string, register: string): PageBlock | null {
   if (!filled) return null;
   const columns = filled.slice(0, Math.max(spec.cells, wants.length));
 
+  /**
+   * AN AGGREGATE OVER A REGISTER WITH TWO SIDES ADDS THEM TOGETHER, and the preview reads as a fact.
+   *
+   * A seeded `bar` over obligations grouped every row by counterparty and summed the money — so
+   * "Halden Type Co GBP 42,490.00" was every obligation regardless of direction: money owed TO you
+   * and money you OWE, in one bar. `21 §3.3` says the preview is a shape problem and the config is
+   * "synthesised from the user's real data"; a figure made of two opposite things is neither shape
+   * nor data, it is a wrong number in a tile somebody chooses a block from.
+   *
+   * THE FIRST ENUM'S COMMONEST VALUE, because that is a real subset the reader can check: the bar
+   * says one side of the register and the heading says which. It is a starting predicate to be
+   * edited, which is what everything else in a seeded block is too.
+   */
+  const partition = ((): { field: string; value: string } | null => {
+    if (!AGGREGATES.has(kind)) return null;
+    const rows = ROWS[register] ?? [];
+    for (const f of decl.fields)
+      if (f.type === 'enum' && (f.values?.length ?? 0) > 1 && !columns.some((c) => c.field === f.id)) {
+        const counted = new Map<string, number>();
+        for (const e of rows) {
+          const v = String(e.fields[f.id] ?? '');
+          if (v) counted.set(v, (counted.get(v) ?? 0) + 1);
+        }
+        const top = [...counted].sort((a, b) => b[1] - a[1])[0];
+        if (top) return { field: f.id, value: top[0] };
+      }
+    return null;
+  })();
+
   /* A GAUGE WITHOUT A TARGET DRAWS NOTHING, and a preview that draws nothing teaches somebody that
-     the kind is broken. There is no target in the record — a budget is a decision, not a column —
-     so the seed proposes one from the rows it is about to show: double the current sum, rounded, so
-     the bar lands near half and the shape reads as a gauge rather than as full or empty. It is a
-     starting number to be edited, which is what everything else in a seeded block is too. */
+     the kind is broken — which is what it did: `Number({ amount, currency })` is `NaN`, so a money
+     column summed to `NaN`, the target was dropped, and the tile read `— of —` in the one place the
+     picker is meant to show a shape. Money is an object with its own currency, and reading it as a
+     number is the mistake minor units exist to make impossible everywhere else.
+
+     There is no target in the record — a budget is a decision, not a column — so the seed proposes
+     one from the rows it is about to show: double the current sum, rounded, so the bar lands near
+     half and the shape reads as a gauge rather than as full or empty. */
   const target =
     kind === 'gauge'
       ? (() => {
           const of = columns[1]?.field;
           if (!of) return undefined;
-          const sum = (ROWS[register] ?? []).reduce((a, e) => a + Number(e.fields[of] ?? 0), 0);
+          const sum = (ROWS[register] ?? [])
+            .filter((e) => !partition || String(e.fields[partition.field] ?? '') === partition.value)
+            .reduce((a, e) => a + (amountOf(e.fields[of]) ?? (Number(e.fields[of]) || 0)), 0);
           return sum > 0 ? Math.round(sum * 2) : undefined;
         })()
       : undefined;
 
   return {
     kind,
-    heading: decl.name,
+    heading: partition ? `${decl.name} — ${partition.value.replace(/_/g, ' ')}` : decl.name,
     span: spec.minSpan,
     source: `register.${register}`,
     columns,
+    ...(partition ? { where: `${partition.field} is ${partition.value.replace(/_/g, ' ')}` } : {}),
     ...(target === undefined ? {} : { target }),
     limit: 6,
     /* Mandatory on every source-bound block (06 §1.1), and it renders on day one — which is exactly

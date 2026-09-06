@@ -22,6 +22,7 @@ import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, isPro
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
+import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
 import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
@@ -598,4 +599,27 @@ test('A URL CARRIES THE VALUE THE FIELD DECLARES, and one spelling reaches the c
   } as never);
   assert.match(href, /direction:in:owed_to_me/, 'a metric handed the reader a spelling its own control does not know');
   assert.ok(!href.includes('%20'), 'a URL carried a spoken value with spaces in it');
+});
+
+test('A SEEDED AGGREGATE DOES NOT ADD TWO OPPOSITE THINGS TOGETHER', () => {
+  /* A `bar` over obligations grouped every row by counterparty and summed the money — so "Halden
+     Type Co GBP 42,490.00" was every obligation regardless of direction: money owed TO you and money
+     you OWE, in one bar, in a tile somebody chooses a block from. 21 §3.3 says the preview's config
+     is "synthesised from the user's real data"; a figure made of two opposite things is neither. */
+  const bar = seedBlock('bar', 'obligations')!;
+  assert.ok(bar.where, 'a seeded bar sums the whole register');
+  assert.match(bar.where!, /direction is owed/, 'it does not narrow to one side of the register');
+  assert.match(bar.heading!, /owed/, 'the heading does not say which side it is about');
+
+  /* AND A GAUGE OVER MONEY GETS A TARGET. `Number({ amount, currency })` is NaN, so the sum was NaN,
+     the target was dropped, and the tile read `— of —` — in the one place the picker exists to show
+     a shape. Money is an object with its own currency; reading it as a number is the mistake minor
+     units exist to make impossible everywhere else. */
+  const gauge = seedBlock('gauge', 'obligations')!;
+  assert.equal(typeof gauge.target, 'number', 'a gauge over money draws no target, so it draws nothing');
+  assert.ok((gauge.target ?? 0) > 0);
+
+  /* A kind that draws one row per row cannot add two things together, so it is not narrowed — the
+     rule is about reducing, not about every block. */
+  assert.equal(seedBlock('table', 'obligations')?.where, undefined);
 });
