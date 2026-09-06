@@ -93,7 +93,7 @@ export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
 export { TRAVELS, decode, encode, projection, tables } from './dogl.ts';
-export { atMs, expandRepeat, offsetMs, remindersFor } from './schedule.ts';
+export { atMs, expandRepeat, offsetMs, remindersFor, shiftFrom } from './schedule.ts';
 export type { Remindable, Repeat, Reminder } from './schedule.ts';
 export type { ImportReport, Section, TableShape } from './dogl.ts';
 export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';

@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { atMs, expandRepeat, offsetMs, openRecord, type Declaration, type Kernel } from '../src/index.ts';
+import { atMs, expandRepeat, offsetMs, openRecord, shiftFrom, type Declaration, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -240,4 +240,30 @@ test('and hands over what is due when the time comes', async () => {
   clock.set(NOW + 11 * DAY);
   assert.equal(k.due().length, 2);
   sql.close();
+});
+
+test('A MONTH IS NOT THIRTY DAYS, and this file used to do both', async () => {
+  /* `expandRepeat` steps months on the calendar and clamps — the 31st of a 30-day month is its 30th
+     — while `remindersFor` multiplied by `30 * DAY_MS`. So `remind: ['-1m']` on 31 March fired on
+     1 March instead of 28 February: three days early, on the one feature whose whole job is to be on
+     the right day. Two answers for one word, in one file. */
+  const march31 = Date.UTC(2026, 2, 31, 12);
+  assert.equal(new Date(shiftFrom(march31, '-1m')!).toISOString().slice(0, 10), '2026-02-28');
+  assert.equal(new Date(shiftFrom(Date.UTC(2028, 2, 31, 12), '-1m')!).toISOString().slice(0, 10), '2028-02-29');
+  assert.equal(new Date(shiftFrom(Date.UTC(2026, 0, 31, 12), '+1m')!).toISOString().slice(0, 10), '2026-02-28');
+});
+
+test('and days and weeks are still exactly what they say', () => {
+  const at = Date.UTC(2026, 2, 31, 12);
+  assert.equal(shiftFrom(at, '-7d'), at - 7 * DAY);
+  assert.equal(shiftFrom(at, '+2w'), at + 14 * DAY);
+  assert.equal(shiftFrom(at, '0d'), at);
+  assert.equal(shiftFrom(at, 'a week before'), null);
+});
+
+test('a month shift keeps the clock it was anchored at', () => {
+  // A reminder on a dated field is noon UTC by `atMs`'s rule; one on an instant carries the time it
+  // was set for, and a month's shift must not silently move it to midday.
+  const at = Date.UTC(2026, 2, 31, 9, 30);
+  assert.equal(new Date(shiftFrom(at, '-1m')!).toISOString(), '2026-02-28T09:30:00.000Z');
 });

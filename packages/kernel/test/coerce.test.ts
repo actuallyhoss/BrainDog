@@ -109,7 +109,22 @@ test('a day is not an instant, and the refusal says which type was wanted', () =
 test('an instant keeps its moment and loses its offset', () => {
   assert.equal(take(f('instant'), '2026-09-05T12:00:00+02:00'), '2026-09-05T10:00:00.000Z');
   assert.equal(take(f('instant'), '2026-09-05T10:00:00Z'), '2026-09-05T10:00:00.000Z');
-  assert.match(refuse(f('instant'), 'yesterday').fix, /not an instant/);
+  assert.match(refuse(f('instant'), 'yesterday').fix, /names no timezone|not an instant/);
+});
+
+test('AND AN INSTANT WITH NO TIMEZONE IS REFUSED, rather than read as the host is set', () => {
+  /* `2026-09-05T02:00:00` with no offset is read as LOCAL time by the ECMAScript grammar, and
+     `instant()` then restamps it as UTC — so on a self-host at UTC+3 it was stored as
+     `2026-09-04T23:00:00Z`: the PREVIOUS DAY for every reader that slices ten characters off it,
+     every digest window and every `before today`. The same host in another timezone stored a
+     different moment for the same string, which is the one thing a record that syncs cannot do. */
+  for (const said of ['2026-09-05T02:00:00', '2026-09-05T02:00', 'Sep 5 2026 10:00', '2026-09-05 02:00:00'])
+    assert.match(refuse(f('instant'), said).fix, /names no timezone/, said);
+
+  // And every spelling that DOES carry one still works, including a compact offset.
+  assert.equal(take(f('instant'), '2026-09-05T02:00:00+0300'), '2026-09-04T23:00:00.000Z');
+  assert.equal(take(f('instant'), '2026-09-05T02:00:00-05:00'), '2026-09-05T07:00:00.000Z');
+  assert.equal(take(f('instant'), '2026-09-05T02:00:00z'), '2026-09-05T02:00:00.000Z');
 });
 
 /* ── the rest of the sixteen ─────────────────────────────────────────────── */

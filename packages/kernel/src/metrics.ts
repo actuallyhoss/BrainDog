@@ -571,7 +571,10 @@ export function scorePrediction(
   sql.exec(
     'UPDATE prediction SET scored_at = ?, observed = ?, met = ? WHERE id = ?',
     deps.nowAt,
-    observed === null ? null : Math.round(observed),
+    /* THE SAME INTEGER RULE AS A SERIES POINT. `Math.round` alone stored a ratio of 0.375 as `0`
+       while `met` was computed from 0.375 and stored as `1` — a row reading "target ≥ 0.3 met,
+       observed 0", which is the record contradicting itself in its own governance table. */
+    observed === null ? null : stored(observed),
     met === null ? null : met ? 1 : 0,
     id,
   );
@@ -629,6 +632,22 @@ export type Snapshot = { series: string; wrote: number; backfilled: number; miss
  * shape for a month, and the record already holds the rows every one of those days is a question
  * about. The backfill never overwrites: a day that has a point keeps it.
  */
+/**
+ * The unit a fractional figure is stored in, and the factor that gets it there.
+ *
+ * `metric_point.value` IS AN INTEGER, on purpose — 08 §8's series model stores a provider's `12.5%`
+ * as `1250` basis points rather than as a float, so two records comparing a series never disagree
+ * about the last bit. But `Math.round` alone is not that model, it is the loss without the scale: a
+ * `ratio` of 0.375 was written as `0` on EVERY day of a backfill, so a series whose whole point is a
+ * trend read as a flat line of zeroes — under a comment two lines above warning that a series of
+ * zeroes cannot tell nothing from no answer.
+ */
+const BASIS = 'pct.bp';
+const BASIS_SCALE = 10_000;
+
+/** What goes in the integer column: the value itself, or basis points when it is fractional. */
+const stored = (value: number): number => (Number.isInteger(value) ? value : Math.round(value * BASIS_SCALE));
+
 export function snapshot(
   sql: Sql,
   decl: MetricDecl,
@@ -657,8 +676,8 @@ export function snapshot(
        ON CONFLICT (series, grain, at) DO UPDATE SET value = excluded.value, unit = excluded.unit, n = excluded.n, wrote_at = excluded.wrote_at`,
       decl.metric,
       day,
-      Math.round(read.value.value),
-      read.value.unit ?? '',
+      stored(read.value.value),
+      read.value.unit ?? (Number.isInteger(read.value.value) ? '' : BASIS),
       read.value.rows,
       decl.source,
       deps.nowAt,

@@ -210,7 +210,22 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
 
     case 'instant': {
       if (typeof value !== 'string') return malformed(`${at} takes an instant.`);
-      const ms = Date.parse(value.trim());
+      const said = value.trim();
+      /* AN INSTANT CARRIES ITS ZONE, and this took `Date.parse` at its word. `2026-09-05T02:00:00`
+         with no offset is read as LOCAL time by the ECMAScript grammar, and `instant()` then
+         restamps it as UTC — so on a self-host at UTC+3 that value was stored as
+         `2026-09-04T23:00:00Z`: the PREVIOUS DAY for every `slice(0, 10)` reader, every digest
+         window and every `before today`. The same host in another timezone stores a different
+         moment for the same string, which is the one thing a record that syncs cannot do.
+
+         And it is inconsistent with itself: a bare `YYYY-MM-DD` is parsed as UTC by the same
+         function, so the identical day with and without a time landed on different days.
+
+         The `day` type next door checks its shape rather than trusting the parse, for the same
+         reason. This is that check for an instant: a zone, or a sentence saying so. */
+      if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(said))
+        return malformed(`${at} is ${said}, which names no timezone. Write 2026-09-05T02:00:00Z, or the offset it was recorded in.`);
+      const ms = Date.parse(said);
       if (!Number.isFinite(ms)) return malformed(`${at} is not an instant this record can read.`);
       return good(instant(ms));
     }

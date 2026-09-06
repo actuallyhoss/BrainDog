@@ -20,6 +20,7 @@ import type { Sql } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
 import { backoffMs, openChangeSuggestion, summary, type AckDeps } from './outbox.ts';
+import { resolveDay } from '@braindog/where';
 
 const DAY_MS = 86_400_000;
 const OFFSET = /^([+-]?)(\d{1,4})([dwm])$/;
@@ -36,12 +37,47 @@ export type Repeat = {
   workday?: 'previous' | 'next';
 };
 
-/** `-7d` as milliseconds. `null` when it is not an offset, which is a declaration to refuse. */
+/**
+ * `-7d` as milliseconds. `null` when it is not an offset, which is a declaration to refuse.
+ *
+ * DAYS AND WEEKS ONLY. A month is not a fixed number of milliseconds, and this used to answer thirty
+ * days for one — in the same file whose `repeat` arithmetic clamps to the calendar. Use `shiftFrom`,
+ * which does both and agrees with itself.
+ */
 export function offsetMs(text: string): number | null {
   const m = OFFSET.exec(text.trim());
   if (!m) return null;
   const n = Number(m[2]) * (m[1] === '-' ? -1 : 1);
   return n * (m[3] === 'd' ? DAY_MS : m[3] === 'w' ? 7 * DAY_MS : 30 * DAY_MS);
+}
+
+/**
+ * An anchor shifted by an offset, in the arithmetic the unit actually has.
+ *
+ * A MONTH IS NOT THIRTY DAYS, and this file did both. `expandRepeat` steps months on the calendar
+ * and clamps — the 31st of a 30-day month is its 30th — while `remindersFor` multiplied by
+ * `30 * DAY_MS`, so `remind: ['-1m']` on 31 March fired on 1 March instead of 28 February: three
+ * days early, on the one feature whose whole job is to be on the right day. Two answers for one
+ * word, in one file.
+ *
+ * `resolveDay` IS THE SHARED ARITHMETIC — the same function `where`'s predicates and the cash walk
+ * step months with, so a reminder and a filter written for the same month land together.
+ */
+export function shiftFrom(atMs: number, offset: string): number | null {
+  const m = OFFSET.exec(offset.trim());
+  if (!m) return null;
+  if (m[3] !== 'm') {
+    const ms = offsetMs(offset);
+    return ms === null ? null : atMs + ms;
+  }
+  const day = resolveDay(`${m[1] === '-' ? '-' : '+'}${m[2]}m`, atMs);
+  if (!day) return null;
+  /* THE CLOCK OF THE ANCHOR IS KEPT. A reminder on a dated field is noon UTC by `atMs`'s own rule;
+     one on an instant carries the time it was set for, and a month's shift must not silently move
+     it to midday. */
+  const at = new Date(atMs);
+  const [y = 0, mo = 1, d = 1] = day.split('-').map(Number);
+  return Date.UTC(y, mo - 1, d, at.getUTCHours(), at.getUTCMinutes(), at.getUTCSeconds(), at.getUTCMilliseconds());
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString();
@@ -152,9 +188,8 @@ export function remindersFor(
   const out: Reminder[] = [];
   for (const at of occurrences)
     for (const offset of offsets) {
-      const shift = offsetMs(offset);
-      if (shift === null) continue;
-      const dueAt = at + shift;
+      const dueAt = shiftFrom(at, offset);
+      if (dueAt === null) continue;
       if (dueAt < now) continue;
       out.push({
         key: `${entry.id}:${field.id}:${iso(at)}:${offset}`,
