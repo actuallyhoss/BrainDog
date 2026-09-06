@@ -18,7 +18,7 @@
  */
 
 import type { Refusal, Result } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import { no, ok, refused } from '@braindog/ports';
 import type { Predicate, Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
@@ -142,7 +142,9 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
     }
     const listed = deps.list({ register: decl.for.register, where: said.predicate, limit: 200 });
     if (!listed.ok) {
-      refuse(listed.refusal);
+      /* A LIST CANNOT CONFLICT — nothing was written — so the guard is the type system agreeing
+         rather than a case anybody expects to see. */
+      if (refused(listed)) refuse(listed.refusal);
       continue;
     }
     const title = deps.titleOf(decl.for.register);
@@ -213,7 +215,8 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
         const at = cell.metric.indexOf(':');
         const param = at < 0 ? undefined : cell.metric.slice(at + 1);
         const read = deps.read(param === undefined ? decl : (fill(decl, null, param) as MetricDecl));
-        return read.ok ? { ...cell, reading: read.value } : { ...cell, reading: null, refusal: read.refusal };
+        if (read.ok) return { ...cell, reading: read.value };
+        return refused(read) ? { ...cell, reading: null, refusal: read.refusal } : { ...cell, reading: null };
       }),
     };
   }
@@ -259,7 +262,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   if (limit === 0) return { ...base, matched: 0 };
   const listed = deps.list({ register, where: said.predicate, limit });
-  if (!listed.ok) return { ...base, refusals: [listed.refusal] };
+  if (!listed.ok) return { ...base, refusals: refused(listed) ? [listed.refusal] : [] };
 
   /* THE COLUMNS ARE CHECKED AGAINST THE REGISTER. A column naming a field nobody declared renders as
      an empty cell under a heading that promises one, which reads as "no value" rather than as "no

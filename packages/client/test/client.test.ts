@@ -12,6 +12,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { codeOf, conflicted } from '@braindog/ports';
+
 import { createClient } from '../src/index.ts';
 import { ROUTES } from '@braindog/host';
 import { start } from '../../../apps/selfhost/src/server.ts';
@@ -134,8 +136,13 @@ test('A REFUSAL IS A VALUE, WITH ITS SENTENCE INTACT, and nothing throws for one
     assert.ok(gone.allowed?.includes('obligations'), 'the refusal lost its list on the way through');
 
     value(await c.client.create({ register: 'obligations', fields: { what: 'a' } }));
-    const stale = refusal(await c.client.update({ register: 'obligations', seq: 1, patch: { what: 'b' }, version: 99 }));
-    assert.equal(stale.code, 'VERSION_STALE');
+    /* A CONFLICT SURVIVES THE TRIP TOO, and it is the arm that would have been quietly lost: the
+       client passes the envelope through, so a body arriving as `{ ok: false, conflict }` reaches a
+       caller reading `.refusal.fix` unless the client knows there are three arms. */
+    const stale = await c.client.update({ register: 'obligations', seq: 1, patch: { what: 'b' }, version: 99 });
+    assert.ok(conflicted(stale));
+    assert.equal(codeOf(stale), 'VERSION_STALE');
+    assert.ok(stale.conflict.current, 'the row did not survive the trip, and it is what a re-apply needs');
   } finally {
     await c.close();
   }

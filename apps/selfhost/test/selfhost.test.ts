@@ -159,8 +159,10 @@ test('the new reads answer, and a page names the blocks it could not draw', asyn
     assert.equal(grants.status, 200, 'the vault index is a read like any other');
     assert.deepEqual(grants.body.value, []);
 
+    // 422 and not 404: a slug nobody declared is a value the caller can fix, and 30 §6 keeps 404 for
+    // a route that does not exist rather than for a thing a route could not find.
     const missing = await s.call('page?slug=nonsense');
-    assert.equal(missing.status, 404);
+    assert.equal(missing.status, 422);
     assert.equal(missing.body.refusal?.code, 'PAGE_UNKNOWN');
   } finally {
     await s.close();
@@ -176,7 +178,7 @@ test('a refusal comes back over HTTP with its sentence and a status that means s
     assert.match(bad.body.refusal?.fix ?? '', /minor units/);
 
     const gone = await s.call('schema?register=atlantis');
-    assert.equal(gone.status, 404);
+    assert.equal(gone.status, 422);
     assert.ok(gone.body.refusal?.allowed?.includes('obligations'));
 
     const nothing = await s.call('nonsense');

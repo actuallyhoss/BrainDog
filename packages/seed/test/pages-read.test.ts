@@ -17,6 +17,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, slugify, type Kernel, type PageResult } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
+import { refused, sayOf } from '@braindog/ports';
 
 import { LOOKUPS, NOW, PAGES, THINGS, installSeed } from '../src/index.ts';
 
@@ -53,13 +54,13 @@ async function seeded(): Promise<{ k: Kernel; sql: Sql & { close(): void } }> {
   const sql = openSqlite();
   const k = await openRecord(sql, { now: () => NOW }, { lookups: LOOKUPS });
   const out = await installSeed(k);
-  assert.ok(out.ok, out.ok ? '' : `${out.refusal.code}: ${out.refusal.fix}`);
+  assert.ok(out.ok, sayOf(out));
   return { k, sql };
 }
 
 const page = (k: Kernel, slug: string): PageResult => {
   const out = k.page(slug);
-  assert.ok(out.ok, out.ok ? '' : `${slug}: ${out.refusal.code} — ${out.refusal.fix}`);
+  assert.ok(out.ok, `${slug}: ${sayOf(out)}`);
   return out.value;
 };
 
@@ -104,6 +105,7 @@ test('and a page that does not exist is refused with the ones that do', async ()
   const out = k.page('atlantis');
   assert.equal(out.ok, false);
   if (!out.ok) {
+    assert.ok(refused(out));
     assert.equal(out.refusal.code, 'PAGE_UNKNOWN');
     assert.ok((out.refusal.allowed ?? []).includes('money'));
   }

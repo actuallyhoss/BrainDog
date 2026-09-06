@@ -355,7 +355,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         const made = deps.write(register, r, mechanism, batch);
         /* ALL THE ROWS OR NONE. Half a rowset accepted is a decision whose answer is not true of the
            record, and the caller's transaction is what undoes the rest. */
-        if (!made.ok) return { ok: false, refusal: made.refusal };
+        if (!made.ok) return made;
         wrote.push(made.value.id);
       }
     } else if (row.body_kind === 'pattern' || row.body_kind === 'change') {

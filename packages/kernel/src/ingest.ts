@@ -35,7 +35,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import { fixOf, no, ok } from '@braindog/ports';
 import { evaluate, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry, Json } from './index.ts';
@@ -310,7 +310,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        exist. It is the same answer the unreadable-field branch above gives, for the same reason, and
        it is what keeps the `write.refused` observation the write left behind. */
     if (!wrote.ok) {
-      const reason = `${matched.writes.register} refused what ${matched.ingest} read: ${wrote.refusal.fix}`;
+      const reason = `${matched.writes.register} refused what ${matched.ingest} read: ${fixOf(wrote)}`;
       store('review', reason);
       const suggestion = openRowset(deps, at, {
         ingest: matched.ingest,

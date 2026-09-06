@@ -18,6 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Entry, type Kernel } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
+import { fixOf, sayOf } from '@braindog/ports';
 
 import { NOW, ORDER, REGISTERS, ROWS, TODAY, forWrite, installSeed } from '../src/index.ts';
 
@@ -54,13 +55,13 @@ async function seeded(): Promise<{ k: Kernel; sql: Sql & { close(): void }; rows
   const sql = openSqlite();
   const k = await openRecord(sql, { now: () => NOW });
   const out = await installSeed(k);
-  assert.ok(out.ok, out.ok ? '' : `${out.refusal.code} at ${out.refusal.at}: ${out.refusal.fix}`);
+  assert.ok(out.ok, sayOf(out));
   return { k, sql, rows: out.value.rows };
 }
 
 const rowsOf = (k: Kernel, register: string): Entry[] => {
   const out = k.list({ register, limit: 1000 });
-  assert.ok(out.ok, out.ok ? '' : out.refusal.fix);
+  assert.ok(out.ok, fixOf(out));
   return out.value.rows;
 };
 
@@ -148,7 +149,7 @@ test('and the record can be asked the questions the interface asks it', async ()
     },
     limit: 100,
   });
-  assert.ok(overdue.ok, overdue.ok ? '' : overdue.refusal.fix);
+  assert.ok(overdue.ok, fixOf(overdue));
   assert.ok(overdue.value.rows.length > 0, 'a seed with nothing overdue cannot show what the product is for');
   for (const r of overdue.value.rows) assert.ok(String(r.fields.due) < TODAY);
 

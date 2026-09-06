@@ -15,7 +15,8 @@
  * them have to stay in step with.
  */
 
-import type { Refusal, Result } from '@braindog/ports';
+import type { Conflict, Refusal, Result } from '@braindog/ports';
+import { conflicted, refused } from '@braindog/ports';
 
 /** One method the host exposes: its name, and what it does to the record. */
 export type Route = {
@@ -79,58 +80,45 @@ export const UNROUTED = ['openGrant', 'bindGrant', 'revokeGrant', 'createRecord'
 const BY_NAME = new Map(ROUTES.map((r) => [r.name, r]));
 
 /**
- * A refusal's HTTP status.
+ * The answer's HTTP status, from its SHAPE.
  *
- * ONE MAPPING, and it is a table rather than a chain of `if`s because the codes are a closed list
- * and a code with no row here should be visible as a 500 rather than silently a 400. The three that
- * matter: 409 for a stale write, so a client knows to re-read rather than retry; 403 for a
- * permission, so a client knows retrying will never work; 422 for a value, so it knows to fix it.
+ * `422` FOR ANY REFUSAL AND `409` FOR A CONFLICT, and the distinction is structural rather than a
+ * lookup by code (30 §6). This was a table of forty codes, and a table has two failure modes a
+ * shape does not: a code nobody remembered to add came back as a 500 — an ordinary "you typed the
+ * wrong enum value" arriving as "the server is broken" — and a code somebody guessed at got a 409,
+ * which tells a client to re-read a row that never moved and retry a write that will be refused
+ * again forever.
+ *
+ * SO ONLY THE EXCEPTIONS ARE ENUMERATED, and each is a different INSTRUCTION to the caller: 401 says
+ * the credential is wrong, 403 says it is the wrong kind and retrying will never work, 503 says the
+ * build and the schema disagree and a deploy fixes it, 409 says somebody else got there first and a
+ * re-read will. Everything else is a value the caller can fix, which is a 422.
  */
-const STATUS: Record<string, number> = {
-  REGISTER_UNKNOWN: 404,
-  FIELD_UNKNOWN: 422,
-  VALUE_MALFORMED: 422,
-  ENUM_VALUE_UNKNOWN: 422,
-  REQUIRED_MISSING: 422,
-  IMMUTABLE_FIELD: 422,
-  TRANSITION_ILLEGAL: 422,
-  INT_OUT_OF_RANGE: 422,
-  TEXT_JSON_QUOTED: 422,
-  TEXT_ESCAPED_NEWLINE: 422,
-  DECLARATION_INVALID: 422,
-  WHERE_MALFORMED: 422,
-  WHERE_UNSUPPORTED: 422,
-  WHERE_OPERATOR_UNSUPPORTED: 422,
-  ALREADY_KNOWN: 409,
-  UNIQUE_VIOLATION: 409,
-  VERSION_STALE: 409,
+const NOT_422: Readonly<Record<string, number>> = {
+  UNAUTHORIZED: 401,
   FORBIDDEN: 403,
+  /* A BROWSER SESSION IS NOT A SCOPE PROBLEM. 403 with the envelope, because the sentence is the
+     part that tells somebody what to do about it — 30 §6's own row. */
+  NEEDS_BROWSER_SESSION: 403,
+  /* THE THREE REFINEMENTS OF `FORBIDDEN`. 30 §6 has one code for "a credential outside its scope,
+     level or ceiling"; the record answers with which of the three it was, because "get a bigger
+     token" and "this belongs to a person and a token is not one" are different instructions and a
+     caller that cannot tell them apart retries the one that can never work. They are a strict
+     refinement, so they take `FORBIDDEN`'s status. */
   SCOPE_INSUFFICIENT: 403,
   LEVEL_REQUIRED: 403,
   PERSON_REQUIRED: 403,
   SCHEMA_MISMATCH: 503,
   SCHEMA_NEWER: 503,
+  /* The router's own two, which no method returns. */
   ROUTE_UNKNOWN: 404,
   BODY_MALFORMED: 400,
-  PAGE_UNKNOWN: 404,
-  METRIC_UNKNOWN: 404,
-  SOURCE_UNKNOWN: 422,
-  LOOKUP_UNKNOWN: 422,
-  LOOKUP_MISSING: 422,
-  MIXED_CURRENCY: 422,
-  OPERATOR_UNSUPPORTED: 422,
-  REF_UNKNOWN: 422,
-  GRANT_REVOKED: 409,
-  WRONG_KEY: 409,
-  /* A BROWSER SESSION IS NOT A SCOPE PROBLEM, so it is not a 403 that reads as "get a bigger token".
-     401 says the credential you have is not the KIND that reaches this. */
-  NEEDS_BROWSER_SESSION: 401,
   UNIMPLEMENTED: 501,
-  OUT_OF_BOUNDS: 404,
   INTERNAL: 500,
 };
 
-export const httpStatus = (code: string): number => STATUS[code] ?? 500;
+export const httpStatus = (r: Result<unknown>): number =>
+  r.ok ? 200 : conflicted(r) ? 409 : refused(r) ? (NOT_422[r.refusal.code] ?? 422) : 500;
 
 export type Handler = (args: Record<string, unknown>, ctx: unknown) => Promise<Result<unknown>>;
 
@@ -305,10 +293,10 @@ export async function serveApi(
       refusal: { code: 'INTERNAL', fix: `${name} could not be answered: ${e instanceof Error ? e.message : String(e)}.` },
     });
   }
-  return out.ok ? json(200, out) : json(httpStatus(out.refusal.code), out);
+  return json(httpStatus(out), out);
 }
 
-const json = (status: number, body: { ok: boolean; value?: unknown; refusal?: Refusal }): Response =>
+const json = (status: number, body: { ok: boolean; value?: unknown; refusal?: Refusal; conflict?: Conflict }): Response =>
   new Response(JSON.stringify(body), {
     status,
     headers: {

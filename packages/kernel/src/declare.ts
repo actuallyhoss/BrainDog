@@ -234,7 +234,9 @@ export async function installDeclarations(
   transaction: <T>(fn: () => T) => T,
 ): Promise<Result<Installed[]>> {
   const staged = await stageDeclarations(batch);
-  if (!staged.ok) return { ok: false, refusal: staged.refusal };
+  /* PASSED THROUGH WHOLE. Rebuilding the envelope by hand dropped whichever arm the rebuild did
+     not know about, and there are three of them now. */
+  if (!staged.ok) return staged;
   return staged.value(sql, now, transaction);
 }
 

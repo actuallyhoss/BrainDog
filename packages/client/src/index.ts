@@ -89,6 +89,13 @@ export function createClient(options: ClientOptions) {
     if (body === null || typeof body !== 'object' || !('ok' in body))
       return { ok: false, refusal: unreachable(`${res.status} with an answer this client does not recognise`) };
 
+    /* AND A NOT-OK ANSWER HAS TO BE ONE OF THE TWO. There are three arms and only two of them are
+       failures; an `{ ok: false }` carrying neither a refusal nor a conflict would reach a caller
+       that reads `.refusal.fix` off it and fail somewhere unrelated, with a 422 in the log and a
+       `TypeError` on the screen. */
+    if (body.ok === false && !('refusal' in body) && !('conflict' in body))
+      return { ok: false, refusal: unreachable(`${res.status} with a failure carrying neither a refusal nor a conflict`) };
+
     return body as Result<T>;
   }
 

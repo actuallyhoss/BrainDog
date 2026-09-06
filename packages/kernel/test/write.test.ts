@@ -9,6 +9,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { codeOf, conflicted, fixOf } from '@braindog/ports';
+
 import { openRecord, type Entry, type Kernel, type RegisterDecl } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -55,7 +57,7 @@ async function record(decls: RegisterDecl[] = [OBLIGATIONS]): Promise<{ k: Kerne
   /* Through the real install, not an INSERT: a test that reaches around the code it is testing is a
      test that passes after the code stops working. */
   const out = await k.install(decls.map((d) => ({ id: `register.${d.id}`, kind: 'register' as const, body: d as never })));
-  assert.ok(out.ok, out.ok ? '' : out.refusal.fix);
+  assert.ok(out.ok, fixOf(out));
   return { k, sql };
 }
 
@@ -150,7 +152,7 @@ test('a refusal says what was wrong and what may be sent instead', async () => {
 
 /* ── the compare-and-set ─────────────────────────────────────────────────── */
 
-test('A STALE WRITE IS REFUSED, NEVER MERGED — last-writer-wins is wrong for money', async () => {
+test('A STALE WRITE IS A CONFLICT, NEVER A MERGE — last-writer-wins is wrong for money', async () => {
   // Two people editing one invoice must not silently produce one of the two amounts, with no record
   // that there were two.
   const { k, sql } = await record();
@@ -159,12 +161,51 @@ test('A STALE WRITE IS REFUSED, NEVER MERGED — last-writer-wins is wrong for m
 
   value(k.update('obligations', 'obligations#1', { amount: { amount: 50_000, currency: 'GBP' } }, { actor: 'p_2' }));
 
-  const stale = refusal(
-    k.update('obligations', 'obligations#1', { amount: { amount: 12_000, currency: 'GBP' } }, { actor: 'p_1', version: read.version }),
+  const stale = k.update(
+    'obligations',
+    'obligations#1',
+    { amount: { amount: 12_000, currency: 'GBP' } },
+    { actor: 'p_1', version: read.version },
   );
-  assert.equal(stale.code, 'VERSION_STALE');
-  assert.match(stale.fix, /Read it again/);
+  assert.ok(conflicted(stale), 'a stale write came back as a refusal, which a caller cannot recover from');
+  assert.equal(codeOf(stale), 'VERSION_STALE');
   assert.deepEqual(k.get('obligations#1')!.fields.amount, { amount: 50_000, currency: 'GBP' });
+  sql.close();
+});
+
+test('and it hands back the row and the name of whoever moved it', async () => {
+  /* THE BODY IS WHAT MAKES A 409 AN INSTRUCTION. Recovering from one means re-reading the row and
+     re-applying your own patch onto it, and as a plain refusal this carried a sentence and nothing
+     else — so a client could show a person that something changed and never what, or by whom. */
+  const { k, sql } = await record();
+  value(k.create('obligations', { what: 'Invoice 41', amount: { amount: 48_000, currency: 'GBP' } }, { actor: 'p_ada' }));
+  const read = k.get('obligations#1')!;
+  value(k.update('obligations', 'obligations#1', { amount: { amount: 50_000, currency: 'GBP' } }, { actor: 'p_bo' }));
+
+  const stale = k.update('obligations', 'obligations#1', { what: 'Invoice 41, revised' }, { actor: 'p_ada', version: read.version });
+  assert.ok(conflicted(stale));
+  assert.equal(stale.conflict.actor, 'p_bo', 'a 409 that will not say who changed it is a dead end');
+  assert.equal(stale.conflict.version, k.get('obligations#1')!.version);
+  assert.deepEqual(
+    (stale.conflict.current as { fields: Record<string, unknown> }).fields.amount,
+    { amount: 50_000, currency: 'GBP' },
+    'the row it hands back has to be the row as it now stands, or the caller re-applies onto a guess',
+  );
+  // And the patch was NOT applied. A conflict is not a partial write.
+  assert.equal(k.get('obligations#1')!.fields.what, 'Invoice 41');
+  sql.close();
+});
+
+test('a conflict is not counted as a refused write', async () => {
+  /* The observe loop counts `write.refused` to notice a DECLARATION that is wrong. Two people
+     editing at once is a record being busy, and a detector that counted it would eventually propose
+     changing a field because the business is doing well. */
+  const { k, sql } = await record();
+  value(k.create('obligations', { what: 'Invoice 41' }, { actor: 'p_1' }));
+  const read = k.get('obligations#1')!;
+  value(k.update('obligations', 'obligations#1', { what: 'Invoice 41a' }, { actor: 'p_2' }));
+  k.update('obligations', 'obligations#1', { what: 'Invoice 41b' }, { actor: 'p_1', version: read.version });
+  assert.equal(sql.all("SELECT 1 FROM observation WHERE kind = 'write.refused'").length, 0);
   sql.close();
 });
 

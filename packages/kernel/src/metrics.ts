@@ -22,7 +22,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import { fixOf, no, ok } from '@braindog/ports';
 import { compile, jsonPath, parseWhere, resolveDay, type Predicate, type Schema } from '@braindog/where';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
@@ -267,7 +267,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
     const before = read(sql, shifted.predicate, schema, decl, ctx.lookups);
 
-    if (!before.ok) why = before.refusal.fix;
+    if (!before.ok) why = fixOf(before);
     else if (!moved) {
       /* A SET COMPARED WITH ITSELF IS NOT NO CHANGE. The delta would be structurally zero, and
          reporting that as "steady" is a fact about the arithmetic dressed as a fact about the

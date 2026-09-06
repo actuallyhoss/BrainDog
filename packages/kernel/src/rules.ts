@@ -24,7 +24,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { ok } from '@braindog/ports';
+import { ok, refused } from '@braindog/ports';
 import { compile, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
@@ -240,7 +240,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
          register left the row it fired on untouched and made a second one holding only the patch. */
       const wrote = deps.write(fired.register, fired.entry.id, patch, `rule:${rule.rule}`, fired.batch);
       if (!wrote.ok) {
-        out.refused.push(wrote.refusal);
+        if (refused(wrote)) out.refused.push(wrote.refusal);
         /* THE MARKER GOES BACK. Keeping it would mark a rule that did nothing as having fired for
            this row for ever — fix the data and it never runs again, with no signal anywhere. */
         if (key !== null) deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ?", key);
@@ -261,7 +261,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     }
     for (const ask of asks) {
       const opened = deps.suggest(fill(ask.question, fired.entry, deps.nowMs), ask.options, `rule:${rule.rule}`);
-      if (!opened.ok) out.refused.push(opened.refusal);
+      if (refused(opened)) out.refused.push(opened.refusal);
       else happened = true;
     }
 
@@ -417,7 +417,7 @@ function expand(
       _parent: fired.entry.id,
       _each: each,
     });
-    if (!made.ok) out.push(made.refusal);
+    if (refused(made)) out.push(made.refusal);
     else grew = true;
   }
   return { refusals: out, grew };

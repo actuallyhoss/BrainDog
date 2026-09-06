@@ -10,6 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { fixOf, refused } from '@braindog/ports';
+
 import { FLOOR_MS, applyPull, checkInterval, jitterMs, openRecord, type Declaration, type GrantRow, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -52,7 +54,7 @@ async function record(decl = CONNECTOR(), withGrant = false): Promise<{ k: Kerne
       { label: 'npm, read', opens: 'registry.npmjs.example', kind: 'api_token', ciphertext: b(1), nonce: b(9), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' },
       'p_1',
     );
-    assert.ok(made.ok, made.ok ? '' : made.refusal.fix);
+    assert.ok(made.ok, fixOf(made));
     grant = (made.value as GrantRow).id;
   }
 
@@ -136,13 +138,13 @@ test('A MINIMUM INTERVAL, REFUSED BEFORE IT IS INSTALLED', () => {
 
   const tooOften = checkInterval({ ingest: 'x', every: '5m' });
   assert.equal(tooOften.ok, false);
-  if (!tooOften.ok) assert.match(tooOften.refusal.fix, /fifteen minutes/);
+  assert.match(fixOf(tooOften), /fifteen minutes/);
 
   /* A PROVIDER'S OWN FLOOR WINS WHEN IT IS HIGHER. Banks are hard-floored at six hours by law, and a
      connector that polled one every minute would be closed by the bank rather than by us. */
   const bank = checkInterval({ ingest: 'bank', every: '1h', floor: '6h' });
   assert.equal(bank.ok, false);
-  if (!bank.ok) assert.match(bank.refusal.fix, /provider's own floor/);
+  assert.match(fixOf(bank), /provider's own floor/);
   assert.equal(checkInterval({ ingest: 'bank', every: '6h', floor: '6h' }).ok, true);
 
   assert.equal(checkInterval({ ingest: 'x', every: 'hourly' }).ok, false);
@@ -233,8 +235,8 @@ test('and a connector whose declaration is gone is dropped rather than fired', a
 test('applyPull on a connector nobody has is a refusal, not a silent nothing', async () => {
   const { k, sql } = await record();
   const out = k.applyPull({ ingest: 'nonesuch', outcome: 'ok' });
-  assert.equal(out.ok, false);
-  if (!out.ok) assert.equal(out.refusal.code, 'OUT_OF_BOUNDS');
+  assert.ok(refused(out));
+  assert.equal(out.refusal.code, 'OUT_OF_BOUNDS');
   sql.close();
 });
 

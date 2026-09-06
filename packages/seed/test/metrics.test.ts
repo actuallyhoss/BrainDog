@@ -19,6 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Entry, type Kernel, type MetricDecl, type Reading } from '@braindog/kernel';
 import { evaluate, parseWhere, type Schema } from '@braindog/where';
 import type { Param, Row, Sql } from '@braindog/ports';
+import { fixOf, sayOf } from '@braindog/ports';
 
 import { LOOKUPS, METRICS, NOW, REGISTERS, ROWS, THINGS, installSeed, type SeedMetric } from '../src/index.ts';
 
@@ -55,7 +56,7 @@ async function seeded(): Promise<{ k: Kernel; sql: Sql & { close(): void } }> {
   const sql = openSqlite();
   const k = await openRecord(sql, { now: () => NOW }, { lookups: LOOKUPS });
   const out = await installSeed(k);
-  assert.ok(out.ok, out.ok ? '' : `${out.refusal.code}: ${out.refusal.fix}`);
+  assert.ok(out.ok, sayOf(out));
   return { k, sql };
 }
 
@@ -131,7 +132,7 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     for (const it of params) {
       const one = it === null ? (decl as MetricDecl) : filled(decl, it);
       const read = k.metric(one);
-      assert.ok(read.ok, read.ok ? '' : `${one.metric}${it ? `:${it}` : ''} — ${read.refusal.code}: ${read.refusal.fix}`);
+      assert.ok(read.ok, `${one.metric}${it ? `:${it}` : ''} — ${sayOf(read)}`);
 
       const hand = byHand(k, one as SeedMetric);
       assert.equal(
@@ -172,10 +173,10 @@ test('A COST PER CYCLE IS ANNUALISED, and the naive sum is 9.25 times too low', 
      under the word "year". */
   const { k, sql } = await seeded();
   const read = k.metric(filled(METRICS['project-cost']!, 'Kiln'));
-  assert.ok(read.ok, read.ok ? '' : read.refusal.fix);
+  assert.ok(read.ok, fixOf(read));
 
   const listed = k.list({ register: 'services', where: 'thing is Kiln, state is not cancelled', limit: 1000 });
-  assert.ok(listed.ok, listed.ok ? '' : `${listed.refusal.code}: ${listed.refusal.fix}`);
+  assert.ok(listed.ok, sayOf(listed));
   const rows = listed.value.rows;
   const naive = rows.reduce((a, e) => a + (e.fields.cost as { amount: number }).amount, 0);
 
@@ -198,7 +199,7 @@ test('THE NINE ARE ALL READABLE, so the record ships with no tile it cannot answ
   for (const decl of Object.values(METRICS)) {
     const one = JSON.stringify(decl).includes('{{it}}') ? filled(decl, String(THINGS[0]!.name)) : (decl as MetricDecl);
     const read = k.metric(one);
-    if (!read.ok) unreadable.push(`${one.metric}: ${read.refusal.code} — ${read.refusal.fix}`);
+    if (!read.ok) unreadable.push(`${one.metric}: ${sayOf(read)}`);
   }
   assert.deepEqual(unreadable, []);
   assert.ok(Object.keys(METRICS).length >= 9);

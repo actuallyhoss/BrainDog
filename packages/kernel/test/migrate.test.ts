@@ -10,6 +10,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+
+import { fixOf, refused } from '@braindog/ports';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -28,7 +30,7 @@ const open = async () => {
 
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
-  assert.ok(result.ok, result.ok ? '' : result.refusal.fix);
+  assert.ok(result.ok, fixOf(result));
   assert.deepEqual(result.value, { kernel: 1, format: 1, applied: [1] });
 
   const tables = sql
@@ -91,7 +93,7 @@ test('A MIGRATION WHOSE TEXT CHANGED AFTER IT WAS APPLIED IS REFUSED', async () 
   const { sql, clock } = await open();
   sql.exec("UPDATE migration SET checksum = 'not the one that was applied' WHERE version = 1");
   const { result, state } = await applyMigrations(sql, clock);
-  assert.ok(!result.ok);
+  assert.ok(refused(result));
   assert.equal(result.refusal.code, 'SCHEMA_MISMATCH');
   assert.match(result.refusal.fix, /add a new migration/);
   assert.ok(state.refusal, 'the refusal has to stick, or half the record works');
@@ -102,7 +104,7 @@ test('a record written by a newer build is refused, and says to deploy it', asyn
   const { sql, clock } = await open();
   sql.exec("INSERT INTO migration (version, applied_at, checksum) VALUES (99, '2026-01-01T00:00:00.000Z', 'x')");
   const { result } = await applyMigrations(sql, clock);
-  assert.ok(!result.ok);
+  assert.ok(refused(result));
   assert.equal(result.refusal.code, 'SCHEMA_NEWER');
   assert.match(result.refusal.fix, /Deploy the newer build/);
   sql.close();

@@ -17,7 +17,7 @@
  */
 
 import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } from './coerce.ts';
 import { attempt } from './tx.ts';
@@ -330,6 +330,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return said ? bySeq(said.register, said.seq, opts.includeDeleted) : byId(ref, opts.includeDeleted);
   }
 
+  /**
+   * Who last touched this row.
+   *
+   * FOR THE ONE ANSWER THAT HAS TO NAME SOMEBODY. A 409 telling a person "this changed" and not who
+   * changed it is a dead end — they cannot ask, and they cannot tell a colleague's edit from a
+   * rule's. The event log already knows, and this is the only question asked of it on a hot path.
+   *
+   * `null` WHEN THE LOG CANNOT SAY, which happens for a row written before the per-field history and
+   * for an imported record. The caller supplies the honest fallback rather than this inventing one.
+   */
+  const lastActor = (id: string): string | null =>
+    sql.one<{ actor: string }>('SELECT actor FROM event WHERE target = ? ORDER BY rowid DESC LIMIT 1', `entry:${id}`)
+      ?.actor ?? null;
+
   const count = (register: string): number =>
     Number(
       sql.one<{ n: number }>('SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', register)?.n ?? 0,
@@ -515,8 +529,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     cursor?: string | null;
     includeDeleted?: boolean;
   }): Result<{ rows: Entry[]; cursor: string | null; matched: number }> {
-    const refused = schemaRefusal(state);
-    if (refused) return refused;
+    const barred = schemaRefusal(state);
+    if (barred) return barred;
     if (!registers.has(q.register))
       return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
 
@@ -577,15 +591,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /* ── the write path ──────────────────────────────────────────────────── */
 
   function write(register: string, ref: string | null, patch: Patch, w: WriteContext): Result<Entry> {
-    const refused = schemaRefusal(state);
-    if (refused) return refused;
+    const barred = schemaRefusal(state);
+    if (barred) return barred;
 
     const out = writing(register, ref, patch, w);
     /* THE ONE WRITE A REFUSAL MAKES. Ten of the same refusal in a month across three days means the
        DECLARATION is wrong rather than one caller having a bad afternoon — and a record that threw
        its refusals away could never notice the difference. It is outside the transaction the write
-       rolled back, or the observation would roll back with it. */
-    if (!out.ok && out.refusal.at)
+       rolled back, or the observation would roll back with it.
+
+       A CONFLICT IS NOT COUNTED. It is not the declaration being wrong; it is two people editing at
+       once, and a detector that counted it would propose changing a field because a record is busy. */
+    if (refused(out) && out.refusal.at)
       observe(sql, clock.now(), [{ kind: 'write.refused', subject: `${register}.${out.refusal.at}:${out.refusal.code}` }]);
     return out;
   }
@@ -621,13 +638,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         return no<Entry>('VALUE_MALFORMED', `${ref} is a row of ${current.register}, not ${register}.`, { at: 'id' });
 
       /* THE COMPARE-AND-SET, before anything is computed. Last-writer-wins is wrong for money: two
-         people editing one invoice must not silently produce one of the two amounts. */
+         people editing one invoice must not silently produce one of the two amounts.
+
+         AND IT IS A CONFLICT, NOT A REFUSAL, which is the difference between an answer a caller can
+         act on and a sentence it can only show. A refusal says the write was WRONG; this write was
+         fine and arrived second. Recovering means re-reading the row and re-applying the patch, and
+         as a refusal it carried neither the row nor the name of whoever moved it — so every client
+         could do was print a sentence and lose the edit. The body is what makes the 409 a
+         instruction: `current` is the row as it now stands, `actor` is who put it there, and a
+         caller resends once when their change was disjoint from it (22 §5, 50 §5.3). */
       if (w.version !== undefined && current && w.version !== current.version)
-        return no<Entry>(
-          'VERSION_STALE',
-          `${ref} has moved on since you read it — you have version ${w.version} and the row is at ${current.version}. Read it again.`,
-          { at: 'version' },
-        );
+        return clash<Entry>(current.version, current, lastActor(current.id) ?? 'someone else');
 
       /* Read before the checks, because uniqueness on a restore depends on it. */
       const deleting = patch.deleted_at !== undefined;
@@ -1229,7 +1250,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const { prediction } = JSON.parse(row.payload) as { prediction?: string };
       if (!prediction) return null;
       const out = scorePrediction(sql, prediction, evalContext(), { mint, nowAt: instant(clock.now()) });
-      if (!out.ok) throw new TypeError(out.refusal.fix);
+      if (!out.ok) throw new TypeError(fixOf(out));
       return null;
     },
 
@@ -1856,7 +1877,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const cannot = unreadable(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
-      if (!staged.ok) return { ok: false as const, refusal: staged.refusal };
+      if (!staged.ok) return staged;
       return ok(() => staged.value(sql, clock.now(), transaction));
     },
 

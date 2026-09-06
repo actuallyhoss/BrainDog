@@ -13,6 +13,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { fixOf } from '@braindog/ports';
+
 import {
   evaluateMetric,
   meets,
@@ -280,7 +282,7 @@ test('A SENTENCE IS A PREDICATE, in a metric and in a list, and both read the sa
   assert.equal(read.value, 720_000, 'the sentence read different rows from the tree');
 
   const listed = k.list({ register: 'obligations', where: said, limit: 100 });
-  assert.ok(listed.ok, listed.ok ? '' : listed.refusal.fix);
+  assert.ok(listed.ok, fixOf(listed));
   assert.equal(listed.value.rows.length, 2);
 
   // And a sentence the register cannot answer is refused, in both.

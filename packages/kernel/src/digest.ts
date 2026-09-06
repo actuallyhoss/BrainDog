@@ -18,7 +18,8 @@
  * the alarm is holding.
  */
 
-import type { Refusal, Sql } from '@braindog/ports';
+import type { Refusal, Result, Sql } from '@braindog/ports';
+import { refused } from '@braindog/ports';
 import type { Predicate, Schema } from '@braindog/where';
 
 import { instant } from './migrate.ts';
@@ -66,12 +67,12 @@ export type DigestPart = {
 
 export type DigestDeps = {
   metric: (id: string) => MetricDecl | null;
-  read: (decl: MetricDecl) => { ok: true; value: Reading } | { ok: false; refusal: Refusal };
+  read: (decl: MetricDecl) => Result<Reading>;
   list: (q: {
     register: string;
     where?: Predicate | undefined;
     limit?: number;
-  }) => { ok: true; value: { rows: Entry[]; matched: number } } | { ok: false; refusal: Refusal };
+  }) => Result<{ rows: Entry[]; matched: number }>;
   schemaOf: (register: string) => Schema | null;
   ctx: EvalContext;
   /** Where an email would go: the owners, by address. Empty means the email channel cannot fire. */
@@ -128,7 +129,7 @@ export function sectionsOf(deps: DigestDeps, decl: DigestDecl): DigestPart[] {
       }
       const read = deps.read(found);
       if (!read.ok) {
-        out.push({ ...base, refusals: [read.refusal] });
+        out.push({ ...base, refusals: refused(read) ? [read.refusal] : [] });
         continue;
       }
       /* A FIGURE IS NEVER EMPTY IN THE SENSE `omit_when_empty` MEANS. "Nothing overdue" is the good
@@ -153,7 +154,7 @@ export function sectionsOf(deps: DigestDeps, decl: DigestDecl): DigestPart[] {
 
     const listed = deps.list({ register, where: said.predicate, limit: SECTION_LIMIT });
     if (!listed.ok) {
-      out.push({ ...base, refusals: [listed.refusal] });
+      out.push({ ...base, refusals: refused(listed) ? [listed.refusal] : [] });
       continue;
     }
     if (listed.value.rows.length === 0 && section.omit_when_empty) continue;

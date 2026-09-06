@@ -11,6 +11,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { refused } from '@braindog/ports';
+
 import { fillTemplate, openRecord, orderRules, type Declaration, type DryRun, type Entry, type Kernel, type RuleDecl } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -472,8 +474,8 @@ test('a candidate the register cannot answer is refused rather than previewed as
   const out = k.dryRun({ rule: 'x', register: 'obligations', when: 'colour is red', then: [{ tag: 'a' }] });
   assert.equal(out.ok, false);
   const other = k.dryRun({ rule: 'x', register: 'nothing', when: 'a is b', then: [] });
-  assert.equal(other.ok, false);
-  if (!other.ok) assert.equal(other.refusal.code, 'REGISTER_UNKNOWN');
+  assert.ok(refused(other));
+  assert.equal(other.refusal.code, 'REGISTER_UNKNOWN');
   sql.close();
 });
 

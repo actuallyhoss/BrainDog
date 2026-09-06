@@ -10,6 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { codeOf, conflicted, fixOf, refused } from '@braindog/ports';
+
 import { TOOLS, tools } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -197,13 +199,18 @@ test('an address that is not one says what an address looks like', async () => {
   sql.close();
 });
 
-test('a stale write is refused with the sentence that says what to do about it', async () => {
+test('a stale write comes back as a conflict, with the row and the actor an agent needs to retry', async () => {
+  /* AN AGENT IS THE CALLER THAT MOST NEEDS THE BODY. It cannot look at the screen, so "this moved"
+     with no row attached leaves it either dropping the write or retrying blind; with `current` it
+     re-applies its own patch and sends once more. 44 §5.4 renders exactly these two fields. */
   const { mcp, sql } = await agent();
   value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
   value(await mcp.call('update', { spoken: 'obligations#1', patch: { what: 'b' } }, owner));
-  const stale = refusal(await mcp.call('update', { spoken: 'obligations#1', patch: { what: 'c' }, version: 1 }, owner));
-  assert.equal(stale.code, 'VERSION_STALE');
-  assert.match(stale.fix, /Read it again/);
+  const stale = await mcp.call('update', { spoken: 'obligations#1', patch: { what: 'c' }, version: 1 }, owner);
+  assert.ok(conflicted(stale));
+  assert.equal(codeOf(stale), 'VERSION_STALE');
+  assert.equal((stale.conflict.current as { fields: { what: string } }).fields.what, 'b');
+  assert.ok(stale.conflict.actor.length > 0, 'a conflict that will not say who changed it is a dead end');
   sql.close();
 });
 
@@ -274,12 +281,12 @@ test('and a query of punctuation finds nothing rather than erroring', async () =
 test('AN AGENT CAN ASK WHAT THE RECORD DRAWS, and read one page of it', async () => {
   const { mcp, sql } = await agent();
   const pages = await mcp.call('pages', {}, owner);
-  assert.ok(pages.ok, pages.ok ? '' : pages.refusal.fix);
+  assert.ok(pages.ok, fixOf(pages));
   assert.deepEqual(pages.value, [], 'this record declares no pages');
 
   const missing = await mcp.call('page', { slug: 'nonsense' }, owner);
-  assert.equal(missing.ok, false);
-  if (!missing.ok) assert.equal(missing.refusal.code, 'PAGE_UNKNOWN');
+  assert.ok(refused(missing));
+  assert.equal(missing.refusal.code, 'PAGE_UNKNOWN');
 
   // And a slug that is not a string is a refusal rather than a crash, like every other argument.
   const bad = await mcp.call('page', {}, owner);
@@ -292,7 +299,7 @@ test('and what each credential OPENS, which is never the credential', async () =
   // index, which is what makes "check nothing expires next week" possible without anything leaking.
   const { mcp, sql } = await agent();
   const out = await mcp.call('credentials', {}, owner);
-  assert.ok(out.ok, out.ok ? '' : out.refusal.fix);
+  assert.ok(out.ok, fixOf(out));
   assert.deepEqual(out.value, []);
   assert.ok(!JSON.stringify(out).includes('ciphertext'));
   sql.close();
@@ -301,8 +308,8 @@ test('and what each credential OPENS, which is never the credential', async () =
 test('a figure comes back with its target, and one that is not declared is named', async () => {
   const { mcp, sql } = await agent();
   const out = await mcp.call('metric', { metric: 'nonesuch' }, owner);
-  assert.equal(out.ok, false);
-  if (!out.ok) assert.equal(out.refusal.code, 'METRIC_UNKNOWN');
+  assert.ok(refused(out));
+  assert.equal(out.refusal.code, 'METRIC_UNKNOWN');
   sql.close();
 });
 

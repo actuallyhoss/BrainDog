@@ -20,6 +20,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { parseWhere, type Schema } from '@braindog/where';
 import type { Param, Row, Sql } from '@braindog/ports';
+import { sayOf } from '@braindog/ports';
 
 import { LOOKUPS, METRICS, NOW, PAGES, REGISTERS, ROWS, installSeed } from '../src/index.ts';
 
@@ -56,7 +57,7 @@ async function seeded(): Promise<{ k: Kernel; sql: Sql & { close(): void } }> {
   const sql = openSqlite();
   const k = await openRecord(sql, { now: () => NOW }, { lookups: LOOKUPS });
   const out = await installSeed(k);
-  assert.ok(out.ok, out.ok ? '' : `${out.refusal.code}: ${out.refusal.fix}`);
+  assert.ok(out.ok, sayOf(out));
   return { k, sql };
 }
 

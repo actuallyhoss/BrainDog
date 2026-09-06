@@ -23,8 +23,8 @@
  * what a pack DECLARES rather than about what it might do.
  */
 
-import type { Refusal, Result } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import type { Conflict, Refusal, Result } from '@braindog/ports';
+import { no, ok, refused } from '@braindog/ports';
 import { KINDS, digest, jcs, type DeclKind, type Json } from '@braindog/kernel';
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
@@ -606,7 +606,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   const staged = await host.stage(
     pack.declarations.map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
   );
-  if (!staged.ok) return { ok: false, refusal: staged.refusal };
+  if (!staged.ok) return staged;
 
   /* ONE TRANSACTION, AND A REFUSAL ROLLS IT BACK. Declarations, retires, seeds and the pack row
      land together or not at all. Four separate commits meant a seed the register refused left the
@@ -617,21 +617,21 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   try {
     return host.transaction((): Result<Applied> => {
       const put = staged.value();
-      if (!put.ok) throw new Rolled(put.refusal);
+      if (!put.ok) throw new Rolled(put);
       /* THE CACHE IS REBUILT BEFORE THE SEEDS, and inside the transaction: a seed is a write like
          any other, and the write path refuses a register it has not been told about yet. */
       host.reload();
 
       if (diff.retires.length) {
         const gone = host.retire(diff.retires.map((r) => r.id));
-        if (!gone.ok) throw new Rolled(gone.refusal);
+        if (!gone.ok) throw new Rolled(gone);
       }
 
       /* THE SEEDS GO THROUGH THE WRITE PATH, so a seed the register would refuse is refused here
          rather than becoming a row nothing else in the product could have made. */
       for (const seed of pack.seeds) {
         const made = host.seed(seed.register, seed.fields, seed.note);
-        if (!made.ok) throw new Rolled(made.refusal);
+        if (!made.ok) throw new Rolled(made);
       }
 
       host.remember({
@@ -652,7 +652,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       });
     });
   } catch (e) {
-    if (e instanceof Rolled) return { ok: false, refusal: e.refusal };
+    if (e instanceof Rolled) return e.answer;
     throw e;
   } finally {
     /* THE CACHE IS REBUILT EITHER WAY. On success it holds what landed; on a rollback it has to
@@ -662,14 +662,21 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   }
 }
 
-/** Thrown so the caller's transaction rolls back, and turned into a refusal outside it. */
+/**
+ * Thrown so the caller's transaction rolls back, and turned back into the answer outside it.
+ *
+ * IT CARRIES THE WHOLE ANSWER, not the refusal inside it. Unwrapping to a `Refusal` and rebuilding
+ * the envelope on the way out silently drops any arm the rebuild does not know about, and there are
+ * three; an install that ever meets a conflict would have come back as a refusal with `undefined`
+ * where its sentence goes.
+ */
 class Rolled extends Error {
   /* A FIELD AND NOT A PARAMETER PROPERTY: `erasableSyntaxOnly` is on, and this file is stripped
      rather than compiled. */
-  refusal: Refusal;
-  constructor(refusal: Refusal) {
-    super(refusal.code);
-    this.refusal = refusal;
+  answer: { ok: false; refusal: Refusal } | { ok: false; conflict: Conflict };
+  constructor(answer: { ok: false; refusal: Refusal } | { ok: false; conflict: Conflict }) {
+    super(refused(answer) ? answer.refusal.code : 'VERSION_STALE');
+    this.answer = answer;
   }
 }
 
@@ -693,7 +700,7 @@ export function uninstall(id: string, host: Host): Result<Retired> {
     }
 
   const gone = host.retire(claimed);
-  if (!gone.ok) return { ok: false, refusal: gone.refusal };
+  if (!gone.ok) return gone;
   host.forget(id);
   return ok({ pack: id, declarations: claimed.length, rows_kept: kept });
 }

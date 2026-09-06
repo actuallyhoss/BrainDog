@@ -353,7 +353,7 @@ export function tools(api: RecordApi) {
    */
   const resources = async (ctx: CallContext): Promise<Result<Resource[]>> => {
     const boot = await api.boot(ctx);
-    if (!boot.ok) return { ok: false, refusal: boot.refusal };
+    if (!boot.ok) return boot;
 
     const out: Resource[] = [
       { uri: 'braindog:whoami', name: 'whoami', description: 'Who you are to this record, and which verbs you reach.', ttlMs: 0 },

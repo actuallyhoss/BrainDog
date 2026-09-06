@@ -9,6 +9,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { clash, no, ok } from '@braindog/ports';
+
 import { ROUTES, handlersFor, httpStatus, serveApi } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -106,8 +108,11 @@ test('a refusal carries its sentence and a status that says what to do about it'
   });
   assert.equal(forbidden.status, 403);
 
-  // 404: there is no such thing.
-  assert.equal((await call('schema?register=atlantis')).status, 404);
+  // 422: a register nobody declared is a value the caller can fix, not a missing route. 30 §6 is
+  // explicit that ANY refusal is a 422 — the exceptions are enumerated and this is not one of them.
+  const nowhere = await call('schema?register=atlantis');
+  assert.equal(nowhere.status, 422);
+  assert.equal(nowhere.body.refusal?.code, 'REGISTER_UNKNOWN');
   sql.close();
 });
 
@@ -145,9 +150,45 @@ test('every answer has one shape, and no answer is cacheable', async () => {
   sql.close();
 });
 
-test('the status table is closed, and an unknown code is a 500 rather than a plausible 400', async () => {
-  assert.equal(httpStatus('VERSION_STALE'), 409);
-  assert.equal(httpStatus('SCOPE_INSUFFICIENT'), 403);
-  assert.equal(httpStatus('SCHEMA_MISMATCH'), 503);
-  assert.equal(httpStatus('SOMETHING_NOBODY_MAPPED'), 500, 'an unmapped code was quietly given a 4xx');
+test('THE STATUS COMES FROM THE SHAPE, so a code nobody enumerated is still a 422', () => {
+  // The table this replaced had forty rows and two ways to be wrong: a code nobody remembered to add
+  // came back as a 500 — an ordinary "you typed the wrong enum value" arriving as "the server is
+  // broken" — and a code somebody guessed at got a 409, telling a client to re-read a row that never
+  // moved and retry a write that will be refused forever.
+  assert.equal(httpStatus(no('SOMETHING_NOBODY_MAPPED', 'x')), 422);
+  assert.equal(httpStatus(no('ENUM_VALUE_UNKNOWN', 'x')), 422);
+  assert.equal(httpStatus(ok(1)), 200);
+});
+
+test('and a conflict is a 409 while a refusal never is', () => {
+  // The one distinction a client acts on: 409 means re-read and re-apply, 422 means fix the value.
+  assert.equal(httpStatus(clash(7, { id: 'x' }, 'p_ada')), 409);
+  // `PLAN_STALE` and `IMPORT_NOT_EMPTY` read like conflicts and are refusals — 30 §6 says so by name,
+  // because repeating either will fail again until the caller does something different.
+  assert.equal(httpStatus(no('PLAN_STALE', 'x')), 422);
+  assert.equal(httpStatus(no('IMPORT_NOT_EMPTY', 'x')), 422);
+  assert.equal(httpStatus(no('UNIQUE_VIOLATION', 'x')), 422);
+});
+
+test('the four exceptions each say something different to the caller', () => {
+  assert.equal(httpStatus(no('UNAUTHORIZED', 'x')), 401, 'the credential is wrong');
+  assert.equal(httpStatus(no('FORBIDDEN', 'x')), 403, 'retrying will never work');
+  assert.equal(httpStatus(no('NEEDS_BROWSER_SESSION', 'x')), 403, 'the wrong KIND of credential, with the envelope');
+  assert.equal(httpStatus(no('SCHEMA_NEWER', 'x')), 503, 'a deploy fixes it');
+});
+
+test('A CONFLICT LEAVES THE HOST AS A CONFLICT, body and all', async () => {
+  // The body is the whole point: `current` is the row as it now stands and `actor` is who moved it,
+  // and without both the client cannot re-apply — which is what a 409 is instructing it to do.
+  const res = await serveApi(
+    new Request('https://x/api/boot'),
+    { boot: async () => clash(41, { id: 'obligations#1', fields: { due: '2026-07-27' } }, 'p_ada') },
+    owner,
+  );
+  assert.equal(res.status, 409);
+  const body = (await res.json()) as { ok: boolean; conflict: { version: number; actor: string; current: unknown } };
+  assert.equal(body.ok, false);
+  assert.equal(body.conflict.version, 41);
+  assert.equal(body.conflict.actor, 'p_ada');
+  assert.deepEqual(body.conflict.current, { id: 'obligations#1', fields: { due: '2026-07-27' } });
 });
