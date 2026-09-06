@@ -22,6 +22,8 @@
 
 import type { Sql } from '@braindog/ports';
 
+import { FORMAT_VERSION } from './migrate.ts';
+
 export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';
 
 /** The header first, then the three that travel. `local` is absent on purpose. */
@@ -225,6 +227,182 @@ export async function exportDogl(
       lines.push(line);
   }
   return lines;
+}
+
+/**
+ * The lines of a file, grouped by the table they belong to.
+ *
+ * IT IS A SECOND READER, and deliberately so: `importDogl`'s walk decides what to WRITE and this one
+ * decides what the file SAYS ABOUT ITSELF. A checksum computed by the same pass that skips rows,
+ * drops columns and takes defaults would hash what the reader made of the file rather than the file,
+ * which is the one thing a checksum must not do.
+ */
+function grouped(lines: readonly string[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  let at: string[] | null = null;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (!line) continue;
+    if (line.startsWith('#table ')) {
+      const name = line.slice('#table '.length).split(' ')[0] ?? '';
+      /* A HEADER WITH NO ROWS UNDER IT IS STILL A TABLE, and its hash is the hash of the empty
+         string. Skipping it would let somebody delete every row of a table and still match, because
+         the manifest names the table and the absence is what has to be caught. */
+      at = out.get(name) ?? [];
+      out.set(name, at);
+      continue;
+    }
+    if (line.startsWith('#')) continue;
+    at?.push(line);
+  }
+  return out;
+}
+
+/** What the file's own `dog_manifest` claims, by table. */
+function claimed(lines: readonly string[]): Map<string, { rows: number; sha: string }> {
+  const out = new Map<string, { rows: number; sha: string }>();
+  for (const line of grouped(lines).get('dog_manifest') ?? []) {
+    let row: unknown;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(row)) continue;
+    const [name, rows, sha] = row as [unknown, unknown, unknown];
+    if (typeof name === 'string' && typeof sha === 'string') out.set(name, { rows: Number(rows) || 0, sha });
+  }
+  return out;
+}
+
+/**
+ * Which section each table is in, ACCORDING TO THE FILE.
+ *
+ * `41 §5.11` step 2 forgives a manifest row whose table is missing when that table's section is
+ * `local` -- the section that does not travel -- and the file carries its own `dog_section` map for
+ * exactly this. Reading the section out of the reader's schema instead would be answering a question
+ * about the file with a fact about the reader.
+ */
+function sections(lines: readonly string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const line of grouped(lines).get('dog_section') ?? []) {
+    try {
+      const [name, section] = JSON.parse(line) as [unknown, unknown];
+      if (typeof name === 'string' && typeof section === 'string') out.set(name, section);
+    } catch {
+      /* A damaged `dog_section` row is not a section. That table's own checksum catches it. */
+    }
+  }
+  return out;
+}
+
+/** The two tables that describe the file rather than travel in it, and so carry no manifest row. */
+const UNHASHED: ReadonlySet<string> = new Set(['dog_manifest', 'dog_sig']);
+
+/**
+ * Does this file still say what it said when it was written?
+ *
+ * `41 §5.11` STEP 2, AND IT WAS NOT THERE. Every export computes a SHA-256 per table and writes it
+ * into `dog_manifest`; every import ignored it. A truncated download, a row deleted in a text editor,
+ * one digit changed in an amount -- all of them imported cleanly and became the record. The manifest
+ * was a claim nothing checked, which reads exactly like a manifest that works.
+ *
+ * IT ANSWERS BEFORE ANYTHING IS WRITTEN. A half-imported record is worse than a refused one, and the
+ * refusal has to be able to name the table so somebody knows what they are looking at.
+ */
+export async function checkDogl(
+  lines: readonly string[],
+): Promise<{ ok: true } | { ok: false; refusal: { code: string; fix: string } }> {
+  /* THE FORMAT, FROM LINE ONE. `03 §11`: a file from a newer build is refused rather than read,
+     because reading it means writing rows whose columns this build does not know into a record it
+     then calls a complete copy. The `dog_meta` check inside the writer finds the same fact later,
+     and later is after the transaction has opened. */
+  const first = lines.find((l) => l.trim() !== '')?.trim() ?? '';
+  if (!first.startsWith('#dogl '))
+    return {
+      ok: false,
+      refusal: {
+        code: 'MALFORMED_FILE',
+        fix: 'A .dog file begins with `#dogl <version>`, and this one does not. Re-export it from the record it came from.',
+      },
+    };
+  const format = Number(first.slice('#dogl '.length).trim());
+  if (!Number.isInteger(format) || format < 1)
+    return {
+      ok: false,
+      refusal: { code: 'MALFORMED_FILE', fix: `The first line does not name a format version. The file is damaged.` },
+    };
+  if (format > FORMAT_VERSION)
+    return {
+      ok: false,
+      refusal: {
+        code: 'FORMAT_NEWER_THAN_READER',
+        fix: `This file is format ${format} and this build reads ${FORMAT_VERSION}. Upgrade BrainDog, and it will open.`,
+      },
+    };
+
+  const held = grouped(lines);
+  const says = claimed(lines);
+  if (says.size === 0)
+    return {
+      ok: false,
+      refusal: {
+        code: 'CHECKSUM_MISMATCH',
+        fix: 'This file carries no manifest, so there is nothing to check it against. Re-export it from the record it came from.',
+      },
+    };
+
+  const where = sections(lines);
+
+  /* EVERY TABLE IN THE FILE, hashed the way the exporter hashed it: its rows joined by LF. */
+  for (const [name, rows] of held) {
+    if (UNHASHED.has(name)) continue;
+    const claim = says.get(name);
+    if (!claim)
+      return {
+        ok: false,
+        refusal: {
+          code: 'CHECKSUM_MISMATCH',
+          fix: `The file carries a ${name} table that its own manifest does not list. It has been edited since it was written.`,
+        },
+      };
+    const sum = await sha256(rows.join('\n'));
+    if (sum !== claim.sha)
+      return {
+        ok: false,
+        refusal: {
+          code: 'CHECKSUM_MISMATCH',
+          fix: `${name} does not match the checksum in the file's own manifest. The file is damaged or has been edited; re-export it from the record it came from.`,
+        },
+      };
+    /* THE COUNT TOO. It is written beside the hash, and a manifest whose two halves disagree is a
+       file assembled by something that was not an export. */
+    if (claim.rows !== rows.length)
+      return {
+        ok: false,
+        refusal: {
+          code: 'CHECKSUM_MISMATCH',
+          fix: `The manifest says ${name} has ${claim.rows} rows and the file carries ${rows.length}.`,
+        },
+      };
+  }
+
+  /* AND EVERY TABLE THE MANIFEST NAMES IS IN THE FILE, unless its section is `local` and does not
+     travel. Without this, deleting a whole table from a file passes: there is nothing left in the
+     file to hash, so there is nothing to compare. */
+  for (const [name, claim] of says) {
+    if (held.has(name)) continue;
+    if (where.get(name) === 'local') continue;
+    return {
+      ok: false,
+      refusal: {
+        code: 'CHECKSUM_MISMATCH',
+        fix: `The manifest lists ${name} with ${claim.rows} rows and the file does not carry it. A table has been removed since it was written.`,
+      },
+    };
+  }
+
+  return { ok: true };
 }
 
 export type ImportReport = { tables: number; rows: number };

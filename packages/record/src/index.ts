@@ -1110,7 +1110,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
          reader — across the boundary this package promises nothing throws over. */
       if (!args.lines.every((line) => typeof line === 'string'))
         return no('VALUE_MALFORMED', 'A .dog file is lines of text, and one of these is not.', { at: 'lines' });
-      return tail(kernel.import(args.lines));
+      return tail(await kernel.import(args.lines));
     },
 
     /* ── VAULT ────────────────────────────────────────────────── */

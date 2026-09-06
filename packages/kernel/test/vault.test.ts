@@ -330,7 +330,7 @@ test('A GRANT TRAVELS IN A `.dog` FILE, SEALED, and comes back as itself', async
 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  value(k.import(lines));
+  value(await k.import(lines));
 
   const there = k.grants()[0]!;
   assert.equal(there.label, 'Stripe, live');

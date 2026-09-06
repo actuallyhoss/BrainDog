@@ -221,7 +221,7 @@ test('A GOVERNANCE-ONLY FILE DOES NOT HAND SOMEBODY A MEMBERSHIP', async () => {
 
   const sql = openSqlite();
   const target = await openRecord(sql, fixedClock(NOW));
-  value(target.import(governance));
+  value(await target.import(governance));
   assert.equal(sql.all('SELECT 1 FROM member').length, 0, "the file's owner became an owner here");
   assert.equal(sql.all('SELECT 1 FROM person').length, 0);
 
@@ -229,7 +229,7 @@ test('A GOVERNANCE-ONLY FILE DOES NOT HAND SOMEBODY A MEMBERSHIP', async () => {
   const full = value<string[]>(await source.k.export());
   const other = openSqlite();
   const whole = await openRecord(other, fixedClock(NOW));
-  value(whole.import(full));
+  value(await whole.import(full));
   assert.equal(other.one<{ n: number }>('SELECT count(*) AS n FROM member')?.n, 1);
   assert.equal(whole.identity()?.slug, 'studio-a');
 

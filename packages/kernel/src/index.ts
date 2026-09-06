@@ -26,7 +26,7 @@ import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from
 import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, jcs, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
-import { exportDogl, importDogl, type Section } from './dogl.ts';
+import { checkDogl, exportDogl, importDogl, type Section } from './dogl.ts';
 import {
   drainSchedule,
   due,
@@ -100,6 +100,7 @@ import {
 } from './vault.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
+export { checkDogl } from './dogl.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
@@ -2153,13 +2154,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * The rebuild is here rather than in the import because it depends on the DECLARATIONS the file
      * just brought — a search index built before them would index nothing and look like it worked.
      */
-    import(lines: Iterable<string>) {
+    async import(lines: Iterable<string>) {
       /* The one destructive path that was not gated. `migrate.ts` says in bold that the refusal is
          sticky and every `Result`-returning method short-circuits on it; this one wrote seven rows
          into a record whose schema the code cannot read. */
       const refused = schemaRefusal(state);
       if (refused) return refused;
-      const out = importDogl(sql, transaction, lines);
+
+      /* THE FILE IS CHECKED AGAINST ITSELF BEFORE ONE ROW IS WRITTEN. `41 §5.11` step 2, and the
+         reason this method is `async`: SHA-256 is, and a checksum computed after the transaction
+         opened would be a checksum of a record that already exists. `lines` is an `Iterable` and a
+         generator read twice is empty the second time, so it is materialised here — once, for both
+         readers. */
+      const all = [...lines];
+      const sound = await checkDogl(all);
+      if (!sound.ok) return sound;
+
+      const out = importDogl(sql, transaction, all);
       if (out.ok) {
         reload();
         rebuildFts();

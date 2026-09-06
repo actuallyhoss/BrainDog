@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
-import { openRecord, TRAVELS, type Declaration, type Kernel } from '../src/index.ts';
+import { checkDogl, openRecord, TRAVELS, type Declaration, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -42,6 +42,58 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   const k = await openRecord(sql, fixedClock(NOW));
   assert.ok((await k.install([OBLIGATIONS])).ok);
   return { k, sql };
+}
+
+/**
+ * Recompute a file's own manifest so that an edited file is INTERNALLY CONSISTENT again.
+ *
+ * IT EXISTS TO KEEP THE OLD TESTS HONEST. `checkDogl` now refuses a file whose rows do not match its
+ * manifest, which means every test that damaged a row line was, after that change, testing the
+ * checksum and not the thing it was written for. Re-sealing puts the parser back under test: this is
+ * a file that passes every integrity check and still carries a line that is not a row.
+ *
+ * It is also what an attacker with a text editor has, which is the point of the signature that goes
+ * on top of it.
+ */
+function reseal(lines: readonly string[]): string[] {
+  const held = new Map<string, string[]>();
+  const order: string[] = [];
+  let at: string[] | null = null;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (line.startsWith('#table ')) {
+      const name = line.slice('#table '.length).split(' ')[0]!;
+      at = [];
+      held.set(name, at);
+      order.push(name);
+      continue;
+    }
+    if (line.startsWith('#') || !line) continue;
+    at?.push(line);
+  }
+
+  const sums = new Map<string, [number, string]>();
+  for (const [name, rows] of held) {
+    if (name === 'dog_manifest' || name === 'dog_sig') continue;
+    sums.set(name, [rows.length, createHash('sha256').update(rows.join('\n')).digest('hex')]);
+  }
+
+  const out: string[] = [];
+  let table: string | null = null;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (line.startsWith('#table ')) {
+      table = line.slice('#table '.length).split(' ')[0]!;
+      out.push(raw);
+      if (table === 'dog_manifest')
+        for (const [name, [rows, sha]] of [...sums].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+          out.push(JSON.stringify([name, rows, sha]));
+      continue;
+    }
+    if (table === 'dog_manifest' && !line.startsWith('#')) continue;
+    out.push(raw);
+  }
+  return out;
 }
 
 const value = <T>(r: unknown): T => {
@@ -230,7 +282,7 @@ test('EXPORT · IMPORT · EXPORT PRODUCES THE SAME FILE, which is the only proof
 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  const report = value<{ tables: number; rows: number }>(k.import(first));
+  const report = value<{ tables: number; rows: number }>(await k.import(first));
   assert.ok(report.rows > 5, `only ${report.rows} rows arrived`);
 
   const second = value<string[]>(await k.export());
@@ -249,7 +301,7 @@ test('and everything the record could answer before, it answers after', async ()
 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  value(k.import(lines));
+  value(await k.import(lines));
 
   // The rows, with their numbers.
   assert.equal(k.count('obligations'), 2, 'a deleted row came back live, or a live one went missing');
@@ -283,7 +335,7 @@ test('AN IMPORT OPENS A FILE INTO AN EMPTY RECORD, and refuses anything else', a
   const lines = value<string[]>(await source.k.export());
   const target = await filled();
 
-  const out = target.k.import(lines) as { ok: boolean; refusal?: { code: string; fix: string } };
+  const out = (await target.k.import(lines)) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(out.ok, false);
   assert.equal(out.refusal?.code, 'RECORD_NOT_EMPTY');
   assert.match(out.refusal?.fix ?? '', /decision per row/);
@@ -301,7 +353,7 @@ test('every travelling table arrives, and not one of them quietly stays behind',
 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  value(k.import(lines));
+  value(await k.import(lines));
 
   const travelling = source.sql
     .all<{ table_name: string; section: string }>('SELECT table_name, section FROM dog_section')
@@ -344,7 +396,7 @@ test('A RECORD WITH NO ROWS BUT ITS OWN GOVERNANCE IS NOT EMPTY', async () => {
   );
   assert.equal(target.count('obligations'), 0, 'the target does hold rows, so this tests the old check');
 
-  const out = target.import(lines) as { ok: boolean; refusal?: { code: string; fix: string } };
+  const out = (await target.import(lines)) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(out.ok, false, 'a record holding a register and a decision was called empty');
   assert.equal(out.refusal?.code, 'RECORD_NOT_EMPTY');
   assert.match(out.refusal?.fix ?? '', /declaration|decision/, 'the refusal does not say what is in the way');
@@ -361,10 +413,13 @@ test('a damaged file is a refusal and not an exception, and it writes nothing', 
   assert.ok(at > 0, 'no row line to damage');
 
   for (const damage of [lines[at]!.slice(0, 20), '{"not":"an array"}']) {
-    const broken = [...lines.slice(0, at), damage, ...lines.slice(at + 1)];
+    /* RE-SEALED, so this is about the PARSER. Without it the manifest catches the edit first and
+       every assertion below is about `checkDogl` instead — a test that passes for a reason other
+       than the one it is named for. */
+    const broken = reseal([...lines.slice(0, at), damage, ...lines.slice(at + 1)]);
     const sql = openSqlite();
     const k = await openRecord(sql, fixedClock(NOW));
-    const out = k.import(broken) as { ok: boolean; refusal?: { code: string; fix: string } };
+    const out = (await k.import(broken)) as { ok: boolean; refusal?: { code: string; fix: string } };
     assert.equal(out.ok, false, `\`${damage.slice(0, 24)}…\` was imported as if it were a row`);
     assert.equal(out.refusal?.code, 'MALFORMED_FILE');
     assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 0, 'a failed import left rows behind');
@@ -393,7 +448,7 @@ test('A RECORD OPENED FROM A FILE KNOWS WHAT IT IS CALLED', async () => {
 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  value(k.import(lines));
+  value(await k.import(lines));
 
   assert.equal(k.identity()?.slug, 'the-studio', 'the record row did not travel');
   assert.equal(k.identity()?.tz, 'Europe/London');
@@ -421,13 +476,14 @@ test('a file from a build that reads a newer format is refused, not half read', 
   // calls a complete copy — and the customer finds out by opening it and finding a table missing.
   const source = await filled();
   const lines = value<string[]>(await source.k.export());
-  const at = lines.findIndex((l) => l.startsWith('["format"'));
-  assert.ok(at > 0, `no format line in the header: ${lines.slice(0, 6).join(' / ')}`);
-
-  const future = [...lines.slice(0, at), '["format","9"]', ...lines.slice(at + 1)];
+  /* LINE ONE, WHICH IS WHERE `41 §5.11` STEP 2 PUTS IT. The `dog_meta` row that said the same
+     thing was checked inside the writer, after the transaction had opened — and it is now
+     unreachable for any file that passes its own checksum, because changing it changes `dog_meta`. */
+  assert.equal(lines[0], '#dogl 1');
+  const future = ['#dogl 9', ...lines.slice(1)];
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  const out = k.import(future) as { ok: boolean; refusal?: { code: string; fix: string } };
+  const out = (await k.import(future)) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(out.ok, false, 'a file from a newer build was read as if this build had written it');
   assert.match(out.refusal?.fix ?? '', /format 9/);
   assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 0, 'a refused import wrote rows');
@@ -450,7 +506,7 @@ test('every kind of value comes back as itself', async () => {
 
   const to = openSqlite();
   const k2 = await openRecord(to, fixedClock(NOW));
-  value(k2.import(lines));
+  value(await k2.import(lines));
   const row = k2.get('obligations#1');
   assert.equal(row?.fields.what, 'A quote " and a backslash \\ and a newline\nin one');
   assert.deepEqual(row?.fields.amount, { amount: -4800, currency: 'EUR' });
@@ -471,4 +527,158 @@ test('the shape is read from the schema, so a table nobody listed still travels'
     .map((r) => r.table_name);
   for (const name of travelling) assert.ok(named.has(name), `${name} is sectioned to travel and is not in the file`);
   sql.close();
+});
+
+/* -- the file checks itself ----------------------------------------------- */
+
+/** Where the rows of one table start and end, in a file's lines. */
+function span(lines: readonly string[], table: string): [number, number] {
+  const from = lines.findIndex((l) => l.startsWith(`#table ${table} `));
+  assert.ok(from >= 0, `${table} is not in the file`);
+  let to = from + 1;
+  while (to < lines.length && !lines[to]!.startsWith('#')) to++;
+  return [from, to];
+}
+
+/**
+ * A row line inside ONE table's span.
+ *
+ * SEARCHING THE WHOLE FILE FINDS THE WRONG LINE. `["entry","data"]` is a `dog_section` row and
+ * `["entry",1,"86e…"]` is a manifest row, and both start the way an entry row does — so a test that
+ * damaged "the line mentioning Halden" damaged the search index, and passed for the wrong reason.
+ */
+function rowIn(lines: readonly string[], table: string, holds: string): number {
+  const [from, to] = span(lines, table);
+  const at = lines.slice(from + 1, to).findIndex((l) => l.includes(holds));
+  assert.ok(at >= 0, `no ${table} row holding ${holds}`);
+  return from + 1 + at;
+}
+
+test('A FILE THAT HAS BEEN EDITED SINCE IT WAS WRITTEN DOES NOT OPEN', async () => {
+  // Every export hashes each table into `dog_manifest` and every import ignored it, so a truncated
+  // download, a deleted row or one changed digit in an amount all became the record. A claim nothing
+  // checks reads exactly like a claim that works.
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+  assert.ok((await checkDogl(lines)).ok, 'a file straight out of export does not match its own manifest');
+
+  const at = rowIn(lines, 'entry', 'Halden');
+
+  // ONE DIGIT, in the one column this product exists to be right about.
+  const edited = [...lines];
+  edited[at] = edited[at]!.replace('48000', '4800');
+  assert.notEqual(edited[at], lines[at], 'the amount was not where the test thought it was');
+  const bent = await checkDogl(edited);
+  assert.equal(bent.ok, false, 'an edited amount passed the manifest');
+  assert.equal(bent.ok === false ? bent.refusal.code : '', 'CHECKSUM_MISMATCH');
+  assert.match(bent.ok === false ? bent.refusal.fix : '', /entry/, 'the refusal does not name the table');
+
+  // A ROW REMOVED. The count and the hash both move, and either is enough.
+  const short = [...lines.slice(0, at), ...lines.slice(at + 1)];
+  assert.equal((await checkDogl(short)).ok, false, 'a deleted row passed the manifest');
+
+  // A ROW ADDED, which is the one that matters: somebody appending an invoice they are owed.
+  const long = [...lines.slice(0, at + 1), lines[at]!.replace('Halden', 'Nobody'), ...lines.slice(at + 1)];
+  assert.equal((await checkDogl(long)).ok, false, 'an appended row passed the manifest');
+
+  sql.close();
+});
+
+test('AND NEITHER DOES A FILE WITH A TABLE MISSING, which is the case a per-table hash cannot see', async () => {
+  // Hash each table and compare: a table that is not in the file has nothing to hash, so the loop
+  // over the file's tables never looks at it. The manifest names it, and that is the check.
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+
+  const [from, to] = span(lines, 'entry');
+  const gone = [...lines.slice(0, from), ...lines.slice(to)];
+  const out = await checkDogl(gone);
+  assert.equal(out.ok, false, 'a file with every entry removed passed');
+  assert.equal(out.ok === false ? out.refusal.code : '', 'CHECKSUM_MISMATCH');
+  assert.match(out.ok === false ? out.refusal.fix : '', /entry/);
+
+  // A TABLE THE MANIFEST DOES NOT LIST is the same fault from the other side.
+  const extra = [...lines, '#table nowhere id,name', '["x","y"]'];
+  assert.equal((await checkDogl(extra)).ok, false, 'a table nothing vouches for passed');
+
+  // AND THE MANIFEST ITSELF CANNOT BE DROPPED. Without this, deleting one header disables every
+  // check in this file and the import proceeds.
+  const [mfrom, mto] = span(lines, 'dog_manifest');
+  const unvouched = [...lines.slice(0, mfrom), ...lines.slice(mto)];
+  const bare = await checkDogl(unvouched);
+  assert.equal(bare.ok, false, 'a file with no manifest passed');
+  assert.equal(bare.ok === false ? bare.refusal.code : '', 'CHECKSUM_MISMATCH');
+
+  sql.close();
+});
+
+test('THE COUNT BESIDE THE HASH IS CHECKED TOO', async () => {
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+  const at = rowIn(lines, 'dog_manifest', '"entry"');
+
+  const [name, rows, sha] = JSON.parse(lines[at]!) as [string, number, string];
+  assert.equal(name, 'entry', 'the manifest row found was not entry’s');
+  const lying = [...lines];
+  lying[at] = JSON.stringify([name, rows + 1, sha]);
+  const out = await checkDogl(lying);
+  assert.equal(out.ok, false, 'a manifest whose two halves disagree passed');
+  assert.match(out.ok === false ? out.refusal.fix : '', /rows/);
+  sql.close();
+});
+
+test('A FILE FROM A NEWER BUILD IS REFUSED ON LINE ONE, before anything is parsed', async () => {
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+
+  const future = await checkDogl(['#dogl 9', ...lines.slice(1)]);
+  assert.equal(future.ok, false);
+  assert.equal(future.ok === false ? future.refusal.code : '', 'FORMAT_NEWER_THAN_READER');
+  assert.match(future.ok === false ? future.refusal.fix : '', /format 9/);
+
+  // AND SOMETHING THAT IS NOT A .dog FILE AT ALL says so, rather than reporting a checksum.
+  for (const first of ['<!doctype html>', '#dogl', '#dogl nine', ''])
+    assert.equal((await checkDogl([first, ...lines.slice(1)])).ok, false, `\`${first}\` was read as a file`);
+  assert.equal(
+    ((await checkDogl(['<!doctype html>'])) as { refusal: { code: string } }).refusal.code,
+    'MALFORMED_FILE',
+  );
+  sql.close();
+});
+
+test('AN EMPTY TABLE IS STILL A TABLE, and a file that grew one does not open', async () => {
+  // The hash of a table with no rows is the hash of the empty string, and a reader that skipped
+  // headers with nothing under them would let somebody empty a table without moving a single hash.
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+
+  const [from, to] = span(lines, 'entry');
+  const emptied = [...lines.slice(0, from + 1), ...lines.slice(to)];
+  assert.equal((await checkDogl(emptied)).ok, false, 'emptying a table left the manifest satisfied');
+
+  // And a real export DOES carry empty tables, which is what makes the case above reachable.
+  const bodiless = lines.filter((l, i) => l.startsWith('#table ') && (lines[i + 1] ?? '#').startsWith('#'));
+  assert.ok(bodiless.length > 0, 'no empty table in the file, so this property is untested');
+  sql.close();
+});
+
+test('AND THE CHECK RUNS BEFORE ONE ROW IS WRITTEN', async () => {
+  const source = await filled();
+  const lines = value<string[]>(await source.k.export());
+  const at = rowIn(lines, 'entry', 'Halden');
+  const edited = [...lines];
+  edited[at] = edited[at]!.replace('48000', '4800');
+
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const out = (await k.import(edited)) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.equal(out.ok, false);
+  assert.equal(out.refusal?.code, 'CHECKSUM_MISMATCH');
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 0, 'a refused import wrote rows');
+  /* AND THE DECLARATIONS ARE UNTOUCHED, which is the half a per-table check could still have got
+     wrong: `importDogl` clears a table on its first line, so a refusal that arrived one table in
+     would leave the record emptier than it started. */
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM declaration')?.n ?? 0, 0);
+  sql.close();
+  source.sql.close();
 });
