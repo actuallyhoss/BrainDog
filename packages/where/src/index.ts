@@ -323,6 +323,12 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            'GBP' OR amount = 10000)`, which returns a value that IS in the list. And `evaluate()`
            answers the same predicate without error, so a rule fires mid-write and the list behind
            it crashes. */
+        /* EACH AMOUNT WITH ITS OWN QUALIFIER, exactly as `in` above does it. The currencies were
+           collected into a SET and the amounts negated against the union of it, so
+           `not_in [GBP 480, EUR 240]` excluded a GBP 240 row — a value that is not in the list —
+           because 240 was in the amounts and GBP was in the currencies. The two halves were never
+           put back together. `evaluate` pairs them and did not agree, which is the disagreement this
+           package exists to make impossible. */
         const seen = new Set<string>();
         const same = (() => {
           const clauses: string[] = [];
@@ -334,8 +340,8 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
           }
           return clauses.length ? `(${clauses.join(' OR ')}) AND ` : '';
         })();
-        const amounts = list.map((_, i) => `${path} = ${put(bounds[i]!)}`).join(' OR ');
-        return `(${path} IS NULL OR (${same}NOT (${amounts})))`;
+        const each = list.map((v, i) => `(${path} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
+        return `(${path} IS NULL OR (${same}NOT (${each.join(' OR ')})))`;
       }
 
       case 'gt':

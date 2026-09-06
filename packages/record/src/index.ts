@@ -59,8 +59,18 @@ export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
 export type Level = (typeof LEVELS)[number];
 
 export type Principal =
-  | { kind: 'person'; id: string; level: Level }
-  | { kind: 'token'; id: string; scope: Scope; person: string; level: Level }
+  /**
+   * `level` IS NULLABLE, and that is a state rather than an absence of information.
+   *
+   * Somebody invited to one register holds nothing ON THE RECORD: not `owner`, which is what
+   * promoting their highest scoped level used to give them, and not `read` either, because `append`
+   * is the one rung whose whole point is that it does not read. Every method that names no register
+   * asks for `read` with nothing to scope it, so any invented record-wide level was a key to all of
+   * them. `null` is the honest value, and the type carrying it is what makes every reader deal with
+   * it.
+   */
+  | { kind: 'person'; id: string; level: Level | null }
+  | { kind: 'token'; id: string; scope: Scope; person: string; level: Level | null }
   | { kind: 'system'; id: string };
 
 export type CallContext = {
@@ -117,14 +127,25 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
   const p = ctx.principal;
   if (p.kind === 'system') return null;
 
+  /* NOTHING ON THE RECORD REACHES NOTHING ON THE RECORD. A caller with only register-scoped rows
+     arrives here with `level: null` for anything not scoped to one of them, and the refusal names
+     what they do hold rather than a bigger token they cannot get. */
+  if (p.level === null)
+    return {
+      code: 'FORBIDDEN',
+      fix: 'You hold named registers in this record and nothing on the record itself.',
+      allowed: [],
+    };
+
+  const level: Level = p.level;
   const reach =
     p.kind === 'person'
-      ? LEVEL_REACH[p.level]
-      : TOKEN_REACH[p.scope].filter((n) => LEVEL_REACH[p.level].includes(n));
+      ? LEVEL_REACH[level]
+      : TOKEN_REACH[p.scope].filter((n) => LEVEL_REACH[level].includes(n));
 
   if (reach.includes(need)) return null;
 
-  const has = p.kind === 'person' ? `${p.level} access` : `a ${p.scope} token on ${p.level} access`;
+  const has = p.kind === 'person' ? `${level} access` : `a ${p.scope} token on ${level} access`;
 
   /* NO TOKEN REACHES THE TOP TWO RUNGS — ADR-060, and it is a design decision rather than a gap: a
      decision needs a person, and so does anything at owner. Reporting that as "your scope is too
@@ -208,6 +229,12 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       held === undefined || ctx.principal.kind === 'system'
         ? ctx
         : { ...ctx, principal: { ...ctx.principal, level: held } };
+
+    /* A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and `allows` refuses a `null` level for
+       exactly that reason: `boot`, `search`, `page`, `metric` and `governance` all ask for `read`
+       with nothing to scope them, and a member with only register-scoped rows used to reach every
+       one of them through whatever record-wide level was invented for them. The registers they hold
+       are reachable BY NAME — which is the substitution above — and the record itself is not. */
     return allows(at, need) ?? (register ? reaches(ctx, register) : null);
   };
 
@@ -802,7 +829,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * installation rather than about the record, and carrying them would move somebody's
      * credentials to a machine they did not authorise.
      */
-    async export(args: { sections?: readonly string[]; redactGrants?: boolean }, ctx: CallContext) {
+    async export(args: { sections?: readonly string[]; redactGrants?: boolean; kek_id?: string }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
 
@@ -819,24 +846,35 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
             allowed: TRAVELS,
           });
       }
-      /* THE SEALED BYTES ARE A VAULT READ, WHEREVER THEY LEAVE FROM. This is an ADMIN method, and
-         ADMIN is a lower bar than VAULT on purpose — so it handed out every grant's `ciphertext`
-         and the wrapped record key to a caller who could not have opened a single one of them
-         through `openGrant`, which is unrouted precisely so that cannot happen. The default is
-         therefore redacted, and the full file needs the gate that actually guards secrets.
+      /* THE SEALED BYTES ARE A VAULT READ, WHEREVER THEY LEAVE FROM. `openGrant` is unrouted so a
+         credential cannot be reached by anything holding a token, and this method handed out every
+         grant's `ciphertext` at once. So the default is redacted.
 
-         The rows still travel: labels, what each key opens, its kind, its rotation dates and its
-         scopes. What is missing is the bytes, and the person restoring re-adds the credentials —
-         an operation they were going to have to do anyway. */
-      const sealed = args?.redactGrants === false && vault(ctx) === null;
-      if (args?.redactGrants === false && !sealed)
-        return no('NEEDS_BROWSER_SESSION', 'An export carrying the sealed bytes needs the vault, which needs a signed-in owner.', {
-          at: 'redactGrants',
-        });
+         AND THE FULL FILE NEEDS THE WRAPPING KEY NAMED. An earlier version of this gated it on
+         `vault(ctx)`, which is the SAME PREDICATE as the `admin(ctx)` two lines above — both refuse
+         a token and then ask for owner — so it was not a second bar at all: any caller who reached
+         this line had already cleared it, and the flag was the whole of the permission. Naming the
+         `kek_id` is a bar `admin` cannot clear by definition: the bytes are wrapped by that key, so
+         a caller who has it can open them anyway, and one who does not gains nothing from the file.
+         It is the same check `openGrant` makes, on the path that copies every grant instead of one.
+
+         The rows still travel under redaction: labels, what each key opens, its kind, its rotation
+         dates and its scopes. What is missing is the bytes. */
+      if (args?.redactGrants === false) {
+        const held = kernel.wrappingKey();
+        if (!held || args.kek_id !== held)
+          return no(
+            'WRONG_KEY',
+            held
+              ? `The sealed bytes are wrapped by ${held}. An export carrying them names that key.`
+              : 'This record has no vault, so there are no sealed bytes to carry.',
+            { at: 'kek_id' },
+          );
+      }
 
       return kernel.export({
         ...(args?.sections ? { sections: args.sections as never } : {}),
-        redactGrants: !sealed,
+        redactGrants: args?.redactGrants !== false,
         actor: actorOf(ctx),
       });
     },

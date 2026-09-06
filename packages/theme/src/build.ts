@@ -8,6 +8,7 @@
  */
 
 import {
+  clipped,
   contrast,
   fromHex,
   gamutMap,
@@ -229,6 +230,17 @@ export type Built = {
   profile: Profile;
   seed: Seed;
   schemes: Record<Scheme, Palette>;
+  /**
+   * How much chroma the gamut mapper took off each role, as a fraction of what was asked for.
+   *
+   * IT IS RECORDED AT THE MOMENT IT HAPPENS, because that is the only moment the answer exists. Once
+   * a colour is a hex it is inside sRGB by construction, so asking a hex whether it is in gamut is
+   * asking whether a number between 0 and 1 is between 0 and 1 — which is what check J did, over
+   * every value, without ever being false. What CAN be wrong is that the emitted colour is a clipped
+   * version of the one the palette was solved as: every contrast figure in this package is computed
+   * against the clipped one while the palette is reasoned about as the other.
+   */
+  clipped: Record<Scheme, Partial<Record<Role, number>>>;
   /** (L, C) per scheme for an identity accent's `oklch(L C h)` — 13 §2.1b. */
   mark: Record<Scheme, { L: number; C: number }>;
   /** The elevation ladder, three levels, fixed geometry, alphas per scheme (28 §1). */
@@ -238,7 +250,22 @@ export type Built = {
   density: Seed['density'];
 };
 
-const hex = (c: Lch) => toHex(quantise(c));
+/**
+ * A colour as it ships, and a note of what the gamut cost it.
+ *
+ * BY THE HEX IT PRODUCED, not by the role that asked for it. `hex` is called from thirty places
+ * inside `buildScheme` and threading a second output through all of them would be the change rather
+ * than the fix; the palette is a map from role to hex, so a lookup the other way is enough. Two
+ * roles landing on one hex take the larger cost, which is the conservative direction.
+ */
+const cost = new Map<string, number>();
+
+const hex = (c: Lch) => {
+  const out = toHex(quantise(c));
+  const lost = clipped(c);
+  if (lost > (cost.get(out) ?? 0)) cost.set(out, lost);
+  return out;
+};
 
 /** The dialect's whole colour grammar: `#RRGGBB`, `#RGB`, or `oklch(L C H)`. No alpha (28 §1). */
 export function parseColour(s: string): Rgb {
@@ -571,11 +598,22 @@ export function build(seed: Seed, profile: Profile = HOUSE_PROFILE, id = 'house'
       `0 4px 8px rgb(0 0 0 / ${a[2]}), 0 16px 40px rgb(0 0 0 / ${(a[2] * 0.7).toFixed(3)})`,
     ];
   };
+  const schemes = { dark: buildScheme(seed, profile, 'dark'), light: buildScheme(seed, profile, 'light') };
+  const lostIn = (p: Palette): Partial<Record<Role, number>> => {
+    const out: Partial<Record<Role, number>> = {};
+    for (const [role, value] of Object.entries(p)) {
+      const lost = cost.get(value) ?? 0;
+      if (lost > 0) out[role as Role] = lost;
+    }
+    return out;
+  };
+
   return {
     id,
     profile,
     seed,
-    schemes: { dark: buildScheme(seed, profile, 'dark'), light: buildScheme(seed, profile, 'light') },
+    schemes,
+    clipped: { dark: lostIn(schemes.dark), light: lostIn(schemes.light) },
     mark: profile.mark,
     elevation: { dark: ladder('dark'), light: ladder('light') },
     radius: seed.radius,

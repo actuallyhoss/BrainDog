@@ -188,7 +188,10 @@ function aggregate(rows: Entry[], agg: Aggregation): number | null {
     const seen = new Set<string>();
     for (const e of rows) {
       const v = e.fields[agg.distinct];
-      if (v === undefined || v === null || v === '') continue;
+      /* `''` IS A VALUE HERE, because it is one to SQLite: the kernel's `count(DISTINCT ...)` counts
+         an empty string as a distinct value, and two builds disagreeing about what a value is is the
+         defect this fix was for, arrived at from the other side. Absent is `undefined` or `null`. */
+      if (v === undefined || v === null) continue;
       seen.add(JSON.stringify(v));
     }
     return seen.size;

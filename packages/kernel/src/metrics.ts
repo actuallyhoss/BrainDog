@@ -646,7 +646,7 @@ const BASIS = 'pct.bp';
 const BASIS_SCALE = 10_000;
 
 /** What goes in the integer column: the value itself, or basis points when it is fractional. */
-const stored = (value: number): number => (Number.isInteger(value) ? value : Math.round(value * BASIS_SCALE));
+export const stored = (value: number): number => (Number.isInteger(value) ? value : Math.round(value * BASIS_SCALE));
 
 export function snapshot(
   sql: Sql,

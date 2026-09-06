@@ -62,7 +62,7 @@ export type MemberDeps = {
 export function access(
   sql: Sql,
   person: string,
-): { level: Level; registers: string[] | null; levels: Record<string, Level> } | null {
+): { level: Level | null; registers: string[] | null; levels: Record<string, Level> } | null {
   const rows = sql.all<{ register: string; level: Level }>(
     'SELECT register, level FROM member WHERE person_id = ?',
     person,
@@ -82,7 +82,16 @@ export function access(
      owner"*, and the only honest reading of "no `'*'` row" is that there is no record-wide level.
 
      The per-register levels below still travel, which is where a scoped grant does its work. */
-  const level = whole?.level ?? 'read';
+  /* THE HIGHEST SCOPED LEVEL, HELD TO THOSE REGISTERS — not `read`, and not the promotion this used
+     to do either. `read` was a second wrong answer in the other direction: it gave an APPENDER a
+     record-wide read, and `append` is the one rung whose point is that it does not read. Every
+     method that names no register — `boot`, `search`, `page`, `metric`, `governance` — asks
+     `guard(ctx, 'read')` with nothing to scope it, so a contractor invited to file expenses could
+     see the register list and search across it.
+
+     What a scoped-only member holds ON THE RECORD is nothing, and `null` is how that is said. The
+     ceiling and the per-register levels below carry everything they can actually do. */
+  const level = whole?.level ?? null;
   /* AND THE PER-REGISTER LEVELS TRAVEL, or the whole feature is decorative: a bookkeeper with
      `read` on the record and `write` on one register is the point, and so is an owner held to
      `read` on the one register that carries the payroll. */

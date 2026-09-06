@@ -114,6 +114,24 @@ export function fromHex(hex: string): Rgb {
 /** Every measurement is taken on the quantised colour, because that is what ships. */
 export const quantise = (c: Lch): Rgb => fromHex(toHex(lchToRgb(gamutMap(c))));
 
+/**
+ * How much chroma the gamut mapper had to take off, as a fraction of what was asked for.
+ *
+ * THIS IS THE ONLY PLACE THE ANSWER EXISTS. Once a colour is a hex it is inside sRGB by
+ * construction — `quantise` clamps, `fromHex` divides by 255 — so asking a hex whether it is in
+ * gamut is asking whether a number between 0 and 1 is between 0 and 1, which is what check J did
+ * over all 4096 three-digit values without ever being false. What can be wrong is that the emitted
+ * colour is a CLIPPED version of the one the palette was solved as, and the mapper is the only thing
+ * that knows.
+ *
+ * ABSOLUTE CHROMA, NOT A FRACTION. A surface at L 0.999 carries 0.014 of chroma and keeps 0.004 of
+ * it — 72% lost, and correctly so: near white there is almost no chroma to have, and the whisper of
+ * hue that survives is the whole intent. As a fraction that reads as a catastrophe and as an amount
+ * it reads as 0.010, which is what it is. A saturated accent giving up 0.06 is the case worth
+ * refusing, and only the absolute measure tells the two apart.
+ */
+export const clipped = (c: Lch): number => Math.max(0, c.C - gamutMap(c).C);
+
 /* ── WCAG 2.1 contrast ────────────────────────────────────────────────────── */
 
 export const relLuminance = (c: Rgb): number =>

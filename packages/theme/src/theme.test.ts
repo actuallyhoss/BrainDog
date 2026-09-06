@@ -361,3 +361,26 @@ test('AND THE HIGH-CONTRAST PROFILE IS CHECKED AT ITS OWN FLOORS', () => {
   const found = refusals(checkScheme(weakened, 'dark')).filter((f) => f.check === 'D');
   assert.ok(found.length > 0, 'the house edge passed the high-contrast floor');
 });
+
+test('CHECK J CAN FAIL, which is more than either of its previous forms could', () => {
+  /* It asked whether a hex was inside sRGB — `quantise` clamps and `fromHex` divides by 255, so the
+     answer is yes for all 65,536 of them. Then it asked whether the hex round-tripped through OKLab,
+     which is an exact analytic inverse: yes again. The question with an answer is how much chroma
+     the gamut mapper had to take off, and only the mapper knows, at the moment it does it. */
+  const built = build(HOUSE_SEED, HOUSE_PROFILE, 'clipped');
+  const wild: Built = {
+    ...built,
+    schemes: { ...built.schemes, dark: { ...built.schemes.dark, accent: '#FF0000' } },
+    clipped: { ...built.clipped, dark: { ...built.clipped.dark, accent: 0.09 } },
+  };
+  const found = refusals(checkScheme(wild, 'dark')).filter((f) => f.check === 'J');
+  assert.equal(found.length, 1, 'a role that lost most of its chroma passed');
+  assert.match(found[0]?.fix ?? '', /gave up 0\.090 of chroma/);
+});
+
+test('and a near-white surface giving up almost all of its chroma does NOT fail', () => {
+  // L 0.999 carries 0.014 and keeps 0.004: 72% lost and correctly so, because near white there is
+  // almost no chroma to have. As a fraction that reads as a catastrophe; as an amount it is 0.010.
+  assert.deepEqual(refusals(checkScheme(HOUSE, 'light')).filter((f) => f.check === 'J'), []);
+  assert.ok((HOUSE.clipped.light.s3 ?? 0) > 0, 'the fixture must actually clip there for this to mean anything');
+});

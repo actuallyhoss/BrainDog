@@ -7,15 +7,20 @@
  * a script that runs on a laptop is not package source, and the directory is what says so.
  */
 
+import { readFile } from 'node:fs/promises';
+
 import { HOUSE, HIGH_CONTRAST } from '../src/index.ts';
 import { INKS, INTENTS, SURFACES, type Built, type Scheme, parseColour } from '../src/build.ts';
 import { contrast, separation, toHex, rgbToLch } from '../src/color.ts';
 import { validate, refusals, warnings } from '../src/checks.ts';
 import { toCSS, forcedColors } from '../src/css.ts';
 
-/* THE CLASSES THE RENDERER ACTUALLY EMITS, handed in rather than imported: the theme package
-   has no workspace dependencies, and that is what makes it a seam. */
-const FORCED = forcedColors(['panel', 'grid', 'rows', 'prop', 'inline', 'list', 'table', 'media']);
+/* THE REAL BLOCK, READ FROM THE FILE THE APP LOADS. Building it here with `forcedColors(…)` and
+   then asking `validate` whether the stylesheet contains one is the caller handing in the thing
+   being looked for — check L cannot fail that way, and this proof is the artefact that is supposed
+   to make the checks believable to a person. */
+const FORCED = await readFile(new URL('../../skin/a11y.css', import.meta.url), 'utf8');
+void forcedColors;
 
 const pad = (s: string, n: number) => s.padEnd(n);
 const num = (n: number) => n.toFixed(2).padStart(6);

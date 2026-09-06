@@ -23,6 +23,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
+import { stored } from './metrics.ts';
 
 /** The three tables that are read like registers and are not registers. */
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
@@ -296,8 +297,19 @@ function checkPrediction(raw: unknown): Refusal | null {
   const m = p.measure as { source?: unknown; value?: unknown } | undefined;
   if (!m || typeof m !== 'object' || typeof m.source !== 'string' || !m.value)
     return unmeasurable('A prediction names what to read and where to read it.', 'body.prediction.measure');
-  if (!p.target || typeof p.target !== 'object' || Object.keys(p.target).length === 0)
+  const target = p.target as Record<string, unknown> | undefined;
+  if (!target || typeof target !== 'object' || Object.keys(target).length === 0)
     return unmeasurable('A prediction with no target cannot be met or missed.', 'body.prediction.target');
+  /* AND ONE OF THE TWO BOUNDS THE SCORER CAN READ. `lt`, `gt` and `is` used to file cleanly and be
+     unscoreable, and an unrecognised key silently turned off the already-true check as well. */
+  const key = Object.keys(target)[0];
+  if (Object.keys(target).length !== 1 || (key !== 'lte' && key !== 'gte') || typeof target[key] !== 'number')
+    return {
+      code: 'ENUM_VALUE_UNKNOWN',
+      fix: 'A prediction takes one bound: { lte: <number> } or { gte: <number> }.',
+      at: 'body.prediction.target',
+      allowed: ['lte', 'gte'],
+    };
   if (typeof p.window !== 'string' || !/^\d+[dhm]$/.test(p.window))
     return unmeasurable('A prediction says when to look: 30d, 90d.', 'body.prediction.window');
   if (p.on_miss !== undefined && p.on_miss !== 'suggest' && p.on_miss !== 'none')
@@ -509,9 +521,17 @@ function writePrediction(deps: GovernDeps, sg: string, p: Prediction, forDecl: s
     forDecl,
     p.claim,
     JSON.stringify(p.measure),
-    Math.round(baseline),
-    p.unit ?? 'count',
-    JSON.stringify(p.target),
+    /* THE SAME INTEGER RULE THE OBSERVATION IS STORED UNDER. `Math.round` here and `stored()` at
+       scoring time put a ratio of 0.375 in as `baseline: 0` and back out as `observed: 3750` — a
+       ten-thousand-fold disagreement in the one row whose entire purpose is a before-and-after. */
+    stored(baseline),
+    p.unit ?? (Number.isInteger(baseline) ? 'count' : 'pct.bp'),
+    /* THE SCORER'S GRAMMAR, NOT JSON. `targetOf` parses `<=0` and `>=3`; `Number('{"lte":0}')` is
+       `NaN`, so a prediction written as JSON came back `VALUE_MALFORMED` at scoring time, never got
+       a `scored_at`, and walked the retry ladder to dead. Twenty scored rows is what the brake
+       needs, so the loop still could not grade itself — the writer had moved and nothing else. Two
+       grammars for one column is the whole of the defect; there is one now. */
+    bound(p.target),
     p.window,
     instant(scoreAt),
     p.on_miss ?? 'suggest',
@@ -532,15 +552,24 @@ function writePrediction(deps: GovernDeps, sg: string, p: Prediction, forDecl: s
   return ok(id);
 }
 
-/** Whether a reading satisfies a bound. The four the target grammar admits, and nothing else. */
+/**
+ * Whether a reading satisfies a bound — the TWO the target grammar admits.
+ *
+ * IT ACCEPTED FIVE AND THE SCORER READS TWO. `lt`, `gt` and `is` filed cleanly here, were unscoreable
+ * at the other end, and — worse — an unknown key made this return `false`, which silently disabled
+ * the already-true check: a prediction the record already meets was accepted because the check that
+ * refuses one could not read its own target. `checkPrediction` refuses the other three now, at
+ * filing, where the author can fix it.
+ */
 function met(value: number, target: Record<string, number>): boolean {
   if (target.lte !== undefined) return value <= target.lte;
-  if (target.lt !== undefined) return value < target.lt;
   if (target.gte !== undefined) return value >= target.gte;
-  if (target.gt !== undefined) return value > target.gt;
-  if (target.is !== undefined) return value === target.is;
   return false;
 }
+
+/** The target as `targetOf` reads it back: `<=0`, `>=3`. One grammar, written where it is written. */
+const bound = (target: Record<string, number>): string =>
+  target.lte !== undefined ? `<=${target.lte}` : `>=${target.gte ?? 0}`;
 
 /** `30d` in milliseconds. The window grammar is the schedule's, so there is one of them. */
 function windowMs(window: string): number {

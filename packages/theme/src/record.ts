@@ -18,17 +18,12 @@
  */
 
 import { build, normalise, HOUSE_PROFILE, HIGH_CONTRAST_PROFILE, type Built, type Seed } from './build.ts';
-import { refusals, validate } from './checks.ts';
+import { checkElevation, checkScheme, refusals } from './checks.ts';
 import { forcedColors, toCSS } from './css.ts';
 
 
-/**
- * The forced-colours block as the page already carries it, for validation only.
- *
- * THE EIGHT PRIMITIVE CLASSES, handed in rather than imported: this package has no workspace
- * dependencies, which is what makes it a seam rather than a layer.
- */
-const A11Y = forcedColors(['panel', 'grid', 'rows', 'prop', 'inline', 'list', 'table', 'media']);
+/* `forcedColors` is no longer called here — see the note on check L below. */
+void forcedColors;
 
 export type RecordTheme = {
   /** The `@layer theme` block, ready for one `replaceSync`. */
@@ -75,12 +70,23 @@ export function recordTheme(accent: string, opts: { neutralHue?: number } = {}):
      THE DOCUMENT IS WHAT IS CHECKED, and a record's theme is one `@layer theme` block — the
      forced-colours boundary lives in `@layer a11y`, which no theme can reach and which is already
      in the page. Validating the block on its own would refuse every record for the absence of a
-     rule it is not allowed to write. */
+     rule it is not allowed to write.
+
+     SO CHECK L IS NOT RUN HERE, AND IT IS NOT FAKED EITHER. It used to be: this file manufactured
+     the forced-colours block with `forcedColors(…)`, appended it to the stylesheet, and then asked
+     `validate` whether the stylesheet contained a forced-colours block — the caller handing in the
+     thing being looked for, which is the exact shape of check that cannot fail. A record's theme
+     genuinely cannot affect that boundary, so the honest answer is that L is not a property of a
+     theme: it is a property of the document, asserted once by the generator that writes the
+     document, against the real `a11y.css`. */
   const css = toCSS(built, contrast);
-  const document_ = css + A11Y;
   const wrong = [
-    ...refusals(validate(built, document_)),
-    ...refusals(validate(contrast, toCSS(contrast, contrast) + A11Y)),
+    ...refusals(checkScheme(built, 'dark')),
+    ...refusals(checkScheme(built, 'light')),
+    ...refusals(checkElevation(built)),
+    ...refusals(checkScheme(contrast, 'dark')),
+    ...refusals(checkScheme(contrast, 'light')),
+    ...refusals(checkElevation(contrast)),
   ].map((f) => f.fix ?? `${f.check} failed on the ${f.scheme} scheme.`);
   if (wrong.length) return { ok: false, refusals: [...new Set(wrong)] };
 

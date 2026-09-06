@@ -309,8 +309,12 @@ function governors(deps: AnalyseDeps): string | null {
      `analyse()` twice in a day got two drafts and two model bills. They are not the same governor:
      a record that answers every proposal the day it arrives never reaches three open, and could be
      asked something new every hour. */
+  /* `state <> 'dead'`, the same clause `asked` uses. A draft that died after eight attempts
+     delivered nothing, and counting it muted the loop for a week on the strength of a bill nobody
+     was sent. Two queries about the same rows in the same function disagreeing is how one of them
+     ends up meaning something nobody intended. */
   const lately = deps.sql.one<{ ts: string }>(
-    "SELECT created AS ts FROM outbox WHERE kind = 'infer.draft' ORDER BY rowid DESC LIMIT 1",
+    "SELECT created AS ts FROM outbox WHERE kind = 'infer.draft' AND state <> 'dead' ORDER BY rowid DESC LIMIT 1",
   )?.ts;
   if (lately && deps.nowMs - Date.parse(lately) < WEEK_MS)
     return 'a proposal has already been drafted this week, and the queue is the product.';
@@ -321,12 +325,25 @@ function governors(deps: AnalyseDeps): string | null {
      had said was wrong three times kept arriving, which is exactly how a gate gets muted. */
   const wrong = deps.sql.all<{ subject: string; n: number }>(
     `SELECT subject, SUM(n) AS n FROM observation
-     WHERE kind = 'suggestion.incorrect' AND day >= ? GROUP BY subject HAVING SUM(n) >= 3`,
+     WHERE kind = 'suggestion.incorrect' AND day >= ? GROUP BY subject HAVING SUM(n) >= 3
+     ORDER BY n DESC, subject`,
     new Date(deps.nowMs - 90 * DAY_MS).toISOString().slice(0, 10),
   );
   const worst = wrong[0];
-  if (worst)
-    return `${worst.n} ${worst.subject} proposals were marked incorrect in ninety days, so that class is suspended.`;
+  if (worst) {
+    /* IT SUSPENDS THE ANALYSER, NOT THE CLASS, and the sentence says so. `governors` returning any
+       string stops the whole weekly run, so three `change` proposals marked incorrect also silence
+       `search.empty`, `ingest.unmatched` and `query.scan`. That is the conservative reading of
+       24 §4.3 and it is defensible — what was not defensible was a sentence claiming otherwise.
+
+       AND IT SAYS SO OUT LOUD, once, like the other brake. This returned a sentence and wrote
+       nothing, so the loop stopped with nothing in the digest or the audit log to say why — the
+       exact failure fixed for the scored-prediction brake, reintroduced beside it, on the brake that
+       fires more often because it is the only one a young record can reach. */
+    const said = `${worst.n} ${worst.subject} proposals were marked incorrect in ninety days, so proposing is suspended until somebody has looked.`;
+    if (!braked(deps)) brakeNote(deps, said);
+    return said;
+  }
 
   /* THE BRAKE. A proposal class that keeps being wrong stops being proposed. Twenty scored
      predictions and fewer than three in five met means the analyser is not earning its place, and a

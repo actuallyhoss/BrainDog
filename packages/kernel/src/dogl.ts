@@ -154,8 +154,19 @@ export function projection(sql: Sql, table: TableShape, redactGrants = false): s
  */
 const SEALED: Readonly<Record<string, ReadonlySet<string>>> = {
   grant: new Set(['ciphertext', 'nonce', 'prev_ciphertext', 'prev_nonce']),
-  vault_key: new Set(['wrapped', 'salt']),
 };
+
+/**
+ * Tables a redacted export leaves out entirely.
+ *
+ * `vault_key.wrapped` IS `NOT NULL`, so blanking it produced a file that could not be imported — a
+ * default export that every vault-provisioned record could make and no record could restore, which
+ * is a worse failure than the one being fixed. The row is the wrapped record key and its salt and
+ * there is nothing left of it once those are gone, so the honest redaction is the row's absence: an
+ * import into a fresh record provisions its own key, which is the operation somebody restoring was
+ * going to perform anyway.
+ */
+const SEALED_TABLES: ReadonlySet<string> = new Set(['vault_key']);
 
 const HEX = Array.from({ length: 256 }, (_, n) => n.toString(16).padStart(2, '0'));
 
@@ -185,8 +196,9 @@ export async function exportDogl(
   const all = tables(sql);
   const body = all.filter((t) => wanted.has(t.section) && t.name !== 'dog_manifest' && t.name !== 'dog_sig');
 
+  const redact = opts.redactGrants === true;
   const rows = new Map<string, string[]>();
-  for (const table of body) rows.set(table.name, projection(sql, table, opts.redactGrants === true));
+  for (const table of body) rows.set(table.name, redact && SEALED_TABLES.has(table.name) ? [] : projection(sql, table, redact));
 
   const sums = await Promise.all(body.map(async (t) => [t.name, await sha256((rows.get(t.name) ?? []).join('\n'))] as const));
 

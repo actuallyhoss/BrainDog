@@ -694,7 +694,7 @@ test('THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT, and removing them stops th
   value(await api.invite({ person: 'p_2', registers: { obligations: 'read' } }, owner));
 
   const bo = api.kernel.access('p_2')!;
-  assert.equal(bo.level, 'read');
+  assert.equal(bo.level, null, 'a register-scoped invitation gave a record-wide level');
   assert.deepEqual(bo.registers, ['obligations'], 'the ceiling was not armed, so one register meant every one');
   assert.deepEqual(bo.levels, { obligations: 'read' });
 
@@ -716,12 +716,14 @@ test('and somebody with only a named register holds nothing on the record itself
 
   const listed = value<{ person_id: string; level: string | null }[]>(await api.members(owner));
   assert.equal(listed.find((m) => m.person_id === 'p_3')?.level, null);
-  /* `read` ON THE RECORD, NOT `write`. This used to promote the highest SCOPED level to the
-     record-wide one, which is the wrong direction and the expensive one: `vault()` and `admin()`
-     read `principal.level` and neither consults the ceiling, because ADMIN and VAULT are not about
-     a register — so owner of one register was owner of the record. The per-register level still
-     travels, which is where a scoped grant does its work. */
-  assert.deepEqual(api.kernel.access('p_3'), { level: 'read', registers: ['obligations'], levels: { obligations: 'write' } });
+  /* `null` ON THE RECORD. This used to promote the highest SCOPED level to the record-wide one —
+     the wrong direction and the expensive one, because `vault()` and `admin()` read
+     `principal.level` and neither consults the ceiling: owner of one register was owner of the
+     record. `read` was a second wrong answer in the other direction, because `append` is the one
+     rung whose point is that it does not read, and every method that names no register asks for
+     `read` with nothing to scope it. The per-register level still travels, which is where a scoped
+     grant does its work. */
+  assert.deepEqual(api.kernel.access('p_3'), { level: null, registers: ['obligations'], levels: { obligations: 'write' } });
   sql.close();
 });
 
@@ -732,7 +734,7 @@ test('AND OWNER OF ONE REGISTER IS NOT OWNER OF THE RECORD', async () => {
   const { api, sql } = await studio();
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_9', 'obligations', 'owner')");
   const held = api.kernel.access('p_9');
-  assert.equal(held?.level, 'read', 'owner of one register was owner of the record');
+  assert.equal(held?.level, null, 'owner of one register was owner of the record');
   assert.equal(held?.levels.obligations, 'owner', 'and the scoped level has to survive, or the feature is decorative');
   sql.close();
 });
@@ -780,11 +782,49 @@ test('AN EXPORT DOES NOT CARRY THE SEALED BYTES, and ADMIN is not the vault', as
   assert.ok(!file.includes('BwgA'), 'the sealed bytes left in an ADMIN export');
 });
 
-test('and the full file needs the gate that actually guards secrets', async () => {
+test('and the full file needs the wrapping key named, which ADMIN does not clear', async () => {
+  /* An earlier version gated this on `vault(ctx)`, which is the SAME PREDICATE as `admin(ctx)` —
+     both refuse a token and then ask for owner — so it was not a second bar at all: every caller who
+     reached the check had already passed it, and the flag was the whole of the permission. This test
+     asserted a token was refused, which `admin` does one line earlier, so it passed with the entire
+     fix reverted. It uses an OWNER now, which is the caller the hole was about. */
   const { api, sql } = await record();
-  const tried = await api.export({ redactGrants: false }, token('write'));
-  // A token never reaches the vault — ADR-060 — so it cannot ask for the sealed bytes either.
-  assert.equal((tried as { refusal?: { code: string } }).refusal?.code, 'NEEDS_BROWSER_SESSION');
+  sql.exec(
+    "INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id) VALUES ('record', ?, ?, 'kek', 'kek_2f')",
+    new Uint8Array([9]),
+    new Uint8Array([1]),
+  );
+
+  const bare = await api.export({ redactGrants: false }, owner);
+  assert.equal((bare as { refusal?: { code: string } }).refusal?.code, 'WRONG_KEY');
+  assert.equal((await api.export({ redactGrants: false, kek_id: 'kek_ff' }, owner) as { refusal?: { code: string } }).refusal?.code, 'WRONG_KEY');
+
+  // And with the key named, the bytes travel.
+  const full = value<string[]>(await api.export({ redactGrants: false, kek_id: 'kek_2f' }, owner));
+  assert.ok(full.some((l) => l.includes('vault_key')), 'the wrapped key did not travel to a caller who named it');
+  sql.close();
+});
+
+test('A REDACTED EXPORT IMPORTS, which is what makes it an export', async () => {
+  /* Blanking `vault_key.wrapped` produced a file that could not be read back — the column is
+     `NOT NULL`, so every vault-provisioned record made a default export no record could restore.
+     That is a worse failure than the one it was fixing. */
+  const { api, sql } = await record();
+  sql.exec(
+    "INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id) VALUES ('record', ?, ?, 'kek', 'kek_2f')",
+    new Uint8Array([9]),
+    new Uint8Array([1]),
+  );
+
+  const lines = value<string[]>(await api.export({}, owner));
+
+  // An EMPTY record, which is the only thing an import opens into.
+  const into = openSqlite();
+  const fresh = await createRecordApi({ sql: into, clock: fixedClock(NOW) });
+  const back = await fresh.import({ lines }, owner);
+  assert.ok((back as { ok: boolean }).ok, `a redacted export would not import: ${JSON.stringify(back).slice(0, 220)}`);
+  assert.equal(into.all('SELECT 1 FROM vault_key').length, 0, 'the wrapped key travelled in a redacted file');
+  into.close();
   sql.close();
 });
 
@@ -797,5 +837,36 @@ test('AND AN EXPORT IS AN EVENT, because it is the read that gets the most out',
   const said = sql.one<{ actor: string; note: string }>("SELECT actor, note FROM event WHERE kind = 'export'");
   assert.ok(said, 'the whole record was copied and the log says nothing');
   assert.match(said.note, /grants redacted/);
+  sql.close();
+});
+
+test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member holds none of it', async () => {
+  /* `access` promoted a scoped level to a record-wide one, then to `read` — and `boot`, `search`,
+     `page`, `metric` and `governance` all ask for `read` with nothing to scope them. So a
+     contractor invited to file expenses could list every register in the record and search across
+     them, which is the whole of what `append` means not to allow. */
+  const { api, sql } = await studio();
+  value(await api.invite({ person: 'p_5', registers: { obligations: 'append' } }, owner));
+
+  const held = api.kernel.access('p_5')!;
+  const them: CallContext = {
+    principal: { kind: 'person', id: 'p_5', level: held.level },
+    ...(held.registers === null ? {} : { registers: held.registers }),
+    levels: held.levels,
+  };
+
+  for (const [name, call] of [
+    ['boot', () => api.boot(them)],
+    ['search', () => api.search({ q: 'invoice' }, them)],
+    ['governance', () => api.governance({ register: 'suggestion' }, them)],
+    ['members', () => api.members(them)],
+  ] as const) {
+    const out = await call();
+    assert.equal((out as { refusal?: { code: string } }).refusal?.code, 'FORBIDDEN', name);
+  }
+
+  // And the register they WERE invited to is still theirs to write into.
+  assert.equal(refusal(await api.list({ register: 'obligations' }, them)).code, 'LEVEL_REQUIRED', 'append does not read');
+  assert.ok((await api.create({ register: 'obligations', fields: { what: 'Filed' } }, them)).ok, 'append could not append');
   sql.close();
 });

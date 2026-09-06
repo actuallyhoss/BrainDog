@@ -37,11 +37,16 @@ const negatives = join(here, 'negative');
  * gate whose tested behaviour is not the shipped one.
  */
 const CASES = [
-  { gate: 'clean-room', expect: /contains/ },
-  { gate: 'colour-grep', expect: /colour literal/ },
-  { gate: 'css-rules', expect: /findings/ },
-  { gate: 'stack', expect: /finding\(s\)/ },
+  { gate: 'clean-room', expect: /contains/, findings: 1 },
+  { gate: 'colour-grep', run: 'colour-grep', expect: /colour literal/, findings: 1 },
+  { gate: 'colour-grep-hex8', run: 'colour-grep', expect: /colour literal/, findings: 1 },
+  { gate: 'colour-grep-oklch', run: 'colour-grep', expect: /colour literal/, findings: 1 },
+  { gate: 'css-rules', expect: /findings/, findings: 1 },
+  { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
 ];
+
+/** How many lines of a gate's output name the seeded file. One per seeded violation. */
+const named = (said, seeded) => said.split('\n').filter((l) => l.includes(seeded)).length;
 
 const failed = [];
 
@@ -68,11 +73,14 @@ function seededLayout() {
     console.error('  layout: PASSED a 2000px heading inside #main — it is examining nothing.');
     failed.push('layout');
   } else {
+    ran++;
     console.log('  layout: red on a 2000px heading inside #main');
   }
 }
 
-for (const { gate, expect } of CASES) {
+let ran = 0;
+
+for (const { gate, expect, findings, run } of CASES) {
   const fixture = join(negatives, gate);
   if (!existsSync(fixture)) {
     console.error(`  ${gate}: no negative fixture at tools/gates/negative/${gate}/`);
@@ -80,7 +88,7 @@ for (const { gate, expect } of CASES) {
     continue;
   }
 
-  const r = spawnSync(process.execPath, [join(here, `${gate}.mjs`)], {
+  const r = spawnSync(process.execPath, [join(here, `${run ?? gate}.mjs`)], {
     cwd: fixture,
     encoding: 'utf8',
     env: { ...process.env, BRAINDOG_GATE_ROOT: fixture },
@@ -100,7 +108,16 @@ for (const { gate, expect } of CASES) {
   } else if (!expect.test(said)) {
     console.error(`  ${gate}: went red with a sentence this test does not recognise.`);
     failed.push(gate);
+  } else if (named(said, seeded) !== findings) {
+    /* THE COUNT, NOT ONLY THE COLOUR. The colour-grep fixture used to carry three forms in one
+       file and this only asserted that the gate went red — so reverting any two of the three
+       fixes still left the third firing, and the negative could not tell which of them was doing
+       the work. A fixture that proves "something here is caught" is not a fixture; it has to
+       prove that THIS is caught, which means one violation per fixture and the count asserted. */
+    console.error(`  ${gate}: named ${seeded} on ${named(said, seeded)} line(s), and the fixture seeds ${findings}.`);
+    failed.push(gate);
   } else {
+    ran++;
     console.log(`  ${gate}: red on its seeded violation, naming ${seeded}`);
   }
 }
@@ -117,7 +134,7 @@ for (const name of readdirSync(negatives, { withFileTypes: true }))
 
 console.log(
   failed.length === 0
-    ? `\n  self-test: ${CASES.length + 1} gates fail when they should.\n`
+    ? `\n  self-test: ${ran} negative${ran === 1 ? '' : 's'} caught by the gate seeded for it.\n`
     : `\n  self-test: ${failed.length} gate(s) do not: ${[...new Set(failed)].join(', ')}.\n`,
 );
 if (failed.length) process.exitCode = 1;

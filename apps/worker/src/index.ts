@@ -156,7 +156,9 @@ export class Record$ extends DurableObject<Env> {
    * THE RECORD'S OWN `member` TABLE, which is the table `invite` writes and the one that travels in
    * a `.dog` file. `registers` is the ceiling and `null` is all of them.
    */
-  async access(person: string): Promise<{ level: string; registers: string[] | null; levels: Record<string, string> } | null> {
+  async access(
+    person: string,
+  ): Promise<{ level: string | null; registers: string[] | null; levels: Record<string, string> } | null> {
     const api = await this.#record();
     return api.kernel.access(person);
   }

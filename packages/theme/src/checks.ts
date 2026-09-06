@@ -12,8 +12,6 @@ import {
   contrast,
   fromHex,
   inGamut,
-  lchToRgb,
-  toHex,
   relLuminance,
   rgbToCielab,
   rgbToLch,
@@ -183,23 +181,24 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         code: 'THEME_VALUE_INVALID',
         fix: `theme — ${role} is "${value}", which is not a colour this dialect accepts.`,
       });
-    /* J · THE ROUND TRIP, not the hex. `rgb()` here is `fromHex`, whose three components are
-       `parseInt(…) / 255` and therefore in [0,1] by construction — so this branch, reached only
-       after `HEX` already matched, asked whether a number between 0 and 1 is between 0 and 1. Over
-       all 4096 three-digit values it is never false.
+    /* J · HOW MUCH THE GAMUT MAPPER HAD TO TAKE OFF, which is the only form of this question that
+       has an answer. Asking a hex whether it is in sRGB is asking whether a number between 0 and 1
+       is between 0 and 1 — `quantise` clamps and `fromHex` divides by 255 — and over all 4096
+       three-digit values that branch was never false. What CAN be wrong is that the emitted colour
+       is a CLIPPED version of the one the palette was solved as, and `built.clipped` is the mapper
+       saying so at the moment it did it.
 
-       What CAN be outside sRGB is the colour the palette was solved in: OKLCH is a larger space,
-       and a chroma the gamut mapper failed to bring in comes back as a hex that is a CLIPPED
-       version of the intended colour rather than the colour. Reading the hex back into LCh and
-       re-projecting it is what detects that: a value the mapper handled round-trips to itself, and
-       one it clipped does not. */
-    else if (!roundTrips(value))
+       0.02 OF CHROMA IS THE LINE, and it is an amount rather than a fraction. A surface at L 0.999
+       keeps 0.004 of the 0.014 it asked for — 72% lost, and correctly so, because near white there
+       is almost no chroma to have. What is worth refusing is a saturated role giving up an amount a
+       reader could see, and 0.02 is about where two OKLCH chromas stop being the same colour. */
+    else if ((built.clipped?.[scheme]?.[role as Role] ?? 0) > 0.02)
       out.push({
         check: 'J',
         scheme,
         level: 'refuse',
         code: 'THEME_VALUE_INVALID',
-        fix: `theme — ${role} is ${value}, which is a clipped version of the colour it was solved as rather than that colour.`,
+        fix: `theme — ${role} gave up ${(built.clipped?.[scheme]?.[role as Role] ?? 0).toFixed(3)} of chroma to the sRGB gamut, so ${value} is not the colour it was solved as.`,
       });
     for (const b of BANNED)
       if (value.includes(b))
@@ -342,21 +341,6 @@ export function checkForcedColors(css: string): Finding[] {
  * actually ran passed no `css` at all, so L was skipped entirely: `''` is falsy, which meant an
  * empty stylesheet passed too. A required argument is what makes the check about the document.
  */
-/**
- * Whether a hex is the colour it was solved as, or a clipped stand-in for it.
- *
- * READ IT BACK INTO LCh AND PROJECT IT AGAIN. A value the gamut mapper handled is already inside
- * sRGB, so mapping it changes nothing and it comes back as itself. One it clipped — a chroma the
- * mapper could not bring in — lands somewhere else, and the difference is the amount of the colour
- * that was lost. One hex step of tolerance, because the quantisation to eight bits is not the
- * defect being looked for.
- */
-function roundTrips(hex: string): boolean {
-  const rgb = fromHex(hex);
-  if (!inGamut(rgb)) return false;
-  const again = fromHex(toHex(lchToRgb(rgbToLch(rgb))));
-  return Math.abs(again.r - rgb.r) <= 2 / 255 && Math.abs(again.g - rgb.g) <= 2 / 255 && Math.abs(again.b - rgb.b) <= 2 / 255;
-}
 
 export function validate(built: Built, css: string): Finding[] {
   return [...checkScheme(built, 'dark'), ...checkScheme(built, 'light'), ...checkElevation(built), ...checkForcedColors(css)];

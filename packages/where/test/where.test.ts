@@ -453,3 +453,20 @@ test('A RANGE IN TWO CURRENCIES IS NOT A RANGE', () => {
   // And one currency on both bounds still works.
   assert.deepEqual(both({ field: 'amount', between: [{ amount: 20_000, currency: 'GBP' }, { amount: 50_000, currency: 'GBP' }] }), ['a', 'b']);
 });
+
+test('AND `not_in` PAIRS EACH AMOUNT WITH ITS OWN CURRENCY', () => {
+  /* The currencies were collected into a SET and the amounts negated against the union of it, so
+     `not_in [GBP 480, EUR 240]` excluded the GBP 240 row — a value that is not in the list — because
+     240 was in the amounts and GBP was in the currencies. The two halves were never put back
+     together, and `evaluate` pairs them, so the two renderings disagreed. */
+  const out = both({
+    field: 'amount',
+    not_in: [
+      { amount: 48_000, currency: 'GBP' },
+      { amount: 24_000, currency: 'EUR' },
+    ],
+  });
+  assert.ok(out.includes('b'), 'GBP 240.00 was excluded by a list that holds EUR 240.00');
+  assert.ok(!out.includes('a'), 'GBP 480.00 is in the list and came back anyway');
+  assert.ok(!out.includes('c'), 'EUR 240.00 is in the list and came back anyway');
+});

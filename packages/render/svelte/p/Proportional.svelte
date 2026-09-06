@@ -67,7 +67,11 @@
            the one row of the chart whose whole purpose is to be the way to fix the chart. Two
            branches rather than a `<svelte:element>` with a conditional handler, because a button is
            a button and a row of a chart is not — and the compiler is right to say so. -->
-      {#if row.hole && typeof opts.hole === 'function'}
+      <!-- `opts.hole` TRUTHY, not `typeof … === 'function'`. The HTML renderer reads presence, and
+           the type admits `true` — which the render tests themselves pass — so with `hole: true` one
+           side emitted a `<button>` and the other a `<div>`, and the parity gate is the whole reason
+           these two files exist as a pair. `fill()` guards the call. -->
+      {#if row.hole && opts.hole}
         <button type="button" class="prop-row" data-hole data-intent={row.tone} onclick={() => fill()}>
           {@render cells(row, v, drawable)}
         </button>

@@ -519,3 +519,43 @@ test('and a change with no prediction is still a change a person may make', asyn
   assert.equal(sql.all('SELECT 1 FROM prediction').length, 0);
   sql.close();
 });
+
+test('AND THE PREDICTION IT WRITES IS ONE THE SCORER CAN READ', async () => {
+  /* The writer stored `target` as JSON and `scorePrediction` parses `<=0`: `Number('{"lte":0}')` is
+     NaN, so every prediction came back VALUE_MALFORMED at scoring time, never got a `scored_at`, and
+     walked the retry ladder to dead. The brake needs twenty SCORED rows, so the loop still could not
+     grade itself — the writer had moved and nothing else. This walks the whole loop. */
+  const { k, sql, clock } = await record();
+  value(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
+
+  const made = value<{ id: string }>(k.propose(change(promise), 'p_1'));
+  value(k.decide(made.id, { decide: { option: 'accept', reason: 'the third direction is real' } }, 'p_2'));
+
+  const id = sql.one<{ id: string }>('SELECT id FROM prediction')?.id;
+  assert.ok(id);
+
+  clock.advance(31 * DAY);
+  const out = await k.drain();
+  assert.equal(out.failed, 0, 'the score job failed, so nothing is ever graded');
+  assert.equal(out.done, 1);
+
+  const scored = sql.one<{ scored_at: string | null; observed: number; met: number }>(
+    'SELECT scored_at, observed, met FROM prediction WHERE id = ?',
+    id,
+  );
+  assert.ok(scored?.scored_at, 'the prediction was never scored, so the brake can never engage');
+  assert.equal(scored.observed, 1, 'one open obligation, which is not the zero it predicted');
+  assert.equal(scored.met, 0);
+  sql.close();
+});
+
+test('and a target the scorer cannot read is refused at filing', async () => {
+  // `lt`, `gt` and `is` used to file cleanly and be unscoreable — and an unrecognised key silently
+  // turned off the already-true check as well, because `met()` answered `false` for one.
+  const { k, sql } = await record();
+  for (const target of [{ lt: 3 }, { gt: 3 }, { is: 0 }, { below: 5 }, { lte: 1, gte: 0 }]) {
+    const out = refusal(k.propose(change({ ...promise, target: target as never }), 'p_1'));
+    assert.equal(out.at, 'body.prediction.target', JSON.stringify(target));
+  }
+  sql.close();
+});

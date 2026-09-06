@@ -1835,6 +1835,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * disagrees with the code was still exportable, and the export rewrote its manifest — putting a
      * hash of rows nobody can safely read into the file a customer keeps.
      */
+    /**
+     * The id of the key this record's vault is wrapped by, or `null` when it has no vault.
+     *
+     * IT IS NOT THE KEY. `kek_id` is a fingerprint — 12 §6 — and naming it proves nothing except
+     * that you know which key you are asking about, which is exactly the bar an export carrying the
+     * sealed bytes should clear: a caller holding that key can open them one at a time already, and
+     * a caller who is not holding it gains nothing from a file full of ciphertext.
+     */
+    wrappingKey(): string | null {
+      return sql.one<{ kek_id: string | null }>('SELECT kek_id FROM vault_key LIMIT 1')?.kek_id ?? null;
+    },
+
     export(opts: { sections?: readonly Section[]; redactGrants?: boolean; actor?: string } = {}) {
       const refused = schemaRefusal(state);
       if (refused) return Promise.resolve(refused as Result<string[]>);
