@@ -45,6 +45,7 @@ const CASES = [
   { gate: 'colour-grep-oklch', run: 'colour-grep', expect: /colour literal/, findings: 1 },
   { gate: 'css-rules', expect: /findings/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
+  { gate: 'secret-grep', expect: /reaches a log/, findings: 1 },
 ];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */

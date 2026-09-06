@@ -36,6 +36,9 @@ const GATES = [
   /* The banned surface: one kernel, three runtimes, and a source file that imports a driver has
      chosen one of them. Cheap and early, beside the other greps. */
   ['stack', ['node', [join(here, 'stack.mjs')]]],
+  /* THE ONE THAT GUARDS THE PROMISE THE PRODUCT IS BUILT ON: a credential never goes in the record,
+     and never in a log. It is a grep, so it belongs beside the other greps and costs nothing. */
+  ['secret-grep', ['node', [join(here, 'secret-grep.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
