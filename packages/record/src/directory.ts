@@ -156,6 +156,32 @@ export function createDirectory(sql: Sql, clock: Clock) {
     personByEmail,
 
     /**
+     * Whether a string is a name at all, and the sentence when it is not.
+     *
+     * EXPORTED SO THERE IS ONE ANSWER. `init` carried a third copy of the grammar that knew the
+     * shape and not the reserved words, so `braindog init api` passed its regex, built a record, and
+     * was refused here — at the end, with the directory and thirty-one tables already on disk.
+     */
+    bad,
+
+    /**
+     * Whether a name can be had, and if not, which kind of no it is.
+     *
+     * BEFORE ANYTHING IS WRITTEN, which is the whole reason it is a read of its own. `provision`
+     * refuses a taken name correctly — and it refuses at the END of a sequence that has already
+     * created a directory, a database and thirty-one tables. So a name somebody could never have had
+     * cost them a half-made record on disk, and the retry hit "is already a record".
+     *
+     * THREE ANSWERS AND NOT TWO, because a tombstone is a different sentence: `taken` is a name to
+     * choose around, and `released` is a name nobody will ever be given again — every stale link
+     * still says it, and handing it out is how one of them reads another customer's record.
+     */
+    claimed: (slug: string): 'free' | 'taken' | 'released' => {
+      const row = sql.one<{ released_at: string | null }>('SELECT released_at FROM dir_slug WHERE slug = ?', slug);
+      return !row ? 'free' : row.released_at ? 'released' : 'taken';
+    },
+
+    /**
      * Whether this address is a record this installation created, and has not closed.
      *
      * THE ROUTER'S FIRST QUESTION WHEN THE BEARER CARRIES THE ADDRESS. `idFromName` on a name nobody

@@ -1863,14 +1863,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * token minted under that constant names a person with no `member` row, and is refused by the
      * server that issued it.
      *
-     * THE FIRST BY `rowid`, which is the founding owner: `createRecord` writes theirs before any
-     * invitation can add a second.
+     * BY `person_id`, NOT BY `rowid`. "The founding owner is first" was wrong three ways: this
+     * record's own `createRecord` uses `INSERT OR REPLACE`, which deletes and re-inserts at a fresh
+     * max rowid; an export and import reorders every table; and neither is visible from here. An
+     * alphabetical order is not the founder either, but it is the same answer before and after a
+     * restore, which is the property a caller actually needs.
+     *
+     * AND A SUSPENDED OWNER IS NOT AN OWNER. `owners()` counts rows without excluding them, so two
+     * owners can both be suspended — and the caller that falls back to a constant on `null` then
+     * hands out `owner` to somebody no `member` row names, on a record whose own tables say nobody
+     * may act.
      */
     ownerId: (): string | null =>
       sql.one<{ person_id: string }>(
         `SELECT m.person_id FROM member m JOIN person p ON p.id = m.person_id
-          WHERE m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL ORDER BY m.rowid LIMIT 1`,
+          WHERE m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL ORDER BY m.person_id LIMIT 1`,
       )?.person_id ?? null,
+
+    /** Whether this object has been created at all, which is a different question from who owns it. */
+    created: (): boolean => recordIdentity(sql) !== null,
 
     /** Put somebody on, or move them. An invitation is the whole of what they hold, not a patch. */
     invite: (

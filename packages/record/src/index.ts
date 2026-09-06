@@ -88,6 +88,20 @@ export type CallContext = {
   registers?: readonly string[] | '*';
   /** Groups the events of everything one call causes. */
   batch?: string;
+
+  /**
+   * Whether this caller presented a credential of their own.
+   *
+   * IT IS FALSE FOR EXACTLY ONE THING: a self-host with no `BRAINDOG_TOKEN`, where an
+   * unauthenticated request is the owner. That is right for one person on one machine — the process
+   * binds loopback, and the machine is the boundary — and it stops being right the moment the call
+   * MINTS SOMETHING THAT OUTLIVES THAT BOUNDARY. A bearer works from anywhere, for thirty days,
+   * including after the operator later sets a token and the process binds every interface.
+   *
+   * `49 §5.2` step 7 admits ADMIN from a cookie, from `config.token`, or from an operation grant.
+   * A request carrying nothing is none of the three, and this is how a method says so.
+   */
+  credentialed?: boolean;
 };
 
 /** What a method needs. The ladder is ordered, and the check is an index comparison. */
@@ -937,6 +951,26 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     async createToken(args: { scope: Scope; label?: string; days?: number }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
+      /* AND MINTING NEEDS A CREDENTIAL OF ITS OWN, which is not true of any other ADMIN method here.
+         A self-host with no `BRAINDOG_TOKEN` treats an unauthenticated request as the owner — right
+         for one person on one machine, where the process binds loopback and the machine is the
+         boundary. This call is the one that hands out something which OUTLIVES that boundary: a
+         bearer works from anywhere, for thirty days, including after the operator later sets a token
+         and the process binds every interface. Anything that can reach loopback for a moment — a
+         postinstall script, a container sharing the namespace, a browser talked into a request —
+         walks away with a portable owner credential.
+
+         `49 §5.2` step 7: ADMIN admits a cookie, `config.token`, or an operation grant. A request
+         carrying nothing is none of the three, and this is the method where that matters. */
+      if (ctx.credentialed === false)
+        return {
+          ok: false as const,
+          refusal: {
+            code: 'NEEDS_BROWSER_SESSION',
+            fix: 'A bearer works from anywhere, so minting one needs a credential. Set BRAINDOG_TOKEN and send it, or open this from the app.',
+            at: 'principal',
+          },
+        };
       return tail(await kernel.createToken(actorOf(ctx), args ?? ({} as never)));
     },
 

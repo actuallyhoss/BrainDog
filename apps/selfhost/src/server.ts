@@ -112,24 +112,20 @@ async function contextFor(
      a value somebody set, and reading it as "no token wanted" opens the server rather than locking
      it. */
   if (token !== undefined && sent !== token) return null;
-  return { principal: { kind: 'person', id: owner(api), level: 'owner' } };
-}
 
-/**
- * Who "one person on one machine" IS.
- *
- * THE RECORD'S OWN OWNER, AND `p_self` ONLY WHEN THERE IS NO RECORD YET. The constant was written
- * before anything could create a record, and it quietly broke the moment one could: a bearer minted
- * through this path carries `p_self` as its person, `access('p_self')` finds no `member` row, and
- * the token is refused 403 by the very server that issued it. `init` writes an owner with a `p_` +
- * ULID id, as `34 §4` requires, so reading it here is what makes the two agree.
- *
- * IT IS STILL A CONSTANT WHEN THE FILE IS BARE, because a record nobody has created has no owner to
- * name and a self-host must still answer — that is what makes `braindog dev` and every test against
- * an empty file work.
- */
-const owner = (api: Awaited<ReturnType<typeof createRecordApi>>): string =>
-  api.kernel.ownerId() ?? 'p_self';
+  /* A RECORD WITH NO ELIGIBLE OWNER REFUSES, rather than inventing one. The fallback to a constant is
+     right for a file nobody has created — that is what `braindog dev` and every test against an
+     empty file open — and wrong the moment there IS a record: it would hand `owner` to a person id
+     no `member` row names, on a record whose own tables say every owner is suspended. */
+  const who = api.kernel.created() ? api.kernel.ownerId() : 'p_self';
+  if (!who) return null;
+
+  /* AND WHETHER ANYTHING WAS PRESENTED TRAVELS WITH IT. Reading and writing as the owner without a
+     credential is the documented shape of a single-person deployment; minting a bearer that outlives
+     the machine is not, and `createToken` is the one method that can tell the difference only if it
+     is told. */
+  return { principal: { kind: 'person', id: who, level: 'owner' }, credentialed: sent !== undefined };
+}
 
 /**
  * What delivers one outbox job. The self-host's whole outbound surface, in one function.

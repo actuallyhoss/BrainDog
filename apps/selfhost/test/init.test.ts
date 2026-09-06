@@ -24,12 +24,17 @@ import { openSqlite, start } from '../src/server.ts';
 
 const MAIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'main.ts');
 
-function run(data: string, ...args: string[]): { code: number; said: string } {
+/**
+ * THE TWO STREAMS ARE KEPT APART, because one of the contracts is about which one carries what.
+ * `48 §5.14` spawns this with `stdio: 'inherit'` and stdout belongs to the CLI's `--json` envelope,
+ * so a merged capture cannot tell a correct command from one that corrupts it.
+ */
+function run(data: string, ...args: string[]): { code: number; said: string; out: string } {
   const r = spawnSync(process.execPath, [MAIN, ...args], {
     encoding: 'utf8',
     env: { ...process.env, BRAINDOG_DATA: data, BRAINDOG_OWNER: '' },
   });
-  return { code: r.status ?? -1, said: `${r.stdout}${r.stderr}` };
+  return { code: r.status ?? -1, said: r.stderr, out: r.stdout };
 }
 
 const scratch = (): string => mkdtempSync(join(tmpdir(), 'braindog-init-'));
@@ -37,9 +42,13 @@ const scratch = (): string => mkdtempSync(join(tmpdir(), 'braindog-init-'));
 test('A RECORD COMES INTO BEING, and both halves say the same thing', async () => {
   const data = scratch();
   try {
-    const out = run(data, 'init', 'the-studio', '--owner', 'Ada@Example.com');
+    const out = run(data, 'init', 'the-studio', '--owner', ' Ada@Example.com ');
     assert.equal(out.code, 0, out.said);
-    assert.match(out.said, /^record the-studio created · owner Ada@Example\.com · inbound email token at /m);
+    /* TRIMMED AND LOWER-CASED, 49 §4.1 — and the whitespace used to travel as far as `provision`,
+       which looked up an address `person$` had already stored trimmed and refused "has no account
+       yet", after the record file had been written. */
+    assert.match(out.said, /^record the-studio created · owner ada@example\.com · inbound email token at /m);
+    assert.equal(out.out, '', 'stdout belongs to the CLI’s --json envelope');
 
     /* THE FILE IS `record.dog`. Migration 0001 makes it one — 49 §4.3, and `record.sqlite` appears
        in none of the fifty-four documents. */
@@ -61,7 +70,7 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
     assert.match(owner.person_id, /^p_[0-9A-HJKMNP-TV-Z]{26}$/);
     assert.equal(
       sql.one<{ email: string }>('SELECT email FROM person WHERE id = ?', owner.person_id)?.email,
-      'Ada@Example.com',
+      'ada@example.com',
       'the record does not know its own owner by address',
     );
 
@@ -76,8 +85,8 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
     assert.equal(named.record, record.id, 'the Directory names a record that does not exist');
     assert.equal(
       dirSql.one<{ email: string }>('SELECT email FROM dir_person')?.email,
-      'Ada@Example.com',
-      'the address is stored as typed',
+      'ada@example.com',
+      'the address is not stored trimmed and lower-cased',
     );
     assert.equal(dirSql.one<{ level: string }>('SELECT level FROM dir_member')?.level, 'owner');
     dirSql.close();
@@ -86,7 +95,12 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
        the wire ever prints a token. */
     const token = readFileSync(join(data, 'the-studio', 'inbound.token'), 'utf8');
     assert.equal(token.length, 43, 'the inbound token is not 32 bytes of base64url');
+    assert.match(token, /^[A-Za-z0-9_-]{43}$/);
     assert.ok(!out.said.includes(token), 'the success line printed the token itself');
+
+    /* AND IT IS RANDOM, not a constant of the right length. A second record's is a different one. */
+    assert.equal(run(data, 'init', 'kiln', '--owner', 'bo@example.com').code, 0);
+    assert.notEqual(readFileSync(join(data, 'kiln', 'inbound.token'), 'utf8'), token);
     if (process.platform !== 'win32')
       assert.equal(statSync(join(data, 'the-studio', 'inbound.token')).mode & 0o777, 0o600);
   } finally {
@@ -100,11 +114,16 @@ test('AND A SECOND INIT IS A REFUSAL, not a second record', async () => {
     assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
     const again = run(data, 'init', 'the-studio', '--owner', 'bo@example.com');
     assert.equal(again.code, 1);
-    assert.match(again.said, /is already a record/);
+    assert.match(again.said, /is already somebody's record here/);
 
     const dirSql = openSqlite(join(data, 'directory.sqlite'));
     assert.equal(dirSql.all('SELECT 1 FROM dir_record').length, 1, 'a refused init left a second record behind');
+    /* AND IT CREATED NOBODY. The refusal now fires before `person$`, so a second init with a
+       different address does not leave that address in the installation's person table — which the
+       earlier version of this assertion could not have caught, because the refusal already came
+       first for a different reason. */
     assert.equal(dirSql.all('SELECT 1 FROM dir_person').length, 1, 'a refused init created a person');
+    assert.equal(dirSql.all("SELECT 1 FROM dir_person WHERE email = 'bo@example.com'").length, 0);
     dirSql.close();
   } finally {
     rmSync(data, { recursive: true, force: true });
@@ -130,8 +149,23 @@ test('a name that is not a name, and a record with no owner, are refused before 
     assert.equal(bad.code, 1);
     assert.match(bad.said, /is not an address/);
 
+    /* A RESERVED NAME, WHICH `init`'S OWN COPY OF THE GRAMMAR DID NOT KNOW. It passed the shape,
+       built the directory and thirty-one tables, and was refused by the Directory at the end — and
+       the leftover was then a record a later `init` could adopt. */
+    for (const slug of ['api', 'auth', 'mcp', 'www']) {
+      const out = run(data, 'init', slug, '--owner', 'ada@example.com');
+      assert.equal(out.code, 1, `${slug} was allowed`);
+      assert.match(out.said, /the platform uses/);
+      assert.equal(existsSync(join(data, slug)), false, `${slug} was refused after it was built`);
+    }
+
     assert.equal(existsSync(join(data, 'the-studio')), false, 'a refused init left a directory behind');
-    assert.equal(existsSync(join(data, 'directory.sqlite')), false, 'a refused init left a Directory behind');
+    /* The Directory itself is the INSTALLATION's and not a record's, so an empty one is not a
+       leftover. What must not be there is a row. */
+    const dirSql = openSqlite(join(data, 'directory.sqlite'));
+    assert.equal(dirSql.all('SELECT 1 FROM dir_record').length, 0, 'a refused init left a record behind');
+    assert.equal(dirSql.all('SELECT 1 FROM dir_person').length, 0, 'a refused init left a person behind');
+    dirSql.close();
 
     /* AND THE NAME IS STILL AVAILABLE, which is the whole point of refusing before anything is
        written: a bad address must not cost somebody their first attempt at the name they wanted. */
@@ -160,41 +194,141 @@ test('AND A COMMAND THIS HOST DOES NOT HAVE IS ONE SENTENCE, not a stack', async
   }
 });
 
-test('AND A BEARER MINTED AFTER IT WORKS, which is the whole point of writing an owner', async () => {
+test('MINTING A BEARER NEEDS A CREDENTIAL, and the one it mints then works', async () => {
   /* THE LOOP THAT DID NOT CLOSE. An unauthenticated request was a constant person, `p_self`, which
      was correct while nothing could create a record — and quietly wrong the moment `init` could: a
-     token minted under that constant names a person with no `member` row, so `access()` returns
-     null and the server refuses, with 403, the bearer it had just issued. */
+     token minted under that constant names a person with no `member` row, so `access()` returns null
+     and the server refuses, with 403, the bearer it had just issued.
+
+     AND CLOSING IT MADE A SECOND HOLE VISIBLE. Reading and writing as the owner without a credential
+     is the documented shape of one person on one machine: the process binds loopback, and the
+     machine is the boundary. A BEARER OUTLIVES THAT BOUNDARY — it works from anywhere, for thirty
+     days, including after the operator later sets a token and the process binds every interface. So
+     anything that could reach loopback for one moment walked away with a portable owner credential.
+     49 §5.2 step 7: ADMIN admits a cookie, `config.token`, or an operation grant. */
   const data = scratch();
+  const SECRET = 'a-shared-secret';
   let running: Awaited<ReturnType<typeof start>> | null = null;
   try {
     assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
 
-    running = await start({ file: join(data, 'the-studio', 'record.dog'), port: 0, pollMs: 0 });
-    const at = (running.server.address() as { port: number }).port;
+    /* FIRST WITH NO SHARED SECRET, which is how a self-host is started by default and the shape the
+       hole lived in: every request is the owner, and every request could therefore mint. */
+    const open = await start({ file: join(data, 'the-studio', 'record.dog'), port: 0, pollMs: 0 });
+    const openAt = (open.server.address() as { port: number }).port;
+    const bare = await fetch(`http://127.0.0.1:${openAt}/api/createToken`, {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'write', label: 'anyone', days: 30 }),
+    });
+    const said = (await bare.json()) as { refusal?: { code: string; fix: string } };
+    await open.close();
 
-    const minted = (await (
-      await fetch(`http://127.0.0.1:${at}/api/createToken`, {
+    assert.equal(bare.status, 403, 'a request carrying nothing minted a bearer that works from anywhere');
+    assert.equal(said.refusal?.code, 'NEEDS_BROWSER_SESSION');
+    assert.match(said.refusal!.fix, /BRAINDOG_TOKEN/);
+
+    /* AND THEN WITH ONE. Reading and writing without a credential stays what it was; minting is the
+       one call that needed the operator to have said something. */
+    running = await start({ file: join(data, 'the-studio', 'record.dog'), port: 0, pollMs: 0, token: SECRET, host: '127.0.0.1' });
+    const at = (running.server.address() as { port: number }).port;
+    const mint = (headers: Record<string, string> = {}) =>
+      fetch(`http://127.0.0.1:${at}/api/createToken`, {
         method: 'POST',
         body: JSON.stringify({ scope: 'write', label: 'a laptop', days: 30 }),
-      })
-    ).json()) as { ok: boolean; value?: { bearer: string }; refusal?: { code: string; fix: string } };
+        headers,
+      });
+
+    const minted = (await (await mint({ authorization: `Bearer ${SECRET}` })).json()) as {
+      ok: boolean;
+      value?: { bearer: string };
+      refusal?: { code: string; fix: string };
+    };
     assert.ok(minted.ok, `the record refused to mint a token: ${minted.refusal?.code} ${minted.refusal?.fix}`);
 
     const bearer = minted.value!.bearer;
     assert.match(bearer, /^rec_[0-9A-HJKMNP-TV-Z]{26}\./, 'a bearer carries the record it is for');
 
-    const said = await fetch(`http://127.0.0.1:${at}/api/whoami`, { headers: { authorization: `Bearer ${bearer}` } });
-    const who = (await said.json()) as { ok: boolean; value?: { level: string; scope?: string }; refusal?: { code: string } };
-    assert.equal(said.status, 200, `the server refused the bearer it issued: ${who.refusal?.code}`);
-    assert.ok(who.ok);
+    const answer = await fetch(`http://127.0.0.1:${at}/api/whoami`, { headers: { authorization: `Bearer ${bearer}` } });
+    const who = (await answer.json()) as { ok: boolean; value?: { level: string; scope?: string }; refusal?: { code: string } };
+    assert.equal(answer.status, 200, `the server refused the bearer it issued: ${who.refusal?.code}`);
     /* THE PERSON'S LEVEL AND THE TOKEN'S SCOPE ARE TWO LADDERS, and this is where they intersect: the
-       owner holds `owner`, and the token they minted may do `write` with it. A token never carries a
-       level of its own — ADR-060 — so `owner` here is the person the bearer belongs to. */
+       owner holds `owner`, and the token they minted may do `write` with it. */
     assert.equal(who.value?.level, 'owner', 'the bearer named somebody the record does not know');
     assert.equal(who.value?.scope, 'write', 'the token was minted at one scope and read back at another');
   } finally {
     await running?.close();
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('A RECORD FILE THAT ALREADY HOLDS A RECORD IS NEVER ADOPTED', async () => {
+  /* THE HOLE THAT RELAXING 49 §5.22 STEP 2 OPENED. The guard became "the Directory does not name
+     this slug", and three ordinary things satisfy that while a live record sits on disk: delete
+     `directory.sqlite`, rename the record, or restore a backup without it. `createRecord` is an
+     upsert, so the next `init` added whoever ran it as a SECOND OWNER and rewrote the record's slug,
+     name, timezone and locale to their arguments — exit 0, "record created". */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+    rmSync(join(data, 'directory.sqlite'), { force: true });
+    rmSync(join(data, 'directory.sqlite-wal'), { force: true });
+    rmSync(join(data, 'directory.sqlite-shm'), { force: true });
+
+    const taken = run(data, 'init', 'the-studio', '--owner', 'mallory@example.com');
+    assert.equal(taken.code, 1, 'a live record was handed to whoever ran init next');
+    assert.match(taken.said, /already holds the record the-studio/);
+
+    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    assert.equal(sql.all("SELECT 1 FROM member WHERE register = '*'").length, 1, 'a second owner was added');
+    assert.equal(
+      sql.one<{ email: string }>("SELECT p.email FROM member m JOIN person p ON p.id = m.person_id WHERE m.register = '*'")?.email,
+      'ada@example.com',
+      'the record was adopted',
+    );
+    sql.close();
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('AND A NAME WITH NO RECORD BEHIND IT IS NOT REISSUED, nor half-created', async () => {
+  /* The other half of the same relaxation: with the FILE gone and the Directory row still there,
+     `init` built a whole new record with a new id and only then refused — so `dir_slug` named
+     `rec_A` and the file on disk was `rec_B`, for ever, with every bearer it minted rejected by
+     anything that checks the two against each other. */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+    const dirSql = openSqlite(join(data, 'directory.sqlite'));
+    const was = dirSql.one<{ record: string }>("SELECT record FROM dir_slug WHERE slug = 'the-studio'")!.record;
+    dirSql.close();
+
+    rmSync(join(data, 'the-studio'), { recursive: true, force: true });
+    const again = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
+    assert.equal(again.code, 1);
+    assert.match(again.said, /is already somebody's record here/);
+    assert.equal(existsSync(join(data, 'the-studio')), false, 'a refused init rebuilt the record it refused');
+
+    const after = openSqlite(join(data, 'directory.sqlite'));
+    assert.equal(after.one<{ record: string }>("SELECT record FROM dir_slug WHERE slug = 'the-studio'")?.record, was);
+    after.close();
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('AND `serve` WITH A PATH THAT IS NOT A RECORD REFUSES, rather than making one', async () => {
+  /* `openSqlite` CREATES the file, so a mistyped flag became a fully migrated thirty-one-table
+     record named `--port=9999`, served on the port, with every anonymous request its owner. The
+     multi-record refusal tells people to use this branch, which made it the likeliest way in. */
+  const data = scratch();
+  try {
+    const out = run(data, 'serve', '--port=9999');
+    assert.equal(out.code, 1);
+    assert.match(out.said, /is not a record/);
+    assert.equal(existsSync(join(data, '--port=9999')), false, 'a mistyped flag became a record');
+    assert.equal(existsSync('--port=9999'), false, 'a mistyped flag became a record in the working directory');
+  } finally {
     rmSync(data, { recursive: true, force: true });
   }
 });

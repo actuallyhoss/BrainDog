@@ -48,13 +48,35 @@ import { EVERY_KIND, openSqlite, start } from './server.ts';
 /** `34-GRAMMARS` line 348, and the Directory's own — the two must agree or one of them is unreachable. */
 const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
 
+/**
+ * One sentence on stderr, and nothing on stdout — ever.
+ *
+ * `49 §2`: "one sentence on stderr, nothing else". `48 §5.14` spawns this with `stdio: 'inherit'`,
+ * so stdout belongs to the CLI's `--json` envelope and anything written there corrupts it.
+ *
+ * AND THE WRITE IS FLUSHED BEFORE THE EXIT. `process.exit` does not wait for a pending write, and on
+ * Windows a write to a PIPE is asynchronous — which is exactly how the CLI spawns this. So the exit
+ * code arrived and the sentence explaining it did not, which is the one output this command has.
+ */
+function say(line: string): void {
+  try {
+    writeFileSync(2, `${line}\n`);
+  } catch {
+    /* A closed stderr is not a reason to fail; the exit code still carries. */
+    stderr.write(`${line}\n`);
+  }
+}
+
 /** One sentence, and the exit code `48 §4.4` reserves for a refusal. */
 function refuse(said: string): never {
-  stderr.write(`${said}\n`);
+  say(said);
   return exit(1);
 }
 
 const dataDir = (): string => env.BRAINDOG_DATA ?? '/data';
+
+/** One clock for the whole command, so the record and the Directory agree about when it happened. */
+const clock = { now: () => Date.now() };
 
 /**
  * `init <slug> [--owner <email>]`, and `BRAINDOG_OWNER` when the flag is absent.
@@ -66,93 +88,135 @@ const dataDir = (): string => env.BRAINDOG_DATA ?? '/data';
 async function init(args: readonly string[]): Promise<void> {
   const slug = args[0];
   if (!slug) return refuse('braindog init needs a name for the record: init <slug> --owner <email>');
-  if (!SLUG.test(slug))
-    return refuse(
-      `${slug} is not a name: it starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one.`,
-    );
 
   const flag = args.indexOf('--owner');
-  const email = (flag >= 0 ? args[flag + 1] : undefined) ?? env.BRAINDOG_OWNER;
+  /* TRIMMED AND LOWER-CASED ONCE, HERE, and this value is the only one used afterwards. `49 §4.1`
+     stores a person's address lower-cased and trimmed — and ` ada@example.com ` went through
+     untrimmed, so `person$` stored the trimmed form and `provision` then looked up the untrimmed one
+     and refused "has no account yet", after the record file had been written. */
+  const email = ((flag >= 0 ? args[flag + 1] : undefined) ?? env.BRAINDOG_OWNER ?? '').trim().toLowerCase();
   /* AND AN OWNERLESS RECORD IS REFUSED. The spec does not say what happens without one, and there is
      no consistent way to invent it: the Directory's `person.email` is `NOT NULL`, so a record with
-     no owner cannot be written there at all — and a record nobody owns is a record nobody can
-     invite anybody to. */
-  if (!email?.trim())
+     no owner cannot be written there at all — and a record nobody owns is a record nobody can invite
+     anybody to. */
+  if (!email)
     return refuse('braindog init needs an owner: --owner <email>, or BRAINDOG_OWNER. A record nobody owns cannot be shared.');
-  /* AND THE ADDRESS IS CHECKED HERE, WHICH IS ONE RULE IN TWO PLACES ON PURPOSE. The Directory
-     refuses a malformed one too, and it is the authority — but it is asked at step 5, three steps
-     after the record file has been created and migrated. So `--owner not-an-address` refused
-     correctly and left a record on disk, and the retry with the right address hit "is already a
-     record". A refusal that costs the user their first attempt at the name is not a refusal. */
-  if (!email.trim().includes('@')) return refuse(`${email} is not an address.`);
+  if (!email.includes('@')) return refuse(`${email} is not an address.`);
 
   const data = dataDir();
   const dir = join(data, slug);
   const file = join(dir, 'record.dog');
 
-  /* 0700 ON THE DATA DIRECTORY, `49 §5.1` step 1. On Windows the mode is advisory and Node applies
-     what it can; saying so is better than pretending the call did nothing. */
+  /* ── EVERY REFUSAL THIS COMMAND CAN MAKE, BEFORE IT WRITES ANYTHING ──────────────────────────
+     Not tidiness: a refusal that costs somebody the name they wanted is not a refusal. Three of
+     these used to fire after the directory, the database and thirty-one tables existed — a reserved
+     slug, an address with a space in it, a name already taken — and the retry then hit "is already a
+     record", for ever, with no command that could clear it. */
+  const dirSql = openSqlite(join(data, 'directory.sqlite'));
+  const directory = createDirectory(dirSql, clock);
+
+  /* THE GRAMMAR AND THE RESERVED SET ARE THE DIRECTORY'S. A third copy here knew the shape and not
+     the words, so `braindog init api` passed this file's regex, built the record, and was refused by
+     `provision` at the end. `bad()` is one call and there is one answer. */
+  const wrong = directory.bad(slug);
+  if (wrong) return refuse(wrong);
+
+  const held = directory.claimed(slug);
+  if (held === 'taken') return refuse(`${slug} is already somebody's record here.`);
+  if (held === 'released')
+    return refuse(`${slug} was the name of another record and cannot be given out again. Every link that still says it would read the wrong record.`);
+
+  /* AND A RECORD FILE THAT ALREADY HOLDS A RECORD IS NEVER ADOPTED. `49 §5.22` step 2 refuses on the
+     directory existing at all, and relaxing that to "the Directory does not name this slug" opened a
+     hole with three doors: delete `directory.sqlite`, rename the record, or restore a backup without
+     it, and the next `init` handed the file to whoever ran it — `createRecord` is an upsert, so it
+     added them as a second owner AND rewrote the live record's slug, name, timezone and locale to
+     their arguments. Exit 0, "record created", no mention of what was already there.
+
+     THE ONE CASE THAT IS RECOVERABLE is a file with no `record` row: the migration ran and the
+     create did not, which is this command's own crash window and nobody else's. Finishing that is
+     the difference between a half-done state and an unrecoverable one. */
+  if (existsSync(file)) {
+    const open = openSqlite(file);
+    const inside = open.one<{ id: string; slug: string }>('SELECT id, slug FROM record WHERE singleton = 1');
+    open.close();
+    if (inside) {
+      dirSql.close();
+      return refuse(
+        `${file} already holds the record ${inside.slug} (${inside.id}). A record is created once; move it aside or serve it.`,
+      );
+    }
+  }
+
+  /* 0700 THROUGHOUT, `49 §5.1` step 1. It applies only to a directory Node CREATES — a pre-existing
+     volume mount keeps its own mode — but the per-record directory is always ours, and it holds the
+     whole record: every row, every token hash, every sealed grant. `0755` there is the wrong side of
+     `49 §8`'s backup argument. */
   mkdirSync(data, { mode: 0o700, recursive: true });
-  mkdirSync(join(dir, 'blobs'), { recursive: true });
-  mkdirSync(join(dir, 'snapshots'), { recursive: true });
+  mkdirSync(join(dir, 'blobs'), { mode: 0o700, recursive: true });
+  mkdirSync(join(dir, 'snapshots'), { mode: 0o700, recursive: true });
 
-  const clock = { now: () => Date.now() };
-  const mint = ulids(clock.now);
-  const id = `rec_${mint()}`;
+  const id = `rec_${ulids(clock.now)()}`;
 
+  const sql = openSqlite(file);
+  const api = await createRecordApi({ sql, clock });
+  const stopped = api.kernel.refused();
+  if (stopped) {
+    sql.close();
+    dirSql.close();
+    return refuse(`${file} could not be migrated: ${stopped.fix}`);
+  }
+
+  const person = directory.person$(email);
+  if (!person.ok) {
+    sql.close();
+    dirSql.close();
+    return refuse(fixOf(person));
+  }
 
   /* THE RECORD FIRST. 51 §13 D21: a Directory row never points at a record that failed to
      initialise. `createRecord` takes no `CallContext` — it is the one method that cannot be routed,
      because there is nobody to authorise it against until it has run. */
-  const dirSql = openSqlite(join(data, 'directory.sqlite'));
-  const directory = createDirectory(dirSql, clock);
-
-  /* A RECORD THAT ALREADY HAS A NAME IS CREATED, and a second `init` is a refusal — 49 §5.22 step 2,
-     and §9's row. But a record file with no name is the HALF-DONE case this ordering deliberately
-     leaves behind, and refusing it would make the one recoverable failure unrecoverable: the file
-     exists, so `init` refuses; the Directory does not know it, so nothing can reach it; and the name
-     is not taken, so there is no command that finishes the job. Finishing it is what a second run
-     should do. */
-  if (existsSync(file) && directory.resolve(slug))
-    return refuse(`${slug} is already a record here. A record is created once.`);
-
-  const person = directory.person$(email);
-  if (!person.ok) return refuse(fixOf(person));
-
-  const sql = openSqlite(file);
-  const api = await createRecordApi({ sql, clock, delivers: EVERY_KIND });
-  const refused = api.kernel.refused();
-  if (refused) return refuse(`${file} could not be migrated: ${refused.fix}`);
-
-  /* AND A RE-RUN USES THE ID THE FILE ALREADY HAS, rather than minting a second one for the same
-     storage — which `createRecord` refuses anyway ("a record is created once, and this is not it"),
-     with a sentence about the wrong problem. */
-  const already = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')?.id;
   const made = await api.createRecord({
-    ...(already ? { id: already } : { id }),
+    id,
     slug,
     name: slug,
     tz: 'UTC',
     locale: 'en',
     owner: { id: person.value.id, email: person.value.email, name: person.value.name },
   });
-  if (!made.ok) return refuse(fixOf(made));
+  if (!made.ok) {
+    sql.close();
+    dirSql.close();
+    return refuse(fixOf(made));
+  }
 
   /* AND THEN THE NAME. `record:` is what makes the ordering expressible at all — without it the
      Directory mints its own id and the two halves disagree for ever. */
-  const named = directory.provision({ slug, email, record: already ?? id });
-  if (!named.ok) return refuse(fixOf(named));
+  const named = directory.provision({ slug, email, record: id });
+  if (!named.ok) {
+    sql.close();
+    dirSql.close();
+    return refuse(fixOf(named));
+  }
 
   /* THE INBOUND TOKEN, `49 §5.16` step 2: the self-host has no MX, so email arrives forwarded to
      `/in/email/<token>`. Nothing reads it until that route exists, and `49 §5.1` step 5.5 already
      says "if present" — but it is one file, and a record created without one would need a second
-     command nobody has written to get one. `wx` so a re-run cannot quietly reissue it. */
+     command nobody has written to get one. `wx` so nothing quietly reissues it, and `EEXIST` is
+     "there already", not a stack trace. */
   const inbound = join(dir, 'inbound.token');
-  if (!existsSync(inbound)) writeFileSync(inbound, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' });
+  try {
+    writeFileSync(inbound, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' });
+  } catch (e) {
+    if ((e as { code?: string }).code !== 'EEXIST') throw e;
+  }
 
+  /* CLOSED, WHICH CHECKPOINTS THE WAL. A process that exits holding one leaves a 400 KB sidecar and
+     a record that reads as empty until something else opens it. */
   sql.close();
   dirSql.close();
-  stderr.write(`record ${slug} created · owner ${email} · inbound email token at ${inbound}\n`);
+  say(`record ${slug} created · owner ${email} · inbound email token at ${inbound}`);
 }
 
 /**
@@ -170,6 +234,12 @@ async function serve(): Promise<void> {
   /* AN EXPLICIT FILE STILL WINS, because every test and every `braindog dev` in this repository
      opens a bare file with no data directory behind it. */
   const explicit = argv[3] ?? env.BRAINDOG_FILE;
+  /* AND IT MUST ALREADY BE A RECORD. `openSqlite` CREATES the file, so a mistyped flag —
+     `serve --port=9999` — became a fully migrated thirty-one-table record named `--port=9999`,
+     served on the port, with every anonymous request its owner. The multi-record refusal below
+     tells people to use this branch, which made it the likeliest way in. */
+  if (explicit && !existsSync(explicit))
+    return refuse(`${explicit} is not a record. Create one with: braindog init <slug> --owner <email>`);
   let file = explicit;
 
   if (!file) {
@@ -177,7 +247,13 @@ async function serve(): Promise<void> {
     if (!existsSync(dirFile))
       return refuse(`There is no record in ${data}. Create one with: braindog init <slug> --owner <email>`);
     const dirSql = openSqlite(dirFile);
-    const slugs = dirSql.all<{ slug: string }>('SELECT slug FROM dir_slug WHERE released_at IS NULL ORDER BY claimed_at');
+    /* A NAME WITH NO FILE BEHIND IT IS SKIPPED, not counted. `49 §5.1` step 6: "a `record_dir` row
+       with no directory … is logged as `slug` and skipped." Counting it made a host with exactly one
+       servable record refuse to start, saying it held two — and nothing on the machine would then
+       start it. */
+    const slugs = dirSql
+      .all<{ slug: string }>('SELECT slug FROM dir_slug WHERE released_at IS NULL ORDER BY claimed_at')
+      .filter((row: { slug: string }) => existsSync(join(data, row.slug, 'record.dog')));
     dirSql.close();
     if (slugs.length === 0)
       return refuse(`There is no record in ${data}. Create one with: braindog init <slug> --owner <email>`);
@@ -195,14 +271,14 @@ async function serve(): Promise<void> {
     ...(env.BRAINDOG_HOST === undefined ? {} : { host: env.BRAINDOG_HOST }),
   });
 
-  stderr.write(`braindog · ${file} · http://localhost:${port}/api/boot\n`);
+  say(`braindog · ${file} · http://localhost:${port}/api/boot`);
   /* SAID OUT LOUD, because the safe default is also the surprising one. Somebody who expected the
      server on their LAN needs to know why it is not, and somebody who set a token needs to know
      that it now is. */
-  stderr.write(
+  say(
     env.BRAINDOG_TOKEN === undefined
-      ? '  loopback only — set BRAINDOG_TOKEN to listen on every interface\n'
-      : '  listening on every interface, behind BRAINDOG_TOKEN\n',
+      ? '  loopback only, and no bearer can be minted — set BRAINDOG_TOKEN for either'
+      : '  listening on every interface, behind BRAINDOG_TOKEN',
   );
 
   /* AND IT STOPS WHEN IT IS ASKED TO. A container that kills a process holding a WAL leaves it to
@@ -213,7 +289,19 @@ async function serve(): Promise<void> {
     });
 }
 
+/**
+ * AND NOTHING REACHES THE OPERATOR AS A STACK TRACE.
+ *
+ * `49 §2` gives this command one sentence and two exit codes, and every reachable throw broke both:
+ * `mkdir /data` without permission — the DEFAULT path, and the first thing a new self-hoster hits —
+ * a `BRAINDOG_FILE` that is not a database, a read-only mount, a file another process holds. Node's
+ * own message is the first line of it, which is the part somebody can act on.
+ */
 const [, , command = 'serve', ...rest] = argv;
-if (command === 'init') await init(rest);
-else if (command === 'serve') await serve();
-else refuse(`braindog has no ${command}. It has serve and init.`);
+try {
+  if (command === 'init') await init(rest);
+  else if (command === 'serve') await serve();
+  else refuse(`braindog has no ${command}. It has serve and init.`);
+} catch (e) {
+  refuse(e instanceof Error ? e.message : String(e));
+}
