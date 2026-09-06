@@ -889,7 +889,9 @@ export const PAGES: Record<string, SeedPage> = {
            contract the reader has never signed, in the danger colour, on every Money page in every
            record — and when nothing was overdue it degraded to a raw internal path beside that
            claim, because the figure it referred to was empty. */
-        body: 'Something is {{ago:obligations.oldest_overdue}} past its terms. Statutory interest may be due; the terms are in the contract.',
+        /* THE INTERPOLATION CARRIES ITS OWN "ago", so the sentence is written around it rather than into
+           it: "Something is 5w ago past its terms" is not English, and it was on the page. */
+        body: 'Something went past its terms {{ago:obligations.oldest_overdue}}. Statutory interest may be due; the terms are in the contract.',
         /* AND IT DRAWS ONLY WHEN IT IS TRUE. `when:` was documented and not implemented, so this
            was `drawn: true` — an alarm that is always on, which is an alarm nobody reads. */
         when: { metric: 'overdue', gt: 0 },

@@ -971,7 +971,23 @@ function runwayBlock(b: PageBlock): BlockResult {
     entries: [],
     matched: [],
     refusals,
-    rows: steps.map((s, i) => ({
+    rows: [
+      /* THE OPENING IS A ROW, because every balance under it is that number plus a movement. It was
+         nowhere on the screen: the first row read "In and out −9,190.00 · Balance −4,190.00", which
+         only adds up if you already know the walk started at 5,000 — and the red "RUNWAY 0 days"
+         headline above it is derived from the same invisible figure. A forecast whose arithmetic
+         cannot be checked from the screen is a number somebody has to trust. */
+      ...(walk.mixed.length
+        ? []
+        : [
+            {
+              key: 'opening',
+              cells: [fmtDay(new Date(NOW).toISOString().slice(0, 10)), 'What is liquid today', '', moneyOr(walk.from, walk.currency)],
+              href: undefined,
+              tone: undefined,
+            },
+          ]),
+      ...steps.map((s, i) => ({
       /* The key is the movement, not the index: two charges on one day from one service are
          different rows, and a keyed list that reuses an index re-renders the wrong one. */
       key: `${s.day}-${s.source}-${s.href}-${i}`,
@@ -981,7 +997,8 @@ function runwayBlock(b: PageBlock): BlockResult {
          walk exists to produce: the day you go under. Everything after it is still under, which is
          `warn` — a state, not an event. */
       tone: s === walk.crossed ? ('bad' as const) : s.balance < 0 ? ('warn' as const) : undefined,
-    })),
+      })),
+    ],
     total: walk.steps.length,
     drawn: b.drawn ?? drawnWhen(b),
     stale_at: new Date(NOW).toISOString(),

@@ -623,3 +623,20 @@ test('A SEEDED AGGREGATE DOES NOT ADD TWO OPPOSITE THINGS TOGETHER', () => {
      rule is about reducing, not about every block. */
   assert.equal(seedBlock('table', 'obligations')?.where, undefined);
 });
+
+test('THE CASH WALK SAYS WHAT IT STARTED FROM', () => {
+  /* The first row read "In and out −9,190.00 · Balance −4,190.00", which only adds up if you
+     already know the walk began at 5,000 — and the red "RUNWAY 0 days" headline above it is derived
+     from the same invisible figure. A forecast whose arithmetic cannot be checked from the screen is
+     a number somebody has to trust. */
+  const drawn = page('money');
+  const walk = drawn?.blocks.find((b) => b.opening !== undefined);
+  assert.ok(walk, 'the money page draws no cash walk, so this test proves nothing');
+  const first = walk.rows[0]!;
+  assert.equal(first.cells[1], 'What is liquid today');
+  assert.match(String(first.cells[3]), /GBP/, 'the opening row carries no figure');
+  assert.equal(first.cells[2], '', 'the opening is a balance, not a movement');
+
+  /* AND EVERY BALANCE UNDER IT IS THAT NUMBER PLUS A MOVEMENT, which is now checkable by eye. */
+  assert.ok(walk.rows.length > 1);
+});
