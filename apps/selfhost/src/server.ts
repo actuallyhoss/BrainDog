@@ -15,10 +15,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
-import { handlersFor, serveApi, type Handler } from '@braindog/host';
+import { handlersFor, httpStatus, serveApi, type Handler } from '@braindog/host';
 import type { OutboxKind, OutboxRow } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
-import type { Param, Row, Scheduler, Sql } from '@braindog/ports';
+import type { Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
 /** The `Sql` port over `node:sqlite`. The one thing this file exists to supply. */
 export function openSqlite(path: string): Sql & { close(): void } {
@@ -65,12 +65,44 @@ export function openSqlite(path: string): Sql & { close(): void } {
  * second level. What there IS is the same `CallContext` the hosted product builds, so every
  * permission check below this line is the same code.
  */
+/** A credential this record does not know, or none where one is needed. 401 — `49 §5.4` step 1. */
+const UNKNOWN: Refusal = { code: 'UNAUTHORIZED', fix: 'This record does not know that credential.', at: 'authorization' };
+
+/** A credential it knows, belonging to somebody it does not. 403, and the Worker says the same. */
+const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach this record.', at: 'principal' };
+
+/**
+ * A record whose every owner is suspended.
+ *
+ * IT IS NOT THE CALLER'S FAULT AND THE SENTENCE SAYS SO. Answering 403 "this credential does not
+ * reach this record" to an operator holding the right shared secret, on loopback, is the least
+ * actionable thing this server can say — the credential is perfect and the record is the problem.
+ * `49 §5.1` step 5.3 calls a record that cannot be brought up `sick`, with a `{ code, fix }`, at 503.
+ */
+const NOBODY: Refusal = {
+  code: 'SCHEMA_UNAVAILABLE',
+  fix: 'Every owner of this record is suspended, so nobody may act on it. Un-suspend one.',
+  at: 'record',
+};
+
 async function contextFor(
   request: Request,
   token: string | undefined,
   api: Awaited<ReturnType<typeof createRecordApi>>,
-): Promise<CallContext | null> {
-  const sent = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+): Promise<CallContext | Refusal> {
+  /**
+   * WHAT WAS ACTUALLY PRESENTED, and `undefined` when that is nothing.
+   *
+   * `headers.get` RETURNS `''` FOR A HEADER WITH NO VALUE, and `'' !== undefined` — so a bare
+   * `Authorization:` line read as a credential. That is one byte, and it walked straight through the
+   * check that had just been added to stop exactly this: a request carrying nothing minted an owner
+   * bearer that works from anywhere for thirty days. `Authorization: Bearer` did it too, because the
+   * strip needs whitespace after `Bearer` to match, so the word itself became the credential.
+   *
+   * TRIMMED AND EMPTIED TO `undefined` HERE, ONCE, so nothing below has to remember.
+   */
+  const raw = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
+  const sent = raw ? raw : undefined;
 
   /* AN AGENT TOKEN IS TRIED FIRST, and it is the same table and the same check the Worker uses. A
      self-host that recognised only one shared string would be a deployment where an agent cannot be
@@ -81,14 +113,17 @@ async function contextFor(
      shared secret is one exact string; anything else with a dot in it is an agent token. */
   if (sent?.includes('.') && sent !== token) {
     const seen = await api.kernel.verifyToken(sent, 'api');
-    if (!seen.ok) return null;
+    if (!seen.ok) return UNKNOWN;
 
     /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant. `owner` here meant a token
        belonging to a colleague invited at `read` came back as an owner — and that a token outlived
        the removal of the person who holds it, which is the one thing this whole path exists to
        prevent. */
     const held = api.kernel.access(seen.value.person_id);
-    if (!held) return null;
+    /* NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. They were one
+       answer, so revoking somebody's membership and sending a bearer nobody minted looked the same
+       to a client — and only one of the two is worth retrying with a different credential. */
+    if (!held) return OFF;
     return {
       principal: {
         kind: 'token',
@@ -105,20 +140,26 @@ async function contextFor(
   /* A BEARER THAT DID NOT VERIFY IS REFUSED, and does not fall through to the branch below. It
      used to: revoking a scoped token PROMOTED it, because the same header that had been a `read`
      agent became an unauthenticated request and an unauthenticated request was the owner. */
-  if (sent?.includes('.') && sent !== token) return null;
+  if (sent?.includes('.') && sent !== token) return UNKNOWN;
 
   /* AND THEN THE ONE SHARED SECRET, which is what a single-person deployment on one machine has
      instead of a sign-in. `undefined` and not falsy: an empty `BRAINDOG_TOKEN` in a compose file is
      a value somebody set, and reading it as "no token wanted" opens the server rather than locking
      it. */
-  if (token !== undefined && sent !== token) return null;
+  if (token !== undefined && sent !== token) return UNKNOWN;
+
+  /* AND SOMETHING THAT MATCHED NOTHING IS REFUSED, rather than treated as nothing. `49 §5.4` step 1:
+     a credential that is neither `config.token` nor a token row nor a device grant is 401. It used
+     to fall through to the branch below — so `Authorization: x` on a self-host with no shared secret
+     was the owner, which is the same hole as the empty header and reads even less like one. */
+  if (sent !== undefined && sent !== token) return UNKNOWN;
 
   /* A RECORD WITH NO ELIGIBLE OWNER REFUSES, rather than inventing one. The fallback to a constant is
      right for a file nobody has created — that is what `braindog dev` and every test against an
      empty file open — and wrong the moment there IS a record: it would hand `owner` to a person id
      no `member` row names, on a record whose own tables say every owner is suspended. */
   const who = api.kernel.created() ? api.kernel.ownerId() : 'p_self';
-  if (!who) return null;
+  if (!who) return NOBODY;
 
   /* AND WHETHER ANYTHING WAS PRESENTED TRAVELS WITH IT. Reading and writing as the owner without a
      credential is the documented shape of a single-person deployment; minting a bearer that outlives
@@ -410,16 +451,18 @@ async function answer(
   });
 
   const ctx = await contextFor(request, token, api);
-  const out = ctx
-    ? await serveApi(request, handlers, ctx)
-    /* `FORBIDDEN` IS A 403 ON BOTH HOSTS. This answered 401 with a `FORBIDDEN` code and a sentence
-       telling the caller to fix a credential that is fine — the Worker answers 403 for the same
-       condition, and one record behaving differently depending on where it runs is the thing the
-       shared `httpStatus` exists to prevent. */
-    : new Response(
-        JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This credential does not reach this record.' } }),
-        { status: 403, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } },
-      );
+  /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —
+     a credential nobody minted, a credential belonging to somebody who is not on the record, and a
+     record with no owner who may act — so a client could not tell which of the three to do something
+     about. `httpStatus` is the same function the Worker uses, which is what keeps one record from
+     behaving differently depending on where it runs. */
+  const out =
+    'principal' in ctx
+      ? await serveApi(request, handlers, ctx)
+      : new Response(JSON.stringify({ ok: false, refusal: ctx }), {
+          status: httpStatus({ ok: false, refusal: ctx }),
+          headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+        });
 
   res.writeHead(out.status, Object.fromEntries(out.headers));
   res.end(Buffer.from(await out.arrayBuffer()));

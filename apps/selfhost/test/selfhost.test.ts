@@ -206,12 +206,14 @@ test('with a token set, a request without it is refused before it reaches the re
     const ok = await s.call('boot');
     assert.equal(ok.status, 200);
 
-    /* 403 AND NOT 401, because the Worker answers 403 for the same condition and one record must not
-       behave differently depending on where it runs — which is what the shared `httpStatus` exists
-       to prevent, and this was the one place bypassing it. */
+    /* 401 AND NOT 403, and the Worker says the same — which is the parity this assertion was always
+       about, at the value both hosts now hold. `49 §5.4` step 1: a credential this record does not
+       know, or none where one is needed, is `UNAUTHORIZED`. `FORBIDDEN` is the other fact — a
+       credential it knows, belonging to somebody who is not on the record — and answering one status
+       for both left a client unable to tell which of the two to do something about. */
     const res = await fetch(`http://127.0.0.1:${s.port}/api/boot`);
-    assert.equal(res.status, 403);
-    assert.equal(((await res.json()) as Answer).refusal?.code, 'FORBIDDEN');
+    assert.equal(res.status, 401);
+    assert.equal(((await res.json()) as Answer).refusal?.code, 'UNAUTHORIZED');
 
     /* AND AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A deployment that
        recognised only one shared string is one where an agent cannot be given less than everything,

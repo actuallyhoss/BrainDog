@@ -43,10 +43,7 @@ import { ulids } from '@braindog/kernel';
 
 import { fixOf } from '@braindog/ports';
 
-import { EVERY_KIND, openSqlite, start } from './server.ts';
-
-/** `34-GRAMMARS` line 348, and the Directory's own — the two must agree or one of them is unreachable. */
-const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
+import { openSqlite, start } from './server.ts';
 
 /**
  * One sentence on stderr, and nothing on stdout — ever.
@@ -112,6 +109,17 @@ async function init(args: readonly string[]): Promise<void> {
      these used to fire after the directory, the database and thirty-one tables existed — a reserved
      slug, an address with a space in it, a name already taken — and the retry then hit "is already a
      record", for ever, with no command that could clear it. */
+  /* THE INSTALLATION ROOT FIRST, BEFORE ANYTHING IS OPENED IN IT. `49 §5.1` step 1 is this `mkdir`
+     and step 4 is opening the Directory inside it, and moving the refusals earlier inverted the two:
+     on a fresh install — the DEFAULT `/data`, the first command a new self-hoster runs —
+     `openSqlite` answered "unable to open database file" and created nothing.
+
+     IT IS NOT A RECORD, so making it on a path that then refuses costs nothing: `<data>` is the
+     installation's, it is where every record and the tenant map live, and a self-host that will hold
+     one will hold it here. 0700, and the mode applies only to a directory Node creates — a volume
+     mount that already existed keeps its own. */
+  mkdirSync(data, { mode: 0o700, recursive: true });
+
   const dirFile = join(data, 'directory.sqlite');
   const dirSql = openSqlite(dirFile);
   const directory = createDirectory(dirSql, clock);
@@ -161,11 +169,9 @@ async function init(args: readonly string[]): Promise<void> {
     }
   }
 
-  /* 0700 THROUGHOUT, `49 §5.1` step 1. It applies only to a directory Node CREATES — a pre-existing
-     volume mount keeps its own mode — but the per-record directory is always ours, and it holds the
-     whole record: every row, every token hash, every sealed grant. `0755` there is the wrong side of
-     `49 §8`'s backup argument. */
-  mkdirSync(data, { mode: 0o700, recursive: true });
+  /* 0700 ON THE RECORD'S OWN DIRECTORY TOO. It holds the whole record — every row, every token
+     hash, every sealed grant — and it is always one this command created, so unlike `<data>` the
+     mode always applies. `0755` there is the wrong side of `49 §8`'s backup argument. */
   mkdirSync(join(dir, 'blobs'), { mode: 0o700, recursive: true });
   mkdirSync(join(dir, 'snapshots'), { mode: 0o700, recursive: true });
 

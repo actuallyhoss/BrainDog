@@ -310,8 +310,26 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
   return ok(null);
 }
 
+/**
+ * How many owners can actually act.
+ *
+ * SUSPENDED IS NOT AN OWNER, and counting them was a way to leave a record with none. Suspension
+ * never deletes the `member` row, so with two owners both suspensions passed the last-owner guard
+ * one at a time — and the record then had two owner rows, neither of whom may do anything. Every
+ * route answered 403 with a sentence about the caller's credential, `suspendMember` is not in the
+ * route table, and `import` refuses a record that is not empty: there was no way back in short of
+ * raw SQL on the file.
+ *
+ * IT IS THE SAME PREDICATE `ownerId()` USES, which is the point: the question "is there an owner"
+ * has to have one answer, or the guard protects a different thing from the one that reads it.
+ */
 const owners = (sql: Sql): number =>
-  Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM member WHERE register = '*' AND level = 'owner'")?.n ?? 0);
+  Number(
+    sql.one<{ n: number }>(
+      `SELECT count(*) AS n FROM member m JOIN person p ON p.id = m.person_id
+        WHERE m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL`,
+    )?.n ?? 0,
+  );
 
 function event(
   deps: MemberDeps,

@@ -20,6 +20,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createDirectory } from '@braindog/record/directory';
+
 import { openSqlite, start } from '../src/server.ts';
 
 const MAIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'main.ts');
@@ -328,6 +330,123 @@ test('AND `serve` WITH A PATH THAT IS NOT A RECORD REFUSES, rather than making o
     assert.match(out.said, /is not a record/);
     assert.equal(existsSync(join(data, '--port=9999')), false, 'a mistyped flag became a record');
     assert.equal(existsSync('--port=9999'), false, 'a mistyped flag became a record in the working directory');
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('A HEADER WITH NOTHING IN IT IS NOT A CREDENTIAL', async () => {
+  /* `headers.get` returns `''` for a bare `Authorization:` line, and `'' !== undefined` — so one
+     byte walked straight through the check added to stop exactly this. `Authorization: Bearer` did
+     it too, because the strip needs whitespace after the word for the pattern to match, so `Bearer`
+     itself became the credential. Every one of these minted an owner bearer that works from
+     anywhere, for thirty days. */
+  const data = scratch();
+  let running: Awaited<ReturnType<typeof start>> | null = null;
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+    running = await start({ file: join(data, 'the-studio', 'record.dog'), port: 0, pollMs: 0 });
+    const at = (running.server.address() as { port: number }).port;
+
+    for (const authorization of ['', ' ', 'Bearer', 'Bearer ', 'Bearer   ', 'x', 'Basic abc']) {
+      const said = await fetch(`http://127.0.0.1:${at}/api/createToken`, {
+        method: 'POST',
+        body: JSON.stringify({ scope: 'write', label: 'anyone', days: 30 }),
+        headers: { authorization },
+      });
+      assert.notEqual(said.status, 200, `\`${authorization}\` minted a bearer that works from anywhere`);
+      await said.arrayBuffer();
+    }
+
+    /* AND SOMETHING THAT MATCHED NOTHING IS REFUSED OUTRIGHT, rather than read as nothing —
+       49 §5.4 step 1. It used to fall through: `Authorization: x` on a self-host with no shared
+       secret was the owner, which reads even less like a hole than the empty header. */
+    const wrong = await fetch(`http://127.0.0.1:${at}/api/boot`, { headers: { authorization: 'nonsense' } });
+    assert.equal(wrong.status, 401, 'a credential that matched nothing was treated as no credential');
+    await wrong.arrayBuffer();
+
+    // And nothing presented at all still reads, which is what one person on one machine means.
+    const bare = await fetch(`http://127.0.0.1:${at}/api/boot`);
+    assert.equal(bare.status, 200, 'a self-host with no token stopped answering its owner');
+    await bare.arrayBuffer();
+  } finally {
+    await running?.close();
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('AND A DATA DIRECTORY THAT DOES NOT EXIST YET IS CREATED, which is every first run', async () => {
+  /* The primary happy path, against the documented default `/data`: nothing exists yet. Moving the
+     refusals before the writes moved the Directory open ahead of the `mkdir` that makes a place for
+     it, so `init` answered "unable to open database file" — naming a database the operator never
+     mentioned — and created nothing. Every test in this file passed, because `mkdtemp` had always
+     made the directory first. */
+  const parent = scratch();
+  const data = join(parent, 'nested', 'data');
+  try {
+    const out = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
+    assert.equal(out.code, 0, out.said);
+    assert.ok(existsSync(join(data, 'the-studio', 'record.dog')));
+    if (process.platform !== 'win32') {
+      assert.equal(statSync(data).mode & 0o777, 0o700, 'the installation root is readable by anybody');
+      assert.equal(statSync(join(data, 'the-studio')).mode & 0o777, 0o700, "the record's own directory is readable by anybody");
+    }
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('AND A RELEASED NAME IS NEVER REISSUED, which is the whole tenant boundary', async () => {
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+
+    /* Renaming releases the old name. Every stale link still says it, so handing it to the next
+       person who asks is how one of them reads another customer's record. */
+    const dirSql = openSqlite(join(data, 'directory.sqlite'));
+    const directory = createDirectory(dirSql, { now: () => Date.now() });
+    assert.ok(directory.rename('the-studio', 'halden').ok);
+    dirSql.close();
+
+    const again = run(data, 'init', 'the-studio', '--owner', 'bo@example.com');
+    assert.equal(again.code, 1, 'a released name was given out again');
+    assert.match(again.said, /cannot be given out again/);
+
+    /* AND THE RECORD THE NAME USED TO MEAN IS UNTOUCHED. Its directory is still there — a rename
+       moves a row and never a file — so the refusal has to come from the Directory rather than from
+       anything on disk, and bo must not appear anywhere in it. */
+    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    assert.equal(sql.all("SELECT 1 FROM member WHERE register = '*'").length, 1, 'a released name added an owner');
+    assert.equal(sql.one<{ slug: string }>('SELECT slug FROM record WHERE singleton = 1')?.slug, 'the-studio');
+    assert.equal(sql.all("SELECT 1 FROM person WHERE email = 'bo@example.com'").length, 0);
+    sql.close();
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('AND `serve` SERVES THE ONE RECORD IT HAS, even beside a name whose file is gone', async () => {
+  /* 49 §5.1 step 6: "a `record_dir` row with no directory … is logged as `slug` and skipped."
+     Counting it made a host with exactly one servable record refuse to start, saying it held two —
+     and nothing on the machine would then start it. */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'one', '--owner', 'ada@example.com').code, 0);
+    assert.equal(run(data, 'init', 'two', '--owner', 'ada@example.com').code, 0);
+
+    const both = run(data, 'serve');
+    assert.equal(both.code, 1, 'a host with two records served one of them');
+    assert.match(both.said, /holds 2 records/);
+
+    rmSync(join(data, 'two'), { recursive: true, force: true });
+    /* It starts now, which cannot be asserted by running `serve` to completion — so the property is
+       that it no longer refuses for the reason it used to. */
+    const one = spawnSync(process.execPath, [MAIN, 'serve'], {
+      encoding: 'utf8',
+      timeout: 4000,
+      env: { ...process.env, BRAINDOG_DATA: data, PORT: '0' },
+    });
+    assert.ok(!`${one.stderr}`.includes('holds 2 records'), 'a name with no file behind it was counted as a record');
   } finally {
     rmSync(data, { recursive: true, force: true });
   }
