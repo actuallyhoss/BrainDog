@@ -33,7 +33,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { argv, env, exit, stderr } from 'node:process';
 
@@ -112,8 +112,21 @@ async function init(args: readonly string[]): Promise<void> {
      these used to fire after the directory, the database and thirty-one tables existed — a reserved
      slug, an address with a space in it, a name already taken — and the retry then hit "is already a
      record", for ever, with no command that could clear it. */
-  const dirSql = openSqlite(join(data, 'directory.sqlite'));
+  const dirFile = join(data, 'directory.sqlite');
+  const dirSql = openSqlite(dirFile);
   const directory = createDirectory(dirSql, clock);
+
+  /* AND THE DIRECTORY FILE IS NOT WORLD-READABLE. `<data>/<slug>/` is created by this command at
+     0700, so a record is protected by the directory it is in — but `<data>` itself is usually a
+     volume mount that already existed, where `mkdir`'s mode never applied, and this file sits
+     directly in it. It holds every person on the installation, by address. SQLite creates it at
+     0666 & ~umask; on Windows the call is advisory and harmless. */
+  try {
+    chmodSync(dirFile, 0o600);
+  } catch {
+    /* A file somebody else owns is theirs to permission, and refusing the whole command over it
+       would be worse than the exposure. */
+  }
 
   /* THE GRAMMAR AND THE RESERVED SET ARE THE DIRECTORY'S. A third copy here knew the shape and not
      the words, so `braindog init api` passed this file's regex, built the record, and was refused by
