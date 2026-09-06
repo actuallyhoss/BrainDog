@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createDirectory, type Directory, type Membership, type Named, type Person } from '../src/directory.ts';
+import { DIRECTORY_VERSION, createDirectory, type Directory, type Membership, type Named, type Person } from '../src/directory.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -242,5 +242,20 @@ test('and a closed record takes nobody, because its name may already be somebody
 
   assert.equal(refusal(d.join(made.record, bo.id, 'owner')).at, 'record');
   assert.equal(d.levelOf(made.record, bo.id), null, 'somebody was given owner on a closed record');
+  sql.close();
+});
+
+test('A DIRECTORY WRITTEN BY A NEWER BUILD IS NOT OPENED', async () => {
+  /* `CREATE TABLE IF NOT EXISTS` over a newer schema is silent: every statement is a no-op, the
+     object opens, and the first `resolve` answers out of columns this build does not know the
+     meaning of — confidently, about which record a name means, which is the one question the tenant
+     map exists to answer. A record refuses in this situation; the map that decides which record
+     anybody reaches did not. */
+  const { d, sql } = directory();
+  assert.equal(Number(sql.one<{ user_version: number }>('PRAGMA user_version')?.user_version), DIRECTORY_VERSION);
+  value<Person>(d.person$('ada@example.com'));
+
+  sql.exec(`PRAGMA user_version = ${DIRECTORY_VERSION + 1}`);
+  assert.throws(() => createDirectory(sql, { now: () => Date.parse('2026-09-05T12:00:00Z') }), /written by a newer BrainDog/);
   sql.close();
 });

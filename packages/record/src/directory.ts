@@ -100,10 +100,32 @@ export type Membership = { record: string; slug: string | null; level: Level; cl
 
 export type Directory = ReturnType<typeof createDirectory>;
 
+/**
+ * The Directory's own schema revision. `49 §5.1` step 4.
+ *
+ * ONE, and a second is a migration with a number. It is here rather than nowhere because a tenant
+ * map has the same problem a record does: a build that opens one written by a NEWER build reads
+ * tables whose columns it does not know about, and every answer it gives is confidently wrong about
+ * which record a name means. `FORMAT_NEWER_THAN_READER` is what the format layer says (`03 §11`),
+ * and this is the one place the Directory can say it.
+ */
+export const DIRECTORY_VERSION = 1;
+
 export function createDirectory(sql: Sql, clock: Clock) {
+  /* THE VERSION IS READ BEFORE THE DDL RUNS. `CREATE TABLE IF NOT EXISTS` over a newer schema is
+     silent: every statement is a no-op, the object opens, and the first `resolve` answers from
+     columns this build does not know the meaning of. A record refuses in that situation and the
+     tenant map — which is the thing that decides WHICH record anybody reaches — did not. */
+  const version = Number(sql.one<{ user_version: number }>('PRAGMA user_version')?.user_version ?? 0);
+  if (version > DIRECTORY_VERSION)
+    throw new Error(
+      `This directory was written by a newer BrainDog: it is at version ${version} and this build reads ${DIRECTORY_VERSION}. Upgrade, or point at a different data directory.`,
+    );
+
   /* ONE SCRIPT, not split on semicolons: the comments in it carry the argument for the tombstone,
      and a naive split would cut one in half. Both adapters run a multi-statement script. */
   sql.exec(SCHEMA);
+  if (version < DIRECTORY_VERSION) sql.exec(`PRAGMA user_version = ${DIRECTORY_VERSION}`);
 
   const mint = ulids(() => clock.now());
   const at = (): string => new Date(clock.now()).toISOString();
