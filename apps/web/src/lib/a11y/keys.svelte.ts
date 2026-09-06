@@ -18,7 +18,17 @@
  * letters are safe, and it is exactly where they are wanted.
  */
 
+/* `silenced` lives next door in a plain `.ts` and is re-exported here, for the reason `icons.ts`
+   does the same: this file uses runes, so an import chain that reaches it cannot be loaded by
+   `node --test` — and the one accessibility claim in this app is the last thing that should be
+   untestable. Imported AND re-exported rather than passed through, so the name is in scope here
+   too. */
+import { silenced } from './chars.ts';
+
+export { silenced };
+
 export type Scope = 'document' | 'grid' | 'page' | 'gate' | 'palette' | 'nav';
+
 
 export type Binding = {
   id: string;
@@ -53,7 +63,10 @@ export const SCROLL_KEYS = ['Space', 'PageDown', 'PageUp'] as const;
 export const BINDINGS: Binding[] = [
   { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the palette', bare: false },
   { id: 'palette-slash', scope: 'document', key: '/', label: 'Open the palette, caret in the query', bare: true },
-  { id: 'goto', scope: 'document', key: 'g then h d i s v p ,', label: 'Go to Home, Decide, Inbox, Search, Vault, Packs, Settings', bare: true },
+  /* NO `g s`, AND THE SHEET SAID THERE WAS. Search is not a place you go — the dispatcher's own
+     comment says so on purpose — and this row printed it anyway, which is the one drift this file's
+     header promises cannot happen. */
+  { id: 'goto', scope: 'document', key: 'g then h d i v p ,', label: 'Go to Home, Decide, Inbox, Vault, Packs, Settings', bare: true },
   { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'The nth item of your nav, in your order', bare: true },
   { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Toggle the sidebar', bare: false },
   { id: 'undo', scope: 'document', key: '⌘Z', label: 'Undo the last change', bare: false },

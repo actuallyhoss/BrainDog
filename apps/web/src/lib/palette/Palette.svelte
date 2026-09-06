@@ -52,9 +52,11 @@
     { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, keys: 'g p', icon: 'packs' },
     { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, keys: 'g ,', icon: 'settings' },
     { id: 'c-audit', title: copy.audit, href: '/audit', group: copy.destinations, icon: 'clock' },
-    { id: 'c-shot', title: copy.screenshotOn, href: '/settings/appearance', group: copy.commands, icon: 'monitor' },
-    { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, keys: '?', icon: 'keyboard' },
+      { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, keys: '?', icon: 'keyboard' },
   ];
+
+/** Which register `@` narrows to. Named once, so the footer's promise and the filter cannot drift. */
+  const PEOPLE = 'people';
 
   /** 34 §4's two regexes: a prefixed spoken id, and `register#seq`. `#125` is plain text. */
   const SPOKEN = /^([A-Z]{1,3})(\d+)$/;
@@ -101,9 +103,16 @@
           out.push({ id: `r-${r.id}`, title: r.name, detail: `${(ROWS[r.id] ?? []).length} rows`, href: `/r/${r.id}`, group: copy.pages, icon: iconFor(r.icon, 'rows') });
     }
 
-    if ((prefix === null || prefix === '#') && text.length > 1)
-      for (const hit of search(text, 8) as SearchHit[])
+    /* `@` IS PEOPLE, AND IT MATCHED NOTHING. The footer of this palette prints `@ people` and this
+       file's own header says the prefix works in every mode — and every branch that produces a row
+       was guarded on a prefix that is not `@`, so typing a colleague's name behind it fell straight
+       through to "Nothing matches". The record has a people register; the search already reaches it;
+       the only thing missing was the register this prefix narrows to. */
+    if ((prefix === null || prefix === '#' || prefix === '@') && text.length > 1)
+      for (const hit of search(text, 8) as SearchHit[]) {
+        if (prefix === '@' && !hit.href.startsWith(`/r/${PEOPLE}/`)) continue;
         out.push({ id: `h-${hit.href}`, title: hit.title, detail: hit.detail, href: hit.href, group: copy.records, spoken: hit.spoken, icon: hit.icon });
+      }
 
     return out.slice(0, 20);
   });

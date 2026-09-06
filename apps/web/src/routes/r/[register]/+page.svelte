@@ -19,6 +19,8 @@
   import { MISSING } from 'braindog-render';
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
+  import * as clipboard from '$lib/clipboard.ts';
+  import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { iconFor, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
@@ -108,18 +110,7 @@
     });
   }
 
-  /** `navigator.clipboard` is absent over plain HTTP and in a sandboxed frame, and a copy button
-      that silently does nothing is worse than one that is not there — so the toast reports either
-      way and says which happened. */
-  async function copyId(seq: number) {
-    const spoken = `${id}#${seq}`;
-    try {
-      await navigator.clipboard.writeText(spoken);
-      toasts.push(copy.copied(spoken));
-    } catch {
-      toasts.push(copy.copyRefused, { intent: 'warn' });
-    }
-  }
+  const copyId = (seq: number) => clipboard.putSpoken(id, seq);
 
   /**
    * The LINK, not the id. `⇧Y` has been on the `?` sheet since the registry was written and was
@@ -129,15 +120,7 @@
    * Two outcomes, same as `copyId`, and the toast says which — the clipboard is absent over plain
    * HTTP and in a sandboxed frame.
    */
-  async function copyLink(seq: number) {
-    const url = `${location.origin}/r/${id}/${seq}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toasts.push(copy.copied(url));
-    } catch {
-      toasts.push(copy.copyRefused, { intent: 'warn' });
-    }
-  }
+  const copyLink = (seq: number) => clipboard.putLink(id, seq);
 
   /* Column 2, not 1: 0 is the picker and 1 is the spoken id, so the caret starts on the first cell
      that says what the row IS. It was 1 when the id was the leading column. */
@@ -258,6 +241,10 @@
       return;
     }
     if (mod || e.altKey) return;
+    /* THE BARE NAMESPACE, AND THE SWITCH THAT TURNS IT OFF. Everything above this line is a chord or
+       a named key and keeps working; everything below is a single character and does not. The arrows
+       are below it and survive, because an arrow is not a character shortcut. */
+    if (silenced(e)) return;
 
     if (e.key === 'j' || e.key === 'ArrowDown') {
       e.preventDefault();

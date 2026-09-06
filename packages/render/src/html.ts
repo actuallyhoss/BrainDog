@@ -32,7 +32,40 @@ export type RenderOptions = InlineOptions & {
    * are in the order its cells named them, and that order is the only handle there is.
    */
   cellHref?: (index: number) => string | null;
+  /**
+   * Where a date goes, if anywhere. `null` is "nowhere", which renders as the plain figure.
+   *
+   * THE RENDERER DOES NOT INVENT ROUTES. This was hard-coded to `/calendar/<day>`, an address no
+   * host in this workspace serves — so every `{{date:}}` in a document was an anchor to the error
+   * page, and the one in the seed's own note put it on a row somebody reaches in two clicks. `row`
+   * has asked the host since it was written; a date is the same question and had been answered by
+   * guessing.
+   */
+  dayHref?: (iso: string) => string | null;
+  /**
+   * What to do about a hole, if the host can do anything.
+   *
+   * A HOLE IS A TASK AND A BUTTON IS A PROMISE. 05 §7.5 is right that an unknown is an affordance
+   * rather than a value — but the affordance was rendered as a `<button>` with no handler on either
+   * side of the parity boundary, so a real tab stop, styled as a control, did nothing on every
+   * document that had one. Absent this, it renders as a marked span: still visibly a gap, no longer
+   * a control that lies.
+   *
+   * The HTML renderer takes the same key and reads only its presence, so the two trees stay
+   * identical and the parity gate keeps meaning something.
+   */
+  hole?: ((path: string | null) => void) | true;
 };
+
+/**
+ * A hole's label, as prose rather than as an address.
+ *
+ * IT PRINTED THE DOTTED PATH — `obligations.oldest_overdue` — in the middle of a sentence somebody
+ * is reading. That is the author's vocabulary, not the reader's, and it appears exactly where the
+ * reader is already confused. The last segment, unpunctuated, says what is missing; the whole path
+ * stays in `data-path` for whoever is fixing it.
+ */
+export const holeLabel = (path: string): string => (path.split('.').at(-1) ?? path).replace(/_/g, ' ');
 
 export const escape = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -57,18 +90,21 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
         case 'path':
           // A path that names nothing renders as the path, marked, and it is an AFFORDANCE: an
           // unknown is a hole, and a hole is a task somebody has to close (05 §7.5).
-          return n.resolved === null
-            ? `<button type="button" class="hole" data-path="${escape(n.path)}">${escape(n.path)} ${MISSING}</button>`
-            : `<span class="figure num">${escape(n.resolved)}</span>`;
+          if (n.resolved !== null) return `<span class="figure num">${escape(n.resolved)}</span>`;
+          return opts.hole
+            ? `<button type="button" class="hole" data-path="${escape(n.path)}">${escape(holeLabel(n.path))} ${MISSING}</button>`
+            : `<span class="hole" data-path="${escape(n.path)}">${escape(holeLabel(n.path))} ${MISSING}</span>`;
         case 'typed': {
-          const href = n.link === 'row' ? opts.link?.(n.arg) : n.link === 'day' ? `/calendar/${n.arg}` : null;
+          const href = n.link === 'row' ? opts.link?.(n.arg) : n.link === 'day' ? opts.dayHref?.(n.arg) : null;
           const body = `<span class="typed num" data-form="${n.form}">${escape(n.text)}</span>`;
           return href ? `<a href="${escape(href)}">${body}</a>` : body;
         }
         case 'evidence':
           // `{unknown}` is not a weak claim, it is a hole, so it renders as an affordance.
           return n.kind === 'unknown'
-            ? `<button type="button" class="hole">unknown</button>`
+            ? opts.hole
+              ? `<button type="button" class="hole">unknown</button>`
+              : `<span class="hole">unknown</span>`
             : `<span class="evidence" data-evidence="${n.kind}"${n.source ? ` title="${escape(n.source)}"` : ''}>${n.kind}${n.source ? `: ${escape(n.source)}` : ''}</span>`;
         case 'unresolved':
           return `<span class="unresolved">${escape(n.text)}</span>`;
@@ -176,7 +212,13 @@ function proportional(b: Block, o: RenderOptions): string {
       const track = drawable ? `<span class="prop-track" style="--magnitude:${magnitude(v / scale)}"></span>` : '';
       const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${escape(r.cells[1] ?? MISSING)}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
       return r.hole
-        ? `<button type="button" class="prop-row" data-hole${toneAttrs(r.tone)}>${inner}</button>`
+        /* A HOLE ROW IS A CONTROL ONLY WHERE THE HOST CAN ACT ON IT — the same rule as an inline
+           hole, for the same reason. This was a `<button>` with no handler on either side of the
+           parity boundary: a tab stop styled as a control, on the one row of the chart that is
+           supposed to be the way to fix the chart. */
+        ? o.hole
+          ? `<button type="button" class="prop-row" data-hole${toneAttrs(r.tone)}>${inner}</button>`
+          : `<div class="prop-row" data-hole${toneAttrs(r.tone)}>${inner}</div>`
         : `<div class="prop-row"${toneAttrs(r.tone)}>${inner}</div>`;
     })
     .join('');

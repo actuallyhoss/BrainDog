@@ -10,7 +10,7 @@
  */
 
 export { parse, splitRow, type Block, type Degraded, type Markdown, type Row, type Segment } from './parse.ts';
-export { toHTML, describe, escape, type RenderOptions } from './html.ts';
+export { toHTML, describe, escape, holeLabel, type RenderOptions } from './html.ts';
 export { inline, text, safeHref, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,

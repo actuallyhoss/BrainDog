@@ -19,6 +19,7 @@
   import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
+  import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, NOW, QUESTIONS } from '$lib/record/api.ts';
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -70,12 +71,19 @@
     if (!question || question.decided) return;
     const typing = e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
 
+    /* ONLY FROM INSIDE THE REASON FIELD, and only with content — 19 §4's own row. This branch ran
+       before the `typing` test below it, so the one keystroke in this product that writes an
+       immutable row with a named decider on it fired from anywhere on the page: with focus on
+       Cancel, or aimed at another application. A gate this file's header calls "deliberately slower
+       than every precedent" had a commit chord that was faster than everything. */
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      if (!typing) return;
       e.preventDefault();
       if (committing && reason.trim()) commit();
       return;
     }
     if (typing) return;
+    if (silenced(e)) return;
 
     const n = Number(e.key);
     if (n >= 1 && n <= question.options.length) {

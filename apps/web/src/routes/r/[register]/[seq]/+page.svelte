@@ -12,11 +12,13 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
-  import { relative } from 'braindog-render';
+  import { holeLabel, relative } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import * as clipboard from '$lib/clipboard.ts';
+  import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { iconFor,
     AUDIT,
     backlinks,
@@ -67,6 +69,12 @@
   const resolved = values();
   const resolve = (path: string) => resolved[path] ?? null;
   /** A link the host cannot resolve is plain text, never a dead anchor (36 §13 D16). */
+  /** What closing a hole would do. Named, because "nothing was written" alone says nothing. */
+  const holeFix = (path: string | null): string =>
+    path
+      ? `${holeLabel(path)} would be opened for whoever can supply it`
+      : 'The unknown would be opened for whoever can supply it';
+
   const link = (spoken: string) => {
     const m = /^([a-z][a-z0-9_]*)#(\d+)$/.exec(spoken);
     return m && REGISTERS[m[1]!] ? `/r/${m[1]}/${m[2]}` : null;
@@ -86,7 +94,12 @@
 {:else}
   <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={decl.name} title={String(row.fields[decl.title] ?? '')} id="#{row.seq}">
     {#snippet actions()}
-      <Button weight="bare"><Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" /></Button>
+      <!-- IT SAID `y` AND NOTHING WAS BOUND, and the button itself had no handler either — two
+           lies in one control, on the screen where somebody most wants a row's id to paste into a
+           message. Both are the same four lines now, shared with the grid. -->
+      <Button weight="bare" onclick={() => clipboard.putSpoken(id, row.seq)}>
+        <Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" />
+      </Button>
       <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>Edit</Button>
     {/snippet}
   </PageHead>
@@ -125,7 +138,14 @@
           {#if row.fields[f.id]}
             <article class="document-slot">
               <h2 class="doc-label">{labelOf(f)}</h2>
-              <Document src={String(row.fields[f.id])} opts={{ resolve, link, now: NOW }} />
+              <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked
+                   span rather than a `<button>` nobody wrote a handler for; with it, this screen
+                   owns what pressing one does. No `dayHref`: there is no calendar in this build,
+                   and a date that links to one is an anchor to the error page. -->
+              <Document
+                src={String(row.fields[f.id])}
+                opts={{ resolve, link, now: NOW, hole: (path) => toasts.push(copy.notWritten(holeFix(path)), { intent: 'warn' }) }}
+              />
             </article>
           {/if}
         {/each}

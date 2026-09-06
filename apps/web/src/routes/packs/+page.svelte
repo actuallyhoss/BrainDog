@@ -51,7 +51,18 @@
             <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>
               {copy.installDiff}
             </Button>
-            <Button weight="bare" tone="bad">{copy.uninstall}</Button>
+            <!-- IT HAD NO HANDLER AT ALL, on all five installed packs, while its sibling one line up
+                 fires the mock toast. A control that does nothing forever with no feedback is the
+                 one shape of dead thing a person retries. -->
+            <Button
+              weight="bare"
+              tone="bad"
+              onclick={() =>
+                toasts.push(
+                  copy.notWritten(`${pack.name} and everything it declares would be removed, with the diff shown first — the rows it created stay`),
+                  { intent: 'warn' },
+                )}
+            >{copy.uninstall}</Button>
           </footer>
           {#if diff === pack.id}
             <pre class="diff"><code>{`+ register.${pack.registers[0]}     ${pack.registers.length} field(s) added

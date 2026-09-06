@@ -84,26 +84,24 @@
     pref.apply('scheme', v === 'system' ? null : v);
   }
 
-  const pen = $derived(
-    Object.values(pages()).filter((p) => p.placed === false && !placed.some((x) => x.page === p.page)),
-  );
+  const pen = $derived(Object.values(pages()).filter((p) => p.placed === false));
 
   /**
-   * PROMOTION IS THE ONE VERB THAT ACTUALLY WORKS HERE, and it works because it is client state.
+   * Put a suggested page in the rail.
    *
    * 29 §2's three tiers are derived → proposed → placed, and *"Movement is forward-only and needs a
-   * user action."* This is the user action. Two rules from §4 are in the four lines below and both
-   * are load-bearing:
+   * user action."* This is the user action, and two rules from §4 govern what it would write: the
+   * page appends AT THE END OF ITS SECTION rather than being inserted mid-list — Microsoft's
+   * Personalized Menus put items at different distances down the menu each time, and Jensen Harris
+   * announced the reversal in 2006 with that as the first reason — and nothing is ever placed
+   * without it, because the system never writes nav order after first install (06 §3).
    *
-   *   - It appends AT THE END OF ITS SECTION, never inserted mid-list. Microsoft's Personalized
-   *     Menus put items at different distances down the menu each time, and Jensen Harris announced
-   *     the reversal in 2006 with that as the first reason.
-   *   - Nothing is ever placed WITHOUT it. The system never writes nav order after first install
-   *     (06 §3), because Findlater & McGrenere measured static menus faster than adaptive ones.
-   *
-   * The undo is on the toast rather than a second button, because a promotion is small and
-   * reversible and does not deserve a confirm — 23 §4: every extra confirm devalues the one gate
-   * that matters.
+   * IT SAID SO IN THE COMPLETED PAST TENSE AND WROTE NOTHING. The row vanished from the pen because
+   * this filtered a local array; the rail reads `boot()`, which filters on the declaration's own
+   * `placed` and `nav`, neither of which this could touch. So the page was back in the pen on
+   * reload and had never once been in the nav. A sentence in the past tense about a thing that did
+   * not happen is the worst kind of mock, because it is the kind somebody believes — and the undo
+   * on the toast made it worse, by offering to reverse it.
    */
   /* AND THE CHARACTER KEYS TOO. It is the one preference that changes what the keyboard DOES, so
      forgetting it is the one somebody notices within a minute. */
@@ -111,13 +109,18 @@
     pref.write({ chars });
   });
 
-  let placed = $state<PageDecl[]>([]);
-
+  /**
+   * Put a suggested page in the rail.
+   *
+   * IT SAID `${title} is in your nav` IN THE COMPLETED PAST TENSE and nothing of the kind happened.
+   * The row vanished from this list because `promote` filtered a local array; the rail reads
+   * `boot()`, which filters on the declaration's own `placed` and `nav` — neither of which this
+   * could touch — so the page was back in the pen on reload and never once in the nav. A sentence
+   * in the past tense about a thing that did not happen is the worst kind of mock, because it is the
+   * kind somebody believes.
+   */
   function promote(decl: PageDecl) {
-    placed = [...placed, decl];
-    toasts.push(copy.promoted(decl.title), {
-      undo: () => (placed = placed.filter((x) => x.page !== decl.page)),
-    });
+    toasts.push(copy.notWritten(`${decl.title} would be placed at the end of its section in your nav`), { intent: 'warn' });
   }
 </script>
 

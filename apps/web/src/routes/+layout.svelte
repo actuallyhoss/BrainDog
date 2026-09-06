@@ -30,7 +30,7 @@
   import * as pref from '$lib/pref.ts';
   import { restore as restoreAccent } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
-  import { GoPrefix, overlays, typing } from '$lib/a11y/keys.svelte.ts';
+  import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import TabBar from '$lib/ui/TabBar.svelte';
@@ -111,6 +111,10 @@
       return;
     }
     if (typing()) return;
+
+    /* AND THE SWITCH. Every chord above this line still works with character keys off; nothing below
+       it does, which is the whole of what `Character keys: Off` promises. */
+    if (silenced(e)) return;
 
     if (go.armed) {
       const target = GOTO[e.key.toLowerCase()];

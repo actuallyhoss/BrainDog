@@ -12,11 +12,12 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { KINDS, isKind } from 'braindog-render';
+  import { KINDS, holeLabel, isKind } from 'braindog-render';
   import { Block, Degraded, Table } from 'braindog-render/svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { NOW, REGISTERS, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
   import { draw } from '$lib/record/blocks.ts';
   import type { PageBlock, PageDecl } from '$lib/record/schema.ts';
@@ -43,7 +44,20 @@
      came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
      the same row, two clicks apart. In production that reads differently on two devices and drifts
      a day further every day. */
-  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW };
+  /* `hole` IS WHAT MAKES A HOLE PRESSABLE, and this screen owns what pressing one does. Without
+     it the renderer draws a marked span instead of a `<button>` with no handler. There is no
+     `dayHref` because there is no calendar in this build. */
+  const opts = {
+    resolve: (path: string) => resolved[path] ?? null,
+    now: NOW,
+    hole: (path: string | null) =>
+      toasts.push(
+        copy.notWritten(
+          path ? `${holeLabel(path)} would be opened for whoever can supply it` : 'The unknown would be opened for whoever can supply it',
+        ),
+        { intent: 'warn' },
+      ),
+  };
 
   /**
    * The declared span, clamped to what the KIND can survive.
@@ -204,6 +218,7 @@
       return;
     }
     if (e.altKey || e.shiftKey || showSource || arranging) return;
+    if (silenced(e)) return;
 
     const blocks = laid;
     if (e.key === 'j' || e.key === 'ArrowDown') {
