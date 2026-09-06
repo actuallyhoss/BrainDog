@@ -21,7 +21,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import type { Param, Row, Scheduler, Sql } from '@braindog/ports';
 
 /** The `Sql` port over `node:sqlite`. The one thing this file exists to supply. */
-function openSqlite(path: string): Sql & { close(): void } {
+export function openSqlite(path: string): Sql & { close(): void } {
   /* FOREIGN KEYS OFF, and it is not a preference. `node:sqlite` defaults this ON and a Durable
      Object leaves SQLite's default OFF — so `decision.supersedes REFERENCES decision(id)` is
      enforced here and nowhere else, which is a behavioural fork between the two hosts on the write
@@ -111,9 +111,25 @@ async function contextFor(
      instead of a sign-in. `undefined` and not falsy: an empty `BRAINDOG_TOKEN` in a compose file is
      a value somebody set, and reading it as "no token wanted" opens the server rather than locking
      it. */
-  if (token === undefined) return { principal: { kind: 'person', id: 'p_self', level: 'owner' } };
-  return sent === token ? { principal: { kind: 'person', id: 'p_self', level: 'owner' } } : null;
+  if (token !== undefined && sent !== token) return null;
+  return { principal: { kind: 'person', id: owner(api), level: 'owner' } };
 }
+
+/**
+ * Who "one person on one machine" IS.
+ *
+ * THE RECORD'S OWN OWNER, AND `p_self` ONLY WHEN THERE IS NO RECORD YET. The constant was written
+ * before anything could create a record, and it quietly broke the moment one could: a bearer minted
+ * through this path carries `p_self` as its person, `access('p_self')` finds no `member` row, and
+ * the token is refused 403 by the very server that issued it. `init` writes an owner with a `p_` +
+ * ULID id, as `34 §4` requires, so reading it here is what makes the two agree.
+ *
+ * IT IS STILL A CONSTANT WHEN THE FILE IS BARE, because a record nobody has created has no owner to
+ * name and a self-host must still answer — that is what makes `braindog dev` and every test against
+ * an empty file work.
+ */
+const owner = (api: Awaited<ReturnType<typeof createRecordApi>>): string =>
+  api.kernel.ownerId() ?? 'p_self';
 
 /**
  * What delivers one outbox job. The self-host's whole outbound surface, in one function.
@@ -411,26 +427,4 @@ async function answer(
 
   res.writeHead(out.status, Object.fromEntries(out.headers));
   res.end(Buffer.from(await out.arrayBuffer()));
-}
-
-/* One file, one port, one token. Everything else is the record. */
-if (argv[1]?.endsWith('server.ts')) {
-  const file = argv[2] ?? env.BRAINDOG_FILE ?? 'record.sqlite';
-  const port = Number(argv[3] ?? env.PORT ?? 8787);
-  const started = await start({
-    file,
-    port,
-    token: env.BRAINDOG_TOKEN,
-    ...(env.BRAINDOG_HOST === undefined ? {} : { host: env.BRAINDOG_HOST }),
-  });
-  void started;
-  console.log(`braindog · ${file} · http://localhost:${port}/api/boot`);
-  /* SAID OUT LOUD, because the safe default is also the surprising one. Somebody who expected the
-     server on their LAN needs to know why it is not, and somebody who set a token needs to know
-     that it now is. */
-  console.log(
-    env.BRAINDOG_TOKEN === undefined
-      ? '  no BRAINDOG_TOKEN, so this is bound to 127.0.0.1 and every request is the owner.'
-      : '  BRAINDOG_TOKEN set, so this is bound to 0.0.0.0 and every request carries it.',
-  );
 }

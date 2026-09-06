@@ -1854,6 +1854,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      */
     access: (person: string) => access(sql, person),
 
+    /**
+     * Who owns this record, by id.
+     *
+     * FOR THE ONE CALLER THAT HAS NO OTHER WAY TO ASK: a self-host with no bearer, which is one
+     * person on one machine and needs to know which person. It was a constant, `p_self`, which was
+     * correct while nothing could create a record and quietly wrong the moment `init` could — a
+     * token minted under that constant names a person with no `member` row, and is refused by the
+     * server that issued it.
+     *
+     * THE FIRST BY `rowid`, which is the founding owner: `createRecord` writes theirs before any
+     * invitation can add a second.
+     */
+    ownerId: (): string | null =>
+      sql.one<{ person_id: string }>(
+        `SELECT m.person_id FROM member m JOIN person p ON p.id = m.person_id
+          WHERE m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL ORDER BY m.rowid LIMIT 1`,
+      )?.person_id ?? null,
+
     /** Put somebody on, or move them. An invitation is the whole of what they hold, not a patch. */
     invite: (
       by: string,
