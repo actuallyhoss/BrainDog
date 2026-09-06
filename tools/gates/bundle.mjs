@@ -15,12 +15,16 @@ import { readFile, stat } from 'node:fs/promises';
 import { brotliCompressSync, constants } from 'node:zlib';
 import { join } from 'node:path';
 
+import { budget } from './lib.mjs';
+
 const APP = join(process.cwd(), 'apps/web');
 const CLIENT = join(APP, '.svelte-kit/output/client');
 const BUILD = join(APP, 'build');
 
+const B = budget('bundle');
+
 const brotli = (buf) =>
-  brotliCompressSync(buf, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length;
+  brotliCompressSync(buf, { params: { [constants.BROTLI_PARAM_QUALITY]: B.brotliQuality } }).length;
 
 const KB = (n) => `${(n / 1024).toFixed(1)} KB`;
 
@@ -109,18 +113,16 @@ const ROWS = [
   {
     name: 'entry JS, brotli',
     size: js,
-    budget: 30 * 1024,
-    // Measured 2026-09-03 with SvelteKit 2.70.3 and Svelte 5.57.0. The interpreter itself is 19.3 KB;
-    // the rest is Kit's client runtime and router, and it does not fit. 50 §10 records the path and
-    // it is NOT a bigger budget: `hydrate()` from svelte plus a 60-line router with the route files
-    // as a table — which is why the app was kept off Kit's data-loading conventions in the first place.
-    baseline: 31 * 1024,
+    budget: B.mainJsBrotli,
+    // The measurement and the argument are in `budgets.json` beside the number, which is where a
+    // reviewer widening it would have to read them.
+    baseline: B.mainJsBaseline,
     note: "Kit's runtime alone; the interpreter is 19.3 of it",
   },
-  { name: 'entry CSS, brotli', size: css, budget: 12 * 1024, note: 'tokens, a11y, blocks, rows and the shell' },
-  { name: 'index.html, brotli', size: shell, budget: 25 * 1024, note: 'it carries no record state' },
-  { name: 'UI face (Plex)', size: await font('plex-sans.woff2'), budget: 45 * 1024, note: "22 §9's budget, unchanged" },
-  { name: 'display face (Poppins)', size: await font('poppins-600.woff2'), budget: 10 * 1024, note: 'nothing below 20px' },
+  { name: 'entry CSS, brotli', size: css, budget: B.mainCssBrotli, note: 'tokens, a11y, blocks, rows and the shell' },
+  { name: 'index.html, brotli', size: shell, budget: B.htmlBrotli, note: 'it carries no record state' },
+  { name: 'UI face (Plex)', size: await font('plex-sans.woff2'), budget: B.uiFaceBytes, note: "22 §9's budget, unchanged" },
+  { name: 'display face (Poppins)', size: await font('poppins-600.woff2'), budget: B.displayFaceBytes, note: 'nothing below 20px' },
 ];
 
 const report = process.argv.includes('--report');

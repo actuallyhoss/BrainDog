@@ -31,6 +31,7 @@ import { extname, join, normalize } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
+import { budget } from './lib.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -46,7 +47,8 @@ const APPS = [
   { name: 'site', root: join(REPO, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], spa: false },
 ];
 const AXE = join(REPO, 'node_modules', 'axe-core', 'axe.min.js');
-const PORT = 5186;
+const A = budget('a11y');
+const PORT = A.port;
 
 /* Every surface at rest. */
 /**
@@ -163,7 +165,7 @@ for (const app of APPS) {
   current = app;
 
 for (const scheme of ['dark', 'light']) {
-  for (const width of [1440, 390]) {
+  for (const width of A.widths) {
     const context = await browser.newContext({
       viewport: { width, height: 900 },
       colorScheme: scheme,

@@ -18,6 +18,10 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
+import { budget } from './lib.mjs';
+
+const R = budget('cssRules');
+
 const ROOT = process.cwd();
 /* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
    on purpose; an ordinary run must not find the violations that are there to be found. */
@@ -251,7 +255,7 @@ for (const u of used)
  * excuses, which is the whole point of requiring it.
  */
 function justified(text, at) {
-  return /focus-ok:/.test(text.slice(Math.max(0, at - 240), at + 120));
+  return /focus-ok:/.test(text.slice(Math.max(0, at - R.waiverLookbehindChars), at + R.waiverLookaheadChars));
 }
 
 const RULES = {

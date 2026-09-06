@@ -32,11 +32,13 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
+import { budget } from './lib.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
-const PORT = 5189;
+const L = budget('layout');
+const PORT = L.port;
 
 /**
  * Every route the app has, derived from the tree, plus a few extra addresses of the same routes.
@@ -56,7 +58,7 @@ if (unsampled.length) {
 }
 
 /** The narrowest phone still in the wild, one bigger phone, one common tablet. */
-const FLOOR = [320, 360, 768];
+const FLOOR = L.floorWidths;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -129,7 +131,7 @@ let checked = 0;
 
 for (const width of widths) {
   const context = await browser.newContext({
-    viewport: { width, height: 900 },
+    viewport: { width, height: L.viewportHeightPx },
     reducedMotion: 'reduce',
   });
   const page = await context.newPage();
@@ -137,7 +139,7 @@ for (const width of widths) {
 
   for (const route of ROUTES) {
     await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+    await page.waitForSelector('#main *', { timeout: L.readyTimeoutMs }).catch(() => {});
     // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
     await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
     /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading
@@ -151,11 +153,11 @@ for (const width of widths) {
         h.style.cssText = 'width:2000px;white-space:nowrap';
         document.getElementById('main')?.prepend(h);
       });
-    await page.waitForTimeout(60);
+    await page.waitForTimeout(L.settleMs);
 
-    const out = await page.evaluate((w) => {
+    const out = await page.evaluate(([w, slack]) => {
       const hits = [];
-      if (document.documentElement.scrollWidth > w + 1) {
+      if (document.documentElement.scrollWidth > w + slack) {
         hits.push(`the DOCUMENT scrolls sideways (${document.documentElement.scrollWidth}px)`);
       }
       /* A table wider than the page is the design. A heading wider than the page is a bug. The
@@ -176,7 +178,7 @@ for (const width of widths) {
         );
       }
       return [...new Set(hits)].slice(0, 4);
-    }, width);
+    }, [width, L.widthTolerancePx]);
 
     checked++;
     process.stdout.write(out.length ? '!' : '.');
@@ -194,6 +196,6 @@ console.log(
     `(${bps.join(', ')} + floor), ${findings.length} finding(s)`,
 );
 
-for (const f of findings.slice(0, 40)) console.error(`      ${f}`);
-if (findings.length > 40) console.error(`      ...and ${findings.length - 40} more`);
+for (const f of findings.slice(0, L.findingsShown)) console.error(`      ${f}`);
+if (findings.length > L.findingsShown) console.error(`      ...and ${findings.length - L.findingsShown} more`);
 if (findings.length) process.exitCode = 1;

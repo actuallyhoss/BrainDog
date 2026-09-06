@@ -1,0 +1,45 @@
+{
+  "//": "52 §4 — every number a gate asserts, in one place. A COUNT IS NEVER HERE: a count is read from the enumeration that owns it (34 §6). Every key is read by at least one gate, which `self-test` proves; a gate holds no numeric literal that is not 0, 1 or an index. A change here is reviewed against the design document that owns the number, which is named on the line.",
+
+  "bundle": {
+    "//": "22 §9. Brotli, because that is what a browser is served.",
+    "brotliQuality": 11,
+    "mainJsBrotli": 30720,
+    "//mainJsBaseline": "A recorded number the gate fails above while the budget is already exceeded by something outside this repository — NOT a wider budget. 50 §10 records the path back under 30 KB. Measured 2026-09-03, SvelteKit 2.70.3 + Svelte 5.57.0.",
+    "mainJsBaseline": 31744,
+    "mainCssBrotli": 12288,
+    "htmlBrotli": 25600,
+    "//fonts": "22 §9 budgets 45 KB over 2 files for one Latin face plus Arabic. This ships two Latin faces, so the workhorse keeps the original number and the display face — used only above 20px — gets its own. A recorded deviation, not a moved goalpost.",
+    "uiFaceBytes": 46080,
+    "displayFaceBytes": 10240
+  },
+
+  "layout": {
+    "//": "13 §8, 22 §10. The widths a page is drawn at, and what counts as overflowing.",
+    "floorWidths": [320, 360, 768],
+    "viewportHeightPx": 900,
+    "//widthTolerancePx": "52 §4 records 0. One pixel is the recorded deviation, and it is sub-pixel rounding rather than a widened budget: `scrollWidth` is an integer rounded up from a fractional layout, so a page laid out to exactly the viewport reports one more than it. At 0 the gate is red on every route for a rounding mode.",
+    "widthTolerancePx": 1,
+    "settleMs": 60,
+    "readyTimeoutMs": 5000,
+    "findingsShown": 40,
+    "port": 5189
+  },
+
+  "a11y": {
+    "//": "13 §9. Both schemes at both ends, because half of a contrast failure is invisible in one.",
+    "widths": [1440, 390],
+    "port": 5186
+  },
+
+  "cssRules": {
+    "//": "13 §8. How far back a `focus-ok:` waiver may sit from the rule it excuses.",
+    "waiverLookbehindChars": 240,
+    "waiverLookaheadChars": 120
+  },
+
+  "colourGrep": {
+    "//": "13 §2. How much of an offending line is quoted — a colour literal is not a secret, but a whole minified line is not a finding either.",
+    "excerptChars": 100
+  }
+}

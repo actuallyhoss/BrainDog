@@ -11,6 +11,10 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
+import { budget } from './lib.mjs';
+
+const C = budget('colourGrep');
+
 const ROOT = process.cwd();
 /* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
    on purpose; an ordinary run must not find the violations that are there to be found. */
@@ -115,7 +119,7 @@ for (const file of await walk(ROOT)) {
   for (const [i, line] of lines.entries()) {
     if (!LITERAL_ANY.test(line) && !(isCss && LITERAL_CSS.test(line))) continue;
     if (ALLOWED_LINES.some((r) => r.test(line))) continue;
-    findings.push({ where: `${rel}:${i + 1}`, text: line.trim().slice(0, 100) });
+    findings.push({ where: `${rel}:${i + 1}`, text: line.trim().slice(0, C.excerptChars) });
   }
 }
 

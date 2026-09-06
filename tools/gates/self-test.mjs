@@ -26,6 +26,8 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
+import { keyPaths } from './lib.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const negatives = join(here, 'negative');
 
@@ -131,6 +133,38 @@ for (const name of readdirSync(negatives, { withFileTypes: true }))
     console.error(`  negative/${name.name}/ is seeded and no case runs it.`);
     failed.push(name.name);
   }
+
+/**
+ * AND EVERY NUMBER IN `budgets.json` IS READ BY SOMETHING.
+ *
+ * `52 §4`: "every key is read by at least one gate (a `budgets.json` key nothing reads is a
+ * `self-test` failure)". The reason is the same one the file exists for. A budget nobody reads is a
+ * number that looks reviewed and asserts nothing — somebody tightens it, the diff is approved, and
+ * the gate goes on measuring against whatever it holds instead. That is strictly worse than no
+ * budget at all, because a missing one is visible and a dead one is not.
+ *
+ * IT GREPS FOR `.key` RATHER THAN PARSING. A gate reads its section into a one-letter binding, so
+ * the use is `B.mainJsBrotli` and the name is unambiguous across this directory — no other file
+ * here has a property by any of these names. A parser would be more precise and would also be a
+ * second thing that can be wrong.
+ */
+function budgetsAreRead() {
+  const sources = readdirSync(here)
+    .filter((f) => f.endsWith('.mjs') && f !== 'lib.mjs' && f !== 'self-test.mjs')
+    .map((f) => readFileSync(join(here, f), 'utf8'))
+    .join(String.fromCharCode(10));
+
+  const dead = keyPaths().filter((path) => !sources.includes(`.${path.split('.')[1]}`));
+  if (dead.length) {
+    console.error(`  budgets: ${dead.length} key(s) no gate reads: ${dead.join(', ')}.`);
+    failed.push('budgets');
+    return;
+  }
+  ran++;
+  console.log(`  budgets: all ${keyPaths().length} numbers are read by a gate`);
+}
+
+budgetsAreRead();
 
 console.log(
   failed.length === 0
