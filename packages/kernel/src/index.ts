@@ -408,6 +408,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     for (const decl of batch) {
       const body = decl.body as Record<string, unknown>;
+
+      /* EVERY FIELD ID THAT WILL BECOME A JSON PATH, CHECKED AT INSTALL. `validate` in `declare.ts`
+         applies the grammar to register and field ids and returns before every other kind — so an
+         `ingest`'s `writes.key` and a `rule`'s `link.to.by` were arbitrary strings that reached
+         `json_extract(fields, '$.<id>')`, from a declaration a PACK can supply. `jsonPath` throws on
+         one now, which is the backstop; this is the check that means it never gets there, said as a
+         refusal at the moment somebody could still fix it. */
+      const paths = [
+        ...(((body.writes as { key?: unknown })?.key ?? []) as unknown[]),
+        ...(((body.then ?? []) as { link?: { to?: { by?: unknown } } }[]).map((a) => a?.link?.to?.by).filter((x) => x !== undefined)),
+      ];
+      for (const path of paths)
+        if (typeof path !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(path))
+          return {
+            code: 'DECLARATION_INVALID',
+            fix: `${decl.id} names ${JSON.stringify(path)} as a field, and a field id is lowercase letters, digits and underscores.`,
+            at: 'field',
+          };
+
       const source = typeof body.source === 'string' ? body.source : '';
       const register =
         decl.kind === 'rule'

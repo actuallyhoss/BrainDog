@@ -302,6 +302,14 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        `= '1234'` never matched an integer and a numeric dedupe key silently wrote a duplicate row
        every time. Money is compared on its amount, one level down, for the same reason. */
     const key = matched.writes.key ?? [];
+    /* A REFUSAL IS A VALUE HERE, even for the backstop. `jsonPath` throws on an id that never went
+       through the install check, and this is a `Result`-returning method — an exception crossing it
+       is the one thing this package promises does not happen. */
+    const wrongId = key.find((f) => typeof f !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(f));
+    if (wrongId !== undefined)
+      return no<Arrived>('DECLARATION_INVALID', `${matched.ingest} names ${JSON.stringify(wrongId)} as a field, and it is not one.`, {
+        at: 'writes.key',
+      });
     const path = (f: string): string => {
       const type = deps.schemaOf(matched.writes.register)?.fields[f]?.type;
       return `json_extract(fields, '${jsonPath(f)}${type === 'money' ? '.amount' : type === 'quantity' ? '.value' : ''}')`;

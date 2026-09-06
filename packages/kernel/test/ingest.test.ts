@@ -527,18 +527,17 @@ test('A FIELD ID FROM A DECLARATION CANNOT BECOME SQL', async () => {
      `json_extract(fields, '$.<id>')` with no grammar check, so a key of
      `ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x` selected the first row of the register and an
      `on_conflict: update` wrote over it. */
-  const { k, sql } = await record(
-    HSBC({
-      writes: {
-        register: 'transactions',
-        key: ["ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x"],
-      },
-    }),
-  );
-  assert.throws(
-    () => k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'inj' }),
-    /is not a field id/,
-  );
+  /* AND IT IS REFUSED AT INSTALL, where somebody can still fix it. `declare.ts`'s grammar check
+     applies to register and field ids and returns before every other kind, so an ingest's
+     `writes.key` was an arbitrary string all the way to the query. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const out = await k.install([
+    TRANSACTIONS,
+    HSBC({ writes: { register: 'transactions', key: ["ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x"] } }),
+  ]);
+  assert.equal(out.ok, false);
+  assert.equal((out as { refusal: { code: string } }).refusal.code, 'DECLARATION_INVALID');
   sql.close();
 });
 
