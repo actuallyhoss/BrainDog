@@ -684,7 +684,11 @@ export const METRICS: Record<string, SeedMetric> = {
      you owe. Those are not the same problem, and the sum is not a quantity. */
   overdue: {
     metric: 'overdue',
-    name: 'Overdue',
+    /* WHAT THIS ONE IS ABOUT, and the word alone was not it. `direction is owed by me` — this is
+       money YOU are late paying, and the saved view called "Overdue" is everything late in both
+       directions. Two clicks apart, one word, two sets: a person reading `GBP 10,540` under
+       "Overdue" and then opening the view was looking at a different question with no way to know. */
+    name: 'Overdue to pay',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me, due before today`,
     value: { sum: 'amount' },
@@ -813,7 +817,7 @@ export const PAGES: Record<string, SeedPage> = {
         cells: [
           { metric: 'owed-to-you', label: 'Owed to you' },
           { metric: 'due-30d', label: 'Due in 30 days' },
-          { metric: 'overdue', label: 'Overdue' },
+          { metric: 'overdue', label: 'Overdue to pay' },
           { metric: 'runway', label: 'Runway' },
         ],
       },
@@ -902,7 +906,12 @@ export const PAGES: Record<string, SeedPage> = {
         span: 7,
         columns: [{ field: 'party' }, { field: 'amount' }],
         source: 'register.obligations',
-        where: 'direction is owed by me, state is open',
+        /* THE SAME PREDICATE AS "Who you owe" DIRECTLY BELOW IT. This said `state is open` and that
+           one says `state is open or part`, so two panels about the same thing, one above the other,
+           were about different sets — 63,084 and 82,434. Neither prints a total, so nothing on screen
+           was wrong and the two disagreed anyway, which is the shape of a number somebody quotes from
+           the wrong panel. A part-paid obligation is money still owed. */
+        where: 'direction is owed by me, state is open or part',
         empty: 'You owe nobody anything.',
       },
       {

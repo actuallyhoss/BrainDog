@@ -217,7 +217,10 @@ export const NEWS: NewsItem[] = [
 export const VIEWS: Record<string, { register: string; name: string; filters: Filter[] }> = {
   'obligations.overdue': {
     register: 'obligations',
-    name: 'Overdue',
+    /* EVERYTHING LATE, IN BOTH DIRECTIONS — which is what its predicate says and what the name has to
+       say too. The money tile called "Overdue" is `direction is owed by me` alone, and one word over
+       two different sets, two clicks apart, is how somebody quotes the wrong figure. */
+    name: 'Overdue, both ways',
     filters: [
       { field: 'state', op: 'in', values: ['open', 'part'] },
       { field: 'due', op: 'before', values: ['today'] },
