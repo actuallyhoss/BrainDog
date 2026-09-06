@@ -26,6 +26,7 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
 
   /* The five live in `copy.ts` with every other sentence in the product, so the scope this screen
      claims can be checked against the rest of it in one pass rather than found in a component. */
@@ -63,6 +64,22 @@
     picked = key;
     queueMicrotask(() => field?.focus());
   }
+
+  /**
+   * `/start?add=<register>` LANDS ON THAT REGISTER'S FORM.
+   *
+   * Screen two's cards send people here to add a second kind of thing, and this screen ignored the
+   * parameter — so every card dropped them back on the choice list they had already answered, one
+   * step further back than where they pressed. A deep link that lands somewhere else is worse than
+   * no deep link: they have to work out that they are in the right place and just earlier.
+   *
+   * ONLY A KEY THIS SCREEN OFFERS. The parameter comes from a URL, and a register the choice list
+   * does not carry has no question written for it.
+   */
+  $effect(() => {
+    const asked = page.url.searchParams.get('add');
+    if (asked && picked === null && CHOICES.some((c) => c.key === asked)) pick(asked);
+  });
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
 

@@ -498,10 +498,21 @@
       </label>
 
       {#each filterable.filter((f) => f.type === 'enum') as f}
-        <div class="segmented" role="group" aria-label={f.id}>
+        <div class="segmented" role="group" aria-label={labelOf(f)}>
           {#each f.values ?? [] as value}
             {@const on = isOn(f.id, value)}
-            <button type="button" class="segment" data-on={on ? '' : undefined} onclick={() => toggleFilter(f.id, value)}>
+            <!-- `aria-pressed`, BECAUSE THE STATE WAS ONLY A COLOUR. A raised white segment says
+                 "this filter is on" to whoever can see it and nothing at all to anybody else — and
+                 which filters are on is the whole of what the grid underneath is showing. `data-on`
+                 is the style hook; this is the fact. `RowForm`'s own segmented control has carried it
+                 since it was written, so the two were a pair that had drifted. -->
+            <button
+              type="button"
+              class="segment"
+              data-on={on ? '' : undefined}
+              aria-pressed={on ? 'true' : 'false'}
+              onclick={() => toggleFilter(f.id, value)}
+            >
               {value.replace(/_/g, ' ')}
             </button>
           {/each}
