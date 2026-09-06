@@ -308,7 +308,13 @@ test('every travelling table arrives, and not one of them quietly stays behind',
     .filter((r) => r.section !== 'local' && r.section !== 'header' && r.table_name !== 'migration');
 
   for (const { table_name } of travelling) {
-    const before = source.sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${table_name}`)?.n ?? 0;
+    /* AN `export` EVENT DOES NOT TRAVEL, and is the only row that does not. It is a fact about this
+       installation's copies rather than about the business — the same argument the `local` section
+       makes for tokens and device grants — and it has to be written, because a vault whose reads are
+       not audited cannot answer "did anything get out". Counting it here would mean no two exports
+       of an unchanged record are the same bytes, because the first one changed the record. */
+    const skip = table_name === 'event' ? " WHERE kind <> 'export'" : '';
+    const before = source.sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${table_name}${skip}`)?.n ?? 0;
     const after = sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${table_name}`)?.n ?? 0;
     assert.equal(after, before, `${table_name}: ${before} rows went in and ${after} came out`);
     if (table_name !== 'entry_fts' && table_name !== 'entry_vec' && table_name !== 'record')

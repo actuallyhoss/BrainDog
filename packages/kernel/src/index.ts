@@ -1835,9 +1835,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * disagrees with the code was still exportable, and the export rewrote its manifest — putting a
      * hash of rows nobody can safely read into the file a customer keeps.
      */
-    export(opts: { sections?: readonly Section[] } = {}) {
+    export(opts: { sections?: readonly Section[]; redactGrants?: boolean; actor?: string } = {}) {
       const refused = schemaRefusal(state);
       if (refused) return Promise.resolve(refused as Result<string[]>);
+
+      /* AN EXPORT IS AN EVENT, and 45 §5.6 says so. `openGrant` writes `grant.read` for ONE
+         credential; `export` copies every one of them and wrote nothing at all — so the one read
+         that gets the most out was the one read that could not answer "did anything leave". 12 §6's
+         first rule is that a vault whose reads are not audited cannot answer that question. */
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'export', NULL, NULL, ?)",
+        mint(),
+        instant(clock.now()),
+        opts.actor ?? 'system',
+        `sections ${(opts.sections ?? ['all']).join(', ')}${opts.redactGrants === true ? ', grants redacted' : ''}`,
+      );
       return exportDogl(sql, transaction, opts).then((lines) => ok(lines));
     },
 

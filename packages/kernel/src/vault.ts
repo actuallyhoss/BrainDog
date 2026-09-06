@@ -313,6 +313,19 @@ export function openGrant(
   /* THE CHECK IS NOT OPT-OUT. Omitting `kek_id` skipped it entirely, so the guard on a credential
      path was satisfied by not asking — which is the wrong default for anything, and this is the
      wrongest place for it. */
+  /* AND A RECORD WITH NO `kek_id` IS NOT A RECORD THAT NEEDS NO KEY. The column is nullable and
+     nothing validates it at provision, so a record wrapped by a KEK whose id was never written
+     stored NULL — and `null !== (undefined ?? null)` is false, so `openGrant` with no key at all
+     sailed past the guard and returned sealed bytes. That is the opt-out two lines up, arrived at
+     through the check written to remove it: an empty string failed closed and only NULL failed
+     open. A wrapping this record cannot name is a wrapping it cannot verify. */
+  if (key.wrapped_by === 'kek' && (key.kek_id === null || key.kek_id === undefined))
+    return no<SealedGrant>(
+      'WRONG_KEY',
+      'This record says it is wrapped by a key and does not say which one, so nothing can be opened until it does.',
+      { at: 'kek_id' },
+    );
+
   if (key.wrapped_by === 'kek' && key.kek_id !== (args.kek_id ?? null))
     return no<SealedGrant>(
       'WRONG_KEY',

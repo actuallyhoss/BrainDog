@@ -341,3 +341,19 @@ test('A GRANT TRAVELS IN A `.dog` FILE, SEALED, and comes back as itself', async
   sql.close();
   source.sql.close();
 });
+
+test('A RECORD THAT WILL NOT NAME ITS WRAPPING KEY OPENS NOTHING', async () => {
+  /* The check was `key.kek_id !== (args.kek_id ?? null)`, and the column is nullable with nothing
+     validating it at provision — so a record wrapped by a KEK whose id was never written stored
+     NULL, and `null !== null` is false: `openGrant` with no key at all sailed past the guard and
+     returned the sealed bytes. That is the opt-out the comment above it says was removed, arrived
+     at through the check written to remove it. An empty string failed closed; only NULL failed open. */
+  const { k, sql } = await vault();
+  const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
+  sql.exec("UPDATE vault_key SET kek_id = NULL WHERE wrapped_by = 'kek'");
+
+  const tried = k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1');
+  assert.equal(refusal(tried).code, 'WRONG_KEY');
+  assert.match(refusal(tried).fix, /does not say which one/);
+  sql.close();
+});

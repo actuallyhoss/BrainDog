@@ -190,6 +190,11 @@ export async function start(options: {
   file: string;
   port: number;
   token?: string | undefined;
+  /**
+   * Which interface to listen on. Defaults to loopback when there is no token, `0.0.0.0` when there
+   * is — because "no token" means "one person on one machine", and one machine is `127.0.0.1`.
+   */
+  host?: string | undefined;
   /** Omit it and nothing is delivered — jobs queue and wait, which is honest rather than lossy. */
   deliver?: Deliver | undefined;
   /** The belt under the doorbell: a tick that catches an abandoned lease. `0` turns it off. */
@@ -280,8 +285,18 @@ export async function start(options: {
      came while nothing was running, and an alarm nobody set is a schedule that never restarts. */
   await api.kernel.tail(scheduler);
 
+  /* LOOPBACK UNLESS THERE IS A TOKEN. `listen(port)` with no host binds every interface, and the
+     no-token case above hands `p_self` at `owner` to whoever asks — so a self-host started with no
+     `BRAINDOG_TOKEN`, which is the documented way to start one, served the credential index and the
+     whole export to anything that could reach the machine. The two decisions are only safe
+     together: no token means one person on one machine, and one machine is `127.0.0.1`.
+
+     A deployment that wants a wider bind says so by setting a token, which is the same sentence
+     read from the other end. `BRAINDOG_HOST` is the explicit override for the case in between — a
+     container that has a token and needs `0.0.0.0` to be reachable at all. */
+  const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '0.0.0.0');
   const server = createServer((req, res) => void answer(req, res, handlers, api, options.token));
-  await new Promise<void>((resolve) => server.listen(options.port, resolve));
+  await new Promise<void>((resolve) => server.listen(options.port, host, resolve));
   return {
     server,
     api,
@@ -331,6 +346,20 @@ async function answer(
 if (argv[1]?.endsWith('server.ts')) {
   const file = argv[2] ?? env.BRAINDOG_FILE ?? 'record.sqlite';
   const port = Number(argv[3] ?? env.PORT ?? 8787);
-  await start({ file, port, token: env.BRAINDOG_TOKEN });
+  const started = await start({
+    file,
+    port,
+    token: env.BRAINDOG_TOKEN,
+    ...(env.BRAINDOG_HOST === undefined ? {} : { host: env.BRAINDOG_HOST }),
+  });
+  void started;
   console.log(`braindog · ${file} · http://localhost:${port}/api/boot`);
+  /* SAID OUT LOUD, because the safe default is also the surprising one. Somebody who expected the
+     server on their LAN needs to know why it is not, and somebody who set a token needs to know
+     that it now is. */
+  console.log(
+    env.BRAINDOG_TOKEN === undefined
+      ? '  no BRAINDOG_TOKEN, so this is bound to 127.0.0.1 and every request is the owner.'
+      : '  BRAINDOG_TOKEN set, so this is bound to 0.0.0.0 and every request carries it.',
+  );
 }

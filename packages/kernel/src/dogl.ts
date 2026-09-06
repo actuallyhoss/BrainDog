@@ -27,7 +27,25 @@ export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';
 /** The header first, then the three that travel. `local` is absent on purpose. */
 export const TRAVELS: readonly Section[] = ['header', 'data', 'origin', 'governance'];
 
-export type TableShape = { name: string; section: Section; columns: string[]; pk: string[] };
+export type TableShape = { name: string; section: Section; columns: string[]; pk: string[]; where?: string };
+
+/**
+ * Rows a table holds that do not travel, by table. One entry, and it earns its special case.
+ *
+ * AN `export` EVENT IS A FACT ABOUT THIS INSTALLATION'S COPIES, not about the business — the same
+ * argument the `local` section already makes for tokens, device grants and failed logins. It has to
+ * be written, because 12 §6's first rule is that a vault whose reads are not audited cannot answer
+ * *"did anything get out"*, and an export is the one read that copies every credential at once.
+ *
+ * AND IT CANNOT BE IN THE FILE, because then no two exports of an unchanged record are the same
+ * bytes — the first one changes the record, and *"has anything changed since my last copy"* stops
+ * being `diff` and becomes a tool. Both promises are kept by writing the event to the record and
+ * leaving it out of the copy: the question it answers is asked of the live record, which is the only
+ * place it can be asked honestly anyway.
+ */
+const LOCAL_ROWS: Readonly<Record<string, string>> = {
+  event: "kind <> 'export'",
+};
 
 /**
  * Every table, in the order it is written: header, data, origin, governance — and within a section,
@@ -53,7 +71,8 @@ export function tables(sql: Sql): TableShape[] {
       const info = sql.all<{ name: string; pk: number }>(`PRAGMA table_info(${name})`);
       const columns = info.map((c) => c.name);
       const pk = info.filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk).map((c) => c.name);
-      out.push({ name, section, columns, pk: pk.length ? pk : columns.slice(0, 1) });
+      const where = LOCAL_ROWS[name];
+      out.push({ name, section, columns, pk: pk.length ? pk : columns.slice(0, 1), ...(where ? { where } : {}) });
     }
   return out;
 }
@@ -107,13 +126,36 @@ export function decode(value: unknown): string | number | null | Uint8Array {
 }
 
 /** One table's rows, as lines. Joined by LF, these are exactly what its manifest entry hashes. */
-export function projection(sql: Sql, table: TableShape): string[] {
+export function projection(sql: Sql, table: TableShape, redactGrants = false): string[] {
   const cols = table.columns.join(', ');
   const order = table.pk.join(', ');
+  const blank = redactGrants ? (SEALED[table.name] ?? null) : null;
   return sql
-    .all<Record<string, unknown>>(`SELECT ${cols} FROM ${table.name} ORDER BY ${order}`)
-    .map((row) => JSON.stringify(table.columns.map((c) => encode(row[c]))));
+    .all<Record<string, unknown>>(
+      `SELECT ${cols} FROM ${table.name}${table.where ? ` WHERE ${table.where}` : ''} ORDER BY ${order}`,
+    )
+    .map((row) => JSON.stringify(table.columns.map((c) => (blank?.has(c) ? null : encode(row[c])))));
 }
+
+/**
+ * The columns a redacted export leaves out, by table.
+ *
+ * AN EXPORT IS THE ONE READ THAT COPIES EVERY GRANT AT ONCE. `openGrant` is deliberately unrouted —
+ * the host's own comment says routing it would make a credential reachable by anything holding a
+ * token — and `export` is routed and carried the same `ciphertext` and `nonce` for every grant in
+ * the record, plus the WRAPPED RECORD KEY and its salt. Wrapped by a KEK that is bytes held
+ * elsewhere, that is a copy of the safe without the key; wrapped by a passphrase, it is an offline
+ * cracking package with the salt attached.
+ *
+ * THE ROW STAYS AND THE BYTES GO, which is what makes a redacted export still an export: the labels,
+ * what each key opens, its kind, its rotation dates and its scopes all travel, so the file is a
+ * complete account of the business with a hole where the secrets were. Somebody restoring it re-adds
+ * the credentials, which is the operation they were going to have to do anyway.
+ */
+const SEALED: Readonly<Record<string, ReadonlySet<string>>> = {
+  grant: new Set(['ciphertext', 'nonce', 'prev_ciphertext', 'prev_nonce']),
+  vault_key: new Set(['wrapped', 'salt']),
+};
 
 const HEX = Array.from({ length: 256 }, (_, n) => n.toString(16).padStart(2, '0'));
 
@@ -135,7 +177,7 @@ async function sha256(text: string): Promise<string> {
 export async function exportDogl(
   sql: Sql,
   transaction: <T>(fn: () => T) => T,
-  opts: { sections?: readonly Section[] } = {},
+  opts: { sections?: readonly Section[]; redactGrants?: boolean } = {},
 ): Promise<string[]> {
   const wanted = new Set<Section>(opts.sections ?? TRAVELS);
   wanted.add('header');
@@ -144,7 +186,7 @@ export async function exportDogl(
   const body = all.filter((t) => wanted.has(t.section) && t.name !== 'dog_manifest' && t.name !== 'dog_sig');
 
   const rows = new Map<string, string[]>();
-  for (const table of body) rows.set(table.name, projection(sql, table));
+  for (const table of body) rows.set(table.name, projection(sql, table, opts.redactGrants === true));
 
   const sums = await Promise.all(body.map(async (t) => [t.name, await sha256((rows.get(t.name) ?? []).join('\n'))] as const));
 

@@ -94,7 +94,13 @@ const TOKEN_REACH: Record<Scope, Need[]> = {
 
 const LEVEL_REACH: Record<Level, Need[]> = {
   read: ['read'],
-  append: ['read', 'propose', 'append'],
+  /* AND NO READ, which is the whole of what `append` means. 20 §1: *"`create`, `propose` and `log`
+     — and no read. The conservative half: an appender sees nothing, not even what it filed."* This
+     included `read`, so a contractor invited to file expenses could list every register inside their
+     ceiling. It is not a ladder rung out of order; it is the one level whose point is that it is
+     not a prefix of the others. Somebody who needs to see what they filed gets a `read` grant on
+     that register, which is the mechanism the sentence above names. */
+  append: ['propose', 'append'],
   write: ['read', 'propose', 'append', 'write'],
   decide: ['read', 'propose', 'append', 'write', 'decide'],
   owner: ['read', 'propose', 'append', 'write', 'decide', 'owner'],
@@ -191,7 +197,13 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     /* THE REGISTER'S OWN LEVEL WHEN IT HAS ONE, which is what makes a level per register a rule
        rather than a decoration. A bookkeeper with `read` on the record and `write` on one register
        is the point; so is an owner held to `read` on the one that carries the payroll. */
-    const held = register === undefined ? undefined : ctx.levels?.[register];
+    /* `Object.hasOwn`, BECAUSE THE KEY COMES FROM THE CALLER. `ctx.levels['constructor']` is
+       `Object`, not `undefined` — so `GET /api/list?register=constructor` ran the permission check
+       with a level of `Object`, `LEVEL_REACH[Object]` was `undefined`, and `.includes` threw a
+       `TypeError` out of the one function this package promises never throws over. A 500 from the
+       authorisation check is not an escalation and is not a thing that should be possible. */
+    const held =
+      register !== undefined && Object.hasOwn(ctx.levels ?? {}, register) ? ctx.levels?.[register] : undefined;
     const at: CallContext =
       held === undefined || ctx.principal.kind === 'system'
         ? ctx
@@ -790,7 +802,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * installation rather than about the record, and carrying them would move somebody's
      * credentials to a machine they did not authorise.
      */
-    async export(args: { sections?: readonly string[] }, ctx: CallContext) {
+    async export(args: { sections?: readonly string[]; redactGrants?: boolean }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
 
@@ -807,7 +819,26 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
             allowed: TRAVELS,
           });
       }
-      return kernel.export(args?.sections ? { sections: args.sections as never } : {});
+      /* THE SEALED BYTES ARE A VAULT READ, WHEREVER THEY LEAVE FROM. This is an ADMIN method, and
+         ADMIN is a lower bar than VAULT on purpose — so it handed out every grant's `ciphertext`
+         and the wrapped record key to a caller who could not have opened a single one of them
+         through `openGrant`, which is unrouted precisely so that cannot happen. The default is
+         therefore redacted, and the full file needs the gate that actually guards secrets.
+
+         The rows still travel: labels, what each key opens, its kind, its rotation dates and its
+         scopes. What is missing is the bytes, and the person restoring re-adds the credentials —
+         an operation they were going to have to do anyway. */
+      const sealed = args?.redactGrants === false && vault(ctx) === null;
+      if (args?.redactGrants === false && !sealed)
+        return no('NEEDS_BROWSER_SESSION', 'An export carrying the sealed bytes needs the vault, which needs a signed-in owner.', {
+          at: 'redactGrants',
+        });
+
+      return kernel.export({
+        ...(args?.sections ? { sections: args.sections as never } : {}),
+        redactGrants: !sealed,
+        actor: actorOf(ctx),
+      });
     },
 
     /**

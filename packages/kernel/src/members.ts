@@ -71,9 +71,18 @@ export function access(
   const scoped = rows.filter((r) => r.register !== RECORD);
   if (!whole && scoped.length === 0) return null;
 
-  /* SOMEBODY WITH ONLY SCOPED ROWS HOLDS NOTHING ON THE RECORD ITSELF, and the level they hold is
-     the highest of the registers they were given — held to those registers by the ceiling. */
-  const level = whole?.level ?? scoped.map((r) => r.level).sort((a, b) => LEVELS.indexOf(b) - LEVELS.indexOf(a))[0]!;
+  /* SOMEBODY WITH ONLY SCOPED ROWS HOLDS `read` ON THE RECORD ITSELF, and nothing more.
+
+     THIS PROMOTED THE HIGHEST SCOPED LEVEL TO THE RECORD-WIDE ONE, which is the wrong direction and
+     the expensive one: `invite({ registers: { payroll: 'owner' } })` is accepted, and the caller
+     then held `level: 'owner'` — which is what `vault()` and `admin()` read, and neither of them
+     consults the ceiling, because ADMIN and VAULT are not about a register. Owner of one register
+     was owner of the record: the credential index, the export, `invite`, `createToken`,
+     `setDeclaration`. 45 §5.1 is explicit that for VAULT and ADMIN *"the `'*'` level must be
+     owner"*, and the only honest reading of "no `'*'` row" is that there is no record-wide level.
+
+     The per-register levels below still travel, which is where a scoped grant does its work. */
+  const level = whole?.level ?? 'read';
   /* AND THE PER-REGISTER LEVELS TRAVEL, or the whole feature is decorative: a bookkeeper with
      `read` on the record and `write` on one register is the point, and so is an owner held to
      `read` on the one register that carries the payroll. */

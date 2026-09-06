@@ -80,6 +80,18 @@ export const UNROUTED = ['openGrant', 'bindGrant', 'revokeGrant', 'createRecord'
 const BY_NAME = new Map(ROUTES.map((r) => [r.name, r]));
 
 /**
+ * The list above is a promise, and this is the thing that keeps it.
+ *
+ * `UNROUTED` WAS READ BY NOTHING — declared, documented, and enforced by no line in the repository.
+ * Adding `openGrant` to `ROUTES` and to the handler map would have passed both of the assertions
+ * `handlersFor` makes, and started returning sealed bytes over HTTP to anything holding a token.
+ * The comment above it argues exactly why that must not happen; this is the argument in code.
+ */
+for (const name of UNROUTED)
+  if (BY_NAME.has(name))
+    throw new TypeError(`${name} is in UNROUTED and in ROUTES. One of the two is wrong, and it is not the vault.`);
+
+/**
  * The answer's HTTP status, from its SHAPE.
  *
  * `422` FOR ANY REFUSAL AND `409` FOR A CONFLICT, and the distinction is structural rather than a

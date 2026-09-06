@@ -92,8 +92,19 @@ test('a person’s ladder is five rungs and a token’s is three, and no token r
 test('the ladder is ordered, so a rung includes every rung under it', () => {
   assert.equal(allows(person('owner'), 'read'), null);
   assert.equal(allows(person('write'), 'append'), null);
-  assert.equal(allows(person('append'), 'read'), null);
   assert.equal(allows(person('read'), 'append')?.code, 'LEVEL_REQUIRED');
+});
+
+test('EXCEPT `append`, WHICH DOES NOT READ — the one rung that is not a prefix', () => {
+  /* 20 §1: *"`create`, `propose` and `log` — and no read. The conservative half: an appender sees
+     nothing, not even what it filed."* `append` included `read`, so a contractor invited to file
+     expenses could list every register inside their ceiling. Somebody who needs to see what they
+     filed gets a `read` grant on that register, which is the mechanism the sentence names. */
+  assert.equal(allows(person('append'), 'append'), null);
+  assert.equal(allows(person('append'), 'propose'), null);
+  assert.equal(allows(person('append'), 'read')?.code, 'LEVEL_REQUIRED');
+  // And every rung above it still reads, so this is not a hole in the ladder.
+  for (const level of ['write', 'decide', 'owner'] as const) assert.equal(allows(person(level), 'read'), null, level);
 });
 
 test('a refusal says what you have and what it needs, and lists what you may do', () => {
@@ -705,7 +716,24 @@ test('and somebody with only a named register holds nothing on the record itself
 
   const listed = value<{ person_id: string; level: string | null }[]>(await api.members(owner));
   assert.equal(listed.find((m) => m.person_id === 'p_3')?.level, null);
-  assert.deepEqual(api.kernel.access('p_3'), { level: 'write', registers: ['obligations'], levels: { obligations: 'write' } });
+  /* `read` ON THE RECORD, NOT `write`. This used to promote the highest SCOPED level to the
+     record-wide one, which is the wrong direction and the expensive one: `vault()` and `admin()`
+     read `principal.level` and neither consults the ceiling, because ADMIN and VAULT are not about
+     a register — so owner of one register was owner of the record. The per-register level still
+     travels, which is where a scoped grant does its work. */
+  assert.deepEqual(api.kernel.access('p_3'), { level: 'read', registers: ['obligations'], levels: { obligations: 'write' } });
+  sql.close();
+});
+
+test('AND OWNER OF ONE REGISTER IS NOT OWNER OF THE RECORD', async () => {
+  /* The vault holds what every credential in the business opens. `invite({ registers: { payroll:
+     'owner' } })` is a legitimate thing to write, and it used to hand over the credential index,
+     the export, `invite`, `createToken` and `setDeclaration` with it. */
+  const { api, sql } = await studio();
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_9', 'obligations', 'owner')");
+  const held = api.kernel.access('p_9');
+  assert.equal(held?.level, 'read', 'owner of one register was owner of the record');
+  assert.equal(held?.levels.obligations, 'owner', 'and the scoped level has to survive, or the feature is decorative');
   sql.close();
 });
 
@@ -725,5 +753,49 @@ test('AND AN EXPORT OF NOTHING IS NOT AN EXPORT', async () => {
   // And a line that is not a line is a refusal rather than a throw.
   assert.equal((await api.import({ lines: [null] } as never, owner)).ok, false);
   assert.equal((await api.import({ lines: [1] } as never, owner)).ok, false);
+  sql.close();
+});
+
+/* ── what leaves, and who may take it ──────────────────────────────────── */
+
+test('AN EXPORT DOES NOT CARRY THE SEALED BYTES, and ADMIN is not the vault', async () => {
+  /* `openGrant` is unrouted on the grounds that routing it would make a credential reachable by
+     anything holding a token — and `export` is routed and carried the same `ciphertext` for every
+     grant in the record, plus the wrapped record key and its salt. Wrapped by a KEK that is bytes
+     held elsewhere, that is a copy of the safe; wrapped by a passphrase, it is an offline cracking
+     package with the salt attached. */
+  const { api, sql } = await record();
+  sql.exec(
+    `INSERT INTO grant (id, label, kind, opens, ciphertext, nonce, kdf, wrapped_by, kek_id, created_at)
+     VALUES ('g1', 'Bank', 'password', 'the bank', ?, ?, 'hkdf', 'kek', 'k1', ?)`,
+    new Uint8Array([7, 8, 0, 255]),
+    new Uint8Array([1, 2, 3]),
+    new Date().toISOString(),
+  );
+
+  const out = value<string[]>(await api.export({}, owner));
+  const file = out.join('\n');
+  assert.ok(file.includes('Bank'), 'the label has to travel, or a redacted export is not an export');
+  assert.ok(file.includes('the bank'), 'and what the key opens, which is the whole index');
+  assert.ok(!file.includes('BwgA'), 'the sealed bytes left in an ADMIN export');
+});
+
+test('and the full file needs the gate that actually guards secrets', async () => {
+  const { api, sql } = await record();
+  const tried = await api.export({ redactGrants: false }, token('write'));
+  // A token never reaches the vault — ADR-060 — so it cannot ask for the sealed bytes either.
+  assert.equal((tried as { refusal?: { code: string } }).refusal?.code, 'NEEDS_BROWSER_SESSION');
+  sql.close();
+});
+
+test('AND AN EXPORT IS AN EVENT, because it is the read that gets the most out', async () => {
+  /* `openGrant` writes `grant.read` for ONE credential; `export` copies every one of them and wrote
+     nothing at all. 12 §6's first rule is that a vault whose reads are not audited cannot answer
+     "did anything get out". */
+  const { api, sql } = await record();
+  value(await api.export({}, owner));
+  const said = sql.one<{ actor: string; note: string }>("SELECT actor, note FROM event WHERE kind = 'export'");
+  assert.ok(said, 'the whole record was copied and the log says nothing');
+  assert.match(said.note, /grants redacted/);
   sql.close();
 });
