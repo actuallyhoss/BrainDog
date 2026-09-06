@@ -21,7 +21,7 @@
   import { goto } from '$app/navigation';
   import { copy } from '../copy.ts';
   import { overlays } from '../a11y/keys.svelte.ts';
-  import { REGISTERS, ROWS, iconFor, search, type NavEntry, type SearchHit } from '../record/api.ts';
+  import { REGISTERS, ROWS, VIEWS, iconFor, search, type NavEntry, type SearchHit } from '../record/api.ts';
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';
   import type { IconName } from '../ui/Icon.svelte';
@@ -96,6 +96,19 @@
       for (const entry of nav)
         if (entry.title.toLowerCase().includes(needle))
           out.push({ id: `p-${entry.id}`, title: entry.title, detail: `${entry.section} page`, href: entry.href, group: copy.pages, icon: entry.icon });
+      /* THE SAVED VIEWS. `/v/<key>` is a real route with two real views on it and NOTHING in the
+         app produced that address — 356 lines and eight copy keys behind a door with no handle. A
+         view is a named list, which is what this section of the palette is for. */
+      for (const [key, v] of Object.entries(VIEWS))
+        if (v.name.toLowerCase().includes(needle) || (REGISTERS[v.register]?.name ?? '').toLowerCase().includes(needle))
+          out.push({
+            id: `v-${key}`,
+            title: v.name,
+            detail: `${REGISTERS[v.register]?.name ?? v.register} · saved view`,
+            href: `/v/${key}`,
+            group: copy.pages,
+            icon: 'filter',
+          });
       for (const r of Object.values(REGISTERS))
         if (r.name.toLowerCase().includes(needle))
           /* The count, not a definition of the word "register". A row that explains the app's own

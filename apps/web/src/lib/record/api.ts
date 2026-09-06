@@ -19,6 +19,8 @@ import {
   AUDIT,
   INBOX,
   JOB,
+  JOBS,
+  VIEWS,
   NOW,
   TODAY,
   PACKS,
@@ -39,7 +41,7 @@ import { compile, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { findingsFrom } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
-import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
+import type { Entry, Filter, FieldDecl, Job, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 /**
  * The currency the rows of one money field are in, or `null` when they are not all one.
@@ -431,7 +433,10 @@ export function toRows(register: string, entries: Entry[], columns: Column[]): T
 
 /* ── filters and order ────────────────────────────────────────────────────── */
 
-export type Filter = { field: string; op: string; values: string[] };
+/* `Filter` LIVES IN `schema.ts` NOW, and is re-exported here so every existing caller is unchanged.
+   It is a SHAPE rather than a reader, and `data.ts` needs it to declare a saved view — which it
+   cannot import from this file, because this file imports it. */
+export type { Filter };
 
 /**
  * The URL's filter chips, as a `where` sentence.
@@ -1232,4 +1237,13 @@ export function search(q: string, limit = 24): SearchHit[] {
   return hits;
 }
 
-export { AUDIT, INBOX, JOB, NOW, PACKS, PAGES, QUESTIONS, DECIDED, REGISTERS, ROWS, NEWS, TODAY, VAULT, PEOPLE_ACCESS };
+export { AUDIT, INBOX, JOB, JOBS, NOW, PACKS, PAGES, QUESTIONS, DECIDED, REGISTERS, ROWS, NEWS, TODAY, VAULT, VIEWS, PEOPLE_ACCESS };
+
+/**
+ * One run, by the id in the address — or `null`, which is a MISS and not a failure.
+ *
+ * THE ROUTE IGNORED ITS OWN PARAMETER. `/jobs/9` and `/jobs/anything` rendered the same screen with
+ * the same fixture under a header printing that fixture's id, so the `[id]` segment was decoration.
+ * A route whose segment means nothing is one that gets linked wrongly the first time it is linked.
+ */
+export const job = (id: string): Job | null => JOBS[id] ?? null;

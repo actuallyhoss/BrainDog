@@ -229,6 +229,12 @@ export const REGISTERS: Record<string, SeedRegister> = {
       { id: 'last_seen', label: 'Last seen', type: 'instant', index: true },
       { id: 'wrote', label: 'Writes', type: 'int' },
       { id: 'host', type: 'text' },
+      /* THE RUN, WHICH IS WHAT A SESSION IS DOING RIGHT NOW. A session row says what an agent is up
+         to in a sentence; the job is the tool calls behind that sentence, in order, with what each
+         one answered. Without this the two exist and cannot be got from one to the other — the job
+         screen was reachable from nowhere in the product at all. Absent on a session that has
+         ended, which is the honest state: the transcript is kept, the run is over. */
+      { id: 'job', label: 'Run', type: 'text' },
     ],
   },
   /**
@@ -562,9 +568,9 @@ export const TASKS: Fields[] = [
  * unit a person would say it in — "8m ago", not "0d ago".
  */
 export const SESSIONS: Fields[] = [
-  { doing: 'Variable axis QA — instances 3 of 9', agent: 'claude', state: 'live', thing: 1, track: 1, last_seen: hours(0), wrote: 14, host: 'kiln-mbp' },
+  { doing: 'Variable axis QA — instances 3 of 9', agent: 'claude', state: 'live', thing: 1, track: 1, last_seen: hours(0), wrote: 14, host: 'kiln-mbp', job: 'j_9K4A' },
   { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'live', thing: 1, track: 3, last_seen: hours(0.1), wrote: 2, host: 'kiln-mbp' },
-  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', thing: 3, track: 2, last_seen: hours(3), wrote: 6, host: 'studio-desktop' },
+  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', thing: 3, track: 2, last_seen: hours(3), wrote: 6, host: 'studio-desktop', job: 'j_7Q2F' },
   { doing: 'Chasing Halden on 2026-041', agent: 'you', state: 'ended', thing: 2, last_seen: hours(26), wrote: 1, host: 'studio-desktop' },
   { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'ended', thing: 1, track: 1, last_seen: hours(34), wrote: 41, host: 'kiln-mbp' },
 ];

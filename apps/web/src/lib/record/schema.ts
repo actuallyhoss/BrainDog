@@ -329,3 +329,11 @@ export type Job = {
   started: string;
   events: readonly { seq: number; tool: string; input: string; out: string; ok: boolean }[];
 };
+
+/**
+ * One clause of a grid's filter bar: a field, an operator, and the values chosen.
+ *
+ * IT IS A SHAPE, so it lives with the shapes. It was in `api.ts` — the reader — which meant the
+ * fixture could not declare a saved view without importing from the module that imports it.
+ */
+export type Filter = { field: string; op: string; values: string[] };

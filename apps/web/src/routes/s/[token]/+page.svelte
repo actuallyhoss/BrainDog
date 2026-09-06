@@ -24,7 +24,24 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
 
-  const result = readPage('money');
+  /**
+   * What this token opens — and `null` when it opens nothing.
+   *
+   * IT IGNORED THE TOKEN ENTIRELY. `readPage('money')` was a module-level constant, so every token
+   * in the world rendered the Money page, and the token appeared only as eight cosmetic characters
+   * in the byline. On the one capability URL in the product: the string IS the permission, and the
+   * screen was not reading it.
+   *
+   * AND THE REVOKED STATE COULD NEVER DRAW. `money` always resolves, so `{#if !result}` was
+   * unreachable — which made it the only use in the app of the empty state's `no-permission` kind,
+   * and of a `Request access` button no reader could ever see. A share that has been closed is the
+   * ordinary end of a share's life, so it is the state this screen most needs to get right.
+   */
+  const SHARES: Record<string, string> = { '9f2a7c41d8b3': 'money' };
+  const result = $derived.by(() => {
+    const slug = SHARES[state.params.token ?? ''];
+    return slug ? readPage(slug) : null;
+  });
   const resolved = values();
   /* NOW IS THE RECORD'S CLOCK, not the browser's. `inline` defaults it to `Date.now()`, so every
      `{{ago:}}` in prose was formatted against the wall clock while every other date on the screen

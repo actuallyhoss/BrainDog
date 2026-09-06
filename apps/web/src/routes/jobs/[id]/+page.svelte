@@ -13,7 +13,9 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { JOB } from '$lib/record/api.ts';
+  import { job as jobById } from '$lib/record/api.ts';
+  import { page as route } from '$app/state';
+  import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -29,10 +31,22 @@
     open = next;
   };
 
-  const last = $derived(JOB.events.at(-1));
+  /* FROM THE ADDRESS, which is what an `[id]` segment is for. */
+  const JOB = $derived(jobById(route.params.id ?? ''));
+  const last = $derived(JOB?.events.at(-1));
 </script>
 
-<svelte:head><title>{titleOf(JOB.kind, 'Job')}</title></svelte:head>
+<svelte:head><title>{titleOf(JOB?.kind ?? 'Job', 'Job')}</title></svelte:head>
+
+{#if !JOB}
+  <!-- A URL naming a run that is not here is a MISS, not a failure: nothing broke, the address is
+       just wrong. `error` is reserved for a call that did not come back. -->
+  <div class="page">
+    <Empty kind="no-results" heading title="Couldn't find {route.params.id}." rid="r7k2m9qd4x">
+      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+    </Empty>
+  </div>
+{:else}
 
 <PageHead icon="session" kicker="Job" title={JOB.kind} id={JOB.id}>
   {#snippet actions()}
@@ -78,6 +92,7 @@
     {copy.mockNotice} A real run polls every 700 ms while it is live and stops on a terminal status.
   </p>
 </div>
+{/if}
 
 <style>
   .page {

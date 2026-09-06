@@ -15,7 +15,7 @@
   import { page } from '$app/state';
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { iconFor, REGISTERS, columnsFor, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { VIEWS, iconFor, REGISTERS, columnsFor, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -34,21 +34,6 @@
    * not overdue — row four was due in four days. A printed predicate that is not the predicate is
    * worse than none, because it is checkable and wrong.
    */
-  const VIEWS: Record<string, { register: string; name: string; filters: Filter[] }> = {
-    'obligations.overdue': {
-      register: 'obligations',
-      name: 'Overdue',
-      filters: [
-        { field: 'state', op: 'in', values: ['open', 'part'] },
-        { field: 'due', op: 'before', values: ['today'] },
-      ],
-    },
-    'services.lapsing': {
-      register: 'services',
-      name: 'Lapsing',
-      filters: [{ field: 'state', op: 'in', values: ['lapsing'] }],
-    },
-  };
 
   const key = $derived(page.params.view ?? '');
   const view = $derived(VIEWS[key]);

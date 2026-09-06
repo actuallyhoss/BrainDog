@@ -32,6 +32,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import RowMenu from '$lib/ui/RowMenu.svelte';
   import RowForm from '$lib/ui/RowForm.svelte';
+  import BindBlock from '$lib/ui/BindBlock.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
 
@@ -63,6 +64,7 @@
   /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
   let createOpen = $state(false);
   let displayOpen = $state(false);
+  let bindOpen = $state(false);
 
   /**
    * Which columns this register shows, and it is PER REGISTER and PER READER.
@@ -246,8 +248,13 @@
       return;
     }
     if (e.altKey && e.key.toLowerCase() === 'b') {
+      /* IT OPENS THE BINDER, which is 204 lines that nothing could reach. The chord already holds
+         the register and the filters — which is everything the binder needs — and it answered with
+         a toast describing what it would do instead of doing the readable half of it. The sentence
+         it builds, its destination picker and its "a page cannot read a register it did not
+         declare" rule were all written and none of them had ever been on a screen. */
       e.preventDefault();
-      toasts.push(copy.notWritten('This filter would be bound as a block on a page'), { intent: 'warn' });
+      bindOpen = true;
       return;
     }
     if (e.shiftKey && e.key === 'Y') {
@@ -533,13 +540,18 @@
     {/if}
 
     {#if rows.length === 0}
+      <!-- THE QUERY IS QUOTED VERBATIM, in its own line and in the id face, rather than folded into
+           the title as a curly-quoted fragment of a sentence. That is where a predicate stops being
+           checkable: a reader cannot tell a filter they typed from one the app built. `Empty` has
+           had the prop and the styling for it since it was written and no call site passed it. -->
       <Empty
         kind={emptyKind}
         title={emptyKind === 'no-results'
-          ? `${result.total} rows, none matching “${q || whereOf(filters)}”.`
+          ? `${result.total} rows, none matching:`
           : emptyKind === 'cleared'
             ? 'Nothing outstanding.'
             : `Nothing in ${decl.name} yet.`}
+        query={emptyKind === 'no-results' ? q || whereOf(filters) : undefined}
         body={emptyKind === 'no-data-yet'
           ? `${decl.name} holds ${decl.holds}.`
           : undefined}
@@ -683,6 +695,16 @@
       <Button weight="bare" onclick={() => (peeked = null)}><Icon name="close" size="s" />{copy.close}</Button>
     {/snippet}
   </Sheet>
+
+  <!-- Put this filter on a page as a block. `⌥B`, and it was a toast until now. -->
+  <BindBlock
+    bind:open={bindOpen}
+    register={id}
+    predicate={whereOf(filters) || q || copy.everything}
+    says={whereOf(filters) || (q ? `matching “${q}”` : copy.everything)}
+    onbind={(toPage, kind) =>
+      toasts.push(copy.notWritten(`This ${kind} would be added to ${toPage}, reading ${decl.name.toLowerCase()}`), { intent: 'warn' })}
+  />
 
   <!-- Display options: what YOU see, never what the record says. `v`. -->
   <Sheet bind:open={displayOpen} title={copy.display}>

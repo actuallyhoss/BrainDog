@@ -124,6 +124,14 @@
                   <span class="row-sub">{s.fields.agent} · {relative(String(s.fields.last_seen).slice(0, 10), NOW)}</span>
                 </span>
               </a>
+              <!-- A SESSION SAYS WHAT IT IS DOING; THE RUN IS WHAT IT IS DOING IT WITH — the tool
+                   calls in order, with what each one answered. The two existed and there was no way
+                   to get from one to the other, so the run screen was reachable from nowhere in the
+                   product at all. Only on a session that carries one: an ended session kept its
+                   transcript and its run is over. -->
+              {#if s.fields.job}
+                <a class="row-run" href="/jobs/{s.fields.job}">{copy.watchRun}</a>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -275,6 +283,14 @@
   .row-sub {
     color: var(--dim);
     font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
+  /* Its own line under the row rather than inside it: the row is a link to the session and a link
+     inside a link is not a thing HTML has. */
+  .row-run {
+    display: block;
+    padding: 0 var(--sp-3) var(--sp-2) var(--sp-6);
     font-size: var(--t-xs);
   }
 

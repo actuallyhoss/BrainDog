@@ -20,7 +20,6 @@
     total,
     kicker,
     actions,
-    filters,
     id,
     icon,
     hue,
@@ -35,7 +34,6 @@
     kicker?: string | undefined;
     id?: string | undefined;
     actions?: Snippet | undefined;
-    filters?: Snippet | undefined;
   } = $props();
 </script>
 
@@ -75,7 +73,6 @@
     {/if}
     {#if actions}<div class="head-actions">{@render actions()}</div>{/if}
   </div>
-  {#if filters}<div class="head-filters">{@render filters()}</div>{/if}
 </header>
 
 <style>
@@ -161,12 +158,6 @@
     gap: var(--sp-2);
   }
 
-  .head-filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    align-items: center;
-  }
 
   @media (width < 900px) {
     .head {

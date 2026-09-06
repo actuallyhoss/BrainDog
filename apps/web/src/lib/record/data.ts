@@ -19,6 +19,7 @@ import type {
   Credential,
   Entry,
   Fields,
+  Filter,
   InboxItem,
   Job,
   NewsItem,
@@ -195,6 +196,36 @@ export const NEWS: NewsItem[] = [
   { at: stamp(-49), by: 'claude', text: 'Set the year-end date on Pell & Vine', href: '/r/people/4' },
 ];
 
+/**
+ * Saved views: a register, a predicate, and the name a person gave the pair.
+ *
+ * OUT OF THE ROUTE AND INTO THE RECORD, because the route was the only thing that knew they
+ * existed — and nothing in the app produced a `/v/<key>` address, so 356 lines and eight copy
+ * keys sat behind a door with no handle. A view is a named list; the palette is where named
+ * things are found; the two could not meet while this lived inside the screen that draws one.
+ *
+ * THE SENTENCE IS DERIVED, NOT TYPED. It used to be a `says:` string beside the filters, and the
+ * two disagreed: Overdue printed "state is open or part, and due is before today" above a list
+ * that only filtered on state, so 28 rows were drawn under the word Overdue and 24 of them were
+ * not overdue. A printed predicate that is not the predicate is worse than none, because it is
+ * checkable and wrong.
+ */
+export const VIEWS: Record<string, { register: string; name: string; filters: Filter[] }> = {
+  'obligations.overdue': {
+    register: 'obligations',
+    name: 'Overdue',
+    filters: [
+      { field: 'state', op: 'in', values: ['open', 'part'] },
+      { field: 'due', op: 'before', values: ['today'] },
+    ],
+  },
+  'services.lapsing': {
+    register: 'services',
+    name: 'Lapsing',
+    filters: [{ field: 'state', op: 'in', values: ['lapsing'] }],
+  },
+};
+
 /* ── what the record has noticed about itself ──────────────────── */
 
 /**
@@ -244,6 +275,30 @@ export const AUDIT: AuditEvent[] = [
 
 /* ── a tier-C run ────────────────────────────────────────────────────────── */
 
+/**
+ * The runs behind the live sessions, by id.
+ *
+ * KEYED, BECAUSE THE ROUTE IS `/jobs/[id]` AND IT USED TO IGNORE ITS OWN PARAMETER — `/jobs/9` and
+ * `/jobs/anything` were the same screen, showing the same single fixture, under a header printing
+ * that fixture's id. A route whose segment means nothing is a route that will be linked wrongly the
+ * first time somebody links it.
+ */
+export const JOBS: Record<string, Job> = {
+  j_9K4A: {
+    id: 'j_9K4A',
+    kind: 'qa',
+    status: 'running',
+    model: 'your machine · claude-opus-5',
+    started: stamp(-0.05),
+    events: [
+      { seq: 1, tool: 'list', input: 'things where state is live', out: '4 rows', ok: true },
+      { seq: 2, tool: 'read', input: 'tracks#1', out: 'Variable axis QA — nine instances', ok: true },
+      { seq: 3, tool: 'search', input: 'mastering pass', out: '2 rows across 1 register', ok: true },
+    ],
+  },
+};
+
+/** The one the reconcile session is running. Named, because two screens quote it by name. */
 export const JOB: Job = {
   id: 'j_7Q2F',
   kind: 'reconcile',
@@ -259,6 +314,8 @@ export const JOB: Job = {
     { seq: 6, tool: 'list', input: 'services where provider is Fenwick Cloud', out: '3 rows', ok: true },
   ],
 };
+
+JOBS[JOB.id] = JOB;
 
 export const PEOPLE_ACCESS: Person[] = [
   { id: 'you', name: 'You', level: 'owner', hue: 214 },

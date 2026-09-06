@@ -56,6 +56,10 @@ export const copy = {
      A disabled control tells you a thing exists and refuses to say why it will not work. */
   /** What to do with something the record noticed: put it where things get decided. */
   raiseIt: 'Raise it',
+  /** The way from a session to the run behind it: the tool calls, in order, with their answers. */
+  watchRun: 'Watch the run',
+  /** The predicate of an unfiltered list, said as a person would say it. */
+  everything: 'everything in it',
   notWritten: (what: string) => `${what}, but nothing was written. This is a mock-up of the record.`,
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
   showMe: 'Show me',
