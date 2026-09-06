@@ -195,6 +195,20 @@ function allowed(register: string, field: string): string[] | null {
  * to resolve and land in `bad`, so the block empties and says why rather than quietly filtering on
  * half a name.
  */
+/**
+ * THE SENTENCES ARE THE KERNEL'S, WORD FOR WORD.
+ *
+ * `13 §6`: every refusal the app shows is the server's `fix`, verbatim — never rewritten
+ * client-side. This file had its own wording for both, and both were worse: "not a predicate" is a
+ * verdict with no instruction, and "This build reads:" is the software describing itself. They are
+ * COPIED rather than imported because this module is the mock of the record and must answer with no
+ * server at all — copied byte for byte, so the day it is wired the sentence does not change.
+ */
+const WRONG_SHAPE = 'where: takes a sentence — `state is open, due before +30d` — and not a tree of objects.';
+
+const cannotSay = (text: string): string =>
+  `${text} — that is not something a filter can say. Write is, is not, before or after.`;
+
 export function compile(register: string, where: string | undefined): Where {
   const clauses: Clause[] = [];
   const bad: string[] = [];
@@ -205,7 +219,7 @@ export function compile(register: string, where: string | undefined): Where {
      documentation. The tree arrived here as an object, `.split` threw, and the throw took the whole
      page. It is a refusal now, and it says which spelling this build reads. */
   if (where !== undefined && typeof where !== 'string')
-    return { register, clauses, bad: ['where: takes a sentence — `state is open, due before +30d` — not a predicate tree'] };
+    return { register, clauses, bad: [WRONG_SHAPE] };
 
   for (const raw of (where ?? '').split(',')) {
     const text = raw.trim();
@@ -216,7 +230,7 @@ export function compile(register: string, where: string | undefined): Where {
       /* THE REFUSAL NAMES THE FOUR THAT WORK. `21-AUTHORING` §4.2 publishes eleven operators and
          four are implemented, so "not a predicate" told an agent it was wrong and nothing about
          what to write — which is the one thing 10 §7's fourth rule asks a refusal to do. */
-      bad.push(`${text} — not a predicate. This build reads: is · is not · before · after`);
+      bad.push(cannotSay(text));
       continue;
     }
     const [, name, op, rest] = m as unknown as [string, string, string, string];

@@ -178,7 +178,11 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     if (verb !== 'is') {
       bad.push({
         code: 'OPERATOR_UNSUPPORTED',
-        fix: `${sentence} — ${verb || '(nothing)'} is not something a predicate says. Write is, is not, before or after.`,
+        /* `predicate` IS THE SCHEMA'S WORD FOR THIS AND NOBODY ELSE'S. It reached three screens,
+           every one of them inside error copy, where the reader is already stuck — and the control
+           that produced the thing is labelled *Filter*. The word for what a person wrote is the word
+           on the button they pressed. */
+        fix: `${sentence} — ${verb || '(nothing)'} is not something a filter can say. Write is, is not, before or after.`,
         at: field,
         allowed: ['is', 'is not', 'before', 'after', 'on'],
       });

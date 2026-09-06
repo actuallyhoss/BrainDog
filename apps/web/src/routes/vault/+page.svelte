@@ -36,6 +36,11 @@
 </PageHead>
 
 <div class="page">
+  <!-- AND WHAT A VAULT ROW IS. The screen showed a title, a count and a list of key names with
+       nothing saying that the value is never here — which is the single most important fact about
+       this surface, and `vaultBlurb` had it, unrendered, in `copy.ts`. -->
+  <p class="blurb">{copy.vaultBlurb}</p>
+
   <ul class="ledger">
     {#each VAULT as c}
       <li>
@@ -75,6 +80,15 @@
 </div>
 
 <style>
+  /* One sentence saying what the things on this screen are, in the person's words. */
+  .blurb {
+    margin-block-end: var(--sp-4);
+    max-inline-size: 62ch;
+    color: var(--ink2);
+    font-size: var(--t-ui);
+    line-height: 1.6;
+  }
+
   .page {
     display: flex;
     flex-direction: column;

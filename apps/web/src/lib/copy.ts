@@ -30,6 +30,21 @@ const widths: Record<number, string> = {
   12: 'the full',
 };
 
+/**
+ * ONE WORD FOR ONE THING, AND THE PERSON'S WORD WINS.
+ *
+ * The sidebar calls a register a **list** and always has; Settings calls them lists; and everywhere
+ * else on screen the product used `register`, which is the schema's word for itself. A person with
+ * one of each in front of them has to work out that they are the same object. `predicate` had the
+ * same problem in the opposite direction — three occurrences, all inside error copy, where the
+ * reader is already stuck, and none of them defined it. The button that produced the thing says
+ * *Filter*.
+ *
+ * WHAT STAYS IS WHAT AN AUTHOR OR AN AGENT READS. `register:` is a key in the dialect, an argument
+ * to an MCP tool and a column in the schema; renaming it there would be renaming the thing. The rule
+ * is the surface: a declaration says `register`, a screen says list.
+ */
+
 /** `a`, `a and b`, `a, b and c` — an Oxford-less list, which is what a person writes. */
 const list = (words: string[]): string =>
   words.length <= 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
@@ -155,7 +170,7 @@ export const copy = {
     timeline: 'what happened, most recent first',
     board: 'cards in columns by state',
     comparison: 'a small table you write yourself',
-    table: 'a register, in full',
+    table: 'a list, in full',
     note: 'a paragraph that matters',
     quote: 'something somebody said',
     code: 'code, exactly as typed',
@@ -347,7 +362,10 @@ export const copy = {
 
   /* packs */
   installed: 'Installed',
-  browse: 'The Kennel',
+  /* `The Kennel` IS A COINED NOUN DEFINED NOWHERE IN THE PRODUCT. It is a good name for the place
+     and a bad heading for a list of things somebody has not met yet — `packBlurb` says what one is
+     and sat unused two hundred lines from the screen that needed it. */
+  browse: 'Packs you can install',
   install: 'Install',
   uninstall: 'Uninstall',
   installDiff: 'What this adds',
@@ -407,14 +425,14 @@ export const copy = {
      which manufactures work is the failure. */
   secondHeading: 'One kind of thing is a list. Two is a record.',
   secondBody:
-    'Rows in one register can point at rows in another — an invoice at the client it is for, a renewal at the project it belongs to — and that is where the record starts answering questions you did not ask it.',
+    'Rows in one list can point at rows in another — an invoice at the client it is for, a renewal at the project it belongs to — and that is where the record starts answering questions you did not ask it.',
 
   /* AND THE WORD *PACK*, FOR THE FIRST TIME IN THE PRODUCT, DEFINED IN PLACE. It does not appear on
      screen one at all: selecting a pack means reading an install diff written in the language of
      metrics and nav order, and asking somebody to approve four schema reviews before they have seen
      one of their own rows is worse than a tour. Here they have seen one. */
   secondPacks:
-    'A pack is a register somebody else already worked out the fields for, with the metrics and the pages that go with it. Nothing installs without you reading what it would change.',
+    'A pack is a list somebody else already worked out the fields for, with the figures and the pages that go with it. Nothing installs without you reading what it would change.',
 
   /* MONEY IS AN INTEGER IN MINOR UNITS, and this is the one place a person types one. The sentence
      says what to do rather than what is wrong: "not a number" is a verdict, and "digits and at most
@@ -443,8 +461,8 @@ export const copy = {
      nothing configured (19 §6), so nothing below this line is a step. */
   agentTitle: 'Set it up in your agent',
   agentBody:
-    'The record is an MCP server. Add it once and the agent you already have can create the ' +
-    'registers, fill the first rows, and read the record from then on.',
+    'The record is an MCP server. Add it once and the agent you already have can make the ' +
+    'lists, fill the first rows, and read the record from then on.',
   agentCommand: 'claude mcp add --transport http braindog https://mcp.brain.dog',
   agentNote: 'Codex, Cursor and anything else that speaks MCP take the same URL.',
   agentCopy: 'Copy the command',
@@ -458,10 +476,19 @@ export const copy = {
   accentSet: (name: string) => `${name} is this record's colour.`,
   accentReset: 'Back to the house colour.',
 
-  /* the vocabulary, defined on first use, in place, once */
-
-  defRow: 'one thing in a register. It has a number you can say',
-  defPack: 'a file that adds registers and pages. Readable text; nothing runs',
+  /**
+   * THE VOCABULARY, DEFINED ON FIRST USE, IN PLACE, ONCE — and for a long time, nowhere.
+   *
+   * All five of these were dead: `grep` found them in this file and in no other. So *row*, *pack*,
+   * *page*, *block* and *tone* each reached a screen — `block` twelve times — and the sentence that
+   * defines them rendered nowhere, while the comment above them claimed a policy the code did not
+   * execute. That is the single largest reason the product reads as jargon: not that it uses its
+   * own words, but that it never says what they are.
+   *
+   * `defRow` USED TO DEFINE A ROW WITH THE WORD `register`, which is the failure twice over.
+   */
+  defRow: 'one thing in a list. It has a number you can say',
+  defPack: 'a file that adds lists and pages. Readable text; nothing runs',
   defPage: 'a screen made of blocks. It is a row, so you can change it',
   defBlock: 'one thing on a page: a table, a figure, a note',
   defTone: 'what a value means: good, watch, wrong, note',
@@ -471,9 +498,11 @@ export const copy = {
 
   /* the keymap sheet */
   keymap: 'Keyboard',
-  keymapHint: 'Bare letters act only inside a focused grid.',
+  /* THE SIDEBAR CALLS IT A LIST AND THIS CALLED IT A GRID — one object, two names, both on screen
+     in the same session, and one of them appearing only in the document that teaches the keyboard. */
+  keymapHint: 'Bare letters act only inside a list you have clicked into.',
   scopeDocument: 'Anywhere',
-  scopeGrid: 'In a grid',
+  scopeGrid: 'In a list',
   scopePage: 'On a page',
   scopeGate: 'At the gate',
   scopePalette: 'In the palette',

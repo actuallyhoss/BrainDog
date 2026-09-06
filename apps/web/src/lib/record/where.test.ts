@@ -24,10 +24,15 @@ const all = (register: string) => (ROWS[register] ?? []).length;
 
 /* ── the failure that motivated it ───────────────────────────────────────── */
 
-test('a predicate it cannot parse matches NOTHING, never everything', () => {
-  const out = keep('services', 'this is not a predicate at all');
+test('a filter it cannot parse matches NOTHING, never everything', () => {
+  const out = keep('services', 'this is not a filter at all');
   assert.equal(out.length, 0, 'an unparseable filter passed rows through');
-  assert.match(compile('services', 'nonsense here').bad[0] ?? '', /not a predicate/);
+  /* AND IT SAYS SO IN THE KERNEL'S WORDS. `13 §6`: the app renders the server's `fix` verbatim, and
+     this file had its own — "not a predicate", a verdict with no instruction, using the schema's
+     word for a thing whose button says Filter. */
+  const said = compile('services', 'nonsense here').bad[0] ?? '';
+  assert.match(said, /not something a filter can say/);
+  assert.ok(!/predicate/.test(said), 'the schema is talking about itself in a refusal');
 });
 
 test('one bad clause poisons the whole predicate rather than being skipped', () => {
@@ -152,8 +157,13 @@ test('and an operator word that is a real value is still a value', () => {
   assert.deepEqual(compile('services', 'state is live').bad, []);
 });
 
-test('an unparseable clause says which four operators exist', () => {
-  assert.match(compile('obligations', 'what contains invoice').bad[0] ?? '', /is · is not · before · after/);
+test('an unparseable clause says which four operators exist, in the words to type', () => {
+  /* THE SENTENCE IS THE KERNEL'S, BYTE FOR BYTE (`packages/where/src/sentence.ts`). It used to be
+     `This build reads: is · is not · before · after` — middle dots a person cannot type, and the
+     software describing itself. */
+  const said = compile('obligations', 'what contains invoice').bad[0] ?? '';
+  assert.match(said, /Write is, is not, before or after\./);
+  assert.ok(!/This build/.test(said), 'the software is describing itself in a refusal');
 });
 
 /* ── shape ───────────────────────────────────────────────────────────────── */

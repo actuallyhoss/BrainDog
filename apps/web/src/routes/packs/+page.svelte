@@ -30,6 +30,10 @@
 <PageHead icon="packs" title={copy.packs} />
 
 <div class="page">
+  <!-- WHAT A PACK IS, SAID ONCE, WHERE THE WORD IS FIRST MET. `packBlurb` existed and rendered
+       nowhere, so this screen listed things by name and version with nothing saying what installing
+       one would do to the record. -->
+  <p class="blurb">{copy.packBlurb}</p>
   <Section title={copy.installed} count={installed.length}>
     <div class="grid-packs">
       {#each installed as pack}
@@ -99,6 +103,15 @@ something is shown here and then ignored.`}</code></pre>
 </div>
 
 <style>
+  /* One sentence saying what the things on this screen are, in the person's words. */
+  .blurb {
+    margin-block-end: var(--sp-4);
+    max-inline-size: 62ch;
+    color: var(--ink2);
+    font-size: var(--t-ui);
+    line-height: 1.6;
+  }
+
   .page {
     display: flex;
     flex-direction: column;
