@@ -349,7 +349,16 @@ export function satisfies(version: string | null, range: string): boolean {
      into the `>=` branch whole, and `parts()` read `1.0.0 <2.0.0` as `1.0.0` — so the upper bound
      vanished and 3.0.0 satisfied it. That is a dependency check admitting the major version the
      range exists to exclude. */
-  if (/\s/.test(want)) return want.split(/\s+/).filter(Boolean).every((one) => satisfies(version, one));
+  /* THE SPACE INSIDE A COMPARATOR IS NOT A SEPARATOR. Splitting on every space turned `>= 1.0.0`
+     into `>=` and `1.0.0` — so a range written with a space after the operator, which is legal and
+     common, blocked every version that satisfies it. The lookbehind splits only where a version
+     ends, which is the only place a second comparator can begin. */
+  const spaced = want.split(/(?<=[\d.xX*])\s+/).filter(Boolean);
+  if (spaced.length > 1) return spaced.every((piece) => satisfies(version, piece));
+  /* AND A LONE COMPARATOR KEEPS ITS SPACE REMOVED, so `>= 1.0.0` reaches the `>=` branch as
+     `>=1.0.0` rather than falling through to an exact compare against `1.0.0`. */
+  const one = (spaced[0] ?? want).replace(/\s+/g, '');
+  if (one !== want) return satisfies(version, one);
 
   const has = parts(version);
   const cmp = (a: string): number => order(has, parts(a));

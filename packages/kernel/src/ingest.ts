@@ -523,13 +523,20 @@ export function extract(deps: IngestDeps, form: Extractor, text: string): Json |
     /* AND THE THOUSANDS SEPARATOR IS DECLARED HERE TOO. `decimal` took one and `money` did not, so
        every European amount was read a thousand times too small — €1.234,56 became €1.23 — which is
        the worst possible place for that bug because the row still looks plausible. */
-    const n = number(anchored, form.money.sep);
-    if (n === null || !form.money.currency) return null;
+    /* THE CURRENCY'S OWN EXPONENT, from `Intl` and cached — 07 §3, and no currency table is shipped
+       anywhere. It governs BOTH halves: a lone separator followed by three digits is grouping
+       *unless the exponent is 3*, so `KWD 1.250` is one and a quarter dinars rather than one
+       thousand two hundred and fifty; and the scale is `10 ** exponent`, so `JPY 1250` is 1250 yen
+       and not 125,000 of a subunit that does not exist. Both were hard-coded at two. */
+    if (!form.money.currency) return null;
+    const exp = exponentOf(form.money.currency);
+    const n = number(anchored, form.money.sep, exp);
+    if (n === null) return null;
     /* A VALUE THAT WOULD NEED ROUNDING IS REFUSED — 07 §3, and it is the difference between an
        extractor that is wrong and one that says it cannot read this. `USD 10.555` is not 1056 minor
        units; it is a payload whose pattern does not fit, and writing the rounded figure puts a
        number nobody sent into a ledger. */
-    const minor = n * 100;
+    const minor = n * 10 ** exp;
     if (Math.abs(minor - Math.round(minor)) > 1e-6) return null;
     return { amount: Math.round(minor), currency: form.money.currency };
   }
@@ -590,7 +597,29 @@ function slice(form: Record<string, unknown>, text: string): string | null {
 }
 
 /** The first number in a run of text, with its separators. `null` when there is none. */
-function number(text: string, sep?: string): number | null {
+/**
+ * How many minor units make one of a currency, from `Intl` — never from a table.
+ *
+ * CACHED PER CODE, because `Intl.NumberFormat` is not free and this runs per field per arrival. Two
+ * for most, three for the Gulf dinars, zero for the yen; and an unknown code gets two, which is the
+ * only guess available and the one every unknown code is.
+ */
+const EXPONENTS = new Map<string, number>();
+export function exponentOf(currency: string): number {
+  const held = EXPONENTS.get(currency);
+  if (held !== undefined) return held;
+  let exp = 2;
+  try {
+    exp = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+  } catch {
+    /* A CODE `Intl` DOES NOT KNOW IS TWO, not a throw. An extractor that dies on an unusual currency
+       is worse than one that reads it as most currencies are read. */
+  }
+  EXPONENTS.set(currency, exp);
+  return exp;
+}
+
+function number(text: string, sep?: string, exponent = 2): number | null {
   /* ONE NUMBER, AND A SPACE ONLY WHERE A GROUP OF THREE FOLLOWS IT. A character class that took any
      whitespace read `EGP 250 2 items` as 250,200 — the digits of the next word glued on, and a
      ledger row nobody reads twice. */
@@ -599,7 +628,12 @@ function number(text: string, sep?: string): number | null {
      four-decimal amount as a grouped one, which is the arithmetic this function exists to get right.
      The three-digit guard belongs on the whitespace alternative alone, where it stops
      `EGP 250 2 items` reading as 250,200. */
-  const m = /-?\d+(?:[\s'][0-9]{3})*(?:[.,]\d+)*/.exec(text);
+  /* A SPACED GROUP IS EXACTLY THREE DIGITS, AND THE FOURTH ENDS THE NUMBER. `1 2345` matched
+     `1 234` and dropped the trailing digit — a plausible row for a number nobody sent, the same
+     defect the mark branch had and still on this one. With the lookahead, ` 2345` is not a group at
+     all, so `EGP 1 2345` reads as `1` for the same reason `EGP 250 2 items` reads as `250`: a space
+     followed by something that is not a group of three is the end of the number, not part of it. */
+  const m = /-?\d+(?:[\s'][0-9]{3}(?![0-9]))*(?:[.,]\d+)*/.exec(text);
   if (!m) return null;
 
   const raw = m[0].replace(/[\s']/g, '');
@@ -621,7 +655,9 @@ function number(text: string, sep?: string): number | null {
     if (marks.length === 0) return null;
     const last = marks.at(-1)!;
     if (sep !== undefined) return last[0] === sep ? null : last.index;
-    if (marks.length === 1) return raw.length - last.index - 1 === 3 ? null : last.index;
+    /* UNLESS THE EXPONENT IS 3, which is 07 §3's own clause and the reason this takes one: in a
+       currency with three minor digits, `1.250` is a decimal and not a group. */
+    if (marks.length === 1) return raw.length - last.index - 1 === 3 && exponent !== 3 ? null : last.index;
     const kinds = new Set(marks.map((x) => x[0]));
     return kinds.size === 1 ? null : last.index;
   })();

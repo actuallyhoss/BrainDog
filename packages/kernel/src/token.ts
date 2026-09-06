@@ -180,11 +180,25 @@ export async function verifyToken(deps: TokenDeps, bearer: string, surface?: str
      token, but not for this record" would tell whoever is guessing which half they got right. */
   if (!record || !secret || record !== deps.recordId()) return wrong;
 
-  const row = deps.sql.one<{ id: string; person_id: string; scope: Scope; expires_at: string | null; revoked_at: string | null }>(
-    'SELECT id, person_id, scope, expires_at, revoked_at FROM token WHERE hash = ?',
+  /* THE PERSON'S SUSPENSION TRAVELS WITH THE TOKEN. A token is a capability handed to an agent by a
+     PERSON — that is the whole of what the second ladder means — so a suspended person's agent must
+     stop with them. This joined nothing, and both hosts happened to call `access` afterwards, which
+     closed the door by accident of call order rather than by a check: any caller of `verifyToken`
+     alone re-opened it. */
+  const row = deps.sql.one<{
+    id: string;
+    person_id: string;
+    scope: Scope;
+    expires_at: string | null;
+    revoked_at: string | null;
+    suspended_at: string | null;
+  }>(
+    `SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.expires_at AS expires_at,
+            t.revoked_at AS revoked_at, p.suspended_at AS suspended_at
+     FROM token t LEFT JOIN person p ON p.id = t.person_id WHERE t.hash = ?`,
     await deps.digest(secret),
   );
-  if (!row || row.revoked_at) return wrong;
+  if (!row || row.revoked_at || row.suspended_at) return wrong;
   if (row.expires_at && row.expires_at <= instant(deps.nowMs)) return wrong;
 
   deps.sql.exec(

@@ -31,6 +31,8 @@ import { extname, join, normalize } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
+import { routesOf } from './routes.mjs';
+
 const REPO = join(import.meta.dirname, '..', '..');
 
 /**
@@ -47,26 +49,22 @@ const AXE = join(REPO, 'node_modules', 'axe-core', 'axe.min.js');
 const PORT = 5186;
 
 /* Every surface at rest. */
-const ROUTES = [
-  '/',
-  '/decide',
-  '/decide/SG31',
-  '/inbox',
-  '/r/obligations',
-  '/r/obligations/1',
-  '/p/money',
-  '/p/kiln',
-  '/vault',
-  '/packs',
-  '/settings/appearance',
-  '/start',
-  '/audit',
-  '/jobs/j_7Q2F',
-  '/t/2',
-  '/t/3',
-  '/v/obligations.overdue',
-  '/nowhere',
-];
+/**
+ * Every route the app has, derived from the tree, plus a few extra addresses of the same routes.
+ *
+ * IT WAS TYPED OUT, AND THE TWO GATES DISAGREED. `a11y` was missing `/s/[token]` — the shared page,
+ * the only surface a non-user ever sees — and neither list was compared to the route directory, so a
+ * route added tomorrow was audited by neither and nothing noticed. The derivation also found
+ * `/[id]`, the spoken-id resolver, which neither list had ever covered.
+ *
+ * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST — a different page, a different
+ * track — because one sample proves the route renders and a second proves the DECLARATION does.
+ */
+const { routes: ROUTES, unsampled } = await routesOf(join(REPO, 'apps', 'web'), ['/p/kiln', '/t/3', '/nowhere']);
+if (unsampled.length) {
+  for (const u of unsampled) console.error(`  a route with no sample address: ${u}`);
+  process.exit(1);
+}
 
 /**
  * The states a route can only be IN, which is where the accessibility bugs actually live.

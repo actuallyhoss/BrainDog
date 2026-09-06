@@ -469,3 +469,13 @@ test('AND AN UNINSTALL THAT FAILS HALFWAY LEAVES NOTHING HALF-DONE', () => {
   assert.throws(() => uninstall('studio-books', host));
   assert.ok(rolled, 'the retire was not inside a transaction the forget could roll back');
 });
+
+test('and a space after the comparator is not a second comparator', () => {
+  /* Splitting on every space turned `>= 1.0.0` into `>=` and `1.0.0` — so a range written with a
+     space after the operator, which is legal and common, blocked every version that satisfies it:
+     the same class of wrong answer as the missing upper bound, in the other direction. */
+  assert.equal(satisfies('1.2.3', '>= 1.0.0'), true);
+  assert.equal(satisfies('0.9.0', '>= 1.0.0'), false);
+  assert.equal(satisfies('1.5.0', '>= 1.0.0 < 2.0.0'), true);
+  assert.equal(satisfies('3.0.0', '>= 1.0.0 < 2.0.0'), false);
+});

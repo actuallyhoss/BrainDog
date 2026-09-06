@@ -69,7 +69,11 @@
       {#snippet actions()}<Button onclick={() => toasts.push(copy.notWritten('Whoever shared this would be asked'), { intent: 'warn' })}>{copy.requestAccess}</Button>{/snippet}
     </Empty>
   {:else}
-    <main class="body">
+    <!-- A `<div>`, NOT A SECOND `<main>`. The layout's bare branch already wraps this route in
+         `<main id="main">`, so this put a main landmark inside a main landmark and gave the document
+         two of them with no accessible name to tell them apart — three axe violations on the one
+         surface a non-user ever sees, on the only route neither browser gate had ever visited. -->
+    <div class="body">
       <h1 class="title">{result.page.title}</h1>
       <p class="from">Shared from The Studio · <code>{token.slice(0, 8)}…</code></p>
 
@@ -94,7 +98,7 @@
           </section>
         {/if}
       {/each}
-    </main>
+    </div>
 
     <footer class="foot">
       A read-only view of one page. The link is signed, scoped to this page, and can be revoked.

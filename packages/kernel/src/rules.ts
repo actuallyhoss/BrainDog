@@ -81,6 +81,14 @@ export type RulesDeps = {
   sql: Sql;
   rules: (register: string) => RuleDecl[];
   schemaOf: (register: string) => Schema | null;
+  /**
+   * Which field a register calls its state, or `null` where it has none.
+   *
+   * `move` WROTE THE LITERAL KEY `state`. A register may call it anything — the seed's projects call
+   * it `lane` — and writing `patch.state` on one of those was a silent no-op: the row did not move,
+   * the version did not change, and the receipt reported `move live` while the dry run previewed it.
+   */
+  stateOf: (register: string) => string | null;
   ctx: EvalContext;
   /** The write path, re-entered. `cascade: false` is what makes a rule one step. */
   write: (register: string, spoken: string | null, patch: Record<string, unknown>, actor: string, batch: string) => Result<Entry>;
@@ -205,9 +213,16 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
            writing it. It bypassed `setFields` entirely, so two rules that both `move` both wrote and
            the last one won — the outcome this file's header calls "an order nobody declared" — while
            `fired` reported both and nothing appeared as suppressed. */
-        if (setFields.has('state')) continue;
-        setFields.add('state');
-        patch.state = action.move;
+        /* THE REGISTER'S OWN STATE FIELD, not the literal word. A register may call it anything —
+           the seed's projects call it `lane` — and writing `patch.state` on one of those was a
+           SILENT NO-OP: the row did not move, the version did not change, and `did` reported
+           `move live` while the dry run previewed it. Claiming the literal key had the same shape of
+           bug in the other direction, so a `set` on `lane` and a `move` did not collide. */
+        const field = deps.stateOf(fired.entry.register);
+        if (!field) continue;
+        if (setFields.has(field)) continue;
+        setFields.add(field);
+        patch[field] = action.move;
         did.push(`move ${action.move}`);
       } else if ('link' in action) {
         /* EXACTLY ONE MATCH OR NOTHING. Two rows bearing the name is a question about which, and a
@@ -632,8 +647,10 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
     else if ('link' in a) {
       /* A LINK THAT CANNOT BE MADE IS NAMED HERE, because the preview is where somebody finds out
          that half their rows name a party nobody has a row for. */
+      /* THE SAME GUARD AS THE PASS ITSELF. One of the two call sites was fixed and this one, 418
+         lines below it, builds the identical query from the identical declaration value. */
       const found = deps.sql.all<{ id: string }>(
-        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${a.link.to.by}') = ? LIMIT 2`,
+        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(a.link.to.by)}') = ? LIMIT 2`,
         a.link.to.register,
         fill(a.link.to.value, entry, deps.nowMs),
       );

@@ -32,33 +32,28 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
+import { routesOf } from './routes.mjs';
+
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
 const PORT = 5189;
 
-const ROUTES = [
-  '/',
-  '/decide',
-  '/decide/SG31',
-  '/inbox',
-  '/r/obligations',
-  '/r/obligations/1',
-  '/p/money',
-  '/p/estate',
-  '/p/work',
-  '/p/kiln',
-  '/vault',
-  '/packs',
-  '/settings/appearance',
-  '/start',
-  '/audit',
-  '/jobs/j_7Q2F',
-  '/t/2',
-  '/t/3',
-  '/v/obligations.overdue',
-  '/s/9f2a7c41d8b3',
-  '/nowhere',
-];
+/**
+ * Every route the app has, derived from the tree, plus a few extra addresses of the same routes.
+ *
+ * IT WAS TYPED OUT, AND THE TWO GATES DISAGREED. `a11y` was missing `/s/[token]` — the shared page,
+ * the only surface a non-user ever sees — and neither list was compared to the route directory, so a
+ * route added tomorrow was audited by neither and nothing noticed. The derivation also found
+ * `/[id]`, the spoken-id resolver, which neither list had ever covered.
+ *
+ * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST — a different page, a different
+ * track — because one sample proves the route renders and a second proves the DECLARATION does.
+ */
+const { routes: ROUTES, unsampled } = await routesOf(join(REPO, 'apps', 'web'), ['/p/estate', '/p/work', '/p/kiln', '/t/3', '/nowhere']);
+if (unsampled.length) {
+  for (const u of unsampled) console.error(`  a route with no sample address: ${u}`);
+  process.exit(1);
+}
 
 /** The narrowest phone still in the wild, one bigger phone, one common tablet. */
 const FLOOR = [320, 360, 768];

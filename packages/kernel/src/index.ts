@@ -23,7 +23,7 @@ import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } fro
 import { attempt } from './tx.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
-import { compile, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, jcs, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 import { exportDogl, importDogl, type Section } from './dogl.ts';
@@ -39,7 +39,7 @@ import {
   type ScheduleKind,
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
-import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps } from './members.ts';
+import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
 import {
   SCOPES,
   createToken,
@@ -415,9 +415,31 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          `json_extract(fields, '$.<id>')`, from a declaration a PACK can supply. `jsonPath` throws on
          one now, which is the backstop; this is the check that means it never gets there, said as a
          refusal at the moment somebody could still fix it. */
+      /* A LIST OR NOTHING, and a shape that is neither is a refusal rather than a throw. The first
+         version of this check spread `body.writes.key` straight into an array literal — so a `key`
+         of `5` threw `not iterable` out of `install`, and a `key` of `"ref"` spread into three
+         one-letter ids that all passed the grammar and then threw at `arrive`. Three uncaught
+         exceptions out of `install`, in the check whose whole thesis is that a refusal is a value. */
+      const listed = (v: unknown, at: string): unknown[] | Refusal =>
+        v === undefined || v === null
+          ? []
+          : Array.isArray(v)
+            ? v
+            : { code: 'DECLARATION_INVALID', fix: `${decl.id}'s ${at} is a list of field ids.`, at };
+
+      const keys = listed((body.writes as { key?: unknown })?.key, 'writes.key');
+      if (!Array.isArray(keys)) return keys;
+      const actions = listed(body.then, 'then');
+      if (!Array.isArray(actions)) return actions;
+
       const paths = [
-        ...(((body.writes as { key?: unknown })?.key ?? []) as unknown[]),
-        ...(((body.then ?? []) as { link?: { to?: { by?: unknown } } }[]).map((a) => a?.link?.to?.by).filter((x) => x !== undefined)),
+        ...keys,
+        ...actions.map((a) => (a as { link?: { to?: { by?: unknown } } })?.link?.to?.by).filter((x) => x !== undefined),
+        /* THE LOOKUP PATHS TOO. Each `extract.<field>.lookup.by` becomes a JSON path in the `find`
+           the ingest runs, and only two of the three were listed here. */
+        ...Object.values((body.extract ?? {}) as Record<string, { lookup?: { by?: unknown } }>)
+          .map((f) => f?.lookup?.by)
+          .filter((x) => x !== undefined),
       ];
       for (const path of paths)
         if (typeof path !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(path))
@@ -1136,6 +1158,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       }),
     note: (entry, actor, text, batch) =>
       void appendEvent({ kind: 'note', target: entry.id, register: entry.register, actor, note: text, at: instant(clock.now()), batch }),
+    stateOf: (register) => registers.get(register)?.state ?? null,
     schedule: (key, payload, pending) => marker(sql, mint, clock.now(), key, payload, pending),
     entry: (id) => byId(id),
     mint,
@@ -1573,9 +1596,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
               .map((r) => JSON.parse(r.body) as IngestDecl),
           schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
           write: (register, spoken, patch, actor) => write(register, spoken, patch, { actor }),
+          /* THE LOOKUP PATH, which is the third of the three and the one that was still open — named
+             in a commit message as fixed and not touched. `by` is `extract.<field>.lookup.by` from an
+             ingest declaration, so a pack could point a `ref` at whatever row it liked and the row
+             looked ordinary afterwards. */
           find: (register, by, value) =>
             sql.one<{ id: string }>(
-              `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${by}') = ? LIMIT 1`,
+              `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(by)}') = ? LIMIT 1`,
               register,
               value,
             )?.id ?? null,
@@ -1738,6 +1765,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     ): Result<Member> => transaction(() => invite(memberDeps(), by, args)),
 
     /** Take somebody off. Never the last owner, and their person row stays. */
+    /** Stop somebody without deciding about them, or start them again. */
+    suspendMember: (by: string, person: string, on: boolean): Result<null> =>
+      transaction(() => suspend(memberDeps(), by, person, on)),
+
     removeMember: (by: string, person: string): Result<null> => transaction(() => remove(memberDeps(), by, person)),
 
     /* ── agent tokens ───────────────────────────────────── */

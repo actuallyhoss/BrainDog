@@ -271,6 +271,45 @@ export function remove(deps: MemberDeps, by: string, person: string): Result<nul
   return ok(null);
 }
 
+/**
+ * Stop somebody without deciding about them.
+ *
+ * THE COLUMN EXISTED AND NOTHING COULD SET IT. `person.suspended_at` was written as `NULL` by
+ * `invite` and by provisioning and by nothing else, so suspension was a word the interface could
+ * show — and once the ladder learned to read it, a check behind a switch nobody could flip.
+ *
+ * IT IS NOT `remove`, AND THAT IS THE POINT. Removal deletes the membership and the levels with it,
+ * so restoring somebody means re-inviting them and remembering what they held; suspension keeps
+ * every row and stops every one of them working. It is what you reach for when somebody has left
+ * for a fortnight, or when you are not yet sure, and the alternative to having it is that people use
+ * `remove` for both and lose the second half.
+ *
+ * THE LAST OWNER CANNOT BE SUSPENDED, for the reason they cannot be removed: a record with nobody
+ * who can decide is a record nobody can un-suspend them from.
+ */
+export function suspend(deps: MemberDeps, by: string, person: string, on: boolean): Result<null> {
+  const row = deps.sql.one<{ id: string; suspended_at: string | null }>(
+    'SELECT id, suspended_at FROM person WHERE id = ?',
+    person,
+  );
+  if (!row) return no<null>('OUT_OF_BOUNDS', `There is nobody called ${person} in this record.`, { at: 'person' });
+
+  const held = deps.sql.all<{ register: string; level: Level }>('SELECT register, level FROM member WHERE person_id = ?', person);
+  if (on && held.some((r) => r.register === RECORD && r.level === 'owner') && owners(deps.sql) <= 1)
+    return no<null>('LEVEL_REQUIRED', 'A record keeps one owner who can act. Make somebody else an owner first.', { at: 'person' });
+
+  /* THE SECOND CALL SAYS WHAT THE FIRST SAID. Suspending somebody already suspended is not an error,
+     and answering one is how a caller that lost its reply learns to be afraid of retrying. */
+  if (Boolean(row.suspended_at) === on) return ok(null);
+
+  const at = instant(deps.nowMs);
+  deps.sql.exec('UPDATE person SET suspended_at = ? WHERE id = ?', on ? at : null, person);
+  /* ON THE LEDGER AS AN ACCESS CHANGE, because that is what it is: every level they hold stops
+     working, and somebody reading the history in six weeks needs to see the moment it happened. */
+  event(deps, at, by, on ? 'access.revoke' : 'access.grant', person, RECORD, (held.find((r) => r.register === RECORD)?.level ?? 'read') as Level);
+  return ok(null);
+}
+
 const owners = (sql: Sql): number =>
   Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM member WHERE register = '*' AND level = 'owner'")?.n ?? 0);
 

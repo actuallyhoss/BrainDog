@@ -230,12 +230,33 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
         ? ctx
         : { ...ctx, principal: { ...ctx.principal, level: held } };
 
-    /* A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and `allows` refuses a `null` level for
-       exactly that reason: `boot`, `search`, `page`, `metric` and `governance` all ask for `read`
-       with nothing to scope them, and a member with only register-scoped rows used to reach every
-       one of them through whatever record-wide level was invented for them. The registers they hold
-       are reachable BY NAME — which is the substitution above — and the record itself is not. */
     return allows(at, need) ?? (register ? reaches(ctx, register) : null);
+  };
+
+  /**
+   * The guard for a read that names no register AND FILTERS BY THE CEILING ITSELF.
+   *
+   * TWO KINDS OF REGISTER-LESS METHOD, and treating them alike broke one of them. `members`,
+   * `whoami` and `markRead` are about the RECORD: somebody who holds only named registers holds none
+   * of it, and `guard` refusing a `null` level is right. But `boot`, `search`, `page`, `metric`,
+   * `governance` and `digestToday` are about ROWS, and every one of them already filters what it
+   * returns to the caller's ceiling — refusing them outright made a scoped member unable to see even
+   * their own registers' figures, and made every one of those filters dead code, which is how a
+   * ceiling stops being enforced by being enforced twice.
+   *
+   * SO A SCOPED MEMBER READS AT THE HIGHEST LEVEL THEY HOLD ANYWHERE, and the filter does the rest.
+   * That is not a widening: the ladder still refuses `write` to somebody who only holds `read`, and
+   * `reaches` still refuses every register they were not given. It is the difference between "may
+   * you ask this question at all" and "which rows are in the answer".
+   */
+  const scoped = (ctx: CallContext, need: Need): Refusal | null => {
+    const p = ctx.principal;
+    if (p.kind === 'system' || p.level !== null) return guard(ctx, need);
+
+    const held = Object.values(ctx.levels ?? {});
+    if (held.length === 0) return guard(ctx, need);
+    const best = held.sort((a, b) => LEVELS.indexOf(b) - LEVELS.indexOf(a))[0]!;
+    return allows({ ...ctx, principal: { ...p, level: best } }, need);
   };
 
   /**
@@ -358,9 +379,20 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
    * two hundred of them, with every field value in the body.
    */
   const holds = (ctx: CallContext, row: Record<string, unknown>): boolean => {
-    if (row.body_kind !== 'rowset') return false;
-    const register = (row.body as { register?: unknown } | undefined)?.register;
-    return typeof register === 'string' && reaches(ctx, register) !== null;
+    const body = row.body as Record<string, unknown> | undefined;
+    /* EVERY BODY THAT NAMES A REGISTER, not only a `rowset`. A `pattern` carries a whole ingest
+       declaration with `writes.register` on it and a `change` carries a `declaration_id`; both name
+       a register and both used to pass unfiltered while the one that carries ROWS was filtered. */
+    const named =
+      row.body_kind === 'rowset'
+        ? body?.register
+        : row.body_kind === 'pattern'
+          ? ((body?.ingest as { body?: { register?: unknown } } | undefined)?.body?.register ??
+            (body?.ingest as { writes?: { register?: unknown } } | undefined)?.writes?.register)
+          : row.body_kind === 'change'
+            ? String(body?.declaration_id ?? '').replace(/^register\./, '')
+            : undefined;
+    return typeof named === 'string' && named !== '' && reaches(ctx, named) !== null;
   };
 
   /** Who the write path records. A token writes as the PERSON who holds it, never as itself. */
@@ -375,7 +407,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * touch and not the ones they may not, because a list of names is itself information.
      */
     async boot(ctx: CallContext): Promise<Result<{ registers: { id: string; name: string; count: number }[] }>> {
-      const stop = guard(ctx, 'read');
+      const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const out: { id: string; name: string; count: number }[] = [];
       for (const [id, decl] of kernel.registers()) {
@@ -468,7 +500,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
 
     /** Every page a person could open, templates expanded into one page per row. */
     async pages(ctx: CallContext) {
-      const stop = guard(ctx, 'read');
+      const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.pages());
     },
@@ -481,7 +513,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * block. A caller who can see three of five registers sees three blocks and two sentences.
      */
     async page(args: { slug: string }, ctx: CallContext) {
-      const stop = guard(ctx, 'read');
+      const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote, and `.split` on an
          absent one threw a TypeError out of the route — a refusal is a value here, an exception is
@@ -502,7 +534,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
 
     /** One figure, by the id a `stat` cell names. */
     async metric(args: { metric: string }, ctx: CallContext) {
-      const stop = guard(ctx, 'read');
+      const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       if (typeof args?.metric !== 'string' || !args.metric)
         return no('REQUIRED_MISSING', 'A figure is asked for by its id, optionally with a parameter after a colon.', { at: 'metric' });
@@ -582,7 +614,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * reading both has no way to tell which.
      */
     async digestToday(args: { digest?: string }, ctx: CallContext) {
-      const stop = guard(ctx, 'read');
+      const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
 
       /* AND IT IS HELD TO THE CALLER'S CEILING. `boot` hides a register this caller cannot reach and
@@ -646,12 +678,15 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * never made.
      */
     async governance(args: { register?: string; id?: string; status?: string; limit?: number }, ctx: CallContext) {
-      const stop = guard(ctx, 'read');
+      const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const register = (args?.register ?? 'suggestion') as GovernRegister;
       if (args?.id) {
+        /* AND ONE BY ID ANSWERS TO THE SAME CEILING. The list path was filtered and this was not,
+           and the ids are sequential — `SG1`, `SG2` — so one extra query parameter walked the whole
+           queue. A row you may not see does not exist, which is the same answer a missing id gets. */
         const row = kernel.governanceRow(register, String(args.id));
-        return ok(row);
+        return ok(row && holds(ctx, row) ? null : row);
       }
       const rows = kernel.governance(register, {
         ...(args?.status === undefined ? {} : { status: String(args.status) }),
@@ -861,6 +896,26 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       return tail(kernel.removeMember(actorOf(ctx), args.person));
     },
 
+    /**
+     * Stop somebody without deciding about them, or start them again.
+     *
+     * REMOVAL IS THE OTHER VERB AND IT LOSES THINGS. It deletes the membership and every level with
+     * it, so restoring somebody means re-inviting them and remembering what they held. Suspension
+     * keeps every row and stops all of them working — which is what you reach for when somebody has
+     * left for a fortnight, or when you are not yet sure. The alternative to having it is that
+     * people use removal for both and lose the second half.
+     *
+     * AND IT REACHES THEIR AGENTS. A token is a capability handed to an agent BY a person, so the
+     * token ladder reads the suspension too; stopping somebody whose agent kept writing would be
+     * the shape of half-measure that makes people distrust the whole mechanism.
+     */
+    async suspendMember(args: { person: string; suspended?: boolean }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.person) return no('REQUIRED_MISSING', 'Who?', { at: 'person' });
+      return tail(kernel.suspendMember(actorOf(ctx), args.person, args.suspended !== false));
+    },
+
     /* ── ADMIN: AGENT TOKENS ──────────────────────────── */
 
     /**
@@ -1035,7 +1090,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * tell that from there having been no matches.
      */
     async search(args: { q: string; limit?: number }, ctx: CallContext) {
-      const stop = guard(ctx, 'read');
+      const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop } as Result<never>;
       const ceiling = ctx.registers ?? '*';
       const registers = ceiling === '*' ? undefined : [...ceiling];

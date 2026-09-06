@@ -604,3 +604,57 @@ test('AND AN INTEGER READS ITS OWN GROUPING', () => {
   assert.equal(extractField({} as never, { int: {} } as never, 'Quantity: 1.500 units'), 1500);
   assert.equal(extractField({} as never, { int: {} } as never, 'Quantity: 2 units'), 2);
 });
+
+test('THE CURRENCY’S OWN EXPONENT DECIDES BOTH THE GROUPING AND THE SCALE', () => {
+  /* 07 §3: a lone separator followed by exactly three digits is grouping UNLESS the exponent is 3,
+     and the exponent comes from `Intl` — no currency table is shipped anywhere. Both were hard-coded
+     at two, so `KWD 1.250` read as 125,000 fils (one thousand two hundred and fifty dinars) for one
+     and a quarter, and `JPY 1250` read as 125,000 of a subunit the yen does not have. */
+  const money = (currency: string, text: string) =>
+    extractField({} as never, { money: { currency } } as never, text);
+
+  assert.deepEqual(money('KWD', 'KWD 1.250'), { amount: 1250, currency: 'KWD' }, 'three minor digits makes it a decimal');
+  assert.deepEqual(money('JPY', 'JPY 1250'), { amount: 1250, currency: 'JPY' }, 'the yen has no subunit');
+  assert.deepEqual(money('GBP', 'GBP 1.250'), { amount: 125_000, currency: 'GBP' }, 'and two minor digits makes it a group');
+});
+
+test('and a number stops where the digits stop making a group', () => {
+  // `1 2345` matched `1 234` and dropped the trailing digit — a plausible row for a number nobody
+  // sent. A space followed by something that is not a group of three ends the number.
+  assert.equal(extractField({} as never, { int: {} } as never, 'Quantity: 1 2345 units'), 1);
+  assert.equal(extractField({} as never, { int: {} } as never, 'Quantity: 1 234 units'), 1234);
+  assert.deepEqual(extractField({} as never, { money: { currency: 'EGP' } } as never, 'EGP 250 2 items'), {
+    amount: 25_000,
+    currency: 'EGP',
+  });
+});
+
+test('A MALFORMED DECLARATION IS A REFUSAL, not a throw out of `install`', async () => {
+  /* The first version of the field-id check spread `writes.key` straight into an array literal, so a
+     `key` of `5` threw `not iterable` out of `install` and a `key` of `"ref"` spread into three
+     one-letter ids that all passed the grammar and threw later at `arrive`. Three uncaught
+     exceptions, in the check whose whole thesis is that a refusal is a value. */
+  for (const writes of [
+    { register: 'transactions', key: 5 },
+    { register: 'transactions', key: 'ref' },
+    { register: 'transactions', key: { ref: true } },
+  ]) {
+    const sql = openSqlite();
+    const k = await openRecord(sql, fixedClock(NOW));
+    const out = await k.install([TRANSACTIONS, HSBC({ writes: writes as never })]);
+    assert.equal(out.ok, false, JSON.stringify(writes));
+    assert.equal((out as { refusal: { code: string } }).refusal.code, 'DECLARATION_INVALID');
+    sql.close();
+  }
+});
+
+test('and a `then` that is not a list is refused the same way', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const out = await k.install([
+    TRANSACTIONS,
+    { id: 'rule.odd', kind: 'rule', body: { rule: 'odd', register: 'transactions', then: 'x' } } as never,
+  ]);
+  assert.equal(out.ok, false);
+  sql.close();
+});

@@ -850,21 +850,41 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
   value(await api.invite({ person: 'p_5', registers: { obligations: 'append' } }, owner));
 
   const held = api.kernel.access('p_5')!;
+  assert.equal(held.level, null, 'a register-scoped invitation gave a record-wide level');
   const them: CallContext = {
     principal: { kind: 'person', id: 'p_5', level: held.level },
     ...(held.registers === null ? {} : { registers: held.registers }),
     levels: held.levels,
   };
 
+  /* THE METHODS THAT ARE ABOUT THE RECORD REFUSE. Somebody who holds only named registers holds
+     none of the record, and these three are about the record rather than about rows. */
   for (const [name, call] of [
-    ['boot', () => api.boot(them)],
-    ['search', () => api.search({ q: 'invoice' }, them)],
-    ['governance', () => api.governance({ register: 'suggestion' }, them)],
     ['members', () => api.members(them)],
+    ['whoami', () => api.whoami(them)],
+    ['markRead', () => api.markRead(them)],
   ] as const) {
     const out = await call();
     assert.equal((out as { refusal?: { code: string } }).refusal?.code, 'FORBIDDEN', name);
   }
+
+  /* AND THE ONES THAT ARE ABOUT ROWS ANSWER, filtered. Refusing these outright made every ceiling
+     filter in them dead code — which is how a ceiling stops being enforced by being enforced twice —
+     and made a scoped member unable to see even their own registers' figures. */
+  assert.equal(refusal(await api.boot(them)).code, 'LEVEL_REQUIRED', 'append reads, and it must not');
+
+  /* AND A SCOPED READER SEES THEIR OWN REGISTERS AND NOT THE OTHERS. Refusing this outright made
+     every ceiling filter in these methods dead code — which is how a ceiling stops being enforced by
+     being enforced twice — and made a scoped member unable to see even their own registers. */
+  value(await api.invite({ person: 'p_11', registers: { obligations: 'read' } }, owner));
+  const reader = api.kernel.access('p_11')!;
+  const they: CallContext = {
+    principal: { kind: 'person', id: 'p_11', level: reader.level },
+    ...(reader.registers === null ? {} : { registers: reader.registers }),
+    levels: reader.levels,
+  };
+  const seen = value<{ registers: { id: string }[] }>(await api.boot(they));
+  assert.deepEqual(seen.registers.map((r) => r.id), ['obligations'], 'a scoped reader saw the wrong set of registers');
 
   // And the register they WERE invited to is still theirs to write into.
   assert.equal(refusal(await api.list({ register: 'obligations' }, them)).code, 'LEVEL_REQUIRED', 'append does not read');
@@ -907,8 +927,21 @@ test('A SUSPENDED PERSON HOLDS NOTHING, which is what suspending is for', async 
   value(await api.invite({ person: 'p_7', level: 'write' }, owner));
   assert.equal(api.kernel.access('p_7')?.level, 'write');
 
-  sql.exec("UPDATE person SET suspended_at = ? WHERE id = 'p_7'", new Date().toISOString());
+  /* THROUGH THE PRODUCT, not through raw SQL. The column was written as NULL by `invite` and by
+     provisioning and by nothing else, so once the ladder learned to read it, it was a check behind a
+     switch nobody could flip. */
+  value(await api.suspendMember({ person: 'p_7' }, owner));
   assert.equal(api.kernel.access('p_7'), null, 'a suspended person still held their access');
+
+  // And it reaches their agents: a token is a capability handed to an agent BY a person.
+  assert.equal(api.kernel.access('p_7'), null);
+
+  // Starting them again restores what they held, which is the difference from removing them.
+  value(await api.suspendMember({ person: 'p_7', suspended: false }, owner));
+  assert.equal(api.kernel.access('p_7')?.level, 'write', 'suspension lost what they held');
+
+  // The last owner cannot be suspended, for the reason they cannot be removed.
+  assert.equal(refusal(await api.suspendMember({ person: 'p_1' }, owner)).code, 'LEVEL_REQUIRED');
   sql.close();
 });
 
@@ -918,9 +951,12 @@ test('AND A METRIC OVER A REGISTER YOU CANNOT SEE DOES NOT EXIST', async () => {
      keeps. `boot` hides register names on the grounds that a list of names is itself information,
      and this handed the same list back a name at a time. */
   const { api, sql } = await studio();
+  value(await api.invite({ person: 'p_8', registers: { notes: 'read' } }, owner));
+  const mine = api.kernel.access('p_8')!;
   const scoped: CallContext = {
-    principal: { kind: 'person', id: 'p_8', level: 'read' },
-    registers: ['notes'],
+    principal: { kind: 'person', id: 'p_8', level: mine.level },
+    ...(mine.registers === null ? {} : { registers: mine.registers }),
+    levels: mine.levels,
   };
 
   const hidden = await api.metric({ metric: 'overdue' }, scoped);
@@ -940,10 +976,15 @@ test('A PROPOSED ROWSET IS HELD TO THE CEILING, in both directions', async () =>
      And `governance` named no register either, so every other scoped member could then read them:
      a `rowset` body carries up to two hundred field-value objects verbatim. */
   const { api, sql } = await studio();
+  /* THE SHAPE `access` ACTUALLY RETURNS, not one hand-written to make the test pass. A ceiling and a
+     record-wide level never co-occur — a `'*'` row means no ceiling — so a test that invents both
+     proves nothing about a caller the product can build. */
+  value(await api.invite({ person: 'p_6', registers: { notes: 'write' } }, owner));
+  const held = api.kernel.access('p_6')!;
   const scoped: CallContext = {
-    principal: { kind: 'person', id: 'p_6', level: 'write' },
-    registers: ['notes'],
-    levels: { notes: 'write' },
+    principal: { kind: 'person', id: 'p_6', level: held.level },
+    ...(held.registers === null ? {} : { registers: held.registers }),
+    levels: held.levels,
   };
 
   const tried = await api.propose(
@@ -961,5 +1002,10 @@ test('A PROPOSED ROWSET IS HELD TO THE CEILING, in both directions', async () =>
   );
   assert.equal(value<unknown[]>(await api.governance({ register: 'suggestion' }, owner)).length, 1);
   assert.deepEqual(value<unknown[]>(await api.governance({ register: 'suggestion' }, scoped)), [], 'the rows leaked through the gate');
+
+  /* AND ONE BY ID TOO. The list path was filtered and this was not, and the ids are sequential —
+     `SG1`, `SG2` — so one extra query parameter walked the whole queue. */
+  assert.equal(value(await api.governance({ register: 'suggestion', id: 'SG1' }, scoped)), null);
+  assert.ok(value(await api.governance({ register: 'suggestion', id: 'SG1' }, owner)));
   sql.close();
 });
