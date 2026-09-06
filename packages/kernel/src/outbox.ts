@@ -199,6 +199,14 @@ export type AckDeps = {
    * and the whole point of the gate is that there is one.
    */
   propose?: (p: { question: string; body_kind: string; body: Record<string, unknown> }, actor: string) => Result<{ id: string }>;
+  /**
+   * Send an assembled digest onto its channels, for the ack of the model call that held it.
+   *
+   * INJECTED FOR THE SAME REASON `propose` IS. Step d belongs to `digest.ts` — it knows what a
+   * channel is — and this file is the queue. A queue that grew its own copy of the channel loop is
+   * how one path acquires a channel the other has never heard of.
+   */
+  sendDigest?: (assembled: unknown, prose: string) => void;
 };
 
 /**
@@ -261,6 +269,36 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
       );
       if (!filed.ok) return filed as Result<null>;
     }
+
+    /* AND THE DIGEST THAT WAS WAITING FOR IT GOES OUT. `prose: spark` stops `runDigest` after one
+       `infer.prose` row, because a model that takes a minute must not be a minute the alarm is
+       holding — and this branch, the half that starts it again, was never written. Every digest
+       declaring `prose: spark` queued a row nothing consumed and sent nothing on any channel, ever,
+       with no error to say so. The feature was one missing `if` from existing.
+
+       THE PROSE IS OPTIONAL AND THE DIGEST IS NOT. A result the host could not produce, or one that
+       came back without a usable sentence, ships the figures on their own — 46 §5: "the digest ships
+       as figures only". Two sentences are worth having and never worth losing a digest over. */
+    if (row.kind === 'infer.prose' && deps.sendDigest) {
+      const said = args.result as { text?: unknown; prose?: unknown } | undefined;
+      /* BOTH KEYS. 45 §5.10 calls it `text` and 46 §5 calls it `prose`, and which one is on the wire
+         is a fact about the host rather than about this record. */
+      const raw = typeof said?.text === 'string' ? said.text : typeof said?.prose === 'string' ? said.prose : '';
+      deps.sendDigest(JSON.parse(row.payload), raw);
+    }
+    return ok(null);
+  }
+
+  /* A FAILED `infer.prose` STILL SENDS THE DIGEST, and does not walk the ladder. The digest was
+     assembled successfully; a model declining to write two sentences about it is not a delivery
+     that failed. Retrying is worse than useless here — 07 §7 and 46 §5 both say a model call retried
+     automatically bills twice for one payload — and eight rungs of it would end in a suggestion
+     asking somebody to decide about an ornament, while the digest it was decorating never went.
+
+     `done` AND NOT `dead`, because the work this row existed for was done: the digest left. */
+  if (row.kind === 'infer.prose' && deps.sendDigest) {
+    sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL WHERE id = ?", args.id);
+    deps.sendDigest(JSON.parse(row.payload), '');
     return ok(null);
   }
 

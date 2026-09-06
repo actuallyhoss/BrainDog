@@ -79,6 +79,17 @@ export type DigestDeps = {
   owners: () => string[];
   outbox: (kind: OutboxKind, payload: unknown) => void;
   note: (actor: string, text: string) => void;
+  /**
+   * What this deployment can actually deliver.
+   *
+   * IT DECIDES WHETHER `prose: spark` WAITS OR IS SKIPPED. A kind no host here serves sits `pending`
+   * for ever, which is the right answer for a notification — it is still there the day a transport
+   * appears — and the wrong one for this, because the `infer.prose` row is not the digest, it is the
+   * thing HOLDING the digest. Parking it parks everything behind it, so a self-host with no model
+   * would have gone quiet on the morning somebody added two sentences to a declaration, and stayed
+   * quiet, with nothing anywhere saying why.
+   */
+  delivers: readonly OutboxKind[];
   mint: () => string;
   nowMs: number;
   tz: string;
@@ -196,38 +207,118 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
   const text = render(name, carrying);
   const channels = [...new Set(decl.channels)].slice(0, 5);
 
-  /* `prose: spark` STOPS HERE. One `infer.prose` row carrying the digest and its channels, and the
-     sending happens on the ack — a model that takes a minute must not be a minute the alarm holds. */
-  if (decl.prose === 'spark') {
-    deps.outbox('infer.prose', { digest: decl.digest, name, text, channels, sections: carrying.length });
+  /* EVERYTHING THE SENDING NEEDS, DECIDED INSIDE THE ALARM'S TRANSACTION. The prose path sends
+     later — after a model answers — and a digest re-assembled at that moment would be a different
+     digest: rows move between the alarm firing and a model returning, and the one the person reads
+     must be the one the record decided to send. */
+  const assembled: Assembled = {
+    digest: decl.digest,
+    name,
+    text,
+    headline: headline(name, carrying),
+    channels,
+    sections: carrying.length,
+    body: JSON.stringify({ digest: decl.digest, sections: carrying }),
+    ...(decl.webhook?.url ? { webhook: decl.webhook.url } : {}),
+  };
+
+  /* `prose: spark` STOPS HERE. One `infer.prose` row carrying the assembled digest, and the sending
+     happens on the ack — a model that takes a minute must not be a minute the alarm holds.
+
+     THE ACK WAS NEVER WRITTEN, so this stopped and never started again: every digest declaring
+     `prose: spark` queued one row that nothing consumed, and sent nothing, ever, on any channel,
+     with no error anywhere. The whole feature was one `return` short of existing. */
+  if (decl.prose === 'spark' && deps.delivers.includes('infer.prose')) {
+    deps.outbox('infer.prose', assembled);
     return { sections: carrying.length, channels, skipped: false };
   }
 
-  for (const channel of channels) {
+  /* AND ON A HOST WITH NO MODEL IT SHIPS AS FIGURES, now rather than never. 46 §5 already says that
+     is what a prose call that comes back unusable does; a prose call nobody can make is the same
+     fact one step earlier. Two sentences are an accelerant and a digest is not — 11 §3: "Spark is an
+     accelerant, never a dependency." */
+  sendDigest(deps, assembled);
+  return { sections: carrying.length, channels, skipped: false };
+}
+
+
+
+/**
+ * A digest, assembled and ready to leave — the whole of what step d needs and nothing else.
+ *
+ * IT IS A PAYLOAD BEFORE IT IS A TYPE. With `prose: spark` this is what rides the `infer.prose`
+ * outbox row, so every field here survives `JSON.stringify` and back, and nothing in it is a
+ * reference to something the record would have to look up again later.
+ */
+export type Assembled = {
+  digest: string;
+  name: string;
+  /** The rendered body, block dialect. */
+  text: string;
+  /** The one line the in-app note carries. */
+  headline: string;
+  channels: Channel[];
+  sections: number;
+  /** The webhook body, already serialised: the sections as they were when the alarm fired. */
+  body: string;
+  webhook?: string;
+};
+
+/**
+ * Step d: the assembled digest onto its channels.
+ *
+ * ONE FUNCTION FOR BOTH PATHS. `runDigest` calls it directly; the `infer.prose` ack calls it with
+ * two sentences in front of the text. A second copy of this loop is how one path grows a channel the
+ * other does not have — and the prose path is the one that would have been forgotten, because it is
+ * the one nobody sees fail.
+ */
+export function sendDigest(deps: DigestDeps, sent: Assembled, prose?: string): void {
+  /* 45 §5.10: the text prefixed by the prose, attributed. Attribution is not decoration — two
+     sentences of figures written by a model, printed above a record's own numbers with nothing
+     saying which is which, is the one place this product would be lying about who said something. */
+  const text = prose ? `${prose}
+
+— Spark
+
+${sent.text}` : sent.text;
+
+  for (const channel of sent.channels) {
     if (channel === 'in-app') {
       /* THE EVENT IS THE NOTIFICATION. There is no inbox table: the unread count is counted over
          these, in one place, on the record rather than per page — a badge per nav section is how a
          product teaches people to ignore badges. */
-      deps.note(`digest:${decl.digest}`, headline(name, carrying));
+      deps.note(`digest:${sent.digest}`, sent.headline);
       continue;
     }
     if (channel === 'email') {
       const to = deps.owners();
       if (to.length === 0) continue;
-      deps.outbox('notify.email', { to, subject: name, text });
+      deps.outbox('notify.email', { to, subject: sent.name, text });
       continue;
     }
     if (channel === 'push') {
       /* NO CONTENT IN A PUSH. It says how many things and where, and the record is where they are:
          a lock screen is not a place a person chose to read their business on. */
-      deps.outbox('notify.push', { title: `${name}: ${carrying.length} items`, url: `/digest/${decl.digest}` });
+      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections} items`, url: `/digest/${sent.digest}` });
       continue;
     }
-    if (channel === 'webhook' && decl.webhook?.url)
-      deps.outbox('notify.webhook', { url: decl.webhook.url, body: JSON.stringify({ digest: decl.digest, sections: carrying }) });
+    if (channel === 'webhook' && sent.webhook) deps.outbox('notify.webhook', { url: sent.webhook, body: sent.body });
   }
+}
 
-  return { sections: carrying.length, channels, skipped: false };
+/**
+ * The two sentences 45 §5.10 allows, and never a third.
+ *
+ * THE CAP IS THE RECORD'S RATHER THAN THE MODEL'S. A host that truncated correctly would make this
+ * a no-op and a host that did not would make it the only thing standing between a digest and an
+ * essay — and which of the two is on the other end of the ack is not a fact this record has.
+ */
+export function twoSentences(said: string): string {
+  const trimmed = said.trim();
+  if (!trimmed) return '';
+  const ends = [...trimmed.matchAll(/[.!?](?:["'”’)]+)?(?=\s|$)/g)];
+  const second = ends[1];
+  return (second === undefined ? trimmed : trimmed.slice(0, second.index + second[0].length)).trim();
 }
 
 /** The one line an in-app note carries: the headings and their counts, under 280 characters. */

@@ -67,7 +67,19 @@ import {
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
-import { carryingOf, headline, nextOccurrence, noteEvent, runDigest, sectionsOf, type DigestDecl, type DigestDeps } from './digest.ts';
+import {
+  carryingOf,
+  headline,
+  nextOccurrence,
+  noteEvent,
+  runDigest,
+  sectionsOf,
+  sendDigest,
+  twoSentences,
+  type Assembled,
+  type DigestDecl,
+  type DigestDeps,
+} from './digest.ts';
 import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
@@ -103,7 +115,19 @@ export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provis
 export { GRANT_KINDS, spanMs } from './vault.ts';
 export { AGGREGATIONS, deltaFrom, evaluateMetric, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
-export { CHANNELS, carryingOf, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
+export {
+  CHANNELS,
+  carryingOf,
+  headline,
+  inQuietHours,
+  localParts,
+  nextOccurrence,
+  render,
+  runDigest,
+  sectionsOf,
+  sendDigest,
+  twoSentences,
+} from './digest.ts';
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { BODY_KINDS, GOVERNANCE } from './govern.ts';
@@ -120,7 +144,7 @@ export type { Analysis, Counted, Finding, Observation, Signal } from './observe.
 export type { Arrival, Arrived, Confidence, Extractor, IngestDecl, IngestDeps } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
-export type { Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
+export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
 export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
@@ -1158,6 +1182,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           .filter(Boolean),
       outbox: (kind, payload) => void enqueue(sql, mint, clock.now(), kind, payload),
       note: (actor, text) => noteEvent(sql, mint, clock.now(), actor, text),
+      delivers: opts.delivers ?? [],
       mint,
       nowMs: clock.now(),
       tz: recordIdentity(sql)?.tz ?? 'UTC',
@@ -1299,6 +1324,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        `propose` a person or a rule uses — one place that decides what a body must contain, one place
        that writes the `suggest` event, and `spark` as the actor because that is who drafted it. */
     propose: (p, actor) => openSuggestion(governDeps(), actor, p as never),
+    /* AND THE OTHER HALF OF `prose: spark`. The digest was assembled inside the alarm's transaction
+       and parked on this row; the ack is where it leaves. Two sentences at most, capped here rather
+       than trusted from the wire — 45 §5.10. */
+    sendDigest: (assembled, prose) => sendDigest(digestDeps(), assembled as Assembled, twoSentences(prose)),
   });
 
   /** The same, plus who is asking and which record this is — the two halves of a `grant.read` row. */

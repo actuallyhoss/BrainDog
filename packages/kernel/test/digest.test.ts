@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { inQuietHours, localParts, nextOccurrence, openRecord, type Declaration, type Kernel } from '../src/index.ts';
+import { inQuietHours, localParts, nextOccurrence, openRecord, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -84,10 +84,14 @@ const day = (offset: number) => new Date(NOW + offset * DAY).toISOString().slice
 
 type Clockish = ReturnType<typeof fixedClock>;
 
-async function record(digest = WEEKLY(), rows = true): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
+async function record(
+  digest = WEEKLY(),
+  rows = true,
+  delivers: OutboxKind[] = ['notify.email', 'notify.push', 'notify.webhook', 'infer.prose'],
+): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  const k = await openRecord(sql, clock);
+  const k = await openRecord(sql, clock, { delivers });
   assert.ok(
     k.createRecord({
       id: ID,
@@ -232,6 +236,74 @@ test('`prose: spark` QUEUES ONE INFERENCE AND STOPS, so a slow model never holds
   const payload = JSON.parse(queued[0]!.payload) as { digest: string; channels: string[] };
   assert.equal(payload.digest, 'money-weekly');
   assert.deepEqual(payload.channels, ['email', 'in-app'], 'the ack has no idea where to send it');
+
+  /* AND THE ACK IS WHERE IT LEAVES. This half was never written: the row was queued, nothing
+     consumed it, and every digest declaring `prose: spark` sent nothing on any channel, ever, with
+     no error to say so. */
+  const leased = k.leaseOutbox(['infer.prose'], 10);
+  assert.equal(leased.length, 1);
+  assert.ok(
+    k.ackOutbox({
+      id: leased[0]!.id,
+      state: 'done',
+      leasedUntil: leased[0]!.leasedUntil,
+      result: { text: 'Two invoices are open. One is over a month late. And a third sentence nobody asked for.' },
+    }).ok,
+  );
+
+  const sent = outbox(sql).filter((r) => r.kind === 'notify.email');
+  assert.equal(sent.length, 1, 'the ack sent no email');
+  const mail = JSON.parse(sent[0]!.payload) as { text: string; subject: string };
+  assert.match(mail.text, /^Two invoices are open\. One is over a month late\.\n\n— Spark\n\n# Money, weekly/);
+  assert.ok(!mail.text.includes('third sentence'), 'the two-sentence cap is the record’s, and it did not apply it');
+
+  /* AND THE IN-APP NOTE WENT TOO, from the headline decided when the alarm fired. */
+  assert.equal(
+    sql.all("SELECT 1 FROM event WHERE actor = 'digest:money-weekly'").length,
+    1,
+    'the in-app channel was dropped on the prose path',
+  );
+  sql.close();
+});
+
+test('AND A PROSE CALL THAT FAILED STILL SENDS THE DIGEST, as figures', async () => {
+  /* 46 §5: "the digest ships as figures only; never retried." Retrying a model call bills twice for
+     one payload (07 §7), and eight rungs of it would end in a suggestion asking somebody to decide
+     about an ornament while the digest it was decorating never went at all. */
+  const { k, sql, clock } = await record(WEEKLY({ prose: 'spark' }));
+  arm(sql, NOW);
+  clock.set(NOW + 1000);
+  await k.drain();
+
+  const leased = k.leaseOutbox(['infer.prose'], 10);
+  assert.ok(k.ackOutbox({ id: leased[0]!.id, state: 'failed', error: 'the model answered 503', leasedUntil: leased[0]!.leasedUntil }).ok);
+
+  const rows = outbox(sql);
+  assert.equal(
+    sql.one<{ state: string }>("SELECT state FROM outbox WHERE kind = 'infer.prose'")?.state,
+    'done',
+    'a failed ornament walked the delivery ladder',
+  );
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry'").length, 0, 'a model call was queued for an automatic retry');
+  const mail = rows.filter((r) => r.kind === 'notify.email');
+  assert.equal(mail.length, 1, 'a model that would not write two sentences took the digest with it');
+  assert.match(JSON.parse(mail[0]!.payload).text as string, /^# Money, weekly/, 'the figures-only digest carried an attribution');
+  sql.close();
+});
+
+test('AND ON A HOST WITH NO MODEL IT SHIPS AS FIGURES NOW, rather than never', async () => {
+  /* A kind no host delivers waits `pending` for ever, which is right for a notification and wrong
+     for the row that is HOLDING a digest: it parks everything behind it. A self-host with no model
+     would have gone quiet the morning somebody added two sentences to a declaration, and stayed
+     quiet, with nothing anywhere saying why. 11 §3: Spark is an accelerant, never a dependency. */
+  const { k, sql, clock } = await record(WEEKLY({ prose: 'spark' }), true, ['notify.email']);
+  arm(sql, NOW);
+  clock.set(NOW + 1000);
+  await k.drain();
+
+  const rows = outbox(sql);
+  assert.equal(rows.filter((r) => r.kind === 'infer.prose').length, 0, 'the digest is parked behind a model nobody has');
+  assert.equal(rows.filter((r) => r.kind === 'notify.email').length, 1, 'the digest never went');
   sql.close();
 });
 
