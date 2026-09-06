@@ -27,6 +27,11 @@ const GATES = [
      commit while the seven browser-and-grep gates all reported green. `pnpm -r` so the packages and
      both apps are held to it, which is where the shapes actually cross. */
   ['typecheck', PNPM],
+  /* THE GATES' OWN TEST, SECOND. A gate that has never failed is a gate that may not work — and an
+     audit found six here reporting zero findings because their predicate could never be true, every
+     one of them printing green. This runs each grep gate against a seeded violation and is red when
+     one of them passes it, which is the only thing that makes the nine below mean anything. */
+  ['self-test', ['node', [join(here, 'self-test.mjs')]]],
   ['clean-room', ['node', [join(here, 'clean-room.mjs')]]],
   /* The banned surface: one kernel, three runtimes, and a source file that imports a driver has
      chosen one of them. Cheap and early, beside the other greps. */

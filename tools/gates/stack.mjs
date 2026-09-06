@@ -22,7 +22,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+/* THE WORKING DIRECTORY, LIKE EVERY OTHER GATE, falling back to the repository this file sits in.
+   Deriving the root from `import.meta.url` alone meant this gate scanned the real tree no matter
+   where it was pointed — so its own negative fixture passed, which `self-test.mjs` found on the
+   first run. A gate that cannot be aimed at a seeded violation cannot be shown to work. */
+const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 /** Every rule is a pattern plus the sentence a person needs when it fires. */
 const BANNED = [
@@ -38,8 +42,18 @@ const BANNED = [
     re: /(?:^|[^\w])(?:import|from)\s*['"]cloudflare:([a-z_/]+)['"]/gm,
     why: 'imports cloudflare:$1 — the same rule in the other direction. The Worker wires it; the package takes a port.',
   },
-  { id: 'fetch', re: /(?<![.\w])fetch\s*\(/g, why: 'calls fetch — the record makes no outbound call (01 §1). Queue an outbox row.' },
-  { id: 'buffer', re: /(?<![.\w])Buffer\s*[.(]/g, why: 'uses Buffer — Uint8Array and TextEncoder are the two that exist everywhere.' },
+  /* `globalThis.` IS NOT AN ESCAPE HATCH. The lookbehind was written to let `res.fetch(` and
+     `this.fetch(` through, and it let `globalThis.fetch(` through with them — which is the spelling
+     somebody reaches for precisely when they know the bare one is banned. */
+  { id: 'fetch', re: /(?<![.\w])(?:globalThis\.)?fetch\s*\(/g, why: 'calls fetch — the record makes no outbound call (01 §1). Queue an outbox row.' },
+  { id: 'buffer', re: /(?<![.\w])(?:globalThis\.)?Buffer\s*[.(]/g, why: 'uses Buffer — Uint8Array and TextEncoder are the two that exist everywhere.' },
+  /* 52 §5.2 rule 4 lists five words and this gate knew three. `process.` is a Node global that does
+     not exist in a Durable Object, and `__dirname` is a CommonJS one that exists in neither. */
+  {
+    id: 'node-globals',
+    re: /(?<![.\w])(process\.|__dirname|__filename)/g,
+    why: 'names a Node global — `process` and `__dirname` exist in neither runtime this ships to.',
+  },
 ];
 
 /** Comments go, always: a banned word inside prose is prose. */
@@ -85,14 +99,18 @@ for (const pkg of packages)
     const stripped = destring(bare);
     for (const rule of BANNED) {
       const text = rule.strings ? bare : stripped;
+      /* EVERY HIT, NOT THE FIRST. `exec` once per rule per file named one line and stopped, so a
+         file with four `node:` imports was reported as having one — and the three below it were
+         found on the next run, after the first was fixed. A gate that names one problem when there
+         are four costs four runs, which is the argument the runner above it is built on. */
       rule.re.lastIndex = 0;
-      const hit = rule.re.exec(text);
-      if (!hit) continue;
-      const line = text.slice(0, hit.index).split('\n').length;
-      findings.push({
-        file: `${relative(root, file).replace(/\\/g, '/')}:${line}`,
-        why: rule.why.replace('$1', hit[1] ?? ''),
-      });
+      for (const hit of text.matchAll(rule.re)) {
+        const line = text.slice(0, hit.index).split('\n').length;
+        findings.push({
+          file: `${relative(root, file).replace(/\\/g, '/')}:${line}`,
+          why: rule.why.replace('$1', hit[1] ?? ''),
+        });
+      }
     }
   }
 

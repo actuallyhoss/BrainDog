@@ -144,6 +144,17 @@ for (const width of widths) {
     await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
     // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
     await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+    /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading
+       is put into `#main` — the exact bug this gate is named after — and the run must go red. It is
+       here rather than in a fixture tree because the thing under test is a real browser over a real
+       build, and there is no smaller way to hold that. */
+    if (process.env.BRAINDOG_GATE_SEED)
+      await page.evaluate(() => {
+        const h = document.createElement('h2');
+        h.textContent = 'seeded';
+        h.style.cssText = 'width:2000px;white-space:nowrap';
+        document.getElementById('main')?.prepend(h);
+      });
     await page.waitForTimeout(60);
 
     const out = await page.evaluate((w) => {

@@ -12,7 +12,9 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
-const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots', 'docs', 'loop']);
+/* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
+   on purpose; an ordinary run must not find the violations that are there to be found. */
+const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots', 'docs', 'loop', 'negative']);
 
 // The four places a colour may legally be spelled out, and why none of them is a component writing
 // one:
@@ -51,7 +53,15 @@ const EXEMPT = [
  * repeated string in this product. A gate that fires on `#125` in a sentence about `#125` is a gate
  * somebody switches off, which costs more than the three-digit form ever saves.
  */
-const LITERAL_ANY = /#[0-9a-fA-F]{6}\b|\brgba?\(\s*\d|\bhsla?\(\s*\d/;
+/* THE 8-DIGIT FORM TOO. `#[0-9a-fA-F]{6}\b` fails on `#11223344`, because `\b` needs a non-word
+   character after the sixth digit and the seventh is one \u2014 so the one hex form that carries an alpha
+   channel, which is exactly what somebody reaches for when they want "the accent, faded", walked
+   straight through the gate written to stop it. */
+/* AND `oklch(` WITH A NUMBER IN IT. The palette is solved in OKLCH, so a hand-written `oklch(0.7
+   0.2 30)` is the modern way to write the literal this gate exists to stop — and it matched none of
+   the three older forms. `\s*[\d.]` rather than a bare `(`, for the same reason `rgba(` carries one:
+   `oklch(var(--mark-l) …)` is three tokens and a function, not a colour. */
+const LITERAL_ANY = /#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\b|\brgba?\(\s*\d|\bhsla?\(\s*\d|\bok(?:lch|lab)\(\s*[\d.]/;
 const LITERAL_CSS = /#[0-9a-fA-F]{3}\b/;
 
 /**
@@ -95,7 +105,12 @@ for (const file of await walk(ROOT)) {
   const rel = relative(ROOT, file).replace(/\\/g, '/');
   if (EXEMPT.some((r) => r.test(rel))) continue;
 
-  const isCss = rel.endsWith('.css');
+  /* MARKUP COUNTS AS CSS FOR THE THREE-DIGIT FORM. This gate's own header names the case it exists
+     for — *"a `fill="#333"` in an inline SVG"* — and the three-digit rule was applied to `.css`
+     files only, so that exact example passed. A `#333` inside a `style=` or an SVG attribute is a
+     colour by construction; the spoken-id collision the rule guards against lives in prose and in
+     `.ts`, not in markup attributes. */
+  const isCss = /\.(css|svelte|html)$/.test(rel);
   const lines = blankComments(await readFile(file, 'utf8')).split('\n');
   for (const [i, line] of lines.entries()) {
     if (!LITERAL_ANY.test(line) && !(isCss && LITERAL_CSS.test(line))) continue;

@@ -41,6 +41,14 @@ async function walk(dir, out = []) {
   return out;
 }
 
+/* AN EMPTY LIST IS RED. A tripwire list that somebody empties to make the gate quiet is a gate that
+   reports "no predecessor identifiers" over a repository nobody checked — the same shape as every
+   other gate in this directory that passed by examining nothing. */
+if (TRIPWIRES.length === 0) {
+  console.error('  clean-room: the tripwire list is empty, so this gate is checking nothing.');
+  process.exitCode = 1;
+}
+
 const findings = [];
 const files = await walk(ROOT);
 
@@ -48,8 +56,13 @@ for (const file of files) {
   const rel = relative(ROOT, file).replace(/\\/g, '/');
   if (rel.startsWith('tools/gates/')) continue;
   const text = await readFile(file, 'utf8');
+  /* CASE-INSENSITIVE. `includes` is case-SENSITIVE, so `BRAIN_TOKEN` was caught and `Brain_Token`
+     was not — and a paste is exactly where a case changes: an identifier renamed on the way in is
+     the ordinary shape of a port, not an exotic one. 52 §5.2 says whole-word and case-insensitive;
+     this was neither. Whole-word is not applied because several tripwires contain a `.` or a `-`,
+     which `` treats as a boundary — they are already distinctive enough to be narrow. */
   for (const needle of TRIPWIRES)
-    if (text.includes(needle)) findings.push({ rel, needle });
+    if (text.toLowerCase().includes(needle.toLowerCase())) findings.push({ rel, needle });
 }
 
 if (findings.length === 0) {

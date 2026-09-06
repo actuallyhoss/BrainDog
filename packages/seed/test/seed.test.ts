@@ -94,7 +94,11 @@ test('EVERY REF RESOLVED TO A ROW, rather than being stored as the number somebo
         const held = row.fields[f.id];
         if (held === undefined || held === null) continue;
         assert.match(String(held), ULID, `${register}.${f.id} holds ${String(held)}, which is not a row id`);
-        assert.ok(k.get(String(held)) === null || true);
+        /* `|| true` MADE THIS A TAUTOLOGY, and it was the only line in the test that checked the
+           thing the test is named after. A well-formed ULID pointing at no row passed — which is
+           precisely the failure "resolved to a row, rather than stored as the number somebody
+           typed" describes, and the shape check one line up cannot see. */
+        assert.ok(k.get(String(held)) !== null, `${register}.${f.id} holds ${String(held)}, which points at no row`);
         checked++;
       }
   }

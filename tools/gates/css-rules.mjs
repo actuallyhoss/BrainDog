@@ -19,7 +19,9 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
-const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots']);
+/* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
+   on purpose; an ordinary run must not find the violations that are there to be found. */
+const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots', 'negative']);
 
 /** Properties whose value paints. A literal in any of them is a component writing a colour. */
 const COLOUR_PROPS = new Set([
@@ -58,7 +60,11 @@ const COLOUR_PROPS = new Set([
 ]);
 
 /** A literal colour, in any of the forms a stylesheet can spell one. */
-const LITERAL = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\blab\(|\blch\(|\bcolor\(/i;
+/* `oklch(` AND `oklab(` ARE ON IT NOW, and they carry a digit test for the reason `oklch(var(…))`
+   is three tokens and a function rather than a colour. This product's whole palette is solved in OKLCH, so a
+   hand-written `oklch(0.7 0.2 30)` is the modern spelling of the literal this rule exists to stop —
+   and the list had `lch(` and `lab(` and not the two forms anybody here would actually type. */
+const LITERAL = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\bok?lab\(\s*[\d.]|\bok?lch\(\s*[\d.]|\bcolor\(/i;
 
 /** Values that are not a colour a theme owns, and are legal anywhere. */
 const ALLOWED_VALUES = new Set([
@@ -188,13 +194,18 @@ for (const file of files) {
       const line = lineOf(text, d.at);
       const where = `${rel}:${line}`;
 
+      /* THE `var()` USES COME FIRST, because a custom property's VALUE can name another token and
+         the early return below skipped it. `--panel: var(--fain)` never entered `used`, so the
+         unknown-token rule — the one this file's header calls as important as the colour rule,
+         because a typo is invisible and looks fine in light mode — was blind to exactly the
+         theme-layering declarations where a token typo lives. */
+      for (const m of d.value.matchAll(/var\(\s*(--[a-z0-9-]+)/gi))
+        used.push({ name: m[1].toLowerCase(), where });
+
       if (d.custom) {
         declared.add(`--${d.prop}`);
         continue;
       }
-
-      for (const m of d.value.matchAll(/var\(\s*(--[a-z0-9-]+)/gi))
-        used.push({ name: m[1].toLowerCase(), where });
 
       if (generated) continue;
 

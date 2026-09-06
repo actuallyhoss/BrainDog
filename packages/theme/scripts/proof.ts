@@ -1,13 +1,17 @@
 /**
- * `node src/proof.ts` — prints the generated palette, its contrast matrix and every finding.
+ * `node scripts/proof.ts` — prints the generated palette, its contrast matrix and every finding.
  * This is the artefact that makes "the palette is derived, not picked" checkable by a person.
+ *
+ * IN `scripts/` AND NOT IN `src/`, because it names `process` — which exists in neither runtime this
+ * package ships to. The stack gate is right to refuse that under `src/`, and was not looking for it:
+ * a script that runs on a laptop is not package source, and the directory is what says so.
  */
 
-import { HOUSE, HIGH_CONTRAST } from './index.ts';
-import { INKS, INTENTS, SURFACES, type Built, type Scheme, parseColour } from './build.ts';
-import { contrast, separation, toHex, rgbToLch } from './color.ts';
-import { validate, refusals, warnings } from './checks.ts';
-import { toCSS, forcedColors } from './css.ts';
+import { HOUSE, HIGH_CONTRAST } from '../src/index.ts';
+import { INKS, INTENTS, SURFACES, type Built, type Scheme, parseColour } from '../src/build.ts';
+import { contrast, separation, toHex, rgbToLch } from '../src/color.ts';
+import { validate, refusals, warnings } from '../src/checks.ts';
+import { toCSS, forcedColors } from '../src/css.ts';
 
 /* THE CLASSES THE RENDERER ACTUALLY EMITS, handed in rather than imported: the theme package
    has no workspace dependencies, and that is what makes it a seam. */

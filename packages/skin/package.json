@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "theme": "node scripts/theme.mjs",
-    "typecheck": "node --experimental-strip-types --test scripts/*.test.ts || true"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@braindog/theme": "workspace:*"
