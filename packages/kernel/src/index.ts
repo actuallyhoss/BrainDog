@@ -108,6 +108,8 @@ export { TRAVELS, decode, encode, projection, tables } from './dogl.ts';
 export { atMs, expandRepeat, offsetMs, remindersFor, shiftFrom } from './schedule.ts';
 export type { Remindable, Repeat, Reminder } from './schedule.ts';
 export type { ImportReport, Section, TableShape } from './dogl.ts';
+export { EVENT_KINDS, isEventKind } from './events.ts';
+export type { EventKind } from './events.ts';
 export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';

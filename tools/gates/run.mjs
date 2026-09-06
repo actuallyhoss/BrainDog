@@ -39,6 +39,9 @@ const GATES = [
   /* THE ONE THAT GUARDS THE PROMISE THE PRODUCT IS BUILT ON: a credential never goes in the record,
      and never in a log. It is a grep, so it belongs beside the other greps and costs nothing. */
   ['secret-grep', ['node', [join(here, 'secret-grep.mjs')]]],
+  /* THE ONE LIST LARGE ENOUGH TO HAVE DRIFTED THREE TIMES (52 §5.2). Four of its five sources are
+     not code, so nothing but a gate can notice that a document gained a kind the database refuses. */
+  ['event-kinds', ['node', [join(here, 'event-kinds.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],

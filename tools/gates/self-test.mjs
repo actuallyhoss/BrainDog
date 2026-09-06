@@ -46,6 +46,9 @@ const CASES = [
   { gate: 'css-rules', expect: /findings/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
   { gate: 'secret-grep', expect: /reaches a log/, findings: 1 },
+  /* THREE, because a kind in one source and not the other three is three statements about the same
+     drift — and which three is the repair. A count of one would pass a gate that compared two. */
+  { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },
 ];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */
