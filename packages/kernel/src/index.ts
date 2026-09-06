@@ -1884,6 +1884,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * `.dog` file — and reading the level from anywhere else made removing somebody a change that
      * did not stop them writing.
      */
+    /**
+     * One note against one row — `30 §2`'s `note` kind, "the one row a person or an agent writes on
+     * purpose".
+     *
+     * NOT AN `edit`. This went through `update` with an empty patch and a note, so a log entry was a
+     * WRITE: it bumped the row's version, which means anybody holding the version they read got a
+     * spurious `VERSION_STALE` on their next real change, for a call that changed no field. `20 §1`
+     * puts `log` in the `append` half beside `create` and `propose`, and `45 §5.1` says the same —
+     * so it must not need `write` either.
+     */
+    log(register: string, seq: number, actor: string, note: string): Result<{ id: string }> {
+      const found = bySeq(register, seq);
+      if (!found) return no<{ id: string }>('OUT_OF_BOUNDS', `There is no ${register} #${seq}.`, { at: 'seq' });
+      return transaction(() => {
+        appendEvent({
+          kind: 'note',
+          target: found.id,
+          register: found.register,
+          actor,
+          note,
+          at: instant(clock.now()),
+        });
+        return ok({ id: found.id });
+      });
+    },
+
     access: (person: string) => access(sql, person),
 
     /**

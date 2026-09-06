@@ -677,9 +677,17 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
          note nobody writes; cutting it silently would lose the half somebody meant. */
       if (note.length > 280)
         return no('OUT_OF_BOUNDS', `A note is at most 280 characters, and this one is ${note.length}.`, { at: 'note' });
-      const stop = guard(ctx, 'write', args.register);
+      /* `append`, NOT `write`. 20 §1 puts `log` in the append half beside `create` and `propose` —
+         "the conservative half: an appender sees nothing, not even what it filed" — and 45 §5.1 says
+         the same. Demanding `write` meant an agent invited to file notes and nothing else could not
+         file one. */
+      const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false as const, refusal: stop };
-      return tail(kernel.update(args.register, `${args.register}#${args.seq}`, {}, { actor: actorOf(ctx), note }));
+      /* AND IT IS A `note` EVENT RATHER THAN AN `edit`. This went through `update` with an empty
+         patch, so a log entry bumped the row's VERSION — and anybody holding the version they read
+         then got a spurious `VERSION_STALE` on their next real change, for a call that changed no
+         field. 30 §2: `note` is "the one row a person or an agent writes on purpose". */
+      return tail(kernel.log(args.register, args.seq, actorOf(ctx), note));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */

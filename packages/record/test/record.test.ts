@@ -384,18 +384,27 @@ test('AN AGENT CAN ASK WHAT IT MAY DO, instead of finding out by being refused',
   sql.close();
 });
 
-test('A NOTE CHANGES NOTHING AND IS STILL A WRITE', async () => {
+test('A NOTE IS A `note`, AND IT DOES NOT MOVE THE ROW', async () => {
+  /* IT WENT THROUGH `update` WITH AN EMPTY PATCH, so a log entry was a WRITE: it bumped the row's
+     version, and anybody holding the version they read then got a spurious `VERSION_STALE` on their
+     next real change — for a call that changed no field. 30 §2 gives it its own kind: `note`, "the
+     one row a person or an agent writes on purpose". */
   const { api, sql } = await record();
   value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }, owner));
+  const before = api.kernel.version();
 
   assert.ok((await api.log({ register: 'obligations', seq: 1, note: 'Chased by phone.' }, owner)).ok);
   assert.equal(
-    sql.one<{ note: string; actor: string }>("SELECT note, actor FROM event WHERE kind = 'edit' ORDER BY rowid DESC LIMIT 1")?.note,
+    sql.one<{ note: string; actor: string }>("SELECT note, actor FROM event WHERE kind = 'note' ORDER BY rowid DESC LIMIT 1")?.note,
     'Chased by phone.',
   );
+  assert.equal(sql.all("SELECT 1 FROM event WHERE kind = 'edit'").length, 0, 'a note was written as an edit');
   assert.equal(api.kernel.get('obligations#1')?.fields.state, 'open', 'a note changed a field');
+  assert.ok(api.kernel.version() > before, 'the ledger did not move at all, so nothing can see the note');
 
-  // It answers to the same permission as the write it is.
+  /* AND IT IS `append`, NOT `write`. 20 §1 puts `log` in the append half beside `create` and
+     `propose` — so an agent invited to file notes and nothing else can file one. */
+  assert.ok((await api.log({ register: 'obligations', seq: 1, note: 'From an appender.' }, person('append'))).ok);
   assert.equal((await api.log({ register: 'obligations', seq: 1, note: 'x' }, person('read'))).ok, false);
   assert.equal((await api.log({ register: 'obligations', seq: 1, note: '  ' }, owner)).ok, false);
   assert.equal((await api.log({ register: 'obligations', seq: 1, note: 'x'.repeat(281) }, owner)).ok, false);
