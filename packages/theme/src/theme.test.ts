@@ -23,13 +23,15 @@ import {
   INKS,
   INTENTS,
   SURFACES,
+  build,
   buildScheme,
   HOUSE_PROFILE,
   nextAccentHue,
   INTENT_HUE,
   parseColour,
+  type Built,
 } from './build.ts';
-import { refusals, validate } from './checks.ts';
+import { checkElevation, checkScheme, refusals, validate } from './checks.ts';
 import { toCSS, forcedColors } from './css.ts';
 
 /* THE CLASSES THE RENDERER ACTUALLY EMITS, handed in rather than imported: the theme package
@@ -293,4 +295,69 @@ test('and the checks would SAY so — a floor nothing measures is not a floor', 
   const found = refusals(validate(broken, css));
   assert.ok(found.some((f) => f.check === 'D'), 'an invisible control boundary was not refused');
   assert.ok(found.some((f) => f.check === 'Q'), 'a control that matches its own label was not refused');
+});
+
+/* ── the checks that could not fail ──────────────────────────────────────── */
+
+test('CHECK I MEASURES THE LADDER THAT VARIES, which is the alpha and not the pixels', () => {
+  /* It took the largest `\d+px` of each shadow, and those are literals in the generator — 2, 14, 40,
+     the same three in every theme there will ever be — so it compared `2 < 14 < 40` and could not
+     fail. Inverting the light scheme's opacities visibly turns the ladder back on itself. */
+  const inverted: Built = {
+    ...HOUSE,
+    elevation: {
+      ...HOUSE.elevation,
+      light: ['0 1px 2px rgb(0 0 0 / 0.9)', '0 2px 4px rgb(0 0 0 / 0.5)', '0 4px 8px rgb(0 0 0 / 0.01)'],
+    },
+  };
+  const found = refusals(checkElevation(inverted));
+  assert.equal(found.length, 2, 'a ladder that goes down was reported as going up');
+  assert.match(found[0]?.fix ?? '', /not above/);
+});
+
+test('and the house ladder still goes up, in both schemes', () => {
+  assert.deepEqual(refusals(checkElevation(HOUSE)), []);
+});
+
+test('CHECK F KNOWS THE HUE FLOOR, which only the generator knew', () => {
+  /* Two intents within twenty degrees are the same colour to a reader whatever their delta-E says,
+     because delta-E 2000 counts lightness and a pale tint of a hue measures far from it. The
+     generator refuses that palette and the validator accepted it — so a third-party theme was
+     installable on exactly the palette this package will not produce. */
+  const built = build({ ...HOUSE.seed }, HOUSE_PROFILE, 'twins');
+  const twinned: Built = {
+    ...built,
+    schemes: {
+      ...built.schemes,
+      dark: { ...built.schemes.dark, info: built.schemes.dark.danger },
+    },
+  };
+  const found = refusals(checkScheme(twinned, 'dark')).filter((f) => f.check === 'F');
+  assert.ok(found.length > 0, 'two intents of one hue passed the separability check');
+  assert.match(found[0]?.fix ?? '', /of hue apart/);
+});
+
+test('CHECK L IS ABOUT THE DOCUMENT, and the caller cannot hand in the thing being looked for', () => {
+  // `validate` took `css` optionally, and the only validation CI ran passed none — so L was skipped
+  // entirely. `''` is falsy, which meant an empty stylesheet passed too.
+  const bare = refusals(validate(HOUSE, toCSS(HOUSE, HIGH_CONTRAST)));
+  assert.ok(bare.some((f) => f.check === 'L'), 'a stylesheet with no forced-colors block passed');
+  assert.ok(refusals(validate(HOUSE, '')).some((f) => f.check === 'L'), 'an empty stylesheet passed');
+});
+
+test('AND THE HIGH-CONTRAST PROFILE IS CHECKED AT ITS OWN FLOORS', () => {
+  /* `Built.profile` was a string id, so the validator structurally could not read them — and every
+     floor was hard-coded at the house's AA value. A regression dropping high-contrast `edge` from
+     4.5 to 3.1 was refused by nothing, in the one theme that exists for readers who need the most
+     help. */
+  assert.equal(HIGH_CONTRAST.profile.edge, 4.5);
+  assert.equal(HIGH_CONTRAST.profile.ink[0], 16);
+  assert.equal(HOUSE.profile.edge, 3);
+
+  const weakened: Built = {
+    ...HIGH_CONTRAST,
+    schemes: { ...HIGH_CONTRAST.schemes, dark: { ...HIGH_CONTRAST.schemes.dark, edge: HOUSE.schemes.dark.edge } },
+  };
+  const found = refusals(checkScheme(weakened, 'dark')).filter((f) => f.check === 'D');
+  assert.ok(found.length > 0, 'the house edge passed the high-contrast floor');
 });

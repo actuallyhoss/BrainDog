@@ -74,6 +74,20 @@ export type Profile = {
   intentFill: number;
   /** Mark constants: every identity hue at this (L, C) is in gamut and >= 3:1 on every surface. */
   mark: Record<Scheme, { L: number; C: number }>;
+  /**
+   * The surface ladder, if this profile needs its own.
+   *
+   * A FLOOR IS ONLY A FLOOR IF IT IS REACHABLE. High contrast asks 16:1 for `ink`, and the generator
+   * solves ink against the WORST surface — `s3` in dark. On the house ladder `s3` is L 0.302, and
+   * pure white measures 13.51:1 against it: so `ink` came out `#ffffff`, the solver returned the
+   * best it could, and nothing said the target had been missed by two and a half. The validator was
+   * hard-coded to AA and could not see it.
+   *
+   * So the mode that exists for readers who need the most help gets a ladder its own numbers can be
+   * met on: the same five rungs, closer together and darker, which is what "high contrast" means
+   * about surfaces as well as about ink.
+   */
+  ladder?: Record<Scheme, Record<(typeof SURFACES)[number], number>>;
   /** The chroma ladder the separability search walks, and the contrast grid it walks it against. */
   chromaLadder: number[];
   targetGrid: number[];
@@ -140,6 +154,19 @@ export const HIGH_CONTRAST_PROFILE: Profile = {
    * distinguishable, not more, which is the opposite of what the mode is for.
    */
   intentText: 5,
+  /**
+   * A tighter, darker ladder, so `ink: 16` is a floor rather than an aspiration.
+   *
+   * Dark `s3` comes down from L 0.302 to 0.244, which puts pure white just past 16:1 against it — the
+   * generator's own target, met with a little to spare. Light `sunk` goes up from 0.938 to 0.965 for
+   * the same reason in the other direction. The five rungs stay five and stay ordered: the elevation
+   * ladder still reads, it reads over a shorter distance, and a shorter distance between surfaces is
+   * what a high-contrast mode wants anyway — the boundary does the separating, not the fill.
+   */
+  ladder: {
+    dark: { sunk: 0.178, bg: 0.202, s1: 0.216, s2: 0.230, s3: 0.244 },
+    light: { sunk: 0.965, bg: 0.978, s1: 0.988, s2: 0.994, s3: 0.999 },
+  },
   intentFill: 4.5,
   mark: { dark: { L: 0.78, C: 0.13 }, light: { L: 0.46, C: 0.11 } },
   chromaLadder: [0.18, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1],
@@ -190,7 +217,16 @@ export const BRAND_RED = '#CF413A';
 
 export type Built = {
   id: string;
-  profile: string;
+  /**
+   * The profile it was solved against — the object, not its id.
+   *
+   * IT WAS A STRING, AND THAT IS WHY THE VALIDATOR COULD NOT READ ITS FLOORS. `Profile` declares
+   * `ink`, `edge`, `intentText` and `intentFill`, and `HIGH_CONTRAST_PROFILE` raises every one of
+   * them — and `checks.ts` hard-coded the house numbers, so a regression dropping high-contrast
+   * `edge` from 4.5 to 3.1, or `ink` from 16 to 4.6, was refused by nothing. In the one theme that
+   * exists for readers who need the most help.
+   */
+  profile: Profile;
   seed: Seed;
   schemes: Record<Scheme, Palette>;
   /** (L, C) per scheme for an identity accent's `oklch(L C h)` — 13 §2.1b. */
@@ -248,7 +284,12 @@ const LADDER: Record<Scheme, Record<(typeof SURFACES)[number], number>> = {
   light: { sunk: 0.938, bg: 0.962, s1: 0.988, s2: 0.994, s3: 0.999 },
 };
 
-function ground(scheme: Scheme, hue: number, chroma: number): Record<(typeof SURFACES)[number], string> {
+function ground(
+  scheme: Scheme,
+  hue: number,
+  chroma: number,
+  rungs?: Record<(typeof SURFACES)[number], number>,
+): Record<(typeof SURFACES)[number], string> {
   /**
    * A VISIBLE amount of hue, not a whisper.
    *
@@ -257,7 +298,7 @@ function ground(scheme: Scheme, hue: number, chroma: number): Record<(typeof SUR
    * cheapest thing a product can do to stop looking like every other dark dashboard.
    */
   const C = Math.min(chroma, scheme === 'light' ? 0.014 : 0.01);
-  const rung = LADDER[scheme];
+  const rung = rungs ?? LADDER[scheme];
   return {
     sunk: hex({ L: rung.sunk, C, H: hue }),
     bg: hex({ L: rung.bg, C, H: hue }),
@@ -287,8 +328,17 @@ const INTENT_NAMES = ['good', 'warn', 'bad', 'info'] as const;
  * categorical naming, and the category a person stores is the hue. Twenty degrees is the same floor
  * 28 §3.2 already puts between an identity mark and an intent, for the same reason.
  */
-const HUE_FLOOR = 20;
-const hueGap = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+/**
+ * The least two intent hues may be apart, and the arc between two.
+ *
+ * EXPORTED, because the validator needs the same number. The generator refuses a palette whose
+ * intents are within twenty degrees regardless of delta-E — the note below records paying to learn
+ * why: `info` came out as the mark and `bad` as a pale tint of it, and every delta-E cleared 10,
+ * because delta-E 2000 counts lightness. The validator knew only the delta-E half, so a third-party
+ * theme was ACCEPTED at install on exactly the palette this generator will not produce.
+ */
+export const HUE_FLOOR = 20;
+export const hueGap = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
 
 function separable(candidates: Rgb[], floor: number): { ok: boolean; worst: number; pair: [number, number] } {
   let worst = Infinity;
@@ -314,7 +364,7 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   const nHue = seed.neutralHue === 'from-accent' ? acc.H : seed.neutralHue;
 
   /* 1 · ground */
-  const g = ground(scheme, nHue, acc.C);
+  const g = ground(scheme, nHue, acc.C, profile.ladder?.[scheme]);
   const worst = worstOf(scheme, g);
   const dir = away(scheme);
 
@@ -457,7 +507,11 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     const AC = Math.min(acc.C, 0.16);
     const clear = (c: string, of: string) =>
       Math.abs(rgbToCielab(rgb(c)).L - rgbToCielab(rgb(of)).L) >= 8;
-    for (const t of [4.5, 5, 5.5, 6, 7, 8, 9, 11, 13]) {
+    /* THE LADDER STARTS AT THE PROFILE'S FLOOR, not at AA's. It began at 4.5 whatever the profile
+       asked, so in high contrast — where a coloured text role needs 5 — the first candidate that
+       cleared the lightness collisions was already below the floor, and the search returned it. The
+       validator was hard-coded to 4.5 and agreed. */
+    for (const t of [profile.intentText, 5.5, 6, 7, 8, 9, 11, 13].filter((x, i, a) => a.indexOf(x) === i && x >= profile.intentText)) {
       const cand = hex(solveL(t, AC, acc.H, worst, dir));
       if (clear(cand, ink) && clear(cand, chosen.danger)) return cand;
     }
@@ -519,7 +573,7 @@ export function build(seed: Seed, profile: Profile = HOUSE_PROFILE, id = 'house'
   };
   return {
     id,
-    profile: profile.id,
+    profile,
     seed,
     schemes: { dark: buildScheme(seed, profile, 'dark'), light: buildScheme(seed, profile, 'light') },
     mark: profile.mark,

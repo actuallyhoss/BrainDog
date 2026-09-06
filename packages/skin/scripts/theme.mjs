@@ -53,7 +53,14 @@ const favicon =
 
 /* A theme is never written without being validated first — the generator drives most of the sixteen
    checks, so what is left here is the handful it cannot drive. */
-const bad = [...refusals(validate(HOUSE)), ...refusals(validate(HIGH_CONTRAST))];
+/* AGAINST THE DOCUMENT AS THE APP LOADS IT, not against the theme block alone. Check L asks whether
+   the stylesheet has a forced-colors block, and the block lives in `a11y.css` — a layer no theme can
+   reach and which is already in the page. Validating the theme on its own would refuse every build
+   for the absence of a rule it is not allowed to write; validating with no `css` at all, which is
+   what this used to do, skipped the check entirely. */
+const a11y = await readFile(join(import.meta.dirname, '..', 'a11y.css'), 'utf8');
+const document_ = css + a11y;
+const bad = [...refusals(validate(HOUSE, document_)), ...refusals(validate(HIGH_CONTRAST, document_))];
 if (bad.length > 0) {
   for (const f of bad) console.error(`  REFUSED ${f.check}  ${f.fix}`);
   process.exit(1);

@@ -12,13 +12,15 @@ import {
   contrast,
   fromHex,
   inGamut,
+  lchToRgb,
+  toHex,
   relLuminance,
   rgbToCielab,
   rgbToLch,
   separation,
   type Deficiency,
 } from './color.ts';
-import { INKS, INTENTS, SURFACES, type Built, type Palette, type Role, type Scheme } from './build.ts';
+import { HUE_FLOOR, hueGap, INKS, INTENTS, SURFACES, type Built, type Palette, type Role, type Scheme } from './build.ts';
 
 export type Finding = {
   check: string;
@@ -64,11 +66,23 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   const p = built.schemes[scheme];
   const out: Finding[] = [];
 
-  /* A · every ink role x every surface */
-  out.push(...pairsAgainstSurfaces(p, INKS, 4.5, 'A', scheme));
+  /* THE FLOORS ARE THE PROFILE'S, and they used to be literals here. `HIGH_CONTRAST_PROFILE` raises
+     every one of them — ink to [16, 12.5, 9.5, 7], `edge` to 4.5, intent text to 5 — and this file
+     asked the house's AA numbers of both, so the theme that exists for readers who need the most
+     help was validated as though it were the ordinary one. A `Profile` is a seam only if something
+     reads through it. */
+  const floors = built.profile;
 
-  /* B · accent as text x every surface */
-  out.push(...pairsAgainstSurfaces(p, ['accent-text'], 4.5, 'B', scheme));
+  /* A · every ink role x every surface. Each ink has its own floor, descending. */
+  for (const [i, ink] of INKS.entries()) out.push(...pairsAgainstSurfaces(p, [ink], floors.ink[i] ?? 4.5, 'A', scheme));
+
+  /* B · accent as text x every surface, at the INTENT-TEXT floor rather than the ink ramp's.
+     `accent-text` is a hue used as text, which is what an intent is, and the high-contrast profile's
+     own note explains why that distinction is load-bearing: pushing a coloured text role to 7:1
+     drives it so far down the lightness axis that it bottoms out against the sRGB gamut. High
+     contrast is a property of ink on surface and of boundaries; forcing it onto the hues makes them
+     less distinguishable, not more. */
+  out.push(...pairsAgainstSurfaces(p, ['accent-text'], floors.intentText, 'B', scheme));
 
   /* C · faint at the large-text floor. The usage half — no faint below 24px — is a css-rules rule. */
   out.push(...pairsAgainstSurfaces(p, ['faint'], 3, 'C', scheme));
@@ -77,14 +91,9 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      `accent-edge` belongs here and not in a check of its own: it is the visual boundary of a filled
      control, which is the same SC 1.4.11 requirement at the same floor as `edge`. It was drawn at
      the call site as a mix of the accent and `sunk` and measured 1.33:1 against `s3` in dark. */
+  out.push(...pairsAgainstSurfaces(p, ['edge', 'accent-edge'], floors.edge, 'D', scheme));
   out.push(
-    ...pairsAgainstSurfaces(
-      p,
-      ['edge', 'accent-edge', 'earn-fill', 'warn-fill', 'danger-fill', 'info-fill'],
-      3,
-      'D',
-      scheme,
-    ),
+    ...pairsAgainstSurfaces(p, ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill'], floors.intentFill, 'D', scheme),
   );
 
   /* E · the focus ring against both neighbours, and the two tones nine apart */
@@ -113,7 +122,22 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   ];
   let worstF = Infinity;
   for (let i = 0; i < intents.length; i++)
-    for (let j = i + 1; j < intents.length; j++)
+    for (let j = i + 1; j < intents.length; j++) {
+      /* AND THE HUE FLOOR, which only the generator knew. Two intents within twenty degrees are the
+         same colour to a reader whatever their delta-E says, because delta-E 2000 counts lightness
+         and a pale tint of a hue is far from it by that measure and indistinguishable on a screen.
+         `danger` and `info` at 25.1° and 29.3° measure 41–46 apart on all three deficiencies and
+         are the exact pair the generator's own note says this rule was added for. */
+      const gap = hueGap(rgbToLch(rgb(intents[i]![1])).H, rgbToLch(rgb(intents[j]![1])).H);
+      if (gap < HUE_FLOOR)
+        out.push({
+          check: 'F',
+          scheme,
+          level: 'refuse',
+          code: 'INTENT_INSEPARABLE',
+          measured: r2(gap),
+          fix: `theme — ${intents[i]![0]} and ${intents[j]![0]} are ${r2(gap)}° of hue apart, and four intents need at least ${HUE_FLOOR}°. Delta-E counts lightness, so a pale tint of a hue measures far from it and reads as the same colour.`,
+        });
       for (const d of DEFS) {
         const de = separation(rgb(intents[i]![1]), rgb(intents[j]![1]), d);
         worstF = Math.min(worstF, de);
@@ -127,10 +151,11 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
             fix: `theme — ${intents[i]![0]} and ${intents[j]![0]} are delta-E ${r2(de)} apart to a ${d}ope. Four intents need at least 10. Move one hue, or lower the chroma of the other.`,
           });
       }
+    }
   out.push({ check: 'F', scheme, level: 'pass', measured: r2(worstF) });
 
   /* G · intent as text x every surface */
-  out.push(...pairsAgainstSurfaces(p, INTENTS, 4.5, 'G', scheme));
+  out.push(...pairsAgainstSurfaces(p, INTENTS, floors.intentText, 'G', scheme));
 
   /* H · the surface ladder is monotonic in RELATIVE LUMINANCE, not in L*.
      Ascending in BOTH schemes: `sunk` is always the lowest surface and `s3` always the raised one.
@@ -158,8 +183,24 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         code: 'THEME_VALUE_INVALID',
         fix: `theme — ${role} is "${value}", which is not a colour this dialect accepts.`,
       });
-    else if (!inGamut(rgb(value)))
-      out.push({ check: 'J', scheme, level: 'refuse', code: 'THEME_VALUE_INVALID', fix: `theme — ${role} is outside sRGB.` });
+    /* J · THE ROUND TRIP, not the hex. `rgb()` here is `fromHex`, whose three components are
+       `parseInt(…) / 255` and therefore in [0,1] by construction — so this branch, reached only
+       after `HEX` already matched, asked whether a number between 0 and 1 is between 0 and 1. Over
+       all 4096 three-digit values it is never false.
+
+       What CAN be outside sRGB is the colour the palette was solved in: OKLCH is a larger space,
+       and a chroma the gamut mapper failed to bring in comes back as a hex that is a CLIPPED
+       version of the intended colour rather than the colour. Reading the hex back into LCh and
+       re-projecting it is what detects that: a value the mapper handled round-trips to itself, and
+       one it clipped does not. */
+    else if (!roundTrips(value))
+      out.push({
+        check: 'J',
+        scheme,
+        level: 'refuse',
+        code: 'THEME_VALUE_INVALID',
+        fix: `theme — ${role} is ${value}, which is a clipped version of the colour it was solved as rather than that colour.`,
+      });
     for (const b of BANNED)
       if (value.includes(b))
         out.push({
@@ -237,16 +278,34 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   return out;
 }
 
-/** I · the elevation ladder only goes up, in both schemes — a theme is what breaks it (28 §4.4). */
+/**
+ * I · the elevation ladder only goes up, in both schemes — a theme is what breaks it (28 §4.4).
+ *
+ * ON THE ALPHA, NOT ON THE PIXELS. This took the largest `\d+px` of each shadow, and those numbers
+ * are literals in the generator — 2, 14, 40, the same three in every theme there will ever be — so
+ * the check compared `2 < 14 < 40` and could not fail. What actually varies per scheme, and what a
+ * theme sets, is the opacity ladder: inverting the light scheme's to `0.9 → 0.5 → 0.01` visibly
+ * turns the ladder back on itself and produced no finding at all.
+ *
+ * THE FIRST ALPHA OF EACH LEVEL, because a level is one or two shadows and the first is the near
+ * one that carries the step. A ladder is monotone in what a reader perceives as depth, and depth
+ * here is darkness.
+ */
 export function checkElevation(built: Built): Finding[] {
   const out: Finding[] = [];
   for (const scheme of ['dark', 'light'] as Scheme[]) {
-    const blurs = built.elevation[scheme].map((s) => {
-      const m = [...s.matchAll(/(\d+)px/g)].map((x) => Number(x[1]));
-      return Math.max(...m);
-    });
-    for (let i = 1; i < blurs.length; i++)
-      if (blurs[i]! <= blurs[i - 1]!)
+    const alphas = built.elevation[scheme].map((s) => Number(/\/\s*([\d.]+)\s*\)/.exec(s)?.[1] ?? NaN));
+    for (const [i, a] of alphas.entries())
+      if (!Number.isFinite(a))
+        out.push({
+          check: 'I',
+          scheme,
+          level: 'refuse',
+          code: 'THEME_LADDER_ORDER',
+          fix: `theme — elevation level ${i + 1} in ${scheme} carries no readable opacity, so its depth cannot be compared.`,
+        });
+    for (let i = 1; i < alphas.length; i++)
+      if (!(alphas[i]! > alphas[i - 1]!))
         out.push({
           check: 'I',
           scheme,
@@ -274,13 +333,33 @@ export function checkForcedColors(css: string): Finding[] {
       ];
 }
 
-export function validate(built: Built, css?: string): Finding[] {
-  return [
-    ...checkScheme(built, 'dark'),
-    ...checkScheme(built, 'light'),
-    ...checkElevation(built),
-    ...(css ? checkForcedColors(css) : []),
-  ];
+/**
+ * Every check, over a built palette and the stylesheet it is emitted as.
+ *
+ * `css` IS REQUIRED, AND IT WAS OPTIONAL. Check L asks whether the stylesheet has a forced-colors
+ * block; every caller passed `toCSS(…) + forcedColors(…)`, which is the string being searched for
+ * concatenated onto the string being searched — so L could not fail. And the only validation CI
+ * actually ran passed no `css` at all, so L was skipped entirely: `''` is falsy, which meant an
+ * empty stylesheet passed too. A required argument is what makes the check about the document.
+ */
+/**
+ * Whether a hex is the colour it was solved as, or a clipped stand-in for it.
+ *
+ * READ IT BACK INTO LCh AND PROJECT IT AGAIN. A value the gamut mapper handled is already inside
+ * sRGB, so mapping it changes nothing and it comes back as itself. One it clipped — a chroma the
+ * mapper could not bring in — lands somewhere else, and the difference is the amount of the colour
+ * that was lost. One hex step of tolerance, because the quantisation to eight bits is not the
+ * defect being looked for.
+ */
+function roundTrips(hex: string): boolean {
+  const rgb = fromHex(hex);
+  if (!inGamut(rgb)) return false;
+  const again = fromHex(toHex(lchToRgb(rgbToLch(rgb))));
+  return Math.abs(again.r - rgb.r) <= 2 / 255 && Math.abs(again.g - rgb.g) <= 2 / 255 && Math.abs(again.b - rgb.b) <= 2 / 255;
+}
+
+export function validate(built: Built, css: string): Finding[] {
+  return [...checkScheme(built, 'dark'), ...checkScheme(built, 'light'), ...checkElevation(built), ...checkForcedColors(css)];
 }
 
 export const refusals = (f: Finding[]) => f.filter((x) => x.level === 'refuse');
