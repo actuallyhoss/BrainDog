@@ -20,7 +20,7 @@ const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const b = (n: number) => new Uint8Array([n, n + 1, 2, 3]);
 
 const CONNECTOR = (over: Record<string, unknown> = {}): Declaration => ({
-  id: 'ingest.npm-downloads',
+  id: `ingest.${String(over.ingest ?? 'npm-downloads')}`,
   kind: 'ingest',
   body: {
     ingest: 'npm-downloads',
@@ -63,9 +63,18 @@ async function record(decl = CONNECTOR(), withGrant = false): Promise<{ k: Kerne
   return { k, sql, clock, ...(grant === undefined ? {} : { grant }) };
 }
 
+/**
+ * The connector's own row, moved to a time these tests can reach.
+ *
+ * AN UPSERT, BECAUSE THE INSTALL ARMS IT NOW. It did not — nothing in any path wrote a `pull` row,
+ * so the reader, the handler and the drain dispatcher were all complete and all unreachable, and
+ * this helper inserting one is the only reason the suite was ever green. 25 §9: "its first `due_at`
+ * at install is `now`."
+ */
 const arm = (sql: NodeSql, ingest = 'npm-downloads', atMs = NOW, cursor?: string) =>
   sql.exec(
-    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_1', ?, 'pull', ?, ?, 'pending', 0)",
+    `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_1', ?, 'pull', ?, ?, 'pending', 0)
+     ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0`,
     new Date(atMs).toISOString(),
     ingest,
     JSON.stringify({ ingest, ...(cursor === undefined ? {} : { cursor }) }),
@@ -263,7 +272,9 @@ test('A PAUSE STOPS THE CONNECTOR THAT FIRED, and does not strand it at `firing`
      reported to whoever asked. */
   const { k, sql, clock } = await record(CONNECTOR({ grant: 'g_gone' }));
   arm(sql, 'npm-downloads', NOW);
-  sql.exec("UPDATE schedule SET key = 'npm-dl-old' WHERE id = 's_1'");
+  /* The install armed this row, so its id is the record's rather than this file's. */
+  const fired = sql.one<{ id: string }>("SELECT id FROM schedule WHERE kind = 'pull'")!.id;
+  sql.exec("UPDATE schedule SET key = 'npm-dl-old' WHERE kind = 'pull'");
   sql.exec(
     "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_2', ?, 'pull', 'npm-downloads', ?, 'pending', 0)",
     new Date(NOW + 30 * 60_000).toISOString(),
@@ -278,7 +289,7 @@ test('A PAUSE STOPS THE CONNECTOR THAT FIRED, and does not strand it at `firing`
   const states = Object.fromEntries(
     sql.all<{ id: string; state: string }>("SELECT id, state FROM schedule WHERE kind = 'pull'").map((r) => [r.id, r.state]),
   );
-  assert.equal(states.s_1, 'paused', 'the row that fired was left at firing');
+  assert.equal(states[fired], 'paused', 'the row that fired was left at firing');
   assert.equal(states.s_2, 'pending', 'a connector not due for half an hour was paused');
   sql.close();
 });
@@ -286,9 +297,45 @@ test('A PAUSE STOPS THE CONNECTOR THAT FIRED, and does not strand it at `firing`
 test('and a payload that is not JSON is a refusal, not an exception', async () => {
   const { k, sql } = await record();
   arm(sql);
-  sql.exec("UPDATE schedule SET payload = 'not json' WHERE id = 's_1'");
+  sql.exec("UPDATE schedule SET payload = 'not json' WHERE kind = 'pull'");
   const out = k.applyPull({ ingest: 'npm-downloads', outcome: 'ok' });
   assert.equal(out.ok, false);
   assert.equal((out as { refusal: { code: string } }).refusal.code, 'VALUE_MALFORMED');
+  sql.close();
+});
+
+test('A CONNECTOR IS ARMED WHEN IT IS DECLARED, and its first run is now', async () => {
+  /* Nothing wrote a `pull` row, in any path. `applyPull` reads one, `firePull` fires one and
+     `drainSchedule` dispatches one — three complete pieces with no writer, so a bank feed installed,
+     printed itself in the install diff's CALLS OUT line, and never fetched anything. Only this
+     file's own helper made the suite look green. 25 §9: "its first `due_at` at install is `now`." */
+  const { sql, clock } = await record();
+  const armed = sql.one<{ key: string; state: string; due_at: string; payload: string }>(
+    "SELECT key, state, due_at, payload FROM schedule WHERE kind = 'pull'",
+  );
+  assert.ok(armed, 'a declared connector was never armed, so it could never run');
+  assert.equal(armed.key, 'npm-downloads');
+  assert.equal(armed.state, 'pending');
+  assert.equal(Date.parse(armed.due_at), clock.now(), 'the first run is not now');
+  assert.deepEqual(JSON.parse(armed.payload), { ingest: 'npm-downloads' });
+  sql.close();
+});
+
+test('AND AN INTERVAL UNDER THE FLOOR DOES NOT INSTALL', async () => {
+  /* `checkInterval` has existed with no production caller, so `every: '1m'` against a bank installed
+     cleanly. 25 §9 puts the floor at install precisely because one enforced at fire time is one
+     somebody finds out about after writing the declaration and waiting for the first run. */
+  const { k, sql } = await record();
+  const refuse = async (over: Record<string, unknown>) => {
+    const out = await k.install([CONNECTOR({ ingest: 'other', ...over })]);
+    assert.equal(out.ok, false, `${JSON.stringify(over)} installed`);
+    return (out as { refusal: { fix: string; at?: string } }).refusal;
+  };
+
+  assert.match((await refuse({ every: '1m' })).fix, /no more often than every fifteen minutes/);
+  assert.match((await refuse({ every: 'often' })).fix, /is not an interval/);
+  /* AND A PROVIDER'S OWN FLOOR IS HIGHER THAN OURS. Banks are six hours by law. */
+  assert.match((await refuse({ every: '1h', floor: '6h' })).fix, /the provider's own floor/);
+  assert.ok((await k.install([CONNECTOR({ ingest: 'other', every: '6h', floor: '6h' })])).ok);
   sql.close();
 });

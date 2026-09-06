@@ -23,6 +23,7 @@ import { jsonPath } from '@braindog/where';
 
 import type { Json } from './coerce.ts';
 import { instant } from './migrate.ts';
+import { checkInterval, type PullDecl } from './pull.ts';
 
 /**
  * `34-GRAMMARS` §4. Checked before an id is inlined into an index name or a JSON path.
@@ -194,6 +195,17 @@ export function validate(decl: Declaration): Refusal | null {
     * success and does nothing.
     */
   if (decl.kind === 'digest') return digestBody(decl);
+
+  /* A CONNECTOR'S INTERVAL, CHECKED WHERE IT IS WRITTEN. `checkInterval` has existed with no
+     production caller, so `every: '1m'` against a bank installed cleanly — and 25 §9 puts the floor
+     at install precisely because one enforced at fire time is one somebody finds out about after
+     they have written the declaration and waited for the first run. */
+  if (decl.kind === 'ingest' && (decl.body as { channel?: unknown }).channel === 'pull') {
+    const said = checkInterval(decl.body as unknown as PullDecl);
+    if (!said.ok && 'refusal' in said)
+      return bad('DECLARATION_INVALID', said.refusal.fix, said.refusal.at ?? 'every');
+    return null;
+  }
 
   /* A `once_per` THAT IS NOT A LIST THROWS AT FIRE TIME, INSIDE A WRITE. `onceKey` calls `.map` on
      it, and nothing checked the shape — so `once_per: 'row'` installed cleanly and then made every

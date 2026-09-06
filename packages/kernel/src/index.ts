@@ -470,6 +470,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const at = nextOccurrence(body.schedule as { day?: string; at: string }, clock.now(), tz);
         if (at !== null) arm('digest', bare, { declaration: decl.id }, at);
       }
+      /* A CONNECTOR RUNS FROM THE MOMENT IT IS DECLARED. `25 §9`: "its first `due_at` at install is
+         `now`". Nothing wrote a `pull` row — anywhere, in any path — so the reader, the handler and
+         the drain dispatcher were all complete and all unreachable, and a bank feed installed,
+         printed itself in the diff's CALLS OUT line, and never fetched anything. The three kinds
+         above were fixed for exactly this; `pull` was left behind.
+
+         `now` AND NOT `now + every`, because a connector nobody has run is a connector nobody knows
+         works: the first fetch is the one that tells you the credential is right. */
+      if (decl.kind === 'ingest' && body.channel === 'pull' && typeof body.every === 'string')
+        arm('pull', bare, { ingest: bare }, clock.now());
+
       /* A METRIC WITH `snapshot:` REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
          about is finished and nothing else is competing for the alarm. */
       if (decl.kind === 'metric' && body.snapshot) {
