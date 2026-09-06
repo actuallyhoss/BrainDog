@@ -234,6 +234,17 @@ for (const file of files) {
       if (PHYSICAL_ALIGN.test(d.prop) && /\b(left|right)\b/.test(d.value))
         findings.push({ where, rule: 'physical-property', text: `${d.prop}: ${d.value}` });
 
+      /* `text-overflow` DOES NOTHING ON A FLEX OR GRID CONTAINER, and says nothing about it.
+         It applies to a block container's own inline content, so on `display: flex` the browser
+         silently ignores it and the parent clips instead — a hard cut with no ellipsis, which is a
+         truncation nobody can see happening. It read `fenwick.examp` for `fenwick.example.com`, six
+         senders in a row, each unreadable in the same way.
+
+         THE ELLIPSIS GOES ON THE CHILD THAT HOLDS THE TEXT. That is one span, and it is the
+         difference between a cut somebody can see and one they cannot. */
+      if (d.prop === 'text-overflow' && /ellipsis/.test(d.value) && flexed(text, d.at))
+        findings.push({ where, rule: 'ellipsis-on-flex', text: `${d.prop}: ${d.value}` });
+
       // 13 §2.4 check C's usage half: `faint` clears only the LARGE-text floor, so it may not carry
       // text below 24px. The palette half is the theme validator's.
       if (d.prop === 'color' && /--faint/.test(d.value))
@@ -245,6 +256,25 @@ for (const file of files) {
 for (const u of used)
   if (!declared.has(u.name))
     findings.push({ where: u.where, rule: 'unknown-property', text: `var(${u.name})` });
+
+/**
+ * Does the rule this declaration sits in also make the element a flex or grid CONTAINER?
+ *
+ * BY THE ENCLOSING BRACES, which is the same bounded-slice technique `justified` uses and is exact
+ * enough for the one thing it decides: a `display` on the same selector as the `text-overflow`.
+ * `display: inline-flex` counts and `display: block` does not, and a rule with no `display` at all
+ * is a block by default, which is where `text-overflow` works.
+ */
+function flexed(text, at) {
+  const open = text.lastIndexOf('{', at);
+  if (open < 0) return false;
+  const close = text.indexOf('}', at);
+  const block = text.slice(open, close < 0 ? text.length : close);
+  /* Read as words rather than matched as a pattern: `display` and its value, with whatever
+     whitespace is between them collapsed, so the check is about what the rule SAYS. */
+  const flat = block.replace(/\s+/g, ' ');
+  return flat.includes('display: flex') || flat.includes('display: grid') || flat.includes('display: inline-flex');
+}
 
 /**
  * Is this declaration annotated with a `focus-ok:` reason?
@@ -264,6 +294,7 @@ const RULES = {
   'physical-property': 'logical properties only — this breaks under dir="rtl"',
   'outline-none': 'the focus ring is not removable without a `focus-ok:` reason beside it',
   'faint-on-text': 'faint clears the large-text floor only; not below 24px',
+  'ellipsis-on-flex': 'text-overflow does nothing on a flex or grid container — put it on the child that holds the text',
 };
 
 if (findings.length === 0) {

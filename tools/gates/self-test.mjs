@@ -44,6 +44,7 @@ const CASES = [
   { gate: 'colour-grep-hex8', run: 'colour-grep', expect: /colour literal/, findings: 1 },
   { gate: 'colour-grep-oklch', run: 'colour-grep', expect: /colour literal/, findings: 1 },
   { gate: 'css-rules', expect: /findings/, findings: 1 },
+  { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
   { gate: 'secret-grep', expect: /reaches a log/, findings: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same

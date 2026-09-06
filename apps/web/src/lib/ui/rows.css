@@ -87,8 +87,13 @@
     font-family: var(--font-id);
     font-size: var(--t-xs);
     letter-spacing: -0.02em;
+    /* CLIPPED, AND THE ELLIPSIS IS THE CHILD'S. `text-overflow` does nothing on a flex container —
+       it applies to a block container's own inline content — so this declared a behaviour it did not
+       have, and a caller putting long text here got a hard cut with nothing to say it happened.
+       `fenwick.example.com` read `fenwick.examp`, six senders in a row. Whoever puts text longer
+       than a spoken id in here wraps it in a span and ellipsises that; `css-rules` is red on the
+       declaration that pretends otherwise. */
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 

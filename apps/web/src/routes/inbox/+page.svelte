@@ -42,8 +42,13 @@
           >
             <!-- A row that expands should say so. `aria-expanded` told a screen reader and nothing
                  told anybody else. -->
-            <span class="seq" data-open={open === item.id ? '' : undefined}>
-              <Icon name="chevronDown" size="s" />{item.from.split('@')[1]}
+            <!-- THE DOMAIN, ELLIPSISED AND CARRYING THE WHOLE OF ITSELF. `.seq` is a twelve-character
+                 column because a spoken id is `#41`; a domain is not, so `fenwick.example.com`
+                 arrived as `fenwick.examp` — hard-cut, with no ellipsis to say it had been. Six
+                 senders in a row, each unreadable and each unreadable in the same way, so the column
+                 said "example" six times and nothing else. -->
+            <span class="seq" data-open={open === item.id ? '' : undefined} title={item.from}>
+              <Icon name="chevronDown" size="s" /><span class="host">{item.from.split('@')[1]}</span>
             </span>
             <span class="line-main">
               <span class="line-title">{item.subject}</span>
@@ -102,6 +107,9 @@
   }
 
   .line {
+    /* WIDER THAN A SPOKEN ID, because what is in it is a domain. Sixteen characters is most of them
+       and the rest ellipsise, which is a truncation somebody can see. */
+    grid-template-columns: 16ch minmax(0, 1fr) auto 9ch;
     inline-size: 100%;
     border: 0;
     background: none;
@@ -110,8 +118,18 @@
   }
 
   .body {
-    padding: 0 var(--sp-4) var(--sp-4) calc(12ch + var(--sp-4) * 2);
+    padding: 0 var(--sp-4) var(--sp-4) calc(16ch + var(--sp-4) * 2);
     background: var(--s1);
+  }
+
+  /* AND IT SHRINKS. A grid child's floor is its content unless it is told otherwise, so without this
+     the column kept the widest domain's width and the ellipsis never applied — the parent clipped
+     instead, which is a cut with nothing to say it happened. */
+  .host {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .raw {
