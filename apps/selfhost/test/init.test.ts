@@ -131,7 +131,16 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
       'ada@example.com',
       'the address is not stored trimmed and lower-cased',
     );
-    assert.equal(dirSql.one<{ level: string }>('SELECT level FROM dir_member')?.level, 'owner');
+    /* THE DIRECTORY SAYS WHICH RECORD AND THE RECORD SAYS WHAT MAY BE DONE. `dir_member` carried a
+       level and that was a second copy of one, in a database that cannot be written in the same
+       transaction as the record's own `member` table — so the two disagreed the moment anybody was
+       invited. The owner is named once, on the record's row. */
+    assert.equal(dirSql.all('SELECT 1 FROM dir_member').length, 1);
+    assert.equal(
+      dirSql.one<{ owner: string }>('SELECT owner FROM dir_record')?.owner,
+      dirSql.one<{ id: string }>('SELECT id FROM dir_person')?.id,
+      'the directory does not name the person who owns the record it just made',
+    );
     dirSql.close();
 
     /* THE INBOUND TOKEN IS A PATH IN THE OUTPUT AND NEVER ITS CONTENTS. 49 §6: nothing at boot or on

@@ -71,6 +71,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS dir_person_email ON dir_person(lower(email));
 
 CREATE TABLE IF NOT EXISTS dir_record (
   id         TEXT PRIMARY KEY,              -- 'rec_01J…' — the argument to idFromName. It NEVER changes.
+  owner      TEXT NOT NULL DEFAULT '',      -- the founding owner. 33 §593: record_dir.owner_person
   created_at TEXT NOT NULL,
   closed_at  TEXT
 );
@@ -85,10 +86,19 @@ CREATE TABLE IF NOT EXISTS dir_slug (
 );
 CREATE INDEX IF NOT EXISTS dir_slug_record ON dir_slug(record, released_at);
 
+-- WHICH RECORDS A PERSON CAN REACH, AND NOT WHAT THEY MAY DO THERE.
+--
+-- IT CARRIED A LEVEL AND THAT WAS A SECOND COPY OF ONE. The record's own member table is written by
+-- invite and removeMember; this one was written by join and leave; the two live in databases that
+-- cannot be written in one transaction, so the moment anybody was invited they disagreed and
+-- nothing reconciled them. A level here is a promise the Directory cannot keep.
+--
+-- 33 §593 settles it: person_record is (person_id, rec_id) and nothing else. The Directory answers
+-- WHICH record, the record answers WHAT MAY BE DONE -- which is what both hosts already did, since
+-- each builds its CallContext level from kernel.access(person).
 CREATE TABLE IF NOT EXISTS dir_member (
   person   TEXT NOT NULL,
   record   TEXT NOT NULL,
-  level    TEXT NOT NULL CHECK (level IN ('read','append','write','decide','owner')),
   added_at TEXT NOT NULL,
   PRIMARY KEY (person, record)
 );
@@ -96,7 +106,8 @@ CREATE TABLE IF NOT EXISTS dir_member (
 
 export type Person = { id: string; email: string; name: string | null; created_at: string };
 export type Named = { record: string; slug: string };
-export type Membership = { record: string; slug: string | null; level: Level; closed: boolean };
+/** A record this person can reach. What they may DO in it is the record's answer, not this one's. */
+export type Membership = { record: string; slug: string | null; closed: boolean };
 
 export type Directory = ReturnType<typeof createDirectory>;
 
@@ -109,7 +120,30 @@ export type Directory = ReturnType<typeof createDirectory>;
  * which record a name means. `FORMAT_NEWER_THAN_READER` is what the format layer says (`03 §11`),
  * and this is the one place the Directory can say it.
  */
-export const DIRECTORY_VERSION = 1;
+export const DIRECTORY_VERSION = 2;
+
+/**
+ * From one to two: the level leaves `dir_member` and the founding owner joins `dir_record`.
+ *
+ * WRITTEN OUT RATHER THAN RE-CREATED. `CREATE TABLE IF NOT EXISTS` is a no-op over an existing
+ * table, so a directory written by version 1 keeps its `level` column for ever unless something
+ * says otherwise — which is the same silent-upgrade failure the version gate above exists to stop,
+ * arriving from the other direction.
+ *
+ * THE OWNER IS RECOVERED FROM THE LEVEL BEFORE IT GOES. Version 1 wrote exactly one `owner` row per
+ * record, in `provision`, and that person is what `dir_record.owner` now holds. A record whose owner
+ * cannot be recovered keeps `''`, which `leave` reads as "this directory does not know who owns
+ * this" and refuses on — the safe answer, and one somebody can fix by hand.
+ */
+const TO_2 = [
+  /* THE COLUMN FIRST, because `CREATE TABLE IF NOT EXISTS` did not add it — which is the whole
+     reason this list exists and was the first thing its own test caught. */
+  `ALTER TABLE dir_record ADD COLUMN owner TEXT NOT NULL DEFAULT ''`,
+  `UPDATE dir_record SET owner = COALESCE(
+     (SELECT m.person FROM dir_member m WHERE m.record = dir_record.id AND m.level = 'owner' LIMIT 1), '')
+   WHERE owner = ''`,
+  'ALTER TABLE dir_member DROP COLUMN level',
+];
 
 export function createDirectory(sql: Sql, clock: Clock) {
   /* THE VERSION IS READ BEFORE THE DDL RUNS. `CREATE TABLE IF NOT EXISTS` over a newer schema is
@@ -125,6 +159,15 @@ export function createDirectory(sql: Sql, clock: Clock) {
   /* ONE SCRIPT, not split on semicolons: the comments in it carry the argument for the tombstone,
      and a naive split would cut one in half. Both adapters run a multi-statement script. */
   sql.exec(SCHEMA);
+
+  /* AND AN OLDER ONE IS BROUGHT FORWARD. `IF NOT EXISTS` leaves an existing table exactly as it was,
+     so the DDL above is the shape of a NEW directory and this is the only thing that changes an old
+     one. Each statement is guarded by the version, runs once, and is a no-op if it has run: the
+     `UPDATE` is idempotent and the `DROP COLUMN` is the one that would throw, so it is last. */
+  if (version === 1)
+    sql.transactionSync(() => {
+      for (const statement of TO_2) sql.exec(statement);
+    });
   if (version < DIRECTORY_VERSION) sql.exec(`PRAGMA user_version = ${DIRECTORY_VERSION}`);
 
   const mint = ulids(() => clock.now());
@@ -312,9 +355,9 @@ export function createDirectory(sql: Sql, clock: Clock) {
            name that can never be issued again. */
         const record = args.record ?? `rec_${mint()}`;
         const now = at();
-        sql.exec('INSERT INTO dir_record (id, created_at) VALUES (?, ?)', record, now);
+        sql.exec('INSERT INTO dir_record (id, owner, created_at) VALUES (?, ?, ?)', record, person.id, now);
         sql.exec('INSERT INTO dir_slug (slug, record, claimed_at) VALUES (?, ?, ?)', args.slug, record, now);
-        sql.exec("INSERT INTO dir_member (person, record, level, added_at) VALUES (?, ?, 'owner', ?)", person.id, record, now);
+        sql.exec('INSERT INTO dir_member (person, record, added_at) VALUES (?, ?, ?)', person.id, record, now);
         return ok({ record, slug: args.slug, person: person.id });
       }),
 
@@ -358,36 +401,47 @@ export function createDirectory(sql: Sql, clock: Clock) {
      */
     recordsOf: (person: string): Membership[] =>
       sql
-        .all<{ record: string; level: Level; slug: string | null; closed_at: string | null }>(
-          `SELECT m.record AS record, m.level AS level,
+        .all<{ record: string; slug: string | null; closed_at: string | null }>(
+          `SELECT m.record AS record,
                   (SELECT s.slug FROM dir_slug s WHERE s.record = m.record AND s.released_at IS NULL) AS slug,
                   (SELECT r.closed_at FROM dir_record r WHERE r.id = m.record) AS closed_at
              FROM dir_member m WHERE m.person = ? ORDER BY m.rowid`,
           person,
         )
-        .map((r) => ({ record: r.record, slug: r.slug, level: r.level, closed: r.closed_at !== null })),
+        .map((r) => ({ record: r.record, slug: r.slug, closed: r.closed_at !== null })),
 
     /**
-     * What this person may do with this record, or `null`.
+     * Can this person reach this record at all?
      *
-     * THE WORKER'S SECOND QUESTION, after the slug. It builds a `CallContext` from the answer, and
-     * the record then does every permission check itself — this says which ladder the caller is on,
-     * never what they may do with it.
+     * THE WORKER'S SECOND QUESTION, after the slug — and the whole of it. It used to answer with a
+     * LEVEL, which is a fact the Directory cannot keep true: the record's own `member` table is
+     * written by `invite` and `removeMember`, this one by `join` and `leave`, and the two live in
+     * databases that cannot be written in one transaction. The moment anybody was invited they
+     * disagreed.
+     *
+     * BOTH HOSTS ALREADY IGNORED IT. The self-host builds its `CallContext` from
+     * `kernel.access(person)` and the Worker does the same — with a comment on each saying the level
+     * comes from the record and never from a constant. So this was a second answer to a question
+     * nothing asked twice, kept correct by nothing.
      */
-    levelOf: (record: string, person: string): Level | null =>
-      sql.one<{ level: Level }>(
-        `SELECT m.level AS level FROM dir_member m
+    reaches: (record: string, person: string): boolean =>
+      sql.one(
+        `SELECT 1 AS x FROM dir_member m
            JOIN dir_record r ON r.id = m.record AND r.closed_at IS NULL
           WHERE m.record = ? AND m.person = ?`,
         record,
         person,
-      )?.level ?? null,
+      ) !== undefined,
 
-    /** Add somebody, or move them. */
-    join: (record: string, person: string, level: Level): Result<null> =>
+    /**
+     * Somebody can reach this record.
+     *
+     * IT TOOK A LEVEL AND NO LONGER DOES. What a person may do is `invite`'s to say, in the record,
+     * where the levels are per register and the audit trail is an event. This says only that the
+     * record is theirs to open — which is the question the Directory is for.
+     */
+    join: (record: string, person: string): Result<null> =>
       sql.transactionSync(() => {
-        if (!(LEVELS as readonly string[]).includes(level))
-          return no<null>('ENUM_VALUE_UNKNOWN', `${level} is not a level.`, { at: 'level', allowed: LEVELS });
         /* AND A CLOSED RECORD TAKES NOBODY. Its name is released and its storage is the platform's
            to delete; adding somebody mints access to a record whose name may already have been
            handed back, and `levelOf` is what the Worker builds a caller's context from. */
@@ -396,24 +450,11 @@ export function createDirectory(sql: Sql, clock: Clock) {
         if (!sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', person))
           return no<null>('OUT_OF_BOUNDS', `There is no person ${person}.`, { at: 'person' });
 
-        /* THE LAST OWNER CANNOT BE DEMOTED EITHER. `leave` refused to remove them and this moved
-           them, which is the same record with nobody who can grant access to it — and the only way
-           out of that is somebody with a database. */
-        const now = sql.one<{ level: Level }>('SELECT level FROM dir_member WHERE record = ? AND person = ?', record, person)?.level;
-        if (now === 'owner' && level !== 'owner') {
-          const owners = Number(
-            sql.one<{ n: number }>("SELECT count(*) AS n FROM dir_member WHERE record = ? AND level = 'owner'", record)?.n ?? 0,
-          );
-          if (owners <= 1)
-            return no<null>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'level' });
-        }
-
         sql.exec(
-          `INSERT INTO dir_member (person, record, level, added_at) VALUES (?, ?, ?, ?)
-           ON CONFLICT (person, record) DO UPDATE SET level = excluded.level`,
+          `INSERT INTO dir_member (person, record, added_at) VALUES (?, ?, ?)
+           ON CONFLICT (person, record) DO NOTHING`,
           person,
           record,
-          level,
           at(),
         );
         return ok(null);
@@ -422,20 +463,26 @@ export function createDirectory(sql: Sql, clock: Clock) {
     /**
      * Remove somebody.
      *
-     * NEVER THE LAST OWNER. A record with no owner is a record nobody can grant access to, invite
-     * anybody into, or close — and the only way out of it is somebody with a database.
+     * NEVER THE OWNER. A record its owner cannot reach is a record nobody can grant access to,
+     * invite anybody into, or close — and the only way out of that is somebody with a database.
+     *
+     * THE OWNER IS `dir_record.owner` NOW, not the highest level in this table. That is the whole
+     * gain: one row names one person, written once by `provision`, and it cannot drift from a level
+     * somebody edited in the record. Moving ownership is a verb nothing has yet; when it exists, it
+     * is the thing that writes this column.
      */
     leave: (record: string, person: string): Result<null> =>
       sql.transactionSync(() => {
-        const level = sql.one<{ level: Level }>('SELECT level FROM dir_member WHERE record = ? AND person = ?', record, person)?.level;
-        if (!level) return ok(null);
-        if (level === 'owner') {
-          const owners = Number(
-            sql.one<{ n: number }>("SELECT count(*) AS n FROM dir_member WHERE record = ? AND level = 'owner'", record)?.n ?? 0,
+        if (!sql.one('SELECT 1 AS x FROM dir_member WHERE record = ? AND person = ?', record, person)) return ok(null);
+        const owner = sql.one<{ owner: string }>('SELECT owner FROM dir_record WHERE id = ?', record)?.owner;
+        if (owner === person || owner === '' || owner === undefined)
+          return no<null>(
+            'LEVEL_REQUIRED',
+            owner === person
+              ? 'A record keeps its owner. Hand it over first.'
+              : `This directory does not know who owns ${record}, so it cannot say who may be removed from it.`,
+            { at: 'person' },
           );
-          if (owners <= 1)
-            return no<null>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'person' });
-        }
         sql.exec('DELETE FROM dir_member WHERE record = ? AND person = ?', record, person);
         return ok(null);
       }),

@@ -149,44 +149,110 @@ test('WHICH RECORDS DOES THIS PERSON REACH — the question a record cannot answ
   const bo = value<Person>(d.person$('bo@example.com'));
   const second = value<Named & { person: string }>(d.provision({ slug: 'kiln', email: 'bo@example.com' }));
 
-  value(d.join(made.record, bo.id, 'write'));
+  value(d.join(made.record, bo.id));
   const reach: Membership[] = d.recordsOf(bo.id);
-  assert.deepEqual(
-    reach.map((m) => [m.slug, m.level]),
-    [
-      ['kiln', 'owner'],
-      ['the-studio', 'write'],
-    ],
-  );
-  assert.equal(d.levelOf(made.record, bo.id), 'write');
-  assert.equal(d.levelOf(second.record, made.person), null, 'somebody reached a record they are not on');
+  assert.deepEqual(reach.map((m) => m.slug), ['kiln', 'the-studio']);
 
-  // Joining again moves them rather than adding a second row.
-  value(d.join(made.record, bo.id, 'read'));
+  /* AND THAT IS THE WHOLE ANSWER. It used to carry a LEVEL, which is a fact this database cannot
+     keep true: the record's own `member` table is written by `invite` and `removeMember`, this one
+     by `join` and `leave`, and the two cannot be written in one transaction. Both hosts already
+     built their `CallContext` level from `kernel.access(person)` and ignored this one. */
+  assert.ok(!('level' in reach[0]!), 'the Directory is answering a question it cannot keep true');
+
+  assert.equal(d.reaches(made.record, bo.id), true);
+  assert.equal(d.reaches(second.record, made.person), false, 'somebody reached a record they are not on');
+
+  // Joining again is the state they asked for, not a second row.
+  value(d.join(made.record, bo.id));
   assert.equal(d.recordsOf(bo.id).length, 2);
-  assert.equal(d.levelOf(made.record, bo.id), 'read');
 
-  assert.equal(refusal(d.join(made.record, bo.id, 'admin' as never)).code, 'ENUM_VALUE_UNKNOWN');
-  assert.equal(refusal(d.join('rec_nothing', bo.id, 'read')).at, 'record');
-  assert.equal(refusal(d.join(made.record, 'p_nobody', 'read')).at, 'person');
+  assert.equal(refusal(d.join('rec_nothing', bo.id)).at, 'record');
+  assert.equal(refusal(d.join(made.record, 'p_nobody')).at, 'person');
   sql.close();
 });
 
-test('A RECORD KEEPS ONE OWNER, or nobody can grant access to it ever again', async () => {
+test('A RECORD KEEPS ITS OWNER, or nobody can grant access to it ever again', async () => {
   const { d, sql } = directory();
   const made = studio(d);
   const bo = value<Person>(d.person$('bo@example.com'));
 
+  /* THE OWNER IS `dir_record.owner`, written once by `provision`. It used to be "whoever holds the
+     highest level in `dir_member`" — a level this database could not keep true, so the guard on the
+     one row that matters rested on the one column that drifted. */
   assert.equal(refusal(d.leave(made.record, made.person)).code, 'LEVEL_REQUIRED');
-  assert.equal(d.levelOf(made.record, made.person), 'owner');
+  assert.match(refusal(d.leave(made.record, made.person)).fix, /keeps its owner/);
+  assert.equal(d.reaches(made.record, made.person), true);
 
-  value(d.join(made.record, bo.id, 'owner'));
-  value(d.leave(made.record, made.person));
-  assert.equal(d.levelOf(made.record, made.person), null);
-  assert.equal(d.levelOf(made.record, bo.id), 'owner');
+  // Anybody else can be removed, and being an owner elsewhere does not protect them here.
+  value(d.join(made.record, bo.id));
+  value(d.leave(made.record, bo.id));
+  assert.equal(d.reaches(made.record, bo.id), false);
 
   // Removing somebody who is not there is not an error; it is the state they asked for.
   value(d.leave(made.record, 'p_nobody'));
+  sql.close();
+});
+
+test('A DIRECTORY WRITTEN BY VERSION 1 IS BROUGHT FORWARD, and keeps its owner', async () => {
+  /* `CREATE TABLE IF NOT EXISTS` is a no-op over an existing table, so a version-1 directory would
+     have kept its `level` column for ever — the same silent-upgrade failure the version gate stops
+     from the other direction. The owner is recovered from the level before the column goes. */
+  const sql = openSqlite();
+  sql.exec(`
+    CREATE TABLE dir_person (id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT, created_at TEXT NOT NULL);
+    CREATE TABLE dir_record (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, closed_at TEXT);
+    CREATE TABLE dir_slug (slug TEXT PRIMARY KEY, record TEXT NOT NULL, claimed_at TEXT NOT NULL, released_at TEXT);
+    CREATE TABLE dir_member (person TEXT NOT NULL, record TEXT NOT NULL,
+      level TEXT NOT NULL CHECK (level IN ('read','append','write','decide','owner')),
+      added_at TEXT NOT NULL, PRIMARY KEY (person, record));
+    PRAGMA user_version = 1;
+  `);
+  sql.exec("INSERT INTO dir_person (id, email, created_at) VALUES ('p_ada', 'ada@example.com', '2026-01-01T00:00:00.000Z')");
+  sql.exec("INSERT INTO dir_person (id, email, created_at) VALUES ('p_bo', 'bo@example.com', '2026-01-01T00:00:00.000Z')");
+  sql.exec("INSERT INTO dir_record (id, created_at) VALUES ('rec_old', '2026-01-01T00:00:00.000Z')");
+  sql.exec("INSERT INTO dir_slug (slug, record, claimed_at) VALUES ('the-studio', 'rec_old', '2026-01-01T00:00:00.000Z')");
+  sql.exec("INSERT INTO dir_member (person, record, level, added_at) VALUES ('p_ada', 'rec_old', 'owner', '2026-01-01T00:00:00.000Z')");
+  sql.exec("INSERT INTO dir_member (person, record, level, added_at) VALUES ('p_bo', 'rec_old', 'write', '2026-01-01T00:00:00.000Z')");
+
+  const d = createDirectory(sql, { now: () => Date.UTC(2026, 8, 7) });
+
+  assert.equal(Number(sql.one<{ user_version: number }>('PRAGMA user_version')?.user_version), DIRECTORY_VERSION);
+  assert.equal(sql.all("SELECT 1 FROM pragma_table_info('dir_member') WHERE name = 'level'").length, 0, 'the level column survived');
+  assert.equal(sql.one<{ owner: string }>("SELECT owner FROM dir_record WHERE id = 'rec_old'")?.owner, 'p_ada');
+
+  // And both memberships survived the migration, which is the point of doing it rather than dropping the table.
+  assert.equal(d.reaches('rec_old', 'p_ada'), true);
+  assert.equal(d.reaches('rec_old', 'p_bo'), true);
+  assert.equal(refusal(d.leave('rec_old', 'p_ada')).code, 'LEVEL_REQUIRED');
+  value(d.leave('rec_old', 'p_bo'));
+
+  /* AND IT IS IDEMPOTENT. Opening the same file again runs no migration, because the version says
+     so — and a `DROP COLUMN` that ran twice would throw out of `createDirectory`. */
+  createDirectory(sql, { now: () => Date.UTC(2026, 8, 7) });
+  sql.close();
+});
+
+test('A DIRECTORY WHOSE OWNER CANNOT BE RECOVERED REFUSES RATHER THAN GUESSING', async () => {
+  const sql = openSqlite();
+  sql.exec(`
+    CREATE TABLE dir_person (id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT, created_at TEXT NOT NULL);
+    CREATE TABLE dir_record (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, closed_at TEXT);
+    CREATE TABLE dir_slug (slug TEXT PRIMARY KEY, record TEXT NOT NULL, claimed_at TEXT NOT NULL, released_at TEXT);
+    CREATE TABLE dir_member (person TEXT NOT NULL, record TEXT NOT NULL,
+      level TEXT NOT NULL CHECK (level IN ('read','append','write','decide','owner')),
+      added_at TEXT NOT NULL, PRIMARY KEY (person, record));
+    PRAGMA user_version = 1;
+  `);
+  sql.exec("INSERT INTO dir_person (id, email, created_at) VALUES ('p_bo', 'bo@example.com', '2026-01-01T00:00:00.000Z')");
+  sql.exec("INSERT INTO dir_record (id, created_at) VALUES ('rec_odd', '2026-01-01T00:00:00.000Z')");
+  // A record with members and no owner — which version 1 could produce, because nothing stopped it.
+  sql.exec("INSERT INTO dir_member (person, record, level, added_at) VALUES ('p_bo', 'rec_odd', 'write', '2026-01-01T00:00:00.000Z')");
+
+  const d = createDirectory(sql, { now: () => Date.UTC(2026, 8, 7) });
+  assert.equal(sql.one<{ owner: string }>("SELECT owner FROM dir_record WHERE id = 'rec_odd'")?.owner, '');
+  /* THE SAFE ANSWER IS THE REFUSAL. Removing the only person on a record whose owner is unknown is
+     how a record becomes unreachable, and this one says which record so somebody can fix it. */
+  assert.match(refusal(d.leave('rec_odd', 'p_bo')).fix, /does not know who owns rec_odd/);
   sql.close();
 });
 
@@ -217,31 +283,14 @@ test('and the directory survives being opened twice over the same storage', asyn
   sql.close();
 });
 
-test('AND THE LAST OWNER CANNOT BE DEMOTED EITHER, which `leave` alone did not stop', async () => {
-  /* `leave` refused to remove them and `join` moved them, which is the same record with nobody who
-     can grant access to it — and the only way out of that is somebody with a database. */
-  const { d, sql } = directory();
-  const made = studio(d);
-
-  assert.equal(refusal(d.join(made.record, made.person, 'read')).code, 'LEVEL_REQUIRED');
-  assert.equal(d.levelOf(made.record, made.person), 'owner');
-
-  // With a second owner it is an ordinary change.
-  const bo = value<Person>(d.person$('bo@example.com'));
-  value(d.join(made.record, bo.id, 'owner'));
-  value(d.join(made.record, made.person, 'read'));
-  assert.equal(d.levelOf(made.record, made.person), 'read');
-  sql.close();
-});
-
 test('and a closed record takes nobody, because its name may already be somebody else’s problem', async () => {
   const { d, sql } = directory();
   const made = studio(d);
   const bo = value<Person>(d.person$('bo@example.com'));
   value(d.close(made.record));
 
-  assert.equal(refusal(d.join(made.record, bo.id, 'owner')).at, 'record');
-  assert.equal(d.levelOf(made.record, bo.id), null, 'somebody was given owner on a closed record');
+  assert.equal(refusal(d.join(made.record, bo.id)).at, 'record');
+  assert.equal(d.reaches(made.record, bo.id), false, 'somebody was let into a closed record');
   sql.close();
 });
 
