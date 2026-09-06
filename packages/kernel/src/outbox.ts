@@ -273,16 +273,28 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
 
   if (attempts < CEILING) {
     /* THE RETRY IS A SCHEDULE ROW, not a flag on this one. `UNIQUE (kind, key)` makes it idempotent:
-       two failures of the same job cannot arm two retries, and the key says what it is about. */
+       two failures of the same job cannot arm two retries, and the key says what it is about.
+
+       AND ITS `attempts` IS ITS OWN, WHICH IS ZERO. This wrote the OUTBOX's attempt count into the
+       SCHEDULE row's failure counter — two different quantities in one column, and nothing ever read
+       it back. A job failing its seventh delivery armed a retry row that `drainSchedule` already
+       considered to be on its seventh rung, so the first transient error inside `retryHandler` — a
+       storage blip, one lock — made it eight, and eight is the ceiling: the row went `failed`
+       immediately, a suggestion opened saying a retry “could not run after 8 attempts” when it had
+       run once, and the outbox row stayed `failed` for ever. Not `dead`, so no dead letter and no
+       question; not `pending`, so nothing could ever lease it again. The notification was gone, and
+       the only trace was a sentence about the wrong subject.
+
+       THE OUTBOX'S COUNT GOES IN THE PAYLOAD, where it is what it always was: something to read,
+       and not something the ladder walks on. */
     sql.exec(
       `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts)
-       VALUES (?, ?, 'retry', ?, ?, 'pending', ?)
-       ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, state = 'pending', attempts = excluded.attempts`,
+       VALUES (?, ?, 'retry', ?, ?, 'pending', 0)
+       ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0`,
       deps.mint(),
       iso(deps.nowMs + backoffMs(attempts)),
       `outbox:${args.id}`,
-      JSON.stringify({ outbox: args.id }),
-      attempts,
+      JSON.stringify({ outbox: args.id, attempt: attempts }),
     );
     return ok(null);
   }

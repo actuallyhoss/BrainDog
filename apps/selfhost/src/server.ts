@@ -178,7 +178,13 @@ function nodeScheduler(run: () => Promise<void>, poll: () => Promise<void>): Sch
 }
 
 /** The kinds a self-host can be asked to deliver. The nine minus nothing: `deliver` decides. */
-const EVERY_KIND: OutboxKind[] = [
+/**
+ * The nine, for a deployment that really can deliver all nine.
+ *
+ * IT IS A CONVENIENCE AND NEVER A DEFAULT. `start` requires the list from whoever supplies the
+ * deliverer, because the only host that can say what it serves is the one holding the transports.
+ */
+export const EVERY_KIND: OutboxKind[] = [
   'notify.email',
   'notify.push',
   'notify.webhook',
@@ -199,11 +205,35 @@ export async function start(options: {
    * is — because "no token" means "one person on one machine", and one machine is `127.0.0.1`.
    */
   host?: string | undefined;
-  /** Omit it and nothing is delivered — jobs queue and wait, which is honest rather than lossy. */
-  deliver?: Deliver | undefined;
   /** The belt under the doorbell: a tick that catches an abandoned lease. `0` turns it off. */
   pollMs?: number;
-}) {
+} & (
+    | {
+        /**
+         * What this deployment can actually deliver, and the deliverer that does it.
+         *
+         * THE TWO TRAVEL TOGETHER BECAUSE THE LIST IS A PROPERTY OF THE DELIVERER. This leased all
+         * nine kinds and handed each row to whatever function it was given — so a self-host with no
+         * model leased its `infer.embed` rows, threw "nothing in this deployment delivers a
+         * infer.embed" at each of them eight times, and dead-lettered them with a suggestion asking
+         * somebody to decide about work they never asked for. 49 §5.12 note 1 says the opposite in
+         * as many words: "a kind not in `kinds` is never leased, so it waits in `pending` until the
+         * host can serve it — a self-host with no model never dead-letters an `infer.embed` row",
+         * and §9 has the test.
+         *
+         * A LIST THAT COULD BE OMITTED WOULD DEFAULT TO ONE OF THE TWO FAILURES — deliver nothing
+         * silently, or dead-letter everything loudly — so it cannot be omitted. The Worker states
+         * the same list as `DELIVERS` and has always leased only that.
+         */
+        delivers: readonly OutboxKind[];
+        deliver: Deliver;
+      }
+    | {
+        /** Omit both and nothing is delivered — jobs queue and wait, which is honest rather than lossy. */
+        delivers?: undefined;
+        deliver?: undefined;
+      }
+  )) {
   const sql = openSqlite(options.file);
 
   /* The alarm and the record refer to each other: the record arms the alarm after every write, and
@@ -238,7 +268,7 @@ export async function start(options: {
     if (!options.deliver) return;
     let jobs: OutboxRow[];
     try {
-      jobs = api.kernel.leaseOutbox(EVERY_KIND, 10);
+      jobs = api.kernel.leaseOutbox(options.delivers, 10);
     } catch (e) {
       console.error('lease:', e instanceof Error ? e.message : String(e));
       return;
@@ -280,7 +310,7 @@ export async function start(options: {
     sql,
     clock: { now: () => Date.now() },
     scheduler,
-    delivers: options.deliver ? EVERY_KIND : [],
+    delivers: options.delivers ?? [],
   });
 
   const refused = api.kernel.refused();

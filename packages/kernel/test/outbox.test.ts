@@ -167,7 +167,7 @@ test('THE RETRY IS A SCHEDULE ROW, and there is exactly one ladder', async () =>
   )!;
   assert.equal(retry.key, `outbox:${id}`);
   assert.equal(Date.parse(retry.due_at) - NOW, 2 * MINUTE, 'the first retry is not two minutes out');
-  assert.deepEqual(JSON.parse(retry.payload), { outbox: id });
+  assert.deepEqual(JSON.parse(retry.payload), { outbox: id, attempt: 1 });
 
   // And when it fires, the job goes back where the deliverer can lease it.
   clock.set(NOW + 3 * MINUTE);
@@ -382,13 +382,58 @@ test('A RETRY ROW MIRRORS THE OUTBOX LADDER RATHER THAN RUNNING ONE OF ITS OWN',
     clock.set(at);
     await k.drain();
   }
-  assert.equal(row(sql, id).attempts, 3);
+  assert.equal(row(sql, id).attempts, 3, 'the job is not on its third rung');
+  /* AND THE SCHEDULE ROW'S OWN COUNTER IS ZERO, because the schedule row has not failed. The two
+     numbers are different quantities — how many times a NOTIFICATION was not delivered, and how
+     many times a HANDLER threw — and this column had been carrying the first while `drainSchedule`
+     read it as the second. */
   assert.equal(
     sql.one<{ attempts: number }>("SELECT attempts FROM schedule WHERE kind = 'retry'")?.attempts,
-    3,
-    'the retry row is counting a ladder of its own',
+    0,
+    'the retry row inherited the job as its own failure count',
+  );
+  assert.deepEqual(
+    JSON.parse(sql.one<{ payload: string }>("SELECT payload FROM schedule WHERE kind = 'retry'")!.payload),
+    { outbox: id, attempt: 3 },
+    'the count somebody reads is not on the row',
   );
   assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0, 'a ceiling was reached three attempts early');
+  sql.close();
+});
+
+test('A RETRY ARMED AT THE OUTBOX CEILING SURVIVES ITS OWN FIRST BAD MINUTE', async () => {
+  /* The shape that lost notifications silently. The retry row was seeded with the JOB's attempt
+     count, so a job failing its seventh delivery armed a row `drainSchedule` already believed to be
+     on its seventh rung — and the first transient error inside the handler made it eight, which is
+     the ceiling. The row went `failed` at once and the outbox row stayed `failed` for ever: not
+     `pending`, so nothing could lease it; not `dead`, so no dead letter and no question. The only
+     trace was a suggestion about the wrong subject. */
+  const { k, sql, clock } = await record();
+  const id = k.outbox('notify.email', {});
+  let at = NOW;
+  for (let n = 1; n <= 7; n++) {
+    k.leaseOutbox(ALL, 10);
+    value(k.ackOutbox({ id, state: 'failed', error: `try ${n}` }));
+    if (n === 7) break;
+    at += backoffMs(n) + MINUTE;
+    clock.set(at);
+    await k.drain();
+  }
+  assert.equal(row(sql, id).attempts, 7, 'the job is not one rung below the ceiling');
+  assert.equal(row(sql, id).state, 'failed');
+
+  const retry = sql.one<{ id: string; attempts: number }>("SELECT id, attempts FROM schedule WHERE kind = 'retry'")!;
+  assert.equal(retry.attempts, 0, 'the retry row was armed already seven rungs up');
+
+  /* AND THE HANDLER THROWS ONCE. Anything can: one lock, one blip, one row that came back wrong. */
+  sql.exec('UPDATE schedule SET payload = ? WHERE id = ?', 'not json', retry.id);
+  clock.set(at + backoffMs(7) + MINUTE);
+  await k.drain();
+
+  const after = sql.one<{ state: string; attempts: number }>('SELECT state, attempts FROM schedule WHERE id = ?', retry.id)!;
+  assert.equal(after.state, 'pending', 'one bad minute took the whole retry with it');
+  assert.equal(after.attempts, 1, 'the retry row is on the wrong rung of its own ladder');
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0, 'the ceiling was reached on the first failure');
   sql.close();
 });
 

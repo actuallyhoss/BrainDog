@@ -73,12 +73,14 @@ test('AND THE OLD NAME IS NEVER GIVEN OUT AGAIN, which is the whole tenant bound
 
   value<Person>(d.person$('bo@example.com'));
   const tried = refusal(d.provision({ slug: 'the-studio', email: 'bo@example.com' }));
-  assert.equal(tried.code, 'UNIQUE_VIOLATION');
+  /* `ALREADY_KNOWN`, which 30's register assigns to a taken slug at sign-up and 51 §5.8 to the route
+     — `UNIQUE_VIOLATION` is the index as a backstop, and nothing was inserted here. */
+  assert.equal(tried.code, 'ALREADY_KNOWN');
   assert.match(tried.fix, /cannot be given out again/);
 
   // Nor by renaming into it.
   const second = value<Named & { person: string }>(d.provision({ slug: 'kiln', email: 'bo@example.com' }));
-  assert.equal(refusal(d.rename('kiln', 'the-studio')).code, 'UNIQUE_VIOLATION');
+  assert.equal(refusal(d.rename('kiln', 'the-studio')).code, 'ALREADY_KNOWN');
   assert.equal(d.resolve('kiln')?.record, second.record);
   sql.close();
 });
@@ -86,13 +88,21 @@ test('AND THE OLD NAME IS NEVER GIVEN OUT AGAIN, which is the whole tenant bound
 test('and a name that is not a name, or is the platform’s, is refused before it is durable', async () => {
   const { d, sql } = directory();
   value<Person>(d.person$('ada@example.com'));
-  for (const slug of ['The-Studio', 'the studio', '-studio', 'studio-', 'a/b', '', '..'])
+  /* 34-GRAMMARS line 348: two to thirty-two characters, starting with a letter. `2024` and `x` were
+     both accepted by the old shape, and so was a forty-character name — and 34 names the two places
+     that makes permanent: `<slug>@in.brain.dog`, and `<data>/<slug>/` on a self-host. */
+  for (const slug of ['The-Studio', 'the studio', '-studio', 'studio-', 'a/b', '', '..', '2024', 'x', 'a'.repeat(33)])
     assert.equal(refusal(d.provision({ slug, email: 'ada@example.com' })).at, 'slug', `${slug} was allowed`);
-  for (const slug of ['api', 'auth', 'a', 's'])
+  /* AND THE WORDS 33 §4'S OWN SURFACE USES. `mcp` and `p` were missing from the set, so either could
+     have been claimed as a customer name the router reaches before the Directory does. */
+  for (const slug of ['api', 'auth', 'mcp', 'in', 'ws', 'www'])
     assert.match(refusal(d.provision({ slug, email: 'ada@example.com' })).fix, /the platform uses/);
 
   assert.equal(refusal(d.provision({ slug: 'nobody', email: 'ghost@example.com' })).code, 'OUT_OF_BOUNDS');
   assert.equal(sql.all('SELECT 1 FROM dir_record').length, 0, 'a refused provision left a record behind');
+
+  // And the far end of the range is a name, so the bound is thirty-two rather than thirty-one.
+  assert.ok(d.provision({ slug: 'a'.repeat(32), email: 'ada@example.com' }).ok, 'thirty-two characters is not a name');
   sql.close();
 });
 
@@ -168,7 +178,7 @@ test('and closing a record releases its name without freeing it', async () => {
   assert.equal(d.recordsOf(made.person)[0]?.closed, true, 'a closed record does not say so');
 
   value<Person>(d.person$('bo@example.com'));
-  assert.equal(refusal(d.provision({ slug: 'the-studio', email: 'bo@example.com' })).code, 'UNIQUE_VIOLATION');
+  assert.equal(refusal(d.provision({ slug: 'the-studio', email: 'bo@example.com' })).code, 'ALREADY_KNOWN');
   assert.equal(refusal(d.close('rec_nothing')).code, 'OUT_OF_BOUNDS');
   sql.close();
 });

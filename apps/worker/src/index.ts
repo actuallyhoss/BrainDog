@@ -21,13 +21,15 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { handlersFor, serveApi } from '@braindog/host';
+import type { OutboxRow } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type RecordApi } from '@braindog/record';
 import type { Param, Row, Scheduler, Sql } from '@braindog/ports';
 
-import { createDirectory, type Directory as Dir, type Level } from '@braindog/record/directory';
+import { createDirectory, type Directory as Dir } from '@braindog/record/directory';
 
 import { alarmScheduler } from './alarm.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
+import { consume, pump } from './pump.ts';
 import { recordPath } from './route.ts';
 
 type EmailBinding = { send(message: { to: string; subject: string; text: string }): Promise<void> };
@@ -89,26 +91,48 @@ export class Record$ extends DurableObject<Env> {
    * is a record that returns rows nobody can interpret.
    */
   #record(): Promise<RecordApi> {
-    this.#api ??= (async () => {
-      let api!: RecordApi;
-      await this.ctx.blockConcurrencyWhile(async () => {
-        api = await createRecordApi({
-          sql: storageSql(this.ctx.storage),
-          clock: { now: () => Date.now() },
-          scheduler: this.#alarm,
-          /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
-             do. A kind with no deliverer sits `pending` for ever — which is honest — and without
-             this every write afterwards rang the queue about it. */
-          delivers: DELIVERS,
-        });
-      });
-      /* ARM FROM WHAT THE RECORD ALREADY HOLDS. An object is evicted between requests and its alarm
-         survives that — but a record restored from a backup, or one whose alarm a `deleteAll` took
-         with it, would otherwise wait for a write it may never get. */
-      if (!api.kernel.refused()) await api.kernel.tail(this.#alarm);
-      return api;
-    })();
+    /* AND A REJECTED PROMISE IS NOT A CACHED ANSWER. `??=` stored whatever the opener returned,
+       including a rejection — so one transient failure at cold start (a queue hiccup in the tail, a
+       storage read that timed out) was remembered as this record's permanent state, and every
+       request until the object was evicted got the same stale error for a condition that had
+       passed. Forgetting a failure is what makes the next request a retry rather than an echo. */
+    this.#api ??= this.#open().catch((e: unknown) => {
+      this.#api = null;
+      throw e;
+    });
     return this.#api;
+  }
+
+  /** Migrate, then arm. Both before any request is answered, which is what the block is for. */
+  async #open(): Promise<RecordApi> {
+    let api!: RecordApi;
+    await this.ctx.blockConcurrencyWhile(async () => {
+      api = await createRecordApi({
+        sql: storageSql(this.ctx.storage),
+        clock: { now: () => Date.now() },
+        scheduler: this.#alarm,
+        /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
+           do. A kind with no deliverer sits `pending` for ever — which is honest — and without
+           this every write afterwards rang the queue about it. */
+        delivers: DELIVERS,
+      });
+
+      /* ARM FROM WHAT THE RECORD ALREADY HOLDS, INSIDE THE BLOCK. An object is evicted between
+         requests and its alarm survives that — but a record restored from a backup, or one whose
+         alarm a `deleteAll` took with it, would otherwise wait for a write it may never get. It sat
+         outside, so a request could be answered by a record whose schedule was not yet armed.
+
+         AND ITS FAILURE IS NOT THE RECORD'S. The tail is belt-and-braces — every write arms the
+         alarm on its way out — so a doorbell that would not ring is a late notification, and
+         letting it through here would have been a record that refuses to open at all. */
+      if (!api.kernel.refused())
+        try {
+          await api.kernel.tail(this.#alarm);
+        } catch (e) {
+          console.error('tail:', e instanceof Error ? e.message : String(e));
+        }
+    });
+    return api;
   }
 
   /**
@@ -132,7 +156,7 @@ export class Record$ extends DurableObject<Env> {
    * and the credentials. Doing the I/O inside the object would give the record a reason to hold a
    * key, and `ADR-062` is the argument for why it must not.
    */
-  async lease(n = 10): Promise<{ id: string; kind: string; payload: string; attempts: number; leasedUntil: string }[]> {
+  async lease(n = 10): Promise<OutboxRow[]> {
     const api = await this.#record();
     return api.kernel.leaseOutbox(DELIVERS, n);
   }
@@ -233,20 +257,27 @@ export class Directory$ extends DurableObject<Env> {
    * and `remove` write a table no authorisation path read — so removing somebody did not stop them
    * writing, and a bookkeeper given `read` on the payroll register wrote to it.
    */
-  reaches(person: string): { record: string; slug: string | null; level: Level }[] {
+  reaches(person: string): { record: string; slug: string | null }[] {
+    /* AND IT NO LONGER RETURNS A LEVEL, because there is nothing keeping that level true. `invite`
+       and `removeMember` write the RECORD's `member` table; `join` and `leave` write the Directory's
+       `dir_member`. Nothing writes both. So the level here is whatever it was when somebody was
+       first put on the record — a person removed a year ago still reads as `write`, and the field
+       reads as an authorisation to anyone who finds it, which is precisely what the paragraph above
+       spends four lines saying it is not. A type that cannot lie is better than a comment that says
+       it does. */
     return this.#directory()
       .recordsOf(person)
       .filter((m) => !m.closed)
-      .map((m) => ({ record: m.record, slug: m.slug, level: m.level }));
+      .map((m) => ({ record: m.record, slug: m.slug }));
   }
 }
 
 /**
- * One pass over one record's outbox: lease, deliver, ack.
+ * One pass over one record’s outbox, with this deployment’s bindings behind it.
  *
- * ONE PASS AND NOT A LOOP. The ack rings the doorbell again when anything is left, so a queue that
- * keeps filling is drained by the doorbell rather than by a `while` nobody can stop — and a
- * consumer that looped would hold one invocation open across a customer's entire backlog.
+ * THE BUILDING IS HERE AND THE PASS IS IN `pump.ts`. What this function contributes is two
+ * transports out of `env` — which is the only part that needs the platform — and everything that
+ * can go wrong in the pass itself is a plain function a bare Node process can run.
  */
 async function drainOutbox(env: Env, id: string): Promise<void> {
   const record = env.RECORD.get(env.RECORD.idFromString(id));
@@ -275,37 +306,7 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
     },
   });
 
-  for (const job of await record.lease()) {
-    /* THE SUCCESS ACK IS OUTSIDE THE TRY WHOSE CATCH ACKS FAILURE. It used to be inside, so an ack
-       that threw for its own reasons — a DO RPC can, on a code update or an eviction — recorded a
-       SENT email as failed, armed a retry and sent it again.
-
-       AND THE LEASE GOES BACK WITH THE ANSWER. Without it a stale ack completes somebody else's
-       lease: a slow endpoint outlives its sixty seconds, another worker reclaims and delivers, and
-       the first worker's late failure arms a retry for a job that already went. */
-    let sent = false;
-    let why = '';
-    try {
-      await deliver(job as never);
-      sent = true;
-    } catch (e) {
-      /* THE MESSAGE AND NEVER THE PAYLOAD. A digest is somebody's overdue invoices; an error line
-         that quoted one has published it to wherever logs go. */
-      why = e instanceof Error ? e.message : String(e);
-    }
-
-    try {
-      await record.ack(
-        sent
-          ? { id: job.id, state: 'done', leasedUntil: job.leasedUntil }
-          : { id: job.id, state: 'failed', error: why, leasedUntil: job.leasedUntil },
-      );
-    } catch (e) {
-      /* AN ACK THAT WILL NOT LAND IS NOT A REASON TO ABANDON THE REST OF THE BATCH. The lease
-         expires and the job is reclaimed, which is what the lease is for. */
-      console.error('ack:', e instanceof Error ? e.message : String(e));
-    }
-  }
+  await pump(record, deliver);
 }
 
 /** Where a call came from, for the "last used" line on a token listing. */
@@ -313,6 +314,16 @@ const surfaceOf = (url: URL): string => (url.pathname.includes('/mcp') ? 'mcp' :
 
 const json = (body: unknown, status: number): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
+
+/**
+ * The one answer to every way of not being let in.
+ *
+ * ONE SENTENCE FOR ALL THREE — no bearer, a bearer this record does not know, and a name no record
+ * has. They were three different answers, and the difference between the third and the other two is
+ * readable without any credential at all: it said which names exist.
+ */
+const unauthorized = (): Response =>
+  json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record needs a bearer it knows. Mint one from the app.' } }, 401);
 
 /**
  * The slug in the path is a NAME, and the Directory says which record it means.
@@ -326,7 +337,39 @@ const json = (body: unknown, status: number): Response =>
  * handing it to the next person who asks is how one of them reads another customer's record.
  */
 export default {
+  /**
+   * AND NOTHING A REQUEST CAN DO ESCAPES AS A BARE 500. 33 §4: "both hosts return the `Result`
+   * envelope unchanged" — and this had no guard at all, so a Directory storage error, a malformed
+   * URL or an RPC that failed mid-deploy came back as workerd's own 500 with an HTML-ish body, while
+   * the self-host answered the same fact as `{ ok: false, refusal }`. A client cannot have one
+   * branch for a refusal when one of its two hosts sometimes speaks a different language.
+   */
   async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      return await route(request, env);
+    } catch (e) {
+      /* THE SENTENCE AND NEVER THE STACK. A trace is a map of this deployment, and a request that
+         reached here is one somebody may be probing with. */
+      const why = e instanceof Error ? e.message : String(e);
+      console.error('fetch:', why);
+      return json({ ok: false, refusal: { code: 'INTERNAL', fix: `This request could not be answered: ${why}.` } }, 500);
+    }
+  },
+
+  /**
+   * The doorbell rang.
+   *
+   * THE MESSAGE IS A NAME AND NOT A JOB. It says which record has something to send; the outbox
+   * says what. A message delivered twice does one pass over a lease that is already taken and
+   * finds nothing — which is why the queue can be at-least-once and the notification is still
+   * sent once.
+   */
+  async queue(batch: MessageBatch<{ record: string }>, env: Env): Promise<void> {
+    await consume(batch.messages, (id) => drainOutbox(env, id));
+  },
+};
+
+async function route(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const routed = recordPath(url.pathname);
 
@@ -335,8 +378,17 @@ export default {
 
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
     const named = await directory.resolve(routed.slug);
-    if (!named)
-      return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no record called ${routed.slug}.` } }, 404);
+
+    /* A NAME THAT DOES NOT RESOLVE ANSWERS WHAT A WRONG CREDENTIAL ANSWERS, and it has to. This said
+       404 "There is no record called kiln" for a name nobody holds and 401 "this record needs a
+       bearer" for one somebody does — two different statuses and two different sentences, to a
+       request carrying nothing at all. That is every customer name on the platform, enumerable by
+       anyone, one GET at a time. 51 §5.6 states the rule for the share tokens and it is the same
+       rule here: a wrong capability looks like nothing.
+
+       THE PATH SHAPE IS STILL A 404, above, because that is a fact about the URL rather than about
+       who lives at it. */
+    if (!named) return unauthorized();
 
     const record = env.RECORD.get(env.RECORD.idFromName(named.record));
 
@@ -346,8 +398,7 @@ export default {
        ladder as the browser. */
     const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1];
     const seen = bearer ? await record.verify(bearer, surfaceOf(url)) : null;
-    if (bearer && !seen)
-      return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is not one this record knows.' } }, 401);
+    if (bearer && !seen) return unauthorized();
 
     /* A BEARER NAMES ITS OWN RECORD AND THE PATH NAMES ONE TOO, and a mismatch is not an accident:
        it is a token for one customer pointed at another's URL. `verify` refuses a bearer whose
@@ -360,11 +411,7 @@ export default {
        BROWSER SESSIONS ARE THE OTHER HALF and they are not built — sessions, passkeys and magic
        links live in the Directory (ADR-061). Until they are, a bearer is the only way in, and
        saying so is better than letting everybody in while the sentence explains why. */
-    if (!seen)
-      return json(
-        { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record needs a bearer. Mint one from the app.' } },
-        401,
-      );
+    if (!seen) return unauthorized();
 
     /* THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT. The Directory said which record the NAME meant
        and nothing more — a level read from there is a level `invite` and `remove` do not write, so
@@ -396,27 +443,4 @@ export default {
        credential takes is another place it can be logged. */
     inner.headers.delete('authorization');
     return record.fetch(inner);
-  },
-
-  /**
-   * The doorbell rang.
-   *
-   * THE MESSAGE IS A NAME AND NOT A JOB. It says which record has something to send; the outbox
-   * says what. A message delivered twice does one pass over a lease that is already taken and
-   * finds nothing — which is why the queue can be at-least-once and the notification is still
-   * sent once.
-   */
-  async queue(batch: MessageBatch<{ record: string }>, env: Env): Promise<void> {
-    /* DE-DUPLICATED WITHIN THE BATCH. Twenty writes to one record in a second ring twenty times,
-       and twenty passes over one outbox is nineteen round trips for nothing. */
-    for (const id of new Set(batch.messages.map((m) => m.body.record))) {
-      try {
-        await drainOutbox(env, id);
-      } catch (e) {
-        /* One record's failure is not the batch's. The rows are still `pending` and the next
-           doorbell drains them. */
-        console.error('drain', id, e instanceof Error ? e.message : String(e));
-      }
-    }
-  },
-};
+}

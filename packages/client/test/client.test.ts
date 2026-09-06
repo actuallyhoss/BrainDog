@@ -35,12 +35,14 @@ const OBLIGATIONS = {
   } as never,
 };
 
-let port = 8960;
+/* PORT 0, AND THE OS PICKS ONE. A counter from a fixed base fails for a reason that is not about
+   the code — a killed run still holding a socket, another checkout, a reserved range — and it fails
+   on whichever test happens to land on the number, which changes every time one is inserted. */
 
 async function connected(token?: string) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-client-'));
-  const at = port++;
-  const running = await start({ file: join(dir, 'record.sqlite'), port: at, ...(token === undefined ? {} : { token }) });
+  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, ...(token === undefined ? {} : { token }) });
+  const at = (running.server.address() as { port: number }).port;
   assert.ok((await running.api.kernel.install([OBLIGATIONS])).ok);
   const client = createClient({ base: `http://127.0.0.1:${at}`, ...(token === undefined ? {} : { token }) });
   return {

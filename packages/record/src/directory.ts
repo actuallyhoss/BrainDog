@@ -31,15 +31,34 @@ export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
 export type Level = (typeof LEVELS)[number];
 
 /**
- * The grammar of a slug, and it is `31-STACK`'s.
+ * The grammar of a slug, and it is `34-GRAMMARS` line 348's: `^[a-z][a-z0-9-]{1,31}$`.
+ *
+ * TWO TO THIRTY-TWO CHARACTERS, STARTING WITH A LETTER. The looser shape this held — anything
+ * alphanumeric, up to sixty-three — accepted `2024`, accepted `x`, and accepted a forty-character
+ * name, and 34 names the two places a slug lands that make each of those permanent: the inbound
+ * email local part `<slug>@in.brain.dog`, and `<data>/<slug>/` on a self-host. There is no repair
+ * path — a released name is a tombstone for ever — so the grammar is checked before the row.
+ *
+ * AND NOT ENDING IN A HYPHEN, which is the one place this is STRICTER than 34. `studio-@in.brain.dog`
+ * is a name somebody has to type and read back over a phone. Refusing is recoverable in the second
+ * before the row exists; accepting is not recoverable at all.
  *
  * IT IS CHECKED HERE AS WELL AS AT THE ROUTE, because this is where a name becomes durable. A route
  * that let something through would write it, and the row would outlive the bug.
  */
-const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
+
+/** The address `provision` writes, when the caller has already created the object it names. */
+const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
 
 /** Names the platform owns, or that would read as one. A slug is a path segment before it is a name. */
-const RESERVED = new Set(['api', 'auth', 'admin', 'app', 'assets', 'a', 'in', 's', 'r', 'ws', 'static', 'www', 'new']);
+const RESERVED = new Set([
+  /* 33 §4's own top-level surface, first: a slug that shadowed one of these would be a name the
+     router reaches before the Directory does. `mcp` and `p` were missing. */
+  'api', 'auth', 'mcp', 'a', 'p', 's', 'in', 'r', 'ws',
+  /* And the words a name would read as the platform's rather than somebody's. */
+  'admin', 'app', 'assets', 'static', 'www', 'new',
+]);
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS dir_person (
@@ -90,7 +109,8 @@ export function createDirectory(sql: Sql, clock: Clock) {
   const at = (): string => new Date(clock.now()).toISOString();
 
   const bad = (slug: string): string | null => {
-    if (!SLUG.test(slug)) return `${slug} is not a name: lower-case letters, digits and hyphens, and not starting or ending with one.`;
+    if (!SLUG.test(slug))
+      return `${slug} is not a name: it starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one.`;
     if (RESERVED.has(slug)) return `${slug} is a name the platform uses for something else.`;
     return null;
   };
@@ -103,11 +123,18 @@ export function createDirectory(sql: Sql, clock: Clock) {
    * nothing — never to the record that used to hold it, and never to whoever asked for it next.
    */
   const resolve = (slug: string): Named | null => {
-    const row = sql.one<{ record: string; released_at: string | null }>(
-      'SELECT record, released_at FROM dir_slug WHERE slug = ?',
+    /* AND A CLOSED RECORD RESOLVES TO NOTHING EITHER. `close()` releases every live slug in the same
+       transaction, so today this join can only ever agree with `released_at` — which is exactly why
+       it belongs here rather than in `close()`'s head. Two of the four readers checked and two did
+       not, and the one thing standing between the other two and a wrong answer was that one method
+       remembers to do both halves. */
+    const row = sql.one<{ record: string; released_at: string | null; closed_at: string | null }>(
+      `SELECT s.record AS record, s.released_at AS released_at,
+              (SELECT r.closed_at FROM dir_record r WHERE r.id = s.record) AS closed_at
+         FROM dir_slug s WHERE s.slug = ?`,
       slug,
     );
-    if (!row || row.released_at) return null;
+    if (!row || row.released_at || row.closed_at) return null;
     return { record: row.record, slug };
   };
 
@@ -133,23 +160,29 @@ export function createDirectory(sql: Sql, clock: Clock) {
      * are one person. Mail is case-insensitive in the half of it anybody types, and a product that
      * disagreed would give one human two accounts and two sets of records.
      */
-    person$: (email: string, name?: string): Result<Person> => {
-      const trimmed = email.trim();
-      if (!trimmed.includes('@')) return no<Person>('VALUE_MALFORMED', `${email} is not an address.`, { at: 'email' });
+    person$: (email: string, name?: string): Result<Person> =>
+      /* IN A TRANSACTION, like every other write here. It is a check and then an insert, and the
+         index behind it is `UNIQUE (lower(email))` — so the losing side of a race is a
+         `SQLITE_CONSTRAINT` thrown out of a function whose entire contract is a `Result`, across a
+         Durable Object RPC boundary, as a bare 500. Both hosts are single-threaded today and it
+         cannot fire; it is one `await` in the wrong place away from firing for ever after. */
+      sql.transactionSync(() => {
+        const trimmed = email.trim();
+        if (!trimmed.includes('@')) return no<Person>('VALUE_MALFORMED', `${email} is not an address.`, { at: 'email' });
 
-      const already = personByEmail(trimmed);
-      if (already) return ok(already);
+        const already = personByEmail(trimmed);
+        if (already) return ok(already);
 
-      const id = `p_${mint()}`;
-      sql.exec(
-        'INSERT INTO dir_person (id, email, name, created_at) VALUES (?, ?, ?, ?)',
-        id,
-        trimmed,
-        name ?? null,
-        at(),
-      );
-      return ok(sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE id = ?', id)!);
-    },
+        const id = `p_${mint()}`;
+        sql.exec(
+          'INSERT INTO dir_person (id, email, name, created_at) VALUES (?, ?, ?, ?)',
+          id,
+          trimmed,
+          name ?? null,
+          at(),
+        );
+        return ok(sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE id = ?', id)!);
+      }),
 
     /**
      * A record comes into being: an address, a name for it, and somebody who owns it.
@@ -158,15 +191,30 @@ export function createDirectory(sql: Sql, clock: Clock) {
      * no record is a 404 that looks like a bug. Naming is provisioning on the platform; here it is
      * the row that says which name the platform is given.
      */
-    provision: (args: { slug: string; email: string; name?: string }): Result<Named & { person: string }> =>
+    provision: (args: { slug: string; email: string; name?: string; record?: string }): Result<Named & { person: string }> =>
       sql.transactionSync(() => {
         const wrong = bad(args.slug);
         if (wrong) return no<Named & { person: string }>('VALUE_MALFORMED', wrong, { at: 'slug' });
+        if (args.record !== undefined && !REC_ID.test(args.record))
+          return no<Named & { person: string }>(
+            'VALUE_MALFORMED',
+            `A record id is rec_ plus a 26-character ULID. ${args.record} is not.`,
+            { at: 'record' },
+          );
 
+        /* `ALREADY_KNOWN` AND NOT `UNIQUE_VIOLATION`. 30's register puts the taken name here — "also
+           a taken slug at sign-up (41; 51)" — and reserves `UNIQUE_VIOLATION` for the index as a
+           backstop, which this is not: nothing was inserted, and the row was read on purpose. 51
+           §5.8 says the sign-up route answers 422 `ALREADY_KNOWN` at `slug`, which is what a form
+           branches on to say "pick another".
+
+           ONE CODE, TWO SENTENCES. A tombstone is not the same fact as a name somebody holds, and
+           the sentence says which — but what whoever is typing must do about it is identical, and a
+           code they cannot act on differently only splits the client. */
         const taken = sql.one<{ released_at: string | null }>('SELECT released_at FROM dir_slug WHERE slug = ?', args.slug);
         if (taken)
           return no<Named & { person: string }>(
-            'UNIQUE_VIOLATION',
+            'ALREADY_KNOWN',
             taken.released_at
               ? `${args.slug} was the name of another record and cannot be given out again.`
               : `${args.slug} is already somebody's record.`,
@@ -176,7 +224,16 @@ export function createDirectory(sql: Sql, clock: Clock) {
         const person = personByEmail(args.email);
         if (!person) return no<Named & { person: string }>('OUT_OF_BOUNDS', `${args.email} has no account yet.`, { at: 'email' });
 
-        const record = `rec_${mint()}`;
+        /* THE CALLER MAY NAME THE RECORD, and on the hosted path it must. 51 §5.8 and §13 D21 both
+           say sign-up writes the RECORD before the Directory rows — "a Directory row never points at
+           a record that failed to initialise" — and that ordering was impossible to express while
+           this minted the id itself and handed it back: the caller could not know what to create
+           until this had already written all three rows.
+
+           IT ALSO MAKES THE HALF-DONE CASE RECOVERABLE. Re-running a provision that failed after the
+           object was created is the same call with the same id, rather than a second record and a
+           name that can never be issued again. */
+        const record = args.record ?? `rec_${mint()}`;
         const now = at();
         sql.exec('INSERT INTO dir_record (id, created_at) VALUES (?, ?)', record, now);
         sql.exec('INSERT INTO dir_slug (slug, record, claimed_at) VALUES (?, ?, ?)', args.slug, record, now);
@@ -204,7 +261,7 @@ export function createDirectory(sql: Sql, clock: Clock) {
         const taken = sql.one<{ released_at: string | null }>('SELECT released_at FROM dir_slug WHERE slug = ?', to);
         if (taken)
           return no<Named>(
-            'UNIQUE_VIOLATION',
+            'ALREADY_KNOWN',
             taken.released_at ? `${to} was the name of another record and cannot be given out again.` : `${to} is already somebody's record.`,
             { at: 'slug' },
           );
@@ -241,7 +298,13 @@ export function createDirectory(sql: Sql, clock: Clock) {
      * never what they may do with it.
      */
     levelOf: (record: string, person: string): Level | null =>
-      sql.one<{ level: Level }>('SELECT level FROM dir_member WHERE record = ? AND person = ?', record, person)?.level ?? null,
+      sql.one<{ level: Level }>(
+        `SELECT m.level AS level FROM dir_member m
+           JOIN dir_record r ON r.id = m.record AND r.closed_at IS NULL
+          WHERE m.record = ? AND m.person = ?`,
+        record,
+        person,
+      )?.level ?? null,
 
     /** Add somebody, or move them. */
     join: (record: string, person: string, level: Level): Result<null> =>

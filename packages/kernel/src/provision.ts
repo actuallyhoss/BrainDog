@@ -18,8 +18,15 @@ import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
 
-/** `31-STACK`'s slug: lower-case, digits and hyphens, no leading or trailing one. */
-const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+/**
+ * `34-GRAMMARS` line 348's slug, and it is the Directory's byte for byte.
+ *
+ * THE TWO MUST AGREE OR ONE OF THEM IS UNREACHABLE. A name the Directory writes and this refuses is
+ * a record with a resolvable slug and no record row behind it; a name this accepts and the Directory
+ * refuses is a record nothing can address. They are two copies because the two halves are provisioned
+ * by two different objects, and the copy is the price of that.
+ */
+const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
 const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
 
 /** The wrapped key material, which the kernel stores and never reads. */
@@ -53,7 +60,7 @@ export function createRecord(
   if (!SLUG.test(args.slug))
     return no<Provisioned>(
       'VALUE_MALFORMED',
-      `A slug is lower-case letters, digits and hyphens, not starting or ending with one. ${args.slug} is not.`,
+      `A slug starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one. ${args.slug} is not.`,
       { at: 'slug' },
     );
   if (!args.name.trim()) return no<Provisioned>('REQUIRED_MISSING', 'A record has a name a person would say.', { at: 'name' });
@@ -104,6 +111,25 @@ export function createRecord(
     sql.exec(
       "INSERT OR REPLACE INTO member (person_id, register, level, seen_at) VALUES (?, '*', 'owner', NULL)",
       args.owner.id,
+    );
+    /* AND THE GRANT IS AN EVENT, like every other grant. `invite` writes `access.grant` per register
+       and `removeMember` writes `access.revoke`; only the founding owner — the one person who has
+       held the level longest — arrived with no row saying how. The audit view could answer "when did
+       this person get owner" for everybody except them, and every record's event log began with an
+       owner already in place. 45 §723: target the owner, field `*`, `to_v` owner.
+
+       BY THEMSELVES, because there is nobody else yet: a record is created for its owner, and an
+       actor the record cannot name would render as an id for ever. */
+    sql.exec(
+      'INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      mint(),
+      at,
+      args.owner.id,
+      'access.grant',
+      `person:${args.owner.id}`,
+      'person',
+      '*',
+      'owner',
     );
 
     for (const [purpose, key] of Object.entries(args.keys ?? {})) {

@@ -636,7 +636,10 @@ test('A LEVEL PER REGISTER, or inviting a bookkeeper means showing them everythi
   const grants = sql
     .all<{ field: string; to_v: string }>("SELECT field, to_v FROM event WHERE kind = 'access.grant' ORDER BY rowid")
     .map((e) => `${e.field}:${e.to_v}`);
-  assert.deepEqual(grants, ['*:read', 'obligations:write']);
+  /* AND THE FOUNDING OWNER IS ONE OF THEM, first. The record's own creation grants `*:owner`, and it
+     was the only grant in the product with no event behind it — so the audit could say when everybody
+     got their access except the person who has held theirs longest. */
+  assert.deepEqual(grants, ['*:owner', '*:read', 'obligations:write']);
   sql.close();
 });
 

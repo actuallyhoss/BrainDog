@@ -34,13 +34,22 @@ const OBLIGATIONS = {
 
 type Answer = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; allowed?: string[] } };
 
-let port = 8900;
+/**
+ * PORT 0, AND THE OS PICKS ONE.
+ *
+ * A COUNTER FROM A FIXED BASE IS A TEST THAT FAILS FOR A REASON THAT IS NOT ABOUT THE CODE. Anything
+ * else on the machine holding one of the numbers in the run — a previous run that was killed rather
+ * than closed, another checkout, Windows' own reserved ranges — is `EADDRINUSE` on whichever test
+ * happens to land on it, which changes every time a test is inserted above it. None of these tests
+ * cares what the number is; every one of them needs to know the number it got.
+ */
+const bound = (running: { server: { address(): unknown } }): number => (running.server.address() as { port: number }).port;
 
 async function server(token?: string) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
   const file = join(dir, 'record.sqlite');
-  const at = port++;
-  const running = await start({ file, port: at, ...(token === undefined ? {} : { token }) });
+  const running = await start({ file, port: 0, ...(token === undefined ? {} : { token }) });
+  const at = bound(running);
   assert.ok((await running.api.kernel.install([OBLIGATIONS])).ok);
 
   const call = async (path: string, body?: unknown): Promise<{ status: number; body: Answer }> => {
@@ -94,7 +103,7 @@ test('a record is a FILE, and it is still there when the process is not', async 
   await s.call('create', { register: 'obligations', fields: { what: 'Invoice 41' } });
   await s.close();
 
-  const again = await start({ file: s.file, port: s.port + 100 });
+  const again = await start({ file: s.file, port: 0 });
   try {
     const rows = await again.api.list({ register: 'obligations' }, { principal: { kind: 'person', id: 'p_self', level: 'owner' } });
     assert.ok(rows.ok);
@@ -260,8 +269,8 @@ test('A WRITE THAT MAKES A REMINDER ARMS THE ALARM, without being asked to', asy
   // The invariant the whole subsystem rests on: the alarm is the earliest pending row or there is no
   // alarm. A record that has to be told to arm has one path that forgets, and that path is silent.
   const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
-  const at = port++;
-  const running = await start({ file: join(dir, 'record.sqlite'), port: at, pollMs: 0 });
+  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0 });
+  const at = bound(running);
   try {
     /* A RECORD WITH DECLARATIONS HAS THE WEEKLY ANALYSIS PENDING — 45 §5.9's own row, and what makes
        the observe loop run at all. So "nothing else to do" is a week out, and the reminder below has
@@ -305,7 +314,7 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
   // until somebody happens to touch the record — and then arrive stamped Monday, three days late.
   const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
   const file = join(dir, 'record.sqlite');
-  const first = await start({ file, port: port++, pollMs: 0 });
+  const first = await start({ file, port: 0, pollMs: 0 });
   try {
     assert.ok((await first.api.kernel.install([REMINDING])).ok);
     await first.api.create({ register: 'renewals', fields: { what: 'brain.dog', on: day(30) } }, owner);
@@ -317,7 +326,7 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
     await first.close();
   }
 
-  const again = await start({ file, port: port++, pollMs: 0 });
+  const again = await start({ file, port: 0, pollMs: 0 });
   try {
     const armed = await again.scheduler.get();
     assert.ok(armed !== null, 'a reopened record armed nothing, so its schedule never restarts');
@@ -336,14 +345,59 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
   }
 });
 
+test('A KIND THIS DEPLOYMENT CANNOT DELIVER IS NEVER LEASED, and never dead-letters', async () => {
+  /* 49 §5.12 note 1, and it is the whole of the rule: "a kind not in `kinds` is never leased, so it
+     waits in `pending` until the host can serve it — a self-host with no model never dead-letters an
+     `infer.embed` row." This leased all nine and threw "nothing in this deployment delivers a
+     infer.embed" at each one eight times, ending in a `dead` row and a suggestion asking somebody to
+     decide about work they had never asked for. Waiting is the honest answer: the day a model is
+     configured, the row is there. */
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
+  const seen: string[] = [];
+  const running = await start({
+    file: join(dir, 'record.sqlite'),
+    /* PORT 0: THE OS PICKS ONE. This test never speaks HTTP — it is about what the poller leases —
+       so a number out of the shared counter is a collision waiting for the day a neighbour is slow
+       to release its socket. */
+    port: 0,
+    pollMs: 0,
+    delivers: ['notify.email'],
+    deliver: async (job) => void seen.push(job.kind),
+  });
+  try {
+    const mine = running.api.kernel.outbox('notify.email', { to: 'p_self', subject: 'yours' });
+    const theirs = running.api.kernel.outbox('infer.embed', { ids: ['e_1'], texts: ['a'] });
+    for (let n = 0; n < 3; n++) {
+      await running.scheduler.wake();
+      await running.poll();
+    }
+
+    assert.deepEqual(seen, ['notify.email'], 'a kind nobody here delivers was handed to the deliverer');
+    const state = (id: string): string =>
+      running.sql.one<{ state: string; attempts: number }>('SELECT state, attempts FROM outbox WHERE id = ?', id)!.state;
+    assert.equal(state(mine), 'done');
+    assert.equal(state(theirs), 'pending', 'a kind this host cannot serve walked the ladder');
+    assert.equal(
+      running.sql.one<{ attempts: number }>('SELECT attempts FROM outbox WHERE id = ?', theirs)!.attempts,
+      0,
+      'a row nobody leased counted an attempt',
+    );
+    assert.equal(running.sql.all('SELECT 1 FROM suggestion').length, 0, 'undeliverable was reported as a decision to make');
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('THE DOORBELL DELIVERS, AND A FAILED DELIVERY WALKS THE RECORD\'S LADDER AND NOT ITS OWN', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
   const sent: string[] = [];
   let fail = true;
   const running = await start({
     file: join(dir, 'record.sqlite'),
-    port: port++,
+    port: 0,
     pollMs: 0,
+    delivers: ['notify.email'],
     deliver: async (job) => {
       if (fail) throw new Error('smtp said 550');
       sent.push(job.kind);
@@ -373,7 +427,7 @@ test('THE DOORBELL DELIVERS, AND A FAILED DELIVERY WALKS THE RECORD\'S LADDER AN
 
 test('with no deliverer, jobs queue and wait — which is honest rather than lossy', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
-  const running = await start({ file: join(dir, 'record.sqlite'), port: port++, pollMs: 0 });
+  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0 });
   try {
     running.api.kernel.outbox('notify.email', {});
     await running.scheduler.wake();
