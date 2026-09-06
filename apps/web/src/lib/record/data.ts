@@ -298,6 +298,21 @@ export const JOBS: Record<string, Job> = {
   },
 };
 
+/**
+ * A row count a reader can reproduce.
+ *
+ * THE RUN LOG QUOTED `31 rows` FOR `obligations where state is open`, and the register holds 22 —
+ * not open, not open+part, not not-paid. A number nobody can get back to is the one thing a record
+ * about being checkable must not print, and a job's log is where somebody goes to find out what an
+ * agent actually did.
+ *
+ * DERIVED, so it cannot drift again: a row added to the fixture moves the log with it.
+ */
+const counted = (register: string, keep: (e: Entry) => boolean): string => {
+  const n = (ROWS[register] ?? []).filter(keep).length;
+  return `${n} row${n === 1 ? '' : 's'}`;
+};
+
 /** The one the reconcile session is running. Named, because two screens quote it by name. */
 export const JOB: Job = {
   id: 'j_7Q2F',
@@ -306,12 +321,24 @@ export const JOB: Job = {
   model: 'your machine · claude-opus-5',
   started: stamp(-0.2),
   events: [
-    { seq: 1, tool: 'list', input: 'obligations where state is open', out: '31 rows', ok: true },
-    { seq: 2, tool: 'list', input: 'services where renews before 2026-10-03', out: '6 rows', ok: true },
+    { seq: 1, tool: 'list', input: 'obligations where state is open', out: counted('obligations', (e) => e.fields.state === 'open'), ok: true },
+    {
+      seq: 2,
+      tool: 'list',
+      input: 'services where renews before 2026-10-03',
+      out: counted('services', (e) => String(e.fields.renews ?? '') < '2026-10-03'),
+      ok: true,
+    },
     { seq: 3, tool: 'read', input: 'inbox since 2026-08-01', out: '18 arrivals, 6 unmatched', ok: true },
     { seq: 4, tool: 'search', input: 'Fenwick', out: '4 rows across 2 registers', ok: true },
     { seq: 5, tool: 'propose', input: 'merge services#6 and services#13 — same provider, same renewal', out: 'PROPOSAL_UNCITED — a proposal must attach the rows it read', ok: false },
-    { seq: 6, tool: 'list', input: 'services where provider is Fenwick Cloud', out: '3 rows', ok: true },
+    {
+      seq: 6,
+      tool: 'list',
+      input: 'services where provider is Fenwick Cloud',
+      out: counted('services', (e) => String(e.fields.provider ?? '').includes('Fenwick')),
+      ok: true,
+    },
   ],
 };
 

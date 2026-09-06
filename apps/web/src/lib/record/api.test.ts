@@ -24,7 +24,7 @@ import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
 import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
-import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
+import { JOB, NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
@@ -639,4 +639,17 @@ test('THE CASH WALK SAYS WHAT IT STARTED FROM', () => {
 
   /* AND EVERY BALANCE UNDER IT IS THAT NUMBER PLUS A MOVEMENT, which is now checkable by eye. */
   assert.ok(walk.rows.length > 1);
+});
+
+test('A RUN LOG QUOTES A NUMBER SOMEBODY CAN GET BACK TO', () => {
+  /* Step 1 read "list · obligations where state is open · ✓ 31 rows" and the register holds 22 — not
+     open, not open+part, not not-paid. A number nobody can reproduce is the one thing a record about
+     being checkable must not print, and a job's log is exactly where somebody goes to find out what
+     an agent actually did. */
+  const open = (ROWS.obligations ?? []).filter((e) => e.fields.state === 'open').length;
+  const step = JOB.events.find((e) => e.seq === 1)!;
+  assert.equal(step.out, `${open} rows`, 'the run log and the register disagree about the same query');
+
+  const fenwick = (ROWS.services ?? []).filter((e) => String(e.fields.provider ?? '').includes('Fenwick')).length;
+  assert.equal(JOB.events.find((e) => e.seq === 6)!.out, `${fenwick} rows`);
 });
