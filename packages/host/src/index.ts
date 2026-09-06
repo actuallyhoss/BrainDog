@@ -18,10 +18,33 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { conflicted, refused } from '@braindog/ports';
 
-/** One method the host exposes: its name, and what it does to the record. */
+/**
+ * The six groups `30 §5` splits the surface into, and it splits it by WHO MAY REACH IT rather than
+ * by convenience — which is what makes ADR-018's "the web app is a client of the agent API"
+ * enforceable rather than aspirational.
+ *
+ * `INTERNAL` IS HERE SO IT CAN BE REFUSED. It is the host's own surface and not routable from
+ * outside; naming it in the type is what lets `router-groups` say "no route carries this" instead of
+ * hoping nobody adds one.
+ */
+export const GROUPS = ['DATA', 'READ+', 'VAULT', 'JOBS', 'ADMIN', 'INTERNAL'] as const;
+export type Group = (typeof GROUPS)[number];
+
+/** One method the host exposes: its name, its group, and what it does to the record. */
 export type Route = {
   /** The name a caller sends. `record.list`, and the dot is the group. */
   name: string;
+  /**
+   * Which of `30 §5`'s six.
+   *
+   * EVERY ROUTE DECLARES ONE, and `30 §5` asks for exactly this: "the router asserts it — every
+   * route declares its group, and a CI test walks the router and fails on a route with no group".
+   * The rule it keeps is the one that stops the surface drifting: *if a screen needs something
+   * outside DATA and READ+, it is either a browser-session group — VAULT, JOBS, ADMIN — or it is a
+   * design error.* There is no third case, and a group in the table is how a reviewer sees which
+   * case a new method is claiming to be.
+   */
+  group: Group;
   /** Whether it changes anything. A read is safe to retry; a write is not. */
   writes: boolean;
   /** One line, for the CLI's help and the MCP tool description. */
@@ -29,45 +52,45 @@ export type Route = {
 };
 
 export const ROUTES: readonly Route[] = [
-  { name: 'boot', writes: false, what: 'What this record holds, and how many rows are in each register.' },
-  { name: 'schema', writes: false, what: 'What one register holds: its fields, their types, and what each may take.' },
-  { name: 'get', writes: false, what: 'One row, by the number a person says out loud.' },
-  { name: 'list', writes: false, what: 'Rows of one register, narrowed by a predicate, newest first.' },
-  { name: 'history', writes: false, what: 'The writes that made one row, in order, each with who and when.' },
-  { name: 'search', writes: false, what: 'Rows whose text matches, across every register you can see, best first.' },
-  { name: 'version', writes: false, what: "The record's version, so a client can ask what changed since." },
-  { name: 'whoami', writes: false, what: 'Who you are to this record, and which verbs you reach.' },
-  { name: 'digestToday', writes: false, what: 'What the digest would say if it went now. It sends nothing.' },
-  { name: 'pages', writes: false, what: 'Every page this record can draw, templates expanded.' },
-  { name: 'page', writes: false, what: 'One page, with every block run: rows and figures, never markup.' },
-  { name: 'metric', writes: false, what: 'One figure, with its target and how it compares.' },
-  { name: 'listGrants', writes: false, what: 'What each credential opens. Never the credential.' },
-  { name: 'dryRun', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.' },
-  { name: 'governance', writes: false, what: 'What has been proposed, what was decided, and what was predicted.' },
-  { name: 'propose', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
-  { name: 'decide', writes: true, what: 'Answer one, with the reason. No token reaches this.' },
-  { name: 'packs', writes: false, what: 'Which packs this record has, and at what version.' },
-  { name: 'planPack', writes: false, what: 'What installing a pack would do to this record. It writes nothing.' },
-  { name: 'installPack', writes: true, what: 'Apply the plan somebody approved. A browser session only.' },
-  { name: 'uninstallPack', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
-  { name: 'setDeclaration', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
-  { name: 'retireDeclaration', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
-  { name: 'ruleApply', writes: true, what: 'Run one rule over the rows already there. `dry` first: there is no undo.' },
-  { name: 'members', writes: false, what: 'Who is on this record, at what level, and where.' },
-  { name: 'invite', writes: true, what: 'Put somebody on, or move them. A level per register.' },
-  { name: 'removeMember', writes: true, what: 'Take somebody off. Never the last owner.' },
-  { name: 'listTokens', writes: false, what: 'Every agent token, with when it was last used. Never the token.' },
-  { name: 'createToken', writes: true, what: 'Mint one. The secret is in the answer and is stored nowhere.' },
-  { name: 'revokeToken', writes: true, what: 'Revoke one. The second call says the same as the first.' },
+  { name: 'boot', group: 'READ+', writes: false, what: 'What this record holds, and how many rows are in each register.' },
+  { name: 'schema', group: 'READ+', writes: false, what: 'What one register holds: its fields, their types, and what each may take.' },
+  { name: 'get', group: 'DATA', writes: false, what: 'One row, by the number a person says out loud.' },
+  { name: 'list', group: 'DATA', writes: false, what: 'Rows of one register, narrowed by a predicate, newest first.' },
+  { name: 'history', group: 'READ+', writes: false, what: 'The writes that made one row, in order, each with who and when.' },
+  { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.' },
+  { name: 'version', group: 'READ+', writes: false, what: "The record's version, so a client can ask what changed since." },
+  { name: 'whoami', group: 'READ+', writes: false, what: 'Who you are to this record, and which verbs you reach.' },
+  { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.' },
+  { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
+  { name: 'page', group: 'READ+', writes: false, what: 'One page, with every block run: rows and figures, never markup.' },
+  { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.' },
+  { name: 'listGrants', group: 'VAULT', writes: false, what: 'What each credential opens. Never the credential.' },
+  { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.' },
+  { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.' },
+  { name: 'propose', group: 'DATA', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
+  { name: 'decide', group: 'DATA', writes: true, what: 'Answer one, with the reason. No token reaches this.' },
+  { name: 'packs', group: 'READ+', writes: false, what: 'Which packs this record has, and at what version.' },
+  { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.' },
+  { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved. A browser session only.' },
+  { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
+  { name: 'setDeclaration', group: 'ADMIN', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
+  { name: 'retireDeclaration', group: 'ADMIN', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
+  { name: 'ruleApply', group: 'ADMIN', writes: true, what: 'Run one rule over the rows already there. `dry` first: there is no undo.' },
+  { name: 'members', group: 'ADMIN', writes: false, what: 'Who is on this record, at what level, and where.' },
+  { name: 'invite', group: 'ADMIN', writes: true, what: 'Put somebody on, or move them. A level per register.' },
+  { name: 'removeMember', group: 'ADMIN', writes: true, what: 'Take somebody off. Never the last owner.' },
+  { name: 'listTokens', group: 'ADMIN', writes: false, what: 'Every agent token, with when it was last used. Never the token.' },
+  { name: 'createToken', group: 'ADMIN', writes: true, what: 'Mint one. The secret is in the answer and is stored nowhere.' },
+  { name: 'revokeToken', group: 'ADMIN', writes: true, what: 'Revoke one. The second call says the same as the first.' },
   /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event — 12 §6's rule that a
      vault whose reads are not audited cannot say whether anything got out — and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
-  { name: 'export', writes: true, what: 'The record as a file: line per row, and it imports back.' },
-  { name: 'import', writes: true, what: 'A file into an EMPTY record. Anything else is a merge nobody asked for.' },
-  { name: 'markRead', writes: true, what: 'How far you have read. A person only, and never an event.' },
-  { name: 'log', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
-  { name: 'create', writes: true, what: 'Add a row. The record allocates its number.' },
-  { name: 'update', writes: true, what: 'Change a row, against the version you read.' },
+  { name: 'export', group: 'ADMIN', writes: true, what: 'The record as a file: line per row, and it imports back.' },
+  { name: 'import', group: 'ADMIN', writes: true, what: 'A file into an EMPTY record. Anything else is a merge nobody asked for.' },
+  { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read. A person only, and never an event.' },
+  { name: 'log', group: 'DATA', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
+  { name: 'create', group: 'DATA', writes: true, what: 'Add a row. The record allocates its number.' },
+  { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
 ];
 
 /**

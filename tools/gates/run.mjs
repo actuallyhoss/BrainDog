@@ -42,6 +42,9 @@ const GATES = [
   /* THE ONE LIST LARGE ENOUGH TO HAVE DRIFTED THREE TIMES (52 §5.2). Four of its five sources are
      not code, so nothing but a gate can notice that a document gained a kind the database refuses. */
   ['event-kinds', ['node', [join(here, 'event-kinds.mjs')]]],
+  /* THE SURFACE IS SPLIT BY WHO MAY REACH IT (30 §5), and sixteen INTERNAL methods are each one line
+     from being routable — `createRecord` makes somebody the owner of a record. */
+  ['router-groups', ['node', [join(here, 'router-groups.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
