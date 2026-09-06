@@ -151,7 +151,22 @@
     color: var(--tone);
   }
 
+  /**
+   * A DISABLED CONTROL LOSES THE FILL, not just the label.
+   *
+   * IT ONLY DIMMED THE TEXT, so a disabled `primary` kept the mark's own red — the loudest thing on
+   * any screen in this product — and wore grey letters on it. Two costs, and the second is the
+   * serious one: `--dim` on `--accent` is about 2.2:1, under half of `23 §6`'s floor, so the label
+   * of the one control somebody is looking for was the least readable text on the screen. It also
+   * read as live, which is the whole of what a disabled state is for.
+   *
+   * `background` AND `box-shadow` BOTH, because the primary weight sets an inset edge as well as a
+   * fill and leaving it behind draws a lit rim around an inert control.
+   */
   .btn:disabled {
+    background: var(--s1);
+    border-color: var(--edge);
+    box-shadow: none;
     color: var(--dim);
     cursor: not-allowed;
   }

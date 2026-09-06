@@ -19,6 +19,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
+  import { addKey } from '$lib/start.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -34,7 +35,9 @@
 
   let picked = $state<string | null>(null);
   let field = $state<HTMLInputElement>();
-  let form = $state<{ problems: () => string[] } | undefined>(undefined);
+  /* What the generated form would refuse, bound out of it so the button can be dead while it is
+     true rather than answering a press with a toast. */
+  let problems = $state<string[]>([]);
 
   /**
    * The number under each choice, and it did nothing.
@@ -76,9 +79,39 @@
    * ONLY A KEY THIS SCREEN OFFERS. The parameter comes from a URL, and a register the choice list
    * does not carry has no question written for it.
    */
+  /**
+   * AND IT TAKES THE WORD ON THE TILE, not only the register id behind it.
+   *
+   * THE FIVE TILES SAY *Money*, *The estate*, *People*, *Projects*, *Work* and the five keys are
+   * `obligations`, `services`, `people`, `things`, `tasks` — so three of the five words a person can
+   * read on this screen fell through to the choice list. Nothing on the page writes the parameter,
+   * so nothing was broken; it is a link somebody types or shares from what is in front of them, and
+   * it worked two times in five.
+   *
+   * NORMALISED TO LETTERS AND DIGITS, and `the` dropped from the front, so `the-estate`, `The
+   * Estate` and `estate` are one thing. Not a fuzzy match: an exact comparison against two names the
+   * screen already publishes.
+   */
+  /**
+   * AND IT IS HONOURED ONCE PER VALUE, WHICH IS WHAT MAKES *Back* WORK.
+   *
+   * THE GUARD WAS `picked === null`, AND `picked` IS READ INSIDE THE EFFECT — so pressing Back set it
+   * to null, the effect re-ran, saw null, and put the person straight back on the form they had just
+   * left. Arriving by `?add=` meant there was no way out of that screen except the browser's own
+   * back button.
+   *
+   * REMEMBERING THE PARAMETER instead of the state fixes both halves: the effect no longer depends
+   * on `picked` at all, and a genuinely different `?add=` — an in-app navigation to another one —
+   * still lands where it says.
+   */
+  let honoured: string | null = null;
+
   $effect(() => {
     const asked = page.url.searchParams.get('add');
-    if (asked && picked === null && CHOICES.some((c) => c.key === asked)) pick(asked);
+    if (asked === honoured) return;
+    honoured = asked;
+    const found = asked ? addKey(asked, CHOICES) : undefined;
+    if (found) pick(found);
   });
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
@@ -95,13 +128,9 @@
   function commit(event: SubmitEvent) {
     event.preventDefault();
     if (!choice) return;
-    /* AND A VALUE THE RECORD WOULD REFUSE IS SAID BEFORE ANYBODY LEAVES THIS SCREEN. The form knows
-       — it marks the field and prints the sentence — and this is the first row somebody writes. */
-    const said = form?.problems() ?? [];
-    if (said.length > 0) {
-      toasts.push(said[0]!, { intent: 'warn' });
-      return;
-    }
+    /* THE BUTTON IS ALREADY DISABLED WHEN THIS IS TRUE. Kept as the second door, because Enter in a
+       text field submits a form whatever its button looks like. */
+    if (problems.length > 0) return;
     toasts.push(copy.notWritten(`the first row in ${choice.label} would be written`));
     /* AND IT SAYS WHERE IT CAME FROM. `19 §6`'s screen two is "the register, with their one row in
        it" — the screen you LAND on, not a standing property of a record that happens to hold one
@@ -191,10 +220,24 @@
         DECLARES one, and nobody writes a second copy of the schema in markup.
       -->
       <form class="form" onsubmit={commit}>
-        <RowForm register={choice.key} first bind:this={form} />
+        <!-- KEYED ON THE CHOICE. Going Back and picking another register reused the component, so
+             an amount typed into Money was still in the field on Projects — and now would count as
+             a required field already filled. -->
+        {#key choice.key}
+          <RowForm register={choice.key} first bind:problems />
+        {/key}
+
+        <!-- The same treatment as the register drawer and `/decide`: the sentence, then the dead
+             button that points at it. -->
+        {#if problems.length > 0}<p class="first-why" id="first-why">{problems[0]}</p>{/if}
 
         <div class="actions">
-          <Button weight="primary" type="submit">Add it</Button>
+          <Button
+            weight="primary"
+            type="submit"
+            disabled={problems.length > 0}
+            aria-describedby={problems.length > 0 ? 'first-why' : undefined}>Add it</Button
+          >
           <Button weight="bare" onclick={() => (picked = null)}>Back</Button>
         </div>
       </form>
@@ -204,6 +247,14 @@
 </div>
 
 <style>
+  /* The register's own rule, said where the refusal is. Ink rather than the warn hue: nobody has
+     done anything wrong yet. */
+  .first-why {
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    line-height: 1.5;
+  }
+
   /* `minmax(0, …)` and not `place-items: center`. A centred grid item sizes its track to
      `max-content`, and the one line of `nowrap` monospace in the agent card is wider than a phone —
      so the track grew to fit it and took the whole page sideways at 320 and 360. The gate caught it

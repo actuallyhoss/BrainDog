@@ -212,8 +212,13 @@
     overflow-y: auto;
   }
 
+  /* WRAPPING, because a footer can carry a sentence as well as buttons — the reason a control is
+     disabled belongs beside it, and squeezed into a flex row it became three lines in a 12ch
+     column. A footer with only buttons in it wraps to exactly the row it was. */
   .sheet-foot {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: var(--sp-2);
     padding: var(--sp-3) var(--sp-4);
     border-block-start: 1px solid var(--line);

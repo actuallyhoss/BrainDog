@@ -260,7 +260,12 @@
               <Kbd keys="⌘↵" />
             </Button>
             <Button weight="bare" onclick={() => (committing = null)}>Cancel</Button>
-            <span class="commit-note">{copy.immutable}</span>
+            <!-- ONE WARNING AT A TIME. `commit-why` above already says "kept for ever and cannot be
+                 edited"; this said the same thing in different words six lines below it, so an empty
+                 reason produced the same caution twice and neither read as the reason the button was
+                 off. It belongs where it is the only thing left to say: the button is live, and the
+                 next press is the irreversible one. -->
+            {#if reason.trim()}<span class="commit-note">{copy.immutable}</span>{/if}
           </div>
           {#if committed}
             <p class="commit-done">{copy.mockNotice}</p>

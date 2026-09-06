@@ -66,8 +66,9 @@
 
   /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
   let createOpen = $state(false);
-  /* The drawer's own button asks the form whether anything it holds would be refused. */
-  let form = $state<{ problems: () => string[] } | undefined>(undefined);
+  /* WHAT THE FORM WOULD REFUSE, held here so the BUTTON can be disabled by it. Asking the form on
+     click could only ever answer after the press. */
+  let problems = $state<string[]>([]);
   let displayOpen = $state(false);
   let bindOpen = $state(false);
 
@@ -807,20 +808,19 @@
        see RowForm — so a pack that adds a field gets a form field, and nobody writes a second copy
        of the schema in markup. -->
   <Sheet bind:open={createOpen} title="{copy.newRow} {decl.one}">
-    <RowForm register={id} bind:this={form} />
+    <RowForm register={id} bind:problems />
     {#snippet footer()}
+      <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED, which is `/decide`'s answer to the same
+           question and was not this one's. The button was live with every required field empty and
+           answered the press with "nothing was written" — true of every submit here, and silent
+           about the actual reason. `aria-describedby` points at the sentence so the greying is not
+           the only cue. -->
+      {#if problems.length > 0}<p class="drawer-why" id="new-row-why">{problems[0]}</p>{/if}
       <Button
         weight="primary"
+        disabled={problems.length > 0}
+        aria-describedby={problems.length > 0 ? 'new-row-why' : undefined}
         onclick={() => {
-          /* A VALUE THE RECORD WOULD REFUSE IS SAID BEFORE THE DRAWER CLOSES. The form knows — it
-             marks the field and prints the sentence — and the button closed anyway, so somebody who
-             had typed a fraction of a penny was told "nothing was written", which is true of every
-             submit here and says nothing about theirs. */
-          const said = form?.problems() ?? [];
-          if (said.length > 0) {
-            toasts.push(said[0]!, { intent: 'warn' });
-            return;
-          }
           createOpen = false;
           toasts.push(copy.savedNothing, { intent: 'warn' });
         }}
@@ -882,6 +882,17 @@
 {/if}
 
 <style>
+  /* The same sentence-under-a-dead-button treatment `/decide` uses, and the same colour: this is a
+     rule the register declared, not an error the person made. */
+  .drawer-why {
+    /* Its own line above the buttons, not a third column beside them. */
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    line-height: 1.5;
+  }
+
   .page {
     display: flex;
     flex-direction: column;

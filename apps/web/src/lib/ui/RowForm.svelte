@@ -25,7 +25,19 @@
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
 
-  let { register, first = false }: { register: string; first?: boolean } = $props();
+  /**
+   * `problems` IS BOUND OUT rather than pulled in.
+   *
+   * IT WAS A METHOD, `problems()`, READ ON CLICK — which is a snapshot, so the button that calls it
+   * cannot be disabled by what it finds. Both callers therefore left the button live and answered a
+   * refused value with a toast AFTER the press, while `/decide` answers the same question ("why can
+   * I not submit?") with a disabled control and a sentence beside it. One product, two answers.
+   */
+  let {
+    register,
+    first = false,
+    problems = $bindable<string[]>([]),
+  }: { register: string; first?: boolean; problems?: string[] } = $props();
 
   const decl = $derived(REGISTERS[register]);
 
@@ -92,7 +104,33 @@
    * is 1,250 yen and `KWD 1.250` is one and a quarter dinars, and a field that assumed two would
    * refuse the second and silently mangle the first.
    */
-  let typed = $state<Record<string, string>>({});
+  /**
+   * AND EVERY OTHER FIELD IS HELD TOO, which it was not.
+   *
+   * ONLY `money` WAS BOUND. Every text box, date, number and document on this form was uncontrolled
+   * — the DOM held what you typed and nothing else did — so the form could not answer "is the
+   * required Description empty?" at all. That is why the button could not be disabled: not a
+   * decision, an absence.
+   *
+   * THE DEADLINE DEFAULT IS SEEDED HERE rather than as a `value` attribute, because a value the
+   * component does not hold is a value it cannot count as filled: the date arrived pre-filled on
+   * screen and read as missing to everything else.
+   */
+  const seed = (): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const f of readableFields(register)) {
+      if (first && f.deadline && f.type === 'day') out[f.id] = soon;
+      /* AND A LONG ENUM OPENS ON ITS FIRST VALUE, the same as the segmented control beside it — a
+         `<select>` bound to `undefined` shows nothing chosen, which is not what a register with a
+         nine-value enum means by "the default". */
+      if (f.type === 'enum' && (f.values?.length ?? 0) > 4 && f.values?.[0]) out[f.id] = f.values[0];
+    }
+    return out;
+  };
+  let typed = $state<Record<string, string>>(seed());
+
+  /** `bool` is never missing: unchecked is an answer, and it is the one the record stores. */
+  let ticked = $state<Record<string, boolean>>({});
 
   const wrong = (f: FieldDecl): string | null => {
     const raw = (typed[f.id] ?? '').trim();
@@ -103,9 +141,35 @@
     return places > exp ? copy.moneyPlaces(exp) : null;
   };
 
+  /**
+   * WHAT THE REGISTER ITSELF SAYS CANNOT BE LEFT OUT, and is.
+   *
+   * `f.required` was already rendered beside the label and enforced nowhere — a form that marks a
+   * field required and takes it empty has told somebody a rule and then not kept it, which is worse
+   * than never marking it. `enum` and `bool` are never in here: a segmented control opens on its
+   * first value and an unchecked box is `false`, so both always carry an answer.
+   */
+  const missing = $derived(
+    fields
+      .filter((f) => f.required && f.type !== 'bool' && !(f.type === 'enum' && (f.values?.length ?? 0) <= 4))
+      .filter((f) => (typed[f.id] ?? '').trim() === '')
+      .map((f) => labelOf(f)),
+  );
+
+  /** Which fields hold something the record would refuse. The sentence itself is already under them. */
+  const bad = $derived(fields.filter((f) => f.type === 'money' && wrong(f) !== null).map((f) => labelOf(f)));
+
   /** Every problem this form can see, for whoever owns the button that submits it. */
-  export const problems = (): string[] =>
-    fields.filter((f) => f.type === 'money').map(wrong).filter((m): m is string => m !== null);
+  const found = $derived([
+    ...(missing.length > 0 ? [copy.rowRequired(missing)] : []),
+    ...(bad.length > 0 ? [copy.rowFieldProblem(bad)] : []),
+  ]);
+
+  /* BOUND OUT ON EVERY CHANGE, so the button is disabled while the reason is on screen rather than
+     after a press. `$effect` and not `$derived` because it crosses the component boundary. */
+  $effect(() => {
+    problems = found;
+  });
 </script>
 
 <form class="row-form" onsubmit={(e) => e.preventDefault()}>
@@ -136,13 +200,13 @@
           {/each}
         </div>
       {:else if f.type === 'enum'}
-        <select class="row-input" id={id(f)}>
-          {#each f.values ?? [] as value}<option>{value.replace(/_/g, ' ')}</option>{/each}
+        <select class="row-input" id={id(f)} bind:value={typed[f.id]}>
+          {#each f.values ?? [] as value}<option value={value}>{value.replace(/_/g, ' ')}</option>{/each}
         </select>
       {:else if f.type === 'ref'}
-        <select class="row-input" id={id(f)}>
+        <select class="row-input" id={id(f)} bind:value={typed[f.id]}>
           <option value="">{copy.noneChosen}</option>
-          {#each options(f) as o}<option value={o.value}>{o.label}</option>{/each}
+          {#each options(f) as o}<option value={String(o.value)}>{o.label}</option>{/each}
         </select>
       {:else if f.type === 'money'}
         <div class="field money">
@@ -171,19 +235,19 @@
              the first thing anybody sees. Four weeks is a plausible term somebody overwrites, and
              `deadline:` is the register saying which field is the one a date belongs on. -->
         <div class="field">
-          <input class="field-input" id={id(f)} type="date" value={first && f.deadline ? soon : undefined} />
+          <input class="field-input" id={id(f)} type="date" bind:value={typed[f.id]} />
         </div>
       {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
         <div class="field">
-          <input class="field-input num" id={id(f)} type="text" inputmode="decimal" />
+          <input class="field-input num" id={id(f)} type="text" inputmode="decimal" bind:value={typed[f.id]} />
           {#if f.unit}<span class="money-unit">{f.unit}</span>{/if}
         </div>
       {:else if f.type === 'bool'}
-        <label class="row-check"><input id={id(f)} type="checkbox" /> {copy.yes}</label>
+        <label class="row-check"><input id={id(f)} type="checkbox" bind:checked={ticked[f.id]} /> {copy.yes}</label>
       {:else if f.type === 'document'}
-        <textarea class="row-input row-area" id={id(f)} rows="4"></textarea>
+        <textarea class="row-input row-area" id={id(f)} rows="4" bind:value={typed[f.id]}></textarea>
       {:else}
-        <div class="field"><input class="field-input" id={id(f)} type="text" /></div>
+        <div class="field"><input class="field-input" id={id(f)} type="text" bind:value={typed[f.id]} /></div>
       {/if}
     </div>
   {/each}

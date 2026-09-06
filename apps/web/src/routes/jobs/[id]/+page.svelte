@@ -78,11 +78,16 @@
   <ol class="ledger">
     {#each JOB.events as e}
       {@const long = e.out.length > FOLD}
-      <!-- A DISCLOSURE THAT DISCLOSES NOTHING TEACHES PEOPLE NOT TO PRESS THEM. The row already
-           shows `out` in full when it is short, so expanding a successful `✓ 22 rows` said `22 rows`
-           — the same six characters, one press later. It is a button only when there is something
-           behind it: a failure, which carries its reason, or an output longer than the fold. -->
-      {@const more = !e.ok || long}
+      <!-- A DISCLOSURE THAT DISCLOSES NOTHING TEACHES PEOPLE NOT TO PRESS THEM, and this row taught
+           it twice. Expanding a successful `✓ 22 rows` said `22 rows` — the same six characters, one
+           press later — so a failure was made pressable instead. But a failure's reason renders
+           whether it is open or not: the button flipped `aria-expanded` and changed nothing on the
+           screen, so a person heard "collapsed" while the reason was already in front of them, and
+           pressing it moved a chevron and nothing else.
+
+           SO THE FOLD IS THE ONLY THING A DISCLOSURE IS FOR. There is more text than fits, or there
+           is nothing to press. A failure below the fold shows its reason and is a plain row. -->
+      {@const more = long}
       <li>
         <!-- A tool call and its result are ONE row. Two rows per call doubles a transcript nobody
              wanted to read in the first place. -->
@@ -93,10 +98,15 @@
         {:else}
           <div class="line line-short" data-flat>{@render step(e, false)}</div>
         {/if}
-        {#if more && (!e.ok || open.has(e.seq))}
+        <!-- A FAILURE ALWAYS CARRIES ITS REASON. `PROPOSAL_UNCITED — a proposal must attach the rows
+             it read` is the whole content of that row; putting it behind a press would be hiding the
+             one thing somebody opened this page to read. -->
+        {#if !e.ok || open.has(e.seq)}
           <p class="detail" data-ok={e.ok ? '' : undefined}>
-            {e.out}
-            {#if long}<span class="fold">{FOLD} of {e.out.length} characters</span>{/if}
+            <!-- AND THE FOLD FOLDS. It printed `2000 of 41000 characters` under the whole 41,000 of
+                 them — a label describing a truncation that had not happened. -->
+            {open.has(e.seq) ? e.out : e.out.slice(0, FOLD)}
+            {#if long && !open.has(e.seq)}<span class="fold">{FOLD} of {e.out.length} characters</span>{/if}
           </p>
         {/if}
       </li>
