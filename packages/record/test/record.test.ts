@@ -1021,3 +1021,38 @@ test('A PROPOSED ROWSET IS HELD TO THE CEILING, in both directions', async () =>
   assert.ok(value(await api.governance({ register: 'suggestion', id: 'SG1' }, owner)));
   sql.close();
 });
+
+test('A PAGE LIST IS SCOPED, because a title is a sentence about what the record holds', async () => {
+  /* `boot` filters its register list on the grounds that a list of names is itself information, and
+     `pages()` returned every page a record declares to anybody with `read` on anything. "Payroll,
+     monthly" tells a bookkeeper invited to one register that there is a payroll register — the exact
+     inference `boot` exists to prevent, one method along. */
+  const { api, sql } = await record();
+  /* Three pages: one over each register, and one that draws from neither. */
+  value(
+    await api.kernel.install([
+      { id: 'page.money', kind: 'page', body: { page: 'money', title: 'Money', blocks: [{ kind: 'table', source: 'register.obligations' }] } },
+      { id: 'page.jotted', kind: 'page', body: { page: 'jotted', title: 'Jotted', blocks: [{ kind: 'table', source: 'register.notes' }] } },
+      { id: 'page.about', kind: 'page', body: { page: 'about', title: 'About', blocks: [{ kind: 'prose', text: 'Nothing but words.' }] } },
+    ] as never),
+  );
+
+  const seen = async (ctx: CallContext) =>
+    (value(await api.pages(ctx)) as { slug: string; title: string }[]).map((p) => p.slug).sort();
+
+  const all = await seen(owner);
+  assert.ok(all.length > 0, 'the record declares no pages, so this test proves nothing');
+
+  /* A caller who reaches nothing but `obligations` sees the pages that draw from it, and no others. */
+  const scoped = { principal: { kind: 'person', id: 'p_2', level: 'read' }, registers: ['obligations'] } as CallContext;
+  const some = await seen(scoped);
+  assert.ok(!some.includes('jotted'), 'a caller who cannot reach notes was told there is a page of them');
+  assert.ok(some.includes('money'), 'a caller lost the page over the one register they hold');
+  assert.ok(some.includes('about'), 'a page bound to no register is prose, and prose is for anybody who may read');
+
+  /* AND THE REGISTER LIST DOES NOT TRAVEL. It is what the filter is for, and shipping it would hand
+     back the names the filter exists to withhold. */
+  const rows = value(await api.pages(owner)) as Record<string, unknown>[];
+  for (const p of rows) assert.deepEqual(Object.keys(p).sort(), ['slug', 'title'], 'a page carried more than its name');
+  sql.close();
+});

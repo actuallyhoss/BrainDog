@@ -316,3 +316,26 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
   });
   return JSON.parse(text);
 }
+
+/**
+ * The registers a page draws from, so a caller's scope can be checked against it.
+ *
+ * A PAGE'S TITLE IS A SENTENCE ABOUT WHAT THE RECORD HOLDS. "Payroll, monthly" tells a bookkeeper
+ * invited to one register that there is a payroll register — which is the exact inference `boot`
+ * filters its own list to prevent: a list of names is itself information. `pages()` returned every
+ * page a record declares to anybody with `read` on anything.
+ *
+ * `for:` COUNTS AS MUCH AS A BLOCK'S `source`. A template is one page per row of the register it
+ * walks, so its existence says that register is there — and each expanded page carries a row's title
+ * as its own, which says more.
+ *
+ * A PAGE THAT NAMES NONE IS PROSE, and prose is for anybody who may read.
+ */
+export function registersOf(decl: PageDecl): string[] {
+  const named = new Set<string>();
+  if (decl.for?.register) named.add(decl.for.register);
+  for (const block of decl.blocks ?? [])
+    if (typeof block.source === 'string' && block.source.startsWith('register.'))
+      named.add(block.source.slice('register.'.length));
+  return [...named];
+}

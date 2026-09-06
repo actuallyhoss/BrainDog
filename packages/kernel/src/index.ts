@@ -66,7 +66,7 @@ import {
 } from './govern.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { readBlock, readPage, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
+import { readBlock, readPage, registersOf, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import {
   carryingOf,
   headline,
@@ -1692,7 +1692,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* ── pages ──────────────────────────────────────────────────── */
 
     /** Every page a person could open, templates expanded into one page per row. */
-    pages: () => resolvePages(pageDeps()).map((p) => ({ slug: p.slug, title: p.decl.title })),
+    /* AND WHICH REGISTERS EACH DRAWS FROM, so the record can scope the list the way `boot` scopes
+       its own. It is stripped before it leaves — the caller gets a slug and a title. */
+    pages: () => resolvePages(pageDeps()).map((p) => ({ slug: p.slug, title: p.decl.title, registers: registersOf(p.decl) })),
 
     /**
      * One page, with every block run.

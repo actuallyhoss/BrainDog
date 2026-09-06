@@ -516,7 +516,27 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     async pages(ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(kernel.pages());
+      /* SCOPED, LIKE `boot` IS. This returned every page a record declares, to anybody with `read` on
+         anything — and a page's title is a sentence about what the record holds. "Payroll, monthly"
+         tells a bookkeeper invited to one register that there is a payroll register, which is the
+         exact inference `boot` filters its own list to prevent: a list of names is itself
+         information.
+
+         A PAGE IS VISIBLE IF ANY REGISTER IT DRAWS FROM IS. Not every one — `page()` already refuses
+         the blocks a caller cannot reach and draws the rest, so a page they can see three fifths of
+         is a page they can use. A page bound to no register at all is prose, and prose is for
+         anybody who may read. */
+      return ok(
+        kernel
+          .pages()
+          /* A PAGE IS VISIBLE IF ANY REGISTER IT DRAWS FROM IS. `page()` already refuses the blocks a
+             caller cannot reach and draws the rest, so a page they can see three fifths of is a page
+             they can use. One that names none is prose, and prose is for anybody who may read. */
+          .filter((p) => p.registers.length === 0 || p.registers.some((id) => !reaches(ctx, id)))
+          /* AND THE REGISTER LIST DOES NOT TRAVEL. It is what the filter is FOR, and shipping it
+             would hand back the names the filter exists to withhold. */
+          .map((p) => ({ slug: p.slug, title: p.title })),
+      );
     },
 
     /**
