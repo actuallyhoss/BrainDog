@@ -162,8 +162,24 @@ for (const width of widths) {
       }
       /* A table wider than the page is the design. A heading wider than the page is a bug. The
          difference is whether anything above it scrolls or clips. */
+      /* THE WALK STOPS AT THE SURFACE, and that is the whole rule. It went all the way to `body` —
+         and the shell's own `.body` panel is `overflow-y: auto`, which computes `overflow-x` to
+         `auto` as well, so EVERY element inside `#main` had a scrolling ancestor and every one of
+         them was excused. The gate could only ever see the nav and the tab bar; a 2000px heading in
+         the middle of a page was contained by the thing that makes the page scroll at all.
+
+         It went green on its own seeded violation the day a second surface got a scroll container,
+         which is the self-test doing exactly what it is for. */
+      /* THE THREE ROOTS THE SELECTOR BELOW WALKS FROM, and a `nav` INSIDE `#main` is not one of them.
+         Stopping at every `nav` excused nothing and accused plenty: the settings tab strip is a
+         `<nav>` with `overflow-x: auto`, doing exactly what a horizontal scroller does, and reading
+         it as a surface root meant its own scrolling never counted — twenty-four findings about a
+         control working as designed. A surface is where the measurement starts, not any element that
+         happens to share its tag. */
+      const surface = (el) =>
+        el.id === 'main' || el.classList.contains('tab-slot') || (el.tagName === 'NAV' && !el.closest('#main'));
       const contained = (el) => {
-        for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        for (let a = el.parentElement; a && a !== document.body && !surface(a); a = a.parentElement) {
           const ox = getComputedStyle(a).overflowX;
           if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') return true;
         }

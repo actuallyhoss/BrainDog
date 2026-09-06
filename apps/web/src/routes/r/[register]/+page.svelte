@@ -64,6 +64,8 @@
 
   /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
   let createOpen = $state(false);
+  /* The drawer's own button asks the form whether anything it holds would be refused. */
+  let form = $state<{ problems: () => string[] } | undefined>(undefined);
   let displayOpen = $state(false);
   let bindOpen = $state(false);
 
@@ -792,11 +794,20 @@
        see RowForm — so a pack that adds a field gets a form field, and nobody writes a second copy
        of the schema in markup. -->
   <Sheet bind:open={createOpen} title="{copy.newRow} {decl.one}">
-    <RowForm register={id} />
+    <RowForm register={id} bind:this={form} />
     {#snippet footer()}
       <Button
         weight="primary"
         onclick={() => {
+          /* A VALUE THE RECORD WOULD REFUSE IS SAID BEFORE THE DRAWER CLOSES. The form knows — it
+             marks the field and prints the sentence — and the button closed anyway, so somebody who
+             had typed a fraction of a penny was told "nothing was written", which is true of every
+             submit here and says nothing about theirs. */
+          const said = form?.problems() ?? [];
+          if (said.length > 0) {
+            toasts.push(said[0]!, { intent: 'warn' });
+            return;
+          }
           createOpen = false;
           toasts.push(copy.savedNothing, { intent: 'warn' });
         }}
@@ -864,6 +875,11 @@
      id face at the smallest size so an operator can find it and a bookkeeper's eye skips it. */
   .seen {
     display: flex;
+    /* IT WRAPS, because at 320px a sentence and a button do not fit on one line and the button was
+       the thing that left the window — pushed eleven pixels past the edge, where the last thing a
+       person can do about a refusal sits half off the screen. `align-items: center` is right for one
+       line and wrong for two, so the wrapped case aligns to the start. */
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
     padding: var(--sp-3) var(--sp-4);
@@ -873,7 +889,10 @@
   }
 
   .seen-said {
-    flex: 1;
+    /* `flex: 1` ALONE DOES NOT LET IT SHRINK. A flex child's floor is its content, so a long
+       sentence held the row at its own width and the button went over the side rather than under. */
+    flex: 1 1 16ch;
+    min-inline-size: 0;
     margin: 0;
     font-size: var(--t-sm);
     line-height: 1.5;

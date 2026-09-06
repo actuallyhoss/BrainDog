@@ -21,6 +21,7 @@
 <script lang="ts">
   import { REGISTERS, ROWS, currencyFor, labelOf, readableFields } from '../record/api.ts';
   import type { FieldDecl } from '../record/schema.ts';
+  import { exponentOf } from 'braindog-render';
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
 
@@ -61,6 +62,33 @@
    */
   let chosen = $state<Record<string, string>>({});
   const pick = (f: FieldDecl): string => chosen[f.id] ?? f.values?.[0] ?? '';
+
+  /**
+   * WHAT A PERSON HAS TYPED INTO A MONEY FIELD, and whether the record would take it.
+   *
+   * THIS IS THE ONE PLACE MONEY IS TYPED INTO THIS PRODUCT, and the input took anything:
+   * `1234.56abc-12` was accepted and displayed as typed, and so was `4800.499` — a fraction of a
+   * penny, which is the exact bug minor units exist to stop. `coerce.ts` refuses both, correctly and
+   * later; a person who finds out at submit has typed a whole row first.
+   *
+   * THE EXPONENT IS THE CURRENCY'S. Two decimals is most currencies and not all of them: `JPY 1250`
+   * is 1,250 yen and `KWD 1.250` is one and a quarter dinars, and a field that assumed two would
+   * refuse the second and silently mangle the first.
+   */
+  let typed = $state<Record<string, string>>({});
+
+  const wrong = (f: FieldDecl): string | null => {
+    const raw = (typed[f.id] ?? '').trim();
+    if (raw === '') return null;
+    const exp = exponentOf(currencyFor(register, f.id) ?? 'GBP');
+    if (!/^-?\d+(\.\d+)?$/.test(raw)) return copy.moneyShape;
+    const places = raw.includes('.') ? raw.length - raw.indexOf('.') - 1 : 0;
+    return places > exp ? copy.moneyPlaces(exp) : null;
+  };
+
+  /** Every problem this form can see, for whoever owns the button that submits it. */
+  export const problems = (): string[] =>
+    fields.filter((f) => f.type === 'money').map(wrong).filter((m): m is string => m !== null);
 </script>
 
 <form class="row-form" onsubmit={(e) => e.preventDefault()}>
@@ -106,8 +134,20 @@
                together; a constant is how one of them ends up wearing the other's code. A field
                whose rows disagree shows no code at all, which is the honest state of that field. -->
           {#if currencyFor(register, f.id)}<span class="money-unit">{currencyFor(register, f.id)}</span>{/if}
-          <input class="field-input num" id={id(f)} type="text" inputmode="decimal" placeholder="0.00" />
+          <input
+            class="field-input num"
+            id={id(f)}
+            type="text"
+            inputmode="decimal"
+            placeholder="0.00"
+            bind:value={typed[f.id]}
+            aria-invalid={wrong(f) ? 'true' : undefined}
+            aria-describedby={wrong(f) ? `${id(f)}-why` : undefined}
+          />
         </div>
+        <!-- SAID WHERE IT WAS TYPED, not at submit. A value the record will refuse is worth knowing
+             about while the caret is still in the field. -->
+        {#if wrong(f)}<p class="row-why" id="{id(f)}-why">{wrong(f)}</p>{/if}
       {:else if f.type === 'day'}
         <div class="field"><input class="field-input" id={id(f)} type="date" /></div>
       {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
@@ -153,6 +193,14 @@
     color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 600;
+  }
+
+  /* THE COLOUR IS NOT THE MESSAGE. Somebody who cannot tell the two reds apart still reads the
+     sentence, which is why there is one. */
+  .row-why {
+    margin-block: var(--sp-1) 0;
+    color: var(--danger);
+    font-size: var(--t-sm);
   }
 
   .row-required {

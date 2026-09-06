@@ -653,6 +653,13 @@
   }
 
   .source {
+    /* THE WHOLE WIDTH, because it is not a block. Every other child of `.page` is a block with a
+       declared span; this is the page's own source, and with no span it took one column of twelve —
+       103 pixels of `page: m` / `title: ` / `nav: { ` clipped down the left edge with fourteen
+       hundred beside it. `minmax(0, 1fr)` on the tracks is what lets a `pre` scroll instead of
+       stretching them, so the two rules are one decision. */
+    grid-column: 1 / -1;
+    min-inline-size: 0;
     margin: 0;
     padding: var(--sp-4);
     background: var(--sunk);

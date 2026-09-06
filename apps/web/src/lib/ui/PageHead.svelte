@@ -155,7 +155,13 @@
 
   .head-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--sp-2);
+    /* A FLEX CHILD DOES NOT SHRINK BELOW ITS CONTENT UNLESS IT IS TOLD TO. Without this the actions
+       row kept its widest button's width at every viewport and pushed the header off the side of a
+       320px window — 399px of it — which the layout gate could not see, because the shell's scroll
+       panel counted as containing it. */
+    min-inline-size: 0;
   }
 
 
@@ -178,6 +184,12 @@
 
     .head-actions {
       margin-inline-start: auto;
+    }
+
+    /* AND THE SHORTCUT HINT GOES, because below 900px there is no keyboard to press it with. It is
+       the widest thing in the button and it is advice nobody on a phone can take. */
+    .head-actions :global(kbd) {
+      display: none;
     }
 
     .title {

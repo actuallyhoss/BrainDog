@@ -336,6 +336,15 @@ export const copy = {
   secondPacks:
     'A pack is a register somebody else already worked out the fields for, with the metrics and the pages that go with it. Nothing installs without you reading what it would change.',
 
+  /* MONEY IS AN INTEGER IN MINOR UNITS, and this is the one place a person types one. The sentence
+     says what to do rather than what is wrong: "not a number" is a verdict, and "digits and at most
+     one point" is an instruction. */
+  moneyShape: 'An amount is digits and at most one point — 1234.56, or -50.',
+  moneyPlaces: (exp: number): string =>
+    exp === 0
+      ? 'This currency has no smaller unit, so an amount is a whole number.'
+      : `This currency goes to ${exp} decimal place${exp === 1 ? '' : 's'}, and a fraction of one is not an amount anybody can pay.`,
+
   /** The label above the first field. Written per choice, because "Your first money" is not English. */
   firstField: {
     obligations: 'Your first invoice',

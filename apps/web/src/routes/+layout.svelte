@@ -158,7 +158,12 @@
 <div class="live" data-state={live} aria-hidden="true"></div>
 
 {#if bare}
-  <main id="main">{@render children()}</main>
+  <!-- ITS OWN SCROLL CONTAINER, because `html, body` are `overflow: hidden` — the shell's `.body`
+       panel is the one thing that scrolls, and a bare surface has no panel. So a page taller than
+       the window simply had two thirds of itself below a fold that could not be crossed: `/s/<token>`
+       is 2,628px of projected page in a 993px window, and the only part anybody could read was the
+       first third. That is the artefact somebody hands an accountant. -->
+  <main id="main" class="bare">{@render children()}</main>
 {:else}
   <div class="shell" data-rail={railOff ? 'off' : undefined}>
     <div class="rail-slot">
@@ -257,6 +262,15 @@
 
   .live[data-state='offline'] {
     background: var(--danger);
+  }
+
+  /* A SURFACE WITH NO SHELL SCROLLS ITSELF. Same architecture as `.body` below — one container, one
+     scrollbar — and `100dvh` rather than `100%` because a phone's address bar is part of the window
+     and a page that ends under it ends where nobody can reach. */
+  .bare {
+    block-size: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   /* Rail on the darker ground, work on the lighter one, one hairline between them, and no inset
