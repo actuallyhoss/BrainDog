@@ -321,6 +321,21 @@ export const copy = {
     { key: 'tasks', icon: 'task', label: 'Work', body: 'What is on, what is next, and who has it.', field: 'What needs doing?' },
   ],
 
+  /* SCREEN 2, INLINE UNDER THE REGISTER THEY JUST MADE (19 §6). The claim is about what the record
+     becomes rather than about what they should do next — "Add another" is work manufactured for
+     somebody who has not asked for any, and 19 §6's own rule for an empty state is that a product
+     which manufactures work is the failure. */
+  secondHeading: 'One kind of thing is a list. Two is a record.',
+  secondBody:
+    'Rows in one register can point at rows in another — an invoice at the client it is for, a renewal at the project it belongs to — and that is where the record starts answering questions you did not ask it.',
+
+  /* AND THE WORD *PACK*, FOR THE FIRST TIME IN THE PRODUCT, DEFINED IN PLACE. It does not appear on
+     screen one at all: selecting a pack means reading an install diff written in the language of
+     metrics and nav order, and asking somebody to approve four schema reviews before they have seen
+     one of their own rows is worse than a tour. Here they have seen one. */
+  secondPacks:
+    'A pack is a register somebody else already worked out the fields for, with the metrics and the pages that go with it. Nothing installs without you reading what it would change.',
+
   /** The label above the first field. Written per choice, because "Your first money" is not English. */
   firstField: {
     obligations: 'Your first invoice',
