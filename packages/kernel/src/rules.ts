@@ -29,6 +29,7 @@ import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where'
 
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
+import { spanMs } from './vault.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
 
 export type RuleAction =
@@ -39,6 +40,19 @@ export type RuleAction =
   | { link: { field: string; to: { register: string; by: string; value: string } } }
   | { note: string }
   | { notify: { say: string; tone?: string; urgent?: boolean } }
+  /**
+   * Come back to this row later. `07 §6`'s fourth shape, and the one that was missing.
+   *
+   * IT INSTALLED, MATCHED, AND WAS DROPPED. `RuleAction` did not carry it and the dispatch chain's
+   * `if / else if` had no arm for it, so a rule declaring `{ schedule: { in: 14d, note: "check
+   * again" } }` fired, did nothing, and did not even appear in `RulesOutcome.fired` — which is the
+   * one place somebody would look to find out whether it had.
+   *
+   * IT IS THE ONLY ACTION THAT REACHES FORWARD IN TIME, which is why it earns its own schedule row
+   * rather than a field on the entry: "chase this in a fortnight" is a thing the record does, and a
+   * date in a field is a thing somebody has to notice.
+   */
+  | { schedule: { in: string; kind?: string; note: string } }
   /**
    * A matrix of rows from one row — a size run, a rate card, a schedule of instalments.
    *
@@ -86,6 +100,14 @@ export type RulesDeps = {
    * "have we interrupted this person already", and the two would disagree on the day it mattered.
    */
   interrupt: (said: { actor: string; say: string; because?: string; url?: string }) => void;
+  /**
+   * Arm one `rule` schedule row: come back to this row at that time.
+   *
+   * KEYED BY THE RULE AND THE ROW, so a rule that fires twice on one row moves the date rather than
+   * arming a second reminder — the same idempotence `once_per` gives the firing, applied to the
+   * thing the firing arms.
+   */
+  later: (key: string, atMs: number, payload: unknown) => void;
   sql: Sql;
   rules: (register: string) => RuleDecl[];
   schemaOf: (register: string) => Schema | null;
@@ -194,6 +216,9 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
        you", and then flattened into the same list a plain `note` goes in — so a rule saying
        "Payment failed" wrote an event and nothing left the record. 09 §4: `true` interrupts. */
     const said: { text: string; urgent: boolean }[] = [];
+    /* HELD LIKE THE NOTES ARE, until the write has happened. A rule whose write the register then
+       refuses has not done anything, and a reminder about what it did not do is worse than silence. */
+    const later: { in: string; note: string }[] = [];
     const made: { register: string; each?: string[]; bound: number; fields: Record<string, string> }[] = [];
     const asks: { question: string; options: string[] }[] = [];
     let stop = false;
@@ -257,6 +282,9 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       } else if ('notify' in action) {
         said.push({ text: fill(action.notify.say, fired.entry, deps.nowMs), urgent: action.notify.urgent === true });
         did.push('notify');
+      } else if ('schedule' in action) {
+        later.push({ in: action.schedule.in, note: fill(action.schedule.note, fired.entry, deps.nowMs) });
+        did.push(`schedule ${action.schedule.in}`);
       } else if ('create' in action) {
         made.push(action.create);
         did.push(`create in ${action.create.register}`);
@@ -287,6 +315,20 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       fired.entry = wrote.value;
     }
 
+    for (const one of later) {
+      const span = spanMs(one.in);
+      /* A SPAN THIS RECORD CANNOT READ IS NOT A SILENT NOTHING. `install` refuses one, so reaching
+         here means a rule written by an older build — and the row it would have chased is exactly the
+         row somebody is trusting it to chase. */
+      if (span === null) continue;
+      deps.later(`${rule.rule}:${fired.entry.id}`, deps.nowMs + span, {
+        entry: fired.entry.id,
+        register: fired.entry.register,
+        rule: rule.rule,
+        note: one.note,
+      });
+    }
+
     for (const one of said)
       /* AN URGENT ONE GOES THROUGH THE ROUTER, which writes the same event and then interrupts —
          once an hour per record, 09 §4. A plain one is the event and nothing else, which is what
@@ -296,7 +338,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
 
     /* THE EXPANSION IS LAST, and it shares the triggering write's batch — so "undo this expansion"
        is one query rather than an archaeology of timestamps. */
-    let happened = Object.keys(patch).length > 0 || said.length > 0;
+    let happened = Object.keys(patch).length > 0 || said.length > 0 || later.length > 0;
     for (const spec of made) {
       const grown = expand(deps, rule, spec, fired);
       if (grown.refusals.length) out.refused.push(...grown.refusals);
@@ -659,6 +701,7 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
     else if ('move' in a) out.push(`move to ${a.move}`);
     else if ('note' in a) out.push(`note ${fill(a.note, entry, deps.nowMs)}`);
     else if ('notify' in a) out.push(`notify ${fill(a.notify.say, entry, deps.nowMs)}`);
+    else if ('schedule' in a) out.push(`in ${a.schedule.in}, ${fill(a.schedule.note, entry, deps.nowMs)}`);
     else if ('stop' in a) out.push('stop');
     else if ('link' in a) {
       /* A LINK THAT CANNOT BE MADE IS NAMED HERE, because the preview is where somebody finds out

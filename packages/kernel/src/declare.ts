@@ -24,6 +24,7 @@ import { jsonPath } from '@braindog/where';
 import type { Json } from './coerce.ts';
 import { instant } from './migrate.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
+import { spanMs } from './vault.ts';
 
 /**
  * `34-GRAMMARS` §4. Checked before an id is inlined into an index name or a JSON path.
@@ -212,6 +213,20 @@ export function validate(decl: Declaration): Refusal | null {
      write to that register raise a `TypeError` out of the rules pass, out of `create`, out of the
      transaction. A declaration's shape is checked where it lands or it is checked by a customer. */
   if (decl.kind === 'rule') {
+    /* AND A SPAN THIS RECORD CANNOT READ IS REFUSED WHERE IT IS WRITTEN. `{ schedule: { in: '2 weeks'
+       } }` would install and then be dropped at fire time — and the row it was meant to chase is
+       exactly the row somebody is trusting it to chase. */
+    for (const action of ((decl.body as { then?: unknown }).then ?? []) as { schedule?: { in?: unknown } }[])
+      if (action && typeof action === 'object' && action.schedule !== undefined) {
+        const span = typeof action.schedule.in === 'string' ? spanMs(action.schedule.in) : null;
+        if (span === null)
+          return bad(
+            'DECLARATION_INVALID',
+            `${decl.id} schedules ${String(action.schedule.in)} ahead, and a span is a number and one of d, w, m or y — write 14d.`,
+            'then',
+          );
+      }
+
     const once = (decl.body as { once_per?: unknown }).once_per;
     if (once !== undefined && (!Array.isArray(once) || once.some((k) => typeof k !== 'string')))
       return bad('DECLARATION_INVALID', `A rule's once_per is a list of field names, and ${decl.id}'s is not.`, 'once_per');

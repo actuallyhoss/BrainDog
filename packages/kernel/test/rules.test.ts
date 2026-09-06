@@ -876,3 +876,73 @@ test('and it is a page, not a `while` nobody can stop', async () => {
   assert.equal(k.applyRule('nothing').ok, false);
   sql.close();
 });
+
+test('A RULE CAN COME BACK TO A ROW, which is 07 §6’s fourth shape', async () => {
+  /* IT INSTALLED, MATCHED, AND WAS DROPPED. `RuleAction` did not carry `schedule` and the dispatch
+     chain had no arm for it, so a rule declaring `{ schedule: { in: 14d, note: "check again" } }`
+     fired, did nothing, and did not appear in `RulesOutcome.fired` — which is the one place somebody
+     would look to find out whether it had. `rule` has meanwhile been one of the ten schedule kinds
+     with nothing to write one and nothing to handle one. */
+  const { k, sql, clock } = await record();
+  value(
+    await k.install([
+      {
+        id: 'rule.chase',
+        kind: 'rule',
+        body: {
+          rule: 'chase',
+          register: 'obligations',
+          on: 'create',
+          when: 'state is open',
+          once_per: ['id'],
+          then: [{ schedule: { in: '14d', note: 'chase {{what}} again' } }],
+        },
+      } as never,
+    ]),
+  );
+
+  value(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
+
+  const armed = sql.one<{ key: string; due_at: string; payload: string; state: string }>(
+    "SELECT key, due_at, payload, state FROM schedule WHERE kind = 'rule' AND payload LIKE '%chase Invoice 41%'",
+  );
+  assert.ok(armed, 'a rule that asked to come back was dropped');
+  assert.equal(armed.state, 'pending');
+  assert.equal(Date.parse(armed.due_at) - clock.now(), 14 * 86_400_000, 'it comes back at the wrong time');
+
+  /* AND WHEN IT COMES BACK IT SAYS SO, against the row it was about. */
+  clock.set(clock.now() + 15 * 86_400_000);
+  await k.drain();
+  const note = sql.one<{ note: string; actor: string }>("SELECT note, actor FROM event WHERE kind = 'note' ORDER BY rowid DESC LIMIT 1");
+  assert.equal(note?.note, 'chase Invoice 41 again');
+  assert.equal(note?.actor, 'rule:chase');
+  assert.equal(
+    sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'rule' AND key LIKE 'chase:%'")?.state,
+    'done',
+    'a one-shot came back twice',
+  );
+  sql.close();
+});
+
+test('AND A SPAN THIS RECORD CANNOT READ DOES NOT INSTALL', async () => {
+  /* It would be dropped at fire time — and the row it was meant to chase is exactly the row somebody
+     is trusting it to chase. */
+  const { k, sql } = await record();
+  const out = await k.install([
+    {
+      id: 'rule.vague',
+      kind: 'rule',
+      body: {
+        rule: 'vague',
+        register: 'obligations',
+        on: 'create',
+        when: 'state is open',
+        once_per: ['id'],
+        then: [{ schedule: { in: '2 weeks', note: 'x' } }],
+      },
+    } as never,
+  ]);
+  assert.equal(out.ok, false, 'a span nobody can read installed');
+  assert.match((out as { refusal: { fix: string } }).refusal.fix, /write 14d/);
+  sql.close();
+});

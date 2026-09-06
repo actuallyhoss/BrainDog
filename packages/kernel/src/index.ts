@@ -1248,6 +1248,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* THE ONE ROUTER. A rule that declares `urgent` shows in the install diff as "interrupts you",
        and until now that diff was the only reader of the key — 09 §4 is what it should have meant. */
     interrupt: (said) => notify(digestDeps(), { ...said, urgent: true }),
+    /* AND THE ONE ACTION THAT REACHES FORWARD IN TIME. `ON CONFLICT (kind, key) DO UPDATE` so a rule
+       that fires twice on one row moves the date rather than arming a second reminder — the same
+       idempotence `once_per` gives the firing, applied to what the firing arms. */
+    later: (key, atMs, payload) =>
+      sql.exec(
+        `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES (?, ?, 'rule', ?, ?, 'pending', 0)
+         ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0`,
+        mint(),
+        instant(atMs),
+        key,
+        JSON.stringify(payload),
+      ),
     rules: (register) =>
       sql
         .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")
@@ -1527,6 +1539,33 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* A credential due for rotation. It says the id and the kind and never the label — a
        notification naming "Stripe, live" tells whoever can see it which one is worth taking. */
     rotate: (row) => rotateDue(sql, vaultDeps('system'), row.payload),
+
+    /**
+     * A rule came back to a row it asked to see again. `07 §6`'s `schedule` action.
+     *
+     * `rule` HAS BEEN ONE OF THE TEN SCHEDULE KINDS WITH NOTHING TO WRITE ONE AND NOTHING TO HANDLE
+     * ONE. A row of a kind nothing handles fails once with a sentence naming the kind, which is the
+     * right behaviour for a kind that should not exist — and the wrong one for a kind the action
+     * grammar has always had a shape for.
+     */
+    rule: (row) => {
+      const p = JSON.parse(row.payload) as { entry?: string; register?: string; rule?: string; note?: string };
+      const entry = p.entry ? byId(p.entry) : null;
+      /* THE ROW MOVED ON. Same rule as a reminder whose row was deleted: the thing it is about is not
+         true any more, and firing it anyway is the failure the derived-schedule design exists to
+         avoid. `once_per` markers land here too, and they name no entry — they are a marker rather
+         than a reminder, so there is nothing to say and nothing to fail about. */
+      if (!entry || !p.note) return null;
+      appendEvent({
+        kind: 'note',
+        target: entry.id,
+        register: entry.register,
+        actor: `rule:${p.rule ?? 'unknown'}`,
+        note: p.note.slice(0, 280),
+        at: instant(clock.now()),
+      });
+      return null;
+    },
 
     reminder: (row) => {
       const p = JSON.parse(row.payload) as { entry?: string; register?: string; field?: string; at?: string };
