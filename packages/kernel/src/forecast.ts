@@ -148,10 +148,19 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
     }
 
     let unreadable = 0;
+    /* A LEG WHOSE AMOUNT IS NOT MONEY MUST SAY SO. `amount === null → continue` skipped the row in
+       silence and only unreadable DATES were counted, so a leg pointing at an `int` or a `duration`
+       field produced no steps and no refusals — and the page said nothing crosses zero, which is
+       the one answer a cash walk must never give wrongly. */
+    let notMoney = 0;
     for (const { id } of rows) {
       const entry = deps.hydrate(id);
       if (!entry) continue;
       const money = entry.fields[leg.amount];
+      if (money !== undefined && money !== null && !isMoney(money)) {
+        notMoney++;
+        continue;
+      }
       const amount = isMoney(money) ? money.amount : null;
       if (amount === null || amount === 0) continue;
       if (isMoney(money)) seen.add(money.currency);
@@ -191,6 +200,12 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         code: 'VALUE_MALFORMED',
         fix: `${unreadable} ${unreadable === 1 ? 'row' : 'rows'} of ${leg.register} have a ${leg.on} this walk could not read, and their money is not in it.`,
         at: 'on',
+      });
+    if (notMoney)
+      refusals.push({
+        code: 'VALUE_MALFORMED',
+        fix: `${leg.register}.${leg.amount} is not money in ${notMoney} ${notMoney === 1 ? 'row' : 'rows'}, and a walk adds money. Point this leg at an amount.`,
+        at: 'amount',
       });
   }
 

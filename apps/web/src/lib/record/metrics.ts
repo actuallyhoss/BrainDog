@@ -68,8 +68,14 @@ export type MetricDecl = {
   /** The sentence grammar, the same one a block's `where:` reads. */
   where?: string;
   value: Value;
-  /** `money.<CUR>` · `int` · `decimal` · `pct` · `days`. */
-  format: string;
+  /**
+   * `money.<CUR>` · `int` · `decimal` · `pct` · `days`.
+   *
+   * OPTIONAL, which every reader already assumed and this type did not say. A declaration without
+   * one crashed `format()` on `shape.startsWith` — a `TypeError` out of a figure, on a page. A
+   * number with no declared shape is written as a number.
+   */
+  format?: string;
   /** What good looks like. Money is minor units, like everywhere else. */
   target: { lte: number } | { gte: number };
   /** The comparison shift: `compare` re-evaluates the predicate with `asOf = now − W`. */
@@ -119,6 +125,28 @@ function operand(e: Entry, op: Operand): number | null {
 }
 
 /**
+ * The `by` values in these rows that the declared table has no factor for.
+ *
+ * IT IS THE SET, NOT A BOOLEAN, because the sentence a person needs names the values — "no factor
+ * for `yearly`" is actionable and "this figure is unreadable" is not.
+ */
+export function missingFactors(rows: Entry[], value: Value): string[] {
+  const aggs: Aggregation[] =
+    'ratio' in value ? [value.ratio.of, value.ratio.per] : 'diff' in value ? [value.diff.of, value.diff.per] : [value];
+  const out = new Set<string>();
+  for (const agg of aggs) {
+    const field = 'count' in agg ? agg.count : 'distinct' in agg ? agg.distinct : 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : agg.max;
+    if (typeof field === 'string') continue;
+    const { lookup, by } = field.product[1];
+    for (const e of rows) {
+      const key = String(e.fields[by] ?? '');
+      if (LOOKUPS[lookup]?.[key] === undefined) out.add(`${lookup}.${key || '—'}`);
+    }
+  }
+  return [...out].sort();
+}
+
+/**
  * The currencies the field an aggregation reads is written in.
  *
  * A SUM IS THE PLACE TWO CURRENCIES MEET. The predicate does not care, the count does not care, and
@@ -151,7 +179,20 @@ const pairCurrencies = (rows: Entry[], pair: { of: Aggregation; per: Aggregation
 function aggregate(rows: Entry[], agg: Aggregation): number | null {
   if ('count' in agg)
     return agg.count === 'id' ? rows.length : rows.filter((e) => operand(e, agg.count) !== null).length;
-  if ('distinct' in agg) return new Set(rows.map((e) => String(e.fields[agg.distinct] ?? ''))).size;
+  if ('distinct' in agg) {
+    /* `JSON.stringify` RATHER THAN `String`, and absent rows dropped. `String({ amount, currency })`
+       is `'[object Object]'`, so every money value in a register collapsed to ONE distinct value —
+       three invoices of different amounts counted as one — and a row with no value at all
+       contributed `''` as a value of its own. Absent is not a value, which is the rule `count` one
+       line up already follows. */
+    const seen = new Set<string>();
+    for (const e of rows) {
+      const v = e.fields[agg.distinct];
+      if (v === undefined || v === null || v === '') continue;
+      seen.add(JSON.stringify(v));
+    }
+    return seen.size;
+  }
 
   const field = 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : agg.max;
   const values = rows.map((e) => operand(e, field)).filter((n): n is number => n !== null);
@@ -177,9 +218,17 @@ function evaluateValue(rows: Entry[], value: Value): number | null {
   return aggregate(rows, value);
 }
 
-/** How a figure is written. The format is declared, so two tiles of one number look the same. */
-export function format(shape: string, n: number | null): string {
+/**
+ * How a figure is written. The format is declared, so two tiles of one number look the same.
+ *
+ * AND `format` IS OPTIONAL, which this did not survive. A declaration without one crashed on
+ * `shape.startsWith` — a `TypeError` out of a figure, on a page, from a key the schema marks
+ * optional and every other reader treats as optional. A number with no declared shape is written as
+ * a number, which is the honest default and what the `default` branch below already said.
+ */
+export function format(shape: string | undefined, n: number | null): string {
   if (n === null) return '—';
+  if (!shape) return n.toLocaleString('en', { maximumFractionDigits: 2 });
   if (shape.startsWith('money.')) return money(Math.round(n), shape.slice('money.'.length));
   switch (shape) {
     case 'int':
@@ -352,6 +401,18 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const held = [...seen][0];
   if (declared && held && declared !== held) {
     const why = `${decl.metric}: the rows are in ${held} and the format says ${declared}`;
+    return { value: null, shown: '—', rows: rows.length, delta: null, why, refusals: [why], href: hrefFor(decl) };
+  }
+
+  /* A FACTOR THE TABLE DOES NOT HOLD IS A REFUSAL, NOT A SMALLER NUMBER. `operand` answered `null`
+     for a row whose `by` value has no entry, `aggregate` then filtered those nulls out of the sum,
+     and the tile printed a figure short by however many rows fell through — with `rows` still
+     counting them, so nothing on the screen disagreed with anything else. A `by` naming a field the
+     table knows nothing about read GBP 0.00 over fourteen rows with no refusal at all. The kernel
+     refuses the identical declaration with `LOOKUP_MISSING`; this is that check, on this side. */
+  const short = missingFactors(rows, decl.value);
+  if (short.length) {
+    const why = `${decl.metric}: no factor for ${short.slice(0, 3).join(', ')}${short.length > 3 ? ` and ${short.length - 3} more` : ''}`;
     return { value: null, shown: '—', rows: rows.length, delta: null, why, refusals: [why], href: hrefFor(decl) };
   }
 

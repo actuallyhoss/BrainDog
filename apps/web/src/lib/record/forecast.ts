@@ -66,26 +66,16 @@ const DAY_MS = 86_400_000;
 const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 const noon = (day: string): number => Date.parse(`${day}T12:00:00Z`);
 
-/** Months per cycle. A cycle this does not know does not recur, which is the safe direction. */
-const CYCLE_MONTHS: Record<string, number> = { monthly: 1, yearly: 12, two_yearly: 24 };
-
-/**
- * Every renewal a live service will actually charge inside the window.
- *
- * A service is one row with a next date and a cycle, so a 180-day window contains six charges from a
- * monthly subscription and none from a two-yearly one that renewed last month. Reading only the
- * stored `renews` date would count each subscription once and make every horizon beyond a month
- * wrong in the same direction: too cheap.
- *
- * Dates advance by calendar month rather than by 30 days, so a monthly renewal on the 31st does not
- * drift backwards through the year.
- */
 /**
  * The days one row's movement lands on inside the window.
  *
  * BY THE CYCLE THE LEG DECLARES. A leg with no `every` is a one-off; one with it reads the row's own
  * cycle field through the leg's table of months, so a quarterly plan is a declaration change rather
  * than a code change.
+ *
+ * A 180-DAY WINDOW HOLDS SIX CHARGES FROM A MONTHLY SUBSCRIPTION and none from a two-yearly one that
+ * renewed last month. Reading only the stored date would count each once and make every horizon
+ * beyond a month wrong in the same direction: too cheap.
  */
 function occurrences(row: Entry, leg: Leg, first: string, until: number): { day: string; at: number }[] {
   const start = noon(first);
@@ -95,35 +85,19 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number): { day:
 
   const out: { day: string; at: number }[] = [];
   for (let n = 0; n < 64; n++) {
-    const at = new Date(start);
-    at.setUTCMonth(at.getUTCMonth() + months * n);
-    if (at.getTime() > until) break;
-    out.push({ day: at.toISOString().slice(0, 10), at: at.getTime() });
-  }
-  return out;
-}
+    /* `resolveDay` RATHER THAN `setUTCMonth`, because `setUTCMonth` OVERFLOWS. A monthly charge on
+       the 29th stepped 29 Jan → 1 Mar → 29 Mar: nothing in February and two charges in March, and
+       every balance between the two was one charge too high on a screen somebody reads to decide
+       whether they can pay a bill. On the 31st it is worse — 31 Jan → 3 Mar → 31 Mar → 1 May.
 
-function renewals(service: Entry, until: number): { day: string; at: number }[] {
-  const first = String(service.fields.renews ?? '');
-  if (!first) return [];
-  const months = CYCLE_MONTHS[String(service.fields.cycle ?? '')] ?? 0;
-  const out: { day: string; at: number }[] = [];
-
-  const start = Date.parse(`${first}T12:00:00Z`);
-  if (!Number.isFinite(start)) return [];
-
-  for (let n = 0; n < 64; n++) {
-    /* `resolveDay` rather than `setUTCMonth`, because `setUTCMonth` OVERFLOWS. A monthly service
-       renewing on the 31st stepped 31 Jan → 3 Mar → 31 Mar → 1 May: nothing in February, two
-       charges in March. The comment here used to claim the opposite. `where.ts` already solved
-       this for predicates and clamps to the last day of the month intended, so it is the same
-       arithmetic in one place rather than two that disagree. */
-    const day = months === 0 ? iso(start) : resolveDay(`+${months * n}m`, start);
+       The fix was written once already and landed in a `renewals` helper nothing called, under a
+       comment claiming this path did it. This is the live path, and it is now the same arithmetic
+       `where.ts` uses for predicates: clamp to the last day of the month intended. */
+    const day = n === 0 ? iso(start) : resolveDay(`+${months * n}m`, start);
     if (!day) break;
-    const at = Date.parse(`${day}T12:00:00Z`);
-    if (at > until) break;
-    if (at >= NOW) out.push({ day, at });
-    if (!months) break;
+    const at = noon(day);
+    if (!Number.isFinite(at) || at > until) break;
+    out.push({ day, at });
   }
   return out;
 }
@@ -163,6 +137,8 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
   const until = NOW + horizon * DAY_MS;
   const movements: { at: number; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
+  /** Whether any leg contributed a number with no currency on it. See the note at the check below. */
+  let bare = false;
 
   for (const leg of legs) {
     const decl = REGISTERS[leg.register];
@@ -173,8 +149,15 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
 
       const amount = amountOf(row.fields[leg.amount]) ?? 0;
       if (amount === 0) continue;
+      /* A BARE NUMBER IS NOT MONEY, AND ADDING ONE IS MIXING. `amountOf` coerces any scalar, and
+         `currencyOf` answers `null` for it — so a leg pointing at a `duration` or an `int` field
+         poured seconds into a sterling walk and `mixed` stayed empty, because nothing counted the
+         currency that was never there. Seventeen thousand seconds arrived on the screen as
+         GBP −172.80 and the crossing day moved. `money.ts` has guarded this since it was written;
+         this walk did not. */
       const currency = currencyOf(row.fields[leg.amount]);
       if (currency) seen.add(currency);
+      else bare = true;
 
       const on = String(row.fields[leg.on] ?? '').slice(0, 10);
       if (!on) continue;
@@ -205,7 +188,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
 
   /* ONE CURRENCY OR NO WALK. A crossing day computed from two currencies is a real-looking date on
      which nothing happens, and there is no screen on which anybody would notice. */
-  const mixed = seen.size > 1 ? [...seen].sort() : [];
+  const mixed = seen.size > 1 || (bare && seen.size > 0) ? [...seen].sort() : [];
   const currency = mixed.length ? null : ([...seen][0] ?? null);
   if (mixed.length) return { from: opening, currency, mixed, steps: [], crossed: null, days: null, horizon };
 

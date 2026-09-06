@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runway, trend } from './forecast.ts';
+import { runway, trend, type Leg } from './forecast.ts';
 import { NOW, PAGES, ROWS } from './data.ts';
 import { page } from './api.ts';
 import { magnitudeOf } from 'braindog-render';
@@ -288,4 +288,55 @@ test('a monthly charge falls in every month, including February', () => {
   const last = keys[keys.length - 1];
   assert.ok(first && last);
   assert.ok(counts.size > 1, 'a year of renewals landed in one month');
+});
+
+/* ── the arithmetic a monthly charge does to a calendar ───────────────────────── */
+
+test('A MONTHLY CHARGE NEVER SKIPS A MONTH AND NEVER LANDS TWICE IN ONE', () => {
+  /* `setUTCMonth` OVERFLOWS: 29 Jan + 1 month is 29 Feb, which does not exist, so it rolls to
+     1 March — and then 29 March. Nothing in February, two charges in March, and every balance
+     between the two one charge too high on a screen somebody reads to decide whether they can pay a
+     bill. The fix had been written once and landed in a helper nothing called.
+
+     ASSERTED PER ROW, so it holds whatever the fixture's own dates are: one subscription's charges
+     must walk one month at a time. */
+  const monthly: Leg = { register: 'services', on: 'renews', amount: 'cost', every: { field: 'cycle', months: { monthly: 1 } } };
+  const byRow = new Map<string, string[]>();
+  // Overdue charges are clamped to today on purpose — the walk stays in order and a balance already
+  // gone is gone at the top of it — so several of one row's can share a day. They are not the
+  // arithmetic under test.
+  for (const step of runway(1_000_000, [monthly], 400).steps)
+    if (!step.label.includes('overdue')) byRow.set(step.href, [...(byRow.get(step.href) ?? []), step.day]);
+
+  for (const [href, days] of byRow) {
+    for (let i = 1; i < days.length; i++) {
+      const [ay = 0, am = 0] = days[i - 1]!.split('-').map(Number);
+      const [by = 0, bm = 0] = days[i]!.split('-').map(Number);
+      const apart = (by - ay) * 12 + (bm - am);
+      assert.equal(apart, 1, `${href} charged ${days[i - 1]} then ${days[i]}, which is ${apart} months apart`);
+    }
+  }
+});
+
+test('and the day of the month is held, clamped rather than overflowed', () => {
+  // The rule `where.ts` already uses for predicates: a step onto a day the month does not have
+  // lands on the last day it does, not on the first of the next one.
+  const monthly: Leg = { register: 'services', on: 'renews', amount: 'cost', every: { field: 'cycle', months: { monthly: 1 } } };
+  for (const step of runway(1_000_000, [monthly], 400).steps) {
+    const [y, m, d] = step.day.split('-').map(Number);
+    assert.ok(y && m && d, step.day);
+    assert.ok(d! <= new Date(Date.UTC(y!, m!, 0)).getUTCDate(), `${step.day} is not a real day`);
+  }
+});
+
+test('A BARE NUMBER IN A STERLING WALK IS MIXING, and the walk says so', () => {
+  /* `amountOf` coerces any scalar and `currencyOf` answers `null` for it, so a leg pointing at a
+     `duration` poured seconds into a sterling walk while `mixed` stayed empty — seventeen thousand
+     seconds arrived on the screen as GBP −172.80, and the crossing day moved. */
+  const seconds: Leg = { register: 'tasks', on: 'by', amount: 'effort' };
+  const money: Leg = { register: 'obligations', on: 'due', amount: 'amount', incoming: { field: 'direction', is: 'owed_to_me' } };
+  const walk = runway(1_000_000, [money, seconds], 180);
+  assert.ok(walk.mixed.length > 0, 'seconds were added to sterling and nothing said so');
+  assert.equal(walk.currency, null, 'a mixed walk is in no currency');
+  assert.deepEqual(walk.steps, [], 'a mixed walk draws no steps');
 });

@@ -101,7 +101,7 @@ export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
-export { AGGREGATIONS, evaluateMetric, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
+export { AGGREGATIONS, deltaFrom, evaluateMetric, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export { CHANNELS, carryingOf, headline, inQuietHours, localParts, nextOccurrence, render, runDigest, sectionsOf } from './digest.ts';
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';

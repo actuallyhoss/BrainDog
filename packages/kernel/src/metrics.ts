@@ -277,7 +277,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     else if (before.value.rows * 2 < now.value.rows) why = 'the window before has under half the rows';
     else if (before.value.value === null || now.value.value === null || before.value.value === 0)
       why = 'the window before has nothing to compare against';
-    else delta = (now.value.value - before.value.value) / before.value.value;
+    else delta = deltaFrom(before.value.value, now.value.value);
   }
 
   return ok({
@@ -370,13 +370,20 @@ function one(
   const type = schema.fields[field]?.type ?? 'text';
   const expr = `json_extract(fields, '${jsonPath(field)}${type === 'money' ? '.amount' : type === 'quantity' ? '.value' : ''}')`;
 
-  if (kind === 'distinct')
+  if (kind === 'distinct') {
+    /* THE PAIR, NOT THE NUMBER. `count(DISTINCT amount)` over GBP 50, USD 50 and EUR 50 answered
+       ONE — three different sums of money counted as the same one — because the currency was
+       dropped on the way in. `sum` over the same rows refuses `MIXED_CURRENCY`; this quietly
+       agreed with itself. A quantity has the same shape and the same hazard. */
+    const unit = type === 'money' ? '.currency' : type === 'quantity' ? '.unit' : null;
+    const key = unit ? `${expr} || '|' || json_extract(fields, '${jsonPath(field)}${unit}')` : expr;
     return ok({
-      value: Number(sql.one<{ n: number }>(`SELECT count(DISTINCT ${expr}) AS n FROM entry WHERE ${where}`, ...params)?.n ?? 0),
+      value: Number(sql.one<{ n: number }>(`SELECT count(DISTINCT ${key}) AS n FROM entry WHERE ${where}`, ...params)?.n ?? 0),
       unit: null,
       rows,
       refusals: [],
     });
+  }
 
   const fn = kind === 'sum' ? 'sum' : kind === 'avg' ? 'avg' : kind === 'min' ? 'min' : 'max';
 
@@ -503,6 +510,19 @@ export type Scored = { id: string; observed: number | null; met: boolean | null 
  * SCORED ONCE. `scored_at` is the guard, so a re-entered alarm or a re-run schedule row finds
  * nothing to do rather than overwriting a verdict with a later reading.
  */
+/**
+ * How far a figure moved, as a fraction of where it was.
+ *
+ * `Math.abs` ON THE DENOMINATOR, or the sign inverts on a negative prior. A net position going from
+ * −48,000 to −72,000 is 50% WORSE, and dividing by −48,000 gives +0.5 — which the interface keys
+ * the word "up" off, so a figure that got worse by half was reported as improving by half. The web
+ * build has divided by the magnitude since it was written; the two disagreed, on money.
+ *
+ * It is a named function rather than one line inline because it is the arithmetic two builds have to
+ * agree on, and the disagreement was invisible until somebody's balance went negative.
+ */
+export const deltaFrom = (before: number, now: number): number => (now - before) / Math.abs(before);
+
 export function scorePrediction(
   sql: Sql,
   id: string,

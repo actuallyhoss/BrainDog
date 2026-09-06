@@ -29,6 +29,8 @@ const OBLIGATIONS: Declaration = {
       { id: 'amount', type: 'money' },
       { id: 'due', type: 'day', index: true },
       { id: 'state', type: 'enum', values: ['open', 'part', 'paid'], index: true },
+      /* NOT MONEY, and a leg is allowed to point at it. That is the whole point of the test below. */
+      { id: 'effort', type: 'duration' },
     ],
   } as never,
 };
@@ -290,5 +292,34 @@ test('and a cycle that is not a whole number of months is refused, not rounded o
   const fine = value<Runway>(k.runway(100_000, [LEGS[1]!], 120));
   assert.equal(fine.steps.length, 4);
   assert.deepEqual([...new Set(fine.steps.map((x) => x.day))].length, 4, 'two charges landed on one day');
+  sql.close();
+});
+
+test('A LEG POINTED AT SOMETHING THAT IS NOT MONEY SAYS SO, rather than vanishing', async () => {
+  /* `amount === null → continue` skipped the row in silence, and only unreadable DATES were counted
+     — so a leg pointing at a `duration` or an `int` produced no steps and no refusals, and the page
+     said nothing crosses zero. That is the one answer a cash walk must never give wrongly: it is
+     read by somebody deciding whether they can pay a bill. */
+  const { k, sql } = await record();
+  for (const n of [1, 2, 3])
+    assert.ok(
+      k.create('obligations', { what: `Job ${n}`, direction: 'owed_by_me', due: day(n * 5), state: 'open', effort: 3600 }, { actor: 'p_1' }).ok,
+    );
+
+  const walk = value<Runway>(k.runway(100_000, [{ register: 'obligations', on: 'due', amount: 'effort' }], 180));
+  assert.deepEqual(walk.steps, [], 'seconds were walked as money');
+  assert.equal(walk.refusals.length, 1, 'three rows of the wrong type produced no steps and no sentence');
+  assert.match(walk.refusals[0]?.fix ?? '', /is not money in 3 rows/);
+  assert.equal(walk.refusals[0]?.at, 'amount');
+  sql.close();
+});
+
+test('and a row with no amount at all is simply not a movement', async () => {
+  // Absent is not wrong. A row nobody has priced yet moves no balance, and saying so on every one of
+  // them would bury the leg that is actually misdeclared.
+  const { k, sql } = await record();
+  assert.ok(k.create('obligations', { what: 'Unpriced', direction: 'owed_by_me', due: day(5), state: 'open' }, { actor: 'p_1' }).ok);
+  const walk = value<Runway>(k.runway(100_000, [{ register: 'obligations', on: 'due', amount: 'amount' }], 180));
+  assert.deepEqual(walk.refusals, []);
   sql.close();
 });

@@ -17,6 +17,7 @@ import { fixOf } from '@braindog/ports';
 
 import {
   evaluateMetric,
+  deltaFrom,
   meets,
   openRecord,
   snapshot,
@@ -599,4 +600,39 @@ test('and a day the grammar does not admit is refused in JSON as it is in a sent
   assert.equal(bad.ok, false);
   assert.equal((bad as { refusal: { code: string } }).refusal.code, 'WHERE_MALFORMED');
   sql.close();
+});
+
+/* ── wrong numbers that looked right ───────────────────────────────────── */
+
+test('DISTINCT OVER MONEY COUNTS THE PAIR, not the number', async () => {
+  /* GBP 50, USD 50 and EUR 50 came back as ONE distinct value — three different sums of money
+     counted as the same one — because the currency was dropped on the way into the expression.
+     `sum` over the same rows refuses `MIXED_CURRENCY`; this quietly agreed with itself. */
+  const { k, sql } = await record();
+  for (const currency of ['GBP', 'USD', 'EUR'])
+    value(k.create('obligations', { what: `Fifty ${currency}`, amount: { amount: 5000, currency } }, { actor: 'p_1' }));
+
+  const out = k.metric({
+    metric: 'kinds',
+    name: 'How many different amounts',
+    source: 'register.obligations',
+    value: { distinct: 'amount' },
+    where: { field: 'what', contains: 'Fifty ' },
+    target: { gte: 1 },
+    window: '30d',
+    compare: 'none',
+  });
+  assert.ok(out.ok, fixOf(out));
+  assert.equal(out.value.rows, 3, 'the predicate did not isolate the three rows under test');
+  assert.equal(out.value.value, 3, 'three currencies of the same number counted as one');
+  sql.close();
+});
+
+test('A DELTA OVER A NEGATIVE PRIOR KEEPS ITS DIRECTION', async () => {
+  /* Dividing by a negative denominator inverts the sign, and the interface keys the word "up" off
+     it — so a net position that got 50% worse was reported as improving by half. The web build has
+     divided by the magnitude since it was written; these two disagreed. */
+  assert.equal(deltaFrom(-48_000, -72_000), -0.5);
+  assert.equal(deltaFrom(-48_000, -24_000), 0.5);
+  assert.equal(deltaFrom(48_000, 72_000), 0.5);
 });

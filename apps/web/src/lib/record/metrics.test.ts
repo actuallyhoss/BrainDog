@@ -266,3 +266,61 @@ test('and everything the record actually ships still reads', () => {
     for (const base of ['project-open', 'project-owed', 'project-cost'])
       assert.deepEqual(read(withParam(METRICS[base]!, name)).refusals, [], `${base}:${name} broke`);
 });
+
+/* ── figures that were quietly short ─────────────────────────────────────── */
+
+test('A FACTOR THE TABLE DOES NOT HOLD IS A REFUSAL, not a smaller number', () => {
+  /* `operand` answered `null` for a row whose `by` value has no entry, `aggregate` filtered those
+     nulls out of the sum, and the tile printed a figure short by however many rows fell through —
+     with `rows` still counting them, so nothing on screen disagreed with anything else. A `by`
+     naming a field the table knows nothing about read GBP 0.00 over fourteen rows with no refusal
+     at all. The kernel refuses the identical declaration with `LOOKUP_MISSING`. */
+  const out = read({
+    metric: 'yearly',
+    name: 'Annualised',
+    source: 'register.services',
+    where: 'state is live',
+    value: { sum: { product: ['cost', { lookup: 'per_year', by: 'kind' }] } },
+    target: { lte: 500_000 },
+    window: '90d',
+    compare: 'none',
+    format: 'money.GBP',
+  });
+  assert.equal(out.value, null, 'a figure with no factors read as a number');
+  assert.ok(out.refusals.length > 0, 'and said nothing about it');
+  assert.match(out.why, /no factor for/);
+});
+
+test('and the sentence names the values, because "unreadable" is not actionable', () => {
+  const out = read({
+    metric: 'yearly',
+    name: 'Annualised',
+    source: 'register.services',
+    where: 'state is live',
+    value: { sum: { product: ['cost', { lookup: 'per_year', by: 'kind' }] } },
+    target: { lte: 500_000 },
+    window: '90d',
+    compare: 'none',
+  });
+  assert.match(out.why, /per_year\./);
+});
+
+test('DISTINCT COUNTS VALUES, not the string `[object Object]`', () => {
+  /* `String({ amount, currency })` is `'[object Object]'`, so every money value in a register
+     collapsed to ONE distinct value — three invoices of different amounts counted as one — and a
+     row with no value contributed `''` as a value of its own. Absent is not a value. */
+  const out = read({
+    metric: 'amounts',
+    name: 'How many different amounts',
+    source: 'register.obligations',
+    value: { distinct: 'amount' },
+    target: { gte: 1 },
+    window: '30d',
+    compare: 'none',
+  });
+  const priced = new Set(
+    (ROWS.obligations ?? []).filter((e) => e.fields.amount !== undefined && e.fields.amount !== null).map((e) => JSON.stringify(e.fields.amount)),
+  );
+  assert.equal(out.value, priced.size);
+  assert.ok(priced.size > 1, 'the fixture must hold more than one amount for this to mean anything');
+});
