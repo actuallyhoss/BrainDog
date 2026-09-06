@@ -194,6 +194,17 @@ export function validate(decl: Declaration): Refusal | null {
     * success and does nothing.
     */
   if (decl.kind === 'digest') return digestBody(decl);
+
+  /* A `once_per` THAT IS NOT A LIST THROWS AT FIRE TIME, INSIDE A WRITE. `onceKey` calls `.map` on
+     it, and nothing checked the shape — so `once_per: 'row'` installed cleanly and then made every
+     write to that register raise a `TypeError` out of the rules pass, out of `create`, out of the
+     transaction. A declaration's shape is checked where it lands or it is checked by a customer. */
+  if (decl.kind === 'rule') {
+    const once = (decl.body as { once_per?: unknown }).once_per;
+    if (once !== undefined && (!Array.isArray(once) || once.some((k) => typeof k !== 'string')))
+      return bad('DECLARATION_INVALID', `A rule's once_per is a list of field names, and ${decl.id}'s is not.`, 'once_per');
+    return null;
+  }
   if (decl.kind !== 'register') return null;
 
   const id = own;

@@ -78,6 +78,14 @@ export type RulesOutcome = {
 };
 
 export type RulesDeps = {
+  /**
+   * Send one interrupt, if the record has not already had one this hour. `09 §4`.
+   *
+   * INJECTED, because routing a notification is `digest.ts`'s — it knows what a channel is — and
+   * this file is the rule engine. A second copy of the rate limit here would be a second answer to
+   * "have we interrupted this person already", and the two would disagree on the day it mattered.
+   */
+  interrupt: (said: { actor: string; say: string; because?: string; url?: string }) => void;
   sql: Sql;
   rules: (register: string) => RuleDecl[];
   schemaOf: (register: string) => Schema | null;
@@ -182,7 +190,10 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
 
     const patch: Record<string, unknown> = {};
     const did: string[] = [];
-    const said: string[] = [];
+    /* A NOTICE, NOT A STRING. `urgent` was declared, printed in the install diff as "interrupts
+       you", and then flattened into the same list a plain `note` goes in — so a rule saying
+       "Payment failed" wrote an event and nothing left the record. 09 §4: `true` interrupts. */
+    const said: { text: string; urgent: boolean }[] = [];
     const made: { register: string; each?: string[]; bound: number; fields: Record<string, string> }[] = [];
     const asks: { question: string; options: string[] }[] = [];
     let stop = false;
@@ -241,10 +252,10 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       } else if ('note' in action) {
         /* HELD UNTIL THE WRITE HAS HAPPENED. A rule whose write the register then refuses has not
            done anything, and a notification about what it did not do is worse than silence. */
-        said.push(fill(action.note, fired.entry, deps.nowMs));
+        said.push({ text: fill(action.note, fired.entry, deps.nowMs), urgent: false });
         did.push('note');
       } else if ('notify' in action) {
-        said.push(fill(action.notify.say, fired.entry, deps.nowMs));
+        said.push({ text: fill(action.notify.say, fired.entry, deps.nowMs), urgent: action.notify.urgent === true });
         did.push('notify');
       } else if ('create' in action) {
         made.push(action.create);
@@ -276,7 +287,12 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       fired.entry = wrote.value;
     }
 
-    for (const text of said) deps.note(fired.entry, `rule:${rule.rule}`, text, fired.batch);
+    for (const one of said)
+      /* AN URGENT ONE GOES THROUGH THE ROUTER, which writes the same event and then interrupts —
+         once an hour per record, 09 §4. A plain one is the event and nothing else, which is what
+         "batch by default" means: it lands in the digest. */
+      if (one.urgent) deps.interrupt({ actor: `rule:${rule.rule}`, say: one.text, url: `/${fired.entry.id}` });
+      else deps.note(fired.entry, `rule:${rule.rule}`, one.text, fired.batch);
 
     /* THE EXPANSION IS LAST, and it shares the triggering write's batch — so "undo this expansion"
        is one query rather than an archaeology of timestamps. */

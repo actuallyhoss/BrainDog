@@ -90,6 +90,14 @@ export type DigestDeps = {
    * quiet, with nothing anywhere saying why.
    */
   delivers: readonly OutboxKind[];
+  /**
+   * Whether this record has already been interrupted within the hour. `09 §4`, `09 §7`.
+   *
+   * A DEP RATHER THAN A QUERY, because this file holds no SQL — and a rate limit on interruption is
+   * a feature: ten rules firing on one write is one afternoon, and ten interruptions is a person who
+   * turns notifications off, after which the one that mattered arrives somewhere they no longer look.
+   */
+  interrupted: () => boolean;
   mint: () => string;
   nowMs: number;
   tz: string;
@@ -502,3 +510,65 @@ export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: st
     text.slice(0, 280),
   );
 }
+
+/**
+ * ONE NOTIFICATION, ROUTED BY `urgent`. `09 §4`, and `45 §5.9` names this helper.
+ *
+ * `urgent` WAS WRITTEN IN FOUR PLACES AND READ IN NONE. A rule declaring
+ * `{ notify: { say: "Payment failed", urgent: true } }`, and a credential expiring inside
+ * forty-eight hours, both wrote a `note` event and stopped — so nothing left the record, for either
+ * of the two things `09 §5` names as urgent by default. The pack install diff meanwhile told the
+ * person it *"interrupts you"*, which made the diff the only honest reader of a key nothing else
+ * consumed.
+ *
+ * `09 §4`: "`true` interrupts — the `note` event **plus a `notify.push` and a `notify.email` outbox
+ * row**, at most one interrupt per hour per record; the default, `false`, lands in the digest".
+ *
+ * THE RATE LIMIT IS PER RECORD AND NOT PER RULE. Ten rules firing on one write is one afternoon, and
+ * ten interruptions is a person who turns notifications off — after which the one that mattered
+ * arrives somewhere they no longer look. `09 §7` states it as a thing this subsystem must never do.
+ *
+ * AND QUIET HOURS DO NOT APPLY. `09 §5` rule 3 moves a NON-urgent notification out of 22:00–08:00,
+ * and a non-urgent notification is a `note` that lands in the digest — which is already batched, and
+ * whose own schedule row decides when it goes. An urgent one is urgent at three in the morning or it
+ * was never urgent; holding it until eight would make "a payment failed" a thing you find out about
+ * after the retry window closed.
+ */
+export function notify(deps: DigestDeps, said: Notice): void {
+  /* THE EVENT ALWAYS, because it is the record's own memory of the thing having happened, and it is
+     what the digest and the unread count are counted over. */
+  deps.note(said.actor, said.say.slice(0, 280));
+  if (!said.urgent) return;
+
+  /* AT MOST ONE PER HOUR. The check is the caller's because this file holds no SQL — and it is a
+     check rather than a queue: an interrupt that waits an hour to arrive is a notification, and the
+     record already has one of those. */
+  if (deps.interrupted()) return;
+
+  deps.outbox('notify.push', { title: said.say.slice(0, 120), url: said.url ?? '/' });
+
+  /* AND THE EMAIL, WHICH IS THE HALF THAT SURVIVES A PHONE IN A DRAWER. `09 §3` gives push "one
+     line, no content" and email "anything with a table in it", so the email carries the reason and
+     the push carries the fact. A record with no owner address sends the push alone. */
+  const to = deps.owners();
+  if (to.length > 0)
+    deps.outbox('notify.email', {
+      to,
+      subject: said.say.slice(0, 120),
+      text: said.because ? `${said.say}\n\n${said.because}` : said.say,
+    });
+}
+
+/** What one interrupt carries. `09 §4`'s six keys, minus the three the caller has already resolved. */
+export type Notice = {
+  /** Who or what it is about: `rule:chase`, `grant:g_01J…`. The event's actor. */
+  actor: string;
+  /** One line, and the whole of what a push carries. */
+  say: string;
+  /** Why, for the email. A push carries no content — a lock screen is not a place somebody chose to read their business on. */
+  because?: string | undefined;
+  /** Where in the app it is about. */
+  url?: string | undefined;
+  /** `false` lands in the digest; `true` interrupts, at most once an hour per record. */
+  urgent?: boolean | undefined;
+};

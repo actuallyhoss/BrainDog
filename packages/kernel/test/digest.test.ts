@@ -49,6 +49,20 @@ const OVERDUE: Declaration = {
   } as never,
 };
 
+/** A rule that interrupts. 09 §5's first urgent-by-default: a payment failing. */
+const RULE_URGENT: Declaration = {
+  id: 'rule.urgent',
+  kind: 'rule',
+  body: {
+    rule: 'urgent',
+    register: 'obligations',
+    on: 'create',
+    when: 'state is open',
+    once_per: ['row'],
+    then: [{ notify: { say: 'Payment failed on {what}', urgent: true } }],
+  } as never,
+};
+
 const WEEKLY = (over: Record<string, unknown> = {}): Declaration => ({
   id: 'digest.money-weekly',
   kind: 'digest',
@@ -465,5 +479,42 @@ test('AND A DIGEST THAT NAMES A CHANNEL NOBODY DELIVERS DOES NOT INSTALL', async
   /* AND `prose` IS WRITTEN BY SPARK OR BY NOBODY (42 §4.11). Anything else waits behind a model that
      was never going to answer. */
   assert.equal((await refusal({ prose: 'gpt' })).at, 'prose');
+  sql.close();
+});
+
+test('`urgent` INTERRUPTS, and that is what the word was for', async () => {
+  /* IT WAS WRITTEN IN FOUR PLACES AND READ IN NONE. A rule declaring `{ notify: { say: "Payment
+     failed", urgent: true } }` wrote a `note` event and stopped, and so did a credential expiring
+     inside forty-eight hours — the two things 09 §5 names as urgent by DEFAULT. Nothing left the
+     record for either. The pack install diff meanwhile told the person it "interrupts you", which
+     made the diff the only honest reader of a key nothing else consumed.
+
+     09 §4: "`true` interrupts — the `note` event plus a `notify.push` and a `notify.email` outbox
+     row, at most one interrupt per hour per record". */
+  const { k, sql } = await record(WEEKLY(), false);
+  value(await k.install([RULE_URGENT]));
+
+  value(k.create('obligations', { what: 'Invoice 41', amount: { amount: 1_000, currency: 'GBP' }, state: 'open' }, { actor: 'p_1' }));
+
+  const rows = outbox(sql);
+  const push = rows.filter((r) => r.kind === 'notify.push');
+  const mail = rows.filter((r) => r.kind === 'notify.email');
+  assert.equal(push.length, 1, 'an urgent rule wrote an event and nothing left the record');
+  assert.equal(mail.length, 1, 'a push carries one line and no content — the email is the half with the reason');
+  assert.match(JSON.parse(push[0]!.payload).title as string, /Payment failed/);
+  /* AND THE EVENT TOO, always, because it is the record's own memory of the thing having happened
+     and what the unread count is counted over. */
+  assert.equal(sql.all("SELECT 1 FROM event WHERE kind = 'note' AND actor = 'rule:urgent'").length, 1);
+
+  /* ONE AN HOUR, PER RECORD. Ten rules firing on one write is one afternoon; ten interruptions is a
+     person who turns notifications off, after which the one that mattered arrives somewhere they no
+     longer look. 09 §7 lists it as a thing this subsystem must never do. */
+  value(k.create('obligations', { what: 'Invoice 42', amount: { amount: 2_000, currency: 'GBP' }, state: 'open' }, { actor: 'p_1' }));
+  assert.equal(outbox(sql).filter((r) => r.kind === 'notify.push').length, 1, 'the second write interrupted again within the hour');
+  assert.equal(
+    sql.all("SELECT 1 FROM event WHERE kind = 'note' AND actor = 'rule:urgent'").length,
+    2,
+    'the rate limit swallowed the event as well as the interrupt',
+  );
   sql.close();
 });

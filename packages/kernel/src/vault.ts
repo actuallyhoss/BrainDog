@@ -99,6 +99,14 @@ export type BindGrantArgs = {
 };
 
 export type VaultDeps = {
+  /**
+   * Send one interrupt, if the record has not already had one this hour. `09 §4`.
+   *
+   * INJECTED, because routing a notification is `digest.ts`'s — it knows what a channel is — and
+   * this file is the vault. A second copy of the rate limit here would be a second answer to "have
+   * we interrupted this person already", and the two would disagree on the day it mattered.
+   */
+  interrupt: (said: { actor: string; say: string; because?: string; url?: string }) => void;
   mint: () => string;
   nowMs: number;
   /**
@@ -393,7 +401,11 @@ export function revokeGrant(sql: Sql, deps: VaultDeps, id: string, transaction: 
  * whoever can see it exactly which credential is worth taking.
  */
 export function rotateDue(sql: Sql, deps: VaultDeps, payload: string): number | null {
-  const { grant } = JSON.parse(payload) as { grant?: string };
+  /* `urgent` WAS DESTRUCTURED AWAY. `bindGrant` arms this row forty-eight hours before a credential
+     expires and writes `{ grant, urgent: true }` — 09 §5 names an expiring credential as one of the
+     three things urgent BY DEFAULT — and this read only `{ grant }`. So the record wrote a `note`
+     event about a key that stops working the day after tomorrow, and nothing left the record. */
+  const { grant, urgent } = JSON.parse(payload) as { grant?: string; urgent?: boolean };
   if (!grant) return null;
   const row = sql.one<{ kind: GrantKind; rotate_every: string | null; revoked_at: string | null }>(
     'SELECT kind, rotate_every, revoked_at FROM grant WHERE id = ?',
@@ -404,13 +416,18 @@ export function rotateDue(sql: Sql, deps: VaultDeps, payload: string): number | 
      derived-reminder design exists to avoid. */
   if (!row || row.revoked_at) return null;
 
+  /* THE ID AND THE KIND, NEVER THE LABEL. A notification naming "Stripe, live" tells whoever can see
+     it exactly which credential is worth taking — and an urgent one is read on a lock screen. */
+  const say = `credential ${grant} (${row.kind}) is due for rotation`;
   sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, 'system', 'note', ?, 'grant', ?)",
     deps.mint(),
     instant(deps.nowMs),
     `grant:${grant}`,
-    `credential ${grant} (${row.kind}) is due for rotation`,
+    say,
   );
+
+  if (urgent) deps.interrupt({ actor: `grant:${grant}`, say, url: '/vault' });
 
   const span = row.rotate_every ? spanMs(row.rotate_every) : null;
   return span === null ? null : deps.nowMs + span;

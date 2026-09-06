@@ -72,6 +72,7 @@ import {
   headline,
   nextOccurrence,
   noteEvent,
+  notify,
   runDigest,
   sectionsOf,
   sendDigest,
@@ -1208,6 +1209,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       outbox: (kind, payload) => void enqueue(sql, mint, clock.now(), kind, payload),
       note: (actor, text) => noteEvent(sql, mint, clock.now(), actor, text),
       delivers: opts.delivers ?? [],
+      /* ONE INTERRUPT AN HOUR, PER RECORD (09 §4). Counted over the outbox rather than over a
+         counter somebody has to reset: the row IS the interrupt, so a push that was queued and never
+         sent still counts — which is the conservative direction, and the only one that is honest
+         about what the person's phone is going to do when the queue drains. */
+      interrupted: () =>
+        sql.one<{ n: number }>(
+          "SELECT count(*) AS n FROM outbox WHERE kind = 'notify.push' AND created > ?",
+          instant(clock.now() - 3_600_000),
+        )?.n
+          ? true
+          : false,
       mint,
       nowMs: clock.now(),
       tz: recordIdentity(sql)?.tz ?? 'UTC',
@@ -1222,6 +1234,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    */
   const rulesDeps = (): RulesDeps => ({
     sql,
+    /* THE ONE ROUTER. A rule that declares `urgent` shows in the install diff as "interrupts you",
+       and until now that diff was the only reader of the key — 09 §4 is what it should have meant. */
+    interrupt: (said) => notify(digestDeps(), { ...said, urgent: true }),
     rules: (register) =>
       sql
         .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")
@@ -1361,6 +1376,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     nowMs: clock.now(),
     actor,
     recordId: recordIdentity(sql)?.id ?? null,
+    /* THE ONE ROUTER, HANDED IN. 09 §4's rate limit, 09 §3's split between what a push carries and
+       what an email does, and the `note` event, are all one function — and a credential expiring is
+       one of the three things 09 §5 makes urgent by default. */
+    interrupt: (said) => notify(digestDeps(), { ...said, urgent: true }),
   });
 
   async function tail(scheduler: Scheduler): Promise<void> {
