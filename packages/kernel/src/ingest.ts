@@ -604,20 +604,36 @@ function slice(form: Record<string, unknown>, text: string): string | null {
  * for most, three for the Gulf dinars, zero for the yen; and an unknown code gets two, which is the
  * only guess available and the one every unknown code is.
  */
-const EXPONENTS = new Map<string, number>();
-export function exponentOf(currency: string): number {
-  const held = EXPONENTS.get(currency);
-  if (held !== undefined) return held;
-  let exp = 2;
-  try {
-    exp = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
-  } catch {
-    /* A CODE `Intl` DOES NOT KNOW IS TWO, not a throw. An extractor that dies on an unusual currency
-       is worse than one that reads it as most currencies are read. */
-  }
-  EXPONENTS.set(currency, exp);
-  return exp;
-}
+/**
+ * Currencies whose minor unit is not two decimal places. `ISO 4217`, and it is a table on purpose.
+ *
+ * IT WAS `Intl`, AND `Intl` IS NOT ISO 4217. CLDR carries a *formatting* convention — what a person
+ * in that country expects to SEE — and ISO carries the minor unit, which is what a record stores.
+ * They disagree on real currencies, and the disagreement was a hundred- or thousand-fold error on a
+ * screen:
+ *
+ *   - `IQD`: ISO 3, `Intl` 0. So `IQD 1.250` was read by the grouping rule as one thousand two
+ *     hundred and fifty dinars, stored as `1250`, and then divided by 10³ for display — printing
+ *     `IQD 1.250` back. One and a quarter dinars on screen for a number the record holds as 1,250.
+ *   - `CLF`: ISO 4, `Intl` 4, `braindog-render`'s table 2. A hundredfold, the other way.
+ *   - `MGA`: ISO 2, `Intl` 0.
+ *
+ * AND THIS TABLE IS `braindog-render`'s, BYTE FOR BYTE. The two cannot be one module: `render` is the
+ * published block dialect and depends on no `@braindog/*` package, and the kernel must not depend on
+ * a published renderer. So they are two copies with a test that compares them — which is the same
+ * shape `event-kinds` uses for the one other list that has to say the same thing in two places.
+ *
+ * A CODE THE TABLE DOES NOT NAME IS TWO, which is what most currencies are and what every unknown
+ * one is read as. An extractor that dies on an unusual code is worse than one that reads it as most
+ * are read.
+ */
+export const EXPONENT: Readonly<Record<string, number>> = {
+  BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3,
+  BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0,
+  PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0,
+};
+
+export const exponentOf = (currency: string): number => EXPONENT[currency.toUpperCase()] ?? 2;
 
 function number(text: string, sep?: string, exponent = 2): number | null {
   /* ONE NUMBER, AND A SPACE ONLY WHERE A GROUP OF THREE FOLLOWS IT. A character class that took any

@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { arrive, extractField, ingestDay, openRecord, type Arrived, type Declaration, type Kernel } from '../src/index.ts';
+import { EXPONENT, exponentOf } from '../src/ingest.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -657,4 +658,32 @@ test('and a `then` that is not a list is refused the same way', async () => {
   ]);
   assert.equal(out.ok, false);
   sql.close();
+});
+
+test('THE MINOR UNIT IS ISO 4217’S, AND ONE TABLE SAYS IT', async () => {
+  /* It was `Intl`, and `Intl` is not ISO 4217: CLDR carries a FORMATTING convention — what somebody
+     in that country expects to see — and ISO carries the minor unit, which is what a record stores.
+     They disagree on real currencies, and the disagreement was a thousandfold error on a screen:
+     `Intl` says the Iraqi dinar has no minor unit, so `IQD 1.250` was read by the grouping rule as
+     one thousand two hundred and fifty dinars, stored as `1250`, and then divided by 10³ by the
+     renderer — which printed `IQD 1.250` back. One and a quarter dinars on screen for a number the
+     record holds as 1,250. */
+  assert.equal(exponentOf('IQD'), 3, 'the Iraqi dinar has 1,000 fils');
+  assert.equal(exponentOf('KWD'), 3);
+  assert.equal(exponentOf('JPY'), 0);
+  assert.equal(exponentOf('GBP'), 2);
+  assert.equal(exponentOf('MGA'), 2, 'ISO gives the ariary two, and Intl gives it none');
+  assert.equal(exponentOf('gbp'), 2, 'the code is matched upper-cased');
+  assert.equal(exponentOf('ZZZ'), 2, 'a code nobody knows is read as most currencies are read');
+
+  /* AND IT IS `braindog-render`'s TABLE, BYTE FOR BYTE. The two cannot be one module — `render` is
+     the published block dialect and depends on no `@braindog/*` package, and the kernel must not
+     depend on a published renderer — so this is the thing that keeps the two copies one answer. A
+     record that stores in one minor unit and draws in another is wrong money on a screen, which is
+     the only class of defect that makes somebody act on a false number. */
+  /* BY PATH, because the kernel does not depend on the renderer and must not — this is a test
+     reading the other copy, which is what a drift check is. */
+  const { exponentOf: drawn } = await import('../../render/src/format.ts');
+  for (const code of [...Object.keys(EXPONENT), 'GBP', 'EUR', 'USD', 'CLF', 'MGA', 'HUF', 'ZZZ'])
+    assert.equal(exponentOf(code), drawn(code), `${code}: the record stores one minor unit and draws another`);
 });
