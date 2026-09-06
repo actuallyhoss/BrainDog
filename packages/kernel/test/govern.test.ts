@@ -537,7 +537,10 @@ test('AND THE PREDICTION IT WRITES IS ONE THE SCORER CAN READ', async () => {
   clock.advance(31 * DAY);
   const out = await k.drain();
   assert.equal(out.failed, 0, 'the score job failed, so nothing is ever graded');
-  assert.equal(out.done, 1);
+  /* MORE THAN ONE ROW COMES DUE. Installing a declaration arms the weekly analysis too, and at 31
+     days both are ready — what this test is about is that the score row RAN, not how many rows the
+     record happened to have. */
+  assert.ok(out.done >= 1);
 
   const scored = sql.one<{ scored_at: string | null; observed: number; met: number }>(
     'SELECT scored_at, observed, met FROM prediction WHERE id = ?',

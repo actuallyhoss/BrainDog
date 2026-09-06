@@ -389,6 +389,46 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * tomorrow; every other refusal here is about the grammar or the shape, and those are facts about
    * the declaration whenever it is read.
    */
+  /**
+   * The schedule rows a batch of declarations earns.
+   *
+   * ONE ROW PER THING THAT RECURS, keyed so a re-install is not a reset. `analyse` is the record's
+   * own and takes no declaration — it is armed the first time anything is installed, because a
+   * record with declarations is a record that can be observed.
+   */
+  function armDerived(batch: readonly Declaration[]): void {
+    const arm = (kind: string, key: string, payload: unknown, at: number): void => {
+      sql.exec(
+        `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts)
+         VALUES (?, ?, ?, ?, ?, 'pending', 0) ON CONFLICT (kind, key) DO NOTHING`,
+        mint(),
+        instant(at),
+        kind,
+        key,
+        JSON.stringify(payload),
+      );
+    };
+
+    const tz = recordIdentity(sql)?.tz ?? 'UTC';
+    for (const decl of batch) {
+      const body = decl.body as Record<string, unknown>;
+      if (decl.kind === 'digest' && body.schedule && typeof body.schedule === 'object') {
+        const at = nextOccurrence(body.schedule as { day?: string; at: string }, clock.now(), tz);
+        if (at !== null) arm('digest', decl.id, { declaration: decl.id }, at);
+      }
+      /* A METRIC WITH `snapshot:` REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
+         about is finished and nothing else is competing for the alarm. */
+      if (decl.kind === 'metric' && body.snapshot) {
+        const at = nextOccurrence({ at: '00:05' }, clock.now(), tz);
+        if (at !== null) arm('snapshot', decl.id, { metric: (body as { metric?: string }).metric ?? decl.id }, at);
+      }
+    }
+
+    /* AND THE WEEKLY ANALYSIS, once. A week out rather than now: a record whose first declarations
+       have just landed has nothing to have noticed yet, and the governors would refuse anyway. */
+    if (batch.length > 0) arm('analyse', 'weekly', {}, clock.now() + 7 * 86_400_000);
+  }
+
   function unreadable(batch: readonly Declaration[]): Refusal | null {
     const shape = (register: string): Schema | null => {
       const arriving = batch.find((d) => d.kind === 'register' && (d.body as { id?: unknown }).id === register);
@@ -1960,7 +2000,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const cannot = unreadable(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const out = await installDeclarations(sql, clock.now(), batch, transaction);
-      if (out.ok) reload();
+      if (out.ok) {
+        reload();
+        /* AND THE ROWS THE DECLARATIONS EARN. `digest`, `snapshot` and `analyse` have complete
+           handlers and NOTHING EVER ARMED THEM — an exhaustive search of every `INSERT INTO
+           schedule` in this repository found six sites and none of those kinds. So a declared Monday
+           brief never sent, a metric's series never snapshotted, and the weekly analysis, which is
+           the whole observe loop, never ran, with no error anywhere. A handler nothing schedules is
+           a feature that exists in the code and not in the product.
+
+           AFTER `reload`, so the identity's timezone is the one just installed. */
+        armDerived(batch);
+      }
       return out;
     },
 
@@ -1982,7 +2033,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;
-      return ok(() => staged.value(sql, clock.now(), transaction));
+      return ok(() => {
+        const out = staged.value(sql, clock.now(), transaction);
+        /* AND THE SAME ON A PACK'S PATH, which stages and applies in one transaction of its own. */
+        armDerived(batch);
+        return out;
+      });
     },
 
     retire(ids: readonly string[]) {

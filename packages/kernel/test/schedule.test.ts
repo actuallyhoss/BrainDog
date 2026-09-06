@@ -60,7 +60,12 @@ const value = <T>(r: unknown): T => {
 };
 
 const pending = (sql: NodeSql) =>
-  sql.all<{ key: string; due_at: string; state: string }>("SELECT key, due_at, state FROM schedule WHERE state = 'pending' ORDER BY due_at");
+  /* THE REMINDERS, and only those. Installing a declaration now also arms the rows it earns — the
+     weekly `analyse`, a `digest`'s next send, a metric's snapshot — and a helper named `reminders`
+     that counted every pending row would make every test below it about something else. */
+  sql.all<{ key: string; due_at: string; state: string }>(
+    "SELECT key, due_at, state FROM schedule WHERE kind = 'reminder' AND state = 'pending' ORDER BY due_at",
+  );
 
 const day = (offsetDays: number) => new Date(NOW + offsetDays * DAY).toISOString().slice(0, 10);
 
@@ -208,12 +213,16 @@ test('the record says when it next has something to do, which is one alarm per c
   // The alternative is a cron worker fanning out across every tenant, waking records that have
   // nothing to do in order to ask them.
   const { k, sql } = await record();
-  assert.deepEqual(k.pending(), { nextDueMs: null, outboxPending: false, queued: false });
+  /* A RECORD WITH DECLARATIONS HAS THE WEEKLY ANALYSIS PENDING, which is 45 §5.9's own row and the
+     thing that makes the observe loop run at all. So "nothing to do" is a week out rather than
+     `null`, and the reminder below has to beat it to be the alarm. */
+  const idle = k.pending().nextDueMs;
+  assert.ok(idle !== null && idle > NOW, 'the weekly analysis was not armed');
 
-  value(k.create('obligations', { what: 'a', due: day(30) }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'a', due: day(3) }, { actor: 'p_1' }));
   const at = k.pending().nextDueMs;
   assert.ok(at !== null);
-  assert.equal(new Date(at).toISOString().slice(0, 10), day(23), 'the alarm is set for the wrong reminder');
+  assert.ok(at < idle, 'the alarm is not the earliest pending row');
 
   assert.equal(k.due().length, 0, 'a reminder in the future is due now');
   assert.equal(k.due().length, 0);
@@ -238,7 +247,10 @@ test('and hands over what is due when the time comes', async () => {
   );
 
   clock.set(NOW + 11 * DAY);
-  assert.equal(k.due().length, 2);
+  /* THE TWO REMINDERS, and only those. Eleven days out the weekly analysis is due as well — it is
+     armed when a declaration lands, which is what makes the observe loop run — and counting it here
+     would make this test about the alarm rather than about reminders. */
+  assert.equal(k.due().filter((r) => r.kind === 'reminder').length, 2);
   sql.close();
 });
 
@@ -266,4 +278,45 @@ test('a month shift keeps the clock it was anchored at', () => {
   // was set for, and a month's shift must not silently move it to midday.
   const at = Date.UTC(2026, 2, 31, 9, 30);
   assert.equal(new Date(shiftFrom(at, '-1m')!).toISOString(), '2026-02-28T09:30:00.000Z');
+});
+
+test('A DECLARED DIGEST IS ARMED WHEN IT IS DECLARED', async () => {
+  /* `digest`, `snapshot` and `analyse` have complete handlers and nothing ever inserted a row of
+     any of those kinds — an exhaustive search of every `INSERT INTO schedule` in the repository
+     found six sites and none of them. So a declared Monday brief never sent, a metric's series never
+     snapshotted, and the weekly analysis — the whole observe loop — never ran, with no error
+     anywhere. A handler nothing schedules is a feature that exists in the code and not in the
+     product. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(
+    await k.install([
+      { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', schedule: { day: 'mon', at: '08:00' }, sections: [] } } as never,
+    ]),
+  );
+
+  const armed = sql.one<{ kind: string; key: string; state: string }>("SELECT kind, key, state FROM schedule WHERE kind = 'digest'");
+  assert.ok(armed, 'a declared digest was never armed, so it could never send');
+  assert.equal(armed.key, 'digest.monday');
+  assert.equal(armed.state, 'pending');
+
+  // And the weekly analysis, once: a record with declarations is a record that can be observed.
+  assert.ok(sql.one("SELECT 1 FROM schedule WHERE kind = 'analyse' AND key = 'weekly'"), 'the loop was never armed');
+  sql.close();
+});
+
+test('and re-installing does not reset a schedule somebody is waiting on', async () => {
+  // `ON CONFLICT (kind, key) DO NOTHING`. A pack upgrade that moved everybody's Monday brief to
+  // next Monday would be a product that loses a week every time it is updated.
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
+  const decl = { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', schedule: { day: 'mon', at: '08:00' }, sections: [] } };
+  value(await k.install([decl as never]));
+  const first = sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'digest'")?.due_at;
+
+  clock.set(NOW + 3 * 86_400_000);
+  value(await k.install([{ ...decl, body: { ...decl.body, sections: [] } } as never]));
+  assert.equal(sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'digest'")?.due_at, first);
+  sql.close();
 });

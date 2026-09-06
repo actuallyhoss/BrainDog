@@ -240,6 +240,9 @@ test('THE EIGHTH FAILURE IS VISIBLE, because a notification that silently gave u
 test('the backoff doubles in minutes and stops at six hours', () => {
   assert.equal(backoffMs(1), 2 * MINUTE);
   assert.equal(backoffMs(2), 4 * MINUTE);
+  /* THE LADDER'S TOP RUNG, and it is under the cap: at a ceiling of eight, `attempts` reaches 7 and
+     the longest wait is 128 minutes. The cap is a BOUND rather than a rung — it keeps the wait
+     finite if the ceiling ever rises, and it is not reached by the ladder as it stands. */
   assert.equal(backoffMs(7), 128 * MINUTE);
   assert.equal(backoffMs(9), 6 * 3_600_000, 'the cap is the only thing between a retry and a year of them');
   assert.equal(backoffMs(40), 6 * 3_600_000);
@@ -399,7 +402,10 @@ test('the batch has a ceiling, and the rest is still there', async () => {
       `outbox:x${n}`,
     );
   assert.equal((await k.drain(undefined, 2)).claimed, 2);
-  assert.equal(sql.all("SELECT 1 FROM schedule WHERE state = 'pending'").length, 3);
+  /* THE RETRY ROWS, and only those. Installing a declaration also arms the weekly analysis, which
+     is what makes the observe loop run — counting it here would make this test about the schedule
+     rather than about the batch ceiling. */
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry' AND state = 'pending'").length, 3);
   sql.close();
 });
 
@@ -409,8 +415,13 @@ test('THE ALARM IS THE EARLIEST PENDING ROW, or there is no alarm', async () => 
   const { k, sql, clock } = await record();
   const scheduler = recordingScheduler();
 
+  /* A RECORD WITH DECLARATIONS HAS THE WEEKLY ANALYSIS PENDING — 45 §5.9's own row, and the thing
+     that makes the observe loop run at all. So "nothing else to do" is a week out rather than no
+     alarm, and the reminder below has to beat it to become the alarm, which is the property this
+     test is actually about. */
   await k.tail(scheduler);
-  assert.equal(scheduler.armed, null, 'a record with nothing to do armed an alarm');
+  const weekly = scheduler.armed;
+  assert.ok(weekly !== null && weekly > NOW, 'the weekly analysis was never armed');
 
   const due = new Date(NOW + 10 * DAY).toISOString().slice(0, 10);
   value(k.create('obligations', { what: 'Invoice 41', due }, { actor: 'p_1' }));
@@ -422,10 +433,12 @@ test('THE ALARM IS THE EARLIEST PENDING ROW, or there is no alarm', async () => 
   await k.tail(scheduler);
   assert.deepEqual(scheduler.calls.slice(before), ['get'], 'the alarm was re-set to the time it already held');
 
-  // And when the last row is drained, the alarm is cleared rather than left in the past.
+  /* And when the reminder is drained, the alarm goes back to the next thing rather than staying in
+     the past — which here is the weekly analysis, because a record always has that. */
   clock.set(NOW + 4 * DAY);
   await k.drain(scheduler);
-  assert.equal(scheduler.armed, null, 'a drained schedule left an alarm behind');
+  assert.equal(scheduler.armed, weekly, 'a drained reminder left its own alarm behind');
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'reminder' AND state = 'pending'").length, 0, 'the reminder was not drained');
   sql.close();
 });
 

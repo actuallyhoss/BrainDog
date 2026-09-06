@@ -738,8 +738,13 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       const verdict = (
         args.decide ? { decide: args.decide } : args.defer ? { defer: args.defer } : { resolved_as: args.resolved_as, reason: args.reason }
       ) as Verdict;
+      /* THE TAIL, LIKE EVERY OTHER WRITE PATH. Accepting a `change` that carries a prediction writes
+         a `score` row into `schedule`, and this returned bare — so the alarm was never compared
+         against it. `setDeclaration` wraps the same `kernel.install` in `tail` twenty lines below,
+         which is the proof this was an omission rather than a decision. On a provisioned record the
+         hourly purge row re-armed within the hour; on one without an identity row, nothing did. */
       const out = kernel.decide(args.id, verdict, actorOf(ctx));
-      if (!out.ok || !out.value.install) return out;
+      if (!out.ok || !out.value.install) return tail(out);
 
       /* THE DECLARATION LANDS BEFORE THE ANSWER DOES. If it will not install, the gate's own
          transaction has already committed — so the suggestion is reopened rather than left resolved
@@ -748,9 +753,9 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       const put = await kernel.install([decl as never]);
       if (!put.ok) {
         kernel.reopen(out.value.suggestion);
-        return put;
+        return tail(put);
       }
-      return out;
+      return tail(out);
     },
 
     /* ── ADMIN: PACKS ───────────────────────────────── */

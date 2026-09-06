@@ -75,7 +75,11 @@ async function contextFor(
   /* AN AGENT TOKEN IS TRIED FIRST, and it is the same table and the same check the Worker uses. A
      self-host that recognised only one shared string would be a deployment where an agent cannot be
      given less than everything — which is the difference between a scope and a password. */
-  if (sent?.includes('.')) {
+  /* AND IT IS NOT THE SHARED SECRET. `includes('.')` is how this tells an agent token from the one
+     shared secret, and a secret like `s3cr3t.v2` took this branch, failed `verifyToken`, and was
+     refused — locking the owner out of their own machine with a status that explains nothing. The
+     shared secret is one exact string; anything else with a dot in it is an agent token. */
+  if (sent?.includes('.') && sent !== token) {
     const seen = await api.kernel.verifyToken(sent, 'api');
     if (!seen.ok) return null;
 
@@ -101,7 +105,7 @@ async function contextFor(
   /* A BEARER THAT DID NOT VERIFY IS REFUSED, and does not fall through to the branch below. It
      used to: revoking a scoped token PROMOTED it, because the same header that had been a `read`
      agent became an unauthenticated request and an unauthenticated request was the owner. */
-  if (sent?.includes('.')) return null;
+  if (sent?.includes('.') && sent !== token) return null;
 
   /* AND THEN THE ONE SHARED SECRET, which is what a single-person deployment on one machine has
      instead of a sign-in. `undefined` and not falsy: an empty `BRAINDOG_TOKEN` in a compose file is
@@ -240,11 +244,25 @@ export async function start(options: {
       return;
     }
     for (const job of jobs) {
+      /* THE SUCCESS ACK IS OUTSIDE THE TRY WHOSE CATCH ACKS FAILURE, and the lease goes back with
+         the answer. See the note on the Worker's copy: both hosts had the same two shapes. */
+      let sent = false;
+      let why = '';
       try {
         await options.deliver(job);
-        api.kernel.ackOutbox({ id: job.id, state: 'done' });
+        sent = true;
       } catch (e) {
-        api.kernel.ackOutbox({ id: job.id, state: 'failed', error: e instanceof Error ? e.message : String(e) });
+        why = e instanceof Error ? e.message : String(e);
+      }
+
+      try {
+        api.kernel.ackOutbox(
+          sent
+            ? { id: job.id, state: 'done', leasedUntil: job.leasedUntil }
+            : { id: job.id, state: 'failed', error: why, leasedUntil: job.leasedUntil },
+        );
+      } catch (e) {
+        console.error('ack:', e instanceof Error ? e.message : String(e));
       }
     }
 
@@ -295,7 +313,26 @@ export async function start(options: {
      read from the other end. `BRAINDOG_HOST` is the explicit override for the case in between — a
      container that has a token and needs `0.0.0.0` to be reachable at all. */
   const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '0.0.0.0');
-  const server = createServer((req, res) => void answer(req, res, handlers, api, options.token));
+  /* NOTHING A REQUEST CAN DO ENDS THE PROCESS. `void answer(…)` discarded the promise and `answer`
+     had no `catch`, so one throw was an unhandled rejection and Node exited — and the first throw is
+     before any authentication: `new Request(url, { body })` refuses a body on a GET, so a `GET
+     /api/boot` with a `Content-Length` killed the server. A client aborting mid-body did the same.
+     The Worker never had this: workerd turns a throw into a 500.
+
+     The 500 says what happened in one sentence and the socket is closed, which is the promise
+     `serveApi` makes one layer down and the one this layer was breaking. */
+  const server = createServer((req, res) => {
+    void answer(req, res, handlers, api, options.token).catch((e: unknown) => {
+      const why = e instanceof Error ? e.message : String(e);
+      try {
+        res.writeHead(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ ok: false, refusal: { code: 'INTERNAL', fix: `This request could not be read: ${why}.` } }));
+      } catch {
+        /* The socket is already gone, which is the ordinary case for an aborted request. */
+        res.destroy();
+      }
+    });
+  });
   await new Promise<void>((resolve) => server.listen(options.port, host, resolve));
   return {
     server,
@@ -333,10 +370,14 @@ async function answer(
   const ctx = await contextFor(request, token, api);
   const out = ctx
     ? await serveApi(request, handlers, ctx)
-    : new Response(JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This record needs its token.' } }), {
-        status: 401,
-        headers: { 'content-type': 'application/json; charset=utf-8' },
-      });
+    /* `FORBIDDEN` IS A 403 ON BOTH HOSTS. This answered 401 with a `FORBIDDEN` code and a sentence
+       telling the caller to fix a credential that is fine — the Worker answers 403 for the same
+       condition, and one record behaving differently depending on where it runs is the thing the
+       shared `httpStatus` exists to prevent. */
+    : new Response(
+        JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This credential does not reach this record.' } }),
+        { status: 403, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } },
+      );
 
   res.writeHead(out.status, Object.fromEntries(out.headers));
   res.end(Buffer.from(await out.arrayBuffer()));

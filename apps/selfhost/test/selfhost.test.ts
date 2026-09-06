@@ -7,6 +7,7 @@
  */
 
 import { test } from 'node:test';
+import { connect } from 'node:net';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -196,8 +197,11 @@ test('with a token set, a request without it is refused before it reaches the re
     const ok = await s.call('boot');
     assert.equal(ok.status, 200);
 
+    /* 403 AND NOT 401, because the Worker answers 403 for the same condition and one record must not
+       behave differently depending on where it runs — which is what the shared `httpStatus` exists
+       to prevent, and this was the one place bypassing it. */
     const res = await fetch(`http://127.0.0.1:${s.port}/api/boot`);
-    assert.equal(res.status, 401);
+    assert.equal(res.status, 403);
     assert.equal(((await res.json()) as Answer).refusal?.code, 'FORBIDDEN');
 
     /* AND AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A deployment that
@@ -259,8 +263,20 @@ test('A WRITE THAT MAKES A REMINDER ARMS THE ALARM, without being asked to', asy
   const at = port++;
   const running = await start({ file: join(dir, 'record.sqlite'), port: at, pollMs: 0 });
   try {
+    /* A RECORD WITH DECLARATIONS HAS THE WEEKLY ANALYSIS PENDING — 45 §5.9's own row, and what makes
+       the observe loop run at all. So "nothing else to do" is a week out, and the reminder below has
+       to beat it to become the alarm, which is the property this test is about. */
     assert.ok((await running.api.kernel.install([REMINDING])).ok);
-    assert.equal(await running.scheduler.get(), null, 'a record with nothing to do armed an alarm');
+    /* THE ROW IS ARMED BY THE INSTALL; THE ALARM IS ARMED BY THE TAIL. This calls the kernel
+       directly, which holds no scheduler — the record API's own `setDeclaration` tails for exactly
+       this reason. */
+    assert.ok(
+      running.sql.one("SELECT 1 FROM schedule WHERE kind = 'analyse' AND key = 'weekly'"),
+      'the weekly analysis was never armed',
+    );
+    await running.api.kernel.tail(running.scheduler);
+    const weekly = await running.scheduler.get();
+    assert.ok(weekly !== null, 'the tail armed nothing');
 
     const res = await fetch(`http://127.0.0.1:${at}/api/create`, {
       method: 'POST',
@@ -268,9 +284,16 @@ test('A WRITE THAT MAKES A REMINDER ARMS THE ALARM, without being asked to', asy
     });
     assert.equal(res.status, 200);
 
+    /* THE WRITE DERIVED A REMINDER, and the alarm is the EARLIEST pending row — which here is the
+       weekly analysis, because it is seven days out and the reminder is twenty-three. Asserting the
+       alarm equals the reminder would be asserting that the earliest row does not win. */
+    const derived = running.sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'reminder'");
+    assert.ok(derived, 'the write derived no reminder');
+    assert.equal(derived.due_at.slice(0, 10), day(23), 'the reminder is derived for the wrong day');
+
     const armed = await running.scheduler.get();
-    assert.ok(armed !== null, 'the write derived a reminder and armed nothing');
-    assert.equal(new Date(armed).toISOString().slice(0, 10), day(23), 'the alarm is set for the wrong reminder');
+    assert.ok(armed !== null, 'the write armed nothing');
+    assert.equal(armed, Math.min(weekly, Date.parse(derived.due_at)), 'the alarm is not the earliest pending row');
   } finally {
     await running.close();
     rmSync(dir, { recursive: true, force: true });
@@ -287,8 +310,9 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
     assert.ok((await first.api.kernel.install([REMINDING])).ok);
     await first.api.create({ register: 'renewals', fields: { what: 'brain.dog', on: day(30) } }, owner);
     assert.ok((await first.scheduler.get()) !== null);
-    /* The weekend, as one statement: the reminder's time came while nothing was running. */
-    first.sql.exec('UPDATE schedule SET due_at = ?', new Date(Date.now() - 60_000).toISOString());
+    /* The weekend, as one statement: the REMINDER's time came while nothing was running. Only that
+       row — dragging the weekly analysis back too would make this a test about the analyser. */
+    first.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'reminder'", new Date(Date.now() - 60_000).toISOString());
   } finally {
     await first.close();
   }
@@ -302,7 +326,10 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
     await again.drain();
     const notes = again.api.kernel.history(again.api.kernel.get('renewals#1')!.id).filter((e) => e.kind === 'note');
     assert.equal(notes.length, 1, 'the due reminder did not fire on reopen');
-    assert.equal(await again.scheduler.get(), null, 'the drained schedule left an alarm behind');
+    /* AND THE ALARM MOVES TO THE NEXT THING rather than being cleared: a record always has the
+       weekly analysis pending, so "nothing left" is a week out. */
+    assert.ok((await again.scheduler.get()) !== null, 'the drained schedule armed nothing');
+    assert.equal(again.sql.all("SELECT 1 FROM schedule WHERE kind = 'reminder' AND state = 'pending'").length, 0);
   } finally {
     await again.close();
     rmSync(dir, { recursive: true, force: true });
@@ -359,5 +386,44 @@ test('with no deliverer, jobs queue and wait — which is honest rather than los
   } finally {
     await running.close();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('NOTHING A REQUEST CAN DO ENDS THE PROCESS', async () => {
+  /* `void answer(…)` discarded the promise and `answer` had no `catch`, so one throw was an
+     unhandled rejection and Node exited. The first throw is BEFORE any authentication:
+     `new Request(url, { body })` refuses a body on a GET, so a `GET /api/boot` carrying a
+     Content-Length killed the server — and with a token set it binds every interface. */
+  const s = await server();
+  try {
+    /* A RAW SOCKET, because `fetch` refuses to SEND a GET with a body — which is the same rule that
+       made `new Request(url, { body })` throw inside the server. The bytes have to go over the wire
+       for the server to meet them. */
+    await new Promise<void>((done) => {
+      const sock = connect(s.port, '127.0.0.1', () => {
+        const CRLF = String.fromCharCode(13, 10);
+        sock.write(['GET /api/boot HTTP/1.1', 'Host: localhost', 'Content-Length: 1', '', 'x'].join(CRLF));
+      });
+      sock.on('data', () => (sock.end(), done()));
+      sock.on('error', () => done());
+      setTimeout(() => (sock.destroy(), done()), 2000).unref?.();
+    });
+    assert.equal((await s.call('boot')).status, 200, 'the server died on a malformed request');
+  } finally {
+    await s.close();
+    s.clean();
+  }
+});
+
+test('and a shared secret with a dot in it is still a shared secret', async () => {
+  /* `includes('.')` is how this tells an agent token from the one shared secret, and a secret like
+     `s3cr3t.v2` took the agent branch, failed `verifyToken`, and refused — locking the owner out of
+     their own machine with a 401 that explains nothing. */
+  const s = await server('s3cr3t.v2');
+  try {
+    assert.equal((await s.call('boot')).status, 200, 'the owner was locked out by their own token');
+  } finally {
+    await s.close();
+    s.clean();
   }
 });

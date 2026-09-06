@@ -144,13 +144,34 @@ export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: 
 /** Eight attempts, and the eighth is visible. One number, read by both ladders. */
 export const CEILING = 8;
 
-/** The backoff both ladders use: doubling minutes, capped at six hours. */
+/**
+ * The backoff both ladders use: doubling minutes, capped at six hours.
+ *
+ * THE CAP IS A BOUND AND NOT A RUNG. At the ceiling of eight, `attempts` reaches 7 and the longest
+ * wait is 128 minutes — the ladder spans about four hours, and six hours is never reached. That is
+ * deliberate rather than dead: the bound is what keeps the wait finite if the ceiling ever rises,
+ * and moving the doubling to reach it would change every wait a person has already learned.
+ */
 export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 60_000, 6 * 3_600_000);
 
 export type Ack = {
   id: string;
   state: 'done' | 'failed';
   error?: string | undefined;
+  /**
+   * The lease this ack is answering, as `lease()` handed it back.
+   *
+   * WITHOUT IT AN ACK HAS NO FENCE, and a stale one completes somebody else's lease. A slow endpoint
+   * outlives its sixty seconds, another worker reclaims the job and starts delivering, the first
+   * worker's request finally fails and acks `failed` — the row IS leased, so it lands: attempts go
+   * up and a retry is armed. The second worker's `done` is then refused and thrown away, and the
+   * retry re-sends a job that already succeeded, up to eight times. The refusal this method returns
+   * says "somebody else has it", describing a check the code did not make.
+   *
+   * OPTIONAL, because a deliverer that does not pass one is answering the old contract and should
+   * keep working — but every deliverer in this repository passes it.
+   */
+  leasedUntil?: string | undefined;
   /**
    * What the job produced, for the kinds that produce something.
    *
@@ -189,10 +210,19 @@ export type AckDeps = {
  * about is the only one who can decide whether to retry it or change what produces it.
  */
 export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
-  const row = sql.one<{ kind: string; payload: string; attempts: number }>(
-    "SELECT kind, payload, attempts FROM outbox WHERE id = ? AND state = 'leased'",
+  const row = sql.one<{ kind: string; payload: string; attempts: number; leased_until: string | null }>(
+    "SELECT kind, payload, attempts, leased_until FROM outbox WHERE id = ? AND state = 'leased'",
     args.id,
   );
+
+  /* THE FENCE. An ack that names a lease which is no longer the current one is answering for a job
+     somebody else now holds, and applying it is how one delivery becomes eight. */
+  if (row && args.leasedUntil !== undefined && row.leased_until !== args.leasedUntil)
+    return no<null>(
+      'OUT_OF_BOUNDS',
+      `Job ${args.id} was leased again while you had it, so this answer is about a lease that is over.`,
+      { at: 'leasedUntil' },
+    );
   /* A JOB THAT IS NOT LEASED CANNOT BE ACKED, and the refusal says which of the two it is: a lease
      that expired while the worker was delivering is a different problem from an id that never
      existed, and a deliverer that cannot tell them apart retries the wrong one. */

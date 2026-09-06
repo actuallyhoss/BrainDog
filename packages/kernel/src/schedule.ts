@@ -282,8 +282,10 @@ export const pendingWork = (
 
 /** The reminders that are due, oldest first. What the alarm hands to whatever sends them. */
 export const due = (sql: Sql, now: number, limit = 100) =>
-  sql.all<{ id: string; key: string; due_at: string; payload: string }>(
-    "SELECT id, key, due_at, payload FROM schedule WHERE state = 'pending' AND due_at <= ? ORDER BY due_at LIMIT ?",
+  /* `kind` COMES BACK TOO, because "what is due" is a question whose answer a caller has to be able
+     to tell apart: a reminder, the weekly analysis and a digest are due through the same door. */
+  sql.all<{ id: string; kind: string; key: string; due_at: string; payload: string }>(
+    "SELECT id, kind, key, due_at, payload FROM schedule WHERE state = 'pending' AND due_at <= ? ORDER BY due_at LIMIT ?",
     iso(now),
     limit,
   );

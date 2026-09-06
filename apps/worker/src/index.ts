@@ -164,7 +164,13 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
-  async ack(done: { id: string; state: 'done' | 'failed'; error?: string }): Promise<void> {
+  /**
+   * How it went, and which lease it is about.
+   *
+   * `leasedUntil` IS THE FENCE. Without it a stale ack completes somebody else's lease and one
+   * delivery becomes eight; the record refuses one that names a lease it no longer holds.
+   */
+  async ack(done: { id: string; state: 'done' | 'failed'; error?: string; leasedUntil?: string }): Promise<void> {
     const api = await this.#record();
     api.kernel.ackOutbox(done);
     /* THE TAIL, because a failed ack writes a `retry` row and nothing else here would notice it —
@@ -246,24 +252,58 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
   const record = env.RECORD.get(env.RECORD.idFromString(id));
   const deliver = makeDeliver({
     ...(env.EMAIL === undefined ? {} : { email: (m: { to: string; subject: string; text: string }) => env.EMAIL!.send(m) }),
+    /* `redirect: 'manual'` AND A TIMEOUT, and both are the difference between a validated URL and a
+       validated request. `postable()` checks the address it is handed and `fetch` followed a 302
+       wherever it pointed — so a webhook that answers `302 -> http://169.254.169.254/…` reached
+       the metadata service, and a 307 replayed the POST BODY at it. The check would have refused
+       that address; the redirect walked round the check.
+
+       AND A REQUEST THAT NEVER RETURNS IS A LEASE THAT EXPIRES UNDER SOMEBODY. Twenty seconds is
+       well inside the sixty-second notify lease, so a slow endpoint fails and retries rather than
+       being delivered twice by two workers who both think they hold it. */
     post: async (url: string, body: string) => {
       const out = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json; charset=utf-8' },
         body,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(20_000),
       });
-      return { ok: out.ok, status: out.status };
+      /* A 3xx IS A FAILURE, not a success with an unread body: the endpoint that was declared is not
+         the endpoint that answered. */
+      return { ok: out.status >= 200 && out.status < 300, status: out.status };
     },
   });
 
   for (const job of await record.lease()) {
+    /* THE SUCCESS ACK IS OUTSIDE THE TRY WHOSE CATCH ACKS FAILURE. It used to be inside, so an ack
+       that threw for its own reasons — a DO RPC can, on a code update or an eviction — recorded a
+       SENT email as failed, armed a retry and sent it again.
+
+       AND THE LEASE GOES BACK WITH THE ANSWER. Without it a stale ack completes somebody else's
+       lease: a slow endpoint outlives its sixty seconds, another worker reclaims and delivers, and
+       the first worker's late failure arms a retry for a job that already went. */
+    let sent = false;
+    let why = '';
     try {
       await deliver(job as never);
-      await record.ack({ id: job.id, state: 'done' });
+      sent = true;
     } catch (e) {
       /* THE MESSAGE AND NEVER THE PAYLOAD. A digest is somebody's overdue invoices; an error line
          that quoted one has published it to wherever logs go. */
-      await record.ack({ id: job.id, state: 'failed', error: e instanceof Error ? e.message : String(e) });
+      why = e instanceof Error ? e.message : String(e);
+    }
+
+    try {
+      await record.ack(
+        sent
+          ? { id: job.id, state: 'done', leasedUntil: job.leasedUntil }
+          : { id: job.id, state: 'failed', error: why, leasedUntil: job.leasedUntil },
+      );
+    } catch (e) {
+      /* AN ACK THAT WILL NOT LAND IS NOT A REASON TO ABANDON THE REST OF THE BATCH. The lease
+         expires and the job is reclaimed, which is what the lease is for. */
+      console.error('ack:', e instanceof Error ? e.message : String(e));
     }
   }
 }
