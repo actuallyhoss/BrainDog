@@ -468,6 +468,17 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       for (const field of unindexed(args.register, args.where))
         kernel.observe([{ kind: 'query.scan', subject: `${args.register}.${field}` }]);
 
+      /* AND THAT THE REGISTER WAS READ AT ALL. `24 §4.2` lists "register never read, page never
+         rendered" as a signal, and a NEVER is only answerable if the reads are counted — the
+         absence of a row is the whole finding, so there is nothing to compute at analysis time and
+         nothing to infer from anywhere else.
+
+         ONE ROW PER REGISTER PER DAY. `observe` is an upsert on `(kind, subject, day)`, so a
+         thousand reads of one register on one day are one row and one increment. It makes a read a
+         write, which is the price of the question: a record that cannot say which of its registers
+         nobody has opened in six months cannot suggest retiring one. */
+      kernel.observe([{ kind: 'register.read', subject: args.register }]);
+
       return kernel.list(args);
     },
 
@@ -549,6 +560,10 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     async page(args: { slug: string }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
+      /* THE OTHER HALF OF "never read, never rendered" (24 §4.2). One row per page per day, and the
+         finding is the page that has none — a page nobody opens is a page whose blocks cost a query
+         every time the schedule runs and tell nobody anything. */
+      if (typeof args?.slug === 'string' && args.slug) kernel.observe([{ kind: 'page.render', subject: args.slug }]);
       /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote, and `.split` on an
          absent one threw a TypeError out of the route — a refusal is a value here, an exception is
          not, and the exception did not even reach the client: the request simply hung. */

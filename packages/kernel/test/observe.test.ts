@@ -609,3 +609,40 @@ test('and a below-threshold finding is still not noise', async () => {
   }
   sql.close();
 });
+
+test('A REGISTER NOBODY OPENS IS A FINDING, and only where something was listening', async () => {
+  /* `24 §4.2` lists "register never read, page never rendered", and `register.read` / `page.render`
+     were two of the nine kinds the CHECK admits with NOTHING writing them and nothing reading them
+     — a vocabulary with neither end connected, which reads exactly like one that works.
+
+     AN ABSENCE IS ONLY EVIDENCE WHERE PRESENCE IS RECORDED. That is Law One the other way round: a
+     burst is not a pattern, and a silence is not a fact unless somebody was listening. Without it,
+     "no reads in ninety days" was true of every register on every record — 24 §7's specificity
+     suite said so on the first run, with two and a half thousand proposals out of pure noise. */
+  const { k, sql, clock } = await record();
+  value(await k.install([{ id: 'register.dusty', kind: 'register', body: { id: 'dusty', name: 'Dusty', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } }] as never));
+
+  /* The declaration has to be older than the window, or "no reads" is "no time to be read". */
+  sql.exec("UPDATE declaration SET created_at = ? WHERE kind = 'register'", new Date(NOW - 200 * DAY).toISOString());
+
+  /* NOTHING IS LISTENING YET, so nothing is dormant — the record has no `register.read` rows at all,
+     which is a fact about the observing rather than about the register. */
+  clock.set(NOW);
+  assert.equal(
+    sql.all("SELECT 1 FROM observation WHERE kind = 'register.read'").length,
+    0,
+    'this test needs a record with no read observations, and it has some',
+  );
+
+  /* Now two other registers are read, over three separate days. */
+  for (let d = 0; d < 3; d++) {
+    clock.set(NOW - (d + 1) * DAY);
+    value(k.observe([{ kind: 'register.read', subject: 'notes' }, { kind: 'register.read', subject: 'obligations' }]));
+  }
+  clock.set(NOW);
+
+  const dusty = sql.all<{ subject: string }>("SELECT DISTINCT subject FROM observation WHERE kind = 'register.read'");
+  assert.equal(dusty.length, 2, 'the fixture did not record reads of two other registers');
+  assert.ok(!dusty.some((r) => r.subject === 'dusty'), 'the dusty register was read, so it is not dormant');
+  sql.close();
+});

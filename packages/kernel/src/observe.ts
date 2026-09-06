@@ -162,6 +162,107 @@ const DETECTORS: Detector[] = [
   },
 ];
 
+/**
+ * How long nothing has to happen before nothing is a finding.
+ *
+ * NINETY DAYS, FROM THE SAME RULE OF THREE EVERY OTHER THRESHOLD USES. With zero events observed in
+ * *n* trials the upper bound on the rate is 3/n — so ninety days of silence bounds a register's read
+ * rate at about one in thirty days, which is the point where "nobody uses this" stops being a guess.
+ * A quarter is also the shortest period over which a person would agree they had not needed
+ * something: anything is unread in a fortnight.
+ *
+ * AND IT COUNTS FROM THE DECLARATION, not from the window. A register installed last week has no
+ * reads because it is new, which is not the same fact and is the one this would otherwise report.
+ */
+const DORMANT_DAYS = 90;
+
+/**
+ * The two signals whose finding is an ABSENCE. `24 §4.2`: "register never read, page never
+ * rendered".
+ *
+ * EVERY OTHER DETECTOR ASKS "how many", AND THIS ONE ASKS "any at all". That is why it is not a row
+ * in `DETECTORS`: the loop there groups observations by subject, and a subject with no observations
+ * has no row to group — the finding is the row that is not there, so it has to start from the
+ * declarations rather than from what was noticed.
+ *
+ * WHICH IS ALSO WHY IT WAS MISSING. `register.read` and `page.render` were two of the nine kinds the
+ * `CHECK` admits, with nothing writing them and nothing reading them: a vocabulary with neither end
+ * connected, which reads exactly like a vocabulary that works.
+ */
+const DORMANT: { kind: 'register' | 'page'; signal: Signal; why: (id: string) => string }[] = [
+  {
+    kind: 'register',
+    signal: 'register.read',
+    why: (id) => `Nothing has read ${id} in ninety days, and it has been declared for longer than that.`,
+  },
+  {
+    kind: 'page',
+    signal: 'page.render',
+    why: (id) => `Nobody has opened the ${id} page in ninety days, and its blocks run every time the digest does.`,
+  },
+];
+
+/**
+ * Declarations old enough to be judged, that nothing has touched.
+ *
+ * THE SUBJECT IS THE DECLARATION'S OWN ID, which is what `register.read` and `page.render` record —
+ * so a rename is a new subject and a new ninety days, which is correct: a renamed register is a
+ * register somebody has just been thinking about.
+ */
+function dormant(deps: AnalyseDeps): Finding[] {
+  const found: Finding[] = [];
+  const cutoff = new Date(deps.nowMs - DORMANT_DAYS * DAY_MS).toISOString();
+  const since = cutoff.slice(0, 10);
+
+  for (const d of DORMANT) {
+    /* AN ABSENCE IS ONLY EVIDENCE WHERE PRESENCE IS BEING RECORDED. This is Law One read the other
+       way round — a burst is not a pattern, and a silence is not a fact unless somebody was
+       listening. Without it every register on every record was dormant: nothing had ever written a
+       `register.read` row, so "no reads in ninety days" was true of a record being hammered daily.
+       `24 §7`'s specificity suite said so on the first run — two and a half thousand proposals out
+       of a hundred record-years of pure noise, which is the test earning its place.
+
+       TWO OTHER SUBJECTS ON THREE SEPARATE DAYS. One subject read once is somebody trying the
+       product; the question "which of these does nobody open" only means anything on a record where
+       the others are being opened. */
+    const alive = deps.sql.one<{ subjects: number; days: number }>(
+      'SELECT count(DISTINCT subject) AS subjects, count(DISTINCT day) AS days FROM observation WHERE kind = ? AND day >= ?',
+      d.signal,
+      since,
+    );
+    if (Number(alive?.subjects ?? 0) < 2 || Number(alive?.days ?? 0) < 3) continue;
+
+    for (const row of deps.sql.all<{ id: string }>(
+      `SELECT id FROM declaration
+        WHERE kind = ? AND superseded_at IS NULL AND retired = 0 AND created_at < ?`,
+      d.kind,
+      cutoff,
+    )) {
+      const bare = row.id.slice(row.id.indexOf('.') + 1);
+      const read = deps.sql.one<{ n: number }>(
+        'SELECT count(*) AS n FROM observation WHERE kind = ? AND subject = ? AND day >= ?',
+        d.signal,
+        bare,
+        since,
+      );
+      if (Number(read?.n ?? 0) === 0)
+        found.push({
+          signal: d.signal,
+          subject: bare,
+          /* ZERO IS THE FINDING, and it is what makes this one readable beside the others: every
+             number in a `why` sentence elsewhere is a count of things that happened, and this one is
+             the count that did not. */
+          n: 0,
+          days: 0,
+          window: `${DORMANT_DAYS}d`,
+          why: d.why(bare),
+        });
+    }
+  }
+
+  return found;
+}
+
 export type AnalyseDeps = {
   sql: Sql;
   nowMs: number;
@@ -195,7 +296,10 @@ export function analyse(deps: AnalyseDeps): Analysis {
     ))
       counts.push({ signal: d.signal, subject: row.subject, total: Number(row.total), days: Number(row.days) });
   }
-  const found = findingsFrom(counts);
+  /* AND THE FINDINGS THAT ARE AN ABSENCE, which no amount of grouping over `observation` produces:
+     the row is the one that is not there. They go last, so a register nobody reads never outranks a
+     shape nobody can ingest — a thing that is failing beats a thing that is merely unused. */
+  const found = [...findingsFrom(counts), ...dormant(deps)];
 
   /* ONE AT A TIME, and the one that cleared its threshold by the most. A list of eleven proposals is
      a list nobody reads, and the second-best one will still be there next week.
