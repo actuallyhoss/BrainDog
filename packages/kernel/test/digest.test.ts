@@ -415,3 +415,55 @@ test('A SECTION THE RECORD CANNOT ANSWER SAYS SO, rather than going quietly miss
   assert.match(text, /colour/, 'the digest dropped the section instead of saying what happened');
   sql.close();
 });
+
+test('A CHANNEL THAT SENT NOTHING IS NOT IN THE RECEIPT', async () => {
+  /* `mcp` fell out of the bottom of a loop with no `else`: the schedule row was marked done and
+     re-armed, and `runDigest` returned `{ channels: ['mcp'], skipped: false }`, so everything that
+     could have noticed said it went. It is a case now — a digest is already the MCP resource
+     `digest/today`, "what the scheduler would have said" (10 §6), so an agent reads it by asking
+     rather than by being pushed at — and the receipt says which channels actually carried it. */
+  const { k, sql, clock } = await record(WEEKLY({ channels: ['mcp', 'email', 'in-app'] }));
+  arm(sql, NOW);
+  clock.set(NOW + 1000);
+  await k.drain();
+
+  assert.equal(outbox(sql).filter((r) => r.kind === 'notify.email').length, 1, 'the email went nowhere');
+  assert.equal(sql.all("SELECT 1 FROM event WHERE actor = 'digest:money-weekly'").length, 1, 'the in-app note went nowhere');
+
+  /* AND AN EMAIL CHANNEL ON A RECORD WITH NO ADDRESS TO SEND TO IS NOT IN IT EITHER. */
+  const { k: k2, sql: sql2, clock: c2 } = await record(WEEKLY({ channels: ['email', 'mcp'] }));
+  sql2.exec("UPDATE person SET email = NULL WHERE id = 'p_1'");
+  arm(sql2, NOW);
+  c2.set(NOW + 1000);
+  await k2.drain();
+  assert.equal(outbox(sql2).length, 0, 'a digest with nowhere to send it queued something anyway');
+  sql.close();
+  sql2.close();
+});
+
+test('AND A DIGEST THAT NAMES A CHANNEL NOBODY DELIVERS DOES NOT INSTALL', async () => {
+  /* 09 §6's keys are typed and closed, and `validate` deep-checked registers and returned `null` for
+     everything else — so a channel nobody has ever heard of installed cleanly and then fell through
+     the send loop, silently, every week. */
+  const { k, sql } = await record();
+  const refusal = async (over: Record<string, unknown>) => {
+    const out = await k.install([WEEKLY(over)]);
+    assert.equal(out.ok, false, `${JSON.stringify(over)} installed`);
+    return (out as { refusal: { code: string; fix: string; at?: string } }).refusal;
+  };
+
+  assert.equal((await refusal({ channels: ['carrier-pigeon'] })).at, 'channels');
+  assert.equal((await refusal({ channels: [] })).at, 'channels');
+  assert.match((await refusal({ channels: [] })).fix, /nothing it assembles would go anywhere/);
+
+  /* A URL A DIGEST POSTS TO IS EGRESS, AND EGRESS IS DECLARED OR IT DOES NOT HAPPEN (04 §7). The
+     channel without the address installed and then posted nowhere, for ever. */
+  assert.equal((await refusal({ channels: ['webhook'] })).at, 'webhook');
+  assert.equal((await refusal({ channels: ['webhook'], webhook: { url: 'http://plain.example' } })).at, 'webhook');
+  assert.ok((await k.install([WEEKLY({ channels: ['webhook'], webhook: { url: 'https://hooks.example/x' } })])).ok);
+
+  /* AND `prose` IS WRITTEN BY SPARK OR BY NOBODY (42 §4.11). Anything else waits behind a model that
+     was never going to answer. */
+  assert.equal((await refusal({ prose: 'gpt' })).at, 'prose');
+  sql.close();
+});

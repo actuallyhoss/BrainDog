@@ -290,7 +290,7 @@ test('A DECLARED DIGEST IS ARMED WHEN IT IS DECLARED', async () => {
   const k = await openRecord(sql, fixedClock(NOW));
   value(
     await k.install([
-      { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', schedule: { day: 'mon', at: '08:00' }, sections: [] } } as never,
+      { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', channels: ['in-app'], schedule: { day: 'mon', at: '08:00' }, sections: [] } } as never,
     ]),
   );
 
@@ -318,7 +318,7 @@ test('A ROW THAT ALREADY FIRED IS RE-ARMED, or it can never fire again', async (
   const DIGEST = {
     id: 'digest.monday',
     kind: 'digest',
-    body: { digest: 'monday', to: 'p_1', schedule: { day: 'mon', at: '08:00' }, sections: [] },
+    body: { digest: 'monday', to: 'p_1', channels: ['in-app'], schedule: { day: 'mon', at: '08:00' }, sections: [] },
   } as never;
   value(await k.install([DIGEST]));
 
@@ -353,7 +353,7 @@ test('AND A REFUSED INSTALL ARMS NOTHING, on the pack path too', async () => {
   value(k.create('services', { name: 'a', renews: day(60) }, { actor: 'p_1' }));
 
   const staged = await k.stageInstall([
-    { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', schedule: { day: 'mon', at: '08:00' }, sections: [] } },
+    { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', channels: ['in-app'], schedule: { day: 'mon', at: '08:00' }, sections: [] } },
     {
       id: 'register.services',
       kind: 'register',
@@ -382,7 +382,7 @@ test('and re-installing does not reset a schedule somebody is waiting on', async
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
-  const decl = { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', schedule: { day: 'mon', at: '08:00' }, sections: [] } };
+  const decl = { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', channels: ['in-app'], schedule: { day: 'mon', at: '08:00' }, sections: [] } };
   value(await k.install([decl as never]));
   const first = sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'digest'")?.due_at;
 

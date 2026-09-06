@@ -236,8 +236,10 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
      is what a prose call that comes back unusable does; a prose call nobody can make is the same
      fact one step earlier. Two sentences are an accelerant and a digest is not — 11 §3: "Spark is an
      accelerant, never a dependency." */
-  sendDigest(deps, assembled);
-  return { sections: carrying.length, channels, skipped: false };
+  /* AND THE RECEIPT NAMES THE CHANNELS IT ACTUALLY USED. This returned the DECLARED list, so a
+     digest that sent nothing — `mcp` alone, or `email` on a record whose owners have no address —
+     reported the same thing as one that reached somebody. */
+  return { sections: carrying.length, channels: sendDigest(deps, assembled), skipped: false };
 }
 
 
@@ -275,7 +277,7 @@ export type Assembled = {
  * other does not have — and the prose path is the one that would have been forgotten, because it is
  * the one nobody sees fail.
  */
-export function sendDigest(deps: DigestDeps, sent: Assembled, prose?: string): void {
+export function sendDigest(deps: DigestDeps, sent: Assembled, prose?: string): Channel[] {
   /* 45 §5.10: the text prefixed by the prose, attributed. Attribution is not decoration — two
      sentences of figures written by a model, printed above a record's own numbers with nothing
      saying which is which, is the one place this product would be lying about who said something. */
@@ -285,7 +287,15 @@ export function sendDigest(deps: DigestDeps, sent: Assembled, prose?: string): v
 
 ${sent.text}` : sent.text;
 
+  /* WHAT ACTUALLY WENT, which is not always what was asked for. An `email` channel on a record whose
+     owners have no address sends nothing; `mcp` sends nothing by design. A receipt that names a
+     channel it did not use is the same lie as a digest that reports success and sends nothing —
+     smaller, and in the one place somebody would go to find out why nothing arrived. */
+  const went: Channel[] = [];
+
   for (const channel of sent.channels) {
+    went.push(channel);
+
     if (channel === 'in-app') {
       /* THE EVENT IS THE NOTIFICATION. There is no inbox table: the unread count is counted over
          these, in one place, on the record rather than per page — a badge per nav section is how a
@@ -295,7 +305,10 @@ ${sent.text}` : sent.text;
     }
     if (channel === 'email') {
       const to = deps.owners();
-      if (to.length === 0) continue;
+      if (to.length === 0) {
+        went.pop();
+        continue;
+      }
       deps.outbox('notify.email', { to, subject: sent.name, text });
       continue;
     }
@@ -305,12 +318,31 @@ ${sent.text}` : sent.text;
       deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length} items`, url: `/digest/${sent.digest}` });
       continue;
     }
-    if (channel === 'webhook' && sent.webhook)
-      deps.outbox('notify.webhook', {
-        url: sent.webhook,
-        body: JSON.stringify({ digest: sent.digest, sections: sent.sections }),
-      });
+    if (channel === 'webhook') {
+      /* THE ADDRESS IS DECLARED OR THE CHANNEL IS NOT. `install` refuses a `webhook` channel with no
+         `webhook: { url }` (09 §6: egress is declared or it does not happen), so reaching here
+         without one is a record written by an older build — and posting nowhere while reporting a
+         send is the failure this whole pass is about, not one to repeat quietly. */
+      if (sent.webhook)
+        deps.outbox('notify.webhook', {
+          url: sent.webhook,
+          body: JSON.stringify({ digest: sent.digest, sections: sent.sections }),
+        });
+      else went.pop();
+      continue;
+    }
+
+    /* `mcp` SENDS NOTHING, AND THAT IS THE WHOLE OF IT. A digest is already an MCP resource —
+       `digest/today`, "what the scheduler would have said" (10 §6) — so an agent reads it by asking
+       rather than by being pushed at, and naming the channel says "an agent should see this", which
+       an agent can.
+
+       IT IS A CASE RATHER THAN A FALL-THROUGH, because the loop had no `else`: `mcp` dropped out of
+       the bottom, the schedule row was marked done and re-armed, and `runDigest` returned
+       `{ channels: ['mcp'], skipped: false }` — so every receipt said it went. */
   }
+
+  return went;
 }
 
 /**

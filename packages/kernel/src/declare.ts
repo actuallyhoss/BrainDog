@@ -120,6 +120,54 @@ const bad = (code: string, fix: string, at?: string, allowed?: readonly string[]
 export const ownId = (decl: Declaration): string =>
   String((decl.body.id as string | undefined) ?? (decl.body[decl.kind] as string | undefined) ?? '');
 
+/** The five `09 §6` admits. Closed, and now actually used as one rather than exported and ignored. */
+const CHANNELS = ['in-app', 'email', 'push', 'webhook', 'mcp'] as const;
+
+/** At most twelve. A digest longer than that is a report, and nobody reads a report every Monday. */
+const SECTION_CEILING = 12;
+
+/**
+ * A digest declaration, checked against `09 §6`.
+ *
+ * EVERY REFUSAL HERE IS ABOUT SOMETHING THAT WOULD OTHERWISE BE SILENT. A channel nobody delivers, a
+ * webhook with nowhere to post, a `prose` value no host answers to — none of them throws, and each
+ * one produces a digest that reports success and sends less than it says.
+ */
+function digestBody(decl: Declaration): Refusal | null {
+  const body = decl.body as { channels?: unknown; sections?: unknown; prose?: unknown; webhook?: unknown };
+
+  const channels = body.channels;
+  if (!Array.isArray(channels) || channels.length === 0)
+    return bad('DECLARATION_INVALID', `${decl.id} names no channel, so nothing it assembles would go anywhere.`, 'channels');
+  if (channels.length > CHANNELS.length)
+    return bad('DECLARATION_INVALID', `A digest has one to ${CHANNELS.length} channels, and ${decl.id} names ${channels.length}.`, 'channels');
+  for (const c of channels)
+    if (!(CHANNELS as readonly unknown[]).includes(c))
+      return bad('DECLARATION_INVALID', `${String(c)} is not a channel.`, 'channels', CHANNELS as unknown as string[]);
+
+  /* A URL A DIGEST POSTS TO IS EGRESS, AND EGRESS IS DECLARED OR IT DOES NOT HAPPEN (04 §7). The
+     channel without the address installed cleanly and then posted nowhere, for ever. */
+  if (channels.includes('webhook')) {
+    const hook = body.webhook as { url?: unknown } | undefined;
+    if (typeof hook?.url !== 'string' || !hook.url.startsWith('https://'))
+      return bad(
+        'DECLARATION_INVALID',
+        `${decl.id} posts to a webhook and names no https address to post to. A URL a digest posts to is egress, and egress is declared.`,
+        'webhook',
+      );
+  }
+
+  if (body.sections !== undefined && (!Array.isArray(body.sections) || body.sections.length > SECTION_CEILING))
+    return bad('DECLARATION_INVALID', `A digest carries at most ${SECTION_CEILING} sections.`, 'sections');
+
+  /* `prose` IS ONLY EVER `spark` (42 §4.11). Anything else is a host nobody has, and the digest
+     would wait behind a model that was never going to answer. */
+  if (body.prose !== undefined && body.prose !== 'spark')
+    return bad('DECLARATION_INVALID', `A digest's prose is written by spark or by nobody.`, 'prose', ['spark']);
+
+  return null;
+}
+
 /**
  * Check a declaration before it is installed, because an id becomes SQL.
  *
@@ -137,6 +185,15 @@ export function validate(decl: Declaration): Refusal | null {
       `A declaration's id is its kind and its own id: ${decl.kind}.${String(own)}, not ${decl.id}.`,
       'id',
     );
+  /**
+    * A DIGEST'S KEYS ARE TYPED AND CLOSED (09 §6), AND NOTHING CHECKED THEM. `validate` deep-checked
+    * registers and returned `null` for everything else — so `channels: ['mcp']` installed and then
+    * fell through the send loop's if-chain with no `else`, and the schedule row was marked done and
+    * re-armed while the receipt said it went. A `webhook` channel with no `webhook: { url }` did the
+    * same. Both are the shape this codebase keeps producing: something complete-looking that reports
+    * success and does nothing.
+    */
+  if (decl.kind === 'digest') return digestBody(decl);
   if (decl.kind !== 'register') return null;
 
   const id = own;
