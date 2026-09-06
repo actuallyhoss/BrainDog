@@ -110,6 +110,20 @@ function qualifier(field: string, type: string, value: unknown, put: (v: string 
   return half === undefined ? '' : ` AND ${extract(field, type, `.${q.part}`)} = ${put(String(half))}`;
 }
 
+/**
+ * The qualifier a value would carry, as a plain string — or `null` where it carries none.
+ *
+ * FOR DEDUPLICATING BEFORE BINDING. The clause `qualifier` returns has a literal `?` in it, so two
+ * different currencies produce the same string; deduplicating those and binding as you go puts more
+ * parameters in the list than there are placeholders in the SQL.
+ */
+function currencyKey(field: string, type: string, value: unknown): string | null {
+  const q = QUALIFIER[type];
+  if (!q || typeof value !== 'object' || value === null) return null;
+  const half = (value as Record<string, unknown>)[q.key];
+  return half === undefined ? null : String(half);
+}
+
 /** Forty bytes. Past it a `LIKE` pattern reaches a platform ceiling that differs between hosts. */
 const CONTAINS_MAX = 40;
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
@@ -126,6 +140,17 @@ function bind(value: unknown, type: string): string | number | null {
   if (type === 'money') return typeof value === 'object' && value !== null ? (value as Money).amount : null;
   if (type === 'quantity') return typeof value === 'object' && value !== null ? (value as Quantity).value : null;
   if (typeof value === 'boolean') return value ? 1 : 0;
+  /* AND THE STRINGS THE SENTENCE GRAMMAR PRODUCES FOR ONE. `resolve` answers the string `'true'`
+     for `done is yes`, `json_extract` answers the integer `1`, and `1 = 'true'` is false in SQLite
+     — so the sentence form matched NOTHING while the structured form matched correctly, and the
+     negation of the same sentence matched EVERYTHING. Two spellings of one grammar disagreeing is
+     the failure this package exists to make impossible, and the second half of it is the clause
+     that quietly matches every row, which its own header is written against. */
+  if (type === 'bool') {
+    if (value === 'true') return 1;
+    if (value === 'false') return 0;
+    return null;
+  }
   if (typeof value === 'number' || typeof value === 'string') return value;
   return null;
 }
@@ -287,9 +312,28 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         }
 
         /* `not_in` KEEPS THE CURRENCY AND NEGATES THE AMOUNTS, for the reason `not` does — and the
-           currency clauses are bound first because they are written first. */
-        const currencies = list.map((v) => qualifier(field, decl.type, v, put)).filter(Boolean);
-        const same = currencies.length ? `(${[...new Set(currencies.map((q) => q.slice(' AND '.length)))].join(' OR ')}) AND ` : '';
+           currency clauses are bound first because they are written first.
+
+           THE SET IS TAKEN BEFORE ANYTHING IS BOUND, which is the whole of the fix. This called
+           `put` once per value and then deduplicated the resulting clause STRINGS — which are
+           identical, because the `?` in them is literal — so two GBP values produced three
+           placeholders and four parameters. `node:sqlite` raises `column index out of range` and
+           the list, the metric or the page fails outright; a driver that tolerated the extra one
+           would shift every binding by a place and answer `currency = 'GBP' AND NOT (amount =
+           'GBP' OR amount = 10000)`, which returns a value that IS in the list. And `evaluate()`
+           answers the same predicate without error, so a rule fires mid-write and the list behind
+           it crashes. */
+        const seen = new Set<string>();
+        const same = (() => {
+          const clauses: string[] = [];
+          for (const v of list) {
+            const key = currencyKey(field, decl.type, v);
+            if (key === null || seen.has(key)) continue;
+            seen.add(key);
+            clauses.push(qualifier(field, decl.type, v, put).slice(' AND '.length));
+          }
+          return clauses.length ? `(${clauses.join(' OR ')}) AND ` : '';
+        })();
         const amounts = list.map((_, i) => `${path} = ${put(bounds[i]!)}`).join(' OR ');
         return `(${path} IS NULL OR (${same}NOT (${amounts})))`;
       }
@@ -326,7 +370,16 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         }
         /* The bounds carry their currency too: `between 20,000 and 30,000 USD` matched a GBP row and
            a EUR row in BOTH renderings, so nothing flagged it — a shared bug is invisible to a test
-           that only compares the two. */
+           that only compares the two.
+
+           AND BOTH BOUNDS, NOT THE LOW ONE. The qualifier was taken from `pair[0]` alone, so a range
+           written from GBP 200 to USD 300 silently reread the ceiling as GBP 300: a plausible answer
+           to a question nobody asked. Two currencies are not a range, and saying so is the only
+           honest answer. */
+        if (currencyKey(field, decl.type, pair[0]) !== currencyKey(field, decl.type, pair[1])) {
+          bad.push(refuse('MIXED_CURRENCY', `${field} between takes one currency, and this range has two.`, field));
+          return '';
+        }
         return `(${path} IS NOT NULL AND ${path} >= ${put(lo)} AND ${path} <= ${put(hi)}${qualifier(field, decl.type, pair[0], put)})`;
       }
 
@@ -368,7 +421,14 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
           bad.push(refuse('VALUE_MALFORMED', `${field} ${op} takes one value to look for in the list.`, field));
           return '';
         }
-        const exists = `EXISTS (SELECT 1 FROM json_each(json_extract(fields, '${jsonPath(field)}')) WHERE value = ${put(bound)})`;
+        /* GUARDED, because `json_each` RAISES on a bare string. `json_each(NULL)` is fine, so an
+           absent row was never the problem — a row holding a scalar where a list belongs was, and
+           one of them made the whole query throw and lost every other row's answer. An import
+           carries whatever the other record held, and the `.dog` reader writes `fields` without
+           coercing it, which is exactly the case the `empty`/`present` branch above is written for.
+           A scalar is not a list, so it holds nothing: `'[]'` is the honest substitute. */
+        const list = `CASE WHEN json_valid(json_extract(fields, '${jsonPath(field)}')) AND json_type(json_extract(fields, '${jsonPath(field)}')) = 'array' THEN json_extract(fields, '${jsonPath(field)}') ELSE '[]' END`;
+        const exists = `EXISTS (SELECT 1 FROM json_each(${list}) WHERE value = ${put(bound)})`;
         return op === 'has' ? `(${exists})` : `(NOT ${exists})`;
       }
 
@@ -531,8 +591,17 @@ function same(a: unknown, b: unknown, type: string): boolean {
       (a as Quantity).value === (b as Quantity).value &&
       (a as Quantity).unit === (b as Quantity).unit
     );
+  /* A BOOL IS TRUE OR FALSE HOWEVER IT WAS SPELLED. The sentence grammar resolves `open is yes` to
+     the STRING `'true'`, and `true === 'true'` is false — so the sentence form matched nothing here
+     while the SQL side had the mirror-image bug, and the two agreed by both being wrong. The
+     compiler's `bind` reads the same two spellings; this is that rule on this side. */
+  if (type === 'bool') return truth(a) === truth(b) && truth(a) !== null;
   return a === b;
 }
+
+/** `true`, `false` or `null` for a value that is neither, whichever of the two spellings it wore. */
+const truth = (v: unknown): boolean | null =>
+  v === true || v === 'true' ? true : v === false || v === 'false' ? false : null;
 
 /* ── the sentence form ───────────────────────────────────────────────────── */
 

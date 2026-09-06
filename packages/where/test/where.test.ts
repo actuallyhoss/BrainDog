@@ -356,3 +356,100 @@ test('AND `empty` IS THE THREE WAYS A VALUE IS ABSENT, because an import carries
   assert.match(c.sql, /= ''/);
   assert.match(c.sql, /= '\[\]'/);
 });
+
+/* ── the two spellings of one grammar ─────────────────────────────────── */
+
+/**
+ * A second, smaller set — rows the shared fixture would have to change shape to hold.
+ *
+ * SEPARATE ON PURPOSE. Adding an imported row to `ROWS` would change the expected answer of every
+ * test above it, which is how a fixture stops being a fixture and becomes a thing you edit to make
+ * tests pass.
+ */
+const ODD: Row[] = [
+  /* A SCALAR WHERE A LIST BELONGS. This is what an import leaves behind: the `.dog` reader writes
+     `fields` without coercing them, so a record that held `tags` as a string arrives holding one. */
+  { id: 'imported', fields: { what: 'Imported', tags: 'urgent', open: true } },
+  { id: 'listed', fields: { what: 'Listed', tags: ['urgent'], open: false } },
+  { id: 'bare', fields: { what: 'Bare' } },
+];
+
+const oddSql = (where: Predicate | undefined): string[] => {
+  const c = compile(where, SCHEMA);
+  assert.deepEqual(c.bad, [], c.bad[0]?.fix);
+  const d = new DatabaseSync(':memory:');
+  d.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, fields TEXT, deleted_at TEXT)');
+  for (const row of ODD)
+    d.prepare('INSERT INTO entry (id, register, fields, deleted_at) VALUES (?, ?, ?, NULL)').run(row.id, 'obligations', JSON.stringify(row.fields));
+  const out = d.prepare(`SELECT id FROM entry WHERE ${c.sql} ORDER BY id`).all(...(c.params as never[])) as { id: string }[];
+  d.close();
+  return out.map((r) => r.id);
+};
+
+const oddBoth = (where: Predicate | undefined): string[] => {
+  const sql = oddSql(where);
+  const js = ODD.filter((r) => evaluate(where, r.fields, SCHEMA)).map((r) => r.id).sort();
+  assert.deepEqual(js, sql, `the two renderings disagree: SQL ${sql.join(',')} vs JS ${js.join(',')}`);
+  return sql;
+};
+
+test('A `has` ON A ROW HOLDING A SCALAR DOES NOT TAKE THE QUERY DOWN WITH IT', () => {
+  /* `json_each` RAISES on a bare string, so one imported row holding `tags: 'urgent'` made the whole
+     query throw and lost every other row's answer. `json_each(NULL)` is fine, so an absent row was
+     never the problem. A scalar is not a list, so it holds nothing. */
+  assert.deepEqual(oddBoth({ field: 'tags', has: 'urgent' }), ['listed']);
+});
+
+test('and `lacks` counts it as holding nothing, rather than as an error', () => {
+  assert.deepEqual(oddBoth({ field: 'tags', lacks: 'urgent' }), ['bare', 'imported']);
+});
+
+test('A BOOL WRITTEN EITHER WAY BINDS THE SAME', () => {
+  /* The sentence grammar resolves `open is yes` to the STRING `'true'`; `json_extract` answers the
+     integer `1`; and `1 = 'true'` is false in SQLite. So the sentence form matched nothing and its
+     negation matched everything — the clause that quietly matches every row, which this module's
+     own header is written against. */
+  assert.deepEqual(oddBoth({ field: 'open', is: true }), ['imported']);
+  assert.deepEqual(oddBoth({ field: 'open', is: 'true' as never }), ['imported'], 'the sentence spelling matched nothing');
+  assert.deepEqual(oddBoth({ field: 'open', is: false }), ['listed']);
+  assert.deepEqual(oddBoth({ field: 'open', is: 'false' as never }), ['listed']);
+});
+
+test('and its negation does not match everything', () => {
+  // The unset row is in it because a row with no value is not "not" anything — the rule the `not`
+  // branch already states. What matters is that the row which IS true is out.
+  assert.deepEqual(oddBoth({ field: 'open', not: 'true' as never }), ['bare', 'listed']);
+});
+
+test('AND `not_in` BINDS AS MANY PARAMETERS AS IT HAS PLACEHOLDERS', () => {
+  /* `put` was called once per value and the resulting clause STRINGS were then deduplicated — and
+     they are identical, because the `?` in them is literal. Two GBP values gave three placeholders
+     and four parameters: `node:sqlite` raises `column index out of range` and the list, the metric
+     or the page fails outright. A driver that tolerated it would shift every binding by a place and
+     return a value that IS in the list. */
+  const gbp = (amount: number) => ({ amount, currency: 'GBP' });
+  const c = compile({ field: 'amount', not_in: [gbp(48_000), gbp(24_000)] }, SCHEMA);
+  assert.deepEqual(c.bad, []);
+  assert.equal((c.sql.match(/\?/g) ?? []).length, c.params.length, 'the SQL and its parameters are different lengths');
+  assert.ok(!both({ field: 'amount', not_in: [gbp(48_000), gbp(24_000)] }).includes('a'));
+});
+
+test('and three currencies in one `not_in` still balance', () => {
+  const c = compile(
+    { field: 'amount', not_in: [{ amount: 1, currency: 'GBP' }, { amount: 2, currency: 'EUR' }, { amount: 3, currency: 'USD' }] },
+    SCHEMA,
+  );
+  assert.equal((c.sql.match(/\?/g) ?? []).length, c.params.length);
+});
+
+test('A RANGE IN TWO CURRENCIES IS NOT A RANGE', () => {
+  /* The qualifier was taken from the low bound alone, so a range written from GBP 200 to USD 300
+     silently reread the ceiling as GBP 300 — a plausible answer to a question nobody asked. */
+  const c = compile(
+    { field: 'amount', between: [{ amount: 20_000, currency: 'GBP' }, { amount: 30_000, currency: 'USD' }] },
+    SCHEMA,
+  );
+  assert.equal(c.bad[0]?.code, 'MIXED_CURRENCY');
+  // And one currency on both bounds still works.
+  assert.deepEqual(both({ field: 'amount', between: [{ amount: 20_000, currency: 'GBP' }, { amount: 50_000, currency: 'GBP' }] }), ['a', 'b']);
+});
