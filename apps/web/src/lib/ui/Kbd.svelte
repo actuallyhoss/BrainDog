@@ -11,8 +11,40 @@
 <script lang="ts">
   let { keys }: { keys: string } = $props();
 
+  /**
+   * THE KEY THE READER ACTUALLY HAS.
+   *
+   * The table writes `⌘K`, because the Mac glyphs are the compact ones and one canonical spelling
+   * beats a conditional in ninety call sites. Printed unchanged, though, this app told a Windows
+   * reader to press a key their keyboard does not have — `⌘K`, `⌘\`, `⌘Z`, `⌘↵`, `⌥V`, and a
+   * primary button reading "Commit the decision ⌘↵" — while the key that works is Ctrl.
+   *
+   * A SHORTCUT HINT NOBODY CAN FOLLOW IS WORSE THAN NONE: it is the palette teaching the wrong
+   * lesson, on the component whose whole purpose is that the slow path teaches the fast one.
+   *
+   * `navigator.platform` IS DEPRECATED AND STILL THE ONE THAT ANSWERS. `userAgentData` is
+   * Chromium-only, so it is tried first and the old property is the fallback rather than the
+   * source — and neither exists during prerender, where the answer is the ordinary one.
+   */
+  const mac =
+    typeof navigator === 'undefined'
+      ? false
+      : /mac/i.test((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? '');
+
+  /** `⌘` is Ctrl, `⌥` is Alt, and a modifier joins its key with a plus, which is the convention. */
+  const said = (part: string): string =>
+    mac
+      ? part
+      : part
+          .replace(/⌘/g, 'Ctrl+')
+          .replace(/⌥/g, 'Alt+')
+          .replace(/⇧/g, 'Shift+')
+          .replace(/↵|⏎/g, 'Enter')
+          /* `Ctrl+ Home` from `⌘Home` — the glyph carried no separator and the word needs none either. */
+          .replace(/\+\s+/g, '+');
+
   /** Two spaces separate alternatives; a single space separates a sequence. */
-  const parts = $derived(keys.split('  '));
+  const parts = $derived(keys.split('  ').map(said));
 </script>
 
 <span class="kbd-run">
