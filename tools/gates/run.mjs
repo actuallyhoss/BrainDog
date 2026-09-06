@@ -48,6 +48,9 @@ const GATES = [
   /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
      code path forgets — which holds only while the CHECK and the document agree about what it is. */
   ['closed-lists', ['node', [join(here, 'closed-lists.mjs')]]],
+  /* THE RULE THE WHOLE ADDITIVE STORY RESTS ON (02 §1). A register the kernel ships is a name no
+     pack can own — and breaking it is always the shortest path. */
+  ['no-declarations-in-kernel', ['node', [join(here, 'no-declarations-in-kernel.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
