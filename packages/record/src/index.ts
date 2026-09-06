@@ -321,6 +321,35 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     return already.includes('example') ? already : [...already, 'example'];
   };
 
+  /**
+   * The fields a predicate filters on that this register has no index for.
+   *
+   * THE DECLARATION IS THE AUTHORITY, not the SQL plan. `index:` on a field is what puts a partial
+   * index on it at install, so a field without it is a scan by construction — no `EXPLAIN` needed,
+   * and no dependence on a planner whose choices differ between the two runtimes this ships to.
+   */
+  const unindexed = (register: string, where: Predicate | undefined): string[] => {
+    if (!where) return [];
+    const decl = kernel.register(register);
+    if (!decl) return [];
+    const indexed = new Set(
+      decl.fields.filter((f) => (f as { index?: boolean }).index || f.unique).map((f) => f.id),
+    );
+    const out = new Set<string>();
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const n = node as Record<string, unknown>;
+      for (const key of ['all', 'any', 'none'])
+        if (Array.isArray(n[key])) {
+          for (const child of n[key] as unknown[]) walk(child);
+          return;
+        }
+      if (typeof n.field === 'string' && !indexed.has(n.field)) out.add(n.field);
+    };
+    walk(where);
+    return [...out];
+  };
+
   /** Who the write path records. A token writes as the PERSON who holds it, never as itself. */
   const actorOf = (ctx: CallContext): string =>
     ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
@@ -367,6 +396,19 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     ): Promise<Result<Page<Entry>>> {
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
+
+      /* A FILTER ON A FIELD WITH NO INDEX IS A SCAN, AND THE RECORD COUNTS IT. `query.scan` is one
+         of the four detectors the observe loop ships with — the one with the most carefully derived
+         threshold, two hundred in thirty days, from the point where an index stops being a liability
+         and starts paying for itself — and nothing in the product emitted the signal, so it could
+         never fire. The declaration already knows which fields are indexed; this is the one place
+         that knows which fields a caller actually filtered on.
+
+         AFTER THE GUARD, so a refused read is not evidence about anything, and outside the answer,
+         so counting never changes what comes back. */
+      for (const field of unindexed(args.register, args.where))
+        kernel.observe([{ kind: 'query.scan', subject: `${args.register}.${field}` }]);
+
       return kernel.list(args);
     },
 

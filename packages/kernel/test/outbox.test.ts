@@ -492,3 +492,50 @@ test('AND `kept` IS CHECKED: a handler that says it moved the row and did not is
   assert.equal(row.attempts, 1, 'it did not walk the ladder');
   sql.close();
 });
+
+test('AN `infer.draft` THAT COMES BACK FILES ITS QUESTION', async () => {
+  /* `analyse` queues the one proposal a crossed threshold earns, and the ack marked the row done and
+     returned — so whatever the model drafted reached nobody. Every governor, every threshold and the
+     whole brake existed to decide WHETHER to ask a question, and the question could not be asked. */
+  const { k, sql } = await record();
+  k.outbox('infer.draft', { signal: 'search.empty', subject: 'retainer' });
+
+  const leased = k.leaseOutbox(['infer.draft'], 10);
+  assert.equal(leased.length, 1);
+  value(
+    k.ackOutbox({
+      id: leased[0]!.id,
+      state: 'done',
+      result: {
+        question: 'Six searches for “retainer” found nothing. Should there be a register for them?',
+        body_kind: 'options',
+        body: {
+          options: [
+            { id: 'yes', label: 'Add one', because: 'you keep looking for it' },
+            { id: 'no', label: 'Leave it', because: 'it is not a thing you keep' },
+          ],
+          requires_reason: true,
+        },
+      },
+    }),
+  );
+
+  const filed = sql.one<{ id: string; opened_by: string }>("SELECT id, opened_by FROM suggestion WHERE opened_by = 'spark'");
+  assert.ok(filed, 'the draft was delivered and the question was thrown away');
+  assert.equal(
+    sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest'")?.to_v,
+    'Six searches for “retainer” found nothing. Should there be a register for them?',
+  );
+  sql.close();
+});
+
+test('and a draft with nothing to file is a refusal rather than a retry', async () => {
+  // The gate refuses a malformed body, and that is a fact about the DRAFT rather than about the
+  // queue: a retry cannot fix it, so the job is done and the caller is told why.
+  const { k, sql } = await record();
+  k.outbox('infer.draft', {});
+  const leased = k.leaseOutbox(['infer.draft'], 10);
+  const out = k.ackOutbox({ id: leased[0]!.id, state: 'done', result: { body_kind: 'options' } });
+  assert.equal(refusal(out).at, 'result');
+  sql.close();
+});

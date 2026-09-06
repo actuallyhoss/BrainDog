@@ -59,7 +59,10 @@ export const ROUTES: readonly Route[] = [
   { name: 'listTokens', writes: false, what: 'Every agent token, with when it was last used. Never the token.' },
   { name: 'createToken', writes: true, what: 'Mint one. The secret is in the answer and is stored nowhere.' },
   { name: 'revokeToken', writes: true, what: 'Revoke one. The second call says the same as the first.' },
-  { name: 'export', writes: false, what: 'The record as a file: line per row, and it imports back.' },
+  /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event — 12 §6's rule that a
+     vault whose reads are not audited cannot say whether anything got out — and a GET that mutates
+     the record is a GET a proxy may replay and a browser may prefetch. */
+  { name: 'export', writes: true, what: 'The record as a file: line per row, and it imports back.' },
   { name: 'import', writes: true, what: 'A file into an EMPTY record. Anything else is a merge nobody asked for.' },
   { name: 'markRead', writes: true, what: 'How far you have read. A person only, and never an event.' },
   { name: 'log', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },

@@ -147,7 +147,22 @@ export const CEILING = 8;
 /** The backoff both ladders use: doubling minutes, capped at six hours. */
 export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 60_000, 6 * 3_600_000);
 
-export type Ack = { id: string; state: 'done' | 'failed'; error?: string | undefined };
+export type Ack = {
+  id: string;
+  state: 'done' | 'failed';
+  error?: string | undefined;
+  /**
+   * What the job produced, for the kinds that produce something.
+   *
+   * THE LOOP HAD NO WAY BACK IN. `analyse` queues an `infer.draft` — the one proposal a crossed
+   * threshold earns — and the ack marked the row `done` and returned, so whatever the model drafted
+   * reached nobody. Every governor, every threshold and the whole brake existed to decide WHETHER to
+   * ask a question, and the question could not be asked. 45 §13 puts the result on the ack, and 45
+   * §14 says the write-back happens in the ack's transaction, which is what makes "delivered" and
+   * "recorded" the same event rather than two that can disagree.
+   */
+  result?: unknown;
+};
 
 /** What the deliverer needs from the record to finish the job, beyond SQL. */
 export type AckDeps = {
@@ -155,6 +170,14 @@ export type AckDeps = {
   /** The next integer for a counter, inside the transaction. `SG41` is `allocate('suggestion')`. */
   allocate: (name: string) => number;
   nowMs: number;
+  /**
+   * File a suggestion, for the ack of a job that drafted one.
+   *
+   * INJECTED, because the gate is `govern.ts`'s and this file is the queue. A draft that wrote its
+   * own suggestion row would be a second `propose` with its own idea of what a body must contain,
+   * and the whole point of the gate is that there is one.
+   */
+  propose?: (p: { question: string; body_kind: string; body: Record<string, unknown> }, actor: string) => Result<{ id: string }>;
 };
 
 /**
@@ -186,6 +209,28 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
 
   if (args.state === 'done') {
     sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL WHERE id = ?", args.id);
+
+    /* AND THE RESULT GOES BACK IN, in this transaction. `infer.draft` is the analyser's one output:
+       the model drafted a question and a body, and until now the ack marked the row done and threw
+       the answer away — so the entire observe loop, every governor and the brake, existed to decide
+       whether to ask something that could never be asked.
+
+       A DRAFT THAT WILL NOT FILE IS NOT A DELIVERY FAILURE. The gate refuses a malformed body, and
+       that is a fact about the draft rather than about the queue: the job is done, the refusal is
+       returned, and the caller sees why rather than watching a retry ladder for something a retry
+       cannot fix. */
+    if (row.kind === 'infer.draft' && args.result !== undefined && deps.propose) {
+      const drafted = args.result as { question?: unknown; body_kind?: unknown; body?: unknown };
+      if (typeof drafted?.question !== 'string' || typeof drafted?.body_kind !== 'string')
+        return no<null>('VALUE_MALFORMED', `Job ${args.id} came back without a question and a body kind, so there is nothing to file.`, {
+          at: 'result',
+        });
+      const filed = deps.propose(
+        { question: drafted.question, body_kind: drafted.body_kind, body: (drafted.body ?? {}) as Record<string, unknown> },
+        'spark',
+      );
+      if (!filed.ok) return filed as Result<null>;
+    }
     return ok(null);
   }
 

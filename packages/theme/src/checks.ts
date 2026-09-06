@@ -71,8 +71,14 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      reads through it. */
   const floors = built.profile;
 
-  /* A · every ink role x every surface. Each ink has its own floor, descending. */
-  for (const [i, ink] of INKS.entries()) out.push(...pairsAgainstSurfaces(p, [ink], floors.ink[i] ?? 4.5, 'A', scheme));
+  /* A · every ink role x every surface. Each ink has its own floor, descending.
+
+     `faint` IS NOT AMONG THEM, and check C below is why: it is the one ink allowed to sit at the
+     LARGE-TEXT floor, because the usage rule — no faint below 24px — is enforced by a css-rules
+     rule rather than here. Including it at the ramp's own floor made C strictly dominated by A: a
+     fifth check that could not produce a finding A had not already produced. */
+  for (const [i, ink] of INKS.entries())
+    if (ink !== 'faint') out.push(...pairsAgainstSurfaces(p, [ink], floors.ink[i] ?? 4.5, 'A', scheme));
 
   /* B · accent as text x every surface, at the INTENT-TEXT floor rather than the ink ramp's.
      `accent-text` is a hue used as text, which is what an intent is, and the high-contrast profile's

@@ -26,7 +26,8 @@ const OBLIGATIONS = {
     fields: [
       { id: 'what', type: 'text', required: true },
       { id: 'amount', type: 'money' },
-      { id: 'state', type: 'enum', values: ['open', 'paid'] },
+      /* INDEXED, so the scan counter has one field on each side of the line to tell apart. */
+      { id: 'state', type: 'enum', values: ['open', 'paid'], index: true },
     ],
   } as never,
 };
@@ -868,5 +869,31 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
   // And the register they WERE invited to is still theirs to write into.
   assert.equal(refusal(await api.list({ register: 'obligations' }, them)).code, 'LEVEL_REQUIRED', 'append does not read');
   assert.ok((await api.create({ register: 'obligations', fields: { what: 'Filed' } }, them)).ok, 'append could not append');
+  sql.close();
+});
+
+test('A FILTER ON AN UNINDEXED FIELD IS COUNTED AS A SCAN', async () => {
+  /* `query.scan` is one of the four detectors the observe loop ships with — the one with the most
+     carefully derived threshold, two hundred in thirty days, from the point where an index stops
+     being a liability and starts paying for itself — and nothing in the product emitted the signal,
+     so it could never fire. */
+  const { api, sql } = await record();
+  value(await api.list({ register: 'obligations', where: { field: 'what', contains: 'Invoice' } }, owner));
+
+  const seen = sql.one<{ subject: string; n: number }>("SELECT subject, n FROM observation WHERE kind = 'query.scan'");
+  assert.equal(seen?.subject, 'obligations.what', 'a filter on an unindexed field went uncounted');
+
+  // And a filter on an INDEXED one is not a scan, which is the half that keeps the count honest.
+  value(await api.list({ register: 'obligations', where: { field: 'state', is: 'open' } }, owner));
+  assert.equal(sql.all("SELECT 1 FROM observation WHERE kind = 'query.scan'").length, 1);
+  sql.close();
+});
+
+test('and a refused read is not evidence about anything', async () => {
+  // The count is after the guard: somebody who may not read this register has not scanned it.
+  const { api, sql } = await record();
+  await api.list({ register: 'obligations', where: { field: 'what', contains: 'x' } }, token('read', 'read'));
+  await api.list({ register: 'obligations', where: { field: 'what', contains: 'x' } }, person('append'));
+  assert.equal(sql.all("SELECT 1 FROM observation WHERE kind = 'query.scan'").length, 1, 'only the permitted read counted');
   sql.close();
 });

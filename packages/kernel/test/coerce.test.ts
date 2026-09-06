@@ -121,8 +121,15 @@ test('AND AN INSTANT WITH NO TIMEZONE IS REFUSED, rather than read as the host i
   for (const said of ['2026-09-05T02:00:00', '2026-09-05T02:00', 'Sep 5 2026 10:00', '2026-09-05 02:00:00'])
     assert.match(refuse(f('instant'), said).fix, /names no timezone/, said);
 
-  // And every spelling that DOES carry one still works, including a compact offset.
+  /* And every spelling that DOES carry one still works, including a compact offset and a BARE DAY —
+     which is not ambiguous: `Date.parse('2026-09-05')` is UTC midnight by the ECMAScript grammar, in
+     every engine, and it is the form an extracted date arrives in. What is ambiguous is a date WITH
+     a time and no offset. The hour-only offset ISO 8601 admits is refused by the ENGINE rather than
+     by this check, with the sentence that says so, which is the honest answer: the record cannot
+     read it. */
+  assert.equal(take(f('instant'), '2026-09-05'), '2026-09-05T00:00:00.000Z');
   assert.equal(take(f('instant'), '2026-09-05T02:00:00+0300'), '2026-09-04T23:00:00.000Z');
+  assert.match(refuse(f('instant'), '2026-09-05T02:00:00+03').fix, /not an instant/);
   assert.equal(take(f('instant'), '2026-09-05T02:00:00-05:00'), '2026-09-05T07:00:00.000Z');
   assert.equal(take(f('instant'), '2026-09-05T02:00:00z'), '2026-09-05T02:00:00.000Z');
 });

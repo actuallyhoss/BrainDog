@@ -1209,7 +1209,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   });
 
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
-  const ackDeps = (): AckDeps => ({ mint, allocate, nowMs: clock.now() });
+  const ackDeps = (): AckDeps => ({
+    mint,
+    allocate,
+    nowMs: clock.now(),
+    /* THE GATE, HANDED IN. An `infer.draft` that came back with a question files it through the same
+       `propose` a person or a rule uses — one place that decides what a body must contain, one place
+       that writes the `suggest` event, and `spark` as the actor because that is who drafted it. */
+    propose: (p, actor) => openSuggestion(governDeps(), actor, p as never),
+  });
 
   /** The same, plus who is asking and which record this is — the two halves of a `grant.read` row. */
   const vaultDeps = (actor: string): VaultDeps => ({

@@ -223,7 +223,15 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
 
          The `day` type next door checks its shape rather than trusting the parse, for the same
          reason. This is that check for an instant: a zone, or a sentence saying so. */
-      if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(said))
+      /* A BARE DAY IS ALLOWED, because it is not ambiguous: `Date.parse('2026-09-05')` is UTC
+         midnight by the ECMAScript grammar, in every engine. What is ambiguous is a date WITH a time
+         and no offset, which the same grammar reads as local. Refusing the bare form as well would
+         be a narrowing nothing asked for, and it is the form an extracted date arrives in.
+
+         `±hh` IS ALSO A ZONE. ISO 8601 admits the hour-only offset and rejecting it would refuse a
+         value that says exactly what it means. */
+      const zoned = /^\d{4}-\d{2}-\d{2}$/.test(said) || /(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(said);
+      if (!zoned)
         return malformed(`${at} is ${said}, which names no timezone. Write 2026-09-05T02:00:00Z, or the offset it was recorded in.`);
       const ms = Date.parse(said);
       if (!Number.isFinite(ms)) return malformed(`${at} is not an instant this record can read.`);
