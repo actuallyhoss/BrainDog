@@ -28,6 +28,7 @@
   import '$lib/ui/controls.css';
 
   import * as pref from '$lib/pref.ts';
+  import { restore as restoreAccent } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
   import { GoPrefix, overlays, typing } from '$lib/a11y/keys.svelte.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
@@ -55,6 +56,12 @@
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
+  /* THE RECORD'S COLOUR, PUT BACK. `app.html` stamps `data-theme` before first paint so there is
+     no flash of the wrong palette; this is what puts the custom properties behind that attribute. */
+  $effect(() => {
+    restoreAccent();
+  });
+
   let railOff = $state(pref.read().sidebar === false);
   const go = new GoPrefix();
 

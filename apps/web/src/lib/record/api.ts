@@ -863,10 +863,39 @@ function runwayBlock(b: PageBlock): BlockResult {
       tone: s === walk.crossed ? ('bad' as const) : s.balance < 0 ? ('warn' as const) : undefined,
     })),
     total: walk.steps.length,
-    drawn: b.drawn ?? true,
+    drawn: b.drawn ?? drawnWhen(b),
     stale_at: new Date(NOW).toISOString(),
     metrics: undefined,
   };
+}
+
+/**
+ * Whether a block's `when:` is satisfied, given the figure it names.
+ *
+ * A FIGURE THAT CANNOT BE READ DOES NOT DRAW THE BLOCK. The alternative — drawing it anyway — is
+ * how a red note about an overdue invoice appears on a record with no invoices at all, which is the
+ * one thing a `when:` exists to prevent. A block with no `when:` always draws.
+ */
+function drawnWhen(b: PageBlock): boolean {
+  if (!b.when) return true;
+  /* A `when:` NAMING A FIGURE NOBODY DECLARED DOES NOT DRAW. It is the same answer as a figure that
+     cannot be computed, and for the same reason: the block's condition is unknown, and drawing on
+     an unknown is guessing. */
+  const decl = METRICS[b.when.metric];
+  if (!decl) return false;
+  const reading = read(withParam(decl, b.when.metric));
+  if (reading.value === null) return false;
+
+  const v = reading.value;
+  if (b.when.gt !== undefined) return v > b.when.gt;
+  if (b.when.gte !== undefined) return v >= b.when.gte;
+  if (b.when.lt !== undefined) return v < b.when.lt;
+  if (b.when.lte !== undefined) return v <= b.when.lte;
+  if (b.when.is !== undefined) return v === b.when.is;
+  if (b.when.not !== undefined) return v !== b.when.not;
+  /* A CONDITION WITH NO TEST IN IT IS NOT A CONDITION, and drawing the block would be guessing that
+     the author meant "always". They meant something; the block waits until they say what. */
+  return false;
 }
 
 /**
@@ -878,7 +907,7 @@ function runwayBlock(b: PageBlock): BlockResult {
  */
 const READS = new Set([
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
-  'target', 'authored', 'empty', 'tone', 'body', 'drawn',
+  'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -908,7 +937,7 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
         refusals: [`${e instanceof Error ? e.message : String(e)} — this block could not be read`],
         rows: [],
         total: 0,
-        drawn: b.drawn ?? true,
+        drawn: b.drawn ?? drawnWhen(b),
         stale_at: new Date(NOW).toISOString(),
         metrics: undefined,
       };
@@ -975,7 +1004,7 @@ function readBlock(b: PageBlock): BlockResult {
       refusals: said,
       rows: toRows(register ?? '', entries, columns),
       total: matched.length,
-      drawn: b.drawn ?? true,
+      drawn: b.drawn ?? drawnWhen(b),
       stale_at: new Date(NOW).toISOString(),
       metrics: b.cells?.map((c) => ({ ...metric(c.metric), label: c.label })),
     };

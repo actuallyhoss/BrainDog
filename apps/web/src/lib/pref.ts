@@ -18,15 +18,15 @@
  */
 
 export type Pref = {
-  scheme?: 'light' | 'dark';
-  text?: 'sm' | 'base' | 'md';
-  density?: 'compact' | 'comfortable' | 'roomy';
+  scheme?: 'light' | 'dark' | undefined;
+  text?: 'sm' | 'base' | 'md' | undefined;
+  density?: 'compact' | 'comfortable' | 'roomy' | undefined;
   /** A record's own accent, once a record has one. Read by `app.html` before anything renders. */
-  theme?: string;
+  theme?: string | undefined;
   /** `false` folds the rail. `undefined` is open, which is what a first visit should be. */
-  sidebar?: boolean;
+  sidebar?: boolean | undefined;
   /** Whether bare letters act inside a focused grid. */
-  chars?: boolean;
+  chars?: boolean | undefined;
 };
 
 const NAME = 'bd_pref';

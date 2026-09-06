@@ -10,6 +10,7 @@ export * from './color.ts';
 export * from './build.ts';
 export * from './checks.ts';
 export * from './css.ts';
+export * from './record.ts';
 
 import { BRAND_RED, build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.ts';
 

@@ -174,8 +174,23 @@
         </span>
       {/snippet}
 
+      <!-- THE ONE CONTROL THAT ASSERTS THIS PRODUCT HOLDS MORE THAN ONE BUSINESS could not reach the
+           second one: every row was `href="/"`, so choosing another record left you in this one with
+           the name unchanged and no toast. The record this app draws is a fixture, so the other row
+           says so instead of pretending — a control that silently does nothing is the failure this
+           app's own rule is written about. -->
       {#each records as r}
-        <a class="mi" role="menuitem" href="/" aria-current={r.name === record ? 'true' : undefined}>
+        <a
+          class="mi"
+          role="menuitem"
+          href="/"
+          aria-current={r.name === record ? 'true' : undefined}
+          onclick={(e) => {
+            if (r.name === record) return;
+            e.preventDefault();
+            toasts.push(copy.notWritten(`${r.name} would open, with its own registers and pages`));
+          }}
+        >
           <span class="mi-avatar" aria-hidden="true">{r.name.slice(0, 1)}</span>
           <span class="mi-name">{r.name}</span>
           <!-- The level is on the ROW, not on a settings screen. Which record you are in and what
@@ -275,7 +290,13 @@
   </div>
 
   <ul class="group foot">
+    <!-- THE PROVENANCE SURFACE WAS REACHABLE ONLY BY ⌘K on a desktop, because this list opened with
+         an EMPTY `<li>` — a blank row, announced as a blank list item, where the audit belonged.
+         "What happened to this record" is not an advanced feature. -->
     <li>
+      <a class="item tap" href="/audit" aria-current={under('/audit') ? 'page' : undefined}>
+        <Icon name="clock" size="m" /><span class="item-name">{copy.audit}</span>
+      </a>
     </li>
     <li>
       <a class="item tap" href="/packs" aria-current={under('/packs') ? 'page' : undefined}>

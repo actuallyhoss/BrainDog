@@ -172,11 +172,20 @@ test('`seq` is a column even though no register declares it', () => {
   assert.deepEqual(block.refusals, []);
 });
 
-test('a key this build does not read is named, not ignored', () => {
-  // `when:` is in `06-PAGES` §1.1 and is read nowhere. The doc's own worked example — a note that
-  // does not render when the figure is zero — drew every time.
-  const block = declared({ when: { metric: 'overdue', gt: 0 } });
-  assert.ok(block.refusals.some((r) => r.startsWith('when:')), '`when:` was silently ignored');
+test('A BLOCK DRAWS ONLY WHEN ITS CONDITION IS TRUE, which is what `when:` is for', () => {
+  /* `when:` is in `06-PAGES` §1.1 and was read nowhere, so a note the doc's own worked example
+     writes — one that does not render when the figure is zero — drew every time. A permanent alarm
+     is an alarm nobody reads. */
+  assert.equal(declared({ when: { metric: 'overdue', gt: 0 } }).drawn, true, 'the seed has overdue rows');
+  assert.equal(declared({ when: { metric: 'overdue', lt: 0 } }).drawn, false);
+
+  // A figure nobody declared, and a condition with no test in it, are both "do not draw": the
+  // block's condition is unknown, and drawing on an unknown is guessing.
+  assert.equal(declared({ when: { metric: 'nothing-declared', gt: 0 } }).drawn, false);
+  assert.equal(declared({ when: { metric: 'overdue' } }).drawn, false);
+
+  // And it is a key the reader knows about now, so it is not reported as one it cannot read.
+  assert.deepEqual(declared({ when: { metric: 'overdue', gt: 0 } }).refusals, []);
 });
 
 /* ── a bound `todo` has a tick ───────────────────────────────────────────── */

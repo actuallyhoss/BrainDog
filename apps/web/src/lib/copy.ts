@@ -340,6 +340,14 @@ export const copy = {
   agentCopy: 'Copy the command',
   agentCopied: 'Copied. Paste it where your agent is running.',
 
+  /* the record's own colour */
+
+  accentTitle: 'Accent',
+  accentHint: 'The colour this record is. Every surface, ink and boundary is solved from it against the same contrast floors, so a colour that would be unreadable is refused rather than approximated.',
+  accentHouse: 'House',
+  accentSet: (name: string) => `${name} is this record's colour.`,
+  accentReset: 'Back to the house colour.',
+
   /* the vocabulary, defined on first use, in place, once */
 
   defRow: 'one thing in a register. It has a number you can say',

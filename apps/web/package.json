@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@braindog/seed": "workspace:*",
+    "@braindog/theme": "workspace:*",
     "svelte": "5.57.0"
   },
   "devDependencies": {

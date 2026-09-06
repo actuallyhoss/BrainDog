@@ -204,8 +204,18 @@ export type PageBlock = {
   empty?: string;
   tone?: 'good' | 'warn' | 'bad' | 'info';
   body?: string;
-  /** The server evaluated `when:` and said whether to draw it. A page that shows a warning that does
-      not apply teaches people to ignore warnings. */
+  /**
+   * Draw this block only when a figure says so. Evaluated at render, never compiled.
+   *
+   * A WARNING THAT DOES NOT APPLY TEACHES PEOPLE TO IGNORE WARNINGS, which is the whole reason this
+   * key exists — and it was documented and not implemented, so a permanent red note naming a
+   * counterparty drew on every Money page in every record whether or not anything was overdue. And
+   * when the figure it referred to was empty the sentence degraded to a raw internal path, in the
+   * danger colour, beside a fabricated claim about somebody the reader has never invoiced.
+   */
+  when?: { metric: string } & Partial<Record<'gt' | 'gte' | 'lt' | 'lte' | 'is' | 'not', number>>;
+
+  /** The server evaluated `when:` and said whether to draw it. */
   drawn?: boolean;
 };
 

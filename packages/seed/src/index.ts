@@ -879,8 +879,14 @@ export const PAGES: Record<string, SeedPage> = {
         tone: 'bad',
         heading: 'Late',
         span: 5,
-        body: 'One invoice is {{ago:obligations.oldest_overdue}} past its terms. UK statutory interest is 8% above base, and the clause is in the Halden contract.',
-        drawn: true,
+        /* THE SENTENCE IS ABOUT THE RECORD, not about one studio's counterparty. It named a
+           contract the reader has never signed, in the danger colour, on every Money page in every
+           record — and when nothing was overdue it degraded to a raw internal path beside that
+           claim, because the figure it referred to was empty. */
+        body: 'Something is {{ago:obligations.oldest_overdue}} past its terms. Statutory interest may be due; the terms are in the contract.',
+        /* AND IT DRAWS ONLY WHEN IT IS TRUE. `when:` was documented and not implemented, so this
+           was `drawn: true` — an alarm that is always on, which is an alarm nobody reads. */
+        when: { metric: 'overdue', gt: 0 },
       },
       {
         kind: 'bar',
@@ -1005,8 +1011,8 @@ export const PAGES: Record<string, SeedPage> = {
         tone: 'warn',
         heading: 'Points at nothing',
         span: 12,
-        body: 'Two domains resolve to nothing and still renew. `tallow.example` costs {{money:1400 GBP}} a year to point at an empty page.',
-        drawn: true,
+        body: 'Something here renews and points at nothing. A domain that resolves nowhere still costs what it costs.',
+        when: { metric: 'lapsing', gt: 0 },
       },
     ],
   },

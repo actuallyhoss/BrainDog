@@ -69,6 +69,9 @@ importers:
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed
+      '@braindog/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
       svelte:
         specifier: 5.57.0
         version: 5.57.0

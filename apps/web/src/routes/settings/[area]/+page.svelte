@@ -16,6 +16,7 @@
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
   import * as pref from '$lib/pref.ts';
+  import { ACCENTS, apply as accentApply } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -59,6 +60,22 @@
   let text = $state<'sm' | 'base' | 'md'>(held.text ?? 'base');
   let density = $state<'compact' | 'comfortable' | 'roomy'>(held.density ?? 'comfortable');
   let chars = $state(held.chars ?? true);
+
+  let accent = $state<string | null>(held.theme ?? null);
+  let accentWrong = $state<string[]>([]);
+
+  function pickAccent(hex: string | null) {
+    const out = accentApply(hex);
+    if (!out.ok) {
+      /* THE FLOOR IT MISSED, NOT "THAT DID NOT WORK". A refusal a person cannot act on is a refusal
+         that teaches them the control is broken. */
+      accentWrong = out.refusals;
+      return;
+    }
+    accentWrong = [];
+    accent = hex;
+    toasts.push(hex ? copy.accentSet(ACCENTS.find((a) => a.hex === hex)?.name ?? hex) : copy.accentReset);
+  }
 
   function pickScheme(v: 'light' | 'system' | 'dark') {
     scheme = v;
@@ -120,6 +137,39 @@
 
   <div class="body">
     {#if area === 'appearance'}
+      <!--
+        THE RECORD'S OWN COLOUR. `@braindog/theme` solves an entire coherent palette from one seed
+        against every floor it defines, and until now nothing called it with anything but the house
+        red — so a bakery and a type foundry looked identical. The swatches are suggestions, not the
+        set: any colour that passes goes in, and one that does not says which floor it missed rather
+        than being quietly approximated.
+      -->
+      <Section title={copy.accentTitle}>
+        <p class="hint">{copy.accentHint}</p>
+        <div class="swatches" role="group" aria-label={copy.accentTitle}>
+          {#each ACCENTS as a}
+            <button
+              type="button"
+              class="swatch"
+              data-on={accent === a.hex ? '' : undefined}
+              style="--swatch:{a.hex}"
+              aria-label={a.name}
+              onclick={() => pickAccent(a.hex)}
+            >
+              {#if accent === a.hex}<Icon name="check" size="s" />{/if}
+            </button>
+          {/each}
+          <button type="button" class="swatch swatch-off" data-on={accent === null ? '' : undefined} onclick={() => pickAccent(null)}>
+            {copy.accentHouse}
+          </button>
+        </div>
+        {#if accentWrong.length}
+          <ul class="wrong">
+            {#each accentWrong as line}<li>{line}</li>{/each}
+          </ul>
+        {/if}
+      </Section>
+
       <Section title={copy.scheme}>
         <div class="segment" role="group" aria-label={copy.scheme}>
           {#each [['light', copy.schemeLight, 'sun'], ['system', copy.schemeSystem, 'monitor'], ['dark', copy.schemeDark, 'moon']] as const as [v, label, icon]}
@@ -293,6 +343,60 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
+  }
+
+  /* The hint sits above the control it explains, not beside it: a sentence in a column beside a
+     row of swatches is read after the choice has been made. */
+  .hint {
+    margin: 0 0 var(--sp-3);
+    max-width: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+  }
+
+  .swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  /* A SWATCH IS THE COLOUR, and the tick is drawn ON it rather than beside it: a selected state
+     that lives outside the thing selected is a state people read as belonging to the next one. */
+  .swatch {
+    display: grid;
+    place-items: center;
+    min-width: var(--tap);
+    height: var(--tap);
+    padding: 0 var(--sp-2);
+    background: var(--swatch, var(--s1));
+    /* THE LABEL ON A FILL, which is the token the theme solves for exactly this: a tick drawn in
+       white on an ochre swatch is the one place a literal would be wrong twice over. */
+    color: var(--accent-ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+  }
+
+  .swatch[data-on] {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+
+  .swatch-off {
+    background: var(--s1);
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
+  /* A refusal a person cannot act on teaches them the control is broken, so the floor it missed is
+     printed rather than a shrug. */
+  .wrong {
+    margin: var(--sp-3) 0 0;
+    padding-inline-start: var(--sp-4);
+    color: var(--danger);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
   }
 
   .segment {
