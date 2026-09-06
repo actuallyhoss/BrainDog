@@ -20,6 +20,14 @@ import {
   type OutboxKind,
 } from '../src/index.ts';
 import { fixedClock, openSqlite, recordingScheduler, type NodeSql } from './sqlite.ts';
+import { testSigner } from './signer.ts';
+
+/**
+ * ONE SIGNING KEY FOR THIS FILE'S RECORDS. `41 §5.11` step 3 refuses a file with no `dog_sig` row,
+ * so every record that exports here needs a signer — which is what a real record has: a wrapped
+ * Ed25519 private half in `vault_key`, opened by the host under its KEK.
+ */
+const SIGNER = testSigner();
 
 const NOW = Date.UTC(2026, 8, 5, 12);
 const DAY = 86_400_000;
@@ -38,7 +46,7 @@ type Clockish = ReturnType<typeof fixedClock>;
 async function record(): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  return { k: await openRecord(sql, clock), sql, clock };
+  return { k: await openRecord(sql, clock, { sign: SIGNER }), sql, clock };
 }
 
 const value = <T>(r: unknown): T => {
@@ -220,7 +228,7 @@ test('A GOVERNANCE-ONLY FILE DOES NOT HAND SOMEBODY A MEMBERSHIP', async () => {
   assert.ok(!governance.some((l) => l.startsWith('#table record ')), 'a governance-only file carried the record row');
 
   const sql = openSqlite();
-  const target = await openRecord(sql, fixedClock(NOW));
+  const target = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   value(await target.import(governance));
   assert.equal(sql.all('SELECT 1 FROM member').length, 0, "the file's owner became an owner here");
   assert.equal(sql.all('SELECT 1 FROM person').length, 0);
@@ -228,7 +236,7 @@ test('A GOVERNANCE-ONLY FILE DOES NOT HAND SOMEBODY A MEMBERSHIP', async () => {
   // A full file carries the record row, and then its members travel with it — which is the point.
   const full = value<string[]>(await source.k.export());
   const other = openSqlite();
-  const whole = await openRecord(other, fixedClock(NOW));
+  const whole = await openRecord(other, fixedClock(NOW), { sign: SIGNER });
   value(await whole.import(full));
   assert.equal(other.one<{ n: number }>('SELECT count(*) AS n FROM member')?.n, 1);
   assert.equal(whole.identity()?.slug, 'studio-a');

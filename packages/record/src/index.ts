@@ -44,6 +44,7 @@ import {
   type Proposal,
   type RegisterDecl,
   type RuleDecl,
+  type Signer,
   type Verdict,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
@@ -203,10 +204,21 @@ export type RecordDeps = {
   scheduler?: Scheduler | undefined;
   /** The outbox kinds this deployment can deliver. The doorbell rings for those and no others. */
   delivers?: readonly OutboxKind[] | undefined;
+  /**
+   * What signs an exported `.dog`, when this host holds the record's signing key.
+   *
+   * IT IS A CALLBACK AND NOT A KEY, all the way down. `12 §6` puts the key hierarchy in the host;
+   * this package and the kernel below it hold sealed bytes they cannot open, and a signer that
+   * arrived as a key would be that rule broken at the one boundary it exists to protect.
+   */
+  sign?: Signer | undefined;
 };
 
 export async function createRecordApi(deps: RecordDeps) {
-  const kernel = await openRecord(deps.sql, deps.clock, deps.delivers === undefined ? {} : { delivers: deps.delivers });
+  const kernel = await openRecord(deps.sql, deps.clock, {
+    ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
+    ...(deps.sign === undefined ? {} : { sign: deps.sign }),
+  });
   return { ...api(kernel, deps.scheduler), kernel };
 }
 

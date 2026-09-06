@@ -26,7 +26,7 @@ import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from
 import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, jcs, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
-import { checkDogl, exportDogl, importDogl, type Section } from './dogl.ts';
+import { checkDogl, exportDogl, importDogl, signDogl, type Section, type Signer } from './dogl.ts';
 import {
   drainSchedule,
   due,
@@ -100,7 +100,7 @@ import {
 } from './vault.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
-export { checkDogl } from './dogl.ts';
+export { checkDogl, keyIdOf, b64url, manifestBytes, signDogl, type Signature, type Signer } from './dogl.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
@@ -260,6 +260,19 @@ export type RecordOptions = {
    * pass that claimed nothing.
    */
   delivers?: readonly OutboxKind[] | undefined;
+  /**
+   * What signs an exported file, when this deployment holds a signing key.
+   *
+   * IT IS A CALLBACK AND NOT A KEY. `12 §6` puts the key hierarchy in the host and the kernel holds
+   * sealed bytes it cannot open, so the shape is: the kernel makes the bytes, something outside
+   * signs them, and `signDogl` joins the two. Nothing in this package can sign anything, and
+   * nothing in it can be made to by passing it the wrong argument.
+   *
+   * ABSENT MEANS THE FILE IS UNSIGNED, and `41 §5.11` step 3 will not import it — which is the
+   * honest state of a deployment with no key rather than a special case. A record that cannot sign
+   * cannot make a file anybody can verify, and saying so at export is better than at import.
+   */
+  sign?: Signer | undefined;
 };
 
 export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
@@ -269,6 +282,9 @@ export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {
 
 function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOptions) {
   const mint: Mint = ulids(() => clock.now());
+  /* Bound here because `export`'s own parameter is called `opts` too, and a signer read off the
+     wrong one is a file that silently goes out unsigned. */
+  const signer = opts.sign;
   let depth = 0;
 
   /** The active declarations, parsed once. Rebuilt when a declaration changes and never otherwise. */
@@ -2145,7 +2161,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         opts.actor ?? 'system',
         `sections ${(opts.sections ?? ['all']).join(', ')}${opts.redactGrants === true ? ', grants redacted' : ''}`,
       );
-      return exportDogl(sql, transaction, opts).then((lines) => ok(lines));
+      return exportDogl(sql, transaction, opts)
+        .then((lines) => (signer ? signDogl(lines, signer) : lines))
+        .then((lines) => ok(lines));
     },
 
     /**

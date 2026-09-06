@@ -14,8 +14,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
-import { checkDogl, openRecord, TRAVELS, type Declaration, type Kernel } from '../src/index.ts';
+import { b64url, checkDogl, keyIdOf, openRecord, signDogl, TRAVELS, type Declaration, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
+import { testSigner } from './signer.ts';
+
+/**
+ * ONE SIGNING KEY FOR THIS FILE'S RECORDS. `41 §5.11` step 3 refuses a file with no `dog_sig` row,
+ * so every record that exports here needs a signer — which is what a real record has: a wrapped
+ * Ed25519 private half in `vault_key`, opened by the host under its KEK.
+ */
+const SIGNER = testSigner();
+
+/** base64url in, bytes out — so the by-hand verification below uses nothing this file is testing. */
+const unb64 = (text: string): Uint8Array =>
+  new Uint8Array(Buffer.from(text.replace(/-/g, '+').replace(/_/g, '/'), 'base64'));
 
 const NOW = Date.UTC(2026, 8, 5, 12);
 
@@ -39,7 +51,7 @@ const OBLIGATIONS: Declaration = {
 
 async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   assert.ok((await k.install([OBLIGATIONS])).ok);
   return { k, sql };
 }
@@ -91,6 +103,11 @@ function reseal(lines: readonly string[]): string[] {
       continue;
     }
     if (table === 'dog_manifest' && !line.startsWith('#')) continue;
+    /* THE OLD SIGNATURE GOES WITH THE OLD MANIFEST. It signed bytes that no longer exist, and
+       leaving it beside a new one gives a file two signatures — which `checkDogl` refuses for its
+       own reason and would hide the one this is testing. `exportDogl` clears `dog_sig` for the same
+       reason. */
+    if (table === 'dog_sig' && !line.startsWith('#')) continue;
     out.push(raw);
   }
   return out;
@@ -254,10 +271,13 @@ test('the header travels, the local section does not', async () => {
   for (const local of ['token', 'auth_fail', 'observation', 'device_grant', 'job'])
     assert.ok(!named.includes(local), `${local} is local and travelled`);
 
-  // `dog_sig` is last and the kernel writes no row under it: signing needs a private key the kernel
-  // must never see.
+  // `dog_sig` IS LAST, whatever section it sits in, so a signer appends one line to the end of a
+  // file whose hashes are already fixed rather than splicing into the middle of it.
   assert.equal(named.at(-1), 'dog_sig');
-  assert.ok(lines.at(-1)?.startsWith('#table dog_sig '), 'a row was written under the signature header');
+  // AND THE KERNEL WROTE NO ROW UNDER IT. `exportDogl` cannot: signing needs a private key `12 §6`
+  // keeps in the host. The row on the end came from `signDogl`, which takes bytes and a callback.
+  assert.equal(value<string[]>(await (await openRecord(openSqlite(), fixedClock(NOW))).export()).at(-1)?.startsWith('#table dog_sig '), true, 'an unsigned export wrote a signature row');
+  assert.ok(lines.at(-1)?.startsWith('["ed25519",'), 'the signed file carries no signature row');
   sql.close();
 });
 
@@ -281,7 +301,7 @@ test('EXPORT · IMPORT · EXPORT PRODUCES THE SAME FILE, which is the only proof
   const first = value<string[]>(await source.k.export());
 
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   const report = value<{ tables: number; rows: number }>(await k.import(first));
   assert.ok(report.rows > 5, `only ${report.rows} rows arrived`);
 
@@ -300,7 +320,7 @@ test('and everything the record could answer before, it answers after', async ()
   const lines = value<string[]>(await source.k.export());
 
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   value(await k.import(lines));
 
   // The rows, with their numbers.
@@ -352,7 +372,7 @@ test('every travelling table arrives, and not one of them quietly stays behind',
   const lines = value<string[]>(await source.k.export());
 
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   value(await k.import(lines));
 
   const travelling = source.sql
@@ -389,7 +409,7 @@ test('A RECORD WITH NO ROWS BUT ITS OWN GOVERNANCE IS NOT EMPTY', async () => {
   const lines = value<string[]>(await source.k.export());
 
   const sql = openSqlite();
-  const target = await openRecord(sql, fixedClock(NOW));
+  const target = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   assert.ok((await target.install([OBLIGATIONS])).ok);
   sql.exec(
     "INSERT INTO decision (id, question, answer, reason, decided_by, ts) VALUES ('D9', 'q', 'a', 'r', 'p_1', '2026-01-01T00:00:00.000Z')",
@@ -413,12 +433,14 @@ test('a damaged file is a refusal and not an exception, and it writes nothing', 
   assert.ok(at > 0, 'no row line to damage');
 
   for (const damage of [lines[at]!.slice(0, 20), '{"not":"an array"}']) {
-    /* RE-SEALED, so this is about the PARSER. Without it the manifest catches the edit first and
-       every assertion below is about `checkDogl` instead — a test that passes for a reason other
-       than the one it is named for. */
-    const broken = reseal([...lines.slice(0, at), damage, ...lines.slice(at + 1)]);
+    /* RE-SEALED AND RE-SIGNED, so this is about the PARSER. Without the reseal the manifest catches
+       the edit; without the re-signature the signature does. Both are the right answer to a damaged
+       file, and both make every assertion below about a check other than the one this test is named
+       for. What is left is the case that gets through everything: a file that is internally
+       consistent, signed by the key that wrote it, and carrying a line that is not a row. */
+    const broken = await signDogl(reseal([...lines.slice(0, at), damage, ...lines.slice(at + 1)]), SIGNER);
     const sql = openSqlite();
-    const k = await openRecord(sql, fixedClock(NOW));
+    const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
     const out = (await k.import(broken)) as { ok: boolean; refusal?: { code: string; fix: string } };
     assert.equal(out.ok, false, `\`${damage.slice(0, 24)}…\` was imported as if it were a row`);
     assert.equal(out.refusal?.code, 'MALFORMED_FILE');
@@ -447,7 +469,7 @@ test('A RECORD OPENED FROM A FILE KNOWS WHAT IT IS CALLED', async () => {
   const lines = value<string[]>(await source.k.export());
 
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   value(await k.import(lines));
 
   assert.equal(k.identity()?.slug, 'the-studio', 'the record row did not travel');
@@ -482,7 +504,7 @@ test('a file from a build that reads a newer format is refused, not half read', 
   assert.equal(lines[0], '#dogl 1');
   const future = ['#dogl 9', ...lines.slice(1)];
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   const out = (await k.import(future)) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(out.ok, false, 'a file from a newer build was read as if this build had written it');
   assert.match(out.refusal?.fix ?? '', /format 9/);
@@ -505,7 +527,7 @@ test('every kind of value comes back as itself', async () => {
   const lines = value<string[]>(await k.export());
 
   const to = openSqlite();
-  const k2 = await openRecord(to, fixedClock(NOW));
+  const k2 = await openRecord(to, fixedClock(NOW), { sign: SIGNER });
   value(await k2.import(lines));
   const row = k2.get('obligations#1');
   assert.equal(row?.fields.what, 'A quote " and a backslash \\ and a newline\nin one');
@@ -670,7 +692,7 @@ test('AND THE CHECK RUNS BEFORE ONE ROW IS WRITTEN', async () => {
   edited[at] = edited[at]!.replace('48000', '4800');
 
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   const out = (await k.import(edited)) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(out.ok, false);
   assert.equal(out.refusal?.code, 'CHECKSUM_MISMATCH');
@@ -681,4 +703,99 @@ test('AND THE CHECK RUNS BEFORE ONE ROW IS WRITTEN', async () => {
   assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM declaration')?.n ?? 0, 0);
   sql.close();
   source.sql.close();
+});
+
+
+/* -- and the file says who wrote it --------------------------------------- */
+
+test('A SIGNED FILE NAMES ITS KEY, AND THE ID IS THE KEY', async () => {
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+
+  const [from] = span(lines, 'dog_sig');
+  const row = JSON.parse(lines[from + 1]!) as [string, string, string, string, string];
+  const [alg, keyId, publicKey, sig, signedAt] = row;
+
+  assert.equal(alg, 'ed25519');
+  // `03 §4`: raw 32-byte Ed25519 in base64url, and `key_id` the first 16 hex of SHA-256 over it.
+  assert.equal(publicKey.length, 43, 'the public key is not 32 raw bytes in base64url');
+  assert.match(keyId, /^[0-9a-f]{16}$/);
+  assert.equal(await keyIdOf(await SIGNER.publicKey), keyId, 'the key id is not the id of this key');
+  assert.equal(b64url(await SIGNER.publicKey), publicKey, 'the file carries a key other than the one that signed it');
+  assert.equal(sig.length, 86, 'an Ed25519 signature is 64 bytes');
+  assert.match(signedAt, /^\d{4}-\d{2}-\d{2}T/);
+
+  // AND IT VERIFIES BY HAND, against the bytes `03 §4` names and nothing this repository wrote.
+  const key = await crypto.subtle.importKey('raw', await SIGNER.publicKey, { name: 'Ed25519' }, false, ['verify']);
+  const manifest = lines.slice(...span(lines, 'dog_manifest')).slice(1);
+  const bytes = new TextEncoder().encode(manifest.join('\n'));
+  assert.ok(await crypto.subtle.verify('Ed25519', key, unb64(sig), bytes), 'the signature is not over the manifest');
+
+  assert.ok((await checkDogl(lines)).ok, 'a file straight out of a signing export does not verify');
+  sql.close();
+});
+
+test('AN EDIT THAT RECOMPUTES THE MANIFEST STILL DOES NOT OPEN', async () => {
+  // This is the whole reason the signature is there. The checksums stop damage; anybody with a text
+  // editor can change a row and recompute a SHA-256, and the file then passes every integrity check
+  // in it. Only a key they do not have stops that.
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+
+  const at = rowIn(lines, 'entry', 'Halden');
+  const forged = reseal([...lines.slice(0, at), lines[at]!.replace('48000', '4800'), ...lines.slice(at + 1)]);
+
+  assert.equal((await checkDogl(forged)).ok, false, 'a re-sealed forgery opened');
+  const out = (await checkDogl(forged)) as { refusal: { code: string; fix: string } };
+  assert.equal(out.refusal.code, 'SIGNATURE_INVALID');
+
+  // AND SIGNING IT WITH ANOTHER KEY DOES NOT HELP, which is what makes the claim "produced by that
+  // instance" rather than "produced by somebody".
+  const elsewhere = await signDogl(forged, testSigner());
+  const other = (await checkDogl(elsewhere)) as { ok: boolean };
+  assert.equal(other.ok, true, 'a file signed by a key it carries should verify — origin is --key’s job');
+  sql.close();
+});
+
+test('AND A FILE WITH NO SIGNATURE IS NOT IMPORTED', async () => {
+  // `41 §5.11` step 3: no row is `SIGNATURE_INVALID`, not `unsigned`. An importer that accepted
+  // unsigned files would accept every forgery, because stripping a signature is one line of `grep`.
+  const sql = openSqlite();
+  const unsigned = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await unsigned.install([OBLIGATIONS])).ok);
+  const lines = value<string[]>(await unsigned.export());
+
+  const out = await checkDogl(lines);
+  assert.equal(out.ok, false, 'a file from a record with no signing key imported anyway');
+  assert.equal(out.ok === false ? out.refusal.code : '', 'SIGNATURE_INVALID');
+  assert.match(out.ok === false ? out.refusal.fix : '', /no signature/);
+  sql.close();
+});
+
+test('THE HEADER OF A SIGNATURE IS CHECKED, not taken', async () => {
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+  const at = span(lines, 'dog_sig')[0] + 1;
+  const row = JSON.parse(lines[at]!) as [string, string, string, string, string];
+
+  const swap = (next: [string, string, string, string, string]) => [
+    ...lines.slice(0, at),
+    JSON.stringify(next),
+    ...lines.slice(at + 1),
+  ];
+  const code = async (ls: string[]) => ((await checkDogl(ls)) as { ok: boolean; refusal?: { code: string } }).refusal?.code;
+
+  // A KEY ID THAT IS NOT THE ID OF THE KEY BESIDE IT. Without recomputing it, the field is a claim
+  // about a key nobody checked — and `braindog verify --key` compares against exactly that field.
+  assert.equal(await code(swap([row[0], '0'.repeat(16), row[2], row[3], row[4]])), 'SIGNATURE_INVALID');
+
+  // ANOTHER ALGORITHM. The column has a CHECK for one value; a file is not the column.
+  assert.equal(await code(swap(['rsa', row[1], row[2], row[3], row[4]])), 'SIGNATURE_INVALID');
+
+  // A KEY THAT IS NOT A KEY, which is an exception from `importKey` if nothing catches it.
+  assert.equal(await code(swap([row[0], row[1], 'bm90LWEta2V5', row[3], row[4]])), 'SIGNATURE_INVALID');
+
+  // AND TWO SIGNATURES ARE NOT ONE. Appending a second is how somebody adds a key they hold.
+  assert.equal(await code([...lines, lines[at]!]), 'SIGNATURE_INVALID');
+  sql.close();
 });

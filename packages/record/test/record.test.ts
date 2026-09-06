@@ -12,6 +12,15 @@ import assert from 'node:assert/strict';
 
 import { allows, createRecordApi, reaches, type CallContext, type Level, type Scope } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { testSigner } from '../../kernel/test/signer.ts';
+
+/**
+ * ONE SIGNING KEY FOR THIS FILE'S RECORDS. `41 §5.11` step 3 refuses a file with no `dog_sig` row,
+ * and a real record has a key: a wrapped Ed25519 private half in `vault_key`, opened by the host
+ * under its KEK. A record whose exports nothing can import is a record with no key, and that is a
+ * state worth having a test for rather than the default every test runs in.
+ */
+const SIGNER = testSigner();
 
 const NOW = Date.UTC(2026, 8, 5, 12);
 
@@ -40,7 +49,7 @@ const NOTES = {
 
 async function record() {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), sign: SIGNER });
   const out = await api.kernel.install([OBLIGATIONS, NOTES]);
   assert.ok(out.ok);
   return { api, sql };
@@ -520,7 +529,7 @@ test('TAKE YOUR RECORD AND GO, and it comes back in', async () => {
   /* EMPTY MEANS EMPTY, declarations included: the file carries the shape as well as the rows, and
      a record that already had a shape would be two shapes merged by primary key. */
   const blank = openSqlite();
-  const fresh = { api: await createRecordApi({ sql: blank, clock: fixedClock(NOW) }), sql: blank };
+  const fresh = { api: await createRecordApi({ sql: blank, clock: fixedClock(NOW), sign: SIGNER }), sql: blank };
   const back = await fresh.api.import({ lines }, owner);
   assert.ok(back.ok, back.ok ? '' : (back as { refusal: { code: string; fix: string } }).refusal.fix);
 
@@ -833,7 +842,7 @@ test('A REDACTED EXPORT IMPORTS, which is what makes it an export', async () => 
 
   // An EMPTY record, which is the only thing an import opens into.
   const into = openSqlite();
-  const fresh = await createRecordApi({ sql: into, clock: fixedClock(NOW) });
+  const fresh = await createRecordApi({ sql: into, clock: fixedClock(NOW), sign: SIGNER });
   const back = await fresh.import({ lines }, owner);
   assert.ok((back as { ok: boolean }).ok, `a redacted export would not import: ${JSON.stringify(back).slice(0, 220)}`);
   assert.equal(into.all('SELECT 1 FROM vault_key').length, 0, 'the wrapped key travelled in a redacted file');

@@ -12,6 +12,14 @@ import assert from 'node:assert/strict';
 
 import { openRecord, spanMs, type GrantRow, type Kernel, type SealedGrant } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
+import { testSigner } from './signer.ts';
+
+/**
+ * ONE SIGNING KEY FOR THIS FILE'S RECORDS. `41 §5.11` step 3 refuses a file with no `dog_sig` row,
+ * so every record that exports here needs a signer — which is what a real record has: a wrapped
+ * Ed25519 private half in `vault_key`, opened by the host under its KEK.
+ */
+const SIGNER = testSigner();
 
 const NOW = Date.UTC(2026, 8, 5, 12);
 const DAY = 86_400_000;
@@ -24,7 +32,7 @@ type Clockish = ReturnType<typeof fixedClock>;
 async function vault(): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  const k = await openRecord(sql, clock);
+  const k = await openRecord(sql, clock, { sign: SIGNER });
   value(
     k.createRecord({
       id: ID,
@@ -334,7 +342,7 @@ test('A GRANT TRAVELS IN A `.dog` FILE, SEALED, and comes back as itself', async
   const lines = value<string[]>(await source.k.export());
 
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   value(await k.import(lines));
 
   const there = k.grants()[0]!;

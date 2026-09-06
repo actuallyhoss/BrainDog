@@ -374,10 +374,20 @@ async function serve(): Promise<void> {
     file = join(data, slugs[0]!.slug, 'record.dog');
   }
 
+  /* AND THE KEY STORE, WHICH NO RUNNING PROCESS HELD. `init` wrote three `vault_key` rows from the
+     first commit that made them and `serve` never opened the KEK — so the rows existed, nothing
+     could open them, and an exported `.dog` went out unsigned. `33 §1` port 8 is a host port, and
+     this is the host.
+
+     A KEK THAT WILL NOT OPEN STOPS THE SERVER, rather than starting one that cannot sign, cannot
+     open a grant, and says so nowhere. `49 §5.1` step 2 puts it before anything is served. */
+  const store = await openKeyStore(env.BRAINDOG_KEK_FILE ?? join(data, 'kek'), say);
+
   const running = await start({
     file,
     port,
     token: env.BRAINDOG_TOKEN,
+    keys: store,
     ...(env.BRAINDOG_HOST === undefined ? {} : { host: env.BRAINDOG_HOST }),
   });
 

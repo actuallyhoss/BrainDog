@@ -16,9 +16,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
 import { handlersFor, httpStatus, serveApi, type Handler } from '@braindog/host';
-import type { OutboxKind, OutboxRow } from '@braindog/kernel';
+import type { OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import type { Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
+
+import type { KeyStore } from './keys.ts';
+import { signerFor } from './sign.ts';
 
 /** The `Sql` port over `node:sqlite`. The one thing this file exists to supply. */
 export function openSqlite(path: string): Sql & { close(): void } {
@@ -260,6 +263,15 @@ export async function start(options: {
   host?: string | undefined;
   /** The belt under the doorbell: a tick that catches an abandoned lease. `0` turns it off. */
   pollMs?: number;
+  /**
+   * The host's key store. `33 §1` port 8, `49 §2`'s `HostDeps.keys`.
+   *
+   * WITHOUT IT THIS RECORD'S EXPORTS ARE UNSIGNED, and `41 §5.11` step 3 will not import one —
+   * which is exactly what the state was: `init` wrote three `vault_key` rows and no running process
+   * ever opened the KEK, so the rows existed and nothing could use them. Optional, because a test
+   * that only wants the routes should not have to mint a key file.
+   */
+  keys?: KeyStore | undefined;
 } & (
     | {
         /**
@@ -359,11 +371,32 @@ export async function start(options: {
   const scheduler = nodeScheduler(run, poll);
   /* WHAT THIS PROCESS CAN ACTUALLY DELIVER. With no `deliver`, nothing leaves — jobs queue and
      wait, which is honest — and the doorbell should not ring about them on every write. */
+  /**
+   * The signer, resolved THE FIRST TIME SOMETHING EXPORTS and not before.
+   *
+   * IT CANNOT BE BUILT HERE. It needs the record's own id, and `record` is a table the migration
+   * makes — which happens inside `createRecordApi`, three lines down. Reading it first threw
+   * `no such table: record` on any file this process was the first to open.
+   *
+   * AND LAZY IS THE BETTER SHAPE ANYWAY, not a workaround: it means the KEK unwraps the record's
+   * private key when a file is actually being written, so a server that runs for a month and exports
+   * nothing never materialises that key at all.
+   */
+  let resolved: Signer | null | undefined;
+  const sign: Signer = async (bytes) => {
+    if (resolved === undefined) {
+      const identity = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1');
+      resolved = options.keys && identity ? await signerFor(sql, options.keys, identity.id) : null;
+    }
+    return resolved ? resolved(bytes) : null;
+  };
+
   api = await createRecordApi({
     sql,
     clock: { now: () => Date.now() },
     scheduler,
     delivers: options.delivers ?? [],
+    sign,
   });
 
   const refused = api.kernel.refused();

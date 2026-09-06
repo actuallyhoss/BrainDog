@@ -300,6 +300,151 @@ function sections(lines: readonly string[]): Map<string, string> {
 const UNHASHED: ReadonlySet<string> = new Set(['dog_manifest', 'dog_sig']);
 
 /**
+ * The bytes a signature is over.
+ *
+ * `03 §4`: the canonical projection of `dog_manifest`, ordered by `table_name`. It is the manifest
+ * and nothing else because the manifest already covers every row in the file — a hash per table,
+ * checked by `checkDogl` — so signing 64 bytes per table proves the whole file without the signer
+ * reading it twice.
+ *
+ * READ OUT OF THE FILE, NOT OUT OF A DATABASE. A verifier has the lines and nothing else, and a
+ * signer that hashed the rows it had in memory would sign something it had not written. The
+ * projection is already sorted: `dog_manifest`'s primary key is `table_name`.
+ */
+export function manifestBytes(lines: readonly string[]): Uint8Array<ArrayBuffer> {
+  const rows = grouped(lines).get('dog_manifest') ?? [];
+  return owned(new TextEncoder().encode(rows.join('\n')));
+}
+
+/**
+ * The same bytes, over a buffer that is definitely not shared.
+ *
+ * WEBCRYPTO'S `BufferSource` IS `ArrayBufferView<ArrayBuffer>`, and both `TextEncoder.encode` and
+ * `unbase64` are typed over `ArrayBufferLike` — which includes `SharedArrayBuffer`, which WebCrypto
+ * will not take. The kernel compiles under `es2024`, where that distinction does not exist, and the
+ * web app compiles this same file under `dom`, where it does: one file, two libs, and this is the
+ * only place they disagree. A copy of a few hundred bytes, once per file.
+ */
+function owned(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(new ArrayBuffer(bytes.length));
+  out.set(bytes);
+  return out;
+}
+
+/**
+ * What a signer hands back. The kernel never sees the private half.
+ *
+ * `signedAt` COMES FROM THE SIGNER because it is a fact about the ACT and not about the content, and
+ * the signer is the one with a clock. It is also the one line of a file that differs between two
+ * exports of an unchanged record — which `exportDogl`'s own header anticipates, and is the price of
+ * `dog_sig.signed_at` being `NOT NULL`.
+ */
+export type Signature = { keyId: string; publicKey: string; sig: string; signedAt: string };
+
+/** `(bytes) => a signature`, or `null` from a deployment that holds no signing key. */
+export type Signer = (bytes: Uint8Array) => Promise<Signature | null>;
+
+/**
+ * Put the signature on the end of a file.
+ *
+ * IT IS A FUNCTION OVER LINES, WHICH IS WHY IT CAN LIVE HERE. The kernel must never hold a private
+ * key — `12 §6` puts the key hierarchy in the host, and `exportDogl`'s own comment says the kernel
+ * writes no row under `dog_sig` for exactly that reason. So the shape is: the kernel makes the
+ * bytes, the host signs them, and this joins the two. Nothing here can sign anything.
+ *
+ * `dog_sig` IS ALREADY LAST. `exportDogl` orders it that way whatever section it sits in, so this
+ * appends one line rather than splicing into the middle of a file whose hashes are already fixed.
+ */
+export async function signDogl(lines: readonly string[], sign: Signer): Promise<string[]> {
+  const at = lines.findIndex((l) => l.startsWith('#table dog_sig '));
+  if (at < 0) return [...lines];
+
+  const signed = await sign(manifestBytes(lines));
+  if (!signed) return [...lines];
+
+  /* The table's own column order: `alg, key_id, public_key, sig, signed_at`. */
+  const row = JSON.stringify(['ed25519', signed.keyId, signed.publicKey, signed.sig, signed.signedAt]);
+  return [...lines.slice(0, at + 1), row, ...lines.slice(at + 1)];
+}
+
+/** `03 §4`: the first 16 hex of SHA-256 over the public key. */
+export async function keyIdOf(publicKey: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', owned(publicKey));
+  let out = '';
+  for (const byte of new Uint8Array(digest)) out += HEX[byte];
+  return out.slice(0, 16);
+}
+
+/** base64url, which is how `03 §4` writes a key and a signature. */
+export function b64url(bytes: Uint8Array): string {
+  return base64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function unb64url(text: string): Uint8Array<ArrayBuffer> {
+  return owned(unbase64(text.replace(/-/g, '+').replace(/_/g, '/')));
+}
+
+/**
+ * Was this file produced by the instance whose key it carries?
+ *
+ * WHAT THE SIGNATURE CLAIMS IS NARROW, and `03 §4` says so: *this file was produced by that
+ * instance, and no row has changed since*. It does not claim the contents are true, and it does not
+ * vouch for a third party's file. Pinning the key to one you fetched independently is
+ * `braindog verify --key`'s job; the key the file carries proves integrity and nothing more.
+ *
+ * NO ROW IS `SIGNATURE_INVALID`, NOT `unsigned`. `41 §5.11` step 3 is explicit, and the reason is
+ * that the alternative is a file anybody can produce: strip the signature, edit a row, recompute the
+ * manifest, and an importer that accepted unsigned files would take it. The checksum is what stops
+ * damage; the signature is what stops an author.
+ */
+async function signatureOf(
+  lines: readonly string[],
+): Promise<{ ok: true } | { ok: false; refusal: { code: string; fix: string } }> {
+  const no = (fix: string) => ({ ok: false as const, refusal: { code: 'SIGNATURE_INVALID', fix } });
+
+  const rows = grouped(lines).get('dog_sig') ?? [];
+  if (rows.length !== 1)
+    return no(
+      rows.length === 0
+        ? 'This file carries no signature. Export it again from a record whose signing key is set up, and it will.'
+        : `This file carries ${rows.length} signatures and a file has one.`,
+    );
+
+  let row: unknown;
+  try {
+    row = JSON.parse(rows[0]!);
+  } catch {
+    return no('The signature line is not readable. The file is damaged.');
+  }
+  if (!Array.isArray(row)) return no('The signature line is not a row. The file is damaged.');
+  const [alg, keyId, publicKey, sig] = row as [unknown, unknown, unknown, unknown];
+  if (alg !== 'ed25519') return no(`This file is signed with ${String(alg)} and this build checks ed25519.`);
+  if (typeof keyId !== 'string' || typeof publicKey !== 'string' || typeof sig !== 'string')
+    return no('The signature line is missing its key or its signature.');
+
+  const key = unb64url(publicKey);
+  /* THE `key_id` IS RECOMPUTED FROM THE KEY, not read. `48 §5.6` step 4: a mismatch is
+     `SIGNATURE_INVALID`, because a file that names one key and carries another is a file whose
+     header is a claim about a key nobody checked. */
+  if ((await keyIdOf(key)) !== keyId)
+    return no('The key id in this file is not the id of the key beside it. The header has been edited.');
+
+  let held: Awaited<ReturnType<typeof crypto.subtle.importKey>>;
+  try {
+    held = await crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify']);
+  } catch {
+    return no('The public key in this file is not an Ed25519 key.');
+  }
+
+  const good = await crypto.subtle.verify('Ed25519', held, unb64url(sig), manifestBytes(lines));
+  if (!good)
+    return no(
+      'The signature does not match this file. It was produced somewhere else, or a row has changed since it was written.',
+    );
+  return { ok: true };
+}
+
+/**
  * Does this file still say what it said when it was written?
  *
  * `41 §5.11` STEP 2, AND IT WAS NOT THERE. Every export computes a SHA-256 per table and writes it
@@ -402,7 +547,10 @@ export async function checkDogl(
     };
   }
 
-  return { ok: true };
+  /* AND THE SIGNATURE LAST, over the manifest every one of those hashes is in. The order is the
+     cheap check first: a damaged file names its table, and only a file that is internally consistent
+     is worth an Ed25519 verify. */
+  return signatureOf(lines);
 }
 
 export type ImportReport = { tables: number; rows: number };

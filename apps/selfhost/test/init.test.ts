@@ -22,7 +22,11 @@ import { fileURLToPath } from 'node:url';
 
 import { createDirectory } from '@braindog/record/directory';
 
+import { checkDogl } from '@braindog/kernel';
+import { createRecordApi } from '@braindog/record';
+
 import { openKeyStore, unwrap } from '../src/keys.ts';
+import { signerFor } from '../src/sign.ts';
 import { openSqlite, start } from '../src/server.ts';
 
 const MAIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'main.ts');
@@ -618,6 +622,79 @@ test('A KEY FILE THAT IS NOT A KEY COSTS NOBODY THE NAME THEY WANTED', () => {
     assert.match(out.said, /is 9 bytes and a key is 32/);
     assert.ok(!existsSync(join(data, 'the-studio')), 'a record directory was made before the key was checked');
     assert.ok(!existsSync(join(data, 'directory.sqlite')), 'the directory was opened before the key was checked');
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+
+/* -- and the file it exports can be checked by somebody else -------------- */
+
+test('A RECORD `init` MADE EXPORTS A FILE THAT VERIFIES, AND IMPORTS INTO ANOTHER ONE', async () => {
+  /* THE WHOLE CHAIN, END TO END, and every link of it was missing a week ago: `init` wrote no keys,
+     no process opened the KEK, nothing signed, and nothing checked. `41 §5.11` steps 2 and 3 are
+     what make a `.dog` a thing somebody can be handed rather than a thing they have to trust. */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+
+    const file = join(data, 'the-studio', 'record.dog');
+    const sql = openSqlite(file);
+    const store = await openKeyStore(join(data, 'kek'));
+    const id = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')!.id;
+
+    const sign = await signerFor(sql, store, id);
+    assert.ok(sign, 'a record init created cannot open its own signing key');
+
+    const api = await createRecordApi({ sql, clock: { now: () => Date.UTC(2026, 8, 5) }, sign });
+    const out = await api.kernel.export();
+    assert.ok(out.ok, 'export refused');
+    const lines = (out as { value: string[] }).value;
+
+    /* IT VERIFIES, against nothing but the file. `checkDogl` recomputes every table's hash and the
+       key id, and checks the signature against the key the file carries. */
+    const checked = await checkDogl(lines);
+    assert.ok(checked.ok, checked.ok ? '' : `${checked.refusal.code}: ${checked.refusal.fix}`);
+
+    /* AND ONE CHANGED DIGIT DOES NOT, even with the manifest recomputed — which is the difference
+       between a checksum and a signature. */
+    const at = lines.findIndex((l) => l.startsWith('["record_id"'));
+    assert.ok(at > 0, 'no dog_meta row to edit');
+    const bent = [...lines];
+    bent[at] = bent[at]!.replace(id, `${id.slice(0, -1)}X`);
+    assert.equal((await checkDogl(bent)).ok, false, 'an edited record id verified');
+
+    sql.close();
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('AND A RECORD WITH NO SIGNING KEY SAYS SO BY MAKING NO SIGNER', async () => {
+  /* `signerFor` answers `null` rather than throwing, because "no signing key" is an ordinary state:
+     a record restored from a redacted export has no `vault_key` rows at all — `dogl.ts` drops them,
+     since the row is nothing but wrapped bytes and a salt. Its exports are unsigned, and nothing
+     will import them, which is true and worth saying at export rather than at import. */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+    const file = join(data, 'the-studio', 'record.dog');
+    const sql = openSqlite(file);
+    const store = await openKeyStore(join(data, 'kek'));
+    const id = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')!.id;
+
+    sql.exec("DELETE FROM vault_key WHERE purpose = 'signing'");
+    assert.equal(await signerFor(sql, store, id), null);
+
+    /* AND A KEY THIS KEK DID NOT WRAP IS THE SAME ANSWER, not an exception three frames down. */
+    sql.exec(
+      "INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id, salt, rewrapped_at) VALUES ('signing', ?, ?, 'kek', ?, NULL, NULL)",
+      new Uint8Array(48),
+      new Uint8Array(12),
+      (await store.current()).kekId,
+    );
+    assert.equal(await signerFor(sql, store, id), null, 'bytes that do not open produced a signer');
+    sql.close();
   } finally {
     rmSync(data, { recursive: true, force: true });
   }
