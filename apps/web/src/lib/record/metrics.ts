@@ -31,7 +31,7 @@ import { integer, money } from 'braindog-render';
 
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf, currencyOf, mixedFix } from './money.ts';
-import { compile, explain, matches } from './where.ts';
+import { compile, explain, matches, declaredValue } from './where.ts';
 import type { Entry } from './schema.ts';
 
 /* ── the document ────────────────────────────────────────────────────────── */
@@ -260,7 +260,11 @@ export function hrefFor(decl: MetricDecl): string {
   const w = compile(register, decl.where);
   const chips = w.clauses.map((c) =>
     'values' in c
-      ? `${c.field}:${c.op === 'is not' ? 'not-in' : 'in'}:${c.values.map(encodeURIComponent).join(',')}`
+      ? /* AS THE FIELD DECLARES THEM. The predicate is a sentence and says `owed to me`; the register
+           holds `owed_to_me`, and a URL is read by a control that compares strings. */
+        `${c.field}:${c.op === 'is not' ? 'not-in' : 'in'}:${c.values
+          .map((v) => encodeURIComponent(declaredValue(register, c.field, v)))
+          .join(',')}`
       : `${c.field}:${c.op}:${encodeURIComponent(c.day)}`,
   );
   return chips.length ? `/r/${register}?${chips.map((f) => `f=${f}`).join('&')}` : `/r/${register}`;

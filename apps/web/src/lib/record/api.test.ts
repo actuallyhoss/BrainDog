@@ -21,6 +21,8 @@ import assert from 'node:assert/strict';
 import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, isProse, labelOf, metric, page, search, toRows } from './api.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
+import { declaredValue } from './where.ts';
+import { hrefFor } from './metrics.ts';
 import { NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
 
@@ -570,4 +572,30 @@ test('the busiest relation is first, because it is why the page was opened', () 
 
 test('the pointing field is not a column, because every row in the list has the same value for it', () => {
   for (const rel of backlinks('people', 1)) assert.ok(!rel.columns.some((c) => c.field === 'party'));
+});
+
+test('A URL CARRIES THE VALUE THE FIELD DECLARES, and one spelling reaches the control', () => {
+  /* The record holds `owed_to_me` and the dialect says `owed to me`, and both are right: an
+     underscore is not a word and a predicate is a sentence. `norm` made them match, and matching was
+     all anything did — so a metric's href wrote `owed%20to%20me` and a segment wrote `owed_to_me`.
+     Both filtered correctly, and arriving from the first the segment did not light, because its own
+     test is an equality. Pressing it then APPENDED the second spelling to the first. */
+  assert.equal(declaredValue('obligations', 'direction', 'owed to me'), 'owed_to_me');
+  assert.equal(declaredValue('obligations', 'direction', 'OWED TO ME'), 'owed_to_me');
+  assert.equal(declaredValue('obligations', 'direction', 'owed_to_me'), 'owed_to_me');
+  /* A value the field does not declare comes back as it was: this canonicalises, it does not
+     validate, and swallowing an unknown value would hide a typo behind a filter that matches
+     nothing. */
+  assert.equal(declaredValue('obligations', 'direction', 'sideways'), 'sideways');
+  assert.equal(declaredValue('obligations', 'nosuchfield', 'x'), 'x');
+
+  const href = hrefFor({
+    metric: 'owed-to-me',
+    name: 'Owed to you',
+    source: 'register.obligations',
+    where: 'state is open, direction is owed to me',
+    value: { sum: 'amount' },
+  } as never);
+  assert.match(href, /direction:in:owed_to_me/, 'a metric handed the reader a spelling its own control does not know');
+  assert.ok(!href.includes('%20'), 'a URL carried a spoken value with spaces in it');
 });

@@ -18,6 +18,7 @@
   import { page } from '$app/state';
   import { MISSING } from 'braindog-render';
   import { Table } from 'braindog-render/svelte';
+  import { declaredValue } from '$lib/record/where.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import * as pref from '$lib/pref.ts';
@@ -198,7 +199,12 @@
        NOT excluded — which is what the grid underneath it shows. Reading `values.includes` for both
        operators drew `cancelled` as the selected state on the one URL a metric tile hands the
        reader, with fifteen live rows under it and not one cancelled. */
-    return f.op === 'not-in' ? !f.values.includes(value) : f.values.includes(value);
+    /* COMPARED AS THE FIELD DECLARES IT, so a link written before there was one canonical spelling
+       still lights the control it named. Every URL this build writes carries the declared value; a
+       bookmark from before does not, and a bookmark is exactly the thing that outlives a fix. */
+    const held = f.values.map((v) => declaredValue(id, field, v));
+    const want = declaredValue(id, field, value);
+    return f.op === 'not-in' ? !held.includes(want) : held.includes(want);
   };
 
   /**

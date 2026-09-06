@@ -128,6 +128,25 @@ const UNIMPLEMENTED = ['at least', 'at most', 'more than', 'less than', 'contain
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
 
 /**
+ * A value as the field DECLARES it, from a value as somebody said it.
+ *
+ * THE RECORD HOLDS `owed_to_me` AND THE DIALECT SAYS `owed to me`, and both are right: an underscore
+ * is not a word and a predicate is a sentence. `norm` is what makes them match, and matching was all
+ * anything did — so two writers of the same URL disagreed. A metric's `where` produced
+ * `?f=direction:in:owed%20to%20me` and a segment produced `?f=direction:in:owed_to_me`; both
+ * filtered correctly, and arriving from the first the segment did not light, because the control's
+ * own test is an equality. Pressing it then APPENDED the second spelling to the first.
+ *
+ * A URL IS MACHINE-FACING, so it carries the declared value. The dialect keeps its sentence, `display`
+ * keeps the spaces on screen, and there is one string in between.
+ */
+export const declaredValue = (register: string, field: string, value: string): string => {
+  const want = norm(value);
+  const values = REGISTERS[register]?.fields.find((f) => f.id === field)?.values;
+  return values?.find((v) => norm(v) === want) ?? value;
+};
+
+/**
  * The declared field a clause names, matched without regard to case, or `null`.
  *
  * AN UNKNOWN FIELD RESOLVES TO NOTHING, whatever the operator. `state is not live` on a register
