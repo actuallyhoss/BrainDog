@@ -1167,6 +1167,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     allocate,
     hasRegister: (register) => registers.has(register),
     write: (register, patch, actor, batch) => write(register, null, patch, { actor, batch }),
+    /* THE FROZEN BASELINE, read through the one evaluator every figure in this record goes through.
+       A prediction's measure is a metric body without a target or a window (24 §4.6) — both are
+       supplied here from the prediction's own, which is what makes it gradeable at all. */
+    measure: (m, window) =>
+      evaluateMetric(
+        sql,
+        {
+          metric: 'prediction',
+          name: 'baseline',
+          source: m.source,
+          ...(m.where === undefined ? {} : { where: m.where as never }),
+          value: m.value as never,
+          target: { gte: 0 },
+          window,
+          compare: 'none',
+        },
+        evalContext(),
+      ),
   });
 
   const memberDeps = (): MemberDeps => ({ sql, nowMs: clock.now(), mint, hasRegister: (r) => registers.has(r) });
@@ -1740,7 +1758,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       attempt(sql, transaction, () => decide(governDeps(), id, verdict, actor)),
 
     /** Put one back in the queue, for the change the gate accepted and could not land. */
-    reopen: (id: string): Result<null> => transaction(() => reopen(governDeps(), id)),
+    reopen: (id: string, why?: string): Result<null> => transaction(() => reopen(governDeps(), id, why)),
 
     /* ── the outbox: work that must leave the record ────────────────── */
 

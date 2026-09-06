@@ -63,6 +63,32 @@ export type GovernDeps = {
   hasRegister: (register: string) => boolean;
   /** The write path, for the rows an accepted `rowset` writes. */
   write: (register: string, patch: Record<string, unknown>, actor: string, batch: string) => Result<{ id: string }>;
+  /**
+   * Read a prediction's measure over a window, for the baseline frozen at acceptance.
+   *
+   * INJECTED RATHER THAN IMPORTED, because it is the metrics module's `evaluateMetric` with the
+   * caller's own evaluation context — timezone and scope included — and this file has no business
+   * knowing what those are.
+   */
+  measure: (m: { source: string; where?: unknown; value: unknown }, window: string) => Result<{ value: number | null }>;
+};
+
+/**
+ * What a `change` promises will be true, and how the record will know.
+ *
+ * 24 §4.6's shape, and the product's own law applied to itself: ADR-007 says a number with no target
+ * is decoration and a number with no comparison window is a number you cannot act on. A proposal
+ * with no falsifiable claim is a proposal nobody can grade, which is how a self-improving loop turns
+ * into a machine that fills somebody's week.
+ */
+export type Prediction = {
+  claim: string;
+  measure: { source: string; where?: unknown; value: unknown };
+  target: Record<string, number>;
+  /** `30d`, `90d` — the same offsets a schedule takes. */
+  window: string;
+  unit?: string;
+  on_miss?: 'suggest' | 'none';
 };
 
 const COLUMNS: Record<GovernRegister, string> = {
@@ -172,14 +198,13 @@ export function propose(deps: GovernDeps, actor: string, p: Proposal): Result<{ 
     actor,
     at,
   );
-  deps.sql.exec(
-    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', ?)",
-    deps.mint(),
-    at,
-    actor,
-    `suggestion:${id}`,
-    p.question.slice(0, 280),
-  );
+  /* THE QUESTION GOES IN `to_v`, WHICH IS WHERE 45 §5.4 PUTS IT — and `note` is capped at 280 by
+     the rule that a note is one sentence a human reads in six weeks. A question is not a note: it is
+     the thing being asked, the `suggestion` table has no column for it, and this event is the only
+     copy. So a question over 280 characters was silently cut here and the cut version became the
+     immutable `decision.question` — the record's permanent answer to "what was asked", wrong, with
+     the original nowhere. */
+  event(deps, at, actor, 'suggest', `suggestion:${id}`, 'suggestion', p.question);
   return ok({ id });
 }
 
@@ -226,10 +251,58 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
     return null;
   }
 
-  if (kind === 'pattern') return body.ingest && typeof body.ingest === 'object' ? null : missing('ingest');
-  return typeof body.declaration_id === 'string' && body.to && typeof body.to === 'object'
-    ? null
-    : missing(typeof body.declaration_id === 'string' ? 'to' : 'declaration_id');
+  if (kind === 'pattern') {
+    if (!body.ingest || typeof body.ingest !== 'object') return missing('ingest');
+    /* AND THE SAMPLES IT WAS DRAWN FROM. 45 §5.4 puts `samples: [raw_id…]` in the body, and 07 §4's
+       review counts hits against them — the `3/3 · 2/3 · 0/3` a reviewer reads before accepting. A
+       pattern filed without them is a declaration somebody is asked to approve with nothing to check
+       it against, which is the shape of proposal that gets approved because reading it is harder. */
+    if (!Array.isArray(body.samples) || body.samples.length === 0)
+      return {
+        code: 'REQUIRED_MISSING',
+        fix: 'A pattern proposal carries the arrivals it was drawn from, so whoever answers can check it against them.',
+        at: 'body.samples',
+      };
+    return null;
+  }
+  if (typeof body.declaration_id !== 'string') return missing('declaration_id');
+  if (!body.to || typeof body.to !== 'object') return missing('to');
+
+  /* AND ITS PREDICTION, IF IT CARRIES ONE — checked here rather than at acceptance, for the reason
+     every other body is checked here: the person answering should not be the one who finds out it
+     was malformed. A `change` may be proposed by a person who is simply changing something, so a
+     prediction is optional; one that is present has to be gradeable. */
+  if (body.prediction !== undefined) {
+    const wrong = checkPrediction(body.prediction);
+    if (wrong) return wrong;
+  }
+  return null;
+}
+
+/**
+ * Whether a prediction can be settled at all.
+ *
+ * `PREDICTION_UNMEASURABLE` IS THE POINT OF THE CHECK (30 §6). It kills the entire class of
+ * "improvements" that are vibes: a claim with no source, no value to read and no bound to compare
+ * against cannot be wrong, and a loop whose proposals cannot be wrong learns nothing from being run.
+ */
+function checkPrediction(raw: unknown): Refusal | null {
+  const unmeasurable = (fix: string, at: string): Refusal => ({ code: 'PREDICTION_UNMEASURABLE', fix, at });
+  if (!raw || typeof raw !== 'object') return unmeasurable('A prediction is an object.', 'body.prediction');
+  const p = raw as Record<string, unknown>;
+
+  if (typeof p.claim !== 'string' || !p.claim.trim())
+    return unmeasurable('A prediction says in one sentence what will be true.', 'body.prediction.claim');
+  const m = p.measure as { source?: unknown; value?: unknown } | undefined;
+  if (!m || typeof m !== 'object' || typeof m.source !== 'string' || !m.value)
+    return unmeasurable('A prediction names what to read and where to read it.', 'body.prediction.measure');
+  if (!p.target || typeof p.target !== 'object' || Object.keys(p.target).length === 0)
+    return unmeasurable('A prediction with no target cannot be met or missed.', 'body.prediction.target');
+  if (typeof p.window !== 'string' || !/^\d+[dhm]$/.test(p.window))
+    return unmeasurable('A prediction says when to look: 30d, 90d.', 'body.prediction.window');
+  if (p.on_miss !== undefined && p.on_miss !== 'suggest' && p.on_miss !== 'none')
+    return { code: 'ENUM_VALUE_UNKNOWN', fix: 'One of: suggest, none.', at: 'body.prediction.on_miss', allowed: ['suggest', 'none'] };
+  return null;
 }
 
 /* ── answering one ───────────────────────────────────────────────────────── */
@@ -366,6 +439,20 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       if (!install || typeof install !== 'object')
         return no<Decided>('VALUE_MALFORMED', `${id} carries nothing to install.`, { at: 'body' });
     }
+
+    /* THE PREDICTION, WRITTEN WITH THE DECISION AND IN THE SAME TRANSACTION.
+
+       NOTHING WROTE ONE. `scorePrediction`, the `score` schedule handler and the brake that reads
+       twenty scored rows were all built, tested and unreachable, because the table they work on had
+       no writer — so the one control that stops a loop proposing nonsense could never engage. A
+       loop that proposes and is never graded is the exact failure 24 §4.6 is titled after.
+
+       ATOMIC WITH THE DECISION, because a declaration that changed with no prediction beside it is
+       a change nobody can grade, and a prediction with no change behind it grades nothing. */
+    if (row.body_kind === 'change' && body.prediction) {
+      const wrote_ = writePrediction(deps, id, body.prediction as Prediction, String(body.declaration_id ?? id), at);
+      if (!wrote_.ok) return wrote_ as Result<Decided>;
+    }
   }
 
   const question = questionOf(deps, id) ?? id;
@@ -387,13 +474,89 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
 }
 
 /**
+ * Write the prediction an accepted `change` carries, and schedule its scoring.
+ *
+ * THE BASELINE IS FROZEN HERE, measured over the window BEFORE acceptance. Recomputing it at scoring
+ * time is grading your own homework and makes every prediction pass — 24 §4.6 says so in one line,
+ * and it is the difference between a loop that learns and a loop that congratulates itself.
+ *
+ * AND A BASELINE THAT ALREADY MEETS ITS TARGET IS REFUSED. It is the reward-hacking control: without
+ * it the cheapest way for the loop to look useful is to predict things that are already true, and
+ * that is a local optimum it will find.
+ */
+function writePrediction(deps: GovernDeps, sg: string, p: Prediction, forDecl: string, at: string): Result<string> {
+  const reading = deps.measure(p.measure, p.window);
+  if (!reading.ok) return reading as Result<string>;
+  const baseline = reading.value.value;
+  if (baseline === null)
+    return no<string>('PREDICTION_UNMEASURABLE', `${sg}'s prediction reads nothing today, so it can never be settled.`, {
+      at: 'body.prediction.measure',
+    });
+
+  if (met(baseline, p.target))
+    return no<string>(
+      'OUT_OF_BOUNDS',
+      `${sg} predicts ${p.claim}, and that is already true at ${baseline}. A prediction the record already meets grades nothing.`,
+      { at: 'body.prediction.target' },
+    );
+
+  const id = `pr_${deps.mint()}`;
+  const scoreAt = deps.nowMs + windowMs(p.window);
+  deps.sql.exec(
+    `INSERT INTO prediction (id, for_decl, claim, measure, baseline, unit, target, window, score_at, on_miss)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    forDecl,
+    p.claim,
+    JSON.stringify(p.measure),
+    Math.round(baseline),
+    p.unit ?? 'count',
+    JSON.stringify(p.target),
+    p.window,
+    instant(scoreAt),
+    p.on_miss ?? 'suggest',
+  );
+
+  /* `score_at` IS A ROW IN `schedule`, which is 24 §4.6's own note and the reason this costs no new
+     infrastructure: the single alarm already drains hundreds of due rows. */
+  deps.sql.exec(
+    `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts)
+     VALUES (?, ?, 'score', ?, ?, 'pending', 0) ON CONFLICT (kind, key) DO NOTHING`,
+    deps.mint(),
+    instant(scoreAt),
+    `prediction:${id}`,
+    JSON.stringify({ prediction: id }),
+  );
+
+  event(deps, at, 'system', 'predict', `prediction:${id}`, 'prediction', JSON.stringify({ claim: p.claim, baseline, target: p.target }));
+  return ok(id);
+}
+
+/** Whether a reading satisfies a bound. The four the target grammar admits, and nothing else. */
+function met(value: number, target: Record<string, number>): boolean {
+  if (target.lte !== undefined) return value <= target.lte;
+  if (target.lt !== undefined) return value < target.lt;
+  if (target.gte !== undefined) return value >= target.gte;
+  if (target.gt !== undefined) return value > target.gt;
+  if (target.is !== undefined) return value === target.is;
+  return false;
+}
+
+/** `30d` in milliseconds. The window grammar is the schedule's, so there is one of them. */
+function windowMs(window: string): number {
+  const [, n = '30', unit = 'd'] = /^(\d+)([dhm])$/.exec(window) ?? [];
+  const each = unit === 'd' ? 86_400_000 : unit === 'h' ? 3_600_000 : 60_000;
+  return Number(n) * each;
+}
+
+/**
  * Put a resolved suggestion back in the queue.
  *
  * FOR THE ONE CASE THE GATE CANNOT HOLD IN ITS TRANSACTION: an accepted `pattern` whose declaration
  * then will not install. The decision stands — somebody did answer — and the question comes back,
  * because a suggestion resolved with nothing behind it is the gate telling a lie.
  */
-export function reopen(deps: GovernDeps, id: string): Result<null> {
+export function reopen(deps: GovernDeps, id: string, why = 'What was accepted would not install.'): Result<null> {
   const row = deps.sql.one<{ status: string; resolved_as: string | null; body_kind: BodyKind }>(
     'SELECT status, resolved_as, body_kind FROM suggestion WHERE id = ?',
     id,
@@ -421,16 +584,28 @@ export function reopen(deps: GovernDeps, id: string): Result<null> {
   /* AND THE DEFERRAL GOES WITH IT. A reopened suggestion carrying a `defer_until` from last year
      comes back invisible, which is the same as not coming back. */
   deps.sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", id);
+
+  /* AND IT SAYS SO, because the first law of this file is that a decision is a row and not a side
+     effect. Without this a resolved row went back to open with nothing between the `resolve` event
+     and the reopened state — so anybody reading the log saw a suggestion resolved and open at once,
+     with no account of how. The `decision` stands: somebody did answer, and this is not an undo. */
+  event(deps, instant(deps.nowMs), 'system', 'suggest', `suggestion:${id}`, 'suggestion', 'reopened', why);
   return ok(null);
 }
 
-/** The question is the `suggest` event's note, which is where it was written and the only copy. */
+/**
+ * The question, from the `suggest` event that carried it — the only copy there is.
+ *
+ * `to_v` FIRST AND `note` AFTER IT. `to_v` is where it belongs and where it is written now; `note`
+ * is where a record written by an earlier build put it, capped at 280. Reading both costs one
+ * `coalesce` and means an old record's questions still answer for themselves.
+ */
 function questionOf(deps: GovernDeps, id: string): string | null {
   return (
-    deps.sql.one<{ note: string | null }>(
-      "SELECT note FROM event WHERE kind = 'suggest' AND target = ? ORDER BY rowid LIMIT 1",
+    deps.sql.one<{ q: string | null }>(
+      "SELECT coalesce(to_v, note) AS q FROM event WHERE kind = 'suggest' AND target = ? ORDER BY rowid LIMIT 1",
       `suggestion:${id}`,
-    )?.note ?? null
+    )?.q ?? null
   );
 }
 

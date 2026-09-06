@@ -89,9 +89,11 @@ test('A PROPOSAL NOBODY CAN SEE IS A PROPOSAL THAT WAS NEVER MADE', async () => 
   assert.equal(open[0]?.opened_by, 'p_1');
   assert.deepEqual((open[0]?.body as { options: unknown[] }).options.length, 2, 'the body came back as a string');
 
-  // And the question is on the ledger, which is where a person reads it.
+  // And the question is on the ledger, which is where a person reads it. In `to_v`, uncapped:
+  // `note` is one sentence a human reads in six weeks and is capped at 280, and a question is not
+  // a note.
   assert.equal(
-    sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'suggest'")?.note,
+    sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest'")?.to_v,
     'Which shape should the register take?',
   );
 
@@ -238,7 +240,11 @@ test('and one that will not install puts the question back', async () => {
   const { k, sql } = await record();
   const made = value<{ id: string }>(
     k.propose(
-      { question: 'Turn this rule on?', body_kind: 'pattern', body: { ingest: { id: 'rule.bad', kind: 'rule', body: { rule: 'bad', register: 'obligations', when: 'colour is red', then: [] } } } },
+      {
+        question: 'Turn this rule on?',
+        body_kind: 'pattern',
+        body: { ingest: { id: 'rule.bad', kind: 'rule', body: { rule: 'bad', register: 'obligations', when: 'colour is red', then: [] } }, samples: ['r1'] },
+      },
       'p_1',
     ),
   );
@@ -335,7 +341,7 @@ test('REOPEN IS FOR THE ONE CASE IT EXISTS FOR, and does not apply a decision tw
 test('and a reopened pattern comes back visible, deferral and all', async () => {
   const { k, sql } = await record();
   const made = value<{ id: string }>(
-    k.propose({ question: 'Turn it on?', body_kind: 'pattern', body: { ingest: { id: 'rule.x', kind: 'rule', body: {} } } }, 'p_1'),
+    k.propose({ question: 'Turn it on?', body_kind: 'pattern', body: { ingest: { id: 'rule.x', kind: 'rule', body: {} }, samples: ['r1'] } }, 'p_1'),
   );
   value(k.decide(made.id, { defer: { until: new Date(NOW + 400 * DAY).toISOString(), why: 'next year' } }, 'p_2'));
   value(k.decide(made.id, { decide: { option: 'accept', reason: 'go on' } }, 'p_2'));
@@ -345,5 +351,171 @@ test('and a reopened pattern comes back visible, deferral and all', async () => 
   assert.equal(row.status, 'open');
   assert.equal(row.defer_until, null, 'it came back invisible');
   assert.equal(value<unknown[]>(k.governance('suggestion')).length, 1);
+  sql.close();
+});
+
+/* ── what the record's permanent answer says ─────────────────────────────── */
+
+test('A LONG QUESTION SURVIVES BEING ASKED', async () => {
+  /* The `suggestion` table has no question column, so the `suggest` event is the only copy — and it
+     was written into `note`, which is capped at 280 by the rule that a note is one sentence a human
+     reads in six weeks. A question is not a note. So a long one was silently cut and the cut version
+     became the immutable `decision.question`: the record's permanent answer to "what was asked",
+     wrong, with the original nowhere. */
+  const { k, sql } = await record();
+  const asked = `Should we ${'raise the retainer and re-paper the terms '.repeat(12)}before the quarter closes?`;
+  assert.ok(asked.length > 280);
+
+  const made = value<{ id: string }>(k.propose({ ...options, question: asked }, 'p_1'));
+  value(k.decide(made.id, { decide: { option: 'accept', reason: 'agreed' } }, 'p_2'));
+
+  const decision = sql.one<{ question: string }>('SELECT question FROM decision LIMIT 1');
+  assert.equal(decision?.question, asked, 'the record remembers a shorter question than the one it asked');
+  sql.close();
+});
+
+test('and it is written where every consumer is told to look', async () => {
+  // `to_v`, per 45 §5.4. `note` is for the sentence, and there is not one on a `suggest`.
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(options, 'p_1'));
+  const row = sql.one<{ to_v: string | null; note: string | null }>(
+    "SELECT to_v, note FROM event WHERE kind = 'suggest' AND target = ?",
+    `suggestion:${made.id}`,
+  );
+  assert.equal(row?.to_v, options.question);
+  assert.equal(row?.note, null);
+  sql.close();
+});
+
+test('REOPENING LEAVES A TRACE, because a decision is a row and not a side effect', async () => {
+  /* A resolved row went back to open with nothing between the `resolve` event and the reopened
+     state, so anybody reading the log saw a suggestion both resolved and open with no account of
+     how. The decision stands — somebody did answer — and this is not an undo of it. */
+  const { k, sql } = await record();
+  const decl = { id: 'rule.x', kind: 'rule' as const, body: { rule: 'x', register: 'obligations', when: 'state is open', then: [] } };
+  const made = value<{ id: string }>(
+    k.propose({ question: 'Turn this rule on?', body_kind: 'pattern', body: { ingest: decl, samples: ['r1'] } }, 'p_1'),
+  );
+  value(k.decide(made.id, { decide: { option: 'accept', reason: 'yes' } }, 'p_2'));
+  value(k.reopen(made.id, 'the declaration named a field that is not there'));
+
+  const back = sql.all<{ to_v: string | null; note: string | null }>(
+    "SELECT to_v, note FROM event WHERE kind = 'suggest' AND target = ? ORDER BY rowid",
+    `suggestion:${made.id}`,
+  );
+  assert.equal(back.length, 2, 'a suggestion came back with nothing in the log to say so');
+  assert.equal(back[1]?.to_v, 'reopened');
+  assert.match(back[1]?.note ?? '', /named a field that is not there/);
+  // And the decision it was reopened from is untouched.
+  assert.equal(sql.all('SELECT 1 FROM decision').length, 1);
+  sql.close();
+});
+
+test('A PATTERN ARRIVES WITH THE ARRIVALS IT WAS DRAWN FROM', async () => {
+  /* 45 §5.4 puts `samples` in the body and 07 §4's review counts hits against them — the
+     `3/3 · 2/3 · 0/3` a reviewer reads before accepting. Without them somebody is asked to approve a
+     declaration with nothing to check it against, which is the shape of proposal that gets approved
+     because reading it is the harder option. */
+  const { k, sql } = await record();
+  const decl = { id: 'rule.x', kind: 'rule' as const, body: { rule: 'x', register: 'obligations', when: 'state is open', then: [] } };
+
+  const bare = refusal(k.propose({ question: 'Turn this on?', body_kind: 'pattern', body: { ingest: decl } }, 'p_1'));
+  assert.equal(bare.code, 'REQUIRED_MISSING');
+  assert.equal(bare.at, 'body.samples');
+  assert.equal(refusal(k.propose({ question: 'x?', body_kind: 'pattern', body: { ingest: decl, samples: [] } }, 'p_1')).at, 'body.samples');
+
+  value(k.propose({ question: 'Turn this on?', body_kind: 'pattern', body: { ingest: decl, samples: ['r1', 'r2', 'r3'] } }, 'p_1'));
+  sql.close();
+});
+
+/* ── the half of the loop that grades it ────────────────────────────────── */
+
+/** A `change` that promises something falsifiable about the record's own rows. */
+const change = (prediction?: unknown) => ({
+  question: 'Should the direction field admit `part`?',
+  body_kind: 'change' as const,
+  body: {
+    declaration_id: 'register.obligations',
+    from: { values: ['owed_to_me', 'owed_by_me'] },
+    to: { values: ['owed_to_me', 'owed_by_me', 'part'] },
+    ...(prediction === undefined ? {} : { prediction }),
+  },
+});
+
+const promise = {
+  claim: 'refused writes to direction fall to zero',
+  measure: { source: 'register.obligations', where: { field: 'state', is: 'open' }, value: { count: 'id' } },
+  target: { lte: 0 },
+  window: '30d',
+  unit: 'count',
+};
+
+test('ACCEPTING A CHANGE WRITES ITS PREDICTION, which is what makes the brake reachable', async () => {
+  /* `scorePrediction`, the `score` schedule handler and the brake that reads twenty scored rows were
+     all built, tested and unreachable: the table they work on had no writer. A loop that proposes
+     and is never graded is the exact failure 24 §4.6 is titled after. */
+  const { k, sql } = await record();
+  value(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
+
+  const made = value<{ id: string }>(k.propose(change(promise), 'p_1'));
+  value(k.decide(made.id, { decide: { option: 'accept', reason: 'the third direction is real' } }, 'p_2'));
+
+  const pred = sql.one<{ baseline: number; target: string; window: string; on_miss: string; scored_at: string | null }>(
+    'SELECT baseline, target, window, on_miss, scored_at FROM prediction',
+  );
+  assert.ok(pred, 'nothing wrote a prediction, so nothing can ever grade this change');
+  assert.equal(pred.baseline, 1, 'the baseline was not frozen from what the record held at acceptance');
+  assert.equal(pred.window, '30d');
+  assert.equal(pred.on_miss, 'suggest');
+  assert.equal(pred.scored_at, null);
+
+  /* AND `score_at` IS A ROW IN `schedule` — 24 §4.6's own note, and the reason this costs no new
+     infrastructure: the single alarm already drains hundreds of due rows. */
+  const job = sql.one<{ kind: string; key: string }>("SELECT kind, key FROM schedule WHERE kind = 'score'");
+  assert.ok(job, 'the prediction will never be scored, because nothing asked for it to be');
+  sql.close();
+});
+
+test('and a prediction the record already meets is refused, which is the reward-hacking control', async () => {
+  /* Without it the cheapest way for the loop to look useful is to predict things that are already
+     true, and that is a local optimum it will find. */
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(change({ ...promise, target: { lte: 5 } }), 'p_1'));
+  const tried = refusal(k.decide(made.id, { decide: { option: 'accept', reason: 'sure' } }, 'p_2'));
+  assert.equal(tried.code, 'OUT_OF_BOUNDS');
+  assert.match(tried.fix, /already true/);
+  assert.equal(sql.all('SELECT 1 FROM prediction').length, 0);
+  // And the decision did not happen either: the gate said no, in one transaction.
+  assert.equal(k.governanceRow('suggestion', made.id)?.status, 'open');
+  sql.close();
+});
+
+test('AN UNMEASURABLE CLAIM IS REFUSED WHERE IT IS FILED, not where it is answered', async () => {
+  /* `PREDICTION_UNMEASURABLE` kills the entire class of improvements that are vibes: a claim with no
+     source, no value to read and no bound cannot be wrong, and a loop whose proposals cannot be
+     wrong learns nothing from being run. It is checked at filing for the reason every other body is:
+     the person answering should not be the one who finds out it was malformed. */
+  const { k, sql } = await record();
+  const vibes = [
+    { ...promise, claim: '' },
+    { ...promise, measure: { value: { count: 'id' } } },
+    { ...promise, target: {} },
+    { ...promise, window: 'soon' },
+  ];
+  for (const p of vibes) {
+    const out = refusal(k.propose(change(p), 'p_1'));
+    assert.equal(out.code, 'PREDICTION_UNMEASURABLE', JSON.stringify(p).slice(0, 60));
+  }
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0);
+  sql.close();
+});
+
+test('and a change with no prediction is still a change a person may make', async () => {
+  // A `change` can be proposed by somebody who is simply changing something. The prediction is what
+  // the LOOP owes, not what every author does.
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(change(), 'p_1'));
+  value(k.decide(made.id, { decide: { option: 'accept', reason: 'we talked about it' } }, 'p_2'));
+  assert.equal(sql.all('SELECT 1 FROM prediction').length, 0);
   sql.close();
 });

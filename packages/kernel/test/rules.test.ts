@@ -801,7 +801,7 @@ test('A RULE CAN ASK RATHER THAN ACT, and the question goes through the gate', a
   assert.equal(open[0]?.opened_by, 'rule:unusual');
   assert.equal((open[0]?.body as { options: { label: string }[] }).options.length, 2);
   assert.equal(
-    sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'suggest'")?.note,
+    sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest'")?.to_v,
     'Is Invoice 41 really ours?',
     'the question was not filled from the row',
   );
