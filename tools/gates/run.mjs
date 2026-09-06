@@ -45,6 +45,9 @@ const GATES = [
   /* THE SURFACE IS SPLIT BY WHO MAY REACH IT (30 §5), and sixteen INTERNAL methods are each one line
      from being routable — `createRecord` makes somebody the owner of a record. */
   ['router-groups', ['node', [join(here, 'router-groups.mjs')]]],
+  /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
+     code path forgets — which holds only while the CHECK and the document agree about what it is. */
+  ['closed-lists', ['node', [join(here, 'closed-lists.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],

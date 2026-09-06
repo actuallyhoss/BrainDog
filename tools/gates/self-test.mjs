@@ -50,6 +50,7 @@ const CASES = [
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },
   { gate: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
+  { gate: 'closed-lists', expect: /the migration admits/, findings: 1 },
 ];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */
