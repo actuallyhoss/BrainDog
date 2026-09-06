@@ -1,0 +1,59 @@
+/**
+ * `noticed()` — the observe loop's one appearance in the interface.
+ *
+ * WHAT IS BEING TESTED IS THE ABSENCE AS MUCH AS THE PRESENCE. A strip that draws whenever any
+ * refusal has ever happened is a strip that is always there, which is the same as not being there.
+ * The fixture carries one subject that clears its threshold and one that deliberately does not, and
+ * the second is the harder half: it proves the screen is applying the kernel's numbers rather than
+ * its own idea of "a lot".
+ *
+ * AND THE NUMBERS ARE THE KERNEL'S. If a detector's `n` or `days` ever changes, this test changes
+ * with it for free, because nothing here restates them.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { noticed } from './api.ts';
+
+test('a register whose refusals crossed the threshold says so', () => {
+  const seen = noticed('obligations');
+  assert.ok(seen, 'twelve refusals over four days clears write.refused, and nothing was drawn');
+  assert.equal(seen.field?.id, 'direction');
+  assert.equal(seen.code, 'ENUM_VALUE_UNKNOWN');
+  assert.equal(seen.n, 12);
+  assert.equal(seen.days, 4);
+  assert.equal(seen.window, '30d');
+});
+
+test('and a register whose refusals did not cross it says nothing', () => {
+  // Nine over three days is a bad fortnight. The detector wants ten, and a screen that rounded up
+  // would announce a pattern the analyser will never propose anything about.
+  assert.equal(noticed('tasks'), null);
+});
+
+test('a register nothing was observed about is silent', () => {
+  assert.equal(noticed('people'), null);
+});
+
+test('the field is named the way the rest of the product names it', () => {
+  // `direction`, not `Direction` by accident and not `direction` raw: it goes through `labelOf`,
+  // so a pack that relabels the field relabels this sentence too.
+  assert.equal(noticed('obligations')?.field?.label, 'Direction');
+});
+
+test('the refusal code survives, whole', () => {
+  // The friendly clause is for the person and the code is for whoever supports them. Showing only
+  // the clause leaves nothing to search for; the code is what appears in the logs.
+  const seen = noticed('obligations');
+  assert.match(seen?.fix ?? '', /not one this field declares/);
+  assert.equal(seen?.code, 'ENUM_VALUE_UNKNOWN');
+});
+
+test('a search.empty finding never lands on a register grid', () => {
+  // `search.empty` carries a bare term as its subject — `retainer` — and a naive `startsWith` on a
+  // register name would have put "6 writes to retainer were refused" above a grid. Only
+  // `write.refused` carries `<register>.<field>:<code>`, and only it is read here.
+  for (const register of ['retainer', 'services', 'things'])
+    assert.equal(noticed(register), null);
+});

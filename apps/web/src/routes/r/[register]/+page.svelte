@@ -20,7 +20,7 @@
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { iconFor, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { iconFor, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -36,6 +36,11 @@
 
   const id = $derived(page.params.register ?? '');
   const decl = $derived(REGISTERS[id]);
+
+  /* WHAT THE RECORD HAS NOTICED ABOUT THIS REGISTER, if anything crossed a threshold. It is derived
+     from the register alone — not from the filters — because a pattern in thirty days of refusals
+     is not a property of the rows currently on screen. */
+  const seen = $derived(noticed(id));
 
   /* URL state: filters and the query define WHICH ROWS YOU ARE LOOKING AT, so they must be
      shareable. View options and the peeked row are not the same thing and do not travel (19 §5). */
@@ -481,6 +486,37 @@
       </span>
     </div>
 
+    <!-- WHAT THE RECORD NOTICED, ON THE SCREEN IT IS ABOUT.
+
+         The observe loop is the most careful mechanism in this product — nine signals, four
+         detectors whose counts come from the rule of three, a dispersion requirement on every one
+         because a burst is not a pattern — and none of it had ever reached a person. It went here
+         and not on a findings page because `write.refused` carries `<register>.<field>:<code>`,
+         which IS this screen: the grid somebody keeps being refused at.
+
+         IT IS A NOTE, NOT AN ALARM. Nothing is broken and nothing is urgent; a thing has been
+         happening for weeks and the record is the only one that counted. `role="note"` and no
+         intent colour, because the day it looks like an error is the day it gets dismissed
+         unread. -->
+    {#if seen}
+      <aside class="seen" role="note">
+        <Icon name="observe" size="s" />
+        <p class="seen-said">
+          <strong>{seen.n} writes</strong> to
+          <!-- A NAME AND NOT A LINK. The writes were REFUSED, so there are no rows to filter to and
+               nowhere in this build that shows a field's own declaration; a link that went to a
+               filter matching nothing would be worse than the plain word. -->
+          {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}this register{/if}
+          were refused over {seen.days} days — {seen.fix}.
+          <span class="seen-code" title={seen.why}>{seen.code} · {seen.window}</span>
+        </p>
+        <Button
+          weight="quiet"
+          onclick={() => toasts.push(copy.notWritten(`${seen?.field?.label ?? id} would be raised as a question on /decide, with the ${seen?.n} refused writes attached`), { intent: 'warn' })}
+        >{copy.raiseIt}</Button>
+      </aside>
+    {/if}
+
     {#if rows.length === 0}
       <Empty
         kind={emptyKind}
@@ -783,6 +819,38 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-4) var(--sp-6) var(--sp-9);
+  }
+
+  /* A NOTE READS AS A NOTE. One hairline, the page's own paper, no intent colour and no fill: it
+     sits above the grid the way a margin annotation sits beside a paragraph. The code is set in the
+     id face at the smallest size so an operator can find it and a bookkeeper's eye skips it. */
+  .seen {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink2);
+  }
+
+  .seen-said {
+    flex: 1;
+    margin: 0;
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .seen-said strong { color: var(--ink); font-weight: 600; }
+  .seen-field { color: var(--ink); font-style: normal; font-weight: 600; }
+
+  .seen-code {
+    margin-inline-start: var(--sp-2);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    color: var(--dim);
+    white-space: nowrap;
   }
 
   .bar {

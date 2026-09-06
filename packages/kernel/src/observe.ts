@@ -178,25 +178,19 @@ export function analyse(deps: AnalyseDeps): Analysis {
   const suspended = governors(deps);
   if (suspended) return { candidate: null, found: [], suspended };
 
-  const found: Finding[] = [];
+  /* THE COUNTS COME FROM SQL AND THE THRESHOLDS ARE APPLIED IN ONE PLACE, so a surface that reads
+     these findings uses the same numbers as the analyser that writes them. */
+  const counts: Counted[] = [];
   for (const d of DETECTORS) {
     const since = new Date(deps.nowMs - d.windowDays * DAY_MS).toISOString().slice(0, 10);
     for (const row of deps.sql.all<{ subject: string; total: number; days: number }>(
-      'SELECT subject, sum(n) AS total, count(DISTINCT day) AS days FROM observation WHERE kind = ? AND day >= ? GROUP BY subject HAVING total >= ? AND days >= ? ORDER BY total DESC',
+      'SELECT subject, sum(n) AS total, count(DISTINCT day) AS days FROM observation WHERE kind = ? AND day >= ? GROUP BY subject ORDER BY total DESC',
       d.signal,
       since,
-      d.n,
-      d.days,
     ))
-      found.push({
-        signal: d.signal,
-        subject: row.subject,
-        n: Number(row.total),
-        days: Number(row.days),
-        window: `${d.windowDays}d`,
-        why: d.why(row.subject, Number(row.total)),
-      });
+      counts.push({ signal: d.signal, subject: row.subject, total: Number(row.total), days: Number(row.days) });
   }
+  const found = findingsFrom(counts);
 
   /* ONE AT A TIME, and the one that cleared its threshold by the most. A list of eleven proposals is
      a list nobody reads, and the second-best one will still be there next week.
@@ -204,7 +198,6 @@ export function analyse(deps: AnalyseDeps): Analysis {
      AND NOT ONE IT HAS ALREADY ASKED ABOUT. This runs weekly and nothing recorded that it had
      proposed, so one finding became one model-call draft every seven days for ever. The next-best
      finding is taken instead, which is the same rule read the other way round. */
-  found.sort((a, b) => b.n / thresholdOf(b.signal) - a.n / thresholdOf(a.signal));
   const candidate = found.find((f) => !asked(deps, f)) ?? null;
 
   if (candidate)
@@ -214,6 +207,41 @@ export function analyse(deps: AnalyseDeps): Analysis {
 }
 
 const thresholdOf = (signal: Signal): number => DETECTORS.find((d) => d.signal === signal)?.n ?? 1;
+
+/** One row of what a record has noticed: a signal, a subject, how often and over how many days. */
+export type Counted = { signal: Signal; subject: string; total: number; days: number };
+
+/**
+ * The findings a set of counts clears, best first — and the ONE place the thresholds are applied.
+ *
+ * SEPARATED FROM THE QUERY so that the surface reading these can use the same numbers as the
+ * analyser that writes them. Two copies of a threshold is a screen that says a pattern has been
+ * reached and a proposal that never comes, or the other way round — and both read as the product
+ * being wrong about itself, which is worse than either.
+ */
+export function findingsFrom(counts: readonly Counted[]): Finding[] {
+  const found: Finding[] = [];
+  for (const d of DETECTORS)
+    for (const row of counts)
+      if (row.signal === d.signal && row.total >= d.n && row.days >= d.days)
+        found.push({
+          signal: d.signal,
+          subject: row.subject,
+          n: row.total,
+          days: row.days,
+          window: `${d.windowDays}d`,
+          why: d.why(row.subject, row.total),
+        });
+
+  /* BY HOW FAR EACH CLEARED ITS OWN THRESHOLD, so a signal that needs two hundred and got four
+     hundred outranks one that needs five and got six. */
+  return found.sort((a, b) => b.n / thresholdOf(b.signal) - a.n / thresholdOf(a.signal));
+}
+
+/** How long each detector looks back, so a caller can ask the right question of its own store. */
+export const WINDOWS: Readonly<Record<Signal, number>> = Object.fromEntries(
+  DETECTORS.map((d) => [d.signal, d.windowDays]),
+) as Record<Signal, number>;
 
 /** Whether this record has already queued a draft about this exact finding. `dead` does not count. */
 const asked = (deps: AnalyseDeps, f: Finding): boolean =>

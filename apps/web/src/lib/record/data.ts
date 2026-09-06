@@ -34,6 +34,7 @@ export { LOOKUPS, NOW, TODAY } from '@braindog/seed';
 /** The pages the record ships with. They live in the seed, because a page is a document it holds. */
 export const PAGES = SEED_PAGES as unknown as Record<string, PageDecl>;
 import { NOW } from '@braindog/seed';
+import type { Counted } from '@braindog/kernel';
 
 /** The eight registers, as this app types them. The seed's shape is a superset of this one. */
 export const REGISTERS = SEED_REGISTERS as unknown as Record<string, RegisterDecl>;
@@ -192,6 +193,29 @@ export const NEWS: NewsItem[] = [
   { at: stamp(-26), by: 'rule.renewal', text: 'kilnfonts.example moved to lapsing — auto-renew is off', href: '/r/services/2', tone: 'bad' },
   { at: stamp(-31), by: 'codex', text: 'Opened SG31 — the Kiln licensing question', href: '/decide/SG31', tone: 'warn' },
   { at: stamp(-49), by: 'claude', text: 'Set the year-end date on Pell & Vine', href: '/r/people/4' },
+];
+
+/* ── what the record has noticed about itself ──────────────────── */
+
+/**
+ * The observations a record of this age would actually be holding.
+ *
+ * NINE SIGNALS, PRE-AGGREGATED BY DAY, and these are the two the interface can do something with:
+ * a write the register kept refusing, and a search that kept finding nothing. Both carry a subject
+ * that IS a place on screen, which is the whole reason they are the two worth surfacing first.
+ *
+ * The thresholds are NOT here. They are `findingsFrom` in the kernel, applied in one place, because
+ * a screen that says a pattern has been reached and an analyser that never proposes anything read
+ * as the product being wrong about itself.
+ */
+export const OBSERVED: Counted[] = [
+  /* Twelve refusals across four days: somebody keeps writing a direction the field does not
+     declare, and the record has been refusing them without anybody drawing the conclusion. */
+  { signal: 'write.refused', subject: 'obligations.direction:ENUM_VALUE_UNKNOWN', total: 12, days: 4 },
+  /* Under the count on purpose — nine over three days is a bad fortnight, not a pattern. It is here
+     so the screen can be seen NOT drawing something, which is the harder half to check. */
+  { signal: 'write.refused', subject: 'tasks.by:REQUIRED_MISSING', total: 9, days: 3 },
+  { signal: 'search.empty', subject: 'retainer', total: 6, days: 4 },
 ];
 
 /* ── the audit log ───────────────────────────────────────────────────────── */

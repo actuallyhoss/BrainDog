@@ -88,6 +88,9 @@ export const PATHS = {
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   keyboard: 'M2 6h20v12H2zM6 9.5v.01M9.5 9.5v.01M13 9.5v.01M16.5 9.5v.01M7 14h10',
   code: 'm9 8-5 4 5 4M15 8l5 4-5 4',
+  /* A pulse: the shape of something that keeps happening. It is what the observe loop looks at, and
+     it is deliberately not `alert` — a pattern the record noticed is a note, not a fault. */
+  observe: 'M3 15h3.2l2.3-7.5L11.8 19l2.4-6.4 1.4 2.4H21',
   history: 'M4 12a8 8 0 1 0 2.3-5.6M4 4v5h5M12 8v4l3 2',
   lock: 'M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3',
   key: 'M14.5 9.5a4 4 0 1 1-1.6 3.2L7 19H4v-3l6.3-6.3a4 4 0 0 1 4.2-.2zM16.5 7.5v.01',

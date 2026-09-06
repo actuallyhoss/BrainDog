@@ -12,6 +12,7 @@
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
+    "@braindog/kernel": "workspace:*",
     "@braindog/seed": "workspace:*",
     "@braindog/theme": "workspace:*",
     "svelte": "5.57.0"

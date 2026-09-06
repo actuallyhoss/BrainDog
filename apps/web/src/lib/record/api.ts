@@ -22,6 +22,7 @@ import {
   NOW,
   TODAY,
   PACKS,
+  OBSERVED,
   PAGES,
   PEOPLE_ACCESS,
   QUESTIONS,
@@ -35,6 +36,7 @@ import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
+import { findingsFrom } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
 import type { Entry, FieldDecl, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
@@ -77,6 +79,98 @@ const declaredWalk = (): PageBlock | null => {
 
 /** One locale for collation, so a list is in the same order for everybody looking at one record. */
 const LOCALE = 'en-GB';
+
+/* ── what the record noticed, on the screen it is about ──────────── */
+
+/**
+ * What this record has noticed about one register, if anything has crossed.
+ *
+ * THE MOST SOPHISTICATED MECHANISM IN THE PRODUCT WAS INVISIBLE. Nine signals, four detectors whose
+ * counts come from the rule of three, a dispersion requirement on each because a burst is not a
+ * pattern, a weekly analyser with four governors and a self-suspending brake — and the interface
+ * never emitted a signal, never read a finding and never showed one. The person it exists for could
+ * not tell it was there.
+ *
+ * IT GOES WHERE IT IS ABOUT. `write.refused` carries `<register>.<field>:<code>`, which is a PLACE:
+ * the grid where somebody keeps being refused. A findings screen somewhere else would be a second
+ * inbox; a line above the rows they are already failing at is the record saying "this keeps
+ * happening" at the moment they are doing it.
+ *
+ * THE THRESHOLDS ARE THE KERNEL'S, applied by `findingsFrom`. A screen with its own copy of them is
+ * a screen that says a pattern has been reached while the analyser proposes nothing.
+ */
+export type Noticed = {
+  /** The field it keeps happening on, as a place on this screen. */
+  field: { id: string; label: string } | null;
+  /** The refusal code, kept whole — it is what an operator greps for. */
+  code: string;
+  n: number;
+  days: number;
+  window: string;
+  /** The kernel's own sentence, verbatim, for the title and for anyone reading the analysis. */
+  why: string;
+  /** What to do about it, in one clause. */
+  fix: string;
+};
+
+/**
+ * What one refusal code means for whoever keeps hitting it.
+ *
+ * THE CODE IS FOR THE OPERATOR AND THE CLAUSE IS FOR THE PERSON. `ENUM_VALUE_UNKNOWN` names the
+ * mechanism exactly and tells a bookkeeper nothing; showing only the friendly sentence would leave
+ * the person supporting them nothing to search. Both, so neither reader is the one it was not
+ * written for.
+ *
+ * AN UNKNOWN CODE IS NOT A BLANK. A refusal this table has not met yet still crossed a threshold
+ * twelve times, and the honest line says so rather than drawing an empty strip.
+ */
+const FIXES: Readonly<Record<string, string>> = {
+  ENUM_VALUE_UNKNOWN: 'the value being written is not one this field declares — either widen the field or fix what writes it',
+  REQUIRED_MISSING: 'something keeps arriving without it — either it is not really required, or whatever sends these rows never had it',
+  TYPE_MISMATCH: 'what arrives is not the shape this field declares',
+  REF_NOT_FOUND: 'the row it points at is not in this record yet',
+  OUT_OF_BOUNDS: 'the value is outside the range this field declares',
+  IMMUTABLE: 'this field is settled once written, and something keeps trying to change it',
+};
+
+/**
+ * What this record has noticed about one register, if anything has crossed.
+ *
+ * THE MOST SOPHISTICATED MECHANISM IN THE PRODUCT WAS INVISIBLE. Nine signals, four detectors whose
+ * counts come from the rule of three, a dispersion requirement on each because a burst is not a
+ * pattern, a weekly analyser with four governors and a self-suspending brake — and the interface
+ * never emitted a signal, never read a finding and never showed one. The person it exists for could
+ * not tell it was there.
+ *
+ * IT GOES WHERE IT IS ABOUT. `write.refused` carries `<register>.<field>:<code>`, which is a PLACE:
+ * the grid where somebody keeps being refused. A findings screen somewhere else would be a second
+ * inbox nobody opens; a line above the rows they are already failing at is the record saying "this
+ * keeps happening" at the moment they are doing it.
+ *
+ * THE THRESHOLDS ARE THE KERNEL'S, applied by `findingsFrom` and never re-stated here. A screen
+ * with its own copy of them is a screen that announces a pattern while the analyser proposes
+ * nothing, which reads as the product being wrong about itself.
+ *
+ * ONE, NOT ALL OF THEM. `findingsFrom` sorts by how far past its own threshold each finding is, so
+ * the first is the worst; a strip listing four is a second inbox again.
+ */
+export function noticed(register: string): Noticed | null {
+  const prefix = `${register}.`;
+  const first = findingsFrom(OBSERVED).find((f) => f.signal === 'write.refused' && f.subject.startsWith(prefix));
+  if (!first) return null;
+
+  const [id = '', code = ''] = first.subject.slice(prefix.length).split(':');
+  const field = decl(register, id);
+  return {
+    field: field ? { id, label: labelOf(field) } : null,
+    code,
+    n: first.n,
+    days: first.days,
+    window: first.window,
+    why: first.why,
+    fix: FIXES[code] ?? 'the record has been refusing these and nobody has looked at why',
+  };
+}
 
 /* ── values ──────────────────────────────────────────────────────────────── */
 

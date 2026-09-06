@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, type Analysis, type Declaration, type Kernel, type Observation } from '../src/index.ts';
+import { findingsFrom, openRecord, WINDOWS, type Analysis, type Declaration, type Kernel, type Observation } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -307,4 +307,50 @@ test('and three open proposals is three, not four', async () => {
   assert.equal(out.candidate, null);
   assert.match(out.suspended ?? '', /3 proposals are already open/);
   sql.close();
+});
+
+test('findingsFrom is the one place the thresholds live', async () => {
+  // The interface shows a finding above the grid it is about, and it must not carry its own copy of
+  // the numbers: a screen that announces a pattern while the analyser proposes nothing reads as the
+  // product being wrong about itself. So the SQL analyser and any surface go through this function.
+  const { k, sql } = await record();
+  seen(sql, 'write.refused', 'obligations.direction:ENUM_VALUE_UNKNOWN', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const counts = [
+    { signal: 'write.refused' as const, subject: 'obligations.direction:ENUM_VALUE_UNKNOWN', total: 10, days: 10 },
+  ];
+  assert.deepEqual(
+    findingsFrom(counts).map((f) => [f.subject, f.n, f.days, f.window]),
+    k.analyse().found.map((f) => [f.subject, f.n, f.days, f.window]),
+  );
+  sql.close();
+});
+
+test('and it refuses the same things the analyser refuses', () => {
+  // One under the count, one under the dispersion. Both are the shapes that would put a permanent
+  // strip above a grid if a surface rounded up.
+  assert.deepEqual(
+    findingsFrom([
+      { signal: 'write.refused', subject: 'tasks.by:REQUIRED_MISSING', total: 9, days: 9 },
+      { signal: 'write.refused', subject: 'tasks.at:TYPE_MISMATCH', total: 40, days: 2 },
+    ]),
+    [],
+  );
+});
+
+test('the worst thing is first, measured against its own threshold', () => {
+  // Two signals with different counts are not comparable by count: 200 scans is one detector's
+  // floor and 10 refusals is another's. The order is how far past its own number each one is, which
+  // is what makes "show the first" a defensible interface.
+  const order = findingsFrom([
+    { signal: 'query.scan', subject: 'obligations', total: 400, days: 30 },
+    { signal: 'write.refused', subject: 'obligations.direction:ENUM_VALUE_UNKNOWN', total: 30, days: 4 },
+  ]).map((f) => f.signal);
+  assert.deepEqual(order, ['write.refused', 'query.scan']);
+});
+
+test('WINDOWS says how far back each detector looked', () => {
+  // The strip prints it. A window shown as "30d" beside a count from a 90-day detector is a lie
+  // about the arithmetic, so the sentence takes the number from the detector itself.
+  assert.equal(WINDOWS['write.refused'], 30);
+  assert.equal(WINDOWS['search.empty'], 90);
 });

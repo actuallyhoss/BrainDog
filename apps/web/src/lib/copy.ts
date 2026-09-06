@@ -54,6 +54,8 @@ export const copy = {
      indistinguishable from a broken one, so every action that cannot happen here says what it
      would have done and that it did not happen — once, in the toast, not as a disabled state.
      A disabled control tells you a thing exists and refuses to say why it will not work. */
+  /** What to do with something the record noticed: put it where things get decided. */
+  raiseIt: 'Raise it',
   notWritten: (what: string) => `${what}, but nothing was written. This is a mock-up of the record.`,
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
   showMe: 'Show me',
