@@ -19,18 +19,35 @@
   says so.
 -->
 <script lang="ts">
-  import { REGISTERS, ROWS, currencyFor, labelOf, readableFields } from '../record/api.ts';
+  import { NOW, REGISTERS, ROWS, currencyFor, labelOf, readableFields } from '../record/api.ts';
   import type { FieldDecl } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
 
-  let { register }: { register: string } = $props();
+  let { register, first = false }: { register: string; first?: boolean } = $props();
 
   const decl = $derived(REGISTERS[register]);
 
-  /** `secret` never appears. Not disabled, not greyed — absent, with the reason said once. */
-  const fields = $derived(readableFields(register));
+  /** Four weeks out, from the record's clock. */
+  const soon = new Date(NOW + 28 * 86_400_000).toISOString().slice(0, 10);
+
+  /**
+   * `secret` never appears. Not disabled, not greyed — absent, with the reason said once.
+   *
+   * AND ON THE FIRST RUN, THE FEWEST FIELDS THAT MAKE A TRUE ROW. `19 §6`: "their first act is
+   * typing one true fact about their own business, and it takes under thirty seconds", which eight
+   * fields is not. The title and the required ones are what the register itself says cannot be left
+   * out — so a money register asks for an amount because it DECLARES one, and a people register does
+   * not ask for a due date because it declares none.
+   *
+   * THE ALTERNATIVE WAS ONE HARD-CODED FORM FOR FIVE QUESTIONS, and it was there: a text box and a
+   * `Due` date, whatever was chosen. "What is it, and how much?" over a form with no amount, on the
+   * first screen of a product about money; and a person, asked when they are due.
+   */
+  const fields = $derived(
+    first ? readableFields(register).filter((f) => f.required || f.id === decl?.title) : readableFields(register),
+  );
 
   /** The rows a `ref` can point at, titled the way a person says them. */
   function options(f: FieldDecl): { value: number; label: string }[] {
@@ -149,7 +166,13 @@
              about while the caret is still in the field. -->
         {#if wrong(f)}<p class="row-why" id="{id(f)}-why">{wrong(f)}</p>{/if}
       {:else if f.type === 'day'}
-        <div class="field"><input class="field-input" id={id(f)} type="date" /></div>
+        <!-- PRE-FILLED FROM THE RECORD'S OWN CLOCK ON THE FIRST RUN, and not from a literal: a
+             hardcoded date is a past date within weeks, on the one screen where a wrong default is
+             the first thing anybody sees. Four weeks is a plausible term somebody overwrites, and
+             `deadline:` is the register saying which field is the one a date belongs on. -->
+        <div class="field">
+          <input class="field-input" id={id(f)} type="date" value={first && f.deadline ? soon : undefined} />
+        </div>
       {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
         <div class="field">
           <input class="field-input num" id={id(f)} type="text" inputmode="decimal" />

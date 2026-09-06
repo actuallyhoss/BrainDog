@@ -22,10 +22,10 @@
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import RowForm from '$lib/ui/RowForm.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { goto } from '$app/navigation';
-  import { NOW } from '$lib/record/api.ts';
 
   /* The five live in `copy.ts` with every other sentence in the product, so the scope this screen
      claims can be checked against the rest of it in one pass rather than found in a component. */
@@ -33,10 +33,9 @@
 
   let picked = $state<string | null>(null);
   let field = $state<HTMLInputElement>();
-  let what = $state('');
   /* FROM THE RECORD'S CLOCK, not a literal. A hardcoded date is a PAST date within weeks, on the
      one screen where a wrong default is the first thing anybody sees. */
-  let due = $state(new Date(NOW + 28 * 86_400_000).toISOString().slice(0, 10));
+  let form = $state<{ problems: () => string[] } | undefined>(undefined);
 
   function pick(key: string) {
     picked = key;
@@ -56,9 +55,15 @@
    */
   function commit(event: SubmitEvent) {
     event.preventDefault();
-    const said = what.trim();
-    if (!said || !choice) return;
-    toasts.push(copy.notWritten(`${said} would be the first row in ${choice.label}`));
+    if (!choice) return;
+    /* AND A VALUE THE RECORD WOULD REFUSE IS SAID BEFORE ANYBODY LEAVES THIS SCREEN. The form knows
+       — it marks the field and prints the sentence — and this is the first row somebody writes. */
+    const said = form?.problems() ?? [];
+    if (said.length > 0) {
+      toasts.push(said[0]!, { intent: 'warn' });
+      return;
+    }
+    toasts.push(copy.notWritten(`the first row in ${choice.label} would be written`));
     void goto(`/r/${choice.key}`);
   }
 
@@ -129,15 +134,19 @@
         that cannot happen here says what it WOULD have done, once, in the toast. Sixteen other
         controls obey that; the first-run commit did not.
       -->
-      <form class="form" onsubmit={commit}>
-        <label class="label" for="first">{copy.firstField[choice.key] ?? `Your first ${choice.label}`}</label>
-        <input bind:this={field} bind:value={what} id="first" class="input" type="text" spellcheck="false" required />
+      <!--
+        THE REGISTER'S OWN FIELDS, and not a form typed out by hand. This was one hard-coded shape
+        for five different questions: a text box and a `Due` date, whatever had been chosen. So
+        "What is it, and how much?" stood over a form with no amount in it — on the first screen of a
+        product about money — and a person was asked when they are due.
 
-        <label class="label" for="due">Due</label>
-        <!-- Pre-filled from the record's own clock, not from a literal: a hardcoded date is a
-             past date within weeks, on the one screen where a wrong default is the first thing
-             somebody sees. -->
-        <input bind:value={due} id="due" class="input" type="date" />
+        `first` NARROWS IT TO THE TITLE AND THE REQUIRED ONES, because 19 §6 wants "one true fact
+        about their own business" in under thirty seconds and a register has eight fields. Which
+        three that is comes from the declaration, so a money register asks for an amount because it
+        DECLARES one, and nobody writes a second copy of the schema in markup.
+      -->
+      <form class="form" onsubmit={commit}>
+        <RowForm register={choice.key} first bind:this={form} />
 
         <div class="actions">
           <Button weight="primary" type="submit">Add it</Button>
@@ -314,28 +323,8 @@
     gap: var(--sp-1);
   }
 
-  /* A label is visible, always. A placeholder is not a label — it disappears exactly when a user
-     needs it, and it fails contrast in most themes (06 §8). */
-  .label {
-    color: var(--dim);
-    font-size: var(--t-xs);
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-  }
-
-  .label + .input {
-    margin-block-end: var(--sp-3);
-  }
-
-  .input {
-    min-block-size: 40px;
-    padding: 0 var(--sp-3);
-    background: var(--sunk);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    color: var(--ink);
-    font-size: var(--t-base);
-  }
+  /* The label and input styles that were here are `RowForm`'s now, which is the point: one control
+     per declared type, drawn one way, wherever a row is written. */
 
   .actions {
     display: flex;
