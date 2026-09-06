@@ -25,7 +25,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { ok, refused } from '@braindog/ports';
-import { compile, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
@@ -180,13 +180,17 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     let stop = false;
 
     for (const action of then) {
+      /* FROM THE PATCH IF THIS RULE HAS ALREADY TOUCHED IT, and from the row otherwise. Each branch
+         rebuilt the set from the row's PRE-WRITE tags, so `then: [{ tag: late }, { tag: chase }]`
+         kept only `chase` — while `did` reported both and the dry run previewed both, which is a
+         preview promising a tag the pass does not apply. */
       if ('tag' in action) {
-        const tags = new Set(asList(fired.entry.fields.tags));
+        const tags = new Set(asList(patch.tags ?? fired.entry.fields.tags));
         tags.add(action.tag);
         patch.tags = [...tags];
         did.push(`tag ${action.tag}`);
       } else if ('untag' in action) {
-        const tags = new Set(asList(fired.entry.fields.tags));
+        const tags = new Set(asList(patch.tags ?? fired.entry.fields.tags));
         tags.delete(action.untag);
         patch.tags = [...tags];
         did.push(`untag ${action.untag}`);
@@ -197,13 +201,21 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         patch[action.set.field] = fill(action.set.to, fired.entry, deps.nowMs);
         did.push(`set ${action.set.field}`);
       } else if ('move' in action) {
+        /* `move` IS A `set` OF THE STATE FIELD, and claiming the field is what stops two rules
+           writing it. It bypassed `setFields` entirely, so two rules that both `move` both wrote and
+           the last one won — the outcome this file's header calls "an order nobody declared" — while
+           `fired` reported both and nothing appeared as suppressed. */
+        if (setFields.has('state')) continue;
+        setFields.add('state');
         patch.state = action.move;
         did.push(`move ${action.move}`);
       } else if ('link' in action) {
         /* EXACTLY ONE MATCH OR NOTHING. Two rows bearing the name is a question about which, and a
            rule that picked one would pick a different one next week. */
+        /* `by` IS A FIELD ID FROM A DECLARATION, and it was inlined into the path with no grammar
+           check — see the note on `jsonPath`. A rule can arrive in a pack. */
         const found = deps.sql.all<{ id: string }>(
-          `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${action.link.to.by}') = ? LIMIT 2`,
+          `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(action.link.to.by)}') = ? LIMIT 2`,
           action.link.to.register,
           fill(action.link.to.value, fired.entry, deps.nowMs),
         );
@@ -398,9 +410,16 @@ function expand(
        than a caught constraint. Adding a colour next season creates only the new combinations, and
        a re-run that reported forty refusals would make the feature unusable. */
     if (
+      /* `deleted_at IS NULL`, AND THE REGISTER. Without the first, a generated row somebody deleted
+         by mistake could never come back — the re-run found the tombstone, skipped, and the header's
+         promise that "adding a colour next season creates only the new combinations" quietly meant
+         "and never restores one". Without the second this was a full scan of every register on an
+         unindexed path. */
       deps.sql.one(
-        `SELECT 1 AS x FROM entry WHERE json_extract(fields, '$._rule') = ?
+        `SELECT 1 AS x FROM entry WHERE register = ? AND deleted_at IS NULL
+         AND json_extract(fields, '$._rule') = ?
          AND json_extract(fields, '$._parent') = ? AND json_extract(fields, '$._each') = ?`,
+        spec.register,
         rule.rule,
         fired.entry.id,
         each,

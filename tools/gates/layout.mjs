@@ -98,8 +98,9 @@ async function breakpoints() {
 }
 
 if (!(await stat(ROOT).catch(() => null))) {
+  /* EXIT 3 IS A SKIP, NOT A PASS — see the note in `bundle.mjs`. */
   console.log('  layout: no build to check. `pnpm build` first, and CI does.');
-  process.exit(0);
+  process.exit(3);
 }
 
 const bps = (await breakpoints()).sort((a, b) => a - b);

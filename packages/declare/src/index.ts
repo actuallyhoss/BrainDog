@@ -345,15 +345,11 @@ export function satisfies(version: string | null, range: string): boolean {
   const want = range.trim();
   if (!want || want === '*' || want === 'x') return true;
 
-  /* A PRERELEASE IS BELOW ITS RELEASE, and stripping it made `1.0.0-alpha` satisfy `>=1.0.0` — a
-     dependency check that admits the version somebody marked as not ready. */
-  const parts = (v: string): [number, number, number, string] => {
-    const [core = '', tag = ''] = v.split('-');
-    const [a, b, c] = core.split('.');
-    return [Number(a) || 0, Number(b) || 0, Number(c) || 0, tag];
-  };
-  const order = (a: [number, number, number, string], b: [number, number, number, string]): number =>
-    a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || (a[3] === b[3] ? 0 : a[3] === '' ? 1 : b[3] === '' ? -1 : a[3] < b[3] ? -1 : 1);
+  /* A SPACE-SEPARATED RANGE IS EVERY COMPARATOR, AND ALL OF THEM MUST HOLD. `>=1.0.0 <2.0.0` fell
+     into the `>=` branch whole, and `parts()` read `1.0.0 <2.0.0` as `1.0.0` — so the upper bound
+     vanished and 3.0.0 satisfied it. That is a dependency check admitting the major version the
+     range exists to exclude. */
+  if (/\s/.test(want)) return want.split(/\s+/).filter(Boolean).every((one) => satisfies(version, one));
 
   const has = parts(version);
   const cmp = (a: string): number => order(has, parts(a));
@@ -374,24 +370,74 @@ export function satisfies(version: string | null, range: string): boolean {
     if (cmp(want.slice(1)) < 0) return false;
     return has[0] === floor[0] && has[1] === floor[1];
   }
-  if (want.endsWith('.x')) return has[0] === parts(want)[0];
+
+  /* `x` IS A WILDCARD IN THE POSITION IT SITS IN, and every position before it must match. This
+     compared the MAJOR only, so `1.2.x` meant `1.x` and admitted 1.9.0 — a range written to pin a
+     minor, pinning nothing. */
+  if (/^\d+(\.\d+)*(\.x)+$/.test(want) || want.endsWith('.x')) {
+    const wanted = want.split('.');
+    return wanted.every((piece, i) => piece === 'x' || Number(piece) === has[i]);
+  }
+
   /* AND A RANGE THIS DOES NOT UNDERSTAND IS NOT A VERSION. Falling through to an exact compare read
      `~1.2.0` as the version `0.2.0` — refusing the right dependency and accepting the wrong one. */
   if (!/^\d/.test(want)) return false;
   return cmp(want) === 0;
 }
 
-/** Which of two versions is later. Prerelease sorts below its own release. */
-const newer = (a: string, b: string): number => {
-  const parts = (v: string): [number, number, number, string] => {
-    const [core = '', tag = ''] = v.split('-');
-    const [x, y, z] = core.split('.');
-    return [Number(x) || 0, Number(y) || 0, Number(z) || 0, tag];
-  };
-  const [a0, a1, a2, at] = parts(a);
-  const [b0, b1, b2, bt] = parts(b);
-  return a0 - b0 || a1 - b1 || a2 - b2 || (at === bt ? 0 : at === '' ? 1 : bt === '' ? -1 : at < bt ? -1 : 1);
+/**
+ * A version as its three numbers and its prerelease identifiers.
+ *
+ * THE CORE ENDS AT THE FIRST HYPHEN. `v.split('-')` destructured the second element, so `1.0.0-rc-1`
+ * and `1.0.0-rc-2` both became the tag `rc` and compared EQUAL — two different prereleases the check
+ * could not tell apart.
+ *
+ * AND THE IDENTIFIERS ARE COMPARED ONE AT A TIME, numerically where they are numbers. As a single
+ * string, `alpha.10 < alpha.9` — so a `>=1.0.0-alpha.9` range refused `alpha.10`, which is the
+ * later version. Semver says so in as many words; comparing the tags as strings does not.
+ */
+const parts = (v: string): [number, number, number, string[]] => {
+  const at = v.indexOf('-');
+  const core = at < 0 ? v : v.slice(0, at);
+  const tag = at < 0 ? '' : v.slice(at + 1);
+  const [a, b, c] = core.split('.');
+  return [Number(a) || 0, Number(b) || 0, Number(c) || 0, tag === '' ? [] : tag.split('.')];
 };
+
+/** Which of two parsed versions is earlier. A prerelease sorts below its own release. */
+function order(a: [number, number, number, string[]], b: [number, number, number, string[]]): number {
+  const core = a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+  if (core !== 0) return core;
+
+  /* NO PRERELEASE OUTRANKS ANY PRERELEASE, which is the rule stripping the tag used to break: it
+     made `1.0.0-alpha` satisfy `>=1.0.0`, a check admitting the version somebody marked not ready. */
+  if (a[3].length === 0 && b[3].length === 0) return 0;
+  if (a[3].length === 0) return 1;
+  if (b[3].length === 0) return -1;
+
+  for (let i = 0; i < Math.max(a[3].length, b[3].length); i++) {
+    const x = a[3][i];
+    const y = b[3][i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const nx = /^\d+$/.test(x) ? Number(x) : null;
+    const ny = /^\d+$/.test(y) ? Number(y) : null;
+    /* A NUMERIC IDENTIFIER IS BELOW AN ALPHANUMERIC ONE, and two numerics compare as numbers. */
+    if (nx !== null && ny !== null) {
+      if (nx !== ny) return nx - ny;
+    } else if (nx !== null) return -1;
+    else if (ny !== null) return 1;
+    else if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+/** Which of two versions is later. Prerelease sorts below its own release. */
+/* ONE ORDERING, AND IT IS `order` ABOVE. This held a second copy with the same two defects the
+   first had — a core split on every hyphen, and prerelease tags compared as strings — so "which of
+   two versions is later" and "does this version satisfy that range" could disagree about the same
+   pair. */
+const newer = (a: string, b: string): number => order(parts(a), parts(b));
 
 /**
  * What installing this pack would do to this record.
@@ -699,8 +745,25 @@ export function uninstall(id: string, host: Host): Result<Retired> {
       kept[register] = host.count(register);
     }
 
-  const gone = host.retire(claimed);
-  if (!gone.ok) return gone;
-  host.forget(id);
-  return ok({ pack: id, declarations: claimed.length, rows_kept: kept });
+  /* ONE TRANSACTION, LIKE `install`. `retire` and `forget` each opened their own, and nothing
+     wrapped the pair — so a failure between them left the declarations retired and the `pack` row
+     alive: `listPacks` still showed a pack whose registers were gone, and retrying was impossible
+     because `claimed` filters on `retired = 0`, so the second attempt answered "not installed". An
+     uninstall that can leave the record in a state no command can reach is not an uninstall. */
+  try {
+    return host.transaction((): Result<Retired> => {
+      const gone = host.retire(claimed);
+      if (!gone.ok) throw new Rolled(gone);
+      host.forget(id);
+      return ok({ pack: id, declarations: claimed.length, rows_kept: kept });
+    });
+  } catch (e) {
+    /* THE ROLLBACK HAPPENED; THE ANSWER COMES BACK WHOLE. `Rolled` carries the envelope rather than
+       the refusal inside it, for the reason its own note gives: rebuilding one by hand drops
+       whichever arm the rebuild does not know about, and there are three. */
+    if (e instanceof Rolled) return e.answer as Result<Retired>;
+    throw e;
+  } finally {
+    host.reload();
+  }
 }

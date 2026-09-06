@@ -66,7 +66,23 @@ const childrenOf = (g: Group): Node[] => (('all' in g ? g.all : 'any' in g ? g.a
  * The partial index and the predicate have to be the same string or the index is never used, and
  * "the query got slow" is the only symptom — a year after somebody renamed a helper.
  */
-export const jsonPath = (field: string): string => `$.${field}`;
+/**
+ * A field id as a JSON path, and the grammar check that makes it safe to inline.
+ *
+ * THE FIELD ID IS THE ONE IDENTIFIER THAT BECOMES SQL. Every value in this package is a bound
+ * parameter; a path cannot be, because SQLite has no placeholder for one. So the grammar is the
+ * security boundary, and this file has always said so — and two other files built the same string
+ * by hand, from ids a PACK supplies. A pack is meant to be safe to install from a stranger.
+ *
+ * IT THROWS RATHER THAN RETURNING A REFUSAL, and that is deliberate: an id that reaches here without
+ * having been checked is a bug in the caller, not a value a person typed, and the callers that take
+ * one from a declaration validate it at install. This is the backstop, and a backstop that returns
+ * a value can be ignored.
+ */
+export const jsonPath = (field: string): string => {
+  if (!IDENT.test(field)) throw new TypeError(`${field} is not a field id, and a field id is what becomes a JSON path.`);
+  return `$.${field}`;
+};
 
 const IDENT = /^[a-z][a-z0-9_]{0,31}$/;
 

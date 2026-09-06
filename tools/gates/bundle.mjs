@@ -28,8 +28,11 @@ let manifest;
 try {
   manifest = JSON.parse(await readFile(join(CLIENT, '.vite/manifest.json'), 'utf8'));
 } catch {
+  /* EXIT 3 IS A SKIP, NOT A PASS. Exiting 0 with no build made `pnpm gates` report ten gates
+     passed on a fresh checkout while three of them had examined nothing — the same silence the
+     self-test exists to break, one level up. The runner names a skip and is red under CI. */
   console.log('  bundle: no build to measure — run `pnpm --filter @braindog/web build` first');
-  process.exit(0);
+  process.exit(3);
 }
 
 /** Everything statically reachable from an entry. A dynamic import is a separate chunk by design. */

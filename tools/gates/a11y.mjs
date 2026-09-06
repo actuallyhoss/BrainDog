@@ -148,13 +148,18 @@ await new Promise((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
 /** `id -> { help, nodes: Set<'route scheme@width  target'> }`, so one bug is one line however often it repeats. */
 const found = new Map();
+/** Apps this run did not look at. A skip is not a pass — see the exit at the bottom. */
+const skipped = [];
 let checked = 0;
 /** Scenarios whose keystroke did not produce the state it names — a silently dead key. */
 const broken = [];
 
 for (const app of APPS) {
   if (!(await stat(app.root).catch(() => null))) {
+    /* NOT A PASS. Skipping one app silently dropped the marketing site from every run that did not
+       build it, and the gate still printed its own green line. */
     console.log(`  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`);
+    skipped.push(app.name);
     continue;
   }
   current = app;
@@ -277,3 +282,8 @@ if (broken.length) {
 }
 
 if (found.size || contrast || broken.length) process.exitCode = 1;
+/* AND A RUN THAT LOOKED AT NOTHING IS A SKIP, exit 3 — not the green line it used to print. */
+else if (skipped.length) {
+  console.log(`  a11y: skipped ${skipped.join(', ')} — no build.`);
+  process.exitCode = 3;
+}

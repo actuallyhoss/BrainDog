@@ -36,7 +36,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok } from '@braindog/ports';
-import { evaluate, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, evaluate, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry, Json } from './index.ts';
 import { instant } from './migrate.ts';
@@ -247,11 +247,23 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        the two is what happens. Checked here rather than only at install, because a declaration can
        arrive through a `.dog` import as well as through the linter. */
     const ceiling = matched.writes.confidence ?? 'exact';
-    if (!(CONFIDENCES as readonly string[]).includes(ceiling))
-      return no<Arrived>('ENUM_VALUE_UNKNOWN', `${String(ceiling)} is not a confidence.`, {
-        at: 'writes.confidence',
-        allowed: CONFIDENCES,
+    if (!(CONFIDENCES as readonly string[]).includes(ceiling)) {
+      /* THE BYTES STAY. This returned before `store` had run, and the whole call sits in a savepoint
+         — so a declaration carrying `confidence: high`, which nothing validates at install and which
+         a `.dog` import or a pack installs cleanly, threw the arrival away entirely. `inbox_raw` got
+         no row at all, against 07 §2's "nothing is ever dropped" and this file's own first line.
+
+         A BAD DECLARATION IS A `review`, NOT A DISCARD. The sender did nothing wrong; the pattern
+         did, and the payload is the evidence for fixing it. */
+      store('review', `${String(ceiling)} is not a confidence this record knows, so ${matched.ingest} did not write.`);
+      return ok<Arrived>({
+        raw,
+        ingest: matched.ingest,
+        state: 'review',
+        wrote: [],
+        reason: `${String(ceiling)} is not a confidence this record knows.`,
       });
+    }
 
     /* A FIELD THE PATTERN COULD NOT READ IS `needs-review`, and everything else this vocabulary can
        do reads cleanly or returns nothing — there is no combinator here that chooses or defaults, so
@@ -278,20 +290,41 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       return ok<Arrived>({ raw, ingest: matched.ingest, state, wrote: [], reason, confidence, suggestion });
     }
 
+    /* THE KEY IS A LIST OF FIELD IDS FROM A DECLARATION, and a declaration can come from a pack —
+       which 04 says is meant to be safe to install from a stranger. These were interpolated into
+       `json_extract(fields, '$.<id>')` with no grammar check at all, so a key of
+       `ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x` selected the first row of the register and
+       an `on_conflict: update` then wrote over it. `jsonPath` is the one place that decides whether
+       an identifier may become SQL, and it throws on anything else.
+
+       AND THE VALUE IS BOUND AS ITSELF, not as a string. `json_extract` answers an INTEGER for an
+       `int` field and an object for a `money` one, and SQLite compares storage classes — so
+       `= '1234'` never matched an integer and a numeric dedupe key silently wrote a duplicate row
+       every time. Money is compared on its amount, one level down, for the same reason. */
     const key = matched.writes.key ?? [];
+    const path = (f: string): string => {
+      const type = deps.schemaOf(matched.writes.register)?.fields[f]?.type;
+      return `json_extract(fields, '${jsonPath(f)}${type === 'money' ? '.amount' : type === 'quantity' ? '.value' : ''}')`;
+    };
+    const bound = (f: string): string | number | null => {
+      const v = extracted[f];
+      if (v === undefined || v === null) return null;
+      if (typeof v === 'object') return (v as { amount?: number; value?: number }).amount ?? (v as { value?: number }).value ?? null;
+      return typeof v === 'number' ? v : String(v);
+    };
     const existing = key.length
       ? deps.sql.one<{ id: string; seq: number }>(
           `SELECT id, seq FROM entry WHERE register = ? AND deleted_at IS NULL AND ${key
-            .map((f) => `json_extract(fields, '$.${f}') = ?`)
+            .map((f) => `${path(f)} = ?`)
             .join(' AND ')} LIMIT 1`,
           matched.writes.register,
-          ...key.map((f) => String(extracted[f] ?? '')),
+          ...key.map(bound),
         )
       : undefined;
 
     const conflict = matched.on_conflict ?? 'skip';
     if (existing && conflict === 'skip') {
-      const reason = `${matched.writes.register}#${existing.seq} already says this.`;
+      const reason = `${existing.seq === null ? existing.id : `${matched.writes.register}#${existing.seq}`} already says this.`;
       store('skipped', reason);
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason });
     }
@@ -300,7 +333,10 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 
     const wrote = deps.write(
       matched.writes.register,
-      existing && conflict === 'update' ? `${matched.writes.register}#${existing.seq}` : null,
+      /* BY ID, NOT BY SPOKEN REF. A series register has `seq = null`, so `<register>#null` missed and
+         the arrival landed in `review` citing a row id that does not exist. `rules.ts` fixed the
+         same bug by passing the id; this had the old form. */
+      existing && conflict === 'update' ? existing.id : null,
       extracted,
       `ingest:${matched.ingest}`,
     );
@@ -481,7 +517,13 @@ export function extract(deps: IngestDeps, form: Extractor, text: string): Json |
        the worst possible place for that bug because the row still looks plausible. */
     const n = number(anchored, form.money.sep);
     if (n === null || !form.money.currency) return null;
-    return { amount: Math.round(n * 100), currency: form.money.currency };
+    /* A VALUE THAT WOULD NEED ROUNDING IS REFUSED — 07 §3, and it is the difference between an
+       extractor that is wrong and one that says it cannot read this. `USD 10.555` is not 1056 minor
+       units; it is a payload whose pattern does not fit, and writing the rounded figure puts a
+       number nobody sent into a ledger. */
+    const minor = n * 100;
+    if (Math.abs(minor - Math.round(minor)) > 1e-6) return null;
+    return { amount: Math.round(minor), currency: form.money.currency };
   }
 
   if ('date' in form) return day(anchored, form.date.format);
@@ -540,17 +582,47 @@ function slice(form: Record<string, unknown>, text: string): string | null {
 }
 
 /** The first number in a run of text, with its separators. `null` when there is none. */
-function number(text: string, sep = ','): number | null {
+function number(text: string, sep?: string): number | null {
   /* ONE NUMBER, AND A SPACE ONLY WHERE A GROUP OF THREE FOLLOWS IT. A character class that took any
      whitespace read `EGP 250 2 items` as 250,200 — the digits of the next word glued on, and a
      ledger row nobody reads twice. */
-  const m = /-?\d+(?:[\s'.,]\d{3})*(?:[.,]\d+)?/.exec(text);
+  /* A SPACE GROUPS ONLY IN THREES; A MARK MAY BE FOLLOWED BY ANY RUN. The two were one class with a
+     `\d{3}` requirement, so `10.5555` matched `10.555` and abandoned the last digit — reading a
+     four-decimal amount as a grouped one, which is the arithmetic this function exists to get right.
+     The three-digit guard belongs on the whitespace alternative alone, where it stops
+     `EGP 250 2 items` reading as 250,200. */
+  const m = /-?\d+(?:[\s'][0-9]{3})*(?:[.,]\d+)*/.exec(text);
   if (!m) return null;
-  /* THE THOUSANDS SEPARATOR IS DECLARED AND THE DECIMAL POINT IS WHAT IS LEFT. Guessing between
-     `1.234` as one thousand and as one-and-a-bit is how an extractor is wrong by a thousand times
-     on a payload nobody reads twice. */
-  const cleaned = m[0].replace(/\s|'/g, '').split(sep).join('');
-  const n = Number(sep === '.' ? cleaned.replace(',', '.') : cleaned);
+
+  const raw = m[0].replace(/[\s']/g, '');
+  const marks = [...raw.matchAll(/[.,]/g)];
+
+  /* 07 §3'S THOUSANDS RULE, READ OFF THE DIGITS RATHER THAN DECLARED.
+
+     `sep` WAS THE WHOLE OF IT AND IT DEFAULTED TO A COMMA, so `1.250` read as 1.25 — a European
+     amount a thousand times too small, on a row that still looks plausible — and `int` had no way to
+     pass one at all, so `Quantity: 2.000` read as 2 and `1.500` read as null: the same declaration
+     refusing one payload and silently mis-reading the next.
+
+     THE DIGITS SAY WHICH IS WHICH. A lone separator followed by exactly three digits is grouping; a
+     lone one followed by any other count is the decimal point; with two or more, the LAST one that
+     differs from the others is the decimal point and the rest are grouping. A declared `sep` still
+     wins where a caller supplied one, because a caller who knows the locale knows better than the
+     digits do. */
+  const decimalAt = ((): number | null => {
+    if (marks.length === 0) return null;
+    const last = marks.at(-1)!;
+    if (sep !== undefined) return last[0] === sep ? null : last.index;
+    if (marks.length === 1) return raw.length - last.index - 1 === 3 ? null : last.index;
+    const kinds = new Set(marks.map((x) => x[0]));
+    return kinds.size === 1 ? null : last.index;
+  })();
+
+  const digits = decimalAt === null
+    ? raw.replace(/[.,]/g, '')
+    : `${raw.slice(0, decimalAt).replace(/[.,]/g, '')}.${raw.slice(decimalAt + 1).replace(/[.,]/g, '')}`;
+
+  const n = Number(digits);
   return Number.isFinite(n) ? n : null;
 }
 

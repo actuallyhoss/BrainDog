@@ -318,7 +318,9 @@ test('TAKING A PACK OUT KEEPS THE ROWS, and says how many are left where', async
 
   assert.equal(out.declarations, 2);
   assert.deepEqual(out.rows_kept, { obligations: 412 });
-  assert.deepEqual(host.log, ['retire:register.obligations,rule.chase', 'forget:studio-books']);
+  /* `reload` LAST, and inside the same `finally` an install uses: the two of them are one
+     transaction now, so whichever way it ends the caches are rebuilt from what the record holds. */
+  assert.deepEqual(host.log, ['retire:register.obligations,rule.chase', 'forget:studio-books', 'reload']);
 
   assert.equal(refusal(uninstall('nothing', fakeHost())).code, 'OUT_OF_BOUNDS');
 });
@@ -399,4 +401,71 @@ test('and a body this record cannot write down is a refusal, never a throw', asy
 
   const big = { register: 'bigs', name: 'B', title: 'what', fields: [], size: 1n };
   assert.equal(refusal(await normalise(DOC({ declarations: [big], seeds: [] }))).code, 'PACK_MALFORMED');
+});
+
+/* ── which version satisfies which range ─────────────────────────────────── */
+
+test('A SPACE-SEPARATED RANGE IS EVERY COMPARATOR, and all of them must hold', () => {
+  /* `>=1.0.0 <2.0.0` fell into the `>=` branch whole and `parts()` read `1.0.0 <2.0.0` as `1.0.0`,
+     so the upper bound vanished and 3.0.0 satisfied it — a dependency check admitting the major
+     version the range exists to exclude. */
+  assert.equal(satisfies('1.5.0', '>=1.0.0 <2.0.0'), true);
+  assert.equal(satisfies('3.0.0', '>=1.0.0 <2.0.0'), false);
+  assert.equal(satisfies('0.9.0', '>=1.0.0 <2.0.0'), false);
+});
+
+test('and `x` is a wildcard in the position it sits in', () => {
+  // It compared the major only, so `1.2.x` meant `1.x` and admitted 1.9.0: a range written to pin a
+  // minor, pinning nothing.
+  assert.equal(satisfies('1.2.7', '1.2.x'), true);
+  assert.equal(satisfies('1.9.0', '1.2.x'), false);
+  assert.equal(satisfies('2.2.0', '1.2.x'), false);
+  assert.equal(satisfies('1.9.0', '1.x'), true);
+});
+
+test('A PRERELEASE ORDERS BY ITS IDENTIFIERS, numerically where they are numbers', () => {
+  /* As a single string `alpha.10 < alpha.9`, so `>=1.0.0-alpha.9` refused `alpha.10` — the later
+     version. And `v.split('-')` destructured the second element, so `rc-1` and `rc-2` both became
+     `rc` and compared equal: two different prereleases the check could not tell apart. */
+  assert.equal(satisfies('1.0.0-alpha.10', '>=1.0.0-alpha.9'), true);
+  assert.equal(satisfies('1.0.0-alpha.9', '>=1.0.0-alpha.10'), false);
+  assert.equal(satisfies('1.0.0-rc-2', '>1.0.0-rc-1'), true);
+  assert.equal(satisfies('1.0.0-rc-1', '>1.0.0-rc-2'), false);
+  // A numeric identifier is below an alphanumeric one, and fewer identifiers is below more.
+  assert.equal(satisfies('1.0.0-alpha.beta', '>1.0.0-alpha.1'), true);
+  assert.equal(satisfies('1.0.0-alpha.1', '>1.0.0-alpha'), true);
+});
+
+test('and a prerelease is still below its own release', () => {
+  // The rule stripping the tag used to break: it made `1.0.0-alpha` satisfy `>=1.0.0`, a check
+  // admitting the version somebody marked as not ready.
+  assert.equal(satisfies('1.0.0-alpha', '>=1.0.0'), false);
+  assert.equal(satisfies('1.0.0', '>=1.0.0-alpha'), true);
+});
+
+test('AND AN UNINSTALL THAT FAILS HALFWAY LEAVES NOTHING HALF-DONE', () => {
+  /* `retire` and `forget` each opened their own transaction and nothing wrapped the pair, so a
+     failure between them left the declarations retired and the pack row alive: `listPacks` still
+     showed a pack whose registers were gone, and retrying was impossible because `claimed` filters
+     on `retired = 0`, so the second attempt answered "not installed". An uninstall that can leave
+     the record in a state no command can reach is not an uninstall. */
+  let rolled = false;
+  const host = fakeHost({
+    claimed: () => ['register.obligations'],
+    count: () => 4,
+    forget: () => {
+      throw new Error('the pack row would not go');
+    },
+    transaction: <T,>(fn: () => T): T => {
+      try {
+        return fn();
+      } catch (e) {
+        rolled = true;
+        throw e;
+      }
+    },
+  });
+
+  assert.throws(() => uninstall('studio-books', host));
+  assert.ok(rolled, 'the retire was not inside a transaction the forget could roll back');
 });

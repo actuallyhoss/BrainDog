@@ -365,11 +365,19 @@ test('THE CEILING ONLY EVER BRINGS IT DOWN: an unreadable field beats an `exact`
   assert.equal(out.confidence, 'needs-review');
   assert.match(out.reason ?? '', /could not read amount/);
 
-  // And a confidence outside the three is refused rather than stored.
+  /* AND A CONFIDENCE OUTSIDE THE THREE KEEPS THE BYTES. This used to refuse before `store` had run,
+     and the whole call sits in a savepoint — so a declaration carrying `confidence: probably`, which
+     nothing validates at install and which a `.dog` import or a pack installs cleanly, threw the
+     arrival away entirely: `inbox_raw` got no row, against 07 §2's "nothing is ever dropped". The
+     sender did nothing wrong; the pattern did, and the payload is the evidence for fixing it. */
   const bad = await record(HSBC({ writes: { register: 'transactions', confidence: 'probably' } }));
-  const r = bad.k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'c3' });
-  assert.equal(r.ok, false);
-  assert.equal((r as { refusal: { code: string; at?: string } }).refusal.code, 'ENUM_VALUE_UNKNOWN');
+  const r = value<Arrived>(
+    bad.k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'c3' }),
+  );
+  assert.equal(r.state, 'review');
+  assert.match(r.reason ?? '', /not a confidence/);
+  assert.equal(bad.sql.all('SELECT 1 FROM inbox_raw').length, 1, 'the bytes were thrown away');
+  assert.equal(bad.k.count('transactions'), 0, 'and nothing was written from a declaration it could not read');
   sql.close();
   bad.sql.close();
 });
@@ -509,4 +517,91 @@ test('and a declared DD/MM/YY does not read the first half of a four-digit year'
   assert.equal(ingestDay('paid 03/04/2026', 'DD/MM/YYYY'), '2026-04-03');
   assert.equal(ingestDay('paid 03/04/26', 'DD/MM/YY'), '2026-04-03');
   assert.equal(ingestDay('ref 12026-04-03', 'YYYY-MM-DD'), null);
+});
+
+/* ── what a pack may put in a query ──────────────────────────────────────── */
+
+test('A FIELD ID FROM A DECLARATION CANNOT BECOME SQL', async () => {
+  /* `writes.key` is a list of field ids from a declaration, and a declaration can come from a pack —
+     which 04 says is meant to be safe to install from a stranger. They were interpolated into
+     `json_extract(fields, '$.<id>')` with no grammar check, so a key of
+     `ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x` selected the first row of the register and an
+     `on_conflict: update` wrote over it. */
+  const { k, sql } = await record(
+    HSBC({
+      writes: {
+        register: 'transactions',
+        key: ["ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x"],
+      },
+    }),
+  );
+  assert.throws(
+    () => k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'inj' }),
+    /is not a field id/,
+  );
+  sql.close();
+});
+
+test('A NUMERIC DEDUPE KEY MATCHES, which it never did', async () => {
+  /* The key values were bound as strings and `json_extract` answers an INTEGER for an `int` field
+     and an object for a `money` one — and SQLite compares storage classes, so `= '1234'` never
+     matched. Every re-notice of one payment wrote a second row and the money was counted twice. */
+  const { k, sql } = await record(HSBC({ writes: { register: 'transactions', key: ['amount'] } }));
+  const first = value<Arrived>(
+    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'm1' }),
+  );
+  assert.equal(first.state, 'matched');
+
+  const again = value<Arrived>(
+    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert (resent)' }, body: MAIL, sha256: 'm2' }),
+  );
+  assert.equal(again.state, 'skipped', 'the same amount arrived twice and was written twice');
+  assert.equal(k.count('transactions'), 1);
+  sql.close();
+});
+
+test('A DOT-GROUPED AMOUNT IS NOT A THOUSAND TIMES TOO SMALL', () => {
+  /* `sep` was the whole of the thousands rule and it defaulted to a comma, so `EGP 1.250` read as
+     125 minor units — EGP 1.25 for EGP 1,250.00, on a row that still looks plausible. And `int` had
+     no way to pass one at all, so `Quantity: 2.000` read as 2 while `1.500` read as null: the same
+     declaration refusing one payload and silently mis-reading the next.
+
+     07 §3's rule reads it off the digits: a lone separator followed by exactly three digits is
+     grouping, and with two or more the last one that differs is the decimal point. */
+  const money = (text: string, sep?: string) =>
+    extractField({} as never, { money: { currency: 'EGP', ...(sep === undefined ? {} : { sep }) } } as never, text);
+
+  assert.deepEqual(money('EGP 1.250'), { amount: 125_000, currency: 'EGP' });
+  assert.deepEqual(money('EGP 1,250'), { amount: 125_000, currency: 'EGP' });
+  assert.deepEqual(money('EGP 1250'), { amount: 125_000, currency: 'EGP' });
+  assert.deepEqual(money('EGP 1.250,00'), { amount: 125_000, currency: 'EGP' });
+  assert.deepEqual(money('EGP 1,250.00'), { amount: 125_000, currency: 'EGP' });
+  assert.deepEqual(money('EGP 12,50'), { amount: 1250, currency: 'EGP' }, 'two digits after a lone mark is a decimal');
+  // A declared separator still wins, because a caller who knows the locale knows better.
+  assert.deepEqual(money('EGP 1.250', '.'), { amount: 125_000, currency: 'EGP' });
+});
+
+test('and an amount that would need rounding is refused', () => {
+  /* 07 §3. `USD 10.5555` is not 1056 minor units; it is a payload whose pattern does not fit, and
+     writing the rounded figure puts a number nobody sent into a ledger.
+
+     `10.555` IS NOT THAT CASE, and the difference is the thousands rule doing its job: a lone
+     separator followed by exactly THREE digits is grouping, so that is ten thousand five hundred and
+     fifty-five. Four digits after a lone mark is a decimal, and 1055.55 minor units is not a number
+     of minor units. */
+  assert.deepEqual(extractField({} as never, { money: { currency: 'USD' } } as never, 'USD 10.555'), {
+    amount: 1_055_500,
+    currency: 'USD',
+  });
+  assert.equal(extractField({} as never, { money: { currency: 'USD' } } as never, 'USD 10.5555'), null);
+  assert.deepEqual(extractField({} as never, { money: { currency: 'USD' } } as never, 'USD 10.55'), {
+    amount: 1055,
+    currency: 'USD',
+  });
+});
+
+test('AND AN INTEGER READS ITS OWN GROUPING', () => {
+  assert.equal(extractField({} as never, { int: {} } as never, 'Quantity: 2.000 units'), 2000);
+  assert.equal(extractField({} as never, { int: {} } as never, 'Quantity: 1.500 units'), 1500);
+  assert.equal(extractField({} as never, { int: {} } as never, 'Quantity: 2 units'), 2);
 });

@@ -49,17 +49,34 @@ const GATES = [
 
 const failed = [];
 
+/**
+ * Gates that could not run — exit 3, which is a skip and not a pass.
+ *
+ * THREE OF THESE PRINTED GREEN WITH NO BUILD. `bundle`, `layout` and `a11y` exited 0 when there was
+ * nothing to measure, so `pnpm gates` on a fresh checkout reported every gate passed with three of
+ * them having examined nothing — the same silence `self-test.mjs` exists to break, one level up.
+ *
+ * UNDER `CI` A SKIP IS RED, because CI builds first: a skip there means the build did not happen and
+ * the three gates that look at the shipped product were not among the ones that ran.
+ */
+const skipped = [];
+
 for (const [name, [cmd, args, opts]] of GATES) {
   process.stdout.write(`\n▸ ${name}\n`);
   const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: false, ...opts });
-  if (r.status !== 0) failed.push(name);
+  if (r.status === 3) skipped.push(name);
+  else if (r.status !== 0) failed.push(name);
 }
 
+if (skipped.length && process.env.CI) failed.push(...skipped);
+
 // NAMED, not counted. "1 of 8 gates failed" over a screen of eight gates' output is a search.
+const ran = GATES.length - skipped.length;
+const aside = skipped.length === 0 ? '' : ', and ' + skipped.length + ' could not run: ' + skipped.join(', ');
 console.log(
   failed.length === 0
-    ? `\n  ${GATES.length} gates passed.\n`
-    : `\n  ${failed.length} of ${GATES.length} gates failed: ${failed.join(', ')}.\n`,
+    ? '\n  ' + ran + ' of ' + GATES.length + ' gates passed' + aside + '.\n'
+    : '\n  ' + [...new Set(failed)].length + ' of ' + GATES.length + ' gates failed: ' + [...new Set(failed)].join(', ') + '.\n',
 );
 
 if (failed.length) process.exitCode = 1;
