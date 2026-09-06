@@ -188,7 +188,11 @@ export const PACKS: PackInfo[] = [
    the screen advanced the mark on open and then asked for everything since it (19 §6). */
 
 export const NEWS: NewsItem[] = [
-  { at: stamp(-3), by: 'claude', text: 'Added 4 services from the Fenwick invoice', href: '/r/services', tone: 'info' },
+  /* TWO, WHICH IS WHAT THE AUDIT RECORDS. This said four, and `/audit` holds `entry.create` for
+     `services#6` and `services#7` and no others — so the one screen a person checks a claim against
+     contradicted the claim, on the surface whose whole job is telling you what happened while you
+     were not looking. The audit is the source: everything else quotes it. */
+  { at: stamp(-3), by: 'claude', text: 'Added 2 services from the Fenwick invoice', href: '/r/services', tone: 'info' },
   { at: stamp(-9), by: 'rule.reply', text: 'Halden replied on 2026-041 — payment run on the 12th', href: '/r/obligations/1', tone: 'good' },
   { at: stamp(-14), by: 'you', text: 'Marked Kerning pass, lowercase done', href: '/r/tasks/12' },
   { at: stamp(-26), by: 'rule.renewal', text: 'kilnfonts.example moved to lapsing — auto-renew is off', href: '/r/services/2', tone: 'bad' },
@@ -272,6 +276,28 @@ export const AUDIT: AuditEvent[] = [
   { seq: 4102, at: stamp(-49), by: 'claude', kind: 'entry.update', target: 'people#4', note: 'note ← "Year end is 31 March"', version: 4102 },
   { seq: 4061, at: stamp(-96), by: 'you', kind: 'declaration.set', target: 'page.money', note: 'Added the Overdue stat cell', version: 4061 },
 ];
+
+/**
+ * THE AUDIT IS THE SOURCE, and every other surface quotes it.
+ *
+ * Rows get a mechanical `created` and `by` — every one "by you", spaced 37 hours apart — because a
+ * fixture has to say something. Then the audit says claude created `services#6` three days ago, and
+ * the row's own detail said "Added 9d ago by you". Two screens, one event, two stories, on the pair
+ * whose whole job is that a row's history is checkable.
+ *
+ * SO THE AUDIT WINS, and the rows are moved to agree with it. A record whose provenance disagrees
+ * with its own ledger has no provenance — the ledger is what makes "who put this here" answerable at
+ * all, and 20 §8 is the reason there is one.
+ */
+for (const event of AUDIT) {
+  if (event.kind !== 'entry.create') continue;
+  const [register, seq] = event.target.split('#');
+  const row = (ROWS[register ?? ''] ?? []).find((e) => e.seq === Number(seq));
+  if (row) {
+    row.created = event.at;
+    row.by = event.by;
+  }
+}
 
 /* ── a tier-C run ────────────────────────────────────────────────────────── */
 

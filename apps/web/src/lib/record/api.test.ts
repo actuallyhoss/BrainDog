@@ -24,7 +24,7 @@ import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
 import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
-import { JOB, NOW, REGISTERS, ROWS, VAULT } from './data.ts';
+import { AUDIT, JOB, NEWS, NOW, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
@@ -652,4 +652,27 @@ test('A RUN LOG QUOTES A NUMBER SOMEBODY CAN GET BACK TO', () => {
 
   const fenwick = (ROWS.services ?? []).filter((e) => String(e.fields.provider ?? '').includes('Fenwick')).length;
   assert.equal(JOB.events.find((e) => e.seq === 6)!.out, `${fenwick} rows`);
+});
+
+test('A ROW AND THE LEDGER AGREE ABOUT WHO PUT IT THERE', () => {
+  /* The audit records claude creating `services#6` three days ago; the row's own detail said "Added
+     9d ago by you". Two screens, one event, two stories — on the pair whose whole job is that a
+     row's history is checkable. A record whose provenance disagrees with its own ledger has no
+     provenance. */
+  for (const event of AUDIT) {
+    if (event.kind !== 'entry.create') continue;
+    const [register, seq] = event.target.split('#');
+    const row = (ROWS[register!] ?? []).find((e) => e.seq === Number(seq));
+    assert.ok(row, `${event.target} is in the audit and not in the record`);
+    assert.equal(row.by, event.by, `${event.target}: the row and the ledger disagree about who`);
+    assert.equal(row.created, event.at, `${event.target}: the row and the ledger disagree about when`);
+  }
+
+  /* AND THE "WHILE YOU WERE AWAY" LINE COUNTS WHAT THE LEDGER HOLDS. It said four services and the
+     audit records two, on the surface whose whole job is telling you what happened while you were
+     not looking. */
+  const made = AUDIT.filter((e) => e.kind === 'entry.create' && e.target.startsWith('services#')).length;
+  const line = NEWS.find((n) => n.text.includes('services from the Fenwick invoice'));
+  assert.ok(line, 'the away list no longer mentions the Fenwick services, so this test proves nothing');
+  assert.match(line.text, new RegExp(`Added ${made} services`), 'the away list and the audit disagree about how many');
 });
