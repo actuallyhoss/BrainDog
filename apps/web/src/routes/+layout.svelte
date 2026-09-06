@@ -371,14 +371,22 @@
       display: block;
     }
 
-    /* The tab bar owns the bottom of a phone, so the circle lifts clear of it rather than covering
-       the fifth tab. It stays a circle and stays in the corner: one launcher, one shape, one place
-       to look, whatever the window is doing. */
+    /* THE TOP OF A PHONE, WHERE THE HEADER ALREADY KEEPS ROOM FOR IT. `PageHead` reserves 56px of
+       trailing padding below 900px and says why in its own comment — "the palette launcher is a fixed
+       header button at this width, so the title clears it" — and the launcher was at the bottom, so
+       the reservation held empty space at the top while the circle sat on the rows.
+
+       AND ON A PHONE IT COVERED THEM ALWAYS, not just at the end of a scroll. `.body`'s bottom
+       padding clears the launcher for the LAST row; a floating circle in the bottom-right corner is
+       over whatever is there the rest of the time — it took the final digit off a money figure on
+       Home and a row's own id on a register. The tab bar owns the bottom of a phone; the header owns
+       the top, and the space was already made. */
     .launcher {
-      inset-block-end: calc(56px + var(--sp-3));
+      inset-block-start: var(--sp-2);
+      inset-block-end: auto;
       inset-inline-end: var(--sp-3);
-      inline-size: 48px;
-      block-size: 48px;
+      inline-size: 40px;
+      block-size: 40px;
     }
   }
 
