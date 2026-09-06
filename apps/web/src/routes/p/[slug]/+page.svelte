@@ -137,7 +137,7 @@
       ...(arrangement.slots ?? (result?.blocks ?? []).map((b, i) => ({ i, span: spanOf(b) }))),
       { i: (result?.blocks.length ?? 0) + extra.length - 1, span: block.span ?? 12 },
     ];
-    toasts.push(copy.blockAdded(block.kind), { intent: 'warn' });
+    toasts.push(copy.blockAdded(copy.kindNames[block.kind] ?? block.kind), { intent: 'warn' });
   }
 
   /**
@@ -506,7 +506,11 @@
               />
             {/if}
             <header class="block-bar">
-              <h2 class="block-name" id="h-{slot.i + 1}">{block.heading ?? block.kind}</h2>
+              <!-- A BLOCK WITH NO AUTHORED `heading:` PRINTED ITS DIALECT ID: `spec`, `chips`, `gauge`,
+                   `params`, `tree`. `kindNames` exists for this and says why in its own header — an id is
+                   what an agent writes into a declaration, a name is what a person reads — and the two
+                   screens where a READER rather than an author is looking were the two that skipped it. -->
+              <h2 class="block-name" id="h-{slot.i + 1}">{block.heading ?? copy.kindNames[block.kind] ?? block.kind}</h2>
               {#if block.register}
                 <!-- THE REGISTER'S NAME, not its id. This line is provenance a person reads, and
                      it was printing `obligations` where the rest of the product says Obligations —

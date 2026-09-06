@@ -106,7 +106,7 @@
            smallest honest diff for one added block is the sentence describing it. -->
       <p class="preview">
         <Icon name="plus" size="s" />
-        {copy.willAdd(kind, isKind(kind) ? KINDS[kind].minSpan : 4)}
+        {copy.willAdd(copy.kindNames[kind] ?? kind, isKind(kind) ? KINDS[kind].minSpan : 4)}
       </p>
     {/if}
   </div>

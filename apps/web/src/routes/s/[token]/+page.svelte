@@ -81,7 +81,11 @@
         {#if block.drawn}
           {@const drawn = draw(block)}
           <section class="block-slot">
-            <h2 class="block-name">{block.heading ?? block.kind}</h2>
+            <!-- A BLOCK WITH NO AUTHORED `heading:` PRINTED ITS DIALECT ID: `spec`, `chips`, `gauge`,
+                 `params`, `tree`. `kindNames` exists for this and says why in its own header — an id is
+                 what an agent writes into a declaration, a name is what a person reads — and the two
+                 screens where a READER rather than an author is looking were the two that skipped it. -->
+            <h2 class="block-name">{block.heading ?? copy.kindNames[block.kind] ?? block.kind}</h2>
             <!-- EVERY kind, through the same conversion the page route uses. This branch used to
                  read `{:else if block.metrics}`, so a `note` or a `bar` on a shared page drew its
                  heading and then nothing — a section title over an empty body, which tells the

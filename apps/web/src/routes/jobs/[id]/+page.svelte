@@ -56,8 +56,12 @@
 </PageHead>
 
 <div class="page">
+  <!-- IT SAID "RUNNING" WHATEVER THE STATUS WAS. The chip above reads `failed` and this line read
+       "Running search" underneath it — one screen, two answers, and the wrong one is the sentence.
+       The status is the subject of the line now, and the tool is the detail. -->
   <p class="status">
-    Running <code>{last?.tool}</code> · {JOB.model}
+    {copy.jobStatus[JOB.status] ?? JOB.status}{#if last}
+      · last step <code>{last.tool}</code>{/if} · {JOB.model}
   </p>
 
   <!-- ONE ROW, DRAWN ONCE. A pressable step and a flat one differ in the element and in the chevron

@@ -24,7 +24,7 @@
   import * as pref from '$lib/pref.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { iconFor, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { iconFor, PAGES, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -725,7 +725,12 @@
     predicate={whereOf(filters) || q || copy.everything}
     says={whereOf(filters) || (q ? `matching “${q}”` : copy.everything)}
     onbind={(toPage, kind) =>
-      toasts.push(copy.notWritten(`This ${kind} would be added to ${toPage}, reading ${decl.name.toLowerCase()}`), { intent: 'warn' })}
+      toasts.push(
+        copy.notWritten(
+          `A ${(copy.kindNames[kind] ?? kind).toLowerCase()} would be added to ${PAGES[toPage]?.title ?? toPage}, reading ${decl.name.toLowerCase()}`,
+        ),
+        { intent: 'warn' },
+      )}
   />
 
   <!-- Display options: what YOU see, never what the record says. `v`. -->

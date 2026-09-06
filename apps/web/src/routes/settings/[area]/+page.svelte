@@ -252,11 +252,12 @@
               <div class="line">
                 <span class="seq">{p.id}</span>
                 <span class="line-main"><span class="line-title">{p.name}</span></span>
-                <span class="line-amount"><Chip label={p.level} tone={p.level === 'owner' ? 'good' : undefined} /></span>
-                <!-- This printed the TOTAL number of lists in the record on every person's row,
-                     identical for all of them, which reads as a per-person figure and is not one.
-                     What the column is for is what this person can reach. -->
-                <span class="line-when">{p.level === 'owner' ? 'Everything' : 'Read only'}</span>
+                <!-- ONE CELL, NOT TWO. A chip printed the enum (`write`) and the cell beside it
+                     collapsed three levels into two with a ternary — so a person with write access
+                     read `write` … `Read only`, two cells three inches apart contradicting each
+                     other about who can change the business record. What the column is for is what
+                     this person can do, said once, in a sentence. -->
+                <span class="line-when">{copy.levelMeans[p.level] ?? p.level}</span>
               </div>
             </li>
           {/each}

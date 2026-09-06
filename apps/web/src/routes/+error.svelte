@@ -6,19 +6,35 @@
 </script>
 
 <div class="page">
-  <!-- One sentence in the house voice, never a stack trace, and a copyable request id always: the
-       client mints an X-Request-Id on every call and the host echoes and logs it (19 §6). -->
-  <Empty
-    kind="error"
-    title={page.status === 404 ? `There is nothing at ${page.url.pathname}.` : "Couldn't load this screen."}
-    body={page.error?.message}
-    rid="r7k2m9qd4x"
-  >
-    {#snippet actions()}
-      <Button weight="primary" href="/">{copy.home}</Button>
-      <Button onclick={() => location.reload()}>{copy.tryAgain}</Button>
-    {/snippet}
-  </Empty>
+  <!--
+    ONE SENTENCE IN THE HOUSE VOICE, AND IT WAS TWO. `page.error.message` is SvelteKit's string and
+    not this product's: on a 404 it is the literal `Not Found`, so a mistyped URL read "There is
+    nothing at /moneyy." and then "Not Found" underneath it — the same fact twice, the second time in
+    the framework's words. On a thrown error it is whatever a developer typed into `error()`, which
+    is the stack trace the comment here used to promise it never showed.
+
+    AND A MISTYPED URL IS NOT AN ALARM. `/[id]` answers the identical event with `no-results` and
+    says why: spending the alarm colour on "you typed an id that does not exist" is how a product
+    teaches people that red means nothing in particular. Two not-found screens, one colour now.
+
+    THE REQUEST ID BELONGS TO THE FAILURE AND NOT TO THE TYPO. The client mints an `X-Request-Id` on
+    every call and the host echoes and logs it (19 §6) — there is nothing to look up for a path
+    that was never a route.
+  -->
+  {#if page.status === 404}
+    <Empty kind="no-results" title={`There is nothing at ${page.url.pathname}.`}>
+      {#snippet actions()}
+        <Button weight="primary" href="/">{copy.home}</Button>
+      {/snippet}
+    </Empty>
+  {:else}
+    <Empty kind="error" title={copy.screenFailed} body={copy.screenFailedBody} rid="r7k2m9qd4x">
+      {#snippet actions()}
+        <Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>
+        <Button href="/">{copy.home}</Button>
+      {/snippet}
+    </Empty>
+  {/if}
 </div>
 
 <style>

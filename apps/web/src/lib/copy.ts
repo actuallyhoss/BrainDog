@@ -13,6 +13,23 @@
  *   - Say what a thing does, plainly. Never sell it, and never explain the interface.
  */
 
+/**
+ * Twelfths, as a person would say them.
+ *
+ * A BLOCK'S WIDTH IS A NUMBER OF TWELFTHS and that is the right storage: it composes, it survives a
+ * theme, and every layout question is arithmetic. It is not what somebody says out loud — "4 of 12"
+ * is the grid explaining itself to the person using it.
+ */
+const widths: Record<number, string> = {
+  2: 'a sixth of the',
+  3: 'a quarter of the',
+  4: 'a third of the',
+  6: 'half the',
+  8: 'two thirds of the',
+  9: 'three quarters of the',
+  12: 'the full',
+};
+
 /** `a`, `a and b`, `a, b and c` — an Oxford-less list, which is what a person writes. */
 const list = (words: string[]): string =>
   words.length <= 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
@@ -71,11 +88,22 @@ export const copy = {
   asA: 'Draw it as',
   onPage: 'On the page',
   noDestination: (register: string) => `No page shows ${register} yet.`,
-  willAdd: (kind: string, span: number) => `Adds a ${kind} to the end of the page, ${span} of 12 wide.`,
-  bound: (kind: string, page: string) =>
-    `Added a ${kind} to ${page}. Nothing was written; this is a mock-up.`,
+  /**
+   * WHAT WILL BE ADDED, IN THE WORDS THE CONTROL ABOVE IT USED.
+   *
+   * ALL THREE TOOK THE DIALECT ID. The dropdown read *Label and value* and the line under it read
+   * "Adds a spec to the end of the page" — one control, two vocabularies for one object — and
+   * `blockAdded` produced "Added a chips.", which is not English. `kindNames` exists for exactly
+   * this and its own header says why: an id is what an agent writes into a declaration, a name is
+   * what a person picks from a list.
+   *
+   * AND THE WIDTH IS A PROPORTION. "4 of 12 wide" is the grid describing itself; a third of the
+   * width is the same fact in the words somebody would use to ask for it.
+   */
+  willAdd: (name: string, span: number) => `Adds a ${name} to the end of the page, ${widths[span] ?? `${span} of 12`} wide.`,
+  bound: (name: string, page: string) => `Added a ${name} to ${page}. Nothing was written; this is a mock-up.`,
   blockLink: 'a link to this block',
-  blockAdded: (kind: string) => `Added a ${kind}. Nothing was written; this is a mock-up.`,
+  blockAdded: (name: string) => `Added a ${name}. Nothing was written; this is a mock-up.`,
 
   /* The picker groups by PURPOSE, because somebody adding a block knows they want to show a list
      and does not know that `todo` and `timeline` share a primitive while `chips` does not. */
@@ -198,6 +226,40 @@ export const copy = {
   yes: 'Yes',
   secretsLiveInTheVault: 'Keys and tokens go in the Vault. A row records what one opens.',
   savedNothing: 'Nothing was written. This is a mock-up of the record, not the record.',
+  /**
+   * WHAT A LEVEL MEANS, IN ONE CELL. There were two: a chip printing the enum (`write`) and, three
+   * inches away, a sentence collapsing three levels into two with a ternary — so S. Marchetti's row
+   * read `write` … `Read only`, two cells contradicting each other about who can change the
+   * business record. The chip was also the schema's spelling, lower-cased, on the one screen where
+   * a person decides who to trust.
+   */
+  /**
+   * WHAT A RUN IS DOING, as a sentence rather than an enum.
+   *
+   * The chip beside it printed `running` and `failed` in the schema's own lower case, and the line
+   * under it said "Running" unconditionally — so a failed run described itself as running, on the
+   * screen somebody opens BECAUSE something went wrong.
+   */
+  /* WHEN A SCREEN DOES NOT LOAD. What was wrong · where · what to do — and the reassurance is a fact
+     about the record rather than an apology: nothing was written, because this screen never got as
+     far as writing. */
+  screenFailed: 'This screen did not load.',
+  screenFailedBody: 'Nothing was changed. Try again, and if it happens twice, quote the request below.',
+
+  jobStatus: {
+    running: 'Running',
+    done: 'Finished',
+    failed: 'Stopped after a step was refused',
+    queued: 'Waiting to start',
+  } as Record<string, string>,
+
+  levelMeans: {
+    owner: 'Can change everything, and invite people',
+    decide: 'Can change rows, and answer questions',
+    write: 'Can add and change rows',
+    append: 'Can add rows, and not read the rest',
+    read: 'Can read, cannot change',
+  } as Record<string, string>,
   /* THE SAME ANSWER `/decide` GIVES TO THE SAME QUESTION. A disabled control says why it is
      disabled, and the register's own declaration is what says which fields cannot be left out — so
      the sentence names them rather than saying "some fields". */

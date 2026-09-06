@@ -80,7 +80,8 @@
     register={view.register}
     predicate={view.name}
     says={whereOf(view.filters)}
-    onbind={(target, kind) => toasts.push(copy.bound(kind, PAGES[target]?.title ?? target), { intent: 'warn' })}
+    onbind={(target, kind) =>
+      toasts.push(copy.bound(copy.kindNames[kind] ?? kind, PAGES[target]?.title ?? target), { intent: 'warn' })}
   />
 
   <div class="page">

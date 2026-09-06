@@ -44,9 +44,19 @@
   const health = $derived(trackHealth(seq));
   const updates = $derived(updatesFor(seq));
   const sessions = $derived(sessionsFor(seq));
-  /* Tasks are optional on a track and most carry none, so this is usually empty and that is the
-     normal case rather than a gap (10 §7). */
-  const tasks = $derived((ROWS.tasks ?? []).filter((t) => Number(t.fields.track) === seq));
+  /**
+   * The tasks on this track that are STILL OPEN, which is what the heading says.
+   *
+   * IT FILTERED ON THE TRACK AND NOT ON THE STATE. The section is titled "Still open" and carried
+   * every task pointing at the track — `done` and `dropped` among them — with the count beside the
+   * heading counting those too. A heading that claims a predicate the list does not apply is worse
+   * than no heading: somebody reads three and believes three are outstanding.
+   */
+  const tasks = $derived(
+    (ROWS.tasks ?? []).filter(
+      (t) => Number(t.fields.track) === seq && t.fields.state !== 'done' && t.fields.state !== 'dropped',
+    ),
+  );
 
   const live = $derived(sessions.filter((s) => s.fields.state === 'live').length);
 </script>
@@ -112,7 +122,8 @@
     <aside class="side">
       <Section title="Agents on this" count={sessions.length}>
       {#if sessions.length === 0}
-        <p class="quiet">Nothing pinned here.</p>
+        <!-- `pinned` appeared nowhere else in the product and nothing pins anything. -->
+        <p class="quiet">No agent is working on this.</p>
       {:else}
         <ul class="rows">
           {#each sessions as s (s.seq)}
@@ -141,7 +152,9 @@
 
       <Section title="Still open" count={tasks.length}>
       {#if tasks.length === 0}
-        <p class="quiet">No task points at this track, which is the normal case.</p>
+        <!-- `points at` is the schema's word for a `ref`, and the second half reassured the reader
+             that nothing was wrong — the product explaining itself rather than saying the fact. -->
+        <p class="quiet">No open tasks on this track.</p>
       {:else}
         <ul class="rows">
           {#each tasks as t (t.seq)}

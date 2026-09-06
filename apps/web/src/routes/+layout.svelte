@@ -37,6 +37,7 @@
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Palette from '$lib/palette/Palette.svelte';
+  import { palette } from '$lib/palette/open.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -50,7 +51,8 @@
      with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6). */
   const bare = $derived(page.url.pathname === '/start' || page.url.pathname.startsWith('/s/'));
 
-  let paletteOpen = $state(false);
+  /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
+     `/[id]`'s `Search` button navigated Home instead of searching. */
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
@@ -87,7 +89,7 @@
 
     if (mod && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      paletteOpen = true;
+      palette.open = true;
       return;
     }
 
@@ -136,7 +138,7 @@
     }
     if (e.key === '/') {
       e.preventDefault();
-      paletteOpen = true;
+      palette.open = true;
       return;
     }
     // `?` is help. It is never "ask the assistant".
@@ -200,11 +202,11 @@
     a different product, and a second overlay that does most of what the palette does is a second
     place to look for one thing. The button opens the palette that already exists.
   -->
-  <button type="button" class="launcher tap" onclick={() => (paletteOpen = true)} aria-label={copy.paletteLabel}>
+  <button type="button" class="launcher tap" onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
     <Mark height={26} tone="inherit" />
   </button>
 
-  <Palette bind:open={paletteOpen} nav={data.nav} />
+  <Palette bind:open={palette.open} nav={data.nav} />
 {/if}
 
 <Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>

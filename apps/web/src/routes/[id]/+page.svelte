@@ -16,6 +16,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import { openPalette } from '$lib/palette/open.svelte.ts';
   import { DECIDED, QUESTIONS, REGISTERS, entry } from '$lib/record/api.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -55,14 +56,16 @@
     <Empty
       kind="no-results"
       heading
-      title={bare ? `“${raw}” could be a row in any register.` : `Nothing answers to “${raw}”.`}
+      title={bare ? `“${raw}” could be in any of your lists.` : `Nothing answers to “${raw}”.`}
       body={bare
-        ? 'Every register has a #1, so a bare number never resolves on its own. Qualify it: obligations#4, tasks#7.'
-        : 'A spoken id is a letter prefix and a number, or a register and a sequence.'}
-      rid="r7k2m9qd4x"
+        ? 'Every list has a #1, so a number on its own does not say which. Put the list in front of it — obligations#4, or tasks#7.'
+        : 'An id is a list and a number, like obligations#4 — or the short code a thing was given, like SG31.'}
     >
+      <!-- IT SAID `Search` AND WENT HOME, beside a second button that also went home. Two controls,
+           one behaviour, and the one with the magnifying glass was named for something it did not
+           do — on the screen whose whole purpose is that somebody was looking for something. -->
       {#snippet actions()}
-        <Button weight="primary" href="/"><Icon name="search" size="s" />{copy.search}</Button>
+        <Button weight="primary" onclick={openPalette}><Icon name="search" size="s" />{copy.search}</Button>
         <Button href="/">{copy.home}</Button>
       {/snippet}
     </Empty>
