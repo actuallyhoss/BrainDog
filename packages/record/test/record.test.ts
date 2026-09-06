@@ -897,3 +897,69 @@ test('and a refused read is not evidence about anything', async () => {
   assert.equal(sql.all("SELECT 1 FROM observation WHERE kind = 'query.scan'").length, 1, 'only the permitted read counted');
   sql.close();
 });
+
+test('A SUSPENDED PERSON HOLDS NOTHING, which is what suspending is for', async () => {
+  /* The column was a thing the interface could show and the ladder could not enforce: `access` read
+     only `member`, `verifyToken` joined nothing, and nothing anywhere ever set it. Suspending
+     somebody is what you do when you cannot yet decide whether to remove them, and it has to
+     actually stop them while you decide. */
+  const { api, sql } = await studio();
+  value(await api.invite({ person: 'p_7', level: 'write' }, owner));
+  assert.equal(api.kernel.access('p_7')?.level, 'write');
+
+  sql.exec("UPDATE person SET suspended_at = ? WHERE id = 'p_7'", new Date().toISOString());
+  assert.equal(api.kernel.access('p_7'), null, 'a suspended person still held their access');
+  sql.close();
+});
+
+test('AND A METRIC OVER A REGISTER YOU CANNOT SEE DOES NOT EXIST', async () => {
+  /* Answering METRIC_UNKNOWN for a name nobody declared and FORBIDDEN for one over a register you
+     cannot reach is an enumeration oracle: one probe per guess tells you which figures this business
+     keeps. `boot` hides register names on the grounds that a list of names is itself information,
+     and this handed the same list back a name at a time. */
+  const { api, sql } = await studio();
+  const scoped: CallContext = {
+    principal: { kind: 'person', id: 'p_8', level: 'read' },
+    registers: ['notes'],
+  };
+
+  const hidden = await api.metric({ metric: 'overdue' }, scoped);
+  const absent = await api.metric({ metric: 'no-such-figure' }, scoped);
+  assert.equal((hidden as { refusal?: { code: string } }).refusal?.code, 'METRIC_UNKNOWN');
+  assert.equal(
+    (hidden as { refusal?: { fix: string } }).refusal?.fix.replace('overdue', 'X'),
+    (absent as { refusal?: { fix: string } }).refusal?.fix.replace('no-such-figure', 'X'),
+    'the two answers differ, so one probe per guess enumerates the figures',
+  );
+  sql.close();
+});
+
+test('A PROPOSED ROWSET IS HELD TO THE CEILING, in both directions', async () => {
+  /* `propose` took no register and `checkBody` only asks whether the named one exists — so a
+     `propose` token scoped to one register could put another's rows in the queue an owner reads.
+     And `governance` named no register either, so every other scoped member could then read them:
+     a `rowset` body carries up to two hundred field-value objects verbatim. */
+  const { api, sql } = await studio();
+  const scoped: CallContext = {
+    principal: { kind: 'person', id: 'p_6', level: 'write' },
+    registers: ['notes'],
+    levels: { notes: 'write' },
+  };
+
+  const tried = await api.propose(
+    { question: 'Add these?', body_kind: 'rowset', body: { register: 'obligations', rows: [{ what: 'Payroll' }] } } as never,
+    scoped,
+  );
+  assert.equal((tried as { refusal?: { code: string } }).refusal?.code, 'FORBIDDEN', 'a scoped caller proposed rows for a register it cannot see');
+
+  // And an owner's proposal about that register does not come back to them through the queue.
+  value(
+    await api.propose(
+      { question: 'Add these?', body_kind: 'rowset', body: { register: 'obligations', rows: [{ what: 'Payroll' }] } } as never,
+      owner,
+    ),
+  );
+  assert.equal(value<unknown[]>(await api.governance({ register: 'suggestion' }, owner)).length, 1);
+  assert.deepEqual(value<unknown[]>(await api.governance({ register: 'suggestion' }, scoped)), [], 'the rows leaked through the gate');
+  sql.close();
+});

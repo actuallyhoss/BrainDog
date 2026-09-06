@@ -112,10 +112,26 @@
     }
   }
 
-  /** The mock-up stops here: nothing writes, and the record is unchanged. */
+  /**
+   * The mock-up stops here — and it says what it would have written.
+   *
+   * IT ANSWERED THE PRODUCT'S CENTRAL ACT WITH THE GENERIC NOTICE. Every other terminal action in
+   * this app names the change it would make: the rule that would be written and tested against the
+   * last thirty days, the pack whose install plan would be shown first, the row that would be
+   * created from an arrival. This one — the immutable row, with a person's name and their reason on
+   * it, that the whole gate exists to slow down — said "nothing writes" and stopped. The one act
+   * worth describing described itself least.
+   */
   let committed = $state(false);
   function commit() {
     committed = true;
+    const chosen = question?.options.find((o) => o.key === committing)?.title ?? committing;
+    toasts.push(
+      copy.notWritten(
+        `${chosen} would be recorded as the decision on ${question?.id ?? ''}, with your reason and your name, and the question closed`,
+      ),
+      { intent: 'warn' },
+    );
   }
 </script>
 

@@ -63,8 +63,17 @@ export function access(
   sql: Sql,
   person: string,
 ): { level: Level | null; registers: string[] | null; levels: Record<string, Level> } | null {
+  /* A SUSPENDED PERSON HOLDS NOTHING, and until now the column was a thing the interface could show
+     and the ladder could not enforce: `access` read only `member`, `verifyToken` joined nothing, and
+     a suspension was a label. Suspending somebody is what you do when you cannot yet decide whether
+     to remove them, and it has to actually stop them while you decide.
+
+     THE JOIN, not two queries: a person row that disappeared between them is a person whose access
+     was computed from half a record. */
   const rows = sql.all<{ register: string; level: Level }>(
-    'SELECT register, level FROM member WHERE person_id = ?',
+    `SELECT m.register AS register, m.level AS level FROM member m
+     WHERE m.person_id = ?
+       AND NOT EXISTS (SELECT 1 FROM person p WHERE p.id = m.person_id AND p.suspended_at IS NOT NULL)`,
     person,
   );
   const whole = rows.find((r) => r.register === RECORD);

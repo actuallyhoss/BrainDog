@@ -350,6 +350,19 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     return [...out];
   };
 
+  /**
+   * Whether a governance row is about a register this caller cannot reach.
+   *
+   * ONLY A `rowset` NAMES ONE. An `options` body is a question and its answers, a `pattern` is a
+   * declaration, a `change` is a diff — none of them carries somebody's rows. A `rowset` does, up to
+   * two hundred of them, with every field value in the body.
+   */
+  const holds = (ctx: CallContext, row: Record<string, unknown>): boolean => {
+    if (row.body_kind !== 'rowset') return false;
+    const register = (row.body as { register?: unknown } | undefined)?.register;
+    return typeof register === 'string' && reaches(ctx, register) !== null;
+  };
+
   /** Who the write path records. A token writes as the PERSON who holds it, never as itself. */
   const actorOf = (ctx: CallContext): string =>
     ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
@@ -498,13 +511,21 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       const at = args.metric.indexOf(':');
       const id = at < 0 ? args.metric : args.metric.slice(0, at);
       const param = at < 0 ? undefined : args.metric.slice(at + 1);
+      /* THE CEILING BEFORE THE EXISTENCE CHECK, and the order is the whole point. Answering
+         `METRIC_UNKNOWN` for a name that does not exist and `FORBIDDEN` for one that does, over a
+         register the caller cannot see, is an enumeration oracle: one probe per guess tells you
+         which figures this business keeps. `boot` goes to trouble to hide register names on the
+         grounds that a list of names is itself information, and this handed the same list back a
+         name at a time.
+
+         SO A METRIC OVER A REGISTER YOU CANNOT REACH IS A METRIC THAT DOES NOT EXIST, said in those
+         words. It is the same answer somebody outside the ceiling would get for a name nobody ever
+         declared, which is the only shape of answer that leaks nothing. */
       const decl = kernel.metricDecl(id ?? '');
-      if (!decl)
+      const filled = decl && param !== undefined ? (fill(decl, null, param) as typeof decl) : decl;
+      const register = filled?.source.startsWith('register.') ? filled.source.slice('register.'.length) : null;
+      if (!filled || (register && reaches(ctx, register)))
         return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });
-      const filled = param === undefined ? decl : (fill(decl, null, param) as typeof decl);
-      const register = filled.source.startsWith('register.') ? filled.source.slice('register.'.length) : null;
-      const beyond = register ? reaches(ctx, register) : null;
-      if (beyond) return { ok: false as const, refusal: beyond };
       return kernel.metric(filled);
     },
 
@@ -632,10 +653,19 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
         const row = kernel.governanceRow(register, String(args.id));
         return ok(row);
       }
-      return kernel.governance(register, {
+      const rows = kernel.governance(register, {
         ...(args?.status === undefined ? {} : { status: String(args.status) }),
         ...(args?.limit === undefined ? {} : { limit: Number(args.limit) }),
       });
+      if (!rows.ok) return rows;
+
+      /* AND IT IS HELD TO THE CALLER'S CEILING, like every other read of rows. A `rowset` body is
+         `{ register, rows: […] }` and carries up to two hundred field-value objects verbatim — so
+         a bookkeeper scoped to expenses could read every proposed payroll row out of the queue,
+         through a method that names no register and therefore ran no ceiling check. `list` refuses
+         that register, `boot` hides it, and the digest was taught the same lesson one commit
+         earlier; the gate is the last read that had not been. */
+      return ok(rows.value.filter((r) => !holds(ctx, r)));
     },
 
     /**
@@ -645,7 +675,14 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * can propose and not write is an agent whose mistakes are a queue rather than a diff.
      */
     async propose(args: Proposal, ctx: CallContext) {
-      const stop = guard(ctx, 'propose');
+      /* THE REGISTER A `rowset` NAMES IS ONE THE CALLER MUST REACH. `propose` took no register, and
+         `checkBody` only asks whether the named one EXISTS — so a `propose` token scoped to expenses
+         could put payroll rows in the queue an owner reads, and (before the line above) every other
+         scoped member could then read them. A proposal is not a write, but it is rows about a
+         register, and naming one you cannot see is the same information leak in the other
+         direction. */
+      const named = args?.body_kind === 'rowset' ? (args.body as { register?: unknown })?.register : undefined;
+      const stop = guard(ctx, 'propose', typeof named === 'string' ? named : undefined);
       if (stop) return { ok: false as const, refusal: stop };
       return kernel.propose(args, actorOf(ctx));
     },
