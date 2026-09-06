@@ -22,6 +22,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
+  import RowCards from '$lib/ui/RowCards.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PAGES } from '$lib/record/data.ts';
 
@@ -88,18 +89,32 @@
       <code>{whereOf(view.filters)}</code>
     </p>
 
-    <Table
-      {columns}
-      {rows}
-      total={result.matched}
-      label={view.name}
-      bind:focus
-      onactivate={(row) => goto(`/r/${view.register}/${row.key.split('#')[1]}`)}
-    />
+    <div class="table-slot">
+      <Table
+        {columns}
+        {rows}
+        total={result.matched}
+        label={view.name}
+        bind:focus
+        onactivate={(row) => goto(`/r/${view.register}/${row.key.split('#')[1]}`)}
+      />
+    </div>
+
+    <!-- THE SAME BODY A REGISTER HAS ON A PHONE. A saved view is that list with a different
+         predicate, and it kept the desktop table with its own horizontal scrollbar — two surfaces,
+         one device, two behaviours, because one of them was written second. -->
+    <RowCards register={view.register} entries={result.entries} />
   </div>
 {/if}
 
 <style>
+  /* One body at a time, and this is the other half of `RowCards`' own rule. */
+  @media (width < 640px) {
+    .table-slot {
+      display: none;
+    }
+  }
+
   .page {
     display: flex;
     flex-direction: column;

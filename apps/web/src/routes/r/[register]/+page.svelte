@@ -30,6 +30,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import RowCards from '$lib/ui/RowCards.svelte';
   import Second from '$lib/ui/Second.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import RowMenu from '$lib/ui/RowMenu.svelte';
@@ -596,21 +597,10 @@
       </Empty>
     {:else}
       <!-- Below 640px the default body is CARDS over the register's three declared `mobile:` fields,
-           and the table is one `v` away. Which fields a card shows comes from the declaration, never
-           from a media query: a phone is not a narrow desktop, and the register knows what matters
-           about its own rows better than a breakpoint does (13 §10, 50 §5.2 step 10). -->
-      <ul class="cards">
-        {#each result.entries.slice(0, DOM_CAP) as e}
-          <li>
-            <a class="card" href="/r/{id}/{e.seq}">
-              <span class="card-seq">#{e.seq}</span>
-              <span class="card-title" dir={dirOf(id, decl.mobile[0])}>{display(id, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}</span>
-              <span class="card-b" dir={dirOf(id, decl.mobile[1])}>{display(id, decl.mobile[1], e.fields[decl.mobile[1]]) ?? ''}</span>
-              <span class="card-c" dir={dirOf(id, decl.mobile[2])}>{display(id, decl.mobile[2], e.fields[decl.mobile[2]]) ?? ''}</span>
-            </a>
-          </li>
-        {/each}
-      </ul>
+           and the table is one `v` away. A saved view is the same list with a different predicate and
+           had only the table, so the two behaved differently on one device — which is what made this
+           a component rather than markup. -->
+      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} />
 
       <!-- THE VERBS, above the rows they act on and nowhere else. It appears with the selection and
            goes with it: a permanently visible bulk bar is a row of disabled controls, which tells
@@ -1168,11 +1158,6 @@
     overflow-wrap: anywhere;
   }
 
-  /* Above 640px the cards do not exist. Below it, the table does not — the register keeps ONE body
-     and the other is an explicit choice, so there is never a moment where both are half-visible. */
-  .cards {
-    display: none;
-  }
 
   @media (width < 900px) {
     .page {
@@ -1192,66 +1177,5 @@
       display: none;
     }
 
-    .cards {
-      display: block;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      background: var(--s1);
-      border: 1px solid var(--line);
-      border-radius: var(--r-md);
-      box-shadow: var(--raise);
-      overflow: hidden;
-    }
-
-    .cards li + li .card {
-      border-block-start: 1px solid var(--line);
-    }
-
-    .card {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 2px var(--sp-3);
-      /* 44px on both axes. A control grown only in height measures 38 x 44 and fails (13 §7). */
-      min-block-size: 56px;
-      padding: var(--sp-2) var(--sp-4);
-      color: var(--ink);
-      font-size: var(--t-ui);
-      text-decoration: none;
-    }
-
-    .card-seq {
-      grid-column: 2;
-      grid-row: 1;
-      color: var(--dim);
-      font-family: var(--font-id);
-      font-size: var(--t-xs);
-      text-align: end;
-    }
-
-    .card-title {
-      grid-column: 1;
-      grid-row: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .card-b {
-      grid-column: 1;
-      grid-row: 2;
-      color: var(--dim);
-      font-size: var(--t-xs);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .card-c {
-      grid-column: 2;
-      grid-row: 2;
-      color: var(--dim);
-      font-size: var(--t-xs);
-      font-variant-numeric: tabular-nums;
-      text-align: end;
-    }
   }
 </style>
