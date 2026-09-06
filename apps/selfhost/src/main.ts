@@ -18,22 +18,20 @@
  * `49 §6`: "nothing at boot or on the wire ever prints a token, a code, a cookie value or a
  * payload" — the success line names the PATH of the inbound token and never its contents.
  *
+ * AND IT MAKES THE KEYS BEFORE THE RECORD. `49 §5.22` step 4 comes before step 6 for a reason a
+ * half-done run makes obvious: a record row with no `vault_key` rows is a record that boots, serves,
+ * accepts writes and cannot seal a single one — and it would take a second command nobody has
+ * written to fix. A KEK file that cannot be created is a refusal before anything exists.
+ *
  * WHAT IT DOES NOT DO YET, said out loud rather than half-built:
  *
- *   - THE KEK, and the three keys. `49 §5.22` step 4 wraps a record DEK, a connector DEK and an
- *     Ed25519 signing key under `KeyStore.current()`, AES-GCM, bound to `record_id ‖ 0x1F ‖ purpose`
- *     (12 §6, 47 §4.6). There is no `KeyStore` in this repository, no KEK file reader and no crypto
- *     at all — `vault.ts` holds sealed bytes and cannot open them, deliberately. Writing that here
- *     would be inventing a key hierarchy in a CLI. `createRecord` takes `keys?` and writes no
- *     `vault_key` rows without them, which is the honest state: nothing is bound yet, so nothing
- *     needs opening.
  *   - `vapid.json`. Web Push is unspecified end to end (no subscription store, no subscribe route,
  *     no Cloud key location), so a keypair generated here would serve nothing.
  *   - `dev`. It needs a `Dispatch` port `start` does not have.
  */
 
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { argv, env, exit, stderr } from 'node:process';
 
@@ -43,6 +41,7 @@ import { ulids } from '@braindog/kernel';
 
 import { fixOf } from '@braindog/ports';
 
+import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { openSqlite, start } from './server.ts';
 
 /**
@@ -120,6 +119,12 @@ async function init(args: readonly string[]): Promise<void> {
      mount that already existed keeps its own. */
   mkdirSync(data, { mode: 0o700, recursive: true });
 
+  /* THE KEK FIRST, `49 §5.1` step 2 and `§5.22` step 1 — before the Directory is even opened.
+     Everything after this point creates something, and a missing, short or group-readable key file
+     is a refusal that should cost nothing: an `init` that made a record and THEN could not find a
+     key to wrap it with would leave a record nothing can seal and a name that resolves to it. */
+  const store = await openKeyStore(env.BRAINDOG_KEK_FILE ?? join(data, 'kek'));
+
   const dirFile = join(data, 'directory.sqlite');
   const dirSql = openSqlite(dirFile);
   const directory = createDirectory(dirSql, clock);
@@ -129,12 +134,10 @@ async function init(args: readonly string[]): Promise<void> {
      volume mount that already existed, where `mkdir`'s mode never applied, and this file sits
      directly in it. It holds every person on the installation, by address. SQLite creates it at
      0666 & ~umask; on Windows the call is advisory and harmless. */
-  try {
-    chmodSync(dirFile, 0o600);
-  } catch {
-    /* A file somebody else owns is theirs to permission, and refusing the whole command over it
-       would be worse than the exposure. */
-  }
+  /* IT HOLDS EVERY PERSON ON THE INSTALLATION, BY ADDRESS, and unlike `<slug>/` it sits directly in
+     `<data>` — usually a volume mount that already existed, where `mkdir`'s 0700 never applied.
+     SQLite creates it at 0666 & ~umask. */
+  lockDown(dirFile);
 
   /* THE GRAMMAR AND THE RESERVED SET ARE THE DIRECTORY'S. A third copy here knew the shape and not
      the words, so `braindog init api` passed this file's regex, built the record, and was refused by
@@ -193,6 +196,12 @@ async function init(args: readonly string[]): Promise<void> {
     return refuse(fixOf(person));
   }
 
+  /* AND THE THREE KEYS, `49 §5.22` step 4, bound to the record id that step 6 is about to write.
+     They are made HERE rather than inside `createRecord` because the kernel must not be able to make
+     one: `12 §6` puts the key hierarchy in the host, the record holds sealed bytes and the
+     fingerprint of what sealed them, and `vault.ts` performs no crypto at all. */
+  const keys = await recordKeys(store, id);
+
   /* THE RECORD FIRST. 51 §13 D21: a Directory row never points at a record that failed to
      initialise. `createRecord` takes no `CallContext` — it is the one method that cannot be routed,
      because there is nobody to authorise it against until it has run. */
@@ -203,6 +212,7 @@ async function init(args: readonly string[]): Promise<void> {
     tz: 'UTC',
     locale: 'en',
     owner: { id: person.value.id, email: person.value.email, name: person.value.name },
+    keys,
   });
   if (!made.ok) {
     sql.close();
@@ -230,6 +240,12 @@ async function init(args: readonly string[]): Promise<void> {
   } catch (e) {
     if ((e as { code?: string }).code !== 'EEXIST') throw e;
   }
+
+  /* THE RECORD FILE IS 0600 TOO. `<slug>/` is 0700 so nobody can walk to it, but a backup that
+     copies file modes and a `docker cp` out of the directory both carry the file's own bits — and
+     this one holds every token hash and every sealed grant. SQLite made it, so `openSqlite` never
+     had the chance. The WAL and the shm sidecars inherit the main file's mode from SQLite itself. */
+  lockDown(file);
 
   /* CLOSED, WHICH CHECKPOINTS THE WAL. A process that exits holding one leaves a 400 KB sidecar and
      a record that reads as empty until something else opens it. */

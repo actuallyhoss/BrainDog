@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createDirectory } from '@braindog/record/directory';
 
+import { openKeyStore, unwrap } from '../src/keys.ts';
 import { openSqlite, start } from '../src/server.ts';
 
 const MAIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'main.ts');
@@ -78,6 +79,42 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
 
     /* AND THE GRANT IS AN EVENT, like every other grant. */
     assert.equal(sql.all("SELECT 1 FROM event WHERE kind = 'access.grant'").length, 1);
+
+    /* THE THREE KEYS ARE THERE, AND THEY OPEN. 49 §5.22 step 4 — and a record created without them
+       boots, serves, accepts writes and cannot seal one of them: `openGrant` has nothing to open
+       with, `bindGrant` nothing to bind under, and a snapshot nothing to sign. Rows alone prove
+       nothing, so each one is opened here under the KEK the command made. */
+    const vault = sql.all<{ purpose: string; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string; wrapped_by: string }>(
+      'SELECT purpose, wrapped, nonce, kek_id, wrapped_by FROM vault_key ORDER BY purpose',
+    );
+    assert.deepEqual(vault.map((v) => v.purpose), ['connector', 'record', 'signing'], '30 §1: three vault_key rows');
+
+    const store = await openKeyStore(join(data, 'kek'));
+    for (const row of vault) {
+      assert.equal(row.wrapped_by, 'kek');
+      assert.equal(row.kek_id, (await store.current()).kekId, 'wrapped under a key this host does not hold');
+      const open = await unwrap(store, record.id, row.purpose as 'record', {
+        wrapped: new Uint8Array(row.wrapped),
+        nonce: new Uint8Array(row.nonce),
+        kek_id: row.kek_id,
+        wrapped_by: 'kek',
+      });
+      assert.ok(open, `the ${row.purpose} key does not open under the KEK that wrapped it`);
+    }
+
+    /* AND THE BINDING IS TO THIS RECORD. A row copied into another record's file does not open,
+       which is the whole of 12 §6's AAD — and is invisible from reading the code. */
+    const first = vault[0]!;
+    assert.equal(
+      await unwrap(store, 'rec_SOMEBODY_ELSE', 'connector', {
+        wrapped: new Uint8Array(first.wrapped),
+        nonce: new Uint8Array(first.nonce),
+        kek_id: first.kek_id,
+        wrapped_by: 'kek',
+      }),
+      null,
+      'a wrapped key opened under a record it was not made for',
+    );
     sql.close();
 
     /* THE DIRECTORY POINTS AT THE RECORD THAT WAS ACTUALLY CREATED. `provision` mints its own id
