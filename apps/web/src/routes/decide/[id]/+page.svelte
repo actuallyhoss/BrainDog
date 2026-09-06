@@ -244,8 +244,18 @@
           ></textarea>
           <!-- Nudged once, never blocked: a person who means it should be able to keep it (20 §3). -->
           {#if short}<p class="commit-nudge">{copy.reasonNudge}</p>{/if}
+          <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED. The only cue was the small word "required"
+               above the box, and 23 §8's rule is that a control which refuses without a reason is
+               the thing this product does not ship. It is announced too: `aria-describedby` points
+               at the sentence, so somebody who cannot see the greying is told the same fact. -->
+          {#if !reason.trim()}<p class="commit-why" id="commit-why">{copy.reasonRequired}</p>{/if}
           <div class="commit-actions">
-            <Button weight="primary" disabled={!reason.trim()} onclick={commit}>
+            <Button
+              weight="primary"
+              disabled={!reason.trim()}
+              aria-describedby={reason.trim() ? undefined : 'commit-why'}
+              onclick={commit}
+            >
               {copy.commit}
               <Kbd keys="⌘↵" />
             </Button>
@@ -458,6 +468,12 @@
     color: var(--ink);
     font-family: var(--font-ui);
     resize: vertical;
+  }
+
+  .commit-why {
+    margin-block: var(--sp-2) 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .commit-nudge {

@@ -176,6 +176,9 @@ export const copy = {
   recommended: 'Recommended',
   chooseThis: 'Choose this',
   yourReason: 'Your reason',
+  /* WHY THE COMMIT IS REFUSING, said where the refusal is. A decision is immutable once made, so the
+     reason is the whole of what anybody reading it in six weeks will have. */
+  reasonRequired: 'A decision is kept for ever and cannot be edited. Write why, and the button turns on.',
   reasonHint: 'Why this one, in a sentence somebody can read in six weeks.',
   reasonNudge: 'That will not mean anything in six weeks. Keep it anyway?',
   commit: 'Commit the decision',
