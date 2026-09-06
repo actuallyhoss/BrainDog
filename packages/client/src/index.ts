@@ -18,7 +18,15 @@ import type { Refusal, Result } from '@braindog/ports';
 import { ROUTES } from '@braindog/host';
 
 export type ClientOptions = {
-  /** Where the record is. `https://braindog.example/r/the-studio` — the method is appended. */
+  /**
+   * Where the host is. `https://braindog.example` or `http://127.0.0.1:8787` — the method is
+   * appended as `/api/<method>`, which is 33 §4's surface and the same on both hosts.
+   *
+   * WHICH RECORD IS THE TOKEN'S TO SAY, not the URL's. A bearer is `<rec_id>.<secret>` and the host
+   * routes on the half in front of the dot; there is no slug in the path, because `/r/<register>` is
+   * the app's own register list and a tenant prefix there would take every link in the product with
+   * it.
+   */
   base: string;
   /** Sent as a bearer. Absent on a self-host that was started without one. */
   token?: string | undefined;

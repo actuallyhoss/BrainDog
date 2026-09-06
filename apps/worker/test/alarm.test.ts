@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { alarmScheduler, type AlarmStore } from '../src/alarm.ts';
-import { recordPath } from '../src/route.ts';
+import { recordOf, servesApi } from '../src/route.ts';
 
 /** The three methods, and a log of what was actually asked of the platform. */
 function fakeStore(at: number | null = null) {
@@ -123,21 +123,54 @@ test('THE COMPATIBILITY DATE IS AN ASSERTION, not a sentence in a document', () 
 
 /* ── the router ────────────────────────────────────────────────── */
 
-test('THE SLUG IN THE PATH IS THE TENANT BOUNDARY, and it is a grammar rather than a trim', () => {
-  // The string this returns is the argument to `idFromName`. A path that resolves to the wrong slug
-  // is one customer reading another's record, so what is NOT a slug matters more than what is.
-  assert.deepEqual(recordPath('/r/the-studio/api/list'), { slug: 'the-studio', rest: '/api/list' });
-  assert.deepEqual(recordPath('/r/kiln'), { slug: 'kiln', rest: '/' });
-  assert.deepEqual(recordPath('/r/kiln/'), { slug: 'kiln', rest: '/' }, 'a trailing slash made a different path');
+test('THE BEARER NAMES THE RECORD, and the string it names is the tenant boundary', () => {
+  /* The id this returns is the argument to `idFromName`, and `idFromName` on a name nobody has
+     CREATES the object rather than failing — so what is NOT a record id matters more than what is.
+     The secret half is never looked at here: whether the bearer is real is the record's question,
+     asked against its own table, and asking it anywhere else would be a search across every
+     customer. */
+  const id = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
+  assert.equal(recordOf(`Bearer ${id}.s3cret`), id);
+  assert.equal(recordOf(`bearer ${id}.s3cret`), id, 'the scheme is case-insensitive');
+  assert.equal(recordOf(`Bearer   ${id}.a.b.c`), id, 'the secret may contain the separator');
 
-  for (const bad of ['/', '/r', '/r/', '/api/list', '/R/kiln/api/list', '/x/kiln/api/list'])
-    assert.equal(recordPath(bad), null, `${bad} resolved to a record`);
+  for (const bad of [
+    null,
+    '',
+    'Bearer',
+    'Bearer ',
+    `Basic ${id}.s3cret`,
+    `Bearer ${id}`,
+    `Bearer .s3cret`,
+    `Bearer ${id.toLowerCase()}.s3cret`,
+    'Bearer rec_01JZ8QK3F7R2M9V4XN6TCB5HA.s3cret',
+    'Bearer rec_01JZ8QK3F7R2M9V4XN6TCB5HADX.s3cret',
+    'Bearer rec_01IZ8QK3F7R2M9V4XN6TCB5HAD.s3cret',
+    `Bearer ${id}/../other.s3cret`,
+    'Bearer directory.s3cret',
+  ])
+    assert.equal(recordOf(bad), null, `${bad} resolved to a record`);
 
-  // And the shapes somebody reaches for when they are looking for a way out of the prefix.
-  for (const bad of ['/r/../api/list', '/r/.well-known/x', '/r/Kiln/api/list', '/r/-kiln/api/list', '/r/kiln-/api/list', '/r/a_b/api/list'])
-    assert.equal(recordPath(bad), null, `${bad} resolved to a record`);
+  /* `directory` IS THE ONE NAME THAT WOULD NOT BE A NEW OBJECT. It is the installation's tenant map,
+     addressed by `idFromName('directory')` — and it is a different class, so reaching it through
+     `RECORD` would not even be the same storage. The grammar refuses it anyway, which is the point:
+     the check is a shape rather than a list of names somebody remembered. */
+});
 
-  // A percent-encoded traversal arrives decoded by `new URL`, so the grammar is what refuses it.
-  assert.equal(recordPath(new URL('https://x/r/%2e%2e/api/list').pathname), null);
-  assert.equal(recordPath(new URL('https://x/r/kiln/api/list?q=1').pathname)?.rest, '/api/list');
+test('AND THE WORKER ANSWERS FOR /api AND NOTHING ELSE', () => {
+  /* `/r/<slug>` was the tenant prefix here, and `/r/<register>` is the app's own register list
+     (19 §2), the target of every `{{ref:}}` link (36) and a real SvelteKit route. Put the Worker in
+     front of the assets as 33 §4's `run_worker_first` describes and every register link in the
+     product answered "There is no record called obligations." */
+  for (const path of ['/api/list', '/api/boot', '//api//list', '/api/create'])
+    assert.equal(servesApi(path), true, `${path} is not served`);
+
+  for (const path of ['/', '/api', '/api/', '/apix/list', '/r/obligations', '/r/obligations/7', '/mcp', '/a/abc', '/s/tok'])
+    assert.equal(servesApi(path), false, `${path} was claimed`);
+
+  /* A percent-encoded traversal arrives DECODED AND RESOLVED by `new URL`, so it is the api prefix
+     by the time this sees it — which is safe, and is why the method is resolved by a table lookup
+     rather than by reading the rest of the path as a name. */
+  assert.equal(new URL('https://x/%2e%2e/api/list').pathname, '/api/list');
+  assert.equal(servesApi(new URL('https://x/api/%2e%2e/%2e%2e/etc').pathname), false, 'a traversal walked out of /api');
 });

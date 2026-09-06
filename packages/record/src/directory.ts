@@ -149,6 +149,17 @@ export function createDirectory(sql: Sql, clock: Clock) {
     slugOf,
     personByEmail,
 
+    /**
+     * Whether this address is a record this installation created, and has not closed.
+     *
+     * THE ROUTER'S FIRST QUESTION WHEN THE BEARER CARRIES THE ADDRESS. `idFromName` on a name nobody
+     * has creates the object rather than failing, so a router that addressed an unverified id would
+     * let a forged bearer mint an empty, migrated, billable record — one per guess. Asked about an
+     * id rather than a name, it is not an oracle: 26 random characters are not guessed.
+     */
+    knows: (record: string): boolean =>
+      sql.one<{ n: number }>('SELECT 1 AS n FROM dir_record WHERE id = ? AND closed_at IS NULL', record) !== undefined,
+
     /** One person, by id. */
     person: (id: string): Person | null =>
       sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE id = ?', id) ?? null,

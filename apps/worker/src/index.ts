@@ -30,7 +30,7 @@ import { createDirectory, type Directory as Dir } from '@braindog/record/directo
 import { alarmScheduler } from './alarm.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { recordPath } from './route.ts';
+import { recordOf, servesApi } from './route.ts';
 
 type EmailBinding = { send(message: { to: string; subject: string; text: string }): Promise<void> };
 
@@ -245,6 +245,18 @@ export class Directory$ extends DurableObject<Env> {
     return this.#dir;
   }
 
+  /**
+   * Whether this address is a record this installation created, and has not closed.
+   *
+   * IT IS ASKED ABOUT AN ID RATHER THAN A NAME, which is why answering is safe: a slug is a word
+   * somebody chose and an id is 26 random characters, so this tells a caller nothing they did not
+   * already have. What it prevents is the router addressing an object that does not exist — and on
+   * this platform, addressing one is creating one.
+   */
+  knows(record: string): boolean {
+    return this.#directory().knows(record);
+  }
+
   /** Which record this name means, or `null` if it means none. The hop, and the whole of it. */
   resolve(slug: string): { record: string; slug: string } | null {
     return this.#directory().resolve(slug);
@@ -326,15 +338,12 @@ const unauthorized = (): Response =>
   json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record needs a bearer it knows. Mint one from the app.' } }, 401);
 
 /**
- * The slug in the path is a NAME, and the Directory says which record it means.
+ * The Worker resolves WHO is asking, and the record decides what they may do.
  *
  * `idFromName(rec_id)` AND NEVER `idFromName(slug)` (ADR-061). The address is the record id, so
  * renaming is one row in the Directory and nothing else — no migration, no copy, and no window in
- * which half the writes go to the old object. Addressing the storage by the name would make a
- * rename a data migration, which is why nobody who does it ever renames anything.
- *
- * AND A NAME THAT HAS BEEN RELEASED RESOLVES TO NOTHING. Every stale link still says the old name;
- * handing it to the next person who asks is how one of them reads another customer's record.
+ * which half the writes go to the old object. Addressing the storage by the name would make a rename
+ * a data migration, which is why nobody who does it ever renames anything.
  */
 export default {
   /**
@@ -371,46 +380,40 @@ export default {
 
 async function route(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const routed = recordPath(url.pathname);
+    if (!servesApi(url.pathname))
+      return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
 
-    if (!routed)
-      return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record is at /r/<slug>/api/<method>.' } }, 404);
-
-    const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
-    const named = await directory.resolve(routed.slug);
-
-    /* A NAME THAT DOES NOT RESOLVE ANSWERS WHAT A WRONG CREDENTIAL ANSWERS, and it has to. This said
-       404 "There is no record called kiln" for a name nobody holds and 401 "this record needs a
-       bearer" for one somebody does — two different statuses and two different sentences, to a
-       request carrying nothing at all. That is every customer name on the platform, enumerable by
-       anyone, one GET at a time. 51 §5.6 states the rule for the share tokens and it is the same
-       rule here: a wrong capability looks like nothing.
-
-       THE PATH SHAPE IS STILL A 404, above, because that is a fact about the URL rather than about
-       who lives at it. */
-    if (!named) return unauthorized();
-
-    const record = env.RECORD.get(env.RECORD.idFromName(named.record));
-
-    /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. This
-       resolves WHO is asking and at what LEVEL; every check about what they may do with it is
-       inside `createRecordApi`, in one place, so the CLI and the MCP server answer to the same
-       ladder as the browser. */
-    const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1];
-    const seen = bearer ? await record.verify(bearer, surfaceOf(url)) : null;
-    if (bearer && !seen) return unauthorized();
-
-    /* A BEARER NAMES ITS OWN RECORD AND THE PATH NAMES ONE TOO, and a mismatch is not an accident:
-       it is a token for one customer pointed at another's URL. `verify` refuses a bearer whose
-       record half is not this object's, so reaching here means the two agree. */
-    /* NOTHING GETS IN WITHOUT SAYING WHO IT IS. This Worker resolves a slug through a Directory of
-       MANY records; an unauthenticated request falling back to a constant person is that person's
-       access on whichever record the URL named, which on a multi-tenant host is not a default, it
-       is a hole. A self-host has one person on one machine and can have one; this cannot.
+    /* NOTHING GETS IN WITHOUT SAYING WHO IT IS. This Worker serves MANY records; an unauthenticated
+       request falling back to a constant person is that person's access on whichever record was
+       named, which on a multi-tenant host is not a default, it is a hole. A self-host has one person
+       on one machine and can have one; this cannot.
 
        BROWSER SESSIONS ARE THE OTHER HALF and they are not built — sessions, passkeys and magic
-       links live in the Directory (ADR-061). Until they are, a bearer is the only way in, and
-       saying so is better than letting everybody in while the sentence explains why. */
+       links live in the Directory (ADR-061). Until they are, a bearer is the only way in, and saying
+       so is better than letting everybody in while the sentence explains why. */
+    const named = recordOf(request.headers.get('authorization'));
+    if (!named) return unauthorized();
+
+    /* AND THE DIRECTORY IS ASKED WHETHER THAT ADDRESS IS ONE OF OURS, before it is used as one.
+       `idFromName` on a name nobody has does not fail — it CREATES the object, and `#record()` then
+       runs the migrations, which writes storage. Routing on an unverified id would be an open
+       invitation to mint empty billable records, one forged bearer at a time. The id is 26 random
+       characters, so answering is not an oracle: nobody guesses their way to a `true`. */
+    const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+    if (!(await directory.knows(named))) return unauthorized();
+
+    const record = env.RECORD.get(env.RECORD.idFromName(named));
+
+    /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. This
+       resolves WHO is asking and at what LEVEL; every check about what they may do with it is inside
+       `createRecordApi`, in one place, so the CLI and the MCP server answer to the same ladder as the
+       browser.
+
+       THE BEARER'S OWN RECORD IS CHECKED AGAIN, INSIDE. Reading the id out of it here is a claim;
+       `verifyToken` refuses a bearer whose record half is not the object's own, which is what makes
+       the claim safe to route on. */
+    const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1];
+    const seen = bearer ? await record.verify(bearer, surfaceOf(url)) : null;
     if (!seen) return unauthorized();
 
     /* THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT. The Directory said which record the NAME meant
@@ -418,7 +421,7 @@ async function route(request: Request, env: Env): Promise<Response> {
        removing somebody would not have stopped them writing. */
     const person = seen.person_id;
     const held = await record.access(person);
-    if (!held) return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: `You are not on ${routed.slug}.` } }, 403);
+    if (!held) return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } }, 403);
     const level = held.level as 'read' | 'append' | 'write' | 'decide' | 'owner';
 
     /* THE INTERSECTION IS THE RECORD'S TO COMPUTE. What goes over is both halves — the token's
@@ -428,7 +431,9 @@ async function route(request: Request, env: Env): Promise<Response> {
       ? { kind: 'token', id: seen.id, scope: seen.scope as 'read' | 'propose' | 'write', person, level }
       : { kind: 'person', id: person, level };
 
-    const inner = new Request(`${url.origin}${routed.rest}${url.search}`, request);
+    /* THE PATH TRAVELS UNCHANGED, because there is no prefix left to strip. `serveApi` reads the
+       method out of `/api/<method>` on both hosts, from the same table. */
+    const inner = new Request(request);
     /* AND THE REGISTER CEILING TRAVELS WITH IT, or a person invited to one register reaches every
        one of them — which is the whole of what "invite the bookkeeper" was supposed to mean. */
     inner.headers.set(
