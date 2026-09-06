@@ -134,8 +134,18 @@ export function createRecord(
 
     for (const [purpose, key] of Object.entries(args.keys ?? {})) {
       if (!key) continue;
+      /* `DO NOTHING`, NOT `OR REPLACE`. `createRecord` re-runs its whole transaction when the id
+         matches — the same id still writes its owner — so a second call carrying fresh keys silently
+         overwrote the record DEK, and every `grant.ciphertext` sealed under the old one became
+         permanently unopenable. `12 §6.1` names that outcome: it reads exactly like corruption, on
+         the one screen where "the data is gone" and "the key changed" need different answers.
+
+         A KEY IS WRITTEN ONCE. Rotation is `rewrapped_at` and an UPDATE, which is a different verb
+         with a different audit trail; there is no path on which creating a record is how you replace
+         its keys. */
       sql.exec(
-        'INSERT OR REPLACE INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id, salt, rewrapped_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)',
+        `INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id, salt, rewrapped_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)
+         ON CONFLICT (purpose) DO NOTHING`,
         purpose,
         key.wrapped,
         key.nonce,

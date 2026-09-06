@@ -123,10 +123,14 @@ async function init(args: readonly string[]): Promise<void> {
      Everything after this point creates something, and a missing, short or group-readable key file
      is a refusal that should cost nothing: an `init` that made a record and THEN could not find a
      key to wrap it with would leave a record nothing can seal and a name that resolves to it. */
-  const store = await openKeyStore(env.BRAINDOG_KEK_FILE ?? join(data, 'kek'));
+  const store = await openKeyStore(env.BRAINDOG_KEK_FILE ?? join(data, 'kek'), say);
 
   const dirFile = join(data, 'directory.sqlite');
   const dirSql = openSqlite(dirFile);
+  /* BEFORE `createDirectory`, NOT AFTER. The `CREATE TABLE`s in it are what make SQLite open a
+     write-ahead log, and the sidecars take the main file's mode at the moment they are created — so
+     a `chmod` further down left a group-readable `-wal` holding every address on the installation. */
+  lockDown(dirFile, say);
   const directory = createDirectory(dirSql, clock);
 
   /* AND THE DIRECTORY FILE IS NOT WORLD-READABLE. `<data>/<slug>/` is created by this command at
@@ -134,11 +138,6 @@ async function init(args: readonly string[]): Promise<void> {
      volume mount that already existed, where `mkdir`'s mode never applied, and this file sits
      directly in it. It holds every person on the installation, by address. SQLite creates it at
      0666 & ~umask; on Windows the call is advisory and harmless. */
-  /* IT HOLDS EVERY PERSON ON THE INSTALLATION, BY ADDRESS, and unlike `<slug>/` it sits directly in
-     `<data>` — usually a volume mount that already existed, where `mkdir`'s 0700 never applied.
-     SQLite creates it at 0666 & ~umask. */
-  lockDown(dirFile);
-
   /* THE GRAMMAR AND THE RESERVED SET ARE THE DIRECTORY'S. A third copy here knew the shape and not
      the words, so `braindog init api` passed this file's regex, built the record, and was refused by
      `provision` at the end. `bad()` is one call and there is one answer. */
@@ -160,16 +159,53 @@ async function init(args: readonly string[]): Promise<void> {
      THE ONE CASE THAT IS RECOVERABLE is a file with no `record` row: the migration ran and the
      create did not, which is this command's own crash window and nobody else's. Finishing that is
      the difference between a half-done state and an unrecoverable one. */
-  if (existsSync(file)) {
-    const open = openSqlite(file);
-    const inside = open.one<{ id: string; slug: string }>('SELECT id, slug FROM record WHERE singleton = 1');
-    open.close();
-    if (inside) {
+  const standing = existsSync(file) ? inhabitant(file) : null;
+  const stale = standing !== null && !directory.knows(standing.id) && held === 'free';
+
+  /* THE HALF-DONE CASE IS FINISHED RATHER THAN REFUSED, AND ONLY FOR THE PERSON WHOSE IT IS.
+     `49 §5.22` writes the record at step 6 and the Directory rows at step 7, so a process killed
+     between them leaves a record that is whole and unaddressable: `init` refused "already holds the
+     record" for ever, `serve` answered "there is no record in <data>", and the only way in was to
+     name the file by hand. The state the ordering was chosen to leave was the one state nothing
+     could recover.
+
+     A MISSING DIRECTORY ROW IS NOT ENOUGH TO PROVE THAT STATE. Deleting `directory.sqlite` produces
+     exactly the same evidence, and adopting on it alone is the hole `49 §5.22` step 2 exists to
+     close — whoever ran `init` next became the owner of somebody else's live record. So the record
+     has to name the SAME OWNER, by address, and the retry is then literally the same command: same
+     slug, same `--owner`. Anybody else gets the refusal, which is the whole point of the check.
+
+     The Directory's person id is checked below, once there is one to check against. */
+  if (standing && !(stale && standing.slug === slug && standing.ownerEmail === email)) {
+    dirSql.close();
+    return refuse(
+      `${file} already holds the record ${standing.slug} (${standing.id}). A record is created once; move it aside or serve it.`,
+    );
+  }
+
+  /* THE NAME FOR A RECORD THAT ALREADY EXISTS. There is nothing left to create: the file, the
+     directories and the keys are all from the run that was killed, and what is missing is the two
+     Directory rows. The person id is checked here because this is where there is one — a record
+     whose own `member` names a person the Directory no longer holds is the deleted-directory case
+     wearing the right address, and re-provisioning it would leave `dir_member` and `member` naming
+     two different people for one owner. */
+  if (standing) {
+    const who = directory.person$(email);
+    if (!who.ok) {
+      dirSql.close();
+      return refuse(fixOf(who));
+    }
+    if (who.value.id !== standing.ownerId) {
       dirSql.close();
       return refuse(
-        `${file} already holds the record ${inside.slug} (${inside.id}). A record is created once; move it aside or serve it.`,
+        `${file} holds the record ${standing.slug}, whose owner is a person this directory does not know. Restore the directory it was created with, or move the record aside.`,
       );
     }
+    const late = directory.provision({ slug, email, record: standing.id });
+    dirSql.close();
+    if (!late.ok) return refuse(fixOf(late));
+    say(`record ${standing.slug} finished · owner ${email} · the record existed and the directory did not name it`);
+    return;
   }
 
   /* 0700 ON THE RECORD'S OWN DIRECTORY TOO. It holds the whole record — every row, every token
@@ -181,6 +217,13 @@ async function init(args: readonly string[]): Promise<void> {
   const id = `rec_${ulids(clock.now)()}`;
 
   const sql = openSqlite(file);
+  /* 0600 BEFORE THE MIGRATIONS, not after. `<slug>/` is 0700 so nobody can walk to it, but a backup
+     that copies file modes and a `docker cp` out of the directory both carry the file's own bits —
+     and this file holds every token hash and every sealed grant. SQLite gives the `-wal` and `-shm`
+     sidecars the main file's mode AT THE MOMENT IT CREATES THEM, which is inside `applyMigrations`:
+     doing this at the end of the command left a group-readable `-wal` holding the record's rows for
+     the whole of the run, and permanently if the process was killed. */
+  lockDown(file, say);
   const api = await createRecordApi({ sql, clock });
   const stopped = api.kernel.refused();
   if (stopped) {
@@ -241,17 +284,49 @@ async function init(args: readonly string[]): Promise<void> {
     if ((e as { code?: string }).code !== 'EEXIST') throw e;
   }
 
-  /* THE RECORD FILE IS 0600 TOO. `<slug>/` is 0700 so nobody can walk to it, but a backup that
-     copies file modes and a `docker cp` out of the directory both carry the file's own bits — and
-     this one holds every token hash and every sealed grant. SQLite made it, so `openSqlite` never
-     had the chance. The WAL and the shm sidecars inherit the main file's mode from SQLite itself. */
-  lockDown(file);
-
   /* CLOSED, WHICH CHECKPOINTS THE WAL. A process that exits holding one leaves a 400 KB sidecar and
      a record that reads as empty until something else opens it. */
   sql.close();
   dirSql.close();
   say(`record ${slug} created · owner ${email} · inbound email token at ${inbound}`);
+}
+
+/**
+ * What a record file already holds, or `null` when it holds no record.
+ *
+ * A FILE THAT IS NOT YET A DATABASE IS THE RECOVERABLE CASE, and reading it used to be the
+ * unrecoverable one. `init` creates the file and migrates it as two steps, so a process killed
+ * between them leaves `record.dog` with no tables — and `SELECT id FROM record` against it threw
+ * `no such table: record` out of the command, printed SQLite's sentence with no path in it, and did
+ * the same thing on every retry for ever. The branch written to make the state recoverable was the
+ * branch that made it permanent.
+ *
+ * `file is not a database` IS STILL A REFUSAL, because that is not this command's crash window — it
+ * is somebody's `.dog` half-downloaded, or the wrong path — and it says which file.
+ */
+function inhabitant(file: string): { id: string; slug: string; ownerId: string; ownerEmail: string } | null {
+  let open: ReturnType<typeof openSqlite>;
+  try {
+    open = openSqlite(file);
+  } catch (e) {
+    return refuse(`${file} could not be opened as a record: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  try {
+    const row = open.one<{ id: string; slug: string }>('SELECT id, slug FROM record WHERE singleton = 1');
+    if (!row) return null;
+    /* AND WHO IT BELONGS TO, from the record's own tables rather than from the Directory — which is
+       the point: this is the question asked when the Directory is the half that is missing. */
+    const owner = open.one<{ id: string; email: string }>(
+      `SELECT p.id, p.email FROM member m JOIN person p ON p.id = m.person_id
+        WHERE m.register = '*' AND m.level = 'owner'`,
+    );
+    return { ...row, ownerId: owner?.id ?? '', ownerEmail: owner?.email ?? '' };
+  } catch {
+    /* No `record` table: the file was created and the migration did not finish. Nothing is in it. */
+    return null;
+  } finally {
+    open.close();
+  }
 }
 
 /**

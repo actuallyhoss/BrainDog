@@ -354,7 +354,13 @@ export function openGrant(
       kdf: row.kdf,
       wrapped_by: row.wrapped_by,
       kek_id: row.kek_id,
-      aad: `${deps.recordId ?? 'self'}‖${row.id}‖${row.version}`,
+      /* `0x1F`, THE BYTE — not the character that looks like it in the spec. `12 §6` says in as
+         many words "wherever this corpus writes ‖ it means that byte", and this line carried a
+         literal U+2016: three bytes of UTF-8, `e2 80 96`, in the additional data that binds a grant
+         to its record. Nothing decrypts a grant yet, which is exactly why it would have been found
+         late — as an `OperationError` from `subtle.decrypt`, indistinguishable from a wrong key, on
+         the first restore that crossed a host. */
+      aad: `${deps.recordId ?? 'self'}\u001f${row.id}\u001f${row.version}`,
       key,
     });
   });

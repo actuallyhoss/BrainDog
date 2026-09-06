@@ -47,6 +47,11 @@ const CASES = [
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
   { gate: 'secret-grep', expect: /reaches a log/, findings: 1 },
+  /* THE SAME LEAK UNDER THE NAME THE CODE USES. `52 §6`'s example is `console.log(plaintext)` and no
+     file here has ever held a variable called that; the key hierarchy calls its secrets `plain`,
+     `dek`, `kek`, `root` and `pkcs8`. One fixture per vocabulary, so widening the pattern is a thing
+     that can be proved rather than asserted. */
+  { gate: 'secret-grep-dek', run: 'secret-grep', expect: /reaches a log/, findings: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },

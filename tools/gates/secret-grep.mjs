@@ -36,8 +36,14 @@ const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', i
  *
  * WORD-BOUNDED, so `plaintextLabel` is not a plaintext and `decrypted_at` is not a decryption. A
  * gate that matched substrings would be a gate somebody turns off.
+ *
+ * AND THE FIVE THE KEY HIERARCHY ACTUALLY USES. `apps/selfhost/src/keys.ts` holds the root key, two
+ * data keys and an Ed25519 private half, and calls them `plain`, `dek`, `kek`, `root` and `pkcs8` —
+ * none of which the four names above match. Its own header claimed this gate was red on a plaintext
+ * reaching a log, and `console.error('unwrap failed', plain)` was green. A gate that cannot see the
+ * one file the whole key hierarchy lives in is a gate that passes because it is not looking.
  */
-const SOURCE = /\b(?:plaintext|plainText|decrypted|secretValue)\b/;
+const SOURCE = /\b(?:plaintext|plainText|decrypted|secretValue|plain|dek|kek|root|pkcs8)\b/i;
 
 /**
  * What keeps or transmits. `52 §5.2`'s five, and every one of them outlives the process.

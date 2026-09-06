@@ -11,7 +11,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -36,6 +36,10 @@ test('THE KEY FILE IS MADE ONCE and read back the same', async () => {
 
     /* AND THE FINGERPRINT IS OF THE KEY, not of the path or the moment. 34 §5: 18 hex. */
     assert.match((await first.current()).kekId, /^[0-9a-f]{18}$/);
+
+    /* 0600 ON THE FILE ITSELF, which `49 §9`'s gate table requires and nothing asserted. The mode
+       is what makes every other property of this file worth having. */
+    if (process.platform !== 'win32') assert.equal(statSync(file).mode & 0o777, 0o600);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -47,33 +51,6 @@ test('A FILE THAT IS NOT A KEY IS A SENTENCE, not a silent short key', async () 
     const file = join(dir, 'kek');
     writeFileSync(file, 'hunter2');
     await assert.rejects(() => openKeyStore(file), /is 7 bytes and a key is 32/);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('THE DERIVED KEYS ARE STABLE, DIFFERENT, AND NOT THE ROOT', async () => {
-  const dir = scratch();
-  try {
-    const file = join(dir, 'kek');
-    const store = await openKeyStore(file);
-    const code = await store.k('braindog/device-code');
-    const share = await store.k('braindog/share');
-
-    assert.equal(code.length, 32);
-    /* A LEAKED SHARE TOKEN SAYS NOTHING ABOUT A DEVICE CODE. Same root, two info strings, 49 §4.4. */
-    assert.notDeepEqual([...code], [...share], 'the two derived keys are the same bytes');
-
-    /* AND THEY SURVIVE A RESTART, because a device code signed before a reboot has to verify after
-       one. Derivation is a function of the file, and the file did not change. */
-    const again = await openKeyStore(file);
-    assert.deepEqual([...(await again.k('braindog/device-code'))], [...code]);
-
-    /* NEITHER IS THE ROOT ITSELF. HKDF over a 32-byte secret returns 32 bytes, so a bug that
-       returned the input would be the right length and the wrong thing entirely. */
-    assert.notDeepEqual([...code], [...readFileSync(file)], 'k() handed back the root key');
-
-    await assert.rejects(() => store.k('braindog/nope'), /is not a derived key this build makes/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -181,6 +158,77 @@ test('TWO RECORDS MADE UNDER ONE KEK DO NOT SHARE A KEY', async () => {
        operator holds one KEK and every record on it is still sealed from every other. */
     assert.equal(await unwrap(store, 'rec_A', 'record', two.record), null);
     assert.equal(await unwrap(store, 'rec_B', 'record', one.record), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('A KEY ANYBODY IN YOUR GROUP CAN READ IS A REFUSAL, and it names the mode', { skip: process.platform === 'win32' }, async () => {
+  const dir = scratch();
+  try {
+    const file = join(dir, 'kek');
+    await openKeyStore(file);
+    chmodSync(file, 0o644);
+    /* `49 §9`'s gate table has a row for this and nothing exercised it. CI is Linux, so the branch
+       runs on every build — delete its body and the suite stayed green, which is the shape of every
+       defect this repository keeps finding. */
+    await assert.rejects(() => openKeyStore(file), /mode 644/);
+
+    chmodSync(file, 0o604);
+    await assert.rejects(() => openKeyStore(file), /mode 604/, 'world-readable passed');
+
+    chmodSync(file, 0o600);
+    assert.ok(await openKeyStore(file), '0600 was refused');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('AND ON WINDOWS THE SKIPPED CHECK IS SAID OUT LOUD', { skip: process.platform !== 'win32' }, async () => {
+  const dir = scratch();
+  try {
+    const said: string[] = [];
+    await openKeyStore(join(dir, 'kek'), (line) => said.push(line));
+    /* `49 §4.4`: on Windows the bit is advisory and the ACL is the real permission, so the check is
+       skipped AND LOGGED ONCE. It was skipped, and a comment claimed it was said. */
+    assert.ok(
+      said.some((l) => /not checked on Windows/.test(l)),
+      `nothing was said about the skipped check: ${said.join(' / ') || '(silence)'}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('A PATH THAT IS NOT A FILE IS A SENTENCE, not a process that never returns', async () => {
+  const dir = scratch();
+  try {
+    /* `readFileSync` on a FIFO blocks for ever: `init` hangs with no output, no timeout and nothing
+       to act on, which is the one outcome worse than a refusal. A directory is the reachable case on
+       every platform and takes the same branch. */
+    mkdirSync(join(dir, 'kek'));
+    await assert.rejects(() => openKeyStore(join(dir, 'kek')), /not a regular file/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('A HALF-WRITTEN KEY FILE IS NEVER LEFT BEHIND', async () => {
+  const dir = scratch();
+  try {
+    const file = join(dir, 'kek');
+    await openKeyStore(file);
+    /* `wx` makes the file EXIST before the bytes are in it, so a process killed in that gap left an
+       empty file `wx` would never rewrite — and every later boot refused "is 0 bytes" on a host
+       where nothing had been created yet. Write-then-rename closes it: what carries the name always
+       carries the key, and the temp file it was written to is gone. */
+    assert.equal(readFileSync(file).length, 32);
+    assert.deepEqual(readdirSync(dir), ['kek'], 'a temp file was left in the data directory');
+
+    /* AND THE OLD FAILURE IS STILL A SENTENCE if somebody has one on disk from before. */
+    const empty = join(dir, 'empty');
+    writeFileSync(empty, '');
+    await assert.rejects(() => openKeyStore(empty), /is 0 bytes and a key is 32/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

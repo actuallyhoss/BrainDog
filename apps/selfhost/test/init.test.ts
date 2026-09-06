@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -484,6 +484,140 @@ test('AND `serve` SERVES THE ONE RECORD IT HAS, even beside a name whose file is
       env: { ...process.env, BRAINDOG_DATA: data, PORT: '0' },
     });
     assert.ok(!`${one.stderr}`.includes('holds 2 records'), 'a name with no file behind it was counted as a record');
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+
+/* -- what a killed run leaves, and whether anything can finish it ---------- */
+
+/** Every Directory file, gone — which is what "restore a backup without it" looks like on disk. */
+function loseTheDirectory(data: string): void {
+  for (const suffix of ['', '-wal', '-shm']) rmSync(join(data, `directory.sqlite${suffix}`), { force: true });
+}
+
+test('A RUN KILLED BEFORE THE MIGRATION FINISHED IS FINISHED BY THE NEXT ONE', async () => {
+  /* `init` creates `record.dog` and migrates it as two steps. Killed between them, the file exists
+     with no tables — and the branch written to make that recoverable was the branch that made it
+     permanent: `SELECT id FROM record` threw `no such table: record` out of the command, printed
+     SQLite's sentence with no path in it, and did the same on every retry for ever. */
+  const data = scratch();
+  try {
+    mkdirSync(join(data, 'the-studio'), { recursive: true });
+    writeFileSync(join(data, 'the-studio', 'record.dog'), '');
+
+    const out = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
+    assert.equal(out.code, 0, out.said);
+    assert.match(out.said, /^record the-studio created/m);
+
+    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    assert.equal(sql.one<{ slug: string }>('SELECT slug FROM record WHERE singleton = 1')?.slug, 'the-studio');
+    sql.close();
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('AND A RECORD THE DIRECTORY NEVER HEARD OF IS FINISHED FOR THE PERSON WHOSE IT IS', async () => {
+  /* `49 §5.22` writes the record at step 6 and the Directory rows at step 7 — deliberately, so a
+     name never resolves to a record that failed. What that ordering leaves when it is interrupted is
+     a whole record nothing can address: `init` refused "already holds the record" for ever and
+     `serve` answered "there is no record in <data>". */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    const was = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')!.id;
+    sql.close();
+
+    /* The two rows step 7 writes, removed — which is what a kill between the two steps leaves. */
+    const dirSql = openSqlite(join(data, 'directory.sqlite'));
+    dirSql.exec("DELETE FROM dir_slug WHERE slug = 'the-studio'");
+    dirSql.exec('DELETE FROM dir_record');
+    dirSql.exec('DELETE FROM dir_member');
+    dirSql.close();
+
+    const again = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
+    assert.equal(again.code, 0, again.said);
+    assert.match(again.said, /finished/);
+
+    const after = openSqlite(join(data, 'directory.sqlite'));
+    assert.equal(
+      after.one<{ record: string }>("SELECT record FROM dir_slug WHERE slug = 'the-studio'")?.record,
+      was,
+      'the directory names a record other than the one on disk',
+    );
+    after.close();
+
+    /* AND THE RECORD WAS NOT REMADE. One owner, one id, one create. */
+    const check = openSqlite(join(data, 'the-studio', 'record.dog'));
+    assert.equal(check.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')?.id, was);
+    assert.equal(check.all("SELECT 1 FROM member WHERE register = '*'").length, 1);
+    check.close();
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('BUT NOT FOR SOMEBODY ELSE, which is the hole the whole check exists to close', async () => {
+  /* Deleting `directory.sqlite` produces the same evidence as a killed run: a record on disk that
+     the Directory does not name. Adopting on that alone hands a live record to whoever runs `init`
+     next — and the address is the thing that tells the two apart, because the retry of a killed run
+     is literally the same command. */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+    loseTheDirectory(data);
+
+    const taken = run(data, 'init', 'the-studio', '--owner', 'mallory@example.com');
+    assert.equal(taken.code, 1, 'a live record was handed to whoever ran init next');
+    assert.match(taken.said, /already holds the record the-studio/);
+
+    /* AND NOT FOR THE RIGHT ADDRESS ATTACHED TO THE WRONG DIRECTORY EITHER. The Directory is new, so
+       `ada@example.com` mints a new person id — and provisioning against it would leave `dir_member`
+       and the record's own `member` naming two different people for one owner. */
+    const wrongDir = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
+    assert.equal(wrongDir.code, 1, 'a record was re-provisioned against a directory that never held its owner');
+    assert.match(wrongDir.said, /a person this directory does not know/);
+
+    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    assert.equal(sql.all("SELECT 1 FROM member WHERE register = '*'").length, 1, 'a second owner was added');
+    sql.close();
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('THE RECORD FILE IS NOT WORLD-READABLE, and neither is its write-ahead log', { skip: process.platform === 'win32' }, () => {
+  /* `<slug>/` is 0700 so nobody can walk to it, but a backup that copies file modes and a `docker cp`
+     out of the directory both carry the file's own bits — and this file holds every token hash and
+     every sealed grant. SQLite gives the sidecars the main file's mode at the moment it creates
+     them, which is inside the migration, so the `chmod` has to happen before it. */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
+    assert.equal(statSync(join(data, 'the-studio', 'record.dog')).mode & 0o777, 0o600);
+    assert.equal(statSync(join(data, 'directory.sqlite')).mode & 0o777, 0o600);
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('A KEY FILE THAT IS NOT A KEY COSTS NOBODY THE NAME THEY WANTED', () => {
+  /* `49 §5.1` step 2 opens the KEK before the Directory, and this is why: everything after that
+     point creates something, and an `init` that made a record and only then could not find a key to
+     wrap it with would leave a record nothing can seal and a name resolving to it. */
+  const data = scratch();
+  try {
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, 'kek'), 'too short');
+
+    const out = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
+    assert.equal(out.code, 1);
+    assert.match(out.said, /is 9 bytes and a key is 32/);
+    assert.ok(!existsSync(join(data, 'the-studio')), 'a record directory was made before the key was checked');
+    assert.ok(!existsSync(join(data, 'directory.sqlite')), 'the directory was opened before the key was checked');
   } finally {
     rmSync(data, { recursive: true, force: true });
   }
