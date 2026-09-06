@@ -676,7 +676,7 @@
   <!-- SCREEN 2 OF THE FIRST RUN, inline under the register they just made (19 §6). It shows itself
        only while the record holds exactly one register with something in it, so nothing has to
        remember a dismissal and nothing can get stuck showing it. -->
-  <Second held={Object.keys(REGISTERS)} register={id} />
+  <Second held={Object.keys(REGISTERS)} register={id} first={page.url.searchParams.has('first')} />
 
   <!-- Peek: a drawer, with the list still visible, for triage. It needs a VISIBLE affordance —
        Linear's own docs admit the flaw that Peek can only be launched with the keyboard shortcut,

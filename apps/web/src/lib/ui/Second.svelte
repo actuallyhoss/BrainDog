@@ -25,16 +25,25 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { goto } from '$app/navigation';
 
-  let { held, register }: { held: readonly string[]; register: string } = $props();
+  let { held, register, first = false }: { held: readonly string[]; register: string; first?: boolean } = $props();
 
   /* THE OTHER STARTERS, and only the ones this record does not already have. Offering a register
      somebody holds is offering to do something that is already done, which is the shape of every
      onboarding people learn to ignore. */
   const rest = $derived(copy.firstChoices.filter((c) => c.key !== register && !held.includes(c.key)));
 
-  /* ONE REGISTER, WITH SOMETHING IN IT. Two is a person who has already done this, and an empty one
-     is somebody still on screen one's work — where the register's own empty state has the say. */
-  const show = $derived(held.length === 1 && rest.length > 0);
+  /**
+   * WHEN THIS IS THE SCREEN THEY JUST LANDED ON.
+   *
+   * `19 §6` calls screen two "the register, with their one row in it" — which is a MOMENT, not a
+   * standing property. Reading it off the register count alone made it correct and unreachable: a
+   * record with a second list never sees it, which is every record anybody demonstrates, so nothing
+   * could show it and no test could reach it.
+   *
+   * A ONE-REGISTER RECORD STILL SEES IT, because that person genuinely is one register in and the
+   * offer is still the right one. Two is somebody who has already done this.
+   */
+  const show = $derived((first || held.length === 1) && rest.length > 0);
 </script>
 
 {#if show}

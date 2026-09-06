@@ -33,9 +33,31 @@
 
   let picked = $state<string | null>(null);
   let field = $state<HTMLInputElement>();
-  /* FROM THE RECORD'S CLOCK, not a literal. A hardcoded date is a PAST date within weeks, on the
-     one screen where a wrong default is the first thing anybody sees. */
   let form = $state<{ problems: () => string[] } | undefined>(undefined);
+
+  /**
+   * The number under each choice, and it did nothing.
+   *
+   * THE KEYBOARD SHEET DOCUMENTS IT — "AT THE GATE · `1–9` Highlight an option. It does not choose
+   * it" — and `/decide` obeys. This screen DRAWS the badges and had no handler, so the one place the
+   * hint is printed on the control it describes was the one place pressing it did nothing.
+   *
+   * HIGHLIGHT AND NOT CHOOSE, exactly as the sheet says. A number that committed would make a
+   * mis-keyed digit the first irreversible act somebody performs, on the screen 19 §6 says has no
+   * skip; a number that moves focus lets them read what they landed on and press Enter.
+   */
+  let lit = $state(-1);
+
+  function key(e: KeyboardEvent) {
+    if (picked !== null || e.metaKey || e.ctrlKey || e.altKey) return;
+    const n = Number(e.key);
+    if (!Number.isInteger(n) || n < 1 || n > CHOICES.length) return;
+    e.preventDefault();
+    lit = n - 1;
+    queueMicrotask(() => choices?.querySelectorAll('button')[lit]?.focus());
+  }
+
+  let choices = $state<HTMLDivElement | undefined>(undefined);
 
   function pick(key: string) {
     picked = key;
@@ -64,7 +86,11 @@
       return;
     }
     toasts.push(copy.notWritten(`the first row in ${choice.label} would be written`));
-    void goto(`/r/${choice.key}`);
+    /* AND IT SAYS WHERE IT CAME FROM. `19 §6`'s screen two is "the register, with their one row in
+       it" — the screen you LAND on, not a standing property of a record that happens to hold one
+       register. Reading it off the register count alone made it unreachable on any record with a
+       second list, which includes every record anybody demonstrates. */
+    void goto(`/r/${choice.key}?first=1`);
   }
 
   async function copyCommand() {
@@ -72,6 +98,8 @@
     toasts.push(copy.agentCopied);
   }
 </script>
+
+<svelte:window onkeydown={key} />
 
 <svelte:head><title>{titleOf('Start')}</title></svelte:head>
 
@@ -90,13 +118,13 @@
 
       <h2 class="question">{copy.firstQuestion}</h2>
 
-      <div class="choices" role="group" aria-label={copy.firstQuestion}>
+      <div class="choices" role="group" aria-label={copy.firstQuestion} bind:this={choices}>
         {#each CHOICES as c, i}
           <!-- The register id used to sit on the right of every row. It is the app's own vocabulary
                explained to somebody who has not agreed to learn it yet, on the one screen where
                they have the least reason to care, and it made five plain choices look like a
                schema review. The glyph does the work the id was pretending to do. -->
-          <button type="button" class="choice" onclick={() => pick(c.key)}>
+          <button type="button" class="choice" data-lit={lit === i ? '' : undefined} onclick={() => pick(c.key)}>
             <span class="choice-icon"><Icon name={c.icon as IconName} size="m" /></span>
             <span class="choice-main">
               <span class="choice-label">{c.label}</span>
@@ -263,6 +291,12 @@
 
   .choice:last-child {
     border-block-end: 0;
+  }
+
+  /* HIGHLIGHTED BY A NUMBER, and focus does the rest — so the ring somebody sees is the one the
+     browser draws for the thing Enter would press, rather than a second convention to learn. */
+  .choice[data-lit] {
+    border-color: var(--accent);
   }
 
   .choice:hover {
