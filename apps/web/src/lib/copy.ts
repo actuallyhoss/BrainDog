@@ -13,6 +13,10 @@
  *   - Say what a thing does, plainly. Never sell it, and never explain the interface.
  */
 
+/** `a`, `a and b`, `a, b and c` — an Oxford-less list, which is what a person writes. */
+const list = (words: string[]): string =>
+  words.length <= 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+
 export const copy = {
   /* the product */
   product: 'BrainDog',
@@ -192,13 +196,13 @@ export const copy = {
   secretsLiveInTheVault: 'Keys and tokens go in the Vault. A row records what one opens.',
   savedNothing: 'Nothing was written. This is a mock-up of the record, not the record.',
   noFilters: 'Nothing here can be filtered yet.',
-  /* What a field CAN be filtered on, said plainly, instead of a disabled range control. */
-  filterKind: (type: string) =>
-    type === 'money' || type === 'int' || type === 'decimal'
-      ? 'Sort on the column instead.'
-      : type === 'day' || type === 'instant'
-        ? 'Sort on the column instead.'
-        : 'Search matches this field.',
+  /* WHERE A FIELD IS FILTERED INSTEAD, said once for all of them rather than as a headed section
+     each. Three fieldsets carrying a legend and one sentence read as three controls that failed to
+     render. */
+  filterBySearch: (fields: string[]): string =>
+    `${list(fields)} ${fields.length === 1 ? 'is' : 'are'} matched by the search box.`,
+  filterBySort: (fields: string[]): string => `${list(fields)} sort${fields.length === 1 ? 's' : ''} on the column.`,
+
   displayOptions: 'Display',
   display: 'Display',
   displayNote: 'Only affects your view of this list.',

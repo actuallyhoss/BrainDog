@@ -178,6 +178,12 @@
       field is a promise the storage cannot keep at 5,000 rows. */
   const filterable = $derived((decl?.fields ?? []).filter((f) => f.index).slice(0, 8));
 
+  /** Where a field that is not an enum IS filtered: the column's sort, or the search box. */
+  const kindOf = (f: { type: string }): 'search' | 'sort' =>
+    f.type === 'money' || f.type === 'int' || f.type === 'decimal' || f.type === 'day' || f.type === 'instant'
+      ? 'sort'
+      : 'search';
+
   function setParam(mutate: (p: URLSearchParams) => void) {
     const next = new URLSearchParams(page.url.searchParams);
     mutate(next);
@@ -840,34 +846,40 @@
       <p class="filter-none">{copy.noFilters}</p>
     {:else}
       <div class="filter-groups">
-        {#each filterable as f}
+        {#each filterable.filter((f) => f.type === 'enum') as f}
           <fieldset class="filter-group">
             <legend class="filter-legend">{labelOf(f)}</legend>
-            {#if f.type === 'enum'}
-              <div class="filter-values">
-                {#each f.values ?? [] as value}
-                  {@const on = isOn(f.id, value)}
-                  <button
-                    type="button"
-                    class="filter-value"
-                    data-on={on ? '' : undefined}
-                    aria-pressed={on ? 'true' : 'false'}
-                    onclick={() => toggleFilter(f.id, value)}
-                  >
-                    <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
-                    {value.replace(/_/g, ' ')}
-                  </button>
-                {/each}
-              </div>
-            {:else}
-              <!-- ABSENT, not disabled. A range control that cannot be built yet is not shown as a
-                   greyed-out one: a disabled control tells you a thing exists and refuses to say
-                   why it will not work (23 §8). This says what it can filter on instead. -->
-              <p class="filter-kind">{copy.filterKind(f.type)}</p>
-            {/if}
+            <div class="filter-values">
+              {#each f.values ?? [] as value}
+                {@const on = isOn(f.id, value)}
+                <button
+                  type="button"
+                  class="filter-value"
+                  data-on={on ? '' : undefined}
+                  aria-pressed={on ? 'true' : 'false'}
+                  onclick={() => toggleFilter(f.id, value)}
+                >
+                  <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
+                  {value.replace(/_/g, ' ')}
+                </button>
+              {/each}
+            </div>
           </fieldset>
         {/each}
       </div>
+
+      <!-- ABSENT, not disabled: a range control that cannot be built yet is not drawn as a greyed-out
+           one, because a disabled control tells you a thing exists and refuses to say why it will not
+           work (23 §8).
+
+           AND SAID ONCE, not as a headed section each. Three fieldsets with a legend and one sentence
+           read as three controls that failed to render — "Party — Search matches this field." looks
+           like a filter that is broken rather than a field that is filtered elsewhere. Grouped, it is
+           a sentence about where to go instead, which is what it always was. -->
+      {@const searched = filterable.filter((f) => f.type !== 'enum' && kindOf(f) === 'search').map(labelOf)}
+      {@const sorted = filterable.filter((f) => f.type !== 'enum' && kindOf(f) === 'sort').map(labelOf)}
+      {#if searched.length > 0}<p class="filter-kind">{copy.filterBySearch(searched)}</p>{/if}
+      {#if sorted.length > 0}<p class="filter-kind">{copy.filterBySort(sorted)}</p>{/if}
     {/if}
 
     {#snippet footer()}
