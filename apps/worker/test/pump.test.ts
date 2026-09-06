@@ -132,6 +132,48 @@ test('A DOORBELL WHOSE RECORD DRAINED IS ACKED, and one whose record threw GOES 
   assert.match(said[0] ?? '', /^drain rec_b: mid-deploy$/);
 });
 
+test('A DOORBELL NOBODY CAN READ IS ACKED, and does not take the batch with it', async () => {
+  /* `m.body.record` on a null body throws a TypeError out of the GROUPING loop — out of `consume`,
+     out of `queue()`, and Cloudflare fails the whole batch. One malformed message (an older payload
+     shape, another producer, one injected from the dashboard) re-drove twenty-four healthy records
+     three times and then dropped them. The docstring promised the opposite; the grouping loop was
+     breaking the promise the drain loop keeps. */
+  const acked: string[] = [];
+  const retried: string[] = [];
+  const bad = (body: unknown): Rung =>
+    ({ body, ack: () => void acked.push('bad'), retry: () => void retried.push('bad') }) as unknown as Rung;
+  const good: Rung = { body: { record: 'rec_a' }, ack: () => void acked.push('good'), retry: () => void retried.push('good') };
+
+  const said: string[] = [];
+  await consume([bad(null), bad({}), bad({ record: 42 }), bad({ record: '' }), good], () => Promise.resolve(), (l) =>
+    said.push(l),
+  );
+
+  assert.deepEqual(acked, ['bad', 'bad', 'bad', 'bad', 'good'], 'a message nobody can read was retried, or took the batch');
+  assert.deepEqual(retried, []);
+  assert.equal(said.length, 4);
+});
+
+test('and the platform’s own answer can throw without becoming a drain failure', async () => {
+  /* `m.ack()` used to be inside the try whose catch reads as a DRAIN failure, so an ack that threw
+     on the third of five ringers retried the two already acked and logged a failure that never
+     happened. */
+  let acks = 0;
+  const bells: Rung[] = ['a', 'b', 'c'].map(() => ({
+    body: { record: 'rec_a' },
+    ack: () => {
+      if (++acks === 2) throw new Error('rpc');
+    },
+    retry: () => assert.fail('a successful drain retried its doorbell'),
+  }));
+  const said: string[] = [];
+  await consume(bells, () => Promise.resolve(), (l) => said.push(l));
+
+  assert.equal(acks, 3, 'one ack that threw stopped the others');
+  assert.equal(said.length, 1);
+  assert.match(said[0] ?? '', /^answering a doorbell: rpc$/, 'an ack that threw was reported as a drain that failed');
+});
+
 test('one record’s failure is not the batch’s, and the rest are still drained', async () => {
   const bells = ring('rec_a', 'rec_bad', 'rec_c');
   const passes: string[] = [];

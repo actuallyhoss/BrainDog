@@ -689,10 +689,41 @@ export function snapshot(
   backfillDays = 30,
 ): Result<Snapshot> {
   const DAY = 86_400_000;
-  const yesterday = ctx.nowMs - DAY;
 
-  const at = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
-  const endOf = (ms: number): number => Date.parse(`${at(ms)}T23:59:59.999Z`);
+  /**
+   * THE DAY IS THE RECORD'S, NOT UTC'S. `deps.tz` was read and thrown away (`void deps.tz`), so
+   * every boundary here was UTC — and the row that fires this is armed for five past midnight
+   * LOCAL. In `Pacific/Auckland` that is 11:05 the previous day in UTC, so `nowMs - DAY` landed two
+   * local days back and `toISOString()` named the wrong one; backfill only walks backwards, so
+   * local yesterday was never written at all, for any record east of UTC. 45 §5.9: "y = yesterday
+   * in tz".
+   *
+   * `en-CA` GIVES `YYYY-MM-DD` DIRECTLY, which is the format `metric_point.at` stores and the one
+   * every comparison in this file assumes.
+   */
+  const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: deps.tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const at = (ms: number): string => dayFmt.format(new Date(ms));
+
+  /**
+   * The last instant of a local day, as a UTC timestamp.
+   *
+   * BY SEARCH RATHER THAN BY ARITHMETIC, because an offset is not a constant: a day that a
+   * government moves the clock in is 23 or 25 hours long, and adding a fixed offset to midnight puts
+   * the boundary an hour inside the neighbouring day twice a year. Starting from noon — which no
+   * transition has ever crossed — and stepping to the last minute that still names this day is
+   * arithmetic-free and correct in every zone.
+   */
+  const endOf = (ms: number): number => {
+    const want = at(ms);
+    let t = Date.parse(`${want}T12:00:00Z`);
+    /* Forward in hours while it is still this day, then back off by a millisecond. */
+    while (at(t + 3_600_000) === want) t += 3_600_000;
+    while (at(t + 60_000) === want) t += 60_000;
+    return t + 60_000 - 1;
+  };
+
+  /** Yesterday, locally: the last instant of the day before the local day `nowMs` falls in. */
+  const yesterday = endOf(ctx.nowMs) - DAY;
 
   const write = (dayMs: number, overwrite: boolean): 'wrote' | 'kept' | 'missing' => {
     const day = at(dayMs);
@@ -730,6 +761,5 @@ export function snapshot(
     if (out === 'missing') missing++;
   }
 
-  void deps.tz;
   return ok({ series: decl.metric, wrote: today === 'wrote' ? 1 : 0, backfilled, missing });
 }

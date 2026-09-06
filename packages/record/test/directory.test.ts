@@ -85,6 +85,28 @@ test('AND THE OLD NAME IS NEVER GIVEN OUT AGAIN, which is the whole tenant bound
   sql.close();
 });
 
+test('AND AN ADDRESS IT ALREADY HAS IS A REFUSAL, not a thrown constraint', async () => {
+  /* `provision` advertises re-running a half-done sign-up with the same id as its recovery path —
+     and then let the primary key throw a `SQLITE_CONSTRAINT` out of a function whose entire contract
+     is a `Result`, across a Durable Object RPC boundary, as a bare 500. */
+  const { d, sql } = directory();
+  value<Person>(d.person$('ada@example.com'));
+  const made = value<Named & { person: string }>(d.provision({ slug: 'the-studio', email: 'ada@example.com' }));
+
+  const again = refusal(d.provision({ slug: 'a-second-name', email: 'ada@example.com', record: made.record }));
+  assert.equal(again.code, 'ALREADY_KNOWN');
+  assert.equal(again.at, 'record');
+  assert.equal(sql.all('SELECT 1 FROM dir_record').length, 1, 'a refused provision left a record behind');
+
+  // And a record id that is not one is refused before anything is read.
+  assert.equal(refusal(d.provision({ slug: 'kiln', email: 'ada@example.com', record: 'rec_nope' })).at, 'record');
+
+  // The one it is for still works, which is the whole point of taking the id at all.
+  const named = value<Named & { person: string }>(d.provision({ slug: 'kiln', email: 'ada@example.com', record: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD' }));
+  assert.equal(named.record, 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', 'the caller named the record and the Directory minted its own');
+  sql.close();
+});
+
 test('and a name that is not a name, or is the platform’s, is refused before it is durable', async () => {
   const { d, sql } = directory();
   value<Person>(d.person$('ada@example.com'));

@@ -138,8 +138,14 @@ export function createDirectory(sql: Sql, clock: Clock) {
     return { record: row.record, slug };
   };
 
+  /* AND A CLOSED RECORD HAS NO NAME EITHER — the fourth reader, and the one the sweep missed. */
   const slugOf = (record: string): string | null =>
-    sql.one<{ slug: string }>('SELECT slug FROM dir_slug WHERE record = ? AND released_at IS NULL', record)?.slug ?? null;
+    sql.one<{ slug: string }>(
+      `SELECT s.slug AS slug FROM dir_slug s
+         JOIN dir_record r ON r.id = s.record AND r.closed_at IS NULL
+        WHERE s.record = ? AND s.released_at IS NULL`,
+      record,
+    )?.slug ?? null;
 
   const personByEmail = (email: string): Person | null =>
     sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE lower(email) = lower(?)', email) ?? null;
@@ -230,6 +236,18 @@ export function createDirectory(sql: Sql, clock: Clock) {
               ? `${args.slug} was the name of another record and cannot be given out again.`
               : `${args.slug} is already somebody's record.`,
             { at: 'slug' },
+          );
+
+        /* AND THE ADDRESS IS CHECKED TOO, or the `INSERT` below violates the primary key and throws
+           a `SQLITE_CONSTRAINT` out of a function whose entire contract is a `Result` — across a
+           Durable Object RPC boundary, as a bare 500. That is the exact hazard `person$` above
+           spends five lines arguing against, and this method INVITES it: re-running a half-done
+           provision with the same id is the recovery path it advertises. */
+        if (args.record !== undefined && sql.one('SELECT 1 FROM dir_record WHERE id = ?', args.record))
+          return no<Named & { person: string }>(
+            'ALREADY_KNOWN',
+            `${args.record} is already a record here. It may need a name, but it does not need creating.`,
+            { at: 'record' },
           );
 
         const person = personByEmail(args.email);

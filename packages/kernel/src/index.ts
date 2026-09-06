@@ -416,15 +416,30 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /**
    * The schedule rows a batch of declarations earns.
    *
-   * ONE ROW PER THING THAT RECURS, keyed so a re-install is not a reset. `analyse` is the record's
-   * own and takes no declaration — it is armed the first time anything is installed, because a
-   * record with declarations is a record that can be observed.
+   * ONE ROW PER THING THAT RECURS, KEYED BY THE BARE ID. `forgetPack` deletes by
+   * `substr(id, instr(id, '.') + 1)` — `brief`, not `digest.brief` — and this wrote the full form,
+   * so the two never intersected: uninstalling a pack left every digest it had earned armed, firing
+   * every Monday about a declaration that is gone. `(kind, key)` is the unique index, so `digest`
+   * and `metric` cannot collide over one bare name.
+   *
+   * AND `DO UPDATE` RATHER THAN `DO NOTHING`, which 45 §5.9 calls "the one path 09 §1 demands". The
+   * difference is a whole class of silence: a row that has already fired is `done`, and
+   * `drainSchedule` claims only `pending` — so with `DO NOTHING` a digest whose row went `done` once
+   * (because its declaration was momentarily absent, say) could never be armed again by any number
+   * of re-installs, and would simply never send, for ever, with nothing anywhere saying so.
+   *
+   * THE `WHERE` IS WHAT KEEPS IT FROM BEING A RESET. A `pending` row is one somebody is waiting on,
+   * and moving its `due_at` because a pack was re-installed is how a Monday brief silently becomes a
+   * Thursday one. Only a row that is finished or given up on is re-armed.
    */
   function armDerived(batch: readonly Declaration[]): void {
     const arm = (kind: string, key: string, payload: unknown, at: number): void => {
       sql.exec(
         `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts)
-         VALUES (?, ?, ?, ?, ?, 'pending', 0) ON CONFLICT (kind, key) DO NOTHING`,
+         VALUES (?, ?, ?, ?, ?, 'pending', 0)
+         ON CONFLICT (kind, key) DO UPDATE
+           SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0
+           WHERE schedule.state IN ('done', 'failed')`,
         mint(),
         instant(at),
         kind,
@@ -433,24 +448,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       );
     };
 
-    const tz = recordIdentity(sql)?.tz ?? 'UTC';
+    /* A TIMEZONE THIS RUNTIME CANNOT READ IS `UTC`, not a `RangeError`. `dog_meta.tz` arrives from an
+       import or a restore as easily as from `createRecord`, and `Intl` throws on a zone it does not
+       know — out of `install`, after the declarations had already committed, so the caller saw a 500
+       for a write that succeeded. */
+    let tz = recordIdentity(sql)?.tz ?? 'UTC';
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: tz });
+    } catch {
+      tz = 'UTC';
+    }
+
     for (const decl of batch) {
       const body = decl.body as Record<string, unknown>;
+      /* The bare id: `digest.brief` is the declaration and `brief` is the key. */
+      const bare = decl.id.slice(decl.id.indexOf('.') + 1);
       if (decl.kind === 'digest' && body.schedule && typeof body.schedule === 'object') {
         const at = nextOccurrence(body.schedule as { day?: string; at: string }, clock.now(), tz);
-        if (at !== null) arm('digest', decl.id, { declaration: decl.id }, at);
+        if (at !== null) arm('digest', bare, { declaration: decl.id }, at);
       }
       /* A METRIC WITH `snapshot:` REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
          about is finished and nothing else is competing for the alarm. */
       if (decl.kind === 'metric' && body.snapshot) {
         const at = nextOccurrence({ at: '00:05' }, clock.now(), tz);
-        if (at !== null) arm('snapshot', decl.id, { metric: (body as { metric?: string }).metric ?? decl.id }, at);
+        if (at !== null) arm('snapshot', bare, { metric: typeof body.metric === 'string' ? body.metric : bare }, at);
       }
     }
-
-    /* AND THE WEEKLY ANALYSIS, once. A week out rather than now: a record whose first declarations
-       have just landed has nothing to have noticed yet, and the governors would refuse anyway. */
-    if (batch.length > 0) arm('analyse', 'weekly', {}, clock.now() + 7 * 86_400_000);
   }
 
   function unreadable(batch: readonly Declaration[]): Refusal | null {
@@ -1360,7 +1383,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /**
    * What each kind of schedule row does when its time comes.
    *
-   * The four that are not here — `rule`, `pull`, `analyse` and `snapshot` — each wait on a subsystem
+   * The one that is not here — `pull` — waits on a subsystem
    * this record does not have yet. A row of one of those kinds fails ONCE with a sentence naming the
    * kind rather than walking eight hours of a ladder, which is the honest behaviour: it says the
    * record cannot do this, instead of looking like it is trying.
@@ -2064,8 +2087,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (!staged.ok) return staged;
       return ok(() => {
         const out = staged.value(sql, clock.now(), transaction);
-        /* AND THE SAME ON A PACK'S PATH, which stages and applies in one transaction of its own. */
-        armDerived(batch);
+        /* AND THE SAME ON A PACK'S PATH, WHEN IT LANDS. `applyDeclarations` refuses and rolls back —
+           a clashing unique field, a missing dependency — and this armed the rows anyway: the caller
+           got a refusal and the schedule held a `digest` row for a declaration that does not exist.
+           It fires once, finds nothing, and goes `done`. */
+        if (out.ok) armDerived(batch);
         return out;
       });
     },

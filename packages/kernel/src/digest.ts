@@ -217,8 +217,7 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
     text,
     headline: headline(name, carrying),
     channels,
-    sections: carrying.length,
-    body: JSON.stringify({ digest: decl.digest, sections: carrying }),
+    sections: carrying,
     ...(decl.webhook?.url ? { webhook: decl.webhook.url } : {}),
   };
 
@@ -258,9 +257,13 @@ export type Assembled = {
   /** The one line the in-app note carries. */
   headline: string;
   channels: Channel[];
-  sections: number;
-  /** The webhook body, already serialised: the sections as they were when the alarm fired. */
-  body: string;
+  /**
+   * The sections as they were when the alarm fired — the ARRAY, which is what 45 §5.9 names in the
+   * `infer.prose` payload and what 46 §5's prompt reads: *"Its sections, each figure with its
+   * path"*. This carried `carrying.length` instead, so a model asked to write two sentences about a
+   * digest would have been handed the number `3`. The count the push title needs is `.length`.
+   */
+  sections: DigestPart[];
   webhook?: string;
 };
 
@@ -299,10 +302,14 @@ ${sent.text}` : sent.text;
     if (channel === 'push') {
       /* NO CONTENT IN A PUSH. It says how many things and where, and the record is where they are:
          a lock screen is not a place a person chose to read their business on. */
-      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections} items`, url: `/digest/${sent.digest}` });
+      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length} items`, url: `/digest/${sent.digest}` });
       continue;
     }
-    if (channel === 'webhook' && sent.webhook) deps.outbox('notify.webhook', { url: sent.webhook, body: sent.body });
+    if (channel === 'webhook' && sent.webhook)
+      deps.outbox('notify.webhook', {
+        url: sent.webhook,
+        body: JSON.stringify({ digest: sent.digest, sections: sent.sections }),
+      });
   }
 }
 

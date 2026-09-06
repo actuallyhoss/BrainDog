@@ -97,21 +97,50 @@ export async function consume(
 ): Promise<void> {
   const rang = new Map<string, Rung[]>();
   for (const m of messages) {
-    const seen = rang.get(m.body.record);
+    /* A MESSAGE NOBODY HERE CAN READ IS ACKED, NOT RETRIED. `m.body.record` on a `null` body throws
+       a `TypeError` out of this loop, out of `queue()`, and Cloudflare fails the WHOLE batch — so a
+       single malformed message (an older payload shape, another producer, one injected from the
+       dashboard) re-drove twenty-four healthy records three times and then dropped them. The
+       docstring above promises the opposite, and the grouping loop was breaking the promise the
+       drain loop below keeps.
+
+       ACKED BECAUSE NOTHING CAN EVER MAKE IT DRAINABLE. Retrying a message whose body is not a
+       record name is three more chances to fail at the same sentence. */
+    const named: unknown = (m as { body?: { record?: unknown } }).body?.record;
+    if (typeof named !== 'string' || named === '') {
+      log('drain: a doorbell that named no record');
+      safely(() => m.ack(), log);
+      continue;
+    }
+    const seen = rang.get(named);
     if (seen) seen.push(m);
-    else rang.set(m.body.record, [m]);
+    else rang.set(named, [m]);
   }
 
   for (const [id, ringers] of rang) {
+    let drained = false;
     try {
       await drain(id);
-      for (const m of ringers) m.ack();
+      drained = true;
     } catch (e) {
       /* ONE RECORD'S FAILURE IS NOT THE BATCH'S. The other twenty-four are drained, and only the
          messages about this one go back. */
       log(`drain ${id}: ${said(e)}`);
-      for (const m of ringers) m.retry();
     }
+    /* AND THE ANSWERING IS OUTSIDE THE TRY THAT CATCHES THE DRAIN, for the same reason the success
+       ack is outside its own: an `ack()` that threw on the third of five ringers used to be caught
+       as a DRAIN failure, so the two already acked were retried and a log line named a failure that
+       never happened. */
+    for (const m of ringers) safely(() => (drained ? m.ack() : m.retry()), log);
+  }
+}
+
+/** The platform's own answer, which can throw too. It is one message, not the batch. */
+function safely(fn: () => void, log: (line: string) => void): void {
+  try {
+    fn();
+  } catch (e) {
+    log(`answering a doorbell: ${said(e)}`);
   }
 }
 

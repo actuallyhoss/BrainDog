@@ -167,6 +167,22 @@ export function createRecord(
       instant(now + 3_600_000),
     );
 
+    /* AND THE WEEKLY ANALYSIS, HERE, BESIDE IT. It was armed on the first `install` — which reads as
+       reasonable and is wrong twice over: 09 §2 sources `analyse` from the self-improvement detector
+       rather than from declarations, and 45 §5.9's detectors read `observation`, which is what a
+       record accrues from USE. A record whose registers arrived through `import` or `restore` never
+       calls `install`, so it would never have been observed at all.
+
+       A WEEK OUT, and the first fire refuses: 45 §5.9's activity floor wants twenty live rows, three
+       distinct event days and a record fourteen days old. Refusing and re-arming is what the
+       governors are for, and it costs one row. */
+    sql.exec(
+      `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES (?, ?, 'analyse', 'weekly', '{}', 'pending', 0)
+       ON CONFLICT (kind, key) DO NOTHING`,
+      mint(),
+      instant(now + 7 * 86_400_000),
+    );
+
     return ok({ id: args.id, slug: args.slug });
   });
 }

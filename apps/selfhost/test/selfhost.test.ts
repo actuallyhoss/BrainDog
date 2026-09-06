@@ -272,20 +272,11 @@ test('A WRITE THAT MAKES A REMINDER ARMS THE ALARM, without being asked to', asy
   const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0 });
   const at = bound(running);
   try {
-    /* A RECORD WITH DECLARATIONS HAS THE WEEKLY ANALYSIS PENDING — 45 §5.9's own row, and what makes
-       the observe loop run at all. So "nothing else to do" is a week out, and the reminder below has
-       to beat it to become the alarm, which is the property this test is about. */
+    /* NOTHING TO DO IS NO ALARM. The weekly analysis is `createRecord`'s row and this server was
+       started against a bare file, so a declaration is all this record has. */
     assert.ok((await running.api.kernel.install([REMINDING])).ok);
-    /* THE ROW IS ARMED BY THE INSTALL; THE ALARM IS ARMED BY THE TAIL. This calls the kernel
-       directly, which holds no scheduler — the record API's own `setDeclaration` tails for exactly
-       this reason. */
-    assert.ok(
-      running.sql.one("SELECT 1 FROM schedule WHERE kind = 'analyse' AND key = 'weekly'"),
-      'the weekly analysis was never armed',
-    );
     await running.api.kernel.tail(running.scheduler);
-    const weekly = await running.scheduler.get();
-    assert.ok(weekly !== null, 'the tail armed nothing');
+    assert.equal(await running.scheduler.get(), null, 'a record with nothing to do armed an alarm');
 
     const res = await fetch(`http://127.0.0.1:${at}/api/create`, {
       method: 'POST',
@@ -293,16 +284,13 @@ test('A WRITE THAT MAKES A REMINDER ARMS THE ALARM, without being asked to', asy
     });
     assert.equal(res.status, 200);
 
-    /* THE WRITE DERIVED A REMINDER, and the alarm is the EARLIEST pending row — which here is the
-       weekly analysis, because it is seven days out and the reminder is twenty-three. Asserting the
-       alarm equals the reminder would be asserting that the earliest row does not win. */
     const derived = running.sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'reminder'");
     assert.ok(derived, 'the write derived no reminder');
     assert.equal(derived.due_at.slice(0, 10), day(23), 'the reminder is derived for the wrong day');
 
     const armed = await running.scheduler.get();
-    assert.ok(armed !== null, 'the write armed nothing');
-    assert.equal(armed, Math.min(weekly, Date.parse(derived.due_at)), 'the alarm is not the earliest pending row');
+    assert.ok(armed !== null, 'the write derived a reminder and armed nothing');
+    assert.equal(armed, Date.parse(derived.due_at), 'the alarm is not the earliest pending row');
   } finally {
     await running.close();
     rmSync(dir, { recursive: true, force: true });
@@ -335,10 +323,8 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
     await again.drain();
     const notes = again.api.kernel.history(again.api.kernel.get('renewals#1')!.id).filter((e) => e.kind === 'note');
     assert.equal(notes.length, 1, 'the due reminder did not fire on reopen');
-    /* AND THE ALARM MOVES TO THE NEXT THING rather than being cleared: a record always has the
-       weekly analysis pending, so "nothing left" is a week out. */
-    assert.ok((await again.scheduler.get()) !== null, 'the drained schedule armed nothing');
-    assert.equal(again.sql.all("SELECT 1 FROM schedule WHERE kind = 'reminder' AND state = 'pending'").length, 0);
+    /* AND THE ALARM IS CLEARED rather than left in the past. */
+    assert.equal(await again.scheduler.get(), null, 'the drained schedule left an alarm behind');
   } finally {
     await again.close();
     rmSync(dir, { recursive: true, force: true });

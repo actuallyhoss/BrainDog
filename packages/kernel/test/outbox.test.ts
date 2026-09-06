@@ -460,13 +460,10 @@ test('THE ALARM IS THE EARLIEST PENDING ROW, or there is no alarm', async () => 
   const { k, sql, clock } = await record();
   const scheduler = recordingScheduler();
 
-  /* A RECORD WITH DECLARATIONS HAS THE WEEKLY ANALYSIS PENDING — 45 §5.9's own row, and the thing
-     that makes the observe loop run at all. So "nothing else to do" is a week out rather than no
-     alarm, and the reminder below has to beat it to become the alarm, which is the property this
-     test is actually about. */
+  /* NOTHING TO DO IS NO ALARM. The weekly analysis is `createRecord`'s row rather than an install's,
+     and this helper opens a record without creating one. */
   await k.tail(scheduler);
-  const weekly = scheduler.armed;
-  assert.ok(weekly !== null && weekly > NOW, 'the weekly analysis was never armed');
+  assert.equal(scheduler.armed, null, 'a record with nothing to do armed an alarm');
 
   const due = new Date(NOW + 10 * DAY).toISOString().slice(0, 10);
   value(k.create('obligations', { what: 'Invoice 41', due }, { actor: 'p_1' }));
@@ -478,11 +475,10 @@ test('THE ALARM IS THE EARLIEST PENDING ROW, or there is no alarm', async () => 
   await k.tail(scheduler);
   assert.deepEqual(scheduler.calls.slice(before), ['get'], 'the alarm was re-set to the time it already held');
 
-  /* And when the reminder is drained, the alarm goes back to the next thing rather than staying in
-     the past — which here is the weekly analysis, because a record always has that. */
+  // And when the last row is drained, the alarm is cleared rather than left in the past.
   clock.set(NOW + 4 * DAY);
   await k.drain(scheduler);
-  assert.equal(scheduler.armed, weekly, 'a drained reminder left its own alarm behind');
+  assert.equal(scheduler.armed, null, 'a drained schedule left an alarm behind');
   assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'reminder' AND state = 'pending'").length, 0, 'the reminder was not drained');
   sql.close();
 });

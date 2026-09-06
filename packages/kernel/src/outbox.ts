@@ -245,6 +245,21 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
     );
   }
 
+  /* A HOST THAT CANNOT FINISH WHAT IT STARTED SAYS SO, BEFORE ANYTHING IS WRITTEN. An `infer.prose`
+     row is not a notification, it is a digest waiting behind a model — so an ack with no way to send
+     it would mark the row `done` and drop the digest silently, which is the exact bug this branch
+     exists to fix, restored by a wiring mistake. Refusing leaves the row leased, and the lease
+     expires into a retry.
+
+     BEFORE THE WRITE, because a refusal returned from inside a transaction COMMITS: nothing throws,
+     so there is nothing to roll back. */
+  if (row.kind === 'infer.prose' && !deps.sendDigest)
+    return no<null>(
+      'NOT_IMPLEMENTED',
+      `Job ${args.id} is a digest waiting on two sentences, and this host wired no way to send it.`,
+      { at: 'kind' },
+    );
+
   if (args.state === 'done') {
     sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL WHERE id = ?", args.id);
 
@@ -279,28 +294,17 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
        THE PROSE IS OPTIONAL AND THE DIGEST IS NOT. A result the host could not produce, or one that
        came back without a usable sentence, ships the figures on their own — 46 §5: "the digest ships
        as figures only". Two sentences are worth having and never worth losing a digest over. */
-    if (row.kind === 'infer.prose' && deps.sendDigest) {
+    if (row.kind === 'infer.prose') {
       const said = args.result as { text?: unknown; prose?: unknown } | undefined;
       /* BOTH KEYS. 45 §5.10 calls it `text` and 46 §5 calls it `prose`, and which one is on the wire
          is a fact about the host rather than about this record. */
       const raw = typeof said?.text === 'string' ? said.text : typeof said?.prose === 'string' ? said.prose : '';
-      deps.sendDigest(JSON.parse(row.payload), raw);
+      deps.sendDigest?.(JSON.parse(row.payload), raw);
     }
     return ok(null);
   }
 
-  /* A FAILED `infer.prose` STILL SENDS THE DIGEST, and does not walk the ladder. The digest was
-     assembled successfully; a model declining to write two sentences about it is not a delivery
-     that failed. Retrying is worse than useless here — 07 §7 and 46 §5 both say a model call retried
-     automatically bills twice for one payload — and eight rungs of it would end in a suggestion
-     asking somebody to decide about an ornament, while the digest it was decorating never went.
 
-     `done` AND NOT `dead`, because the work this row existed for was done: the digest left. */
-  if (row.kind === 'infer.prose' && deps.sendDigest) {
-    sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL WHERE id = ?", args.id);
-    deps.sendDigest(JSON.parse(row.payload), '');
-    return ok(null);
-  }
 
   const after = sql.one<{ attempts: number }>(
     "UPDATE outbox SET state = 'failed', leased_until = NULL, attempts = attempts + 1 WHERE id = ? RETURNING attempts",
@@ -334,6 +338,21 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
       `outbox:${args.id}`,
       JSON.stringify({ outbox: args.id, attempt: attempts }),
     );
+    return ok(null);
+  }
+
+  /* AT THE CEILING, A DIGEST STILL GOES — as figures, which is 46 §5's own fallback for a prose
+     call that came back unusable. This used to happen on the FIRST failure, which conflated two
+     different events: a model that answered and said nothing usable, and a request that never
+     reached one. `pump` acks `failed` for a twenty-second timeout, a 502 or a DNS blip, and nothing
+     bills twice for a call that never happened — so the ladder is right for those, and the ladder
+     ending is the right moment to stop waiting.
+
+     `done` AND NOT `dead`, because the work this row existed for was done at that point: the digest
+     left. A dead letter would ask somebody to decide about an ornament. */
+  if (row.kind === 'infer.prose') {
+    sql.exec("UPDATE outbox SET state = 'done' WHERE id = ?", args.id);
+    deps.sendDigest?.(JSON.parse(row.payload), '');
     return ok(null);
   }
 

@@ -318,14 +318,41 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
     },
   });
 
-  await pump(record, deliver);
+  /* AND AN ACK THAT WOULD NOT LAND RINGS AGAIN. `pump` leaves such a job `leased` and moves on,
+     because "the lease expires and the job is reclaimed" — which is true on the self-host, where a
+     fifteen-second poller reclaims it. This Worker has no poller: reclaiming needs a `lease()`, which
+     needs the doorbell, which `tail()` rings only when `pendingWork().outboxPending` is true — and
+     that counts `pending` rows, not `leased` ones. So the job waited for the record's NEXT
+     deliverable row to ring for it, which on a quiet record is indefinitely.
+
+     ONE RING, NOT A LOOP. The lease is still held when this fires; the redelivery arrives after
+     Cloudflare's own delay, by which time it has expired and `leaseOutbox` reclaims it. */
+  const pass = await pump(record, deliver);
+  if (pass.unacked > 0) await env.INGRESS.send({ record: id });
 }
 
 /** Where a call came from, for the "last used" line on a token listing. */
-const surfaceOf = (url: URL): string => (url.pathname.includes('/mcp') ? 'mcp' : 'api');
+/**
+ * Where a call came from, for the "last used" line on a token listing.
+ *
+ * THE PATH IS THE CALLER'S TO WRITE, so it is matched at the root rather than anywhere in the
+ * string. `includes('/mcp')` made `POST /api/list/mcp` record `mcp` on somebody's token before the
+ * method lookup 404'd it — a forgeable line in the one place a person decides what to revoke.
+ */
+const surfaceOf = (url: URL): string => (/^\/+mcp(?:\/|$)/.test(url.pathname) ? 'mcp' : 'api');
 
+/**
+ * `no-store`, ON THE ROUTER'S OWN ANSWERS TOO.
+ *
+ * 33 §4 asks for it on all of `/api/*`, and `serveApi` sets it — but the 401, 403, 404 and 500 this
+ * file writes never reach `serveApi`. A cached 401 is a person who signs in and still cannot get in;
+ * a cached 403 is a person invited to a record who is told for an hour that they are not on it.
+ */
 const json = (body: unknown, status: number): Response =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  });
 
 /**
  * The one answer to every way of not being let in.

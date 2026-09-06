@@ -213,16 +213,15 @@ test('the record says when it next has something to do, which is one alarm per c
   // The alternative is a cron worker fanning out across every tenant, waking records that have
   // nothing to do in order to ask them.
   const { k, sql } = await record();
-  /* A RECORD WITH DECLARATIONS HAS THE WEEKLY ANALYSIS PENDING, which is 45 §5.9's own row and the
-     thing that makes the observe loop run at all. So "nothing to do" is a week out rather than
-     `null`, and the reminder below has to beat it to be the alarm. */
-  const idle = k.pending().nextDueMs;
-  assert.ok(idle !== null && idle > NOW, 'the weekly analysis was not armed');
+  /* NOTHING TO DO IS NO ALARM. This helper installs declarations but never calls `createRecord` —
+     and the weekly analysis is the RECORD's row, armed when the record is created, because 09 §2
+     sources it from use rather than from anything being declared. */
+  assert.equal(k.pending().nextDueMs, null, 'a record with nothing to do armed an alarm');
 
-  value(k.create('obligations', { what: 'a', due: day(3) }, { actor: 'p_1' }));
+  value(k.create('obligations', { what: 'a', due: day(30) }, { actor: 'p_1' }));
   const at = k.pending().nextDueMs;
   assert.ok(at !== null);
-  assert.ok(at < idle, 'the alarm is not the earliest pending row');
+  assert.equal(new Date(at).toISOString().slice(0, 10), day(23), 'the alarm is set for the wrong reminder');
 
   assert.equal(k.due().length, 0, 'a reminder in the future is due now');
   assert.equal(k.due().length, 0);
@@ -297,11 +296,83 @@ test('A DECLARED DIGEST IS ARMED WHEN IT IS DECLARED', async () => {
 
   const armed = sql.one<{ kind: string; key: string; state: string }>("SELECT kind, key, state FROM schedule WHERE kind = 'digest'");
   assert.ok(armed, 'a declared digest was never armed, so it could never send');
-  assert.equal(armed.key, 'digest.monday');
+  /* THE BARE ID IS THE KEY. `forgetPack` deletes by `substr(id, instr(id, '.') + 1)`, so a full
+     `digest.monday` here would be a row an uninstall could never take with it. */
+  assert.equal(armed.key, 'monday');
   assert.equal(armed.state, 'pending');
 
-  // And the weekly analysis, once: a record with declarations is a record that can be observed.
-  assert.ok(sql.one("SELECT 1 FROM schedule WHERE kind = 'analyse' AND key = 'weekly'"), 'the loop was never armed');
+  /* AND NOT THE WEEKLY ANALYSIS, which is not a declaration's to earn. It is armed by
+     `createRecord`, beside `purge/sweep` — a record whose registers arrived by `import` or
+     `restore` never calls `install`, and would otherwise never be observed at all. */
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'analyse'").length, 0, 'an install armed the observe loop');
+  sql.close();
+});
+
+test('A ROW THAT ALREADY FIRED IS RE-ARMED, or it can never fire again', async () => {
+  /* `drainSchedule` claims `pending` only. So with `ON CONFLICT DO NOTHING`, a digest row that went
+     `done` once — because its declaration was momentarily absent, which is exactly what happens
+     when an uninstall and a re-install cross — could never be armed again by any number of
+     re-installs. It would simply never send, for ever, with nothing anywhere saying so. 45 §5.9:
+     `DO UPDATE`, "the one path 09 §1 demands". */
+  const { k, sql } = await record();
+  const DIGEST = {
+    id: 'digest.monday',
+    kind: 'digest',
+    body: { digest: 'monday', to: 'p_1', schedule: { day: 'mon', at: '08:00' }, sections: [] },
+  } as never;
+  value(await k.install([DIGEST]));
+
+  sql.exec("UPDATE schedule SET state = 'done' WHERE kind = 'digest'");
+  value(await k.install([DIGEST]));
+  assert.equal(
+    sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'digest'")?.state,
+    'pending',
+    'a digest that fired once could never be armed again',
+  );
+
+  /* AND A `failed` ROW TOO, which is where the eighth attempt of anything ends up. */
+  sql.exec("UPDATE schedule SET state = 'failed', attempts = 8 WHERE kind = 'digest'");
+  value(await k.install([DIGEST]));
+  const after = sql.one<{ state: string; attempts: number }>("SELECT state, attempts FROM schedule WHERE kind = 'digest'")!;
+  assert.equal(after.state, 'pending');
+  assert.equal(after.attempts, 0, 'a re-armed row is still eight rungs up its own ladder');
+  sql.close();
+});
+
+test('AND A REFUSED INSTALL ARMS NOTHING, on the pack path too', async () => {
+  /* THE PACK PATH STAGES AND APPLIES IN A TRANSACTION OF ITS OWN, and armed the rows whether or not
+     it landed — so a refused install handed the caller a refusal and left the schedule holding a
+     `digest` row for a declaration that does not exist. It fires once, finds nothing, and goes
+     `done`, at which point no re-install could ever bring it back.
+
+     A UNIQUE CONSTRAINT THE EXISTING ROWS ALREADY BREAK is the refusal that happens at APPLY rather
+     than at stage, which is the one this branch is about: everything about the declaration is fine
+     and the record it lands in is not. */
+  const { k, sql } = await record();
+  value(k.create('services', { name: 'a', renews: day(30) }, { actor: 'p_1' }));
+  value(k.create('services', { name: 'a', renews: day(60) }, { actor: 'p_1' }));
+
+  const staged = await k.stageInstall([
+    { id: 'digest.monday', kind: 'digest', body: { digest: 'monday', to: 'p_1', schedule: { day: 'mon', at: '08:00' }, sections: [] } },
+    {
+      id: 'register.services',
+      kind: 'register',
+      body: {
+        id: 'services',
+        name: 'Services',
+        title: 'name',
+        fields: [
+          { id: 'name', type: 'text', required: true, unique: true },
+          { id: 'renews', type: 'day', remind: ['-3d'], repeat: { freq: 'month' } },
+        ],
+      },
+    },
+  ] as never);
+  assert.ok(staged.ok, 'the batch never reached the apply, so this test proves nothing');
+
+  const applied = staged.value() as { ok: boolean };
+  assert.equal(applied.ok, false, 'two rows sharing a value accepted a unique constraint');
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'digest'").length, 0, 'a refused install armed a digest');
   sql.close();
 });
 

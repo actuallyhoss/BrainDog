@@ -110,9 +110,18 @@ async function record(
   return { k, sql, clock };
 }
 
+/**
+ * The digest's own row, moved to a time these tests can reach.
+ *
+ * AN UPSERT, BECAUSE THE INSTALL ARMS IT NOW. It did not — `digest` had a complete handler and
+ * nothing ever wrote a row for it — so this used to insert one, and now collides with the row the
+ * declaration earned. Moving the armed row is also closer to what these tests are about: the digest
+ * that fires is the one the record armed, not one the test invented.
+ */
 const arm = (sql: NodeSql, atMs: number) =>
   sql.exec(
-    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_1', ?, 'digest', 'money-weekly', ?, 'pending', 0)",
+    `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_1', ?, 'digest', 'money-weekly', ?, 'pending', 0)
+     ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0`,
     new Date(atMs).toISOString(),
     JSON.stringify({ declaration: 'digest.money-weekly' }),
   );
@@ -266,28 +275,47 @@ test('`prose: spark` QUEUES ONE INFERENCE AND STOPS, so a slow model never holds
   sql.close();
 });
 
-test('AND A PROSE CALL THAT FAILED STILL SENDS THE DIGEST, as figures', async () => {
-  /* 46 §5: "the digest ships as figures only; never retried." Retrying a model call bills twice for
-     one payload (07 §7), and eight rungs of it would end in a suggestion asking somebody to decide
-     about an ornament while the digest it was decorating never went at all. */
+test('A PROSE CALL THAT COULD NOT BE MADE IS RETRIED, and the digest goes at the ceiling', async () => {
+  /* TWO DIFFERENT EVENTS WEAR THE SAME ACK. A model that answered and said nothing usable is 46 §5's
+     case — figures only, never retried, because retrying bills twice for one payload (07 §7). A
+     request that never REACHED one is not: `pump` acks `failed` for a twenty-second timeout, a 502
+     or a DNS blip, and nothing bills twice for a call that did not happen. So the ladder runs, and
+     the ladder ending is the right moment to stop waiting for two sentences. */
   const { k, sql, clock } = await record(WEEKLY({ prose: 'spark' }));
   arm(sql, NOW);
   clock.set(NOW + 1000);
   await k.drain();
 
-  const leased = k.leaseOutbox(['infer.prose'], 10);
-  assert.ok(k.ackOutbox({ id: leased[0]!.id, state: 'failed', error: 'the model answered 503', leasedUntil: leased[0]!.leasedUntil }).ok);
+  const id = sql.one<{ id: string }>("SELECT id FROM outbox WHERE kind = 'infer.prose'")!.id;
+  const fail = () => {
+    const leased = k.leaseOutbox(['infer.prose'], 10);
+    assert.equal(leased.length, 1, 'the prose row was not leasable');
+    assert.ok(k.ackOutbox({ id, state: 'failed', error: 'the model answered 503', leasedUntil: leased[0]!.leasedUntil }).ok);
+  };
 
-  const rows = outbox(sql);
-  assert.equal(
-    sql.one<{ state: string }>("SELECT state FROM outbox WHERE kind = 'infer.prose'")?.state,
-    'done',
-    'a failed ornament walked the delivery ladder',
-  );
-  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry'").length, 0, 'a model call was queued for an automatic retry');
-  const mail = rows.filter((r) => r.kind === 'notify.email');
-  assert.equal(mail.length, 1, 'a model that would not write two sentences took the digest with it');
+  fail();
+  assert.equal(sql.one<{ state: string }>('SELECT state FROM outbox WHERE id = ?', id)!.state, 'failed');
+  assert.equal(outbox(sql).filter((r) => r.kind === 'notify.email').length, 0, 'one bad minute shipped the digest early');
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry'").length, 1, 'a transport failure armed no retry');
+
+  /* Seven more, which is the ceiling. Each retry row is wound forward rather than waited out. */
+  let at = NOW + 1000;
+  for (let n = 2; n <= 8; n++) {
+    at += 6 * 3_600_000;
+    clock.set(at);
+    sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'retry'", new Date(at - 1000).toISOString());
+    await k.drain();
+    fail();
+  }
+
+  /* AT THE CEILING THE DIGEST STILL GOES, as figures. `done` and not `dead`: the work this row
+     existed for was done at that point, and a dead letter would ask somebody to decide about an
+     ornament. */
+  assert.equal(sql.one<{ state: string }>('SELECT state FROM outbox WHERE id = ?', id)!.state, 'done');
+  const mail = outbox(sql).filter((r) => r.kind === 'notify.email');
+  assert.equal(mail.length, 1, 'eight failures took the digest with them');
   assert.match(JSON.parse(mail[0]!.payload).text as string, /^# Money, weekly/, 'the figures-only digest carried an attribution');
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0, 'an ornament was filed as a decision to make');
   sql.close();
 });
 

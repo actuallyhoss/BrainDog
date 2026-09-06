@@ -315,10 +315,14 @@ test('and nothing crossing a threshold queues nothing at all', async () => {
 
 test('the `analyse` row recurs weekly rather than finishing', async () => {
   const { k, sql, clock } = await record();
-  /* IT IS ALREADY THERE. Installing a declaration arms it — which is the whole reason the loop runs
-     at all — so this brings it forward rather than inserting a second one. */
-  sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'analyse' AND key = 'weekly'", new Date(NOW).toISOString());
-  assert.ok(sql.one("SELECT 1 FROM schedule WHERE kind = 'analyse'"), 'the weekly analysis was never armed');
+  /* THE ROW IS `createRecord`'s, beside `purge/sweep` — this helper opens a record without creating
+     one, so the row is armed here. What is under test is that the HANDLER re-arms it rather than
+     finishing: a weekly analysis that ran once and went `done` is an observe loop that stops. */
+  sql.exec(
+    `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_an', ?, 'analyse', 'weekly', '{}', 'pending', 0)
+     ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, state = 'pending'`,
+    new Date(NOW).toISOString(),
+  );
 
   clock.set(NOW + 1000);
   const drained = await k.drain();
