@@ -60,25 +60,40 @@
     Running <code>{last?.tool}</code> · {JOB.model}
   </p>
 
+  <!-- ONE ROW, DRAWN ONCE. A pressable step and a flat one differ in the element and in the chevron
+       and in nothing else, and two copies of five spans is where the two stop agreeing. -->
+  {#snippet step(e: (typeof JOB.events)[number], pressable: boolean)}
+    <span class="seq" data-open={open.has(e.seq) ? '' : undefined}>
+      {#if pressable}<Icon name="chevronDown" size="s" />{/if}{e.tool}
+    </span>
+    <span class="line-main"><span class="line-title">{e.input}</span></span>
+    <span class="line-amount out" data-ok={e.ok ? '' : undefined}>
+      <!-- `data-ok` was the only thing separating a result from a failure, which is colour carrying
+           meaning alone. -->
+      <Icon name={e.ok ? 'check' : 'ban'} size="s" />{e.ok ? e.out : 'failed'}
+    </span>
+    <span class="line-when">{e.seq}</span>
+  {/snippet}
+
   <ol class="ledger">
     {#each JOB.events as e}
       {@const long = e.out.length > FOLD}
+      <!-- A DISCLOSURE THAT DISCLOSES NOTHING TEACHES PEOPLE NOT TO PRESS THEM. The row already
+           shows `out` in full when it is short, so expanding a successful `✓ 22 rows` said `22 rows`
+           — the same six characters, one press later. It is a button only when there is something
+           behind it: a failure, which carries its reason, or an output longer than the fold. -->
+      {@const more = !e.ok || long}
       <li>
         <!-- A tool call and its result are ONE row. Two rows per call doubles a transcript nobody
              wanted to read in the first place. -->
-        <button type="button" class="line line-short" onclick={() => toggle(e.seq)} aria-expanded={open.has(e.seq)}>
-          <span class="seq" data-open={open.has(e.seq) ? '' : undefined}>
-            <Icon name="chevronDown" size="s" />{e.tool}
-          </span>
-          <span class="line-main"><span class="line-title">{e.input}</span></span>
-          <span class="line-amount out" data-ok={e.ok ? '' : undefined}>
-            <!-- `data-ok` was the only thing separating a result from a failure, which is colour
-                 carrying meaning alone. -->
-            <Icon name={e.ok ? 'check' : 'ban'} size="s" />{e.ok ? e.out : 'failed'}
-          </span>
-          <span class="line-when">{e.seq}</span>
-        </button>
-        {#if !e.ok || open.has(e.seq)}
+        {#if more}
+          <button type="button" class="line line-short" onclick={() => toggle(e.seq)} aria-expanded={open.has(e.seq)}>
+            {@render step(e, true)}
+          </button>
+        {:else}
+          <div class="line line-short" data-flat>{@render step(e, false)}</div>
+        {/if}
+        {#if more && (!e.ok || open.has(e.seq))}
           <p class="detail" data-ok={e.ok ? '' : undefined}>
             {e.out}
             {#if long}<span class="fold">{FOLD} of {e.out.length} characters</span>{/if}
@@ -125,10 +140,19 @@
     cursor: pointer;
   }
 
+  /* A ROW WITH NOTHING BEHIND IT DOES NOT LOOK PRESSABLE. The pointer was the only difference and it
+     is not one on a phone; the chevron is gone too, so the affordance and the behaviour agree. */
+  .line[data-flat] {
+    cursor: default;
+  }
+
   .out {
     color: var(--dim);
     font-family: var(--font-id);
     font-size: var(--t-xs);
+    /* `text-overflow` does nothing on the flex parent, so the ellipsis lives on this span, which is
+       the one holding the text. */
+    min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
