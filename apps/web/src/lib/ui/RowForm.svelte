@@ -42,12 +42,34 @@
   }
 
   const id = (f: FieldDecl) => `new-${register}-${f.id}`;
+  /* The label needs an id of its own now that the segmented control points at it rather than at an
+     input it does not render. */
+  const labelId = (f: FieldDecl) => `${id(f)}-label`;
+
+  /**
+   * Which value each enum segment shows as chosen.
+   *
+   * IT WAS PINNED TO INDEX 0 AND NOTHING SET IT. Every enum with four values or fewer — Direction,
+   * State, Kind, Role — rendered as a picker that always showed the first value selected and could
+   * not be changed: no `onclick`, and `data-on={i === 0}`. The `>4` branch beside it uses a real
+   * `<select>` and has always worked, so a register's form was half live and half a drawing of one,
+   * with no way to tell which from looking.
+   *
+   * THE FIRST VALUE IS STILL THE DEFAULT, because a declaration's first enum value is what a row
+   * starts as and a picker opened on nothing makes somebody choose before they have read the form.
+   * What changed is that it is now a starting point rather than the only point.
+   */
+  let chosen = $state<Record<string, string>>({});
+  const pick = (f: FieldDecl): string => chosen[f.id] ?? f.values?.[0] ?? '';
 </script>
 
 <form class="row-form" onsubmit={(e) => e.preventDefault()}>
   {#each fields as f}
     <div class="row-field" data-type={f.type}>
-      <label class="row-label" for={id(f)}>
+      <!-- `for` ONLY WHERE THERE IS SOMETHING TO POINT AT. The segmented branch renders no element
+           carrying `id(f)`, so both the label's `for` and the group's `aria-labelledby` pointed at
+           an id that does not exist — which is a label announced as attached to nothing. -->
+      <label class="row-label" id={labelId(f)} for={f.type === 'enum' && (f.values?.length ?? 0) <= 4 ? undefined : id(f)}>
         {labelOf(f)}
         <!-- Required is marked on the LABEL and spelled out, never as a bare asterisk: an asterisk
              is a convention you have to already know, and it is announced as "star". -->
@@ -55,9 +77,15 @@
       </label>
 
       {#if f.type === 'enum' && (f.values?.length ?? 0) <= 4}
-        <div class="segmented" role="group" aria-labelledby={id(f)}>
-          {#each f.values ?? [] as value, i}
-            <button type="button" class="segment" data-on={i === 0 ? '' : undefined}>
+        <div class="segmented" role="group" aria-labelledby={labelId(f)}>
+          {#each f.values ?? [] as value}
+            <button
+              type="button"
+              class="segment"
+              data-on={pick(f) === value ? '' : undefined}
+              aria-pressed={pick(f) === value ? 'true' : 'false'}
+              onclick={() => (chosen = { ...chosen, [f.id]: value })}
+            >
               {value.replace(/_/g, ' ')}
             </button>
           {/each}

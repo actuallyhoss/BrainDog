@@ -31,6 +31,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
+  import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
   import Icon, { type IconName } from './Icon.svelte';
@@ -70,7 +71,24 @@
    * never to the end. Empty means "as declared", so a record that has never been rearranged carries
    * no arrangement at all rather than a copy of its own defaults.
    */
-  let arrangement = $state<string[]>([]);
+  let arrangement = $state<string[]>(pref.read().nav ?? []);
+
+  /**
+   * Keep the order, because this header claims it is kept.
+   *
+   * *"Position lives in a per-user store and wins"* is two lines above, and there was no store:
+   * Move up reordered the rail on screen and a reload put it back, silently — while `Hide`, one item
+   * below it in the same menu, was honest about writing nothing. A control that visibly works and
+   * quietly does not is the worst of the three states a control can be in.
+   *
+   * IT IS A LIST OF ADDRESSES rather than of ids, because an address is what the rail already keys
+   * on and what survives a pack renaming a page. An entry the list does not name keeps its declared
+   * order, so a new page appears where the record put it rather than at the end.
+   */
+  const remember = (next: string[]) => {
+    arrangement = next;
+    pref.write({ nav: next });
+  };
 
   const ordered = $derived.by(() => {
     const base = [...nav].sort((a, b) => a.order - b.order);
@@ -109,7 +127,7 @@
     const next = [...list];
     next[from] = next[to]!;
     next[to] = me;
-    arrangement = next.map((e) => e.href);
+    remember(next.map((e) => e.href));
     focusItem(href);
   }
 
@@ -121,7 +139,7 @@
     const rest = list.filter((e) => e.href !== href);
     const at = rest.findIndex((e) => e.section === me.section);
     rest.splice(at === -1 ? rest.length : at, 0, me);
-    arrangement = rest.map((e) => e.href);
+    remember(rest.map((e) => e.href));
     focusItem(href);
   }
 

@@ -20,6 +20,7 @@
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
+  import * as pref from '$lib/pref.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { iconFor, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
@@ -74,6 +75,33 @@
    * The title column is not offerable. A register whose title is hidden is a list of ids.
    */
   let hidden = $state(new Set<string>());
+
+  /* SEEDED FROM THE COOKIE AND WRITTEN BACK TO IT. This was client state with no store behind it,
+     so unticking a column and reloading put it back — on a screen whose search, filters and sort all
+     survive in the URL, which is precisely why a reader expects this to. The effect is keyed on the
+     register, so walking between two registers loads each one's own answer. */
+  $effect(() => {
+    hidden = new Set(pref.read().columns?.[id] ?? []);
+  });
+
+  /** Every column back, and the register's entry out of the cookie rather than emptied in it. */
+  function showAll() {
+    hidden = new Set();
+    const all = { ...pref.read().columns };
+    delete all[id];
+    pref.write({ columns: all });
+  }
+
+  function hide(field: string, off: boolean) {
+    const next = new Set(hidden);
+    if (off) next.add(field);
+    else next.delete(field);
+    hidden = next;
+    const all = { ...pref.read().columns };
+    if (next.size === 0) delete all[id];
+    else all[id] = [...next];
+    pref.write({ columns: all });
+  }
 
 /**
    * A LEADING COLUMN FOR THE SELECTION, and it is a column rather than a decoration on the id.
@@ -671,12 +699,7 @@
               data-on={!hidden.has(c.field) ? '' : undefined}
               aria-pressed={!hidden.has(c.field) ? 'true' : 'false'}
               disabled={locked}
-              onclick={() => {
-                const next = new Set(hidden);
-                if (next.has(c.field)) next.delete(c.field);
-                else next.add(c.field);
-                hidden = next;
-              }}
+              onclick={() => hide(c.field, !hidden.has(c.field))}
             >
               <span class="filter-box" aria-hidden="true">{hidden.has(c.field) ? '' : '✓'}</span>
               {c.label}
@@ -690,7 +713,7 @@
     {#snippet footer()}
       <Button weight="primary" onclick={() => (displayOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
       {#if hidden.size > 0}
-        <Button weight="bare" onclick={() => (hidden = new Set())}>{copy.showAll}</Button>
+        <Button weight="bare" onclick={() => showAll()}>{copy.showAll}</Button>
       {/if}
     {/snippet}
   </Sheet>

@@ -27,6 +27,26 @@ export type Pref = {
   sidebar?: boolean | undefined;
   /** Whether bare letters act inside a focused grid. */
   chars?: boolean | undefined;
+  /**
+   * Which columns you have hidden, per register.
+   *
+   * 50 §5.2 names it `prefs.columns[register]`, and the store did not exist — so untick a column,
+   * press Done, reload, and it is back. The search, the filters and the sort on that same screen are
+   * URL state, which is exactly why a reader expects this to hold too, and the doc comment beside
+   * the control named the store it was not writing to.
+   *
+   * PER DEVICE, LIKE EVERYTHING ELSE HERE. Two people looking at one register may want different
+   * columns and neither is editing the record.
+   */
+  columns?: Record<string, string[]> | undefined;
+  /**
+   * Your nav order, as a list of addresses.
+   *
+   * The rail's own header claims *"position lives in a per-user store and wins"*, and there was no
+   * store: Move up reordered the list on screen and a reload put it back, silently — while `Hide`,
+   * one item below it in the same menu, was honest about writing nothing.
+   */
+  nav?: string[] | undefined;
 };
 
 const NAME = 'bd_pref';
