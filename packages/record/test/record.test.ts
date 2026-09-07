@@ -84,6 +84,55 @@ test('THE EFFECTIVE PERMISSION IS THE INTERSECTION, never the maximum', () => {
   assert.equal(allows(token('read', 'owner'), 'read'), null);
 });
 
+test('EVERY REFUSAL A CALLER CAN REACH NAMES SOMETHING THEY CAN DO NEXT', () => {
+  /* A refusal that says what is wrong and not what to do is half a sentence, and the half the
+     caller does not need. `PERSON_REQUIRED` has always read this way — "no token reaches it, a
+     person has to do it, signed in" — and it is the shape the others now copy.
+
+     ASSERTED AS A PROPERTY, not string by string. Any of these can be reworded; none of them may
+     stop naming a next move, which is the thing that made them unusable. */
+  const cases = [
+    allows(token('propose', 'read'), 'write'),
+    allows(token('read', 'owner'), 'write'),
+    allows(token('write', 'read'), 'write'),
+    allows({ principal: { kind: 'person', id: 'p_1', level: 'read' } } as CallContext, 'write'),
+    allows({ principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: null } } as CallContext, 'read'),
+    reaches({ principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: 'write' }, registers: ['services'] } as CallContext, 'obligations'),
+  ];
+
+  for (const r of cases) {
+    assert.ok(r, 'a call that should have been refused was allowed');
+    /* Ask somebody, send it another way, name something else, do it signed in — or be told what IS
+       reachable, which ends the search rather than sending the caller back to ask. */
+    assert.match(r.fix, /(Ask|Send|Name|has to do it|It reaches)/, `no next move: ${r.fix}`);
+    assert.ok(r.fix.trim().endsWith('.'), `not a sentence: ${r.fix}`);
+  }
+});
+
+test('A TOKEN SCOPED TO REGISTERS IS TOLD WHICH ONES, rather than that it holds nothing', () => {
+  /* `You hold named registers in this record and nothing on the record itself` named no rule, no
+     remedy and no next step, and sent `allowed: []` — so an agent an owner set up ten minutes ago
+     could not tell whether to retry, to ask for something else, or to stop. */
+  const scoped = {
+    principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: null },
+    registers: ['services', 'people'],
+  } as CallContext;
+
+  const out = allows(scoped, 'read')!;
+  assert.equal(out.code, 'FORBIDDEN');
+  assert.match(out.fix, /services, people/, 'the refusal does not say what the token does hold');
+  assert.deepEqual([...(out.allowed ?? [])], ['services', 'people'], 'allowed was empty for a token that holds two');
+
+  /* AND A CEILING NAMES ITS OWN CONTENTS TOO. The list was in `allowed` for a machine and nowhere
+     in the sentence for a person, so a refusal that could have ended the search sent them back to
+     the owner to ask what they had. */
+  const wall = reaches(
+    { principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: 'write' }, registers: ['services'] } as CallContext,
+    'obligations',
+  )!;
+  assert.match(wall.fix, /does not reach obligations\. It reaches services\./);
+});
+
 test('a person’s ladder is five rungs and a token’s is three, and no token reaches the top two', () => {
   // ADR-060: there is no `admin` scope. A decision needs a person, and so does anything owner-level —
   // and the refusal says exactly that, rather than "your scope is too small", which would send an

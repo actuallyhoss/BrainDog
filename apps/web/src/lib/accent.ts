@@ -37,7 +37,7 @@ const adoptable = (): boolean =>
  * `null` PUTS THE HOUSE COLOUR BACK, which is a real answer and not an absence: somebody who tried
  * a green and did not like it wants the product back, not a blank.
  */
-export function apply(accent: string | null): { ok: true } | { ok: false; refusals: string[] } {
+export function apply(accent: string | null): { ok: true } | { ok: false; refusals: string[]; codes: string[] } {
   if (accent === null) {
     if (sheet) sheet.replaceSync('');
     pref.write({ theme: undefined });

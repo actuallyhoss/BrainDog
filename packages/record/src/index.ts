@@ -143,13 +143,20 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
   if (p.kind === 'system') return null;
 
   /* NOTHING ON THE RECORD REACHES NOTHING ON THE RECORD. A caller with only register-scoped rows
-     arrives here with `level: null` for anything not scoped to one of them, and the refusal names
-     what they do hold rather than a bigger token they cannot get. */
+     arrives here with `level: null` for anything not scoped to one of them.
+
+     AND IT SAYS WHICH ONES, AND WHAT TO DO. This named no rule, no remedy and no next step, and sent
+     `allowed: []` — so an agent an owner had set up ten minutes earlier could not tell whether to
+     retry, to ask for something else, or to stop. Naming the registers it DOES hold is the whole of
+     the answer: either the call belongs to one of them, or it belongs to the record and this caller
+     was never given the record. */
   if (p.level === null)
     return {
       code: 'FORBIDDEN',
-      fix: 'You hold named registers in this record and nothing on the record itself.',
-      allowed: [],
+      fix: ctx.registers && ctx.registers !== '*' && ctx.registers.length > 0
+        ? `This call is about the record itself, and you hold ${[...ctx.registers].join(', ')} and nothing else. Name one of those, or ask the owner for a record-wide token.`
+        : 'This call is about the record itself, and you hold no access to it. Ask the owner for a token.',
+      allowed: ctx.registers && ctx.registers !== '*' ? [...ctx.registers] : [],
     };
 
   const level: Level = p.level;
@@ -172,9 +179,24 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
       allowed: reach,
     };
 
+  /* AND THE REMEDY, WHICH IS DIFFERENT FOR THE TWO CODES. `This needs write, and you have a propose
+     token on read access` was complete about the STATE and silent about what to do next — which is
+     half a sentence, and the half a caller does not need. A scope that is too small is a token the
+     owner can mint bigger; a `propose` token at its ceiling has another way through, which is to
+     propose. `PERSON_REQUIRED` above already reads like this and is the shape being copied. */
+  const short = p.kind === 'token' && !TOKEN_REACH[p.scope].includes(need);
+  const next =
+    p.kind !== 'token'
+      ? ' Ask an owner to raise your access.'
+      : short && p.scope === 'propose' && need === 'write'
+        ? ' Send it as a proposal, or ask the owner for a write token.'
+        : short
+          ? ' Ask the owner for a token with a wider scope.'
+          : ' Ask the owner to raise the access this token was minted against.';
+
   return {
-    code: p.kind === 'token' && !TOKEN_REACH[p.scope].includes(need) ? 'SCOPE_INSUFFICIENT' : 'LEVEL_REQUIRED',
-    fix: `This needs ${need}, and you have ${has}.`,
+    code: short ? 'SCOPE_INSUFFICIENT' : 'LEVEL_REQUIRED',
+    fix: `This needs ${need}, and you have ${has}.${next}`,
     allowed: reach,
   };
 }
@@ -183,9 +205,12 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
 export function reaches(ctx: CallContext, register: string): Refusal | null {
   const ceiling = ctx.registers ?? '*';
   if (ceiling === '*' || ceiling.includes(register)) return null;
+  /* AND WHAT IT DOES REACH. The list was already in `allowed` for a machine and nowhere in the
+     sentence for a person, so a refusal that could have ended the search sent them back to the
+     owner to ask what they had. */
   return {
     code: 'FORBIDDEN',
-    fix: `This token does not reach ${register}.`,
+    fix: `This token does not reach ${register}. It reaches ${[...ceiling].join(', ')}.`,
     allowed: [...ceiling],
   };
 }

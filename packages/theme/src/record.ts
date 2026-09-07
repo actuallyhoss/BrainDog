@@ -42,14 +42,35 @@ export type RecordTheme = {
  * surfaces stay the paper-in-the-sun olive that everything else is built against, and what changes
  * is the accent, the marks and the links — which is where colour means anything.
  */
-export function recordTheme(accent: string, opts: { neutralHue?: number } = {}): { ok: true; value: RecordTheme } | { ok: false; refusals: string[] } {
+/**
+ * WHY IT WAS REFUSED, AND NOT ONLY THE AUTHOR'S SENTENCE FOR IT.
+ *
+ * `refusals` are written for whoever is BUILDING a theme: "the pair (faint on s3) is 3.61:1 in dark,
+ * it needs 4.5:1, move faint further from the ground". Every one of them instructs an action, and
+ * every one of those actions is a theme author's — there is no control on the settings screen that
+ * moves a hue or lowers a chroma. `checks.ts`'s own comment says a refusal a person cannot act on
+ * teaches them the control is broken.
+ *
+ * SO THE CODE TRAVELS TOO. It is the one thing a caller can turn into a sentence for the person in
+ * front of it: a contrast floor is "text would not be readable", an inseparable intent is "two of
+ * the four meanings would look the same". The author's sentences stay, for the surface that has an
+ * author on it.
+ */
+export function recordTheme(
+  accent: string,
+  opts: { neutralHue?: number } = {},
+): { ok: true; value: RecordTheme } | { ok: false; refusals: string[]; codes: string[] } {
   /* A COLOUR WITH NO HUE IN IT IS NOT A SEED. `normalise` throws on a near-grey, and it is right to
      — there is nothing to build a palette from — but a throw is not how anything else in this
      product answers, so the sentence comes back as a refusal. */
   try {
     normalise(accent);
   } catch (e) {
-    return { ok: false, refusals: [e instanceof Error ? e.message : `${accent} is not a colour this record can read.`] };
+    return {
+      ok: false,
+      refusals: [e instanceof Error ? e.message : `${accent} is not a colour this record can read.`],
+      codes: ['THEME_VALUE_INVALID'],
+    };
   }
   const hex = accent;
 
@@ -80,15 +101,24 @@ export function recordTheme(accent: string, opts: { neutralHue?: number } = {}):
      theme: it is a property of the document, asserted once by the generator that writes the
      document, against the real `a11y.css`. */
   const css = toCSS(built, contrast);
-  const wrong = [
+  const found = [
     ...refusals(checkScheme(built, 'dark')),
     ...refusals(checkScheme(built, 'light')),
     ...refusals(checkElevation(built)),
     ...refusals(checkScheme(contrast, 'dark')),
     ...refusals(checkScheme(contrast, 'light')),
     ...refusals(checkElevation(contrast)),
-  ].map((f) => f.fix ?? `${f.check} failed on the ${f.scheme} scheme.`);
-  if (wrong.length) return { ok: false, refusals: [...new Set(wrong)] };
+  ];
+  const wrong = found.map((f) => f.fix ?? `${f.check} failed on the ${f.scheme} scheme.`);
+  if (wrong.length)
+    return {
+      ok: false,
+      refusals: [...new Set(wrong)],
+      /* A FINDING WITHOUT A CODE IS STILL A REFUSAL. `Finding.code` is optional, and dropping the
+         undefined ones rather than widening the type keeps the list to codes a caller can switch on
+         — which is the only thing it is for. */
+      codes: [...new Set(found.flatMap((f) => (f.code === undefined ? [] : [f.code as string])))],
+    };
 
   return { ok: true, value: { css, accent: hex, built } };
 }

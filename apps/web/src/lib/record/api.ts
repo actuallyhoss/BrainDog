@@ -15,6 +15,7 @@ import { day as fmtDay, money, relative, integer, MISSING } from 'braindog-rende
 import { amountOf, currencyOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { PATHS, type IconName } from '../ui/icons.ts';
+import { copy } from '../copy.ts';
 import {
   AUDIT,
   INBOX,
@@ -750,8 +751,32 @@ export function metric(id: string): Metric {
   const decl = at === -1 ? template : withParam(template, id.slice(at + 1));
 
   const reading = read(decl);
+  /**
+   * A FIGURE THAT CANNOT BE WORKED OUT SAYS SO, IN THE TERMS OF THIS SCREEN.
+   *
+   * `reading.refusals` are written for whoever wrote the DECLARATION: "group_by: is published in 08
+   * and not read by this build", "target takes a number in the figure's own units — { lte: 400000 }
+   * for money in minor units, not { lte: { amount, currency } }". Those are the right sentences and
+   * they were printed under a headline figure on the Home screen — `08` is a document number, `this
+   * build` is the software talking about itself, and there is no control anywhere in this app that
+   * edits a metric.
+   *
+   * THE AUTHOR'S SENTENCE IS NOT LOST. It is what `/p/*`'s degraded block prints, beside the
+   * declaration, where there is somebody who can act on it. Here the note says the fact and points
+   * at the pack that owns the figure, which is the one move available to the person reading it.
+   */
   if (reading.refusals.length)
-    return { id, label: decl.name, value: MISSING, note: reading.refusals[0] ?? '', tone: 'warn', href: '/p/money' };
+    return {
+      id,
+      label: decl.name,
+      value: MISSING,
+      note: copy.figureUnavailable,
+      tone: 'warn',
+      /* THE PACK IS WHERE A FIGURE IS DECLARED, and it is the only screen in this product that has
+         anything to say about one. A tile that cannot be worked out linking to the money page —
+         which is where it is already — was a link back to itself. */
+      href: '/packs',
+    };
 
   const met = meetsTarget(decl, reading.value);
   /* The delta reads as a MOVEMENT and not as a sign: "up 18% on the 30d before" is a sentence, and

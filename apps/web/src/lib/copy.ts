@@ -381,6 +381,35 @@ export const copy = {
   accentHouse: 'House',
   accentSet: (name: string) => `${name} is this record's colour.`,
   accentReset: 'Back to the house colour.',
+  /* A FIGURE THAT CANNOT BE WORKED OUT, said to the person reading the tile rather than to whoever
+     wrote the declaration. What was here was the author's sentence — "group_by: is published in 08
+     and not read by this build", "{ lte: 400000 } for money in minor units" — under a headline
+     figure, quoting a document number and a JSON literal at somebody with no control that edits a
+     metric. The author's sentence still prints on the page block, beside the declaration. */
+  figureUnavailable: 'This figure cannot be worked out from what is declared. The pack that owns it says why.',
+  /**
+   * WHY A COLOUR CANNOT BE USED, SAID TO THE PERSON WHO PRESSED THE SWATCH.
+   *
+   * What was on this screen was the theme author's sentence — "the pair (faint on s3) is 3.61:1 in
+   * dark. It needs 4.5:1. Move faint further from the ground." — and there is no control here that
+   * moves a hue, lowers a chroma, or knows what `s3` is. Every one of those sentences instructs an
+   * action only somebody writing a theme can take, which `checks.ts` itself says is a refusal that
+   * teaches people the control is broken.
+   *
+   * THE FLOOR IT MISSED IS STILL WHAT IT SAYS, in the terms this screen is about: readable text,
+   * and four meanings that stay apart. What it does not do is quote a ratio at somebody who cannot
+   * change one.
+   */
+  accentRefused: (name: string, codes: readonly string[]): string => {
+    const why = codes.includes('CONTRAST_FLOOR')
+      ? 'text on some of its surfaces would not be readable'
+      : codes.includes('INTENT_INSEPARABLE')
+        ? 'two of the four meanings — good, watch, wrong, note — would look the same to somebody who does not see red and green apart'
+        : codes.includes('THEME_LADDER_ORDER')
+          ? 'its surfaces would not stack in order, so a card would not read as sitting on the page'
+          : 'a full palette cannot be solved from it';
+    return `${name} cannot be this record's colour: ${why}. The other colours are unaffected.`;
+  },
 
   /** Names the source block so tabbing into it says which page's declaration it is. */
   declarationOf: (page: string) => `Source of ${page}`,

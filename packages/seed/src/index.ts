@@ -149,7 +149,14 @@ export const REGISTERS: Record<string, SeedRegister> = {
       { id: 'kind', label: 'Type', type: 'enum', values: ['domain', 'hosting', 'saas', 'certificate'], index: true, required: true },
       { id: 'renews', type: 'day', index: true, deadline: true, required: true, remind: ['-30d', '-7d', '0d'] },
       { id: 'cost', type: 'money', required: true },
-      { id: 'cycle', type: 'enum', values: ['monthly', 'yearly', 'two_yearly'], required: true },
+      /* INDEXED, WHICH IS WHY IT IS ON THE SCREEN. Two reasons, and both were already true:
+         `page.estate` declares a block filtering `state is live, cycle is monthly`, and filtering an
+         unindexed field is the thing `query.scan` exists to notice — so the declaration was asking
+         for a scan on every render of the estate page. And a column of amounts on unstated periods
+         cannot be read: `GBP 340.00` beside `GBP 5.00` is not a comparison until one says yearly and
+         the other monthly. `columnsFor` draws every indexed field, so the period travels with the
+         amount and neither is a guess. */
+      { id: 'cycle', type: 'enum', values: ['monthly', 'yearly', 'two_yearly'], index: true, required: true },
       { id: 'state', type: 'enum', values: ['live', 'lapsing', 'cancelled'], index: true, required: true },
       { id: 'points_at', label: 'Target', type: 'text' },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },

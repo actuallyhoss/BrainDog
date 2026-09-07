@@ -62,17 +62,21 @@
   let chars = $state(held.chars ?? true);
 
   let accent = $state<string | null>(held.theme ?? null);
-  let accentWrong = $state<string[]>([]);
+  let accentWrong = $state<string | null>(null);
 
   function pickAccent(hex: string | null) {
     const out = accentApply(hex);
     if (!out.ok) {
-      /* THE FLOOR IT MISSED, NOT "THAT DID NOT WORK". A refusal a person cannot act on is a refusal
-         that teaches them the control is broken. */
-      accentWrong = out.refusals;
+      /* THE FLOOR IT MISSED, NOT "THAT DID NOT WORK" — AND IN THE TERMS OF THIS SCREEN. `out.refusals`
+         are the theme AUTHOR's sentences: "the pair (faint on s3) is 3.61:1 in dark, it needs 4.5:1,
+         move faint further from the ground". There is no control here that moves a hue, lowers a
+         chroma or knows what `s3` is, so every one of them instructed an action this person cannot
+         take — which is the failure `checks.ts` names in its own comment two lines above the string.
+         The code is what survives the trip; the sentence is built here, where the swatch is. */
+      accentWrong = copy.accentRefused(ACCENTS.find((a) => a.hex === hex)?.name ?? String(hex), out.codes);
       return;
     }
-    accentWrong = [];
+    accentWrong = null;
     accent = hex;
     toasts.push(hex ? copy.accentSet(ACCENTS.find((a) => a.hex === hex)?.name ?? hex) : copy.accentReset);
   }
@@ -166,11 +170,7 @@
             {copy.accentHouse}
           </button>
         </div>
-        {#if accentWrong.length}
-          <ul class="wrong">
-            {#each accentWrong as line}<li>{line}</li>{/each}
-          </ul>
-        {/if}
+        {#if accentWrong}<p class="wrong">{accentWrong}</p>{/if}
       </Section>
 
       <Section title={copy.scheme}>
