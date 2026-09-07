@@ -14,6 +14,8 @@
 import { readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
+import { skipDir } from './lib.mjs';
+
 /** One address per dynamic segment, by the segment's own name. */
 const SAMPLES = {
   '[register]': 'obligations',
@@ -31,7 +33,7 @@ const BY_ROUTE = { '/jobs/[id]': 'j_7Q2F' };
 
 async function walk(dir, out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
-    if (e.name === 'node_modules') continue;
+    if (skipDir(e.name)) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) await walk(p, out);
     else if (e.name === '+page.svelte') out.push(dir);

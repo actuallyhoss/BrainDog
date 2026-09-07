@@ -18,13 +18,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, isProse, labelOf, metric, page, search, toRows } from './api.ts';
+import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, isProse, labelOf, metric, packDiff, page, search, toRows } from './api.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
 import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
-import { AUDIT, JOB, NEWS, NOW, REGISTERS, ROWS, VAULT } from './data.ts';
+import { AUDIT, JOB, NEWS, NOW, PACKS, PAGES, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
@@ -675,4 +675,65 @@ test('A ROW AND THE LEDGER AGREE ABOUT WHO PUT IT THERE', () => {
   const line = NEWS.find((n) => n.text.includes('services from the Fenwick invoice'));
   assert.ok(line, 'the away list no longer mentions the Fenwick services, so this test proves nothing');
   assert.match(line.text, new RegExp(`Added ${made} services`), 'the away list and the audit disagree about how many');
+});
+
+/* ── the one screen that carries the trust model ─────────────────────────── */
+
+test('A PACK DIFF COUNTS WHAT IT SAYS IT COUNTS', () => {
+  /* `04 §3`: "A pack is readable text, so a truthful diff is possible — this is the entire trust
+     model. You cannot diff a binary's intentions." The screen that carries it printed
+     `${pack.registers.length} field(s) added` — a count of REGISTERS labelled as FIELDS — so all
+     five installed packs said "1 field(s)" while Obligations declares eight. */
+  const money = PACKS.find((p) => p.id === 'money-core')!;
+  const d = packDiff(money);
+
+  const list = d.adds.find((a) => a.kind === 'list')!;
+  assert.equal(list.name, REGISTERS.obligations!.name, 'the diff named the id, not the list');
+  assert.equal(list.detail, `${REGISTERS.obligations!.fields.length} fields`);
+  assert.notEqual(list.detail, `${money.registers.length} fields`, 'the register count is back in the field slot');
+
+  const page_ = d.adds.find((a) => a.kind === 'page')!;
+  assert.equal(page_.name, PAGES.money!.title);
+  assert.match(page_.detail ?? '', new RegExp(`^${PAGES.money!.blocks.length} blocks`));
+});
+
+test('and it never names a page that does not exist', () => {
+  /* `+ page.— placed in nav` — the em-dash fallback for a pack with no page, rendered as though `—`
+     were a page about to be put in somebody's sidebar. Two of the eight packs declare none. */
+  for (const pack of PACKS) {
+    const d = packDiff(pack);
+    assert.equal(d.adds.filter((a) => a.kind === 'page').length, pack.pages.length, `${pack.id}: page rows and declared pages disagree`);
+    assert.equal(d.adds.filter((a) => a.kind === 'list').length, pack.registers.length, `${pack.id}: list rows and declared registers disagree`);
+    for (const add of d.adds) {
+      assert.ok(add.name, `${pack.id}: an unnamed thing in the diff`);
+      assert.ok(!add.name.includes('—'), `${pack.id}: the em-dash fallback reached the screen as a name`);
+      /* EVERY LINE SAYS WHICH KIND IT IS, in words. The glyph beside it is decorative, so without
+         this an unread pack is three bare nouns to anybody listening. */
+      assert.ok(add.detail, `${pack.id}: "${add.name}" says nothing about what it is`);
+    }
+  }
+});
+
+test('an unread pack says the shape is unknown rather than inventing one', () => {
+  const available = PACKS.find((p) => !p.installed)!;
+  const d = packDiff(available);
+  assert.equal(d.unread, true);
+  /* A pack this record has not installed declares lists it does not have, so there is no field
+     count — and the previous version printed one anyway. */
+  for (const add of d.adds) assert.match(add.detail ?? '', /^a (list|page)$/);
+});
+
+test('the two guarantees are stated, and the two findings only when there are any', () => {
+  for (const pack of PACKS) {
+    const d = packDiff(pack);
+    /* `04 §3.2`: seeds are a WRITE and get their own line — the trust screen was untrue for as long
+       as it claimed "0 rows written" while three documents required seeding. */
+    assert.match(d.seeds, /example/);
+    /* And this one is a fact about the mechanism: a pack physically cannot read a row at install. */
+    assert.match(d.touches, /0 rows read/);
+    /* `06 §1`: a warning that does not apply teaches people to ignore warnings. Nothing in this
+       record moves a page it does not own, so nothing is shown. */
+    assert.deepEqual(d.changes, []);
+    assert.deepEqual(d.conflicts, []);
+  }
 });

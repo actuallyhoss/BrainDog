@@ -13,17 +13,65 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PAGES, REGISTERS, PACKS, pages } from '$lib/record/api.ts';
+  import { PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import type { PackInfo } from '$lib/record/schema.ts';
 
   const installed = PACKS.filter((p) => p.installed);
   const available = PACKS.filter((p) => !p.installed);
 
   let diff = $state<string | null>(null);
 </script>
+
+<!--
+  ONE DIFF, TWO LISTS.
+
+  It existed only under the packs you ALREADY HAVE. The three you could install carried an `Install`
+  button whose toast said the plan "would be shown before anything applied" and showed none — so the
+  before-and-after was offered for the decision already made and withheld from the one still open.
+  `04 §3`: "The diff is shown before it applies … this is the entire trust model."
+-->
+{#snippet plan(pack: PackInfo)}
+  {@const d = packDiff(pack)}
+  <dl class="diff">
+    <dt>{copy.diffAdds}</dt>
+    <dd>
+      <ul class="diff-adds">
+        {#each d.adds as add}
+          <li>
+            <Icon name={add.kind === 'list' ? 'rows' : 'doc'} size="s" />
+            <span class="diff-name">{add.name}</span>
+            {#if add.detail}<span class="diff-detail">{add.detail}</span>{/if}
+          </li>
+        {/each}
+      </ul>
+      <!-- WHAT IS NOT KNOWN, SAID AS NOT KNOWN. A pack this record has not installed declares lists
+           and pages it does not have, so there is no field count to give — and the previous version
+           printed one anyway. -->
+      {#if d.unread}<p class="diff-note">{copy.diffUnread}</p>{/if}
+    </dd>
+
+    <!-- `04 §4`: a pack may place a page it owns and may never move yours, and an update that would
+         is SHOWN and then ignored. Nothing in this record does, so the line is absent rather than
+         printed empty — `06 §1`, a warning that does not apply teaches people to ignore warnings. -->
+    {#if d.changes.length}
+      <dt>{copy.diffChanges}</dt>
+      <dd>{#each d.changes as c}<p>{c} — {copy.diffNavKept}</p>{/each}</dd>
+    {/if}
+    {#if d.conflicts.length}
+      <dt>{copy.diffConflicts}</dt>
+      <dd>{#each d.conflicts as c}<p>{c}</p>{/each}</dd>
+    {/if}
+
+    <dt>{copy.diffSeeds}</dt>
+    <dd>{d.seeds}</dd>
+    <dt>{copy.diffTouches}</dt>
+    <dd>{d.touches}</dd>
+  </dl>
+{/snippet}
 
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
@@ -68,14 +116,7 @@
                 )}
             >{copy.uninstall}</Button>
           </footer>
-          {#if diff === pack.id}
-            <pre class="diff"><code>{`+ register.${pack.registers[0]}     ${pack.registers.length} field(s) added
-+ page.${pack.pages[0] ?? '—'}         placed in nav, section "${pack.name}"
-+ 1 example row, marked example, deletable in one click
-
-nav order is read once, at install. A later update that would move
-something is shown here and then ignored.`}</code></pre>
-          {/if}
+          {#if diff === pack.id}{@render plan(pack)}{/if}
         </article>
       {/each}
     </div>
@@ -94,8 +135,16 @@ something is shown here and then ignored.`}</code></pre>
             <span class="line-amount">
               {#if pack.stars}<span class="stars"><Icon name="star" size="s" />{pack.stars}</span>{/if}
             </span>
-            <span class="line-when"><Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The install plan would be shown before anything applied'), { intent: 'warn' })}>{copy.install}</Button></span>
+            <span class="line-when">
+              <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>{copy.installDiff}</Button>
+              <Button
+                weight="quiet"
+                onclick={() =>
+                  toasts.push(copy.notWritten(`${pack.name} would be installed in one transaction, after this plan`), { intent: 'warn' })}
+              >{copy.install}</Button>
+            </span>
           </div>
+          {#if diff === pack.id}{@render plan(pack)}{/if}
         </li>
       {/each}
     </ul>
@@ -198,17 +247,68 @@ something is shown here and then ignored.`}</code></pre>
     border-block-start: 1px solid var(--line);
   }
 
+  /* A DEFINITION LIST, NOT A CODE BLOCK. It was a `<pre>` in the id face with its own horizontal
+     scrollbar, so on a phone the only line that fitted was half of one — and what a person is doing
+     here is deciding whether to trust something, which is reading rather than diffing. The sections
+     are `04 §3`'s, the words are theirs, and it wraps. */
   .diff {
+    display: grid;
+    grid-template-columns: minmax(6ch, max-content) minmax(0, 1fr);
+    gap: var(--sp-1) var(--sp-4);
     margin: 0;
     padding: var(--sp-3);
     background: var(--sunk);
     border: 1px solid var(--line);
     border-radius: var(--r-sm);
     color: var(--ink2);
-    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    line-height: 1.6;
+  }
+
+  .diff dt {
+    color: var(--dim);
     font-size: var(--t-xs);
-    line-height: 1.7;
-    overflow-x: auto;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .diff dd {
+    margin: 0;
+  }
+
+  .diff dd p {
+    margin: 0;
+  }
+
+  .diff-adds {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .diff-adds li {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+  }
+
+  .diff-name {
+    color: var(--ink);
+  }
+
+  .diff-detail {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .diff-note {
+    margin-block-start: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-xs);
   }
 
   .stars {

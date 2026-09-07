@@ -27,6 +27,10 @@
    * mid-read — the definition disappearing out from under somebody's eyes as they navigate a
    * neighbouring control. The answer for this instance is fixed the moment it exists.
    */
+  /* AND SVELTE IS RIGHT THAT IT ONLY CAPTURES THE INITIAL VALUE — that is the requirement. Each of
+     these is written with a literal noun at its call site, so the prop cannot change; and if it
+     could, re-running would spend a second word without anybody having read the first. */
+  // svelte-ignore state_referenced_locally
   const say = teach(noun) ? copy.defines[noun] : null;
 </script>
 

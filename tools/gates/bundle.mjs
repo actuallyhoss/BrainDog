@@ -15,7 +15,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { brotliCompressSync, constants } from 'node:zlib';
 import { join, relative } from 'node:path';
 
-import { budget } from './lib.mjs';
+import { budget, skipDir } from './lib.mjs';
 
 const APP = join(process.cwd(), 'apps/web');
 const CLIENT = join(APP, '.svelte-kit/output/client');
@@ -94,7 +94,7 @@ async function newestSource(dir) {
   for (const e of entries) {
     /* `node_modules` under a workspace package is a symlink farm the size of the registry, and its
        mtimes are about an install rather than about this code. */
-    if (!e.isFile() || (e.parentPath ?? e.path).includes('node_modules')) continue;
+    if (!e.isFile() || (e.parentPath ?? e.path).split(/[\\/]/).some(skipDir)) continue;
     /* AND A TEST IS NOT SOURCE EITHER. The app's tests sit beside the code they test rather than in
        a `test/` directory, so the rule one comment up did not reach them: writing a test for a page
        block declared the bundle stale and demanded a rebuild that could not move a byte. Same

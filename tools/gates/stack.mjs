@@ -22,6 +22,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { skipDir } from './lib.mjs';
+
 /* THE WORKING DIRECTORY, LIKE EVERY OTHER GATE, falling back to the repository this file sits in.
    Deriving the root from `import.meta.url` alone meant this gate scanned the real tree no matter
    where it was pointed — so its own negative fixture passed, which `self-test.mjs` found on the
@@ -73,7 +75,7 @@ const destring = (text) =>
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
-    if (name === 'node_modules' || name === '.svelte-kit' || name === 'build') continue;
+    if (skipDir(name)) continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     else if (/\.(ts|mjs|js)$/.test(name) && !name.endsWith('.test.ts')) out.push(full);

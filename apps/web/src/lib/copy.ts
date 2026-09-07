@@ -379,6 +379,18 @@ export const copy = {
   install: 'Install',
   uninstall: 'Uninstall',
   installDiff: 'What this adds',
+  /* `04 §3`'s seven sections, in a person's words. Only the ones that say something render: a
+     `CHANGES` heading over nothing is a warning that does not apply, and `06 §1` is that those
+     teach people to ignore warnings. */
+  diffAdds: 'Adds',
+  diffChanges: 'Changes',
+  diffConflicts: 'Conflicts',
+  diffSeeds: 'Seeds',
+  diffTouches: 'Touches',
+  /* `04 §4`: a pack may place a page it owns and may never move yours. The move is SHOWN, so that
+     the refusal is visible rather than silent, and then it does not happen. */
+  diffNavKept: 'shown, not applied. Your sidebar is yours',
+  diffUnread: 'This record has not read the pack yet, so the shape of each arrives with the file.',
   packBlurb: 'A pack adds ready-made lists and pages. Readable text; nothing runs.',
 
   /* settings */

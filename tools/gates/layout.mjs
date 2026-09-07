@@ -32,7 +32,7 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget } from './lib.mjs';
+import { budget, skipDir } from './lib.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -73,7 +73,7 @@ const TYPES = {
 /** Every source file that could hold a media query. */
 async function* sources(dir) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
-    if (e.name === 'node_modules' || e.name === '.svelte-kit' || e.name === 'build') continue;
+    if (skipDir(e.name)) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) yield* sources(p);
     else if (/\.(css|svelte)$/.test(e.name)) yield p;

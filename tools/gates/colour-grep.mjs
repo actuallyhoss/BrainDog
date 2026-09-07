@@ -11,14 +11,16 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
-import { budget } from './lib.mjs';
+import { budget, skipDir } from './lib.mjs';
 
 const C = budget('colourGrep');
 
 const ROOT = process.cwd();
 /* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
    on purpose; an ordinary run must not find the violations that are there to be found. */
-const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots', 'docs', 'loop', 'negative']);
+/* `docs` and `loop` are prose about colours rather than colours, and `negative` is this gate's
+   own seeded violation. Everything else a gate never walks into is `skipDir`. */
+const SKIP = new Set(['docs', 'loop', 'negative']);
 
 // The four places a colour may legally be spelled out, and why none of them is a component writing
 // one:
@@ -95,7 +97,7 @@ const blankComments = (text) =>
 
 async function walk(dir, out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
-    if (SKIP.has(e.name)) continue;
+    if (skipDir(e.name) || SKIP.has(e.name)) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) await walk(p, out);
     else if (/\.(ts|js|mjs|svelte|css|html|json)$/.test(e.name)) out.push(p);

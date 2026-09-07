@@ -29,6 +29,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { skipDir } from './lib.mjs';
+
 const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 /**
@@ -99,7 +101,7 @@ function walk(dir, out = []) {
     return out;
   }
   for (const name of entries) {
-    if (name === 'node_modules' || name === '.svelte-kit' || name === 'build' || name === 'dist') continue;
+    if (skipDir(name)) continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     /* `.svelte` TOO. A component that logs a grant it just opened is the same leak in a file this

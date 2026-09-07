@@ -73,3 +73,28 @@ export function keyPaths() {
     Object.keys(values).map((key) => `${section}.${key}`),
   );
 }
+
+/**
+ * Directories no gate walks into, and one list instead of seven.
+ *
+ * THERE WERE SEVEN, AND THEY HAD DRIFTED. `secret-grep` skipped four names, `stack` three,
+ * `layout` three, `css-rules` and `colour-grep` their own supersets, and `routes` and
+ * `no-declarations-in-kernel` skipped `node_modules` alone — so the same directory was source to
+ * two gates and invisible to five, with nothing anywhere saying which answer was intended.
+ *
+ * WHAT IT COST, MEASURED: a subagent left a scratch script under `apps/web/.verify/` during an
+ * audit, and `secret-grep` read `console.log('=== plain /r/obligations ===')` as a plaintext
+ * reaching a log. One gate red, on a file nobody wrote to ship, in a directory five other gates
+ * were already ignoring.
+ *
+ * A LEADING DOT MEANS TOOLING. `.svelte-kit` was already named by three of the seven and `.git` by
+ * two, which is the rule those lists were groping towards; no source directory in this repository
+ * begins with one, and every scratch, cache and editor directory does. The built outputs are named
+ * because they do not.
+ *
+ * IT IS THE UNIVERSAL PART ONLY. A gate that also skips its own fixtures, or `docs/`, keeps saying
+ * so at its own call site — those are statements about what that gate measures, not about what a
+ * directory is.
+ */
+const BUILT = new Set(['node_modules', 'build', 'dist', 'shots']);
+export const skipDir = (name) => name.startsWith('.') || BUILT.has(name);

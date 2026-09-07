@@ -18,14 +18,16 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
-import { budget } from './lib.mjs';
+import { budget, skipDir } from './lib.mjs';
 
 const R = budget('cssRules');
 
 const ROOT = process.cwd();
 /* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
    on purpose; an ordinary run must not find the violations that are there to be found. */
-const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots', 'negative']);
+/* `negative` is this gate's own seeded violation, which it must not find while checking the app.
+   Everything else a gate never walks into is `skipDir`. */
+const SKIP = new Set(['negative']);
 
 /** Properties whose value paints. A literal in any of them is a component writing a colour. */
 const COLOUR_PROPS = new Set([
@@ -133,7 +135,7 @@ const PHYSICAL_ALIGN = /^(text-align|float|clear)$/;
 
 async function walk(dir, out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
-    if (SKIP.has(e.name)) continue;
+    if (skipDir(e.name) || SKIP.has(e.name)) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) await walk(p, out);
     else if (/\.(css|svelte)$/.test(e.name)) out.push(p);

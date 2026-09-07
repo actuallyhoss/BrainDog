@@ -42,7 +42,7 @@ import { compile, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { findingsFrom } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
-import type { Entry, Filter, FieldDecl, Job, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
+import type { Entry, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 /**
  * The currency the rows of one money field are in, or `null` when they are not all one.
@@ -968,6 +968,97 @@ export function boot() {
  * matched nothing" from "there is nothing here yet" needs exactly this number.
  */
 export const heldBy = (register: string): number => (ROWS[register] ?? []).length;
+
+/**
+ * What installing a pack would add, derived from the record rather than typed.
+ *
+ * `04 §3` IS THE TRUST MODEL AND IT IS THE REASON A PACK MAY NOT CONTAIN CODE: "A pack is readable
+ * text, so a truthful diff is possible — this is the entire trust model. You cannot diff a binary's
+ * intentions." So the one screen that carries that promise had better be true.
+ *
+ * IT WAS A TEMPLATE STRING WITH THREE THINGS WRONG WITH IT. `+ register.things  1 field(s) added`:
+ * the internal id for a list the rail calls Projects; `${pack.registers.length}` — a count of
+ * REGISTERS — printed as a count of FIELDS, so all five installed packs said "1 field(s)" while
+ * Obligations declares eight; and `+ page.— placed in nav`, the em-dash fallback for a pack with no
+ * page, rendered as though `—` were a page about to be put in somebody's sidebar. Under it, a
+ * paragraph explaining how nav ordering works — `23 §7`: never write a sentence explaining the
+ * interface.
+ *
+ * SEVEN SECTIONS, AND ONLY THE ONES THAT SAY SOMETHING. `04 §3`'s diff is
+ * `adds · changes · conflicts · seeds · spawns · calls_out · touches`, and three of them are
+ * guarantees rather than findings: a pack physically cannot read a row at install time, so
+ * "0 rows read" is a fact about the mechanism and not about this pack. Those are stated. `changes`
+ * is stated only when there IS one, because `06 §1` is that a warning which does not apply teaches
+ * people to ignore warnings.
+ *
+ * WHAT IS NOT KNOWN IS SAID AS NOT KNOWN. A pack this record has not installed declares registers
+ * and pages this record does not have, so there is no field count to give and inventing one would
+ * be the same lie in a new place. It gets the names it declares and a line saying the shape arrives
+ * with the file.
+ */
+export type PackDiff = {
+  adds: { kind: 'list' | 'page'; name: string; detail: string | null }[];
+  /** A nav move this pack would make to a page it does not own. Shown, never applied (04 §4). */
+  changes: string[];
+  conflicts: string[];
+  seeds: string;
+  touches: string;
+  /** True when the pack is not installed, so the counts are unknown rather than zero. */
+  unread: boolean;
+};
+
+export function packDiff(pack: PackInfo): PackDiff {
+  const adds: PackDiff['adds'] = [];
+
+  for (const id of pack.registers) {
+    const decl = REGISTERS[id];
+    adds.push(
+      decl
+        ? { kind: 'list', name: decl.name, detail: `${decl.fields.length} ${decl.fields.length === 1 ? 'field' : 'fields'}` }
+        /* THE KIND IN WORDS WHEN THERE IS NO COUNT, because the glyph beside it is decorative and a
+           screen reader would otherwise hear three bare nouns with nothing saying which is which. */
+        : { kind: 'list', name: id, detail: 'a list' },
+    );
+  }
+
+  for (const id of pack.pages) {
+    const decl = PAGES[id];
+    adds.push(
+      decl
+        ? {
+            kind: 'page',
+            name: decl.title,
+            detail: [
+              `${decl.blocks.length} ${decl.blocks.length === 1 ? 'block' : 'blocks'}`,
+              /* WHERE IT LANDS IN THE RAIL, which is the half somebody actually checks. A pack may
+                 place a page it owns; `04 §4` is that it may never move yours. */
+              decl.nav ? `${decl.nav.section} section` : 'not in your sidebar',
+            ].join(' · '),
+          }
+        : { kind: 'page', name: id, detail: 'a page' },
+    );
+  }
+
+  /* NO PACK IN THIS RECORD MOVES A PAGE IT DOES NOT OWN, so there is nothing to show and the line
+     is absent rather than printed empty. The shape is here because `04 §4` says the day one tries,
+     the move is shown and then ignored — and a diff with nowhere to put that is a diff that would
+     hide it. */
+  const changes: string[] = [];
+  const conflicts: string[] = [];
+
+  return {
+    adds,
+    changes,
+    conflicts,
+    /* `04 §3.2`: seeds get their own line, are marked `example`, and are clearable in one undoable
+       action. It is a WRITE, and the trust screen was untrue for as long as it claimed otherwise. */
+    seeds: '1 example row, marked example, clearable in one action',
+    /* AND THIS ONE IS A GUARANTEE, not a measurement. `04 §3.2`: "A pack physically cannot read a
+       row at install time, so \"0 rows read\" is a guarantee." */
+    touches: 'nothing you have written — 0 rows read, 0 of your rows changed',
+    unread: !pack.installed,
+  };
+}
 
 export type BlockResult = PageBlock & {
   rows: TableRow[];

@@ -34,6 +34,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { skipDir } from './lib.mjs';
+
 const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 /** `04 §1`'s eight. A ninth is a migration, which is what `closed-lists` is for. */
@@ -47,7 +49,7 @@ function walk(dir, out = []) {
     return out;
   }
   for (const name of entries) {
-    if (name === 'node_modules') continue;
+    if (skipDir(name)) continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     else out.push(full);
