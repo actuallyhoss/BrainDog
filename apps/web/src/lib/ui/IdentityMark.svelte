@@ -47,6 +47,16 @@
     white-space: nowrap;
   }
 
+  /* IT IS A NAME, SO IT WRAPS RATHER THAN LOSING ITS END. At 320 `Marlow & Co` came back as
+     `Marlow & C` — a project's name, one character short, on the row that is about that project. */
+  @media (width < 400px) {
+    .name {
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+    }
+  }
+
   .thing[data-size='md'] .glyph {
     font-size: 12px;
   }

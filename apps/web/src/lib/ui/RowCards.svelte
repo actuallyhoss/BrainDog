@@ -119,6 +119,11 @@
       text-align: end;
     }
 
+    /* THE TITLE WRAPS ON THE NARROWEST PHONE, because there is nothing else on its line to protect.
+       At 390 the column is wide enough that nothing truncates; at 320 nine of the thirty-eight
+       obligation cards lost their end — `Invoice 2026-041 — brand` — and the row number beside it,
+       which is the only other thing on that line, is four characters. A card grows; that is the
+       whole reason it is a card. */
     .card-title {
       grid-column: 1;
       grid-row: 1;
@@ -126,6 +131,14 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    @media (width < 400px) {
+      .card-title {
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+      }
     }
 
     .card-b {

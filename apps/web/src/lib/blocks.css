@@ -421,6 +421,31 @@
     }
   }
 
+  /**
+   * A `list` ITEM IS FOUR TRACKS, AND FOUR DO NOT FIT ON THE NARROWEST PHONE.
+   *
+   * Same shape as `.row` one block up: `auto minmax(0,1fr) minmax(0,auto) auto` with no rule under
+   * it, so at 320 the marker, the title, the detail and the state compete and the title loses —
+   * `tallow.example` and `Move kilnfonts.example off auto-…` on the estate and work pages. The
+   * marker is a date or a glyph and the state is a word; the title is the sentence, so the title
+   * gets the line.
+   */
+  @media (width < 400px) {
+    .item {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: var(--sp-1) var(--sp-3);
+    }
+
+    .item-title {
+      grid-column: 1 / -1;
+    }
+
+    .item-detail,
+    .item-state {
+      grid-column: 2;
+    }
+  }
+
   /* AND THREE LINES ON THE NARROWEST PHONE. Two tracks still fit at 390; at 320 the value and the
      note were sharing 250px and `redirect → kiln.example` needed 159 of it on its own. A value that
      may not wrap needs a line that is not shared. */

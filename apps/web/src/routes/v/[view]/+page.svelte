@@ -94,7 +94,11 @@
   <PageHead icon={iconFor(decl.icon, 'rows')} kicker="{decl.name} · saved view" title={view.name} count={result.matched} total={result.total}>
     {#snippet actions()}
       <Button weight="bare" href="/r/{view.register}"><Icon name="external" size="s" />Open {decl.name}<Kbd keys="o" /></Button>
-      <Button weight="quiet" onclick={() => (binding = true)}>{copy.bindBlock}<Kbd keys="⌥B" /></Button>
+      <!-- `BindBlock`'s own file header opens "THIS IS THE WHOLE WIZARD", which is what `13 §10`
+           means by a page builder. It opened and worked on a phone. -->
+      <span class="bind-slot">
+        <Button weight="quiet" onclick={() => (binding = true)}>{copy.bindBlock}<Kbd keys="⌥B" /></Button>
+      </span>
     {/snippet}
   </PageHead>
 
@@ -132,6 +136,13 @@
 {/if}
 
 <style>
+  /* Authoring is a desktop surface (13 §10). */
+  @media (width < 900px) {
+    .bind-slot {
+      display: none;
+    }
+  }
+
   /* One body at a time, and this is the other half of `RowCards`' own rule. */
   @media (width < 640px) {
     .table-slot {

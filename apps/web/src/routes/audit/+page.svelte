@@ -180,7 +180,7 @@
                  wanted anyway — an audit line names a row, and the next question is always what
                  that row says now. -->
             <span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
-              <a class="target" href={href(e.target)}>{targetOf(e.target)}</a></span>
+              <a class="target tap" href={href(e.target)}>{targetOf(e.target)}</a></span>
           </span>
           <span class="line-amount note">{e.note}</span>
           <span class="line-when">{relative(e.at.slice(0, 10), NOW)}</span>
@@ -200,6 +200,9 @@
 <style>
   /* WIDE ENOUGH FOR A NAME, in the reading face rather than the id face. It sits in the grid slot
      `.seq` would have taken, so the ledger's columns still line up down the page. */
+  /* A NAME WRAPS ON A CARD TOO. `reply rule` and `renewal rule` are two words and the card's first
+     column is 94px; truncating a four-actor filter's own labels leaves `reply r…` as the only thing
+     saying who did it. */
   .who {
     min-inline-size: 0;
     overflow: hidden;
@@ -242,8 +245,27 @@
   /* 16ch FOR THE ACTOR, because it is a name and not a spoken id. The ledger's default first column
      is 10ch of monospace, which "renewal rule" does not fit in — and once `rule.renewal` became
      English, every rule in the log truncated. */
-  .ledger :global(.line) {
-    grid-template-columns: 16ch minmax(0, 22ch) minmax(0, 1fr) 9ch;
+  /**
+   * A DESKTOP TRACK LIST IS A DESKTOP RULE, AND HAS TO SAY SO.
+   *
+   * `rows.css` turns a row into a two-line card below 640px. This override said nothing about width,
+   * and it is more specific than the card rule — Svelte compiles `.ledger :global(.line)` to
+   * `.ledger.svelte-xxx .line`, three classes against one — so it won at every size. The children
+   * took their card placements and the parent kept four desktop tracks underneath them: computed at
+   * 390, `144px 63px 0px 81px`, a zero-width track with a nowrap note in it.
+   *
+   * The cost is measurable. The longest note in the audit log was 19% visible — `added a n…` — and
+   * `/decide` lost 227px of a 551px sentence. Eight entries, none readable, on the two screens whose
+   * whole job is to say what changed and why. Every desktop screenshot looked correct.
+   *
+   * `@layer components` alone does NOT fix it: within one layer the more specific rule still wins.
+   * The width query is what makes the two rules describe two different screens instead of arguing
+   * about one.
+   */
+  @media (width >= 640px) {
+    .ledger :global(.line) {
+      grid-template-columns: 16ch minmax(0, 22ch) minmax(0, 1fr) 9ch;
+    }
   }
 
   /* A word and a glyph, not an identifier. It is still the quiet half of the line, because the
@@ -263,6 +285,25 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* AND ON A CARD IT WRAPS, because a card has a line to spare and a truncated note is the one
+     thing this screen must not do: the note IS what changed. */
+  @media (width < 640px) {
+    .note,
+    .who {
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+    }
+
+    /* THE ACTOR GETS A LINE. On a card the row is two tracks, and `.who` is not one of the four
+       cells the card layout places — so it fell into whatever was left, which was nothing: measured
+       `clientWidth: 0` against 29px of text. Who did it is half of what this log says. */
+    .who {
+      grid-column: 1 / -1;
+      grid-row: 1;
+    }
   }
 
   /* It is a link, so it says so on hover and on focus — but not with a permanent underline, which

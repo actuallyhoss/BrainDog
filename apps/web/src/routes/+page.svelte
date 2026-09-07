@@ -68,7 +68,7 @@
 
 <PageHead icon="home" kicker={data.index.name} title={today}>
   {#snippet actions()}
-    <a class="to-decide" href="/decide">
+    <a class="to-decide tap" href="/decide">
       <span class="to-decide-n num">{data.questions.length}</span>
       <span>to decide</span>
     </a>

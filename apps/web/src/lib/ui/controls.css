@@ -67,8 +67,22 @@
   /* A SEGMENTED CONTROL, and the same rule as the field: one sunk track, and the chosen option is a
      raised card sitting in it. The selected state has to be a SHAPE and not a shade — a slightly
      lighter grey behind one word out of four is the single most-missed control in dense software. */
+  /**
+   * AND THE TRACK WRAPS, because the alternative hides a state with no way to know it is there.
+   *
+   * The segments are separately rounded chips in a sunken track rather than one fused pill, so a
+   * second line costs nothing visually. Once they became 44px tall on a coarse pointer, five of them
+   * measured 342px inside a 320px screen and `/r/tasks` scrolled sideways by 38 — the register
+   * whose bar carries `open doing blocked done dropped`.
+   *
+   * Not `overflow-x: auto`: the settings rail was a scroller, and nine of twelve areas were
+   * unreachable for exactly as long, because a strip that scrolls with nothing peeking past its edge
+   * looks like a strip that ends. Every state a register can be filtered by is on screen or the
+   * control is lying about the register.
+   */
   .segmented {
     display: flex;
+    flex-wrap: wrap;
     gap: 2px;
     padding: 2px;
     background: var(--sunk);
@@ -76,8 +90,31 @@
     border-radius: var(--r-md);
   }
 
+  /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM. */
+  @media (pointer: coarse) {
+    .segmented {
+      gap: var(--sp-1);
+    }
+  }
+
+  /**
+   * A SEGMENT IS 28px HIGH AND THE POINTER DECIDES OTHERWISE.
+   *
+   * `05 §6` and `13 §7`: density follows the POINTER, never the width — a control is 44px on a
+   * coarse pointer and 32 on a fine one, and `--ctl-h` already resolves to exactly that. This read
+   * `28px`, flat, and consulted neither. Measured on a phone: ten of these on `/r/services`, nine on
+   * `/audit`, twenty on `/settings/people` at 43x28 with 2px between them — a 28px band with three
+   * targets in it, which is the classic wrong-chip tap.
+   *
+   * The gap goes with it. `--tap` is 44 and the space between two of these was 2px, so even at the
+   * right height a thumb landing between two chips is a coin toss. Four pixels on a coarse pointer
+   * is not enough on its own — the height is what fixes it — but two is a rounding error.
+   *
+   * `min-block-size`, not `block-size`: a segment whose label wraps grows, and 44 is the floor
+   * rather than the size.
+   */
   .segment {
-    min-block-size: 28px;
+    min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
     background: none;
     border: 1px solid transparent;

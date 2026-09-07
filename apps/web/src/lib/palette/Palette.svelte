@@ -409,12 +409,15 @@
     text-transform: uppercase;
   }
 
+  /* `--ctl-h`, BECAUSE THESE ARE THE PHONE'S ROUTE TO SEVERAL PLACES. 38px, adjacent, with no gap
+     between neighbours — twenty-four of them in one scroller, on a surface whose whole job is to get
+     somebody somewhere. `05 §6`: the pointer decides, and on a fine one this is still 32. */
   .p-row {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: 38px;
+    min-block-size: var(--ctl-h);
     padding: 0 var(--sp-2);
     border: 0;
     border-radius: var(--r-sm);

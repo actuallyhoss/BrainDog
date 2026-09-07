@@ -242,7 +242,7 @@
                command, which the element already is. -->
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
           <code tabindex="0">{firstRun.agentCommand}</code>
-          <button type="button" class="agent-copy" onclick={copyCommand} aria-label={firstRun.agentCopy}>
+          <button type="button" class="agent-copy tap" onclick={copyCommand} aria-label={firstRun.agentCopy}>
             <Icon name="copy" size="s" />
           </button>
         </div>

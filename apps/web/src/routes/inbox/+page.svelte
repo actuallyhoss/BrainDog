@@ -179,8 +179,13 @@
     line-height: 1.55;
   }
 
+  /* THEY WRAP. `.ledger` is `overflow: hidden`, so a row of actions that does not fit is CUT rather
+     than scrolled: at 320 "Leave it for another rule" ended at x=381 in a 320px viewport and read
+     `Leave it for ano`. Half the inbox's verbs, on the screen that asks you to make a standing rule.
+     At 390 it still spilled 8px past its own card. */
   .pattern-actions,
   .actions {
+    flex-wrap: wrap;
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);

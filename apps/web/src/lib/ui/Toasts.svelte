@@ -45,7 +45,7 @@
       {#if toast.undo}
         <button type="button" class="undo" onclick={() => toasts.run(toast.id)}>{copy.undo}</button>
       {/if}
-      <button type="button" class="close" onclick={() => toasts.dismiss(toast.id)} aria-label={copy.close}>
+      <button type="button" class="close tap" onclick={() => toasts.dismiss(toast.id)} aria-label={copy.close}>
         <Icon name="close" size="s" />
       </button>
     </div>
@@ -114,9 +114,11 @@
 
   /* The undo is the LOUD thing in the toast, because it is the only thing in it that does anything.
      A row of two grey links, one of which gives you your data back, weights them the same. */
+  /* AND IT IS A 44px TARGET ON A THUMB. It was 28 — the only control in the product that gives you
+     your data back, on a countdown, at two thirds of the floor. */
   .undo {
     flex: none;
-    min-block-size: 28px;
+    min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
     background: none;
     border: 1px solid var(--line);
@@ -135,6 +137,9 @@
     border-color: var(--accent);
   }
 
+  /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH. `a11y.css`'s `.tap::before` grows a small
+     control to `--tap` in both axes, which is what keeps a 28px ✕ visually right and 44px to a
+     thumb — the same trick the palette launcher uses. */
   .close {
     display: grid;
     place-items: center;
@@ -157,7 +162,11 @@
   @media (width < 900px) {
     .stack {
       inset-inline: var(--sp-3);
-      inset-block-end: calc(56px + var(--sp-3));
+      /* THE TAB BAR PAYS `env(safe-area-inset-bottom)` AND THIS DID NOT. On a phone with a home
+         indicator the bar is 91px tall and this sat 68px up — 23px of toast over the tab labels,
+         and `--z-toast` beats `--z-sheet`, so it painted on top of them. The inset is the same
+         number in both places or the two disagree by exactly the height of the indicator. */
+      inset-block-end: calc(56px + var(--sp-3) + env(safe-area-inset-bottom));
       max-inline-size: none;
     }
   }

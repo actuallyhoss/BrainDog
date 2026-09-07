@@ -142,6 +142,33 @@
   /* Below 640px a row becomes a two-line card. It is the register's three declared `mobile:` fields
      that decide what a card shows — a declaration, not a media query (13 §10). */
   @media (width < 640px) {
+    /**
+     * AND A CARD HAS A LINE TO SPARE, SO THE TITLE TAKES IT.
+     *
+     * `.line-title` is `nowrap` with an ellipsis and had no card exception, though `.line-detail`
+     * two rules down does and argues for it. On a desktop row that is right: one row, one line, and
+     * a column that must stay in step with the header above it. A card has neither constraint.
+     *
+     * Measured on Home at 390: "Does Portage keep sending from portagemail.example, or move to the
+     * apex?" is 512px of text in a 324px box, so 188px of a question is gone — while the card
+     * directly under it carries two lines of wrapped body text. `/decide` renders the same three
+     * questions in full, three lines each, which is the proof the space is there.
+     */
+    .line-title,
+    .line-detail {
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+    }
+
+    /* AND THE ID COLUMN SIZES TO WHAT IS IN IT. `.seq` is a fixed monospace track that a card gives
+       whatever is left over — 20px at 320, which is two characters of `braindog`. On a card it is a
+       line of its own rather than a column competing with one. */
+    .seq {
+      grid-column: 1 / -1;
+      min-inline-size: max-content;
+    }
+
     .line {
       grid-template-columns: minmax(0, 1fr) auto;
       gap: var(--sp-1) var(--sp-3);

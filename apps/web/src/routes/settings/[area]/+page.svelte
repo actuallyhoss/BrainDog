@@ -62,6 +62,27 @@
 
   const area = $derived(page.params.area ?? 'appearance');
 
+  /**
+   * NINE OF TWELVE AREAS WERE UNREACHABLE ON A PHONE.
+   *
+   * Below 900px the rail becomes a horizontal scroller — `scrollWidth 1294` inside `clientWidth
+   * 358` — and nothing ever scrolled it. `scrollLeft` was 0 on every area, so the strip always read
+   * "Appearance · Identity · Recovery" and a sliver of the fourth. On `/settings/billing` the
+   * heading said Billing, the strip highlighted nothing, and no partial item peeked to suggest there
+   * were nine more.
+   *
+   * `nearest` rather than `center`: on the first three areas the current one is already in view and
+   * centring would scroll the list for no reason, which reads as the page moving under you.
+   * `block: 'nearest'` keeps it from scrolling the PAGE to reach a strip that is already on screen.
+   */
+  let rail = $state<HTMLElement | undefined>(undefined);
+
+  $effect(() => {
+    rail
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  });
+
   /* SET IT AND REMEMBER IT, in one call. These were two things and the second was never written:
      every preference in this product was lost on refresh, and a setting that does not survive a
      reload is a setting somebody changes once and then stops trusting. */
@@ -174,7 +195,7 @@
 <PageHead icon="settings" kicker={copy.settings} title={area.replace(/^./, (c) => c.toUpperCase())} />
 
 <div class="shell">
-  <nav class="areas" aria-label={copy.settings}>
+  <nav class="areas" bind:this={rail} aria-label={copy.settings}>
     {#each AREAS as a}
       <a class="area" href="/settings/{a.id}" aria-current={a.id === area ? 'page' : undefined}>
         <Icon name={a.icon} size="s" />
@@ -895,8 +916,10 @@
   /* The same row as the rail's, because it IS the same thing: a vertical list of places, one of
      which you are in. It read as a different control entirely — a grey box where the rail uses the
      accent — which teaches that "here" looks like two things. */
+  /* AND THE ROWS ARE TARGETS. `min-block-size: 32px` with no pointer query — they measured 67px
+     only because "People & sharing" wraps to two lines and stretches its siblings. */
   .area {
-    min-block-size: 32px;
+    min-block-size: var(--ctl-h);
     display: flex;
     align-items: center;
     gap: var(--sp-3);
@@ -989,11 +1012,14 @@
     border-radius: var(--r-sm);
   }
 
+  /* `--ctl-h`, LIKE EVERY OTHER CONTROL. Nine of these on `/settings/appearance` were 28px tall on
+     a phone — the screen whose own Text and Density controls are about making things easier to
+     use. `05 §6`: density follows the pointer, never the width. */
   .seg {
     display: flex;
     align-items: center;
     gap: 6px;
-    min-block-size: 28px;
+    min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
@@ -1016,7 +1042,10 @@
 
 
 
+  /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
+     are two buttons off the edge. At 320 "Export the rows only" ended at x=406 in a 320px screen. */
   .row-actions {
+    flex-wrap: wrap;
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);

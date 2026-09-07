@@ -195,9 +195,28 @@
   }
 
   /* The row shape is `$lib/ui/rows.css`; the decided list uses three of its four columns. */
-  .ledger :global(.line) {
-    grid-template-columns: 8ch minmax(0, 1fr) auto;
-    min-block-size: 44px;
+  /**
+   * A DESKTOP TRACK LIST IS A DESKTOP RULE, AND HAS TO SAY SO.
+   *
+   * `rows.css` turns a row into a two-line card below 640px. This override said nothing about width,
+   * and it is more specific than the card rule — Svelte compiles `.ledger :global(.line)` to
+   * `.ledger.svelte-xxx .line`, three classes against one — so it won at every size. The children
+   * took their card placements and the parent kept four desktop tracks underneath them: computed at
+   * 390, `144px 63px 0px 81px`, a zero-width track with a nowrap note in it.
+   *
+   * The cost is measurable. The longest note in the audit log was 19% visible — `added a n…` — and
+   * `/decide` lost 227px of a 551px sentence. Eight entries, none readable, on the two screens whose
+   * whole job is to say what changed and why. Every desktop screenshot looked correct.
+   *
+   * `@layer components` alone does NOT fix it: within one layer the more specific rule still wins.
+   * The width query is what makes the two rules describe two different screens instead of arguing
+   * about one.
+   */
+  @media (width >= 640px) {
+    .ledger :global(.line) {
+      grid-template-columns: 8ch minmax(0, 1fr) auto;
+      min-block-size: 44px;
+    }
   }
 
   @media (width < 900px) {

@@ -1092,7 +1092,12 @@
     white-space: nowrap;
   }
 
+  /* THE SAME WRAP `/audit` TOOK, in a commit whose comment names the measurement — "Five of those
+     in one unwrapping track reached 335px inside a 320px screen". The register's bar has the
+     identical shape and was not fixed with it: at 320 `dropped` ran off the edge of `/r/tasks` and
+     the app panel scrolled sideways by 30px. */
   .bar {
+    flex-wrap: wrap;
     display: flex;
     flex-wrap: wrap;
     align-items: center;

@@ -240,6 +240,32 @@
     border-block-start: 1px solid var(--line);
   }
 
+  /**
+   * AND THE UA'S `max-width`, WHICH IS THE OTHER HALF OF THE SAME BUG.
+   *
+   * This file already overrides `max-block-size` for the UA's `max-height: calc(100% - 6px - 2em)`,
+   * with a comment saying "measured, not guessed" — and the horizontal twin was never taken. At the
+   * sheet's 15px font that computes to `calc(100% - 36px)`, so a sheet declaring `100vw` rendered
+   * 284px at 320, 354 at 390 and 394 at 430: a dead strip of dimmed page down the right edge, with
+   * the sheet's rounded corner floating mid-screen, in every sheet in the product.
+   */
+  .sheet {
+    max-inline-size: 100%;
+  }
+
+  /**
+   * AND THE UA'S `max-width`, WHICH IS THE OTHER HALF OF THE SAME BUG.
+   *
+   * This file already overrides `max-block-size` for the UA's `max-height: calc(100% - 6px - 2em)`,
+   * with a comment saying "measured, not guessed" — and the horizontal twin was never taken. At the
+   * sheet's 15px font that computes to `calc(100% - 36px)`, so a sheet declaring `100vw` rendered
+   * 284px at 320, 354 at 390 and 394 at 430: a dead strip of dimmed page down the right edge, with
+   * the sheet's rounded corner floating mid-screen, in every sheet in the product.
+   */
+  .sheet {
+    max-inline-size: 100%;
+  }
+
   @media (width < 640px) {
     .sheet {
       inset-block-start: auto;

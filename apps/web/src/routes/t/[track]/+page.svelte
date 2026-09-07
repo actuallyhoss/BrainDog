@@ -146,7 +146,7 @@
                    product at all. Only on a session that carries one: an ended session kept its
                    transcript and its run is over. -->
               {#if s.fields.job}
-                <a class="row-run" href="/jobs/{s.fields.job}">{copy.watchRun}</a>
+                <a class="row-run tap" href="/jobs/{s.fields.job}">{copy.watchRun}</a>
               {/if}
             </li>
           {/each}

@@ -453,11 +453,19 @@
         <Button weight="bare" onclick={() => arrangement.cancel()}><Icon name="close" size="s" />{copy.arrangeCancel}</Button>
         <Button weight="primary" onclick={commitArrange}><Icon name="check" size="s" />{copy.arrangeDone}</Button>
       {:else}
-        <Button weight="bare" href="?src={showSource ? '0' : '1'}">
-          <Icon name="code" size="s" />
-          {showSource ? 'Page' : 'Source'}
-          <Kbd keys="⇧E" />
-        </Button>
+        <!-- AUTHORING IS A DESKTOP SURFACE (13 §10), and this is the one that stayed. `Arrange` is
+             hidden below 900px and the kbd hints beside the source link are hidden with a comment
+             calling that "a desktop affordance for the same reason the source link beside it is" —
+             the source link itself never was. On four project pages it is the ONLY header control a
+             phone gets, and what it opens is a 1,129px-wide YAML declaration in a 356px box that you
+             drag sideways to read, line by line, with lines cut mid-token. -->
+        <span class="source-slot">
+          <Button weight="bare" href="?src={showSource ? '0' : '1'}">
+            <Icon name="code" size="s" />
+            {showSource ? 'Page' : 'Source'}
+            <Kbd keys="⇧E" />
+          </Button>
+        </span>
         <!-- ARRANGING IS A DESKTOP SURFACE. 13 §10: "Authoring: read and approve, do not author. The
              page builder and pack builder are desktop surfaces." A drag-to-reorder mode on a phone
              is a mode where every gesture competes with the scroll, and the button is absent rather
@@ -576,7 +584,7 @@
                      filtered and may take a block of four rows for the whole register. But the
                      clause that names the page you are already on is dropped: "thing is Kiln" under
                      a heading on the Kiln page is the one fact the reader cannot be missing. -->
-                <a class="block-source" href={openHref(block) ?? `/r/${block.register}`}>
+                <a class="block-source tap" href={openHref(block) ?? `/r/${block.register}`}>
                   {REGISTERS[block.register]?.name ?? block.register}
                   <!-- AND IT SAYS THAT IT IS A FILTER. `/v/<view>` labels the identical string
                        `FILTER`, so the word existed and the page blocks did not use it — leaving an
@@ -642,7 +650,7 @@
                 {block.source === 'forecast.runway'
                   ? copy.ofWhichWalked(block.shown, block.total, block.horizon ?? 180)
                   : copy.ofWhichDrawn(block.shown, block.total)}{#if to}
-                  &nbsp;— <a href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
+                  &nbsp;— <a class="tap" href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
                 {/if}
               </p>
             {/if}
@@ -910,7 +918,15 @@
       grid-column: auto;
     }
 
-    .arrange-slot {
+    /* Both of them, for one reason. `13 §10`: "Authoring: read and approve, do not author. The page
+     builder and pack builder are desktop surfaces." */
+  @media (width < 900px) {
+    .source-slot {
+      display: none;
+    }
+  }
+
+  .arrange-slot {
       display: none;
     }
 
