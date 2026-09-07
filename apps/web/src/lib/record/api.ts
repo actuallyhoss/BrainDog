@@ -908,6 +908,20 @@ export function boot() {
         name: r.name,
         count: (ROWS[r.id] ?? []).length,
         icon: iconFor(r.icon, 'rows'),
+        /**
+         * THE SAVED VIEWS OF THIS LIST, which appeared in no navigation at all.
+         *
+         * Two views existed in the record and the rail held zero `/v/` links, while the keyboard
+         * sheet documented `⌥V` as "Save the filter as a view" — so the product taught somebody to
+         * make a thing and then never showed it to them again. The palette found them, and the
+         * palette is labelled "Search, or run a command".
+         *
+         * UNDER THE LIST THEY FILTER, because that is what one IS: the same rows with a predicate.
+         * A section of its own would be a second place to look for a list.
+         */
+        views: Object.entries(VIEWS)
+          .filter(([, v]) => v.register === r.id)
+          .map(([key, v]) => ({ key, name: v.name })),
       })),
     },
     nav,

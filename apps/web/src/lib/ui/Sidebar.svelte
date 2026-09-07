@@ -54,7 +54,7 @@
     pen: PageDecl[];
     record: string;
     records?: { slug: string; name: string; level: string }[];
-    registers: { id: string; name: string; count: number; icon: IconName }[];
+    registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string }[] }[];
     open?: number | undefined;
     inbox?: number | undefined;
   } = $props();
@@ -284,6 +284,18 @@
             <span class="item-name">{r.name}</span>
             <span class="tally num">{r.count}</span>
           </a>
+          <!-- A SAVED VIEW IS THE SAME LIST WITH A PREDICATE, so it lives under the list. There were
+               two in the record and zero `/v/` links in this rail, while the `?` sheet documents
+               `⌥V` as "Save the filter as a view" — the product taught somebody to make a thing and
+               then never showed it to them again.
+
+               NO GLYPH, AND INDENTED. It is not a sibling of the list; it is a way of looking at it,
+               and the indent is what says so without a second section to read. -->
+          {#each r.views ?? [] as v}
+            <a class="item view tap" href="/v/{v.key}" aria-current={under(`/v/${v.key}`) ? 'page' : undefined}>
+              <span class="item-name">{v.name}</span>
+            </a>
+          {/each}
         </li>
       {/each}
     </ul>
@@ -509,6 +521,14 @@
     color: var(--dim);
   }
 
+  /* Indented to where a glyph would be, so the name lines up with the names above it and the row
+     reads as belonging to the one before it rather than following it. */
+  .view {
+    padding-inline-start: calc(var(--sp-3) + 20px + var(--sp-3));
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
   .group {
     display: flex;
     flex-direction: column;
@@ -521,12 +541,34 @@
     margin-block-start: var(--sp-4);
   }
 
+  /**
+   * THE RAIL SCROLLS, AND IT DID NOT SAY SO.
+   *
+   * `19 §3`'s whole argument for a vertical rail is that this nav is a QUERY over `page` rows whose
+   * length varies per customer — so it scrolls, and that is correct. What was wrong is that nothing
+   * on the screen said it did. Measured at 1920×993, a laptop: `clientHeight` 664 against
+   * `scrollHeight` 852. A hundred and eighty-eight pixels, about five rows, gone with no edge, no
+   * shadow and (on macOS, and on Windows with overlay scrollbars) no scrollbar until you move the
+   * pointer into it. The spine and the foot are pinned, so the part that gets cut is the part that
+   * varies per customer: their own lists.
+   *
+   * FOUR LAYERS, NO SCRIPT. Two `local` gradients scroll with the content and sit ON TOP of two
+   * fixed shadows — so at the top of the list the first gradient covers the first shadow, and both
+   * uncover themselves as you scroll. It is Komarov's technique and it is the only pure-CSS way to
+   * make a shadow that knows whether there is anything past the edge; the alternative is a scroll
+   * listener that has to be right on resize, on zoom, and on every nav change.
+   */
   .scroll {
     flex: 1;
     min-block-size: 0;
     margin-block-start: var(--sp-2);
     padding-block-end: var(--sp-4);
     overflow-y: auto;
+    background:
+      linear-gradient(var(--bg) 30%, transparent) top / 100% 20px no-repeat local,
+      linear-gradient(transparent, var(--bg) 70%) bottom / 100% 20px no-repeat local,
+      linear-gradient(color-mix(in srgb, var(--ink) 10%, transparent), transparent) top / 100% 8px no-repeat scroll,
+      linear-gradient(transparent, color-mix(in srgb, var(--ink) 10%, transparent)) bottom / 100% 8px no-repeat scroll;
   }
 
   /* Small caps here and nowhere else in the product. A section header is not read — it is a RULER

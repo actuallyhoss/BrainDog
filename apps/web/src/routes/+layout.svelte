@@ -245,6 +245,10 @@
       <a href="/r/{r.id}" onclick={() => (moreOpen = false)}>
         {r.name}<span class="more-tally num">{r.count}</span>
       </a>
+      <!-- And its saved views, which are the same list with a predicate. -->
+      {#each r.views ?? [] as v}
+        <a class="more-view" href="/v/{v.key}" onclick={() => (moreOpen = false)}>{v.name}</a>
+      {/each}
     {/each}
 
     <hr />
@@ -450,6 +454,12 @@
 
   .more-section:first-child {
     margin-block-start: 0;
+  }
+
+  .more-view {
+    padding-inline-start: var(--sp-4);
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .more-tally {
