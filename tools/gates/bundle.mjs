@@ -95,6 +95,11 @@ async function newestSource(dir) {
     /* `node_modules` under a workspace package is a symlink farm the size of the registry, and its
        mtimes are about an install rather than about this code. */
     if (!e.isFile() || (e.parentPath ?? e.path).includes('node_modules')) continue;
+    /* AND A TEST IS NOT SOURCE EITHER. The app's tests sit beside the code they test rather than in
+       a `test/` directory, so the rule one comment up did not reach them: writing a test for a page
+       block declared the bundle stale and demanded a rebuild that could not move a byte. Same
+       argument, colocated. */
+    if (/\.test\.[cm]?[jt]sx?$/.test(e.name)) continue;
     const full = join(e.parentPath ?? e.path, e.name);
     const t = (await stat(full)).mtimeMs;
     if (t > when) {

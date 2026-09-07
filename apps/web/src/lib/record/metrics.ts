@@ -31,7 +31,7 @@ import { integer, money } from 'braindog-render';
 
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf, currencyOf, mixedFix } from './money.ts';
-import { compile, explain, matches, declaredValue } from './where.ts';
+import { compile, explain, matches, registerHref } from './where.ts';
 import type { Entry } from './schema.ts';
 
 /* ── the document ────────────────────────────────────────────────────────── */
@@ -269,17 +269,11 @@ export function format(shape: string | undefined, n: number | null): string {
 export function hrefFor(decl: MetricDecl): string {
   const register = registerOf(decl.source);
   if (!register) return '/p/money';
-  const w = compile(register, decl.where);
-  const chips = w.clauses.map((c) =>
-    'values' in c
-      ? /* AS THE FIELD DECLARES THEM. The predicate is a sentence and says `owed to me`; the register
-           holds `owed_to_me`, and a URL is read by a control that compares strings. */
-        `${c.field}:${c.op === 'is not' ? 'not-in' : 'in'}:${c.values
-          .map((v) => encodeURIComponent(declaredValue(register, c.field, v)))
-          .join(',')}`
-      : `${c.field}:${c.op}:${encodeURIComponent(c.day)}`,
-  );
-  return chips.length ? `/r/${register}?${chips.map((f) => `f=${f}`).join('&')}` : `/r/${register}`;
+  /* THE SAME BUILDER A PAGE BLOCK USES. It lived here, so a figure's link was derived from its
+     predicate and a block's link was not derived from anything — the block just went to the
+     register. Two surfaces asking the same question of the same sentence now get the same answer
+     from the same function, which is the only arrangement under which they cannot drift. */
+  return registerHref(register, decl.where);
 }
 
 /** Does this predicate mention time at all? Without one, the shifted window is the same rows. */

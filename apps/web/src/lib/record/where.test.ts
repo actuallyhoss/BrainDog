@@ -13,7 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { NOW, ROWS } from './data.ts';
-import { compile, explain, matches, resolveDay } from './where.ts';
+import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
 
 const keep = (register: string, where: string) => {
   const w = compile(register, where);
@@ -239,4 +239,41 @@ test('explain says what was wrong, because the refusal is the teacher', () => {
   const w = compile('obligations', 'state is not done, due after soon');
   assert.equal(explain(w).length, 2);
   for (const line of explain(w)) assert.ok(line.length > 10, 'a refusal that explains nothing is a dead end');
+});
+
+/* ── the address of the rows it did not draw ─────────────────────────────── */
+
+test('the register href carries the predicate the surface filtered by', () => {
+  /* THE BLOCK PRINTED ITS FILTER AND LINKED PAST IT. `/p/marlow-co`'s Money block reads
+     `Filter state is open, direction is owed to me` and its provenance link went to `/r/obligations`
+     bare — all 38 rows, the filter the reader had just been shown thrown away on the way through. */
+  const href = registerHref('obligations', 'state is open, direction is owed to me');
+  assert.match(href, /^\/r\/obligations\?/);
+  assert.match(href, /f=state:in:open/);
+  /* AS THE FIELD DECLARES THEM, because the control at the other end compares strings: the
+     predicate says `owed to me` and the register stores `owed_to_me`. */
+  assert.match(href, /f=direction:in:owed_to_me/);
+  assert.ok(!href.includes('%20'), 'a URL carried a spoken value with spaces in it');
+});
+
+test('a dated clause survives the trip, and a negation becomes not-in', () => {
+  /* THE WORD, NOT THE DAY IT RESOLVES TO. `+90d` travels; `2026-12-06` is the window frozen at the
+     moment the link was rendered, and a bookmark to "renews in 90 days" that means a fixed December
+     afternoon is a bookmark that quietly stops answering its own question. The chip parser hands it
+     back to `compile`, which resolves it against the record's clock on arrival. */
+  const dated = registerHref('services', 'renews before +90d');
+  assert.match(dated, /f=renews:before:%2B90d/, 'the + did not survive encoding');
+
+  /* NOT the enum's complement: the complement is only writable while the field's values are fixed,
+     and a URL that lists them breaks the day a pack adds one. */
+  const negated = registerHref('services', 'state is not cancelled');
+  assert.match(negated, /f=state:not-in:cancelled/);
+});
+
+test('a predicate it could not read opens the register UNFILTERED, and does not pretend', () => {
+  /* The alternative is a URL narrowed by the half of the sentence that parsed — a list that looks
+     filtered and is not, which is the one failure `compile` exists to prevent. */
+  const href = registerHref('obligations', 'state is open, ackamarackus');
+  assert.equal(href, '/r/obligations');
+  assert.equal(registerHref('obligations', undefined), '/r/obligations');
 });

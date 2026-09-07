@@ -10,9 +10,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { page, pages } from './api.ts';
+import { applyFilters, page, pages, type Filter } from './api.ts';
 import { PAGES, REGISTERS, ROWS } from './data.ts';
 import { fill, resolvePages, slugify } from './pages.ts';
+import { registerHref } from './where.ts';
 import type { PageDecl } from './schema.ts';
 
 const projects = () => Object.values(pages()).filter((p) => p.param?.register === 'things');
@@ -162,4 +163,67 @@ test('a declared page is untouched, and a template never replaces one', () => {
     if (was === undefined) delete rows[1]!.fields[title];
     else rows[1]!.fields[title] = was;
   }
+});
+
+/* ── a block that is showing a slice, and the way to the rest ────────────── */
+
+/** The register route's own reading of `?f=` chips, verbatim, so this proves the round trip. */
+const chipsOf = (href: string): Filter[] =>
+  new URL(href, 'https://x').searchParams.getAll('f').map((raw) => {
+    const [field = '', op = 'is', values = ''] = raw.split(':');
+    return { field, op, values: values.split(',').map(decodeURIComponent) };
+  });
+
+const cut = () =>
+  Object.keys(pages()).flatMap((slug) =>
+    (page(slug)?.blocks ?? [])
+      .filter((b) => b.register && b.total > b.entries.length)
+      .map((b) => ({ slug, block: b })),
+  );
+
+test('A BLOCK THAT DRAWS A SLICE IS A BLOCK THAT SAYS SO', () => {
+  /* `limit:` is a reading cap and every page in the seed declares one. Nothing rendered admitted it:
+     `/p/marlow-co`'s Money drew 8 of that client's 12 obligations under a heading that reads as the
+     complete answer. This test does not assert a sentence — the route renders that — it asserts the
+     two numbers the sentence is made of are both present and both true. */
+  const slices = cut();
+  assert.ok(slices.length > 0, 'nothing in the seed truncates, so the surface cannot be checked here');
+
+  for (const { slug, block } of slices) {
+    assert.equal(block.rows.length, block.entries.length, `${slug}: the drawn rows and the drawn entries disagree`);
+    assert.equal(block.entries.length, block.limit ?? 50, `${slug}: a block was cut somewhere other than its limit`);
+    /* THE TOTAL IS THE WHOLE ANSWER, not the page. A count that is also capped is a count that
+       cannot tell a short list from a narrow one, which is the reason the line exists at all. */
+    assert.ok(block.total > block.entries.length, `${slug}: total did not survive the cut`);
+    assert.equal(block.total, block.matched.length, `${slug}: total is not what the predicate admitted`);
+  }
+});
+
+test('and the register it points at holds every row the block did not draw', () => {
+  /* THE LADDER, END TO END. The line says "8 of 12" and offers the register; if that address does
+     not open those twelve rows the line is worse than saying nothing, because it has now promised
+     somewhere to find them. The block's predicate goes out as `?f=` chips and comes back through
+     the register route's own parser and the same evaluator. */
+  for (const { slug, block } of cut()) {
+    const href = registerHref(block.register!, block.where);
+    const opened = applyFilters(block.register!, ROWS[block.register!] ?? [], chipsOf(href));
+    assert.equal(
+      opened.length,
+      block.total,
+      `${slug}: "${block.heading}" says ${block.total} rows and its link opens ${opened.length}`,
+    );
+    const drawn = new Set(block.entries.map((e) => e.seq));
+    for (const seq of drawn)
+      assert.ok(opened.some((e) => e.seq === seq), `${slug}: a row the block drew is not in the list it links to`);
+  }
+});
+
+test('an unfiltered block still links to its register, and every link is one the app can route', () => {
+  for (const slug of Object.keys(pages()))
+    for (const block of page(slug)?.blocks ?? []) {
+      if (!block.register) continue;
+      const href = registerHref(block.register, block.where);
+      assert.match(href, /^\/r\/[a-z_]+(\?|$)/, `${slug}: ${href} is not a register address`);
+      assert.ok(!href.includes(' '), `${slug}: a raw space reached a URL`);
+    }
 });

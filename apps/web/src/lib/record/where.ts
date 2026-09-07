@@ -319,3 +319,34 @@ export function matches(entry: Entry, w: Where, now: number): boolean {
  * "state has no value done" fixes it on the next call.
  */
 export const explain = (w: Where): string[] => w.bad;
+
+/**
+ * The register, opened at the rows this predicate admitted.
+ *
+ * ONE PREDICATE, TWO PRODUCTS: the rows a surface draws, and the address of the rest of them. A
+ * metric tile has derived its link this way since the day a tile counting five states was found
+ * linking to a list of three — but a PAGE BLOCK did not, so a block headed "Money", filtered to
+ * `state is open, direction is owed to me`, printed that sentence and then linked to the whole of
+ * Obligations. The reader is told the list is a slice and handed a door to somewhere else.
+ *
+ * A PREDICATE IT COULD NOT READ OPENS THE REGISTER UNFILTERED, and does not pretend otherwise.
+ * Dropping the clause it failed on would produce a URL that filters by the half it understood —
+ * a list that looks narrowed and is not, which is the failure `compile` exists to prevent. The
+ * surface that owns the predicate refuses in its own words; this returns the honest wide address.
+ */
+export function registerHref(register: string, where: string | undefined): string {
+  const w = compile(register, where);
+  if (w.bad.length) return `/r/${register}`;
+
+  /* A NEGATION BECOMES `not-in` RATHER THAN THE ENUM'S COMPLEMENT: the complement is only writable
+     when the field declares its values, and a URL that silently lists them is a URL that breaks the
+     day a pack adds one. */
+  const chips = w.clauses.map((c) =>
+    'values' in c
+      ? `${c.field}:${c.op === 'is not' ? 'not-in' : 'in'}:${c.values
+          .map((v) => encodeURIComponent(declaredValue(register, c.field, v)))
+          .join(',')}`
+      : `${c.field}:${c.op}:${encodeURIComponent(c.day)}`,
+  );
+  return chips.length ? `/r/${register}?${chips.map((f) => `f=${f}`).join('&')}` : `/r/${register}`;
+}

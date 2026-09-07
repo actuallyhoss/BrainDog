@@ -20,6 +20,7 @@
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
   import { draw, saidPlainly } from '$lib/record/blocks.ts';
+  import { registerHref } from '$lib/record/where.ts';
   import type { PageBlock, PageDecl } from '$lib/record/schema.ts';
   import { PAGES } from '$lib/record/data.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -95,6 +96,23 @@
    * carry — and it was the admission that the name should never have been typed into the predicate.
    * A resolved page knows its own parameter, so the comparison is exact.
    */
+  /**
+   * WHERE THE BLOCK'S ROWS LIVE, at the block's own predicate.
+   *
+   * The provenance link and the `o` key both went to `/r/<register>` bare. So a block headed
+   * "Money", printing `Filter state is open, direction is owed to me` directly above the link, sent
+   * you to all 214 obligations — the reader is shown a filter, told the list is a slice, and handed
+   * a door to a different set of rows. The register reads exactly these chips from the URL and the
+   * metric tiles have used the same builder for months; the page blocks were the surface that never
+   * asked for it.
+   *
+   * `registerHref` returns the bare register when it could not read the predicate, which is the
+   * honest answer: a URL narrowed by the half of a sentence that parsed is a list that looks
+   * filtered and is not.
+   */
+  const openHref = (block: { register?: string | undefined; where?: string | undefined }): string | null =>
+    block.register ? registerHref(block.register, block.where) : null;
+
   const param = $derived(result?.page.param);
   const whereOf = (block: { register?: string | undefined; where?: string | undefined }): string =>
     saidPlainly(
@@ -233,10 +251,11 @@
       cursor = Math.max(cursor - 1, 0);
       focusBlock();
     } else if (e.key === 'o') {
-      const register = blocks[cursor]?.block.register;
-      if (register) {
+      const held = blocks[cursor]?.block;
+      const to = held ? openHref(held) : null;
+      if (to) {
         e.preventDefault();
-        void goto(`/r/${register}`);
+        void goto(to);
       }
     } else if (e.key === 'y') {
       const slotIndex = blocks[cursor]?.slot.i;
@@ -523,7 +542,7 @@
                      filtered and may take a block of four rows for the whole register. But the
                      clause that names the page you are already on is dropped: "thing is Kiln" under
                      a heading on the Kiln page is the one fact the reader cannot be missing. -->
-                <a class="block-source" href="/r/{block.register}">
+                <a class="block-source" href={openHref(block) ?? `/r/${block.register}`}>
                   {REGISTERS[block.register]?.name ?? block.register}
                   <!-- AND IT SAYS THAT IT IS A FILTER. `/v/<view>` labels the identical string
                        `FILTER`, so the word existed and the page blocks did not use it — leaving an
@@ -561,6 +580,31 @@
                   />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}
+
+            <!--
+              AND IT SAYS THAT IT IS A SLICE.
+
+              `limit:` cuts the rows a block draws and nothing rendered ever admitted it. Six blocks
+              in the seed are cut today — `/p/marlow-co`'s Money shows 8 of that client's 12
+              obligations, `/p/estate`'s timeline 8 of 11, `/p/work`'s steps 5 of 8 — each under a
+              heading that reads as the complete answer to the question it asks. Invisible at nine
+              rows and a lie at four hundred.
+
+              ONE LINE FOR ALL SIXTEEN KINDS, and not the `table` primitive's own `cap` prop: four of
+              the six cut blocks are `timeline`, `steps` and `spec`, so a fix inside `Table` would
+              have covered a third of them and left the rest silent in a way that looks deliberate.
+
+              IT IS A `status`, NOT AN ASIDE. The count changes when the rows do, and somebody who
+              cannot see the list end short is exactly who needs to be told it did.
+            -->
+            {#if !drawn.refusal && block.total > block.entries.length}
+              {@const to = openHref(block)}
+              <p class="block-slice" role="status">
+                {copy.ofWhichDrawn(block.entries.length, block.total)}{#if to}
+                  &nbsp;— <a href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
+                {/if}
+              </p>
+            {/if}
           </div>
         {/if}
       {/each}
@@ -594,6 +638,17 @@
      that actually needs a measure is running text, and `.measure` already caps that at 72ch inside
      the block that has it. So the page gets the width a dashboard can use and prose keeps its own
      limit, rather than every block on every page paying for the one that reads like a paragraph. */
+  /* The same weight and colour as the register grid's own cap line, because it is the same
+     sentence about the same thing seen from the page rather than from the list. Left-aligned rather
+     than centred: it sits under content of every shape here, and a centred line under a two-row
+     `spec` block reads as a caption for it. */
+  .block-slice {
+    margin: 0;
+    padding-block-start: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
   .page {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
