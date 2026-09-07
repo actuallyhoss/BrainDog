@@ -28,6 +28,25 @@
  * never reach a reader, which satisfies a rule about the first time a word appears on a screen. A
  * definition surface for a word nobody sees would be the glossary the rule forbids.
  *
+ * AND WHERE EACH CLAUSE SITS IS A JUDGEMENT, SO HERE IS THE ARGUMENT AND THE OBJECTION.
+ *
+ * `19 §6` asks for the definition "the first time they appear on a screen" AND "in the sentence
+ * that needs it", and for two of these four the two halves point at different places. `list` and
+ * `page` first APPEAR in the rail — a section header reading LISTS, and a line reading "1 suggested
+ * page." — on every route including the first one anybody sees. The clauses are not there. They are
+ * on the first list you open and the first page you open, which is the first time you are looking
+ * at the THING rather than at the word for it.
+ *
+ * A verification pass filed this as a defect and it is a fair reading: on `/`, with cookies
+ * cleared, nothing is defined. The counter-argument, and the reason this stands: a rail section
+ * header is a label and not a sentence, so there is no sentence there for the clause to be in; and
+ * "1 suggested page." is a count of a thing you have not seen, which is the worst place in the
+ * product to first explain what one is. Teaching a word in 200px of chrome, before it refers to
+ * anything on screen, is the tour the same section forbids.
+ *
+ * What is NOT defensible is describing this as "the first time it is seen". It is the first time it
+ * is USED.
+ *
  * ONCE PER DEVICE, IN THE COOKIE. "Never again" is a fact about a person, so it has to survive a
  * reload; `50 §4.7`'s preference set has no slot for it, and every other store this product has is
  * either the URL (which would put "have you read this" in a shareable address) or component state

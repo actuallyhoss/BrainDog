@@ -100,8 +100,12 @@ function seededLayout() {
  * The a11y gate's `intent-without-glyph` negative, and it cannot be a fixture tree either.
  *
  * `13 §5.1`'s rule is about what reaches the DOM, so the only place it can be checked is a rendered
- * page. `BRAINDOG_GATE_SEED=intent` prepends a `div[data-intent="bad"]` with no name for the
- * intent — which is precisely the shape four components were shipping — and the gate must go red.
+ * page. `BRAINDOG_GATE_SEED=intent` prepends an `a[data-intent="bad"]` with no name for the intent
+ * and the gate must go red.
+ *
+ * AN ANCHOR BECAUSE A `div` PROVED NOTHING. The gate's exemption was written `button, a[href], …`,
+ * so every phone card — each one an anchor — was exempt, and the negative was seeding the one shape
+ * that could not slip through. The rule looked tested and covered a third of what it claimed.
  */
 function seededIntent() {
   if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
@@ -114,7 +118,7 @@ function seededIntent() {
     env: { ...process.env, BRAINDOG_GATE_SEED: 'intent' },
   });
   const said = `${r.stdout}${r.stderr}`;
-  if (r.status === 0 || !said.includes('div.seeded[bad]')) {
+  if (r.status === 0 || !said.includes('a.seeded[bad]')) {
     console.error('  a11y: PASSED an intent with no glyph — colour is carrying meaning alone and nothing sees it.');
     failed.push('a11y');
   } else {

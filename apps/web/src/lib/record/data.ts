@@ -177,9 +177,16 @@ export const PACKS: PackInfo[] = [
   { id: 'people', name: 'People', blurb: 'Collaborators, contractors, accountants.', version: '1.0.3', installed: true, registers: ['people'], pages: [], author: 'braindog' },
   { id: 'work', name: 'Work', blurb: 'Tasks, tracks, dates.', version: '1.1.0', installed: true, registers: ['tasks'], pages: ['work'], author: 'braindog' },
   { id: 'portfolio', name: 'Portfolio', blurb: 'The things you run, and the plan for each.', version: '1.0.0', installed: true, registers: ['things'], pages: [], author: 'braindog' },
-  { id: 'agents', name: 'Agents', blurb: 'Learnings, skills, credentials — what each tool is for, and what it opens.', version: '0.9.2', installed: false, registers: ['learnings', 'skills', 'credentials'], pages: ['agents'], author: 'braindog' },
-  { id: 'freelancer-uk', name: 'Freelancer UK', blurb: 'Invoices with VAT, statutory interest, and the payment terms clause.', version: '2.0.1', installed: false, registers: ['invoices', 'clients'], pages: ['invoicing'], author: 'k.marsh', stars: 214 },
-  { id: 'type-foundry', name: 'Type foundry', blurb: 'Licences, cuts, and who is allowed to use what.', version: '0.4.0', installed: false, registers: ['licences', 'cuts'], pages: ['licensing'], author: 'a.brandt', stars: 37 },
+  { id: 'agents', name: 'Agents', blurb: 'Learnings, skills, credentials — what each tool is for, and what it opens.', version: '0.9.2', installed: false, registers: ['learnings', 'skills', 'credentials'], pages: ['agents'], author: 'braindog', titles: { learnings: 'Learnings', skills: 'Skills', credentials: 'Credentials', agents: 'Agents' } },
+  /* IT WANTS TO SIT ABOVE YOUR MONEY PAGE, AND IT DOES NOT GET TO. `04 §4`'s worked example is this
+     pack, and the record had no way to hold the fact — so the diff's `CHANGES` section was behind a
+     condition that could never be true and the three sentences about it rendered nowhere. A trust
+     screen that structurally cannot show the refusal it makes is a trust screen with a hole. */
+  { id: 'freelancer-uk', name: 'Freelancer UK', blurb: 'Invoices with VAT, statutory interest, and the payment terms clause.', version: '2.0.1', installed: false, registers: ['invoices', 'clients'], pages: ['invoicing'], author: 'k.marsh', titles: { invoices: 'Invoices', clients: 'Clients', invoicing: 'Invoicing' }, stars: 214, moves: [{ page: 'money', from: 10, to: 12 }] },
+  /* AND THIS ONE COLLIDES. `services` is the Estate pack's, and two packs owning one name is the
+     failure `02 §1` builds the whole additive story on — so it is a CONFLICT rather than a change,
+     and the install is refused rather than merged. */
+  { id: 'type-foundry', name: 'Type foundry', blurb: 'Licences, cuts, and who is allowed to use what.', version: '0.4.0', installed: false, registers: ['licences', 'cuts', 'services'], pages: ['licensing'], author: 'a.brandt', titles: { licences: 'Licences', cuts: 'Cuts', licensing: 'Licensing' }, stars: 37, conflicts: ['services'] },
 ];
 
 /* ── what happened while you were away ───────────────────────────────────

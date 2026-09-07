@@ -122,7 +122,11 @@
                  better: the reader cannot notice the list is short by comparing it against anything.
                  They get the two numbers and no link, because there is nowhere they may go. -->
             {#if !drawn.refusal && block.total > block.shown}
-              <p class="block-slice" role="status">{copy.ofWhichDrawn(block.shown, block.total)}</p>
+              <p class="block-slice" role="status">
+                {block.source === 'forecast.runway'
+                  ? copy.ofWhichWalked(block.shown, block.total, block.horizon ?? 180)
+                  : copy.ofWhichDrawn(block.shown, block.total)}
+              </p>
             {/if}
           </section>
         {/if}

@@ -391,6 +391,9 @@ export const copy = {
      the refusal is visible rather than silent, and then it does not happen. */
   diffNavKept: 'shown, not applied. Your sidebar is yours',
   diffUnread: 'This record has not read the pack yet, so the shape of each arrives with the file.',
+  /* `02 §1`: a name another pack ships is a name this one cannot own, and the whole install is one
+     transaction — so it does not half-apply. */
+  diffRefused: 'Installing is refused while a name collides. Nothing would be applied.',
   packBlurb: 'A pack adds ready-made lists and pages. Readable text; nothing runs.',
 
   /* settings */
@@ -502,6 +505,17 @@ export const copy = {
   ofWhichDrawn: (drawn: number, total: number) =>
     `Showing ${drawn.toLocaleString('en')} of ${total.toLocaleString('en')}`,
   openTheRest: (register: string) => `Open ${register} for the rest`,
+  /**
+   * THE CASH WALK COUNTS MOVEMENTS, AND THERE IS NOWHERE TO OPEN.
+   *
+   * The general sentence says "Showing 12 of 69" and the comment above it promises a rung — but a
+   * walk is computed from several lists at once, so there is no single one to open, and the block
+   * draws THIRTEEN rows: the twelve movements plus the opening balance, which is a header wearing a
+   * row's clothes. A reader who counted got a number the line did not use. This names the unit, so
+   * the extra line is not a discrepancy, and promises nothing it cannot give.
+   */
+  ofWhichWalked: (drawn: number, total: number, days: number) =>
+    `The next ${drawn.toLocaleString('en')} of ${total.toLocaleString('en')} movements over ${days} days`,
 
   /* the keymap sheet */
   keymap: 'Keyboard',

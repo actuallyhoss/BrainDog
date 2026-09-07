@@ -137,13 +137,27 @@
             </span>
             <span class="line-when">
               <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>{copy.installDiff}</Button>
+              <!-- A PACK THAT COLLIDES CANNOT BE INSTALLED, and the button says so rather than
+                   promising a transaction that would be refused. `02 §5` warns that a disabled
+                   control "invites a question the UI cannot answer" — this one is answered directly
+                   below it, in the CONFLICTS section the button points at, which is the same shape
+                   the row form uses for its own disabled submit. -->
               <Button
                 weight="quiet"
+                disabled={Boolean(pack.conflicts?.length)}
+                aria-describedby={pack.conflicts?.length ? `conflict-${pack.id}` : undefined}
                 onclick={() =>
                   toasts.push(copy.notWritten(`${pack.name} would be installed in one transaction, after this plan`), { intent: 'warn' })}
               >{copy.install}</Button>
             </span>
           </div>
+          <!-- THE REASON IS BESIDE THE BUTTON, NOT INSIDE THE DISCLOSURE. `02 §5`'s objection to a
+               disabled control is that it "invites a question the UI cannot answer" — which is
+               exactly what it would be if the answer lived behind a panel that is closed by
+               default. One sentence, always, next to the control it disables. -->
+          {#if pack.conflicts?.length}
+            <p class="pack-refused" id="conflict-{pack.id}">{copy.diffRefused}</p>
+          {/if}
           {#if diff === pack.id}{@render plan(pack)}{/if}
         </li>
       {/each}
@@ -303,6 +317,12 @@
   .diff-detail {
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  .pack-refused {
+    margin: 0 0 var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .diff-note {

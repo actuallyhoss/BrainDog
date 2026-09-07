@@ -349,10 +349,17 @@ export function draw(
    * on day one, which is exactly when a register is empty". It did render on day one. Under the
    * wrong kind, with the search glyph, and with nothing to do about it.
    *
-   * AND THE AUTHOR'S SENTENCE IS WRONG ON THAT DAY, not merely less specific. "You owe nobody
-   * anything" is a claim about a filter that ran; on a record whose Obligations list has never held
-   * a row, no filter ran and the sentence is a statement about nothing. A list with no rows in it
-   * cannot have matched, so which fact is true is decided by the count and not by the declaration.
+   * AND A FILTER'S SENTENCE IS ABOUT A FILTER THAT RAN. "Nothing owed either way in the next
+   * ninety days" is a claim about a window; on a record whose Obligations list has never held a
+   * row, no window was searched and the sentence describes a search that did not happen. A list
+   * with no rows in it cannot have matched, so which fact is true is decided by the count and not
+   * by the declaration.
+   *
+   * THE UNFILTERED CASE IS DIFFERENT AND KEEPS ITS WORDS, and an earlier version of this comment
+   * used a filtered block's sentence to argue against them, which was the wrong example: "You owe
+   * nobody anything" belongs to a block filtered to `direction is owed to me, state is open or
+   * part`, and it takes the derived title precisely because it is filtered. Over the WHOLE list,
+   * the same sentence is simply true — there are no obligations, so you owe nobody anything.
    *
    * THE AUTHOR STILL WINS THE CASE THEY WROTE IT FOR: rows exist and none of them matched.
    */

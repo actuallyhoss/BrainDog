@@ -325,7 +325,43 @@ export type PackInfo = {
   pages: readonly string[];
   author: string;
   stars?: number;
+  /**
+   * A page of YOURS this pack's nav order would move, and never does.
+   *
+   * `04 §4`: "The commonest way an extension ecosystem degrades a product is by quietly rearranging
+   * the navigation, so a pack does not get to … A pack may place a page it owns; it may never move
+   * yours." The move is SHOWN and then ignored — which needs somewhere to be shown from, and there
+   * was nowhere: the diff had a `CHANGES` section behind a condition that could not be true, so
+   * three sentences about the most important refusal this screen makes rendered nowhere.
+   */
+  moves?: readonly { page: string; from: number; to: number }[];
+  /** A name this pack declares that the record already has. `04 §3`'s `CONFLICTS`. */
+  conflicts?: readonly string[];
+  /**
+   * What the pack calls the things it declares, for a pack this record has not installed.
+   *
+   * `04 §3`'s worked diff prints `register.invoices  11 fields` for a pack that is NOT installed —
+   * the plan is computed by READING the pack, so the shape is known before anything is applied, and
+   * the Kennel index carries it. Without this the diff falls back to the id, which is the same leak
+   * it was rewritten to remove: `learnings`, `skills`, `credentials` in front of somebody deciding
+   * whether to trust a stranger's file.
+   */
+  titles?: Readonly<Record<string, string>>;
 };
+
+/**
+ * The kinds that REDUCE, and are therefore handed the whole answer rather than a page of it.
+ *
+ * `bar` groups and counts, `chips` groups and counts, `gauge` sums against a target: each one is
+ * arithmetic over every row the predicate admitted, because a sum of the first page is a wrong
+ * number rather than a short list. `limit:` cuts their GROUPS, never their rows.
+ *
+ * IT IS HERE, IN THE FILE THAT IMPORTS NOTHING, because two files need it and neither may import
+ * the other: `blocks.ts` is where the three functions read `matched`, and `api.ts` is where the
+ * count of what a block draws is computed. Those two disagreeing is a slice line saying "Showing 5
+ * of 38" over a chart with all thirty-eight rows in it.
+ */
+export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge']);
 
 export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 

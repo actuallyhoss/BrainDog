@@ -629,7 +629,9 @@
             {#if !drawn.refusal && block.total > block.shown}
               {@const to = openHref(block)}
               <p class="block-slice" role="status">
-                {copy.ofWhichDrawn(block.shown, block.total)}{#if to}
+                {block.source === 'forecast.runway'
+                  ? copy.ofWhichWalked(block.shown, block.total, block.horizon ?? 180)
+                  : copy.ofWhichDrawn(block.shown, block.total)}{#if to}
                   &nbsp;— <a href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
                 {/if}
               </p>

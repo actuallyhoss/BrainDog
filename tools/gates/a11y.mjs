@@ -107,6 +107,10 @@ const STATES = [
      which is why the state was unreachable in the product for as long as it was. */
   { name: 'empty: no results', route: '/r/obligations?q=zzzzz', keys: [], expect: '.empty[data-kind="no-results"]' },
   { name: 'empty: not found', route: '/r/nope', keys: [], expect: '.empty[data-kind="error"]' },
+  /* A TOAST, WHICH IS ONE KEYSTROKE AWAY AND WAS IN FRONT OF NO SCENARIO. The list covered sheets,
+     menus, the palette, arrange mode and two empty states; the surface that appears after almost
+     every action in this mock-up appeared in none of them. `e` on a focused row raises one. */
+  { name: 'toast', route: '/r/obligations', keys: ['e'], expect: '.toast' },
 ];
 
 const TYPES = {
@@ -214,8 +218,15 @@ for (const scheme of ['dark', 'light']) {
          reason the layout gate's is: the thing under test is a real browser over a real build. */
       if (process.env.BRAINDOG_GATE_SEED === 'intent')
         await page.evaluate(() => {
-          const el = document.createElement('div');
+          /* AN ANCHOR, NOT A `div`, and that is the whole of what the negative is worth.
+             
+             The first version seeded a bare `<div>`, which the old exemption did not cover — so the
+             gate proved itself against the one shape that could not slip through, while every phone
+             card, being `<a class="card" href=…>`, was exempt. A negative that cannot fail the way
+             the rule fails is a negative that certifies nothing. */
+          const el = document.createElement('a');
           el.className = 'seeded';
+          el.href = '#seeded';
           el.dataset.intent = 'bad';
           el.textContent = 'a meaning carried by colour and nothing else';
           document.getElementById('main')?.prepend(el);
@@ -246,16 +257,26 @@ for (const scheme of ['dark', 'light']) {
        * inside the element. That is the shape every primitive that got it right already emits, so
        * the rule is "do what `List` does" rather than a new contract.
        *
-       * WHAT IS EXEMPT, and the exemption is narrow: a control whose own text is the meaning. A
-       * button reading `Uninstall` or `Stop the run` is not telling you it is destructive with
-       * colour — it is telling you with the verb, and the colour agrees with it. Same for a count:
-       * `3` beside `Decide` is a number, and the tint is emphasis on a fact already written out.
-       * Everything else — a row, a card, a cell, a panel, a chip — is a colour and nothing else.
+       * WHAT IS EXEMPT: an element whose own TEXT is the meaning, and the list is named rather
+       * than described. A `.btn` reading `Uninstall` or `Stop the run` is not telling you it is
+       * destructive with colour — it is telling you with the verb. A `.count` or `.badge` is a
+       * number, and the tint is emphasis on a fact already written out. A `.toast` is a whole
+       * sentence in a live region: "Nothing was written" says what happened, and the amber agrees.
+       *
+       * IT WAS WRITTEN AS `button, a[href], .count, .badge` AND EXEMPTED THE SURFACE IT WAS FOR.
+       * Every phone card is `<a class="card" href=… data-intent=…>`, so all sixteen rows on
+       * `/r/obligations` at 390 were exempt — one of the four components the rule was written to
+       * protect, and stripping every glyph out of them left the gate green. Being a link is not
+       * being a sentence. The exemption is by class now, and each class is here with its reason.
+       *
+       * The guard was also written `el.closest(sel)?.contains(el) && el.matches(sel)`, and an
+       * element always contains itself, so the first half could never decide anything. Dead code
+       * inside the test that decides whether the rule applies.
        */
       const unnamed = await page.evaluate(() => {
         const out = [];
         for (const el of document.querySelectorAll('[data-intent]')) {
-          if (el.closest('button, a[href], .count, .badge')?.contains(el) && el.matches('button, a[href], .count, .badge')) continue;
+          if (el.matches('.btn, .count, .badge, .toast')) continue;
           if (el.querySelector('[role="img"][aria-label]')) continue;
           /* A NESTED INTENT IS ONE INTENT. `Block` puts `data-intent` on the figure AND on its own
              figcaption; the glyph is in the caption, so the figure is named through it. */

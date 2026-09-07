@@ -42,6 +42,7 @@ import { compile, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { findingsFrom } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
+import { REDUCES } from './schema.ts';
 import type { Entry, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 /**
@@ -1011,13 +1012,17 @@ export function packDiff(pack: PackInfo): PackDiff {
   const adds: PackDiff['adds'] = [];
 
   for (const id of pack.registers) {
+    /* A NAME THAT COLLIDES IS NOT AN ADD. It is the reason the install does not happen, and it has
+       its own section; listing it under ADDS as well — with the EXISTING list's field count, since
+       that name resolves — would say the pack brings you a Services you already have. */
+    if (pack.conflicts?.includes(id)) continue;
     const decl = REGISTERS[id];
     adds.push(
       decl
         ? { kind: 'list', name: decl.name, detail: `${decl.fields.length} ${decl.fields.length === 1 ? 'field' : 'fields'}` }
         /* THE KIND IN WORDS WHEN THERE IS NO COUNT, because the glyph beside it is decorative and a
            screen reader would otherwise hear three bare nouns with nothing saying which is which. */
-        : { kind: 'list', name: id, detail: 'a list' },
+        : { kind: 'list', name: pack.titles?.[id] ?? id, detail: 'a list' },
     );
   }
 
@@ -1035,16 +1040,26 @@ export function packDiff(pack: PackInfo): PackDiff {
               decl.nav ? `${decl.nav.section} section` : 'not in your sidebar',
             ].join(' · '),
           }
-        : { kind: 'page', name: id, detail: 'a page' },
+        : { kind: 'page', name: pack.titles?.[id] ?? id, detail: 'a page' },
     );
   }
 
-  /* NO PACK IN THIS RECORD MOVES A PAGE IT DOES NOT OWN, so there is nothing to show and the line
-     is absent rather than printed empty. The shape is here because `04 §4` says the day one tries,
-     the move is shown and then ignored — and a diff with nowhere to put that is a diff that would
-     hide it. */
-  const changes: string[] = [];
-  const conflicts: string[] = [];
+  /* `04 §4`: a pack may place a page it OWNS and may never move yours, and an update that would is
+     shown and then ignored. Named by title, because the reader is being asked about their own
+     sidebar rather than about a declaration. */
+  const changes = (pack.moves ?? []).map((m) => {
+    const decl = PAGES[m.page];
+    return `${decl?.title ?? m.page} would move from ${m.from} to ${m.to} in the ${decl?.nav?.section ?? 'sidebar'} section`;
+  });
+
+  /* A NAME THIS RECORD ALREADY HAS. `02 §1`: a register the kernel or another pack ships is a name
+     no pack can own, and the install is refused rather than merged — so this is the one section on
+     the screen that means "you cannot have this", not "here is what would happen". */
+  const conflicts = (pack.conflicts ?? []).map((id) => {
+    const decl = REGISTERS[id];
+    const owner = PACKS.find((p) => p.installed && p.registers.includes(id));
+    return `${decl?.name ?? id} already exists${owner ? `, from ${owner.name}` : ''}`;
+  });
 
   return {
     adds,
@@ -1309,7 +1324,12 @@ function readBlock(b: PageBlock): BlockResult {
       matched,
       refusals: said,
       rows: toRows(register ?? '', entries, columns),
-      shown: entries.length,
+      /* A KIND THAT REDUCES DRAWS THE WHOLE ANSWER, so it is never showing a slice of it. `bar`,
+         `chips` and `gauge` iterate `matched` — every row — and apply `limit:` to their GROUPS; this
+         counted `entries` for every kind alike, so the first author to write `limit: 5` on a bar
+         over 38 rows would have got "Showing 5 of 38" above a chart containing all 38. No block in
+         the seed declares one, which is the only reason it is not on screen today. */
+      shown: REDUCES.has(b.kind) ? matched.length : entries.length,
       total: matched.length,
       drawn: b.drawn ?? drawnWhen(b),
       stale_at: new Date(NOW).toISOString(),

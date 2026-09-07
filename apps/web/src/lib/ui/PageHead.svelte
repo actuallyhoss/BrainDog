@@ -78,8 +78,8 @@
     </div>
     {#if count !== undefined}
       <p class="count num">
-        {count.toLocaleString('en')}{#if total !== undefined && total !== count}<span class="of">
-            of {total.toLocaleString('en')}</span
+        {count.toLocaleString('en')}{#if total !== undefined && total !== count}<span class="of"
+            >&nbsp;of {total.toLocaleString('en')}</span
           >{/if}
       </p>
     {/if}
@@ -166,11 +166,15 @@
     letter-spacing: -0.02em;
   }
 
-  /* THE SPACE IS A MARGIN AND NOT A TEXT NODE. Svelte collapses the whitespace at the start of the
-     span, so the count rendered `4of 38` — at every width, on every filtered register and every
-     saved view. A `&nbsp;` would work and would be a character in the accessible name; this is not. */
+  /* THE SPACE IS A CHARACTER, AND IT HAS TO BE.
+
+     Svelte collapses the whitespace at the start of the span, so this rendered `4of 38` at every
+     width on every filtered register. It was fixed with `margin-inline-start` and a comment arguing
+     that a `&nbsp;` "would be a character in the accessible name; this is not" — which is the
+     failure stated as the fix. The pixels were right and the TEXT still read `10of 38`: that is
+     what a screen reader announces, what find-in-page searches, and what a copy-paste carries. A
+     margin is not a separator; it is a gap where one should be. */
   .of {
-    margin-inline-start: 0.4ch;
     color: var(--dim);
     font-size: var(--t-sm);
   }
