@@ -180,6 +180,28 @@
   });
   const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns));
 
+  /**
+   * WHAT A READER CAN ORDER THE LIST BY, and what each direction is CALLED.
+   *
+   * `columns[0]` is the selection box — not a field, ordering nothing — so the sort list is
+   * everything after it. It offered "Select" as a sort key for exactly as long as it took to look.
+   *
+   * And the direction is named in the field's own terms. A column header can get away with an arrow
+   * because the arrow sits on the thing it orders; a chip in a sheet is read on its own, and
+   * "Due ↑ lowest first" is a sentence about a date that nobody says. `19 §9`'s rule is that the
+   * product speaks the reader's words, and the reader's word for an ascending day is *oldest*.
+   */
+  const sortable = $derived(columns.slice(1));
+
+  const wayOf = (field: string): readonly [string, string] => {
+    if (field === 'seq') return [copy.firstAdded, copy.lastAdded];
+    const type = decl?.fields.find((f) => f.id === field)?.type;
+    if (type === 'day' || type === 'instant') return [copy.oldestFirst, copy.newestFirst];
+    if (type === 'money' || type === 'int' || type === 'decimal' || type === 'duration')
+      return [copy.lowestFirst, copy.highestFirst];
+    return [copy.aToZ, copy.zToA];
+  };
+
   function archive(seq: number) {
     archived = new Set([...archived, seq]);
     toasts.push(copy.archived(`${id}#${seq}`), {
@@ -469,17 +491,35 @@
   let selected = $state(new Set<number>());
   let anchor = 0;
 
-  /* ⇧F10 and the context-menu key. The rect is taken at open and not tracked: a menu that follows
-     a scrolling row is a menu that walks away from the pointer. */
+  /**
+   * ⇧F10 and the context-menu key — AND, ON A PHONE, THE ⋯ ON A CARD.
+   *
+   * The rect is taken at open and not tracked: a menu that follows a scrolling row is a menu that
+   * walks away from the pointer.
+   *
+   * `menuRow` READ `result.entries[focus.row]`, which is the row the KEYBOARD is on. That is the
+   * same row on a keyboard and no row at all on a phone, where `focus.row` is 0 and nothing has
+   * moved it — so a card menu would have offered Peek, Copy and Archive for whichever row happened
+   * to be first. The menu is about a row, so it holds the row.
+   */
   let menuAt = $state<{ x: number; y: number; height: number } | null>(null);
+  let menuSeq = $state<number | null>(null);
   const menuOpen = $derived(menuAt !== null);
-  const menuRow = $derived(result.entries[focus.row]);
+  const menuRow = $derived(result.entries.find((e) => e.seq === menuSeq));
 
   function openRowMenu() {
     const el = document.querySelectorAll('.rowgroup .tr')[focus.row];
     if (!el) return;
     const r = el.getBoundingClientRect();
     menuAt = { x: r.x + 24, y: r.y, height: r.height };
+    menuSeq = result.entries[focus.row]?.seq ?? null;
+  }
+
+  /** The same menu, opened by touch from the card's own trailing control. */
+  function openCardMenu(seq: number, el: HTMLElement) {
+    const r = el.getBoundingClientRect();
+    menuAt = { x: r.x, y: r.y, height: r.height };
+    menuSeq = seq;
   }
 
   /** The Table speaks in row KEYS (`register#seq`), which is the id a row is addressed by. */
@@ -659,6 +699,19 @@
         <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
       {/if}
 
+      <!-- DISPLAY WAS A KEY AND NOTHING ELSE. `v` opens this sheet, the keymap sheet prints it, and
+           on a phone neither of those is reachable — so which columns you see and, now, what the
+           list is sorted by were both unreachable on the device where the table that carries them
+           is `display: none`. `19 §4` makes the key an accelerator OVER a visible control; there was
+           no control to accelerate.
+
+           IT IS IN THE BAR, which appears at eight rows. Below that there is nothing to sort and
+           nothing worth hiding, and the bar's own comment already argues why standing a strip of
+           controls over a list you can read at a glance is worse than not having them. -->
+      <Button weight="bare" onclick={() => (displayOpen = true)}>
+        <Icon name="settings" size="s" />{copy.display}
+      </Button>
+
       <!-- FOUR ROW VERBS OVER NOTHING TO ACT ON. Filtering to zero kept the strip, so a screen whose
            whole message is "38 rows, none matching" also offered to move, peek, open and archive a
            row that is not there. -->
@@ -767,7 +820,24 @@
            and the table is one `v` away. A saved view is the same list with a different predicate and
            had only the table, so the two behaved differently on one device — which is what made this
            a component rather than markup. -->
-      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} />
+      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} picked={selected}>
+        {#snippet action(e)}
+          <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
+               key: peek `p`, copy `y`, copy link `⇧Y`, archive `⌫`, select `x`. On the device
+               with no keyboard that made a register a list you could read and open and nothing
+               else — eight capabilities, none of them reachable. It opens the SAME `RowMenu` the
+               keyboard opens, so there is one set of verbs rather than a touch copy of them, and
+               each item still prints the key that replaces it. -->
+          <button
+            type="button"
+            class="card-more"
+            aria-label="{copy.rowMenu} #{e.seq}"
+            onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
+          >
+            <Icon name="more" size="s" />
+          </button>
+        {/snippet}
+      </RowCards>
 
       <!-- THE VERBS, above the rows they act on and nowhere else. It appears with the selection and
            goes with it: a permanently visible bulk bar is a row of disabled controls, which tells
@@ -924,6 +994,50 @@
   <Sheet bind:open={displayOpen} title={copy.display}>
     <p class="display-note">{copy.displayNote}</p>
     <div class="filter-groups">
+      <!--
+        SORT LIVED ON THE COLUMN HEADERS AND THE COLUMNS ARE GONE BELOW 640px.
+
+        Every header on this table is a sort button announcing `aria-sort`, which is the right place
+        for it and is why the drawer's old "Due sorts on the column" sentence was deleted rather than
+        corrected. But a card list has no headers, so on a phone the whole capability went with them:
+        thirty-eight obligations in whatever order the record returned, with no way to ask for the
+        oldest.
+
+        SAME PARAMETER, SAME TOGGLE. It writes `?sort=<field>:<dir>` and flips direction on the field
+        already sorted, exactly as `onsort` does — so a sort set here and a sort set by clicking a
+        header are the same fact, and the URL still carries it (`19 §5`: which rows you are looking
+        at, and in what order, is shareable).
+
+        Two rows or fewer and there is nothing to order, which is the same test the table applies
+        before it wires `onsort` at all.
+      -->
+      {#if result.entries.length > 1}
+        <fieldset class="filter-group">
+          <legend class="filter-legend">{copy.sortedBy}</legend>
+          <div class="filter-values">
+            {#each sortable as c}
+              {@const on = sort?.field === c.field}
+              {@const way = wayOf(c.field)}
+              <button
+                type="button"
+                class="filter-value"
+                data-on={on ? '' : undefined}
+                aria-pressed={on ? 'true' : 'false'}
+                onclick={() =>
+                  setParam((p) => p.set('sort', `${c.field}:${on && sort?.dir === 'asc' ? 'desc' : 'asc'}`))}
+              >
+                <!-- THE ARROW IS THE DIRECTION AND THE BOX IS THE STATE. A pressed chip that does
+                     not say which way it went is half an answer, and `13 §5.1` will not let the
+                     raised background carry it alone. -->
+                <span class="filter-box" aria-hidden="true">{on ? (sort?.dir === 'asc' ? '↑' : '↓') : ''}</span>
+                {c.label}
+                {#if on}<span class="locked">{sort?.dir === 'asc' ? way[0] : way[1]}</span>{/if}
+              </button>
+            {/each}
+          </div>
+        </fieldset>
+      {/if}
+
       <fieldset class="filter-group">
         <legend class="filter-legend">{copy.columns}</legend>
         <div class="filter-values">
@@ -950,6 +1064,11 @@
       <Button weight="primary" onclick={() => (displayOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
       {#if hidden.size > 0}
         <Button weight="bare" onclick={() => showAll()}>{copy.showAll}</Button>
+      {/if}
+      <!-- A SORT YOU CANNOT UNDO IS A TRAP. The only other way back to the register's own order was
+           Clear filters, which also throws away the search and every chip. -->
+      {#if sort}
+        <Button weight="bare" onclick={() => setParam((p) => p.delete('sort'))}>{copy.rowOrder}</Button>
       {/if}
     {/snippet}
   </Sheet>
@@ -987,6 +1106,13 @@
       <button class="mi" role="menuitem" type="button" onclick={() => void copyLink(seq)}>
         <Icon name="link" size="s" />
         <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
+      </button>
+      <!-- AND THE ONE VERB THAT UNLOCKS THE OTHER FOUR. Selection was `x` alone, so the bulk bar —
+           copy ids, set state, archive them — could not be reached at all without a keyboard. One
+           row selected is enough to make it appear, and the bar takes it from there. -->
+      <button class="mi" role="menuitem" type="button" onclick={() => toggleSelect(seq, false)}>
+        <Icon name="check" size="s" />
+        <span class="mi-name">{selected.has(seq) ? copy.deselect : copy.select}</span><Kbd keys="x" />
       </button>
       <hr class="mi-rule" />
       <button class="mi" role="menuitem" type="button" onclick={() => archive(seq)}>
@@ -1143,6 +1269,41 @@
   /* Above the rows it acts on, and only while there is a selection: a permanently visible bulk bar
      is a row of disabled controls, which tells you a thing exists and refuses to say why it will
      not work. It wraps rather than scrolls, so the verbs survive a phone. */
+  /**
+   * THE CARD'S TRAILING CONTROL, which exists only where the cards do.
+   *
+   * `--ctl-h` for the width and the card's own 56px for the height, so the target is the full height
+   * of the row it acts on rather than a 44px button with dead edges above and below it. `13 §10`:
+   * the card IS the row on this device, and half a row that does nothing when tapped is worse than
+   * no control.
+   */
+  @media (width < 640px) {
+    .card-more {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      inline-size: var(--ctl-h);
+      flex: none;
+      padding: 0;
+      background: none;
+      border: 0;
+      border-inline-start: 1px solid var(--line);
+      color: var(--dim);
+      cursor: pointer;
+    }
+
+    .card-more:hover {
+      background: var(--s2);
+      color: var(--ink);
+    }
+  }
+
+  @media (width >= 640px) {
+    .card-more {
+      display: none;
+    }
+  }
+
   .picked-bar {
     display: flex;
     flex-wrap: wrap;

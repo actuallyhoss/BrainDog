@@ -1003,7 +1003,12 @@ export const PAGES: Record<string, SeedPage> = {
         /* Grouped and counted by the first column, so this is six chips rather than fifteen. */
         columns: [{ field: 'kind' }],
         source: 'register.services',
-        empty: 'Nothing here yet.',
+        /* THE PHRASE `19 §6` QUOTES AS THE FAILURE, in this record's own first-party pack. "Nothing
+           here yet" names nothing, says nothing about what belongs, and reads identically whether a
+           filter missed or the list has never held a row — which is the collapse the section is
+           about. A block's `empty:` is the one sentence its author gets, so it says what would be
+           here. */
+        empty: 'Nothing to break down until a service is added.',
       },
       {
         kind: 'timeline',
@@ -1050,7 +1055,7 @@ export const PAGES: Record<string, SeedPage> = {
           { field: 'renews', label: 'Renews', width: '15ch', align: 'end' },
         ],
         order: [{ field: 'renews', dir: 'asc' }],
-        empty: 'Nothing here yet.',
+        empty: 'No services on the estate yet.',
         limit: 50,
       },
       {

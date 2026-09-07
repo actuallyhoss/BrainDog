@@ -446,7 +446,12 @@ export function draw(
  * everything it does not recognise exactly as written. A sentence it cannot improve is a sentence
  * it must not change: half a filter said in English and half in the dialect is worse than either.
  */
-const UNITS: Record<string, string> = { d: 'day', w: 'week', m: 'month', y: 'year' };
+/* THREE UNITS, WHICH IS WHAT THE GRAMMAR HAS. `34 §1.1`'s EBNF is `unit = "d" | "w" | "m"` and
+   `where.ts`'s `RELATIVE` reads exactly those, so `y` was a fourth spelling this table could print
+   and nothing in the product could compile — a sentence offered to a reader that the record refuses
+   the moment they use it. (The kernel's own parser does accept `y`, against the same EBNF; that is
+   filed as the kernel's bug, not answered by printing it here.) */
+const UNITS: Record<string, string> = { d: 'day', w: 'week', m: 'month' };
 
 /* `today`, `yesterday` and `tomorrow` are already English and pass through; `+90d` is not. That is
    the whole of `resolveDay`'s grammar and the whole of what a block ever writes. */
@@ -464,14 +469,18 @@ export function saidPlainly(register: string, where: string | undefined): string
     .split(',')
     .map((clause) => {
       const said = clause.trim();
-      const m = /^(.+?)\s+(is not|is|before|after|on)\s+(.+)$/i.exec(said);
+      /* FOUR OPERATORS, THE SAME FOUR `where.ts` READS. `on` was a fifth: this would render
+         `renews on today` as though it meant something, and `compile` answers "that is not
+         something a filter can say". A printer that speaks a wider language than the parser is a
+         printer that teaches people sentences the record will not take. */
+      const m = /^(.+?)\s+(is not|is|before|after)\s+(.+)$/i.exec(said);
       if (!m) return said;
       const [, rawField, verb, rest] = m as unknown as [string, string, string, string];
       const decl = REGISTERS[register]?.fields.find((f) => f.id.toLowerCase() === rawField.trim().toLowerCase());
       if (!decl) return said;
       const name = decl.label ?? decl.id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
       const values =
-        verb === 'before' || verb === 'after' || verb === 'on'
+        verb === 'before' || verb === 'after'
           ? spokenDay(rest)
           : rest
               .split(/\s+or\s+/)

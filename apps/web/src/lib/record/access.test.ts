@@ -9,6 +9,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { copy } from '../copy.ts';
 import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './data.ts';
@@ -112,6 +115,30 @@ test('and a method this deployment does not have is not offered', () => {
 });
 
 /* ── the five areas that were the same stub ──────────────────────────────── */
+
+test('every settings area the rail offers has a body written for it', () => {
+  /**
+   * THE STUB IS GONE, SO NOTHING RENDERS FOR AN AREA WITH NO BRANCH.
+   *
+   * The `{:else}` used to catch that case, and what it caught in practice was a URL naming no area
+   * at all — `/settings/banana` got `<h1>Banana</h1>` and a `no-data-yet` state asserting the
+   * feature exists and is merely unconfigured, while `/r/nope`, `/v/nope` and `/p/nope` all refused
+   * correctly. An unknown area is a refusal now, and with the costume removed a thirteenth row added
+   * to `AREAS` with no branch behind it would draw an empty column in silence.
+   *
+   * So the guard moved here, where it can say which id is missing. It reads the route as text for
+   * the reason the `keys` gate does: the thing being checked is a correspondence between two lists
+   * in one file, and there is no smaller way to hold it.
+   */
+  const route = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'),
+    'utf8',
+  );
+  const ids = [...route.matchAll(/\{ id: '([a-z-]+)', label:/g)].map((m) => m[1]!);
+  assert.ok(ids.length >= 12, `only ${ids.length} areas were found in the rail`);
+  for (const id of ids)
+    assert.ok(route.includes(`area === '${id}'`), `the rail offers ${id} and no branch draws it`);
+});
 
 test('EVERY SETTINGS AREA HAS SOMETHING TO SAY, and it is not the same something', () => {
   /* Seven of the twelve rendered one byte-identical sentence: "Nothing configured yet. This area is

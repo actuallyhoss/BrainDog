@@ -187,20 +187,66 @@
     list-style: none;
   }
 
+  /**
+   * COMPACT WAS A SMALLER GLYPH AND A SMALLER TITLE, AND NOTHING ELSE.
+   *
+   * `19 §6` Partial asks a block's empty state for "one line naming what belongs there, and the
+   * register link". This dropped the frame and shrank two things, and still drew the glyph, the
+   * title, the body and a full-weight button in a column — 243px per block. On `/p/money` over an
+   * empty Obligations list that is four of them, three verbatim identical, each ending in its own
+   * *Add the first row*: **996px of the same three sentences**, on the screen somebody sees the hour
+   * they install the product. The page did not shrink either — sixteen controls at thirty-eight rows
+   * and sixteen at zero.
+   *
+   * ONE ROW: glyph, sentence, and the action at the trailing edge. The body goes, because the body
+   * is the register's `holds:` sentence and it is already on the register's own screen — which is
+   * where the action leads, and where `19 §6` puts the full state. The agent line goes with it for
+   * the same reason: four copies of one prompt is not four times the help.
+   */
   .empty.compact {
-    padding: var(--sp-3) 0 var(--sp-2);
+    flex-direction: row;
+    align-items: center;
+    /* WRAPPING, because an `error` block keeps its lines and they are the content. One clause per
+       line, below the sentence they belong to, rather than run into it. */
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    max-inline-size: none;
+    padding: var(--sp-2) 0;
     background: none;
     border: 0;
   }
 
   .empty.compact .empty-glyph {
-    inline-size: 28px;
-    block-size: 28px;
-    margin-block-end: var(--sp-2);
+    flex: none;
+    inline-size: 20px;
+    block-size: 20px;
+    margin-block-end: 0;
   }
 
   .empty.compact .empty-title {
-    font-size: var(--t-md);
+    font-family: inherit;
+    font-size: var(--t-ui);
+    font-weight: 500;
+    letter-spacing: normal;
+  }
+
+  /* THE FRAME IS GONE AND SO IS THE COLUMN, so the parts that only made sense stacked go too. The
+     refusal lines stay: on an `error` block they are the whole content, and a block that cannot say
+     which clause it failed on is the silence this component exists to break. */
+  .empty.compact .empty-body,
+  .empty.compact .empty-agent,
+  .empty.compact .empty-prompt {
+    display: none;
+  }
+
+  .empty.compact .empty-actions {
+    margin-inline-start: auto;
+  }
+
+  .empty.compact .empty-lines,
+  .empty.compact .empty-query,
+  .empty.compact .empty-rid {
+    flex-basis: 100%;
   }
 
   .empty-body,

@@ -16,7 +16,8 @@
   import Button from '$lib/ui/Button.svelte';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { AUDIT, NOW, PAGES } from '$lib/record/api.ts';
+  import { AUDIT, NOW, PAGES, actorOf } from '$lib/record/api.ts';
+  import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
@@ -43,16 +44,6 @@
   };
 
   const kindOf = (k: string) => KIND[k] ?? { word: k.replace(/[.]/g, ' '), icon: 'doc' as IconName };
-
-  /**
-   * WHO DID IT, IN WORDS. `rule.renewal` and `rule.reply` are declaration ids, and this column is
-   * the answer to "who changed my record" — a question nobody asks in dotted notation. A person and
-   * an agent both arrive as a name and stay one.
-   */
-  const actorOf = (by: string): string => {
-    const rule = /^rule\.(.+)$/.exec(by);
-    return rule ? `${rule[1]!.replace(/[._]/g, ' ')} rule` : by;
-  };
 
   /**
    * WHAT IT WAS DONE TO. A spoken id stays a spoken id — `services#6` is the product's own way of
@@ -160,8 +151,31 @@
     </div>
   {/if}
 
+  <!--
+    THE SAME FIVE STATES EVERY OTHER LIST DRAWS, and this drew a grey sentence.
+
+    `/audit?by=codex&kind=entry.create` gave a header reading `0 of 8` and one line — "Nothing in
+    the log matches that." — which names neither the actor nor the kind. `19 §6` for `no-results`
+    says quote the query verbatim, and the register gets it exactly right on the same record:
+    `38 rows, none matching: zzzzz`, the term in a code chip, Clear filters inside the state.
+
+    AND THE OTHER HALF WAS UNREACHABLE. `grep -c "<Empty"` on this file was 0, so a log with nothing
+    in it — which is every record for about a minute — had the same sentence as a filter that missed:
+    `no-data-yet` and `no-results` collapsed, which `19 §6` calls the failure.
+  -->
   {#if shown.length === 0}
-    <p class="none">{copy.auditNone}</p>
+    <Empty
+      kind={AUDIT.length === 0 ? 'no-data-yet' : 'no-results'}
+      title={AUDIT.length === 0 ? copy.auditNone : copy.noneMatching(AUDIT.length, 'entries')}
+      query={AUDIT.length === 0
+        ? undefined
+        : [who ? actorOf(who) : '', what ? kindOf(what).word : ''].filter(Boolean).join(' · ')}
+      body={AUDIT.length === 0 ? copy.auditHolds : undefined}
+    >
+      {#snippet actions()}
+        {#if who || what}<Button href="/audit">{copy.clearFilters}</Button>{/if}
+      {/snippet}
+    </Empty>
   {/if}
 
   <ul class="ledger">
@@ -227,11 +241,6 @@
      320px screen — the layout gate caught it. Two rows of track still read as one control. */
   .bar :global(.segmented) {
     flex-wrap: wrap;
-  }
-
-  .none {
-    color: var(--dim);
-    font-size: var(--t-ui);
   }
 
   .page {

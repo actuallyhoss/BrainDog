@@ -89,7 +89,17 @@ export type Reading = {
   /** `null` when the metric could not be read; `refusals` says why. */
   value: number | null;
   shown: string;
+  /** How many rows the predicate matched. Zero of these is an answer. */
   rows: number;
+  /**
+   * How many rows the source register holds AT ALL. Zero of these is not an answer.
+   *
+   * Nothing overdue on a register of thirty-eight obligations is the good news the figure exists to
+   * deliver. Nothing overdue on a register somebody has not typed into yet is not news at all, and
+   * with only `rows` to read from, the tile could not tell them apart — so an hour-old record
+   * reported its finances healthy, in green, on all four tiles.
+   */
+  held: number;
   /** The proportional change against the shifted window, or `null` when it is not comparable. */
   delta: number | null;
   /** Why there is no delta, in words, so an absent comparison is not an absent explanation. */
@@ -417,7 +427,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     refusals.push(...explain(compile(register, decl.where)).map((r) => `${decl.metric}: ${r}`));
 
   if (refusals.length || !register)
-    return { value: null, shown: '—', rows: 0, delta: null, why: refusals[0] ?? '', unmeasured: null, refusals, href: '/p/money' };
+    return { value: null, shown: '—', rows: 0, held: 0, delta: null, why: refusals[0] ?? '', unmeasured: null, refusals, href: '/p/money' };
 
   const w = compile(register, decl.where);
   const all = ROWS[register] ?? [];
@@ -429,7 +439,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const seen = currenciesRead(rows, decl.value);
   if (seen.size > 1) {
     const why = `${decl.metric}: ${mixedFix([...seen].sort())}`;
-    return { value: null, shown: '—', rows: rows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   /* AND THE FORMAT IS CHECKED AGAINST THEM. `format: money.GBP` is a declaration about how to write
@@ -439,7 +449,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const held = [...seen][0];
   if (declared && held && declared !== held) {
     const why = `${decl.metric}: the rows are in ${held} and the format says ${declared}`;
-    return { value: null, shown: '—', rows: rows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   /* A FACTOR THE TABLE DOES NOT HOLD IS A REFUSAL, NOT A SMALLER NUMBER. `operand` answered `null`
@@ -451,7 +461,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const short = missingFactors(rows, decl.value);
   if (short.length) {
     const why = `${decl.metric}: no factor for ${short.slice(0, 3).join(', ')}${short.length > 3 ? ` and ${short.length - 3} more` : ''}`;
-    return { value: null, shown: '—', rows: rows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   const value = evaluateValue(rows, decl.value);
@@ -492,13 +502,49 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
         unmeasured = 'nothing to compare with yet';
       } else {
         delta = (value - prior) / Math.abs(prior);
-        why = `on the ${decl.window} before`;
+        why = `on the ${spokenWindow(decl.window)} before`;
       }
     }
   }
 
-  return { value, shown: format(decl.format, value), rows: rows.length, delta, why, unmeasured, refusals: [], href: hrefFor(decl) };
+  /**
+   * AND HOW MANY ROWS THE REGISTER HOLDS AT ALL, which is not `rows`.
+   *
+   * `rows` is what the predicate matched, and zero of those is a real answer: nothing overdue, on a
+   * register holding thirty-eight obligations, is the good news the figure exists to deliver. Zero
+   * rows in the REGISTER is a different fact and the tile had no way to tell them apart — so on a
+   * record somebody installed an hour ago, `OWED TO YOU · GBP 0.00 · ✓` reported the finances
+   * healthy, four times, in green. `19 §6`'s collapse, in the direction nothing had audited:
+   * `no-data-yet` read as `cleared`.
+   */
+  return {
+    value,
+    shown: format(decl.format, value),
+    rows: rows.length,
+    held: all.length,
+    delta,
+    why,
+    unmeasured,
+    refusals: [],
+    href: hrefFor(decl),
+  };
 }
+
+/**
+ * A window as a person reads it, from the window as a declaration writes it.
+ *
+ * `on the 30d before` sat under every figure on Home and `/p/money` — the two screens somebody reads
+ * every day — with the raw literal interpolated straight out of the declaration. `30d` is the
+ * dialect's spelling and `30 days` is the sentence; the same swap `saidPlainly` makes for a
+ * predicate's `+90d`, for the same reason.
+ */
+export const spokenWindow = (window: string): string => {
+  const m = /^(\d{1,4})([dwmy])$/.exec(window.trim());
+  if (!m) return window;
+  const [, n, unit] = m as unknown as [string, string, string];
+  const noun = { d: 'day', w: 'week', m: 'month', y: 'year' }[unit] ?? 'day';
+  return `${n} ${noun}${n === '1' ? '' : 's'}`;
+};
 
 /** Is the figure on the right side of what was declared as good? */
 export function meetsTarget(decl: MetricDecl, value: number | null): boolean | null {
@@ -520,5 +566,17 @@ export const targetLine = (decl: MetricDecl): string => {
   const under = 'lte' in decl.target;
   const bound = 'lte' in decl.target ? decl.target.lte : decl.target.gte;
   if (under && bound === 0) return 'should be nothing';
-  return under ? `watch over ${format(decl.format, bound)}` : `watch under ${format(decl.format, bound)}`;
+  /**
+   * "WATCH OVER" IS NOT A SENTENCE ANYBODY SAYS, and at the boundary it argued with itself.
+   *
+   * It reads as the verb phrase — *supervise* — and the sense meant was "watch it if it goes over".
+   * `/decide` printed **Open questions · 3 · watch over 3 · ✓**: the same number twice with a verb
+   * between them, ticked, on one of `19 §2`'s three spine screens. And it was wrong about the
+   * boundary either way round — `lte: 3` means three is fine, which "over 3" does not say.
+   *
+   * `no more than` and `at least` are what the inequality means, in the words a person uses for it.
+   * The `lte: 0` branch above already reads perfectly, which is what says the pattern was fixable
+   * rather than inherent.
+   */
+  return under ? `no more than ${format(decl.format, bound)}` : `at least ${format(decl.format, bound)}`;
 };

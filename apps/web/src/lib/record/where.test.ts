@@ -12,7 +12,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { NOW, ROWS } from './data.ts';
+import { labelOf } from './api.ts';
+import { saidPlainly } from './blocks.ts';
+import { NOW, PAGES, REGISTERS, ROWS, VIEWS } from './data.ts';
 import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
 
 const keep = (register: string, where: string) => {
@@ -276,4 +278,132 @@ test('a predicate it could not read opens the register UNFILTERED, and does not 
   const href = registerHref('obligations', 'state is open, ackamarackus');
   assert.equal(href, '/r/obligations');
   assert.equal(registerHref('obligations', undefined), '/r/obligations');
+});
+
+
+/* ── the sentence on the screen is a sentence the record takes ───────────── */
+
+/**
+ * A SCREEN'S RESTATEMENT OF A DECLARATION HAS TO BE A DECLARATION.
+ *
+ * Every declared page prints its own filter through `saidPlainly`, which swaps each field id for the
+ * label the same screens render and each `+90d` for the phrase it means. That sentence is the one
+ * thing on the page that says what the block is about — it is what a person reads when they ask what
+ * a page filters on, and what an agent copies when it asks the same question. Six of the seed's
+ * twelve declared filters did not survive one trip back through the compiler: `kind is domain` came
+ * back as `type is domain — there is no field called type`, and `renews before +90d` as
+ * `90 days from now is not a date`.
+ *
+ * The fix was on the compiler's side, not the printer's, and the file already argued for it:
+ * `declaredValue` exists so "the stored form and the readable form have to be the same thing, or the
+ * predicate is a second language somebody has to learn". A field's VALUE had been taught both
+ * spellings and its NAME and its DATE never had.
+ *
+ * THE ASSERTION IS THE MATCHED SET, not the parse tree — `+90d` and `90 days from now` are stored as
+ * written and resolved at match time, so two identical filters hold different literals. What has to
+ * be equal is the rows.
+ */
+
+const rowsFor = (register: string, where: string): string => {
+  const w = compile(register, where);
+  return (ROWS[register] ?? [])
+    .filter((e) => matches(e, w, NOW))
+    .map((e) => e.seq)
+    .join(',');
+};
+
+const roundTrips = (register: string, where: string, from: string) => {
+  const first = compile(register, where);
+  /* A TEMPLATE'S `{{name}}` IS NOT A FILTER YET. `for:` expands it per row before anything draws;
+     until then it does not compile on either side of the trip, which is a different finding. */
+  if (first.bad.length) return;
+  const said = saidPlainly(register, where);
+  const back = compile(register, said);
+  assert.deepEqual(back.bad, [], `${from}: the record refuses its own sentence — "${said}"`);
+  assert.equal(
+    rowsFor(register, said),
+    rowsFor(register, where),
+    `${from}: "${where}" and the "${said}" it prints select different rows`,
+  );
+};
+
+test('every filter a declared page prints is one the record reads back', () => {
+  let checked = 0;
+  for (const [slug, page] of Object.entries(PAGES)) {
+    for (const block of page.blocks ?? []) {
+      const source = String(block.source ?? '');
+      if (!block.where || !source.startsWith('register.')) continue;
+      roundTrips(source.slice('register.'.length), block.where, `/p/${slug}`);
+      checked++;
+    }
+  }
+  assert.ok(checked >= 8, `only ${checked} declared page filters were reachable to check`);
+});
+
+test('and every filter a saved view prints', () => {
+  for (const [id, view] of Object.entries(VIEWS)) {
+    const where = view.filters
+      .map((f) => `${f.field} ${f.op === 'in' ? 'is' : f.op} ${f.values.join(' or ')}`)
+      .join(', ');
+    if (where) roundTrips(view.register, where, `/v/${id}`);
+  }
+});
+
+test('a clause written with the label the screen shows is the same clause', () => {
+  /* THE SWEEP, rather than the eight the seed happens to declare. Every enum field of every
+     register, said both ways, must select the same rows — which is the promise the round trip above
+     depends on and the one that quietly breaks the first time somebody adds a `label:`. */
+  let pairs = 0;
+  for (const [id, decl] of Object.entries(REGISTERS)) {
+    for (const field of decl.fields) {
+      if (field.type !== 'enum' || !field.values?.length) continue;
+      const label = labelOf(field);
+      if (label.toLowerCase() === field.id) continue;
+      const value = field.values[0]!;
+      assert.equal(
+        rowsFor(id, `${label} is ${value}`),
+        rowsFor(id, `${field.id} is ${value}`),
+        `${id}: "${label} is ${value}" and "${field.id} is ${value}" disagree`,
+      );
+      assert.deepEqual(compile(id, `${label} is ${value}`).bad, [], `${id}: ${label} is not read as a field`);
+      pairs++;
+    }
+  }
+  assert.ok(pairs > 0, 'no register labels a field differently from its id, so nothing was proved');
+});
+
+test('the id wins over a label, so one field cannot answer for another', () => {
+  /* A register is free to label one field with another's id. If the label branch ran first, a
+     predicate naming a real field would silently be compiled against a different column. */
+  const decl = REGISTERS.obligations!;
+  const ids = new Set(decl.fields.map((f) => f.id));
+  for (const field of decl.fields) {
+    const label = labelOf(field).toLowerCase();
+    if (!ids.has(label) || label === field.id) continue;
+    assert.equal(compile('obligations', `${label} is x`).register, 'obligations');
+  }
+  /* And the plain statement of it, which holds whatever the seed happens to declare. */
+  assert.deepEqual(compile('obligations', 'state is open').bad, []);
+});
+
+test('the prose day is the machine day, to the day', () => {
+  for (const [prose, machine] of [
+    ['90 days from now', '+90d'],
+    ['1 day from now', '+1d'],
+    ['7 days ago', '-7d'],
+    ['2 weeks from now', '+2w'],
+    ['1 week ago', '-1w'],
+    ['3 months from now', '+3m'],
+    ['6 months ago', '-6m'],
+  ] as const) {
+    assert.equal(resolveDay(prose, NOW), resolveDay(machine, NOW), `${prose} is not ${machine}`);
+  }
+});
+
+test('and nothing else in English is a day', () => {
+  /* IT IS A COMPILER, NOT A PARSER OF ENGLISH. The closed set is exactly what `saidPlainly` emits;
+     anything else has to be `null`, or an unrecognised operand goes back to being string-compared,
+     which is the bug this whole module was rewritten to kill. */
+  for (const word of ['soon', 'next week', 'in 90 days', '90 days', 'days from now', '90 years from now', '1 fortnight ago', '90 days from then'])
+    assert.equal(resolveDay(word, NOW), null, `"${word}" resolved to a day`);
 });

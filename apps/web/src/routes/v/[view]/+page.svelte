@@ -41,7 +41,35 @@
   const view = $derived(VIEWS[key]);
   const decl = $derived(view ? REGISTERS[view.register] : undefined);
   const columns = $derived(view ? columnsFor(view.register) : []);
-  const result = $derived(view ? list(view.register, { filters: view.filters }) : { entries: [], total: 0, matched: 0 });
+
+  /**
+   * THE REST OF THE URL, WHICH THIS ROUTE USED TO THROW AWAY WITHOUT SAYING SO.
+   *
+   * `/v/obligations.overdue?q=zzzzz` returned `4 of 38` — the same four rows as with no query at
+   * all — while `/r/obligations?q=zzzzz` correctly drew `no-results` with the term quoted. Same
+   * record, same list, two behaviours, and this is the one in the rail on day one. A parameter read
+   * by one surface and silently dropped by its twin is this build's signature failure: something
+   * complete-looking that reports success and does nothing.
+   *
+   * `19 §1` says the saved view IS the predicate and the URL is its serialisation. So an extra
+   * clause in the URL is a narrower question about the same list, and the answer is the narrower
+   * list — ANDed on, never replacing, because the view's own predicate is what makes it that view.
+   * The way back is the view's own address, which the state and the note both offer.
+   */
+  const q = $derived(page.url.searchParams.get('q') ?? '');
+  const extra = $derived.by((): Filter[] =>
+    page.url.searchParams.getAll('f').map((raw) => {
+      const [field = '', op = 'is', values = ''] = raw.split(':');
+      return { field, op, values: values.split(',') };
+    }),
+  );
+  const narrowed = $derived(Boolean(q) || extra.length > 0);
+
+  const result = $derived(
+    view
+      ? list(view.register, { filters: [...view.filters, ...extra], ...(q ? { q } : {}) })
+      : { entries: [], total: 0, matched: 0 },
+  );
   const rows = $derived(view ? toRows(view.register, result.entries, columns) : []);
 
   let focus = $state({ row: 0, col: 1 });
@@ -114,10 +142,47 @@
   <div class="page">
     <p class="predicate">
       <span class="predicate-label">Filter</span>
-      <code>{whereOf(view.filters)}</code>
+      <code>{whereOf([...view.filters, ...extra])}</code>
+      {#if q}<span class="predicate-q">{copy.matching} <code>{q}</code></span>{/if}
+      {#if narrowed}
+        <Button weight="bare" href="/v/{key}"><Icon name="close" size="s" />{copy.backToView}</Button>
+      {/if}
     </p>
 
-    <div class="table-slot">
+    <!--
+      THE FIVE STATES, WHICH THIS ROUTE HAD NONE OF.
+
+      Its only `<Empty>` was the 404. At zero matching rows it drew a header, a `0`, the filter chip,
+      a bare column-header row and about 1,200px of blank canvas — on the surface `19 §1` calls the
+      up half of the two-altitude ladder, and the one thing in the rail under Obligations on day one.
+
+      TWO DIFFERENT NOTHINGS, and this is the whole of `19 §6`'s argument. A list nobody has typed
+      into yet is `no-data-yet` and the thing to do is add a row; a predicate that matched none of
+      thirty-eight is `no-results` and the thing to do is widen it. The register next door has said
+      both correctly for months, so the sentences come from the same place.
+    -->
+    {#if result.entries.length === 0}
+      <Empty
+        kind={result.total === 0 ? 'no-data-yet' : 'no-results'}
+        title={result.total === 0
+          ? copy.nothingIn(decl.name)
+          : copy.noneMatching(result.total, copy.rowsWord(result.total))}
+        query={result.total === 0 ? undefined : [q, whereOf([...view.filters, ...extra])].filter(Boolean).join(' · ')}
+        body={result.total === 0 && decl.holds ? `${decl.name} holds ${decl.holds}.` : undefined}
+      >
+        {#snippet actions()}
+          {#if result.total === 0}
+            <Button weight="primary" href="/r/{view.register}?new=1">{copy.addOne}</Button>
+          {:else if narrowed}
+            <Button href="/v/{key}">{copy.backToView}</Button>
+          {:else}
+            <Button href="/r/{view.register}">{copy.openUnfiltered(decl.name)}</Button>
+          {/if}
+        {/snippet}
+      </Empty>
+    {/if}
+
+    <div class="table-slot" class:gone={result.entries.length === 0}>
       <Table
         {columns}
         {rows}
@@ -131,11 +196,25 @@
     <!-- THE SAME BODY A REGISTER HAS ON A PHONE. A saved view is that list with a different
          predicate, and it kept the desktop table with its own horizontal scrollbar — two surfaces,
          one device, two behaviours, because one of them was written second. -->
-    <RowCards register={view.register} entries={result.entries} />
+    {#if result.entries.length > 0}
+      <RowCards register={view.register} entries={result.entries} />
+    {/if}
   </div>
 {/if}
 
 <style>
+  /* ONE BODY AT A TIME, and an empty state is a body. The table draws its own header row whatever
+     it holds, so leaving it under the empty state gave a column strip standing over the sentence
+     saying there was nothing to put in it. */
+  .table-slot.gone,
+  .gone :global(.cards) {
+    display: none;
+  }
+
+  .predicate-q {
+    color: var(--dim);
+  }
+
   /* Authoring is a desktop surface (13 §10). */
   @media (width < 900px) {
     .bind-slot {

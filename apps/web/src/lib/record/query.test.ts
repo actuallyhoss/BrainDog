@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, sortRows } from './api.ts';
+import { REGISTERS, ROWS, columnsFor, display, list, sortRows, applyFilters } from './api.ts';
 import type { Entry } from './schema.ts';
 
 const rows = (...fields: Record<string, unknown>[]): Entry[] =>
@@ -128,4 +128,106 @@ test('search reaches an enum by the words it shows, not the identifier it stores
 test('a filter and a query are both applied', () => {
   const out = applyFilters('obligations', OBL, [{ field: 'state', op: 'in', values: ['open'] }], 'owed to me');
   assert.deepEqual(seqs(out), [1]);
+});
+
+
+/* ── every key the sort control offers is a key that sorts ───────────────── */
+
+/**
+ * A CHIP THAT DOES NOT REORDER THE LIST IS A CONTROL THAT LIES.
+ *
+ * Sorting used to live on the table's column headers alone, which meant it did not exist below
+ * 640px — the table is `display: none` there and the cards have no headers. It is now also a list
+ * of chips in the Display sheet, built from `columnsFor`: the same projection, so the offer is
+ * every column of every register rather than the handful anybody hand-writes a test for.
+ *
+ * Both sort bugs this file has caught were one column of one register and both looked sorted from a
+ * distance: money compared as objects (`{} < {}` is false both ways, so the column came back in
+ * arrival order), and a `ref` ordered by the hidden seq behind it while the cell rendered a name.
+ * Neither threw. So the sweep below asserts the rule a READER can check rather than the one the
+ * implementation happens to use — *the order is a function of what is on the screen* — which is
+ * why it is written out here again instead of importing the comparator.
+ */
+
+/** What the reader compares, per kind of column. Money is a magnitude; a day is its ISO text; a
+    ref, an enum and a bool are the words drawn in the cell, not the values behind them. */
+function readerKey(register: string, field: string, e: Entry): number | string | null {
+  if (field === 'seq') return e.seq;
+  const raw = e.fields[field];
+  if (raw === null || raw === undefined) return null;
+  const type = REGISTERS[register]?.fields.find((f) => f.id === field)?.type;
+  if (type === 'money') return (raw as { amount: number }).amount;
+  if (type === 'int' || type === 'decimal' || type === 'duration') return Number(raw);
+  if (type === 'day' || type === 'instant') return String(raw);
+  return display(register, field, raw) ?? '';
+}
+
+const before = (a: number | string, b: number | string): boolean =>
+  typeof a === 'number' && typeof b === 'number' ? a < b : String(a).localeCompare(String(b), 'en-GB') < 0;
+
+for (const register of Object.keys(REGISTERS)) {
+  test(`every column ${register} offers is a column that sorts`, () => {
+    const held = (ROWS[register] ?? []).length;
+    for (const column of columnsFor(register)) {
+      const field = column.field;
+
+      const up = list(register, { sort: { field, dir: 'asc' } }).entries;
+      const down = list(register, { sort: { field, dir: 'desc' } }).entries;
+
+      /* NOTHING IS DROPPED AND NOTHING IS INVENTED. A sort is a permutation; the fastest way to
+         hide a comparator that throws is to return the rows it managed. */
+      assert.equal(up.length, held, `${register}.${field} asc lost rows`);
+      assert.equal(down.length, held, `${register}.${field} desc lost rows`);
+      assert.deepEqual(
+        [...up].map((e) => e.seq).sort((a, b) => a - b),
+        [...down].map((e) => e.seq).sort((a, b) => a - b),
+        `${register}.${field} returns a different set in each direction`,
+      );
+
+      /* ASCENDING IS ASCENDING, in the values a person can see. Blanks are allowed to trail, which
+         is what `sortRows` does deliberately — a row with nothing in the column has no place in an
+         order over that column, and putting it first is the same as claiming it is the smallest. */
+      const seen = up.map((e) => readerKey(register, field, e));
+      const present = seen.filter((v): v is number | string => v !== null && v !== '');
+      assert.equal(
+        seen.filter((v) => v !== null && v !== '').length,
+        seen.length - seen.filter((v) => v === null || v === '').length,
+        `${register}.${field} interleaves blanks with values`,
+      );
+      for (let i = 1; i < present.length; i++) {
+        assert.ok(
+          !before(present[i]!, present[i - 1]!),
+          `${register}.${field} ascending puts ${JSON.stringify(present[i])} after ${JSON.stringify(present[i - 1])}`,
+        );
+      }
+
+      /* AND DESCENDING IS THE SAME ORDER READ BACKWARDS. This is the assertion the money bug fails:
+         a comparator that always answers "equal" returns the input order both ways, which reads as
+         a sort that worked until you ask for the other direction and get the identical list. */
+      const downPresent = down
+        .map((e) => readerKey(register, field, e))
+        .filter((v): v is number | string => v !== null && v !== '');
+      for (let i = 1; i < downPresent.length; i++) {
+        assert.ok(
+          !before(downPresent[i - 1]!, downPresent[i]!),
+          `${register}.${field} descending puts ${JSON.stringify(downPresent[i - 1])} before ${JSON.stringify(downPresent[i])}`,
+        );
+      }
+    }
+  });
+}
+
+test('a column whose values differ actually reorders the list', () => {
+  /* THE OTHER HALF OF THE SAME QUESTION. Every assertion above is satisfied by a sort that returns
+     its input untouched whenever the rows arrive in order, and the seeded record is written in seq
+     order — so at least one column per register has to move something, or the sweep proves nothing
+     about the seed it runs on. */
+  for (const register of Object.keys(REGISTERS)) {
+    if ((ROWS[register] ?? []).length < 3) continue;
+    const moved = columnsFor(register).filter((c) => {
+      const up = list(register, { sort: { field: c.field, dir: 'asc' } }).entries.map((e) => e.seq);
+      return up.join() !== [...up].sort((a, b) => a - b).join();
+    });
+    assert.ok(moved.length > 0, `${register}: not one of its columns changes the order of the list`);
+  }
 });

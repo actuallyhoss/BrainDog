@@ -22,6 +22,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
 
   const stale = $derived(VAULT.filter((c) => c.stale).length);
@@ -44,7 +45,15 @@
   <p class="blurb">{copy.vaultBlurb}</p>
 
   <ul class="ledger">
-    {#each VAULT as c}
+    <!-- A NEW RECORD HAS NO CREDENTIALS IN IT, and this was a bare `{#each}` over the list: a
+       heading, a `0`, one sentence of standing prose, and then nothing at all. `19 §6` names the
+       state and asks for a line saying what belongs here; the vault's own framing sentence already
+       says what that is, so the state says where one comes from. -->
+  {#if VAULT.length === 0}
+    <Empty kind="no-data-yet" title={copy.vaultEmpty} body={copy.vaultHolds} />
+  {/if}
+
+  {#each VAULT as c}
       <li>
         <div class="line">
           <!-- THE KIND AS A READER SAYS IT. `api_token` is what the column holds; `12 §6` closes

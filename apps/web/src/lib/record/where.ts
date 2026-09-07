@@ -43,7 +43,7 @@
  * The temporal literals are the set `02-DATA-MODEL` §6 already settled on, not a set invented here.
  */
 
-import { display } from './api.ts';
+import { display, labelOf } from './api.ts';
 import { REGISTERS, ROWS } from './data.ts';
 import type { Entry } from './schema.ts';
 
@@ -99,6 +99,30 @@ export function resolveDay(word: string, now: number): string | null {
       break;
   }
 
+  /**
+   * AND THE SAME DAY WRITTEN THE WAY THE SCREEN WRITES IT.
+   *
+   * `saidPlainly` turns `+90d` into "90 days from now", because `+90d` is a machine duration nobody
+   * types or says — and every declared page prints its filter through it. That sentence is the
+   * record's own restatement of the declaration; it is what somebody reads when they ask what a page
+   * filters on, and it is what an agent copies. It did not compile. Three of the seed's four
+   * temporal blocks printed a filter the record would refuse.
+   *
+   * The fix belongs here rather than in the printer, and the file already says why: `declaredValue`
+   * exists because "the stored form and the readable form have to be the same thing, or the
+   * predicate is a second language somebody has to learn". A field's VALUE was taught both
+   * spellings and its DATE never was. This is the same rule, one operand along.
+   *
+   * The set is closed and it is exactly what `spokenDay` emits — no more, so this stays a compiler
+   * and not a parser of English.
+   */
+  const prose = /^(\d{1,4})\s+(day|days|week|weeks|month|months)\s+(from now|ago)$/.exec(word);
+  if (prose) {
+    const [, n, noun, way] = prose as unknown as [string, string, string, string];
+    const unit = noun.startsWith('day') ? 'd' : noun.startsWith('week') ? 'w' : 'm';
+    return resolveDay(`${way === 'ago' ? '-' : '+'}${n}${unit}`, now);
+  }
+
   const m = RELATIVE.exec(word);
   if (!m) return null;
   const n = Number(m[2]) * (m[1] === '-' ? -1 : 1);
@@ -113,7 +137,11 @@ export function resolveDay(word: string, now: number): string | null {
   return iso(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d.getUTCDate(), last), 12));
 }
 
-const CLAUSE = /^\s*([a-z][a-z0-9_]*)\s+(is not|is|before|after)\s+(.+?)\s*$/i;
+/* SPACES IN THE FIELD, because a label has them. `Row title is x` could not even reach `fieldOf`
+   under `[a-z][a-z0-9_]*`: it failed the grammar and got "that is not something a filter can say",
+   which is the wrong sentence about the wrong half of the clause. Non-greedy, so the first operator
+   still ends the field name and a value may contain the word `is`. */
+const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after)\s+(.+?)\s*$/i;
 
 /**
  * The operators `21-AUTHORING` §4.2 publishes and this build does not read.
@@ -155,8 +183,24 @@ export const declaredValue = (register: string, field: string, value: string): s
  * it had worked.
  */
 const fieldOf = (register: string, name: string): string | null => {
-  const want = name.toLowerCase();
-  return REGISTERS[register]?.fields.find((f) => f.id.toLowerCase() === want)?.id ?? null;
+  const want = norm(name);
+  const fields = REGISTERS[register]?.fields ?? [];
+  /* THE ID FIRST, ALWAYS. A label is a second spelling, not a replacement, and a register free to
+     label one field with another's id must not be able to redirect a predicate by doing it. */
+  const byId = fields.find((f) => norm(f.id) === want);
+  if (byId) return byId.id;
+  /**
+   * AND THEN THE NAME THE SCREEN USES, which is the one a person has in front of them.
+   *
+   * `/r/services` calls its `kind` column **Type** and `/p/estate` prints its filter as
+   * `type is domain` — the record's own restatement of its own declaration — and feeding that back
+   * got "there is no field called type". Six of the seed's twelve declared filters failed to
+   * survive one round trip through the screen that displays them.
+   *
+   * `labelOf`'s fallback is the id with underscores as spaces, so `owed_by` and `Owed by` resolve
+   * through the same branch and a register that declares no labels is unaffected.
+   */
+  return fields.find((f) => norm(labelOf(f)) === want)?.id ?? null;
 };
 
 /** Both spellings of a value: what the column stores, and what a reader sees. */

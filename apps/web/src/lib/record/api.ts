@@ -751,13 +751,23 @@ export function metric(id: string): Metric {
   if (id === 'runway') {
     const block = declaredWalk();
     const walk = runway(block?.opening ?? 0, block?.from ?? []);
+    /* AND A WALK OVER NOTHING IS NOT A RUNWAY OF OVER 180 DAYS. `tone: 'good'` is hard-coded on this
+       branch, so a record with no money in it and nothing dated to spend reported the one figure in
+       the product that is about the future as fine — out of an opening balance of zero and an empty
+       list of movements. `19 §6` again: nothing to show is not the same as nothing to worry about. */
+    if (!walk.crossed && walk.steps.length === 0 && walk.from === 0)
+      return { id, label: 'Runway', value: MISSING, note: copy.nothingDated, href: '/p/money' };
     if (!walk.crossed)
       return {
         id,
         label: 'Runway',
         value: `Over ${walk.horizon} days`,
         note: `nothing dated takes ${money(walk.from, walk.currency ?? 'GBP')} under`,
-        tone: 'good',
+        /* THE TICK NEEDS SOMETHING TO HAVE BEEN WALKED. With an opening balance declared on the page
+           and no dated movement anywhere in the record, the note is true — nothing takes it under,
+           because there is no nothing — and a green tick over it is a verdict on a walk that did not
+           happen. The sentence stays; the judgement goes. */
+        ...(walk.steps.length === 0 ? {} : { tone: 'good' as const }),
         href: '/p/money',
       };
     return {
@@ -821,25 +831,50 @@ export function metric(id: string): Metric {
       href: '/packs',
     };
 
-  const met = meetsTarget(decl, reading.value);
+  /**
+   * A FIGURE OVER AN EMPTY LIST IS NOT GOOD NEWS. IT IS NOT NEWS.
+   *
+   * `meetsTarget` is `value <= target.lte`, and `0 <= 2000000` is true — so on a record with nothing
+   * in it, `OWED TO YOU · GBP 0.00`, `DUE IN 30 DAYS · GBP 0.00` and `OVERDUE TO PAY · GBP 0.00`
+   * each carried a tick labelled *good*. Four green ticks on the screen somebody sees the hour they
+   * install the product, telling them their finances are healthy on the strength of no data at all.
+   *
+   * `19 §6` names five empty states and says collapsing them is the failure; this is the collapse
+   * nothing had audited, because both usability passes before this one could not reach an empty
+   * record in a browser. `no-data-yet` was reading as `cleared`.
+   *
+   * THE TONE GOES AND THE SENTENCE ARRIVES. A tile with no tone is a fact without a verdict, which
+   * is exactly right here — and the note says which list is empty, so it points at the thing to do
+   * rather than only declining to judge. The comparison line is dropped with it: "nothing to compare
+   * with yet" under "nothing in Obligations yet" is the same sentence twice.
+   */
+  const empty = reading.held === 0;
+
+  const met = empty ? null : meetsTarget(decl, reading.value);
   /* The delta reads as a MOVEMENT and not as a sign: "up 18% on the 30d before" is a sentence, and
      `+18%` beside a target is two numbers a reader has to tell apart. */
   /* AND AN ABSENT COMPARISON SAYS SO. `19 §6`: a surface showing nothing must never be
      indistinguishable from a surface with nothing to show — and three of the four tiles on the money
      page carried no movement and no explanation, which reads as "this has not moved" when every one
      of them declares a window. */
+  /* AND A MOVEMENT OF NOTHING IS NOT A MOVEMENT. `Math.abs(delta * 100).toFixed(0)` rounds every
+     shift under half a per cent to `0`, so the sentence read "up 0% on the 30 days before" — a
+     direction, a magnitude of nothing, and a reader left to work out which half to believe. */
+  const pct = reading.delta === null ? 0 : Math.round(Math.abs(reading.delta * 100));
   const move =
     reading.delta === null
       ? reading.unmeasured
         ? ` · ${reading.unmeasured}`
         : ''
-      : ` · ${reading.delta >= 0 ? 'up' : 'down'} ${Math.abs(reading.delta * 100).toFixed(0)}% ${reading.why}`;
+      : pct === 0
+        ? ` · ${copy.aboutTheSame} ${reading.why}`
+        : ` · ${reading.delta >= 0 ? 'up' : 'down'} ${pct}% ${reading.why}`;
 
   return {
     id,
     label: decl.name,
     value: reading.shown,
-    note: `${targetLine(decl)}${move}`,
+    note: empty ? copy.nothingIn(REGISTERS[decl.source.replace(/^register\./, '')]?.name ?? decl.name) : `${targetLine(decl)}${move}`,
     tone: met === null ? undefined : met ? 'good' : 'warn',
     href: reading.href,
   };
@@ -1423,6 +1458,21 @@ export function list(register: string, opts: { filters?: Filter[]; q?: string; s
   const sorted = opts.sort ? sortRows(register, filtered, opts.sort.field, opts.sort.dir) : filtered;
   return { entries: sorted, total: all.length, matched: filtered.length };
 }
+
+/**
+ * WHO DID IT, IN WORDS. `rule.renewal` and `rule.reply` are declaration ids, and every surface that
+ * answers "who changed my record" answers a question nobody asks in dotted notation.
+ *
+ * IT LIVED IN `/audit` AND HOME DREW THE RAW ID. Two of the six actors in "Since you were away" were
+ * `rule.reply` and `rule.renewal`, while the audit log one route over rendered the same two as
+ * "reply rule" and "renewal rule" — the same fact, on the same record, spelled two ways, and the
+ * screen a person lands on had the machine's spelling. A function two surfaces need is not a detail
+ * of one of them.
+ */
+export const actorOf = (by: string): string => {
+  const rule = /^rule\.(.+)$/.exec(by);
+  return rule ? `${rule[1]!.replace(/[._]/g, ' ')} rule` : by;
+};
 
 export const registerOf = (id: string): RegisterDecl | undefined => REGISTERS[id];
 export const entry = (register: string, seq: number): Entry | undefined =>

@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 
 import { METRICS } from './declared.ts';
 import { mixedFix } from './money.ts';
-import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, read, targetLine, windowMs, withParam, type MetricDecl } from './metrics.ts';
+import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, read, spokenWindow, targetLine, windowMs, withParam, type MetricDecl } from './metrics.ts';
 import { applyFilters, metric } from './api.ts';
 import { NOW, ROWS } from './data.ts';
 import { amountOf } from './money.ts';
@@ -361,10 +361,13 @@ test('WHAT GOOD LOOKS LIKE IS A SENTENCE, not an inequality', () => {
      `target ≤ GBP 0.00` under *Overdue to pay* — the commonest shape there is — means "none", not
      "at most nothing". `≤` and `≥` are also two glyphs a person cannot type and half will read as
      "less than". */
+  /* AND "WATCH OVER" WAS NOT ONE. It reads as the verb phrase — supervise — and at the boundary it
+     argued with itself: `/decide` printed `Open questions · 3 · watch over 3 · ✓`, the same number
+     twice with a verb between them, ticked, over a target that allows exactly three. */
   const under = targetLine({ format: 'money.GBP', target: { lte: 2_000_000 } } as MetricDecl);
-  assert.equal(under, 'watch over GBP 20,000.00');
+  assert.equal(under, 'no more than GBP 20,000.00');
   assert.equal(targetLine({ format: 'money.GBP', target: { lte: 0 } } as MetricDecl), 'should be nothing');
-  assert.equal(targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl), 'watch under 3');
+  assert.equal(targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl), 'at least 3');
   for (const said of [under, targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl)])
     assert.ok(!/[≤≥]/.test(said), `a glyph nobody types: ${said}`);
 });
@@ -404,4 +407,109 @@ test('and a blank field is absent, not unitless', () => {
 
   const seen = currenciesRead(rows, { sum: 'amount' });
   assert.deepEqual([...seen], ['GBP'], 'an empty field was read as a unit mismatch');
+});
+
+
+/* ── a figure over an empty list is not good news ────────────────────────── */
+
+/**
+ * THE STATE OF THE FIRST HOUR, which nothing had ever measured.
+ *
+ * `meetsTarget` is `value <= target.lte`, so `0 <= 2000000` is true — and on a record with nothing
+ * in it every money tile carried a tick labelled *good*. Four of them on `/p/money`, on the screen
+ * somebody sees the hour they install the product, reporting their finances healthy on the strength
+ * of no data at all. Both usability passes before the one that found it could not reach an empty
+ * record in a browser, which is why it survived six audits.
+ *
+ * `19 §6` names five empty states and says collapsing them is the failure. This is the collapse
+ * nothing had looked for: `no-data-yet` reading as `cleared`.
+ *
+ * The register is emptied and put back, because the distinction being asserted is exactly the one
+ * between a predicate that matched nothing and a list that holds nothing — and no fixture can stand
+ * in for it: the whole bug was that the code could not tell them apart.
+ */
+const withEmpty = (register: string, run: () => void) => {
+  const kept = ROWS[register];
+  ROWS[register] = [];
+  try {
+    run();
+  } finally {
+    ROWS[register] = kept!;
+  }
+};
+
+test('a reading knows how many rows the list HOLDS, not only how many matched', () => {
+  for (const decl of Object.values(METRICS)) {
+    if (isTemplate(decl)) continue;
+    const register = decl.source.replace(/^register\./, '');
+    if (!ROWS[register]) continue;
+    const reading = read(decl as MetricDecl, NOW);
+    assert.equal(reading.held, ROWS[register]!.length, `${decl.metric}: held is not the list's own count`);
+    assert.ok(reading.rows <= reading.held, `${decl.metric}: matched more rows than the list holds`);
+  }
+});
+
+test('a tile over an empty list carries no verdict, and says which list is empty', () => {
+  withEmpty('obligations', () => {
+    for (const decl of Object.values(METRICS)) {
+      if (isTemplate(decl) || decl.source !== 'register.obligations') continue;
+      const tile = metric(decl.metric);
+      assert.equal(tile.tone, undefined, `${decl.metric}: an empty list still reports "${tile.tone}"`);
+      assert.match(tile.note, /^Nothing in .+ yet\.$/, `${decl.metric}: the note is "${tile.note}"`);
+    }
+  });
+});
+
+test('and the same tile with rows under it does carry one', () => {
+  /* THE OTHER HALF, or the assertion above is satisfied by a build that never tones anything. */
+  const toned = Object.values(METRICS)
+    .filter((d) => !isTemplate(d) && d.source === 'register.obligations')
+    .map((d) => metric(d.metric).tone);
+  assert.ok(toned.length > 0, 'no obligations metric was reachable to check');
+  assert.ok(
+    toned.every((t) => t === 'good' || t === 'warn' || t === 'bad'),
+    `a figure over thirty-eight rows reports no verdict: ${JSON.stringify(toned)}`,
+  );
+});
+
+test('nothing overdue on a list that HAS rows is still good news', () => {
+  /* The distinction stated the other way round: zero matched is a real answer, and this must not
+     have become "no data" when the fix went in. `overdue` is `lte: 0`, so an empty match is the
+     good case, and a build that read `rows === 0` instead of `held === 0` would silence it. */
+  const decl = Object.values(METRICS).find((d) => d.source === 'register.obligations' && 'lte' in d.target && d.target.lte === 0);
+  if (!decl) return;
+  const reading = read(decl as MetricDecl, NOW);
+  assert.ok(reading.held > 0, 'the seed has no obligations, so this proves nothing');
+  assert.equal(metric(decl.metric).tone, reading.value === 0 ? 'good' : 'warn');
+});
+
+/* ── the words under every figure in the product ─────────────────────────── */
+
+test('a target is a sentence somebody would say, and it is right at the boundary', () => {
+  const line = (target: { lte: number } | { gte: number }, format?: string) =>
+    targetLine({ format, target } as MetricDecl);
+
+  assert.equal(line({ lte: 0 }), 'should be nothing');
+  assert.equal(line({ lte: 3 }, 'int'), 'no more than 3');
+  assert.equal(line({ gte: 90 }, 'int'), 'at least 90');
+  /* "watch over 3" under the figure `3`, ticked, was on `/decide` — the same number twice with a
+     verb between them, and wrong about the boundary either way you read it. */
+  assert.doesNotMatch(line({ lte: 3 }, 'int'), /watch/);
+  assert.equal(meetsTarget({ target: { lte: 3 } } as MetricDecl, 3), true, 'lte means the bound is allowed');
+});
+
+test('a window is said in words, not in the dialect it is declared in', () => {
+  assert.equal(spokenWindow('30d'), '30 days');
+  assert.equal(spokenWindow('1d'), '1 day');
+  assert.equal(spokenWindow('4w'), '4 weeks');
+  assert.equal(spokenWindow('3m'), '3 months');
+  assert.equal(spokenWindow('1y'), '1 year');
+  /* Anything it cannot improve it leaves alone, for the same reason `saidPlainly` does: half a
+     sentence in English and half in the dialect is worse than either. */
+  assert.equal(spokenWindow('rolling'), 'rolling');
+});
+
+test('every shipped metric declares a window this can say', () => {
+  for (const decl of Object.values(METRICS))
+    assert.match(decl.window, /^\d{1,4}[dwmy]$/, `${decl.metric}: window "${decl.window}" is not one this can put in a sentence`);
 });

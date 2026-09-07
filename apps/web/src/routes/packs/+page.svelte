@@ -17,6 +17,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import type { PackInfo } from '$lib/record/schema.ts';
 
@@ -82,8 +83,14 @@
        nowhere, so this screen listed things by name and version with nothing saying what installing
        one would do to the record. -->
   <p class="blurb">{copy.packBlurb}</p>
+  <!-- A RECORD WITH NOTHING INSTALLED IS THE ORDINARY FIRST STATE OF THIS SCREEN, and it drew an
+       empty `Section` under a `0`. `19 §6` again — and here the sentence has somewhere obvious to
+       point, because the list of packs that are NOT installed is directly below it. -->
   <Section title={copy.installed} count={installed.length}>
     <div class="grid-packs">
+      {#if installed.length === 0}
+        <Empty kind="no-data-yet" title={copy.noPacksYet} body={copy.noPacksBody} />
+      {/if}
       {#each installed as pack}
         <article class="pack">
           <header class="pack-head">
@@ -156,7 +163,9 @@
                exactly what it would be if the answer lived behind a panel that is closed by
                default. One sentence, always, next to the control it disables. -->
           {#if pack.conflicts?.length}
-            <p class="pack-refused" id="conflict-{pack.id}">{copy.diffRefused}</p>
+            <p class="pack-refused" id="conflict-{pack.id}">
+              {copy.diffRefused(pack.conflicts.map((id) => REGISTERS[id]?.name ?? id))}
+            </p>
           {/if}
           {#if diff === pack.id}{@render plan(pack)}{/if}
         </li>

@@ -12,13 +12,39 @@
   with a different predicate — and only the register had cards, so a saved view on a phone kept the
   desktop table and its own horizontal scrollbar. Two surfaces, one device, two behaviours, from one
   of them having been written second.
+
+  AND A CARD CAN CARRY THE ROW'S VERBS. The table has a row menu, a selected state and a sort on
+  every column header; a card had a link and nothing else, so a register on a phone was a list you
+  could read and open and do nothing else to — peek, copy, archive, select and set-state all lived
+  behind keys, on the one device with no keyboard. `13 §10` says authoring is a desktop act, and
+  that is right; but *choosing a row and acting on it* is not authoring, it is the list working.
+
+  BOTH EXTRAS ARE OPTIONAL PROPS, so a saved view stays a list of links until somebody decides what
+  a verb means there. A component that assumes its second caller wants everything the first one did
+  is how the table ended up on a phone in the first place.
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { TONES } from 'braindog-render';
+  import { copy } from '$lib/copy.ts';
   import { REGISTERS, dirOf, display, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
 
-  let { register, entries, href }: { register: string; entries: readonly Entry[]; href?: (e: Entry) => string } = $props();
+  let {
+    register,
+    entries,
+    href,
+    picked,
+    action,
+  }: {
+    register: string;
+    entries: readonly Entry[];
+    href?: (e: Entry) => string;
+    /** Which rows are selected, by `seq`. Omitted where a surface has no bulk verbs. */
+    picked?: ReadonlySet<number>;
+    /** The trailing control on each card — the caller's, because the verbs are the caller's. */
+    action?: Snippet<[Entry]>;
+  } = $props();
 
   const decl = $derived(REGISTERS[register]);
   const to = $derived(href ?? ((e: Entry) => `/r/${register}/${e.seq}`));
@@ -37,14 +63,22 @@
    * red — which on this surface is every overdue invoice in the register.
    */
   const toneFor = (e: Entry) => toneOf(register, e);
+
+  /* The tick's accessible name. `copy.ts` holds every sentence (`50 §3`) and this is one. */
+  const selectedLabel = copy.selected;
 </script>
 
 {#if decl}
   <ul class="cards">
     {#each entries as e (e.seq)}
-      <li>
+      <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
         <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
           <span class="card-seq">
+            {#if picked?.has(e.seq)}
+              <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row
+                   is one of the four the bar above is about" is the meaning most worth not losing. -->
+              <span class="picked-tick" role="img" aria-label={selectedLabel}>✓</span>
+            {/if}
             {#if toneFor(e)}
               <span class="glyph" role="img" aria-label={TONES[toneFor(e)!].label}>{TONES[toneFor(e)!].glyph}</span>
             {/if}
@@ -60,6 +94,9 @@
             {display(register, decl.mobile[2], e.fields[decl.mobile[2]]) ?? ''}
           </span>
         </a>
+        <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
+             tap target for opening the row and this sits beside it. -->
+        {#if action}{@render action(e)}{/if}
       </li>
     {/each}
   </ul>
@@ -83,11 +120,29 @@
       overflow: hidden;
     }
 
-    .cards li + li .card {
+    .cards li + li {
       border-block-start: 1px solid var(--line);
     }
 
+    /* THE CARD AND ITS VERB SHARE A LINE. `align-items: stretch` so the menu button is the height of
+       the card rather than of its own glyph — a 44px control beside a 56px card leaves 12px of dead
+       edge that looks tappable and is not. */
+    .card-line {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .card-line[data-picked] {
+      background: var(--sunk);
+    }
+
+    .picked-tick {
+      color: var(--ink);
+    }
+
     .card {
+      flex: 1;
+      min-inline-size: 0;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 2px var(--sp-3);

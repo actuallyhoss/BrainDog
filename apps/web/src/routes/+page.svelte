@@ -16,11 +16,13 @@
   import { parse, relative, TONES } from 'braindog-render';
   import { Block, Degraded } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { NOW, ROWS, metric } from '$lib/record/api.ts';
+  import { NOW, ROWS, actorOf, metric } from '$lib/record/api.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Money from '$lib/ui/Money.svelte';
+  import Button from '$lib/ui/Button.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
 
   let { data } = $props();
@@ -81,8 +83,30 @@
 <div class="page">
   <div class="primary">
     <Section title={copy.needsYou}>
+    <!--
+      TWO NOTHINGS, AND THIS SCREEN COULD ONLY SAY ONE.
+
+      `grep -c "<Empty"` on this file was 0. The one state it could draw was hand-rolled as a grey
+      paragraph, OUTSIDE the component that exists to keep `19 §6`'s five apart — so an hour-old
+      record, with nothing in any list, was told "Nothing needs you today", which is the sentence for
+      a record you have worked through. It is the difference between finished and not started, on
+      the first screen somebody lands on.
+
+      `cleared` GETS NO ACTION, deliberately: there is nothing to do, which is the whole message.
+      `no-data-yet` gets one, and it is the first-run path, because on a record holding nothing the
+      thing to do is not "add an obligation" — it is to be shown what any of this is.
+    -->
     {#if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0}
-      <p class="cleared">{copy.nothingNeedsYou}</p>
+      {@const anything = Object.values(ROWS).reduce((n, list) => n + list.length, 0) + data.questions.length}
+      <Empty
+        kind={anything === 0 ? 'no-data-yet' : 'cleared'}
+        title={anything === 0 ? copy.recordEmpty : copy.nothingNeedsYou}
+        body={anything === 0 ? copy.recordEmptyBody : undefined}
+      >
+        {#snippet actions()}
+          {#if anything === 0}<Button weight="primary" href="/start">{copy.startHere}</Button>{/if}
+        {/snippet}
+      </Empty>
     {:else}
       <ul class="ledger">
         {#each data.questions as q}
@@ -170,7 +194,7 @@
               <!-- The agent that wrote it, named. Never a sparkle badge: across thirteen experiments
                    participants trusted people and organisations LESS when their use of AI was
                    disclosed, so the badge imposes the cost without buying anything (19 §6). -->
-              <span class="event-by">{item.by}</span>
+              <span class="event-by">{actorOf(item.by)}</span>
               <span class="event-text">{item.text}</span>
               <span class="event-when">{relative(item.at.slice(0, 10), NOW)}</span>
             </a>
@@ -280,10 +304,6 @@
     color: var(--accent-text);
     font-size: var(--t-sm);
     text-decoration: none;
-  }
-
-  .cleared {
-    color: var(--earn);
   }
 
   .to-decide {

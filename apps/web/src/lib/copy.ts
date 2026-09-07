@@ -294,6 +294,46 @@ export const copy = {
   clear: 'Clear the selection',
   /* The picker's two labels, written out rather than built by concatenation — the screenshot
      allow-list only keeps text a developer typed into source. */
+  /* WHAT THE LIST IS ORDERED BY. It lives beside the column list because both are answers to
+     "what am I looking at", and on a phone this sheet is the only place either can be asked. */
+  sortedBy: 'Sorted by',
+  /* A DIRECTION IN THE FIELD'S OWN WORDS. An arrow on a column header sits on the thing it orders
+     and needs no more; a chip in a sheet is read alone, and nobody calls an ascending date "lowest
+     first". Six words rather than two, because a date, a number and a name each have their own. */
+  oldestFirst: 'oldest first',
+  newestFirst: 'newest first',
+  lowestFirst: 'lowest first',
+  highestFirst: 'highest first',
+  aToZ: 'A to Z',
+  zToA: 'Z to A',
+  firstAdded: 'first added',
+  lastAdded: 'last added',
+  rowOrder: 'Back to row order',
+  /* WHAT A FIGURE SAYS WHEN THE LIST UNDER IT IS EMPTY. Not a verdict — there is nothing to judge —
+     and not silence either, because a bare `GBP 0.00` with no note beside it is the same tile a
+     working figure draws. It names the list, so it points at what to do next. */
+  nothingIn: (list: string) => `Nothing in ${list} yet.`,
+  nothingDated: 'Nothing dated to walk yet.',
+  /* A ROUNDED ZERO IS NOT A DIRECTION. "up 0%" gives a reader a way and a distance of nothing. */
+  aboutTheSame: 'about the same',
+  /* THE FIVE STATES, ON THE FOUR SCREENS THAT COULD NOT DRAW ANY OF THEM. `grep -c "<Empty"` was
+     0 on Home, /audit, /packs and /vault — four surfaces with no way to tell "nothing here yet"
+     from "nothing matched", which `19 §6` calls the failure by name. */
+  /* THE RECORD ITSELF IS EMPTY, which is a different sentence from every list being empty and from
+     nothing needing you. It is the state of the first hour and nothing could say it. */
+  recordEmpty: 'Nothing in the record yet.',
+  recordEmptyBody: 'A record holds what a business is made of — what you owe and are owed, what it runs on, who is involved, and the decisions behind them.',
+  startHere: 'Start here',
+  noPacksYet: 'No packs installed.',
+  noPacksBody: 'A pack adds ready-made lists and pages. The ones below are ready to install.',
+  matching: 'matching',
+  backToView: 'Back to the saved view',
+  openUnfiltered: (list: string) => `Open ${list}`,
+  rowsWord: (n: number) => (n === 1 ? 'row' : 'rows'),
+  noneMatching: (total: number, what: string) => `${total} ${what}, none matching:`,
+  auditHolds: 'Every change to this record is appended here, with who made it and when.',
+  vaultEmpty: 'No credentials indexed yet.',
+  vaultHolds: 'A credential here is a note about what a key opens and when it was last rotated. The value itself is never in the record.',
   select: 'Select',
   deselect: 'Deselect',
   /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
@@ -312,7 +352,10 @@ export const copy = {
   /* The two questions an audit log exists to answer, as the labels of the two controls. */
   auditWho: 'Who',
   auditWhat: 'What kind of change',
-  auditNone: 'Nothing in the log matches that.',
+  /* A DAY-ONE SENTENCE, because this is now the `no-data-yet` title and the filtered case has its
+     own. "Nothing in the log matches that" was drawn for both, so an empty record and a filter that
+     missed said the same thing — and the empty record has not been asked anything. */
+  auditNone: 'Nothing in the log yet.',
   /* THE INBOX. `pattern` and `claimed` are the schema's words for a thing a person would call a
      rule, and what they are being offered is not a pattern — it is what happens to the NEXT one. */
   ruleOffer: 'A rule that would have filed this, and the next one like it',
@@ -421,8 +464,14 @@ export const copy = {
   diffNavKept: 'shown, not applied. Your sidebar is yours',
   diffUnread: 'This record has not read the pack yet, so the shape of each arrives with the file.',
   /* `02 §1`: a name another pack ships is a name this one cannot own, and the whole install is one
-     transaction — so it does not half-apply. */
-  diffRefused: 'Installing is refused while a name collides. Nothing would be applied.',
+     transaction — so it does not half-apply.
+
+     AND IT NAMES WHAT COLLIDES. "Installing is refused while a name collides" said the shape of the
+     rule and not the fact: the reader is looking at a disabled button and the one thing they need is
+     WHICH name, because it is the only part of this they can act on — drop the pack, or ask its
+     author to rename. `10 §7`'s fourth rule, on a screen rather than in an envelope. */
+  diffRefused: (names: string[]) =>
+    `${names.join(' and ')} ${names.length === 1 ? 'is already a list' : 'are already lists'} on this record, and a pack cannot take a name another one owns. Nothing would be applied.`,
   packBlurb: 'A pack adds ready-made lists and pages. Readable text; nothing runs.',
 
   /* settings */

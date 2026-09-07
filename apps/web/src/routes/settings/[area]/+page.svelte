@@ -63,6 +63,22 @@
   const area = $derived(page.params.area ?? 'appearance');
 
   /**
+   * WHETHER THIS IS AN AREA AT ALL, which nothing asked.
+   *
+   * `area` came straight off the param with no membership test, and every screen downstream believed
+   * it: `/settings/banana` gave `<title>Banana · Settings</title>`, an `<h1>Banana</h1>`, and a
+   * `no-data-yet` state reading "This area is part of the shell and is not wired in the mock-up" —
+   * a page answering a nonexistent address by asserting the feature exists and is merely
+   * unconfigured.
+   *
+   * `/r/nope`, `/v/nope` and `/p/nope` all refuse this correctly and helpfully, naming the thing,
+   * saying it is not here, and listing what is. Three route families got it right and the fourth
+   * invented an area. `10 §7`'s fourth rule holds on a URL as much as on a write: the refusal is
+   * the teacher.
+   */
+  const known = $derived(AREAS.find((a) => a.id === area));
+
+  /**
    * NINE OF TWELVE AREAS WERE UNREACHABLE ON A PHONE.
    *
    * Below 900px the rail becomes a horizontal scroller — `scrollWidth 1294` inside `clientWidth
@@ -190,9 +206,21 @@
   }
 </script>
 
-<svelte:head><title>{titleOf(area.replace(/^./, (c) => c.toUpperCase()), copy.settings)}</title></svelte:head>
+<svelte:head><title>{titleOf(known?.label, copy.settings)}</title></svelte:head>
 
-<PageHead icon="settings" kicker={copy.settings} title={area.replace(/^./, (c) => c.toUpperCase())} />
+{#if !known}
+  <div class="gone">
+    <Empty
+      kind="error"
+      heading
+      title={copy.noSuch('settings area', area)}
+      body={copy.theseExist('Settings areas', AREAS.map((a) => a.label))}
+    >
+      {#snippet actions()}<Button href="/settings/appearance">{copy.settings}</Button>{/snippet}
+    </Empty>
+  </div>
+{:else}
+<PageHead icon="settings" kicker={copy.settings} title={known.label} />
 
 <div class="shell">
   <nav class="areas" bind:this={rail} aria-label={copy.settings}>
@@ -766,21 +794,19 @@
           >
         </div>
       </Section>
-    {:else}
-      <Section title={area.replace(/^./, (c) => c.toUpperCase())}>
-        <Empty
-          kind="no-data-yet"
-          title="Nothing configured yet."
-          body="This area is part of the shell and is not wired in the mock-up."
-        />
-      </Section>
     {/if}
 
     <p class="mock">{copy.mockNotice} {PACKS.length} packs, {Object.keys(REGISTERS).length} lists.</p>
   </div>
 </div>
+{/if}
 
 <style>
+  /* The refusal stands alone, with the area rail gone: there is no area to be in. */
+  .gone {
+    padding: var(--sp-6) var(--sp-5);
+  }
+
   /* A short list of stated facts, for the three areas that REPORT rather than offer. Two columns so
      the label and the value line up down the page; it wraps to one below 520px. */
   .facts {
