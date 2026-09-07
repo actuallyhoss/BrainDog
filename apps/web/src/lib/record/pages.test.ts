@@ -177,7 +177,7 @@ const chipsOf = (href: string): Filter[] =>
 const cut = () =>
   Object.keys(pages()).flatMap((slug) =>
     (page(slug)?.blocks ?? [])
-      .filter((b) => b.register && b.total > b.entries.length)
+      .filter((b) => b.register && b.total > b.shown)
       .map((b) => ({ slug, block: b })),
   );
 
@@ -190,11 +190,11 @@ test('A BLOCK THAT DRAWS A SLICE IS A BLOCK THAT SAYS SO', () => {
   assert.ok(slices.length > 0, 'nothing in the seed truncates, so the surface cannot be checked here');
 
   for (const { slug, block } of slices) {
-    assert.equal(block.rows.length, block.entries.length, `${slug}: the drawn rows and the drawn entries disagree`);
-    assert.equal(block.entries.length, block.limit ?? 50, `${slug}: a block was cut somewhere other than its limit`);
+    assert.equal(block.rows.length, block.shown, `${slug}: the drawn rows and the drawn count disagree`);
+    assert.equal(block.shown, block.limit ?? 50, `${slug}: a block was cut somewhere other than its limit`);
     /* THE TOTAL IS THE WHOLE ANSWER, not the page. A count that is also capped is a count that
        cannot tell a short list from a narrow one, which is the reason the line exists at all. */
-    assert.ok(block.total > block.entries.length, `${slug}: total did not survive the cut`);
+    assert.ok(block.total > block.shown, `${slug}: total did not survive the cut`);
     assert.equal(block.total, block.matched.length, `${slug}: total is not what the predicate admitted`);
   }
 });
@@ -226,4 +226,28 @@ test('an unfiltered block still links to its register, and every link is one the
       assert.match(href, /^\/r\/[a-z_]+(\?|$)/, `${slug}: ${href} is not a register address`);
       assert.ok(!href.includes(' '), `${slug}: a raw space reached a URL`);
     }
+});
+
+test('EVERY block counts what it is showing, in the unit its total is in', () => {
+  /* "Showing 0 of 58" over thirteen visible rows, on `/p/money`'s cash walk, one hour after the line
+     shipped. `entries` is a register row and a step of a walk is not one, so `forecast.runway` left
+     it empty; `rows` was no better, because the walk's first row is the opening balance — a header
+     wearing a row's clothes, and not one of the 58. The count is now stated by whoever builds the
+     block, and this is the assertion that it always is. */
+  for (const slug of Object.keys(pages()))
+    for (const block of page(slug)?.blocks ?? []) {
+      if (block.refusals.length) continue;
+      assert.equal(typeof block.shown, 'number', `${slug}: a block with no count of what it draws`);
+      assert.ok(block.shown <= block.total, `${slug}: "${block.heading}" draws ${block.shown} of ${block.total}`);
+      /* A BLOCK THAT SHOWS NOTHING AND HOLDS SOMETHING IS THE BUG THIS TEST IS NAMED AFTER. */
+      if (block.total > 0) assert.ok(block.shown > 0, `${slug}: "${block.heading}" holds ${block.total} rows and admits to drawing none`);
+    }
+});
+
+test('and the walk counts steps, not the opening balance beside them', () => {
+  const walk = (page('money')?.blocks ?? []).find((b) => b.source === 'forecast.runway');
+  assert.ok(walk, 'the money page no longer draws a cash walk, so this proves nothing');
+  /* The opening row is drawn and is not a step: `rows` is one longer than `shown`, deliberately. */
+  assert.equal(walk.rows.length, walk.shown + 1, 'the walk lost its opening row, or started counting it');
+  assert.ok(walk.total > walk.shown, 'the seeded walk no longer runs past its limit');
 });

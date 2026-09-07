@@ -15,7 +15,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { relative } from 'braindog-render';
+  import { TONES, relative } from 'braindog-render';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { copy } from '$lib/copy.ts';
   import { NOW, VAULT } from '$lib/record/api.ts';
@@ -65,7 +65,14 @@
               {copy.reveal}
             </Button>
           </span>
+          <!-- A STALE CREDENTIAL WAS AMBER AND NOTHING ELSE. `13 §5.1`: colour never carries
+               meaning alone. "14 months ago" in warn amber says "rotate this" to somebody who sees
+               the amber and says nothing at all to anybody else — on the one screen in the product
+               where not noticing has a cost measured in somebody else's access to your accounts. -->
           <span class="line-when" data-intent={c.stale ? 'warn' : undefined}>
+            {#if c.stale}
+              <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
+            {/if}
             {relative(c.rotated, NOW)}
           </span>
         </div>

@@ -14,6 +14,7 @@
   of them having been written second.
 -->
 <script lang="ts">
+  import { TONES } from 'braindog-render';
   import { REGISTERS, dirOf, display, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
 
@@ -29,6 +30,11 @@
    * `good` — which the grid renders as a bar down the leading edge. On a phone that disappeared, so
    * an overdue invoice and a paid one were the same card, on the surface where somebody is most
    * likely to be looking for exactly that.
+   *
+   * AND THE BAR ALONE IS STILL COLOUR ALONE. `13 §5.1`: "Colour never carries meaning alone. The
+   * glyph is part of the intent token, not a choice at the call site." A card wearing `data-intent`
+   * and nothing else says nothing at all to a screen reader and nothing to anybody who does not see
+   * red — which on this surface is every overdue invoice in the register.
    */
   const toneFor = (e: Entry) => toneOf(register, e);
 </script>
@@ -38,7 +44,12 @@
     {#each entries as e (e.seq)}
       <li>
         <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
-          <span class="card-seq">#{e.seq}</span>
+          <span class="card-seq">
+            {#if toneFor(e)}
+              <span class="glyph" role="img" aria-label={TONES[toneFor(e)!].label}>{TONES[toneFor(e)!].glyph}</span>
+            {/if}
+            #{e.seq}
+          </span>
           <span class="card-title" dir={dirOf(register, decl.mobile[0])}>
             {display(register, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}
           </span>

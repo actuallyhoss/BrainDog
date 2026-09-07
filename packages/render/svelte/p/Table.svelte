@@ -25,6 +25,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { TONES } from '../../src/index.ts';
   import { chunkRows, type Column, type TableRow } from '../types.ts';
 
   let {
@@ -64,6 +65,31 @@
      one on screen. It is also where `chunk={0}` stops being an endless loop during render. */
   const grouped = $derived(chunkRows(rows, chunk));
 
+  /**
+   * DOES ANY ROW CARRY A TONE? If none does, no row pays for the gutter one would sit in.
+   *
+   * `13 §5.1` is unambiguous: "Colour never carries meaning alone. The glyph is part of the intent
+   * token, not a choice at the call site — a component cannot render `warn` without its glyph
+   * because there is no API that lets it." Six primitives keep it. THIS ONE DID NOT. A toned row got
+   * a two-pixel bar down its leading edge and nothing else: measured on `/r/obligations`, 16 rows
+   * carrying an intent and 0 elements with a name for it, so an overdue invoice and a paid one were
+   * the same row to a screen reader and the same row to anybody who does not see red.
+   *
+   * It is the primitive that carries most of the record — the register grid, every `table` block,
+   * and the phone cards — which is why it is the one that mattered.
+   */
+  const toned = $derived(rows.some((r) => r.tone));
+
+  /**
+   * THE FIRST COLUMN THAT CARRIES A VALUE, which is not always the first column.
+   *
+   * The register grid leads with the row picker — a column whose cells are a checkbox and whose
+   * `hideLabel` says exactly that. Putting the mark there sat it on top of the checkbox: a glyph
+   * qualifying a control instead of a row. `hideLabel` is already the declaration for "this column
+   * is a control, not a value", so it is the one this reads.
+   */
+  const lead = $derived(Math.max(0, columns.findIndex((c) => !c.hideLabel)));
+
   /** Roving tabindex: exactly one cell is reachable by Tab, every other is -1. */
   const isFocused = (r: number, c: number) => focus?.row === r && focus?.col === c;
   const tabIndex = (r: number, c: number) =>
@@ -97,7 +123,12 @@
   nothing cut, and no horizontal scroll on the surface `13 §10` says is for reading.
 -->
 {#snippet card(row: TableRow)}
-  <span class="table-card-lead">{row.cells[0]}</span>
+  <span class="table-card-lead">
+    {#if row.tone}
+      <span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
+    {/if}
+    {row.cells[0]}
+  </span>
   {#each columns.slice(1) as column, i}
     {#if row.cells[i + 1]}
       <span class="table-card-pair">
@@ -133,6 +164,7 @@
   <div
     class="table"
     role="grid"
+    data-toned={toned ? '' : undefined}
     aria-rowcount={total}
     aria-colcount={columns.length}
     style="--cols:{tracks}"
@@ -180,9 +212,29 @@
                 tabindex={tabIndex(index, c)}
                 data-align={column.align ?? 'start'}
                 data-truncate={column.truncate ?? 'end'}
+                data-lead={c === lead ? '' : undefined}
                 onclick={() => onactivate?.(row)}
                 onkeydown={(e) => e.key === 'Enter' && onactivate?.(row)}
               >
+                <!-- IN THE FIRST CELL, AND AT ITS HEAD.
+
+                     Inside a cell because the only children `role="row"` admits are cells: a glyph
+                     hung on the row itself is a stray node in the accessibility tree, which is the
+                     same mistake the cap line was making one element up.
+
+                     In the FIRST cell because that is where `List` puts it and says why — "a tone
+                     belongs to the thing it qualifies, and five hundred pixels away it belongs to
+                     nothing" — and at its head because the rest of that cell truncates. A glyph
+                     after the text is a glyph the ellipsis eats on exactly the narrow rows that
+                     needed it. It also lands on the same edge as the colour bar, so the two channels
+                     say one thing in one place.
+
+                     THE GUTTER IS RESERVED FOR THE COLUMN, NOT FOR THE ROW. Otherwise the toned rows
+                     indent and the column's left edge goes ragged, which reads as five different
+                     columns rather than one column with five marks in it. -->
+                {#if c === lead && row.tone}
+                  <span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
+                {/if}
                 {#if cellSnippet}{@render cellSnippet(row, column, value)}
                 {:else if value === null}<span class="missing">—</span>
                 {:else}{value}{/if}

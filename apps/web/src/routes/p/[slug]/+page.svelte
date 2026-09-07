@@ -338,7 +338,7 @@
   function resolveExtra(block: PageBlock): BlockResult {
     const template = result?.blocks.find((b) => b.register === block.source?.replace('register.', ''));
     return {
-      ...(template ?? { rows: [], entries: [], matched: [], total: 0, drawn: true, stale_at: '' }),
+      ...(template ?? { rows: [], entries: [], matched: [], shown: 0, total: 0, drawn: true, stale_at: '' }),
       ...block,
       columns: (block.columns ?? []).map((c) => ({
         field: c.field,
@@ -597,10 +597,10 @@
               IT IS A `status`, NOT AN ASIDE. The count changes when the rows do, and somebody who
               cannot see the list end short is exactly who needs to be told it did.
             -->
-            {#if !drawn.refusal && block.total > block.entries.length}
+            {#if !drawn.refusal && block.total > block.shown}
               {@const to = openHref(block)}
               <p class="block-slice" role="status">
-                {copy.ofWhichDrawn(block.entries.length, block.total)}{#if to}
+                {copy.ofWhichDrawn(block.shown, block.total)}{#if to}
                   &nbsp;— <a href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
                 {/if}
               </p>

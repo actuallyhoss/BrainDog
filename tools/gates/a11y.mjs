@@ -157,6 +157,8 @@ const skipped = [];
 let checked = 0;
 /** Scenarios whose keystroke did not produce the state it names — a silently dead key. */
 const broken = [];
+/** `element[intent] -> Set<'route scheme@width'>`: a meaning carried by colour and nothing else. */
+const mute = new Map();
 
 for (const app of APPS) {
   if (!(await stat(app.root).catch(() => null))) {
@@ -198,6 +200,18 @@ for (const scheme of ['dark', 'light']) {
           '.rowgroup{content-visibility:visible !important}' +
           '*,*::before,*::after{transition:none !important;animation:none !important}',
       });
+      /* THE GATE'S OWN PROOF THAT ITS NEW RULE LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=intent`
+         a row wearing an intent and carrying no name for it is put into `#main` — the exact bug the
+         rule is for — and the run must go red. Here rather than in a fixture tree for the same
+         reason the layout gate's is: the thing under test is a real browser over a real build. */
+      if (process.env.BRAINDOG_GATE_SEED === 'intent')
+        await page.evaluate(() => {
+          const el = document.createElement('div');
+          el.className = 'seeded';
+          el.dataset.intent = 'bad';
+          el.textContent = 'a meaning carried by colour and nothing else';
+          document.getElementById('main')?.prepend(el);
+        });
       await page.addScriptTag({ content: axeSource });
     };
 
@@ -209,8 +223,47 @@ for (const scheme of ['dark', 'light']) {
           resultTypes: ['violations'],
         });
       });
+      /**
+       * COLOUR NEVER CARRIES MEANING ALONE — `13 §5.1`, and axe cannot decide it.
+       *
+       * "The glyph is part of the intent token, not a choice at the call site. There is exactly one
+       * table mapping intent → (role, glyph), and it is the only path by which an intent reaches the
+       * DOM. A component cannot render `warn` without its glyph because there is no API that lets
+       * it." There WAS such a path: `data-intent` is an attribute, and four components set it and
+       * drew a coloured edge and nothing else. Measured on `/r/obligations`: sixteen rows carrying
+       * an intent, zero elements naming one — so an overdue invoice and a paid one were the same
+       * row to a screen reader and the same row to anybody who does not see red.
+       *
+       * WHAT COUNTS AS NAMED. The intent's own glyph, `role="img"` with the `TONES` label, anywhere
+       * inside the element. That is the shape every primitive that got it right already emits, so
+       * the rule is "do what `List` does" rather than a new contract.
+       *
+       * WHAT IS EXEMPT, and the exemption is narrow: a control whose own text is the meaning. A
+       * button reading `Uninstall` or `Stop the run` is not telling you it is destructive with
+       * colour — it is telling you with the verb, and the colour agrees with it. Same for a count:
+       * `3` beside `Decide` is a number, and the tint is emphasis on a fact already written out.
+       * Everything else — a row, a card, a cell, a panel, a chip — is a colour and nothing else.
+       */
+      const unnamed = await page.evaluate(() => {
+        const out = [];
+        for (const el of document.querySelectorAll('[data-intent]')) {
+          if (el.closest('button, a[href], .count, .badge')?.contains(el) && el.matches('button, a[href], .count, .badge')) continue;
+          if (el.querySelector('[role="img"][aria-label]')) continue;
+          /* A NESTED INTENT IS ONE INTENT. `Block` puts `data-intent` on the figure AND on its own
+             figcaption; the glyph is in the caption, so the figure is named through it. */
+          if (el.querySelector('[data-intent] [role="img"][aria-label]')) continue;
+          out.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}[${el.getAttribute('data-intent')}]`);
+        }
+        return [...new Set(out)];
+      });
+      for (const u of unnamed) {
+        const at = mute.get(u) ?? new Set();
+        at.add(`${app.name} ${where} ${scheme}@${width}`);
+        mute.set(u, at);
+      }
+
       checked++;
-      process.stdout.write(result.violations.length ? '!' : '.');
+      process.stdout.write(result.violations.length || unnamed.length ? '!' : '.');
       for (const v of result.violations) {
         const entry = found.get(v.id) ?? { help: v.help, impact: v.impact, nodes: new Set() };
         for (const n of v.nodes) entry.nodes.add(`${app.name}${where.startsWith('/') ? '' : ' '}${where} ${scheme}@${width}  ${n.target.join(' ')}`);
@@ -266,7 +319,17 @@ const CONTRAST = 'color-contrast';
 const contrast = found.get(CONTRAST);
 found.delete(CONTRAST);
 
-console.log(`  a11y: ${checked} page-runs, ${found.size + (contrast ? 1 : 0)} rule(s) with findings`);
+console.log(
+  `  a11y: ${checked} page-runs, ${found.size + (contrast ? 1 : 0) + (mute.size ? 1 : 0)} rule(s) with findings`,
+);
+
+if (mute.size) {
+  console.error(`
+  intent-without-glyph (serious) — 13 §5.1: colour never carries meaning alone`);
+  for (const [what, at] of [...mute].slice(0, 8))
+    console.error(`      ${what}  ${[...at].slice(0, 3).join(' · ')}${at.size > 3 ? ` …${at.size - 3} more` : ''}`);
+  if (mute.size > 8) console.error(`      ...and ${mute.size - 8} more`);
+}
 
 const show = (id, e) => {
   console.error(`\n  ${id} (${e.impact}) — ${e.help}`);
@@ -285,7 +348,7 @@ if (broken.length) {
   for (const b of broken) console.error(`      ${b}`);
 }
 
-if (found.size || contrast || broken.length) process.exitCode = 1;
+if (found.size || contrast || broken.length || mute.size) process.exitCode = 1;
 /* AND A RUN THAT LOOKED AT NOTHING IS A SKIP, exit 3 — not the green line it used to print. */
 else if (skipped.length) {
   console.log(`  a11y: skipped ${skipped.join(', ')} — no build.`);

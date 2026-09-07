@@ -93,6 +93,33 @@ function seededLayout() {
   }
 }
 
+/**
+ * The a11y gate's `intent-without-glyph` negative, and it cannot be a fixture tree either.
+ *
+ * `13 §5.1`'s rule is about what reaches the DOM, so the only place it can be checked is a rendered
+ * page. `BRAINDOG_GATE_SEED=intent` prepends a `div[data-intent="bad"]` with no name for the
+ * intent — which is precisely the shape four components were shipping — and the gate must go red.
+ */
+function seededIntent() {
+  if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
+    console.log('  a11y: no build, so its negative is not run');
+    return;
+  }
+  const r = spawnSync(process.execPath, [join(here, 'a11y.mjs')], {
+    cwd: join(here, '..', '..'),
+    encoding: 'utf8',
+    env: { ...process.env, BRAINDOG_GATE_SEED: 'intent' },
+  });
+  const said = `${r.stdout}${r.stderr}`;
+  if (r.status === 0 || !said.includes('div.seeded[bad]')) {
+    console.error('  a11y: PASSED an intent with no glyph — colour is carrying meaning alone and nothing sees it.');
+    failed.push('a11y');
+  } else {
+    ran++;
+    console.log('  a11y: red on an intent with no glyph');
+  }
+}
+
 let ran = 0;
 
 for (const { gate, expect, findings, run } of CASES) {
@@ -138,6 +165,7 @@ for (const { gate, expect, findings, run } of CASES) {
 }
 
 seededLayout();
+seededIntent();
 
 /* AND EVERY FIXTURE IS CLAIMED. A directory under `negative/` that no case runs is a violation
    nobody is seeding, which is the same silence this file exists to break. */

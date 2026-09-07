@@ -160,6 +160,22 @@
     margin-block-start: var(--sp-3);
   }
 
+  /* A CALLOUT'S GUTTER. The mark sits beside the first line rather than above it, because a note is
+     one sentence and a glyph on a line of its own turns it into two. The paragraphs keep their own
+     block flow — a grid here would break `measure`'s reading width. */
+  .panel[data-marked] {
+    position: relative;
+    padding-inline-start: calc(var(--sp-4) + 1.4em);
+  }
+
+  .panel-glyph {
+    position: absolute;
+    inset-inline-start: var(--sp-4);
+    inset-block-start: var(--sp-4);
+    color: var(--tone);
+    line-height: inherit;
+  }
+
   blockquote.panel {
     display: flex;
     flex-direction: column;
@@ -642,8 +658,18 @@
     }
 
     .table-card-lead {
+      display: flex;
+      align-items: baseline;
+      gap: var(--sp-2);
       color: var(--ink);
       font-weight: 600;
+    }
+
+    /* On a card the lead is a flex line rather than a truncating cell, so the glyph is simply the
+       first item on it — no gutter to reserve and nothing to absolutely position. */
+    .table-card-lead .td-glyph {
+      position: static;
+      flex: none;
     }
 
     .table-card-pair {
@@ -765,6 +791,33 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* THE TONE'S GUTTER, in the leading column, and only in a table that has a tone to put there.
+
+     A toned row's glyph sits at the head of its first cell; if the space were not reserved on every
+     row, the marked rows would indent by an em and the column's left edge would go ragged — which
+     scans as several columns rather than one column with marks in it. Scoped to `[data-toned]` so a
+     table with no intent in it pays nothing for the gutter it would never use. */
+  .table[data-toned] .td[data-lead] {
+    position: relative;
+    padding-inline-start: calc(var(--sp-3) + 1.2em);
+  }
+
+  .td-glyph {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: var(--sp-3);
+    display: inline-flex;
+    align-items: center;
+    color: var(--tone);
+    /* The row's own bar is `--tone-fill`; the glyph is the readable weight of the same intent. A
+       glyph is text, so it takes the pair that has to survive a contrast check. */
+    font-size: var(--t-sm);
+    /* The cell sets `line-height: var(--row-h)` to centre one line of text. An absolutely positioned
+       box takes its own line box and inherited that height, which pushed the glyph below the middle
+       of the row — visible as a mark sitting under its own row rather than in it. */
+    line-height: 1;
+  }
+
   /* A figure NEVER truncates. A truncated figure is not shortened, it is wrong (13 §4.2). */
   .td[data-truncate='never'] {
     overflow: visible;
@@ -782,6 +835,21 @@
   .tr[data-focused] {
     background: var(--s2);
     box-shadow: inset 2px 0 0 0 var(--accent);
+  }
+
+  /* THE TONE'S COLOUR IS DROPPED ON A SELECTED ROW, AND THE SHAPE IS NOT.
+
+     Selection washes the row with 12% of the accent, which in the house theme is the same red the
+     `bad` tone is — and `--tone` over that composed surface measures 4.34:1, under the 4.5 floor.
+     The theme's proof certifies token PAIRS against declared surfaces; a surface mixed at the call
+     site is not one of them, and the honest answer is not to put a certified pair on it.
+
+     Dropping the colour costs nothing, which is the whole argument of `13 §5.1`: the glyph carries
+     the meaning and the colour is the second channel. ✓ · ⚠ · ⊘ · ⓘ are four different marks before
+     they are four different colours, and on the one row in the grid that is tinted for another
+     reason entirely, one channel saying one thing is better than two saying two. */
+  .rowgroup .tr[aria-selected='true'] .td-glyph {
+    color: var(--ink2);
   }
 
   /* A SELECTED row is tinted, and a focused one keeps its band. They are different facts — "one of

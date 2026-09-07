@@ -199,6 +199,16 @@ export type PageBlock = {
     every?: { field: string; months: Readonly<Record<string, number>> };
   }[];
 
+  /**
+   * `forecast.runway` only: how many days ahead the walk looks. 180 when it is not declared.
+   *
+   * IT IS A BUSINESS QUESTION AND `limit:` IS A SCREEN QUESTION. The block derived one from the
+   * other — twelve times however many rows fit — so a page declaring twelve rows got a 144-day
+   * forecast while its own `empty:` sentence promised six months. The kernel's `PageBlock` has
+   * carried this key since it was written and nothing on this side read it.
+   */
+  horizon?: number;
+
   /** Mandatory on every source-bound block. An empty state that says nothing is a dead end, and a
       record is MOSTLY empty on day one (06 §1). */
   empty?: string;

@@ -99,6 +99,16 @@
                 {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}
+
+            <!-- AND IT SAYS IT IS A SLICE HERE TOO, WITHOUT THE WAY OUT.
+
+                 A shared link is the one surface read by somebody who has no account, no rail and no
+                 register to open — which makes an unannounced cut worse here than anywhere, not
+                 better: the reader cannot notice the list is short by comparing it against anything.
+                 They get the two numbers and no link, because there is nowhere they may go. -->
+            {#if !drawn.refusal && block.total > block.shown}
+              <p class="block-slice" role="status">{copy.ofWhichDrawn(block.shown, block.total)}</p>
+            {/if}
           </section>
         {/if}
       {/each}
@@ -111,6 +121,13 @@
 </div>
 
 <style>
+  .block-slice {
+    margin: 0;
+    padding-block-start: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
   .shared {
     max-inline-size: 1000px;
     margin-inline: auto;

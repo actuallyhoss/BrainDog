@@ -985,6 +985,17 @@ export type BlockResult = PageBlock & {
   matched: Entry[];
   /** What the `where:` could not understand, in words. Empty when it understood all of it. */
   refusals: string[];
+  /**
+   * HOW MANY OF THE ANSWER THIS BLOCK IS SHOWING, against `total`.
+   *
+   * It is not `entries.length` and it is not `rows.length`, and the surface that said "Showing 0 of
+   * 58" over thirteen visible rows had used both. A `forecast.runway` block has no `entries` — a
+   * step of a cash walk is not a register row — and its `rows` carry a fourteenth that is not a
+   * step: the opening balance, which is a header wearing a row's clothes.
+   *
+   * So the count is stated by whoever builds the block, in the unit the block's own total is in.
+   */
+  shown: number;
   total: number;
   drawn: boolean;
   /** Machine-readable, and every block that renders a query result carries one: staleness is a
@@ -1009,7 +1020,16 @@ function runwayBlock(b: PageBlock): BlockResult {
      page said GBP 5,000 — so the tile and the block it sat beside disagreed by 8.4 times, in the
      one figure this product computes about the future. A block with no `opening:` gets none, and
      the walk says so rather than inventing a balance. */
-  const walk = runway(b.opening ?? 0, b.from ?? [], b.limit ? b.limit * 12 : 180);
+  /* HOW FAR AHEAD IS A BUSINESS QUESTION; `limit:` IS A SCREEN QUESTION.
+     
+     This read `b.limit ? b.limit * 12 : 180`, so the horizon was twelve times however many rows fit
+     on the page — 144 days for a block declaring twelve — while the block's own `empty:` sentence
+     read "Nothing dated in the next six months." Two answers to how far the forecast looks, in one
+     declaration, and neither was the `horizon:` key `PageBlock` has always carried and nothing read.
+     
+     It mattered the moment the block started stating its total: "12 of 58" where 58 was movements
+     inside a window derived from a row count. */
+  const walk = runway(b.opening ?? 0, b.from ?? [], b.horizon);
   const columns = [
     { field: 'day', label: 'When', width: 'minmax(10ch,auto)', align: 'start' as const, truncate: 'end' as const },
     { field: 'what', label: 'What', width: 'minmax(16ch,1fr)', align: 'start' as const, truncate: 'end' as const },
@@ -1027,6 +1047,7 @@ function runwayBlock(b: PageBlock): BlockResult {
     entries: [],
     matched: [],
     refusals,
+    shown: steps.length,
     rows: [
       /* THE OPENING IS A ROW, because every balance under it is that number plus a movement. It was
          nowhere on the screen: the first row read "In and out −9,190.00 · Balance −4,190.00", which
@@ -1100,7 +1121,7 @@ function drawnWhen(b: PageBlock): boolean {
  */
 const READS = new Set([
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
-  'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from',
+  'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -1129,6 +1150,7 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
         matched: [],
         refusals: [`${e instanceof Error ? e.message : String(e)} — this block could not be read`],
         rows: [],
+        shown: 0,
         total: 0,
         drawn: b.drawn ?? drawnWhen(b),
         stale_at: new Date(NOW).toISOString(),
@@ -1196,6 +1218,7 @@ function readBlock(b: PageBlock): BlockResult {
       matched,
       refusals: said,
       rows: toRows(register ?? '', entries, columns),
+      shown: entries.length,
       total: matched.length,
       drawn: b.drawn ?? drawnWhen(b),
       stale_at: new Date(NOW).toISOString(),
