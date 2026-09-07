@@ -10,9 +10,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from './copy.ts';
+import { firstRun } from './first-run.ts';
 import { addKey, plain } from './start.ts';
 
-const CHOICES = copy.firstChoices;
+const CHOICES = firstRun.firstChoices;
 
 test('EVERY WORD ON A TILE RESOLVES, and so does every register id', () => {
   for (const c of CHOICES) {

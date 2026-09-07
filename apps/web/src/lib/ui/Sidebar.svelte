@@ -31,6 +31,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
+  import { group } from '../nav.ts';
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
@@ -100,14 +101,7 @@
       .map((x) => x.e);
   });
 
-  const sections = $derived.by(() => {
-    const out = new Map<string, NavEntry[]>();
-    for (const e of ordered) {
-      if (!out.has(e.section)) out.set(e.section, []);
-      out.get(e.section)!.push(e);
-    }
-    return [...out];
-  });
+  const sections = $derived(group(nav));
 
   /**
    * Move one item, one place, WITHIN ITS SECTION.

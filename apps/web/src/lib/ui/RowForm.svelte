@@ -23,6 +23,7 @@
   import type { FieldDecl } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
   import { copy } from '../copy.ts';
+  import { firstRun } from '../first-run.ts';
   import Icon from './Icon.svelte';
 
   /**
@@ -57,17 +58,17 @@
    * 400 and 900 ms after choosing a tile. `19 §6` budgets thirty seconds from landing to typing one
    * true fact; the budget could not start until somebody noticed the box and clicked it.
    *
-   * THE BINDING IS ON THE FIELD'S WRAPPER, not on an input. This form draws nine different controls
-   * depending on the declared type, so one `bind:this` per branch is nine places to forget; the
-   * wrapper is always there and always holds exactly one control.
+   * THE BINDING IS ON THE FORM, not on an input. This draws nine different controls depending on the
+   * declared type, so one `bind:this` per branch is nine places to forget — and the form is always
+   * there, in document order, so its first focusable descendant IS the first field.
    */
-  let firstField = $state<HTMLElement | undefined>(undefined);
+  let form = $state<HTMLFormElement | undefined>(undefined);
   let placed = false;
 
   $effect(() => {
-    if (!autofocus || placed || !firstField) return;
+    if (!autofocus || placed || !form) return;
     placed = true;
-    firstField.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+    form.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
   });
 
   const decl = $derived(REGISTERS[register]);
@@ -203,14 +204,14 @@
   });
 </script>
 
-<form class="row-form" onsubmit={(e) => e.preventDefault()}>
+<form class="row-form" bind:this={form} onsubmit={(e) => e.preventDefault()}>
   {#each fields as f, i}
-    <div class="row-field" data-type={f.type} {@attach (el) => void (i === 0 && (firstField = el))}>
+    <div class="row-field" data-type={f.type}>
       <!-- `for` ONLY WHERE THERE IS SOMETHING TO POINT AT. The segmented branch renders no element
            carrying `id(f)`, so both the label's `for` and the group's `aria-labelledby` pointed at
            an id that does not exist — which is a label announced as attached to nothing. -->
       <label class="row-label" id={labelId(f)} for={f.type === 'enum' && (f.values?.length ?? 0) <= 4 ? undefined : id(f)}>
-        <!-- ON THE FIRST RUN THE TITLE FIELD IS ASKED FOR AS A FACT. `copy.firstField` had a
+        <!-- ON THE FIRST RUN THE TITLE FIELD IS ASKED FOR AS A FACT. `firstRun.firstField` had a
              sentence per register — "Your first invoice", "The first person" — and was referenced
              nowhere, so the one screen `19 §6` writes a budget for asked for `Description`. -->
         {label && f.id === decl?.title ? label : labelOf(f)}

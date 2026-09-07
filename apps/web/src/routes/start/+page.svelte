@@ -19,6 +19,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
+  import { firstRun } from '$lib/first-run.ts';
   import { addKey } from '$lib/start.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -31,7 +32,7 @@
 
   /* The five live in `copy.ts` with every other sentence in the product, so the scope this screen
      claims can be checked against the rest of it in one pass rather than found in a component. */
-  const CHOICES = copy.firstChoices;
+  const CHOICES = firstRun.firstChoices;
 
   let picked = $state<string | null>(null);
   /* What the generated form would refuse, bound out of it so the button can be dead while it is
@@ -142,8 +143,8 @@
   }
 
   async function copyCommand() {
-    await navigator.clipboard?.writeText(copy.agentCommand).catch(() => {});
-    toasts.push(copy.agentCopied);
+    await navigator.clipboard?.writeText(firstRun.agentCommand).catch(() => {});
+    toasts.push(firstRun.agentCopied);
   }
 </script>
 
@@ -161,12 +162,12 @@
     {#if !choice}
       <!-- SAY WHAT THIS IS BEFORE ASKING WHAT THEY WANT. The question on its own let the three
            examples under it define the product, and three examples always define it downward. -->
-      <h1 class="lede">{copy.firstLede}</h1>
-      <p class="body">{copy.firstBody}</p>
+      <h1 class="lede">{firstRun.firstLede}</h1>
+      <p class="body">{firstRun.firstBody}</p>
 
-      <h2 class="question">{copy.firstQuestion}</h2>
+      <h2 class="question">{firstRun.firstQuestion}</h2>
 
-      <div class="choices" role="group" aria-label={copy.firstQuestion} bind:this={choices}>
+      <div class="choices" role="group" aria-label={firstRun.firstQuestion} bind:this={choices}>
         {#each CHOICES as c, i}
           <!-- The register id used to sit on the right of every row. It is the app's own vocabulary
                explained to somebody who has not agreed to learn it yet, on the one screen where
@@ -183,22 +184,22 @@
         {/each}
       </div>
 
-      <p class="hint">{copy.firstHint}</p>
+      <p class="hint">{firstRun.firstHint}</p>
 
       <section class="agent" aria-labelledby="agent-h">
-        <h2 class="agent-h" id="agent-h"><Icon name="session" size="m" />{copy.agentTitle}</h2>
-        <p class="agent-body">{copy.agentBody}</p>
+        <h2 class="agent-h" id="agent-h"><Icon name="session" size="m" />{firstRun.agentTitle}</h2>
+        <p class="agent-body">{firstRun.agentBody}</p>
         <div class="agent-cmd">
           <!-- Focusable, because at 390 the command is wider than the card and scrolls. A scrolling
                box a keyboard cannot reach is a box a keyboard cannot read (WCAG 2.1.1) — the same
                fix the sheet body and the declaration block already carry. -->
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <code tabindex="0" aria-label={copy.agentCopy}>{copy.agentCommand}</code>
-          <button type="button" class="agent-copy" onclick={copyCommand} aria-label={copy.agentCopy}>
+          <code tabindex="0" aria-label={firstRun.agentCopy}>{firstRun.agentCommand}</code>
+          <button type="button" class="agent-copy" onclick={copyCommand} aria-label={firstRun.agentCopy}>
             <Icon name="copy" size="s" />
           </button>
         </div>
-        <p class="agent-note">{copy.agentNote}</p>
+        <p class="agent-note">{firstRun.agentNote}</p>
       </section>
     {:else}
       <h1 class="question step">{choice.field}</h1>
@@ -230,7 +231,7 @@
             register={choice.key}
             first
             autofocus
-            label={copy.firstField[choice.key]}
+            label={firstRun.firstField[choice.key]}
             bind:problems
           />
         {/key}

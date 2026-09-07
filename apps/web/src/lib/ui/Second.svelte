@@ -20,6 +20,7 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { firstRun } from '$lib/first-run.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
@@ -30,7 +31,7 @@
   /* THE OTHER STARTERS, and only the ones this record does not already have. Offering a register
      somebody holds is offering to do something that is already done, which is the shape of every
      onboarding people learn to ignore. */
-  const rest = $derived(copy.firstChoices.filter((c) => c.key !== register && !held.includes(c.key)));
+  const rest = $derived(firstRun.firstChoices.filter((c) => c.key !== register && !held.includes(c.key)));
 
   /**
    * WHEN THIS IS THE SCREEN THEY JUST LANDED ON.
@@ -48,8 +49,8 @@
 
 {#if show}
   <section class="second" aria-labelledby="second-h">
-    <h2 id="second-h">{copy.secondHeading}</h2>
-    <p class="body">{copy.secondBody}</p>
+    <h2 id="second-h">{firstRun.secondHeading}</h2>
+    <p class="body">{firstRun.secondBody}</p>
 
     <ul class="rest">
       {#each rest.slice(0, 3) as c (c.key)}
@@ -66,7 +67,7 @@
     <!-- AND THE WORD, HERE, FOR THE FIRST TIME. Defined in place in one clause, which is the rule
          every term in this product is introduced under (19 §9). -->
     <p class="packs">
-      {copy.secondPacks}
+      {firstRun.secondPacks}
       <Button href="/packs" weight="bare">Browse packs</Button>
     </p>
   </section>

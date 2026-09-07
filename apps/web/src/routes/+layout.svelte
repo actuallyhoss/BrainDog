@@ -38,6 +38,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Palette from '$lib/palette/Palette.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
+  import { group } from '$lib/nav.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -57,14 +58,7 @@
   let moreOpen = $state(false);
 
   /** The same sectioned grouping the rail does, so one nav is not a different shape from the other. */
-  const grouped = $derived.by(() => {
-    const out = new Map<string, typeof data.nav>();
-    for (const e of data.nav) {
-      if (!out.has(e.section)) out.set(e.section, []);
-      out.get(e.section)!.push(e);
-    }
-    return [...out];
-  });
+  const grouped = $derived(group(data.nav));
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */

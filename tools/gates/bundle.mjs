@@ -11,9 +11,9 @@
  *   node tools/gates/bundle.mjs [--report]
  */
 
-import { readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { brotliCompressSync, constants } from 'node:zlib';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import { budget } from './lib.mjs';
 
@@ -29,14 +29,59 @@ const brotli = (buf) =>
 const KB = (n) => `${(n / 1024).toFixed(1)} KB`;
 
 let manifest;
+let built;
 try {
-  manifest = JSON.parse(await readFile(join(CLIENT, '.vite/manifest.json'), 'utf8'));
+  const at = join(CLIENT, '.vite/manifest.json');
+  manifest = JSON.parse(await readFile(at, 'utf8'));
+  built = (await stat(at)).mtimeMs;
 } catch {
   /* EXIT 3 IS A SKIP, NOT A PASS. Exiting 0 with no build made `pnpm gates` report ten gates
      passed on a fresh checkout while three of them had examined nothing — the same silence the
      self-test exists to break, one level up. The runner names a skip and is red under CI. */
   console.log('  bundle: no build to measure — run `pnpm --filter @braindog/web build` first');
   process.exit(3);
+}
+
+/**
+ * AND A BUILD OLDER THAN THE SOURCE IS NOT A MEASUREMENT.
+ *
+ * THIS GATE HAS BEEN REPORTING ON CODE THAT IS NOT THE CODE. A missing build was already a skip —
+ * the paragraph above argues it carefully — and a STALE one was a pass: `pnpm gates` measured
+ * whatever `build/` happened to hold, so a session that edited the shell and ran the gates without
+ * rebuilding got a green entry-chunk row about the previous version. That is the same silence one
+ * level up again, and it is how 116 bytes of growth got three commits past the gate that exists to
+ * catch exactly that.
+ *
+ * IT IS A SKIP AND NOT A FAILURE, because "you have not built" is not "you have broken something",
+ * and the runner is red on a skip under CI either way.
+ */
+const newest = await newestSource(join(APP, 'src'));
+if (newest.when > built) {
+  console.log(
+    `  bundle: the build is older than ${relative(APP, newest.at)} — run \`pnpm --filter @braindog/web build\` first`,
+  );
+  process.exit(3);
+}
+
+/**
+ * The most recently touched source file under a directory, and which one it was.
+ *
+ * The name comes back with the time because a gate that says "the build is stale" and not WHICH file
+ * made it stale is a gate somebody re-runs blind.
+ */
+async function newestSource(dir) {
+  let when = 0;
+  let at = dir;
+  for (const e of await readdir(dir, { withFileTypes: true, recursive: true })) {
+    if (!e.isFile()) continue;
+    const full = join(e.parentPath ?? e.path, e.name);
+    const t = (await stat(full)).mtimeMs;
+    if (t > when) {
+      when = t;
+      at = full;
+    }
+  }
+  return { when, at };
 }
 
 /** Everything statically reachable from an entry. A dynamic import is a separate chunk by design. */

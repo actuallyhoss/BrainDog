@@ -19,7 +19,7 @@
   import { copy } from '$lib/copy.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
-  import { draw } from '$lib/record/blocks.ts';
+  import { draw, saidPlainly } from '$lib/record/blocks.ts';
   import type { PageBlock, PageDecl } from '$lib/record/schema.ts';
   import { PAGES } from '$lib/record/data.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -96,12 +96,15 @@
    * A resolved page knows its own parameter, so the comparison is exact.
    */
   const param = $derived(result?.page.param);
-  const whereOf = (block: { where?: string | undefined }): string =>
-    (block.where ?? '')
-      .split(',')
-      .map((c) => c.trim())
-      .filter((c) => c && !(param && c.toLowerCase() === `thing is ${param.title.toLowerCase()}`))
-      .join(', ');
+  const whereOf = (block: { register?: string | undefined; where?: string | undefined }): string =>
+    saidPlainly(
+      block.register ?? '',
+      (block.where ?? '')
+        .split(',')
+        .map((c) => c.trim())
+        .filter((c) => c && !(param && c.toLowerCase() === `thing is ${param.title.toLowerCase()}`))
+        .join(', '),
+    );
 
   /**
    * The blocks in the order and at the widths currently in force, each carrying the index it had in
@@ -522,7 +525,13 @@
                      a heading on the Kiln page is the one fact the reader cannot be missing. -->
                 <a class="block-source" href="/r/{block.register}">
                   {REGISTERS[block.register]?.name ?? block.register}
-                  {#if whereOf(block)}<span class="block-where">{whereOf(block)}</span>{/if}
+                  <!-- AND IT SAYS THAT IT IS A FILTER. `/v/<view>` labels the identical string
+                       `FILTER`, so the word existed and the page blocks did not use it — leaving an
+                       unlabelled clause of machine grammar under a heading, which a reader can only
+                       take for part of the title. -->
+                  {#if whereOf(block)}
+                    <span class="block-where"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
+                  {/if}
                   <Kbd keys="o" />
                 </a>
               {/if}
@@ -654,6 +663,14 @@
      same thing and costs nothing, because the ceiling has room and the floor does not. */
   .block-where {
     color: var(--dim);
+  }
+
+  /* The word, quieter than the clause it introduces: it is a label and the clause is the fact. */
+  .block-where-lead {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .source {

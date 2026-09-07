@@ -37,6 +37,7 @@
 import { money, parse, relative } from 'braindog-render';
 import { KINDS, isKind } from 'braindog-render';
 import { NOW, REGISTERS, display, type BlockResult } from './api.ts';
+import { declaredValue } from './where.ts';
 import { asMoney, merge, mixedFix, total, type Total } from './money.ts';
 
 /**
@@ -375,4 +376,53 @@ export function draw(
     segments,
     refusal: blank ? nothing() : null,
   };
+}
+
+/**
+ * A `where:` clause as a person would read it.
+ *
+ * EVERY BLOCK ON EVERY DECLARED PAGE PRINTED ITS CLAUSE VERBATIM. `direction is owed to me, state
+ * is open or part`; `renews after yesterday, renews before +90d`; `kind is domain`. The field ids
+ * are the schema's spelling of names the same screens render properly — `kind` is the word
+ * `/r/services` calls **Type** — and `+90d` is a machine duration nobody types or says.
+ *
+ * IT IS A RENDER AND NOT A PARSER. The clause is already valid; this walks it once, swaps each
+ * field id for its declared label and each relative day for the phrase it means, and leaves
+ * everything it does not recognise exactly as written. A sentence it cannot improve is a sentence
+ * it must not change: half a filter said in English and half in the dialect is worse than either.
+ */
+const UNITS: Record<string, string> = { d: 'day', w: 'week', m: 'month', y: 'year' };
+
+/* `today`, `yesterday` and `tomorrow` are already English and pass through; `+90d` is not. That is
+   the whole of `resolveDay`'s grammar and the whole of what a block ever writes. */
+const spokenDay = (word: string): string => {
+  const rel = /^([+-])(\d+)([dwmy])$/.exec(word.trim());
+  if (!rel) return word;
+  const [, sign, n, unit] = rel as unknown as [string, string, string, string];
+  const noun = UNITS[unit] ?? 'day';
+  return `${n} ${noun}${n === '1' ? '' : 's'} ${sign === '+' ? 'from now' : 'ago'}`;
+};
+
+export function saidPlainly(register: string, where: string | undefined): string {
+  if (!where) return '';
+  return where
+    .split(',')
+    .map((clause) => {
+      const said = clause.trim();
+      const m = /^(.+?)\s+(is not|is|before|after|on)\s+(.+)$/i.exec(said);
+      if (!m) return said;
+      const [, rawField, verb, rest] = m as unknown as [string, string, string, string];
+      const decl = REGISTERS[register]?.fields.find((f) => f.id.toLowerCase() === rawField.trim().toLowerCase());
+      if (!decl) return said;
+      const name = decl.label ?? decl.id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+      const values =
+        verb === 'before' || verb === 'after' || verb === 'on'
+          ? spokenDay(rest)
+          : rest
+              .split(/\s+or\s+/)
+              .map((v) => declaredValue(register, decl.id, v.trim()).replace(/_/g, ' '))
+              .join(' or ');
+      return `${name.toLowerCase()} ${verb} ${values}`;
+    })
+    .join(', ');
 }

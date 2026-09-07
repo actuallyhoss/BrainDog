@@ -81,7 +81,11 @@ if (unsampled.length) {
  * auditing the page underneath it, and the gate would go green over a dialog that no longer opens.
  */
 const STATES = [
-  { name: 'grid: filter sheet', route: '/r/obligations', keys: ['f'], expect: 'dialog[open]' },
+  /* THE FILTER DRAWER IS GONE AND `f` OPENS NOTHING. It rendered the same enum fields as the chips
+     in the toolbar, as checkboxes, behind a scrim, over the identical controls still visible
+     underneath — so this scenario audited a second copy of the row above it. What is worth auditing
+     is that the chips themselves carry their state to somebody who cannot see the raised segment. */
+  { name: 'grid: filter chips', route: '/r/obligations', keys: [], expect: '.segmented [aria-pressed]' },
   { name: 'grid: create sheet', route: '/r/obligations', keys: ['n'], expect: 'dialog[open]' },
   { name: 'grid: display options', route: '/r/obligations', keys: ['v'], expect: 'dialog[open]' },
   { name: 'grid: peek drawer', route: '/r/obligations', keys: ['p'], expect: 'dialog[open]' },
