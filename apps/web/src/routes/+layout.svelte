@@ -78,6 +78,11 @@
 
   /** `ponytail:` a constant in the mock-up. The live channel is `lib/data/live.ts` in the real app:
       a hibernatable WebSocket carrying `{ version, registers }` and nothing else. */
+  /* ONE STATE, AND THE HEADER ABOVE DESCRIBED THREE. `polling` and `offline` are what a real
+     transport produces; this app has none, so nothing could ever reassign this and two of the three
+     rules below it could never match. `50 §2.4` is explicit that `offline` is set "only after a
+     failed write or failed poll, never from `navigator.onLine` alone" — there is no write and no
+     poll here yet. Stated as one value rather than described as three. */
   const live: 'open' | 'polling' | 'offline' = 'open';
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */

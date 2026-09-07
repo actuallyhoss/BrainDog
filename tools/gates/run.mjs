@@ -65,6 +65,10 @@ const GATES = [
      setting shipped inert for the life of the build because the 128-configuration matrix is widths,
      schemes and directions — no preference but `scheme` is an axis of it, so nothing ever asked. */
   ['prefs', ['node', [join(here, 'prefs.mjs')]]],
+  /* AND EVERY KEY THE PRODUCT PRINTS IS A KEY THAT DOES SOMETHING. `19 §4`'s whole argument for a
+     registry is that the sheet documents by READING it, so it cannot drift — and it had drifted
+     three ways, found by a sweep rather than by anything here. */
+  ['keys', ['node', [join(here, 'keys.mjs')]]],
   // Last two because they are the slow ones: a real browser over every route.
   ['layout', ['node', [join(here, 'layout.mjs')]]],
   ['a11y', ['node', [join(here, 'a11y.mjs')]]],

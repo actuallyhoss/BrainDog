@@ -149,11 +149,34 @@
     { field: 'select', label: copy.select, hideLabel: true, width: '3ch', align: 'start' as const, truncate: 'never' as const },
     ...columnsFor(id).filter((c) => !hidden.has(c.field)),
   ]);
+  /**
+   * Archived rows, in the mock-up, held in the page rather than in the record.
+   *
+   * A destructive action here is UNDONE, never confirmed. A confirmation dialog asks its question
+   * before anything has happened, when the reader knows the least they ever will about it, and the
+   * answer is always yes — which is why people stop reading them. Ten seconds of undo, with the row
+   * named in the past tense, gives back the one thing a dialog cannot.
+   */
+  let archived = $state(new Set<number>());
+
   const found = $derived(list(id, { filters, q, ...(sort ? { sort } : {}) }));
+  /**
+   * `total` IS ARCHIVED-AWARE TOO, and it was not.
+   *
+   * `entries` and `matched` both drop the archived rows and `total` did not — so after archiving one
+   * row the header read "37 of 38" (right: 37 match this filter, 38 are in the list) while the
+   * empty state read "38 rows, none matching" (wrong: there are 37). Two counts of the same list,
+   * three inches apart, disagreeing by one, and the one a reader checks a filter against was the
+   * stale one.
+   *
+   * `19 §6` gives `no-results` the title "{N} rows, none matching" — N is what the LIST holds, so
+   * it has to drop the same rows the list does.
+   */
   const result = $derived({
     ...found,
     entries: found.entries.filter((e) => !archived.has(e.seq)),
     matched: found.entries.filter((e) => !archived.has(e.seq)).length,
+    total: found.total - archived.size,
   });
   const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns));
 
@@ -209,16 +232,6 @@
       if (seq === null) p.delete('row');
       else p.set('row', String(seq));
     });
-
-  /**
-   * Archived rows, in the mock-up, held in the page rather than in the record.
-   *
-   * A destructive action here is UNDONE, never confirmed. A confirmation dialog asks its question
-   * before anything has happened, when the reader knows the least they ever will about it, and the
-   * answer is always yes — which is why people stop reading them. Ten seconds of undo, with the row
-   * named in the past tense, gives back the one thing a dialog cannot.
-   */
-  let archived = $state(new Set<number>());
 
   const peekedEntry = $derived(peeked === null ? undefined : entry(id, peeked));
 
@@ -602,9 +615,14 @@
     <div class="bar">
       <label class="field">
         <Icon name="search" size="s" />
+        <!-- A NAME, NOT A PLACEHOLDER. The input sits in a `<label>` whose only other child is an
+             `aria-hidden` icon, so its accessible name came from the placeholder alone — which
+             disappears the moment somebody types, taking the name with it. Every search box in the
+             product had the same shape. -->
         <input
           class="field-input"
           type="search"
+          aria-label={copy.searchIn(decl.name)}
           placeholder="Search {decl.name.toLowerCase()}"
           value={q}
           oninput={(e) => setParam((p) => {

@@ -18,7 +18,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
-  import { silenced } from '$lib/a11y/keys.svelte.ts';
+  import { silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { iconFor,
     AUDIT,
     backlinks,
@@ -79,7 +79,32 @@
     const m = /^([a-z][a-z0-9_]*)#(\d+)$/.exec(spoken);
     return m && REGISTERS[m[1]!] ? `/r/${m[1]}/${m[2]}` : null;
   };
+
+  /**
+   * `y` COPIES THE ID AND `⇧Y` THE LINK, which is what the grid does and what this page prints.
+   *
+   * The route had no key listener at all while its own header carried `<kbd>y</kbd>` — so the one
+   * screen where somebody most wants a row's spoken id to paste into a message advertised the key
+   * for it and ignored every press. `19 §4`'s whole argument for a registry is that the sheet
+   * documents what is bound BY READING IT, so a printed key that does nothing is the drift the
+   * registry exists to prevent.
+   *
+   * `silenced` first: `y` is a bare letter, and `Character keys: off` silences the namespace.
+   */
+  function onkeydown(e: KeyboardEvent) {
+    if (typing() || silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!row) return;
+    if (e.key === 'y') {
+      e.preventDefault();
+      void clipboard.putSpoken(id, row.seq);
+    } else if (e.key === 'Y') {
+      e.preventDefault();
+      void clipboard.putLink(id, row.seq);
+    }
+  }
 </script>
+
+<svelte:window {onkeydown} />
 
 <svelte:head><title>{titleOf(row && decl && String(row.fields[decl.title] ?? ""), decl?.name)}</title></svelte:head>
 
@@ -98,7 +123,8 @@
     {#snippet actions()}
       <!-- IT SAID `y` AND NOTHING WAS BOUND, and the button itself had no handler either — two
            lies in one control, on the screen where somebody most wants a row's id to paste into a
-           message. Both are the same four lines now, shared with the grid. -->
+           message. The button was fixed and the KEY was not, under a comment claiming both were:
+           this route registered no key listener at all while its own header printed one. -->
       <Button weight="bare" onclick={() => clipboard.putSpoken(id, row.seq)}>
         <Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" />
       </Button>

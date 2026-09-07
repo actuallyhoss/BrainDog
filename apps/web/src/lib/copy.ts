@@ -203,6 +203,10 @@ export const copy = {
   lastDecided: 'The last one was decided',
 
   /* the register grid */
+  /* A NAME FOR THE SEARCH BOX. It had only a placeholder, which is not an accessible name and
+     disappears the moment somebody types — so the field announced itself right up until it had
+     content, and then stopped. */
+  searchIn: (name: string) => `Search ${name}`,
   newRow: 'New',
   filter: 'Filter',
   done: 'Done',

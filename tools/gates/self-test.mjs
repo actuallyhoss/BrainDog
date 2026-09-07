@@ -154,6 +154,32 @@ function seededPrefs() {
   }
 }
 
+/**
+ * The keys gate's negative, and it cannot be a fixture tree.
+ *
+ * `BRAINDOG_GATE_SEED=keys` swallows every `y` in the capture phase, which is what a binding nobody
+ * wrote looks like from outside the page — and the gate must name `copy-id`.
+ */
+function seededKeys() {
+  if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
+    console.log('  keys: no build, so its negative is not run');
+    return;
+  }
+  const r = spawnSync(process.execPath, [join(here, 'keys.mjs')], {
+    cwd: join(here, '..', '..'),
+    encoding: 'utf8',
+    env: { ...process.env, BRAINDOG_GATE_SEED: 'keys' },
+  });
+  const said = `${r.stdout}${r.stderr}`;
+  if (r.status === 0 || !said.includes('copy-id')) {
+    console.error('  keys: PASSED a swallowed key — the sheet could advertise a binding nothing answers.');
+    failed.push('keys');
+  } else {
+    ran++;
+    console.log('  keys: red on a key the page never receives');
+  }
+}
+
 let ran = 0;
 
 for (const { gate, expect, findings, run } of CASES) {
@@ -201,6 +227,7 @@ for (const { gate, expect, findings, run } of CASES) {
 seededLayout();
 seededIntent();
 seededPrefs();
+seededKeys();
 
 /* AND EVERY FIXTURE IS CLAIMED. A directory under `negative/` that no case runs is a violation
    nobody is seeding, which is the same silence this file exists to break. */

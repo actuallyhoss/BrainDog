@@ -12,6 +12,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { goto } from '$app/navigation';
+  import { silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { page } from '$app/state';
   import { Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
@@ -48,11 +49,23 @@
 
   /* `⌥B`, which 50 §5.2 step 9 has specified all along and nothing bound. */
   function onkeydown(e: KeyboardEvent) {
-    const el = document.activeElement;
-    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+    if (typing()) return;
     if (e.altKey && e.key.toLowerCase() === 'b' && view) {
       e.preventDefault();
       binding = true;
+      return;
+    }
+    /* AND `o`, WHICH THE BUTTON BESIDE IT HAS PRINTED SINCE IT WAS WRITTEN. `Open {register}` in
+       this page's own header carries a `<kbd>o</kbd>` and nothing listened for it — the same key,
+       for the same thing, is live one route over on `/p/<slug>`. A printed key that does nothing
+       teaches a reader that the printed keys do nothing.
+
+       `silenced` FIRST, because `o` is a bare letter and `Character keys: off` is what makes the
+       whole bare namespace legal (19 §4). This handler asked neither question before. */
+    if (silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'o' && view) {
+      e.preventDefault();
+      void goto(`/r/${view.register}`);
     }
   }
 </script>

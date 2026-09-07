@@ -16,6 +16,10 @@
     "displayFaceBytes": 10240
   },
 
+  "keys": {
+    "//": "19 §4: the sheet documents the bindings by reading them, so it cannot drift from what is bound. Its own port, beside the other browser gates.",
+    "port": 4184
+  },
   "prefs": {
     "//": "A preference that changes nothing is a control that lies (25 §1's `series` class). Its own port, so it can run beside the other browser gates without fighting for one.",
     "port": 4183

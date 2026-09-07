@@ -42,7 +42,12 @@ export type Binding = {
 };
 
 /**
- * Never bound, and asserted by a test over the registry. Chrome's own extension API is the honest
+ * Never bound, and asserted by a test over the registry.
+ *
+ * IT WAS NOT. The comment claimed a test and there was none, and the list had no importer at all —
+ * so `NEVER_BIND` was a promise nothing kept, and it was already broken: with `g` armed, the
+ * dispatcher read the pressed key without asking whether a modifier was held, so `g` then `Ctrl+H`
+ * navigated Home over the browser's own binding. `keys.test.ts` asserts it now. Chrome's own extension API is the honest
  * proxy for what is contestable at all: a command shortcut must include Ctrl or Alt, and certain
  * OS and browser shortcuts always take priority and cannot be overridden.
  */
@@ -85,7 +90,6 @@ export const BINDINGS: Binding[] = [
   { id: 'select', scope: 'grid', key: 'x  ⇧x  ⌘a', label: 'Select, extend, all loaded', bare: true },
   { id: 'edit', scope: 'grid', key: 'e  F2', label: 'Edit the focused cell in place', bare: true },
   { id: 'new', scope: 'grid', key: 'n', label: 'New row', bare: true },
-  { id: 'filter', scope: 'grid', key: 'f', label: 'Filter', bare: true },
   { id: 'display', scope: 'grid', key: 'v', label: 'Display options', bare: true },
   { id: 'copy-id', scope: 'grid', key: 'y  ⇧Y', label: 'Copy the id, or the link', bare: true },
   { id: 'related', scope: 'grid', key: 'o', label: 'Open the linked list', bare: true },
