@@ -593,6 +593,84 @@
 
   /* ── table: comparison, and the register grid's body ────────────────────── */
 
+  /* ROWS BECOME CARDS BELOW 640px — `13 §10`. Above it the cards do not exist and the table does;
+     below it, the other way round. There is never a moment where both are half-visible, which is
+     the same rule `RowCards` keeps for a register. */
+  .table-cards {
+    display: none;
+  }
+
+  @media (width < 640px) {
+    .table-cards {
+      display: block;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      background: var(--s1);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      box-shadow: var(--raise);
+      overflow: hidden;
+    }
+
+    .table-cards li + li .table-card {
+      border-block-start: 1px solid var(--line);
+    }
+
+    .table-card {
+      inline-size: 100%;
+      background: none;
+      border: 0;
+      font: inherit;
+      text-align: start;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      /* 44px on both axes, and a card is taller than that anyway. */
+      min-block-size: 56px;
+      padding: var(--sp-3) var(--sp-4);
+      /* The same bar a row wears in the grid, so late and settled read the same on both surfaces.
+         Declared after the `border: 0` a button reset needs, or it is the one that loses. */
+      border-inline-start: 2px solid transparent;
+      color: var(--ink);
+      font-size: var(--t-ui);
+      text-decoration: none;
+    }
+
+    .table-card[data-intent] {
+      border-inline-start-color: var(--tone);
+    }
+
+    .table-card-lead {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .table-card-pair {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--sp-3);
+    }
+
+    .table-card-label {
+      color: var(--dim);
+      font-size: var(--t-xs);
+    }
+
+    /* A FIGURE IS NOT TRUNCATED HERE EITHER, and here it does not have to be: the value sits on its
+       own line-end with the whole card width behind it. */
+    .table-card-value {
+      color: var(--ink2);
+      font-variant-numeric: tabular-nums;
+      text-align: end;
+    }
+
+    .table-region {
+      display: none;
+    }
+  }
+
   .table-region {
     overflow: auto;
     background: var(--s1);

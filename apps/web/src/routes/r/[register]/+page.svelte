@@ -648,7 +648,10 @@
                filter matching nothing would be worse than the plain word. -->
           {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}this register{/if}
           were refused over {seen.days} days — {seen.fix}.
-          <span class="seen-code" title={seen.why}>{seen.code} · {seen.window}</span>
+          <!-- NO `title`. It carried `seen.why` — the same fact as the sentence beside it, in the
+               schema's spelling, in an attribute no touch device shows and no keyboard reaches. Two
+               tellings of one thing, one of them unreachable. -->
+          <span class="seen-code">{seen.code} · {seen.window}</span>
         </p>
         <Button
           weight="quiet"
@@ -983,8 +986,14 @@
 
   .seen-said {
     /* `flex: 1` ALONE DOES NOT LET IT SHRINK. A flex child's floor is its content, so a long
-       sentence held the row at its own width and the button went over the side rather than under. */
-    flex: 1 1 16ch;
+       sentence held the row at its own width and the button went over the side rather than under.
+
+       AND 16ch WAS A FLOOR IT COULD SIT AT. At 390px the sentence took 141px beside a fixed-width
+       button and wrapped into eight ragged lines, 182px tall, above the first row — `13 §6` calls
+       the refusal the main teaching surface and this was the least readable text on the screen.
+       32ch is wider than the row can give it on a phone, so the button wraps to its own line and
+       the sentence gets the width; on a desktop there is room for both and nothing changes. */
+    flex: 1 1 32ch;
     min-inline-size: 0;
     margin: 0;
     font-size: var(--t-sm);

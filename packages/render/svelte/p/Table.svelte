@@ -83,6 +83,51 @@
      screen-reader user gets the same destination twice in the landmark list and no way to tell
      which is which. `group` keeps the accessible name on focus, keeps the scrolling, and stops
      claiming to be a place you can navigate to, which the section above it already is. -->
+<!--
+  ROWS BECOME CARDS BELOW 640px, WHICH IS `13 §10`'s RULE AND NOT A NEW ONE. "A 500-row table: the
+  scroll wrapper survives, but the default view is the card list; the table is an explicit choice."
+  A register has had this since it was written, through its declared `mobile:` fields. A table
+  rendered from a page block never did — so `/p/money` on a phone showed `3 Sep 2…`, `Legal review,
+  Fe…`, `GBP −19,100.00` spilling into the column beside it, and the Balance column, which is the
+  entire reason the block exists, off the right edge behind a scrollbar.
+
+  EVERY COLUMN, LABELLED. A register's card can pick three fields because its declaration names
+  them; a block table has columns and no such declaration, so guessing which three matter would be
+  guessing. The first column leads the card and the rest are label and value — nothing hidden,
+  nothing cut, and no horizontal scroll on the surface `13 §10` says is for reading.
+-->
+{#snippet card(row: TableRow)}
+  <span class="table-card-lead">{row.cells[0]}</span>
+  {#each columns.slice(1) as column, i}
+    {#if row.cells[i + 1]}
+      <span class="table-card-pair">
+        <span class="table-card-label">{column.label}</span>
+        <span class="table-card-value">{row.cells[i + 1]}</span>
+      </span>
+    {/if}
+  {/each}
+{/snippet}
+
+<ul class="table-cards">
+  {#each rows as row (row.key)}
+    <li>
+      <!-- AN ANCHOR OR A BUTTON, never a `div` with a click handler. A row that has somewhere to go
+           is a link and gets the browser's whole contract — middle-click, copy the address, the
+           status bar; one that is only activated is a button. Both carry a role without being told
+           one, which a `svelte:element` with an `onclick` does not. -->
+      {#if row.href}
+        <a class="table-card" href={row.href} data-intent={row.tone}>
+          {@render card(row)}
+        </a>
+      {:else}
+        <button type="button" class="table-card" data-intent={row.tone} onclick={() => onactivate?.(row)}>
+          {@render card(row)}
+        </button>
+      {/if}
+    </li>
+  {/each}
+</ul>
+
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="table-region" role="group" tabindex="0" aria-label={label ?? 'Rows'}>
   <div
