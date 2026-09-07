@@ -281,7 +281,7 @@
 
     <!-- The registers themselves. Native, never pack-positioned: a page can be uninstalled with the
          pack that declared it, and the collections underneath it still have to be reachable. -->
-    <h2 class="section">Lists</h2>
+    <h2 class="section">{copy.lists}</h2>
     <ul class="group">
       {#each registers as r}
         <li>

@@ -165,7 +165,11 @@
    */
   .btn:disabled {
     background: var(--s1);
-    border-color: var(--edge);
+    /* `--edge` IS THE STRONG BOUNDARY — 3:1 against the worst surface, solved to be SEEN. Using it
+       here gave the disabled control a darker outline than an enabled secondary has (`--line`, at
+       1.55:1), so the dead button was the more prominent of the two. `--line` is the quiet one, and
+       quiet is the whole point. */
+    border-color: var(--line);
     box-shadow: none;
     color: var(--dim);
     cursor: not-allowed;

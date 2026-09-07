@@ -55,6 +55,16 @@
      `/[id]`'s `Search` button navigated Home instead of searching. */
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
+
+  /** The same sectioned grouping the rail does, so one nav is not a different shape from the other. */
+  const grouped = $derived.by(() => {
+    const out = new Map<string, typeof data.nav>();
+    for (const e of data.nav) {
+      if (!out.has(e.section)) out.set(e.section, []);
+      out.get(e.section)!.push(e);
+    }
+    return [...out];
+  });
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
@@ -213,9 +223,36 @@
   <Keymap />
 </Sheet>
 
+<!--
+  THE PHONE HAD NO ROUTE TO ANY LIST.
+
+  This iterated `data.nav` — the DECLARED pages — and stopped. The rail beside it renders those and
+  then a second group, `Lists`, holding every register, because a page can be uninstalled with the
+  pack that declared it and the collections underneath it still have to be reachable. On a phone that
+  second group did not exist, so Obligations, Services, Projects, People, Sessions, Tracks, Updates
+  and Tasks — the eight lists that hold every row in the record — were not in the navigation at all.
+  The only way to one was the palette, whose label is "Search, or run a command".
+
+  ON A FRESH RECORD IT WAS WORSE. One register, no declared pages: this sheet would have held Packs,
+  Vault, Settings and Audit, and nothing belonging to the person using it.
+
+  THE SECTION HEADINGS COME TOO. They are a grouping over one ordered list of `page` rows, and
+  dropping them delivered "Overview" and "Board" as bare words with no idea what they were about.
+-->
 <Sheet bind:open={moreOpen} title={copy.more}>
   <nav class="more-nav">
-    {#each data.nav as entry}<a href={entry.href} onclick={() => (moreOpen = false)}>{entry.title}</a>{/each}
+    {#each grouped as [section, entries]}
+      <h2 class="more-section">{section}</h2>
+      {#each entries as entry}<a href={entry.href} onclick={() => (moreOpen = false)}>{entry.title}</a>{/each}
+    {/each}
+
+    <h2 class="more-section">{copy.lists}</h2>
+    {#each data.index.registers as r}
+      <a href="/r/{r.id}" onclick={() => (moreOpen = false)}>
+        {r.name}<span class="more-tally num">{r.count}</span>
+      </a>
+    {/each}
+
     <hr />
     <a href="/packs" onclick={() => (moreOpen = false)}>{copy.packs}</a>
     <a href="/vault" onclick={() => (moreOpen = false)}>{copy.vault}</a>
@@ -401,8 +438,30 @@
     min-block-size: var(--tap);
     display: flex;
     align-items: center;
+    gap: var(--sp-3);
     color: var(--ink);
     text-decoration: none;
+  }
+
+  /* The same headings the rail carries. They are a grouping over one ordered list of pages, so
+     dropping them delivered "Overview" and "Board" as bare words. */
+  .more-section {
+    margin-block: var(--sp-4) var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .more-section:first-child {
+    margin-block-start: 0;
+  }
+
+  .more-tally {
+    margin-inline-start: auto;
+    color: var(--dim);
+    font-size: var(--t-xs);
   }
 
   .more-nav hr {

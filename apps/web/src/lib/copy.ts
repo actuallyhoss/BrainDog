@@ -59,6 +59,8 @@ export const copy = {
   decide: 'Decide',
   inbox: 'Inbox',
   search: 'Search',
+  /* The rail's heading for the registers, hard-coded there and needed by the phone nav too. */
+  lists: 'Lists',
   packs: 'Packs',
   vault: 'Vault',
   settings: 'Settings',
@@ -289,10 +291,14 @@ export const copy = {
   noFilters: 'Nothing here can be filtered yet.',
   /* WHERE A FIELD IS FILTERED INSTEAD, said once for all of them rather than as a headed section
      each. Three fieldsets carrying a legend and one sentence read as three controls that failed to
-     render. */
+     render.
+
+     ITS SIBLING SAID SOMETHING FALSE and is gone: "Due sorts on the column" named one field, and
+     every column on the table sorts. A sentence explaining the interface is against the house rule
+     to begin with; one that explains it wrongly teaches somebody the product is smaller than it is.
+     Sorting is a fact about the table, and the table says it — every header is a button. */
   filterBySearch: (fields: string[]): string =>
     `${list(fields)} ${fields.length === 1 ? 'is' : 'are'} matched by the search box.`,
-  filterBySort: (fields: string[]): string => `${list(fields)} sort${fields.length === 1 ? 's' : ''} on the column.`,
 
   displayOptions: 'Display',
   display: 'Display',

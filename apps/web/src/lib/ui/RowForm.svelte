@@ -36,8 +36,39 @@
   let {
     register,
     first = false,
+    label,
+    autofocus = false,
     problems = $bindable<string[]>([]),
-  }: { register: string; first?: boolean; problems?: string[] } = $props();
+  }: {
+    register: string;
+    first?: boolean;
+    /** What to call the title field. `19 §6`: the first screen asks for a fact, not for a column. */
+    label?: string | undefined;
+    autofocus?: boolean;
+    problems?: string[];
+  } = $props();
+
+  /**
+   * THE CARET GOES IN THE FIRST FIELD, WHICH IT NEVER DID.
+   *
+   * `/start` held `let field = $state<HTMLInputElement>()` and called `field?.focus()` in a
+   * microtask after every pick — and no `bind:this={field}` existed anywhere in that file, so the
+   * call was a no-op for the life of the screen. `document.activeElement` was `BODY` at 0, 50, 150,
+   * 400 and 900 ms after choosing a tile. `19 §6` budgets thirty seconds from landing to typing one
+   * true fact; the budget could not start until somebody noticed the box and clicked it.
+   *
+   * THE BINDING IS ON THE FIELD'S WRAPPER, not on an input. This form draws nine different controls
+   * depending on the declared type, so one `bind:this` per branch is nine places to forget; the
+   * wrapper is always there and always holds exactly one control.
+   */
+  let firstField = $state<HTMLElement | undefined>(undefined);
+  let placed = false;
+
+  $effect(() => {
+    if (!autofocus || placed || !firstField) return;
+    placed = true;
+    firstField.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+  });
 
   const decl = $derived(REGISTERS[register]);
 
@@ -173,13 +204,16 @@
 </script>
 
 <form class="row-form" onsubmit={(e) => e.preventDefault()}>
-  {#each fields as f}
-    <div class="row-field" data-type={f.type}>
+  {#each fields as f, i}
+    <div class="row-field" data-type={f.type} {@attach (el) => void (i === 0 && (firstField = el))}>
       <!-- `for` ONLY WHERE THERE IS SOMETHING TO POINT AT. The segmented branch renders no element
            carrying `id(f)`, so both the label's `for` and the group's `aria-labelledby` pointed at
            an id that does not exist — which is a label announced as attached to nothing. -->
       <label class="row-label" id={labelId(f)} for={f.type === 'enum' && (f.values?.length ?? 0) <= 4 ? undefined : id(f)}>
-        {labelOf(f)}
+        <!-- ON THE FIRST RUN THE TITLE FIELD IS ASKED FOR AS A FACT. `copy.firstField` had a
+             sentence per register — "Your first invoice", "The first person" — and was referenced
+             nowhere, so the one screen `19 §6` writes a budget for asked for `Description`. -->
+        {label && f.id === decl?.title ? label : labelOf(f)}
         <!-- Required is marked on the LABEL and spelled out, never as a bare asterisk: an asterisk
              is a convention you have to already know, and it is announced as "star". -->
         {#if f.required}<span class="row-required">{copy.required}</span>{/if}

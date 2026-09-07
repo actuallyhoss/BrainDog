@@ -162,7 +162,6 @@
      that says what the row IS. It was 1 when the id was the leading column. */
   let focus = $state({ row: 0, col: 2 });
   let peeked = $state<number | null>(null);
-  let filterOpen = $state(false);
 
   /**
    * Archived rows, in the mock-up, held in the page rather than in the record.
@@ -181,6 +180,9 @@
   const filterable = $derived((decl?.fields ?? []).filter((f) => f.index).slice(0, 8));
 
   /** Where a field that is not an enum IS filtered: the column's sort, or the search box. */
+  /** The fields the search box matches, named where the search box is. */
+  const searched = $derived(filterable.filter((f) => f.type !== 'enum' && kindOf(f) === 'search').map(labelOf));
+
   const kindOf = (f: { type: string }): 'search' | 'sort' =>
     f.type === 'money' || f.type === 'int' || f.type === 'decimal' || f.type === 'day' || f.type === 'instant'
       ? 'sort'
@@ -316,9 +318,6 @@
     } else if (e.key === 'Enter') {
       const row = result.entries[focus.row];
       if (row) goto(`/r/${id}/${row.seq}`);
-    } else if (e.key === 'f') {
-      e.preventDefault();
-      filterOpen = true;
     } else if (e.key === 'v') {
       e.preventDefault();
       displayOpen = true;
@@ -479,11 +478,18 @@
     count={result.matched}
     total={result.total}
   >
+    <!--
+      THE FILTER DRAWER IS GONE, AND THE CHIPS ARE THE FILTER.
+
+      It rendered `filterable.filter((f) => f.type === 'enum')` — the SAME expression as the
+      segmented controls in the toolbar — as checkboxes, behind a scrim, over the identical six
+      controls still visible underneath it. The bar wraps, so the chips are never hidden at any
+      width: the drawer was duplication everywhere, always, and pressing Filter took a person to a
+      second copy of what they were already looking at.
+
+      A drawer earns its place when there are more fields than fit. At six there is nothing to fit.
+    -->
     {#snippet actions()}
-      <Button weight="quiet" onclick={() => (filterOpen = true)}>
-        <Icon name="filter" size="s" />
-        {copy.filter}
-      </Button>
       <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{copy.newRow} {decl.one}</Button>
     {/snippet}
   </PageHead>
@@ -535,6 +541,17 @@
         <Kbd keys="j  k" /> move <Kbd keys="p" /> peek <Kbd keys="↵" /> open <Kbd keys="⌫" /> archive
       </span>
     </div>
+
+    <!--
+      WHERE THE FIELDS THAT ARE NOT CHIPS ARE FILTERED. It lived inside the drawer and came out with
+      it, which is where it always belonged: the search box it names is on the line above.
+
+      AND ONE OF THE TWO SENTENCES WAS FALSE. "Due sorts on the column" named one field, and every
+      column on this table sorts — clicking `Amount` gives `?sort=amount:asc` and
+      `aria-sort="ascending"`. So the product explained its own interface, in a drawer, incorrectly.
+      Sorting is a fact about the table and the table already says it: eight headers, each a button.
+    -->
+    {#if searched.length > 0}<p class="bar-note">{copy.filterBySearch(searched)}</p>{/if}
 
     <!-- WHAT THE RECORD NOTICED, ON THE SCREEN IT IS ABOUT.
 
@@ -836,54 +853,6 @@
     {/snippet}
   </Sheet>
 
-  <Sheet bind:open={filterOpen} title={copy.filter}>
-    {#if filterable.length === 0}
-      <p class="filter-none">{copy.noFilters}</p>
-    {:else}
-      <div class="filter-groups">
-        {#each filterable.filter((f) => f.type === 'enum') as f}
-          <fieldset class="filter-group">
-            <legend class="filter-legend">{labelOf(f)}</legend>
-            <div class="filter-values">
-              {#each f.values ?? [] as value}
-                {@const on = isOn(f.id, value)}
-                <button
-                  type="button"
-                  class="filter-value"
-                  data-on={on ? '' : undefined}
-                  aria-pressed={on ? 'true' : 'false'}
-                  onclick={() => toggleFilter(f.id, value)}
-                >
-                  <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
-                  {value.replace(/_/g, ' ')}
-                </button>
-              {/each}
-            </div>
-          </fieldset>
-        {/each}
-      </div>
-
-      <!-- ABSENT, not disabled: a range control that cannot be built yet is not drawn as a greyed-out
-           one, because a disabled control tells you a thing exists and refuses to say why it will not
-           work (23 §8).
-
-           AND SAID ONCE, not as a headed section each. Three fieldsets with a legend and one sentence
-           read as three controls that failed to render — "Party — Search matches this field." looks
-           like a filter that is broken rather than a field that is filtered elsewhere. Grouped, it is
-           a sentence about where to go instead, which is what it always was. -->
-      {@const searched = filterable.filter((f) => f.type !== 'enum' && kindOf(f) === 'search').map(labelOf)}
-      {@const sorted = filterable.filter((f) => f.type !== 'enum' && kindOf(f) === 'sort').map(labelOf)}
-      {#if searched.length > 0}<p class="filter-kind">{copy.filterBySearch(searched)}</p>{/if}
-      {#if sorted.length > 0}<p class="filter-kind">{copy.filterBySort(sorted)}</p>{/if}
-    {/if}
-
-    {#snippet footer()}
-      <Button weight="primary" onclick={() => (filterOpen = false)}>{copy.done}</Button>
-      {#if filters.length}
-        <Button weight="bare" href="/r/{id}">{copy.clearFilters}</Button>
-      {/if}
-    {/snippet}
-  </Sheet>
 {/if}
 
 <style>
@@ -1150,13 +1119,8 @@
     font-size: var(--t-xs);
   }
 
-  .filter-value:disabled {
-    cursor: default;
-    opacity: 0.75;
-  }
-
-  .filter-kind,
-  .filter-none {
+  .bar-note {
+    margin-block-start: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
   }

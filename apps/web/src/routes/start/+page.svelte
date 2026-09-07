@@ -34,7 +34,6 @@
   const CHOICES = copy.firstChoices;
 
   let picked = $state<string | null>(null);
-  let field = $state<HTMLInputElement>();
   /* What the generated form would refuse, bound out of it so the button can be dead while it is
      true rather than answering a press with a toast. */
   let problems = $state<string[]>([]);
@@ -63,9 +62,12 @@
 
   let choices = $state<HTMLDivElement | undefined>(undefined);
 
+  /* THE FORM PUTS ITS OWN CARET IN NOW. This held a `field` binding nothing ever bound — the form
+     below is generated from the declaration, so the page cannot reach its first input — and the
+     `focus()` was a no-op for the life of the screen. `RowForm`'s `autofocus` does it from inside,
+     where the first control is. */
   function pick(key: string) {
     picked = key;
-    queueMicrotask(() => field?.focus());
   }
 
   /**
@@ -224,7 +226,13 @@
              an amount typed into Money was still in the field on Projects — and now would count as
              a required field already filled. -->
         {#key choice.key}
-          <RowForm register={choice.key} first bind:problems />
+          <RowForm
+            register={choice.key}
+            first
+            autofocus
+            label={copy.firstField[choice.key]}
+            bind:problems
+          />
         {/key}
 
         <!-- The same treatment as the register drawer and `/decide`: the sentence, then the dead
