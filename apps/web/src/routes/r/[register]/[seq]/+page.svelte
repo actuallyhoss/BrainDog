@@ -100,7 +100,7 @@
       <Button weight="bare" onclick={() => clipboard.putSpoken(id, row.seq)}>
         <Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" />
       </Button>
-      <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>Edit</Button>
+      <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>{copy.editRow}</Button>
     {/snippet}
   </PageHead>
 

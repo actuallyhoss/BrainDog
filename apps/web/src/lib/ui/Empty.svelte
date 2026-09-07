@@ -11,6 +11,7 @@
   `cleared` has no action, because nobody manufactures work.
 -->
 <script lang="ts">
+  import * as clipboard from '../clipboard.ts';
   import type { Snippet } from 'svelte';
 
   import Icon from './Icon.svelte';
@@ -89,7 +90,23 @@
     </ul>
   {/if}
   {#if query}<p class="empty-query"><code>{query}</code></p>{/if}
-  {#if rid}<p class="empty-rid">Request <code>{rid}</code></p>{/if}
+  <!--
+    THE REQUEST ID IS A FACT ABOUT A FAILURE, and it appeared on four `no-results` screens where
+    nothing had failed — which teaches a reader that it means nothing, and it is the one thing on
+    the screen that has to mean something when it matters. `kind === 'error'` is the only state
+    there is a request to look up for: a spoken id that resolves to nothing was never a request.
+
+    AND IT IS COPYABLE, which `13 §5.2` asks for in as many words. One noun and an opaque token
+    with no sentence and no affordance is a string somebody transcribes wrong into an email.
+  -->
+  {#if rid && kind === 'error'}
+    <p class="empty-rid">
+      If you report this, quote
+      <button type="button" class="rid tap" onclick={() => void clipboard.put(rid)}>
+        <code>{rid}</code><Icon name="copy" size="s" />
+      </button>
+    </p>
+  {/if}
   {#if agentPrompt}
     <p class="empty-agent">Or from any session:</p>
     <pre class="empty-prompt"><code>{agentPrompt}</code></pre>
@@ -98,6 +115,19 @@
 </div>
 
 <style>
+  /* A control, because it is one: the id is there to be taken somewhere else. */
+  .rid {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
   .empty {
     display: flex;
     flex-direction: column;

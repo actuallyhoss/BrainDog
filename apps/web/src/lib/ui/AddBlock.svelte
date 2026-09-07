@@ -156,9 +156,13 @@
                       {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
                     {/each}
                   {:else}
-                    <!-- The documented degrade: the description in the same slot, so the row of
-                         tiles keeps its shape. Never a wireframe and never an icon. -->
-                    <span class="tile-fallback">{copy.kindNames[tile.kind] ?? tile.kind}</span>
+                    <!-- The documented degrade: the DESCRIPTION in the same slot, so the row of
+                         tiles keeps its shape. Never a wireframe and never an icon.
+
+                         IT PRINTED THE NAME, which the tile's own head prints two lines above — so a
+                         tile that could not draw itself read `Bar chart / amounts side by side,
+                         biggest first / Bar chart`. -->
+                    <span class="tile-fallback">{copy.kinds[tile.kind] ?? ''}</span>
                   {/if}
                 </span>
               </button>

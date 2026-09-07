@@ -161,7 +161,10 @@ const ROWS = [
     budget: B.mainJsBrotli,
     // The measurement and the argument are in `budgets.json` beside the number, which is where a
     // reviewer widening it would have to read them.
-    baseline: B.mainJsBaseline,
+    /* THE BAND IS ON THE RECORDED NUMBER, NOT ON THE BUDGET. Its argument, and the measurement it
+       rests on, are in `budgets.json` beside the number — which is where a reviewer widening either
+       would have to read them. */
+    baseline: B.mainJsBaseline + B.mainJsNoise,
     note: "Kit's runtime alone; the interpreter is 19.3 of it",
   },
   { name: 'entry CSS, brotli', size: css, budget: B.mainCssBrotli, note: 'tokens, a11y, blocks, rows and the shell' },

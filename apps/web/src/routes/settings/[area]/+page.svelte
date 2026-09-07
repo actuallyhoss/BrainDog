@@ -20,7 +20,11 @@
   import { copy } from '$lib/copy.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PACKS, PAGES, PEOPLE_ACCESS, REGISTERS, pages } from '$lib/record/api.ts';
+  import { PACKS, PAGES, PEOPLE_ACCESS, REGISTERS, boot, pages } from '$lib/record/api.ts';
+
+  /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
+     `the studio` — and one of the two was a literal. */
+  const RECORD = boot().index.name;
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -276,13 +280,21 @@
             weight="bare"
             onclick={() =>
               toasts.push(copy.notWritten('A .dog file would be checked against its own manifest and signature'))}
-          >Verify a `.dog`</Button>
+          >{copy.verifyFile}</Button>
         </div>
       </Section>
-      <Section title="Danger">
+      <!-- `Danger` IS A ONE-WORD HEADING THAT STATES NO FACT, over a line saying `Delete this
+           record` over a button saying `Delete the studio` — three lines, two of them the same
+           sentence, and the two disagreeing about what the record is called. One sentence saying
+           what happens, and the button that does it. -->
+      <Section title={copy.deleteRecord(RECORD)}>
         <div class="danger">
-          <p class="danger-title">Delete this record</p>
-          <Button tone="bad" onclick={() => toasts.push(copy.notWritten('Deleting a record asks you to type its name first'), { intent: 'bad' })}>Delete the studio</Button>
+          <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
+          <Button
+            tone="bad"
+            onclick={() => toasts.push(copy.notWritten('Deleting a record asks you to type its name first'), { intent: 'bad' })}
+            >{copy.deleteRecord(RECORD)}</Button
+          >
         </div>
       </Section>
     {:else}

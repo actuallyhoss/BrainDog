@@ -61,7 +61,7 @@ export const copy = {
      would have done and that it did not happen — once, in the toast, not as a disabled state.
      A disabled control tells you a thing exists and refuses to say why it will not work. */
   /** What to do with something the record noticed: put it where things get decided. */
-  raiseIt: 'Raise it',
+  raiseIt: 'Open a question',
   /** The way from a session to the run behind it: the tool calls, in order, with their answers. */
   watchRun: 'Watch the run',
   /** The predicate of an unfiltered list, said as a person would say it. */
@@ -196,7 +196,7 @@ export const copy = {
   reasonHint: 'Why this one, in a sentence somebody can read in six weeks.',
   reasonNudge: 'That will not mean anything in six weeks. Keep it anyway?',
   commit: 'Commit the decision',
-  defer: 'Defer',
+  defer: 'Defer the question',
   decidedBy: 'Decided by',
   immutable: 'A decision cannot be edited once it is made.',
   noQuestions: 'Nothing to decide.',
@@ -206,7 +206,16 @@ export const copy = {
   newRow: 'New',
   filter: 'Filter',
   done: 'Done',
-  /* Verb + Noun, never "Save" or "Submit": the button says what will exist afterwards. */
+  /**
+   * VERB + NOUN, never "Save" or "Submit": the button says what will exist afterwards.
+   *
+   * IT WAS STATED HERE AND KEPT BY ABOUT HALF THE FILE. Fourteen labels were a bare verb or a
+   * pronoun — `Add it`, `Back`, `Edit`, `Stop`, `Archive`, `Raise it`, `Add one`, `Done`, `Defer`,
+   * `Open`, `Peek`, `Clear`, `Show me an example`, `Show them all`. Each is unambiguous while you
+   * are looking at the thing it acts on and unreadable in a list of shortcuts, a screen reader's
+   * control list, or a sentence quoting it. A CTA that needs its surroundings to mean anything is a
+   * CTA that means nothing to somebody arriving at it from the side.
+   */
   addRow: 'Add',
   noneChosen: 'None',
   yes: 'Yes',
@@ -274,11 +283,11 @@ export const copy = {
   displayNote: 'Only affects your view of this list.',
   columns: 'Columns',
   always: 'always',
-  showAll: 'Show them all',
+  showAll: 'Show every column',
   rowMenu: 'Actions for this row',
-  archive: 'Archive',
+  archive: 'Archive the row',
   selected: 'selected',
-  clear: 'Clear',
+  clear: 'Clear the selection',
   /* The picker's two labels, written out rather than built by concatenation — the screenshot
      allow-list only keeps text a developer typed into source. */
   select: 'Select',
@@ -288,16 +297,27 @@ export const copy = {
      nothing. Verb + Noun, like every other action here. */
   copyIds: 'Copy ids',
   setState: 'Set state',
-  archiveSelected: 'Archive',
+  archiveSelected: 'Archive them',
   clearFilters: 'Clear filters',
   saveAsView: 'Save as a view',
-  export: 'Export',
+  export: 'Export the record',
   requestAccess: 'Request access',
-  tryAgain: 'Try again',
-  addOne: 'Add one',
-  showExample: 'Show me an example',
-  peek: 'Peek',
-  openRow: 'Open',
+  tryAgain: 'Load it again',
+  addOne: 'Add the first row',
+  addTheRow: 'Add the row',
+  goBack: 'Choose something else',
+  editRow: 'Edit the row',
+  stopRun: 'Stop the run',
+  verifyFile: 'Check an exported file',
+  /* WHAT DELETING DOES, said instead of a one-word heading that states no fact. `Danger` was over
+     `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
+     the two disagreeing about what the record is called. */
+  deleteWhat: (record: string): string =>
+    `Deleting ${record} removes every list, page and row in it. It cannot be undone.`,
+  deleteRecord: (record: string): string => `Delete ${record}`,
+  showExample: 'Show an example row',
+  peek: 'Peek at the row',
+  openRow: 'Open the row',
   copyId: 'Copy id',
   copyLink: 'Copy link',
   includesExample: 'includes 1 example',

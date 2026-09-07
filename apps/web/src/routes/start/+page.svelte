@@ -245,9 +245,9 @@
             weight="primary"
             type="submit"
             disabled={problems.length > 0}
-            aria-describedby={problems.length > 0 ? 'first-why' : undefined}>Add it</Button
+            aria-describedby={problems.length > 0 ? 'first-why' : undefined}>{copy.addTheRow}</Button
           >
-          <Button weight="bare" onclick={() => (picked = null)}>Back</Button>
+          <Button weight="bare" onclick={() => (picked = null)}>{copy.goBack}</Button>
         </div>
       </form>
 
