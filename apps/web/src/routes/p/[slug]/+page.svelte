@@ -487,7 +487,21 @@
           {@const held = block.register ? REGISTERS[block.register] : undefined}
           {@const drawn = draw(
             block,
-            held ? { rows: heldBy(block.register!), name: held.name, ...(held.holds ? { holds: held.holds } : {}) } : undefined,
+            held
+              ? {
+                  rows: heldBy(block.register!),
+                  name: held.name,
+                  ...(held.holds ? { holds: held.holds } : {}),
+                  /* WHERE THE FIRST ROW WOULD GO, and `19 §6` says the action for this state is
+                     **Add one** rather than "go and look". `?new=1` opens the list's own create
+                     form, so the button lands on the field somebody is about to type into instead
+                     of on a list of nothing with a second button on it.
+
+                     The block's own filter is deliberately NOT carried: the list is empty, and
+                     narrowing an empty list is the last thing anybody needs. */
+                  add: { href: `/r/${block.register}?new=1`, label: copy.addOne },
+                }
+              : undefined,
           )}
           <!-- A `div` that takes `region` or `listitem`, and NOT a `<section>`. A section is already
                a region landmark once it is named, and ARIA does not let one be a `listitem` — so
@@ -570,13 +584,18 @@
                  silently shrinks teaches that blocks come and go (19 §6). ONE surface for all
                  sixteen kinds, so "nothing matched" and "this block is broken" are told apart. -->
             {#if drawn.refusal}
+              {@const act = drawn.refusal.action}
               <Empty
                 compact
                 kind={drawn.refusal.kind}
                 title={drawn.refusal.title}
                 body={drawn.refusal.body}
                 lines={drawn.refusal.lines}
-              />
+              >
+                {#snippet actions()}
+                  {#if act}<Button href={act.href}>{act.label}</Button>{/if}
+                {/snippet}
+              </Empty>
             {:else if block.kind === 'table'}
               <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
             {:else}

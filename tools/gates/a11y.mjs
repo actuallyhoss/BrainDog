@@ -99,6 +99,14 @@ const STATES = [
   /* Arranging has no key — it is a button, and only on desktop. 13 §10 keeps authoring off phones,
      and `.arrange-slot` is display:none below 900px rather than a control that exists and refuses. */
   { name: 'page: arrange mode', route: '/p/kiln', click: '.arrange-slot button', expect: '[role="listitem"]', desktop: true },
+  /* THE EMPTY STATES, WHICH NO ROUTE AT REST EVER REACHES. `19 §6` designs five and says collapsing
+     them is the failure; an audit measured `no-results`, `cleared`, `no-permission` and `error`
+     rendering zero times across forty-two routes, so four fifths of that section had never been in
+     front of this gate. Two of them are reachable from an address, and these are those two. The
+     other three need a record shaped differently from the seed — `no-data-yet` needs an empty list,
+     which is why the state was unreachable in the product for as long as it was. */
+  { name: 'empty: no results', route: '/r/obligations?q=zzzzz', keys: [], expect: '.empty[data-kind="no-results"]' },
+  { name: 'empty: not found', route: '/r/nope', keys: [], expect: '.empty[data-kind="error"]' },
 ];
 
 const TYPES = {

@@ -25,6 +25,7 @@
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { iconFor, PAGES, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { saidPlainly } from '$lib/record/blocks.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -66,6 +67,27 @@
 
   /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
   let createOpen = $state(false);
+
+  /**
+   * A LINK CAN ASK FOR THE FORM: `/r/obligations?new=1`.
+   *
+   * `19 §6` gives `no-data-yet` one action and it is **Add one**, and the surface where that state
+   * is most often true is not this one — it is a declared page whose block draws a list nobody has
+   * put anything in yet. A block cannot open a sheet that lives in another route, so the address
+   * carries the intent and this reads it.
+   *
+   * IT IS IN THE URL AND NOT IN COMPONENT STATE because it arrives from outside the component;
+   * `19 §5`'s rule is about where a fact belongs, and "somebody asked for the form" is a fact about
+   * the request. Closing clears it, or the effect would reopen the sheet the moment it shut.
+   */
+  $effect(() => {
+    if (page.url.searchParams.get('new') === '1') createOpen = true;
+  });
+
+  const closeCreate = () => {
+    createOpen = false;
+    if (page.url.searchParams.has('new')) setParam((p) => p.delete('new'));
+  };
   /* WHAT THE FORM WOULD REFUSE, held here so the BUTTON can be disabled by it. Asking the form on
      click could only ever answer after the press. */
   let problems = $state<string[]>([]);
@@ -669,7 +691,19 @@
       <!-- THE QUERY IS QUOTED VERBATIM, in its own line and in the id face, rather than folded into
            the title as a curly-quoted fragment of a sentence. That is where a predicate stops being
            checkable: a reader cannot tell a filter they typed from one the app built. `Empty` has
-           had the prop and the styling for it since it was written and no call site passed it. -->
+           had the prop and the styling for it since it was written and no call site passed it.
+
+           AND BOTH HALVES OF IT, because both narrowed the list. It read `q || whereOf(filters)`,
+           which dropped every active chip the moment a search term existed: at `?q=zzz&f=state:in:paid`
+           the `paid` chip reads `aria-pressed="true"` on screen and the sentence underneath said
+           "38 rows, none matching: zzz". Half a query quoted verbatim is the same failure the
+           paragraph above describes, committed by the line below it.
+
+           VERBATIM IS THE READER'S WORDS, NOT THE COLUMN'S. `whereOf` builds the sentence the
+           evaluator reads, so it spells the stored value — `direction is owed_to_me` — and the chip
+           the reader actually pressed says "owed to me". Quoting the storage would show them a
+           filter they never set. The typed search term passes through exactly as typed, because
+           that one IS their words. -->
       <Empty
         kind={emptyKind}
         title={emptyKind === 'no-results'
@@ -677,7 +711,7 @@
           : emptyKind === 'cleared'
             ? 'Nothing outstanding.'
             : `Nothing in ${decl.name} yet.`}
-        query={emptyKind === 'no-results' ? q || whereOf(filters) : undefined}
+        query={emptyKind === 'no-results' ? [q, saidPlainly(id, whereOf(filters))].filter(Boolean).join(' · ') : undefined}
         body={emptyKind === 'no-data-yet'
           ? `${decl.name} holds ${decl.holds}.`
           : undefined}
@@ -830,12 +864,16 @@
     {/snippet}
   </Sheet>
 
-  <!-- Put this filter on a page as a block. `⌥B`, and it was a toast until now. -->
+  <!-- Put this filter on a page as a block. `⌥B`, and it was a toast until now.
+
+       `predicate` is written into a declaration and `says` is read by a person, so they are the same
+       filter in two spellings — `direction is owed_to_me` and "direction is owed to me". This handed
+       the machine's to both. -->
   <BindBlock
     bind:open={bindOpen}
     register={id}
     predicate={whereOf(filters) || q || copy.everything}
-    says={whereOf(filters) || (q ? `matching “${q}”` : copy.everything)}
+    says={saidPlainly(id, whereOf(filters)) || (q ? `matching “${q}”` : copy.everything)}
     onbind={(toPage, kind) =>
       toasts.push(
         copy.notWritten(
@@ -924,7 +962,7 @@
   <!-- The new-row drawer. Every control in it comes from the register's own field declarations —
        see RowForm — so a pack that adds a field gets a form field, and nobody writes a second copy
        of the schema in markup. -->
-  <Sheet bind:open={createOpen} title="{copy.newRow} {decl.one}">
+  <Sheet bind:open={createOpen} onclose={closeCreate} title="{copy.newRow} {decl.one}">
     <!-- No `autofocus` here: `Sheet` puts the caret in the first field after `showModal()`, which is
          the only moment it can, and it does it for every sheet that carries one. -->
     <RowForm register={id} bind:problems />
@@ -940,7 +978,7 @@
         disabled={problems.length > 0}
         aria-describedby={problems.length > 0 ? 'new-row-why' : undefined}
         onclick={() => {
-          createOpen = false;
+          closeCreate();
           toasts.push(copy.savedNothing, { intent: 'warn' });
         }}
       >

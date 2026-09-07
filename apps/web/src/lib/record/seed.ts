@@ -250,8 +250,22 @@ export function seedBlock(kind: string, register: string): PageBlock | null {
     ...(partition ? { where: `${partition.field} is ${partition.value.replace(/_/g, ' ')}` } : {}),
     ...(target === undefined ? {} : { target }),
     limit: 6,
-    /* Mandatory on every source-bound block (06 §1.1), and it renders on day one — which is exactly
-       when a register is empty, so it is written for that day rather than for a full one. */
-    empty: `Nothing in ${decl.name.toLowerCase()} yet.`,
+    /**
+     * Mandatory on every source-bound block (06 §1.1), and it is a sentence about A FILTER.
+     *
+     * It said `Nothing in <name> yet.` under a comment claiming it was written for day one. Day one
+     * is not this sentence's job any more and never should have been: an empty LIST is `no-data-yet`
+     * and `blocks.ts` writes that state's own words, with the register's `holds:` under them and a
+     * button to add the first row. `empty:` is what shows when the list has rows and this block's
+     * `where:` admitted none of them — where "Nothing in tasks yet" is false in front of fourteen
+     * tasks.
+     *
+     * SO IT IS ONLY A FILTER SENTENCE WHEN THERE IS A FILTER. Without a partition this block draws
+     * the whole list, cannot be empty unless the list is, and its `empty:` is the day-one sentence
+     * `blocks.ts` will use verbatim.
+     */
+    empty: partition
+      ? `No ${decl.one.toLowerCase()} is ${partition.value.replace(/_/g, ' ')}.`
+      : `Nothing in ${decl.name.toLowerCase()} yet.`,
   };
 }

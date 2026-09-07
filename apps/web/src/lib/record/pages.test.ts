@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 
 import { applyFilters, page, pages, type Filter } from './api.ts';
 import { PAGES, REGISTERS, ROWS } from './data.ts';
+import { draw } from './blocks.ts';
 import { fill, resolvePages, slugify } from './pages.ts';
 import { registerHref } from './where.ts';
 import type { PageDecl } from './schema.ts';
@@ -250,4 +251,43 @@ test('and the walk counts steps, not the opening balance beside them', () => {
   /* The opening row is drawn and is not a step: `rows` is one longer than `shown`, deliberately. */
   assert.equal(walk.rows.length, walk.shown + 1, 'the walk lost its opening row, or started counting it');
   assert.ok(walk.total > walk.shown, 'the seeded walk no longer runs past its limit');
+});
+
+/* ── day one, over the real declarations ─────────────────────────────────── */
+
+test('EVERY BLOCK BOUND TO AN EMPTY LIST SAYS "nothing here yet", not "nothing matched"', () => {
+  /* The seeded record has no empty register, which is exactly why this survived: the state `19 §6`
+     designs for day one could not be reached from any route in the build, so nothing on screen ever
+     showed it being wrong. This empties one and walks every page that reads it.
+
+     `services` because it is read by seven blocks across three pages, filtered and unfiltered. */
+  const held = ROWS.services ?? [];
+  const was = [...held];
+  held.length = 0;
+  try {
+    let seen = 0;
+    for (const slug of Object.keys(pages()))
+      for (const block of page(slug)?.blocks ?? []) {
+        if (block.register !== 'services' || block.refusals.length) continue;
+        const decl = REGISTERS.services!;
+        const { refusal } = draw(block, {
+          rows: 0,
+          name: decl.name,
+          ...(decl.holds ? { holds: decl.holds } : {}),
+          add: { href: '/r/services?new=1', label: 'Add the first row' },
+        });
+        /* NOT "every block refuses" — the claim is that whatever IS empty is not called a filter
+           result. A kind that REDUCES has nothing to be empty: a `stat` over an empty list reads
+           GBP 0.00 and a `gauge` reads 0 of 22,000, and both are true answers rather than absences.
+           `19 §6`'s five states are about a list with nothing in it. */
+        if (!refusal) continue;
+        assert.equal(refusal.kind, 'no-data-yet', `${slug}: "${block.heading}" called an empty list a filter result`);
+        assert.ok(refusal.action, `${slug}: "${block.heading}" offered nothing to do about it`);
+        assert.ok(refusal.title, `${slug}: "${block.heading}" said nothing at all`);
+        seen++;
+      }
+    assert.ok(seen >= 3, `only ${seen} blocks read services, so this proves less than it should`);
+  } finally {
+    held.push(...was);
+  }
 });

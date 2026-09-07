@@ -18,7 +18,7 @@
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { NOW, page as readPage, values } from '$lib/record/api.ts';
+  import { NOW, REGISTERS, heldBy, page as readPage, values } from '$lib/record/api.ts';
   import { draw } from '$lib/record/blocks.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -79,7 +79,22 @@
 
       {#each result.blocks as block}
         {#if block.drawn}
-          {@const drawn = draw(block)}
+          <!-- THE SAME FIVE STATES A READER GETS ANYWHERE ELSE. This called `draw(block)` with no
+               second argument, so `no-data-yet` was structurally impossible here whatever the
+               precedence inside it: a shared page could only ever say "your filter matched nothing"
+               about a list that had never held a row. `19 §6` is about telling a reader which fact
+               is true, and a reader with no account is not owed less of the truth than one with.
+
+               NO `href`. The action is the half this surface cannot offer — it is read-only, scoped
+               to one page, and there is no list to open — so the state comes without one rather than
+               with a button that goes nowhere. -->
+          {@const held = block.register ? REGISTERS[block.register] : undefined}
+          {@const drawn = draw(
+            block,
+            held
+              ? { rows: heldBy(block.register!), name: held.name, ...(held.holds ? { holds: held.holds } : {}) }
+              : undefined,
+          )}
           <section class="block-slot">
             <!-- A BLOCK WITH NO AUTHORED `heading:` PRINTED ITS DIALECT ID: `spec`, `chips`, `gauge`,
                  `params`, `tree`. `kindNames` exists for this and says why in its own header — an id is

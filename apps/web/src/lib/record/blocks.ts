@@ -306,6 +306,16 @@ export type Refusal = {
   body?: string;
   /** One line per clause that did not resolve, verbatim from `explain()`. */
   lines?: string[];
+  /**
+   * The one thing to do about it, when there is one.
+   *
+   * `13 §5.2` asks every empty state for an action and says it must be a real link or button "so it
+   * joins the tab order" — and `no-data-yet` is the state where an action is the entire point: the
+   * list is empty because nobody has put anything in it, and the reader is the person who would.
+   * `no-results` gets none, because the way out of a filter that matched nothing is the filter that
+   * is already on screen; a second control saying so is a second control.
+   */
+  action?: { href: string; label: string };
 };
 
 /** Everything a surface needs to draw one block: the segments, or the reason there are none. */
@@ -322,24 +332,62 @@ export function draw(
    * THE CALLER SUPPLIES THE FACTS AND THIS DECIDES THE STATE, because a register's row count and its
    * declared `holds:` sentence come from the record and this file draws blocks.
    */
-  held?: { rows: number; name: string; holds?: string } | undefined,
+  held?: { rows: number; name: string; holds?: string; add?: { href: string; label: string } } | undefined,
 ): { segments: ReturnType<typeof parse>; refusal: Refusal | null } {
   /**
    * Nothing matched — and which kind of nothing.
    *
-   * THE AUTHOR'S OWN `empty:` WINS WHEREVER THEY WROTE ONE. "You owe nobody anything" is a result
-   * rather than a fault, and it is a better sentence than anything derived can be.
+   * AN EMPTY LIST BEATS THE AUTHOR'S SENTENCE, and the order used to be the other way round.
+   *
+   * `empty:` is MANDATORY on every source-bound block — `06 §1.1`, and `schema.ts` requires it, and
+   * `arrange.test.ts` asserts it — so a check for `block.empty` FIRST is a check that always passes.
+   * `no-data-yet` could not be reached from a declared page at all: measured across forty-two
+   * routes, `no-results` rendered 0 times, `cleared` 0, `no-permission` 0, `error` 0, and every one
+   * of the five states `19 §6` says must be told apart was drawn as whichever one the author happened
+   * to have typed. The seed made it literal — its generated block declares `empty: "Nothing in
+   * <name> yet."`, the phrase the section quotes as THE FAILURE, under a comment saying "it renders
+   * on day one, which is exactly when a register is empty". It did render on day one. Under the
+   * wrong kind, with the search glyph, and with nothing to do about it.
+   *
+   * AND THE AUTHOR'S SENTENCE IS WRONG ON THAT DAY, not merely less specific. "You owe nobody
+   * anything" is a claim about a filter that ran; on a record whose Obligations list has never held
+   * a row, no filter ran and the sentence is a statement about nothing. A list with no rows in it
+   * cannot have matched, so which fact is true is decided by the count and not by the declaration.
+   *
+   * THE AUTHOR STILL WINS THE CASE THEY WROTE IT FOR: rows exist and none of them matched.
    */
   const nothing = (): Refusal => {
-    if (block.empty) return { kind: 'no-results', title: block.empty };
     if (held && held.rows === 0)
       return {
         kind: 'no-data-yet',
-        title: `Nothing in ${held.name} yet.`,
+        /**
+         * AN UNFILTERED BLOCK'S `empty:` IS THIS STATE'S SENTENCE, and there is no other state it
+         * could ever be about.
+         *
+         * A block with no `where:` draws every row its list holds, so it can only be empty when the
+         * list is — which makes `no-results` unreachable for it and its `empty:` a sentence about
+         * day one whether the author meant it that way or not. Three in the seed say so outright:
+         * "Nobody yet.", and "Nothing here yet." twice. Deriving over them would replace a sentence
+         * somebody wrote about their own record with a generated one AND leave theirs rendering
+         * nowhere, which is the same dead-copy failure `dead-copy` exists to catch, one level down.
+         *
+         * A FILTERED BLOCK'S IS NOT. "You owe nobody anything" is a claim about a filter that ran,
+         * and on a list that has never held a row no filter ran.
+         */
+        title: block.where || !block.empty ? `Nothing in ${held.name} yet.` : block.empty,
         /* BE SPECIFIC ABOUT WHAT WILL BE HERE (19 §6). The register declares the sentence; every
            register does, and one screen was reading it. */
         ...(held.holds ? { body: `${held.name} holds ${held.holds}.` } : {}),
+        /* AND ONE THING TO DO, when the surface knows where. A shared page does not: it is read-only
+           and there is no list to open, so it gets the sentence and no button rather than a button
+           that goes nowhere.
+
+           THE CALLER SUPPLIES THE WORDS. Every sentence in this product is typed in `copy.ts` — it
+           is the whole reason `50 §3` gives for that file existing, and a label built here would be
+           the one line of user-facing English outside it. */
+        ...(held.add ? { action: held.add } : {}),
       };
+    if (block.empty) return { kind: 'no-results', title: block.empty };
     return { kind: 'no-results', title: 'Nothing matched.' };
   };
 

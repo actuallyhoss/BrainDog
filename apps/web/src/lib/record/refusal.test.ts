@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { draw, toSegments } from './blocks.ts';
+import { draw, saidPlainly, toSegments } from './blocks.ts';
 import { page } from './api.ts';
 import { PAGES } from './data.ts';
 import { KINDS } from 'braindog-render';
@@ -221,4 +221,84 @@ test('A REGISTER-BOUND `todo` CAN SHOW A TICK, and it comes from the register', 
 
   // And the tick is not left in the text.
   for (const r of [...done, ...open]) assert.ok(!r.cells[0]?.startsWith('['), `${r.cells[0]} kept its brackets`);
+});
+
+/* ── day one, which is the state that could never be reached ─────────────── */
+
+const EMPTY_LIST = { rows: 0, name: 'Obligations', holds: 'money owed either way' };
+
+test('AN EMPTY LIST IS `no-data-yet` EVEN THOUGH THE AUTHOR WROTE AN `empty:`', () => {
+  /* THE ORDER USED TO BE THE OTHER WAY ROUND, and `empty:` is MANDATORY on every source-bound block
+     (06 §1.1, `schema.ts`, and `arrange.test.ts` asserts it) — so the check for it always passed and
+     `no-data-yet` was unreachable from a declared page. Across forty-two routes of the seeded
+     record, four of the five states `19 §6` requires be told apart rendered zero times.
+
+     And the author's sentence is WRONG on that day, not merely less specific: "You owe nobody
+     anything" is a claim about a filter that ran, and on a list that has never held a row none did. */
+  const { refusal } = draw(
+    bound({ rows: [], entries: [], matched: [], refusals: [], where: 'state is open', empty: 'You owe nobody anything.' }),
+    EMPTY_LIST,
+  );
+  assert.equal(refusal?.kind, 'no-data-yet', 'the author’s sentence outranked the fact');
+  assert.equal(refusal?.title, 'Nothing in Obligations yet.');
+  assert.equal(refusal?.body, 'Obligations holds money owed either way.', '19 §6: be specific about what will be here');
+});
+
+test('and it carries the one action `19 §6` gives that state', () => {
+  const add = { href: '/r/obligations?new=1', label: 'Add the first row' };
+  const { refusal } = draw(
+    bound({ rows: [], entries: [], matched: [], refusals: [], where: 'state is open' }),
+    { ...EMPTY_LIST, add },
+  );
+  assert.deepEqual(refusal?.action, add, 'the state whose whole point is that somebody can act had no way to');
+  /* A REAL ADDRESS, because `13 §5.2` asks the CTA to be a link or button "so it joins the tab
+     order" — and because the form lives on another route, which a block cannot open from here. */
+  assert.match(refusal?.action?.href ?? '', /^\/r\/[a-z_]+\?new=1$/);
+});
+
+test('a surface with nowhere to send anybody offers no button rather than a dead one', () => {
+  /* The shared page: read-only, scoped to one page, no list to open. It still gets the right STATE,
+     because a reader with no account is not owed less of the truth than one with. */
+  const { refusal } = draw(bound({ rows: [], entries: [], matched: [], refusals: [], where: 'state is open' }), EMPTY_LIST);
+  assert.equal(refusal?.kind, 'no-data-yet');
+  assert.equal(refusal?.action, undefined);
+});
+
+test('AN UNFILTERED BLOCK KEEPS THE AUTHOR’S SENTENCE, because it is about this state', () => {
+  /* A block with no `where:` draws every row its list holds, so it can only be empty when the list
+     is — which makes `no-results` unreachable for it and its `empty:` a day-one sentence whether the
+     author meant it that way or not. Three in the seed are exactly that: "Nobody yet." and "Nothing
+     here yet." twice. Deriving over them would leave three written sentences rendering nowhere. */
+  const { refusal } = draw(
+    bound({ rows: [], entries: [], matched: [], refusals: [], empty: 'Nobody yet.' }, ['where']),
+    { rows: 0, name: 'People' },
+  );
+  assert.equal(refusal?.kind, 'no-data-yet', 'the kind is decided by the count, not by the wording');
+  assert.equal(refusal?.title, 'Nobody yet.');
+});
+
+test('a list that HAS rows and matched none is still the filter’s answer', () => {
+  /* The case the author wrote the sentence for, and the one that must not change. */
+  const { refusal } = draw(
+    bound({ rows: [], entries: [], matched: [], refusals: [], where: 'state is open', empty: 'You owe nobody anything.' }),
+    { rows: 38, name: 'Obligations' },
+  );
+  assert.equal(refusal?.kind, 'no-results');
+  assert.equal(refusal?.title, 'You owe nobody anything.');
+  assert.equal(refusal?.action, undefined, 'the way out of a filter is the filter already on screen');
+});
+
+/* ── and the query the empty state quotes ────────────────────────────────── */
+
+test('THE QUOTED QUERY IS THE READER’S WORDS, not the column’s', () => {
+  /* `19 §6` asks a `no-results` state to quote the query verbatim, and the register quoted
+     `whereOf(filters)` — the sentence the EVALUATOR reads, which spells the stored value. So a
+     reader who pressed a chip labelled "owed to me" was shown `direction is owed_to_me` and asked to
+     check a filter in a spelling they had never seen. */
+  assert.equal(saidPlainly('obligations', 'direction is owed_to_me'), 'direction is owed to me');
+  assert.equal(saidPlainly('obligations', 'state is paid'), 'state is paid');
+  /* A relative day becomes the phrase, for the same reason: `+30d` is not something anybody typed. */
+  assert.equal(saidPlainly('services', 'renews before +30d'), 'renews before 30 days from now');
+  /* And a field the register does not declare passes through rather than being invented. */
+  assert.equal(saidPlainly('obligations', 'nonsense is x'), 'nonsense is x');
 });
