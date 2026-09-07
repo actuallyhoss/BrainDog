@@ -14,11 +14,14 @@
 import { copy } from './copy.ts';
 import { toasts } from './ui/toast.svelte.ts';
 
-/** Put `text` on the clipboard and say so. `label` is what the toast quotes; the text by default. */
-export async function put(text: string, label = text): Promise<void> {
+/**
+ * Put `text` on the clipboard and say so. `label` is what the toast quotes; the text by default.
+ * `said` overrides the sentence for a surface that has its own — first run says where to paste it.
+ */
+export async function put(text: string, label = text, said?: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
-    toasts.push(copy.copied(label));
+    toasts.push(said ?? copy.copied(label));
   } catch {
     toasts.push(copy.copyRefused, { intent: 'warn' });
   }

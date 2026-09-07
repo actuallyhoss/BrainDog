@@ -61,6 +61,10 @@ const GATES = [
   // Needs a build. Both report and exit 0 when there is not one, so `pnpm gates` is useful on a
   // fresh checkout; CI builds first, and then they are real gates.
   ['bundle', ['node', [join(here, 'bundle.mjs')]]],
+  /* A PREFERENCE THAT CHANGES NOTHING IS A CONTROL THAT LIES (`25 §1`'s `series` class). The Text
+     setting shipped inert for the life of the build because the 128-configuration matrix is widths,
+     schemes and directions — no preference but `scheme` is an axis of it, so nothing ever asked. */
+  ['prefs', ['node', [join(here, 'prefs.mjs')]]],
   // Last two because they are the slow ones: a real browser over every route.
   ['layout', ['node', [join(here, 'layout.mjs')]]],
   ['a11y', ['node', [join(here, 'a11y.mjs')]]],

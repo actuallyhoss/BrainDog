@@ -127,6 +127,33 @@ function seededIntent() {
   }
 }
 
+/**
+ * The prefs gate's negative, and it cannot be a fixture tree either.
+ *
+ * `BRAINDOG_GATE_SEED=prefs` pins `--row-h` and `--t-ui` to constants — which is precisely what the
+ * build shipped for the life of the Text control — and the gate must notice that two settings come
+ * back identical.
+ */
+function seededPrefs() {
+  if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
+    console.log('  prefs: no build, so its negative is not run');
+    return;
+  }
+  const r = spawnSync(process.execPath, [join(here, 'prefs.mjs')], {
+    cwd: join(here, '..', '..'),
+    encoding: 'utf8',
+    env: { ...process.env, BRAINDOG_GATE_SEED: 'prefs' },
+  });
+  const said = `${r.stdout}${r.stderr}`;
+  if (r.status === 0 || !said.includes('the body step')) {
+    console.error('  prefs: PASSED a pinned token — a preference could reach the cookie and nothing else.');
+    failed.push('prefs');
+  } else {
+    ran++;
+    console.log('  prefs: red on a preference pinned to a constant');
+  }
+}
+
 let ran = 0;
 
 for (const { gate, expect, findings, run } of CASES) {
@@ -173,6 +200,7 @@ for (const { gate, expect, findings, run } of CASES) {
 
 seededLayout();
 seededIntent();
+seededPrefs();
 
 /* AND EVERY FIXTURE IS CLAIMED. A directory under `negative/` that no case runs is a violation
    nobody is seeding, which is the same silence this file exists to break. */

@@ -1,0 +1,188 @@
+/**
+ * A preference that changes nothing is a control that lies.
+ *
+ *   node tools/gates/prefs.mjs
+ *
+ * `25 §1` names this class of defect and calls it a bug rather than a gap: "Exactly the same class
+ * of defect as the `series` chart that was advertised with no way to feed it: **a capability that
+ * exists as a table row.**" `27 §3` puts it in a list titled "Four findings that were bugs, not
+ * gaps", because "each was a statement the corpus already made and could not honour". `23 §3.1` is
+ * the same rule from the other side: *"a row that cannot run is not there"*.
+ *
+ * IT WAS FOUND BY AN AUDIT, NOT BY A GATE, AND THAT IS THE POINT. Settings → Text size set
+ * `data-text` on `<html>`, lit its own segment and wrote the cookie, while every UI surface sized
+ * from a token pinned to a constant. Full-page screenshots at Small, Normal and Large were
+ * byte-identical on six routes at two widths; 0 of 182 elements moved on Home. It shipped that way
+ * because the 128-configuration matrix (`50 §9`) is 8 fixtures x 4 widths x 2 schemes x 2
+ * directions — `data-text` is not an axis of it, and neither is any other preference but `scheme`.
+ *
+ * SO THIS GATE ASKS ONE QUESTION OF EACH: set it, and does the page come back different? Not "is it
+ * the right difference" — a gate cannot judge that — but "is there one at all", which is the
+ * question that was never asked. Each check names the token or attribute it measures, so a red line
+ * says which preference stopped reaching the DOM rather than that something is wrong.
+ *
+ * IT DOES NOT COVER `keys`, `columns`, `previewDismissed` OR `suggestPages`. Those need a keystroke,
+ * a menu or a state this fixture does not reach; a check that pretended to cover them would be the
+ * thing this file exists to catch. What is here is what can be measured by loading a page.
+ */
+
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { extname, join } from 'node:path';
+
+import { chromium } from '@playwright/test';
+
+import { budget } from './lib.mjs';
+
+const REPO = join(import.meta.dirname, '..', '..');
+const ROOT = join(REPO, 'apps', 'web', 'build');
+const PORT = budget('prefs').port;
+
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
+  '.json': 'application/json',
+};
+
+if (!(await stat(ROOT).catch(() => null))) {
+  console.log('  prefs: no build to check. `pnpm build` first, and CI does.');
+  process.exit(3);
+}
+
+/**
+ * What to set, where to look, and what has to differ.
+ *
+ * `probe` runs in the page and returns a string. Two settings whose probes come back equal is the
+ * finding: the preference reached the cookie and not the DOM.
+ */
+const CASES = [
+  {
+    name: 'text',
+    what: 'the body step (13 §7)',
+    route: '/r/obligations',
+    /* `50 §4.7`: `text: 'sm' | 'base' | 'md'`, applied before first paint. `13 §7`: it "picks the
+       body step" — so the chrome moves and the fixed steps around it do not. */
+    values: [{ text: 'sm' }, { text: 'base' }, { text: 'md' }],
+    probe: () => {
+      const el = document.querySelector('.line-title, .td, .rail a[data-nav]');
+      return el ? getComputedStyle(el).fontSize : 'no element';
+    },
+  },
+  {
+    name: 'density',
+    what: 'the row height (13 §4.2)',
+    route: '/r/obligations',
+    values: [{ density: 'compact' }, { density: 'comfortable' }, { density: 'roomy' }],
+    probe: () => getComputedStyle(document.documentElement).getPropertyValue('--row-h').trim(),
+  },
+  {
+    name: 'scheme',
+    what: 'the ground colour',
+    route: '/',
+    values: [{ scheme: 'light' }, { scheme: 'dark' }],
+    probe: () => getComputedStyle(document.body).backgroundColor,
+  },
+  {
+    name: 'sidebar',
+    what: 'whether the rail is drawn',
+    route: '/',
+    /* `undefined` is open, which is what a first visit should be — so the two values are "unset"
+       and `false` rather than `true` and `false`. */
+    values: [{}, { sidebar: false }],
+    /* THE RENDERED WIDTH, not the link count. Folding hides the rail with CSS, so its anchors are
+       still in the DOM and still queryable — a probe that counts them reports "no change" about a
+       control that works, which is the same lie in the other direction. */
+    probe: () => String(Math.round(document.querySelector('.rail-slot, nav.rail')?.getBoundingClientRect().width ?? -1)),
+  },
+  {
+    name: 'nav',
+    what: 'the order of the rail (19 §3: position lives in a per-user store and wins)',
+    route: '/',
+    /* THE ONE THAT WAS WRITTEN, SURVIVED A RELOAD, AND MOVED NOTHING. The rail rendered the raw
+       list while the arrangement lived in a value read only by the two move functions. */
+    /* WITHIN ONE SECTION, because that is the only move the product offers: `29 §4` places a page
+       "at the end of its section, never inserted mid-list", and the menu is up / down / to top /
+       hide. Three pages from three different sections would reorder three buckets of one, which
+       changes nothing and would fail this gate for being a bad test rather than a bad build. */
+    values: [{}, { nav: ['/p/portage', '/p/kiln', '/p/marlow-co'] }],
+    probe: () => [...document.querySelectorAll('nav.rail a[data-nav]')].map((a) => a.getAttribute('href')).join(' '),
+  },
+];
+
+const server = createServer(async (req, res) => {
+  const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
+  if (rel.includes('..')) return res.writeHead(400).end();
+  for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
+    const file = join(ROOT, candidate);
+    if ((await stat(file).catch(() => null))?.isFile()) {
+      res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
+      return createReadStream(file).pipe(res);
+    }
+  }
+  if (!Object.hasOwn(TYPES, extname(rel))) {
+    res.writeHead(200, { 'content-type': TYPES['.html'] });
+    return createReadStream(join(ROOT, 'index.html')).pipe(res);
+  }
+  res.writeHead(404).end();
+});
+await new Promise((r) => server.listen(PORT, r));
+
+const browser = await chromium.launch();
+const findings = [];
+let checked = 0;
+
+for (const test of CASES) {
+  const seen = new Map();
+  for (const value of test.values) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
+       script before first paint, so setting it is exactly what the product does — and it keeps this
+       gate about whether the preference REACHES the DOM rather than about the control that sets it,
+       which the a11y and layout gates already drive. */
+    await context.addCookies([
+      { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(value)), url: `http://localhost:${PORT}` },
+    ]);
+    const page = await context.newPage();
+    await page.goto(`http://localhost:${PORT}${test.route}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+    /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=prefs` pins the two
+       tokens the checks read, which is exactly the shape of the bug this gate is named after — a
+       preference reaching the cookie and a constant reaching the page — and the run must go red. */
+    if (process.env.BRAINDOG_GATE_SEED === 'prefs')
+      await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--t-ui:15px !important}' });
+    await page.waitForTimeout(120);
+    seen.set(JSON.stringify(value), await page.evaluate(test.probe));
+    await context.close();
+    checked++;
+    process.stdout.write('.');
+  }
+
+  /* EVERY VALUE DISTINCT, not merely "some pair differs". Three settings where two agree is a
+     control with a step that does nothing, which is the same defect one notch smaller. */
+  const answers = [...seen.entries()];
+  const distinct = new Set(answers.map(([, v]) => v));
+  if (distinct.size < answers.length) {
+    findings.push(
+      `${test.name}: ${answers.length} values, ${distinct.size} distinct — ${test.what}\n` +
+        answers.map(([k, v]) => `        ${k} -> ${v}`).join('\n'),
+    );
+    process.stdout.write('!');
+  }
+}
+
+process.stdout.write('\n');
+await browser.close();
+server.close();
+
+console.log(`  prefs: ${checked} page-runs over ${CASES.length} preferences, ${findings.length} finding(s)`);
+
+if (findings.length) {
+  console.error('\n  a preference that reaches the cookie and not the page:');
+  for (const f of findings) console.error(`      ${f}`);
+  process.exitCode = 1;
+}

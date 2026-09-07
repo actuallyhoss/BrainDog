@@ -86,8 +86,23 @@
 
     /* The chrome reads at the body size, not below it. Running labels, rows and controls at 13
        bought density nobody asked for and cost comfort everybody notices: a record is read for an
-       hour at a time. 15 is the body step, and the chrome is body. */
-    --t-ui: var(--t-base);
+       hour at a time. 15 is the body step, and the chrome is body.
+
+       AND `--text` IS THE BODY STEP, WHICH IS THE WHOLE POINT OF IT. This read `var(--t-base)` — a
+       constant — so the Settings → Text control set `data-text`, lit its segment, wrote the cookie,
+       and moved nothing. Measured: 0 of 182 elements shift on Home between Small and Large, and 0
+       of 94 on the screen the control itself lives on. Full-page screenshots at all three settings
+       are byte-identical.
+
+       `13 §7` says what the setting does and it is narrower than it sounds: "the reader's Text
+       setting picks the BODY STEP among `t-sm` / `t-base` / `t-md`". Not the scale, not the
+       headings, not the captions — the body step, and the chrome is body. `--t-xs` labels and
+       `--t-lg` headings stay where they are, deliberately: "if a screen is hard to read, the fault
+       is in what it says and how it is arranged."
+
+       There is no `data-text` axis in the 128-configuration gate matrix, which is why a control
+       that changed nothing kept CI green for the life of the build. */
+    --t-ui: var(--text);
 
     /* Space is one base multiplied, and it goes further than it used to. The old scale stopped at
        48 and every gap between sections was 24 or 32, which is what made a screen of five groups

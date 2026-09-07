@@ -21,6 +21,8 @@
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { addKey } from '$lib/start.ts';
+  import * as clipboard from '$lib/clipboard.ts';
+  import { silenced } from '$lib/a11y/keys.svelte.ts';
   import Define from '$lib/ui/Define.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -55,6 +57,10 @@
 
   function key(e: KeyboardEvent) {
     if (picked !== null || e.metaKey || e.ctrlKey || e.altKey) return;
+    /* AND THE SWITCH, WHICH THIS SCREEN ALONE DID NOT HONOUR. `Character keys: off` is the app's
+       stated WCAG 2.1.4 mechanism (`19 §4`) and `1`–`5` here are bare letters by any reading. Every
+       other bare-key handler in the product asks; the first screen anybody sees did not. */
+    if (silenced(e)) return;
     const n = Number(e.key);
     if (!Number.isInteger(n) || n < 1 || n > CHOICES.length) return;
     e.preventDefault();
@@ -164,10 +170,21 @@
     void goto(`/r/${choice.key}?first=1`);
   }
 
-  async function copyCommand() {
-    await navigator.clipboard?.writeText(firstRun.agentCommand).catch(() => {});
-    toasts.push(firstRun.agentCopied);
-  }
+  /**
+   * IT SAID "Copied." WHETHER OR NOT ANYTHING WAS COPIED.
+   *
+   * `navigator.clipboard?.writeText(…).catch(…)` — the `?.` short-circuits the WHOLE chain, the
+   * `.catch` included, so with no Clipboard API the expression is `undefined` and the toast fires
+   * anyway. A rejected write was swallowed the same way. Verified by removing `navigator.clipboard`
+   * at runtime: the button reported "Copied. Paste it where your agent is running." and the
+   * clipboard still held whatever was there before.
+   *
+   * `navigator.clipboard` IS ABSENT OVER PLAIN HTTP, which is how a self-host is first opened — so
+   * the environment where this lies is the one this screen exists for. `clipboard.ts` was written
+   * for exactly this and says why in its own header; this was the one caller that did not use it.
+   */
+  const copyCommand = () =>
+    void clipboard.put(firstRun.agentCommand, firstRun.agentCommand, firstRun.agentCopied);
 </script>
 
 <svelte:window onkeydown={key} />
@@ -216,9 +233,15 @@
         <div class="agent-cmd">
           <!-- Focusable, because at 390 the command is wider than the card and scrolls. A scrolling
                box a keyboard cannot reach is a box a keyboard cannot read (WCAG 2.1.1) — the same
-               fix the sheet body and the declaration block already carry. -->
+               fix the sheet body and the declaration block already carry.
+
+               NO `aria-label` ON IT. `code` is a name-prohibited role, so the attribute was dropped
+               by the browser and did nothing — and the string it carried was the COPY BUTTON's
+               label, so the first screen of the product had two focusable controls announcing "Copy
+               the command", the first of which copied nothing. What a reader needs here is the
+               command, which the element already is. -->
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <code tabindex="0" aria-label={firstRun.agentCopy}>{firstRun.agentCommand}</code>
+          <code tabindex="0">{firstRun.agentCommand}</code>
           <button type="button" class="agent-copy" onclick={copyCommand} aria-label={firstRun.agentCopy}>
             <Icon name="copy" size="s" />
           </button>

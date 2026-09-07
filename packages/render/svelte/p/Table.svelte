@@ -145,15 +145,27 @@
       <!-- AN ANCHOR OR A BUTTON, never a `div` with a click handler. A row that has somewhere to go
            is a link and gets the browser's whole contract — middle-click, copy the address, the
            status bar; one that is only activated is a button. Both carry a role without being told
-           one, which a `svelte:element` with an `onclick` does not. -->
+           one, which a `svelte:element` with an `onclick` does not.
+
+           AND NEITHER, WHEN THERE IS NOTHING TO ACTIVATE. `onactivate` is supplied by two call
+           sites — the register grid and a saved view — and a declared page passes none, so every
+           hrefless row on `/p/*` became a focusable, pressable no-op. Measured on `/p/money` at
+           390: the opening-balance card, "What is liquid today", sitting among nine siblings that
+           all navigate, is a button that does nothing when pressed. At 1440 the same row is a
+           `div[role=row]` with `cursor: auto` and makes no promise at all, which is what this
+           branch now matches. A row that cannot be activated is not a control. -->
       {#if row.href}
         <a class="table-card" href={row.href} data-intent={row.tone}>
           {@render card(row)}
         </a>
-      {:else}
-        <button type="button" class="table-card" data-intent={row.tone} onclick={() => onactivate?.(row)}>
+      {:else if onactivate}
+        <button type="button" class="table-card" data-intent={row.tone} onclick={() => onactivate(row)}>
           {@render card(row)}
         </button>
+      {:else}
+        <div class="table-card" data-intent={row.tone}>
+          {@render card(row)}
+        </div>
       {/if}
     </li>
   {/each}

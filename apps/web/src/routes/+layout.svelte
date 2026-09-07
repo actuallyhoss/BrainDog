@@ -38,7 +38,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Palette from '$lib/palette/Palette.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
-  import { group } from '$lib/nav.ts';
+  import { arrange } from '$lib/nav.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -57,8 +57,13 @@
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
 
-  /** The same sectioned grouping the rail does, so one nav is not a different shape from the other. */
-  const grouped = $derived(group(data.nav));
+  /** The same sectioned grouping AND THE SAME ORDER the rail draws — one nav, not two shapes. It
+      was `group(data.nav)`, so the phone's More sheet ignored an arrangement the rail honoured. */
+  const grouped = $derived(arrange(data.nav, pref.read().nav ?? []));
+
+  /* `g 1`–`9` COUNT WHAT IS ON SCREEN. This indexed the raw list, so after a reorder the digit
+     printed beside a rail row and the row the digit opened were different pages. */
+  const numbered = $derived(grouped.flatMap(([, entries]) => entries));
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
@@ -123,15 +128,22 @@
     if (silenced(e)) return;
 
     if (go.armed) {
+      /* A CHORD IS NOT THE SECOND HALF OF A SEQUENCE. `g` armed, then `Ctrl+H`, navigated Home —
+         `Mod+H` is on `NEVER_BIND`'s list precisely because the browser owns it, and the arm read
+         the key without asking whether a modifier was held. Any chord disarms and is left alone. */
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        go.disarm();
+        return;
+      }
       const target = GOTO[e.key.toLowerCase()];
       const digit = Number(e.key);
       go.disarm();
       if (target) {
         e.preventDefault();
         goto(target);
-      } else if (digit >= 1 && digit <= 9 && data.nav[digit - 1]) {
+      } else if (digit >= 1 && digit <= 9 && numbered[digit - 1]) {
         e.preventDefault();
-        goto(data.nav[digit - 1]!.href);
+        goto(numbered[digit - 1]!.href);
       }
       return;
     }

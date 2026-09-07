@@ -24,7 +24,7 @@
     <!-- ONE statement, static bytes, so its SHA-256 is the single hash in the hosts' script-src.
          A static shell has no server to write the attributes, so this reads the per-device
          preference cookie and sets them before first paint (50 §4.7). -->
-    <script>try{var p=JSON.parse(decodeURIComponent((document.cookie.match(/(?:^|; )bd_pref=([^;]*)/)||[])[1]||'{}')),d=document.documentElement;p.scheme&&d.setAttribute('data-scheme',p.scheme),d.setAttribute('data-text',p.text||'base'),d.setAttribute('data-density',p.density||'comfortable'),p.theme&&d.setAttribute('data-theme',p.theme),p.sidebar===false&&d.setAttribute('data-rail','off')}catch(e){}</script>
+    <script>try{var p=JSON.parse(decodeURIComponent((document.cookie.match(/(?:^|; )bd_pref=([^;]*)/)||[])[1]||'{}')),d=document.documentElement;p.scheme&&d.setAttribute('data-scheme',p.scheme),d.setAttribute('data-text',p.text||'base'),d.setAttribute('data-density',p.density||'comfortable'),p.theme&&d.setAttribute('data-theme',p.theme)}catch(e){}</script>
 
     %sveltekit.head%
   </head>

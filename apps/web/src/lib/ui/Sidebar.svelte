@@ -31,7 +31,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
-  import { group } from '../nav.ts';
+  import { arrange } from '../nav.ts';
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
@@ -91,17 +91,12 @@
     pref.write({ nav: next });
   };
 
-  const ordered = $derived.by(() => {
-    const base = [...nav].sort((a, b) => a.order - b.order);
-    if (arrangement.length === 0) return base;
-    const rank = new Map(arrangement.map((href, i) => [href, i]));
-    return base
-      .map((e, i) => ({ e, at: rank.get(e.href) ?? Number.MAX_SAFE_INTEGER, i }))
-      .sort((a, b) => a.at - b.at || a.i - b.i)
-      .map((x) => x.e);
-  });
+  const sections = $derived(arrange(nav, arrangement));
 
-  const sections = $derived(group(nav));
+  /* THE FLAT LIST IN RENDER ORDER, and it is derived FROM what renders rather than beside it. The
+     two were computed separately and disagreed, which is how a move came to be calculated against a
+     list nobody could see. One of them has to be the other's source. */
+  const ordered = $derived(sections.flatMap(([, entries]) => entries));
 
   /**
    * Move one item, one place, WITHIN ITS SECTION.
