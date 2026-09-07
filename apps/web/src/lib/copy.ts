@@ -305,6 +305,10 @@ export const copy = {
   tryAgain: 'Load it again',
   addOne: 'Add the first row',
   addTheRow: 'Add the row',
+  /* The two questions an audit log exists to answer, as the labels of the two controls. */
+  auditWho: 'Who',
+  auditWhat: 'What kind of change',
+  auditNone: 'Nothing in the log matches that.',
   /* THE INBOX. `pattern` and `claimed` are the schema's words for a thing a person would call a
      rule, and what they are being offered is not a pattern — it is what happens to the NEXT one. */
   ruleOffer: 'A rule that would have filed this, and the next one like it',

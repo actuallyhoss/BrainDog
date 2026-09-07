@@ -11,6 +11,9 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
+  import { goto } from '$app/navigation';
+  import { page as route } from '$app/state';
+  import Button from '$lib/ui/Button.svelte';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { AUDIT, NOW, PAGES } from '$lib/record/api.ts';
@@ -48,7 +51,7 @@
    */
   const actorOf = (by: string): string => {
     const rule = /^rule\.(.+)$/.exec(by);
-    return rule ? `the ${rule[1]!.replace(/[._]/g, ' ')} rule` : by;
+    return rule ? `${rule[1]!.replace(/[._]/g, ' ')} rule` : by;
   };
 
   /**
@@ -77,21 +80,98 @@
     const page = /^page\.([a-z0-9_]+)$/.exec(target);
     return page ? `/p/${page[1]}` : `/${encodeURIComponent(target)}`;
   };
+
+  /**
+   * WHO, AND WHAT KIND OF CHANGE. The two questions this screen exists to answer.
+   *
+   * IT HAD NO CONTROLS AT ALL. Eight rows, a footer saying the record is at version 4,192, and
+   * nothing on the page to reach any of the other four thousand — no search, no actor, no kind, no
+   * range, no pagination. So the surface stated a number and then refused to let anybody use it,
+   * which is worse than not stating it: "who changed obligations#1 last month" is the whole job of
+   * an audit log and it could not be done.
+   *
+   * IN THE URL, LIKE EVERY OTHER FILTER IN THIS PRODUCT. `19 §5`: what defines which rows you are
+   * looking at must be shareable, and "what did the renewal rule do" is exactly the thing somebody
+   * pastes into a message.
+   *
+   * AND THEY APPEAR WHEN THERE IS SOMETHING TO CHOOSE BETWEEN. One actor is not a filter; it is a
+   * fact, and a control offering it is a control that cannot change anything.
+   */
+  const actors = $derived([...new Set(AUDIT.map((e) => e.by))]);
+  const kinds = $derived([...new Set(AUDIT.map((e) => e.kind))]);
+
+  const who = $derived(route.url.searchParams.get('by') ?? '');
+  const what = $derived(route.url.searchParams.get('kind') ?? '');
+
+  const shown = $derived(AUDIT.filter((e) => (!who || e.by === who) && (!what || e.kind === what)));
+
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(route.url.searchParams);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    void goto(`?${next}`, { replaceState: false, noScroll: true, keepFocus: true });
+  };
 </script>
 
 <svelte:head><title>{titleOf(copy.audit)}</title></svelte:head>
 
-<PageHead icon="history"
-  title={copy.audit}
-  count={AUDIT.length}
-/>
+<PageHead icon="history" title={copy.audit} count={shown.length} total={AUDIT.length} />
 
 <div class="page">
+  <!-- A CHOICE APPEARS WHEN THERE IS ONE TO MAKE. Two actors and two kinds is a filter; one of
+       either is a fact about the record, and a segmented control over it changes nothing. -->
+  {#if actors.length > 1 || kinds.length > 1}
+    <div class="bar">
+      {#if actors.length > 1}
+        <div class="segmented" role="group" aria-label={copy.auditWho}>
+          {#each actors as a}
+            <button
+              type="button"
+              class="segment"
+              data-on={who === a ? '' : undefined}
+              aria-pressed={who === a ? 'true' : 'false'}
+              onclick={() => setParam('by', who === a ? '' : a)}
+            >
+              {actorOf(a)}
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      {#if kinds.length > 1}
+        <div class="segmented" role="group" aria-label={copy.auditWhat}>
+          {#each kinds as k}
+            <button
+              type="button"
+              class="segment"
+              data-on={what === k ? '' : undefined}
+              aria-pressed={what === k ? 'true' : 'false'}
+              onclick={() => setParam('kind', what === k ? '' : k)}
+            >
+              {kindOf(k).word}
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      {#if who || what}
+        <Button weight="bare" href="/audit"><Icon name="close" size="s" />{copy.clearFilters}</Button>
+      {/if}
+    </div>
+  {/if}
+
+  {#if shown.length === 0}
+    <p class="none">{copy.auditNone}</p>
+  {/if}
+
   <ul class="ledger">
-    {#each AUDIT as e}
+    {#each shown as e}
       <li>
         <div class="line line-short">
-          <span class="seq">{actorOf(e.by)}</span>
+          <!-- ITS OWN COLUMN, NOT `.seq`. That one is 12ch of monospace for spoken ids, and
+               `rows.css` says in as many words that anything longer needs a span of its own — so
+               "renewal rule" arrived as `the renewal r…`. An actor is a name. -->
+          <span class="who">{actorOf(e.by)}</span>
           <span class="line-main">
             <!-- The target is a LINK, and that is not decoration. This page was a list of spans:
                  nothing in it could be reached by Tab, so the one scrolling container in the app
@@ -118,6 +198,39 @@
 </div>
 
 <style>
+  /* WIDE ENOUGH FOR A NAME, in the reading face rather than the id face. It sits in the grid slot
+     `.seq` would have taken, so the ledger's columns still line up down the page. */
+  .who {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The same shape the register's toolbar has, because it is the same act: narrowing a list. */
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-4);
+  }
+
+  /* THE TRACK WRAPS HERE AND NOWHERE ELSE. A register's segmented groups hold two to four short
+     enum values and fit on any phone; this one holds every actor the log has ever carried, and
+     "renewal rule" is not "open". Five of those in one unwrapping track reached 335px inside a
+     320px screen — the layout gate caught it. Two rows of track still read as one control. */
+  .bar :global(.segmented) {
+    flex-wrap: wrap;
+  }
+
+  .none {
+    color: var(--dim);
+    font-size: var(--t-ui);
+  }
+
   .page {
     display: flex;
     flex-direction: column;
@@ -126,8 +239,11 @@
     max-inline-size: 1100px;
   }
 
+  /* 16ch FOR THE ACTOR, because it is a name and not a spoken id. The ledger's default first column
+     is 10ch of monospace, which "renewal rule" does not fit in — and once `rule.renewal` became
+     English, every rule in the log truncated. */
   .ledger :global(.line) {
-    grid-template-columns: 10ch minmax(0, 22ch) minmax(0, 1fr) 9ch;
+    grid-template-columns: 16ch minmax(0, 22ch) minmax(0, 1fr) 9ch;
   }
 
   /* A word and a glyph, not an identifier. It is still the quiet half of the line, because the
