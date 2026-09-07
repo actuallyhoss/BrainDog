@@ -20,7 +20,9 @@
   import { copy } from '$lib/copy.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PACKS, PAGES, PEOPLE_ACCESS, REGISTERS, boot, pages } from '$lib/record/api.ts';
+  import { AUTH_METHODS, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS, REGISTERS, boot, pages } from '$lib/record/api.ts';
+  import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
+  import { relative } from 'braindog-render';
 
   /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
      `the studio` — and one of the two was a literal. */
@@ -127,6 +129,33 @@
    * in the past tense about a thing that did not happen is the worst kind of mock, because it is the
    * kind somebody believes.
    */
+  /**
+   * WHAT `invite({ person, levels, why })` WOULD WRITE, said in the words it would write it in.
+   *
+   * `45 §5.6`: one method does all three. It reads the old rows, deletes every `member` row for the
+   * person, re-inserts from `levels`, and appends an `access.grant` per register raised or added and
+   * an `access.revoke` per register lowered or removed — each carrying `why` as its note. So
+   * invitation, level change and removal are not three operations with three confirmations; they are
+   * one call, and `levels: []` is the removal.
+   *
+   * THE MOCK SAYS THE SENTENCE THAT WOULD BE WRITTEN rather than "saved". A toast reading "Saved"
+   * over a call that also revokes eleven registers is the shape of thing somebody trusts once.
+   */
+  const levelChange = (who: Person, to: Level) =>
+    toasts.push(
+      copy.notWritten(
+        to === who.level
+          ? `${who.name} already reaches ${to}`
+          : `${who.name} would move from ${who.level} to ${to} across this record, with one access.${LEVELS.indexOf(to) > LEVELS.indexOf(who.level) ? 'grant' : 'revoke'} per list and your reason on each`,
+      ),
+      { intent: 'warn' },
+    );
+
+  /* A RECORD KEEPS AT LEAST ONE OWNER — `LEVEL_REQUIRED`, and its fix sentence verbatim (45 §5.6).
+     The check is here rather than in the control because it is a fact about the whole list. */
+  const owners = $derived(PEOPLE_ACCESS.filter((p) => p.level === 'owner' && p.since).length);
+  const lastOwner = (who: Person) => who.level === 'owner' && owners <= 1;
+
   function promote(decl: PageDecl) {
     toasts.push(copy.notWritten(`${decl.title} would be placed at the end of its section in your nav`), { intent: 'warn' });
   }
@@ -249,23 +278,170 @@
         {/if}
       </Section>
     {:else if area === 'people'}
-      <Section title="Who can see this record" count={PEOPLE_ACCESS.length}>
-        <ul class="ledger">
+      <!--
+        IT WAS A LIST WITH NO CONTROLS, on the screen called People & sharing.
+
+        You could see who had access and could not change it, could not invite anybody, and could
+        not take it away — one of the five areas that were "real", and the one whose whole subject
+        is a thing you do. `19 §2` names it beside `recovery` as an area an earlier draft dropped.
+
+        `45 §5.6` HAS ONE METHOD FOR ALL THREE, which is why this is one control and not three:
+        `invite({ person, levels, why })` deletes the person's `member` rows and re-inserts from
+        `levels`, so a level change and a removal are the same call with a different argument.
+      -->
+      <Section title={copy.whoCanSee} count={PEOPLE_ACCESS.length}>
+        <p class="hint">{copy.accessScope}</p>
+        <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
+
+             The control is five buttons wide and the sentence beside it is a full clause, so in one
+             row of that grid the email clipped mid-address and the sentence saying what the person
+             can DO was squeezed out of existence — leaving five bare ladder words as the only
+             answer to the question this screen exists for. Who they are on the first line, what they
+             can do on the second, and the sentence directly under the control that sets it. -->
+        <ul class="whos">
           {#each PEOPLE_ACCESS as p}
-            <li>
-              <div class="line">
-                <span class="seq">{p.id}</span>
-                <span class="line-main"><span class="line-title">{p.name}</span></span>
-                <!-- ONE CELL, NOT TWO. A chip printed the enum (`write`) and the cell beside it
-                     collapsed three levels into two with a ternary — so a person with write access
-                     read `write` … `Read only`, two cells three inches apart contradicting each
-                     other about who can change the business record. What the column is for is what
-                     this person can do, said once, in a sentence. -->
-                <span class="line-when">{copy.levelMeans[p.level] ?? p.level}</span>
+            <li class="who">
+              <div class="who-head">
+                <!-- NO AVATAR. `13 §2.1b` gives a frozen accent to a REGISTER ROW's identity, and
+                     `20 §6` puts avatar stacks on a business record in the refused column. A glyph
+                     says "person" without inventing a face for one. -->
+                <Icon name="people" size="s" />
+                <span class="who-name">{p.name}</span>
+                <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
+                     tells two people with one name apart. And WHEN, because access with no date is
+                     a list you cannot audit. -->
+                <span class="who-detail">
+                  {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}
+                </span>
+                <Button
+                  weight="bare"
+                  tone="bad"
+                  disabled={lastOwner(p)}
+                  aria-describedby={lastOwner(p) ? 'last-owner' : undefined}
+                  onclick={() =>
+                    toasts.push(
+                      copy.notWritten(`Every one of ${p.name}'s access rows would be removed, with one access.revoke per list`),
+                      { intent: 'bad' },
+                    )}
+                >{copy.removeAccess}</Button>
+              </div>
+              <div class="who-level">
+                <div class="segment segment-sm" role="group" aria-label={copy.levelFor(p.name)}>
+                  {#each LEVELS as level}
+                    <button
+                      type="button"
+                      class="seg"
+                      data-on={p.level === level ? '' : undefined}
+                      aria-pressed={p.level === level ? 'true' : 'false'}
+                      disabled={lastOwner(p) && level !== 'owner'}
+                      aria-describedby={lastOwner(p) && level !== 'owner' ? 'last-owner' : undefined}
+                      onclick={() => levelChange(p, level)}
+                    >{level}</button>
+                  {/each}
+                </div>
+                <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
+                     sets it. Five ladder words with nothing explaining them is the schema's
+                     vocabulary on the screen that decides who can change somebody's business. -->
+                <p class="means">{copy.levelMeans[p.level] ?? p.level}</p>
               </div>
             </li>
           {/each}
         </ul>
+        <!-- `LEVEL_REQUIRED`'s own fix sentence, and it is always on screen rather than inside the
+             refusal — a disabled control whose reason arrives only after you press it is a control
+             that has already wasted the press. -->
+        <p class="hint" id="last-owner">{copy.lastOwner}</p>
+      </Section>
+
+      <Section title={copy.inviteTitle}>
+        <p class="hint">{copy.inviteHow}</p>
+        <div class="row-actions">
+          <Button
+            weight="primary"
+            onclick={() =>
+              toasts.push(copy.notWritten('A single-use link would be sent, bound to that one address and good for 24 hours'), { intent: 'warn' })}
+          ><Icon name="plus" size="s" />{copy.invitePerson}</Button>
+        </div>
+      </Section>
+
+      <!-- `53 §5.8`: the owner erases a person from here, and it is the one control on this screen
+           that is not about access at all — it is `02 §10`'s cascade over sixteen stores, in one
+           transaction. It says which, because "erase" without a subject is a word nobody can act on. -->
+      <Section title={copy.erasePerson}>
+        <div class="danger">
+          <p class="danger-title">{copy.eraseWhat}</p>
+          <Button
+            tone="bad"
+            onclick={() => toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'bad' })}
+          >{copy.erasePerson}</Button>
+        </div>
+      </Section>
+    {:else if area === 'recovery'}
+      <!--
+        THE WAY BACK IN, and until now a dead end that said nothing about recovery.
+
+        `19 §2`, verbatim: "`recovery` and `people & sharing` were missing from an earlier draft —
+        the first left a passkey-primary product with NO DESIGNED WAY BACK IN." This build shipped
+        the area and then left it saying "This area is part of the shell and is not wired in the
+        mock-up", which is the same hole with a sentence in it.
+
+        THERE IS NO ACCOUNT-RECOVERY FLOW AND THIS SCREEN DOES NOT INVENT ONE. `grep -rn "recovery
+        code"` over all fifty-four documents returns nothing: the mechanism is a second passkey, and
+        the fallback is the email link. Anything else here would be a control with nothing behind it
+        on the one screen where that costs somebody their record.
+      -->
+      <Section title={copy.passkeys} count={PASSKEYS.length}>
+        <p class="hint">{copy.passkeyHow}</p>
+        {#if PASSKEYS.length === 0}
+          <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy} />
+        {:else}
+          <ul class="ledger">
+            {#each PASSKEYS as k}
+              <li>
+                <div class="line">
+                  <span class="seq"><Icon name="key" size="s" /></span>
+                  <span class="line-main">
+                    <span class="line-title">{k.label}</span>
+                    <span class="line-detail">{copy.addedWhen(relative(k.added, NOW))}</span>
+                  </span>
+                  <span class="line-amount"></span>
+                  <span class="line-when">
+                    <!-- LAST USED IS THE COLUMN THAT MATTERS. A key you have not used in a year is
+                         the one on the laptop you sold. -->
+                    {k.lastUsed ? copy.usedWhen(relative(k.lastUsed, NOW)) : copy.neverUsed}
+                    <Button
+                      weight="bare"
+                      tone="bad"
+                      disabled={PASSKEYS.length <= 1}
+                      aria-describedby={PASSKEYS.length <= 1 ? 'last-key' : undefined}
+                      onclick={() => toasts.push(copy.notWritten(`${k.label} would stop being a way into this record`), { intent: 'bad' })}
+                    >{copy.remove}</Button>
+                  </span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+          {#if PASSKEYS.length <= 1}<p class="hint" id="last-key">{copy.lastPasskey}</p>{/if}
+        {/if}
+        <div class="row-actions">
+          <Button
+            weight="primary"
+            onclick={() => toasts.push(copy.notWritten('Your browser would be asked for a new passkey, and this session is what proves it is you'), { intent: 'warn' })}
+          ><Icon name="plus" size="s" />{copy.addPasskey}</Button>
+        </div>
+      </Section>
+
+      <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
+           `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery
+           screen offering a link that cannot be sent is worse than one offering nothing. -->
+      {#if AUTH_METHODS.magic}
+        <Section title={copy.magicLink}>
+          <p class="hint">{copy.magicHow}</p>
+        </Section>
+      {/if}
+
+      <Section title={copy.lockout}>
+        <p class="hint">{copy.lockoutHow}</p>
       </Section>
     {:else if area === 'export'}
       <Section title="Your data">
@@ -312,6 +488,66 @@
 </div>
 
 <style>
+  .whos {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .who {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-3);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .who-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2);
+  }
+
+  .who-name {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* IT TAKES THE SLACK AND GIVES IT BACK. `1 1 24ch` rather than a fixed width: on a wide screen the
+     address and the date sit on the name's line, and below about 520px the whole clause wraps
+     instead of truncating an email address in the middle, which is where they stop being
+     recognisable. */
+  .who-detail {
+    flex: 1 1 24ch;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .who-level {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .means {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* The ladder is five words, so its buttons are the narrowest segment in the product. */
+  .segment-sm .seg {
+    padding-inline: var(--sp-2);
+    font-size: var(--t-sm);
+  }
+
   .shell {
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr);

@@ -365,7 +365,36 @@ export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge']);
 
 export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 
-export type Person = { id: string; name: string; level: 'read' | 'write' | 'admin' | 'owner'; hue: number };
+/**
+ * The person ladder, closed at five: `read ⊂ append ⊂ write ⊂ decide ⊂ owner` (`20 §1`).
+ *
+ * IT USED TO ADMIT `admin`, WHICH IS NOT ONE OF THEM. `copy.levelMeans` has the right five and the
+ * screen falls back to printing the raw value, so a person at `admin` would have rendered the word
+ * `admin` where every other row reads a sentence — an id on the screen that says who can change
+ * your business record. `20 §1` also says why the word does not exist: the ladder is "never held by
+ * a token or a share link, which is why there is no `admin` token scope".
+ */
+export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
+export type Level = (typeof LEVELS)[number];
+
+export type Person = {
+  id: string;
+  name: string;
+  /** Their level over the whole record — the `member` row whose register is `*`. */
+  level: Level;
+  /** The invitation is bound to one email (`12 §3`), so this is the identifier and not the name. */
+  email: string;
+  /** When they accepted. `null` while an invitation is still out. */
+  since: string | null;
+};
+
+/**
+ * A passkey this person can get back in with. `/settings/recovery` (`49 §5.8` step 5).
+ *
+ * `19 §2` names the area and says why it exists: "`recovery` and `people & sharing` were missing
+ * from an earlier draft — the first left a passkey-primary product with NO DESIGNED WAY BACK IN."
+ */
+export type Passkey = { id: string; label: string; added: string; lastUsed: string | null };
 
 export type Job = {
   id: string;

@@ -488,6 +488,46 @@ export const copy = {
     block: 'one thing on a page — a table, a figure, a note',
   } as const,
 
+  /* the settings areas `19 §2` says an earlier draft dropped */
+  whoCanSee: 'Who can see this record',
+  /* `19 §9` bans `ceiling` and `scope` by name and says: say WHAT THEY CAN SEE. And it says the
+     thing this line exists for — a level here is over the whole record, not one list. */
+  accessScope: 'A level here covers every list. Nobody is added to a new list until you add them.',
+  levelFor: (name: string) => `What ${name} can do`,
+  sinceWhen: (ago: string) => `joined ${ago}`,
+  /* AN INVITATION OUT IS NOT ACCESS, and the two were one row. Somebody who had invited a
+     bookkeeper could not tell whether the link had been used. */
+  inviteOut: 'invited, not accepted yet',
+  removeAccess: 'Remove',
+  /* `LEVEL_REQUIRED`'s own fix sentence, verbatim (45 §5.6). */
+  lastOwner: 'A record keeps at least one owner.',
+  inviteTitle: 'Invite somebody',
+  inviteHow: 'The link is single-use, good for 24 hours, and bound to the one address you send it to.',
+  invitePerson: 'Invite a person',
+  erasePerson: 'Erase a person',
+  eraseWhat: 'Everything one person wrote, removed from sixteen places in one go. It cannot be undone.',
+
+  /* recovery — the way back in */
+  passkeys: 'Passkeys',
+  passkeyHow: 'A passkey is how you get back in. Keep more than one, on more than one device.',
+  noPasskeys: 'No passkey yet.',
+  /* `13 §5.2`: be specific about what will be here. On this screen that sentence is the stakes. */
+  noPasskeysWhy: 'Without one, the only way back into this record is an email link.',
+  addPasskey: 'Add a passkey',
+  addedWhen: (ago: string) => `added ${ago}`,
+  usedWhen: (ago: string) => `used ${ago}`,
+  neverUsed: 'never used',
+  remove: 'Remove',
+  lastPasskey: 'This is your only passkey, so it cannot be removed. Add a second one first.',
+  magicLink: 'If you lose them all',
+  /* `49 §5.6`. It is the ONLY other way in — there are no recovery codes anywhere in this product,
+     and saying so is kinder than letting somebody look for them. */
+  magicHow:
+    'A link is emailed to the address on this record. It lasts fifteen minutes and works once. There are no recovery codes.',
+  lockout: 'After too many tries',
+  /* `49 §5.5`: ten strikes, fifteen minutes, sticky, fail-closed. */
+  lockoutHow: 'Ten failed attempts locks sign-in for fifteen minutes. Waiting is the only way through it.',
+
   /** Names the source block so tabbing into it says which page's declaration it is. */
   declarationOf: (page: string) => `Source of ${page}`,
 

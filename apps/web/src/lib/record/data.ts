@@ -25,6 +25,7 @@ import type {
   NewsItem,
   PackInfo,
   PageDecl,
+  Passkey,
   Person,
   Question,
   RegisterDecl,
@@ -381,7 +382,25 @@ export const JOB: Job = {
 JOBS[JOB.id] = JOB;
 
 export const PEOPLE_ACCESS: Person[] = [
-  { id: 'you', name: 'You', level: 'owner', hue: 214 },
-  { id: 'sm', name: 'S. Marchetti', level: 'write', hue: 305 },
-  { id: 'pv', name: 'Pell & Vine', level: 'read', hue: 176 },
+  { id: 'you', name: 'You', level: 'owner', email: 'you@thestudio.example', since: day(-612) },
+  { id: 'sm', name: 'S. Marchetti', level: 'write', email: 's.marchetti@example.com', since: day(-181) },
+  { id: 'pv', name: 'Pell & Vine', level: 'read', email: 'accounts@pellvine.example', since: day(-96) },
+  /* AN INVITATION THAT HAS NOT BEEN ACCEPTED IS A DIFFERENT STATE FROM ACCESS, and the screen had
+     no way to hold one — so somebody who had invited a bookkeeper could not tell whether the link
+     had been used. `12 §3`: single-use, 24 hours, bound to one email. */
+  { id: 'jo', name: 'J. Okonkwo', level: 'append', email: 'j@okonkwo.example', since: null },
 ];
+
+/* ── the way back in ──────────────────────────────────────────────────────────── */
+
+export const PASSKEYS: Passkey[] = [
+  { id: 'pk_01', label: 'This laptop', added: day(-612), lastUsed: day(0) },
+  { id: 'pk_02', label: 'Phone', added: day(-410), lastUsed: day(-3) },
+];
+
+/**
+ * WHICH WAYS IN THIS DEPLOYMENT ACTUALLY HAS. `GET /auth/methods` (`49 §5.6`), and the reason it
+ * exists: on a self-host with no SMTP the answer is `magic: false` "so the screen never offers it".
+ * A recovery screen offering a link that cannot be sent is worse than one offering nothing.
+ */
+export const AUTH_METHODS = { passkey: true, magic: true } as const;

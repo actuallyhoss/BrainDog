@@ -24,10 +24,12 @@ import {
   VIEWS,
   NOW,
   TODAY,
+  AUTH_METHODS,
   PACKS,
   OBSERVED,
   PAGES,
   SUSPENDED,
+  PASSKEYS,
   PEOPLE_ACCESS,
   QUESTIONS,
   DECIDED,
@@ -1453,7 +1455,7 @@ export function search(q: string, limit = 24): SearchHit[] {
   return hits;
 }
 
-export { AUDIT, INBOX, JOB, JOBS, NOW, PACKS, PAGES, QUESTIONS, DECIDED, REGISTERS, ROWS, NEWS, TODAY, VAULT, VIEWS, PEOPLE_ACCESS };
+export { AUDIT, AUTH_METHODS, INBOX, JOB, JOBS, NOW, PACKS, PAGES, PASSKEYS, QUESTIONS, DECIDED, REGISTERS, ROWS, NEWS, TODAY, VAULT, VIEWS, PEOPLE_ACCESS };
 
 /**
  * One run, by the id in the address — or `null`, which is a MISS and not a failure.
