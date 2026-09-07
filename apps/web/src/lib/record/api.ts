@@ -743,7 +743,10 @@ export function metric(id: string): Metric {
       id,
       label: 'Open questions',
       value: String(QUESTIONS.length),
-      note: 'target ≤ 3',
+      /* A LITERAL THAT `targetLine` WOULD HAVE WRITTEN. Every other target on every other tile went
+         from `target ≤ X` to a sentence; this one is typed out here, so it stayed — on `/decide`,
+         which `19 §2` names as one of the three spine screens. */
+      note: targetLine({ format: 'int', target: { lte: 3 } } as Parameters<typeof targetLine>[0]),
       tone: QUESTIONS.length > 3 ? 'warn' : 'good',
       href: '/decide',
     };

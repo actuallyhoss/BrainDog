@@ -598,9 +598,14 @@
         <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
       {/if}
 
-      <span class="bar-hint">
-        <Kbd keys="j  k" /> move <Kbd keys="p" /> peek <Kbd keys="↵" /> open <Kbd keys="⌫" /> archive
-      </span>
+      <!-- FOUR ROW VERBS OVER NOTHING TO ACT ON. Filtering to zero kept the strip, so a screen whose
+           whole message is "38 rows, none matching" also offered to move, peek, open and archive a
+           row that is not there. -->
+      {#if result.entries.length > 0}
+        <span class="bar-hint">
+          <Kbd keys="j  k" /> move <Kbd keys="p" /> peek <Kbd keys="↵" /> open <Kbd keys="⌫" /> archive
+        </span>
+      {/if}
     </div>
     {/if}
 
@@ -631,7 +636,9 @@
          that has been written to repeatedly — it is addressed to whoever maintains the declaration,
          and it was the largest thing on the screen a person landed on after typing their first row,
          reading "12 writes to Direction were refused … ENUM_VALUE_UNKNOWN · 30d". -->
-    {#if seen && !arriving}
+    <!-- AND NOT OVER AN EMPTY RESULT EITHER. It is a note about a register somebody writes to, and
+         a screen showing no rows is not the moment to read it. -->
+    {#if seen && !arriving && result.entries.length > 0}
       <aside class="seen" role="note">
         <Icon name="observe" size="s" />
         <p class="seen-said">
@@ -910,6 +917,8 @@
        see RowForm — so a pack that adds a field gets a form field, and nobody writes a second copy
        of the schema in markup. -->
   <Sheet bind:open={createOpen} title="{copy.newRow} {decl.one}">
+    <!-- No `autofocus` here: `Sheet` puts the caret in the first field after `showModal()`, which is
+         the only moment it can, and it does it for every sheet that carries one. -->
     <RowForm register={id} bind:problems />
     {#snippet footer()}
       <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED, which is `/decide`'s answer to the same

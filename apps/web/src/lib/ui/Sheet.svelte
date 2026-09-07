@@ -40,6 +40,22 @@
     if (open && !el.open) {
       el.showModal();
       overlays.open();
+      /**
+       * AND THE CARET GOES WHERE THE WORK IS.
+       *
+       * `showModal()` focuses the first focusable descendant, which on every sheet in this product
+       * is the header's own Close button — so somebody who pressed "New obligation" and started
+       * typing got nothing, and a keyboard user's first Enter closed the sheet they had just opened.
+       *
+       * THE FORM CANNOT DO IT ITSELF. `RowForm` focuses its first field on mount and `showModal()`
+       * runs after that, taking the focus straight back; the sheet owns the modal lifecycle, so the
+       * sheet is where this belongs.
+       *
+       * ONLY WHEN THERE IS A FIELD. A sheet that carries a list, a keymap or a peeked row has
+       * nothing to type into, and moving focus off the close button there would take away the one
+       * control somebody arrived wanting.
+       */
+      el.querySelector<HTMLElement>('.sheet-body input, .sheet-body select, .sheet-body textarea')?.focus();
     } else if (!open && el.open) {
       el.close();
       overlays.close();
