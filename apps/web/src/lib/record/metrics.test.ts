@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { METRICS } from './declared.ts';
-import { format, hrefFor, isTemplate, meetsTarget, read, windowMs, withParam, type MetricDecl } from './metrics.ts';
+import { format, hrefFor, isTemplate, meetsTarget, read, targetLine, windowMs, withParam, type MetricDecl } from './metrics.ts';
 import { applyFilters, metric } from './api.ts';
 import { NOW, ROWS } from './data.ts';
 import { amountOf } from './money.ts';
@@ -323,4 +323,47 @@ test('DISTINCT COUNTS VALUES, not the string `[object Object]`', () => {
   );
   assert.equal(out.value, priced.size);
   assert.ok(priced.size > 1, 'the fixture must hold more than one amount for this to mean anything');
+});
+
+
+/* -- showing nothing, and having nothing to show ------------------------- */
+
+test('A FIGURE WITH NO COMPARISON SAYS WHY, and one that was told not to compare says nothing', () => {
+  /* `19 §6`: a surface showing nothing must never be indistinguishable from a surface with nothing
+     to show. Three of the four tiles on the money page carried no movement and no explanation —
+     which reads as "this has not moved" — while every one of them declares a window. */
+  const base = {
+    metric: 'test',
+    name: 'Test',
+    source: 'register.obligations',
+    value: { sum: 'amount' },
+    target: { lte: 1 },
+    window: '30d',
+  } as const;
+
+  /* A PREDICATE THAT MENTIONS NO DATE CANNOT MOVE OVER A WINDOW, and the reason a person needs is
+     that nothing here is dated — not that "the predicate does not mention time". */
+  const undated = read({ ...base, where: 'state is open', compare: 'previous' });
+  assert.equal(undated.delta, null);
+  assert.ok(undated.unmeasured, 'a figure with no comparison explained nothing');
+  assert.ok(!/predicate/.test(undated.unmeasured), 'the schema is talking about itself on a tile');
+
+  /* AND `compare: 'none'` IS NOT A MISSING COMPARISON. A declaration that says not to compare is
+     working exactly as written, and saying so on every render would be noise on every such tile. */
+  const asked = read({ ...base, where: 'state is open', compare: 'none' });
+  assert.equal(asked.delta, null);
+  assert.equal(asked.unmeasured, null, 'a figure declared not to compare was reported as unmeasured');
+});
+
+test('WHAT GOOD LOOKS LIKE IS A SENTENCE, not an inequality', () => {
+  /* `target ≤ GBP 20,000.00` under *Owed to you* reads as an instruction to be owed less, and
+     `target ≤ GBP 0.00` under *Overdue to pay* — the commonest shape there is — means "none", not
+     "at most nothing". `≤` and `≥` are also two glyphs a person cannot type and half will read as
+     "less than". */
+  const under = targetLine({ format: 'money.GBP', target: { lte: 2_000_000 } } as MetricDecl);
+  assert.equal(under, 'watch over GBP 20,000.00');
+  assert.equal(targetLine({ format: 'money.GBP', target: { lte: 0 } } as MetricDecl), 'should be nothing');
+  assert.equal(targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl), 'watch under 3');
+  for (const said of [under, targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl)])
+    assert.ok(!/[≤≥]/.test(said), `a glyph nobody types: ${said}`);
 });

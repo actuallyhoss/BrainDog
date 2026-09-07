@@ -781,9 +781,15 @@ export function metric(id: string): Metric {
   const met = meetsTarget(decl, reading.value);
   /* The delta reads as a MOVEMENT and not as a sign: "up 18% on the 30d before" is a sentence, and
      `+18%` beside a target is two numbers a reader has to tell apart. */
+  /* AND AN ABSENT COMPARISON SAYS SO. `19 §6`: a surface showing nothing must never be
+     indistinguishable from a surface with nothing to show — and three of the four tiles on the money
+     page carried no movement and no explanation, which reads as "this has not moved" when every one
+     of them declares a window. */
   const move =
     reading.delta === null
-      ? ''
+      ? reading.unmeasured
+        ? ` · ${reading.unmeasured}`
+        : ''
       : ` · ${reading.delta >= 0 ? 'up' : 'down'} ${Math.abs(reading.delta * 100).toFixed(0)}% ${reading.why}`;
 
   return {

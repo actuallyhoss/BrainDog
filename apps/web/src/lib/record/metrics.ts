@@ -94,6 +94,18 @@ export type Reading = {
   delta: number | null;
   /** Why there is no delta, in words, so an absent comparison is not an absent explanation. */
   why: string;
+  /**
+   * The same fact for the person reading the tile, or `null` when no comparison was asked for.
+   *
+   * `why` IS THE AUTHOR'S PHRASE and this is the reader's. "the predicate does not mention time, so
+   * the window moves nothing" is precise and is addressed to whoever wrote the declaration; what a
+   * person under a headline figure needs is that nothing here is dated, so there is no before.
+   *
+   * `null` FOR `compare: 'none'` IS DELIBERATE. A figure whose declaration says not to compare it is
+   * not missing a comparison — it is a figure that does not have one, and saying so every time
+   * would be noise on every tile that is working exactly as declared.
+   */
+  unmeasured: string | null;
   refusals: string[];
   href: string;
 };
@@ -386,7 +398,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     refusals.push(...explain(compile(register, decl.where)).map((r) => `${decl.metric}: ${r}`));
 
   if (refusals.length || !register)
-    return { value: null, shown: '—', rows: 0, delta: null, why: refusals[0] ?? '', refusals, href: '/p/money' };
+    return { value: null, shown: '—', rows: 0, delta: null, why: refusals[0] ?? '', unmeasured: null, refusals, href: '/p/money' };
 
   const w = compile(register, decl.where);
   const all = ROWS[register] ?? [];
@@ -398,7 +410,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const seen = currenciesRead(rows, decl.value);
   if (seen.size > 1) {
     const why = `${decl.metric}: ${mixedFix([...seen].sort())}`;
-    return { value: null, shown: '—', rows: rows.length, delta: null, why, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   /* AND THE FORMAT IS CHECKED AGAINST THEM. `format: money.GBP` is a declaration about how to write
@@ -408,7 +420,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const held = [...seen][0];
   if (declared && held && declared !== held) {
     const why = `${decl.metric}: the rows are in ${held} and the format says ${declared}`;
-    return { value: null, shown: '—', rows: rows.length, delta: null, why, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   /* A FACTOR THE TABLE DOES NOT HOLD IS A REFUSAL, NOT A SMALLER NUMBER. `operand` answered `null`
@@ -420,31 +432,53 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const short = missingFactors(rows, decl.value);
   if (short.length) {
     const why = `${decl.metric}: no factor for ${short.slice(0, 3).join(', ')}${short.length > 3 ? ` and ${short.length - 3} more` : ''}`;
-    return { value: null, shown: '—', rows: rows.length, delta: null, why, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   const value = evaluateValue(rows, decl.value);
 
+  /**
+   * AND WHETHER THERE IS A COMPARISON AT ALL, WHICH IS NOT THE SAME AS THERE BEING NO MOVEMENT.
+   *
+   * `19 §6`: a surface showing nothing must never be indistinguishable from a surface with nothing
+   * to show. Three of the four tiles on the money page carried no comparison and said nothing about
+   * why — which reads as "this has not moved", and every one of them declares a window. `unmeasured`
+   * is the reason, in the terms of the screen: `why` stays the author's phrase for the ones that are
+   * a declaration problem, and this is what a person is told.
+   */
   let delta: number | null = null;
   let why = '';
-  if (decl.compare === 'none' || shift === null) why = 'no comparison asked for';
-  else if (shift < 7 * DAY_MS) why = 'a window under seven days is noise';
-  else if (!dated(decl.where, register)) why = 'the predicate does not mention time, so the window moves nothing';
-  else {
+  let unmeasured: string | null = null;
+  if (decl.compare === 'none' || shift === null) {
+    why = 'no comparison asked for';
+    unmeasured = null;
+  } else if (shift < 7 * DAY_MS) {
+    why = 'a window under seven days is noise';
+    unmeasured = 'too short a window to compare over';
+  } else if (!dated(decl.where, register)) {
+    why = 'the predicate does not mention time, so the window moves nothing';
+    unmeasured = 'nothing here is dated, so there is no before to compare with';
+  } else {
     const before = all.filter((e) => matches(e, w, now - shift));
-    if (rows.length === 0 || before.length === 0) why = 'one of the two windows is empty';
-    else if (before.length * 2 < rows.length) why = 'the window before has under half the rows';
-    else {
+    if (rows.length === 0 || before.length === 0) {
+      why = 'one of the two windows is empty';
+      unmeasured = 'nothing to compare with yet';
+    } else if (before.length * 2 < rows.length) {
+      why = 'the window before has under half the rows';
+      unmeasured = 'too few rows before to compare against';
+    } else {
       const prior = evaluateValue(before, decl.value);
-      if (prior === null || prior === 0 || value === null) why = 'the window before has nothing to compare against';
-      else {
+      if (prior === null || prior === 0 || value === null) {
+        why = 'the window before has nothing to compare against';
+        unmeasured = 'nothing to compare with yet';
+      } else {
         delta = (value - prior) / Math.abs(prior);
         why = `on the ${decl.window} before`;
       }
     }
   }
 
-  return { value, shown: format(decl.format, value), rows: rows.length, delta, why, refusals: [], href: hrefFor(decl) };
+  return { value, shown: format(decl.format, value), rows: rows.length, delta, why, unmeasured, refusals: [], href: hrefFor(decl) };
 }
 
 /** Is the figure on the right side of what was declared as good? */
@@ -454,7 +488,18 @@ export function meetsTarget(decl: MetricDecl, value: number | null): boolean | n
 }
 
 /** The target, in the same words the figure is written in. */
-export const targetLine = (decl: MetricDecl): string =>
-  'lte' in decl.target
-    ? `target ≤ ${format(decl.format, decl.target.lte)}`
-    : `target ≥ ${format(decl.format, decl.target.gte)}`;
+/**
+ * WHAT GOOD LOOKS LIKE FOR THIS FIGURE, as a sentence rather than an inequality.
+ *
+ * `target ≤ GBP 20,000.00` under *Owed to you* reads as an instruction to be owed less, which is
+ * not what it means: it is the line past which somebody should be chasing. `≤` and `≥` are also
+ * two glyphs a person cannot type and half of them will read as "less than" — and `target ≤ GBP
+ * 0.00` under *Overdue to pay*, which is the commonest shape of all, means "none", not "at most
+ * nothing".
+ */
+export const targetLine = (decl: MetricDecl): string => {
+  const under = 'lte' in decl.target;
+  const bound = 'lte' in decl.target ? decl.target.lte : decl.target.gte;
+  if (under && bound === 0) return 'should be nothing';
+  return under ? `watch over ${format(decl.format, bound)}` : `watch under ${format(decl.format, bound)}`;
+};
