@@ -528,6 +528,76 @@ export const copy = {
   /* `49 §5.5`: ten strikes, fifteen minutes, sticky, fail-closed. */
   lockoutHow: 'Ten failed attempts locks sign-in for fifteen minutes. Waiting is the only way through it.',
 
+  /* identity — `33 §10`: login is account-level, so this lives outside the record */
+  you: 'You',
+  signedInAs: 'Signed in as',
+  onThisRecord: 'On this record',
+  identityOutside:
+    'Your sign-in belongs to you rather than to this record, so it is the same across every record you hold.',
+  yourRecords: 'Records you can open',
+  thisOne: 'you are here',
+
+  /* agents — `12 §6.1`'s device grants */
+  connected: 'Connected machines',
+  connectedHow: 'A machine asks, and you approve it here on a device you are already holding.',
+  deviceState: {
+    pending: 'waiting for you',
+    active: 'connected',
+    /* `12 §6.1`: a denied row is KEPT. "I said no to a request I did not make" is the single most
+       important line this table can produce. */
+    denied: 'you said no',
+    revoked: 'you disconnected it',
+  } as Record<string, string>,
+  overSurface: (surface: string) => `over ${surface}`,
+  askedWhen: (ago: string) => `asked ${ago}`,
+  approve: 'Approve',
+  deny: 'Deny',
+  revoke: 'Disconnect',
+
+  /* ingest — `25 §9` draws this screen */
+  sources: 'Where rows come in from',
+  sourcesHow: 'Each of these fetches on its own schedule. Nothing here writes without a receipt.',
+  sourceState: { ok: 'working', failing: 'failing', paused: 'paused' } as Record<string, string>,
+  lastRan: (ago: string) => `last ran ${ago}`,
+  nextRun: (ago: string) => `next ${ago}`,
+  noNextRun: 'nothing scheduled',
+  pointsIn: (n: number) => `${n.toLocaleString('en')} in`,
+  reconnect: 'Reconnect',
+  retryNow: 'Retry now',
+  /* `25 §9`'s own blockquote, and it outranks the screen it is on. */
+  staleShows: 'A figure fed by one of these shows a gap and says it is stale rather than holding yesterday’s number.',
+
+  /* notifications — `09` specifies the mechanism and no settings, so this reports */
+  whenWeInterrupt: 'When this record interrupts you',
+  batchByDefault: 'Batch by default; interrupt by exception.',
+  quietHours: 'Quiet hours',
+  quietHoursAre: '22:00 to 08:00 in this record’s timezone. Anything not urgent waits until they end.',
+  urgentKinds: 'Urgent',
+  urgentKindsAre: 'A payment failing, a credential expiring inside 48 hours, a domain expiring inside 7 days.',
+  interruptCap: 'At most',
+  interruptCapIs: 'One urgent interruption an hour.',
+  unreadCount: 'Unread',
+  unreadCountIs: 'One number, on the record, in one place.',
+  muteAtSource: 'To stop one of these, change the rule that raises it. There is no switch here that would.',
+
+  /* backups — `53 §5.4` */
+  kept: 'What is kept',
+  keptHow: (n: number) => `A sealed copy of the whole record, nightly, at 03:00. The ${n} newest are kept.`,
+  rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
+  snapshotNow: 'Take one now',
+  theKey: 'The key',
+  /* `49 §8` asks for exactly this line. */
+  theKeyIs:
+    'These copies are sealed with a key that is not inside them. Back that key up somewhere else, or the copies cannot be opened.',
+  restore: 'Going back',
+  restoreSelfHost: 'This record is self-hosted, so going back means restoring one of the copies above by hand.',
+  restoreCloud: 'Any point in the last thirty days, not only the nightly copies.',
+
+  /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
+  billing: 'Billing',
+  billingSelfHost: 'This record runs on your own machine. There is nothing to bill and no subscription to lapse.',
+  billingCloud: 'Payment is up to date. If it ever lapses the record turns read-only, and export keeps working.',
+
   /** Names the source block so tabbing into it says which page's declaration it is. */
   declarationOf: (page: string) => `Source of ${page}`,
 

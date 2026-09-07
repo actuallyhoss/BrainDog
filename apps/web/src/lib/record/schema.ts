@@ -396,6 +396,49 @@ export type Person = {
  */
 export type Passkey = { id: string; label: string; added: string; lastUsed: string | null };
 
+/**
+ * A sealed copy of the whole record. `53 §5.4`: "Three mechanisms, one contract: nightly, sealed,
+ * thirty kept, restorable."
+ *
+ * `03 §6` is why it is not an export: "A snapshot is not an export: it is a full copy … disaster
+ * recovery, not portability." The two live in different settings areas for that reason.
+ */
+export type Snapshot = { id: string; at: string; bytes: number; rows: number };
+
+/**
+ * A connector that pulls rows in. `25 §9` draws this screen — the most concrete UI specification
+ * for any settings area — and its display words are three, not five.
+ */
+export type Source = {
+  id: string;
+  name: string;
+  /** `ok · failing · paused`, from `PullResult.outcome` and the schedule row (47 §12). */
+  state: 'ok' | 'failing' | 'paused';
+  lastAt: string;
+  /** `null` while paused: nothing is scheduled until somebody reconnects it. */
+  nextAt: string | null;
+  points: number;
+  /** Why it stopped. `13 §6`: the app prints the server's `fix` VERBATIM. */
+  error?: { code: string; fix: string; credential: string; at: string };
+};
+
+/**
+ * A machine that asked to act as you, and what happened to the request. `12 §6.1`.
+ *
+ * "One row, two lives: pending → approved → active." And a denied row is KEPT, because
+ * *"I said no to a request I did not make"* is the single most important line the table can
+ * produce — a denial that leaves no trace is a break-in attempt nobody can see afterwards.
+ */
+export type Device = {
+  id: string;
+  name: string;
+  /** `33 §2`'s six: `web · mcp · cli · email · webhook · alarm`. */
+  surface: 'web' | 'mcp' | 'cli' | 'email' | 'webhook' | 'alarm';
+  state: 'pending' | 'active' | 'denied' | 'revoked';
+  at: string;
+  lastSeen: string | null;
+};
+
 export type Job = {
   id: string;
   kind: string;

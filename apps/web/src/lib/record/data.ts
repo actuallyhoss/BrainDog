@@ -24,9 +24,12 @@ import type {
   Job,
   NewsItem,
   PackInfo,
+  Device,
   PageDecl,
   Passkey,
   Person,
+  Snapshot,
+  Source,
   Question,
   RegisterDecl,
 } from './schema.ts';
@@ -404,3 +407,72 @@ export const PASSKEYS: Passkey[] = [
  * A recovery screen offering a link that cannot be sent is worse than one offering nothing.
  */
 export const AUTH_METHODS = { passkey: true, magic: true } as const;
+
+/* ── where this record runs ───────────────────────────────────────────────────── */
+
+/**
+ * SELF-HOST OR CLOUD, and three areas answer differently.
+ *
+ * `33 §9`: "A self-host has no PITR and does not serve `restore`", and `Snapshots.restore(id)`
+ * throws there. `53 §5.10` puts the whole billing ladder "in the Worker and nothing in the record,
+ * so the record package stays billing-agnostic" — which means a self-hosted record has nothing to
+ * bill and no state to show.
+ *
+ * `03 §6` on exactly this case: "PITR is Cloud-only and this is documented, NOT HIDDEN." So the
+ * areas stay and say which deployment they are on, rather than vanishing — `50 §2.2` admits all
+ * twelve with no per-deployment conditional, and `ADR-024` found that hiding items to reduce
+ * clutter made feature discovery worse.
+ */
+export const DEPLOYMENT = { kind: 'self-host' as const, since: day(-612) };
+
+/* ── backups ───────────────────────────────────────────────────────────────── */
+
+/** Four of the thirty kept. `53 §5.4`: nightly at 03:00 local on a self-host, thirty retained. */
+export const SNAPSHOTS: Snapshot[] = [
+  { id: '2026-09-07', at: day(0), bytes: 2_140_992, rows: 1_206 },
+  { id: '2026-09-06', at: day(-1), bytes: 2_138_112, rows: 1_204 },
+  { id: '2026-09-05', at: day(-2), bytes: 2_131_968, rows: 1_199 },
+  { id: '2026-09-04', at: day(-3), bytes: 2_129_920, rows: 1_197 },
+];
+
+export const SNAPSHOTS_KEPT = 30;
+
+/* ── ingest ────────────────────────────────────────────────────────────────── */
+
+/**
+ * `25 §9`'s three rows, in its own shape: one `ok`, one `failing`, one `paused` on a credential.
+ *
+ * The failure sentence is `47 §6`'s `PULL_AUTH_REJECTED` fix, verbatim, because `13 §6` says the
+ * app renders the server's `fix` and does not write its own.
+ */
+export const SOURCES: Source[] = [
+  { id: 'ledger-post', name: 'Ledger Post deliveries', state: 'ok', lastAt: day(0), nextAt: day(1), points: 7 },
+  {
+    id: 'kestrel',
+    name: 'Kestrel error reports',
+    state: 'failing',
+    lastAt: day(0),
+    nextAt: day(0),
+    points: 0,
+    error: { code: 'PULL_PROVIDER_UNAVAILABLE', fix: 'The provider answered 429 three times. It retries on its own.', credential: 'Kestrel ingest', at: day(0) },
+  },
+  {
+    id: 'tallyard',
+    name: 'Tallyard ledger export',
+    state: 'paused',
+    lastAt: day(-4),
+    nextAt: null,
+    points: 0,
+    error: { code: 'PULL_AUTH_REJECTED', fix: 'Reconnect the credential — the provider rejected it; the connector is paused until you do.', credential: 'Tallyard bookkeeping', at: day(-4) },
+  },
+];
+
+/* ── agents ────────────────────────────────────────────────────────────────── */
+
+/** `12 §6.1`. The denied row is kept deliberately — see the type. */
+export const DEVICES: Device[] = [
+  { id: 'dg_01', name: 'Claude Code, this laptop', surface: 'mcp', state: 'active', at: day(-31), lastSeen: day(0) },
+  { id: 'dg_02', name: 'braindog CLI, studio desktop', surface: 'cli', state: 'active', at: day(-88), lastSeen: day(-2) },
+  { id: 'dg_03', name: 'Codex, unknown machine', surface: 'mcp', state: 'pending', at: day(0), lastSeen: null },
+  { id: 'dg_04', name: 'Unrecognised request, Frankfurt', surface: 'mcp', state: 'denied', at: day(-6), lastSeen: null },
+];

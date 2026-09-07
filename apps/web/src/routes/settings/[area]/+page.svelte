@@ -20,13 +20,21 @@
   import { copy } from '$lib/copy.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { AUTH_METHODS, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS, REGISTERS, boot, pages } from '$lib/record/api.ts';
+  import {
+    AUTH_METHODS, DEPLOYMENT, DEVICES, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS,
+    REGISTERS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, boot, pages,
+  } from '$lib/record/api.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
-  import { relative } from 'braindog-render';
+  import { TONES, relative } from 'braindog-render';
 
   /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
      `the studio` — and one of the two was a literal. */
   const RECORD = boot().index.name;
+  const me = boot().me;
+
+  /* Bytes as a person reads them. One decimal, because 2.1 MB and 2.14 MB say the same thing and
+     the second one asks to be read twice. */
+  const size = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -313,6 +321,7 @@
                 <span class="who-detail">
                   {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}
                 </span>
+                <span class="who-do">
                 <Button
                   weight="bare"
                   tone="bad"
@@ -324,6 +333,7 @@
                       { intent: 'bad' },
                     )}
                 >{copy.removeAccess}</Button>
+                </span>
               </div>
               <div class="who-level">
                 <div class="segment segment-sm" role="group" aria-label={copy.levelFor(p.name)}>
@@ -443,6 +453,229 @@
       <Section title={copy.lockout}>
         <p class="hint">{copy.lockoutHow}</p>
       </Section>
+    {:else if area === 'identity'}
+      <!--
+        THE DOCUMENTS SPECIFY NO SCREEN HERE, and this says what the record knows rather than
+        inventing controls. `identity` is named once in `19 §2`'s inventory and elaborated nowhere —
+        the only one of the twelve with no downstream section — and no route in the whole surface
+        changes any `person` field, so a name or email editor would be a form with nothing behind it.
+
+        `33 §10` is the fact that makes the area make sense at all: "Login is account-level — a
+        person may hold several records — so identity lives OUTSIDE the record."
+      -->
+      <Section title={copy.you}>
+        <ul class="facts">
+          <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{me.person}</span></li>
+          <li><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{copy.levelMeans[me.level] ?? me.level}</span></li>
+        </ul>
+        <p class="hint">{copy.identityOutside}</p>
+      </Section>
+
+      <Section title={copy.yourRecords} count={me.records.length}>
+        <ul class="ledger">
+          {#each me.records as r}
+            <li>
+              <div class="line">
+                <span class="seq"><Icon name="rows" size="s" /></span>
+                <span class="line-main"><span class="line-title">{r.name}</span></span>
+                <span class="line-amount"><span class="means">{copy.levelMeans[r.level] ?? r.level}</span></span>
+                <span class="line-when">
+                  {#if r.slug === boot().index.slug}{copy.thisOne}{/if}
+                </span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </Section>
+    {:else if area === 'agents'}
+      <!--
+        `12 §6.1`, and the sentence that decides the shape of this list: "ONE ROW, TWO LIVES:
+        pending → approved → active." A machine asks, you approve on a device you are already
+        holding, and the same row becomes the grant. "The code is not the security. What the code
+        proves is that the approver is looking at the device that asked."
+
+        AND A DENIED ROW IS KEPT. `12 §6.1` calls *"I said no to a request I did not make"* the
+        single most important line this table can produce — a denial that leaves no trace is a
+        break-in attempt nobody can see afterwards.
+      -->
+      <Section title={copy.connected} count={DEVICES.filter((d) => d.state === 'active').length}>
+        <p class="hint">{copy.connectedHow}</p>
+<ul class="whos">
+          {#each DEVICES as d}
+            <li class="who" data-intent={d.state === 'denied' ? 'bad' : d.state === 'pending' ? 'warn' : undefined}>
+              <div class="who-head">
+                {#if d.state === 'denied' || d.state === 'pending'}
+                  <span class="glyph" role="img" aria-label={d.state === 'denied' ? TONES.bad.label : TONES.warn.label}
+                    >{d.state === 'denied' ? TONES.bad.glyph : TONES.warn.glyph}</span>
+                {:else}<Icon name="session" size="s" />{/if}
+                <span class="who-name">{d.name}</span>
+                <span class="who-detail">
+                  {copy.deviceState[d.state]} · {copy.overSurface(d.surface)} ·
+                  {d.lastSeen ? copy.usedWhen(relative(d.lastSeen, NOW)) : copy.askedWhen(relative(d.at, NOW))}
+                </span>
+                <span class="who-do">
+                  {#if d.state === 'pending'}
+                    <Button
+                      weight="primary"
+                      onclick={() => toasts.push(copy.notWritten(`Approving asks for the six-digit code ${d.name} is showing, so you are looking at the device that asked`), { intent: 'warn' })}
+                    >{copy.approve}</Button>
+                    <Button
+                      weight="bare"
+                      tone="bad"
+                      onclick={() => toasts.push(copy.notWritten('The request would be denied, and the denial kept'), { intent: 'bad' })}
+                    >{copy.deny}</Button>
+                  {:else if d.state === 'active'}
+                    <Button
+                      weight="bare"
+                      tone="bad"
+                      onclick={() => toasts.push(copy.notWritten(`${d.name} would stop being able to act as you`), { intent: 'bad' })}
+                    >{copy.revoke}</Button>
+                  {/if}
+                </span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </Section>
+    {:else if area === 'ingest'}
+      <!--
+        `25 §9` DRAWS THIS SCREEN, which makes it the one settings area where inventing a control is
+        least excusable. Three status words, a last-run line, a next-run line, a failure line naming
+        the credential by its VAULT LABEL rather than its value, and two buttons on the paused row
+        only. `47 §12` gives the composition: one row per connector, from `PullResult` via the
+        receipts and the schedule row.
+      -->
+      <Section title={copy.sources} count={SOURCES.length}>
+        <p class="hint">{copy.sourcesHow}</p>
+<ul class="whos">
+          {#each SOURCES as src}
+            <li class="who" data-intent={src.state === 'ok' ? undefined : src.state === 'paused' ? 'bad' : 'warn'}>
+              <div class="who-head">
+                {#if src.state === 'ok'}<Icon name="inbox" size="s" />
+                {:else}
+                  {@const t = src.state === 'paused' ? 'bad' : 'warn'}
+                  <span class="glyph" role="img" aria-label={TONES[t].label}>{TONES[t].glyph}</span>
+                {/if}
+                <span class="who-name">{src.name}</span>
+                <span class="who-detail">
+                  {copy.sourceState[src.state]} · {copy.lastRan(relative(src.lastAt, NOW))} ·
+                  {src.nextAt ? copy.nextRun(relative(src.nextAt, NOW)) : copy.noNextRun} ·
+                  {copy.pointsIn(src.points)}
+                </span>
+                <span class="who-do">
+                  {#if src.state === 'paused'}
+                    <Button
+                      weight="primary"
+                      onclick={() => toasts.push(copy.notWritten(`${src.error?.credential ?? src.name} would be reconnected, and the schedule started again`), { intent: 'warn' })}
+                    >{copy.reconnect}</Button>
+                    <Button
+                      weight="bare"
+                      onclick={() => toasts.push(copy.notWritten(`${src.name} would run once, now`), { intent: 'warn' })}
+                    >{copy.retryNow}</Button>
+                  {/if}
+                </span>
+              </div>
+              <!-- THE SERVER'S `fix` SENTENCE, VERBATIM (13 §6), ON ITS OWN LINE SO IT WRAPS.
+                   In the five-column ledger it was a `.line-detail` — one line, `overflow: hidden`,
+                   ellipsis — so the sentence that says what to DO about a broken connector read
+                   "Reconnect the credential — the provider rejected it; the connector is…". A `fix`
+                   rendered verbatim and then cut is not rendered verbatim.
+
+                   And the credential by the LABEL the vault indexes it under. A pull failure names
+                   what to reconnect; naming the value would put a secret on a settings screen. -->
+              {#if src.error}
+                <p class="who-why">{src.error.fix} — {src.error.credential}</p>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
+             shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
+             it were today's is the failure that actually costs somebody money." -->
+        <p class="hint">{copy.staleShows}</p>
+      </Section>
+    {:else if area === 'notifications'}
+      <!--
+        `09` SPECIFIES A COMPLETE MECHANISM WITH ZERO USER-CONFIGURABLE SETTINGS. Every constant is
+        hard-coded, digests are pack declarations, no kernel table holds a preference and none of the
+        sixty-four methods writes one. So this screen REPORTS rather than offers — and a row of
+        toggles here would be four controls that write nothing, which is the failure this whole
+        session has been removing.
+
+        Muting is turned off at the source: edit or retire the rule that raises it.
+      -->
+      <Section title={copy.whenWeInterrupt}>
+        <p class="hint">{copy.batchByDefault}</p>
+        <ul class="facts">
+          <li><span class="fact-key">{copy.quietHours}</span><span class="fact-value">{copy.quietHoursAre}</span></li>
+          <li><span class="fact-key">{copy.urgentKinds}</span><span class="fact-value">{copy.urgentKindsAre}</span></li>
+          <li><span class="fact-key">{copy.interruptCap}</span><span class="fact-value">{copy.interruptCapIs}</span></li>
+          <li><span class="fact-key">{copy.unreadCount}</span><span class="fact-value">{copy.unreadCountIs}</span></li>
+        </ul>
+        <p class="hint">{copy.muteAtSource}</p>
+      </Section>
+    {:else if area === 'backups'}
+      <!--
+        `53 §5.4`: "Three mechanisms, one contract: nightly, sealed, thirty kept, restorable." And
+        `03 §6` on why this is not the Export area: "A snapshot is not an export: it is a full copy
+        … disaster recovery, not portability."
+      -->
+      <Section title={copy.kept} count={SNAPSHOTS.length}>
+        <p class="hint">{copy.keptHow(SNAPSHOTS_KEPT)}</p>
+        <ul class="ledger">
+          {#each SNAPSHOTS as snap}
+            <li>
+              <div class="line">
+                <span class="seq"><Icon name="archive" size="s" /></span>
+                <span class="line-main">
+                  <span class="line-title">{snap.id}</span>
+                  <span class="line-detail">{relative(snap.at, NOW)}</span>
+                </span>
+                <span class="line-amount"><span class="means">{copy.rowsAndSize(snap.rows, size(snap.bytes))}</span></span>
+                <span class="line-when"></span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+        <div class="row-actions">
+          <Button
+            weight="primary"
+            onclick={() => toasts.push(copy.notWritten('A sealed copy of the whole record would be written now, and counted against the thirty'), { intent: 'warn' })}
+          >{copy.snapshotNow}</Button>
+        </div>
+      </Section>
+
+      <!-- `49 §8`, and it asks for exactly this: the key "is what a self-hoster must back up
+           SEPARATELY — Settings → backups says so in one line." A snapshot sealed with a key that
+           is only inside the snapshot is a snapshot nobody can open. -->
+      <Section title={copy.theKey}>
+        <p class="hint">{copy.theKeyIs}</p>
+      </Section>
+
+      <!-- `03 §6`: "PITR is Cloud-only and this is DOCUMENTED, NOT HIDDEN." `33 §9`: a self-host
+           "has no PITR and does not serve `restore`". So the fact is stated where somebody would go
+           looking for the control, rather than the control being drawn and then refusing. -->
+      <Section title={copy.restore}>
+        <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.restoreSelfHost : copy.restoreCloud}</p>
+      </Section>
+    {:else if area === 'billing'}
+      <!--
+        THERE IS NOTHING TO BILL ON A SELF-HOST, and `23 §8`'s precedent for exactly this shape is
+        "one line in Settings". `53 §5.10` puts the whole ladder "in the Worker and nothing in the
+        record, so the record package stays billing-agnostic"; `33 §10` holds the state in the Cloud
+        Directory. The area cannot simply be removed — `50 §2.2` admits the twelve of `19 §2` with
+        no per-deployment conditional and `50 §13 D2` builds one artefact for both hosts — so it
+        says which deployment this is and what that means.
+
+        `ADR-059`'s line is here because it is the promise the whole product rests on and it is TRUE
+        on a self-host in the strongest possible way: "At no point is export withheld."
+      -->
+      <Section title={copy.billing}>
+        <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.billingSelfHost : copy.billingCloud}</p>
+        <div class="row-actions">
+          <Button weight="quiet" href="/settings/export"><Icon name="download" size="s" />{copy.export}</Button>
+        </div>
+      </Section>
     {:else if area === 'export'}
       <Section title="Your data">
         <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
@@ -451,7 +684,7 @@
           <Button
             onclick={() =>
               toasts.push(copy.notWritten('The whole record would be written to a .dog file, line per row'))}
-          >Export the record</Button>
+          >{copy.export}</Button>
           <Button
             weight="bare"
             onclick={() =>
@@ -488,6 +721,42 @@
 </div>
 
 <style>
+  /* A short list of stated facts, for the three areas that REPORT rather than offer. Two columns so
+     the label and the value line up down the page; it wraps to one below 520px. */
+  .facts {
+    display: grid;
+    grid-template-columns: minmax(12ch, max-content) minmax(0, 1fr);
+    gap: var(--sp-2) var(--sp-4);
+    margin: 0 0 var(--sp-3);
+    padding: 0;
+    list-style: none;
+  }
+
+  .facts li {
+    display: contents;
+  }
+
+  .fact-key {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .fact-value {
+    color: var(--ink2);
+  }
+
+  @media (width < 520px) {
+    .facts {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0 0;
+    }
+
+    .facts li {
+      display: block;
+      margin-block-end: var(--sp-2);
+    }
+  }
+
   .whos {
     display: flex;
     flex-direction: column;
@@ -527,6 +796,27 @@
     flex: 1 1 24ch;
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  /* The controls sit at the end of the head line and never shrink: a button that wraps its own
+     label is a button somebody reads twice. */
+  .who-do {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  /* A whole sentence, wrapping, under the row it is about. */
+  .who-why {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* The same bar a toned row wears in a grid, on the block that replaced it. */
+  .who[data-intent] {
+    border-inline-start: 2px solid var(--tone);
   }
 
   .who-level {

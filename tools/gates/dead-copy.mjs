@@ -53,7 +53,6 @@ const ALLOWED = new Map([
   ['noFilters', 'UNBUILT — the filter bar\'s own empty state; the bar is hidden under 8 rows instead.'],
   ['displayOptions', 'UNBUILT — the display menu names its sections directly.'],
   ['saveAsView', 'UNBUILT — a saved view is seeded, never created from the grid.'],
-  ['export', 'DUPLICATE — `/settings/export` types the same words in markup. One of the two must go.'],
   ['includesExample', 'UNBUILT — 19 §6 mechanism 2: the example row, marked and deletable in one click.'],
   ['example', 'UNBUILT — the chip that mark would render.'],
   ['offline', 'UNBUILT — 19 §6\'s "Offline and stale" surface.'],

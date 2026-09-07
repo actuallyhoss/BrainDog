@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
-import { AUTH_METHODS, PASSKEYS, PEOPLE_ACCESS } from './data.ts';
+import { AUTH_METHODS, DEPLOYMENT, DEVICES, PASSKEYS, PEOPLE_ACCESS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './data.ts';
 import { LEVELS } from './schema.ts';
 
 /* ── the ladder ──────────────────────────────────────────────────────────── */
@@ -109,4 +109,70 @@ test('and a method this deployment does not have is not offered', () => {
   assert.equal(typeof AUTH_METHODS.magic, 'boolean');
   assert.equal(typeof AUTH_METHODS.passkey, 'boolean');
   assert.ok(AUTH_METHODS.passkey, 'the passkey list would render with nothing behind it');
+});
+
+/* ── the five areas that were the same stub ──────────────────────────────── */
+
+test('EVERY SETTINGS AREA HAS SOMETHING TO SAY, and it is not the same something', () => {
+  /* Seven of the twelve rendered one byte-identical sentence: "Nothing configured yet. This area is
+     part of the shell and is not wired in the mock-up." The build's own words about itself, shown
+     to a user — `23 §7` forbids explaining the interface, `19 §9` calls `shell` and `mock-up`
+     internal vocabulary reaching a user, and `13 §5.2` requires a `no-data-yet` state to be
+     specific about what will be here and to carry a real action. It had none. */
+  const stub = 'not wired in the mock-up';
+  for (const line of Object.values(copy) as unknown[])
+    if (typeof line === 'string') assert.ok(!line.includes(stub), `the stub sentence survives: ${line}`);
+});
+
+test('the connector rows are `25 §9`\u2019s three states, and the paused one names what to reconnect', () => {
+  /* `25 §9` draws this screen — three status words, a last-run line, a next-run line, a failure line
+     naming the credential by its VAULT LABEL, and two buttons on the paused row only. */
+  assert.deepEqual([...new Set(SOURCES.map((s) => s.state))].sort(), ['failing', 'ok', 'paused']);
+  for (const s of SOURCES) {
+    if (s.state === 'ok') {
+      assert.equal(s.error, undefined, `${s.name} is working and carries a failure`);
+      assert.ok(s.nextAt, `${s.name} is working and has nothing scheduled`);
+      continue;
+    }
+    assert.ok(s.error, `${s.name} is ${s.state} and does not say why`);
+    /* `13 §6`: the app renders the server's `fix` VERBATIM, so it has to BE a sentence somebody can
+       act on rather than a code. */
+    assert.ok(s.error.fix.length > 30, `${s.name}'s fix explains nothing`);
+    /* AND THE CREDENTIAL BY THE LABEL THE VAULT INDEXES IT UNDER. A pull failure names what to
+       reconnect; naming the value would put a secret on a settings screen. */
+    assert.ok(VAULT.some((c) => c.label === s.error!.credential), `${s.name} names a credential the vault does not hold`);
+  }
+  /* Paused means nothing is scheduled until somebody acts. A next run on a paused connector is a
+     promise the schedule is not keeping. */
+  for (const s of SOURCES) if (s.state === 'paused') assert.equal(s.nextAt, null);
+});
+
+test('A DENIED DEVICE ROW IS KEPT', () => {
+  /* `12 §6.1` calls "I said no to a request I did not make" the single most important line this
+     table can produce. A denial that leaves no trace is a break-in attempt nobody can see
+     afterwards — so the seed carries one, or the state renders nowhere and nothing proves it. */
+  assert.ok(DEVICES.some((d) => d.state === 'denied'), 'no denied row, so that state is unreachable');
+  assert.ok(DEVICES.some((d) => d.state === 'pending'), 'no pending row, so Approve and Deny render nowhere');
+  for (const d of DEVICES) {
+    assert.ok(copy.deviceState[d.state], `${d.state} has no sentence, so the screen would print the enum`);
+    /* `33 §2`'s six surfaces, closed. */
+    assert.ok(['web', 'mcp', 'cli', 'email', 'webhook', 'alarm'].includes(d.surface), `${d.name} is over ${d.surface}`);
+    /* Only a row that has actually acted has been seen. */
+    if (d.state !== 'active') assert.equal(d.lastSeen, null, `${d.name} is ${d.state} and claims to have been used`);
+  }
+});
+
+test('and the two areas that report rather than offer say which deployment this is', () => {
+  /* `03 §6` on exactly this case: "PITR is Cloud-only and this is DOCUMENTED, NOT HIDDEN." So the
+     fact is stated where somebody would go looking for the control, rather than the control being
+     drawn and then refusing — and `50 §2.2` admits all twelve areas with no per-host conditional. */
+  assert.ok(['self-host', 'cloud'].includes(DEPLOYMENT.kind));
+  assert.notEqual(copy.restoreSelfHost, copy.restoreCloud);
+  assert.notEqual(copy.billingSelfHost, copy.billingCloud);
+  /* `49 §8` asks for one line, here, and names the reason: the key "is what a self-hoster must back
+     up separately". A copy sealed with a key that is only inside the copy cannot be opened. */
+  assert.match(copy.theKeyIs, /back that key up somewhere else/i);
+  /* `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some". */
+  assert.match(copy.keptHow(SNAPSHOTS_KEPT), new RegExp(String(SNAPSHOTS_KEPT)));
+  assert.ok(SNAPSHOTS.length > 0 && SNAPSHOTS.length <= SNAPSHOTS_KEPT);
 });
