@@ -148,7 +148,11 @@
     letter-spacing: -0.02em;
   }
 
+  /* THE SPACE IS A MARGIN AND NOT A TEXT NODE. Svelte collapses the whitespace at the start of the
+     span, so the count rendered `4of 38` — at every width, on every filtered register and every
+     saved view. A `&nbsp;` would work and would be a character in the accessible name; this is not. */
   .of {
+    margin-inline-start: 0.4ch;
     color: var(--dim);
     font-size: var(--t-sm);
   }

@@ -117,7 +117,13 @@ export const REGISTERS: Record<string, SeedRegister> = {
     one: 'obligation',
     holds: 'what you owe and what you are owed, with a date and a currency',
     title: 'what',
-    mobile: ['what', 'amount', 'due'],
+    /* WHICH WAY THE MONEY GOES, on the one screen that could not say. A card shows three declared
+       fields and these were `what`, `amount`, `due` — so a phone rendered `Corporation tax, payment
+       on account · GBP 19,100.00 · 7 Sep 2026` in a card identical to an invoice somebody owes YOU,
+       and nothing on it said which. Direction is the fact a reader cannot recover from anything else
+       on the card; a due date is one row-tap away, and lateness still reads, because the card wears
+       the row's tone. */
+    mobile: ['what', 'amount', 'direction'],
     state: 'state',
     done: ['paid', 'written_off'],
     pack: 'money-core',
@@ -558,15 +564,20 @@ export const TASKS: Fields[] = [
   { what: 'Decide the licensing tier split', state: 'blocked', thing: 1, by: day(6), effort: days(1), note: 'Waiting on SG31.' },
   { what: 'Move kilnfonts.example off auto-renew', state: 'open', thing: 1, by: day(-4), effort: days(0.2), note: '' },
   { what: 'Draft the September issue', state: 'doing', thing: 3, by: day(4), effort: days(2), note: '' },
-  { what: 'Wire the sending domain to Ledger Post', state: 'open', thing: 3, by: day(9), effort: days(0.5), note: '' },
-  { what: 'Year-end pack for Pell & Vine', state: 'open', thing: null, by: day(23), effort: days(1.5), note: '' },
+  /* SEVEN OF THE FOURTEEN NAME A TRACK, and none of them did. `tasks` declares a `track:` ref and
+     every row left it null, so the Track column on `/r/tasks` was fourteen dashes and every track
+     page reported "Still open · 0 · No open tasks on this track" — an empty state that is correct
+     about the data and wrong about the world, on five pages whose whole subject is the work. Two of
+     the seven are `done`, so the filtering that heading promises is exercised rather than assumed. */
+  { what: 'Wire the sending domain to Ledger Post', state: 'open', thing: 3, track: 4, by: day(9), effort: days(0.5), note: '' },
+  { what: 'Year-end pack for Pell & Vine', state: 'open', thing: null, track: 5, by: day(23), effort: days(1.5), note: '' },
   { what: 'Retire the Tallow staging box', state: 'open', thing: 4, by: day(30), effort: days(0.5), note: '' },
-  { what: 'Variable axis QA on the new cut', state: 'doing', thing: 1, by: day(3), effort: days(3), note: '' },
-  { what: 'Rotate the Fenwick deploy key', state: 'open', thing: 1, by: day(12), effort: days(0.2), note: '' },
-  { what: 'Write the specimen page', state: 'open', thing: 1, by: day(18), effort: days(2), note: '' },
+  { what: 'Variable axis QA on the new cut', state: 'doing', thing: 1, track: 1, by: day(3), effort: days(3), note: '' },
+  { what: 'Rotate the Fenwick deploy key', state: 'open', thing: 1, track: 2, by: day(12), effort: days(0.2), note: '' },
+  { what: 'Write the specimen page', state: 'open', thing: 1, track: 3, by: day(18), effort: days(2), note: '' },
   { what: 'Invoice Ravensworth for September', state: 'open', thing: 2, by: day(27), effort: days(0.2), note: '' },
-  { what: 'Kerning pass, lowercase', state: 'done', thing: 1, by: day(-11), effort: days(4), note: '' },
-  { what: 'Set up the newsletter archive', state: 'done', thing: 3, by: day(-6), effort: days(1), note: '' },
+  { what: 'Kerning pass, lowercase', state: 'done', thing: 1, track: 1, by: day(-11), effort: days(4), note: '' },
+  { what: 'Set up the newsletter archive', state: 'done', thing: 3, track: 4, by: day(-6), effort: days(1), note: '' },
   { what: 'Cancel the Hobnail plan', state: 'done', thing: 4, by: day(-58), effort: days(0.2), note: '' },
 ];
 
@@ -1148,16 +1159,28 @@ export const PAGES: Record<string, SeedPage> = {
         empty: '{{name}} runs on nothing you pay for.',
       },
       {
-        /* A `code` block is authored rather than projected: `body` is the whole of it, verbatim.
-           It is on a project page because the question "how do I point an agent at this one" is
-           asked once per project and answered nowhere else. */
+        /**
+         * A `code` block is authored rather than projected: `body` is the whole of it, verbatim. It
+         * is on a project page because the question "how do I point an agent at this one" is asked
+         * once per project and answered nowhere else.
+         *
+         * ONLY THE FIRST LINE WAS TEMPLATED, AND THE OTHER TWO INSTRUCTED SOMEBODY TO DAMAGE ROWS
+         * THAT ARE NOT THIS PAGE'S. `{{name}}` resolves per page; `tasks#7` and `track 1` did not,
+         * so Kiln, Marlow & Co and Portage all printed the same two literals — and `tasks#7` is
+         * "Retire the Tallow staging box", a TALLOW task, while `track 1` is "Variable axis QA", a
+         * KILN track. A person on their client's page, running the block their own record handed
+         * them, would set a third project's task to `doing` and overwrite a fourth's health with a
+         * sentence about neither.
+         *
+         * WHAT IS LEFT IS THE LINE THAT IS TRUE ON EVERY PAGE, and it is a read. The two writes
+         * were demonstrating a verb at the cost of being wrong, and a demonstration that is wrong
+         * is not a demonstration. A second line naming a row this page can resolve would need the
+         * projection a `code` block deliberately does not have.
+         */
         kind: 'code',
         heading: 'Work on this from an agent',
         span: 12,
-        body:
-          'braindog.list tasks where thing is {{name}} and state is open\n' +
-          'braindog.set tasks#7 state: doing\n' +
-          'braindog.update track 1 health: on_track body: "Six instances queued."',
+        body: 'braindog.list tasks where thing is {{name}} and state is open',
       },
     ],
   },

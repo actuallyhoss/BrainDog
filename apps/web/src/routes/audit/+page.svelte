@@ -32,7 +32,10 @@
     'entry.archive': { word: 'Archived', icon: 'archive' },
     'question.open': { word: 'Asked', icon: 'decide' },
     'question.decide': { word: 'Decided', icon: 'check' },
-    'declaration.set': { word: 'Page changed', icon: 'doc' },
+    /* `Page changed` READ AS A VERB PHRASE ONCE THE TARGET BECAME A TITLE: "Page changed Overview".
+       Every sibling row is "Created services#6" or "Changed obligations#1" — verb first, then what
+       it was done to. */
+    'declaration.set': { word: 'Changed the page', icon: 'doc' },
     'pack.install': { word: 'Installed', icon: 'packs' },
   };
 

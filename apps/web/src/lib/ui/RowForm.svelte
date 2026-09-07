@@ -185,7 +185,10 @@
     fields
       .filter((f) => f.required && f.type !== 'bool' && !(f.type === 'enum' && (f.values?.length ?? 0) <= 4))
       .filter((f) => (typed[f.id] ?? '').trim() === '')
-      .map((f) => labelOf(f)),
+      /* THE LABEL ON THE SCREEN, not the declaration's. On the first run the title field is asked
+         for as a fact — "Your first invoice" — and this sentence went on naming it `Description`,
+         which is a field nobody on that screen can see. */
+      .map((f) => (label && f.id === decl?.title ? label : labelOf(f))),
   );
 
   /** Which fields hold something the record would refuse. The sentence itself is already under them. */

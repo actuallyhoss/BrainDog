@@ -14,20 +14,30 @@
   of them having been written second.
 -->
 <script lang="ts">
-  import { REGISTERS, dirOf, display } from '$lib/record/api.ts';
+  import { REGISTERS, dirOf, display, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
 
   let { register, entries, href }: { register: string; entries: readonly Entry[]; href?: (e: Entry) => string } = $props();
 
   const decl = $derived(REGISTERS[register]);
   const to = $derived(href ?? ((e: Entry) => `/r/${register}/${e.seq}`));
+
+  /**
+   * THE ROW'S TONE, WHICH THE TABLE HAS ALWAYS DRAWN AND THE CARD NEVER DID.
+   *
+   * A register declares a `deadline:` field and `toRows` turns "past it" into `bad` and "done" into
+   * `good` — which the grid renders as a bar down the leading edge. On a phone that disappeared, so
+   * an overdue invoice and a paid one were the same card, on the surface where somebody is most
+   * likely to be looking for exactly that.
+   */
+  const toneFor = (e: Entry) => toneOf(register, e);
 </script>
 
 {#if decl}
   <ul class="cards">
     {#each entries as e (e.seq)}
       <li>
-        <a class="card" href={to(e)}>
+        <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
           <span class="card-seq">#{e.seq}</span>
           <span class="card-title" dir={dirOf(register, decl.mobile[0])}>
             {display(register, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}
@@ -73,9 +83,20 @@
       /* 44px on both axes. A control grown only in height measures 38 x 44 and fails (13 §7). */
       min-block-size: 56px;
       padding: var(--sp-2) var(--sp-4);
+      /* The same bar the grid draws down a row's leading edge, and for the same reason: it is the
+         only thing on a card that says a thing is late or settled. Transparent when there is no
+         intent, so every card keeps the same text position.
+
+         `data-intent` AND `var(--tone)`, which is `blocks.css`'s intent map — the one place an
+         intent becomes a colour. A component that names `--danger` itself is a second map. */
+      border-inline-start: 2px solid transparent;
       color: var(--ink);
       font-size: var(--t-ui);
       text-decoration: none;
+    }
+
+    .card[data-intent] {
+      border-inline-start-color: var(--tone);
     }
 
     .card-seq {

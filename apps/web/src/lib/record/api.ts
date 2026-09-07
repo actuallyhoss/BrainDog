@@ -406,7 +406,15 @@ export function columnsFor(register: string): Column[] {
 }
 
 /** A row's tone comes from the data, never from a call site: overdue is `bad`, due soon is `warn`. */
-function toneOf(register: string, e: Entry): TableRow['tone'] {
+/**
+ * What a row's state and its deadline say about it: `good`, `bad`, or nothing.
+ *
+ * EXPORTED BECAUSE THE CARD NEEDS IT TOO. The grid has drawn this as a bar down the leading edge
+ * since it was written, and below 640px the grid does not exist — so on a phone an overdue invoice
+ * and a paid one were the same card, on the surface where somebody is most likely to be looking for
+ * exactly that difference.
+ */
+export function toneOf(register: string, e: Entry): TableRow['tone'] {
   const r = REGISTERS[register];
   if (!r) return undefined;
   const state = r.state ? String(e.fields[r.state] ?? '') : '';
