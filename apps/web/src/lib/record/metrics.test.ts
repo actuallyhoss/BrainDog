@@ -14,7 +14,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { METRICS } from './declared.ts';
-import { format, hrefFor, isTemplate, meetsTarget, read, targetLine, windowMs, withParam, type MetricDecl } from './metrics.ts';
+import { mixedFix } from './money.ts';
+import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, read, targetLine, windowMs, withParam, type MetricDecl } from './metrics.ts';
 import { applyFilters, metric } from './api.ts';
 import { NOW, ROWS } from './data.ts';
 import { amountOf } from './money.ts';
@@ -366,4 +367,41 @@ test('WHAT GOOD LOOKS LIKE IS A SENTENCE, not an inequality', () => {
   assert.equal(targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl), 'watch under 3');
   for (const said of [under, targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl)])
     assert.ok(!/[≤≥]/.test(said), `a glyph nobody types: ${said}`);
+});
+
+/* ── money and bare numbers, which is mixed too ──────────────────────────── */
+
+test('A METRIC REFUSES TO SUM MONEY WITH A UNITLESS NUMBER', () => {
+  /* `money.ts`'s `total()` has guarded this by name since it was written — "quietly reading the bare
+     ones as the currency of the others is the same failure wearing a different hat" — and
+     `forecast.ts` guards it again, because a leg pointing at a `duration` field once poured
+     seventeen thousand seconds into a sterling walk and moved the crossing day. `metrics.ts` was the
+     third summing site and the only one that did not: it collected the non-null currencies, so a set
+     of size one passed however many unitless numbers were summed into it. */
+  const rows = [
+    { seq: 1, register: 'obligations', fields: { amount: { amount: 100_00, currency: 'GBP' } } },
+    { seq: 2, register: 'obligations', fields: { amount: 4200 } },
+  ] as unknown as Parameters<typeof currenciesRead>[0];
+
+  const seen = currenciesRead(rows, { sum: 'amount' });
+  assert.ok(seen.size > 1, 'a sum of money and a bare number was not called mixed');
+  assert.ok(seen.has('GBP'));
+  assert.ok(seen.has(BARE));
+  /* AND THE SENTENCE SAYS SO. `mixedFix` is what the tile prints instead of a figure, and the
+     marker has to read as English there rather than as a currency code. */
+  assert.match(mixedFix([...seen].sort()), /no currency/);
+});
+
+test('and a blank field is absent, not unitless', () => {
+  /* `null` and `undefined` are a row somebody left empty, and `amountOf` skips them. Counting them
+     as bare would refuse every metric over a field anybody has not filled in yet — which is most
+     fields on most days. */
+  const rows = [
+    { seq: 1, register: 'obligations', fields: { amount: { amount: 100_00, currency: 'GBP' } } },
+    { seq: 2, register: 'obligations', fields: { amount: null } },
+    { seq: 3, register: 'obligations', fields: {} },
+  ] as unknown as Parameters<typeof currenciesRead>[0];
+
+  const seen = currenciesRead(rows, { sum: 'amount' });
+  assert.deepEqual([...seen], ['GBP'], 'an empty field was read as a unit mismatch');
 });

@@ -218,7 +218,24 @@
       spellcheck="false"
       autocomplete="off"
     />
+    <!--
+      A WAY OUT A THUMB CAN REACH.
+
+      The only dismiss affordances were `Esc` and a backdrop click — and below 640px the dialog is
+      `100vw x 100dvh`, so `onbackdrop`'s "is this click outside the rect" test can never be true.
+      Measured: six taps at the edges and corners, all six left it open. The `<kbd>Esc</kbd>` beside
+      the query is a label, not a control, and a phone has no Esc. So the app's only search — and the
+      phone's only route to several places — was a screen you could enter and not leave except by
+      choosing a result you did not want or using the OS back gesture.
+
+      `19 §4` gives Esc the job of closing "the topmost layer, one per press"; this is the same verb
+      for the pointer that has no Esc key. The `<kbd>` stays for the keyboard that does, and hides
+      under a coarse pointer where it is advice nobody can take.
+    -->
     <kbd class="p-esc">Esc</kbd>
+    <button type="button" class="p-close tap" onclick={() => (open = false)} aria-label={copy.close}>
+      <Icon name="close" size="m" />
+    </button>
   </div>
 
   <div class="p-body" id="palette-list" role="listbox" aria-label={copy.paletteLabel}>
@@ -259,6 +276,32 @@
 </dialog>
 
 <style>
+  /* THE KEY IS ADVICE FOR A KEYBOARD, AND THE BUTTON IS FOR A THUMB. Exactly one of them is on
+     screen at a time, so the head never carries two ways to say the same thing. */
+  .p-close {
+    display: none;
+  }
+
+  @media (pointer: coarse), (width < 640px) {
+    .p-esc {
+      display: none;
+    }
+
+    .p-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      inline-size: var(--ctl-h);
+      block-size: var(--ctl-h);
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--dim);
+      cursor: pointer;
+    }
+  }
+
   .palette {
     inline-size: min(680px, calc(100vw - var(--sp-4)));
     max-block-size: min(72dvh, 620px);

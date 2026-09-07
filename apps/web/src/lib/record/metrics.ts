@@ -171,12 +171,37 @@ function currenciesOf(rows: Entry[], agg: Aggregation): Set<string> {
   const id = typeof field === 'string' ? field : field.product[0];
   const seen = new Set<string>();
   if (typeof id !== 'string') return seen;
+  let bare = false;
   for (const e of rows) {
-    const c = currencyOf(e.fields[id]);
+    const value = e.fields[id];
+    /* A ROW WITH NOTHING IN THE FIELD IS NOT A UNIT MISMATCH. `null` and `undefined` are absent
+       rather than unitless, and `amountOf` skips them; counting them as bare would refuse every
+       metric over a field anybody left blank. */
+    if (value === null || value === undefined) continue;
+    const c = currencyOf(value);
     if (c) seen.add(c);
+    else if (amountOf(value) !== null) bare = true;
   }
+  /* MONEY AND BARE NUMBERS TOGETHER IS MIXED TOO, and this was the third summing site and the only
+     one that did not say so. `money.ts`'s `total()` guards it by name — "quietly reading the bare
+     ones as the currency of the others is the same failure wearing a different hat" — and
+     `forecast.ts` guards it again for the cash walk, because a leg pointing at a `duration` field
+     once poured seventeen thousand seconds into a sterling walk and moved the crossing day.
+     
+     Here the check collected only the NON-NULL currencies, so a set of size one passed however many
+     unitless numbers were summed into it. The sentinel is a marker in the set rather than a second
+     return value, so every existing caller of `currenciesRead` refuses without being changed. */
+  if (bare && seen.size > 0) seen.add(BARE);
   return seen;
 }
+
+/**
+ * The mark for "and some of these had no currency at all".
+ *
+ * A string that is not a currency code, so it cannot collide with one and cannot be printed as one:
+ * `mixedFix` renders the set into a sentence, and this reads as what it is.
+ */
+export const BARE = 'no currency';
 
 /** Every currency any operand of this value expression reads. */
 export function currenciesRead(rows: Entry[], value: Value): Set<string> {

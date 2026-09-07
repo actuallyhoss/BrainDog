@@ -323,21 +323,6 @@ for (const event of AUDIT) {
  * that fixture's id. A route whose segment means nothing is a route that will be linked wrongly the
  * first time somebody links it.
  */
-export const JOBS: Record<string, Job> = {
-  j_9K4A: {
-    id: 'j_9K4A',
-    kind: 'qa',
-    status: 'running',
-    model: 'your machine · claude-opus-5',
-    started: stamp(-0.05),
-    events: [
-      { seq: 1, tool: 'list', input: 'things where state is live', out: '4 rows', ok: true },
-      { seq: 2, tool: 'read', input: 'tracks#1', out: 'Variable axis QA — nine instances', ok: true },
-      { seq: 3, tool: 'search', input: 'mastering pass', out: '2 rows across 1 register', ok: true },
-    ],
-  },
-};
-
 /**
  * A row count a reader can reproduce.
  *
@@ -352,6 +337,67 @@ const counted = (register: string, keep: (e: Entry) => boolean): string => {
   const n = (ROWS[register] ?? []).filter(keep).length;
   return `${n} row${n === 1 ? '' : 's'}`;
 };
+
+/**
+ * A search result, counted across every list, the way the record's own `search` counts.
+ *
+ * THREE LINES IN THESE LOGS WERE TYPED AND ALL THREE CONTRADICTED THE RECORD, sitting beside
+ * siblings that were derived — which is exactly what makes an invented figure believable. A run log
+ * is a receipt: `10 §7` has the refusal teach, and a receipt that reports a count the record cannot
+ * produce is a receipt nobody can check.
+ *
+ * `search` matches on the title field only (`api.ts`), which is what an agent's `search` tool does,
+ * so this counts the same way rather than a way that flatters the number.
+ */
+const searched = (needle: string): string => {
+  const want = needle.toLowerCase();
+  let rows = 0;
+  let lists = 0;
+  for (const [id, entries] of Object.entries(ROWS)) {
+    const title = REGISTERS[id]?.title;
+    if (!title) continue;
+    const hit = entries.filter((e) => String(e.fields[title] ?? '').toLowerCase().includes(want)).length;
+    if (hit) {
+      rows += hit;
+      lists++;
+    }
+  }
+  /* `lists`, NOT `registers`. `19 §9` bans the schema's word from a surface a person reads, and this
+     log printed both spellings two lines apart. */
+  return `${rows} row${rows === 1 ? '' : 's'} across ${lists} list${lists === 1 ? '' : 's'}`;
+};
+
+/**
+ * How many arrivals the inbox holds.
+ *
+ * ALL OF THEM ARE UNMATCHED, and that is what the list IS — `InboxItem`'s own `body` field is "why
+ * no pattern matched it". The log said "18 arrivals, 6 unmatched" over a record holding six, whose
+ * rail badge says six, and every one of them unclaimed. `07 §2` gives `inbox_raw` seven states and
+ * this build seeds one, so a second number here would be a distinction the fixture cannot make.
+ */
+const arrivals = (): string =>
+  `${INBOX.length} arrival${INBOX.length === 1 ? '' : 's'}, all unmatched`;
+
+export const JOBS: Record<string, Job> = {
+  j_9K4A: {
+    id: 'j_9K4A',
+    kind: 'qa',
+    status: 'running',
+    model: 'your machine · claude-opus-5',
+    started: stamp(-0.05),
+    events: [
+      /* `things` HAS NO `state` FIELD — its state column is `lane`, and its values are
+         `building | earning | parked | retired`. So the predicate does not compile, `matches()`
+         admits nothing, and the log's "4 rows" was the register's total: the number you get when a
+         filter is IGNORED rather than run, which is the one failure a declarative surface must not
+         have. The input says what the agent would actually write. */
+      { seq: 1, tool: 'list', input: 'things where lane is earning', out: counted('things', (e) => e.fields.lane === 'earning'), ok: true },
+      { seq: 2, tool: 'read', input: 'tracks#1', out: 'Variable axis QA — nine instances', ok: true },
+      { seq: 3, tool: 'search', input: 'mastering pass', out: searched('mastering pass'), ok: true },
+    ],
+  },
+};
+
 
 /** The one the reconcile session is running. Named, because two screens quote it by name. */
 export const JOB: Job = {
@@ -369,8 +415,8 @@ export const JOB: Job = {
       out: counted('services', (e) => String(e.fields.renews ?? '') < '2026-10-03'),
       ok: true,
     },
-    { seq: 3, tool: 'read', input: 'inbox since 2026-08-01', out: '18 arrivals, 6 unmatched', ok: true },
-    { seq: 4, tool: 'search', input: 'Fenwick', out: '4 rows across 2 lists', ok: true },
+    { seq: 3, tool: 'read', input: 'inbox since 2026-08-01', out: arrivals(), ok: true },
+    { seq: 4, tool: 'search', input: 'Fenwick', out: searched('Fenwick'), ok: true },
     { seq: 5, tool: 'propose', input: 'merge services#6 and services#13 — same provider, same renewal', out: 'PROPOSAL_UNCITED — a proposal must attach the rows it read', ok: false },
     {
       seq: 6,
@@ -428,12 +474,30 @@ export const DEPLOYMENT = { kind: 'self-host' as const, since: day(-612) };
 /* ── backups ───────────────────────────────────────────────────────────────── */
 
 /** Four of the thirty kept. `53 §5.4`: nightly at 03:00 local on a self-host, thirty retained. */
-export const SNAPSHOTS: Snapshot[] = [
-  { id: '2026-09-07', at: day(0), bytes: 2_140_992, rows: 1_206 },
-  { id: '2026-09-06', at: day(-1), bytes: 2_138_112, rows: 1_204 },
-  { id: '2026-09-05', at: day(-2), bytes: 2_131_968, rows: 1_199 },
-  { id: '2026-09-04', at: day(-3), bytes: 2_129_920, rows: 1_197 },
-];
+/**
+ * Four of the thirty kept, DERIVED from the clock and from the record.
+ *
+ * Both halves were typed and both were wrong. The ids read `2026-09-07 … 2026-09-04` while their
+ * own `at` values are `day(0) … day(-3)` — 2026-09-03 back to 08-31 — so each row printed an id
+ * four days after the date its own relative phrase resolved to, and all four sat in the future of a
+ * record whose today is Thursday 3 September. This is the only screen that says when the last sealed
+ * copy was taken and it carries no other absolute date to check against.
+ *
+ * And the counts said 1,206 rows for a record that holds 93 — the rail's own tallies, 38 + 16 + 4 +
+ * 6 + 5 + 5 + 5 + 14 — at 2.1 MB, which is 23 KB a row. The nightly DELTAS were right, which is what
+ * made an invented absolute figure read as a derived one.
+ *
+ * A snapshot is a copy of the record, so its size comes from the record. `bytes` is the one estimate
+ * left and it is marked as one: a `.dog` is a SQLite file, so it is rows plus pages plus the schema
+ * rather than a sum of field lengths, and this seed has no SQLite to ask.
+ */
+const snapshotAt = (back: number): Snapshot => {
+  const at = day(back);
+  const rows = Object.values(ROWS).reduce((n, list) => n + list.length, 0) - back * -2;
+  return { id: at, at, bytes: 24_576 + rows * 1_460, rows };
+};
+
+export const SNAPSHOTS: Snapshot[] = [0, -1, -2, -3].map(snapshotAt);
 
 export const SNAPSHOTS_KEPT = 30;
 

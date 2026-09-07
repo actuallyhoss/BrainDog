@@ -498,7 +498,12 @@
         single most important line this table can produce — a denial that leaves no trace is a
         break-in attempt nobody can see afterwards.
       -->
-      <Section title={copy.connected} count={DEVICES.filter((d) => d.state === 'active').length}>
+      <!-- THE COUNT IS THE ROWS BENEATH IT. This counted only the ACTIVE machines and then drew all
+           four — 2 over a list of four — which is the one `Section` in the product whose number and
+           list disagreed, on the screen where "how many machines can act as me" is the whole
+           question. A pending request and a denial are rows you are meant to see; if the heading is
+           to say `active`, it has to say so in the heading. -->
+      <Section title={copy.connected} count={DEVICES.length}>
         <p class="hint">{copy.connectedHow}</p>
 <ul class="whos">
           {#each DEVICES as d}

@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
-import { AUTH_METHODS, DEPLOYMENT, DEVICES, PASSKEYS, PEOPLE_ACCESS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './data.ts';
+import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './data.ts';
 import { LEVELS } from './schema.ts';
 
 /* ── the ladder ──────────────────────────────────────────────────────────── */
@@ -175,4 +175,41 @@ test('and the two areas that report rather than offer say which deployment this 
   /* `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some". */
   assert.match(copy.keptHow(SNAPSHOTS_KEPT), new RegExp(String(SNAPSHOTS_KEPT)));
   assert.ok(SNAPSHOTS.length > 0 && SNAPSHOTS.length <= SNAPSHOTS_KEPT);
+});
+
+/* ── the seed's own arithmetic ───────────────────────────────────────────── */
+
+test('A SNAPSHOT IS DATED BY THE CLOCK AND COUNTED FROM THE RECORD', () => {
+  /* Both halves were typed and both were wrong. The ids read `2026-09-07 … 2026-09-04` against `at`
+     values of `day(0) … day(-3)` — 2026-09-03 back to 08-31 — so each row printed an id four days
+     after the date its own relative phrase resolved to, and all four sat in the FUTURE of a record
+     whose today is Thursday 3 September. This is the only screen that says when the last sealed copy
+     was taken, and it carries no other absolute date to check against. */
+  for (const snap of SNAPSHOTS) assert.equal(snap.id, snap.at, `${snap.id} is dated ${snap.at}`);
+  assert.equal(SNAPSHOTS[0]!.at.slice(0, 10), new Date(NOW).toISOString().slice(0, 10), 'the newest copy is not from today');
+
+  /* And the counts said 1,206 rows for a record holding 93. The nightly DELTAS were right, which is
+     what made an invented absolute figure read as a derived one. */
+  const held = Object.values(ROWS).reduce((n, list) => n + list.length, 0);
+  assert.equal(SNAPSHOTS[0]!.rows, held, `the newest copy claims ${SNAPSHOTS[0]!.rows} rows and the record holds ${held}`);
+  /* Older copies hold fewer, because rows were added since. Monotonic, and never above today's. */
+  for (let i = 1; i < SNAPSHOTS.length; i++)
+    assert.ok(SNAPSHOTS[i]!.rows < SNAPSHOTS[i - 1]!.rows, 'an older copy holds at least as many rows as a newer one');
+});
+
+test('a run log reports counts the record can produce', () => {
+  /* Three lines in these logs were typed and all three contradicted the record, sitting beside
+     siblings that were derived — which is exactly what makes an invented figure believable. A run
+     log is a receipt, and a receipt reporting a count the record cannot produce is one nobody can
+     check. */
+  const outs = [...JOB.events, ...Object.values(JOBS).flatMap((j) => j.events)].map((e) => e.out);
+
+  /* The inbox holds what it holds, and the log said eighteen. */
+  const inbox = outs.find((o) => o.includes('arrival'));
+  assert.ok(inbox, 'no arrival count in either log');
+  assert.match(inbox, new RegExp(`^${INBOX.length} arrivals`), `the log says "${inbox}" and the inbox holds ${INBOX.length}`);
+
+  /* `19 §9` bans the schema's word from a surface a person reads, and one line said `register` two
+     lines from another saying `lists`. */
+  for (const out of outs) assert.ok(!/\bregisters?\b/.test(out), `a run log says "${out}"`);
 });

@@ -388,6 +388,52 @@
     text-align: end;
   }
 
+  /**
+   * THREE TRACKS DO NOT FIT ON A PHONE, AND THE MIDDLE ONE GOT ZERO.
+   *
+   * `minmax(9ch, 22ch) minmax(0, 1fr) minmax(0, auto)` is a desktop track list with no rule under
+   * it. At 390 the label took 190px, the note 110px and `1fr` collapsed to ZERO — and `.row-value`
+   * is `white-space: nowrap` with visible overflow, so the value printed straight over the note
+   * beside it: `redirect → kiln.example` (159px of text in a 0px box) reading as
+   * `redirect →okilm.exam` across `Nordhaven Registry`. Four rows of `/p/estate` were illegible,
+   * and at 320 the same collapse cut `GBP 14.00` to `GBP 1` on two project pages.
+   *
+   * The comment three rules up says the row "grows instead" when the track is narrow. A `1fr` track
+   * does not grow — it takes what is left, and there was nothing left.
+   *
+   * SO THE ROW BECOMES TWO LINES, which is `13 §10`'s own answer to this shape everywhere else in
+   * the product: the label leads, the value and the note share the line under it. Nothing truncates
+   * and nothing overlaps, because nothing is competing for one track.
+   */
+  @media (width < 640px) {
+    .row {
+      grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+      gap: var(--sp-1) var(--sp-3);
+      align-items: baseline;
+    }
+
+    .row-label {
+      grid-column: 1 / -1;
+    }
+
+    .row-note {
+      text-align: end;
+    }
+  }
+
+  /* AND THREE LINES ON THE NARROWEST PHONE. Two tracks still fit at 390; at 320 the value and the
+     note were sharing 250px and `redirect → kiln.example` needed 159 of it on its own. A value that
+     may not wrap needs a line that is not shared. */
+  @media (width < 400px) {
+    .row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .row-note {
+      text-align: start;
+    }
+  }
+
   /* ── proportional: bar, gauge ───────────────────────────────────────────── */
 
   .prop {

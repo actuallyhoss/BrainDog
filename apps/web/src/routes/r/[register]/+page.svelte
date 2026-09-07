@@ -161,22 +161,22 @@
 
   const found = $derived(list(id, { filters, q, ...(sort ? { sort } : {}) }));
   /**
-   * `total` IS ARCHIVED-AWARE TOO, and it was not.
+   * `total` IS WHAT THE LIST HOLDS, AND ARCHIVING HERE HOLDS NOTHING.
    *
-   * `entries` and `matched` both drop the archived rows and `total` did not — so after archiving one
-   * row the header read "37 of 38" (right: 37 match this filter, 38 are in the list) while the
-   * empty state read "38 rows, none matching" (wrong: there are 37). Two counts of the same list,
-   * three inches apart, disagreeing by one, and the one a reader checks a filter against was the
-   * stale one.
+   * I made this `found.total - archived.size` one iteration ago, to settle a sweep's finding that
+   * the header read "37 of 38" while the empty state read "38 rows, none matching". Both were
+   * true and the change was wrong twice over: the rail kept reading 38 from the record, so the two
+   * numbers for one list disagreed across the screen; and once `count === total` the head drops its
+   * "of N" span entirely, so the header stopped admitting it was showing a subset at all.
    *
-   * `19 §6` gives `no-results` the title "{N} rows, none matching" — N is what the LIST holds, so
-   * it has to drop the same rows the list does.
+   * Archive is page-local state that writes nothing — the record does still hold 38 — so `total` is
+   * 38 and says so. What the sweep actually found is one level down and is in the backlog: a
+   * destructive control in a mock-up that hides rows the record still has.
    */
   const result = $derived({
     ...found,
     entries: found.entries.filter((e) => !archived.has(e.seq)),
     matched: found.entries.filter((e) => !archived.has(e.seq)).length,
-    total: found.total - archived.size,
   });
   const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns));
 

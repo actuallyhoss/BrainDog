@@ -462,7 +462,13 @@ Too | many | cells | for | a | stat | row
 \`\`\``;
 
 export const THINGS: Fields[] = [
-  { name: 'Kiln', lane: 'earning', revenue: gbp(184_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE },
+  /* GBP 18,400.00, AND THE NOTE FOUR LINES BELOW IT HAS SAID SO ALL ALONG. The field held
+     `gbp(184_000)` — GBP 1,840.00, one zero short — while Kiln's own note opens "{{money:1840000
+     GBP}} since March 2024" and its revenue chart breaks that down: 11,200 + 5,300 + 1,900 = 18,400,
+     with printed shares of 61 / 29 / 10 that are exactly those over that total. Three figures agreed
+     and the fourth did not, and the fourth is the one the register sorts, the grid shows and any
+     future roll-up reads. */
+  { name: 'Kiln', lane: 'earning', revenue: gbp(1_840_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE },
   { name: 'Marlow & Co', lane: 'earning', revenue: gbp(420_000), since: '2023-01-08', mark: '▲', hue: 305 },
   { name: 'Portage', lane: 'building', revenue: gbp(0), since: '2026-05-02', mark: '●', hue: 176 },
   { name: 'Tallow', lane: 'parked', revenue: gbp(0), since: '2025-02-20', mark: '◼', hue: 261 },
@@ -913,7 +919,13 @@ export const PAGES: Record<string, SeedPage> = {
            claim, because the figure it referred to was empty. */
         /* THE INTERPOLATION CARRIES ITS OWN "ago", so the sentence is written around it rather than into
            it: "Something is 5w ago past its terms" is not English, and it was on the page. */
-        body: 'Something went past its terms {{ago:obligations.oldest_overdue}}. Statutory interest may be due; the terms are in the contract.',
+        /* AND IT QUOTES THE AGE OF THE SET THAT MADE IT APPEAR. It read
+           `{{ago:obligations.oldest_overdue}}`, which resolves over money owed TO you, while the
+           `when:` below gates on `overdue` — money owed BY you. So the alarm fired because two
+           payables were late and then printed the age of a receivable: 5w on screen for a record
+           whose oldest overdue payable is nine weeks old. The gate and the figure have to describe
+           one set, and the path is named for which one. */
+        body: 'Something you owe went past its terms {{ago:obligations.oldest_unpaid}}. Statutory interest may be due; the terms are in the contract.',
         /* AND IT DRAWS ONLY WHEN IT IS TRUE. `when:` was documented and not implemented, so this
            was `drawn: true` — an alarm that is always on, which is an alarm nobody reads. */
         when: { metric: 'overdue', gt: 0 },

@@ -140,6 +140,28 @@
 </div>
 
 <style>
+  /* THREE FIGURES ACROSS A PHONE IS THREE FIGURES OVER EACH OTHER.
+
+     `/p/<slug>` restacks a `stat` block's cells to one column under 640px and this page, rendering
+     the identical `.block-slot`, carried no media query at all. Measured on the shared money page at
+     390: the figure box is 95px and `GBP 28,320.00` is 109px of text with `overflow: visible`, so it
+     printed over `GBP 26,690.00`, which printed over `GBP 10,540.00`. On `/p/money` at the same
+     width the same box is 324px.
+
+     `13 §4.2` — a truncated figure is not shortened, it is wrong — and overlapped is worse than
+     truncated, because it reads as a number rather than as damage. This is also the one surface
+     somebody sends to an accountant, who opens it on a phone. */
+  @media (width < 640px) {
+    .block-slot :global(.grid) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .block-slot :global(.cell + .cell) {
+      border-inline-start: 0;
+      border-block-start: 1px solid var(--line);
+    }
+  }
+
   .block-slice {
     margin: 0;
     padding-block-start: var(--sp-2);

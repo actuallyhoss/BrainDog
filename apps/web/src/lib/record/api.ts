@@ -513,6 +513,30 @@ export function sortRows(register: string, entries: Entry[], field: string, dir:
     if (x === y) return a.seq - b.seq;
     if (x === null || x === undefined) return 1;
     if (y === null || y === undefined) return -1;
+
+    /**
+     * A REF SORTS BY THE NAME ON SCREEN, not by the row number behind it.
+     *
+     * A `ref` is stored as a seq — a number — so it missed the string branch below and fell into
+     * `amountOf`, which coerces any scalar, and the column was ordered by the hidden id while the
+     * cell rendered the title of the row it points at. `/r/obligations?sort=party:asc` gave Halden
+     * ×9, Ravensworth ×8, J. Okonkwo ×4, Pell & Vine ×5 — the `people` register's own seq order, in
+     * no visible order at all, under a `columnheader` announcing `aria-sort="ascending"`.
+     *
+     * The Project column has the same shape and was saved by luck: Kiln, Marlow & Co, Portage and
+     * Tallow happen to be alphabetical in seq order, so renaming one project would have silently
+     * stopped that column sorting too.
+     *
+     * `display()` IS WHAT THE CELL SHOWS, so it is what the sort has to read. Same locale collation
+     * as any other text, for the same reason.
+     */
+    const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
+    if (decl?.type === 'ref') {
+      const sx = display(register, field, x) ?? '';
+      const sy = display(register, field, y) ?? '';
+      return sx.localeCompare(sy, LOCALE) * sign;
+    }
+
     /* TEXT COLLATES, everything else compares. `<` on strings compares UTF-16 code units, so every
        capital sorts above every lowercase — "Zebra" before "apple" — and anything accented lands
        after "z", which puts "Ökonkwo" at the bottom of a column of party names. Numbers and ISO
@@ -823,17 +847,30 @@ export function metric(id: string): Metric {
 
 /** The values a page's `{{path}}` interpolations resolve to, pre-resolved server-side (22 §5). */
 export function values(): Record<string, string> {
-  /* OWED TO YOU, and the direction is the whole of it. The only sentence that consumes this path is
-     about statutory interest on a receivable, and the minimum was taken over overdue rows in BOTH
-     directions — so the Money page printed the age of a bill YOU owe, in the alarm colour, under a
-     sentence about interest you can charge somebody else. Shown 2mo; the oldest overdue receivable
-     is 5w. A path is named after what it means or it means whatever the first caller assumed. */
-  const overdue = (ROWS.obligations ?? []).filter(
-    (e) => open(e) && e.fields.direction === 'owed_to_me' && days(e.fields.due) < 0,
-  );
-  const oldest = overdue.map((e) => String(e.fields.due)).sort()[0];
+  /**
+   * TWO PATHS, EACH NAMED FOR THE DIRECTION IT MEANS.
+   *
+   * There was one, called `oldest_overdue`, and it changed direction under a comment explaining why:
+   * first it took the minimum over BOTH directions, so a sentence about a receivable printed the age
+   * of a bill you owe; then it was narrowed to `owed_to_me`, and the note that consumes it is gated
+   * on the `overdue` metric — which is `owed BY me`. So the alarm fired on payables and printed the
+   * age of a receivable: 5w on screen for a record whose oldest overdue payable is nine weeks old.
+   *
+   * The old comment got the rule right and the caller wrong: *a path is named after what it means or
+   * it means whatever the first caller assumed*. So neither of these is called `oldest_overdue`, and
+   * a sentence has to say which one it wants.
+   */
+  const oldestIn = (direction: string) =>
+    (ROWS.obligations ?? [])
+      .filter((e) => open(e) && e.fields.direction === direction && days(e.fields.due) < 0)
+      .map((e) => String(e.fields.due))
+      .sort()[0] ?? '';
+
   return {
-    'obligations.oldest_overdue': oldest ?? '',
+    /** Money you owe, past its date — the set the `overdue` metric counts. */
+    'obligations.oldest_unpaid': oldestIn('owed_by_me'),
+    /** Money owed to you, past its date. Statutory interest you could charge. */
+    'obligations.oldest_unrecovered': oldestIn('owed_to_me'),
     'obligations.count': String((ROWS.obligations ?? []).length),
     'services.count': String((ROWS.services ?? []).length),
     ...Object.fromEntries(
