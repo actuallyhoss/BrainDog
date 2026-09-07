@@ -55,7 +55,19 @@ try {
  * IT IS A SKIP AND NOT A FAILURE, because "you have not built" is not "you have broken something",
  * and the runner is red on a skip under CI either way.
  */
-const newest = await newestSource(join(APP, 'src'));
+/* `apps/web/src` IS NOT ALL OF THE SOURCE. The app imports eight workspace packages and compiles
+   them into its own chunks, so a change to `packages/kernel/src` makes the build exactly as stale as
+   a change to a route — and the first version of this check walked only the app, so the first kernel
+   commit after it went straight through a green bundle row again. */
+const dirs = [join(APP, 'src')];
+for (const pkg of await readdir(join(process.cwd(), 'packages'), { withFileTypes: true }))
+  if (pkg.isDirectory()) dirs.push(join(process.cwd(), 'packages', pkg.name, 'src'));
+
+/* `src` AND NOT THE PACKAGE. A package's `test/` is not compiled into anything the browser
+   downloads, so counting it would demand a rebuild for a change that cannot move a byte of the
+   bundle — and a gate that cries stale on work it does not measure is a gate people learn to
+   re-run blind. */
+const newest = (await Promise.all(dirs.map((d) => newestSource(d)))).reduce((a, b) => (a.when >= b.when ? a : b));
 if (newest.when > built) {
   console.log(
     `  bundle: the build is older than ${relative(APP, newest.at)} — run \`pnpm --filter @braindog/web build\` first`,
@@ -72,8 +84,17 @@ if (newest.when > built) {
 async function newestSource(dir) {
   let when = 0;
   let at = dir;
-  for (const e of await readdir(dir, { withFileTypes: true, recursive: true })) {
-    if (!e.isFile()) continue;
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true, recursive: true });
+  } catch {
+    /* A package with no `src` is a package that compiles into nothing. */
+    return { when, at };
+  }
+  for (const e of entries) {
+    /* `node_modules` under a workspace package is a symlink farm the size of the registry, and its
+       mtimes are about an install rather than about this code. */
+    if (!e.isFile() || (e.parentPath ?? e.path).includes('node_modules')) continue;
     const full = join(e.parentPath ?? e.path, e.name);
     const t = (await stat(full)).mtimeMs;
     if (t > when) {

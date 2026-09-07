@@ -24,6 +24,7 @@ import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
 import { stored } from './metrics.ts';
+import { sparkMayWrite } from './spark.ts';
 
 /** The three tables that are read like registers and are not registers. */
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
@@ -648,6 +649,7 @@ function event(
   to: string,
   note?: string,
 ): void {
+  sparkMayWrite(actor, kind);
   deps.sql.exec(
     'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     deps.mint(),

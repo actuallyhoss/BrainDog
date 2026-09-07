@@ -98,9 +98,11 @@ import {
   type SealedGrant,
   type VaultDeps,
 } from './vault.ts';
+import { sparkMayWrite } from './spark.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkDogl, keyIdOf, b64url, manifestBytes, signDogl, type Signature, type Signer } from './dogl.ts';
+export { SPARK, SPARK_KINDS, sparkMayWrite } from './spark.ts';
 export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
@@ -1117,6 +1119,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     opId?: string | undefined;
   }): string {
     const id = mint();
+    /* `30 §3`: a model suggests, proposes and predicts, and writes nothing else into the log. */
+    sparkMayWrite(e.actor, e.kind);
     /* `target` carries its KIND — `entry:01J…` — because an event is about a row, a decision, a pack
        or a declaration, and a bare id would make "everything about this" a search of four tables. */
     sql.exec(

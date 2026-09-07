@@ -27,6 +27,7 @@ import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { predicateOf } from './metrics.ts';
 import type { Entry } from './index.ts';
 import type { OutboxKind } from './outbox.ts';
+import { sparkMayWrite } from './spark.ts';
 
 export const CHANNELS = ['in-app', 'email', 'push', 'webhook', 'mcp'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -502,6 +503,10 @@ export const inQuietHours = (ms: number, tz: string): boolean => {
 
 /** An in-app note, as the event that IS the notification. */
 export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: string, text: string): void {
+  /* A DIGEST'S PROSE IS WRITTEN BY SPARK and its note is not a `note` a model may sign. `prose:
+     spark` is the one declaration that puts a model's sentences into a digest, and if the actor of
+     that note were ever the model rather than the record, this is where it would land. */
+  sparkMayWrite(actor, 'note');
   sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'note', NULL, NULL, ?)",
     mint(),
