@@ -50,7 +50,7 @@
   const seen = $derived(noticed(id));
 
   /* URL state: filters and the query define WHICH ROWS YOU ARE LOOKING AT, so they must be
-     shareable. View options and the peeked row are not the same thing and do not travel (19 §5). */
+     shareable. View options are about your eyes rather than the data and live in the cookie. */
   const q = $derived(page.url.searchParams.get('q') ?? '');
   const sortParam = $derived(page.url.searchParams.get('sort'));
   const sort = $derived.by(() => {
@@ -161,7 +161,32 @@
   /* Column 2, not 1: 0 is the picker and 1 is the spoken id, so the caret starts on the first cell
      that says what the row IS. It was 1 when the id was the leading column. */
   let focus = $state({ row: 0, col: 2 });
-  let peeked = $state<number | null>(null);
+  /**
+   * THE PEEKED ROW IS IN THE URL, and the comment above used to say it was not.
+   *
+   * `19 §5`'s table puts *open drawers* in component state and this file read the peek as one of
+   * those. It is not: `19 §2` names it in its own row — "Entry peek | `/r/obligations?row=7` — a
+   * 480px drawer, list still visible, for triage" — and `§5` gives *Focused row* the same
+   * `?row=7`, with the note that deep-linking a paged list needs a stable key and never an index.
+   *
+   * WHAT IT COST WAS TWO THINGS A PERSON DOES CONSTANTLY. Copying the URL out of a peek sent a
+   * colleague the whole list rather than the row being discussed, and Back — the gesture every
+   * person on earth uses to close a thing that opened over what they were reading — left the
+   * register entirely.
+   *
+   * THE KEY IS `seq`, WHICH IS THE STABLE ONE. `focus.row` is an index into whatever is on screen
+   * and moves when a filter does; `#7` is `#7` under every sort this list has.
+   */
+  const peeked = $derived.by(() => {
+    const said = Number(page.url.searchParams.get('row'));
+    return Number.isInteger(said) && said > 0 ? said : null;
+  });
+
+  const peek = (seq: number | null) =>
+    setParam((p) => {
+      if (seq === null) p.delete('row');
+      else p.set('row', String(seq));
+    });
 
   /**
    * Archived rows, in the mock-up, held in the page rather than in the record.
@@ -341,7 +366,7 @@
       focus = { ...focus, col: Math.max(focus.col - 1, 0) };
     } else if (e.key === 'p') {
       e.preventDefault();
-      peeked = result.entries[focus.row]?.seq ?? null;
+      peek(result.entries[focus.row]?.seq ?? null);
     } else if (e.key === 'Enter') {
       const row = result.entries[focus.row];
       if (row) goto(`/r/${id}/${row.seq}`);
@@ -765,7 +790,7 @@
     open={peeked !== null}
     title={String(peekedEntry?.fields[decl.title] ?? '')}
     id="#{peeked ?? ''}"
-    onclose={() => (peeked = null)}
+    onclose={() => peek(null)}
   >
     {#if peekedEntry}
       <!-- FORMATTED, through the same `display` every other surface goes through.
@@ -786,7 +811,7 @@
     {/if}
     {#snippet footer()}
       <Button weight="primary" href="/r/{id}/{peeked}"><Icon name="external" size="s" />{copy.openRow}</Button>
-      <Button weight="bare" onclick={() => (peeked = null)}><Icon name="close" size="s" />{copy.close}</Button>
+      <Button weight="bare" onclick={() => peek(null)}><Icon name="close" size="s" />{copy.close}</Button>
     {/snippet}
   </Sheet>
 
@@ -861,7 +886,7 @@
         <Icon name="external" size="s" />
         <span class="mi-name">{copy.openRow}</span><Kbd keys="↵" />
       </a>
-      <button class="mi" role="menuitem" type="button" onclick={() => (peeked = seq)}>
+      <button class="mi" role="menuitem" type="button" onclick={() => peek(seq)}>
         <Icon name="eye" size="s" />
         <span class="mi-name">{copy.peek}</span><Kbd keys="p" />
       </button>
