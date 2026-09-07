@@ -177,7 +177,34 @@
 
   /** Only INDEXED fields are offered, in declaration order, at most eight. A filter on an unindexed
       field is a promise the storage cannot keep at 5,000 rows. */
+  /**
+   * HOW MANY ROWS MAKE SIFTING WORTH OFFERING.
+   *
+   * A CONTROL THAT ACTS ON A SET IS NOISE UNTIL THE SET IS BIGGER THAN THE SCREEN. Measured on this
+   * page at 390px with one row: the row's top was 445px into an 844px viewport — the row 5% of the
+   * screen, the chrome 53% — and 45 of the 71 focusable controls in `<main>` were there whether the
+   * list held one row or thirty-eight. Searching a list you can see all of is slower than reading
+   * it, and filtering it is slower still.
+   *
+   * EIGHT, BECAUSE THAT IS WHAT FITS. A phone shows about eight card rows at once, so below it
+   * everything the person owns is already in front of them and there is nothing to find. It is the
+   * one number here and it is tied to a screen rather than to a taste.
+   */
+  const ENOUGH_TO_SIFT = 8;
+
   const filterable = $derived((decl?.fields ?? []).filter((f) => f.index).slice(0, 8));
+
+  /** The moment `19 §6` describes: the register, with their one row in it. */
+  const arriving = $derived(page.url.searchParams.has('first'));
+
+  /**
+   * WHETHER THIS LIST IS BIG ENOUGH TO NEED SIFTING THROUGH.
+   *
+   * `result.total` AND NOT `result.matched`, because the question is about the list and not about
+   * what is on screen: filtering thirty-eight rows down to one must not remove the control that got
+   * you there. The two differ exactly when somebody is already sifting.
+   */
+  const siftable = $derived(!arriving && result.total >= ENOUGH_TO_SIFT);
 
   /** Where a field that is not an enum IS filtered: the column's sort, or the search box. */
   /** The fields the search box matches, named where the search box is. */
@@ -495,6 +522,15 @@
   </PageHead>
 
   <div class="page">
+    <!-- THE BAR APPEARS WHEN THERE IS SOMETHING TO SIFT. Below eight rows it was a search box, six
+         chips and a keyboard strip standing over a list you could already read — and on the first
+         run it stood over the one row somebody had just typed. -->
+    <!-- AND ON THE RUN SCREEN TWO IS ABOUT, IT COMES FIRST. -->
+    {#if arriving}
+      <Second held={Object.keys(REGISTERS)} register={id} first />
+    {/if}
+
+    {#if siftable || q || filters.length}
     <div class="bar">
       <label class="field">
         <Icon name="search" size="s" />
@@ -541,6 +577,7 @@
         <Kbd keys="j  k" /> move <Kbd keys="p" /> peek <Kbd keys="↵" /> open <Kbd keys="⌫" /> archive
       </span>
     </div>
+    {/if}
 
     <!--
       WHERE THE FIELDS THAT ARE NOT CHIPS ARE FILTERED. It lived inside the drawer and came out with
@@ -551,7 +588,7 @@
       `aria-sort="ascending"`. So the product explained its own interface, in a drawer, incorrectly.
       Sorting is a fact about the table and the table already says it: eight headers, each a button.
     -->
-    {#if searched.length > 0}<p class="bar-note">{copy.filterBySearch(searched)}</p>{/if}
+    {#if siftable && searched.length > 0}<p class="bar-note">{copy.filterBySearch(searched)}</p>{/if}
 
     <!-- WHAT THE RECORD NOTICED, ON THE SCREEN IT IS ABOUT.
 
@@ -565,7 +602,11 @@
          happening for weeks and the record is the only one that counted. `role="note"` and no
          intent colour, because the day it looks like an error is the day it gets dismissed
          unread. -->
-    {#if seen}
+    <!-- AND NOT ON SOMEBODY'S FIRST MINUTE. This reports a pattern over thirty days on a register
+         that has been written to repeatedly — it is addressed to whoever maintains the declaration,
+         and it was the largest thing on the screen a person landed on after typing their first row,
+         reading "12 writes to Direction were refused … ENUM_VALUE_UNKNOWN · 30d". -->
+    {#if seen && !arriving}
       <aside class="seen" role="note">
         <Icon name="observe" size="s" />
         <p class="seen-said">
@@ -656,6 +697,9 @@
       {/if}
 
       <div class="table-slot">
+        <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
+             without it, so eight header buttons over a single row — each announcing
+             `aria-sort="none"` — become eight headings. -->
         <Table
           {columns}
           {rows}
@@ -666,8 +710,12 @@
           selected={selectedKeys}
           bind:focus
           onactivate={(row) => goto(`/r/${id}/${row.key.split('#')[1]}`)}
-          onsort={(field) =>
-            setParam((p) => p.set('sort', `${field}:${sort?.field === field && sort.dir === 'asc' ? 'desc' : 'asc'}`))}
+          {...result.entries.length < 2
+            ? {}
+            : {
+                onsort: (field: string) =>
+                  setParam((p) => p.set('sort', `${field}:${sort?.field === field && sort.dir === 'asc' ? 'desc' : 'asc'}`)),
+              }}
         >
           {#snippet cellSnippet(row, column, value)}
             {@const seq = Number(row.key.split('#')[1])}
@@ -700,8 +748,15 @@
 
   <!-- SCREEN 2 OF THE FIRST RUN, inline under the register they just made (19 §6). It shows itself
        only while the record holds exactly one register with something in it, so nothing has to
-       remember a dismissal and nothing can get stuck showing it. -->
-  <Second held={Object.keys(REGISTERS)} register={id} first={page.url.searchParams.has('first')} />
+       remember a dismissal and nothing can get stuck showing it.
+
+       IT IS ABOVE THE TABLE ON THE RUN IT IS ABOUT. `19 §6` calls screen two "the register, with
+       their one row in it, and the second choice offered inline" — and rendering it after the table
+       put it below however many rows the register holds, which on any record with history is a
+       scroll away from the row it is talking about. -->
+  {#if !arriving}
+    <Second held={Object.keys(REGISTERS)} register={id} first={false} />
+  {/if}
 
   <!-- Peek: a drawer, with the list still visible, for triage. It needs a VISIBLE affordance —
        Linear's own docs admit the flaw that Peek can only be launched with the keyboard shortcut,
