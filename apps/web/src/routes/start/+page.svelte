@@ -21,6 +21,7 @@
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { addKey } from '$lib/start.ts';
+  import Define from '$lib/ui/Define.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -184,7 +185,9 @@
         {/each}
       </div>
 
-      <p class="hint">{firstRun.firstHint}</p>
+      <!-- `row` is defined in the one sentence that already uses it, on the screen where somebody
+           is about to make their first one. `19 §6`: one clause, in the sentence that needs it. -->
+      <p class="hint">{firstRun.firstHint} <Define noun="row" /></p>
 
       <section class="agent" aria-labelledby="agent-h">
         <h2 class="agent-h" id="agent-h"><Icon name="session" size="m" />{firstRun.agentTitle}</h2>

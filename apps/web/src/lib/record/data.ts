@@ -359,7 +359,7 @@ export const JOB: Job = {
       ok: true,
     },
     { seq: 3, tool: 'read', input: 'inbox since 2026-08-01', out: '18 arrivals, 6 unmatched', ok: true },
-    { seq: 4, tool: 'search', input: 'Fenwick', out: '4 rows across 2 registers', ok: true },
+    { seq: 4, tool: 'search', input: 'Fenwick', out: '4 rows across 2 lists', ok: true },
     { seq: 5, tool: 'propose', input: 'merge services#6 and services#13 — same provider, same renewal', out: 'PROPOSAL_UNCITED — a proposal must attach the rows it read', ok: false },
     {
       seq: 6,

@@ -58,6 +58,9 @@ const CASES = [
   { gate: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
   { gate: 'closed-lists', expect: /the migration admits/, findings: 1 },
   { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
+  /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both — or neither —
+     is a gate that is counting keys rather than finding dead ones. */
+  { gate: 'dead-copy', expect: /nobody reads/, findings: 1 },
 ];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */

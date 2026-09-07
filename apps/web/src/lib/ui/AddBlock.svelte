@@ -31,6 +31,7 @@
   import { toSegments } from '../record/blocks.ts';
   import { bindableFor, seedBlock } from '../record/seed.ts';
   import type { PageBlock } from '../record/schema.ts';
+  import Define from './Define.svelte';
   import Sheet from './Sheet.svelte';
 
   let {
@@ -130,6 +131,17 @@
 </script>
 
 <Sheet bind:open title={copy.addBlock} >
+  <!-- `block` reaches a reader in exactly two places — this sheet and `/v/…`'s "Bind as a block",
+       which is a button and cannot carry a clause. So it is defined here, once, above the sixteen
+       kinds it is about to list.
+
+       `{#if open}` IS LOAD-BEARING. A `<dialog>` renders its children whether or not it is showing,
+       so without the guard the definition would be constructed — and spent — on every page a person
+       opens, having never been on screen. A noun gets one chance and this is how you waste it. -->
+  {#if open}
+    <p class="sheet-define"><Define noun="block" /></p>
+  {/if}
+
   {#each PURPOSES as purpose}
     {@const group = tiles.filter((t) => t.spec?.purpose === purpose)}
     {#if group.length}
@@ -175,6 +187,15 @@
 </Sheet>
 
 <style>
+  /* Empty and gone after the first time, so it never leaves a gap above the first group. */
+  .sheet-define:empty {
+    display: none;
+  }
+
+  .sheet-define {
+    margin: 0 0 var(--sp-3);
+  }
+
   .group + .group {
     margin-block-start: var(--sp-5);
   }

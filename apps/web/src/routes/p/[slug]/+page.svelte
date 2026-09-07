@@ -423,7 +423,17 @@
     </Empty>
   </div>
 {:else}
-  <PageHead icon={iconFor(result.page.icon, 'doc')} hue={hueOf(result.page.identity)} kicker={result.page.nav?.section} title={result.page.title}>
+  <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place
+       somebody is looking at one. The clause carries `block` and `row` with it, which is `19 §642`'s
+       own wording and deliberate — the two nouns it leans on are the two this product defines
+       either side of it. -->
+  <PageHead
+    icon={iconFor(result.page.icon, 'doc')}
+    hue={hueOf(result.page.identity)}
+    kicker={result.page.nav?.section}
+    title={result.page.title}
+    define="page"
+  >
     {#snippet actions()}
       {#if arranging}
         <Button weight="quiet" onclick={() => (adding = true)}>

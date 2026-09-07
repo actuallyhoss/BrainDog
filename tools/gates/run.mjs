@@ -53,6 +53,10 @@ const GATES = [
   ['no-declarations-in-kernel', ['node', [join(here, 'no-declarations-in-kernel.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
+  /* `50 §3` says one file holds every sentence so the copy is reviewable in one place. That is true
+     only while the file and the product hold the same sentences — and 26 of 212 were reviewable and
+     unrendered, including the five that define the words the product is built out of. */
+  ['dead-copy', ['node', [join(here, 'dead-copy.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
   // Needs a build. Both report and exit 0 when there is not one, so `pnpm gates` is useful on a
   // fresh checkout; CI builds first, and then they are real gates.

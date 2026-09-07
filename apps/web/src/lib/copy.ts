@@ -446,6 +446,33 @@ export const copy = {
     return `${name} cannot be this record's colour: ${why}. The other colours are unaffected.`;
   },
 
+  /**
+   * THE LOAD-BEARING NOUNS, one clause each, `19 §6`.
+   *
+   * Four, and the number was measured rather than chosen. Of the eight the rule names, `pack` is
+   * already defined in place — "A pack adds ready-made lists and pages" is the first line of
+   * `/packs` — and `tone`, `target` and `window` never appear on a screen in this build at all, so
+   * a rule about the first time a word appears is satisfied by their not appearing. `register` is
+   * not here because this product says LIST to a reader; `register` is the id an agent writes.
+   *
+   * NONE OF THEM DEFINES ITSELF WITH ANOTHER OF THEM except downwards: a row is a thing in a list,
+   * a page is made of blocks. A definition that needs a second definition to land is a glossary.
+   */
+  defines: {
+    /* `19 §642`'s clauses, with one word swapped: the table writes `register` and this product says
+       LIST to a reader. Its wording, except here.
+
+       ITS OWN EXAMPLES BACKFIRE IN PLACE. The document's clause is "a typed collection —
+       obligations, domains, people", which reads well in a glossary listing all eight nouns and
+       badly under the heading "Obligations", where the three examples sit directly beneath one of
+       themselves and scan as the list's FIELDS. What "typed" actually means is the half a reader
+       needs, so that is the half this says. */
+    list: 'a list of one kind of thing, with the same fields on every row',
+    row: 'one thing in a list. It has a number you can say',
+    page: 'a screen made of blocks. It is a row, so you can change it',
+    block: 'one thing on a page — a table, a figure, a note',
+  } as const,
+
   /** Names the source block so tabbing into it says which page's declaration it is. */
   declarationOf: (page: string) => `Source of ${page}`,
 

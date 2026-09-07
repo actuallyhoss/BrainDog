@@ -47,6 +47,16 @@ export type Pref = {
    * one item below it in the same menu, was honest about writing nothing.
    */
   nav?: string[] | undefined;
+  /**
+   * Which load-bearing nouns have already been explained to this person.
+   *
+   * `19 §6` requires a definition "the first time they appear on a screen … and never again", and
+   * "never again" is a fact about a person rather than about a screen — so it has to outlive a
+   * reload. `50 §4.7` states the preference set and has no slot for it; the URL would put "have you
+   * read this" into a shareable address and component state forgets on navigation, so this is the
+   * store that is left. One key, named here rather than added quietly.
+   */
+  defined?: string[] | undefined;
 };
 
 const NAME = 'bd_pref';

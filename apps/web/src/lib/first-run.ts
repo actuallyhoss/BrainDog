@@ -85,20 +85,12 @@ export const firstRun = {
   agentCopy: 'Copy the command',
   agentCopied: 'Copied. Paste it where your agent is running.',
 
-  /**
-   * THE VOCABULARY, DEFINED ON FIRST USE, IN PLACE, ONCE — and for a long time, nowhere.
-   *
-   * All five of these were dead: `grep` found them in this file and in no other. So *row*, *pack*,
-   * *page*, *block* and *tone* each reached a screen — `block` twelve times — and the sentence that
-   * defines them rendered nowhere, while the comment above them claimed a policy the code did not
-   * execute. That is the single largest reason the product reads as jargon: not that it uses its
-   * own words, but that it never says what they are.
-   *
-   * `defRow` USED TO DEFINE A ROW WITH THE WORD `register`, which is the failure twice over.
-   */
-  defRow: 'one thing in a list. It has a number you can say',
-  defPack: 'a file that adds lists and pages. Readable text; nothing runs',
-  defPage: 'a screen made of blocks. It is a row, so you can change it',
-  defBlock: 'one thing on a page: a table, a figure, a note',
-  defTone: 'what a value means: good, watch, wrong, note',
+  /* THE VOCABULARY MOVED TO `copy.ts` AND IS NOW RENDERED.
+     
+     Five definitions lived here, imported by nothing, under a comment that stated the policy in the
+     past tense — so `row`, `pack`, `page`, `block` and `tone` each reached a screen and the sentence
+     defining them appeared on none. They belong in `copy.ts` for the reason `50 §3` gives (one file
+     holds every sentence, so the no-over-explaining rule is reviewable in one place) and they belong
+     to the whole product rather than to first run, because three of the four are met long after it.
+     See `define.svelte.ts` for which four survived the measurement and why. */
 } as const;

@@ -525,10 +525,15 @@
     </Empty>
   </div>
 {:else}
+  <!-- `define="list"`: `19 §6`'s clause, on the first list this person ever opens and never again.
+       The rail has said LISTS on every screen since the day it was written and nothing has ever said
+       what one is — and this heading is where somebody is looking at a list rather than at the word
+       for it, which is what "in the sentence that needs it" means. -->
   <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
     count={result.matched}
     total={result.total}
+    define="list"
   >
     <!--
       THE FILTER DRAWER IS GONE, AND THE CHIPS ARE THE FILTER.

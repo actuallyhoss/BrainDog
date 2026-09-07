@@ -11,6 +11,8 @@
 -->
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import Define from './Define.svelte';
+  import type { Noun } from '$lib/define.svelte.ts';
   import type { IconName } from './icons.ts';
   import type { Snippet } from 'svelte';
 
@@ -23,6 +25,7 @@
     id,
     icon,
     hue,
+    define,
   }: {
     title: string;
     /** The glyph the register or page already declares. The rail draws it; the page dropped it. */
@@ -33,6 +36,14 @@
     total?: number | undefined;
     kicker?: string | undefined;
     id?: string | undefined;
+    /**
+     * A load-bearing noun this heading is the first sight of, explained once and never again.
+     *
+     * `19 §6`. The clause goes UNDER the `h1` and never inside it: a heading is an address in the
+     * document outline and a name in the accessibility tree, and a definition appended to it makes
+     * both longer for everybody, for ever, to teach one word once.
+     */
+    define?: Noun | undefined;
     actions?: Snippet | undefined;
   } = $props();
 </script>
@@ -63,6 +74,7 @@
         <span dir="auto">{title}</span>
         {#if id}<span class="title-id">{id}</span>{/if}
       </h1>
+      {#if define}<p class="head-define"><Define noun={define} /></p>{/if}
     </div>
     {#if count !== undefined}
       <p class="count num">
@@ -78,6 +90,12 @@
 <style>
   /* Sticky, and `--sticky` is what `scroll-padding-block` is set from, so keyboard focus never
      lands underneath it (WCAG 2.4.11). Paid once, in app.css. */
+  /* No margin of its own: it is either there or it is not, and a head that reserved the space
+     would leave a gap on every screen after the first. */
+  .head-define {
+    margin: 0;
+  }
+
   .head {
     position: sticky;
     inset-block-start: 0;
