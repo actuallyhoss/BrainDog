@@ -13,7 +13,7 @@
   import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { AUDIT, NOW } from '$lib/record/api.ts';
+  import { AUDIT, NOW, PAGES } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
@@ -37,6 +37,27 @@
   };
 
   const kindOf = (k: string) => KIND[k] ?? { word: k.replace(/[.]/g, ' '), icon: 'doc' as IconName };
+
+  /**
+   * WHO DID IT, IN WORDS. `rule.renewal` and `rule.reply` are declaration ids, and this column is
+   * the answer to "who changed my record" — a question nobody asks in dotted notation. A person and
+   * an agent both arrive as a name and stay one.
+   */
+  const actorOf = (by: string): string => {
+    const rule = /^rule\.(.+)$/.exec(by);
+    return rule ? `the ${rule[1]!.replace(/[._]/g, ' ')} rule` : by;
+  };
+
+  /**
+   * WHAT IT WAS DONE TO. A spoken id stays a spoken id — `services#6` is the product's own way of
+   * naming a row out loud, and `19 §2` is explicit that a row has a number you can say. What does
+   * not stay is `page.money`, which is a DECLARATION id: the page has a title, every other screen
+   * uses it, and this was the one place printing the key instead.
+   */
+  const targetOf = (target: string): string => {
+    const page = /^page\.([a-z0-9_-]+)$/.exec(target);
+    return page ? (PAGES[page[1]!]?.title ?? target) : target;
+  };
 
   /**
    * Where a target goes when you click it.
@@ -67,7 +88,7 @@
     {#each AUDIT as e}
       <li>
         <div class="line line-short">
-          <span class="seq">{e.by}</span>
+          <span class="seq">{actorOf(e.by)}</span>
           <span class="line-main">
             <!-- The target is a LINK, and that is not decoration. This page was a list of spans:
                  nothing in it could be reached by Tab, so the one scrolling container in the app
@@ -76,7 +97,7 @@
                  wanted anyway — an audit line names a row, and the next question is always what
                  that row says now. -->
             <span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
-              <a class="target" href={href(e.target)}>{e.target}</a></span>
+              <a class="target" href={href(e.target)}>{targetOf(e.target)}</a></span>
           </span>
           <span class="line-amount note">{e.note}</span>
           <span class="line-when">{relative(e.at.slice(0, 10), NOW)}</span>
@@ -84,9 +105,12 @@
       </li>
     {/each}
   </ul>
+  <!-- IT EXPLAINED THE DATA MODEL TO SOMEBODY WHO CAME TO SEE WHO CHANGED WHAT. "The log and the
+       version are the same fact, so a version number is a place in this list" is true, and it is a
+       sentence about how the record is built. What a reader needs from the number is what it is
+       FOR: it is how you name a moment when you talk to somebody about it. -->
   <p class="foot">
-    Version {AUDIT[0]?.version.toLocaleString('en')}. The log and the version are the same fact, so
-    a version number is a place in this list.
+    {copy.auditVersion(AUDIT[0]?.version.toLocaleString('en') ?? '—')}
   </p>
 </div>
 

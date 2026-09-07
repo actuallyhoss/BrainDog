@@ -65,29 +65,38 @@
 
               {#if item.suggestion}
                 <div class="pattern">
+                  <!-- IT WAS A DSL STRING UNDER THE HIGHEST-EMPHASIS CONTROL ON THE PAGE.
+                       `services where provider is Fenwick Cloud → set renews`, in a code block, on
+                       day one, beside a red primary button — so the loudest thing on the screen was
+                       a language nobody has been taught. `claimed` and `pattern` are the schema's
+                       words too; what a person is being offered is a rule that files the next one
+                       like this without asking. -->
                   <p class="pattern-head">
                     <Icon name="filter" size="s" />
-                    A pattern that would have claimed this
+                    {copy.ruleOffer}
                   </p>
-                  <code class="pattern-code">{item.suggestion}</code>
+                  <p class="pattern-said">{item.suggestion}</p>
                   <div class="pattern-actions">
-                    <Button weight="primary" onclick={() => toasts.push(copy.notWritten('The rule would be written and tested against the last 30 days'), { intent: 'warn' })}>Make it a rule</Button>
+                    <Button weight="primary" onclick={() => toasts.push(copy.notWritten('The rule would be written and tested against the last 30 days'), { intent: 'warn' })}>{copy.makeRule}</Button>
                     <Button
                       weight="bare"
                       onclick={() => toasts.push(copy.notWritten('This arrival would be left for a different pattern'))}
-                    >Not this one</Button>
+                    >{copy.notThisOne}</Button>
                   </div>
                 </div>
-              {:else}
-                <p class="no-pattern">No pattern fits this one. Turn it into a row by hand, or leave it.</p>
               {/if}
+              <!-- THE PROSE THAT WAS HERE RESTATED THE TWO BUTTONS BELOW IT, and mismapped one:
+                   "or leave it" reads as doing nothing, and the control it pointed at was `Archive`,
+                   which has a consequence. The buttons are the instruction. -->
 
               <div class="actions">
-                <Button onclick={() => toasts.push(copy.notWritten('A row would be created from this arrival'), { intent: 'warn' })}>Create a row</Button>
+                <Button onclick={() => toasts.push(copy.notWritten('A row would be created from this arrival'), { intent: 'warn' })}
+                  >{copy.fileIt}</Button
+                >
                 <Button
                   weight="bare"
                   onclick={() => toasts.push(copy.notWritten('This arrival would be archived, and its bytes kept'))}
-                >Archive</Button>
+                >{copy.archiveArrival}</Button>
               </div>
             </div>
           {/if}
@@ -156,14 +165,18 @@
   }
 
   /* Ink, not the accent. This is the rule the record is offering to write — a thing to READ and
-     agree with — and a line of red monospace is the universal shape of a stack trace. The accent is
-     spent on the button beside it, which is the part that is actually a decision. */
-  .pattern-code {
+     agree with — and the accent is spent on the button beside it, which is the part that is
+     actually a decision.
+
+     AND NOT MONOSPACE EITHER. It was a `<code>` block carrying `services where provider is Fenwick
+     Cloud → set renews`: a language, set in the face this product reserves for ids, under the
+     loudest control on the screen, on day one. What it says is a sentence, so it is set as one. */
+  .pattern-said {
     display: block;
     margin-block: var(--sp-2);
     color: var(--ink);
-    font-family: var(--font-id);
     font-size: var(--t-ui);
+    line-height: 1.55;
   }
 
   .pattern-actions,
@@ -171,12 +184,6 @@
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
-  }
-
-  .no-pattern {
-    margin-block-start: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-ui);
   }
 
   @media (width < 900px) {

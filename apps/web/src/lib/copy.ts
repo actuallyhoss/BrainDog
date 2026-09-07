@@ -305,6 +305,17 @@ export const copy = {
   tryAgain: 'Load it again',
   addOne: 'Add the first row',
   addTheRow: 'Add the row',
+  /* THE INBOX. `pattern` and `claimed` are the schema's words for a thing a person would call a
+     rule, and what they are being offered is not a pattern — it is what happens to the NEXT one. */
+  ruleOffer: 'A rule that would have filed this, and the next one like it',
+  makeRule: 'Make it a rule',
+  notThisOne: 'Leave it for another rule',
+  fileIt: 'File it as a row',
+  archiveArrival: 'Archive the arrival',
+  /* WHAT THE VERSION IS FOR, rather than what it is. Every change moves it by one, so it names a
+     moment — which is the only thing anybody does with it. */
+  auditVersion: (n: string): string =>
+    `This record is at version ${n}. Every change moves it by one, so a version is a way of naming a moment.`,
   goBack: 'Choose something else',
   editRow: 'Edit the row',
   stopRun: 'Stop the run',
