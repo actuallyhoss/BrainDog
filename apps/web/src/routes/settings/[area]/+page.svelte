@@ -677,19 +677,53 @@
         </div>
       </Section>
     {:else if area === 'export'}
-      <Section title="Your data">
+      <Section title={copy.yourData}>
         <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
-             product's central promise: take your record and go. They say what they would do. -->
+             product's central promise: take your record and go. They say what they would do.
+
+             AND ONE OF THEM DESCRIBED THE WRONG FILE. It read "written to a .dog file, LINE PER
+             ROW", which welds together the two containers `03 §2.1` keeps in separate columns: a
+             `.dog` is a SQLite database you open with `sqlite3` and no SDK, and a `.dogl` is the
+             canonical logical dump — one JSON row per line — that the record streams out of a
+             Durable Object in pages. Both are signed over the same manifest, which is why `verify`
+             and `import` take either; they are not the same artefact and the sentence made `.dog`
+             sound like a text format. -->
+        <p class="hint">{copy.exportWhat}</p>
         <div class="row-actions">
           <Button
             onclick={() =>
-              toasts.push(copy.notWritten('The whole record would be written to a .dog file, line per row'))}
+              toasts.push(copy.notWritten('The whole record would be written to one .dog file — a SQLite database you can open with sqlite3'))}
           >{copy.export}</Button>
           <Button
             weight="bare"
             onclick={() =>
-              toasts.push(copy.notWritten('A .dog file would be checked against its own manifest and signature'))}
+              toasts.push(copy.notWritten('A .dog or .dogl file would be checked against its own manifest and signature'))}
           >{copy.verifyFile}</Button>
+        </div>
+      </Section>
+
+      <!-- AND THE SLICE, WHICH IS A DIFFERENT FILE FOR A DIFFERENT JOB.
+
+           `03 §1`: the three layers are addressable independently, and that is what makes the useful
+           operations cheap — "export data without origin (a clean handover), export origin without
+           data (an audit), export governance alone (share a way of working — THAT IS A PACK)."
+
+           The screen offered one button for the whole record and nothing for the other three, so the
+           only exit this product appeared to have was all-or-nothing. A pack is the readable-text
+           half: your lists, pages, metrics and rules without a single row of your business in it. -->
+      <Section title={copy.takeAway}>
+        <p class="hint">{copy.takeAwayWhat}</p>
+        <div class="row-actions">
+          <Button
+            weight="quiet"
+            onclick={() =>
+              toasts.push(copy.notWritten('Your lists, pages, metrics and rules would be written as one readable pack, with none of your rows in it'))}
+          >{copy.exportPack}</Button>
+          <Button
+            weight="bare"
+            onclick={() =>
+              toasts.push(copy.notWritten('The rows would be written without where each one came from — a clean handover'))}
+          >{copy.exportRows}</Button>
         </div>
       </Section>
       <!-- `Danger` IS A ONE-WORD HEADING THAT STATES NO FACT, over a line saying `Delete this

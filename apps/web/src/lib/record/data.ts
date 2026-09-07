@@ -165,12 +165,12 @@ export const INBOX: InboxItem[] = [
    deliberate and audited, and the backup benefit and the exfiltration path are the same object. */
 
 export const VAULT: Credential[] = [
-  { id: 'cr_01', label: 'Fenwick deploy key', opens: 'Workers deploys for kiln.example', kind: 'api key', rotated: day(-214), stale: true },
-  { id: 'cr_02', label: 'Nordhaven API', opens: 'DNS for five domains', kind: 'api key', rotated: day(-41) },
-  { id: 'cr_03', label: 'Ledger Post sending key', opens: 'Newsletter delivery for Portage', kind: 'api key', rotated: day(-12) },
-  { id: 'cr_04', label: 'Tallyard bookkeeping', opens: 'Read-only ledger export', kind: 'oauth', rotated: day(-88) },
-  { id: 'cr_05', label: 'Object storage, write', opens: 'Font binaries bucket', kind: 'api key', rotated: day(-303), stale: true },
-  { id: 'cr_06', label: 'Kestrel ingest', opens: 'Error reports from kiln.example', kind: 'token', rotated: day(-64) },
+  { id: 'cr_01', label: 'Fenwick deploy key', opens: 'Workers deploys for kiln.example', kind: 'api_token', rotated: day(-214), stale: true },
+  { id: 'cr_02', label: 'Nordhaven API', opens: 'DNS for five domains', kind: 'api_token', rotated: day(-41) },
+  { id: 'cr_03', label: 'Ledger Post sending key', opens: 'Newsletter delivery for Portage', kind: 'api_token', rotated: day(-12) },
+  { id: 'cr_04', label: 'Tallyard bookkeeping', opens: 'Read-only ledger export', kind: 'password', rotated: day(-88) },
+  { id: 'cr_05', label: 'Object storage, write', opens: 'Font binaries bucket', kind: 'ssh_key', rotated: day(-303), stale: true },
+  { id: 'cr_06', label: 'Kestrel ingest', opens: 'Error reports from kiln.example', kind: 'api_token', rotated: day(-64) },
 ];
 
 /* ── packs ───────────────────────────────────────────────────────────────── */

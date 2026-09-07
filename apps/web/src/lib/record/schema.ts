@@ -294,12 +294,31 @@ export type InboxItem = {
   suggestion?: string;
 };
 
+/**
+ * What a vault row can hold, closed at five: `12 §6`'s prose and the `CHECK` in `30 §1`'s DDL.
+ *
+ * `kind` WAS `string`, AND THREE OF THE SIX SEEDED ROWS WERE OUTSIDE THE LIST. They read `api key`,
+ * `oauth` and `token`:
+ *
+ *   - `api key` is not a value — the value is `api_token`, and "API key" also uses the word `19 §9`
+ *     bans on this exact screen.
+ *   - `oauth` is not a `grant.kind` AT ALL. It belongs to `auth.kind`, the connector's eight
+ *     (`25 §5.2`: `none · bearer · basic · header · query_param · oauth2_refresh · jwt_rs256 ·
+ *     aws_sigv4`), which describes how a CONNECTOR authenticates rather than what a vault row holds.
+ *     Two enums, one screen, and the wrong one printed.
+ *   - `token` is a `device_grant.reach` value (`02 §1`), from a third table.
+ *
+ * A closed list typed as `string` is a closed list nothing closes.
+ */
+export const CREDENTIAL_KINDS = ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'] as const;
+export type CredentialKind = (typeof CREDENTIAL_KINDS)[number];
+
 export type Credential = {
   id: string;
   label: string;
   /** What it OPENS. The register indexes that and never the value itself. */
   opens: string;
-  kind: string;
+  kind: CredentialKind;
   rotated: string;
   /** Days since rotation, past which the record says so. */
   stale?: boolean;

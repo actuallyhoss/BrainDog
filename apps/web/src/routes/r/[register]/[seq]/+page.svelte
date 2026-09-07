@@ -85,9 +85,11 @@
 
 {#if !decl || !row}
   <div class="page">
-    <!-- A URL naming a row that is not there is a MISS, not a failure: nothing broke, the address is
-         just wrong. `error` is reserved for a call that did not come back. -->
-    <Empty kind="no-results" heading title="Couldn't find {id}#{seq}." rid="r7k2m9qd4x">
+    <!-- A URL NAMING A ROW THAT IS NOT THERE IS A REFUSAL. Nothing broke, so there is no request
+         id to quote; no filter ran, so "nothing matched" describes something that did not happen.
+         It names the number, because `19 §642` is that a row "has a number you can say" and this is
+         the screen where saying it did not work. -->
+    <Empty kind="error" heading title={decl ? copy.noSuchNumber(decl.one, seq) : copy.noSuch('list', id)}>
       {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
     </Empty>
   </div>

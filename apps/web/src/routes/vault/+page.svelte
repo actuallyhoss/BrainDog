@@ -31,7 +31,9 @@
 
 <PageHead icon="vault" title={copy.vault} count={VAULT.length}>
   {#snippet actions()}
-    {#if stale}<Chip label="{stale} not rotated in six months" tone="warn" />{/if}
+    <!-- ONE SENTENCE, FROM ONE PLACE. This was typed here AND sat unrendered in `copy.ts` as
+         `staleKey` — the same fact written twice, with the reviewable copy the dead one. -->
+    {#if stale}<Chip label={copy.staleCount(stale)} tone="warn" />{/if}
   {/snippet}
 </PageHead>
 
@@ -45,7 +47,9 @@
     {#each VAULT as c}
       <li>
         <div class="line">
-          <span class="seq">{c.kind}</span>
+          <!-- THE KIND AS A READER SAYS IT. `api_token` is what the column holds; `12 §6` closes
+               the list at five and `19 §9` bans the word this screen used for three of them. -->
+          <span class="seq">{copy.credentialKinds[c.kind] ?? c.kind}</span>
           <span class="line-main">
             <span class="line-title">{c.label}</span>
             <span class="line-detail">{copy.opens}: {c.opens}</span>
@@ -73,6 +77,11 @@
             {#if c.stale}
               <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
             {/if}
+            <!-- THE COLUMN SAYS WHAT THE DATE IS. "14 months ago" beside a credential label is a
+                 date with no noun: rotated? created? last opened? All three are on this row's DDL
+                 (`12 §6`) and only one is on screen. `copy.rotated` existed for this and rendered
+                 nowhere. -->
+            <span class="rotated-key">{copy.rotated}</span>
             {relative(c.rotated, NOW)}
           </span>
         </div>
@@ -87,6 +96,11 @@
 </div>
 
 <style>
+  .rotated-key {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
   /* One sentence saying what the things on this screen are, in the person's words. */
   .blurb {
     margin-block-end: var(--sp-4);

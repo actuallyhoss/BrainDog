@@ -24,7 +24,7 @@
   import * as pref from '$lib/pref.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { iconFor, PAGES, REGISTERS, columnsFor, display, dirOf, entry, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { iconFor, PAGES, REGISTERS, columnsFor, display, dirOf, entry, heldBy, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -542,7 +542,17 @@
 
 {#if !decl}
   <div class="page">
-    <Empty kind="error" heading title="Couldn't load {id}." rid="r7k2m9qd4x">
+    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
+         the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
+         no filter ran, so "nothing matched" is about something that did not happen. It names the
+         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
+         teacher. -->
+    <Empty
+      kind="error"
+      heading
+      title={copy.noSuch('list', id)}
+      body={copy.theseExist('Lists', Object.values(REGISTERS).map((r) => r.name))}
+    >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>
@@ -579,7 +589,13 @@
          run it stood over the one row somebody had just typed. -->
     <!-- AND ON THE RUN SCREEN TWO IS ABOUT, IT COMES FIRST. -->
     {#if arriving}
-      <Second held={Object.keys(REGISTERS)} register={id} first />
+      <!-- ON THE ARRIVAL ITSELF, THE ONLY LIST WITH ANYTHING IN IT IS THIS ONE.
+
+           `?first=1` is a claim about the moment: somebody has just written their first row and been
+           sent here. `19 §6` calls this screen "the register, with their one row in it" — so on a
+           genuine first run `held` is one register, and it is this one. Passing the seeded record's
+           eight would describe a record that person does not have. -->
+      <Second held={[id]} register={id} first />
     {/if}
 
     {#if siftable || q || filters.length}
@@ -829,7 +845,10 @@
        put it below however many rows the register holds, which on any record with history is a
        scroll away from the row it is talking about. -->
   {#if !arriving}
-    <Second held={Object.keys(REGISTERS)} register={id} first={false} />
+    <!-- AND OFF IT, THE CONDITION IS THE RECORD'S OWN SHAPE: registers that HOLD something. It was
+         `Object.keys(REGISTERS)` — every register declared, whether or not a row had ever been
+         written to it — which is the count that made this unreachable. -->
+    <Second held={Object.keys(REGISTERS).filter((r) => heldBy(r) > 0)} register={id} first={false} />
   {/if}
 
   <!-- Peek: a drawer, with the list still visible, for triage. It needs a VISIBLE affordance —

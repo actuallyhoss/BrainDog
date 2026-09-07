@@ -30,7 +30,15 @@
 
   /* THE OTHER STARTERS, and only the ones this record does not already have. Offering a register
      somebody holds is offering to do something that is already done, which is the shape of every
-     onboarding people learn to ignore. */
+     onboarding people learn to ignore.
+
+     `held` IS REGISTERS WITH SOMETHING IN THEM, and the call site was passing every register the
+     record DECLARES. The seed declares all eight, five of which are exactly the five starter keys —
+     so `rest` was empty on every possible record, `show` was false for the life of the build, and
+     screen two could not render at all. With it went `secondHeading`, `secondBody` and
+     `secondPacks`: the only place in the product that says what a PACK is.
+
+     A declared register with no rows in it is precisely the one worth offering. */
   const rest = $derived(firstRun.firstChoices.filter((c) => c.key !== register && !held.includes(c.key)));
 
   /**

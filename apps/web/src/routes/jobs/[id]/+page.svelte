@@ -39,10 +39,13 @@
 <svelte:head><title>{titleOf(JOB?.kind ?? 'Job', 'Job')}</title></svelte:head>
 
 {#if !JOB}
-  <!-- A URL naming a run that is not here is a MISS, not a failure: nothing broke, the address is
-       just wrong. `error` is reserved for a call that did not come back. -->
   <div class="page">
-    <Empty kind="no-results" heading title="Couldn't find {route.params.id}." rid="r7k2m9qd4x">
+    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
+         the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
+         no filter ran, so "nothing matched" is about something that did not happen. It names the
+         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
+         teacher. -->
+    <Empty kind="error" heading title={copy.noSuch('run', String(route.params.id))}>
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>

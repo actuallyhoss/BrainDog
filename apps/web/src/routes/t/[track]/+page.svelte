@@ -65,7 +65,12 @@
 
 {#if !track}
   <div class="page">
-    <Empty kind="no-results" heading title="No track with that number." rid="r7k2m9qd4x">
+    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
+         the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
+         no filter ran, so "nothing matched" is about something that did not happen. It names the
+         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
+         teacher. -->
+    <Empty kind="error" heading title={copy.noSuch('track', String(route.params.track))}>
       {#snippet actions()}
         <Button weight="primary" href="/r/tracks">Open Tracks</Button>
       {/snippet}

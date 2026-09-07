@@ -63,7 +63,17 @@
 
 {#if !view || !decl}
   <div class="page">
-    <Empty kind="error" heading title="No view called {key}." body="That saved view no longer exists." rid="r7k2m9qd4x">
+    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
+         the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
+         no filter ran, so "nothing matched" is about something that did not happen. It names the
+         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
+         teacher. -->
+    <Empty
+      kind="error"
+      heading
+      title={copy.noSuch('saved view', key)}
+      body={copy.theseExist('Saved views', Object.values(VIEWS).map((v) => v.name))}
+    >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>

@@ -3,6 +3,12 @@
   import { copy } from '$lib/copy.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import { rid } from '$lib/data/call.ts';
+
+  /* MINTED ONCE, WHEN THIS SCREEN EXISTS, and not on every render. The id names one failure; a
+     `$derived` would hand a person a different string each time something on the page changed,
+     which is the one way to make a quotable id worse than none. */
+  const requestId = rid();
 </script>
 
 <div class="page">
@@ -28,7 +34,14 @@
       {/snippet}
     </Empty>
   {:else}
-    <Empty kind="error" title={copy.screenFailed} body={copy.screenFailedBody} rid="r7k2m9qd4x">
+    <!-- AND THE ONE ID IN THE PRODUCT THAT IS REAL. `50 §2.5` mints it client-side — ten base32
+         characters from `crypto.getRandomValues` — and sends it as `X-Request-Id` so both hosts can
+         echo and log it. It was the literal `r7k2m9qd4x` at eight call sites, identical on every
+         screen that could fail: two different failures quoting one id, and an id that identifies
+         nothing is the worst thing to put on an error screen, because it is the one string there
+         that has to mean something. Seven of those eight sites were not failures at all and no
+         longer offer one. -->
+    <Empty kind="error" title={copy.screenFailed} body={copy.screenFailedBody} rid={requestId}>
       {#snippet actions()}
         <Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>
         <Button href="/">{copy.home}</Button>

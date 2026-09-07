@@ -18,7 +18,7 @@
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
-  import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, values, type BlockResult } from '$lib/record/api.ts';
+  import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
   import { draw, saidPlainly } from '$lib/record/blocks.ts';
   import { registerHref } from '$lib/record/where.ts';
   import type { PageBlock, PageDecl } from '$lib/record/schema.ts';
@@ -418,7 +418,17 @@
 
 {#if !result}
   <div class="page">
-    <Empty kind="error" heading title="Couldn't load {slug}." rid="r7k2m9qd4x">
+    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
+         the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
+         no filter ran, so "nothing matched" is about something that did not happen. It names the
+         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
+         teacher. -->
+    <Empty
+      kind="error"
+      heading
+      title={copy.noSuch('page', slug)}
+      body={copy.theseExist('Pages', Object.values(readPages()).map((p) => p.title))}
+    >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>

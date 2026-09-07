@@ -362,13 +362,38 @@ export const copy = {
   pages: 'Pages and lists',
   askBrainDog: 'Ask BrainDog',
 
-  /* the vault */
-  vaultBlurb: 'What each key opens, and when each was last rotated. The value is never shown here.',
+  /**
+   * THE VAULT, AND THE ONE WORD IT MAY NOT USE.
+   *
+   * `19 §9` bans `key` outright — "say **field**" — and in the same table renames this screen's row
+   * to **credential**, with the reason spelled out: "Not `key`, which this same table bans because
+   * it means a JSON key." This blurb said `key` and the whole screen never said `credential` once.
+   *
+   * Two documents still say the wrong thing and will keep saying it: `19 §2`'s screen inventory
+   * ("What each key opens") and `50 §2.2` ("what each key opens"). `19 §9` is the later, explicit
+   * correction and names the collision it is fixing, so it wins.
+   *
+   * IT IS A DISPLAY RENAME ONLY. `grant`, `grant.read` and `grant.kind` stay as they are in the
+   * schema, the API and the `.dog` — `19 §9` again: "renaming a column to improve a label is how a
+   * spoken id stops resolving."
+   */
+  vaultBlurb: 'What each credential opens, and when each was last rotated. The value is never shown here.',
   opens: 'Opens',
   rotated: 'Rotated',
   reveal: 'Reveal once',
   revealWarning: 'Revealing is recorded in the audit log with your name on it.',
-  staleKey: 'Not rotated in over six months.',
+  /* `n` NOT ROTATED, said once. It was a hardcoded literal in the markup with this string sitting
+     unrendered beside it — two sentences about one fact, and the one in `copy.ts` unreachable. */
+  staleCount: (n: number) => `${n} not rotated in six months`,
+  /* The five of `12 §6` and `30 §1`'s CHECK, as a reader says them rather than as the column
+     stores them. `50 §10`'s precedent: "field labels are ids with `_` as a space." */
+  credentialKinds: {
+    api_token: 'API token',
+    password: 'Password',
+    ssh_key: 'SSH key',
+    recovery_codes: 'Recovery codes',
+    note: 'Note',
+  } as Record<string, string>,
 
   /* packs */
   installed: 'Installed',
@@ -527,6 +552,41 @@ export const copy = {
   lockout: 'After too many tries',
   /* `49 §5.5`: ten strikes, fifteen minutes, sticky, fail-closed. */
   lockoutHow: 'Ten failed attempts locks sign-in for fifteen minutes. Waiting is the only way through it.',
+
+  /**
+   * A URL THAT NAMES SOMETHING THIS RECORD DOES NOT HAVE.
+   *
+   * It was dressed two ways across eight routes: four said "Couldn't load nope." with a request id,
+   * which is `error` — "it failed. Say what, once" — and nothing failed; four said "Couldn't find
+   * nope." as `no-results`, which `19 §6` defines as "a filter matched nothing" and no filter ran.
+   * Neither is what happened, and the same fact read as two different kinds of wrong.
+   *
+   * IT IS A REFUSAL, AND THE KERNEL ALREADY HAS THE SENTENCE: `There is no register called nope.`
+   * with the allowed list beside it. `13 §6` renders a `fix` verbatim and `10 §7`'s fourth rule is
+   * that the refusal is the teacher — so it names the thing, says it does not exist, and lists what
+   * does. No request id: `50 §13 D11` makes that the copyable id of a call that failed, and there
+   * was no call.
+   */
+  noSuch: (kind: string, name: string) => `There is no ${kind} called ${name}.`,
+  /* A ROW IS NAMED BY ITS NUMBER, and "no obligation CALLED #9999" is not English. `19 §642`: a row
+     "has a number you can say" — so the sentence says it the way somebody would. */
+  noSuchNumber: (one: string, seq: number | string) => `There is no ${one} #${seq}.`,
+  theseExist: (kind: string, names: readonly string[]) =>
+    `${kind} on this record: ${names.join(' · ')}.`,
+
+  /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */
+  yourData: 'The whole record',
+  /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`). Saying so is the difference between
+     a promise and a checkable fact: `sqlite3 portfolio.dog "select …"` works with no SDK, no import
+     step and no reader of ours. */
+  exportWhat:
+    'One .dog file: a SQLite database you can open with sqlite3, or anything that reads one. No import step, no reader of ours.',
+  /* `03 §1`: the three layers are addressable independently, and the governance layer alone IS a
+     pack. A product whose only exit is all-or-nothing has three exits it is not offering. */
+  takeAway: 'Part of it',
+  takeAwayWhat: 'The way you work and the rows you have written are separate things, and either can leave on its own.',
+  exportPack: 'Export the way you work',
+  exportRows: 'Export the rows only',
 
   /* identity — `33 §10`: login is account-level, so this lives outside the record */
   you: 'You',

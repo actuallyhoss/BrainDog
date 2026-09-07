@@ -64,13 +64,28 @@
 
   let choices = $state<HTMLDivElement | undefined>(undefined);
 
-  /* THE FORM PUTS ITS OWN CARET IN NOW. This held a `field` binding nothing ever bound — the form
-     below is generated from the declaration, so the page cannot reach its first input — and the
-     `focus()` was a no-op for the life of the screen. `RowForm`'s `autofocus` does it from inside,
-     where the first control is. */
-  function pick(key: string) {
-    picked = key;
-  }
+  /* THE FORM PUTS ITS OWN CARET IN. This screen used to hold a `field` binding nothing ever bound —
+     the form below is generated from the declaration, so the page cannot reach its first input — and
+     the `focus()` was a no-op for its whole life. `RowForm`'s `autofocus` does it from inside, where
+     the first control is. */
+
+  /**
+   * CHOOSING A CARD IS A NAVIGATION, and it was a variable.
+   *
+   * Both first-run screens lived at `/start` with the choice in component state, so the FIRST screen
+   * of the product broke the browser two ways at once. Back from the form left `/start` entirely and
+   * landed on `/` — a stranger's fully populated record, nineteen controls, on somebody's first
+   * thirty seconds. Reload went to screen one and threw away the row they had typed.
+   *
+   * THE ADDRESS ALREADY EXISTED. `?add=<register>` is read below, honoured once per value, and
+   * accepts the word on the tile as well as the register id — screen two's own cards navigate to it.
+   * The five cards on screen one were the only thing that reached the form without it.
+   *
+   * `19 §5`'s rule decides it: what defines WHICH SCREEN YOU ARE LOOKING AT belongs in the URL. The
+   * caret, the typed values and the validation stay where they are, because those are about the
+   * moment rather than the place.
+   */
+  const choose = (key: string) => void goto(`/start?add=${key}`, { keepFocus: true });
 
   /**
    * `/start?add=<register>` LANDS ON THAT REGISTER'S FORM.
@@ -110,12 +125,18 @@
    */
   let honoured: string | null = null;
 
+  /* AND IT MIRRORS THE ADDRESS BOTH WAYS, which is the half that makes Back mean anything.
+     
+     It only ever SET the choice, so leaving `?add=` behind — the browser's Back, or this screen's
+     own — changed the URL and left the form on screen: you were at `/start`, looking at the second
+     screen, with no way to the first except pressing Back again into whatever came before the
+     product. An unknown key resets too, because a register the choice list does not carry has no
+     question written for it and screen one is the honest landing. */
   $effect(() => {
     const asked = page.url.searchParams.get('add');
     if (asked === honoured) return;
     honoured = asked;
-    const found = asked ? addKey(asked, CHOICES) : undefined;
-    if (found) pick(found);
+    picked = (asked ? addKey(asked, CHOICES) : undefined) ?? null;
   });
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
@@ -174,7 +195,7 @@
                explained to somebody who has not agreed to learn it yet, on the one screen where
                they have the least reason to care, and it made five plain choices look like a
                schema review. The glyph does the work the id was pretending to do. -->
-          <button type="button" class="choice" data-lit={lit === i ? '' : undefined} onclick={() => pick(c.key)}>
+          <button type="button" class="choice" data-lit={lit === i ? '' : undefined} onclick={() => choose(c.key)}>
             <span class="choice-icon"><Icon name={c.icon as IconName} size="m" /></span>
             <span class="choice-main">
               <span class="choice-label">{c.label}</span>
@@ -250,7 +271,9 @@
             disabled={problems.length > 0}
             aria-describedby={problems.length > 0 ? 'first-why' : undefined}>{copy.addTheRow}</Button
           >
-          <Button weight="bare" onclick={() => (picked = null)}>{copy.goBack}</Button>
+          <!-- BACK IS A NAVIGATION TOO, so the browser's own Back and this button end up in the
+               same place instead of disagreeing about where "back" is. -->
+          <Button weight="bare" onclick={() => void goto('/start')}>{copy.goBack}</Button>
         </div>
       </form>
 

@@ -141,7 +141,12 @@
 
 {#if !question}
   <div class="page">
-    <Empty kind="no-results" heading title="Couldn't find {page.params.id}." rid="r7k2m9qd4x">
+    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
+         the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
+         no filter ran, so "nothing matched" is about something that did not happen. It names the
+         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
+         teacher. -->
+    <Empty kind="error" heading title={copy.noSuch('question', String(page.params.id))}>
       {#snippet actions()}<Button href="/decide">Back to Decide</Button>{/snippet}
     </Empty>
   </div>
