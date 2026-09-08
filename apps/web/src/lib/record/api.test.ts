@@ -486,7 +486,7 @@ test('THE CUT IS TAKEN ACROSS THE SOURCES, NOT INSIDE THE FIRST ONE', () => {
   // Typing `re` returned 8 hits, all Obligations, out of 21 across six other sources, and nothing on
   // screen said the list was partial. `tasks` is last in declaration order, so it was lost most.
   for (const q of ['re', 'in', 'a']) {
-    const hits = search(q, 8);
+    const { hits } = search(q, 8);
     const sources = new Set(hits.map((h) => h.kind));
     assert.ok(hits.length > 0, `${q} found nothing`);
     assert.ok(sources.size >= 4, `${q}: 8 hits came from ${sources.size} source(s): ${[...sources].join(', ')}`);
@@ -496,17 +496,24 @@ test('THE CUT IS TAKEN ACROSS THE SOURCES, NOT INSIDE THE FIRST ONE', () => {
 test('a source with more matches than the cap costs the others one slot, not all of them', () => {
   const all = search('a', 9999);
   const byKind = new Map<string, number>();
-  for (const h of all) byKind.set(h.kind, (byKind.get(h.kind) ?? 0) + 1);
+  for (const h of all.hits) byKind.set(h.kind, (byKind.get(h.kind) ?? 0) + 1);
+  /* AND THE GROUPS AGREE WITH THE HITS. `groups` is the same matches kept in their lists rather
+     than interleaved, so their counts must add to the total the palette reports. */
+  assert.equal(all.groups.reduce((n, g) => n + g.total, 0), all.total);
+  assert.equal(all.total, all.hits.length, 'a limit of 9,999 should have held everything');
   const biggest = [...byKind].sort((x, y) => y[1] - x[1])[0];
   assert.ok(biggest && biggest[1] > 8, 'no source has enough matches to swamp the list');
-  const hits = search('a', 8);
+  const { hits } = search('a', 8);
   assert.ok(hits.filter((h) => h.kind === biggest[0]).length <= 2, `${biggest[0]} still took the list`);
 });
 
 test('the cap is honoured, and nothing is returned twice', () => {
-  const hits = search('e', 8);
+  const { hits, total } = search('e', 8);
   assert.equal(hits.length, 8);
   assert.equal(new Set(hits.map((h) => h.href)).size, hits.length);
+  /* AND IT REPORTS WHAT IT CUT. A capped list that cannot say how much it cut is a list with no way
+     past it — which is what the palette was, on the surface `19 §4` makes the primary way to a row. */
+  assert.ok(total > hits.length, `nothing was cut, so the report proves nothing (${total})`);
 });
 
 /* ── a date is not a deadline ────────────────────────────────────────────── */

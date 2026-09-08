@@ -500,6 +500,27 @@ test('nothing MATCHED on a list that HAS rows is still good news', () => {
     assert.equal(reading.rows, 0, 'the predicate was supposed to match nothing');
     assert.ok(reading.held > 0, 'the register was supposed to keep its rows');
     assert.equal(meetsTarget(narrowed, reading.value), true, 'nothing owed is on the right side of "should be nothing"');
+
+    /**
+     * AND THE TILE, WHICH IS WHERE THE GUARD LIVES.
+     *
+     * The first version of this asserted on `read()` and `meetsTarget()` and never called
+     * `metric()` — so swapping `held` for `rows` in `api.ts`, the exact substitution this test is
+     * named for, left the whole suite green. The declaration is put into `METRICS` under its own id
+     * so the tile can be asked for it, because a guard nothing reaches is a guard nothing tests.
+     */
+    const probe = 'probe-nothing-matched';
+    (METRICS as Record<string, MetricDecl>)[probe] = { ...narrowed, metric: probe };
+    try {
+      const tile = metric(probe);
+      assert.ok(
+        tile.tone === 'good' || tile.tone === 'warn',
+        `zero MATCHED on a list that holds rows reported no verdict: ${JSON.stringify(tile)}`,
+      );
+      assert.doesNotMatch(tile.note, /^Nothing in /, `a full list was described as empty: ${tile.note}`);
+    } finally {
+      delete (METRICS as Record<string, MetricDecl>)[probe];
+    }
   } finally {
     ROWS.obligations = kept;
   }

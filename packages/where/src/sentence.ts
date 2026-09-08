@@ -42,7 +42,11 @@ import type { Predicate, Schema } from './index.ts';
 
 const DAY_MS = 86_400_000;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
-const RELATIVE = /^([+-])(\d{1,4})([dwmy])$/;
+/* THREE UNITS, WHICH IS WHAT `34 §1.1`'s EBNF HAS: `unit = "d" | "w" | "m"`. This read `y` and the
+   browser's compiler read three, so `renews before +2y` was refused on screen and resolved to a real
+   date two years out by the parser the MCP surface and every agent talk to — a fourth spelling in
+   the grammar of one of the two implementations, in neither document. */
+const RELATIVE = /^([+-])(\d{1,4})([dwm])$/;
 const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
 /** The temporal literals `02-DATA-MODEL` §6 settled on. Not a set invented here. */
@@ -120,7 +124,7 @@ export function resolveDay(word: string, nowMs: number): string | null {
   if (m[3] === 'd') return iso(nowMs + n * DAY_MS);
   if (m[3] === 'w') return iso(nowMs + n * 7 * DAY_MS);
 
-  const months = m[3] === 'm' ? n : n * 12;
+  const months = n;
   const first = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1, 12));
   const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0, 12)).getUTCDate();
   return iso(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d.getUTCDate(), last), 12));

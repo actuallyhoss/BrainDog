@@ -68,10 +68,13 @@ export const SCROLL_KEYS = ['Space', 'PageDown', 'PageUp'] as const;
 export const BINDINGS: Binding[] = [
   { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the palette', bare: false },
   { id: 'palette-slash', scope: 'document', key: '/', label: 'Open the palette, caret in the query', bare: true },
-  /* NO `g s`, AND THE SHEET SAID THERE WAS. Search is not a place you go — the dispatcher's own
-     comment says so on purpose — and this row printed it anyway, which is the one drift this file's
-     header promises cannot happen. */
-  { id: 'goto', scope: 'document', key: 'g then h d i v p ,', label: 'Go to Home, Decide, Inbox, Vault, Packs, Settings', bare: true },
+  /* `g s` IS BACK, BECAUSE SEARCH BECAME A PLACE YOU GO. This row printed it while nothing bound
+     it, and the fix at the time was to delete the key: *"search is not a place you go, it is the
+     thing under the launcher"* — which was true while the palette was the only search, and which
+     contradicted `19 §2`'s screen inventory and `19 §4`'s own chord list, both of which name
+     `/search?q=`. The palette caps its record hits and now has somewhere to overflow to, so the
+     screen exists and the chord reaches it. */
+  { id: 'goto', scope: 'document', key: 'g then h d i s v p ,', label: 'Go to Home, Decide, Inbox, Search, Vault, Packs, Settings', bare: true },
   { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'The nth item of your nav, in your order', bare: true },
   { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Toggle the sidebar', bare: false },
   { id: 'undo', scope: 'document', key: '⌘Z', label: 'Undo the last change', bare: false },

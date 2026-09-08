@@ -68,8 +68,13 @@
     return { prefix, text: prefix ? raw.slice(1).trim() : raw };
   });
 
+  /* How many rows the record matched, beside how many are drawn. Set inside `rows` so one search
+     runs per keystroke rather than two, and read by the status line below. */
+  let total = 0;
+
   const rows = $derived.by((): Row[] => {
     const { prefix, text } = parsed;
+    total = 0;
     const needle = text.toLowerCase();
     const out: Row[] = [];
 
@@ -121,13 +126,59 @@
        was guarded on a prefix that is not `@`, so typing a colleague's name behind it fell straight
        through to "Nothing matches". The record has a people register; the search already reaches it;
        the only thing missing was the register this prefix narrows to. */
-    if ((prefix === null || prefix === '#' || prefix === '@') && text.length > 1)
-      for (const hit of search(text, 8) as SearchHit[]) {
-        if (prefix === '@' && !hit.href.startsWith(`/r/${PEOPLE}/`)) continue;
+    /**
+     * TWELVE, AND THE NUMBER IS `50 §5.5` STEP 3'S. It asked for eight and printed eight and said
+     * nothing about the rest — and because the round-robin hands one hit per source per round, a
+     * budget of eight across nine sources is frequently one row per list. `search()` reports what
+     * it did not return now, and the row below says so.
+     */
+    if ((prefix === null || prefix === '#' || prefix === '@') && text.length > 1) {
+      const found = search(text, 12);
+      total = found.total;
+      const kept = found.hits.filter((hit) => prefix !== '@' || hit.href.startsWith(`/r/${PEOPLE}/`));
+      for (const hit of kept)
         out.push({ id: `h-${hit.href}`, title: hit.title, detail: hit.detail, href: hit.href, group: copy.records, spoken: hit.spoken, icon: hit.icon });
-      }
+
+      /**
+       * AND THE OVERFLOW IS A ROW, NOT A CAPTION.
+       *
+       * `19 §2` names `/search?q=` a spine screen — *"the structured fallback when the palette's
+       * ranked list was not enough"* — so what is missing has somewhere to go, and a row is how you
+       * get there: it takes the arrow keys and Enter like every other result, which a caption
+       * cannot. The shape already ships in this product at `r/[register]/[seq]`, where a capped
+       * backlink list ends in `All 400 →`.
+       *
+       * `⇥` completes and must never land on it, which it cannot: completion reads `flat[cursor]`
+       * only when the row carries a `title` a query can become, and this one's href is the query.
+       */
+      if (prefix !== '@' && found.total > kept.length)
+        out.push({
+          id: 'all',
+          title: copy.allMatches(found.total, text),
+          detail: '',
+          href: `/search?q=${encodeURIComponent(text)}`,
+          group: copy.records,
+          icon: 'search',
+        });
+    }
 
     return out.slice(0, 20);
+  });
+
+  /**
+   * THE RESULT COUNT, DEBOUNCED, which `13 §7` and `50 §5.5` step 1 both ask for and neither got.
+   *
+   * `13 §7`'s last row: *"a **debounced** `role="status"` for the result count — an undebounced live
+   * region announces on every keystroke and is unusable."* 250 ms is `50 §5.5`'s number. Without it
+   * a screen reader hears a number for every letter typed; without the region at all, which is what
+   * shipped, it hears nothing and the list simply changes underneath.
+   */
+  let announced = $state('');
+
+  $effect(() => {
+    const said = flat.length === 0 ? '' : copy.showingOf(flat.length, total);
+    const t = setTimeout(() => (announced = said), 250);
+    return () => clearTimeout(t);
   });
 
   const groups = $derived.by(() => {
@@ -232,6 +283,10 @@
       for the pointer that has no Esc key. The `<kbd>` stays for the keyboard that does, and hides
       under a coarse pointer where it is advice nobody can take.
     -->
+    <!-- THE COUNT, ANNOUNCED AND VISIBLE. `13 §7` asks for a debounced `role="status"`; a reader who
+         can see the list still benefits from knowing twelve of forty-eight are on screen, and a
+         reader who cannot has nothing else to tell them the list changed. -->
+    <p class="p-count" role="status">{announced}</p>
     <kbd class="p-esc">Esc</kbd>
     <button type="button" class="p-close tap" onclick={() => (open = false)} aria-label={copy.close}>
       <Icon name="close" size="m" />
@@ -283,7 +338,15 @@
   }
 
   @media (pointer: coarse), (width < 640px) {
-    .p-esc {
+    .p-count {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .p-esc {
       display: none;
     }
 

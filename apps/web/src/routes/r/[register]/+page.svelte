@@ -197,8 +197,10 @@
   /**
    * The next page, or nothing.
    *
-   * IT STOPS AT THE CAP, WHICH IS WHAT MAKES THE CAP THE END OF A SEQUENCE rather than a slice. At
-   * two thousand rows `Table` swaps the sentinel for the line that says so, so nothing asks again.
+   * IT STOPS AT THE CAP, WHICH IS WHAT MAKES THE CAP THE END OF A SEQUENCE rather than a slice. The
+   * guard is here rather than in `Table`: an earlier version relied on `Table` swapping its sentinel
+   * for the cap line, which is a count of the rows it was HANDED and therefore wrong the moment a
+   * row is archived — the sentinel stayed, advertising more that this function then refused.
    *
    * A STALE CURSOR STARTS OVER. `list` answers `stale` when the row a cursor names is no longer in
    * the answer, which means the question moved under the reader — and the honest response is the
@@ -209,15 +211,19 @@
     if (loaded >= DOM_CAP) return;
     const next = list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE, cursor });
     if (next.stale) {
-      pages = [list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE }).entries];
-      cursor = null;
+      /* AND IT KEEPS THE NEW CURSOR. Starting over used to set `cursor = null`, which says *this is
+         the whole answer* — so the head dropped its `+` and its "of N", the sentinel disappeared,
+         and the grid sat on two hundred rows claiming two thousand six hundred. The recovery
+         produced exactly the failure `stale` exists to prevent, one step later. */
+      const first = list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE });
+      pages = [first.entries];
+      cursor = first.cursor;
       return;
     }
     pages = [...pages, next.entries];
     cursor = next.cursor;
   }
 
-  const loaded = $derived(pages.reduce((n, p) => n + p.length, 0));
 
   /**
    * The whole answer's SIZE, which is not the same as the rows in hand.
@@ -243,11 +249,33 @@
    */
   const result = $derived({
     ...found,
-    /* THE ROWS IN HAND, not the whole answer. `matched` stays the answer's size, because that is
-       what the head counts and what "38 rows, none matching" is about. */
+    /* THE ROWS IN HAND, not the whole answer. `matched` is the answer's SIZE — what the head counts
+       against, and what "38 rows, none matching" is about. What the head PRINTS while paging is
+       `drawn`, the rows actually on screen; the two were conflated and the head over-reported. */
     entries: pages.flat().filter((e) => !archived.has(e.seq)),
     matched: found.entries.filter((e) => !archived.has(e.seq)).length,
   });
+  /**
+   * THE ROWS IN HAND, WHICH IS NOT THE ROWS FETCHED.
+   *
+   * This summed the raw pages, archived rows included, while `Table` counts what it actually draws —
+   * so archiving three rows on page one left `more()` stopping at 2,000 fetched while the grid held
+   * 1,997. `Table`'s cap never fired, the cap line vanished, the head over-reported by three, and
+   * the sentinel went on advertising more that `more()` refused to fetch. One number, counted the
+   * way the screen counts it.
+   */
+  const loaded = $derived(result.entries.length);
+
+  /**
+   * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
+   *
+   * `more()` stops once `loaded` reaches the cap, and a page is two hundred rows, so it overshoots:
+   * eleven pages minus three archived rows is 2,197 loaded while the grid slices to 2,000. Reporting
+   * `loaded` put "2,197" in the head and "Showing 2,197 of 2,611" in the cap line over two thousand
+   * rows — two numbers describing rows nobody can see. The head and the line both count the grid.
+   */
+  const drawn = $derived(Math.min(loaded, DOM_CAP));
+
   /** Whether the reader is looking at all of it. Everything honest on this screen turns on it. */
   const whole = $derived(cursor === null);
 
@@ -260,7 +288,20 @@
    * and a screen reader told "row 12 of 38" while the grid is still fetching has been told a number
    * that may move under it.
    */
-  const rowCount = $derived(whole ? result.matched : filters.length || q ? -1 : result.total);
+  /**
+   * `-1` MEANS *STILL FETCHING*, WHICH THE CAP IS NOT.
+   *
+   * `50 §5.2` step 4 scopes it precisely: *"`-1` while filtered **and paging**"*. At the cap the
+   * walk has stopped and the count is known, so `-1` there tells a screen reader the total is
+   * unknowable when the line beside it prints the number. `settled` is the honest test: the answer
+   * is whole, or the grid has reached the cap and will not grow.
+   *
+   * And `matched` rather than `total` on the other branch: archiving here is page-local and the
+   * record still holds every row, but `aria-rowcount` describes THIS GRID, which has stopped drawing
+   * the archived ones. It read 2,614 over 2,611 rows.
+   */
+  const settled = $derived(whole || drawn >= DOM_CAP);
+  const rowCount = $derived(settled ? result.matched : filters.length || q ? -1 : result.matched);
 
   /**
    * THE SENTINEL, AND THE OBSERVER `50 §5.2` STEP 4 SPECIFIES.
@@ -280,6 +321,27 @@
   let body = $state<HTMLElement | undefined>(undefined);
 
   $effect(() => {
+    /**
+     * EVERY REASON THE SENTINEL COULD HAVE MOVED, READ ON PURPOSE.
+     *
+     * The only reactive read here was `body`, which is bound to the wrapper holding BOTH bodies and
+     * therefore never changes — so this effect ran exactly once, for the life of the page, holding
+     * whichever node existed at mount.
+     *
+     * Two ways that broke, both measured and both permanent. Navigating `/r/obligations` →
+     * `/r/services` (16 rows, no sentinel) → back reuses the component across the `[register]` param:
+     * the observed node left the document, a new sentinel was built, nobody watched it, and the
+     * reader sat on 200 of 2,614 under a head reading `200+` with a sentinel that did nothing.
+     * Crossing 640px did the same thing, in both directions, because the two bodies are separate
+     * elements now.
+     *
+     * `id`, `whole`, `loaded` and `rowsAsCards()` are the four facts that decide whether a sentinel
+     * exists and which element it is. Reading them makes the subscription follow it.
+     */
+    void id;
+    void whole;
+    void loaded;
+    void rowsAsCards();
     const el = body?.querySelector('.sentinel');
     if (!el) return;
     /* THE ROOT IS THE APP'S SCROLLER, NOT THE VIEWPORT. `+layout.svelte` makes `#main` "the ONE
@@ -417,6 +479,33 @@
     const next = new URLSearchParams(page.url.searchParams);
     mutate(next);
     goto(`?${next}`, { replaceState: false, noScroll: true, keepFocus: true });
+  }
+
+  /**
+   * TYPING IS NOT NAVIGATING, and this box was pushing a history entry per keystroke.
+   *
+   * `19 §5` says it in as many words: *"`pushState` for discrete intent so Back undoes a filter,
+   * **throttled `replaceState` for typing**"*. Pressing a chip is intent — you decided to narrow
+   * the list and Back should undo that decision. Typing `overdue` is one decision spelled over seven
+   * keystrokes, and it left seven entries, so Back became a character-by-character rewind of
+   * something nobody thinks of as navigation.
+   *
+   * THE THROTTLE ALSO PAYS FOR ITSELF ON THE OTHER SIDE. Every keystroke re-ran `applyFilters`,
+   * which formats every field of every row through `display()`; at five thousand rows that is seven
+   * full scans for one word. Scoping the scan to the register's declared search fields is the real
+   * fix and needs a `search:` key the declaration does not have yet — filed — but not doing it seven
+   * times is free.
+   */
+  let typing: ReturnType<typeof setTimeout> | undefined;
+
+  function setQuery(value: string) {
+    clearTimeout(typing);
+    typing = setTimeout(() => {
+      const next = new URLSearchParams(page.url.searchParams);
+      if (value) next.set('q', value);
+      else next.delete('q');
+      goto(`?${next}`, { replaceState: true, noScroll: true, keepFocus: true });
+    }, 150);
   }
 
 /**
@@ -752,8 +841,8 @@
        for it, which is what "in the sentence that needs it" means. -->
   <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
-    count={whole ? result.matched : loaded}
-    atLeast={!whole && loaded < DOM_CAP}
+    count={whole ? result.matched : drawn}
+    atLeast={!whole && drawn < DOM_CAP}
     total={result.total}
     define="list"
   >
@@ -802,11 +891,7 @@
           aria-label={copy.searchIn(decl.name)}
           placeholder="Search {decl.name.toLowerCase()}"
           value={q}
-          oninput={(e) => setParam((p) => {
-            const v = (e.currentTarget as HTMLInputElement).value;
-            if (v) p.set('q', v);
-            else p.delete('q');
-          })}
+          oninput={(e) => setQuery((e.currentTarget as HTMLInputElement).value)}
         />
       </label>
 
@@ -1028,13 +1113,7 @@
       <!-- AND THE CAP LINE COMES WITH THE BODY. `Table` draws its own outside the grid, so the
            phone could see it while the table was merely hidden; with the table gone from the
            document, the card list has to say it. -->
-      <!-- ONLY AT THE CAP. This read `Math.min(matched, DOM_CAP)` against the whole answer, so it
-           rendered on page ONE — "Showing 2,000 of 2,614" over two hundred rows, which is two wrong
-           numbers at once. The cap line is not "there is more"; the head's `+` says that. It is
-           "this is as far as it goes, narrow the filter or export", and that is only true here. -->
-      {#if loaded >= DOM_CAP}
-        <CapLine shown={DOM_CAP} total={result.matched} />
-      {/if}
+
       <!-- The card list's own sentinel, for the reason `Table` has one: with the grid absent from
            the document there is nothing else for the observer to watch, and a phone would stop at
            page one with no way to ask for page two. -->
@@ -1093,6 +1172,24 @@
           {/snippet}
         </Table>
       </div>
+      {/if}
+
+      <!--
+        ONE CAP LINE, FOR WHICHEVER BODY IS DRAWING.
+
+        `Table` used to draw its own from its `total` prop, which is `aria-rowcount` — and
+        `aria-rowcount` is deliberately `-1` while a filtered list is still paging, so `2000 < -1`
+        was false and **the line vanished in exactly the state it was written for**: filter the list,
+        scroll to the cap, and the sentence telling you to narrow or export was gone. The card body
+        drew its own from a different number, so the two bodies disagreed about whether the list was
+        capped.
+
+        Out here it belongs to the LIST rather than to a body, and it reads the one number that is
+        always the answer's size. `Table` keeps `cap` for the sentinel, which is the other half of
+        what that prop is for.
+      -->
+      {#if loaded >= DOM_CAP}
+        <CapLine shown={drawn} total={result.matched} />
       {/if}
       </div>
     {/if}

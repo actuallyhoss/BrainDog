@@ -206,6 +206,12 @@
       />
     </div>
     {/if}
+
+    <!-- THE LIST'S OWN CAP LINE. `Table` used to draw it from `aria-rowcount`, which is `-1` while a
+         filtered list pages, so the sentence vanished in the state it exists for. -->
+    {#if shown.length >= DOM_CAP}
+      <CapLine shown={DOM_CAP} total={result.matched} />
+    {/if}
   </div>
 {/if}
 

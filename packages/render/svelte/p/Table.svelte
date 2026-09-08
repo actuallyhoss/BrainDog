@@ -24,7 +24,6 @@
   2.1.4 (19 §4).
 -->
 <script lang="ts">
-  import CapLine from './CapLine.svelte';
   import { rowsAsCards } from '../cards.svelte.ts';
   import type { Snippet } from 'svelte';
   import { TONES } from '../../src/index.ts';
@@ -183,13 +182,6 @@
       {/if}
     </li>
   {/each}
-  <!-- THE SENTINEL BELONGS TO WHICHEVER BODY IS ON THE SCREEN. It used to live only inside the
-       grid, which was survivable while both bodies were built and one was hidden; with the branch
-       above, a phone would have had nothing to observe and the list would have stopped at page one
-       with no way to ask for page two. -->
-  {#if onmore && !(cap !== undefined && rows.length >= cap)}
-    <li class="sentinel" aria-hidden="true"></li>
-  {/if}
 </ul>
 {:else}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -286,19 +278,13 @@
 
 {/if}
 
-<!-- The way past the cap is a filter or an export, never a virtualised scroll: virtualisation
-     breaks find-in-page, breaks the scrollbar as a position cue, and only HIDES the measured wall,
-     which is DOM construction (13 §4.3).
+<!-- THE CAP LINE IS THE HOST'S, NOT THIS COMPONENT'S.
 
-     OUTSIDE BOTH BODIES. It used to sit inside `.table-region`, so the one line telling a reader
-     they were looking at 2,000 of 4,181 rows was drawn only in the body a desktop sees — and it was
-     a `<p>` among the rows of a `role="grid"`, where the only permitted children are rows and
-     rowgroups, so a screen reader walking the grid met a paragraph. Out here it belongs to the list
-     rather than to whichever body is drawing it, which is what the branch above made necessary:
-     when the grid is not rendered at all, a line inside it is not hidden, it is absent.
-
-     THE SENTENCE ITSELF IS `CapLine`, because five other lists in the product needed it and were
-     rendering every row they held instead. -->
-{#if cap !== undefined && rows.length >= cap}
-  <CapLine shown={cap} total={total} />
-{/if}
+     The way past the cap is a filter or an export, never a virtualised scroll: virtualisation breaks
+     find-in-page, breaks the scrollbar as a position cue, and only HIDES the measured wall, which is
+     DOM construction (13 §4.3). This component used to draw that sentence from its own `total`
+     prop — which is `aria-rowcount`, and `aria-rowcount` is deliberately `-1` while a filtered list
+     is still paging, so `2000 < -1` was false and the line disappeared in exactly the state it was
+     written for. A cap line is about the LIST; the host has the answer's real size and draws one for
+     whichever body it rendered. `cap` stays here, because its other job is deciding whether there is
+     a sentinel to observe. -->

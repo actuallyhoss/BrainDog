@@ -122,7 +122,16 @@ test('THE TEMPORAL LITERALS ARE THE SET THE DATA MODEL SETTLED ON, and a month i
   const jan31 = Date.UTC(2026, 0, 31, 12);
   assert.equal(resolveDay('+1m', jan31), '2026-02-28');
   assert.equal(resolveDay('+2m', jan31), '2026-03-31');
-  assert.equal(resolveDay('-1y', NOW), '2025-09-05');
+
+  /**
+   * AND A YEAR IS NOT A UNIT. `34 §1.1`'s EBNF is `unit = "d" | "w" | "m"`, and this test used to
+   * assert `-1y` resolving — an assertion that a fourth spelling exists, in a grammar table that
+   * does not have it and in one of the two implementations only. The browser's compiler refused
+   * `+2y` while this one turned it into a real date two years out, so the same declaration meant
+   * different things to a person and to an agent. The test was asserting the divergence.
+   */
+  assert.equal(resolveDay('-1y', NOW), null);
+  assert.equal(resolveDay('+2y', NOW), null);
 });
 
 /* ── what cannot be resolved is refused ──────────────────────────────────── */

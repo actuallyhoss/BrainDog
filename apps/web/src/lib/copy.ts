@@ -192,6 +192,20 @@ export const copy = {
      job to `/audit` — so what this screen owes a reader is how much it is not showing and the door
      to the rest, which is the same shape the needs-you list already uses. */
   moreInTheLog: (n: number) => `${n.toLocaleString('en')} more in the log`,
+  /* WHAT THE PALETTE IS NOT SHOWING, and where the rest is. It printed eight hits and said nothing
+     about the ninth — on the surface `19 §4` makes the primary way to reach a row, and with a
+     round-robin that gives one hit per list, eight across nine lists is one row each. */
+  /* `/search?q=` — `19 §2`'s spine screen, which the route directory did not have. `search` is
+     already declared above, as the nav's own word for the same place. */
+  searchRecord: 'Search the record',
+  searchWaiting: 'Type to search the record.',
+  /* NOT `noneMatching`, which counts the rows a LIST holds and reads "0 rows, none matching" here —
+     a search is over every list at once, so there is no single total to count against. */
+  searchNone: 'Nothing in the record matches:',
+  searchWhere: 'Every list, every decision, and every page — by the words in them.',
+  allIn: (n: number, list: string) => `All ${n.toLocaleString('en')} in ${list}`,
+  allMatches: (n: number, q: string) => `All ${n.toLocaleString('en')} matches for “${q}”`,
+  showingOf: (shown: number, total: number) => (shown >= total ? `${shown}` : `${shown} of ${total}`),
   markAllRead: 'Mark all read',
   /* THE `cleared` STATE FOR THE FEED, which is a feed you have worked through rather than a record
      with nothing in it. `19 §6` gives this state no action, because there is nothing to do. */

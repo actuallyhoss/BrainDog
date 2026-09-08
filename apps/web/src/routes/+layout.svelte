@@ -93,10 +93,11 @@
   const live: 'open' | 'polling' | 'offline' = 'open';
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
-  /* No `g s`. Search is not a place you go, it is the thing under the launcher and behind `/` and
-     `⌘K` — a second door to one room, with its own nav row and its own URL, was the room looking
-     like two rooms. */
-  const GOTO: Record<string, string> = { h: '/', d: '/decide', i: '/inbox', v: '/vault', p: '/packs', ',': '/settings/appearance' };
+  /* `g s` IS HERE NOW. It was removed on the grounds that "search is not a place you go, it is the
+     thing under the launcher" — true while the palette was the only search, and contradicted by
+     `19 §2`, which lists `/search?q=` in the screen inventory, and by `19 §4`, which has `g s` in
+     its own chord list. The palette caps its record hits; the cap needs somewhere to point. */
+  const GOTO: Record<string, string> = { h: '/', d: '/decide', i: '/inbox', s: '/search', v: '/vault', p: '/packs', ',': '/settings/appearance' };
 
   function onkeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;

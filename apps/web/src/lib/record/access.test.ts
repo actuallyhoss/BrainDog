@@ -159,20 +159,49 @@ test('EVERY SETTINGS AREA HAS SOMETHING TO SAY, and it is not the same something
    * screen exactly as much as one inside a literal, and `copy.ts` is now half functions.
    */
   const BANNED = ['mock-up', 'mockup', 'the shell', 'predicate', 'declaration', 'projection'];
-  const said = (v: unknown): string[] => {
+
+  /**
+   * ONE SET OF ARGUMENTS WAS NOT ENOUGH, AND THE FALLBACK MADE IT WORSE.
+   *
+   * Calling every function with `('x', 1, 'y')` and grepping the result reached most of them, and
+   * for the three that THROW on those arguments — `theseExist`, `diffRefused`, `accentRefused` —
+   * the `catch` fell back to `String(v)`, which is the function's SOURCE. A banned word assembled at
+   * run time from pieces was invisible to that, and `theseExist` is what `/r/<unknown>` and
+   * `/v/<unknown>` print. A review wrote a copy function whose banned word survived and the test
+   * stayed green.
+   *
+   * So: several shapes of argument, and **a throw is a failure, not a fallback**. A sentence this
+   * test cannot render is a sentence it cannot check, and saying so out loud is the only honest
+   * answer — the alternative is a green light over an unchecked string.
+   */
+  const SHAPES: unknown[][] = [
+    ['x', 1, 'y'],
+    [['x', 'y'], 'z', 1],
+    ['x', ['y', 'z'], 1],
+    [1, 'x', ['y']],
+    [{ name: 'x' }, 'y', 2],
+  ];
+
+  const said = (v: unknown, at: string): string[] => {
     if (typeof v === 'string') return [v];
     if (typeof v === 'function') {
-      try {
-        return [String((v as (...a: unknown[]) => unknown)('x', 1, 'y'))];
-      } catch {
-        return [String(v)];
+      const out: string[] = [];
+      for (const args of SHAPES) {
+        try {
+          out.push(String((v as (...a: unknown[]) => unknown)(...args)));
+        } catch {
+          /* the next shape may suit it */
+        }
       }
+      assert.ok(out.length > 0, `${at} could not be rendered by any argument shape, so nothing checked it`);
+      return out;
     }
-    if (v && typeof v === 'object') return Object.values(v as Record<string, unknown>).flatMap(said);
+    if (v && typeof v === 'object')
+      return Object.entries(v as Record<string, unknown>).flatMap(([k, x]) => said(x, `${at}.${k}`));
     return [];
   };
 
-  for (const line of Object.values(copy).flatMap(said))
+  for (const line of Object.entries(copy).flatMap(([k, v]) => said(v, `copy.${k}`)))
     for (const word of BANNED)
       assert.ok(
         !line.toLowerCase().includes(word),

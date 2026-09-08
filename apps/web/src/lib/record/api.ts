@@ -1484,7 +1484,14 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): { ent
  */
 export const DOM_CAP = 2_000;
 
-/** `33 §2`: `list` answers 25 rows by default and 200 at most, plus a cursor. */
+/**
+ * `33 §2`'s CEILING, and the page a grid asks for.
+ *
+ * The contract's `limit` defaults to 25 and caps at 200; this function's default is **the whole
+ * answer**, because every caller but the grid wants a count, a metric or a forecast and paging one
+ * of those would be a cap nobody asked for. An earlier comment here said "25 by default", which its
+ * own docstring thirty lines down contradicted.
+ */
 export const PAGE = 200;
 
 /**
@@ -1530,14 +1537,21 @@ export function list(
   const all = ROWS[register] ?? [];
   const filtered = applyFilters(register, all, opts.filters ?? [], opts.q);
   const sorted = opts.sort ? sortRows(register, filtered, opts.sort.field, opts.sort.dir) : filtered;
+  const key = questionKey(register, opts);
 
   if (opts.limit === undefined)
     return { entries: sorted, total: all.length, matched: filtered.length, cursor: null, stale: false };
 
-  const limit = Math.min(Math.max(1, Math.floor(opts.limit)), PAGE);
+  /* `NaN` SURVIVED THIS CLAMP AND CAME BACK AS THE END OF THE LIST. `Math.floor(NaN)` is `NaN` and
+     both `Math.max` and `Math.min` propagate it, so `slice(0, NaN)` was `[]` and the answer was
+     `{ entries: [], cursor: null }` — the empty page this function's own comment says it refuses to
+     give, because it is indistinguishable from a finished walk. */
+  const asked = Number(opts.limit);
+  const limit = Number.isFinite(asked) ? Math.min(Math.max(1, Math.floor(asked)), PAGE) : PAGE;
+
   let from = 0;
   if (opts.cursor !== undefined) {
-    const at = sorted.findIndex((e) => String(e.seq) === opts.cursor);
+    const at = cursorAt(sorted, key, opts.cursor);
     if (at === -1) return { entries: [], total: all.length, matched: filtered.length, cursor: null, stale: true };
     from = at + 1;
   }
@@ -1551,10 +1565,40 @@ export function list(
     /* NULL AT THE END OF THE ANSWER, and only there. A cursor pointing at the last row would ask the
        caller for one more page that is always empty, and an observer watching a sentinel would keep
        firing at the bottom of a finished list. */
-    cursor: last && from + limit < sorted.length ? String(last.seq) : null,
+    cursor: last && from + limit < sorted.length ? `${key}:${last.seq}` : null,
     stale: false,
   };
 }
+
+/**
+ * A CURSOR NAMES A ROW **IN ONE ANSWER**, and it used to name only the row.
+ *
+ * `findIndex` on a bare `seq` finds that row wherever it happens to sit, so a cursor taken from an
+ * ascending page and handed to the descending answer resumed at index 2,415 of 2,614 and reported
+ * `stale: false` — silently skipping 2,415 rows. The grid resets its pages when the question changes,
+ * so it was not reachable through the screen; the API had no guard and nothing tested it, which is
+ * how it would have reached the first caller that did not reset.
+ *
+ * The question is part of the cursor now. `33 §2` calls a cursor opaque, and this is what opaque
+ * buys: a cursor from a different question does not resolve, so the answer is `stale` — start again —
+ * rather than a page from the middle of somewhere else.
+ */
+const questionKey = (
+  register: string,
+  opts: { filters?: Filter[]; q?: string; sort?: { field: string; dir: 'asc' | 'desc' } },
+): string => {
+  const said = JSON.stringify([register, opts.filters ?? [], opts.q ?? '', opts.sort ?? null]);
+  let h = 5381;
+  for (let i = 0; i < said.length; i++) h = ((h * 33) ^ said.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+};
+
+const cursorAt = (rows: readonly Entry[], key: string, cursor: string): number => {
+  const at = cursor.lastIndexOf(':');
+  if (at === -1 || cursor.slice(0, at) !== key) return -1;
+  const seq = cursor.slice(at + 1);
+  return rows.findIndex((e) => String(e.seq) === seq);
+};
 
 /**
  * WHO DID IT, IN WORDS. `rule.renewal` and `rule.reply` are declaration ids, and every surface that
@@ -1598,9 +1642,32 @@ export type SearchHit = {
  * register with three hundred matching rows now costs the others one slot each rather than all of
  * them, which is the only behaviour that makes a palette over eight registers usable.
  */
-export function search(q: string, limit = 24): SearchHit[] {
+/**
+ * What a search found, and how much of it you are being shown.
+ *
+ * IT USED TO RETURN AN ARRAY AND NOTHING ELSE, so every caller knew what it had and none of them
+ * could know what it was missing. The palette asked for eight, printed eight, and said nothing —
+ * on the surface `19 §4` makes the primary way to reach a row. Worse than a flat cap of eight: the
+ * round-robin below hands one hit per source per round, so across nine sources a budget of eight is
+ * frequently ONE ROW PER LIST, and the comment beside it says the rotation was added precisely
+ * because *"nothing on screen said the list was partial"*. The distribution was fixed and the
+ * silence was not.
+ *
+ * `total` COSTS ONE COUNTER inside loops that already run. `groups` is the same hits kept in their
+ * lists rather than interleaved, which is what a results PAGE wants and a ranked palette does not.
+ */
+export type SearchResult = {
+  /** The round-robined hits, at most `limit`. */
+  hits: SearchHit[];
+  /** How many rows matched across every list — what the caller is not showing. */
+  total: number;
+  /** Every list that matched, with its own count and the address that holds the rest. */
+  groups: { kind: string; total: number; hits: SearchHit[]; href: string | null }[];
+};
+
+export function search(q: string, limit = 24): SearchResult {
   const needle = q.trim().toLowerCase();
-  if (!needle) return [];
+  if (!needle) return { hits: [], total: 0, groups: [] };
 
   const groups: SearchHit[][] = [];
 
@@ -1641,7 +1708,28 @@ export function search(q: string, limit = 24): SearchHit[] {
     }
     if (hits.length === before) break;
   }
-  return hits;
+
+  return {
+    hits,
+    total: groups.reduce((n, g) => n + g.length, 0),
+    /* The list's own name, off the first hit — every hit in a group carries the same `kind` because
+       the group IS one register (or the questions, which unshift themselves in front).
+
+       AND THE ADDRESS THAT HOLDS ALL OF THEM. A results page that caps a group and cannot say where
+       the rest is has the defect it was built to fix, one door along; the register's own `q` runs
+       the same title match, so the link is the same question asked of one list. The questions group
+       has no register, and `/decide` is not a filtered list, so it gets none. */
+    groups: groups.map((g) => {
+      const first = g[0]?.href ?? '';
+      const register = /^\/r\/([a-z0-9_]+)\//.exec(first)?.[1] ?? null;
+      return {
+        kind: g[0]?.kind ?? '',
+        total: g.length,
+        hits: g,
+        href: register ? `/r/${register}?q=${encodeURIComponent(q.trim())}` : null,
+      };
+    }),
+  };
 }
 
 export { AUDIT, AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PACKS, PAGES, PASSKEYS, QUESTIONS, DECIDED, REGISTERS, ROWS, NEWS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TODAY, VAULT, VIEWS, PEOPLE_ACCESS };

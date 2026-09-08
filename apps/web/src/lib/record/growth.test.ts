@@ -89,9 +89,12 @@ test('search answers within its limit and spreads across the lists', () => {
   for (const n of [200, 5_000] as const)
     at('obligations', n, () => {
       for (const limit of [8, 12, 50] as const) {
-        const hits = search('what', limit);
-        assert.ok(hits.length <= limit, `search(${limit}) returned ${hits.length}`);
-        assert.ok(hits.length > 0, `search found nothing among ${n} rows`);
+        const found = search('what', limit);
+        assert.ok(found.hits.length <= limit, `search(${limit}) returned ${found.hits.length}`);
+        assert.ok(found.hits.length > 0, `search found nothing among ${n} rows`);
+        /* AND IT SAYS WHAT IT DID NOT RETURN. The palette caps at twelve and the record holds
+           thousands; a hit list that cannot report its own total is a list nobody can page past. */
+        assert.ok(found.total >= found.hits.length, `total ${found.total} < hits ${found.hits.length}`);
       }
     });
 });
@@ -150,7 +153,12 @@ test('a filter over five thousand rows narrows to the rows it names', () => {
  * word appearing in the file.
  */
 const CAPPED: readonly (readonly [route: string, what: string, capped: RegExp])[] = [
-  ['r/[register]/+page.svelte', 'the register grid and its phone cards', /entries\.slice\(0, DOM_CAP\)/],
+  /* TWO BODIES, TWO ASSERTIONS. The register is the only route with both a grid and a card list, and
+     one regex matching "either of them is sliced" was satisfied by whichever survived: uncapping the
+     grid alone left this green, and uncapping the cards alone did too. Only uncapping both went red,
+     which is the one state nobody would ever reach by accident. */
+  ['r/[register]/+page.svelte', 'the register grid', /toRows\(id, result\.entries\.slice\(0, DOM_CAP\)/],
+  ['r/[register]/+page.svelte', 'the register’s phone cards', /<RowCards[^>]*entries=\{result\.entries\.slice\(0, DOM_CAP\)\}/],
   ['v/[view]/+page.svelte', 'the saved view, which is the same list', /result\.entries\.slice\(0, DOM_CAP\)/],
   ['audit/+page.svelte', 'the log, which grows with writes', /matched\.slice\(0, DOM_CAP\)/],
   ['inbox/+page.svelte', 'arrivals that matched no rule', /INBOX\.slice\(0, DOM_CAP\)/],
