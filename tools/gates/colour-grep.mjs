@@ -71,6 +71,51 @@ const LITERAL_ANY = /#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\b|\brgba?\(\s*\d|\bhsla?
 const LITERAL_CSS = /#[0-9a-fA-F]{3}\b/;
 
 /**
+ * AND THE PLAINEST NOTATION OF ALL, which three regexes over hex, `rgb()` and `oklch()` all miss.
+ *
+ * `color: red` is how somebody writes a colour when they are not thinking about the theme, which is
+ * exactly the population this gate exists for — and it was invisible. Measured against ten ways to
+ * write a colour in CSS, the gate caught three; `red`, `white` and `rebeccapurple` went through.
+ *
+ * THE PROPERTY IS PART OF THE RULE, not just the word. `tan`, `plum`, `linen`, `orange` and `gold`
+ * are CSS colour names and also ordinary English, so matching the bare word would report a register
+ * called `linen` and a comment about gold. A colour name only means a colour where a colour is
+ * being set, so the match is `<a property that takes a colour>: <name>`.
+ *
+ * THE FOUR THAT STAY. `transparent`, `currentColor`, `inherit` and `none` are not literals: they
+ * name a relationship to something else, which is what the semantic layer is for.
+ */
+const NAMED = [
+  'aliceblue', 'antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black',
+  'blanchedalmond', 'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse',
+  'chocolate', 'coral', 'cornflowerblue', 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan',
+  'darkgoldenrod', 'darkgray', 'darkgreen', 'darkgrey', 'darkkhaki', 'darkmagenta',
+  'darkolivegreen', 'darkorange', 'darkorchid', 'darkred', 'darksalmon', 'darkseagreen',
+  'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 'darkviolet', 'deeppink',
+  'deepskyblue', 'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 'forestgreen',
+  'fuchsia', 'gainsboro', 'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow',
+  'grey', 'honeydew', 'hotpink', 'indianred', 'indigo', 'ivory', 'khaki', 'lavender',
+  'lavenderblush', 'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan',
+  'lightgoldenrodyellow', 'lightgray', 'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon',
+  'lightseagreen', 'lightskyblue', 'lightslategray', 'lightslategrey', 'lightsteelblue',
+  'lightyellow', 'lime', 'limegreen', 'linen', 'magenta', 'maroon', 'mediumaquamarine',
+  'mediumblue', 'mediumorchid', 'mediumpurple', 'mediumseagreen', 'mediumslateblue',
+  'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue', 'mintcream',
+  'mistyrose', 'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange',
+  'orangered', 'orchid', 'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred',
+  'papayawhip', 'peachpuff', 'peru', 'pink', 'plum', 'powderblue', 'purple', 'rebeccapurple',
+  'red', 'rosybrown', 'royalblue', 'saddlebrown', 'salmon', 'sandybrown', 'seagreen', 'seashell',
+  'sienna', 'silver', 'skyblue', 'slateblue', 'slategray', 'slategrey', 'snow', 'springgreen',
+  'steelblue', 'tan', 'teal', 'thistle', 'tomato', 'turquoise', 'violet', 'wheat', 'white',
+  'whitesmoke', 'yellow', 'yellowgreen',
+];
+
+/** A property whose value is a colour. `border`/`outline`/`box-shadow` carry one among other parts. */
+const COLOUR_PROP = String.raw`(?:[a-z-]*color|background(?:-color)?|fill|stroke|border(?:-[a-z]+)?|outline(?:-color)?|box-shadow|text-shadow|caret-color|accent-color)`;
+
+const LITERAL_NAMED = new RegExp(String.raw`\b${COLOUR_PROP}\s*:[^;{}]*\b(?:${NAMED.join('|')})\b`, 'i');
+
+/**
  * Two lines are allowed to hold a literal, and they are named rather than exempted by file — a
  * whole-file exemption is how the next one gets in.
  *
@@ -119,7 +164,7 @@ for (const file of await walk(ROOT)) {
   const isCss = /\.(css|svelte|html)$/.test(rel);
   const lines = blankComments(await readFile(file, 'utf8')).split('\n');
   for (const [i, line] of lines.entries()) {
-    if (!LITERAL_ANY.test(line) && !(isCss && LITERAL_CSS.test(line))) continue;
+    if (!LITERAL_ANY.test(line) && !(isCss && (LITERAL_CSS.test(line) || LITERAL_NAMED.test(line)))) continue;
     if (ALLOWED_LINES.some((r) => r.test(line))) continue;
     findings.push({ where: `${rel}:${i + 1}`, text: line.trim().slice(0, C.excerptChars) });
   }

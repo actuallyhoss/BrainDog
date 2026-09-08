@@ -513,8 +513,11 @@
     }
   }
 
+  /* `--scrim`, not a colour. This and `Sheet.svelte` each wrote their own `color-mix` over
+     `black`, six per cent apart — two strengths of the same *behind*, and neither of them chosen.
+     `colour-grep` was blind to both, because a colour with a name is not hex. */
   .palette::backdrop {
-    background: color-mix(in srgb, black 52%, transparent);
+    background: var(--scrim);
   }
 
   .p-head {

@@ -150,8 +150,9 @@
     display: none;
   }
 
+  /* THE SAME `--scrim` THE PALETTE USES. It was 46% here and 52% there. */
   .sheet::backdrop {
-    background: color-mix(in srgb, black 46%, transparent);
+    background: var(--scrim);
   }
 
   .sheet[open] {

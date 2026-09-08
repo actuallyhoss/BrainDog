@@ -156,6 +156,23 @@
     --z-toast: 30;
     --z-hint: 40;
 
+    /**
+     * What sits behind an overlay — one value, because there is one kind of *behind*.
+     *
+     * It was written twice, in the two components that draw one: `color-mix(in srgb, black 52%,
+     * transparent)` in the palette and `… 46% …` in the sheet. Two scrims over the same page at two
+     * different strengths, six per cent apart, which nobody chose — the second was written from
+     * memory of the first. `13 §6`: a component may name only the semantic layer.
+     *
+     * `colour-grep` could not see either of them. It knew hex, `rgb()` and `oklch()`, and a colour
+     * with a NAME went straight through — which is the plainest way there is to write one.
+     *
+     * A SCRIM IS THE PAGE'S OWN DARKEST INK AT LOW ALPHA, NOT BLACK. `--sunk` is the theme's
+     * deepest surface and it moves with the scheme, so the layer separates on both halves rather
+     * than putting black over a near-black page in the dark.
+     */
+    --scrim: color-mix(in srgb, var(--ink) 52%, transparent);
+
     /* Open and close are not symmetric. Opening is something you watch; closing is something you
        have already decided about (13 §9). Ceiling 300ms — nothing is longer. */
     --d-press: 90ms;

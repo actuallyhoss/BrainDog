@@ -43,6 +43,13 @@ const CASES = [
   { gate: 'colour-grep', run: 'colour-grep', expect: /colour literal/, findings: 1 },
   { gate: 'colour-grep-hex8', run: 'colour-grep', expect: /colour literal/, findings: 1 },
   { gate: 'colour-grep-oklch', run: 'colour-grep', expect: /colour literal/, findings: 1 },
+  /* THE FOURTH NOTATION, and the plainest: `color: red`. The gate knew hex, `rgb()` and `oklch()`,
+     so the two real scrims in this repository — `color-mix(in srgb, black …)`, at two strengths six
+     per cent apart — had never been seen. ONE finding, and the fixture carries two decoys beside
+     it: `content: 'gold'` and a grid area called `tan`. `tan`, `linen`, `plum` and `gold` are CSS
+     colour names and ordinary English, so the rule is the PROPERTY plus the name, and a count of
+     one is what proves the distinction rather than asserting it. */
+  { gate: 'colour-grep-named', run: 'colour-grep', expect: /colour literal/, findings: 1 },
   { gate: 'css-rules', expect: /findings/, findings: 1 },
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
@@ -52,6 +59,11 @@ const CASES = [
      `dek`, `kek`, `root` and `pkcs8`. One fixture per vocabulary, so widening the pattern is a thing
      that can be proved rather than asserted. */
   { gate: 'secret-grep-dek', run: 'secret-grep', expect: /reaches a log/, findings: 1 },
+  /* THE THIRD SINK, AND THE ONE THIS GATE'S OWN MESSAGE NAMES FIRST: *"a credential never goes in
+     the record."* One finding, not two — the fixture holds a real leak and an innocent call whose
+     SQL merely contains the words `root`, `wrapped_by` and `kek`, because eight calls in the real
+     tree are that shape and a gate red on all of them is a gate switched off. */
+  { gate: 'secret-grep-record', run: 'secret-grep', expect: /reaches the record/, findings: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },

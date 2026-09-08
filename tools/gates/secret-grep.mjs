@@ -61,7 +61,62 @@ const SINKS = [
   { id: 'telemetry', re: /\btelemetry\s*\(/g },
   { id: 'a push notification', re: /(?<![.\w])push\s*\(/g },
   { id: 'a dispatch', re: /\bdispatch\.[a-z]+\s*\(/gi },
+  /**
+   * AND THE RECORD ITSELF, WHICH IS THE HALF THIS GATE'S OWN FAILURE MESSAGE NAMES FIRST.
+   *
+   * *"A credential never goes in the record, and never in a log."* Five sinks, and every one of them
+   * was the log half: `console`, `log`, `telemetry`, `push`, `dispatch`. A plaintext written into
+   * the record through `sql.exec` was checked by nothing at all — and that is `12 §6`'s promise, the
+   * one the vault exists to keep and the one ADR-062 is about. Measured against seven leak shapes,
+   * this gate caught one.
+   */
+  { id: 'the record', re: /\bsql\.(?:exec|one|all|run)\s*\(/g, bound: true },
+  /* AN ERROR MESSAGE REACHES A LOG BY EVERY PATH THERE IS. `throw new Error(`unwrap failed:
+     ${plain}`)` is a plaintext in a string that is about to be caught, serialised and written
+     somewhere by code that has no idea what is in it. */
+  { id: 'an error message', re: /new Error\s*\(/g },
+  /* SERIALISATION IS THE STEP BEFORE EVERY OTHER SINK. A value inside `JSON.stringify` is a value
+     on its way out of the process, whatever it is handed to next. */
+  { id: 'a serialisation', re: /JSON\.stringify\s*\(/g },
+  { id: 'a response', re: /new Response\s*\(/g },
+  { id: 'an outbound request', re: /(?<![.\w])fetch\s*\(/g },
 ];
+
+/**
+ * The bound parameters of a `sql.` call: everything after the SQL text, with its literals removed.
+ *
+ * A COLUMN NAME IS NOT A VALUE, AND NEITHER IS A LABEL. Reading the whole argument list makes eight
+ * of this repository's `sql.exec` calls a finding, and every one of them is innocent:
+ * `INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id)` has `kek` and `root` as
+ * words in the SCHEMA, and `key.wrapped_by ?? 'kek'` binds the NAME of the key that did the
+ * wrapping. What is bound there is already sealed. A gate red on all eight is a gate switched off
+ * within a week, which is this file's own argument for not matching substrings.
+ *
+ * What IS a leak is a plaintext identifier bound: `sql.exec('INSERT INTO grant …', plain)`. So the
+ * SQL text goes, the string literals go, and what is left is the variables.
+ *
+ * Measured after: 0 findings over 244 files, and six of seven seeded leak shapes caught where the
+ * five log sinks caught one.
+ */
+function bound(args) {
+  const text = args.trimStart();
+  const quote = text[0];
+  let rest = args;
+  if (quote === "'" || quote === '"' || quote === '`') {
+    rest = '';
+    for (let i = 1; i < text.length; i++) {
+      if (text[i] === '\\') {
+        i++;
+        continue;
+      }
+      if (text[i] === quote) {
+        rest = text.slice(i + 1);
+        break;
+      }
+    }
+  }
+  return rest.replace(/'[^']*'|"[^"]*"/g, "''");
+}
 
 /**
  * Comments go: a banned word inside prose is prose, and this file's own header proves it.
@@ -135,7 +190,8 @@ for (const top of ['packages', 'apps'])
     for (const sink of SINKS) {
       sink.re.lastIndex = 0;
       for (const m of text.matchAll(sink.re)) {
-        const args = argsOf(text, m.index + m[0].length - 1);
+        const raw = argsOf(text, m.index + m[0].length - 1);
+        const args = sink.bound ? bound(raw) : raw;
         if (SOURCE.test(args))
           findings.push({
             where: `${rel}:${lineOf(text, m.index)}`,
