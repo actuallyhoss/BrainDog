@@ -9,7 +9,8 @@
   import { titleOf } from '$lib/title.ts';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { DECIDED, NOW, metric } from '$lib/record/api.ts';
+  import { DECIDED, DOM_CAP, NOW, metric } from '$lib/record/api.ts';
+  import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -50,9 +51,18 @@
                 </span>
                 <span class="q-title">{q.title}</span>
                 <span class="q-cost">{q.cost}</span>
-                <span class="q-options">
-                  {#each q.options as o}<span class="q-option">{o.title}</span>{/each}
-                </span>
+                <!-- WHAT THE CHOICES ARE, NOT THREE CONTROLS THAT MAKE THEM. These were pill-shaped,
+                     boxed and bordered, inside the card's own link — so three targets that looked
+                     like three choices were one: clicking "One studio price" landed on the question
+                     with nothing preselected, byte-identical to clicking anywhere else on the card.
+                     `13 §5.2`'s rule is that a control is a control; the inverse holds, and a thing
+                     that is not one must not dress as one.
+
+                     They stay, because knowing a decision has three options and what they are is
+                     most of why this row is scannable. They read as the sentence they are. Picking
+                     one from here is a real feature and it is filed as one: it needs the card to
+                     stop being a single link, which is a change to a spine screen, not a style. -->
+                <span class="q-options">{q.options.map((o) => o.title).join(' · ')}</span>
               </span>
               <Icon name="chevron" size="m" />
             </a>
@@ -65,7 +75,7 @@
   {#if DECIDED.length}
     <Section title="Decided" count={DECIDED.length}>
       <ul class="ledger">
-        {#each DECIDED as q}
+        {#each DECIDED.slice(0, DOM_CAP) as q}
           <li>
             <a class="line" href="/decide/{q.id}">
               <span class="seq">{q.id}</span>
@@ -78,6 +88,7 @@
           </li>
         {/each}
       </ul>
+      <CapLine shown={Math.min(DECIDED.length, DOM_CAP)} total={DECIDED.length} />
     </Section>
   {/if}
 </div>
@@ -174,18 +185,8 @@
 
 
   .q-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
     margin-block-start: var(--sp-2);
-  }
-
-  .q-option {
-    padding: 2px var(--sp-2);
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
+    color: var(--dim);
     font-size: var(--t-xs);
   }
 

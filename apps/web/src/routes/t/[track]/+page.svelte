@@ -16,11 +16,13 @@
 -->
 <script lang="ts">
   import { relative } from 'braindog-render';
+  import { CapLine } from 'braindog-render/svelte';
   import { page as route } from '$app/state';
 
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import {
+    DOM_CAP,
     NOW,
     ROWS,
     display,
@@ -102,7 +104,7 @@
         />
       {:else}
         <ol class="thread">
-          {#each updates as u (u.seq)}
+          {#each updates.slice(0, DOM_CAP) as u (u.seq)}
             <li class="update" data-intent={healthTone(String(u.fields.health) as never)}>
               <div class="u-head">
                 <Chip
@@ -116,6 +118,7 @@
             </li>
           {/each}
         </ol>
+        <CapLine shown={Math.min(updates.length, DOM_CAP)} total={updates.length} />
         <p class="foot">
           Appended, never edited. A correction is a new update that replaces the one before it, so the
           thread stays the record of what was believed and when.
@@ -131,7 +134,7 @@
         <p class="quiet">No agent is working on this.</p>
       {:else}
         <ul class="rows">
-          {#each sessions as s (s.seq)}
+          {#each sessions.slice(0, DOM_CAP) as s (s.seq)}
             <li>
               <a class="row" href="/r/sessions/{s.seq}">
                 <span class="dot" data-state={s.fields.state}></span>
@@ -151,6 +154,7 @@
             </li>
           {/each}
         </ul>
+        <CapLine shown={Math.min(sessions.length, DOM_CAP)} total={sessions.length} />
         {#if live}<p class="quiet">{live} working right now.</p>{/if}
       {/if}
       </Section>

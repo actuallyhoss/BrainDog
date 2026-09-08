@@ -34,7 +34,11 @@
   const say = teach(noun) ? copy.defines[noun] : null;
 </script>
 
-{#if say}<span class="define">— {say}</span>{/if}
+<!-- A CLAUSE IS PART OF A SENTENCE AND ENDS LIKE ONE. Every call site puts this at the end of a
+     line, and the line already ended with a full stop before the dash arrived — so `/start` read
+     "One real row is enough. You can delete it later. — one thing in a list. It has a number you can
+     say", a fragment trailing off a finished paragraph. The clause closes itself. -->
+{#if say}<span class="define">— {say}.</span>{/if}
 
 <style>
   /* Dimmer and smaller than the sentence it joins: it is an aside inside a line, and a clause that

@@ -24,4 +24,5 @@ export { default as Proportional } from './p/Proportional.svelte';
 export { default as Inline } from './p/Inline.svelte';
 export { default as List } from './p/List.svelte';
 export { default as Table } from './p/Table.svelte';
+export { default as CapLine } from './p/CapLine.svelte';
 export { default as Media } from './p/Media.svelte';

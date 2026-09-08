@@ -175,6 +175,29 @@
 </div>
 
 <style>
+  /**
+   * THE ACTIONS NEED A TRACK WIDE ENOUGH FOR THEM.
+   *
+   * These rows borrow the ledger shape, whose trailing track is `9ch` — the width of a date, which
+   * is what it holds everywhere else. Here it holds two buttons, ~222px of them, in an 81px track:
+   * they overflowed left across the stars beside them and painted *through* the label. Two of the
+   * three rows read "What this a**214**s" and "What this ad**37**", with the star count sitting
+   * inside the word. The third escaped only because it has no stars.
+   *
+   * `auto` for both trailing tracks, so the buttons take the width they need and the star count
+   * takes the width it needs. Scoped to this list: the ledger's own 9ch is right for a date, and
+   * changing it there would move every other row in the product to fix one screen.
+   *
+   * Above 640px only, for the reason `/audit` and `/decide` carry the same guard — below it the row
+   * becomes a two-line card and a track list from the desktop wins over the card placements, because
+   * a component `<style>` is unlayered and more specific than `@layer components`.
+   */
+  @media (width >= 640px) {
+    .ledger :global(.line) {
+      grid-template-columns: 12ch minmax(0, 1fr) auto auto;
+    }
+  }
+
   /* One sentence saying what the things on this screen are, in the person's words. */
   .blurb {
     margin-block-end: var(--sp-4);

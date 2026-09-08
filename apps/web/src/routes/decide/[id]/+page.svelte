@@ -17,7 +17,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { relative } from 'braindog-render';
+  import { day, relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, NOW, QUESTIONS } from '$lib/record/api.ts';
@@ -222,7 +222,11 @@
               disabled={!reason.trim() || !wake}
               onclick={() => {
                 deferring = false;
-                toasts.push(copy.deferred(wake), { intent: 'warn' });
+                /* THE DAY, SPELLED. Every other date in the product reads "17 Sep 2026"; this one
+                   printed `2026-09-17`, the storage spelling, in a sentence about when somebody
+                   will next look at a decision. `day()` is the one formatter and it was one call
+                   away. */
+                toasts.push(copy.deferred(day(wake)), { intent: 'warn' });
               }}
             >
               {copy.deferAction}
@@ -448,13 +452,20 @@
     font-size: var(--t-ui);
   }
 
+  /* A HEADING IS AS TALL AS ITS DESCENDERS. `display: flex` on an `h2` collapses its box to the
+     content height — measured 18.297px against a `line-height` of 18.3 — and the field below it
+     starts flush at that boundary, so the tails of "Why" and "yet" were painted over by the
+     textarea. The commit-reason panel uses the same `h2` and escaped only because a sub-line
+     happens to sit between it and its field. `line-height` first, and space under it. */
   .commit-title {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
+    margin-block-end: var(--sp-2);
     font-family: var(--font-ui);
     font-size: var(--t-ui);
     font-weight: 500;
+    line-height: 1.4;
   }
 
   .commit-required {

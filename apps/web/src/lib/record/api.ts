@@ -1452,6 +1452,22 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): { ent
   };
 }
 
+/**
+ * THE MOST ROWS ANY SURFACE PUTS IN A DOCUMENT, and the number `13 §4.3` gives.
+ *
+ * It lived as a `const DOM_CAP = 2000` inside the register route, so it was the register's rule
+ * rather than the product's — and every other list in the build rendered every row it held. A saved
+ * view is the register's list with a different filter and had no cap at all; `/audit` grows with
+ * WRITES rather than rows, so on a busy record it is the longest list in the product; `/inbox` is
+ * where one bad ingest rule puts thousands of arrivals, and it is the screen you need at exactly
+ * that moment.
+ *
+ * `22 §4` measures the cost: ~27 µs a row on a desktop and ~167 µs at 4× throttle, at nine nodes a
+ * row — so five thousand rows is *"~833 ms of build on a mid-tier phone no matter what CSS you
+ * write"*. The way past it is a filter or an export, never a virtualised scroll.
+ */
+export const DOM_CAP = 2_000;
+
 export function list(register: string, opts: { filters?: Filter[]; q?: string; sort?: { field: string; dir: 'asc' | 'desc' } } = {}) {
   const all = ROWS[register] ?? [];
   const filtered = applyFilters(register, all, opts.filters ?? [], opts.q);

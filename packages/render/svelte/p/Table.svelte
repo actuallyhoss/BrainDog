@@ -24,6 +24,7 @@
   2.1.4 (19 §4).
 -->
 <script lang="ts">
+  import CapLine from './CapLine.svelte';
   import type { Snippet } from 'svelte';
   import { TONES } from '../../src/index.ts';
   import { chunkRows, type Column, type TableRow } from '../types.ts';
@@ -263,17 +264,18 @@
   </div>
 </div>
 
-{#if cap !== undefined && rows.length >= cap}
-  <!-- The way past the cap is a filter or an export, never a virtualised scroll: virtualisation
-       breaks find-in-page, breaks the scrollbar as a position cue, and only HIDES the measured wall,
-       which is DOM construction (13 §4.3).
+<!-- The way past the cap is a filter or an export, never a virtualised scroll: virtualisation
+     breaks find-in-page, breaks the scrollbar as a position cue, and only HIDES the measured wall,
+     which is DOM construction (13 §4.3).
 
-       OUTSIDE THE SCROLLER, AND OUTSIDE THE GRID. Two reasons, and both were bugs. It sat inside
-       `.table-region`, which is `display: none` below 640px now that rows become cards — so the one
-       line telling a phone it was looking at 2,000 of 4,181 rows was the line the phone could not
-       see. And it was a `<p>` among the rows of a `role="grid"`, where the only permitted children
-       are rows and rowgroups; a screen reader walking the grid met a paragraph. -->
-  <p class="cap-line" role="status">
-    Showing {cap.toLocaleString('en')} of {total.toLocaleString('en')} — narrow the filter or export.
-  </p>
+     OUTSIDE THE SCROLLER, AND OUTSIDE THE GRID. Two reasons, and both were bugs. It sat inside
+     `.table-region`, which is `display: none` below 640px now that rows become cards — so the one
+     line telling a phone it was looking at 2,000 of 4,181 rows was the line the phone could not
+     see. And it was a `<p>` among the rows of a `role="grid"`, where the only permitted children
+     are rows and rowgroups; a screen reader walking the grid met a paragraph.
+
+     THE SENTENCE ITSELF IS `CapLine`, because four other lists in the product needed it and were
+     rendering every row they held instead. -->
+{#if cap !== undefined && rows.length >= cap}
+  <CapLine shown={cap} total={total} />
 {/if}

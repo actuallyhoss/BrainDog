@@ -11,7 +11,8 @@
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { INBOX, NOW } from '$lib/record/api.ts';
+  import { DOM_CAP, INBOX, NOW } from '$lib/record/api.ts';
+  import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -32,7 +33,7 @@
     <Empty kind="cleared" title="Nothing unmatched." body="Every arrival since you last looked became a row." />
   {:else}
     <ul class="ledger">
-      {#each INBOX as item}
+      {#each INBOX.slice(0, DOM_CAP) as item}
         <li>
           <button
             type="button"
@@ -103,6 +104,7 @@
         </li>
       {/each}
     </ul>
+    <CapLine shown={Math.min(INBOX.length, DOM_CAP)} total={INBOX.length} />
   {/if}
 </div>
 

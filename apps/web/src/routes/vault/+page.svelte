@@ -105,6 +105,26 @@
 </div>
 
 <style>
+  /**
+   * THE ROTATION COLUMN NEEDS THE WIDTH IT USES.
+   *
+   * The ledger's trailing track is `9ch`, which is a date; this holds a glyph, the word *Rotated*
+   * and a relative age. Measured: the *Reveal once* button ends at x 1099 and "⚠︎ Rotated 10mo ago"
+   * starts at 1079 — twenty pixels of overlap, painting the warning triangle inside the word. Only
+   * the two rows carrying the glyph collide, which is why it survived: the four without it clear the
+   * button by a few pixels, so four rows out of six looked correct.
+   *
+   * `auto` for both trailing tracks. Scoped here rather than in `rows.css`, and above 640px only,
+   * for the same two reasons `/packs` carries the identical guard: 9ch is right for a date
+   * everywhere else, and below 640 the row is a card whose placements a component `<style>` would
+   * override.
+   */
+  @media (width >= 640px) {
+    .ledger :global(.line) {
+      grid-template-columns: 12ch minmax(0, 1fr) auto auto;
+    }
+  }
+
   .rotated-key {
     color: var(--dim);
     font-size: var(--t-xs);

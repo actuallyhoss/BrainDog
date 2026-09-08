@@ -39,6 +39,17 @@
 
   const NEEDS_CAP = 6;
 
+  /**
+   * AND THE FEED HAS ONE TOO, for a different reason from every other cap in this commit.
+   *
+   * "Since you were away" grows with WRITES rather than with rows, so on a record anybody actually
+   * uses it is unbounded — and Home is not the log. `19 §2` gives `/audit` that job, and the whole
+   * shape of this screen is "what needs you", which a hundred events is the opposite of. So this cap
+   * is small on purpose and its overflow is a door rather than a line: the same `.more` link the
+   * needs-you list already uses, pointing at the surface that exists to hold the rest.
+   */
+  const NEWS_CAP = 8;
+
   const dueSoon = $derived(
     (ROWS.obligations ?? [])
       .filter((e) => (e.fields.state === 'open' || e.fields.state === 'part') && days(e.fields.due) <= 7)
@@ -188,7 +199,7 @@
 
     <Section title={copy.sinceAway} count={data.whatsNew.length}>
       <ul class="feed">
-        {#each data.whatsNew as item}
+        {#each data.whatsNew.slice(0, NEWS_CAP) as item}
           <li>
             <a class="event" href={item.href}>
               <!-- The agent that wrote it, named. Never a sparkle badge: across thirteen experiments
@@ -201,7 +212,17 @@
           </li>
         {/each}
       </ul>
-      {#if data.sinceCapped}<p class="more">{copy.andMore}</p>{/if}
+      <!-- AND MORE IS A DOOR. The record's own `sinceCapped` said "and more" as a dead sentence: it
+           tells you something is missing and gives you nowhere to go for it, on the one screen whose
+           whole shape is "here is what happened". `19 §2` gives `/audit` that job, so the overflow
+           points at it — and it now also fires for the rows this screen itself is not drawing, which
+           the record's flag knew nothing about. -->
+      {#if data.sinceCapped || data.whatsNew.length > NEWS_CAP}
+        <a class="more" href="/audit">
+          {data.sinceCapped ? copy.andMore : copy.moreInTheLog(data.whatsNew.length - NEWS_CAP)}
+          <Icon name="arrow" size="s" />
+        </a>
+      {/if}
     </Section>
   </aside>
 </div>

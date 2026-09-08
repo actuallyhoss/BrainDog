@@ -16,7 +16,8 @@
   import Button from '$lib/ui/Button.svelte';
   import { relative } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { AUDIT, NOW, PAGES, actorOf } from '$lib/record/api.ts';
+  import { AUDIT, DOM_CAP, NOW, PAGES, actorOf } from '$lib/record/api.ts';
+  import { CapLine } from 'braindog-render/svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -94,7 +95,11 @@
   const who = $derived(route.url.searchParams.get('by') ?? '');
   const what = $derived(route.url.searchParams.get('kind') ?? '');
 
-  const shown = $derived(AUDIT.filter((e) => (!who || e.by === who) && (!what || e.kind === what)));
+  const matched = $derived(AUDIT.filter((e) => (!who || e.by === who) && (!what || e.kind === what)));
+  /* THE LOG GROWS WITH WRITES, NOT WITH ROWS, so on a record of any size this is the longest list in
+     the product — and it was the one rendering every entry it held. `13 §4.3`'s cap, and the line
+     that admits it. */
+  const shown = $derived(matched.slice(0, DOM_CAP));
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(route.url.searchParams);
@@ -106,7 +111,7 @@
 
 <svelte:head><title>{titleOf(copy.audit)}</title></svelte:head>
 
-<PageHead icon="history" title={copy.audit} count={shown.length} total={AUDIT.length} />
+<PageHead icon="history" title={copy.audit} count={matched.length} total={AUDIT.length} />
 
 <div class="page">
   <!-- A CHOICE APPEARS WHEN THERE IS ONE TO MAKE. Two actors and two kinds is a filter; one of
@@ -163,7 +168,7 @@
     in it — which is every record for about a minute — had the same sentence as a filter that missed:
     `no-data-yet` and `no-results` collapsed, which `19 §6` calls the failure.
   -->
-  {#if shown.length === 0}
+  {#if matched.length === 0}
     <Empty
       kind={AUDIT.length === 0 ? 'no-data-yet' : 'no-results'}
       title={AUDIT.length === 0 ? copy.auditNone : copy.noneMatching(AUDIT.length, 'entries')}
@@ -202,6 +207,7 @@
       </li>
     {/each}
   </ul>
+  <CapLine shown={shown.length} total={matched.length} />
   <!-- IT EXPLAINED THE DATA MODEL TO SOMEBODY WHO CAME TO SEE WHO CHANGED WHAT. "The log and the
        version are the same fact, so a version number is a place in this list" is true, and it is a
        sentence about how the record is built. What a reader needs from the number is what it is

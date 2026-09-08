@@ -14,9 +14,9 @@
   import { goto } from '$app/navigation';
   import { silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { page } from '$app/state';
-  import { Table } from 'braindog-render/svelte';
+  import { CapLine, Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { VIEWS, iconFor, REGISTERS, columnsFor, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { DOM_CAP, VIEWS, iconFor, REGISTERS, columnsFor, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -24,6 +24,7 @@
   import Kbd from '$lib/ui/Kbd.svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import RowCards from '$lib/ui/RowCards.svelte';
+  import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PAGES } from '$lib/record/data.ts';
 
@@ -70,7 +71,11 @@
       ? list(view.register, { filters: [...view.filters, ...extra], ...(q ? { q } : {}) })
       : { entries: [], total: 0, matched: 0 },
   );
-  const rows = $derived(view ? toRows(view.register, result.entries, columns) : []);
+  /* THE SAME CAP THE REGISTER APPLIES, because this is the same list with a different filter — and
+     it is the surface `13 §4.3` sends you to when a register gets big, so it was the one place a
+     five-thousand-row answer was rendered whole. `Table` draws the line that says so. */
+  const shown = $derived(result.entries.slice(0, DOM_CAP));
+  const rows = $derived(view ? toRows(view.register, shown, columns) : []);
 
   let focus = $state({ row: 0, col: 1 });
   let binding = $state(false);
@@ -182,22 +187,24 @@
       </Empty>
     {/if}
 
+    <!-- ONE BODY AT A TIME, in the document and not only in the stylesheet — the register's own
+         measurement: both bodies were built at every width and one was hidden, so a list of 2,614
+         rows held 4,001 rows and 102,681 nodes and took eight seconds to settle. -->
+    {#if result.entries.length > 0 && rowsAsCards()}
+      <RowCards register={view.register} entries={shown} />
+      <CapLine shown={shown.length} total={result.matched} />
+    {:else}
     <div class="table-slot" class:gone={result.entries.length === 0}>
       <Table
         {columns}
         {rows}
         total={result.matched}
+        cap={DOM_CAP}
         label={view.name}
         bind:focus
         onactivate={(row) => goto(`/r/${view.register}/${row.key.split('#')[1]}`)}
       />
     </div>
-
-    <!-- THE SAME BODY A REGISTER HAS ON A PHONE. A saved view is that list with a different
-         predicate, and it kept the desktop table with its own horizontal scrollbar — two surfaces,
-         one device, two behaviours, because one of them was written second. -->
-    {#if result.entries.length > 0}
-      <RowCards register={view.register} entries={result.entries} />
     {/if}
   </div>
 {/if}

@@ -33,7 +33,11 @@ export const firstRun = {
     'Money, the estate it runs on, the people, the projects, and the decisions behind ' +
     'them. Typed, versioned, and readable by every agent you use.',
   firstQuestion: 'Where do you want to start?',
-  firstHint: 'One real row is enough. You can delete it later.',
+  /* SPLIT IN TWO, so the clause defining *row* can sit against the word rather than behind the
+     paragraph. Both halves are sentences on their own, which is what lets the definition slot
+     between them without either one reading as a fragment. */
+  firstRowIs: 'One real row is enough.',
+  firstHint: 'You can delete it later.',
   firstChoices: [
     { key: 'obligations', icon: 'money', label: 'Money', body: 'What you owe, and what you are owed.', field: 'What is it, and how much?' },
     { key: 'services', icon: 'calendar', label: 'The estate', body: 'Domains, hosting, subscriptions, licences.', field: 'What renews, and when?' },

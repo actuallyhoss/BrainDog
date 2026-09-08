@@ -225,7 +225,10 @@
 
       <!-- `row` is defined in the one sentence that already uses it, on the screen where somebody
            is about to make their first one. `19 §6`: one clause, in the sentence that needs it. -->
-      <p class="hint">{firstRun.firstHint} <Define noun="row" /></p>
+      <!-- THE CLAUSE GOES BESIDE THE WORD. It rendered after the whole hint, so the definition of
+           *row* trailed two sentences behind the only place the word appears — `19 §6` asks for it
+           "in the sentence that needs it", and the sentence that needs it is the first one. -->
+      <p class="hint">{firstRun.firstRowIs} <Define noun="row" /> {firstRun.firstHint}</p>
 
       <section class="agent" aria-labelledby="agent-h">
         <h2 class="agent-h" id="agent-h"><Icon name="session" size="m" />{firstRun.agentTitle}</h2>

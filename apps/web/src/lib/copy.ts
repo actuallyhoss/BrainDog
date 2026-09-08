@@ -179,7 +179,15 @@ export const copy = {
   needsYou: 'What needs you',
   sinceAway: 'Since you were away',
   nothingNeedsYou: 'Nothing needs you today.',
+  /* THE ONE CONTROL THAT APPEARS WHEN THE NAV DOES NOT. It names the thing it brings back rather
+     than the gesture that hid it: "Toggle the sidebar" is what the key sheet calls the chord, and a
+     reader looking at a blank gutter does not know a toggle happened. */
+  showSidebar: 'Show the sidebar',
   andMore: 'and more',
+  /* THE OVERFLOW OF A FEED, as a count and a place to go. Home is not the log — `19 §2` gives that
+     job to `/audit` — so what this screen owes a reader is how much it is not showing and the door
+     to the rest, which is the same shape the needs-you list already uses. */
+  moreInTheLog: (n: number) => `${n.toLocaleString('en')} more in the log`,
   markAllRead: 'Mark all read',
 
   /* decide and the gate */
@@ -561,7 +569,17 @@ export const copy = {
        themselves and scan as the list's FIELDS. What "typed" actually means is the half a reader
        needs, so that is the half this says. */
     list: 'a list of one kind of thing, with the same fields on every row',
-    row: 'one thing in a list. It has a number you can say',
+    /**
+     * DEFINED BY EXAMPLE, NOT BY ANOTHER NOUN. This read "one thing in a list. It has a number you
+     * can say" and broke `copy.ts`'s own stated invariant two lines up — none of these defines
+     * itself with another of them **except downwards** — because the first place it renders is
+     * `/start`, where `list` has not been defined and will not be until the next screen, and where
+     * there is not a single number on the page for "a number you can say" to point at.
+     *
+     * `19 §6` asks for the clause to be specific about the thing rather than about the schema. An
+     * invoice, a domain and a person are three things a reader already owns.
+     */
+    row: 'one thing you are keeping track of: an invoice, a domain, a person',
     page: 'a screen made of blocks. It is a row, so you can change it',
     block: 'one thing on a page — a table, a figure, a note',
   } as const,

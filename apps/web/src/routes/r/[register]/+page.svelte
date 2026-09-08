@@ -24,7 +24,7 @@
   import * as pref from '$lib/pref.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { iconFor, PAGES, REGISTERS, columnsFor, display, dirOf, entry, heldBy, identityOf, labelOf, list, noticed, readableFields, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, labelOf, list, noticed, PAGES, readableFields, REGISTERS, toRows, type Filter, whereOf } from '$lib/record/api.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -32,6 +32,8 @@
   import Menu from '$lib/ui/Menu.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import RowCards from '$lib/ui/RowCards.svelte';
+  import { rowsAsCards } from '$lib/ui/body.svelte.ts';
+  import { CapLine } from 'braindog-render/svelte';
   import Second from '$lib/ui/Second.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import RowMenu from '$lib/ui/RowMenu.svelte';
@@ -40,7 +42,6 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
 
-  const DOM_CAP = 2000;
 
   const id = $derived(page.params.register ?? '');
   const decl = $derived(REGISTERS[id]);
@@ -508,7 +509,14 @@
   const menuRow = $derived(result.entries.find((e) => e.seq === menuSeq));
 
   function openRowMenu() {
-    const el = document.querySelectorAll('.rowgroup .tr')[focus.row];
+    /* WHICHEVER BODY IS ON THE SCREEN. This looked for `.tr` alone, and once the card list and the
+       grid stopped both being built, `⇧F10` found nothing below 640px and the row menu stopped
+       opening at all — the a11y gate's own scenario caught it. It had never really worked there
+       either: a `display: none` row still matches a selector and reports a zero rect, so the menu
+       used to open in the top-left corner of the window rather than beside the row. */
+    const el =
+      document.querySelectorAll('.rowgroup .tr')[focus.row] ??
+      document.querySelectorAll('.cards > li')[focus.row];
     if (!el) return;
     const r = el.getBoundingClientRect();
     menuAt = { x: r.x + 24, y: r.y, height: r.height };
@@ -571,14 +579,22 @@
     const seqs = picked.map((e) => e.seq);
     archived = new Set([...archived, ...seqs]);
     selected = new Set();
-    toasts.push(copy.archived(`${seqs.length} ${decl?.name.toLowerCase() ?? 'rows'}`), {
-      undo: () => {
-        const next = new Set(archived);
-        for (const seq of seqs) next.delete(seq);
-        archived = next;
-        selected = new Set(seqs);
+    /* ONE ROW IS NOT "1 obligations". The register declares both spellings — `name` for the list
+       and `one` for a row of it — and this read only the first, so every single-row bulk archive
+       said the plural. The keyboard path next door has always said `obligations#1`. */
+    toasts.push(
+      copy.archived(
+        `${seqs.length} ${(seqs.length === 1 ? decl?.one : decl?.name)?.toLowerCase() ?? 'rows'}`,
+      ),
+      {
+        undo: () => {
+          const next = new Set(archived);
+          for (const seq of seqs) next.delete(seq);
+          archived = next;
+          selected = new Set(seqs);
+        },
       },
-    });
+    );
   }
 
   /** The register's own states, so the menu is the vocabulary rather than a list typed here. */
@@ -819,29 +835,18 @@
       <!-- Below 640px the default body is CARDS over the register's three declared `mobile:` fields,
            and the table is one `v` away. A saved view is the same list with a different predicate and
            had only the table, so the two behaved differently on one device — which is what made this
-           a component rather than markup. -->
-      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} picked={selected}>
-        {#snippet action(e)}
-          <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
-               key: peek `p`, copy `y`, copy link `⇧Y`, archive `⌫`, select `x`. On the device
-               with no keyboard that made a register a list you could read and open and nothing
-               else — eight capabilities, none of them reachable. It opens the SAME `RowMenu` the
-               keyboard opens, so there is one set of verbs rather than a touch copy of them, and
-               each item still prints the key that replaces it. -->
-          <button
-            type="button"
-            class="card-more"
-            aria-label="{copy.rowMenu} #{e.seq}"
-            onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
-          >
-            <Icon name="more" size="s" />
-          </button>
-        {/snippet}
-      </RowCards>
+           a component rather than markup.
 
-      <!-- THE VERBS, above the rows they act on and nowhere else. It appears with the selection and
-           goes with it: a permanently visible bulk bar is a row of disabled controls, which tells
-           you a thing exists and refuses to say why it will not work. -->
+           ONE BODY AT A TIME, AND NOW IN THE DOM RATHER THAN ONLY IN THE STYLESHEET. Both bodies
+           were built at every width and one was hidden: at 2,614 rows this document held 4,001 rows
+           and 102,681 nodes — two thousand of them cards no pixel was showing — and took eight
+           seconds to settle. `13 §4.3` caps the DOM at 2,000 and it was being paid twice, once
+           invisibly. `05 §6`'s rule is that a width query never changes a control's SIZE; which of
+           two bodies exists is layout, which is exactly what width decides. -->
+      <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS TWO BODIES. Putting the branch in the
+           markup rather than in the stylesheet swallowed this into the card arm, so a desktop
+           selection raised no bulk bar at all — which is the whole reason the branch had to be
+           measured rather than assumed. It sits above the rows it acts on in both. -->
       {#if picked.length > 0}
         <div class="picked-bar" role="toolbar" aria-label="{picked.length} {copy.selected}">
           <span class="picked-n num">{picked.length}</span>
@@ -874,6 +879,35 @@
         </div>
       {/if}
 
+      {#if rowsAsCards()}
+      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} picked={selected}>
+        {#snippet action(e)}
+          <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
+               key: peek `p`, copy `y`, copy link `⇧Y`, archive `⌫`, select `x`. On the device
+               with no keyboard that made a register a list you could read and open and nothing
+               else — eight capabilities, none of them reachable. It opens the SAME `RowMenu` the
+               keyboard opens, so there is one set of verbs rather than a touch copy of them, and
+               each item still prints the key that replaces it. -->
+          <button
+            type="button"
+            class="card-more"
+            aria-label="{copy.rowMenu} #{e.seq}"
+            onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
+          >
+            <Icon name="more" size="s" />
+          </button>
+        {/snippet}
+      </RowCards>
+
+      <!-- THE VERBS, above the rows they act on and nowhere else. It appears with the selection and
+           goes with it: a permanently visible bulk bar is a row of disabled controls, which tells
+           you a thing exists and refuses to say why it will not work. -->
+
+      <!-- AND THE CAP LINE COMES WITH THE BODY. `Table` draws its own outside the grid, so the
+           phone could see it while the table was merely hidden; with the table gone from the
+           document, the card list has to say it. -->
+      <CapLine shown={Math.min(result.matched, DOM_CAP)} total={result.matched} />
+      {:else}
       <div class="table-slot">
         <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
              without it, so eight header buttons over a single row — each announcing
@@ -921,6 +955,7 @@
           {/snippet}
         </Table>
       </div>
+      {/if}
     {/if}
   </div>
 

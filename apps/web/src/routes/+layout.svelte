@@ -74,6 +74,13 @@
   });
 
   let railOff = $state(pref.read().sidebar === false);
+
+  /* One function, because the chord and the restore control are the same act and a second copy of
+     two lines is a second place for the preference to be written differently. */
+  function toggleRail() {
+    railOff = !railOff;
+    pref.write({ sidebar: !railOff });
+  }
   const go = new GoPrefix();
 
   /** `ponytail:` a constant in the mock-up. The live channel is `lib/data/live.ts` in the real app:
@@ -113,8 +120,7 @@
        become unreadable. Hidden, with `g` and the palette still reaching everything. */
     if (mod && e.key === '\\') {
       e.preventDefault();
-      railOff = !railOff;
-      pref.write({ sidebar: !railOff });
+      toggleRail();
       return;
     }
 
@@ -199,6 +205,13 @@
         open={data.questions.length}
         inbox={data.inbox}
       />
+    </div>
+
+    <!-- The way back, and the only chrome that appears when the rail does not. -->
+    <div class="rail-back">
+      <button type="button" class="tap" onclick={toggleRail} aria-label={copy.showSidebar} title={copy.showSidebar}>
+        <Icon name="rows" size="s" />
+      </button>
     </div>
 
     <main id="main" class="body">
@@ -332,13 +345,87 @@
      ONE scroll container, so the rail never moves and the window shows exactly one scrollbar. */
   .shell {
     display: grid;
+    /* `--rail-back` is 0 while the rail is here and the width of one control while it is not, so the
+       two states are one declaration rather than two grids that can disagree. */
+    --rail-back: 0px;
     grid-template-columns: auto minmax(0, 1fr);
     block-size: 100dvh;
     overflow: hidden;
   }
 
+  @media (width >= 900px) {
+    .shell[data-rail='off'] {
+      --rail-back: 40px;
+    }
+  }
+
+  /**
+   * HIDING THE RAIL LEFT THE COLUMN IT LIVED IN.
+   *
+   * `display: none` takes the rail out of flow, and `.body` — now the first in-flow grid item —
+   * lands in the `auto` track, which sizes to its own content. Measured at a 1,536px window:
+   * `grid-template-columns: 692.75px 843.25px`. The whole app rendered in 45% of the window with a
+   * dead strip of ground beside it, on the one gesture whose entire purpose is to give the work the
+   * width.
+   *
+   * One column when there is one column.
+   */
+  .shell[data-rail='off'] {
+    grid-template-columns: var(--rail-back) minmax(0, 1fr);
+  }
+
   .shell[data-rail='off'] .rail-slot {
     display: none;
+  }
+
+  /**
+   * AND ONE WAY BACK, because `⌘\` is reachable by accident and the state is a cookie.
+   *
+   * With the rail gone, a sweep of every visible control on `/vault` returned six: the six *Reveal
+   * once* buttons. No nav, no menu, no mark, nothing to restore it — and `pref` had already written
+   * `sidebar: false`, so reloading does not clear it. A person who hits the chord by accident is
+   * stranded unless they happen to know `⌘\`, `?` or `⌘K`.
+   *
+   * NOT THE ICON RAIL THE CHORD'S OWN COMMENT REJECTS. `19 §3`'s argument is about the NAV — a query
+   * over `page` rows whose length varies per customer, which a strip of unlabelled glyphs makes
+   * unreadable. This is not the nav. It is one control, in the gutter the nav used to start in, that
+   * does exactly one thing and says so; the same shape as the launcher in the opposite corner.
+   *
+   * It is 40px wide and only above 900px: below that the rail is already gone and the tab bar is the
+   * nav, so a restore control would be offering to bring back something that was never taken.
+   */
+  .rail-back {
+    display: none;
+  }
+
+  @media (width >= 900px) {
+    .shell[data-rail='off'] .rail-back {
+      display: flex;
+      align-items: start;
+      justify-content: center;
+      padding-block-start: var(--sp-3);
+      background: var(--s1);
+      border-inline-end: 1px solid var(--line);
+    }
+  }
+
+  .rail-back button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--dim);
+    cursor: pointer;
+  }
+
+  .rail-back button:hover {
+    background: var(--s2);
+    color: var(--ink);
   }
 
   .body {
