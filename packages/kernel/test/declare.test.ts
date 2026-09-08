@@ -536,3 +536,107 @@ test('AND `search:` TAKES WHAT THE INDEX CAN TAKE', () => {
   assert.equal(refusedWith(withFields([{ id: 'what', type: 'text' }], { ...NO_STATE, search: ['nope'] })), 'DECLARATION_INVALID');
   assert.equal(refusedWith(withFields([{ id: 'what', type: 'text' }], { ...NO_STATE, search: 'what' })), 'DECLARATION_INVALID');
 });
+
+/* ── a metric, which nothing checked at all ───────────────────────────────────── */
+
+/** A metric that satisfies `08 §2`, with one key overridden per case. */
+const metric = (over: Record<string, unknown> = {}): Declaration => ({
+  id: 'metric.unpaid',
+  kind: 'metric',
+  body: {
+    metric: 'unpaid',
+    source: 'register.obligations',
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { lte: 2_000_000 },
+    window: '30d',
+    ...over,
+  } as never,
+});
+
+test('A METRIC WAS CHECKED BY NOTHING, and 08 §2 marks two keys required in bold', () => {
+  /**
+   * `validate` deep-checked a register, a digest, a connector and a rule, and returned `null` for a
+   * metric — so every key in `08 §2`'s table was advisory.
+   *
+   * `04 §5` gives the refusal its own sentence, and it is the argument for this product having
+   * metrics rather than counters: *"a number with no target is decoration; a number with no
+   * comparison window cannot be acted on."*
+   */
+  assert.equal(refusedWith(metric()), null, 'a metric that satisfies 08 §2 was refused');
+
+  const noTarget = validateDeclaration(metric({ target: undefined }));
+  assert.equal(noTarget?.code, 'METRIC_NEEDS_TARGET_OR_WINDOW');
+  assert.equal(noTarget?.at, 'target');
+  assert.match(noTarget?.fix ?? '', /decoration/, 'the refusal does not carry 04 §5’s sentence');
+
+  const noWindow = validateDeclaration(metric({ window: undefined }));
+  assert.equal(noWindow?.code, 'METRIC_NEEDS_TARGET_OR_WINDOW');
+  assert.equal(noWindow?.at, 'window');
+});
+
+test('and a source is a register or a series, not a bare name', () => {
+  /* `08 §2`: `register.<id>` or `series.<id>` (`25 §8`). A bare register name is the commonest
+     mistake and the evaluator reads it as neither. */
+  assert.equal(refusedWith(metric({ source: 'series.npm-downloads' })), null);
+  for (const source of ['obligations', 'register.', 'table.obligations', 7, undefined])
+    assert.equal(refusedWith(metric({ source })), 'DECLARATION_INVALID', `${String(source)} is not a source`);
+});
+
+test('and money carries its currency, because 02 §3 says a bare number is not money', () => {
+  /* A `format` of `money` with no currency reaches the renderer as an unresolved figure — and
+     `02 §3`'s whole argument is that a bare number loses the one fact that makes a total mean
+     anything. */
+  assert.equal(refusedWith(metric({ format: 'money.EGP' })), null);
+  for (const format of ['int', 'decimal', 'pct', 'days', 'duration'])
+    assert.equal(refusedWith(metric({ format })), null, `${format} is a format`);
+  for (const format of ['money', 'money.gbp', 'money.GB', 'currency', 'number', undefined])
+    assert.equal(refusedWith(metric({ format })), 'DECLARATION_INVALID', `${String(format)} is not a format`);
+});
+
+test('and one dimension, because two is a report generator', () => {
+  /* `04 §5`, verbatim: *"group_by takes one field. Two dimensions is a report generator."*
+     `08 §2.1` is explicit that the second dimension is the line this product does not cross. */
+  assert.equal(refusedWith(metric({ group_by: 'channel' })), null);
+  assert.equal(refusedWith(metric({ group_by: ['channel'] })), null);
+  const two = validateDeclaration(metric({ group_by: ['channel', 'client'] }));
+  assert.equal(two?.code, 'GROUP_BY_TWICE');
+  assert.match(two?.fix ?? '', /report generator/);
+  assert.equal(refusedWith(metric({ group_by: 7 })), 'DECLARATION_INVALID');
+});
+
+test('and a bucket buckets a grouping, or it buckets nothing', () => {
+  /* `08 §2.1`: *"only with a date `group_by`"*. Handed one alone, the evaluator returns the
+     ungrouped figure with a bucket key nobody reads — a chart that draws one bar and looks like
+     data. */
+  assert.equal(refusedWith(metric({ group_by: 'due', bucket: 'week' })), null);
+  assert.equal(refusedWith(metric({ bucket: 'week' })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(metric({ group_by: 'due', bucket: 'fortnight' })), 'DECLARATION_INVALID');
+  for (const bucket of ['day', 'week', 'month', 'quarter', 'year'])
+    assert.equal(refusedWith(metric({ group_by: 'due', bucket })), null, `${bucket} is a bucket`);
+});
+
+test('and a comparison is one of the three the evaluator has an arm for', () => {
+  /* `compare: 'last'` fell through the evaluator's if-chain and silently compared against nothing —
+     the shape this codebase keeps producing: something complete-looking that reports success and
+     does nothing. */
+  for (const compare of ['previous', 'year_ago', 'none'])
+    assert.equal(refusedWith(metric({ compare })), null, `${compare} is a comparison`);
+  const said = validateDeclaration(metric({ compare: 'last' }));
+  assert.equal(said?.code, 'DECLARATION_INVALID');
+  assert.deepEqual(said?.allowed, ['previous', 'year_ago', 'none']);
+});
+
+test('AND EVERY METRIC THE RECORD SHIPS SATISFIES ALL OF IT', async () => {
+  /* BY PATH, because the kernel does not depend on the seed and must not — `31 §2`'s order puts
+     the seed above it. This is a test reading a population, which is the same shape as the currency
+     drift check one package over. */
+  const { metricDeclarations } = await import('../../seed/src/index.ts');
+  /* The other half of a new check: it must not refuse what already works. A rule that is red for
+     every input is as useless as one that is never red, and the seed is the population this one
+     will meet first. */
+  const SEED_METRICS = metricDeclarations();
+  for (const decl of SEED_METRICS)
+    assert.equal(validateDeclaration(decl), null, `${decl.id} is a metric this record ships and the check refuses it`);
+  assert.ok(SEED_METRICS.length >= 5, 'too few seeded metrics for that to mean anything');
+});

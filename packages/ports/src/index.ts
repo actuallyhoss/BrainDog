@@ -137,13 +137,15 @@ export type Conflict = {
  *
  * *"The type `Refusal` (with `RefusalCode`) is a type-only export of `@braindog/ports`, the lowest
  * shared package, because `where` raises one and sits below the kernel."* It did not exist. `code`
- * was `string`, so a refusal could carry any word at all. `refusals.mjs` counts it: **39 of the 99
- * emitted, 60 emitted by nothing, and 22 more that are not in the registry at all** — including
- * `DECLARATION_INVALID`, the catch-all this build leans on hardest.
+ * was `string`, so a refusal could carry any word at all. `refusals.mjs` counts it: **51 of the 99
+ * emitted, 48 emitted by nothing, and 24 more that are not in the registry at all** — 32 of those
+ * occurrences being `DECLARATION_INVALID`, the catch-all this build leans on hardest.
  *
- * (An earlier draft of this paragraph said 41 · 58 · 24, from a review that counted by hand. The
- * gate's numbers are the ones here, because they are the ones anybody can reproduce — which is the
- * whole argument for having the gate.)
+ * (Two earlier numbers here were wrong and both are worth keeping. A hand count said 41 · 58 · 24.
+ * Then the gate said 39 · 60 · 22 — and it was wrong too, because its pattern matched `no(` and
+ * `code:` and nothing else, while `declare.ts`, the largest emitter in the repository, builds every
+ * refusal through a local `bad()`. A gate whose predicate cannot reach its biggest input is the
+ * failure this tools directory exists to catch, made by the tool.)
  *
  * A code is the one part of a refusal a caller can branch on. `10 §7` builds the agent contract on
  * it — *"the refusal teaches"* — and an agent teaches itself from a code that is stable across

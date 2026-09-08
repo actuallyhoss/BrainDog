@@ -12,16 +12,16 @@
  * `RefusalCode` DID NOT EXIST, and `code` was `string`. A code is the one part of a refusal a caller
  * can branch on: `10 §7` builds the agent contract on it — *"the refusal teaches"* — and an agent
  * teaches itself from a code that is stable across versions. With nothing closing the list, an audit
- * counts **39 of the 99 emitted, 60 emitted by nothing, and 22 more that are not in the registry**.
+ * counts **51 of the 99 emitted, 48 emitted by nothing, and 24 more that are not in the registry**.
  *
  * WHAT THIS GATE DOES, AND WHY IT IS A BUDGET RATHER THAN A RULE. Typing the field `RefusalCode`
- * today compiles against 41 call sites carrying codes that are not in the registry. Some of those
+ * today compiles against seventy-odd sites carrying codes that are not in the registry. Some of those
  * are concepts `30 §6` is missing and should gain by amendment (`ROUTE_UNKNOWN`, `PAGE_UNKNOWN`);
  * some are placeholders that should not exist at all (`UNIMPLEMENTED`, `INTERNAL`,
  * `SOMETHING_NOBODY_MAPPED`); and telling those apart is a judgement per site, not a rename. A
- * budget that may only go down measures the drift, makes a twenty-third invented code red today,
+ * budget that may only go down measures the drift, makes a twenty-fifth invented code red today,
  * and lets the type narrow the day it reaches zero — which is the honest intermediate between a
- * list nothing enforces and 41 hurried guesses.
+ * list nothing enforces and seventy hurried guesses.
  *
  * The three sources, and the same shape `event-kinds` uses for the one other list this large:
  *
@@ -135,8 +135,19 @@ for (const [what, list] of [['30 §6', table], ['REFUSAL_CODES', declared]]) {
 
 /* ── 4 · what the code actually emits ───────────────────────────────────── */
 
-/** A code handed to `no()` or written as a `code:`, which is every way one reaches a caller. */
-const EMITTED = /(?:code:\s*|no<[^>]*>\(\s*|no\(\s*)'([A-Z][A-Z0-9_]{2,})'/g;
+/**
+ * A code handed to a refusal constructor, or written as a `code:`.
+ *
+ * FOUR HELPERS, NOT ONE. The first version of this matched `no(` and `code:` only — and
+ * `declare.ts`, the single largest emitter in the repository, builds every refusal through a local
+ * `bad(code, fix, at, allowed)`. So the gate reported *39 emitted* over a scan that could not see
+ * the file `04 §5` is about, and the six checks added the same afternoon moved the number by zero.
+ *
+ * A gate whose predicate cannot reach the biggest input is the failure this whole tools directory
+ * exists to catch, made by the tool. The names are `no`, `bad`, `refuse` and `at`, counted from the
+ * source rather than remembered: a fifth is a finding, because the number below would silently drop.
+ */
+const EMITTED = /(?:code:\s*|\b(?:no|bad|refuse|at)\s*(?:<[^>]*>)?\(\s*)'([A-Z][A-Z0-9_]{2,})'/g;
 
 const known = new Set(table);
 const invented = new Map();
@@ -175,7 +186,7 @@ for (const dir of ['packages', 'apps', 'tools']) {
  * standing in for a refusal nobody has written. All three are fixed by a person reading the site.
  * What a gate can do is stop the number growing while that happens.
  */
-const BUDGET = 22;
+const BUDGET = 24;
 const codes = [...invented.keys()].sort();
 /* THE BUDGET IS ABOUT A TREE WITH CODE IN IT. A fixture root holds a document and an array and no
    source at all, so counting emitted codes there measures nothing — and the slack rule below would

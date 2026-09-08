@@ -180,3 +180,16 @@ test('THE GATE ARRIVES RANKED, because two screens read it and one of them sorte
      order, which is the thing this test exists to stop mattering. */
   assert.equal(new Set(ranks).size, ranks.length, 'two questions share a rank');
 });
+
+test('and the decided list arrives newest first, because one screen reads [0]', () => {
+  /* `/decide`'s empty state is `copy.lastDecided` + `since(DECIDED[0]?.decided?.at)` — a sentence
+     about recency taken from a position. That held while the array was one row; appending a second
+     decision made the screen say the last one was three months old with a nine-hour-old one two
+     lines below it. `[0]` is a fine way to ask for the newest once the list is sorted. */
+  const at = DECIDED.map((q) => q.decided?.at ?? '');
+  assert.deepEqual(at, [...at].sort().reverse(), 'the decided list is not newest-first');
+  assert.ok(DECIDED.every((q) => q.decided), 'a decided question with no decision');
+
+  /* AND IT IS NOT A LIST OF ONE, which is the state that made the defect invisible. */
+  assert.ok(DECIDED.length > 1, 'one decision, so the ordering above is asserted over nothing');
+});

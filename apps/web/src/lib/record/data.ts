@@ -373,7 +373,20 @@ export const DECIDED: Question[] = [
     decided: { option: 'accept', reason: 'Both are live and both renew; an invoice line nobody has a row for is the thing this record exists to stop.', by: 'you', at: stamp(-3) },
   },
   ...(VARIANT === 'busy' ? OLD_RENEWALS : []),
-];
+]
+  /**
+   * NEWEST FIRST, because `/decide` reads `DECIDED[0]` as *the last one decided*.
+   *
+   * Its empty state is `copy.lastDecided` + `since(DECIDED[0]?.decided?.at)` — a sentence about
+   * recency taken from a position. That held while the array was one row, and the moment a second
+   * decision was appended (the Fenwick proposal, accepted three hours ago) the screen said the last
+   * decision was three months old with a nine-hour-old one sitting two lines below it.
+   *
+   * Same shape as the gate above: a list whose order is a fact about it should arrive ordered,
+   * rather than every reader being trusted to remember. `[0]` is a fine way to ask for the newest
+   * once the list is sorted, and a bug in every other case.
+   */
+  .sort((a, b) => (b.decided?.at ?? '').localeCompare(a.decided?.at ?? ''));
 
 /* ── inbox ───────────────────────────────────────────────────────────────── */
 

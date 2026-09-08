@@ -258,6 +258,97 @@ function digestBody(decl: Declaration): Refusal | null {
   return null;
 }
 
+/** `08 §2`'s table, closed. A `format` outside these is a figure nothing knows how to draw. */
+const FORMATS = ['int', 'decimal', 'pct', 'days', 'duration'] as const;
+
+/** `08 §2`: `previous` · `year_ago` · `none`, and the default is `previous`. */
+const COMPARE = ['previous', 'year_ago', 'none'] as const;
+
+/** `08 §2.1`, and only ever beside a date `group_by`. */
+const BUCKETS = ['day', 'week', 'month', 'quarter', 'year'] as const;
+
+/**
+ * A metric declaration, checked against `08 §2`.
+ *
+ * NOTHING CHECKED ONE. `validate` deep-checked a register, a digest, a connector and a rule, and
+ * returned `null` for a metric — so every key in `08 §2`'s table was advisory. A metric with no
+ * `target` installed and drew a number nobody could act on; a `format` of `money` with no currency
+ * reached the renderer as an unresolved figure; `compare: 'last'` fell through the evaluator's
+ * if-chain and silently compared against nothing.
+ *
+ * `08 §2` MARKS `target` AND `window` REQUIRED IN BOLD, and `04 §5` gives the reason as the
+ * refusal's own sentence: *"a number with no target is decoration; a number with no comparison
+ * window cannot be acted on."* That is the whole argument for this product having metrics rather
+ * than counters, and it was enforced nowhere.
+ */
+function metricBody(decl: Declaration): Refusal | null {
+  const body = decl.body as {
+    source?: unknown;
+    value?: unknown;
+    format?: unknown;
+    target?: unknown;
+    window?: unknown;
+    compare?: unknown;
+    group_by?: unknown;
+    bucket?: unknown;
+  };
+  const id = decl.id;
+
+  /* `register.<id>` OR `series.<id>` (`08 §2`, `25 §8`). A bare register name is the commonest
+     mistake and the evaluator reads it as neither. */
+  if (typeof body.source !== 'string' || !/^(?:register|series)\.[a-z][a-z0-9_-]*$/u.test(body.source))
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is register.<id> or series.<id>.`,
+      'source',
+    );
+
+  if (body.value === null || typeof body.value !== 'object')
+    return bad('DECLARATION_INVALID', `${id} has no value, so there is nothing to compute.`, 'value');
+
+  /* `money.<CUR>` CARRIES ITS CURRENCY. `02 §3` is why: a money figure without one is a bare
+     number, and a bare number loses the one fact that makes a total mean anything. */
+  const format = body.format;
+  const money = typeof format === 'string' && /^money\.[A-Z]{3}$/u.test(format);
+  if (!money && !(FORMATS as readonly unknown[]).includes(format))
+    return bad(
+      'DECLARATION_INVALID',
+      `${id}'s format is ${JSON.stringify(format ?? null)}. A metric is money.<CUR>, ${FORMATS.join(', ')}.`,
+      'format',
+      [...FORMATS, 'money.<CUR>'],
+    );
+
+  /* `04 §5`'s own sentence, and `08 §2` marks both required in bold. */
+  if (body.target === undefined || body.window === undefined)
+    return bad(
+      'METRIC_NEEDS_TARGET_OR_WINDOW',
+      `${id}: a number with no target is decoration; a number with no comparison window cannot be acted on.`,
+      body.target === undefined ? 'target' : 'window',
+    );
+
+  if (body.compare !== undefined && !(COMPARE as readonly unknown[]).includes(body.compare))
+    return bad('DECLARATION_INVALID', `${String(body.compare)} is not a comparison.`, 'compare', COMPARE as unknown as string[]);
+
+  /* ONE FIELD. `04 §5`: *"group_by takes one field. Two dimensions is a report generator"* — and
+     `08 §2.1` is explicit that the second dimension is the line this product does not cross. */
+  if (Array.isArray(body.group_by) && body.group_by.length > 1)
+    return bad('GROUP_BY_TWICE', `${id}: group_by takes one field. Two dimensions is a report generator.`, 'group_by');
+  if (body.group_by !== undefined && !Array.isArray(body.group_by) && typeof body.group_by !== 'string')
+    return bad('DECLARATION_INVALID', `${id}'s group_by is a field name.`, 'group_by');
+
+  /* A BUCKET WITHOUT A `group_by` BUCKETS NOTHING. `08 §2.1`: *"only with a date `group_by`"* —
+     and the evaluator, handed one alone, returns the ungrouped figure with a bucket key nobody
+     reads, which is a chart that draws one bar and looks like data. */
+  if (body.bucket !== undefined) {
+    if (!(BUCKETS as readonly unknown[]).includes(body.bucket))
+      return bad('DECLARATION_INVALID', `${String(body.bucket)} is not a bucket.`, 'bucket', BUCKETS as unknown as string[]);
+    if (body.group_by === undefined)
+      return bad('DECLARATION_INVALID', `${id} buckets by ${String(body.bucket)} and groups by nothing.`, 'bucket');
+  }
+
+  return null;
+}
+
 /**
  * Check a declaration before it is installed, because an id becomes SQL.
  *
@@ -287,6 +378,7 @@ export function validate(decl: Declaration): Refusal | null {
     * success and does nothing.
     */
   if (decl.kind === 'digest') return digestBody(decl);
+  if (decl.kind === 'metric') return metricBody(decl);
 
   /* A CONNECTOR'S INTERVAL, CHECKED WHERE IT IS WRITTEN. `checkInterval` has existed with no
      production caller, so `every: '1m'` against a bank installed cleanly — and 25 §9 puts the floor
