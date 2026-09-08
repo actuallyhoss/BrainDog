@@ -481,7 +481,21 @@ export type Passkey = { id: string; label: string; added: string; lastUsed: stri
  * `03 §6` is why it is not an export: "A snapshot is not an export: it is a full copy … disaster
  * recovery, not portability." The two live in different settings areas for that reason.
  */
-export type Snapshot = { id: string; at: string; bytes: number; rows: number };
+export type Snapshot = {
+  id: string;
+  at: string;
+  bytes: number;
+  rows: number;
+  /**
+   * Why this night produced nothing, or `null`.
+   *
+   * `12 §8`: *"A backup that silently gave up is worse than none."* The record writes an `export`
+   * event with `note: 'failed: <reason>'` and opens a suggestion (`49 §5.13` raises a question on a
+   * self-host), and the screen listing what is kept is where somebody would look. A list of four
+   * successes cannot show the one state the feature is for.
+   */
+  failed: string | null;
+};
 
 /**
  * A connector that pulls rows in. `25 §9` draws this screen — the most concrete UI specification

@@ -168,6 +168,38 @@ export function since(iso: string, now: number = Date.now()): string {
 /** `date:` links to the calendar and `day:` does not — a future date raises "what else is then". */
 export const dateLong = (iso: string, now?: number): string => `${day(iso)} · ${relative(iso, now)}`;
 
+/**
+ * A size, in the unit that tells one file from another.
+ *
+ * `(bytes / 1e6).toFixed(1) + ' MB'` was written inline on the backups screen, and over a record of
+ * ninety-three rows every snapshot came out **"0.2 MB"** — four distinct copies, four identical
+ * strings, on the one screen whose entire job is to say which copy is which. A formatter that cannot
+ * distinguish the values it is given is not formatting them.
+ *
+ * NO DOCUMENT SPECIFIES THIS. `13-UI` has no rule for bytes; the specs use raw counts, `KiB` and
+ * `MiB`. So it is a decision rather than a citation, and the decision is:
+ *
+ *   · **Decimal units**, because `53 §4`'s ceiling is written `40 MiB` and a person reading a file
+ *     listing sees `MB`. One of the two has to be picked; the screen picks the one people read.
+ *   · **Three significant figures**, so 157 kB and 160 kB are different strings and 1.24 MB and
+ *     1.31 MB are too. A fixed decimal place is what collapsed them.
+ *   · **Whole bytes below a kilobyte**, because `0.4 kB` is a number nobody wanted.
+ */
+export function bytes(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return MISSING;
+  if (n < 1_000) return `${Math.round(n)} B`;
+  const units = ['kB', 'MB', 'GB', 'TB'];
+  let value = n / 1_000;
+  let i = 0;
+  while (value >= 1_000 && i < units.length - 1) {
+    value /= 1_000;
+    i += 1;
+  }
+  /* Three significant figures: 157 kB · 15.7 MB · 1.57 GB. `toPrecision` would give `1.57e+2`. */
+  const places = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toLocaleString(NUM, { minimumFractionDigits: places, maximumFractionDigits: places })} ${units[i]}`;
+}
+
 export const yesno = (v: boolean): string => (v ? 'yes' : 'no');
 
 /** A ref reads as its spoken id, which is the string a person says out loud. */

@@ -26,10 +26,12 @@
  * `suggestPages`, while four real fields went unmentioned. The file written to catch an excuse that
  * outlives its reason had grown one of its own.
  *
- * `Pref` holds ten: `scheme`, `text`, `density`, `theme`, `sidebar`, `chars`, `seen`, `columns`,
- * `nav`, `defined`. This covers five — `text`, `density`, `scheme`, `sidebar`, `nav` — which is
- * everything a page LOAD can settle. The other five each need something a fixture cannot do by
- * loading a URL:
+ * `Pref` holds eleven: `scheme`, `text`, `density`, `theme`, `sidebar`, `chars`, `suggestPages`,
+ * `seen`, `columns`, `nav`, `defined`. This covers six — `text`, `density`, `scheme`, `sidebar`,
+ * `nav` and `suggestPages` — which is everything a page LOAD can settle. `suggestPages` joined the
+ * type after this file had spent a paragraph excusing itself from covering a field the type did not
+ * have; it is covered now, on the load, because turning it off empties a list. The other five each
+ * need something a fixture cannot do by loading a URL:
  *
  *   - `theme`   an accent is chosen by pressing a swatch, and the difference is a palette rather
  *               than one token. **A duplicate swatch that repainted nothing lived here for months**
@@ -115,6 +117,20 @@ const CASES = [
        still in the DOM and still queryable — a probe that counts them reports "no change" about a
        control that works, which is the same lie in the other direction. */
     probe: () => String(Math.round(document.querySelector('.rail-slot, nav.rail')?.getBoundingClientRect().width ?? -1)),
+  },
+  {
+    /**
+     * `suggestPages` — `29 §4`'s one global switch, and the list it empties.
+     *
+     * A page LOAD settles it, which is what makes it gateable at all: off draws a `cleared` empty
+     * state where on draws the holding pen, so the count in the section heading is the measurement.
+     * `19 §2` says this switch is the reason the `navigation` area exists, and the area shipped
+     * without it — the third control in this product found to move a tick and write nothing.
+     */
+    name: 'suggestPages',
+    route: '/settings/navigation',
+    values: [{}, { suggestPages: false }],
+    probe: () => String(document.querySelectorAll('#main .ledger li').length),
   },
   {
     name: 'nav',

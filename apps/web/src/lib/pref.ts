@@ -28,6 +28,28 @@ export type Pref = {
   /** Whether bare letters act inside a focused grid. */
   chars?: boolean | undefined;
   /**
+   * Whether the record proposes pages at all — `29 §4`'s one global switch.
+   *
+   * `19 §2` names it as the reason the `navigation` area exists: *"`navigation` was missing too: it
+   * holds the *Suggest new pages* switch that `29 §4` places there."* `50 §4.7` has had
+   * `suggestPages: boolean` in this type's specification the whole time and the type did not have it
+   * — which the `prefs` gate noticed from the other side, listing it among the fields it excused
+   * itself from covering while `Pref` had never held it.
+   *
+   * `undefined` IS ON, and no document states a default. `29 §3`'s trigger table describes them
+   * firing, so on is the only reading consistent with the rest of that section — and it is a reading
+   * rather than a citation, which is why it is said here rather than assumed.
+   *
+   * PER DEVICE, AND `19 §3` SAYS IT SHOULD NOT BE. *"nav order, hidden pages, pins, dismissals and
+   * the *Suggest new pages* switch must survive a change of device, so none of them is a cookie."*
+   * There is no table among `30 §1`'s thirty-one that could hold it and no `setPref` in `45 §5`;
+   * `50 §10` owns the deviation and names the migration. This is the honest state, and the screen
+   * does not claim otherwise.
+   *
+   * `ponytail:` move to a `member('*')` column and a `setPref` method when the record grows one.
+   */
+  suggestPages?: boolean | undefined;
+  /**
    * The instant you last marked the activity feed read.
    *
    * "SINCE YOU WERE AWAY" NEVER ADVANCED. Home's feed reads a module constant and nothing anywhere

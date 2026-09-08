@@ -18,24 +18,26 @@
   import * as pref from '$lib/pref.ts';
   import { ACCENTS, apply as accentApply } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
+  import * as clipboard from '$lib/clipboard.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
     AUTH_METHODS, DEPLOYMENT, DEVICES, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS,
-    REGISTERS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, boot, pages,
+    REGISTERS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, boot, pages,
   } from '$lib/record/api.ts';
   import { LEVELS, type Level, type Person, type Device } from '$lib/record/schema.ts';
   import { CODE_DIGITS, approve } from '$lib/record/device.ts';
-  import { TONES, relative, since } from 'braindog-render';
+  import { TONES, bytes, relative, since } from 'braindog-render';
 
   /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
      `the studio` — and one of the two was a literal. */
   const RECORD = boot().index.name;
   const me = boot().me;
 
-  /* Bytes as a person reads them. One decimal, because 2.1 MB and 2.14 MB say the same thing and
-     the second one asks to be read twice. */
-  const size = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
+  /* Bytes as a person reads them — `braindog-render`'s, and it is imported rather than written here
+     because it was written here, as `(bytes / 1e6).toFixed(1)`, and printed **"0.2 MB"** for all four
+     snapshots of a ninety-three-row record. Four distinct copies, four identical strings, on the one
+     screen whose entire job is to say which copy is which. */
 
   /**
    * THE CODE-ENTRY CONTROL'S STATE, and the device rows are part of it.
@@ -50,6 +52,9 @@
    * be the one the attempt handed back rather than the constant it started from.
    */
   let typed = $state('');
+  /* The slug, typed to confirm — `02 §9`, and the button is disabled until it matches. Its own
+     state, because a field that shared the device code's would be armed by typing six digits. */
+  let typedSlug = $state('');
   let devices = $state<Device[]>([...DEVICES]);
   let said = $state<{ tone: 'good' | 'bad'; line: string } | null>(null);
   let codeField = $state<HTMLInputElement | undefined>(undefined);
@@ -176,6 +181,9 @@
   let text = $state<'sm' | 'base' | 'md'>(held.text ?? 'base');
   let density = $state<'compact' | 'comfortable' | 'roomy'>(held.density ?? 'comfortable');
   let chars = $state(held.chars ?? true);
+  /* ON UNLESS SOMEBODY SAID OTHERWISE. No document states the default; `29 §3`'s triggers are
+     described as firing, so on is the only reading consistent with the section. */
+  let suggestPages = $state(held.suggestPages ?? true);
 
   let accent = $state<string | null>(held.theme ?? null);
   let accentWrong = $state<string | null>(null);
@@ -224,9 +232,11 @@
    * on the toast made it worse, by offering to reverse it.
    */
   /* AND THE CHARACTER KEYS TOO. It is the one preference that changes what the keyboard DOES, so
-     forgetting it is the one somebody notices within a minute. */
+     forgetting it is the one somebody notices within a minute. And *Suggest new pages*, which is the
+     other switch on this surface and would otherwise be the third control in this product to move a
+     tick, write nothing, and come back on. */
   $effect(() => {
-    pref.write({ chars });
+    pref.write({ chars, suggestPages });
   });
 
   /**
@@ -403,8 +413,38 @@
         </div>
       </Section>
     {:else if area === 'navigation'}
-      <Section title="Suggested pages" count={pen.length}>
-        {#if pen.length === 0}
+      <!--
+        THE SWITCH THIS AREA WAS ADDED TO HOLD, and the area shipped without it.
+
+        `19 §2`: *"`navigation` was missing too: it holds the *Suggest new pages* switch that `29 §4`
+        places there."* `29 §4` gives its shape exactly — *"one global switch, the same shape as
+        `Character keys: off`"* — so it is the same control, not a new one.
+
+        WHAT IT TURNS OFF IS THE PROPOSING, NOT THE PAGES. `29 §2`: movement is forward-only and needs
+        a user action, and *"the system never writes nav order after first install"*. So off empties
+        the holding pen and stops it refilling; nothing already placed moves, and nothing is lost.
+        Saying that is the whole difference between a switch somebody turns off once and a switch
+        somebody is afraid of.
+      -->
+      <Section title={copy.suggestPages}>
+        <p class="hint">{copy.suggestPagesHint}</p>
+        <div class="segment" role="group" aria-label={copy.suggestPages}>
+          <button type="button" class="seg" data-on={suggestPages ? '' : undefined} onclick={() => (suggestPages = true)}>{copy.on}</button>
+          <button type="button" class="seg" data-on={!suggestPages ? '' : undefined} onclick={() => (suggestPages = false)}>{copy.off}</button>
+        </div>
+        <!-- `19 §3` and `29 §4` both say this belongs to the record and not to the device, and there
+             is no table in `30 §1` that could hold it — `50 §10` owns the deviation. The screen says
+             which it is rather than letting somebody assume the durable one. -->
+        <p class="hint">{copy.perDevice}</p>
+      </Section>
+
+      <Section title={copy.suggested} count={suggestPages ? pen.length : 0}>
+        {#if !suggestPages}
+          <!-- NOT `no-data-yet`, WHICH WOULD BE A LIE ABOUT THE RECORD. `19 §6` separates the five
+               empty states precisely so that "nothing has happened yet" and "you turned this off"
+               cannot read the same. -->
+          <Empty kind="cleared" title={copy.suggestOff} body={copy.suggestOffWhy} />
+        {:else if pen.length === 0}
           <Empty kind="cleared" title="Nothing waiting." />
         {:else}
           <ul class="ledger">
@@ -1034,19 +1074,48 @@
         {#if SNAPSHOTS.length === 0}
           <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
         {:else}
-        <p class="hint">{copy.keptHow(SNAPSHOTS_KEPT)}</p>
+        <!-- THE POLICY IS THE HOST'S, and this sentence was Cloud's schedule and the self-host's
+             retention at the same time. `53 §4`: Cloud keeps *"the 30 newest dated keys plus
+             `latest`"* and runs at `17 3 * * *` UTC; `49 §5.13`: a self-host keeps 30 files and runs
+             at 02:00 UTC plus `hash(slug) mod 60` minutes. It said "nightly, at 03:00. The 30 newest
+             are kept" on both, which is right on neither. -->
+        <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.keptSelfHost(SNAPSHOTS_KEPT) : copy.keptCloud(SNAPSHOTS_KEPT)}</p>
         {/if}
         <ul class="ledger">
           {#each SNAPSHOTS as snap}
-            <li>
+            <li data-intent={snap.failed ? 'bad' : undefined}>
               <div class="line">
-                <span class="seq"><Icon name="archive" size="s" /></span>
+                <span class="seq">
+                  {#if snap.failed}
+                    <span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>
+                  {:else}<Icon name="archive" size="s" />{/if}
+                </span>
                 <span class="line-main">
                   <span class="line-title">{snap.id}</span>
                   <span class="line-detail">{relative(snap.at, NOW)}</span>
                 </span>
-                <span class="line-amount"><span class="means">{copy.rowsAndSize(snap.rows, size(snap.bytes))}</span></span>
-                <span class="line-when"></span>
+                <!-- A NIGHT THAT PRODUCED NOTHING SAYS SO, AND SAYS WHY. `12 §8`: "A backup that
+                     silently gave up is worse than none" — which is the argument for these two
+                     routes existing, and the list drew four identical successes. `13 §6`: the
+                     record's own `note` is rendered, not a sentence written here. -->
+                <span class="line-amount">
+                  <span class="means">{snap.failed ? copy.snapshotFailed : copy.rowsAndSize(snap.rows, bytes(snap.bytes))}</span>
+                </span>
+                <span class="line-when">
+                  {#if snap.failed}<span class="why-failed">{snap.failed}</span>
+                  {:else}
+                    <!-- `49 §5.13`: `GET /api/snapshots/:id` streams the file with
+                         `Content-Disposition: attachment`. A self-host's only way back is putting a
+                         copy back by hand, so the copy has to be reachable. Cloud's prefix is not
+                         served to a browser, so there is nothing to offer. -->
+                    {#if DEPLOYMENT.kind === 'self-host'}
+                      <Button
+                        weight="bare"
+                        onclick={() => toasts.push(copy.notWritten(`${snap.id} would be downloaded, sealed, as it sits on disk`), { intent: 'warn' })}
+                      >{copy.download}</Button>
+                    {/if}
+                  {/if}
+                </span>
               </div>
             </li>
           {/each}
@@ -1069,8 +1138,36 @@
       <!-- `03 §6`: "PITR is Cloud-only and this is DOCUMENTED, NOT HIDDEN." `33 §9`: a self-host
            "has no PITR and does not serve `restore`". So the fact is stated where somebody would go
            looking for the control, rather than the control being drawn and then refusing. -->
+      <!--
+        `03 §6`: "PITR is Cloud-only and this is DOCUMENTED, NOT HIDDEN." `33 §9`: a self-host "has no
+        PITR and does not serve `restore`". So the fact is stated where somebody would go looking for
+        the control, rather than the control being drawn and then refusing.
+
+        AND ON CLOUD IT IS A CONTROL. `53 §5.5(a)` puts it here by name — *"The owner, Settings →
+        backups → restore to a time — `POST /api/restore { at }`"* — and this area held the sentence
+        and not the button, which is the one thing a person comes to a backups screen to do.
+      -->
       <Section title={copy.restore}>
         <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.restoreSelfHost : copy.restoreCloud}</p>
+        {#if DEPLOYMENT.kind !== 'self-host'}
+          <ul class="facts">
+            <!-- WHAT IT COSTS, BEFORE THE PRESS. `53 §5.5`: a bookmark restore rewinds the database,
+                 so every write after the chosen instant is gone — and its own rollback is another
+                 point in time, valid for thirty days. `45 §5.6` makes it two phases for exactly that
+                 reason. A control this destructive that says nothing until afterwards is a control
+                 nobody should press. -->
+            <li><span class="fact-key">{copy.restoreLoses}</span><span class="fact-value">{copy.restoreLosesWhat}</span></li>
+            <li><span class="fact-key">{copy.restoreBack}</span><span class="fact-value">{copy.restoreBackHow}</span></li>
+          </ul>
+          <div class="row-actions">
+            <Button
+              onclick={() => toasts.push(copy.notWritten('A time would be picked, and the record put back to it — every write after it gone, and the audit ending there plus one restore.pitr row'), { intent: 'bad' })}
+            >{copy.restoreTo}</Button>
+            <!-- `53 §5.5`'s precondition: *"the owner knows the last good instant — `/audit` shows
+                 every write with its time"*. The control that answers it is one link away. -->
+            <Button weight="bare" href="/audit">{copy.findTheMoment}</Button>
+          </div>
+        {/if}
       </Section>
     {:else if area === 'billing'}
       <!--
@@ -1140,18 +1237,83 @@
           >{copy.exportRows}</Button>
         </div>
       </Section>
+      <!--
+        THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE, and this screen is where four documents put
+        it. `53 §4`: *"the public half in Settings → export and at the well-known URL 03 §4 names"*.
+        `53 §5.4` step 3 has the operator paste it into
+        `braindog verify latest.dogl --key <the record's public key, Settings → export>`, and
+        `48 §5.6` says the answer without it reads **`unpinned`** — the file's own key proves
+        integrity, and origin is `--key`'s job.
+
+        THE ONE KEY THAT BELONGS ON A SCREEN. This product's first promise is that the record indexes
+        what a key opens and never the key, and that rule is about SECRETS; the whole mechanism here
+        is publication. It is served to anybody who asks at `GET /.well-known/braindog-key`, which is
+        the sentence beneath it.
+      -->
+      <Section title={copy.theSignature}>
+        <p class="hint">{copy.theSignatureIs}</p>
+        <ul class="facts">
+          <li>
+            <span class="fact-key">{copy.keyFingerprint}</span>
+            <span class="fact-value mono">{SIGNING_KEY.keyId}</span>
+          </li>
+          <li>
+            <span class="fact-key">{copy.keyPublic}</span>
+            <span class="fact-value mono wrap">{SIGNING_KEY.publicKey}</span>
+          </li>
+        </ul>
+        <div class="row-actions">
+          <Button weight="bare" onclick={() => void clipboard.put(SIGNING_KEY.publicKey, copy.keyPublic, copy.keyCopied)}>{copy.copyKey}</Button>
+        </div>
+        <p class="hint">{copy.verifyHow}</p>
+      </Section>
+
       <!-- `Danger` IS A ONE-WORD HEADING THAT STATES NO FACT, over a line saying `Delete this
            record` over a button saying `Delete the studio` — three lines, two of them the same
            sentence, and the two disagreeing about what the record is called. One sentence saying
            what happens, and the button that does it. -->
+      <!--
+        AND THE CONFIRMATION IS THE CONTROL, not a sentence about one.
+
+        Four documents give the same flow — `02 §9` (*"an ADMIN method, browser session,
+        re-authenticated, **the slug typed**"*), `33 §4`, `33 §10`, `19 §2` — and the screen was one
+        button whose toast said *"Deleting a record asks you to type its name first"*. A control that
+        DESCRIBES its own safeguard has not got one: the description is exactly as far as the product
+        went, on the one action `53 §5.9` says has no rollback after step 2.
+
+        The field is the gate. The button is disabled until the slug is typed, so the safeguard is a
+        thing you do rather than a thing you are told about. Re-authentication is the half nothing
+        specifies HOW to do — `49 §4.2`'s `authed_at` is the only lever the documents give — so the
+        screen says it will be asked for rather than inventing a mechanism.
+      -->
       <Section title={copy.deleteRecord(RECORD)}>
         <div class="danger">
           <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
+          <!-- WHAT IT COSTS, BEFORE THE FIELD. `53 §5.9`: *"Rollback: none after step 2 … by day +30
+               nothing of the record remains anywhere"*, and a final snapshot exists only so that a
+               same-day "wait" is answerable. -->
+          <p class="danger-why">{copy.deleteCosts}</p>
+          <label class="code-label" for="delete-slug">{copy.typeSlug(boot().index.slug)}</label>
+          <div class="code-row">
+            <div class="field field-lg">
+              <input
+                class="field-input"
+                id="delete-slug"
+                type="text"
+                autocapitalize="off"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder={boot().index.slug}
+                bind:value={typedSlug}
+              />
+            </div>
           <Button
             tone="bad"
-            onclick={() => toasts.push(copy.notWritten('Deleting a record asks you to type its name first'), { intent: 'bad' })}
+            disabled={typedSlug.trim() !== boot().index.slug}
+            onclick={() => toasts.push(copy.notWritten(`You would be asked to sign in again, and then ${RECORD} and every copy of it would be gone`), { intent: 'bad' })}
             >{copy.deleteRecord(RECORD)}</Button
           >
+          </div>
         </div>
       </Section>
     {/if}

@@ -521,12 +521,49 @@ export const DEPLOYMENT = { kind: 'self-host' as const, since: day(-612) };
 const snapshotAt = (back: number): Snapshot => {
   const at = day(back);
   const rows = Object.values(ROWS).reduce((n, list) => n + list.length, 0) - back * -2;
-  return { id: at, at, bytes: 24_576 + rows * 1_460, rows };
+  return { id: at, at, bytes: 24_576 + rows * 1_460, rows, failed: null };
 };
 
-export const SNAPSHOTS: Snapshot[] = [0, -1, -2, -3].map(snapshotAt);
+/**
+ * Four nights, and one of them did not run.
+ *
+ * `12 §8` is the whole argument for this screen: *"A backup that silently gave up is worse than
+ * none."* A failed night writes an `export` event with `note: 'failed: <reason>'` and opens a
+ * suggestion; a self-host raises it as a QUESTION (`49 §5.13`) rather than a toast nobody was there
+ * to see. The list held four identical successes, so the state the feature exists to make visible
+ * was the one state it could not draw.
+ */
+export const SNAPSHOTS: Snapshot[] = [0, -1, -2, -3].map(snapshotAt).map((s, i) =>
+  i === 2 ? { ...s, bytes: 0, rows: 0, failed: 'the record was mid-import and would not hold still' } : s,
+);
 
 export const SNAPSHOTS_KEPT = 30;
+
+/**
+ * The record's own signing key, public half — and it is not a credential.
+ *
+ * `53 §4` says where it lives: *"generated on first run; the public half in **Settings → export**
+ * and at the well-known URL 03 §4 names"*. `03 §4` says what it is for: *"so a customer can verify a
+ * backup they downloaded a year ago against a key they can independently fetch"*, and what the
+ * signature claims — *"this file was produced by that instance, and no row has changed since"*.
+ * `53 §5.4` has the operator copy it from this screen into
+ * `braindog verify latest.dogl --key <…>`, and `48 §5.6` says that without it the answer reads
+ * **`unpinned`**: the embedded key proves integrity and origin is `--key`'s job.
+ *
+ * A PUBLIC KEY IS THE ONE KEY THAT BELONGS ON A SCREEN, and this product's first promise makes that
+ * worth saying out loud: the vault indexes what a key OPENS and never the key, and the rule is about
+ * secrets. Publishing this one is the mechanism — it is served at
+ * `GET /.well-known/braindog-key` to anybody who asks.
+ *
+ * `03 §4`: raw 32-byte Ed25519 in base64url; `key_id` is the first 16 hex characters of SHA-256 over
+ * the public key. Both are shown, because `48 §5.6`'s pin check compares `key_id` and that is the
+ * half short enough to read down a phone.
+ */
+export const SIGNING_KEY = {
+  keyId: '9f2c41ab7e05d38c',
+  publicKey: 'Zk8vQ3RhbXBlZC1wdWJsaWMta2V5LWZvci10aGUtc3R1ZGlv',
+  since: day(-612),
+};
 
 /* ── ingest ────────────────────────────────────────────────────────────────── */
 

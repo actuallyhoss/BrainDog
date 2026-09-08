@@ -890,7 +890,42 @@ export const copy = {
 
   /* backups — `53 §5.4` */
   kept: 'What is kept',
-  keptHow: (n: number) => `A sealed copy of the whole record, nightly, at 03:00. The ${n} newest are kept.`,
+  /* ONE SENTENCE SAID BOTH HOSTS' POLICIES AND WAS RIGHT ON NEITHER: "nightly, at 03:00. The 30
+     newest are kept." `53 §4` gives Cloud `17 3 * * *` UTC and *"the 30 newest dated keys plus
+     `latest`"*; `49 §5.13` gives a self-host 02:00 UTC plus `hash(slug) mod 60` minutes and thirty
+     files. And Cloud's real promise is the bigger one — any point in thirty days — which the shared
+     sentence obscured by talking about the nightly copies. */
+  /* navigation — `29 §4`'s one global switch, which `19 §2` says is why this area exists */
+  suggestPages: 'Suggest new pages',
+  suggestPagesHint: 'When a list grows or you keep asking the same question, this record offers a page for it. Nothing is ever placed for you — an offer sits in the list below until you promote it.',
+  suggested: 'Waiting for you',
+  suggestOff: 'Not offering anything.',
+  suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
+  perDevice: 'This setting is remembered on this device.',
+
+  /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
+  theSignature: 'How anybody checks a copy is yours',
+  theSignatureIs: 'Every export and every backup is signed. This is the public half of the key that signs them — it opens nothing, and anybody can fetch it from this record at /.well-known/braindog-key.',
+  keyFingerprint: 'Fingerprint',
+  keyPublic: 'Public key',
+  copyKey: 'Copy the key',
+  keyCopied: 'Public key copied',
+  verifyHow: 'Hand it to somebody with a copy of your record and they can prove it came from here and that no row has changed since. Without it they can prove the file is whole, but not where it came from.',
+
+  /* deletion — `02 §9`: browser session, re-authenticated, the slug typed */
+  deleteCosts: 'There is no undo after this. A final copy is kept for the same day only, and within thirty days nothing of this record is left anywhere.',
+  typeSlug: (slug: string) => `Type ${slug} to confirm`,
+
+  keptCloud: (n: number) => `A sealed copy of the whole record every night. The ${n} newest are kept, plus the latest.`,
+  keptSelfHost: (n: number) => `A sealed copy of the whole record every night, on this machine. The ${n} newest are kept.`,
+  snapshotFailed: 'nothing kept',
+  download: 'Download',
+  restoreTo: 'Restore to a time',
+  findTheMoment: 'Find the moment',
+  restoreLoses: 'What it costs',
+  restoreLosesWhat: 'Every change made after the moment you pick. There is no way to bring them back except restoring forward again.',
+  restoreBack: 'If it was wrong',
+  restoreBackHow: 'Restore to the instant just before — that is a point in time too, for thirty days.',
   rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
   snapshotNow: 'Take one now',
   theKey: 'The key',

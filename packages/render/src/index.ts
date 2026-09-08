@@ -29,6 +29,7 @@ export {
 export {
   MISSING,
   TYPED,
+  bytes,
   dateLong,
   day,
   exponentOf,

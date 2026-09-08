@@ -14,7 +14,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { copy } from '../copy.ts';
-import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './data.ts';
+import { bytes } from 'braindog-render';
+import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './data.ts';
 import { LEVELS, type Level } from './schema.ts';
 import { REGISTERS } from './api.ts';
 
@@ -335,9 +336,42 @@ test('and the two areas that report rather than offer say which deployment this 
   /* `49 §8` asks for one line, here, and names the reason: the key "is what a self-hoster must back
      up separately". A copy sealed with a key that is only inside the copy cannot be opened. */
   assert.match(copy.theKeyIs, /back that key up somewhere else/i);
-  /* `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some". */
-  assert.match(copy.keptHow(SNAPSHOTS_KEPT), new RegExp(String(SNAPSHOTS_KEPT)));
+  /**
+   * `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some".
+   *
+   * AND ONE SENTENCE PER HOST, because one sentence said both policies and was right on neither:
+   * *"nightly, at 03:00. The 30 newest are kept."* `53 §4` gives Cloud `17 3 * * *` UTC and *"the 30
+   * newest dated keys **plus `latest`**"*; `49 §5.13` gives a self-host 02:00 UTC plus
+   * `hash(slug) mod 60` minutes and thirty files. Neither host runs at three o'clock local, and only
+   * one of them keeps exactly thirty.
+   */
+  for (const said of [copy.keptCloud(SNAPSHOTS_KEPT), copy.keptSelfHost(SNAPSHOTS_KEPT)]) {
+    assert.match(said, new RegExp(String(SNAPSHOTS_KEPT)));
+    assert.doesNotMatch(said, /03:00|3 ?am/iu, 'the sentence still names a clock time neither host keeps');
+  }
+  assert.notEqual(copy.keptCloud(SNAPSHOTS_KEPT), copy.keptSelfHost(SNAPSHOTS_KEPT));
+  assert.match(copy.keptCloud(SNAPSHOTS_KEPT), /latest/iu, 'Cloud keeps thirty plus `latest` and the sentence does not say so');
+  assert.match(copy.keptSelfHost(SNAPSHOTS_KEPT), /this machine/iu, 'the self-host sentence does not say where the copies are');
   assert.ok(SNAPSHOTS.length > 0 && SNAPSHOTS.length <= SNAPSHOTS_KEPT);
+
+  /**
+   * A NIGHT THAT PRODUCED NOTHING IS IN THE LIST, because that is what the list is for.
+   *
+   * `12 §8`: *"A backup that silently gave up is worse than none."* That sentence is the argument for
+   * the two routes this screen draws, and the seed held four identical successes — so the one state
+   * the feature exists to make visible was the one state the screen could not show, and no test
+   * could have noticed.
+   */
+  const failed = SNAPSHOTS.filter((s) => s.failed !== null);
+  assert.equal(failed.length, 1, 'no night failed, so the state that matters is undrawable');
+  for (const s of failed) {
+    assert.ok((s.failed ?? '').length > 10, 'it failed and does not say why');
+    assert.equal(s.bytes, 0, 'a failed night kept bytes');
+    assert.equal(s.rows, 0);
+  }
+  /* AND THE SIZES TELL THE COPIES APART. `(bytes / 1e6).toFixed(1)` printed "0.2 MB" for all four. */
+  const sizes = new Set(SNAPSHOTS.filter((s) => s.failed === null).map((s) => bytes(s.bytes)));
+  assert.equal(sizes.size, SNAPSHOTS.filter((s) => s.failed === null).length, `${sizes.size} distinct sizes over ${SNAPSHOTS.length} snapshots: ${[...sizes].join(', ')}`);
 });
 
 /* ── the seed's own arithmetic ───────────────────────────────────────────── */
@@ -355,9 +389,11 @@ test('A SNAPSHOT IS DATED BY THE CLOCK AND COUNTED FROM THE RECORD', () => {
      what made an invented absolute figure read as a derived one. */
   const held = Object.values(ROWS).reduce((n, list) => n + list.length, 0);
   assert.equal(SNAPSHOTS[0]!.rows, held, `the newest copy claims ${SNAPSHOTS[0]!.rows} rows and the record holds ${held}`);
-  /* Older copies hold fewer, because rows were added since. Monotonic, and never above today's. */
-  for (let i = 1; i < SNAPSHOTS.length; i++)
-    assert.ok(SNAPSHOTS[i]!.rows < SNAPSHOTS[i - 1]!.rows, 'an older copy holds at least as many rows as a newer one');
+  /* Older copies hold fewer, because rows were added since. Monotonic over the nights that RAN — a
+     night that failed kept nothing, and zero is not a smaller record, it is no record. */
+  const ran = SNAPSHOTS.filter((s) => s.failed === null);
+  for (let i = 1; i < ran.length; i++)
+    assert.ok(ran[i]!.rows < ran[i - 1]!.rows, 'an older copy holds at least as many rows as a newer one');
 });
 
 test('a run log reports counts the record can produce', () => {
@@ -375,4 +411,69 @@ test('a run log reports counts the record can produce', () => {
   /* `19 §9` bans the schema's word from a surface a person reads, and one line said `register` two
      lines from another saying `lists`. */
   for (const out of outs) assert.ok(!/\bregisters?\b/.test(out), `a run log says "${out}"`);
+});
+
+
+/* ── the public key, which four documents put on the export screen ────────── */
+
+test('THE RECORD PUBLISHES THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE', () => {
+  /**
+   * `53 §4`: *"generated on first run; the public half in **Settings → export** and at the well-known
+   * URL 03 §4 names"*. `53 §5.4` step 3 has the operator paste it into
+   * `braindog verify latest.dogl --key <…>`, and `48 §5.6` says the answer without it reads
+   * `unpinned` — the file's own key proves integrity, and origin is `--key`'s job. The screen had
+   * neither half.
+   *
+   * IT IS THE ONE KEY THAT BELONGS ON A SCREEN, and the shape check says so: `03 §4` gives raw
+   * 32-byte Ed25519 in base64url, and `key_id` as the first 16 hex characters of SHA-256 over it.
+   * Anything longer or differently shaped would be something else, and something else on this screen
+   * would be a secret.
+   */
+  assert.match(SIGNING_KEY.keyId, /^[0-9a-f]{16}$/u, 'the fingerprint is not `03 §4`\u2019s sixteen hex characters');
+  assert.match(SIGNING_KEY.publicKey, /^[A-Za-z0-9_-]+$/u, 'the public key is not base64url');
+  assert.ok(SIGNING_KEY.publicKey.length >= 40 && SIGNING_KEY.publicKey.length <= 64, `a 32-byte key is ~43 base64url characters, and this is ${SIGNING_KEY.publicKey.length}`);
+  assert.ok(SIGNING_KEY.since, 'the key has no date, so nobody can tell a rotation from the original');
+
+  /* AND THE SENTENCE SAYS WHY IT IS SAFE TO SHOW. This product's first promise is that the record
+     indexes what a key opens and never the key, so a screen printing one has to say which kind. */
+  assert.match(copy.theSignatureIs, /opens nothing/iu);
+  assert.match(copy.theSignatureIs, /well-known/iu, 'it does not say the key is public by design');
+  /* `48 §5.6`'s two answers, so somebody knows what they lose by not passing it. */
+  assert.match(copy.verifyHow, /where it came from/iu);
+});
+
+test('and the delete control is the confirmation rather than a sentence about one', () => {
+  /**
+   * Four documents give one flow — `02 §9` (*"an ADMIN method, browser session, re-authenticated, the
+   * slug typed"*), `33 §4`, `33 §10`, `19 §2` — and the screen was one button whose toast read
+   * *"Deleting a record asks you to type its name first"*. A control that DESCRIBES its own safeguard
+   * has not got one, and this is the action `53 §5.9` says has no rollback after step 2.
+   */
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'), 'utf8');
+  assert.match(src, /id="delete-slug"/u, 'there is no field to type the slug into');
+  assert.match(src, /disabled=\{typedSlug\.trim\(\) !== boot\(\)\.index\.slug\}/u, 'the button is not gated on the typed slug');
+  /* The old toast, and not the comment quoting it — a bare grep over the file matches the paragraph
+     explaining why the toast is gone, which is the assertion catching its own evidence. */
+  assert.doesNotMatch(src, /toasts\.push\([^)]*Deleting a record asks you to type its name first/u, 'the toast still describes the safeguard');
+  /* The slug is the record's own, not its display name: `deleteRecord({ slug })`. */
+  assert.match(copy.typeSlug('the-studio'), /the-studio/u);
+  /* AND IT SAYS WHAT IT COSTS BEFORE THE FIELD. `53 §5.9`: no rollback, and by day +30 nothing
+     remains anywhere. */
+  assert.match(copy.deleteCosts, /no undo/iu);
+  assert.match(copy.deleteCosts, /thirty days|30 days/iu);
+});
+
+test('and the *Suggest new pages* switch that `19 §2` says the area exists for', () => {
+  /* `29 §4` gives the shape: *"one global switch, the same shape as `Character keys: off`"*. It is
+     what turns the PROPOSING off — `29 §2`: movement is forward-only and nothing already placed
+     moves — and saying that is the difference between a switch somebody turns off and one they are
+     afraid of. */
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'), 'utf8');
+  assert.match(src, /suggestPages = \$state\(held\.suggestPages \?\? true\)/u, 'the switch does not read the store, so it comes back on');
+  assert.match(src, /pref\.write\(\{ chars, suggestPages \}\)/u, 'the switch does not write the store');
+  assert.match(copy.suggestPagesHint, /Nothing is ever placed for you/iu);
+  assert.match(copy.suggestOffWhy, /untouched/iu, 'turning it off does not say that placed pages are safe');
+  /* `19 §3` and `29 §4` both say it belongs to the record; `50 §10` owns the deviation. The screen
+     says which it is rather than letting somebody assume the durable one. */
+  assert.match(copy.perDevice, /this device/iu);
 });
