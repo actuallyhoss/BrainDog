@@ -15,7 +15,8 @@ import { fileURLToPath } from 'node:url';
 
 import { copy } from '../copy.ts';
 import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './data.ts';
-import { LEVELS } from './schema.ts';
+import { LEVELS, type Level } from './schema.ts';
+import { REGISTERS } from './api.ts';
 
 /* ── the ladder ──────────────────────────────────────────────────────────── */
 
@@ -65,12 +66,76 @@ test('and every one of them has a sentence, so no enum reaches a screen', () => 
     assert.ok((LEVELS as readonly string[]).includes(key), `levelMeans.${key} is not a level`);
 });
 
-test('every seeded person sits on the ladder', () => {
+test('every seeded person sits on the ladder, or holds nothing on the record and says so', () => {
   for (const p of PEOPLE_ACCESS) {
-    assert.ok((LEVELS as readonly string[]).includes(p.level), `${p.name} is at ${p.level}`);
+    /* `null` IS A LEVEL THIS TYPE CAN HOLD AND THE LADDER DOES NOT CONTAIN. `members.ts` shipped two
+       wrong readings of it — promoting the highest scoped level, then defaulting to `read` — and the
+       browser's mirror typed it non-null, so it could hold neither the answer nor the argument. */
+    assert.ok(p.level === null || (LEVELS as readonly string[]).includes(p.level), `${p.name} is at ${p.level}`);
     /* THE INVITATION IS BOUND TO ONE EMAIL (`12 §3`), so it is the identifier and not the name. */
     assert.match(p.email, /^[^@\s]+@[^@\s]+$/, `${p.name} has no address the invitation could bind to`);
   }
+});
+
+test('AND SOMEBODY HOLDS NOTHING ON THE RECORD, OR `null` IS A SHAPE NOBODY EVER SEES', () => {
+  /**
+   * The bookkeeper. `members.ts`'s header gives the whole argument: *"inviting a bookkeeper means
+   * showing them everything, and what people do then is not invite the bookkeeper."* A seed where
+   * every person has a record level makes `null` a branch the screen carries and nothing renders,
+   * which is how the two wrong readings survived as long as they did.
+   */
+  const scopedOnly = PEOPLE_ACCESS.filter((p) => p.level === null);
+  assert.equal(scopedOnly.length, 1, 'nobody is held to named lists, so the matrix has no second row');
+  for (const p of scopedOnly)
+    assert.ok(p.scoped.length > 0, `${p.name} holds nothing on the record and nothing on any list, which is not an invitation`);
+});
+
+test('THE EXCEPTIONS ARE REAL LISTS, AND THEY ARE EXCEPTIONS', () => {
+  /* A scoped row naming a register that does not exist is a grant to nothing — `invite` refuses one
+     with `REGISTER_UNKNOWN`, and a seed that carried one would be drawing a row the kernel would not
+     have accepted. And a scoped row at the person's own record level is not an exception; it is the
+     same answer written twice, which is the shape that makes a matrix unreadable. */
+  for (const p of PEOPLE_ACCESS) {
+    const seen = new Set<string>();
+    for (const ex of p.scoped) {
+      assert.ok(REGISTERS[ex.register], `${p.name} holds ${ex.register}, which is not a list`);
+      assert.ok((LEVELS as readonly string[]).includes(ex.level), `${p.name} holds ${ex.level} on ${ex.register}`);
+      assert.notEqual(ex.level, p.level, `${p.name}'s ${ex.register} row repeats their record level instead of excepting it`);
+      assert.ok(!seen.has(ex.register), `${p.name} has two rows for ${ex.register}`);
+      seen.add(ex.register);
+    }
+  }
+});
+
+test('and the matrix runs in both directions, or half of it is decorative', () => {
+  /**
+   * A scoped level that could only NARROW the record level would make the bookkeeper's opposite
+   * impossible — `read` on the record and `write` on the one list they actually work in — and a
+   * screen that only ever narrows teaches the wrong model. Both directions have to be in the seed,
+   * or nothing on any screen ever shows one.
+   */
+  const rung = (l: string | null) => (l === null ? -1 : LEVELS.indexOf(l as Level));
+  const pairs = PEOPLE_ACCESS.flatMap((p) => p.scoped.map((ex) => rung(ex.level) - rung(p.level)));
+  assert.ok(pairs.some((d) => d < 0), 'no exception narrows a record level');
+  assert.ok(pairs.some((d) => d > 0), 'no exception widens one, so the screen can only ever take away');
+});
+
+test('the hint says one rule rather than two that contradict each other', () => {
+  /* It read *"A level here covers every list. Nobody is added to a new list until you add them."*
+     The first clause is `45 §5.1`'s `'*'` fill and the second is `20 §1`'s private-until-granted,
+     and both are true of DIFFERENT rows of a matrix the screen was not drawing. */
+  assert.doesNotMatch(copy.accessScope, /Nobody is added to a new list/u);
+  assert.match(copy.accessScope, /including ones added later/u, 'the hint no longer says the `*` row covers what comes next');
+  assert.match(copy.accessScope, /one list/u, 'the hint does not mention the exception it is now possible to make');
+});
+
+test('“nothing on the record” has its own sentence, and it is not the bottom rung’s', () => {
+  assert.ok(copy.noRecordLevel.length > 0);
+  assert.ok(copy.noRecordLevelMeans.length > 20);
+  assert.notEqual(copy.noRecordLevelMeans, copy.levelMeans.read);
+  /* And it says the part that makes it different from `read`: a list installed tomorrow gives them
+     nothing, because the ceiling is exactly the lists they were named on. */
+  assert.match(copy.noRecordLevelMeans, /added later|nothing that is added/u);
 });
 
 test('A RECORD KEEPS AT LEAST ONE OWNER, and the seed has exactly one to prove the rule', () => {

@@ -207,10 +207,14 @@ export function invite(
     ...Object.entries(args.registers ?? {}),
   ]);
   /* A LEVEL LEFT OFF THE RECORD TAKES THE ROW WITH IT, for the same reason a register left out of
-     the list does: an invitation is the whole of what somebody holds. */
+     the list does: an invitation is the whole of what somebody holds.
+
+     THE LAST-OWNER CHECK THAT USED TO BE REPEATED HERE COULD NEVER FIRE. The guard above reads
+     `args.level !== 'owner'`, and `undefined !== 'owner'` is true — so an invitation that leaves the
+     record level off has already been refused by the time it reaches this branch. Two spellings of
+     one rule, one of them unreachable, is how a rule ends up being changed in the copy that does
+     nothing; a mutation run found it by disabling the dead one and watching every test stay green. */
   if (args.level === undefined && now !== undefined) {
-    if (now === 'owner' && owners(deps.sql) <= 1)
-      return no<Member>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'level' });
     deps.sql.exec('DELETE FROM member WHERE person_id = ? AND register = ?', args.person, RECORD);
     event(deps, instant(deps.nowMs), by, 'access.revoke', args.person, RECORD, now);
   }

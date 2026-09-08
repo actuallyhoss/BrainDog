@@ -251,15 +251,23 @@
    * THE MOCK SAYS THE SENTENCE THAT WOULD BE WRITTEN rather than "saved". A toast reading "Saved"
    * over a call that also revokes eleven registers is the shape of thing somebody trusts once.
    */
-  const levelChange = (who: Person, to: Level) =>
+  const levelChange = (who: Person, to: Level | null) => {
+    /* `null` IS A DESTINATION AND A STARTING POINT, and the sentence has to survive both. Taking the
+       record level away is `access.revoke` on `'*'` and leaves whatever exceptions they hold; going
+       the other way from nothing is a grant. Comparing `LEVELS.indexOf(null)` would have made it
+       `-1`, which is below `read` and therefore always a grant — the wrong verb in the event, in
+       exactly the case this control was added for. */
+    const from = who.level === null ? -1 : LEVELS.indexOf(who.level);
+    const into = to === null ? -1 : LEVELS.indexOf(to);
     toasts.push(
       copy.notWritten(
         to === who.level
-          ? `${who.name} already reaches ${to}`
-          : `${who.name} would move from ${who.level} to ${to} across this record, with one access.${LEVELS.indexOf(to) > LEVELS.indexOf(who.level) ? 'grant' : 'revoke'} per list and your reason on each`,
+          ? `${who.name} already reaches ${to ?? 'nothing on this record'}`
+          : `${who.name} would move from ${who.level ?? 'nothing'} to ${to ?? 'nothing'} across this record, with one access.${into > from ? 'grant' : 'revoke'} per list and your reason on each`,
       ),
       { intent: 'warn' },
     );
+  };
 
   /* A RECORD KEEPS AT LEAST ONE OWNER — `LEVEL_REQUIRED`, and its fix sentence verbatim (45 §5.6).
      The check is here rather than in the control because it is a fact about the whole list. */
@@ -456,7 +464,7 @@
                      tells two people with one name apart. And WHEN, because access with no date is
                      a list you cannot audit. -->
                 <span class="who-detail">
-                  {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}
+                  {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
                 </span>
                 <span class="who-do">
                 <Button
@@ -473,8 +481,23 @@
                 </span>
               </div>
               <div class="who-level">
+                <!--
+                  SIX OPTIONS, AND THE SIXTH IS NOT A LEVEL.
+
+                  `member.level` is five words and `member` is a ROW that may not exist — and
+                  `members.ts` records what it cost to conflate the two. `access()` first promoted a
+                  scoped level to the record-wide one, so somebody invited to one list as its owner
+                  owned the record; the fix then gave a scoped-only member `read`, which hands an
+                  APPENDER a record-wide read, and `append`'s point is that it does not read. `null`
+                  is the answer both versions were reaching for, and a control offering five words
+                  could not say it.
+
+                  It is first, not last: it is the state somebody is in before you decide anything,
+                  and reading left to right the row now says *nothing on the record, then these
+                  lists* — which is the sentence "invite the bookkeeper" makes.
+                -->
                 <div class="segment segment-sm" role="group" aria-label={copy.levelFor(p.name)}>
-                  {#each LEVELS as level}
+                  {#each [null, ...LEVELS] as level}
                     <button
                       type="button"
                       class="seg"
@@ -487,13 +510,60 @@
                           ? 'own-level'
                           : undefined}
                       onclick={() => levelChange(p, level)}
-                    >{level}</button>
+                    >{level ?? copy.noRecordLevel}</button>
                   {/each}
                 </div>
                 <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
                      sets it. Five ladder words with nothing explaining them is the schema's
                      vocabulary on the screen that decides who can change somebody's business. -->
-                <p class="means">{copy.levelMeans[p.level] ?? p.level}</p>
+                <p class="means">{p.level === null ? copy.noRecordLevelMeans : (copy.levelMeans[p.level] ?? p.level)}</p>
+
+                <!--
+                  THE EXCEPTIONS, WHICH ARE THE MATRIX.
+
+                  `20 §1` materialises person × register × level and `19 §2` names the absence of a
+                  screen for it as the reason this area was added back. Drawing the whole grid — five
+                  people down, fourteen lists across — is the shape that makes a person close the
+                  page: most cells are the same value, and the same value is the record level one
+                  line up.
+
+                  So the record level is the answer and these are the EXCEPTIONS to it. Somebody with
+                  none has one line and nothing else, which is almost everybody; somebody with two
+                  has two, named, with what they hold on each. It is the same information and it is
+                  the difference between a table nobody reads and a sentence anybody can.
+                -->
+                {#if p.scoped.length > 0}
+                  <ul class="exceptions">
+                    {#each p.scoped as ex}
+                      <li>
+                        <span class="ex-list">{REGISTERS[ex.register]?.name ?? ex.register}</span>
+                        <span class="ex-level">{copy.levelMeans[ex.level] ?? ex.level}</span>
+                        <Button
+                          weight="bare"
+                          tone="bad"
+                          onclick={() =>
+                            toasts.push(
+                              copy.notWritten(
+                                `${REGISTERS[ex.register]?.name ?? ex.register} would go back to ${p.level === null ? 'nothing' : p.level}, with one access.revoke naming that list`,
+                              ),
+                              { intent: 'bad' },
+                            )}
+                        >{copy.removeException}</Button>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+                <!-- `45 §5.6` HAS ONE METHOD FOR ALL OF IT: `invite` takes the record level and the
+                     register map together, so adding an exception is the same call as changing a
+                     level. One control, because one call. -->
+                <Button
+                  weight="bare"
+                  onclick={() =>
+                    toasts.push(
+                      copy.notWritten(`One list would be picked, and ${p.name} given a different level on it — one invite, one access.grant naming that list`),
+                      { intent: 'warn' },
+                    )}
+                ><Icon name="plus" size="s" />{copy.addException}</Button>
               </div>
             </li>
           {/each}
@@ -1217,9 +1287,43 @@
     font-size: var(--t-sm);
   }
 
-  /* The ladder is five words, so its buttons are the narrowest segment in the product. */
+  /* The ladder is five words plus `nothing`, so its buttons are the narrowest segment in the
+     product — and the track wraps rather than scrolling, which `controls.css` already decided for
+     the same reason: five 44px segments measured 342px inside a 320px screen. */
   .segment-sm .seg {
     padding-inline: var(--sp-2);
+    font-size: var(--t-sm);
+  }
+
+  /* THE EXCEPTIONS. Indented under the level they are exceptions to, because that relationship is
+     the whole content of the line — a flat list beside the level reads as a second, unrelated
+     answer. One row each: which list, what they hold there, and the way back. */
+  .exceptions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0 0 0 var(--sp-3);
+    border-inline-start: 2px solid var(--line);
+    list-style: none;
+  }
+
+  .exceptions li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2);
+  }
+
+  .ex-list {
+    color: var(--ink);
+    font-weight: 600;
+    font-size: var(--t-sm);
+  }
+
+  .ex-level {
+    flex: 1 1 20ch;
+    color: var(--ink2);
     font-size: var(--t-sm);
   }
 

@@ -431,14 +431,29 @@ export const JOB: Job = {
 
 JOBS[JOB.id] = JOB;
 
+/**
+ * The five-person × fourteen-register matrix of `20 §1`, with four people and three exceptions.
+ *
+ * EVERY ROW HERE IS A SHAPE THE SCREEN COULD NOT DRAW. It held one level each, so the record-wide
+ * level was the whole answer and `member.register` — the column the matrix is made of — appeared
+ * nowhere. What that cost is not abstract: the one sentence `members.ts` gives as the reason the
+ * feature exists could not be expressed on the screen that exists for it.
+ */
 export const PEOPLE_ACCESS: Person[] = [
-  { id: 'you', name: 'You', level: 'owner', email: 'you@thestudio.example', since: day(-612) },
-  { id: 'sm', name: 'S. Marchetti', level: 'write', email: 's.marchetti@example.com', since: day(-181) },
-  { id: 'pv', name: 'Pell & Vine', level: 'read', email: 'accounts@pellvine.example', since: day(-96) },
+  { id: 'you', name: 'You', level: 'owner', scoped: [], email: 'you@thestudio.example', since: day(-612), suspended: null },
+  /* AN OWNER HELD TO `read` ON ONE LIST — `members.ts`'s own example, and the direction people
+     assume is impossible. A scoped level that could only narrow the record level would make the
+     other row below impossible instead. */
+  { id: 'sm', name: 'S. Marchetti', level: 'write', scoped: [{ register: 'people', level: 'read' }], email: 's.marchetti@example.com', since: day(-181), suspended: null },
+  /* THE BOOKKEEPER, AND `level: null` IS THE POINT OF HER. Nothing on the record itself — not the
+     list of lists, not search, not a page — and `read` on the two lists she was asked to reconcile.
+     `45 §5.1`: with no `'*'` row the ceiling is exactly the named registers, so a pack that installs
+     a fifteenth list tomorrow gives her nothing, which is `20 §1`'s *"private until granted"*. */
+  { id: 'pv', name: 'Pell & Vine', level: null, scoped: [{ register: 'obligations', level: 'read' }, { register: 'services', level: 'read' }], email: 'accounts@pellvine.example', since: day(-96), suspended: null },
   /* AN INVITATION THAT HAS NOT BEEN ACCEPTED IS A DIFFERENT STATE FROM ACCESS, and the screen had
      no way to hold one — so somebody who had invited a bookkeeper could not tell whether the link
      had been used. `12 §3`: single-use, 24 hours, bound to one email. */
-  { id: 'jo', name: 'J. Okonkwo', level: 'append', email: 'j@okonkwo.example', since: null },
+  { id: 'jo', name: 'J. Okonkwo', level: 'append', scoped: [{ register: 'sessions', level: 'read' }], email: 'j@okonkwo.example', since: null, suspended: null },
 ];
 
 /* ── the way back in ──────────────────────────────────────────────────────────── */

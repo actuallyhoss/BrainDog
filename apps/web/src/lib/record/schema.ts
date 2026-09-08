@@ -411,12 +411,49 @@ export type Level = (typeof LEVELS)[number];
 export type Person = {
   id: string;
   name: string;
-  /** Their level over the whole record — the `member` row whose register is `*`. */
-  level: Level;
+  /**
+   * Their level over the whole record — the `member` row whose register is `*` — or `null`.
+   *
+   * `null` IS NOT `read`, AND THE KERNEL HAS SHIPPED BOTH WRONG ANSWERS. `members.ts` records them:
+   * it first PROMOTED the highest scoped level to the record-wide one, so somebody invited to one
+   * register as its owner was an owner of the record — the vault, the export, `invite` itself; the
+   * fix then gave a scoped-only member `read`, which hands an APPENDER a record-wide read, and
+   * `append`'s whole point is that it does not read.
+   *
+   * The browser's mirror typed this `Level`, non-null, so it could not hold the answer either
+   * version was arguing about. `null` means *nothing on the record itself* — what somebody holds
+   * when they were invited to named lists and nothing else, which is the entire content of "invite
+   * the bookkeeper".
+   */
+  level: Level | null;
+  /**
+   * The lists where they hold something OTHER than their record level — `member.register`.
+   *
+   * `20 §1` materialises a **5-person × 14-register matrix**, and `19 §2` names its absence as the
+   * reason this area exists: *"the second left `20-COLLABORATION`'s 5-person × 14-register access
+   * matrix with no screen anywhere in 24 documents."* The screen replaced it with one level each,
+   * so the sentence the feature is FOR could not be drawn — `members.ts`'s own header: *"Somebody can
+   * be an owner of the record and hold nothing more than `read` on the one register that carries the
+   * payroll — because the alternative is a product where inviting a bookkeeper means showing them
+   * everything, and what people do then is not invite the bookkeeper."*
+   *
+   * It overrides the record level in BOTH directions. A scoped level that could only narrow would
+   * make the other half — `read` on the record, `write` on one list — impossible.
+   */
+  scoped: readonly { register: string; level: Level }[];
   /** The invitation is bound to one email (`12 §3`), so this is the identifier and not the name. */
   email: string;
   /** When they accepted. `null` while an invitation is still out. */
   since: string | null;
+  /**
+   * `person.suspended_at` — stopped without being decided about.
+   *
+   * `20 §6` puts it beside removal for a reason: removal deletes the levels, so restoring somebody
+   * means remembering what they held. Suspension keeps every row and stops every one of them
+   * working, which is what you reach for when somebody has left for a fortnight. `access()` reads it
+   * now; for a while it was a column the interface could show and the ladder could not enforce.
+   */
+  suspended: string | null;
 };
 
 /**

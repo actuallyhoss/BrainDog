@@ -627,8 +627,26 @@ export const copy = {
   whoCanSee: 'People on this record',
   /* `19 §9` bans `ceiling` and `scope` by name and says: say WHAT THEY CAN SEE. And it says the
      thing this line exists for — a level here is over the whole record, not one list. */
-  accessScope: 'A level here covers every list. Nobody is added to a new list until you add them.',
+  /**
+   * IT ASSERTED TWO RULES THAT CANNOT BOTH BE TRUE, and each half was a real one.
+   *
+   * *"A level here covers every list. Nobody is added to a new list until you add them."* The first
+   * clause is `45 §5.1` step 3 — the `'*'` row fills every register without one of its own, new
+   * ones included. The second is `20 §1`'s *"a new register, entity or page is private until
+   * granted"*. Both are true **of different rows of the matrix**: the `'*'` grant covers everything,
+   * and somebody with no `'*'` row holds exactly the lists they were named on. The screen drew one
+   * level per person, so there was no matrix for either clause to be about, and the sentence read as
+   * a contradiction because on that screen it was one.
+   */
+  accessScope: 'A level here covers every list, including ones added later. Give somebody a different level on one list and it replaces it, for that list only.',
   levelFor: (name: string) => `What ${name} can do`,
+  /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
+     the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */
+  noRecordLevel: 'nothing',
+  noRecordLevelMeans: 'Nothing on this record itself — only the lists named below, and nothing that is added later.',
+  addException: 'Different on one list',
+  removeException: 'Back to their level',
+  suspendedSince: (ago: string) => `stopped ${ago}`,
   sinceWhen: (ago: string) => `joined ${ago}`,
   /* AN INVITATION OUT IS NOT ACCESS, and the two were one row. Somebody who had invited a
      bookkeeper could not tell whether the link had been used. */
