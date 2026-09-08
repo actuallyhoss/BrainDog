@@ -11,9 +11,14 @@
     "@braindog/record": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "4.20250913.0"
+    "@cloudflare/workers-types": "4.20250913.0",
+    "wrangler": "4.42.0"
   },
   "scripts": {
+    "deploy": "wrangler deploy",
+    "deploy:production": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
+    "tail": "wrangler tail",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
   }

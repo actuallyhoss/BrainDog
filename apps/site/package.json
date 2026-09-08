@@ -6,8 +6,10 @@
   "license": "AGPL-3.0-only",
   "description": "brain.dog — the marketing site. Prerendered, no JavaScript required to read it.",
   "scripts": {
-    "dev": "vite dev",
     "build": "pnpm --filter @braindog/skin theme && vite build",
+    "deploy:production": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
+    "dev": "vite dev",
     "preview": "vite preview",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
@@ -21,6 +23,7 @@
     "@sveltejs/vite-plugin-svelte": "7.3.0",
     "svelte-check": "4.7.6",
     "typescript": "6.0.3",
-    "vite": "8.2.2"
+    "vite": "8.2.2",
+    "wrangler": "4.42.0"
   }
 }

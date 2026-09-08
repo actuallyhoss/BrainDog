@@ -1,0 +1,356 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+
+  /* ===========================================================================================
+     THE CLOUD DEPLOYMENT — TWO ENVIRONMENTS, ONE LADDER.
+     51 §4.6 writes this file in full for a single environment. This is that file with `staging`
+     and `production` split out of it, and the split is not cosmetic: 33 §7 and 31 §8 both say
+     plainly *"there is no staging environment: the ops record is the canary"*, and 53 §10 records
+     the ceiling with its own exit — `ponytail: no staging environment ... add env.staging in
+     wrangler.jsonc when a second person deploys`. This is that day, taken early. The canary
+     argument is untouched: the ops record is still the first record to migrate on every deploy
+     (53 §5.3). Staging is not a replacement for it — it is where a DEPLOY is rehearsed, and the
+     ops record is where a MIGRATION is. Amend 33 §7, 31 §8 and 53 §13 #14 in the same revision.
+
+     THE FRONTEND IS NOT DEPLOYED SEPARATELY, AND THAT IS THE WHOLE SHAPE OF THIS FILE. `assets`
+     below carries `apps/web/build` INTO the Worker version (33 §7, 50 §13 D2). One `wrangler
+     deploy` ships the shell and the code as one version, which is what lets `deploy-parity`
+     compare the live `/` against the local `build/` and mean something (52 §3): if they were two
+     deploys they could differ for a minute and the gate would be measuring a race. So the answer
+     to *"how is the static frontend deployed"* is: it is not, it is a property of the Worker
+     version. Only `apps/site` is a separate static deployment, and it has its own file.
+
+     ORDER OF THE KEYS BELOW: everything inheritable first, then the two environments. The
+     division is not stylistic — it is the one fact this file has to get right. See the two
+     comment blocks at `migrations` and at `env`.
+     =========================================================================================== */
+
+  "name": "braindog",
+  "main": "src/index.ts",
+
+  /* INHERITABLE, AND DELIBERATELY NOT OVERRIDDEN PER ENVIRONMENT. A staging environment on a
+     different compatibility date is not a rehearsal of production, it is a rehearsal of a
+     different runtime — and the one thing this date decides is whether `deleteAll()` also deletes
+     the alarm (51 A7, floor 2026-02-24), which is precisely the behaviour a customer deletion
+     drill exercises (53 §5.9). One date, both environments, and `compat-date` reads this one key
+     (52 §3). */
+  "compatibility_date": "2026-09-01",
+
+  /* No `nodejs_compat`: `node:sqlite` is a stub under it (22 §9) and nothing here reaches for
+     `node:*`. An empty array rather than an absent key, so a flag added later is a diff. */
+  "compatibility_flags": [],
+
+  /* BOTH OFF, IN BOTH ENVIRONMENTS, AND THIS IS A SECURITY SETTING RATHER THAN A PREFERENCE.
+     `workers.dev` and preview URLs are additional ORIGINS serving the same records. 51 §5.1 step 3
+     makes every cookie-authenticated mutation require `Origin === "https://" + PUBLIC_HOST`, so a
+     second origin is either a surface where nothing can be written (confusing) or, if anyone ever
+     "fixes" it by relaxing the check, a CSRF hole with a stable public hostname (12 §8). It is
+     also the reason there are no per-pull-request preview deployments — see REPORT.md §4. */
+  "workers_dev": false,
+  "preview_urls": false,
+
+  /* 53 §2.3's five `op` lines are read here. Inheritable, so both environments get it, which is
+     what makes a staging incident debuggable with the same `wrangler tail` the runbook names. */
+  "observability": { "enabled": true },
+
+  /* -------------------------------------------------------------------------------------------
+     THE STATIC SHELL. Inheritable, so both environments serve the same `build/` — there is one
+     artefact and it is host-agnostic by construction (50 §2.1, §13 D1/D2).
+
+     `directory` IS RELATIVE TO THIS FILE, which is why it climbs. 51 §4.6 writes
+     `apps/worker/src/index.ts` and `apps/web/build` because it imagines the config at the
+     repository root; the file actually lives in `apps/worker/`, so both paths shorten by one
+     segment and the asset directory gains a `..`. Amend 51 §4.6's two paths, or move the file —
+     not both.
+
+     `run_worker_first` IS 33 §4'S LIST AND NOT A SECOND COPY OF IT. Everything outside it is the
+     app's (19 §5: *if a future change requires enumerating app paths in two files, that change is
+     wrong*) — this enumerates the HOST's paths, which is the complement and is allowed to exist
+     once. Several of these routes are not built yet, and listing them anyway is the truthful
+     choice: `src/route.ts`'s `servesApi` sends an unbuilt one to `ROUTE_UNKNOWN` (404 JSON),
+     whereas leaving it off this list serves `index.html` with a 200 to an agent's POST — a lie
+     that looks like a working endpoint. `/.well-known/*` is on the list because 33 §7's skeleton
+     has it and `braindog verify` reads `/.well-known/braindog-key` offline (03 §4); the SPA shell
+     answering there would break verification of every backup.
+
+     `single-page-application` is what makes `/r/obligations` and `/D41` resolve in the browser
+     with no path list on either host (19 §5, 50 §13 D1). */
+  "assets": {
+    "directory": "../web/build",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api/*",
+      "/mcp",
+      "/a",
+      "/a/*",
+      "/in/*",
+      "/s/*",
+      "/ws",
+      "/ws/*",
+      "/auth/*",
+      "/.well-known/*"
+    ]
+  },
+
+  /* -------------------------------------------------------------------------------------------
+     DURABLE OBJECT MIGRATIONS — THE PART THAT GOES WRONG, SO IT IS THE PART WITH THE LONGEST
+     COMMENT. Six facts, in the order they bite:
+
+     1. `migrations` IS AN INHERITABLE KEY, and the migration tag is tracked PER WORKER SCRIPT.
+        A named environment is a separate script — `braindog-staging` and `braindog-production` —
+        so each one keeps its own list of applied tags while reading this one ladder. That is
+        exactly what is wanted: one ladder, two scripts, each climbing it independently.
+
+     2. THEREFORE THE LADDER LIVES HERE AND NOWHERE ELSE. Cloudflare's rule is that a migration
+        block inside an environment REPLACES the top-level one; it does not merge. A `migrations`
+        key under `env.staging` is how the two environments silently stop being the same product.
+        There is no legitimate reason to write one. If you ever find yourself wanting one, what you
+        actually want is a new tag here.
+
+     3. THE ARRAY IS APPEND-ONLY AND EVERY PAST TAG STAYS IN IT FOREVER. Tags are unique names,
+        not versions; wrangler applies the ones this script has not applied. Editing an applied tag
+        in place is the quietest failure available — the deploy succeeds, the tag is already
+        recorded, and nothing runs.
+
+     4. A NEW ENVIRONMENT REPLAYS THE WHOLE LADDER FROM EMPTY. `braindog-staging` on its first
+        deploy applies v1, then v2, then v3, in order, against no data. Every tag must therefore be
+        valid against an empty script — which is a live constraint on `renamed_classes`, whose
+        `from` class will not exist there. Create staging BEFORE the first rename lands and the
+        problem never arises, because both scripts then walk the same rungs in the same order.
+        (Whether a rename of an absent class is a no-op or an error is a *verify* — REPORT.md §8.)
+
+     5. NEVER `deleted_classes`. 12 §8 and 53 §3 both state it as a rule rather than a preference:
+        it deletes every object of that class and the data in them, and there is no undo. A class
+        that is finished is left bound and unused.
+
+     6. A NEW TAG BLOCKS `wrangler rollback` — Cloudflare refuses a rollback across a Durable
+        Object class lifecycle change. This is a SECOND rule on top of 53 §5.2's own (*after a
+        kernel migration a rollback is forbidden; every record that migrated answers the old code
+        with SCHEMA_NEWER*), and the two are independent: the platform's rule is about the class
+        list in this array, the corpus's is about `packages/kernel/migrations/`. Either one alone
+        makes the deploy a fix-forward-only deploy.
+
+     THE CLASS NAMES ARE THE CODE'S, NOT 51 §4.6'S. `src/index.ts` exports `Record$` and
+     `Directory$`; the `$` is there because `Record` is a TypeScript utility type and the class
+     would shadow it. 51 §4.6 writes `Record`, `Spark`, `Directory`. A config naming a class the
+     script does not export does not deploy, so this file follows the code and 51 §4.6 is the thing
+     to amend. THIS IS FREE TO DECIDE EXACTLY ONCE — before the first production deploy. Afterwards
+     the two names cost a `renamed_classes` tag (see REPORT.md §8, risk R2).
+
+     `Spark$` IS NOT HERE BECAUSE THE CLASS IS NOT WRITTEN. 33 §7 lists three classes; the code has
+     two. Its rung is drafted below so the shape is settled before it is needed. */
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Record$", "Directory$"] }
+
+    /* THE NEXT RUNG, WHEN `src/do/spark.ts` LANDS (51 §2, §3). Append; do not edit v1.
+       { "tag": "v2", "new_sqlite_classes": ["Spark$"] } */
+
+    /* AND IF 51 §4.6'S NAMES WIN AFTER A PRODUCTION DEPLOY, this is the shape — a rename, never
+       an edit of v1, and never a delete:
+       { "tag": "v3", "renamed_classes": [
+           { "from": "Record$", "to": "Record" }, { "from": "Directory$", "to": "Directory" } ] } */
+  ],
+
+  /* THE NIGHTLY WALK IS NOT WIRED YET AND SO ITS TRIGGER IS NOT EITHER. 51 §4.6 carries
+     `"triggers": { "crons": ["17 3 * * *"] }` and 53 §5.1 is the procedure it runs, but
+     `src/index.ts` exports no `scheduled()` handler — a cron pointed at a Worker with no handler
+     is a nightly invocation that does nothing, on both environments, and nothing says so. It goes
+     in the same commit as `scheduled()`.
+
+     WHEN IT DOES: leave it here at the top level rather than per-environment. Inheritable means
+     both environments run the walk, and that is the point — 53 §9 wants the drills rehearsed, and
+     a backup path that has only ever run in production is a backup path nobody has watched fail.
+     Staging writes to its own R2 bucket, so the two nightly runs cannot touch each other.
+     "triggers": { "crons": ["17 3 * * *"] }, */
+
+  /* ===========================================================================================
+     THE TWO ENVIRONMENTS.
+
+     THE ONE RULE: EVERY NON-INHERITABLE KEY IS REPEATED IN FULL IN BOTH BLOCKS. `durable_objects`,
+     `queues`, `r2_buckets`, `vars`, `secrets_store_secrets`, `analytics_engine_datasets`,
+     `send_email`, `services` and `kv_namespaces` are non-inheritable, and a non-inheritable key
+     omitted from an environment is not inherited — it is EMPTY. The deploy succeeds. The Worker
+     comes up with no Durable Object binding, or no queue, and the first request is the error
+     report. Duplication here is not redundancy, it is the schema.
+
+     `routes` IS INHERITABLE, WHICH IS THE OTHER HALF OF THE SAME TRAP AND THE MORE DANGEROUS ONE.
+     A `routes` key at the top level of this file would be inherited by `env.staging`, and
+     `wrangler deploy --env staging` would then claim `app.brain.dog`. Two Workers cannot hold one
+     Custom Domain, so the likeliest outcome is a failed deploy — but the outcome that is not
+     ruled out is staging answering production's hostname. There is deliberately no top-level
+     `routes` key above. Routes are declared here and only here.
+
+     AND THERE IS NO NAMELESS DEPLOY. Because every binding lives inside an environment, a bare
+     `wrangler deploy` would upload a third Worker called `braindog` with no bindings at all.
+     `deploy.yml` always passes `--env`; do the same by hand. (`wrangler` is expected to refuse
+     this outright, since `migrations` names classes the environment does not bind — *verify*.)
+     =========================================================================================== */
+  "env": {
+    /* -----------------------------------------------------------------------------------------
+       STAGING — script `braindog-staging`. Deployed on every green merge to master, by nobody.
+       Its Durable Objects, its queue, its bucket and its KEK are its own; there is no path by
+       which a staging request reaches a production record, because a DO namespace is scoped to
+       the script and these are two scripts.
+       ----------------------------------------------------------------------------------------- */
+    "staging": {
+      /* ONE LABEL DEEP, AND THAT IS A TLS CONSTRAINT RATHER THAN A PREFERENCE. Universal SSL on a
+         full-setup zone covers the apex and first-level subdomains only, so `app.staging.brain.dog`
+         has no certificate without Advanced Certificate Manager or Total TLS. `app-staging` is
+         free, and identical in every other respect. REPORT.md §1 argues it at length. */
+      "routes": [{ "pattern": "app-staging.brain.dog", "custom_domain": true }],
+
+      /* `PUBLIC_HOST` IS THE CSRF CHECK. 51 §5.1 step 3 compares `Origin` against
+         `https://<PUBLIC_HOST>` on every cookie-authenticated mutation, so a `PUBLIC_HOST` copied
+         from production means every write in staging is a 403 `FORBIDDEN` and every read works —
+         a failure that looks like a permissions bug for about an hour.
+
+         `AGE_RECIPIENT` IS A SEPARATE RECIPIENT, not a copy. 12 §8 keeps the age identity outside
+         Cloudflare in the operator's password manager; two recipients means a staging snapshot can
+         never be opened with the production identity, and the restore drill (53 §5.5) exercises a
+         real key rather than the real key.
+
+         `AI_GATEWAY` is its own gateway so staging's neuron spend and its rate limits are visible
+         apart from production's (12 §8: *per record at AI Gateway*).
+
+         `BRAINDOG_BUILD` IS DECLARED EMPTY AND OVERWRITTEN AT DEPLOY TIME by `--var` in
+         `deploy.yml`. It is here so the key exists, so `wrangler types` emits it, and so the
+         failure when the workflow forgets it is `""` — which `deploy-parity` catches (52 §13 #17)
+         — rather than an undefined binding. It is a var 51 §4.1's `Env` does not list; adding it
+         is an amendment, and REPORT.md §8 names why `/api/version` cannot answer without it. */
+      "vars": {
+        "PUBLIC_HOST": "app-staging.brain.dog",
+        "AI_GATEWAY": "braindog-staging",
+        "AGE_RECIPIENT": "age1<staging-recipient>",
+        "SPARK_ENDPOINT": "",
+        "BRAINDOG_BUILD": ""
+      },
+
+      "durable_objects": {
+        "bindings": [
+          { "name": "RECORD", "class_name": "Record$" },
+          /* One instance for the whole installation, always `idFromName('directory')`. It is the
+             tenant map, and two of them would be two maps that disagree — ADR-061. */
+          { "name": "DIRECTORY", "class_name": "Directory$" }
+        ]
+      },
+
+      /* A QUEUE NAME IS ACCOUNT-GLOBAL, so it carries the environment. Sharing one queue between
+         two scripts would have staging's consumer leasing production's outbox rows — the message
+         is `{ record }` and nothing else (01 §2, 51 §13 D16), so the consumer would resolve that
+         id against its own namespace, find an empty record, and ack nothing. Quiet, and wrong. */
+      "queues": {
+        "producers": [{ "queue": "braindog-ingress-staging", "binding": "INGRESS" }],
+        "consumers": [
+          {
+            "queue": "braindog-ingress-staging",
+            "max_batch_size": 25,
+            "max_batch_timeout": 5,
+            /* Cloudflare's own retry, over the record's ladder — this one covers a consumer that
+               crashed. A delivery that failed is `ackOutbox`, which is the record's, and
+               conflating them produces either a retry storm or a job never retried at all. */
+            "max_retries": 3
+          }
+        ]
+      },
+
+      /* Outbound email. The record never holds the credential: ADR-062 puts every credential in
+         the host. The sending domain is verified in the dashboard, once, per 51 A3. */
+      "send_email": [{ "name": "EMAIL" }]
+
+      /* ---------------------------------------------------------------------------------------
+         THE REST OF 51 §4.6, DRAFTED AND NOT ACTIVE. Each block below binds a resource the code
+         does not yet read (`src/index.ts`'s `Env` has four members). Binding a resource that does
+         not exist fails the deploy, so these are uncommented in the commit that first reads them,
+         together with the account resource named beside each. Names carry the environment for the
+         same reason the queue does — every one of these namespaces is account-global.
+
+         "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs-staging" }],
+         "ai": { "binding": "AI" },
+         "analytics_engine_datasets": [
+           { "binding": "TELEMETRY", "dataset": "braindog_telemetry_staging" }],
+         "ratelimits": [
+           { "name": "RL_READ",  "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
+           { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }],
+         "secrets_store_secrets": [
+           { "binding": "KEK",      "store_id": "<store-id>", "secret_name": "braindog-kek-staging" },
+           { "binding": "KEK_PREV", "store_id": "<store-id>", "secret_name": "braindog-kek-staging-prev" }]
+
+         THERE IS NO `kv_namespaces` KEY IN EITHER ENVIRONMENT, AND THERE WILL NOT BE ONE. The
+         record is the Durable Object's own SQLite (33 §7); the Directory is a Durable Object; the
+         shell is `assets`; sessions, tokens and lockouts are rows in the Directory (33 §10). There
+         is nothing left for a KV namespace to hold, and an eventually-consistent store beside a
+         single-writer object is a second answer to questions that already have one.
+         --------------------------------------------------------------------------------------- */
+    },
+
+    /* -----------------------------------------------------------------------------------------
+       PRODUCTION — script `braindog-production`. Deployed from a tag, or by hand from
+       `workflow_dispatch`, behind the `production` GitHub Environment's approval.
+
+       NOTE THE SCRIPT NAME. A named environment deploys `<name>-<environment>`, so declaring these
+       two environments RENAMES the production Worker from `braindog` to `braindog-production`. If
+       `braindog` has ever been deployed, its Durable Objects stay with `braindog` and the new
+       script starts empty — this is a migration, not a rename, and REPORT.md §8 risk R1 is the
+       one thing to settle before the first run of `deploy.yml`.
+       ----------------------------------------------------------------------------------------- */
+    "production": {
+      /* THE RECORD IS ON `app.brain.dog` AND THE APEX IS THE MARKETING SITE. 51 §4.6 puts the
+         Worker on `brain.dog` with `PUBLIC_HOST: "brain.dog"`, which cannot hold: `apps/site`
+         serves `/`, `/pricing` and `/changelog` from the same apex (14 §4), and the Worker's
+         `single-page-application` fallback answers every unmatched path with the app shell — so
+         `brain.dog/pricing` would resolve as a spoken id and draw "no such entry". One apex, one
+         owner. REPORT.md §1 sets out the split and the sentences it costs (19 §5's `brain.dog/D41`
+         becomes `app.brain.dog/D41`); amend 51 §4.6 and 19 §5. */
+      "routes": [{ "pattern": "app.brain.dog", "custom_domain": true }],
+
+      "vars": {
+        "PUBLIC_HOST": "app.brain.dog",
+        "AI_GATEWAY": "braindog",
+        "AGE_RECIPIENT": "age1<production-recipient>",
+        "SPARK_ENDPOINT": "",
+        "BRAINDOG_BUILD": ""
+      },
+
+      "durable_objects": {
+        "bindings": [
+          { "name": "RECORD", "class_name": "Record$" },
+          { "name": "DIRECTORY", "class_name": "Directory$" }
+        ]
+      },
+
+      "queues": {
+        "producers": [{ "queue": "braindog-ingress", "binding": "INGRESS" }],
+        "consumers": [
+          {
+            "queue": "braindog-ingress",
+            "max_batch_size": 25,
+            "max_batch_timeout": 5,
+            "max_retries": 3
+          }
+        ]
+      },
+
+      "send_email": [{ "name": "EMAIL" }]
+
+      /* The same drafted blocks as staging, without the suffix:
+         "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs" }],
+         "ai": { "binding": "AI" },
+         "analytics_engine_datasets": [
+           { "binding": "TELEMETRY", "dataset": "braindog_telemetry" }],
+         "ratelimits": [
+           { "name": "RL_READ",  "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
+           { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }],
+         "secrets_store_secrets": [
+           { "binding": "KEK",      "store_id": "<store-id>", "secret_name": "braindog-kek" },
+           { "binding": "KEK_PREV", "store_id": "<store-id>", "secret_name": "braindog-kek-prev" }]  */
+    }
+  }
+
+  /* WORKER SECRETS ARE NOT IN THIS FILE AND NEVER WILL BE. `SESSION_SECRET` and
+     `TOKENS_VALID_FROM` (12 §8's two fleet-wide levers, 53 §5.11's incident response) are set with
+     `wrangler secret put <NAME> --env <environment>`, value at the prompt and never as an
+     argument (53 §2.2). They are PER SCRIPT, so staging and production hold different values —
+     which is the point: a shared `SESSION_SECRET` would make a session minted in staging valid in
+     production, since the session hash is an HMAC under it. */
+}

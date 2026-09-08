@@ -3,3 +3,25 @@ packages:
   - apps/*
 minimumReleaseAge: 1440
 linkWorkspacePackages: false
+# WHICH DEPENDENCIES MAY RUN A BUILD SCRIPT, DECIDED RATHER THAN APPROVED.
+#
+# pnpm 10 refuses to run a package's `postinstall` until it is named here, which is the right
+# default: a build script is arbitrary code executing at install time with the developer's
+# permissions, and it is the shortest path a supply-chain attack has. `pnpm approve-builds` writes
+# this list interactively, which means the decision lives in one person's terminal history; writing
+# it here puts it in the diff, where the next reader can ask why.
+#
+# Three, and each earns it by needing a platform binary that cannot be shipped as portable
+# JavaScript:
+#
+#   esbuild   the bundler wrangler runs. A Go binary per platform.
+#   workerd   the Workers runtime itself, for `wrangler dev` and the deploy's own bundling.
+#   sharp     libvips, which generates the favicons from the mark (`packages/skin/scripts`).
+#
+# A fourth name appearing here is a thing to look at, not a box to tick. It was previously left as
+# three literal `set this to true or false` strings, which is neither an approval nor a refusal —
+# every install printed the same warning and nobody read it.
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
