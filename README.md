@@ -1,4 +1,8 @@
-# BrainDog
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/media/banner-dark.svg">
+  <img src=".github/media/banner-light.svg" width="830"
+       alt="BrainDog — a typed, append-only database for what a business knows that isn't code.">
+</picture>
 
 A typed, append-only database for the things a small business knows that aren't code: money owed,
 renewal dates, hosting, credentials, people, projects, and the decisions behind them.
@@ -72,6 +76,18 @@ static SvelteKit app that talks to either.
 
 Everything is reachable three ways from one route table so they cannot drift: HTTP, an MCP server,
 and a typed client.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/media/write-path-dark.svg">
+  <img src=".github/media/write-path-light.svg" width="830"
+       alt="The write path. A write whose op_id has been seen replays its first result and stops. Inside one synchronous transaction: resolve, lock, pinned, coerce, validate and transition run first, and nothing above that line has written a row; then persist, pairs, project, event, rules, schedule and outbox. A refusal is recorded by observe, outside the transaction so it survives the rollback. Arm and wake run last, outside it.">
+</picture>
+
+Every write takes that path, and the event is appended in the same transaction as the row it
+describes — which is what "append-only by construction" means here. There is no hash chain and there
+are no triggers; there is one writer, and the history is a table nothing deletes from.
+[docs/30-BLUEPRINT.md](docs/30-BLUEPRINT.md) §4 specifies each step, and `REPORT.md` says which of
+them are built.
 
 ## Repository
 
