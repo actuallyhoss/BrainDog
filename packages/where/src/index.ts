@@ -202,16 +202,39 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
 
     const leaf = node as Record<string, unknown>;
 
+    /**
+     * `MATCH_OP_UNSUPPORTED`, AND NOT A CODE THIS FILE INVENTED FOR ITSELF.
+     *
+     * These four branches used to carry `WHERE_UNSUPPORTED`, `WHERE_OPERATOR_UNSUPPORTED` and
+     * `WHERE_MALFORMED` — three names for one fact, none of them in `30 §6`, and none of them
+     * anything a caller could branch on across versions. `30 §6` already has the code, and it is
+     * written as the general one rather than as `inbox_raw`'s: *"`MATCH_OP_UNSUPPORTED` — the one
+     * code for* this test cannot apply here*: `via has near matches starts ends` on the `inbox_raw`
+     * backend (02 §6), an operator outside its type's set, `lacks` on a non-list, `near` anywhere but
+     * the last leaf."* Every clause of that sentence is one of the branches below — `via`, `matches`,
+     * `near`, an operator a type cannot take, an operator the switch does not implement — so the
+     * grammar family had the word and this file spelled three of its own beside it.
+     *
+     * THE RULE IT KEEPS is `10 §7`'s: the refusal teaches, and it teaches from a code that is stable
+     * across versions. An agent that learns `WHERE_UNSUPPORTED` from the compiler and
+     * `MATCH_OP_UNSUPPORTED` from ingest has learned that the record has two words for one refusal,
+     * which is the same as having none — and the browser's own compiler is a third consumer of this
+     * grammar (34 §1, seven of them), so a name minted here is a name the whole product has to keep.
+     *
+     * A LEAF WITH NO TEST IS THE SAME FACT, and it is the branch below on `OPERATORS.find`. Either
+     * the leaf named no operator or it named a word that is not one of the nineteen; both read as
+     * *this test cannot apply here*, and the `fix` names the nineteen either way.
+     */
     for (const key of ['matches', 'predicate', 'near'])
       if (key in leaf) {
         bad.push(
-          refuse('WHERE_UNSUPPORTED', `${key} is in the grammar and not read by this build — it needs the text index.`, key),
+          refuse('MATCH_OP_UNSUPPORTED', `${key} is in the grammar and not read by this build — it needs the text index.`, key),
         );
         return '';
       }
 
     if ('via' in leaf && leaf.via !== undefined) {
-      bad.push(refuse('WHERE_UNSUPPORTED', 'via is a hop through a ref, and this build reads one register at a time.', 'via'));
+      bad.push(refuse('MATCH_OP_UNSUPPORTED', 'via is a hop through a ref, and this build reads one register at a time.', 'via'));
       return '';
     }
 
@@ -235,12 +258,14 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
 
     const op = OPERATORS.find((o) => o in leaf);
     if (!op) {
-      bad.push(refuse('WHERE_MALFORMED', `${field} has no test on it. One of: ${OPERATORS.join(' · ')}.`, field));
+      bad.push(
+        refuse('MATCH_OP_UNSUPPORTED', `${field} carries no test this grammar knows. One of: ${OPERATORS.join(' · ')}.`, field, OPERATORS),
+      );
       return '';
     }
     if (!operatorAllowed(op, decl.type)) {
       bad.push(
-        refuse('WHERE_OPERATOR_UNSUPPORTED', `${field} is a ${decl.type}, which cannot be asked "${op}".`, field),
+        refuse('MATCH_OP_UNSUPPORTED', `${field} is a ${decl.type}, which cannot be asked "${op}".`, field),
       );
       return '';
     }
@@ -310,7 +335,12 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
       case 'not_in': {
         const list = Array.isArray(value) ? value : [];
         if (list.length === 0) {
-          bad.push(refuse('WHERE_MALFORMED', `${field} ${op} needs at least one value.`, field));
+          /* `VALUE_MALFORMED`, WHICH THE NEXT BRANCH DOWN ALREADY SAYS FOR THE SAME FACT. An empty
+             `in` and a member the field cannot hold are both "the value this operator was given is
+             not the shape it takes", and `30 §6` writes that code as exactly that — *"a value outside
+             its type's shape that cannot be coerced"*. Two codes eight lines apart for one sentence
+             is how a registry stops being one. */
+          bad.push(refuse('VALUE_MALFORMED', `${field} ${op} needs at least one value.`, field));
           return '';
         }
         for (const v of list) if (!checkEnum(v)) return '';
@@ -387,7 +417,7 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         const lo = bind(pair[0], decl.type);
         const hi = bind(pair[1], decl.type);
         if (lo === null || hi === null) {
-          bad.push(refuse('WHERE_MALFORMED', `${field} between takes two values, low first.`, field));
+          bad.push(refuse('VALUE_MALFORMED', `${field} between takes two values, low first.`, field));
           return '';
         }
         /* The bounds carry their currency too: `between 20,000 and 30,000 USD` matched a GBP row and
@@ -455,7 +485,7 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
       }
 
       default:
-        bad.push(refuse('WHERE_UNSUPPORTED', `${op} is in the grammar and not read by this build.`, field));
+        bad.push(refuse('MATCH_OP_UNSUPPORTED', `${op} is in the grammar and not read by this build.`, field));
         return '';
     }
   };

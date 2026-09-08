@@ -141,18 +141,27 @@ test('a field the register does not have, and an operator a predicate does not s
   assert.equal(field.code, 'FIELD_UNKNOWN');
   assert.ok((field.allowed ?? []).includes('state'), 'the refusal does not say what the register does have');
 
-  assert.equal(bad('state equals open').code, 'OPERATOR_UNSUPPORTED');
+  // `MATCH_OP_UNSUPPORTED` is `30 §6`'s code for it, and the structured compiler answers the same
+  // one for the same leaf: two renderings of one grammar that refuse under two names are two
+  // languages again, which is what this whole module exists not to be.
+  assert.equal(bad('state equals open').code, 'MATCH_OP_UNSUPPORTED');
   assert.equal(bad('state is').code, 'REQUIRED_MISSING');
 });
 
 test('`before` on something that is not a date is refused rather than compared as text', () => {
   const out = bad('what before 2026-10-01');
-  assert.equal(out.code, 'OPERATOR_UNSUPPORTED');
+  assert.equal(out.code, 'MATCH_OP_UNSUPPORTED');
   assert.match(out.fix, /is a text, and before is about dates/);
 });
 
 test('a name no row bears is a refusal, not a clause that matches nothing quietly', () => {
   const out = bad('thing is Atlantis');
+  /* `REF_UNKNOWN`, AND IT IS ITS OWN CODE RATHER THAN A `VALUE_MALFORMED` — which it very nearly
+     became, since that row already reads "an unresolvable id or spoken reference". `declare` lints
+     a rule's `when:` and survives exactly this refusal and no other, because `owner is Kiln` names a
+     row that may be written tomorrow. Merging them would make the exemption swallow a real shape
+     error and install a rule that fires on nothing, for ever, in silence. Two refusals are one when
+     no caller has to tell them apart; here one does. */
   assert.equal(out.code, 'REF_UNKNOWN');
   assert.match(out.fix, /no things called Atlantis/);
 });

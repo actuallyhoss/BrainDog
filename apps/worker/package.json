@@ -16,8 +16,8 @@
   },
   "scripts": {
     "deploy": "wrangler deploy",
+    "deploy:alpha": "wrangler deploy --env alpha",
     "deploy:production": "wrangler deploy --env production",
-    "deploy:staging": "wrangler deploy --env staging",
     "tail": "wrangler tail",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"

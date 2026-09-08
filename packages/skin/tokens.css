@@ -191,14 +191,23 @@
     );
     --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
 
-    /* The mark. Not a role and not an identity accent: the one colour in the product that belongs
-       to the product rather than to a meaning. It paints the logo and nothing else, which is why it
-       is a token and not a literal in an SVG (22 §7 gate 2).
+    /* The mark is GENERATED now, and this note is where it went.
+       Not a role and not an identity accent: the one colour in the product that belongs to the
+       product rather than to a meaning. It paints the logo and nothing else, which is why it is a
+       token and not a literal in an SVG (22 §7 gate 2), and why a theme a customer installs must
+       not be able to reach it (04 §7, 28 §4.5).
 
-       It is also, deliberately, the same value the theme generator seeds `--accent` from — the
-       accent IS the mark here. Kept as a separate token anyway, because the logo must not change
-       colour when someone installs a theme. */
-    --brand: #cf413a;
+       IT WAS WRITTEN HERE BY HAND, beside a comment observing that it is deliberately the same
+       value the generator seeds `--accent` from — which is to say: two copies of one colour, one of
+       them outside the generator, and `colour-grep` carried an exemption so the literal could
+       stay. The cost was not tidiness. This file is shared by both apps and every deployment and it
+       `@import`s `house.css` above, so this rule won — a alpha build would have worn the
+       production mark whatever its accent did, in the one place where telling two deployments apart
+       matters most.
+
+       `packages/theme`'s `brand()` emits it into `house.css` and `alpha.css`. It sits outside
+       `toCSS`, which is what keeps it out of a record's reach: `toCSS` emits what a THEME may set,
+       and the mark is not one of those things. */
   }
 
   /* The reader's Text setting picks the body step. Three, not a slider. */

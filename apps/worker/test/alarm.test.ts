@@ -99,26 +99,107 @@ test('THE COMPATIBILITY DATE IS AN ASSERTION, not a sentence in a document', () 
      it, the alarm outlives the storage and fires against a record that no longer exists. The extra
      `deleteAlarm()` in the delete runbook is belt and braces at a current date — which is only true
      while the date IS current, and a document cannot check that. */
-  const toml = readFileSync(fileURLToPath(new URL('../wrangler.toml', import.meta.url)), 'utf8');
-  const date = /^compatibility_date\s*=\s*"(\d{4}-\d{2}-\d{2})"/m.exec(toml)?.[1];
-  assert.ok(date, 'wrangler.toml declares no compatibility_date');
-  assert.ok(date && date >= '2026-02-24', `compatibility_date is ${date}, and deleteAll() leaves the alarm behind before 2026-02-24`);
+  /* PARSED, NOT GREPPED, AND THE FORMAT MOVED UNDER IT ONCE ALREADY. This read `wrangler.toml`
+     with four regexes; the config is `wrangler.jsonc` now, because two environments need a `env`
+     block and TOML makes that a wall of `[env.alpha.…]` headers nobody reads. A test that
+     pattern-matches a config file breaks when the file changes shape — and worse, a regex that
+     stops matching reports the ASSERTION as false rather than the file as different: this one
+     would have said *"declares no compatibility_date"* about a config that declares one.
+
+     So it parses. `wrangler` itself reads JSONC, and the comments in that file are load-bearing
+     enough that stripping them here — respecting string literals, which is the part a naive
+     `//` strip gets wrong — is worth the twelve lines. */
+  const jsonc = readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8');
+  const stripped = (() => {
+    let out = '';
+    let inString = false;
+    for (let i = 0; i < jsonc.length; i++) {
+      const c = jsonc[i];
+      const next = jsonc[i + 1];
+      if (inString) {
+        if (c === '\\') {
+          out += c + (next ?? '');
+          i++;
+          continue;
+        }
+        if (c === '"') inString = false;
+        out += c;
+        continue;
+      }
+      if (c === '"') {
+        inString = true;
+        out += c;
+        continue;
+      }
+      if (c === '/' && next === '/') {
+        while (i < jsonc.length && jsonc[i] !== '\n') i++;
+        continue;
+      }
+      if (c === '/' && next === '*') {
+        i += 2;
+        while (i < jsonc.length && !(jsonc[i] === '*' && jsonc[i + 1] === '/')) i++;
+        i++;
+        continue;
+      }
+      out += c;
+    }
+    return out.replace(/,(\s*[}\]])/g, '$1');
+  })();
+  const config = JSON.parse(stripped) as {
+    compatibility_date?: string;
+    migrations?: { new_sqlite_classes?: string[] }[];
+    queues?: { producers?: { binding?: string; queue?: string }[]; consumers?: unknown[] };
+    env?: Record<string, unknown>;
+  };
+
+  const date = config.compatibility_date;
+  assert.ok(date, 'wrangler.jsonc declares no compatibility_date');
+  assert.ok(date >= '2026-02-24', `compatibility_date is ${date}, and deleteAll() leaves the alarm behind before 2026-02-24`);
+
+  /* ONE DATE FOR BOTH ENVIRONMENTS. A alpha deployment on a different compatibility date is not a
+     rehearsal of production, it is a rehearsal of a different runtime — and the one behaviour this
+     date decides is the one this test is about. */
+  for (const [name, env] of Object.entries(config.env ?? {}))
+    assert.equal(
+      (env as { compatibility_date?: string }).compatibility_date,
+      undefined,
+      `env.${name} sets its own compatibility_date, so it rehearses a different runtime`,
+    );
 
   // And both objects are SQLite-backed, which is what buys FTS5, point-in-time recovery and the
   // alarm — the Directory needs none of those and shares the class of storage anyway, because a
   // second kind of object is a second set of platform behaviours to hold in mind.
-  const classes = /new_sqlite_classes\s*=\s*\[([^\]]*)\]/.exec(toml)?.[1] ?? '';
-  for (const name of ['Record$', 'Directory$'])
-    assert.ok(classes.includes(`"${name}"`), `${name} is not SQLite-backed`);
+  const classes = (config.migrations ?? []).flatMap((m) => m.new_sqlite_classes ?? []);
+  for (const name of ['Record$', 'Directory$']) assert.ok(classes.includes(name), `${name} is not SQLite-backed`);
 
   // The doorbell is a producer AND a consumer of one queue: the record rings it and the Worker
   // answers. Declaring only the producer is a queue nobody drains, which looks like a record whose
   // notifications simply never arrive.
-  assert.match(toml, /\[\[queues\.producers\]\][\s\S]*binding = "INGRESS"/, 'nothing rings the doorbell');
-  assert.match(toml, /\[\[queues\.consumers\]\]/, 'nothing answers the doorbell');
-  const producer = /\[\[queues\.producers\]\][^[]*?queue = "([^"]+)"/.exec(toml)?.[1];
-  const consumer = /\[\[queues\.consumers\]\][^[]*?queue = "([^"]+)"/.exec(toml)?.[1];
-  assert.equal(producer, consumer, 'the doorbell rings one queue and is answered on another');
+  /* PER ENVIRONMENT, BECAUSE `queues` IS NOT INHERITABLE — and that is the trap this file exists
+     next to. `durable_objects`, `queues`, `r2_buckets` and `vars` are not inherited by a named
+     environment: leave one out and it is EMPTY there, not inherited, and `wrangler deploy`
+     succeeds. So a top-level check would pass on a config where production rings nothing.
+     `migrations` and `routes` are the opposite, which is why the ladder is top-level and there is
+     deliberately no top-level `routes`. */
+  const environments = Object.entries(config.env ?? {});
+  assert.ok(environments.length > 0, 'no environments, so there is nothing to deploy');
+  for (const [name, raw] of environments) {
+    const env = raw as { queues?: { producers?: { binding?: string; queue?: string }[]; consumers?: unknown[] } };
+    assert.ok(
+      (env.queues?.producers ?? []).some((p) => p.binding === 'INGRESS'),
+      `nothing rings the doorbell in env.${name}`,
+    );
+    assert.ok((env.queues?.consumers ?? []).length > 0, `nothing answers the doorbell in env.${name}`);
+
+    /* AND THE SAME QUEUE ON BOTH SIDES. Ringing one queue and answering another is a record whose
+       notifications are written, accepted, and never delivered — with nothing anywhere reporting a
+       failure, because both halves are individually fine. Per environment for the same reason as
+       above, and it is the check that would catch `braindog-ingress` left in `alpha` after a
+       copy-paste, which is the way the two names actually diverge. */
+    const rings = env.queues?.producers?.[0]?.queue;
+    const answers = (env.queues?.consumers?.[0] as { queue?: string } | undefined)?.queue;
+    assert.equal(rings, answers, `env.${name} rings ${rings} and answers ${answers}`);
+  }
 });
 
 /* ── the router ────────────────────────────────────────────────── */

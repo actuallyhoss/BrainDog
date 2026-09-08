@@ -253,9 +253,15 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
 
      BEFORE THE WRITE, because a refusal returned from inside a transaction COMMITS: nothing throws,
      so there is nothing to roll back. */
+  /* `NOT_IN_THIS_BUILD`, WHICH IS WHAT `NOT_IMPLEMENTED` WAS TRYING TO SAY AND COULD NOT. The job is
+     legal, the row is legal, and the deployment holding it wired no sender — `49 §5.12` note 1's
+     whole argument is that a host serves the kinds it declares and leaves the rest in `pending`, so
+     "this deployment does not do that" is a first-class answer here rather than a gap. It is the
+     same fact `metrics.ts` and `pages.ts` refuse with the same code for a published shape this build
+     does not compute, and one fact takes one code (`30 §6`). */
   if (row.kind === 'infer.prose' && !deps.sendDigest)
     return no<null>(
-      'NOT_IMPLEMENTED',
+      'NOT_IN_THIS_BUILD',
       `Job ${args.id} is a digest waiting on two sentences, and this host wired no way to send it.`,
       { at: 'kind' },
     );

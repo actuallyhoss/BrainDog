@@ -242,12 +242,24 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
           },
         ],
       };
+    /* `NOT_IN_THIS_BUILD` RATHER THAN `UNIMPLEMENTED`, and the distinction below it is the one that
+       matters to whoever wrote the block: `08 §2.6` and `06 §3` PUBLISH these computed sources, so a
+       block naming one is a correct declaration against a build that has not caught up — a deploy
+       away, not an edit away. `SOURCE_UNKNOWN` at the bottom of this function is the other answer,
+       for a word no document publishes at all. Both said `UNIMPLEMENTED` once and a person could not
+       tell "wait" from "you made this up". */
     const walk = deps.runway(block.opening, block.from, block.horizon);
-    if (!walk) return { ...base, refusals: [{ code: 'UNIMPLEMENTED', fix: 'This record does not compute a cash walk.', at: 'source' }] };
+    if (!walk)
+      return { ...base, refusals: [{ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }] };
     return { ...base, walk, matched: walk.steps.length, refusals: walk.refusals };
   }
   if (COMPUTED.has(block.source))
-    return { ...base, refusals: [{ code: 'UNIMPLEMENTED', fix: `${block.source} is computed, and this record does not compute it yet.`, at: 'source' }] };
+    return {
+      ...base,
+      refusals: [
+        { code: 'NOT_IN_THIS_BUILD', fix: `${block.source} is computed, and this record does not compute it yet.`, at: 'source' },
+      ],
+    };
 
   const register = block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
   const schema = register ? deps.schemaOf(register) : null;

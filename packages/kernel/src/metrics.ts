@@ -161,7 +161,11 @@ function resolveRelative(
     if (typeof value !== 'string') return value;
     const day = resolveDay(value, nowMs);
     if (day === null) {
-      bad.push({ code: 'WHERE_MALFORMED', fix: `${field} is a date, and ${value} is not one.`, at: field });
+      /* `RELATIVE_LITERAL_UNKNOWN` — `30 §6`'s grammar family, *"a temporal literal outside the
+         anchors and offsets"*, which is exactly what `resolveDay` reads and exactly what this
+         string failed to be. It was `WHERE_MALFORMED`, a code in no registry, for the one fact
+         `34 §1.1` names the anchors and offsets in order to make refusable. */
+      bad.push({ code: 'RELATIVE_LITERAL_UNKNOWN', fix: `${field} is a date, and ${value} is not one.`, at: field });
       return value;
     }
     return day;
@@ -226,9 +230,28 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   /* THE KEYS, NOT A SUBSTRING OF THE JSON. `includes('"trend"')` cannot tell a key from a value, so
      a register with a field called `trend` could never be summed — refused for being a shape this
      build does not read, which it was not. */
+  /**
+   * `NOT_IN_THIS_BUILD`, AND THE OLD NAME WAS THE PROBLEM RATHER THAN THE BRANCH.
+   *
+   * `UNIMPLEMENTED` names nothing: it does not say what is unimplemented, by whom, or what the
+   * person holding it should do — it is a `fix` sentence with a shouty prefix, which is the exact
+   * shape `30 §6` exists to stop. The three branches it stood in front of are all one fact, and it
+   * is a fact worth a code: `08 §2.2` PUBLISHES eleven aggregations and this build computes six,
+   * publishes `group_by` and `bucket` and reads neither. The declaration is well formed. The build
+   * is behind. The repair is a deploy, not an edit.
+   *
+   * That is the same sentence `FORMAT_NEWER_THAN_READER` and `SCHEMA_NEWER` already say about a
+   * version integer, which is why `30 §6` files the new code beside them in format and lifecycle
+   * rather than inventing a family for it.
+   *
+   * AND IT IS NOT `VALUE_MALFORMED`, though the branch below uses that for a neighbouring failure.
+   * `median` is a documented word; telling its author it is malformed sends them to check their
+   * spelling of a thing they spelled correctly. `08 §2.2` is the document they read, and it says
+   * `median` is real — so the record has to say *not here yet*, not *not a thing*.
+   */
   for (const word of keysOf(decl.value))
     if ((UNREAD as readonly string[]).includes(word))
-      at('UNIMPLEMENTED', `${word} is a published shape this build does not read, so its figure would be the ungrouped one`, 'value');
+      at('NOT_IN_THIS_BUILD', `${word} is a published shape this build does not read, so its figure would be the ungrouped one`, 'value');
 
   const fields = aggregationsOf(decl.value);
   if (fields.length === 0) at('VALUE_MALFORMED', 'a value is an aggregation, a ratio or a diff', 'value');
@@ -237,9 +260,9 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
       for (const id of [f.field, f.by].filter((x): x is string => typeof x === 'string'))
         if (id !== 'id' && !Object.hasOwn(schema.fields, id)) at('FIELD_UNKNOWN', `${register} has no field called ${id}`, 'value');
       if (!AGGREGATIONS.includes(f.kind as (typeof AGGREGATIONS)[number]))
-        at('UNIMPLEMENTED', `${f.kind} is not an aggregation this build reads`, 'value');
+        at('NOT_IN_THIS_BUILD', `${f.kind} is not an aggregation this build reads`, 'value');
       if (f.lookup && !ctx.lookups?.[f.lookup]) at('LOOKUP_UNKNOWN', `there is no factor table called ${f.lookup}`, 'value');
-      if (f.lookup && f.kind !== 'sum') at('UNIMPLEMENTED', `a product is summed, and ${f.kind} is not a sum`, 'value');
+      if (f.lookup && f.kind !== 'sum') at('NOT_IN_THIS_BUILD', `a product is summed, and ${f.kind} is not a sum`, 'value');
     }
 
   const said = schema ? predicateOf(decl.where, schema, ctx) : { predicate: undefined, bad: [] };
@@ -402,6 +425,11 @@ function one(
         ...Object.keys(table),
       )
       .map((r) => r.v ?? '(unset)');
+    /* TWO LOOKUP CODES, AND `30 §6` NOW CARRIES BOTH, because they are two repairs rather than two
+       spellings. `LOOKUP_UNKNOWN` above says the declaration named a factor table nobody declared —
+       fix the name. `LOOKUP_MISSING` says the table is right and does not cover the data — add a
+       factor for `yearly`, and the `allowed` list says which ones it does cover. Collapsing them
+       would hand one sentence to two different people. */
     if (missing.length)
       return no<Read>(
         'LOOKUP_MISSING',

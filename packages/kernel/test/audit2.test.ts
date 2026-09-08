@@ -112,7 +112,7 @@ test('A FIELD CALLED `trend` CAN BE SUMMED, because a key is not a substring of 
   assert.ok(k.create('books', { name: 'a', trend: 3 }, { actor: 'p_1' }).ok);
   assert.equal(value<{ value: number }>(k.metric(METRIC({ value: { sum: 'trend' }, target: { gte: 0 } }))).value, 3);
   // And a shape this build does not read is still refused, by its KEY.
-  assert.equal(refusal(k.metric(METRIC({ value: { trend: 'amount' } as never }))).code, 'UNIMPLEMENTED');
+  assert.equal(refusal(k.metric(METRIC({ value: { trend: 'amount' } as never }))).code, 'NOT_IN_THIS_BUILD');
   sql.close();
 });
 
@@ -265,7 +265,9 @@ test('a sentence made only of separators says nothing, and is refused rather tha
   // got the whole register.
   const out = parse(',,,');
   assert.equal(out.predicate, undefined);
-  assert.equal(out.bad[0]?.code, 'WHERE_MALFORMED');
+  /* `VALUE_MALFORMED`: a sentence IS the value of `where:`, and `,,,` is one outside the shape a
+     filter takes — `30 §6`'s own words for that code. `WHERE_MALFORMED` was in no registry. */
+  assert.equal(out.bad[0]?.code, 'VALUE_MALFORMED');
   // An empty string is still no filter, which is a different thing.
   assert.equal(parse('').bad.length, 0);
   assert.equal(parse('').predicate, undefined);

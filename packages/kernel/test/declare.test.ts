@@ -640,3 +640,506 @@ test('AND EVERY METRIC THE RECORD SHIPS SATISFIES ALL OF IT', async () => {
     assert.equal(validateDeclaration(decl), null, `${decl.id} is a metric this record ships and the check refuses it`);
   assert.ok(SEED_METRICS.length >= 5, 'too few seeded metrics for that to mean anything');
 });
+
+/* ── a page, which installed unchecked ───────────────────────────────────── */
+
+/** A page that satisfies `06 §1.1`, with one key overridden per case. */
+const page = (over: Record<string, unknown> = {}): Declaration => ({
+  id: 'page.invoicing',
+  kind: 'page',
+  body: {
+    page: 'invoicing',
+    title: 'Invoicing',
+    nav: { section: 'Money', order: 20 },
+    requires: ['register.obligations'],
+    blocks: [
+      { kind: 'table', heading: 'Open', span: 12, source: 'register.obligations', columns: [{ field: 'what' }], limit: 50, empty: 'Nothing outstanding.' },
+    ],
+    ...over,
+  } as never,
+});
+
+/** One block on an otherwise sound page — the shape most cases here vary. */
+const block = (over: Record<string, unknown>): Declaration => page({ blocks: [{ kind: 'note', ...over }] });
+
+/** What a declaration is refused with when the record can say what else it holds. */
+const inRecord = (decl: Declaration, ...also: Declaration[]): string | null =>
+  validateDeclaration(decl, new Map([[decl.id, decl.body], ...also.map((d) => [d.id, d.body] as const)]))?.code ?? null;
+
+test('A PAGE WAS CHECKED BY NOTHING, and it is the declaration with the most ways to be quietly wrong', () => {
+  /**
+   * `validate` deep-checked a register, a digest, a connector and a rule and returned `null` for a
+   * page — so every key in `06 §1.1`'s two tables was advisory, on the one kind whose faults all
+   * RENDER. `readBlock` is written never to throw, which is right at render and is exactly why the
+   * install check matters: the refusal it produces is read by whoever opens the page, weeks after
+   * the person who wrote it has gone.
+   */
+  assert.equal(refusedWith(page()), null, 'a page that satisfies 06 §1.1 was refused');
+
+  /* A PAGE IS NAMED ON THE SCREEN BEFORE IT IS DRAWN. */
+  for (const title of [undefined, '', '   ', 7])
+    assert.equal(refusedWith(page({ title })), 'DECLARATION_INVALID', `${String(title)} is not a title`);
+
+  /* AND A PAGE WITH NO BLOCKS IS A HEADING WITH NOTHING UNDER IT. */
+  assert.equal(refusedWith(page({ blocks: [] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(page({ blocks: 'a table' })), 'DECLARATION_INVALID');
+  const many = (n: number) => Array.from({ length: n }, () => ({ kind: 'note' }));
+  assert.equal(refusedWith(page({ blocks: many(24) })), null, 'twenty-four is the ceiling, not one past it');
+  assert.match(validateDeclaration(page({ blocks: many(25) }))?.fix ?? '', /25 blocks/);
+});
+
+test('A BLOCK KIND IS ONE OF THE SIXTEEN, and the closure is what the security argument is made of', () => {
+  /**
+   * `04 §1`: *"the closure is load-bearing rather than tidy — the security argument in §7 is an
+   * ENUMERATION, and an enumeration only works over a finite list."*
+   *
+   * And the failure it prevents is silence rather than an exploit: `readBlock` compares `kind` to
+   * nothing, so a block whose kind is a typo takes the *"a block with no source is a written block"*
+   * arm and comes back as `base` — no rows, no refusal, no mark on the page. A block that draws
+   * nothing and says nothing is indistinguishable from a block whose register is empty.
+   */
+  const said = validateDeclaration(block({ kind: 'prose' }));
+  assert.equal(said?.code, 'KIND_UNKNOWN');
+  assert.equal(said?.at, 'blocks[0]', 'a refusal names the block that was wrong (04 §5)');
+  assert.ok(said?.allowed?.includes('note'), 'the refusal offers no alternative');
+
+  /* THE SIXTEEN STILL INSTALL. A gate red for every input is as useless as one never red. */
+  for (const kind of ['note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params', 'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table'])
+    assert.equal(refusedWith(block({ kind })), null, `${kind} is one of the sixteen and was refused`);
+
+  /* AND A SEVENTEENTH ARRIVES AS A DECLARATION, which is the whole reason the primitive layer
+     exists (05 §2) — admitted by prefix, and checked as a document of its own. */
+  assert.equal(refusedWith(block({ kind: 'block.invoice_card' })), null);
+  assert.equal(refusedWith(block({ kind: 'block.Invoice Card' })), 'KIND_UNKNOWN');
+});
+
+test('A BLOCK HAS AN ORDER AND A WIDTH IN TWELFTHS, and no x, y or height at all', () => {
+  /* `06 §1.1` gives a block its place in the list and `span: 1–12`, and that is the whole of its
+     geometry. `21 §11`: a size control REFUSES below its floor rather than clamping, because a
+     declaration silently clamped is a number that never reached the screen. */
+  for (let span = 1; span <= 12; span++) assert.equal(refusedWith(block({ span })), null, `span ${span} is a width`);
+  for (const span of [0, 13, -1, 2.5, '6', null])
+    assert.equal(refusedWith(block({ span })), 'OUT_OF_BOUNDS', `${String(span)} is not a width`);
+  assert.match(validateDeclaration(block({ span: 13 }))?.fix ?? '', /12 columns/);
+
+  /* AND THE ROW COUNT, which `readBlock` reads as 50 when absent and floors at 500. Zero is a block
+     that draws nothing, which is a thing somebody can mean. */
+  for (const limit of [0, 1, 50, 500]) assert.equal(refusedWith(block({ kind: 'table', limit })), null, `${limit} is a row count`);
+  for (const limit of [-1, 501, 1.5]) assert.equal(refusedWith(block({ kind: 'table', limit })), 'OUT_OF_BOUNDS');
+});
+
+test('and a source is one of the three forms, or the one the record computes', () => {
+  /* `42 §4.5` gives three; `pages.ts`'s `COMPUTED` set adds `forecast.runway`, which the money page
+     ships. A source list written from the document with the product left out would refuse the
+     record's own page. */
+  for (const source of ['register.obligations', 'metric.overdue', 'block.2', 'forecast.runway'])
+    assert.equal(refusedWith(page({ requires: undefined, blocks: [{ kind: 'table', source, empty: 'x' }] })), null, `${source} is a source`);
+  for (const source of ['obligations', 'table.obligations', 'register.', 7, null])
+    assert.equal(
+      refusedWith(page({ requires: undefined, blocks: [{ kind: 'table', source, empty: 'x' }] })),
+      'DECLARATION_INVALID',
+      `${String(source)} is not a source`,
+    );
+});
+
+test('A PAGE CANNOT APPEAR WITHOUT ITS DATA, and that is what `requires:` is for', () => {
+  /**
+   * `06 §1`: *"a nav entry that opens an empty screen is worse than no nav entry"* — and `requires`
+   * is the mechanism, because it is what takes the page out of the nav when the pack holding its
+   * rows is uninstalled.
+   *
+   * `42 §4.5` states the coverage rule and gives it a code: *"every register any block reads must be
+   * here (`DEPENDENCY_UNRESOLVED`)"*. A block reading a register the page does not require is a page
+   * that OUTLIVES its data — it stays in the nav and draws an empty table under a heading that
+   * promises one.
+   */
+  const said = validateDeclaration(
+    page({ requires: ['register.obligations'], blocks: [{ kind: 'table', source: 'register.clients', empty: 'x' }] }),
+  );
+  assert.equal(said?.code, 'DEPENDENCY_UNRESOLVED');
+  assert.ok(said?.allowed?.includes('register.obligations'), 'the refusal does not say what the page does require');
+  assert.match(said?.fix ?? '', /outlives its data/);
+
+  /* And the shape of the list itself, which is one to sixteen registers. */
+  for (const requires of [[], 'register.obligations', ['obligations'], ['metric.x'], Array.from({ length: 17 }, (_, i) => `register.r${i}`)])
+    assert.equal(refusedWith(page({ requires })), 'DECLARATION_INVALID', `${JSON.stringify(requires)} is not a requires`);
+});
+
+test('AND A REGISTER THAT NEVER ARRIVED IS THE HALF A DOCUMENT CANNOT ANSWER ALONE', () => {
+  /* `04 §5`'s own code and own sentence. The batch is the arriving record — `04 §2`'s worked pack
+     declares `register.invoices` and `page.invoicing` in one file, so resolving only against what is
+     already installed would refuse every pack that ships a page with its data. */
+  const OBS: Declaration = { id: 'register.obligations', kind: 'register', body: { id: 'obligations' } as never };
+  assert.equal(inRecord(page(), OBS), null, 'a page whose register arrives with it was refused');
+  assert.equal(inRecord(page()), 'DEPENDENCY_UNRESOLVED', 'a page requiring a register nobody has installed cleanly');
+  assert.match(validateDeclaration(page(), new Map())?.fix ?? '', /not installed/);
+
+  /* AND A CALLER WITH NO VIEW OF THE RECORD GETS THE ANSWER IT ALWAYS GOT. A refusal somebody cannot
+     act on teaches them the check is broken, and `validateDeclaration` is called on a single
+     document in places that have no idea what else is installed. */
+  assert.equal(refusedWith(page()), null, 'a context-free check refused a page for something it cannot see');
+});
+
+test('and a figure a page draws is a metric id, parameter and all', () => {
+  /* `pages.ts` splits a cell's metric on the FIRST colon — `project-owed:Kiln` is one document read
+     about one project, which is what makes a project page a declaration rather than four copies. */
+  const stat = (cells: unknown) => refusedWith(page({ requires: undefined, blocks: [{ kind: 'stat', cells }] }));
+  assert.equal(stat([{ metric: 'overdue', label: 'Overdue' }]), null);
+  assert.equal(stat([{ metric: 'project-owed:{{name}}', label: 'Owed' }]), null, 'a parameterised figure was refused');
+  assert.equal(stat([]), 'DECLARATION_INVALID');
+  assert.equal(stat(Array.from({ length: 7 }, () => ({ metric: 'overdue' }))), 'DECLARATION_INVALID');
+  for (const metric of [undefined, 7, 'Overdue', ''])
+    assert.equal(stat([{ metric }]), 'DECLARATION_INVALID', `${String(metric)} is not a figure`);
+
+  /* AND `when:` IS ONE LEAF NAMING A METRIC (06 §1). A `when:` naming nothing is a block that is
+     either always drawn or never, and both are indistinguishable from the block working. */
+  assert.equal(refusedWith(block({ when: { metric: 'overdue', gt: 0 } })), null);
+  for (const when of [{ gt: 0 }, { metric: 7 }, 'overdue > 0'])
+    assert.equal(refusedWith(block({ when })), 'DECLARATION_INVALID', `${JSON.stringify(when)} is not a when`);
+});
+
+test('and the counted keys are counted, and a tone is one of the four', () => {
+  assert.equal(refusedWith(block({ kind: 'table', columns: [{ field: 'what' }] })), null);
+  for (const columns of [[], 'what', [{ label: 'What' }], Array.from({ length: 17 }, () => ({ field: 'a' }))])
+    assert.equal(refusedWith(block({ kind: 'table', columns })), 'DECLARATION_INVALID', `${JSON.stringify(columns)} is not a column list`);
+
+  assert.equal(refusedWith(block({ kind: 'table', order: [{ field: 'due', dir: 'asc' }] })), null);
+  for (const order of [[], [{ field: 'due', dir: 'up' }], [{ dir: 'asc' }], [1, 2, 3, 4].map(() => ({ field: 'a' }))])
+    assert.equal(refusedWith(block({ kind: 'table', order })), 'DECLARATION_INVALID', `${JSON.stringify(order)} is not an order`);
+
+  for (const tone of ['good', 'warn', 'bad', 'info']) assert.equal(refusedWith(block({ tone })), null, `${tone} is an intent`);
+  assert.equal(refusedWith(block({ tone: 'danger' })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(page({ tone: 'danger' })), 'DECLARATION_INVALID');
+});
+
+test('PAGES CAN APPEAR ON THEIR OWN; NAVIGATION CANNOT', () => {
+  /* `06 §3`, and both halves of a nav entry are load-bearing: an entry with no section is an item in
+     no menu, and one with no order sorts against whatever the reader last wrote. Both install
+     cleanly today and both produce a page reachable only by typing its slug. */
+  assert.equal(refusedWith(page({ nav: undefined })), null, 'a page out of the nav is a page (06 §3, the holding pen)');
+  assert.equal(refusedWith(page({ nav: { section: 'Money', order: 0 } })), null);
+  for (const nav of [{ order: 20 }, { section: 'Money' }, { section: '', order: 1 }, { section: 'Money', order: 10_000 }, { section: 'Money', order: 1.5 }, 'Money'])
+    assert.equal(refusedWith(page({ nav })), 'DECLARATION_INVALID', `${JSON.stringify(nav)} is not a nav entry`);
+});
+
+test('AND A BATCH IS ALL OR NOTHING ABOUT A DEPENDENCY TOO', async () => {
+  /* THE END OF THE WIRE. `installDeclarations` reads the record's live declarations and unions them
+     with the batch before it validates, so the page half of `DEPENDENCY_UNRESOLVED` is a fact about
+     the record rather than a unit test's argument. */
+  const { k, sql } = await record();
+  const lone = refusal(await k.install([page({ requires: ['register.clients'], blocks: [{ kind: 'note' }] })]));
+  assert.equal(lone.code, 'DEPENDENCY_UNRESOLVED');
+  assert.equal(sql.all('SELECT 1 FROM declaration').length, 0, 'a page whose register is nowhere was installed');
+
+  /* AND THE REGISTER ARRIVING BESIDE IT RESOLVES, which is what a pack is. */
+  value(await k.install([OBLIGATIONS, page({ blocks: [{ kind: 'note' }] })]));
+  /* AND SO DOES ONE THAT WAS ALREADY THERE, on a second install that carries only the page. */
+  value(await k.install([page({ title: 'Invoicing, again', blocks: [{ kind: 'note' }] })]));
+  sql.close();
+});
+
+test('AND EVERY PAGE THE RECORD SHIPS SATISFIES ALL OF IT', async () => {
+  /* BY PATH, because the kernel does not depend on the seed and must not — `31 §2`'s order puts the
+     seed above it, and an import through the workspace name would invert that. The metric half of
+     this test has caught checks that were right about the document and wrong about the product; the
+     page half is where a closed kind list and a `requires` coverage rule meet a real population for
+     the first time. */
+  const { declarations, pageDeclarations, metricDeclarations } = await import('../../seed/src/index.ts');
+  const SEED_PAGES = pageDeclarations();
+  for (const decl of SEED_PAGES)
+    assert.equal(validateDeclaration(decl), null, `${decl.id} is a page this record ships and the check refuses it`);
+  assert.ok(SEED_PAGES.length >= 4, 'too few seeded pages for that to mean anything');
+
+  /* AND AS A BATCH, which is the form they install in — every `requires` resolved against the
+     registers arriving beside them. */
+  const batch = [...declarations(), ...pageDeclarations(), ...metricDeclarations()];
+  const known = new Map(batch.map((d) => [d.id, d.body]));
+  for (const decl of batch)
+    assert.equal(validateDeclaration(decl, known), null, `${decl.id} is refused when the record says what it holds`);
+});
+
+/* ── a theme, whose closure a parser can answer and whose floors it cannot ─ */
+
+/** A theme that satisfies `28 §1`, with one key overridden per case. */
+const theme = (over: Record<string, unknown> = {}): Declaration => ({
+  id: 'theme.midnight',
+  kind: 'theme',
+  body: { theme: 'midnight', seed: { accent: '#CF413A' }, scheme: 'both', ...over } as never,
+});
+
+test('A THEME VALUE IS ONE THE COLOUR PARSER READS, and alpha is the one that looks right', () => {
+  /**
+   * `39 §6.2` gives `THEME_VALUE_INVALID` to *"what only the colour parser sees"*, and the dialect is
+   * three forms: `#RGB`, `#RRGGBB`, `oklch(L C H)` (`parseColour`, `28 §1`).
+   *
+   * ALPHA IS NAMED SEPARATELY BECAUSE IT PARSES EVERYWHERE ELSE. `#0B0D0CCC` is a colour in every
+   * other tool; here it is a role that is partly the surface underneath it, so every contrast number
+   * measured against that role is measured against a colour that never ships. A refusal that only
+   * said *not a colour* would send somebody hunting a typo in eight correct hex digits.
+   */
+  assert.equal(refusedWith(theme()), null, 'a theme that satisfies 28 §1 was refused');
+  for (const accent of ['#CF413A', '#C43', 'oklch(0.58 0.18 27)'])
+    assert.equal(refusedWith(theme({ seed: { accent } })), null, `${accent} is a colour`);
+
+  for (const accent of ['rebeccapurple', 'rgb(207 65 58)', 'hsl(3 57% 52%)', '#GGGGGG', '#CF413', 5])
+    assert.equal(refusedWith(theme({ seed: { accent } })), 'THEME_VALUE_INVALID', `${String(accent)} is not a colour this dialect reads`);
+
+  for (const accent of ['#CF413ACC', '#C43F', 'rgba(207 65 58 / 0.8)', 'oklch(0.58 0.18 27 / 0.5)']) {
+    const said = validateDeclaration(theme({ seed: { accent } }));
+    assert.equal(said?.code, 'THEME_VALUE_INVALID', `${accent} carries an alpha and was admitted`);
+    assert.match(said?.fix ?? '', /alpha/, 'the refusal does not say which half of the value is the problem');
+  }
+});
+
+test('AN ACHROMATIC SEED HAS NO HUE TO BUILD FROM, which is 04 §5’s own worked example', () => {
+  /* `28 §3` step 0: below chroma 0.02 the hue angle is numerically unstable — two greys can be 180°
+     apart — so every role solved from that hue is solved from a number that means nothing. */
+  const said = validateDeclaration(theme({ seed: { accent: 'oklch(0.62 0.01 262)' } }));
+  assert.equal(said?.code, 'THEME_VALUE_INVALID');
+  assert.equal(said?.at, 'theme.midnight.seed.accent', 'the refusal names the JSON path (39 §6.2)');
+  assert.match(said?.fix ?? '', /almost grey/);
+
+  /* A HEX WHOSE THREE CHANNELS ARE EQUAL IS GREY BY CONSTRUCTION and needs no conversion. */
+  for (const accent of ['#808080', '#CCC', '#000000', '#ffffff'])
+    assert.equal(refusedWith(theme({ seed: { accent } })), 'THEME_VALUE_INVALID', `${accent} is grey`);
+  assert.equal(refusedWith(theme({ seed: { accent: 'oklch(0.58 0.02 27)' } })), null, '0.02 is the floor, not one under it');
+  assert.equal(refusedWith(theme({ seed: { accent: '#CF413A' } })), null);
+});
+
+test('and a theme loads nothing from elsewhere, which is the pack’s refusal wherever it appears', () => {
+  /* `04 §5` and `42 §4.10`: the banned substrings are `REMOTE_ASSET`, *"the same refusal wherever in
+     a pack it appears"* — an image URL in a page and a `url(` in a token value are one attack, and
+     it is the record id arriving in somebody's access log. `var(` is here for a different reason and
+     it is not the network: it lets a token escape into another token's context. */
+  for (const value of ['url(https://cdn.example/a.png)', 'image(x)', 'element(#a)', 'attr(href)', 'var(--ink)', '\\41'])
+    assert.equal(refusedWith(theme({ roles: { dark: { ink: value } } })), 'REMOTE_ASSET', `${value} is not a token value`);
+});
+
+test('and the closed words and the bounded numbers of 42 §4.10', () => {
+  assert.equal(refusedWith(theme({ roles: { light: { ink: '#111111' }, dark: { ink: '#EEEEEE' } } })), null);
+  /* `info` IS A ROLE. `42 §4.10` lists twenty-two and `@braindog/theme`'s own `Role` union has
+     twenty-seven — `info` was added when the house accent became the mark and stopped being what
+     `info` resolved to. A role list closed against the stale half would refuse a role the shipped
+     house theme emits, which is why the names are left to the package that owns them. */
+  assert.equal(refusedWith(theme({ roles: { dark: { info: '#5B8DEF' } } })), null, 'the stale 22-role list refused a role the house theme ships');
+  for (const roles of [{ midnight: { ink: '#111111' } }, { dark: { ink: 7 } }, { dark: 'ink' }, ['#111111']])
+    assert.equal(refusedWith(theme({ roles })), 'THEME_VALUE_INVALID', `${JSON.stringify(roles)} is not a role map`);
+
+  for (const scheme of ['light', 'dark', 'both']) assert.equal(refusedWith(theme({ scheme })), null);
+  assert.equal(refusedWith(theme({ scheme: 'auto' })), 'THEME_VALUE_INVALID');
+
+  for (const density of ['compact', 'comfortable', 'roomy']) assert.equal(refusedWith(theme({ scale: { density } })), null);
+  assert.equal(refusedWith(theme({ scale: { density: 'cosy' } })), 'THEME_VALUE_INVALID');
+  assert.equal(refusedWith(theme({ scale: { space: { base: 4 } } })), null);
+  for (const base of [1, 9, 4.5, '4']) assert.equal(refusedWith(theme({ scale: { space: { base } } })), 'THEME_VALUE_INVALID');
+  assert.equal(refusedWith(theme({ scale: { radius: { sm: 4, md: 6, lg: 8 } } })), null);
+  assert.equal(refusedWith(theme({ scale: { radius: { lg: 25 } } })), 'THEME_VALUE_INVALID');
+
+  assert.equal(refusedWith(theme({ seed: { accent: '#CF413A', neutral_hue: 110 } })), null);
+  assert.equal(refusedWith(theme({ seed: { accent: '#CF413A', neutral_hue: 'from-accent' } })), null);
+  assert.equal(refusedWith(theme({ seed: { accent: '#CF413A', neutral_hue: 400 } })), 'THEME_VALUE_INVALID');
+  assert.equal(refusedWith(theme({ seed: undefined })), 'THEME_VALUE_INVALID');
+});
+
+/* ── an ingest, of which only the pull half was checked ──────────────────── */
+
+/** An ingest that satisfies `07 §3`, with one key overridden per case. */
+const ingest = (over: Record<string, unknown> = {}): Declaration => ({
+  id: 'ingest.hsbc_sms',
+  kind: 'ingest',
+  body: {
+    ingest: 'hsbc_sms',
+    channel: 'email',
+    match: { all: [{ field: 'from', is: 'alerts@hsbc.example' }, { field: 'subject', contains: 'transaction' }] },
+    extract: { amount: { money: { after: 'EGP', currency: 'EGP' } } },
+    writes: { register: 'transactions' },
+    ...over,
+  } as never,
+});
+
+test('AN EXTRACTOR IS ONE OF THE THIRTEEN, and a fourteenth returns null on an arrival days later', () => {
+  /**
+   * `07 §3` counts them: ten extractors and three combinators. `ingest.ts` reads a form with
+   * `'money' in form`, so an unknown key falls through every arm and `extract` returns `null` for
+   * that field — which the write path then reports as a MISSING REQUIRED FIELD, on somebody's bank
+   * email, naming the field rather than the typo that caused it. The person who could fix it wrote
+   * the declaration, and by then they are looking at a stranger's payload.
+   */
+  const said = validateDeclaration(ingest({ extract: { amount: { regex: '\\d+' } } }));
+  assert.equal(said?.code, 'EXTRACTOR_UNKNOWN');
+  assert.match(said?.fix ?? '', /thirteen/);
+  assert.ok(said?.allowed?.includes('money'), 'the refusal offers no alternative');
+
+  /* `07 §3` RECORDS AN EARLIER DRAFT COLLAPSING `int` AND `decimal` INTO AN INVENTED `number`, which
+     is the failure mode a stated count exists to catch. So the count is stated here too. */
+  const forms: Record<string, unknown> = {
+    after: { after: 'EGP' }, before: { before: ' on' }, between: { between: ['at ', ' on'] },
+    money: { money: { currency: 'EGP' } }, date: { date: { format: 'DD/MM/YY' } }, text: { text: {} },
+    int: { int: {} }, decimal: { decimal: { sep: '.' } }, enum: { enum: { map: { debited: 'debit' } } },
+    lookup: { lookup: { register: 'accounts', by: 'last4' } },
+    first: { first: [{ text: {} }, { int: {} }] }, nth: { nth: { n: 2, of: { text: {} } } },
+    default: { default: { value: 0, of: { int: {} } } },
+  };
+  assert.equal(Object.keys(forms).length, 13, 'the thirteen are not thirteen');
+  for (const [name, form] of Object.entries(forms))
+    assert.equal(refusedWith(ingest({ extract: { a: form } })), null, `${name} is a form and was refused`);
+
+  /* AND A COMBINATOR HOLDS FORMS, so the walk goes through it. `{ first: [ …, { number: {} } ] }` is
+     the shape that installs cleanly and then chooses an arm that reads nothing. */
+  assert.equal(refusedWith(ingest({ extract: { a: { first: [{ text: {} }, { number: {} }] } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { nth: { n: 2, of: { number: {} } } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { default: { value: 0, of: { number: {} } } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: 'money' } })), 'EXTRACTOR_UNKNOWN');
+});
+
+test('A MATCH IS ABOUT WHAT AN ARRIVAL HOLDS, and a field it does not hold matches nothing', () => {
+  /* `42 §4.7`: `inbox_raw` holds `from to subject body channel state ts`. A `match:` naming anything
+     else compiles to a predicate over a path that is never non-null — so the pattern matches
+     NOTHING, and an ingest that never fires looks exactly like one that fires correctly until
+     somebody notices a month of arrivals sitting untriaged. */
+  const said = validateDeclaration(ingest({ match: { all: [{ field: 'amount', gt: 0 }] } }));
+  assert.equal(said?.code, 'MATCH_FIELD_UNKNOWN');
+  assert.equal(said?.at, 'match');
+  assert.deepEqual(said?.allowed, ['from', 'to', 'subject', 'body', 'channel', 'state', 'ts']);
+
+  for (const field of ['from', 'to', 'subject', 'body', 'channel', 'state', 'ts'])
+    assert.equal(refusedWith(ingest({ match: { all: [{ field, is: 'x' }] } })), null, `${field} is what an arrival holds`);
+  assert.equal(refusedWith(ingest({ match: { field: 'from', is: 'x' } })), null, 'a bare leaf is a predicate');
+  assert.equal(refusedWith(ingest({ match: { any: [{ none: [{ field: 'merchant', is: 'x' }] }] } })), 'MATCH_FIELD_UNKNOWN', 'the walk does not reach a nested group');
+  /* THE SENTENCE FORM IS NOT PARSED HERE, and saying so is the point: `parseWhere` needs a `Schema`
+     and a clock, neither of which a context-free check has. */
+  assert.equal(refusedWith(ingest({ match: 'from is alerts@hsbc.example' })), null);
+});
+
+test('and a path is 43 §4.4’s grammar, because one outside it reaches nothing rather than throwing', () => {
+  /* A mapped field whose path is malformed is simply absent, so the row is written without it and
+     the connector reports a successful page. */
+  const pull = (map: unknown) => refusedWith(ingest({ channel: 'pull', every: '1h', match: undefined, extract: undefined, map }));
+  for (const path of ['downloads', 'a.b.c', 'rows[0].value', 'rows[-1].value', 'rows[].value', '', 'a.b[]'])
+    assert.equal(pull({ v: { path } }), null, `${JSON.stringify(path)} is a path`);
+  for (const path of ['a b', 'a..b', 'rows[x]', 'a[0', 'a.b[].c[]', 7, Array.from({ length: 17 }, () => 'a').join('.')])
+    assert.equal(pull({ v: { path } }), 'PATH_INVALID', `${JSON.stringify(path)} is not a path`);
+  assert.equal(pull({ v: { path: ['a.b', 'c.d'] } }), null, 'a pair of paths is a path');
+  assert.equal(pull({ v: { path: ['a.b', 'c d'] } }), 'PATH_INVALID');
+
+  /* AND THE SAME GRAMMAR EVERYWHERE IT IS ONE (25 §3.1, 47 §4.3). */
+  const fetch = (f: unknown) => refusedWith(ingest({ channel: 'pull', every: '1h', match: undefined, extract: undefined, fetch: f }));
+  assert.equal(fetch({ read: { rows: 'data.rows' } }), null);
+  assert.equal(fetch({ read: { rows: 'data rows' } }), 'PATH_INVALID');
+  assert.equal(fetch({ expect: [{ path: 'a.b', present: true }] }), null);
+  assert.equal(fetch({ expect: [{ path: 'a b', present: true }] }), 'PATH_INVALID');
+  assert.equal(fetch({ page: { from: 'meta.next' } }), null);
+  assert.equal(fetch({ page: { from: 'meta next' } }), 'PATH_INVALID');
+  assert.equal(fetch({ probe: { read: { who: 'user.id' } } }), null);
+  assert.equal(fetch({ probe: { read: { who: 'user id' } } }), 'PATH_INVALID');
+});
+
+test('and an ingest arrives by one of the five channels, and a pull is still held to its floor', () => {
+  for (const channel of ['email', 'webhook', 'paste', 'api'])
+    assert.equal(refusedWith(ingest({ channel })), null, `${channel} is a channel`);
+  assert.equal(refusedWith(ingest({ channel: 'sms' })), 'DECLARATION_INVALID');
+  /* THE ONE CHECK THIS KIND ALREADY HAD, kept: `25 §9`'s floor, refused where it is written. */
+  assert.equal(refusedWith(ingest({ channel: 'pull', every: '1m', match: undefined, extract: undefined })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ channel: 'pull', every: '1h', match: undefined, extract: undefined })), null);
+});
+
+/* ── the rule checks 04 §5 names and nothing emitted ─────────────────────── */
+
+/** A rule that satisfies `07 §6`, with one key overridden per case. */
+const rule = (over: Record<string, unknown> = {}): Declaration => ({
+  id: 'rule.expand_size_run',
+  kind: 'rule',
+  body: {
+    rule: 'expand_size_run',
+    register: 'runs',
+    when: { field: 'state', is: 'open' },
+    once_per: ['entry'],
+    then: [{ create: { register: 'skus', each: ['sizes', 'colours'], bound: 500, fields: { code: '{{each.0}}' } } }],
+    ...over,
+  } as never,
+});
+
+/** The register a `create` crosses, whose enums are the only place the cardinality is written down. */
+const RUNS: Declaration = {
+  id: 'register.runs',
+  kind: 'register',
+  body: {
+    id: 'runs',
+    title: 'what',
+    fields: [
+      { id: 'what', type: 'text' },
+      { id: 'sizes', type: 'enum', values: ['xs', 's', 'm', 'l', 'xl', 'xxl', '3xl', '4xl'] },
+      { id: 'colours', type: 'enum', values: Array.from({ length: 12 }, (_, i) => `c${i}`) },
+      { id: 'tags', type: 'list', of: 'text' },
+    ],
+  } as never,
+};
+
+test('A GENERATOR WITH NO CEILING FILLS THE RECORD, and `bound:` is what buys the whole row', () => {
+  /**
+   * `04 §7` is an enumeration, and the row it spends is *"declare a BOUNDED `create` rule, whose
+   * ceiling is shown as SPAWNS in the diff"*. A `create` with no `bound:` is that row with its
+   * condition deleted — and the diff, which is the entire trust model, cannot print `SPAWNS` for it.
+   */
+  const said = validateDeclaration(rule({ then: [{ create: { register: 'skus', fields: { code: 'x' } } }] }));
+  assert.equal(said?.code, 'CREATE_UNBOUNDED');
+  assert.equal(said?.at, 'bound');
+  assert.match(said?.fix ?? '', /fills the record/);
+  assert.equal(refusedWith(rule()), null, 'a bounded create was refused');
+});
+
+test('AND A BOUND ITS OWN AXES CAN EXCEED IS WRONG TODAY, not at the thousandth row', () => {
+  /* `04 §5`'s worked example, and the cardinality is in the OTHER document: an `enum`'s `values` is a
+     fact written down, so the product is knowable at install. That is why this check needs the batch
+     — a pack declares its register and its rule in one file. */
+  const known = new Map([[RUNS.id, RUNS.body]]);
+  const said = validateDeclaration(
+    rule({ then: [{ create: { register: 'skus', each: ['sizes', 'colours'], bound: 60, fields: { code: 'x' } } }] }),
+    known,
+  );
+  assert.equal(said?.code, 'CREATE_OVER_BOUND');
+  assert.match(said?.fix ?? '', /sizes \(8\) × colours \(12\) = 96 exceeds bound 60/);
+
+  /* AND IT DOES NOT REFUSE A BOUND THAT HOLDS. */
+  assert.equal(inRecord(rule(), RUNS), null, '96 rows under a bound of 500 was refused');
+
+  /* A `list` HAS NO DECLARED LENGTH, so the product is unknowable and the check does not apply.
+     Multiplying by nothing for it would turn the check off for `enum × list`, where half is
+     knowable — and treating an unknown as zero would pass every bound there is. */
+  assert.equal(
+    validateDeclaration(rule({ then: [{ create: { register: 'skus', each: ['sizes', 'tags'], bound: 2, fields: { code: 'x' } } }] }), known),
+    null,
+    'a list axis was measured rather than left unknown',
+  );
+
+  /* AND WITHOUT THE OTHER DOCUMENT IT SAYS NOTHING, rather than guessing. */
+  assert.equal(refusedWith(rule({ then: [{ create: { register: 'skus', each: ['sizes', 'colours'], bound: 1, fields: { code: 'x' } } }] })), null);
+});
+
+test('A `starts` PATTERN IS MEASURED AS THE `LIKE` PATTERN IT BECOMES, not as the literal', () => {
+  /**
+   * `where`'s compiler already caps a `starts`/`ends` literal at forty bytes and calls it
+   * `CONTAINS_TOO_LONG` — and the string that reaches SQLite is not the literal. `starts` compiles to
+   * `LIKE`, and every `\`, `%` and `_` is escaped on the way in, so twenty-one per-cent signs are a
+   * forty-two-byte pattern. Its own comment says why that matters: *"one platform caps a LIKE
+   * pattern at fifty bytes and the other at fifty thousand"* — the parity failure that package
+   * exists to make impossible, measured on the wrong string.
+   */
+  const said = validateDeclaration(rule({ when: { field: 'ref', starts: '%'.repeat(21) } }));
+  assert.equal(said?.code, 'PATTERN_OVER_CAP');
+  assert.equal(said?.at, 'when');
+  assert.match(said?.fix ?? '', /42 bytes. The cap is 40. Use 'matches'/);
+
+  /* The same twenty-one characters that need no escaping are twenty-one bytes and install. */
+  assert.equal(refusedWith(rule({ when: { field: 'ref', starts: 'a'.repeat(21) } })), null);
+  assert.equal(refusedWith(rule({ when: { field: 'ref', starts: 'a'.repeat(40) } })), null, 'forty is the cap, not one under it');
+  assert.equal(refusedWith(rule({ when: { field: 'ref', ends: 'a'.repeat(41) } })), 'PATTERN_OVER_CAP');
+  /* AND IT WALKS THE GROUPS, because a pattern is never at the top of a real predicate. */
+  assert.equal(
+    refusedWith(rule({ when: { all: [{ field: 'state', is: 'open' }, { any: [{ field: 'ref', starts: '_'.repeat(21) }] }] } })),
+    'PATTERN_OVER_CAP',
+  );
+  /* A `contains` KEEPS ITS OWN CODE AND ITS OWN CEILING: it compiles to `instr`, which has no
+     pattern, so it has no platform limit and needs no escape. */
+  assert.equal(refusedWith(rule({ when: { field: 'ref', contains: '%'.repeat(21) } })), null);
+});

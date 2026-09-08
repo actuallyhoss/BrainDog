@@ -79,3 +79,26 @@ export const forcedColors = (classes: readonly string[]): string => `@media (for
     [data-intent] { forced-color-adjust: none; }
     :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
   }`;
+
+/**
+ * `--brand`, emitted into the generated stylesheet rather than typed into `tokens.css`.
+ *
+ * THE LOGO IS NOT THE ACCENT, AND IT USED TO BE THE SAME LITERAL WRITTEN TWICE. `tokens.css` carried
+ * `--brand: #cf413a;` by hand, beside a comment explaining that it is deliberately the same value
+ * the generator seeds `--accent` from — two copies of one colour, one of them outside the generator,
+ * and `colour-grep`'s only `ALLOWED_LINES` exemption existed to let it past.
+ *
+ * The cost of the copy is not tidiness. `tokens.css` is shared by both apps and every deployment, so
+ * a alpha build would have worn the production mark whatever its accent did — the one place where
+ * telling the environments apart matters most, wearing the wrong one by construction.
+ *
+ * IT IS NOT PART OF `toCSS`, AND THAT IS THE POINT. `toCSS` emits what a THEME may set, and a theme
+ * a customer installs must not be able to repaint the logo: `04 §7` and `28 §4.5` both put the mark
+ * outside the palette a pack may touch. So the mark is emitted alongside, by the build, from a value
+ * the build chooses — and a record's theme has no way to reach it.
+ *
+ * `@layer theme` so it sits with the rest of the generated block and a `tokens.css` rule can still
+ * override it locally without a specificity fight.
+ */
+export const brand = (colour: string): string =>
+  ['', '@layer theme {', '  html {', `    --brand: ${colour.toLowerCase()};`, '  }', '}', ''].join('\n');

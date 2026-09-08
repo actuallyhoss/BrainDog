@@ -133,38 +133,58 @@ export type Conflict = {
 };
 
 /**
- * THE NINETY-NINE, AND `30 §6` SAYS THIS PACKAGE IS WHERE THEY LIVE.
+ * THE HUNDRED AND TWELVE, AND `30 §6` SAYS THIS PACKAGE IS WHERE THEY LIVE.
  *
  * *"The type `Refusal` (with `RefusalCode`) is a type-only export of `@braindog/ports`, the lowest
  * shared package, because `where` raises one and sits below the kernel."* It did not exist. `code`
- * was `string`, so a refusal could carry any word at all. `refusals.mjs` counts it: **51 of the 99
- * emitted, 48 emitted by nothing, and 24 more that are not in the registry at all** — 32 of those
+ * was `string`, so a refusal could carry any word at all, and it did: the first audit found **51 of
+ * the 99 emitted, 48 emitted by nothing, and 24 more outside the registry entirely** — 32 of those
  * occurrences being `DECLARATION_INVALID`, the catch-all this build leans on hardest.
  *
- * (Two earlier numbers here were wrong and both are worth keeping. A hand count said 41 · 58 · 24.
- * Then the gate said 39 · 60 · 22 — and it was wrong too, because its pattern matched `no(` and
+ * (Three earlier numbers here were wrong and all three are worth keeping. A hand count said
+ * 41 · 58 · 24. Then the gate said 39 · 60 · 22 — wrong too, because its pattern matched `no(` and
  * `code:` and nothing else, while `declare.ts`, the largest emitter in the repository, builds every
- * refusal through a local `bad()`. A gate whose predicate cannot reach its biggest input is the
- * failure this tools directory exists to catch, made by the tool.)
+ * refusal through a local `bad()`. Widened for that it said 51 · 48 · 24, and was STILL wrong: a
+ * code written as `cond ? 'A' : 'B'` puts an expression where the pattern wanted a quote, and two
+ * codes were hiding behind one — `IMPORT_FAILED`, which appeared nowhere else in the tree, and
+ * `SCOPE_INSUFFICIENT`, which a test asserts on. The honest count was 26. A gate whose predicate
+ * cannot reach its input is the failure the tools directory exists to catch, made by the tool, and
+ * it made it twice.)
  *
  * A code is the one part of a refusal a caller can branch on. `10 §7` builds the agent contract on
  * it — *"the refusal teaches"* — and an agent teaches itself from a code that is stable across
  * versions. An invented code is a `fix` sentence with a shouty prefix.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"Ninety-nine, counted, in eight families
- * — 41 pack and declaration · 13 grammar · 18 write path · 7 auth and vault · 6 format and
- * lifecycle · 2 dialect · 5 spark · 7 connector."* A sentence that counts is a sentence that can be
- * wrong, so the shape is kept and `refusals.mjs` checks both the total and the eight sizes against
- * the document — the same gate shape `event-kinds` uses for the one other list that has to say the
- * same thing in two places.
+ * TWENTY-SIX WERE SORTED AND THIRTEEN WERE ADMITTED, on 2026-09-08. Six of the twenty-six were
+ * renames onto codes that already existed — five spellings of `MATCH_OP_UNSUPPORTED`, and
+ * `RECORD_NOT_EMPTY` onto `IMPORT_NOT_EMPTY`, `PERSON_REQUIRED` onto `FORBIDDEN` — which is the
+ * repair this list prefers, because a registry that grows whenever somebody needs a word is not a
+ * closed list. Five more were renamed onto three of the NEW codes, their old names having been wrong
+ * about their own subject rather than redundant. A twelfth rename was made and then UNDONE:
+ * `REF_UNKNOWN` reads like `VALUE_MALFORMED` and `declare` branches on it, which is the test for
+ * whether two refusals are one — not whether the sentences read alike, but whether a caller has to
+ * tell them apart. The thirteen that were admitted had no existing name at all, and the four
+ * in `HOST` below are a family this document had never had: `30 §6` was written about what a record
+ * refuses and never about the boundary a request arrives through, so both hosts and the client each
+ * minted their own word for a route that does not exist.
+ *
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twelve, counted, in nine
+ * families — 47 pack and declaration · 14 grammar · 18 write path · 7 auth and vault · 8 format and
+ * lifecycle · 2 dialect · 5 spark · 7 connector · 4 host and client."* A sentence that counts is a
+ * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
+ * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
+ * that has to say the same thing in two places.
  *
  * TWO THINGS THAT LOOK LIKE CODES AND ARE NOT: JSON-RPC's `-32602` and the `Http` port's four error
  * names. They are vocabularies, mapped onto a code where one applies (`PULL_ORIGIN_REFUSED`) and
  * otherwise never on the wire as a refusal. The storage adapter's own thirteen (`30 §13`) are a
  * third list and stay thirteen — they name what the DRIVER refused, not what the FORMAT refused.
+ * `INTERNAL` is a fourth: a handler that threw names no field and no expectation, so a 500 is a
+ * crash report wearing the envelope's shape rather than a refusal, and admitting it would turn this
+ * into the list of everything that can appear in a `code`.
  */
 
-/** Pack and declaration — 41. */
+/** Pack and declaration — 47. */
 const PACK = [
   'KIND_UNKNOWN', 'FIELD_TYPE_UNKNOWN', 'FIELDS_OVER_CAP', 'INDEXES_OVER_CAP', 'PATTERN_OVER_CAP',
   'METRIC_NEEDS_TARGET_OR_WINDOW', 'MIXED_CURRENCY', 'CONTRAST_FLOOR', 'REQUIRED_ON_POPULATED', 'ID_RENAMED',
@@ -176,14 +196,25 @@ const PACK = [
   'FIELD_TYPE_CHANGED', 'PROVIDES_MISMATCH', 'PLAN_STALE', 'THEME_VALUE_INVALID', 'INTENT_INSEPARABLE',
   'THEME_LADDER_ORDER', 'PACK_MALFORMED', 'PROVIDES_CONFLICT', 'REMOTE_ASSET', 'SECRET_IN_PACK',
   'WOULD_ORPHAN',
+  /* The 2026-09-08 audit's six: a caller naming a declaration this record has not got. The family is
+     named for what its codes are ABOUT and not for the moment they are raised — `TRANSITION_ILLEGAL`
+     above has said "one code, two moments" since the first draft — which is why a page read at 7am
+     belongs here rather than under a family whose first line is "refused before any row is written". */
+  'DECLARATION_UNKNOWN', 'PAGE_UNKNOWN', 'METRIC_UNKNOWN', 'SOURCE_UNKNOWN', 'LOOKUP_UNKNOWN',
+  'LOOKUP_MISSING',
 ] as const;
 
-/** Grammar — 13. */
+/** Grammar — 14. */
 const GRAMMAR = [
   'PREDICATE_TOO_DEEP', 'VIA_TWICE', 'VIA_NESTED_SUBQUERY', 'MONEY_LITERAL_NEEDS_CURRENCY',
   'QUANTITY_LITERAL_NEEDS_UNIT', 'MATCH_FIELD_UNKNOWN', 'MATCH_OP_UNSUPPORTED', 'CONTAINS_TOO_LONG',
   'RELATIVE_LITERAL_UNKNOWN', 'RELATIVE_UNIT_FOR_DAY', 'EXTRACTOR_UNKNOWN', 'DATE_FORMAT_INVALID',
   'PATH_INVALID',
+  /* THE ONE THAT WAS RENAMED AWAY AND HAD TO COME BACK. `REF_UNKNOWN` reads like `VALUE_MALFORMED`,
+     whose row says "an unresolvable id or spoken reference" — and `declare`'s rule linter branches
+     on it, surviving this refusal and no other because a name with nothing behind it today may be
+     written tomorrow. Two refusals are one when no caller has to tell them apart. One does. */
+  'REF_UNKNOWN',
 ] as const;
 
 /** Write path — 18. */
@@ -200,10 +231,15 @@ const AUTH = [
   'DEVICE_CODE_TRIES',
 ] as const;
 
-/** Format and lifecycle — 6. */
+/** Format and lifecycle — 8. */
 const LIFECYCLE = [
   'FORMAT_NEWER_THAN_READER', 'CHECKSUM_MISMATCH', 'SIGNATURE_INVALID', 'IMPORT_NOT_EMPTY',
   'SCHEMA_MISMATCH', 'SCHEMA_NEWER',
+  /* Two facts the family already implied and had no word for: a file that is not a `.dogl` at all
+     (nothing has been checksummed, so `CHECKSUM_MISMATCH` would be a lie), and a declaration that is
+     correct against its document and ahead of this code — the same sentence the three `*_NEWER*`
+     codes say about a version integer, which is why it is filed beside them. */
+  'FILE_MALFORMED', 'NOT_IN_THIS_BUILD',
 ] as const;
 
 /** Dialect — 2. */
@@ -221,9 +257,24 @@ const CONNECTOR = [
   'PULL_AUTH_REJECTED', 'PULL_PROVIDER_UNAVAILABLE', 'PULL_REQUEST_REFUSED', 'PULL_EXPECT_FAILED',
   'PULL_SHAPE_MISMATCH', 'PULL_ORIGIN_REFUSED', 'PULL_LEASE_EDGE',
 ] as const;
-/** The ninety-nine, in `30 §6`'s order. */
+
+/**
+ * Host and client — 4. The ninth family, and the one this document had never had.
+ *
+ * The other eight are all about the record's CONTENT — what a pack may declare, what a predicate may
+ * ask, what a write may do — and none of them is about the surface every caller actually touches. So
+ * `serveApi`, the self-host and the client each invented a word, and `httpStatus` grew a table of
+ * codes `30 §6` had never heard of. That is not a tidiness problem: a code outside the registry is a
+ * code outside the status map, and `RECORD_UNAVAILABLE` — which said `SCHEMA_UNAVAILABLE` while
+ * having nothing to do with a schema — therefore answered **422** for a record nobody may act on,
+ * where `49 §5.1` step 5.3 says 503.
+ */
+const HOST = [
+  'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
+] as const;
+/** The hundred and twelve, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
-  ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SPARK, ...CONNECTOR,
+  ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SPARK, ...CONNECTOR, ...HOST,
 ] as const;
 
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
@@ -234,18 +285,22 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the ninety-nine. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and twelve. `30-BLUEPRINT` §6, and the list is above.
    *
-   * STILL `string`, AND THE GATE IS WHY. Typing it `RefusalCode` compiles against 41 sites carrying
-   * 22 codes that are not in the registry — `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and
-   * the rest. Some of those are concepts `30 §6` is missing and should gain by amendment; some are
-   * placeholders (`UNIMPLEMENTED`, `INTERNAL`, `SOMETHING_NOBODY_MAPPED`) that should not exist at
-   * all; and telling them apart is a judgement per site, not a rename.
+   * STILL `string`, AND THE GATE IS WHY — but the reason is now six codes rather than twenty-four.
+   * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was
+   * missing and they have been admitted by amendment; the synonyms have been renamed onto the
+   * codes that already existed. What is left is `DECLARATION_INVALID` — the catch-all `declare.ts`
+   * leans on, 32 occurrences, a project of its own — and five codes whose last emitting site sits in
+   * a file the same change could not reach: `INTERNAL` (a crash, not a refusal, and it must move in
+   * all three hosts at once or they answer differently), `RECORD_NOT_EMPTY` in `seed`,
+   * `WHERE_OPERATOR_UNSUPPORTED` in the kernel's rule linter, `SCOPE_INSUFFICIENT`, and two
+   * deliberate placeholders that live only in tests and should stay there.
    *
-   * So `refusals.mjs` holds the number instead, as a budget that may only go down. That is the
-   * honest intermediate: the list is real, the drift is measured, and a twenty-third invented code
-   * is red today — rather than a type change that would have to be landed with 41 hurried guesses
-   * behind it. The field narrows the day the budget reaches zero.
+   * So `refusals.mjs` holds the number as a budget that may only go down. That is still the honest
+   * intermediate: the list is real, the drift is measured, and a seventh invented code is red today.
+   * The field narrows the day the budget reaches zero, and it is now six away rather than
+   * twenty-four.
    */
   code: string;
   /** What was wrong, where, and what to do. No apology, no blame. */

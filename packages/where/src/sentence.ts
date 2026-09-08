@@ -181,8 +181,12 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     /* ── before · after · on ─────────────────────────────────────────────── */
     if (verb in ORDERED) {
       if (decl.type !== 'day' && decl.type !== 'instant') {
+        /* `MATCH_OP_UNSUPPORTED` IS THE STRUCTURED COMPILER'S CODE FOR THIS EXACT LEAF, and the two
+           renderings of one grammar have to answer with one code or the sentence form is a second
+           language after all — which is the failure this file's own header is about. `30 §6` writes
+           the code as *"an operator outside its type's set"*, which is `before` on a `text`. */
         bad.push({
-          code: 'OPERATOR_UNSUPPORTED',
+          code: 'MATCH_OP_UNSUPPORTED',
           fix: `${sentence} — ${field} is a ${decl.type}, and ${verb} is about dates.`,
           at: field,
         });
@@ -205,7 +209,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     /* ── is · is not ─────────────────────────────────────────────────────── */
     if (verb !== 'is') {
       bad.push({
-        code: 'OPERATOR_UNSUPPORTED',
+        code: 'MATCH_OP_UNSUPPORTED',
         /* `predicate` IS THE SCHEMA'S WORD FOR THIS AND NOBODY ELSE'S. It reached three screens,
            every one of them inside error copy, where the reader is already stuck — and the control
            that produced the thing is labelled *Filter*. The word for what a person wrote is the word
@@ -259,7 +263,11 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
   if (clauses.length === 0)
     return {
       predicate: undefined,
-      bad: [{ code: 'WHERE_MALFORMED', fix: `${text} says nothing a register can answer.`, at: 'where' }],
+      /* `VALUE_MALFORMED`: a `where:` written as a sentence IS a value, and `,,,` is one outside the
+         shape a filter takes. `30 §6` reads the code as *"a value outside its type's shape that
+         cannot be coerced, an unresolvable id or spoken reference"* — a spoken filter that resolves
+         to no clause is the second half of that sentence as much as the first. */
+      bad: [{ code: 'VALUE_MALFORMED', fix: `${text} says nothing a register can answer.`, at: 'where' }],
     };
   return { predicate: clauses.length === 1 ? clauses[0] : { all: clauses }, bad };
 }
@@ -306,6 +314,24 @@ function refuseValue(
       at: field,
       allowed: (decl.values ?? []).map((v) => v.replace(/_/g, ' ')),
     };
+  /**
+   * `REF_UNKNOWN` STAYS, AND IT IS NOW IN `30 §6` RATHER THAN INVENTED HERE.
+   *
+   * It looks like a synonym of `VALUE_MALFORMED` — whose own row reads *"an unresolvable id or
+   * spoken reference"* — and it is not, because something BRANCHES on it. `declare` lints every
+   * rule's `when:` before installing it and takes exactly one refusal as survivable:
+   * `said.bad.find((b) => b.code !== 'REF_UNKNOWN')`. The argument is written there: *"`owner is
+   * Kiln` names a row that may be written tomorrow; every other refusal here is about the grammar
+   * or the shape, and those are facts about the declaration whenever it is read."* Fold this into
+   * `VALUE_MALFORMED` and the filter has to exempt `VALUE_MALFORMED` instead — which swallows a
+   * genuinely malformed value and installs a rule that fires on nothing, silently, for ever.
+   *
+   * THAT IS WHAT A CODE IS FOR, and it is the test for whether two refusals are one: not whether the
+   * sentences read alike, but whether any caller has to tell them apart. This one does.
+   *
+   * IT IS ALSO NOT `REF_REGISTER_MISMATCH`, which is a ref resolving to a row of the WRONG register
+   * — repoint it. Here there is nothing to point at.
+   */
   if (decl.type === 'ref')
     return {
       code: 'REF_UNKNOWN',

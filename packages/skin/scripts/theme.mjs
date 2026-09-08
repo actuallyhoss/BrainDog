@@ -1,89 +1,139 @@
 /**
- * Build the house theme into the skin.
+ * Build the house theme, and one stylesheet per environment, into the skin.
  *
- * ONE output, two consumers. This writes `packages/skin/house.css` at build time so first paint is
- * themed with no server to render a head, and an installed theme arrives later with `boot()` and is
- * applied by one `replaceSync` (28 §5 mechanism 3, 50 §13 D18). The marketing site imports the same
- * file — it is the same product, and a landing page whose red is a shade off the app's is a landing
- * page that makes the app look like a different company's.
+ * ONE output per deployment, two consumers. This writes `packages/skin/house.css` at build time so
+ * first paint is themed with no server to render a head, and an installed theme arrives later with
+ * `boot()` and is applied by one `replaceSync` (28 section 5 mechanism 3, 50 section 13 D18). The
+ * marketing site imports the house file - it is the same product, and a landing page whose red is a
+ * shade off the app's is a landing page that makes the app look like a different company's.
  *
- * The file is COMMITTED and gated for exactness, like `allow.json`: a palette that drifts from its
+ * AND ONE PER ENVIRONMENT, WHICH IS THE SAME ARTEFACT AND NOT A SPECIAL CASE. A alpha deployment
+ * gets `alpha.css`, generated from the same generator, validated by the same sixteen checks and
+ * committed and byte-compared the same way. The reason it is a second FILE rather than a second
+ * selector inside the first is that the wrong palette must not be in the bundle at all: a rule
+ * behind `html[data-env]` is a rule anybody can turn on in devtools, and `apps/web/vite.config.ts`
+ * already refuses that shape of door in as many words - "a `window.__seed` hook would be a dev door
+ * shipping to production".
+ *
+ * The files are COMMITTED and gated for exactness, like `allow.json`: a palette that drifts from its
  * own generator is a palette nobody validated.
  *
- *   node scripts/theme.mjs           write it
- *   node scripts/theme.mjs --check   fail if the committed file is not what the generator emits
+ *   node scripts/theme.mjs           write them
+ *   node scripts/theme.mjs --check   fail if a committed file is not what the generator emits
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { BRAND_RED, HOUSE, HIGH_CONTRAST, toCSS, validate, refusals } from '@braindog/theme';
+import {
+  BRAND_RED,
+  HOUSE,
+  HIGH_CONTRAST,
+  ALPHA,
+  ALPHA_HIGH_CONTRAST,
+  brand,
+  toCSS,
+  validate,
+  refusals,
+} from '@braindog/theme';
 
 import { MARK } from '../mark.ts';
 
-const OUT = join(import.meta.dirname, '..', 'house.css');
-const css = toCSS(HOUSE, HIGH_CONTRAST);
+const root = join(import.meta.dirname, '..', '..', '..');
+const skin = join(import.meta.dirname, '..');
 
 /**
  * The favicon, generated from the same two sources as everything else: `MARK` for the artwork and
- * `BRAND_RED` for the colour.
+ * the deployment's own accent for the colour.
  *
  * It has to be a literal hex and a real file. A favicon is fetched as its OWN document, outside any
- * page, so it can reach no custom property and no theme — and that is exactly why it kept drifting:
+ * page, so it can reach no custom property and no theme - and that is exactly why it kept drifting:
  * it was the one copy of the mark that no token change touched. Generating it means it cannot.
+ *
+ * AND IT IS THE ONE PLACE AN ENVIRONMENT IS SEEN WITH THE PRODUCT NOT IN FRONT OF YOU. A tab strip
+ * with nine tabs shows about a dozen characters of title and the whole icon, so the icon is where a
+ * alpha window is picked out of a row of production ones. The title carries the word, for the
+ * reader who cannot use the colour; the icon carries the colour, for everybody else. Neither is
+ * sufficient and both are cheap.
  *
  * The glyph on transparency, at its own ratio, and no tile. A rounded red square with the dog
  * reversed out is an APP ICON, and a browser tab is not a home screen: the tile competes with the
  * favicons beside it, its corner radius fights whatever radius the browser applies, and in dark
  * chrome a red square is the loudest thing in the tab strip.
  */
-const FAVICONS = ['apps/web/static/mark.svg', 'apps/site/static/mark.svg'];
-const favicon =
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MARK.viewBox}" role="img" aria-label="BrainDog">
-` +
-  `  <title>BrainDog</title>
-` +
-  `  <g fill="${BRAND_RED}">
-` +
-  MARK.paths.map((d) => `    <path d="${d}" />
-`).join('') +
-  `  </g>
-</svg>
-`;
+const favicon = (hex) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MARK.viewBox}" role="img" aria-label="BrainDog">\n` +
+  `  <title>BrainDog</title>\n` +
+  `  <g fill="${hex}">\n` +
+  MARK.paths.map((d) => `    <path d="${d}" />\n`).join('') +
+  `  </g>\n</svg>\n`;
 
-/* A theme is never written without being validated first — the generator drives most of the sixteen
+/**
+ * Every file this script owns, by what it is generated from.
+ *
+ * A LIST RATHER THAN FIVE PAIRS OF CALLS, because `--check` and the write path have to walk exactly
+ * the same set. They did not before: `--check` verified two favicons and one stylesheet by three
+ * separate blocks of code, and a fourth artefact would have been written by one and checked by
+ * neither.
+ *
+ * `--brand` IS EMITTED HERE AND NO LONGER LIVES IN `tokens.css`. It is the one colour that belongs
+ * to the product rather than to a meaning, and it was a hand-written literal in the shared token
+ * layer - which meant a alpha build painted its logo in the production red, on the single most
+ * looked-at element in the app. It is still a separate token from `--accent`, and for the reason
+ * `tokens.css` gave: the logo must not change colour when somebody installs a record theme. That
+ * property is preserved by WHERE it is emitted rather than by what it is called - `toCSS` does not
+ * write it, so `recordTheme`'s adopted block cannot carry it, and only this script can.
+ */
+const ARTEFACTS = [
+  { path: join(skin, 'house.css'), text: toCSS(HOUSE, HIGH_CONTRAST) + brand(BRAND_RED) },
+  {
+    path: join(skin, 'alpha.css'),
+    text: toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + brand(ALPHA.schemes.light.accent),
+  },
+  { path: join(root, 'apps/web/static/mark.svg'), text: favicon(BRAND_RED) },
+  { path: join(root, 'apps/site/static/mark.svg'), text: favicon(BRAND_RED) },
+  { path: join(root, 'apps/web/static/mark-alpha.svg'), text: favicon(ALPHA.schemes.light.accent) },
+];
+
+/* A theme is never written without being validated first - the generator drives most of the sixteen
    checks, so what is left here is the handful it cannot drive. */
 /* AGAINST THE DOCUMENT AS THE APP LOADS IT, not against the theme block alone. Check L asks whether
-   the stylesheet has a forced-colors block, and the block lives in `a11y.css` — a layer no theme can
+   the stylesheet has a forced-colors block, and the block lives in `a11y.css` - a layer no theme can
    reach and which is already in the page. Validating the theme on its own would refuse every build
    for the absence of a rule it is not allowed to write; validating with no `css` at all, which is
    what this used to do, skipped the check entirely. */
-const a11y = await readFile(join(import.meta.dirname, '..', 'a11y.css'), 'utf8');
-const document_ = css + a11y;
-const bad = [...refusals(validate(HOUSE, document_)), ...refusals(validate(HIGH_CONTRAST, document_))];
+const a11y = await readFile(join(skin, 'a11y.css'), 'utf8');
+const houseDoc = toCSS(HOUSE, HIGH_CONTRAST) + a11y;
+const alphaDoc = toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + a11y;
+
+/* EVERY PALETTE THAT SHIPS, NOT ONLY THE HOUSE ONE. An environment palette is a real palette a real
+   person reads all day; validating the house theme and shipping a second unvalidated one would be
+   the exact defect 28 section 4.5 refuses - "an auto-corrected theme is not portable" - one step
+   further along, where nothing was even asked. */
+const bad = [
+  ...refusals(validate(HOUSE, houseDoc)),
+  ...refusals(validate(HIGH_CONTRAST, houseDoc)),
+  ...refusals(validate(ALPHA, alphaDoc)),
+  ...refusals(validate(ALPHA_HIGH_CONTRAST, alphaDoc)),
+];
 if (bad.length > 0) {
   for (const f of bad) console.error(`  REFUSED ${f.check}  ${f.fix}`);
   process.exit(1);
 }
 
-const root = join(import.meta.dirname, '..', '..', '..');
-
 if (process.argv.includes('--check')) {
-  for (const rel of FAVICONS) {
-    const on_disk = await readFile(join(root, rel), 'utf8').catch(() => '');
-    if (on_disk !== favicon) {
-      console.error(`  ${rel} is not what the generator emits. Run: pnpm theme`);
-      process.exit(1);
+  let wrong = 0;
+  for (const { path, text } of ARTEFACTS) {
+    const on_disk = await readFile(path, 'utf8').catch(() => '');
+    if (on_disk !== text) {
+      console.error(`  ${path.slice(root.length + 1).replace(/\\/g, '/')} is not what the generator emits. Run: pnpm theme`);
+      wrong += 1;
     }
   }
-  const on_disk = await readFile(OUT, 'utf8').catch(() => '');
-  if (on_disk !== css) {
-    console.error('  packages/skin/house.css is not what the generator emits. Run: pnpm theme');
-    process.exit(1);
-  }
-  console.log('  house.css and both favicons match their generator.');
+  if (wrong > 0) process.exit(1);
+  console.log(`  ${ARTEFACTS.length} generated files match their generator.`);
 } else {
-  await writeFile(OUT, css, 'utf8');
-  for (const rel of FAVICONS) await writeFile(join(root, rel), favicon, 'utf8').catch(() => {});
-  console.log(`  wrote packages/skin/house.css — ${(css.length / 1024).toFixed(1)} KB, 0 refusals`);
+  for (const { path, text } of ARTEFACTS) await writeFile(path, text, 'utf8');
+  const bytes = ARTEFACTS.reduce((n, a) => n + a.text.length, 0);
+  console.log(`  wrote ${ARTEFACTS.length} files - ${(bytes / 1024).toFixed(1)} KB, 0 refusals`);
 }

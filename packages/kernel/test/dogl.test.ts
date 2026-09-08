@@ -357,7 +357,11 @@ test('AN IMPORT OPENS A FILE INTO AN EMPTY RECORD, and refuses anything else', a
 
   const out = (await target.k.import(lines)) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(out.ok, false);
-  assert.equal(out.refusal?.code, 'RECORD_NOT_EMPTY');
+  /* `IMPORT_NOT_EMPTY` is `30 §6`'s name for this and `41 §6` gives it the same sentence. It read
+     `RECORD_NOT_EMPTY`, which mattered more than a synonym normally would: `30 §6`'s HTTP row names
+     `IMPORT_NOT_EMPTY` by hand as one of the two refusals a caller might mistake for a 409, so a
+     caller that had read the document and branched on it never matched. */
+  assert.equal(out.refusal?.code, 'IMPORT_NOT_EMPTY');
   assert.match(out.refusal?.fix ?? '', /decision per row/);
   assert.equal(target.k.count('obligations'), 2, 'a refused import wrote rows anyway');
   source.sql.close();
@@ -418,7 +422,7 @@ test('A RECORD WITH NO ROWS BUT ITS OWN GOVERNANCE IS NOT EMPTY', async () => {
 
   const out = (await target.import(lines)) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(out.ok, false, 'a record holding a register and a decision was called empty');
-  assert.equal(out.refusal?.code, 'RECORD_NOT_EMPTY');
+  assert.equal(out.refusal?.code, 'IMPORT_NOT_EMPTY');
   assert.match(out.refusal?.fix ?? '', /declaration|decision/, 'the refusal does not say what is in the way');
   assert.ok(target.register('obligations'), 'the refused import destroyed the register anyway');
   assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM decision')?.n, 1);
@@ -443,7 +447,12 @@ test('a damaged file is a refusal and not an exception, and it writes nothing', 
     const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
     const out = (await k.import(broken)) as { ok: boolean; refusal?: { code: string; fix: string } };
     assert.equal(out.ok, false, `\`${damage.slice(0, 24)}…\` was imported as if it were a row`);
-    assert.equal(out.refusal?.code, 'MALFORMED_FILE');
+    /* `FILE_MALFORMED` — `30 §6`'s new format-and-lifecycle code for the hole `33 §9`'s import row
+       left: it names `SIGNATURE_INVALID`, `CHECKSUM_MISMATCH` and `FORMAT_NEWER_THAN_READER` and has
+       no word for a file that is simply not a `.dogl`. Both arms of the old ternary here —
+       `MALFORMED_FILE` and `IMPORT_FAILED` — are this one code now, and `IMPORT_FAILED` was invisible
+       to the refusals gate because its pattern could not see past a `?`. */
+    assert.equal(out.refusal?.code, 'FILE_MALFORMED');
     assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 0, 'a failed import left rows behind');
     sql.close();
   }
@@ -663,7 +672,7 @@ test('A FILE FROM A NEWER BUILD IS REFUSED ON LINE ONE, before anything is parse
     assert.equal((await checkDogl([first, ...lines.slice(1)])).ok, false, `\`${first}\` was read as a file`);
   assert.equal(
     ((await checkDogl(['<!doctype html>'])) as { refusal: { code: string } }).refusal.code,
-    'MALFORMED_FILE',
+    'FILE_MALFORMED',
   );
   sql.close();
 });

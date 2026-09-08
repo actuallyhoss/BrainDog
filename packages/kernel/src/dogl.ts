@@ -462,12 +462,27 @@ export async function checkDogl(
      because reading it means writing rows whose columns this build does not know into a record it
      then calls a complete copy. The `dog_meta` check inside the writer finds the same fact later,
      and later is after the transaction has opened. */
+  /**
+   * `FILE_MALFORMED`, WHICH `30 §6` GAINED FOR THE HOLE `33 §9` LEFT OPEN.
+   *
+   * The import row of `33 §9` enumerates three refusals — `SIGNATURE_INVALID` for a manifest that
+   * does not verify, `CHECKSUM_MISMATCH` for rows that do not match it, `FORMAT_NEWER_THAN_READER`
+   * for a `user_version` above this reader's — and has no name at all for the commonest way a file
+   * arrives wrong: it is not a `.dogl`. Neither of the first two can be said honestly here. Nothing
+   * has been checksummed when there is no header to say what the file claims to be, and a person
+   * told `CHECKSUM_MISMATCH` goes looking for a manifest that was never read.
+   *
+   * SO THE CODE IS `FILE_MALFORMED` and it sits beside those three in format and lifecycle, spelled
+   * the way `PACK_MALFORMED`, `BODY_MALFORMED` and `VALUE_MALFORMED` are spelled: the artefact, then
+   * what is wrong with it. The name it replaced, `MALFORMED_FILE`, was the same two words in the
+   * other order and in no registry — which is how one file can carry a code nobody else can find.
+   */
   const first = lines.find((l) => l.trim() !== '')?.trim() ?? '';
   if (!first.startsWith('#dogl '))
     return {
       ok: false,
       refusal: {
-        code: 'MALFORMED_FILE',
+        code: 'FILE_MALFORMED',
         fix: 'A .dog file begins with `#dogl <version>`, and this one does not. Re-export it from the record it came from.',
       },
     };
@@ -475,7 +490,7 @@ export async function checkDogl(
   if (!Number.isInteger(format) || format < 1)
     return {
       ok: false,
-      refusal: { code: 'MALFORMED_FILE', fix: `The first line does not name a format version. The file is damaged.` },
+      refusal: { code: 'FILE_MALFORMED', fix: `The first line does not name a format version. The file is damaged.` },
     };
   if (format > FORMAT_VERSION)
     return {
@@ -595,7 +610,13 @@ export function importDogl(
     return {
       ok: false,
       refusal: {
-        code: 'RECORD_NOT_EMPTY',
+        /* `IMPORT_NOT_EMPTY` IS THE REGISTRY'S NAME FOR THIS EXACT SENTENCE — `30 §6`, format and
+           lifecycle, *"`import` into a record that has rows, §5 — a refusal, 422"*, and `41 §6`
+           gives the fix as *"Import into a new record."* `RECORD_NOT_EMPTY` was a second name for a
+           code that already existed, and it mattered more than a synonym usually does: `30 §6`'s
+           HTTP row names `IMPORT_NOT_EMPTY` by hand as one of the two refusals a caller might
+           mistake for a 409, so a caller reading that row and branching on it never matched. */
+        code: 'IMPORT_NOT_EMPTY',
         fix: `An import opens a file into an empty record, and this one already holds ${held}. Merging two records is a decision per row, and it is not this tool’s to make.`,
       },
     };
@@ -613,10 +634,19 @@ export function importDogl(
        value is the wrong type — all of them arrived here as a thrown Error, which a caller reading
        `Result` never sees coming. The transaction had already rolled back; the only thing missing
        was a sentence saying so. */
+    /* ONE CODE, TWO SENTENCES, AND THE TERNARY WAS HIDING THE SECOND ONE. The two arms carried
+       `MALFORMED_FILE` and `IMPORT_FAILED` — neither in `30 §6`, and `IMPORT_FAILED` appeared
+       NOWHERE ELSE in the tree, because the refusals gate's own pattern anchored a code to the
+       quote immediately after `code:` and a ternary puts an expression there. A code invisible to
+       the gate that counts codes is the failure `tools/gates` exists to catch, made by the tool, and
+       the pattern is widened in the same change that removes this one.
+       BOTH ARMS ARE `FILE_MALFORMED`. A truncated line and a row the record cannot hold are the same
+       answer to the caller — this file did not go in, nothing was written, get another copy — and
+       `30 §6` puts several sentences under one code wherever the repair is one repair. */
     return {
       ok: false,
       refusal: {
-        code: e instanceof BadLine ? 'MALFORMED_FILE' : 'IMPORT_FAILED',
+        code: 'FILE_MALFORMED',
         fix:
           e instanceof BadLine
             ? `${e.message} The file is damaged; re-export it from the record it came from.`

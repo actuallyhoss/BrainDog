@@ -222,8 +222,12 @@ test('a shape this build does not read is named rather than answered as the ungr
   // `group_by` and `bucket` were ignored in silence, and the figure that came back was the UNGROUPED
   // one — drawn under a heading that says it is grouped, which is worse than an em dash.
   const { k, sql } = await record();
+  /* `NOT_IN_THIS_BUILD`, added to `30 §6` in the same change. `UNIMPLEMENTED` named nothing — not
+     what is unimplemented, not by whom, not what to do — and `08 §2.2` PUBLISHES these eleven
+     aggregations, so telling their author the shape is unknown or malformed would send them to
+     check a spelling that is correct. The build is behind the document; a deploy is the repair. */
   for (const value of [{ last: 'amount' }, { median: 'amount' }, { group_by: 'party' }])
-    assert.equal(refusal(k.metric({ ...OVERDUE, value: value as never })).code, 'UNIMPLEMENTED');
+    assert.equal(refusal(k.metric({ ...OVERDUE, value: value as never })).code, 'NOT_IN_THIS_BUILD');
 
   // A product naming a table the record was not given is named too, rather than read as factor one.
   assert.equal(
@@ -598,7 +602,9 @@ test('and a day the grammar does not admit is refused in JSON as it is in a sent
   const { k, sql } = await record();
   const bad = evaluateMetric(sql, { ...OPEN_JSON, where: { field: 'due', before: '2026-13-45' } }, ctxOf(k, NOW));
   assert.equal(bad.ok, false);
-  assert.equal((bad as { refusal: { code: string } }).refusal.code, 'WHERE_MALFORMED');
+  // `RELATIVE_LITERAL_UNKNOWN`: `30 §6`'s code for a temporal literal outside the anchors and
+  // offsets, which is what `2026-13-45` is. The sentence form has always answered the same way.
+  assert.equal((bad as { refusal: { code: string } }).refusal.code, 'RELATIVE_LITERAL_UNKNOWN');
   sql.close();
 });
 

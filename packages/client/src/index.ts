@@ -37,10 +37,24 @@ export type ClientOptions = {
 const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
 const NAMES = new Set(ROUTES.map((r) => r.name));
 
+/**
+ * The one refusal the record does not produce, and `30 §6` now says so rather than leaving it to be
+ * invented here.
+ *
+ * IT SAYS WHICH SIDE FAILED. A caller told "the record refused" for a DNS failure goes looking for a
+ * problem with their arguments; there is not one, and every minute spent there is a minute the
+ * network is still down. That argument was already written here and the code it produced —
+ * `UNREACHABLE` — was in no registry, which meant the one refusal a client is guaranteed to meet
+ * was the one refusal it could not look up.
+ *
+ * AND `30 §6` HAD RULED ON THE HALF OF THIS IT COULD SEE. The `Http` port's four error names —
+ * `PrivateRange` · `TooLarge` · `Timeout` · `Network` — are a **vocabulary**, mapped onto exactly one
+ * code, `PULL_ORIGIN_REFUSED`, for the record's OUTBOUND calls. The record's inbound half, which is
+ * this file, had no such code, so it made one. The amendment gives it the same treatment the
+ * outbound half already had: one code, named, for the whole vocabulary of ways a socket fails.
+ */
 const unreachable = (why: string): Refusal => ({
   code: 'UNREACHABLE',
-  /* The one refusal the record does not produce, so it says which side failed: a caller told "the
-     record refused" for a DNS failure looks for a problem with their arguments. */
   fix: `The record could not be reached: ${why}`,
 });
 

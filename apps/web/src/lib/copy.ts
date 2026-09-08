@@ -673,6 +673,13 @@ export const copy = {
      invitation is still out has also never looked, and that is a different sentence. This one is
      only ever drawn for somebody who has accepted. */
   neverLooked: 'has not opened it',
+  /* WHAT THIS DEPLOYMENT IS, IN A WORD, AND NOT ONLY IN A COLOUR. `13 §5.1`: meaning may not live
+     in the styling alone, so an accent a colour-blind reader cannot tell from production is a
+     signal that is not there for them. The word sits beside the mark and in the page title, where
+     it survives a screenshot and a tab strip; it is not a banner, because a banner is dismissed
+     once and then absent for the rest of the session. Production has no word — the absence is the
+     signal, and labelling the normal case trains people to stop reading the label. */
+  alpha: 'Alpha',
   removeAccess: 'Remove',
   /* `LEVEL_REQUIRED`'s own fix sentence, verbatim (45 §5.6). */
   lastOwner: 'A record keeps at least one owner.',

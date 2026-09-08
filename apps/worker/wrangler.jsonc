@@ -3,13 +3,13 @@
 
   /* ===========================================================================================
      THE CLOUD DEPLOYMENT — TWO ENVIRONMENTS, ONE LADDER.
-     51 §4.6 writes this file in full for a single environment. This is that file with `staging`
+     51 §4.6 writes this file in full for a single environment. This is that file with `alpha`
      and `production` split out of it, and the split is not cosmetic: 33 §7 and 31 §8 both say
-     plainly *"there is no staging environment: the ops record is the canary"*, and 53 §10 records
-     the ceiling with its own exit — `ponytail: no staging environment ... add env.staging in
+     plainly *"there is no alpha environment: the ops record is the canary"*, and 53 §10 records
+     the ceiling with its own exit — `ponytail: no alpha environment ... add env.alpha in
      wrangler.jsonc when a second person deploys`. This is that day, taken early. The canary
      argument is untouched: the ops record is still the first record to migrate on every deploy
-     (53 §5.3). Staging is not a replacement for it — it is where a DEPLOY is rehearsed, and the
+     (53 §5.3). Alpha is not a replacement for it — it is where a DEPLOY is rehearsed, and the
      ops record is where a MIGRATION is. Amend 33 §7, 31 §8 and 53 §13 #14 in the same revision.
 
      THE FRONTEND IS NOT DEPLOYED SEPARATELY, AND THAT IS THE WHOLE SHAPE OF THIS FILE. `assets`
@@ -28,7 +28,7 @@
   "name": "braindog",
   "main": "src/index.ts",
 
-  /* INHERITABLE, AND DELIBERATELY NOT OVERRIDDEN PER ENVIRONMENT. A staging environment on a
+  /* INHERITABLE, AND DELIBERATELY NOT OVERRIDDEN PER ENVIRONMENT. A alpha environment on a
      different compatibility date is not a rehearsal of production, it is a rehearsal of a
      different runtime — and the one thing this date decides is whether `deleteAll()` also deletes
      the alarm (51 A7, floor 2026-02-24), which is precisely the behaviour a customer deletion
@@ -50,7 +50,7 @@
   "preview_urls": false,
 
   /* 53 §2.3's five `op` lines are read here. Inheritable, so both environments get it, which is
-     what makes a staging incident debuggable with the same `wrangler tail` the runbook names. */
+     what makes a alpha incident debuggable with the same `wrangler tail` the runbook names. */
   "observability": { "enabled": true },
 
   /* -------------------------------------------------------------------------------------------
@@ -98,13 +98,13 @@
      COMMENT. Six facts, in the order they bite:
 
      1. `migrations` IS AN INHERITABLE KEY, and the migration tag is tracked PER WORKER SCRIPT.
-        A named environment is a separate script — `braindog-staging` and `braindog-production` —
+        A named environment is a separate script — `braindog-alpha` and `braindog-production` —
         so each one keeps its own list of applied tags while reading this one ladder. That is
         exactly what is wanted: one ladder, two scripts, each climbing it independently.
 
      2. THEREFORE THE LADDER LIVES HERE AND NOWHERE ELSE. Cloudflare's rule is that a migration
         block inside an environment REPLACES the top-level one; it does not merge. A `migrations`
-        key under `env.staging` is how the two environments silently stop being the same product.
+        key under `env.alpha` is how the two environments silently stop being the same product.
         There is no legitimate reason to write one. If you ever find yourself wanting one, what you
         actually want is a new tag here.
 
@@ -113,10 +113,10 @@
         in place is the quietest failure available — the deploy succeeds, the tag is already
         recorded, and nothing runs.
 
-     4. A NEW ENVIRONMENT REPLAYS THE WHOLE LADDER FROM EMPTY. `braindog-staging` on its first
+     4. A NEW ENVIRONMENT REPLAYS THE WHOLE LADDER FROM EMPTY. `braindog-alpha` on its first
         deploy applies v1, then v2, then v3, in order, against no data. Every tag must therefore be
         valid against an empty script — which is a live constraint on `renamed_classes`, whose
-        `from` class will not exist there. Create staging BEFORE the first rename lands and the
+        `from` class will not exist there. Create alpha BEFORE the first rename lands and the
         problem never arises, because both scripts then walk the same rungs in the same order.
         (Whether a rename of an absent class is a no-op or an error is a *verify* — REPORT.md §8.)
 
@@ -161,7 +161,7 @@
      WHEN IT DOES: leave it here at the top level rather than per-environment. Inheritable means
      both environments run the walk, and that is the point — 53 §9 wants the drills rehearsed, and
      a backup path that has only ever run in production is a backup path nobody has watched fail.
-     Staging writes to its own R2 bucket, so the two nightly runs cannot touch each other.
+     Alpha writes to its own R2 bucket, so the two nightly runs cannot touch each other.
      "triggers": { "crons": ["17 3 * * *"] }, */
 
   /* ===========================================================================================
@@ -175,10 +175,10 @@
      report. Duplication here is not redundancy, it is the schema.
 
      `routes` IS INHERITABLE, WHICH IS THE OTHER HALF OF THE SAME TRAP AND THE MORE DANGEROUS ONE.
-     A `routes` key at the top level of this file would be inherited by `env.staging`, and
-     `wrangler deploy --env staging` would then claim `app.brain.dog`. Two Workers cannot hold one
+     A `routes` key at the top level of this file would be inherited by `env.alpha`, and
+     `wrangler deploy --env alpha` would then claim `app.brain.dog`. Two Workers cannot hold one
      Custom Domain, so the likeliest outcome is a failed deploy — but the outcome that is not
-     ruled out is staging answering production's hostname. There is deliberately no top-level
+     ruled out is alpha answering production's hostname. There is deliberately no top-level
      `routes` key above. Routes are declared here and only here.
 
      AND THERE IS NO NAMELESS DEPLOY. Because every binding lives inside an environment, a bare
@@ -188,29 +188,29 @@
      =========================================================================================== */
   "env": {
     /* -----------------------------------------------------------------------------------------
-       STAGING — script `braindog-staging`. Deployed on every green merge to master, by nobody.
+       ALPHA — script `braindog-alpha`. Deployed on every green merge to master, by nobody.
        Its Durable Objects, its queue, its bucket and its KEK are its own; there is no path by
-       which a staging request reaches a production record, because a DO namespace is scoped to
+       which a alpha request reaches a production record, because a DO namespace is scoped to
        the script and these are two scripts.
        ----------------------------------------------------------------------------------------- */
-    "staging": {
+    "alpha": {
       /* ONE LABEL DEEP, AND THAT IS A TLS CONSTRAINT RATHER THAN A PREFERENCE. Universal SSL on a
-         full-setup zone covers the apex and first-level subdomains only, so `app.staging.brain.dog`
-         has no certificate without Advanced Certificate Manager or Total TLS. `app-staging` is
+         full-setup zone covers the apex and first-level subdomains only, so `app.alpha.brain.dog`
+         has no certificate without Advanced Certificate Manager or Total TLS. `app-alpha` is
          free, and identical in every other respect. REPORT.md §1 argues it at length. */
-      "routes": [{ "pattern": "app-staging.brain.dog", "custom_domain": true }],
+      "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }],
 
       /* `PUBLIC_HOST` IS THE CSRF CHECK. 51 §5.1 step 3 compares `Origin` against
          `https://<PUBLIC_HOST>` on every cookie-authenticated mutation, so a `PUBLIC_HOST` copied
-         from production means every write in staging is a 403 `FORBIDDEN` and every read works —
+         from production means every write in alpha is a 403 `FORBIDDEN` and every read works —
          a failure that looks like a permissions bug for about an hour.
 
          `AGE_RECIPIENT` IS A SEPARATE RECIPIENT, not a copy. 12 §8 keeps the age identity outside
-         Cloudflare in the operator's password manager; two recipients means a staging snapshot can
+         Cloudflare in the operator's password manager; two recipients means a alpha snapshot can
          never be opened with the production identity, and the restore drill (53 §5.5) exercises a
          real key rather than the real key.
 
-         `AI_GATEWAY` is its own gateway so staging's neuron spend and its rate limits are visible
+         `AI_GATEWAY` is its own gateway so alpha's neuron spend and its rate limits are visible
          apart from production's (12 §8: *per record at AI Gateway*).
 
          `BRAINDOG_BUILD` IS DECLARED EMPTY AND OVERWRITTEN AT DEPLOY TIME by `--var` in
@@ -219,9 +219,9 @@
          — rather than an undefined binding. It is a var 51 §4.1's `Env` does not list; adding it
          is an amendment, and REPORT.md §8 names why `/api/version` cannot answer without it. */
       "vars": {
-        "PUBLIC_HOST": "app-staging.brain.dog",
-        "AI_GATEWAY": "braindog-staging",
-        "AGE_RECIPIENT": "age1<staging-recipient>",
+        "PUBLIC_HOST": "alpha.brain.dog",
+        "AI_GATEWAY": "braindog-alpha",
+        "AGE_RECIPIENT": "age1<alpha-recipient>",
         "SPARK_ENDPOINT": "",
         "BRAINDOG_BUILD": ""
       },
@@ -236,14 +236,14 @@
       },
 
       /* A QUEUE NAME IS ACCOUNT-GLOBAL, so it carries the environment. Sharing one queue between
-         two scripts would have staging's consumer leasing production's outbox rows — the message
+         two scripts would have alpha's consumer leasing production's outbox rows — the message
          is `{ record }` and nothing else (01 §2, 51 §13 D16), so the consumer would resolve that
          id against its own namespace, find an empty record, and ack nothing. Quiet, and wrong. */
       "queues": {
-        "producers": [{ "queue": "braindog-ingress-staging", "binding": "INGRESS" }],
+        "producers": [{ "queue": "braindog-ingress-alpha", "binding": "INGRESS" }],
         "consumers": [
           {
-            "queue": "braindog-ingress-staging",
+            "queue": "braindog-ingress-alpha",
             "max_batch_size": 25,
             "max_batch_timeout": 5,
             /* Cloudflare's own retry, over the record's ladder — this one covers a consumer that
@@ -265,16 +265,16 @@
          together with the account resource named beside each. Names carry the environment for the
          same reason the queue does — every one of these namespaces is account-global.
 
-         "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs-staging" }],
+         "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs-alpha" }],
          "ai": { "binding": "AI" },
          "analytics_engine_datasets": [
-           { "binding": "TELEMETRY", "dataset": "braindog_telemetry_staging" }],
+           { "binding": "TELEMETRY", "dataset": "braindog_telemetry_alpha" }],
          "ratelimits": [
            { "name": "RL_READ",  "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
            { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }],
          "secrets_store_secrets": [
-           { "binding": "KEK",      "store_id": "<store-id>", "secret_name": "braindog-kek-staging" },
-           { "binding": "KEK_PREV", "store_id": "<store-id>", "secret_name": "braindog-kek-staging-prev" }]
+           { "binding": "KEK",      "store_id": "<store-id>", "secret_name": "braindog-kek-alpha" },
+           { "binding": "KEK_PREV", "store_id": "<store-id>", "secret_name": "braindog-kek-alpha-prev" }]
 
          THERE IS NO `kv_namespaces` KEY IN EITHER ENVIRONMENT, AND THERE WILL NOT BE ONE. The
          record is the Durable Object's own SQLite (33 §7); the Directory is a Durable Object; the
@@ -333,7 +333,7 @@
 
       "send_email": [{ "name": "EMAIL" }]
 
-      /* The same drafted blocks as staging, without the suffix:
+      /* The same drafted blocks as alpha, without the suffix:
          "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs" }],
          "ai": { "binding": "AI" },
          "analytics_engine_datasets": [
@@ -350,7 +350,7 @@
   /* WORKER SECRETS ARE NOT IN THIS FILE AND NEVER WILL BE. `SESSION_SECRET` and
      `TOKENS_VALID_FROM` (12 §8's two fleet-wide levers, 53 §5.11's incident response) are set with
      `wrangler secret put <NAME> --env <environment>`, value at the prompt and never as an
-     argument (53 §2.2). They are PER SCRIPT, so staging and production hold different values —
-     which is the point: a shared `SESSION_SECRET` would make a session minted in staging valid in
+     argument (53 §2.2). They are PER SCRIPT, so alpha and production hold different values —
+     which is the point: a shared `SESSION_SECRET` would make a session minted in alpha valid in
      production, since the session hash is an HMAC under it. */
 }

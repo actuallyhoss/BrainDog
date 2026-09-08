@@ -138,20 +138,38 @@ const NOT_422: Readonly<Record<string, number>> = {
   /* A BROWSER SESSION IS NOT A SCOPE PROBLEM. 403 with the envelope, because the sentence is the
      part that tells somebody what to do about it — 30 §6's own row. */
   NEEDS_BROWSER_SESSION: 403,
-  /* THE THREE REFINEMENTS OF `FORBIDDEN`. 30 §6 has one code for "a credential outside its scope,
-     level or ceiling"; the record answers with which of the three it was, because "get a bigger
-     token" and "this belongs to a person and a token is not one" are different instructions and a
-     caller that cannot tell them apart retries the one that can never work. They are a strict
-     refinement, so they take `FORBIDDEN`'s status. */
+  /* THE REFINEMENTS OF `FORBIDDEN`, AND THERE WERE THREE. 30 §6 has one code for "a credential
+     outside its scope, level or ceiling", and this file answered with which of the three it was,
+     because "get a bigger token" and "this belongs to a person and a token is not one" are different
+     instructions and a caller that cannot tell them apart retries the one that can never work. They
+     are a strict refinement, so they take `FORBIDDEN`'s status.
+
+     THE INSTRUCTION IS RIGHT AND THE REMEDY WAS WRONG, and `PERSON_REQUIRED` has gone because of it.
+     `30 §6`'s `FORBIDDEN` row already carries three separate facts — a `spark` principal writing a
+     row, a runner posting out of `seq` order, the scope case — each told apart by its SENTENCE. A
+     code is what a caller branches on; "ask a person to sign in" is what it acts on, and minting a
+     code per remedy grows the vocabulary at the speed of the copywriting (`10 §7`).
+     `LEVEL_REQUIRED` is in the registry and stays. `SCOPE_INSUFFICIENT` is the last invention of the
+     three and follows `PERSON_REQUIRED` the day the one assertion in `packages/mcp`'s tests that
+     names it moves with it; the row is here until then. */
   SCOPE_INSUFFICIENT: 403,
   LEVEL_REQUIRED: 403,
-  PERSON_REQUIRED: 403,
   SCHEMA_MISMATCH: 503,
   SCHEMA_NEWER: 503,
-  /* The router's own two, which no method returns. */
+  /* A RECORD NOBODY MAY ACT ON IS NOT A REFUSAL OF THE CALLER'S INPUT. Every owner suspended is the
+     record's problem, at 503, and it answered 422 for as long as its code was outside the registry
+     and therefore outside this table — `49 §5.1` step 5.3, and the self-host's `NOBODY`. */
+  RECORD_UNAVAILABLE: 503,
+  /* The router's own four, which no method returns — `30 §6`'s host and client family, except
+     `INTERNAL`, which is a crash rather than a refusal and is discussed at the catch below. */
   ROUTE_UNKNOWN: 404,
   BODY_MALFORMED: 400,
-  UNIMPLEMENTED: 501,
+  /* 501 FOR "PUBLISHED, NOT BUILT". A metric declaring `median`, a block naming a computed source,
+     an `infer.prose` job on a host that wired no sender: the declaration is right and this build is
+     behind, which is what 501 means and what 422 would deny. It was `UNIMPLEMENTED`, a code in no
+     registry; `30 §6` now has `NOT_IN_THIS_BUILD` beside `FORMAT_NEWER_THAN_READER`, which is the
+     same sentence about a version number. */
+  NOT_IN_THIS_BUILD: 501,
   INTERNAL: 500,
 };
 
@@ -322,6 +340,20 @@ export async function serveApi(
      throws — an argument nobody coerced, a driver error, a bug — used to escape here, and the caller
      never wrote a response at all: the socket stayed open, the request hung, and on the self-host
      the SERVER then never closed. A crash is a 500 with a sentence, not a connection nobody ends. */
+  /**
+   * `INTERNAL` IS LEFT STANDING, DELIBERATELY, AND IT IS NOT A REFUSAL.
+   *
+   * `30 §6`'s whole shape is *a refusal names the field and what was expected* — a crash names
+   * neither, and there is nothing a caller can fix. So the registry should not carry it, and it is
+   * the one code in this file that stays outside on purpose rather than by neglect: a 500 body has
+   * to say something, the envelope has one shape, and the shape has a `code`.
+   *
+   * THE REASON IT IS NOT RENAMED HERE IS THAT THERE ARE THREE OF IT. This catch, the self-host's
+   * outer `catch` and the Worker's own — one fact, one word, three files, and the first paragraph of
+   * this module is about exactly the failure of the two hosts drifting apart. Moving two of the
+   * three would buy a lower number in one gate and a product that answers differently depending on
+   * where a customer runs it, which is the trade this file exists to refuse.
+   */
   let out: Result<unknown>;
   try {
     out = await handler(args, ctx);

@@ -53,6 +53,11 @@ const GATES = [
      the refusal teaches, and it teaches from a code stable across versions. Beside `event-kinds`
      because it is the same shape over the corpus's other large vocabulary. */
   ['refusals', ['node', [join(here, 'refusals.mjs')]]],
+  /* A FLAG IS A DECISION THAT HAS NOT BEEN TAKEN, and the failure it becomes is permanent
+     branching. This asks six questions of the list, of which the load-bearing one is whether the
+     flag is read at all — `dead-copy`'s own hole is that a statically-false `{#if}` counts as
+     rendered, and every flag is that `{#if}`. */
+  ['flags', ['node', [join(here, 'flags.mjs')]]],
   /* THE RULE THE WHOLE ADDITIVE STORY RESTS ON (02 §1). A register the kernel ships is a name no
      pack can own — and breaking it is always the shortest path. */
   ['no-declarations-in-kernel', ['node', [join(here, 'no-declarations-in-kernel.mjs')]]],

@@ -62,3 +62,33 @@ export const HOUSE_SEED: Seed = {
 
 export const HOUSE = build(HOUSE_SEED, HOUSE_PROFILE, 'house');
 export const HIGH_CONTRAST = build(HOUSE_SEED, HIGH_CONTRAST_PROFILE, 'high-contrast');
+
+/**
+ * The environment palettes, re-exported so a build has one place to ask.
+ *
+ * `environment.ts` needs `HOUSE_SEED` and `HOUSE_PROFILE`, which are declared above, so it imports
+ * from here and this line closes the loop rather than opening a cycle: the module is loaded on
+ * demand by whoever asks for a alpha palette, and nothing in the house build depends on it.
+ */
+import { environmentSeed } from './environment.ts';
+
+export { ENVIRONMENTS, environmentHue, environmentSeed, environmentTheme, intentGaps } from './environment.ts';
+export type { Environment } from './environment.ts';
+
+/**
+ * The alpha palette, solved from the house seed rather than written down.
+ *
+ * `environmentSeed` keeps every field of `HOUSE_SEED` and moves ONE: the accent, to the hue
+ * `nextAccentHue` returns as farthest from the brand's own. Every non-accent role therefore comes
+ * out byte-identical to `HOUSE`, which is what keeps a alpha screenshot comparable to a
+ * production one — the two differ in exactly the places the accent is, and nowhere else.
+ *
+ * IT IS NOT ORANGE, AND THAT WAS MEASURED. Four orange candidates were solved and every one of them
+ * put the MARK within 2.1 ΔE of the brand's after dichromat simulation, against `28 §3.2`'s floor of
+ * 4 — red and orange are the same colour to a protanope, so the alpha logo and the production
+ * logo would be indistinguishable to the reader the floor exists for. The window the 20° intent-hue
+ * rule leaves for orange is hues 47–55, and the mark separation is ≤1.4 across all of it.
+ */
+export const ALPHA_SEED = environmentSeed(HOUSE_SEED);
+export const ALPHA = build(ALPHA_SEED, HOUSE_PROFILE, 'alpha');
+export const ALPHA_HIGH_CONTRAST = build(ALPHA_SEED, HIGH_CONTRAST_PROFILE, 'alpha-high-contrast');

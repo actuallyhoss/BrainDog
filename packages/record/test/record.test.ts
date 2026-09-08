@@ -142,10 +142,16 @@ test('a person’s ladder is five rungs and a token’s is three, and no token r
   // ADR-060: there is no `admin` scope. A decision needs a person, and so does anything owner-level —
   // and the refusal says exactly that, rather than "your scope is too small", which would send an
   // agent looking for a bigger token that does not exist.
+  //
+  // THE SENTENCE SAYS IT AND THE CODE IS `FORBIDDEN`, which is why the `fix` is asserted here too.
+  // This asserted `PERSON_REQUIRED`, a code in no registry: `30 §6` writes `FORBIDDEN` as "a
+  // credential outside its scope, level or ceiling" and already carries three distinct facts under
+  // it, each told apart by its sentence. A code is what a caller branches on; "ask a person to sign
+  // in" is what it acts on, and `10 §7` wants the first stable across versions.
   for (const level of ['read', 'append', 'write', 'decide', 'owner'] as const)
     for (const need of ['decide', 'owner'] as const) {
       const r = allows(token('write', level), need);
-      assert.equal(r?.code, 'PERSON_REQUIRED', `${level} / ${need}`);
+      assert.equal(r?.code, 'FORBIDDEN', `${level} / ${need}`);
       assert.match(r?.fix ?? '', /a person has to do it/);
     }
   assert.equal(allows(person('owner'), 'owner'), null);
@@ -296,9 +302,10 @@ test('AN AGENT MAY ASK AND MAY NOT ANSWER, and that is not a scope anybody can b
   for (const scope of ['read', 'propose', 'write'] as const) {
     const tried = await api.decide({ id, decide: { option: 'accept', reason: 'go on' } }, token(scope));
     assert.equal(tried.ok, false, `a ${scope} token decided`);
-    /* AND THE REFUSAL NAMES A PERSON, not a bigger token. `SCOPE_INSUFFICIENT` would send whoever
-       read it looking for a scope that does not exist. */
-    assert.equal((tried as { refusal: { code: string } }).refusal.code, 'PERSON_REQUIRED');
+    /* AND THE SENTENCE NAMES A PERSON, not a bigger token — `SCOPE_INSUFFICIENT` would send whoever
+       read it looking for a scope that does not exist, so the `fix` is asserted beside the code. */
+    assert.equal((tried as { refusal: { code: string } }).refusal.code, 'FORBIDDEN');
+    assert.match((tried as { refusal: { fix: string } }).refusal.fix, /a person has to do it/);
   }
   assert.equal(api.kernel.count('obligations'), 0);
 
@@ -520,7 +527,10 @@ test('A READ MARK BELONGS TO A PERSON, and is never an event', async () => {
 
   const tried = await api.markRead(undefined, token('write'));
   assert.equal(tried.ok, false);
-  assert.equal((tried as { refusal: { code: string } }).refusal.code, 'PERSON_REQUIRED');
+  // `FORBIDDEN`, with the reason in the sentence — a read mark belongs to a person and a token is
+  // not one, which is `30 §6`'s "outside its scope, level or ceiling" said about the principal.
+  assert.equal((tried as { refusal: { code: string } }).refusal.code, 'FORBIDDEN');
+  assert.match((tried as { refusal: { fix: string } }).refusal.fix, /belongs to a person/);
   sql.close();
 });
 
@@ -1130,7 +1140,7 @@ test('A PAGE LIST IS SCOPED, because a title is a sentence about what the record
     await api.kernel.install([
       { id: 'page.money', kind: 'page', body: { page: 'money', title: 'Money', blocks: [{ kind: 'table', source: 'register.obligations' }] } },
       { id: 'page.jotted', kind: 'page', body: { page: 'jotted', title: 'Jotted', blocks: [{ kind: 'table', source: 'register.notes' }] } },
-      { id: 'page.about', kind: 'page', body: { page: 'about', title: 'About', blocks: [{ kind: 'prose', text: 'Nothing but words.' }] } },
+      { id: 'page.about', kind: 'page', body: { page: 'about', title: 'About', blocks: [{ kind: 'note', text: 'Nothing but words.' }] } },
     ] as never),
   );
 

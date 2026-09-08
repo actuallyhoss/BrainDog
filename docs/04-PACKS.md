@@ -261,7 +261,7 @@ was expected — the failure mode to avoid is a valid-looking pack that half-loa
 
 Forty-one codes — the thirty-three an earlier draft counted and the eight beneath `PLAN_STALE`, the last
 three of them the theme's — `UPPER_SNAKE`, each with a fixture that produces it. The one table every code
-lives in is [30-BLUEPRINT](30-BLUEPRINT.md) §6, which counts ninety-nine across eight families; the
+lives in is [30-BLUEPRINT](30-BLUEPRINT.md) §6, which counts a hundred and twelve across nine families; the
 grammar's own codes (`VIA_TWICE`, `CONTAINS_TOO_LONG`, …, and the three that guard an ingest's extractor
 forms — [07-INGEST](07-INGEST-AND-RULES.md) §3) are [34-GRAMMARS](34-GRAMMARS.md) §1. *An earlier draft of this table had no code column, and the last
 row compared a `braindog` version the app does not have.* A dialect fault is never one of these — a

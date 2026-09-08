@@ -82,8 +82,22 @@ const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach t
  * actionable thing this server can say — the credential is perfect and the record is the problem.
  * `49 §5.1` step 5.3 calls a record that cannot be brought up `sick`, with a `{ code, fix }`, at 503.
  */
+/**
+ * `RECORD_UNAVAILABLE`, AND THE NAME IT REPLACES WAS ANSWERING THE WRONG QUESTION AT THE WRONG STATUS.
+ *
+ * This said `SCHEMA_UNAVAILABLE`, which was never about a schema — no migration is involved, no
+ * checksum, no `user_version`. The word was borrowed from `SCHEMA_MISMATCH` and `SCHEMA_NEWER`
+ * because those two are the codes `httpStatus` maps to 503, and a name chosen to look like a
+ * neighbour is a name that teaches the wrong thing (`10 §7`).
+ *
+ * AND IT DID NOT EVEN GET THE STATUS. `SCHEMA_UNAVAILABLE` was in no registry and therefore in no
+ * row of `host`'s `NOT_422`, so this answered **422** — *fix your input* — to a caller whose input
+ * was perfect and whose record was the problem. `49 §5.1` step 5.3 says 503 in as many words, and
+ * the sentence above about "the same function the Worker uses" was true and was reading a table
+ * with no row for this. `30 §6` now carries the code and `NOT_422` carries the 503 with it.
+ */
 const NOBODY: Refusal = {
-  code: 'SCHEMA_UNAVAILABLE',
+  code: 'RECORD_UNAVAILABLE',
   fix: 'Every owner of this record is suspended, so nobody may act on it. Un-suspend one.',
   at: 'record',
 };

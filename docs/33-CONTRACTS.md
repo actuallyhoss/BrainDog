@@ -527,7 +527,7 @@ the one home; a count is never a budget — it is read from the owning enumerati
 | `no-declarations-in-kernel` | script | the kernel declares nothing of the eight kinds except `register.session` |
 | `closed-lists` | script | every list in [34-GRAMMARS](34-GRAMMARS.md) §6 matches its owner's enumeration and its CHECK — the record's `DIALECT` constant against `render`'s kinds among them |
 | `event-kinds` | script | the `event.kind` CHECK has forty members and the prose says forty |
-| `refusal-fixtures` | script | every one of the ninety-nine codes in 30 §6 has a fixture that produces it, and no fixture lacks a code; the script checks the names, the `via`-keyed runners of 40 §6 check production |
+| `refusal-fixtures` | script | every code in 30 §6 has a fixture that produces it, and no fixture lacks a code; the script checks the names, the `via`-keyed runners of 40 §6 check production |
 | `router-groups` | script | every route declares its group; INTERNAL has no route; VAULT accepts no bearer; ADMIN accepts a bearer only with an operation grant, at exactly one ADMIN method |
 | `spark-actor` | script | `event WHERE actor = 'spark' AND kind NOT IN ('suggest','propose','predict')` is empty over the `corpus` record |
 | `grant-note` | script | no `grant.*` event note contains its grant's `label` or `opens`, over the `corpus` record (12 §8) |

@@ -25,9 +25,17 @@ separate list because it names what the *driver* refused, not what the *format* 
 | Surface | Becomes |
 |---|---|
 | CLI | `register.invoices.fields[4].type 'currency' — did you mean 'money'?` |
-| HTTP | the `Result` envelope, unchanged, and a status that is one function of it — `httpStatus(result)`, shared by both hosts: `422` for **any** refusal (`PLAN_STALE` and `IMPORT_NOT_EMPTY` included — refusals, never 409); `409` for a `conflict` (`VERSION_STALE`; `WRONG_KEY` per [12-SECURITY](12-SECURITY.md) §6.1); `401` with an empty body for `UNAUTHORIZED`; `403` with the envelope for `FORBIDDEN` and `NEEDS_BROWSER_SESSION`; `503` for `SCHEMA_MISMATCH` / `SCHEMA_NEWER`. `X-Request-Id` is echoed |
+| HTTP | the `Result` envelope, unchanged, and a status that is one function of it — `httpStatus(result)`, shared by both hosts: `422` for any refusal the exceptions below do not name (`PLAN_STALE` and `IMPORT_NOT_EMPTY` included — refusals, never 409); `409` for a `conflict` (`VERSION_STALE`; `WRONG_KEY` per [12-SECURITY](12-SECURITY.md) §6.1); `401` with an empty body for `UNAUTHORIZED`; `403` with the envelope for `FORBIDDEN` and `NEEDS_BROWSER_SESSION`; `404` for `ROUTE_UNKNOWN` and `400` for `BODY_MALFORMED`, which are the router's own and no method returns; `501` for `NOT_IN_THIS_BUILD`; `503` for `SCHEMA_MISMATCH`, `SCHEMA_NEWER` and `RECORD_UNAVAILABLE`. `X-Request-Id` is echoed |
 | MCP | an error result carrying `code` and `fix`, so **the refusal teaches the agent** — [10-MCP](10-MCP.md) §7 rule 4. A call outside its published schema is the protocol's own `-32602`, `message` the fix and `data` `{ at, found, wanted, fix }` — a vocabulary, not a code (below) |
 | UI | the sentence, next to the field, plus in the summary — [06-PAGES](06-PAGES.md) §8 |
+
+*The HTTP row said `422` for **any** refusal and then listed five exceptions, which is a sentence that contradicts
+itself and — worse — contradicted the tree, where `httpStatus`'s table had grown four more. The exceptions are
+enumerated because each is a different INSTRUCTION: 401 says the credential is wrong, 403 that it is the wrong kind
+and retrying will never work, 404 that the method does not exist, 400 that the body was never read, 501 that the
+declaration is right and the build is behind, 503 that a deploy or an un-suspension fixes it, 409 that somebody got
+there first. Everything else is a value the caller can fix, and that is the 422. A code outside §6's table is a code
+outside this map: `RECORD_UNAVAILABLE` answered 422 for two months for exactly that reason (53).*
 
 Two refusal codes exist because of corruption the predecessor shipped, and they **refuse rather than
 repair**: `TEXT_JSON_QUOTED` — a string value that arrived wrapped in its own quotes — and
@@ -37,13 +45,61 @@ the caller's bug; refusing names it.
 
 ### The codes
 
-Ninety-nine, counted, in eight families — 41 pack and declaration · 13 grammar · 18 write path · 7 auth and vault ·
-6 format and lifecycle · 2 dialect · 5 spark · 7 connector. Every fixture lives at `fixtures/refusals/<name>.yaml`; the
+One hundred and twelve, counted, in nine families — 47 pack and declaration · 14 grammar · 18 write path · 7 auth and
+vault · 8 format and lifecycle · 2 dialect · 5 spark · 7 connector · 4 host and client. Every fixture lives at
+`fixtures/refusals/<name>.yaml`; the
 name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
 `write`, `rpc` and the rest; the split per `via` is the fixtures spec's to count (40 §6), not this table's. *An
 earlier draft called the code "enumerated" and enumerated three; the next said seventy-five, and six specs then each
 added their own to seventy-five, so the corpus briefly held six totals. Their twenty-four proposals are all accepted
 here, once.*
+
+*Ninety-nine became a hundred and twelve on 2026-09-08, and the thirteen are named in the rows they sit in. The
+occasion was an audit against the tree rather than a wish-list: `refusals.mjs` found **twenty-four codes the source
+emits that this table does not have** — twenty-six once its pattern was widened to see past a ternary — and each of the
+twenty-six had to be sorted by hand, because the difference between a missing concept, a synonym and a placeholder is a
+judgement about a call site and not a rename.*
+
+***Six were renamed onto codes that already existed here**, and that is the repair this table prefers.
+`WHERE_UNSUPPORTED` · `WHERE_OPERATOR_UNSUPPORTED` · `OPERATOR_UNSUPPORTED` and a leaf carrying no test at all are five
+spellings of `MATCH_OP_UNSUPPORTED`, whose row was already written as the general case rather than `inbox_raw`'s.
+`WHERE_MALFORMED` was three facts under one word and is `VALUE_MALFORMED` for an empty `in` and a one-sided `between`,
+`RELATIVE_LITERAL_UNKNOWN` for `due before soon`, `MATCH_OP_UNSUPPORTED` for a leaf with no operator.
+`RECORD_NOT_EMPTY` is `IMPORT_NOT_EMPTY`. `PERSON_REQUIRED` is `FORBIDDEN`, with the remedy in the sentence where the
+other three facts that code carries already keep theirs. **A registry that grows whenever somebody needs a word is not
+a closed list**, and these went away by being read rather than by being admitted.*
+
+***Five more were renamed onto three of the new codes**, because the name was wrong about its own subject rather than
+redundant: `SCHEMA_UNAVAILABLE` involved no schema; `MALFORMED_FILE` and `IMPORT_FAILED` were two names for one answer
+to the caller; `UNIMPLEMENTED` and `NOT_IMPLEMENTED` named nothing at all — not what is unimplemented, not by whom, not
+what to do about it, which is a `fix` sentence with a shouty prefix.*
+
+***Ten kept their names and were admitted**, having no equivalent here. They cluster: **six things a declaration can
+name and this record has not got** (a page, a metric, a source, a factor table, a factor, a declaration); **three for a
+ninth family**, the surface every caller actually talks to; and `REF_UNKNOWN`, which was so nearly a synonym of
+`VALUE_MALFORMED` that it WAS renamed onto it — until `declare`'s rule linter turned out to branch on it, which is the
+one test that settles whether two refusals are one. Not whether the sentences read alike: whether a caller has to tell
+them apart.*
+
+*The ninth family is the hole this audit is proudest of finding. `30 §6` was written about what a record refuses and
+never about the boundary a request arrives through, so both hosts and the client each minted a word — `ROUTE_UNKNOWN`,
+`BODY_MALFORMED`, `UNREACHABLE`, and a code named after a schema for a record with no owner. That last one, being in no
+registry, was in no row of `httpStatus`'s table either, and answered **422** where `49 §5.1` step 5.3 says 503. A code
+outside this table is a code outside the status map, which is the concrete cost of an open list and not a stylistic
+one.*
+
+*Seven names are still outside, and `refusals.mjs` holds the number as a budget that may only go down.
+`DECLARATION_INVALID` is 32 of them and a project of its own; `INTERNAL` is a crash rather than a refusal and is
+deliberately not admitted (below); `RECORD_NOT_EMPTY`, `WHERE_OPERATOR_UNSUPPORTED` and `SCOPE_INSUFFICIENT` each have
+one straggler site the same change could not reach; and `NOPE` and `SOMETHING_NOBODY_MAPPED` live only in tests, the
+second of them as the SUBJECT of its test — "a code nobody enumerated is still a 422" — so replacing it would delete
+the assertion. Two of the seven should therefore never go, and the honest floor is two rather than zero.*
+
+*Four documents quote the old total and are not yet amended — [04-PACKS](04-PACKS.md) §5's closing line,
+[16-DECISIONS](16-DECISIONS.md) ADR on the enumeration, [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6's fixture row and
+[33-CONTRACTS](33-CONTRACTS.md) §8's `refusal-fixtures` row. They say **ninety-nine across eight families**. This table
+is the home and they are citations of it, so the repair is theirs and it is named here rather than left to be
+discovered: a corpus that briefly held six totals is what the paragraph above is about, and this is how it starts.*
 
 The type `Refusal` (with `RefusalCode`) is a type-only export of `@braindog/ports`, the lowest shared package,
 because `where` raises one and sits below the kernel; **this table stays the list's home**, and every package
@@ -54,10 +110,18 @@ applies (`PULL_ORIGIN_REFUSED`) and otherwise never on the wire as a refusal. Th
 the third list, and it stays thirteen.
 
 **Pack and declaration** — refused at install, by `declare`. The first twenty-four are [04-PACKS](04-PACKS.md) §5's
-rows, in order; the nine after them are the 2026-09-02 review's; the eight after those are iteration 2's. Seven
+rows, in order; the nine after them are the 2026-09-02 review's; the eight after those are iteration 2's; the last six
+are the 2026-09-08 audit's. Seven
 write-path codes are raised here too, for the same fact in a declaration's seed or default — `FIELD_UNKNOWN`
 `REQUIRED_MISSING` `ENUM_VALUE_UNKNOWN` `OUT_OF_BOUNDS` `REGISTER_UNKNOWN` `INT_OUT_OF_RANGE` `VALUE_MALFORMED` — one
 code, two moments (42).
+
+*The family is named for what its codes are ABOUT and not for the moment they are raised, which is what makes room for
+the last six: `TRANSITION_ILLEGAL` has said "at install; §4 step 5 at write — one code, two moments" since the first
+draft. A page read at 7am and a metric asked for by a `stat` cell are both a caller naming a DECLARATION this record
+has not got, which is this family's subject; filing them under the write path — where `REGISTER_UNKNOWN`, their exact
+analogue for a register, already sits — would put a read-only refusal in a family whose first line is "refused before
+any row is written".*
 
 | Code | Raised where | Fixture |
 |---|---|---|
@@ -102,10 +166,16 @@ code, two moments (42).
 | `REMOTE_ASSET` | a pack asset fetched from elsewhere — a URL, `data:`, a script — 04 §7's enumeration; the one name for the banned-token refusal (42) | `remote-asset` |
 | `SECRET_IN_PACK` | a credential inside a pack — 25 §7's enumeration (42) | `secret-in-pack` |
 | `WOULD_ORPHAN` | an install that would retire a register with rows under it — 04 §5's downgrade rule; no `--force` in v1 (42) | `would-orphan` |
+| `DECLARATION_UNKNOWN` | `retire(ids)` naming nothing installed — the one refusal `declare` had no code for, and it was reaching callers as a word invented on the line (53) | `declaration-unknown` |
+| `PAGE_UNKNOWN` | a slug no page declaration resolves to, 06 §2 — `allowed` carries the slugs that do, so the answer ends the search rather than starting one (53) | `page-unknown` |
+| `METRIC_UNKNOWN` | a `stat` cell, a digest section or `record.metric` naming a metric nobody declared, 08 §2 — **and a metric over a register the caller cannot reach, said in the same words**, because answering `FORBIDDEN` for one that exists and this for one that does not is an enumeration oracle, one probe per guess (45 §13) | `metric-unknown` |
+| `SOURCE_UNKNOWN` | a `source:` outside the namespaces this record reads — a metric's, a page block's, a digest section's, 08 §2 — as distinct from `REGISTER_UNKNOWN`, which is the namespace being right and the register not installed; both are raised two lines apart in `metrics.ts` and they are two repairs (53) | `source-unknown` |
+| `LOOKUP_UNKNOWN` | a `product:` naming a factor table nobody declared, 08 §2.5 — fix the name | `lookup-unknown` |
+| `LOOKUP_MISSING` | the factor table is right and does not cover the data: a `by` value present in the rows with no factor for it, 08 §2.5. **Two codes and not one**, because a row multiplied by one is a wrong number rather than a missing one — the failure that came out 9.25 times too low — and "fix the name" and "add a factor for `yearly`" go to different people; `allowed` lists the values the table does know (53) | `lookup-missing` |
 
 **Grammar** — refused when a `where:`, an `extract:` form or a connector path is compiled or validated
-([34-GRAMMARS](34-GRAMMARS.md) §1, §3, §6); the three at the end are raised at install, by `declare`, before `extract`
-ever sees the declaration (42, 43):
+([34-GRAMMARS](34-GRAMMARS.md) §1, §3, §6); three of the four at the end are raised at install, by `declare`, before
+`extract` ever sees the declaration (42, 43); the last is raised by the sentence parser and read by `declare` (53):
 
 | Code | Raised where | Fixture |
 |---|---|---|
@@ -122,6 +192,7 @@ ever sees the declaration (42, 43):
 | `EXTRACTOR_UNKNOWN` | an `extract:` form key outside the thirteen, 34 §3 (43) | `extractor-unknown` |
 | `DATE_FORMAT_INVALID` | a `date` form's `format:` outside its token rules, 34 §3 (43) | `date-format-invalid` |
 | `PATH_INVALID` | a response path outside the one `Path` grammar that serves `map`, `read`, `probe`, `expect` and `page.from`, 25 §3 (43) | `path-invalid` |
+| `REF_UNKNOWN` | a `ref` written by name against a register that holds no row of that name — `thing is Kiln`, 34 §1.1's spoken form. **It is not `VALUE_MALFORMED`**, though that row already reads "an unresolvable id or spoken reference", and the test is not whether the sentences read alike but whether a caller has to tell them apart: `declare` lints every rule's `when:` and survives this refusal and no other, because a name that resolves to nothing today may be written tomorrow while a grammar fault is a fault whenever it is read. Merge them and the exemption swallows a real shape error and installs a rule that fires on nothing, in silence, for ever. Nor is it `REF_REGISTER_MISMATCH`, which resolves to a row of the wrong register — repoint that one; this one has nothing to point at (53) | `ref-unknown` |
 
 **Write path** — refused before any row is written (§4); the step is named:
 
@@ -168,6 +239,8 @@ ever sees the declaration (42, 43):
 | `IMPORT_NOT_EMPTY` | `import` into a record that has rows, §5 — a refusal, 422 | `import-not-empty` |
 | `SCHEMA_MISMATCH` | a migration checksum the code does not recognise — module-level, every RPC 503 | `schema-mismatch` |
 | `SCHEMA_NEWER` | a database migrated past the code — module-level, every RPC 503 | `schema-newer` |
+| `FILE_MALFORMED` | a `.dogl` that is not one: no `#dogl` first line, a version that is not a number, a line that is not a row, a row the record cannot hold. **Nothing has been checksummed**, so `CHECKSUM_MISMATCH` would send a person looking for a manifest that was never read, and `33 §9`'s import row names three refusals and had no word for the commonest way a file arrives wrong. Spelled artefact-then-fault like `PACK_MALFORMED` and `VALUE_MALFORMED` (53) | `file-malformed` |
+| `NOT_IN_THIS_BUILD` | a declaration that is correct against a document and ahead of the code: one of `08 §2.2`'s eleven aggregations this build does not compute, a `group_by` or `bucket`, a computed page source, an outbox kind this deployment wired no sender for. **The repair is a deploy, not an edit** — which is what `FORMAT_NEWER_THAN_READER` and `SCHEMA_NEWER` already say about a version integer, and why it is filed beside them. It is not `VALUE_MALFORMED`: `median` is a published word, and telling its author it is malformed sends them to check a spelling that is right (53) | `not-in-this-build` |
 
 **Dialect** — render-time degradation, never a write refusal ([34-GRAMMARS](34-GRAMMARS.md) §2):
 
@@ -199,6 +272,31 @@ a person reads ([25-CONNECTORS](25-CONNECTORS.md) §5, §7, §9):
 | `PULL_SHAPE_MISMATCH` | `read.rows` / `map:` do not fit the page — a non-JSON body, rows that are not a list, a repeated cursor | `pull-shape-mismatch` |
 | `PULL_ORIGIN_REFUSED` | the `Http` adapter refused the origin — a private range, size, timeout — or a URL off `base`, 25 §7; the one code the `Http` vocabulary maps onto | `pull-origin-refused` |
 | `PULL_LEASE_EDGE` | the run stopped at its lease's edge; `applyPull` on a lease no longer this runner's | `pull-lease-edge` |
+
+**Host and client** — the boundary itself, raised by `serveApi` and by the client before or after any method runs
+([33-CONTRACTS](33-CONTRACTS.md) §4; [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5):
+
+*A ninth family, added 2026-09-08, and the argument for a family rather than four rows scattered across the other
+eight is that the other eight are all about the record's CONTENT. This table was written from the inside out — what a
+pack may declare, what a predicate may ask, what a write may do — and never once about the surface a request arrives
+through, which is the only part of the record most callers ever touch. The consequence was not theoretical: the two
+hosts and the client each minted their own word, `httpStatus` grew a table of four codes this document had never
+heard of, and `RECORD_UNAVAILABLE` — outside the registry, therefore outside that table — answered 422 for a
+record nobody may act on, where `49 §5.1` step 5.3 says 503. There is nowhere among the eight that
+"there is no method called `nonsense`" belongs; filing it beside `REF_REGISTER_MISMATCH` would teach a reader that
+the groups mean nothing.*
+
+*`INTERNAL` IS DELIBERATELY NOT HERE, and it is the one code in the tree left outside this table on purpose. A
+refusal names the field and what was expected; a handler that threw names neither and there is nothing a caller can
+fix, so 500 is a crash report wearing the envelope's shape rather than a refusal. Admitting it would make the
+registry the list of everything that can appear in a `code`, which is a different and much weaker promise.*
+
+| Code | Raised where | Fixture |
+|---|---|---|
+| `ROUTE_UNKNOWN` | a path that is not `/api/<method>` for a method in `ROUTES` — 404, and `allowed` carries the method names; also an MCP tool or resource URI that resolves to nothing, 10 §3 (53) | `route-unknown` |
+| `BODY_MALFORMED` | a POST body that is not a JSON object — 400, refused before anything reads an argument off it (53) | `body-malformed` |
+| `RECORD_UNAVAILABLE` | the record cannot be acted on and it is not the caller's fault: every owner suspended — 503, `49 §5.1` step 5.3. **Named for the record and not for a schema**, which is what it said while borrowing the word from `SCHEMA_MISMATCH` to look like something that earns a 503 (53) | `record-unavailable` |
+| `UNREACHABLE` | the client could not reach the record at all — DNS, the socket, a body that is not JSON, an answer carrying neither a refusal nor a conflict. **The one code the record never produces**, and it exists so that a caller told "the record refused" does not go looking for a problem with its arguments while the network is down. It is the inbound half of the same treatment the `Http` vocabulary gets outbound, where four error names map onto the single code `PULL_ORIGIN_REFUSED` (53) | `unreachable` |
 
 And the test that stops the enumeration rotting: **every `code` has a fixture that produces it.** A
 code with no fixture fails CI; a refusal path with no code fails review; a code in this table that no

@@ -231,16 +231,25 @@ test('a value the enum does not have is refused — the failure that motivated t
   assert.equal(compile({ field: 'state', in: ['open', 'done'] }, SCHEMA).bad[0]?.code, 'ENUM_VALUE_UNKNOWN');
 });
 
+/* THE CODE IS `MATCH_OP_UNSUPPORTED` IN ALL FIVE, and it moved here because it was never this
+   package's to mint. `30 §6`'s grammar family calls it "the one code for *this test cannot apply
+   here*" and then enumerates the cases: `via has near matches starts ends` on a backend that cannot
+   serve them, an operator outside its type's set, `near` off the last leaf. `WHERE_OPERATOR_UNSUPPORTED`,
+   `WHERE_UNSUPPORTED` and `WHERE_MALFORMED` were three local spellings of it, in no registry, and the
+   browser compiles this same grammar — so a name minted here is a name two implementations carry. */
 test('an operator the type cannot take is refused by name', () => {
-  assert.equal(compile({ field: 'what', gt: 3 }, SCHEMA).bad[0]?.code, 'WHERE_OPERATOR_UNSUPPORTED');
-  assert.equal(compile({ field: 'amount', contains: 'x' }, SCHEMA).bad[0]?.code, 'WHERE_OPERATOR_UNSUPPORTED');
-  assert.equal(compile({ field: 'what', has: 'x' }, SCHEMA).bad[0]?.code, 'WHERE_OPERATOR_UNSUPPORTED');
+  assert.equal(compile({ field: 'what', gt: 3 }, SCHEMA).bad[0]?.code, 'MATCH_OP_UNSUPPORTED');
+  assert.equal(compile({ field: 'amount', contains: 'x' }, SCHEMA).bad[0]?.code, 'MATCH_OP_UNSUPPORTED');
+  assert.equal(compile({ field: 'what', has: 'x' }, SCHEMA).bad[0]?.code, 'MATCH_OP_UNSUPPORTED');
 });
 
 test('a leaf with no test, and a grammar shape this build does not read, are both named', () => {
-  assert.equal(compile({ field: 'what' } as never, SCHEMA).bad[0]?.code, 'WHERE_MALFORMED');
+  const none = compile({ field: 'what' } as never, SCHEMA).bad[0];
+  assert.equal(none?.code, 'MATCH_OP_UNSUPPORTED');
+  // And it says which tests there are, rather than only that this was not one.
+  assert.ok((none?.allowed ?? []).includes('is'), 'the refusal does not name the operators');
   for (const shape of [{ matches: 'x' }, { predicate: 'p' }, { field: 'what', near: { text: 'x' } }, { field: 'what', is: 'x', via: 'party' }])
-    assert.match(compile(shape as never, SCHEMA).bad[0]?.code ?? '', /WHERE_UNSUPPORTED/, JSON.stringify(shape));
+    assert.match(compile(shape as never, SCHEMA).bad[0]?.code ?? '', /MATCH_OP_UNSUPPORTED/, JSON.stringify(shape));
 });
 
 test('a refused predicate compiles to something that matches NOTHING', () => {

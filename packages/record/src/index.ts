@@ -172,9 +172,26 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
   /* NO TOKEN REACHES THE TOP TWO RUNGS — ADR-060, and it is a design decision rather than a gap: a
      decision needs a person, and so does anything at owner. Reporting that as "your scope is too
      small" would send an agent looking for a bigger token, and there is not one. */
+  /**
+   * `FORBIDDEN`, AND THE SENTENCE IS WHAT TELLS THE TWO CASES APART.
+   *
+   * This carried `PERSON_REQUIRED` — a code in no registry — on the argument that a caller must be
+   * able to tell "your token is too small" from "no token reaches this". The argument is right and
+   * the remedy was wrong. `30 §6` writes `FORBIDDEN` as *"a credential outside its scope, level or
+   * ceiling — 403"* and then lists three separate facts under it: a row write from a `spark`
+   * principal, a runner posting out of `seq` order, and the scope case. One code, several
+   * sentences, is how that registry already works — because a code is what a caller BRANCHES on and
+   * a `fix` is what it ACTS on, and "ask a person to sign in" is an act, not a branch. A refusal
+   * that needed its own code to be readable would be a refusal whose sentence had failed.
+   *
+   * THE COST OF THE OTHER CHOICE is `10 §7`'s: an agent teaches itself from codes that are stable
+   * across versions, and a code minted per remedy makes the vocabulary grow at the speed of the
+   * copywriting. `SCOPE_INSUFFICIENT`, twelve lines down, is the same invention and is still here:
+   * it moves the same way, together with the assertion in `packages/mcp`'s tests that names it.
+   */
   if (p.kind === 'token' && (need === 'decide' || need === 'owner'))
     return {
-      code: 'PERSON_REQUIRED',
+      code: 'FORBIDDEN',
       fix: `This needs ${need}, and no token reaches it — a person has to do it, signed in.`,
       allowed: reach,
     };
@@ -183,7 +200,7 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
      token on read access` was complete about the STATE and silent about what to do next — which is
      half a sentence, and the half a caller does not need. A scope that is too small is a token the
      owner can mint bigger; a `propose` token at its ceiling has another way through, which is to
-     propose. `PERSON_REQUIRED` above already reads like this and is the shape being copied. */
+     propose. The `FORBIDDEN` above already reads like this and is the shape being copied. */
   const short = p.kind === 'token' && !TOKEN_REACH[p.scope].includes(need);
   const next =
     p.kind !== 'token'
@@ -735,7 +752,8 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       if (ctx.principal.kind !== 'person')
-        return no('PERSON_REQUIRED', 'A read mark belongs to a person, and a token is not one.', { at: 'principal' });
+        /* `FORBIDDEN` with the sentence carrying the reason — the same move as `allows` above. */
+        return no('FORBIDDEN', 'A read mark belongs to a person, and a token is not one.', { at: 'principal' });
       const upTo = args?.upTo ?? kernel.newestEvent();
       return ok({ upTo, seen_at: kernel.markRead(ctx.principal.id, upTo) });
     },

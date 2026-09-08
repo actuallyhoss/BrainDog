@@ -75,6 +75,10 @@ const CASES = [
      token*, not *findings the gate made*, and conflating them is how a fixture ends up asserting a
      number that means something else. */
   { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1 },
+  /* ONE, and the fixture holds two flags so the count means something: one declared and never
+     read, one declared and read. A gate that reported both would be counting flags rather than
+     finding dead ones. */
+  { gate: 'flags', expect: /a branch nobody takes/, findings: 1 },
   { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
   /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both — or neither —
      is a gate that is counting keys rather than finding dead ones. */

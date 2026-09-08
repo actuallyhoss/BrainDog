@@ -420,3 +420,9 @@
     --e3: 0 4px 8px rgb(0 0 0 / 0.62), 0 16px 40px rgb(0 0 0 / 0.434);
   }
 }
+
+@layer theme {
+  html {
+    --brand: #cf413a;
+  }
+}

@@ -1225,9 +1225,14 @@ primitive layer is wrong, not the count.
 ## ADR-057 · Refusal codes are enumerated, `UPPER_SNAKE`, in one table, with a fixture per code
 
 **Decided.** Every refusal has a code from the one table in [30-BLUEPRINT](30-BLUEPRINT.md) §6 —
-**ninety-nine codes in eight families**: pack and declaration (41), grammar (13), write path (18),
-auth and vault (7), format and lifecycle (6), dialect (2), spark (5) and connector (7) — plus the
-adapter's separate closed vocabulary of thirteen. JSON-RPC `-32602` and the `Http` adapter's error
+**a hundred and twelve codes in nine families**: pack and declaration (47), grammar (14), write path
+(18), auth and vault (7), format and lifecycle (8), dialect (2), spark (5), connector (7) and host
+and client (4) — plus the adapter's separate closed vocabulary of thirteen. *An earlier draft said
+ninety-nine in eight, which was true when nothing enforced it: the `refusals` gate then compared the
+table against the code and found twenty-six codes the tree emitted and the registry did not have,
+including one — a record whose owners are all suspended — whose absence from the table also kept it
+out of `httpStatus`'s exception list, so a 503 condition answered 422. A closed list nothing closes
+is a list that is already open.* JSON-RPC `-32602` and the `Http` adapter's error
 names are vocabularies, not codes. A code with no fixture fails CI — the rule reaches every family,
 the Spark and connector codes through their own `via` runners
 ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §6); a refusal path with no code fails review. Adding a code

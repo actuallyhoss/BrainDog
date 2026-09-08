@@ -8,7 +8,6 @@
   "scripts": {
     "build": "pnpm --filter @braindog/skin theme && vite build",
     "deploy:production": "wrangler deploy --env production",
-    "deploy:staging": "wrangler deploy --env staging",
     "dev": "vite dev",
     "preview": "vite preview",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"

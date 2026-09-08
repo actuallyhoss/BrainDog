@@ -110,7 +110,12 @@ test('AN `instant` SAYS `today` TOO, and a JSON predicate used to send SQL the w
   assert.equal(value<Reading>(evaluateMetric(sql, metric({ field: 'seen_at', after: 'today' }), ctx)).value, 3);
 
   // And a date the grammar does not admit is still refused on an instant.
-  assert.equal(refusal(evaluateMetric(sql, metric({ field: 'seen_at', before: 'soon' }), ctx)).code, 'WHERE_MALFORMED');
+  /* `RELATIVE_LITERAL_UNKNOWN` — `30 §6`'s grammar family, "a temporal literal outside the anchors
+     and offsets", which is what `soon` is and what the old `WHERE_MALFORMED` never said. */
+  assert.equal(
+    refusal(evaluateMetric(sql, metric({ field: 'seen_at', before: 'soon' }), ctx)).code,
+    'RELATIVE_LITERAL_UNKNOWN',
+  );
   sql.close();
 });
 
