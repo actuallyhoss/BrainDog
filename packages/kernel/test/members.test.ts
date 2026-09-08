@@ -29,6 +29,7 @@ import assert from 'node:assert/strict';
 
 import { openRecord, type Declaration, type Kernel } from '../src/index.ts';
 import { access, invite, members, remove, suspend, LEVELS, RECORD, type Level, type MemberDeps } from '../src/members.ts';
+import { createToken, verifyToken, type TokenDeps } from '../src/token.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -72,8 +73,8 @@ const refusal = (r: unknown) => {
 };
 
 const events = (sql: NodeSql) =>
-  sql.all<{ kind: string; target: string; target_kind: string; field: string; to_v: string; actor: string }>(
-    "SELECT kind, target, target_kind, field, to_v, actor FROM event WHERE kind LIKE 'access.%' ORDER BY id",
+  sql.all<{ kind: string; target: string; target_kind: string; field: string; from_v: string | null; to_v: string | null; note: string | null; actor: string }>(
+    "SELECT kind, target, target_kind, field, from_v, to_v, note, actor FROM event WHERE kind LIKE 'access.%' ORDER BY id",
   );
 
 /** An owner who is not the person under test, so the last-owner guard is not what is being measured. */
@@ -184,6 +185,79 @@ test('A SUSPENDED PERSON HOLDS NOTHING, AND THE LADDER READS IT', async () => {
   assert.equal(access(sql, 'p_a')!.level, 'owner', 'un-suspending did not give back what suspension kept');
 });
 
+test('SUSPENSION RECORDS WHAT THEY WERE ACTUALLY HOLDING', async () => {
+  /**
+   * It wrote ONE event, about `'*'`, with the level defaulted to `'read'` when there was no `'*'`
+   * row — the exact wrong reading this module's header condemns twice, surviving in the event
+   * writer. Suspending the bookkeeper recorded `access.revoke · * · read`, a record-wide level she
+   * never held, and said nothing about the two grants that actually stopped.
+   *
+   * An audit that answers *what were they holding when you stopped them* with a fabrication is worse
+   * than one that does not answer.
+   */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_book', email: 'b@example.test', registers: { payroll: 'read', obligations: 'read' } }));
+  const before = events(sql).length;
+
+  value(suspend(deps, 'p_root', 'p_book', true));
+  const off = events(sql).slice(before);
+  assert.equal(off.length, 2, 'suspension wrote one event for a person holding two grants');
+  /* `from_v` IS WHAT THEY HELD AND `to_v` IS WHAT THEY HOLD NOW, which for a revoke is nothing.
+     One column could not tell a raise from a drop. */
+  assert.deepEqual(
+    off.map((e) => [e.kind, e.field, e.from_v, e.to_v]).sort(),
+    [['access.revoke', 'obligations', 'read', null], ['access.revoke', 'payroll', 'read', null]],
+  );
+  for (const e of off) assert.notEqual(e.field, RECORD, 'it recorded a record-wide level she never held');
+
+  /* AND THE INVERSE READS AS THE INVERSE, or the history cannot be replayed. */
+  value(suspend(deps, 'p_root', 'p_book', false));
+  const on = events(sql).slice(before + 2);
+  assert.deepEqual(
+    on.map((e) => [e.kind, e.field, e.from_v, e.to_v]).sort(),
+    [['access.grant', 'obligations', null, 'read'], ['access.grant', 'payroll', null, 'read']],
+  );
+});
+
+test('and a suspended token stops with the person who minted it', async () => {
+  /**
+   * `20 §6` asks for it *"in the same statement — not by a nightly job"*, and `verifyToken` gets
+   * there by joining `person.suspended_at` rather than by writing `revoked_at` on every token —
+   * which is the better answer, because `revoked_at` is not reversible and un-suspending has to give
+   * the tokens back.
+   *
+   * *"A token is a capability handed to an agent by a PERSON — that is the whole of what the second
+   * ladder means — so a suspended person's agent must stop with them."* The join was added because
+   * both hosts happened to call `access` afterwards, closing the door by accident of call order; any
+   * caller of `verifyToken` alone re-opened it. Nothing tested either half.
+   */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'write' }));
+
+  const tokens: TokenDeps = {
+    sql,
+    nowMs: NOW,
+    mint: () => 't_0001',
+    recordId: () => 'rec_test',
+    digest: async (text) => `h:${text}`,
+    random: () => new Uint8Array(32).fill(7),
+  };
+  const minted = value<{ bearer: string }>(await createToken(tokens, 'p_a', { scope: 'write', label: 'agent' }));
+  assert.ok((await verifyToken(tokens, minted.bearer)).ok, 'the token did not work before the suspension');
+
+  value(suspend(deps, 'p_root', 'p_a', true));
+  const refused = await verifyToken(tokens, minted.bearer);
+  assert.equal(refused.ok, false, 'a suspended person\u2019s agent kept writing');
+  assert.equal(refusal(refused).code, 'FORBIDDEN');
+  /* THE SAME SENTENCE AS A BEARER THIS RECORD NEVER MINTED. A different one would tell whoever is
+     holding it which half they got right. */
+  assert.equal(refusal(refused).fix, refusal(await verifyToken(tokens, 'rec_test.nonsense')).fix);
+
+  /* AND IT COMES BACK, which is the whole difference from `remove`. */
+  value(suspend(deps, 'p_root', 'p_a', false));
+  assert.ok((await verifyToken(tokens, minted.bearer)).ok, 'un-suspending did not give the agent back');
+});
+
 test('the last owner cannot be suspended, and the sentence says what to do instead', async () => {
   const { deps } = await record();
   value(invite(deps, 'system', { person: 'p_a', email: 'a@example.test', level: 'owner' }));
@@ -272,9 +346,9 @@ test('EVERY CHANGE WRITES ONE EVENT PER REGISTER, AND THAT IS NOT BOOKKEEPING', 
   value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read', registers: { payroll: 'write' } }));
   const wrote = events(sql).filter((e) => e.target === 'person:p_a');
   assert.equal(wrote.length, 2, 'one invitation over two registers did not write two events');
-  assert.deepEqual(wrote.map((e) => [e.kind, e.field, e.to_v]).sort(), [
-    ['access.grant', '*', 'read'],
-    ['access.grant', 'payroll', 'write'],
+  assert.deepEqual(wrote.map((e) => [e.kind, e.field, e.from_v, e.to_v]).sort(), [
+    ['access.grant', '*', null, 'read'],
+    ['access.grant', 'payroll', null, 'write'],
   ]);
   for (const e of wrote) {
     /* `target_kind` SELECTED, not defaulted. This read `e.target_kind ?? 'person'` over a query that
@@ -294,7 +368,7 @@ test('A REGISTER LEFT OUT OF A SECOND INVITATION IS REVOKED OUT LOUD', async () 
 
   assert.deepEqual(access(sql, 'p_a')!.levels, { payroll: 'write' });
   const revoked = events(sql).filter((e) => e.target === 'person:p_a' && e.kind === 'access.revoke');
-  assert.deepEqual(revoked.map((e) => [e.field, e.to_v]), [['obligations', 'write']], 'the register that was dropped left no trace');
+  assert.deepEqual(revoked.map((e) => [e.field, e.from_v, e.to_v]), [['obligations', 'write', null]], 'the register that was dropped left no trace');
 });
 
 test('and a level that did not change writes nothing', async () => {

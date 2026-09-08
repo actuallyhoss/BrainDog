@@ -161,7 +161,7 @@ export function members(sql: Sql): Member[] {
 export function invite(
   deps: MemberDeps,
   by: string,
-  args: { person: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level> },
+  args: { person: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level>; why?: string },
 ): Result<Member> {
   if (!args?.person) return no<Member>('REQUIRED_MISSING', 'Who?', { at: 'person' });
   /* A LEVEL ON THE RECORD IS OPTIONAL, and leaving it out is how somebody is invited to ONE
@@ -216,7 +216,7 @@ export function invite(
      nothing; a mutation run found it by disabling the dead one and watching every test stay green. */
   if (args.level === undefined && now !== undefined) {
     deps.sql.exec('DELETE FROM member WHERE person_id = ? AND register = ?', args.person, RECORD);
-    event(deps, instant(deps.nowMs), by, 'access.revoke', args.person, RECORD, now);
+    event(deps, instant(deps.nowMs), by, 'access.revoke', args.person, RECORD, null, now, args.why ?? null);
   }
   for (const [register, level] of wanted) {
     const had = deps.sql.one<{ level: Level }>(
@@ -232,7 +232,7 @@ export function invite(
       register,
       level,
     );
-    event(deps, at, by, 'access.grant', args.person, register, level);
+    event(deps, at, by, 'access.grant', args.person, register, level, had ?? null, args.why ?? null);
   }
 
   /* A REGISTER LEFT OUT OF A SECOND INVITATION IS A REGISTER TAKEN AWAY, and it is revoked out loud
@@ -245,7 +245,7 @@ export function invite(
     ))
       if (!wanted.has(row.register)) {
         deps.sql.exec('DELETE FROM member WHERE person_id = ? AND register = ?', args.person, row.register);
-        event(deps, at, by, 'access.revoke', args.person, row.register, row.level);
+        event(deps, at, by, 'access.revoke', args.person, row.register, null, row.level, args.why ?? null);
       }
 
   return ok(members(deps.sql).find((m) => m.person_id === args.person)!);
@@ -257,7 +257,7 @@ export function invite(
  * NEVER THE LAST OWNER, and the refusal says what to do instead. Removing somebody who is not there
  * is not an error: it is the state they asked for.
  */
-export function remove(deps: MemberDeps, by: string, person: string): Result<null> {
+export function remove(deps: MemberDeps, by: string, person: string, why?: string): Result<null> {
   const rows = deps.sql.all<{ register: string; level: Level }>(
     'SELECT register, level FROM member WHERE person_id = ?',
     person,
@@ -268,7 +268,7 @@ export function remove(deps: MemberDeps, by: string, person: string): Result<nul
     return no<null>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'person' });
 
   const at = instant(deps.nowMs);
-  for (const row of rows) event(deps, at, by, 'access.revoke', person, row.register, row.level);
+  for (const row of rows) event(deps, at, by, 'access.revoke', person, row.register, null, row.level, why ?? null);
   deps.sql.exec('DELETE FROM member WHERE person_id = ?', person);
   /* THE PERSON ROW STAYS. Every event they ever wrote names them, and a history whose actors cannot
      be resolved is a history that reads as a list of identifiers. */
@@ -291,7 +291,7 @@ export function remove(deps: MemberDeps, by: string, person: string): Result<nul
  * THE LAST OWNER CANNOT BE SUSPENDED, for the reason they cannot be removed: a record with nobody
  * who can decide is a record nobody can un-suspend them from.
  */
-export function suspend(deps: MemberDeps, by: string, person: string, on: boolean): Result<null> {
+export function suspend(deps: MemberDeps, by: string, person: string, on: boolean, why?: string): Result<null> {
   const row = deps.sql.one<{ id: string; suspended_at: string | null }>(
     'SELECT id, suspended_at FROM person WHERE id = ?',
     person,
@@ -308,9 +308,23 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
 
   const at = instant(deps.nowMs);
   deps.sql.exec('UPDATE person SET suspended_at = ? WHERE id = ?', on ? at : null, person);
-  /* ON THE LEDGER AS AN ACCESS CHANGE, because that is what it is: every level they hold stops
-     working, and somebody reading the history in six weeks needs to see the moment it happened. */
-  event(deps, at, by, on ? 'access.revoke' : 'access.grant', person, RECORD, (held.find((r) => r.register === RECORD)?.level ?? 'read') as Level);
+  /**
+   * ON THE LEDGER AS AN ACCESS CHANGE, because that is what it is: every level they hold stops
+   * working, and somebody reading the history in six weeks needs to see the moment it happened.
+   *
+   * ONE EVENT PER REGISTER, the same as `remove` — and this wrote ONE, about `'*'`, with the level
+   * defaulted to `'read'` when there was no `'*'` row. That default is the exact wrong reading this
+   * file's header condemns twice: suspending a bookkeeper who holds nothing on the record and `read`
+   * on two lists recorded `access.revoke · * · read`, a record-wide level she never had, and said
+   * nothing about the two grants that actually stopped. The audit answered *what were they holding
+   * when you stopped them* with a fabrication.
+   *
+   * Suspension stops every row, so it says so per row. Un-suspending gives every row back and says
+   * that per row too — the two have to be readable as each other's inverse or the history cannot be
+   * replayed.
+   */
+  for (const row of held)
+    event(deps, at, by, on ? 'access.revoke' : 'access.grant', person, row.register, on ? null : row.level, on ? row.level : null, why ?? null);
   return ok(null);
 }
 
@@ -335,6 +349,19 @@ const owners = (sql: Sql): number =>
     )?.n ?? 0,
   );
 
+/**
+ * One access change, on the ledger — with the two columns it used to leave empty.
+ *
+ * `from_v` AND `note`, BOTH SPECIFIED AND NEITHER WRITTEN. `45 §5.6` gives the row as *"`from_v` =
+ * old level or NULL, `to_v` = new level or NULL, `note = why`"*, and this wrote `to_v` alone. What
+ * that cost is the whole value of the table: **every access change in this record was
+ * unattributed** — the audit said who was granted what and never why, on the one table whose
+ * entries are decisions about other people, and it could not say what they were moved FROM either,
+ * so a raise and a drop read identically.
+ *
+ * `null` IS A REAL VALUE FOR `from_v` and means *they held nothing here*, which is different from a
+ * grant that lowered something. The column is nullable for exactly that.
+ */
 function event(
   deps: MemberDeps,
   at: string,
@@ -342,10 +369,12 @@ function event(
   kind: 'access.grant' | 'access.revoke',
   person: string,
   register: string,
-  level: Level,
+  level: Level | null,
+  was: Level | null = null,
+  why: string | null = null,
 ): void {
   deps.sql.exec(
-    'INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     deps.mint(),
     at,
     by,
@@ -353,6 +382,8 @@ function event(
     `person:${person}`,
     'person',
     register,
+    was,
     level,
+    why,
   );
 }
