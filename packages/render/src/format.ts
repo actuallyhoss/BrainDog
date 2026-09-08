@@ -202,20 +202,38 @@ export const dateLong = (iso: string, now?: number): string => `${day(iso)} · $
  *   · **Three significant figures**, so 157 kB and 160 kB are different strings and 1.24 MB and
  *     1.31 MB are too. A fixed decimal place is what collapsed them.
  *   · **Whole bytes below a kilobyte**, because `0.4 kB` is a number nobody wanted.
+ *
+ * AND THE UNIT IS CHOSEN AFTER THE ROUNDING, WHICH IS THE ONLY ORDER THAT WORKS. Choosing first gave
+ * `999_500 → "1,000 kB"` — four significant figures, a thousands separator inside a kB reading, and
+ * five hundred bytes later the same file is `"1.00 MB"`. The same at every boundary: `9_995` was
+ * `"10.00 kB"` beside `10_000`'s `"10.0 kB"`, and `999_999_999` was `"1,000 MB"`. It is the same
+ * capping `since()` needed twenty lines above, arrived at the same way: round, then look at what you
+ * rounded to, and climb if it spilled.
  */
 export function bytes(n: number): string {
   if (!Number.isFinite(n) || n < 0) return MISSING;
-  if (n < 1_000) return `${Math.round(n)} B`;
+  /* ROUNDED BEFORE THE BAND IS CHOSEN, for the same reason as the loop below: `999.5` rounds to 1000
+     and `1000 B` is a four-digit reading of a unit that stops at three. */
+  const whole = Math.round(n);
+  if (whole < 1_000) return `${whole} B`;
+
   const units = ['kB', 'MB', 'GB', 'TB'];
-  let value = n / 1_000;
+  let value = whole / 1_000;
   let i = 0;
-  while (value >= 1_000 && i < units.length - 1) {
+  /* Three significant figures: 157 kB · 15.7 MB · 1.57 GB. `toPrecision` is not it — it would give
+     `1.00e+3` for the very case this loop exists to catch. */
+  const places = (v: number) => (v >= 100 ? 0 : v >= 10 ? 1 : 2);
+  for (;;) {
+    const rounded = Number(value.toFixed(places(value)));
+    if (rounded < 1_000 || i === units.length - 1) {
+      value = rounded;
+      break;
+    }
     value /= 1_000;
     i += 1;
   }
-  /* Three significant figures: 157 kB · 15.7 MB · 1.57 GB. `toPrecision` would give `1.57e+2`. */
-  const places = value >= 100 ? 0 : value >= 10 ? 1 : 2;
-  return `${value.toLocaleString(NUM, { minimumFractionDigits: places, maximumFractionDigits: places })} ${units[i]}`;
+  const p = places(value);
+  return `${value.toLocaleString(NUM, { minimumFractionDigits: p, maximumFractionDigits: p })} ${units[i]}`;
 }
 
 export const yesno = (v: boolean): string => (v ? 'yes' : 'no');

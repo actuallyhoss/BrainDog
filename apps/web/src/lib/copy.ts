@@ -905,7 +905,11 @@ export const copy = {
 
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
   theSignature: 'How anybody checks a copy is yours',
-  theSignatureIs: 'Every export and every backup is signed. This is the public half of the key that signs them — it opens nothing, and anybody can fetch it from this record at /.well-known/braindog-key.',
+  /* IT SAID ANYBODY COULD FETCH IT AT `/.well-known/braindog-key`, and there is no such route in
+     any of the three apps — the one sentence on this screen asserting a live endpoint, where every
+     other unwritten action goes through `notWritten`. `03 §4` specifies the URL; the product has not
+     got it yet, and the sentence says what is true today. */
+  theSignatureIs: 'Every export and every backup is signed. This is the public half of the key that signs them, and it opens nothing — which is why it is safe to hand to anybody checking a copy.',
   keyFingerprint: 'Fingerprint',
   keyPublic: 'Public key',
   copyKey: 'Copy the key',
@@ -913,7 +917,11 @@ export const copy = {
   verifyHow: 'Hand it to somebody with a copy of your record and they can prove it came from here and that no row has changed since. Without it they can prove the file is whole, but not where it came from.',
 
   /* deletion — `02 §9`: browser session, re-authenticated, the slug typed */
-  deleteCosts: 'There is no undo after this. A final copy is kept for the same day only, and within thirty days nothing of this record is left anywhere.',
+  /* `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on the screen — in the
+     section whose own comment condemns *"three lines, two of them the same sentence"*. This one
+     carries what `deleteWhat` does not: how long a change of mind lasts, and when the last copy is
+     gone (`53 §5.9`). */
+  deleteCosts: 'A final copy is kept for the rest of today, in case you change your mind within the hour. Within thirty days nothing of this record is left anywhere.',
   typeSlug: (slug: string) => `Type ${slug} to confirm`,
 
   keptCloud: (n: number) => `A sealed copy of the whole record every night. The ${n} newest are kept, plus the latest.`,

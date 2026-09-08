@@ -444,13 +444,22 @@ test('THE RECORD PUBLISHES THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE', () =
    */
   assert.match(SIGNING_KEY.keyId, /^[0-9a-f]{16}$/u, 'the fingerprint is not `03 §4`\u2019s sixteen hex characters');
   assert.match(SIGNING_KEY.publicKey, /^[A-Za-z0-9_-]+$/u, 'the public key is not base64url');
-  assert.ok(SIGNING_KEY.publicKey.length >= 40 && SIGNING_KEY.publicKey.length <= 64, `a 32-byte key is ~43 base64url characters, and this is ${SIGNING_KEY.publicKey.length}`);
+  /* EXACTLY 43. `03 §4`: raw 32 bytes in base64url, which is `ceil(32 * 4 / 3)` = 43 characters with
+     no padding. The range used to be 40–64, which admitted the 48-character ASCII sentence that was
+     shipping — an assertion whose own message named the right number and whose bounds did not. */
+  assert.equal(SIGNING_KEY.publicKey.length, 43, 'a raw 32-byte key is 43 base64url characters');
+  assert.doesNotMatch(SIGNING_KEY.publicKey, /public|key|studio|stamped/iu, 'the key is a sentence rather than a key');
   assert.ok(SIGNING_KEY.since, 'the key has no date, so nobody can tell a rotation from the original');
 
   /* AND THE SENTENCE SAYS WHY IT IS SAFE TO SHOW. This product's first promise is that the record
      indexes what a key opens and never the key, so a screen printing one has to say which kind. */
   assert.match(copy.theSignatureIs, /opens nothing/iu);
-  assert.match(copy.theSignatureIs, /well-known/iu, 'it does not say the key is public by design');
+  /* AND IT ASSERTS NO ROUTE THIS PRODUCT HAS NOT GOT. It used to name
+     `/.well-known/braindog-key` — `03 §4` specifies it and no app serves it — which made this the one
+     sentence on the screen claiming a live endpoint, where every other unwritten action goes
+     through `notWritten`. */
+  assert.doesNotMatch(copy.theSignatureIs, /well-known|https?:/iu, 'the sentence promises an endpoint again');
+  assert.match(copy.theSignatureIs, /safe to hand/iu, 'it does not say why a key belongs on a screen');
   /* `48 §5.6`'s two answers, so somebody knows what they lose by not passing it. */
   assert.match(copy.verifyHow, /where it came from/iu);
 });
@@ -472,8 +481,13 @@ test('and the delete control is the confirmation rather than a sentence about on
   assert.match(copy.typeSlug('the-studio'), /the-studio/u);
   /* AND IT SAYS WHAT IT COSTS BEFORE THE FIELD. `53 §5.9`: no rollback, and by day +30 nothing
      remains anywhere. */
-  assert.match(copy.deleteCosts, /no undo/iu);
+  /* `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on screen — two lines, the
+     same sentence, in the section whose own comment condemns exactly that. This one carries what
+     the other does not: how long a change of mind lasts, and when the last copy is gone. */
+  assert.doesNotMatch(copy.deleteCosts, /cannot be undone|no undo/iu, 'it repeats the line above it again');
+  assert.match(copy.deleteWhat('The Studio'), /cannot be undone/iu);
   assert.match(copy.deleteCosts, /thirty days|30 days/iu);
+  assert.match(copy.deleteCosts, /rest of today|same day/iu, '`53 §5.9`: a final copy exists so a same-day change of mind is answerable');
 });
 
 test('and the *Suggest new pages* switch that `19 §2` says the area exists for', () => {

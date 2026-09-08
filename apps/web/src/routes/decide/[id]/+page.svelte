@@ -17,7 +17,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { day, relative } from 'braindog-render';
+  import { day, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, NOW, QUESTIONS } from '$lib/record/api.ts';
@@ -159,7 +159,7 @@
         <p class="settled-head">
           <Icon name="check" size="m" />
           {copy.decidedBy}
-          {question.decided.by}, {relative(question.decided.at.slice(0, 10), NOW)}
+          {question.decided.by}, {since(question.decided.at, NOW)}
         </p>
         <p class="settled-choice">{question.options.find((o) => o.key === question.decided!.option)?.title}</p>
         <p class="settled-reason">“{question.decided.reason}”</p>
@@ -169,7 +169,7 @@
       <section class="cost">
         <h2 class="cost-label">{copy.costOfDelay}</h2>
         <p class="cost-body">{question.cost}</p>
-        <p class="cost-age">Opened {relative(question.opened.slice(0, 10), NOW)}. Nobody has decided it.</p>
+        <p class="cost-age">Opened {since(question.opened, NOW)}. Nobody has decided it.</p>
       </section>
 
       <section class="options">

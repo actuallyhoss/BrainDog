@@ -12,7 +12,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
-  import { holeLabel, relative } from 'braindog-render';
+  import { holeLabel, relative, since } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -201,7 +201,7 @@
           <!-- IN WORDS, like the other two surfaces that answer "who changed my record". `actorOf`
                moved into `api.ts` when Home and `/audit` were found spelling the same two actors two
                ways; this route reads the same `AUDIT` array and was the third. -->
-          <dd>{relative(row.created.slice(0, 10), NOW)} by {actorOf(row.by)}</dd>
+          <dd>{since(row.created, NOW)} by {actorOf(row.by)}</dd>
         </dl>
 
         {#if history.length}
@@ -211,7 +211,7 @@
               <li>
                 <span class="history-by">{actorOf(e.by)}</span>
                 <span class="history-note">{e.note}</span>
-                <span class="history-when">{relative(e.at.slice(0, 10), NOW)}</span>
+                <span class="history-when">{since(e.at, NOW)}</span>
               </li>
             {/each}
           </ol>

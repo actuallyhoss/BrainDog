@@ -15,7 +15,7 @@
   putting the sessions or the tasks above it would separate the claim from its evidence by a screen.
 -->
 <script lang="ts">
-  import { relative } from 'braindog-render';
+  import { since } from 'braindog-render';
   import { CapLine } from 'braindog-render/svelte';
   import { page as route } from '$app/state';
 
@@ -112,7 +112,7 @@
                   tone={healthTone(String(u.fields.health) as never)}
                 />
                 <span class="u-by">{u.fields.by}</span>
-                <span class="u-at">{relative(String(u.fields.at).slice(0, 10), NOW)}</span>
+                <span class="u-at">{since(String(u.fields.at), NOW)}</span>
               </div>
               <p class="u-body" dir="auto">{u.fields.body}</p>
             </li>
@@ -140,7 +140,7 @@
                 <span class="dot" data-state={s.fields.state}></span>
                 <span class="row-main">
                   <span class="row-title" dir="auto">{s.fields.doing}</span>
-                  <span class="row-sub">{s.fields.agent} · {relative(String(s.fields.last_seen).slice(0, 10), NOW)}</span>
+                  <span class="row-sub">{s.fields.agent} · {since(String(s.fields.last_seen), NOW)}</span>
                 </span>
               </a>
               <!-- A SESSION SAYS WHAT IT IS DOING; THE RUN IS WHAT IT IS DOING IT WITH — the tool

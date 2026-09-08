@@ -6,7 +6,7 @@ import { parse, splitRow } from './parse.ts';
 import { toHTML } from './html.ts';
 import { chunkRows } from '../svelte/types.ts';
 import { inline, safeHref, text } from './inline.ts';
-import { money, pct, relative, since, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
+import { bytes, money, pct, relative, since, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
@@ -418,11 +418,100 @@ test('AND PAST A DAY IT SAYS WHAT THE DAY COLUMN SAYS, AT EVERY HOUR OF THE CLOC
   }
   assert.ok(compared > 1_500, `only ${compared} comparisons`);
 
+  /**
+   * AND THE ANSWER IS THE RIGHT ONE, not merely the same one.
+   *
+   * Both sides are `band(|dayIndex(a) - dayIndex(b)|)`, literally the same expression — so an error
+   * inside `dayIndex` cancels and the agreement above proves nothing about it. A review shifted it by
+   * one and made it truncate instead of floor, and all 1,508 comparisons stayed green.
+   *
+   * These are absolute: a day is a day, counted from midnight UTC, which is what the whole fix means.
+   */
+  const noon = Date.UTC(2026, 8, 8, 12);
+  for (const [days, said] of [[1, '1d ago'], [2, '2d ago'], [14, '14d ago'], [21, '3w ago']] as const) {
+    assert.equal(since(new Date(noon - days * 86_400_000).toISOString(), noon), said, `${days} days back`);
+    assert.equal(relative(new Date(noon - days * 86_400_000).toISOString().slice(0, 10), noon), said);
+  }
+  /**
+   * AND IT FLOORS RATHER THAN TRUNCATES, which is only observable before 1970 — and a record holds
+   * dates a person types, so a founding date or a date of birth reaches it. `Math.trunc` rounds
+   * toward zero, so on the far side of the epoch it puts a day in the wrong bucket and every
+   * distance past it is out by one.
+   *
+   * (A constant OFFSET on `dayIndex` is not a defect and cannot be tested: both callers take a
+   * difference, so it cancels. Saying so is better than an assertion that pretends otherwise.)
+   */
+  assert.equal(relative('1969-12-31', Date.UTC(1970, 0, 1, 12)), '1d ago');
+  assert.equal(relative('1969-12-30', Date.UTC(1970, 0, 1, 12)), '2d ago');
+  assert.equal(relative('1969-12-31', Date.UTC(1969, 11, 31, 12)), 'today');
+
+  /* And the boundary is midnight, not "twenty-four hours ago": 23:59 on the previous day is one day
+     back however few minutes have passed. */
+  const justAfter = Date.UTC(2026, 8, 8, 0, 1);
+  assert.equal(since(new Date(Date.UTC(2026, 8, 7, 23, 59)).toISOString(), justAfter), '2 min ago', 'inside an hour it is still minutes');
+  assert.equal(relative('2026-09-07', justAfter), '1d ago', 'the day before is one day back one minute after midnight');
+
   /* AND THE MIDNIGHT CASE THAT STARTED IT, on `relative()` alone. */
   const midnight = Date.UTC(2026, 8, 8, 0);
   assert.equal(relative('2026-09-07', midnight), '1d ago', 'yesterday read as today at midnight');
   assert.equal(relative('2026-09-08', midnight), 'today');
   assert.equal(relative('2026-09-09', midnight), 'in 1d');
+});
+
+test('A SIZE IS SAID IN THE UNIT THAT TELLS TWO FILES APART', () => {
+  /**
+   * Written because a screen printed **"0.2 MB"** for all four snapshots of a ninety-three-row record
+   * — four distinct copies, four identical strings, on the one screen whose job is to say which copy
+   * is which — and then shipped with no test of its own at all. Seven mutations survived: the guard,
+   * the whole-bytes branch, both decimal places, the unit labels, 1000-vs-1024, and never climbing
+   * past kB.
+   */
+  assert.equal(bytes(0), '0 B');
+  assert.equal(bytes(1), '1 B');
+  assert.equal(bytes(999), '999 B');
+  assert.equal(bytes(1_000), '1.00 kB');
+  assert.equal(bytes(157_000), '157 kB');
+  assert.equal(bytes(1_240_000), '1.24 MB');
+  assert.equal(bytes(41_943_040), '41.9 MB');
+  assert.equal(bytes(2_500_000_000), '2.50 GB');
+  assert.equal(bytes(2_500_000_000_000), '2.50 TB');
+
+  /* DECIMAL, NOT BINARY, and the decision is recorded rather than assumed: a person reading a file
+     listing sees `MB`. 1024 would make this `976 kB`. */
+  assert.equal(bytes(1_000_000), '1.00 MB');
+  assert.notEqual(bytes(1_048_576), '1.00 MB');
+
+  /* THREE SIGNIFICANT FIGURES, so the values a snapshot list actually holds are different strings.
+     A fixed decimal place is what collapsed them. */
+  assert.equal(new Set([157_000, 160_460, 152_100].map(bytes)).size, 3);
+
+  /**
+   * AND NO BAND SPELLS THE ONE ABOVE IT. The unit was chosen before the rounding, so `999_500` read
+   * `"1,000 kB"` — four significant figures and a thousands separator inside a kB reading — five
+   * hundred bytes before the same file becomes `1.00 MB`. Every boundary had it.
+   */
+  assert.equal(bytes(999_499), '999 kB');
+  assert.equal(bytes(999_500), '1.00 MB');
+  assert.equal(bytes(999_999_999), '1.00 GB');
+  assert.equal(bytes(999_999_999_999), '1.00 TB');
+  assert.equal(bytes(999.5), '1.00 kB', 'a four-digit reading of a unit that stops at three');
+  for (const n of [999.5, 9_995, 99_950, 999_500, 999_999_999]) {
+    const said = bytes(n);
+    assert.doesNotMatch(said, /^1,000 /u, `${n} spells the band above it: ${said}`);
+    assert.doesNotMatch(said, /^\d{4}/u, `${n} has four digits before the unit: ${said}`);
+  }
+
+  /* A size that is not one is `—`, never a number. A negative byte count is a bug upstream and
+     printing it as `-1 B` is how it reaches a screen unnoticed. */
+  for (const n of [-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) assert.equal(bytes(n), MISSING);
+
+  /* Monotone, which is the property a list of them is read for. */
+  let last = -1;
+  for (let n = 0; n < 5_000_000; n += 1_237) {
+    const v = Number(bytes(n).replace(/[^\d.]/gu, '')) * (bytes(n).includes('MB') ? 1_000_000 : bytes(n).includes('kB') ? 1_000 : 1);
+    assert.ok(v >= last, `${n} reads smaller than the size before it`);
+    last = v;
+  }
 });
 
 test('a day is formatted, and a malformed one renders as what the author typed', () => {

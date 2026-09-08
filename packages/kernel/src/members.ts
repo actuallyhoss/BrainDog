@@ -127,10 +127,19 @@ export function access(
   };
 }
 
-/** Everybody on the record, with what they hold and where. */
+/**
+ * Everybody on the record, with what they hold and where.
+ *
+ * IT JOINS `person` FOR THE SAME REASON `access()` DOES. A `member` row whose person is missing was
+ * listed as an active owner with a `null` name — so after the fail-open in `access()` was closed, the
+ * two disagreed: the ladder said the ghost held nothing and the People screen drew it holding
+ * everything. That is the pair the fix was about, relocated one function over.
+ */
 export function members(sql: Sql): Member[] {
   const rows = sql.all<{ person_id: string; register: string; level: Level; seen_at: string | null }>(
-    'SELECT person_id, register, level, seen_at FROM member ORDER BY person_id, register',
+    `SELECT m.person_id AS person_id, m.register AS register, m.level AS level, m.seen_at AS seen_at
+       FROM member m JOIN person p ON p.id = m.person_id
+      ORDER BY m.person_id, m.register`,
   );
   const people = new Map(
     sql
@@ -214,13 +223,11 @@ export function invite(
 
   /* THE LAST OWNER CANNOT BE MOVED DOWN, and this is the same check `remove` makes for the same
      reason: the state it prevents is one nobody inside the product can get out of. */
-  const held = deps.sql.one<{ level: Level; seen_at: string | null }>(
-    'SELECT level, seen_at FROM member WHERE person_id = ? AND register = ?',
+  const now = deps.sql.one<{ level: Level }>(
+    'SELECT level FROM member WHERE person_id = ? AND register = ?',
     args.person,
     RECORD,
-  );
-  const now = held?.level;
-  const seen = held?.seen_at ?? null;
+  )?.level;
   if (now === 'owner' && args.level !== 'owner' && owners(deps.sql) <= 1)
     return no<Member>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'level' });
 
@@ -258,17 +265,25 @@ export function invite(
       register,
     )?.level;
     if (had === level) continue;
-    /* THE READ MARK SURVIVES A LEVEL CHANGE. `45 §5.6`: *"keeping the old `'*'` row's `seen_at`"*.
-       Dropping the record level deletes the row and `seen_at` with it, so restoring the level put
-       somebody back to having read nothing — the unread badge for the whole record, reset by an
-       administrative change they did not make. `seen` is carried across the delete. */
+    /**
+     * THE READ MARK SURVIVES A LEVEL CHANGE, and `ON CONFLICT … SET level` is the whole of why.
+     *
+     * `45 §5.6` asks for *"keeping the old `'*'` row's `seen_at`"*, and a previous pass added a
+     * fourth column to carry it across a delete — which was dead code for a defect that did not
+     * exist: the `'*'` row is deleted only when `level` is absent, and in that branch `'*'` is not in
+     * `wanted`, so the DELETE and this INSERT are mutually exclusive. The conflict path never touched
+     * `seen_at` in the first place. A review proved it by reverting the carry and watching the test
+     * written for it stay green.
+     *
+     * The requirement is real and the mechanism is this clause. It is stated here because the next
+     * person to widen the `DO UPDATE SET` is the one who would break it.
+     */
     deps.sql.exec(
-      `INSERT INTO member (person_id, register, level, seen_at) VALUES (?, ?, ?, ?)
+      `INSERT INTO member (person_id, register, level) VALUES (?, ?, ?)
        ON CONFLICT (person_id, register) DO UPDATE SET level = excluded.level`,
       args.person,
       register,
       level,
-      register === RECORD ? (seen ?? null) : null,
     );
     event(deps, at, by, 'access.grant', args.person, register, level, had ?? null, args.why ?? null);
   }
@@ -315,7 +330,11 @@ export function remove(deps: MemberDeps, by: string, person: string, why?: strin
   );
   if (rows.length === 0) return ok(null);
 
-  if (rows.some((r) => r.register === RECORD && r.level === 'owner') && owners(deps.sql) <= 1)
+  /* AND IT ASKS `owners()` WHETHER THEY COUNT, rather than reading the raw row. The row says
+     `'*' owner`; `owners()` counts only owners whose person is not suspended — so a SUSPENDED owner
+     was treated as the last one and could not be taken off, with a working owner sitting beside
+     them. Suspension is "stop somebody without deciding about them", and the deciding was refused. */
+  if (counts(deps.sql, person) && owners(deps.sql) <= 1)
     return no<null>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'person' });
 
   const at = instant(deps.nowMs);
@@ -350,7 +369,7 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
   if (!row) return no<null>('OUT_OF_BOUNDS', `There is nobody called ${person} in this record.`, { at: 'person' });
 
   const held = deps.sql.all<{ register: string; level: Level }>('SELECT register, level FROM member WHERE person_id = ?', person);
-  if (on && held.some((r) => r.register === RECORD && r.level === 'owner') && owners(deps.sql) <= 1)
+  if (on && counts(deps.sql, person) && owners(deps.sql) <= 1)
     return no<null>('LEVEL_REQUIRED', 'A record keeps one owner who can act. Make somebody else an owner first.', { at: 'person' });
 
   /* THE SECOND CALL SAYS WHAT THE FIRST SAID. Suspending somebody already suspended is not an error,
@@ -392,6 +411,23 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
  * IT IS THE SAME PREDICATE `ownerId()` USES, which is the point: the question "is there an owner"
  * has to have one answer, or the guard protects a different thing from the one that reads it.
  */
+/**
+ * Is this person one of the owners `owners()` is counting?
+ *
+ * THE GUARD AND THE COUNT HAVE TO ASK ONE QUESTION. `remove` and `suspend` read the raw `member` row
+ * — `register === '*' && level === 'owner'` — while `owners()` joins `person` and skips the suspended
+ * and the missing. So a suspended owner was the last owner to the guard and not an owner to the
+ * count, and could neither be removed nor un-suspended by removal; and a ghost row was an owner to
+ * the guard and invisible to the count, which is how a record with one real owner refused to let
+ * that owner go.
+ */
+const counts = (sql: Sql, person: string): boolean =>
+  (sql.one<{ n: number }>(
+    `SELECT count(*) AS n FROM member m JOIN person p ON p.id = m.person_id
+      WHERE m.person_id = ? AND m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL`,
+    person,
+  )?.n ?? 0) > 0;
+
 const owners = (sql: Sql): number =>
   Number(
     sql.one<{ n: number }>(

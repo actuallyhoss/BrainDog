@@ -1087,7 +1087,10 @@
         `03 §6` on why this is not the Export area: "A snapshot is not an export: it is a full copy
         … disaster recovery, not portability."
       -->
-      <Section title={copy.kept} count={SNAPSHOTS.length}>
+      <!-- THE COUNT IS WHAT IS KEPT, and a night that kept nothing is not one. It read "What is kept
+           · 4" over three copies and a row saying *nothing kept* — counting the failure as a backup,
+           which is the same class of error as hiding it. -->
+      <Section title={copy.kept} count={SNAPSHOTS.filter((s) => s.failed === null).length}>
         <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
              first backup has not run it describes a policy over nothing, above nothing. -->
         {#if SNAPSHOTS.length === 0}
@@ -1322,7 +1325,6 @@
                 autocapitalize="off"
                 spellcheck="false"
                 autocomplete="off"
-                placeholder={boot().index.slug}
                 bind:value={typedSlug}
               />
             </div>
@@ -1547,7 +1549,6 @@
   }
 
   .ex-level {
-    flex: 1 1 20ch;
     color: var(--ink2);
     font-size: var(--t-sm);
   }

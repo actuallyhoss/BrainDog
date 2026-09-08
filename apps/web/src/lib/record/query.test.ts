@@ -10,7 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { REGISTERS, ROWS, columnsFor, display, list, sortRows, applyFilters } from './api.ts';
+import { REGISTERS, ROWS, columnsFor, display, list, sortRows, applyFilters, NOW } from './api.ts';
+import { compile, explain, matches } from './where.ts';
 import type { Entry } from './schema.ts';
 
 const rows = (...fields: Record<string, unknown>[]): Entry[] =>
@@ -288,4 +289,64 @@ test('a column whose values differ actually reorders the list', () => {
     });
     assert.ok(moved.length > 0, `${register}: not one of its columns changes the order of the list`);
   }
+});
+
+
+/* ── a date is compared as a date ──────────────────────────────────────── */
+
+test('`is <a date>` ON A DATE FIELD MATCHED NOTHING, ON EVERY REGISTER, ALWAYS', () => {
+  /**
+   * `before` and `after` had a date path from the day they were written and `is` never got one, so
+   * the value went through `formsOf` — which compares against the raw store (`2026-09-03`) and
+   * against `display()` (`3 Sep 2026`). `today` is neither, so the one date filter a person types by
+   * hand was the one that could not work.
+   *
+   * AND IT MADE `display()` LOAD-BEARING WHERE IT MUST NOT BE. `last_seen is today` DID match while
+   * `display()` happened to render an instant through `relative()` — a filter whose meaning was a
+   * side effect of a formatting choice, which broke the day that formatter learned to say `3h ago`.
+   */
+  const rows2 = rows({ due: '2026-09-03' }, { due: '2026-09-14' }, { due: null });
+  assert.deepEqual(seqs(applyFilters('obligations', rows2, [{ field: 'due', op: 'is', values: ['2026-09-03'] }])), [1]);
+
+  /* A relative literal, which is the thing somebody actually types. */
+  const said = compile('obligations', 'due is today');
+  assert.deepEqual(explain(said), [], 'the clause was not understood');
+  assert.deepEqual(rows2.filter((e) => matches(e, said, NOW)).map((e) => e.seq), [1]);
+
+  /* AND THE THREE OPERATORS AGREE ABOUT THE DAY THEY NAME. `34 §6`: before and after are exclusive
+     of it, so the three partition the field exactly — every row with a date lands in one of them. */
+  const before = compile('obligations', 'due before today');
+  const after = compile('obligations', 'due after today');
+  const dated = rows2.filter((e) => e.fields.due !== null);
+  const parts = [before, said, after].map((c) => dated.filter((e) => matches(e, c, NOW)).length);
+  assert.equal(parts.reduce((n, x) => n + x, 0), dated.length, `the three operators cover ${parts.join('+')} of ${dated.length} dated rows`);
+
+  /* A row with no date is in none of them. Counting it would put rows with no due date into an
+     overdue list, which is a list somebody acts on. */
+  for (const c of [before, said, after]) assert.equal(matches(rows2[2]!, c, NOW), false);
+});
+
+test('and an enum whose value is the word `today` is untouched', () => {
+  /* The date path is taken only when the FIELD is a date. A register that really holds the word
+     would otherwise stop being filterable by it — the fix eating a case it was not about. */
+  const some = rows({ state: 'open' }, { state: 'paid' });
+  assert.deepEqual(seqs(applyFilters('obligations', some, [{ field: 'state', op: 'in', values: ['open'] }])), [1]);
+  const said = compile('obligations', 'state is open');
+  assert.deepEqual(explain(said), []);
+  assert.deepEqual(some.filter((e) => matches(e, said, NOW)).map((e) => e.seq), [1]);
+});
+
+test('AN INSTANT CELL IS BANDED, NOT TRUNCATED TO ITS DAY', () => {
+  /* `display()`'s `instant` branch had no test at all — `api.test.ts` asserts `money`, `day`, `enum`,
+     `int`, `duration`, `ref`, unknown and `secret`, and reverting this one broke nothing. It was
+     `relative(value.slice(0, 10))`, so a session seen two hours ago and one seen eleven hours ago
+     both read *today*, on the register whose whole subject is what is happening now. */
+  const at = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
+  assert.equal(display('sessions', 'last_seen', at(0)), 'just now');
+  assert.equal(display('sessions', 'last_seen', at(2)), '2h ago');
+  assert.equal(display('sessions', 'last_seen', at(11)), '11h ago');
+  assert.notEqual(display('sessions', 'last_seen', at(2)), display('sessions', 'last_seen', at(11)));
+  /* And a `day` field is still a DATE, which is the branch beside it and a different answer on
+     purpose: a deadline is a date somebody diaries against, and an age is not. */
+  assert.equal(display('obligations', 'due', '2026-09-03'), '3 Sep 2026');
 });

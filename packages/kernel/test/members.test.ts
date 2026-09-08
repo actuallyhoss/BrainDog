@@ -208,6 +208,51 @@ test('AN INVITATION IS THE WHOLE OF WHAT SOMEBODY HOLDS, INCLUDING WHEN IT NAMES
   assert.deepEqual(revoked.map((e) => [e.field, e.from_v, e.to_v]), [['payroll', 'owner', null]]);
 });
 
+test('A SUSPENDED OWNER IS NOT THE OWNER THE RECORD IS KEEPING', async () => {
+  /**
+   * `remove` and `suspend` read the raw `member` row — `register === '*' && level === 'owner'` —
+   * while `owners()` joins `person` and skips the suspended. So a suspended owner was the last owner
+   * to the guard and not an owner to the count, and could not be taken off with a working owner
+   * sitting beside them. Suspension is *"stop somebody without deciding about them"*; the deciding
+   * was refused.
+   *
+   * The same split, one function down from where `access()` was just fixed for it.
+   */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'owner' }));
+  value(suspend(deps, 'p_root', 'p_a', true));
+
+  value(remove(deps, 'p_root', 'p_a'));
+  assert.equal(access(sql, 'p_a'), null, 'a suspended owner could not be removed');
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM member WHERE person_id = 'p_a'")!.n, 0);
+
+  /* And the REAL last owner is still protected, which is what the guard is for. */
+  assert.equal(refusal(remove(deps, 'p_root', 'p_root')).code, 'LEVEL_REQUIRED');
+});
+
+test('and a membership with nobody behind it protects nobody', async () => {
+  /**
+   * The other half of the same split. A ghost `member('*','owner')` was an owner to the guard and
+   * invisible to the count — so a record with exactly one real owner refused to let that owner go,
+   * on the strength of a row the ladder had just been taught to ignore. `access()` was fixed and the
+   * three methods around it were not.
+   */
+  const { sql, deps } = await record();
+  value(invite(deps, 'system', { person: 'p_real', email: 'r@example.test', level: 'owner' }));
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_ghost', '*', 'owner')");
+  value(invite(deps, 'p_real', { person: 'p_b', email: 'b@example.test', level: 'owner' }));
+
+  /* Two real owners, so demoting one is allowed — and was not, because the ghost was counted by the
+     guard and not by `owners()`. */
+  value(invite(deps, 'p_real', { person: 'p_b', level: 'write' }));
+  assert.equal(access(sql, 'p_b')!.level, 'write');
+
+  /* AND THE LISTING AGREES WITH THE LADDER. `members()` did not join `person`, so the People screen
+     drew the ghost as an active owner while `access()` said it held nothing — the exact pair the
+     inner join was added to end. */
+  assert.ok(!members(sql).some((m) => m.person_id === 'p_ghost'), 'the listing shows an owner the ladder does not');
+});
+
 test('THE READ MARK SURVIVES A LEVEL CHANGE', async () => {
   /* `45 §5.6`: *"keeping the old `'*'` row's `seen_at`"*. A level change deletes the `'*'` row and
      re-inserts it, and `seen_at` went with it — so an administrative change somebody else made reset
@@ -219,7 +264,16 @@ test('THE READ MARK SURVIVES A LEVEL CHANGE', async () => {
   value(invite(deps, 'p_root', { person: 'p_a', level: 'write' }));
   assert.equal(members(sql).find((m) => m.person_id === 'p_a')!.seen_at, '2026-09-01T00:00:00.000Z', 'a level change reset the read mark');
 
-  /* Even through the drop-and-restore, which is the path that deletes the row outright. */
+  /* AND THE MECHANISM IS `ON CONFLICT … SET level`, not a carried column. A previous pass added a
+     fourth column to copy `seen_at` across a delete, and it was dead code for a defect that did not
+     exist — the `'*'` row is deleted only when `level` is ABSENT, and in that branch `'*'` is not
+     re-inserted. Reverting the carry left this test green, which is how it was found. The clause is
+     what this asserts, so widening the `DO UPDATE SET` is what fails it. */
+  value(invite(deps, 'p_root', { person: 'p_a', level: 'decide' }));
+  assert.equal(members(sql).find((m) => m.person_id === 'p_a')!.seen_at, '2026-09-01T00:00:00.000Z');
+
+  /* Dropping the record level does take the mark with it, and that is right: the mark is ON that
+     row, and somebody holding only named registers has not read the record. */
   value(invite(deps, 'p_root', { person: 'p_a', registers: { payroll: 'read' } }));
   value(invite(deps, 'p_root', { person: 'p_a', level: 'read', registers: { payroll: 'read' } }));
   assert.equal(members(sql).find((m) => m.person_id === 'p_a')!.seen_at, null, 'the record level was gone, so the mark on it is gone with it');

@@ -501,7 +501,20 @@ export const AUTH_METHODS = { passkey: true, magic: true } as const;
  * twelve with no per-deployment conditional, and `ADR-024` found that hiding items to reduce
  * clutter made feature discovery worse.
  */
-export const DEPLOYMENT = { kind: 'self-host' as const, since: day(-612) };
+/**
+ * WHICH HOST THIS RECORD IS ON — and `as const` made it a compile-time constant.
+ *
+ * `kind: 'self-host' as const` pins the literal type, so `{#if DEPLOYMENT.kind !== 'self-host'}` is
+ * statically false and every Cloud branch on every settings screen is unreachable code that
+ * `svelte-check` cannot complain about and `dead-copy` counts as rendered — a grep for
+ * `copy.<key>` finds a key inside a dead `{#if}`. Eight sentences shipped to the browser and drew
+ * nowhere, including the restore control a commit was named for.
+ *
+ * The union is the honest type: a record IS on one host or the other, and the screens branch on it.
+ * The seed can only be one of them, so the other half is exercised by `deployment.test.ts` rather
+ * than by a browser gate — which is the shape the seed-variant harness in the backlog is for.
+ */
+export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = { kind: 'self-host', since: day(-612) };
 
 /* ── backups ───────────────────────────────────────────────────────────────── */
 
@@ -566,7 +579,11 @@ export const SNAPSHOTS_KEPT = 30;
  */
 export const SIGNING_KEY = {
   keyId: '9f2c41ab7e05d38c',
-  publicKey: 'Zk8vQ3RhbXBlZC1wdWJsaWMta2V5LWZvci10aGUtc3R1ZGlv',
+  /* FORTY-THREE CHARACTERS, which is what 32 bytes of base64url is. It was 48 — 36 bytes of ASCII
+     text spelling a sentence — under a test whose own message said "a 32-byte key is ~43 base64url
+     characters" and whose range admitted it anyway. A key of the wrong length on the screen a person
+     copies it from is a key that fails `braindog verify` and teaches them the tool is broken. */
+  publicKey: 'k3Zq7Nl9xBvR2sTfW8yUcAe4Hj1MpDoQzL5aXgVn0iY',
   since: day(-612),
 };
 

@@ -298,8 +298,15 @@
 <div class="sr-only" role="status" aria-live="polite"></div>
 
 <style>
+  /* 127x41 ON EVERY ROUTE, and it is the first target a keyboard user reaches. It sat four pixels
+     under `13 §7`'s floor for the life of the build, on the control whose entire audience is people
+     who cannot use a pointer — and the layout gate could not see it, because the scan was scoped to
+     `#main` and the shell is not in it. */
   .skip {
     position: fixed;
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
     inset-block-start: var(--sp-2);
     inset-inline-start: var(--sp-2);
     z-index: var(--z-hint);

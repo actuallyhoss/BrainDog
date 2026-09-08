@@ -535,8 +535,13 @@
     color: var(--ink2);
   }
 
+  /* 262x28 ON A PHONE — the palette's only text field, sixteen pixels under the rule, on the surface
+     `19 §4` makes the primary way to reach a row. `controls.css` carries a paragraph about 28px
+     being exactly this mistake. Two gates missed it: it is outside `#main`, and while the `<dialog>`
+     is closed it measures 0x0 and is filtered as not-on-screen. */
   .p-input {
     flex: 1;
+    min-block-size: var(--ctl-h);
     min-inline-size: 0;
     border: 0;
     border-radius: var(--r-sm);

@@ -134,8 +134,9 @@ for (const width of widths) {
    * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
    *
    * `05 §6` and `13 §7`: density follows the POINTER, never the width — `--ctl-h` is 44 on a coarse
-   * pointer and 32 on a fine one. A gate that only ever emulated a mouse could measure every width
-   * this product has and never once see the size a thumb gets.
+   * pointer and **36** on a fine one, measured in the built page. (Two comments in this repo say 32,
+   * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
+   * measure every width this product has and never once see the size a thumb gets.
    */
   const context = await browser.newContext({
     viewport: { width, height: L.viewportHeightPx },
@@ -227,7 +228,10 @@ for (const width of widths) {
           return [Math.max(r.width, Number.isFinite(w) ? w : 0), Math.max(r.height, Number.isFinite(h) ? h : 0)];
         };
         const small = [];
-        for (const el of document.querySelectorAll('#main button, #main a[href], #main [role="button"], #main input:not([type="hidden"]), #main select, #main summary')) {
+        /* THE WHOLE DOCUMENT, not `#main`. Scoping to the main region excused the shell — the skip
+           link, which is the first target a keyboard user reaches on every route, and the palette's
+           own text field. A target is a target wherever it is drawn. */
+        for (const el of document.querySelectorAll('button, a[href], [role="button"], input:not([type="hidden"]), select, summary')) {
           if (el.closest('[hidden], [aria-hidden="true"]')) continue;
           const [w2, h2] = box(el);
           if (w2 === 0 || h2 === 0) continue;

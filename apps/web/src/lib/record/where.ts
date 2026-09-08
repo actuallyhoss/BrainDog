@@ -49,7 +49,7 @@ import type { Entry } from './schema.ts';
 
 export type Clause =
   | { field: string; op: 'is' | 'is not'; values: string[] }
-  | { field: string; op: 'before' | 'after'; day: string };
+  | { field: string; op: 'before' | 'after' | 'on'; day: string };
 
 export type Where = {
   /** The register it was compiled against. A value means nothing without one. */
@@ -300,6 +300,31 @@ export function compile(register: string, where: string | undefined): Where {
       continue;
     }
 
+    /**
+     * `is <a date>` ON A DATE FIELD IS A DATE COMPARISON, and it was a string comparison.
+     *
+     * `due is today` matched **nothing**, on every register, always — the value went through
+     * `formsOf`, which compares against the raw store (`2026-09-03`) and against `display()`
+     * (`3 Sep 2026`), and `today` is neither. `before` and `after` had a date path from the day they
+     * were written and `is` never got one, so the one date filter a person types by hand was the one
+     * that could not work.
+     *
+     * IT ALSO MADE `display()` LOAD-BEARING IN A PLACE IT MUST NOT BE. `last_seen is today` DID match
+     * while `display()` happened to render an instant as `relative()` — so a filter's meaning was a
+     * side effect of a formatting choice, and it broke the day that formatter learned to say
+     * `3h ago`. A filter that depends on how a cell is printed is a filter nobody can reason about.
+     *
+     * The date path is taken only when the FIELD is a date and the value resolves as one, so an enum
+     * whose value is literally the word `today` is untouched.
+     */
+    const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
+    const dated = decl?.type === 'day' || decl?.type === 'instant';
+    const one = rest.trim();
+    if (dated && !/\s+or\s+/i.test(rest) && resolveDay(one, Date.now()) !== null) {
+      clauses.push({ field, op: 'on', day: one });
+      continue;
+    }
+
     /* ` or ` and not `|`, because the person reading this is reading a sentence. */
     const values = rest.split(/\s+or\s+/i).map((v) => v.trim()).filter(Boolean);
 
@@ -356,7 +381,12 @@ export function matches(entry: Entry, w: Where, now: number): boolean {
     if (typeof raw !== 'string' || !raw) return false;
     const day = resolveDay(c.day, now);
     if (day === null) return false;
-    return c.op === 'before' ? raw.slice(0, 10) < day : raw.slice(0, 10) > day;
+    /* THE DAY THE VALUE FALLS ON, for all three. `before` and `after` are exclusive of the day named
+       — `34 §6` — and `on` is the day itself, which is what makes `due before today or due is
+       today` say what it looks like it says. An instant is compared by its date, because a person
+       asking for today means the day and not the second. */
+    const at = raw.slice(0, 10);
+    return c.op === 'before' ? at < day : c.op === 'after' ? at > day : at === day;
   });
 }
 

@@ -66,6 +66,21 @@ export function project(
  */
 export function ftsQuery(q: string): string | null {
   const words = q
+    /**
+     * NFC FIRST, because a combining mark is a token separator to `unicode61` and a person pasting
+     * from a Mac does not know that.
+     *
+     * `unicode61` normalises nothing. A stored `mañana` — one codepoint for `ñ`, which is what every
+     * database and every keyboard produces — tokenises to `manana` under `remove_diacritics 2`. The
+     * same word typed or pasted DECOMPOSED is `n` + U+0303, and the mark is not a letter, so this
+     * built `"man"* AND "ana"*`: two tokens, and no match for a query that is character-for-character
+     * the stored value.
+     *
+     * macOS filenames are NFD by design, and several IMEs emit it. So the reachable case is somebody
+     * pasting a name out of Finder into a search box and being told the record does not hold it.
+     * Composing first makes the two spellings one query.
+     */
+    .normalize('NFC')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
     .split(/\s+/)

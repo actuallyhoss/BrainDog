@@ -14,7 +14,7 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import Button from '$lib/ui/Button.svelte';
-  import { relative } from 'braindog-render';
+  import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { AUDIT, DOM_CAP, NOW, PAGES, actorOf } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
@@ -202,7 +202,7 @@
               <a class="target tap" href={href(e.target)}>{targetOf(e.target)}</a></span>
           </span>
           <span class="line-amount note">{e.note}</span>
-          <span class="line-when">{relative(e.at.slice(0, 10), NOW)}</span>
+          <span class="line-when">{since(e.at, NOW)}</span>
         </div>
       </li>
     {/each}

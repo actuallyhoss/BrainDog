@@ -13,7 +13,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { parse, relative, TONES } from 'braindog-render';
+  import { parse, relative, since, TONES } from 'braindog-render';
   import { Block, Degraded } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import * as pref from '$lib/pref.ts';
@@ -165,7 +165,7 @@
                 <span class="line-detail">{q.cost}</span>
               </span>
               <span class="line-amount"></span>
-              <span class="line-when">{relative(q.opened.slice(0, 10), NOW)}</span>
+              <span class="line-when">{since(q.opened, NOW)}</span>
             </a>
           </li>
         {/each}
@@ -256,7 +256,7 @@
                    disclosed, so the badge imposes the cost without buying anything (19 §6). -->
               <span class="event-by">{actorOf(item.by)}</span>
               <span class="event-text">{item.text}</span>
-              <span class="event-when">{relative(item.at.slice(0, 10), NOW)}</span>
+              <span class="event-when">{since(item.at, NOW)}</span>
             </a>
           </li>
         {/each}

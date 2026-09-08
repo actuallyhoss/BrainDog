@@ -146,7 +146,17 @@ test('AND THE FOLD IS THE RECORD\u2019S FOLD, MEASURED AGAINST A REAL FTS5 TABLE
 
   /* Latin marks fold; Arabic harakat, Greek tonos and `Ł` do not. The comment about Arabic and
      English in one record is on the migration, which makes the third row the one that matters. */
+  /* BOTH NORMALISATION FORMS OF EVERY QUERY. The browser folds through NFD and `unicode61`
+     normalises nothing, so a decomposed paste — which is what macOS produces — tokenised as two
+     words in the record and one in the browser: `mañana` typed decomposed matched here and not
+     there. `ftsQuery` composes first now, and this is the check that says both spellings are one
+     query on both sides. */
   const pairs: [string, string][] = [
+    ['mañana', 'mañana'],
+    ['mañana', 'mañana'],
+    ['mañana', 'manana'],
+    ['Ωμέγα', 'ωμέγα'],
+    ['Kraków', 'kraków'],
     ['Zurich cafe', 'zurich'],
     ['Zürich café', 'zurich'],
     ['Zürich café', 'cafe'],

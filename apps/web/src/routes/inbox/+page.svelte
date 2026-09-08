@@ -8,7 +8,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { relative } from 'braindog-render';
+  import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { DOM_CAP, INBOX, NOW } from '$lib/record/api.ts';
@@ -56,7 +56,7 @@
               <span class="line-detail">{item.from}</span>
             </span>
             <span class="line-amount"></span>
-            <span class="line-when">{relative(item.arrived.slice(0, 10), NOW)}</span>
+            <span class="line-when">{since(item.arrived, NOW)}</span>
           </button>
 
           {#if open === item.id}

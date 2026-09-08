@@ -7,7 +7,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { relative } from 'braindog-render';
+  import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED, DOM_CAP, NOW, metric } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
@@ -31,7 +31,7 @@
 
 <div class="page">
   {#if open.length === 0}
-    <Empty kind="cleared" title={copy.noQuestions} body="{copy.lastDecided} {relative(DECIDED[0]?.decided?.at.slice(0, 10) ?? '', NOW)}." />
+    <Empty kind="cleared" title={copy.noQuestions} body="{copy.lastDecided} {since(DECIDED[0]?.decided?.at ?? '', NOW)}." />
   {:else}
     <Section title={copy.openQuestions} count={open.length}>
       {#snippet aside()}
@@ -47,7 +47,7 @@
                 <span class="q-head">
                   <span class="q-id">{q.id}</span>
                   {#if q.entity}<span class="q-entity">{q.entity}</span>{/if}
-                  <span class="q-age">opened {relative(q.opened.slice(0, 10), NOW)}</span>
+                  <span class="q-age">opened {since(q.opened, NOW)}</span>
                 </span>
                 <span class="q-title">{q.title}</span>
                 <span class="q-cost">{q.cost}</span>
@@ -83,7 +83,7 @@
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{q.decided?.reason}</span>
               </span>
-              <span class="line-when">{relative(q.decided?.at.slice(0, 10) ?? '', NOW)}</span>
+              <span class="line-when">{since(q.decided?.at ?? '', NOW)}</span>
             </a>
           </li>
         {/each}

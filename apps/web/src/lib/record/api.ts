@@ -382,7 +382,11 @@ const WIDTH: Record<string, string> = {
   seq: '9ch',
   money: '15ch',
   day: '15ch',
-  instant: '20ch',
+  /* A FOSSIL SIZED FOR A STRING IT NO LONGER PRINTS. `20ch` fits `2026-09-03T11:57:00.000Z`, which
+     is what an `instant` cell rendered before `display()` learned to band one; the longest thing it
+     can say now is `55 min ago`. Ten characters of empty column, right-aligned, on every register
+     that has one. */
+  instant: '12ch',
   int: '10ch',
   decimal: '10ch',
   duration: '10ch',
