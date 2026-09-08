@@ -87,17 +87,21 @@ export function day(iso: string): string {
 }
 
 /**
- * Banded: days to about two weeks, weeks to about two months, months to a year, then years. A band
- * is what a person actually holds — nobody plans around "in 47 days".
+ * How a number of whole days is said: days to about two weeks, weeks to about two months, months to
+ * a year, then years. A band is what a person actually holds — nobody plans around "in 47 days".
+ *
+ * SHARED, because `since()` needs the same ladder past a day and the alternative is two band tables
+ * that drift. `''` for zero days, which the callers turn into their own word.
  */
+const band = (n: number): string =>
+  n === 0 ? '' : n <= 14 ? `${n}d` : n <= 60 ? `${Math.round(n / 7)}w` : n < 365 ? `${Math.round(n / 30)}mo` : `${(n / 365).toFixed(n < 730 ? 1 : 0)}y`;
+
 export function relative(iso: string, now: number = Date.now()): string {
   const t = noon(iso);
   if (t === null) return iso;
   const days = Math.round((t - now) / 86_400_000);
-  const n = Math.abs(days);
-  const size =
-    n === 0 ? 'today' : n <= 14 ? `${n}d` : n <= 60 ? `${Math.round(n / 7)}w` : n < 365 ? `${Math.round(n / 30)}mo` : `${(n / 365).toFixed(n < 730 ? 1 : 0)}y`;
-  if (size === 'today') return 'today';
+  const size = band(Math.abs(days));
+  if (size === '') return 'today';
   return days > 0 ? `in ${size}` : `${size} ago`;
 }
 
@@ -121,19 +125,43 @@ export function relative(iso: string, now: number = Date.now()): string {
  * Past a day it hands over to `relative()` rather than growing a second set of bands, so one date
  * cannot be said two ways by two functions.
  *
- * A string that is neither an instant nor a day comes back unchanged, which is `relative()`'s own
- * contract: a formatter must never invent a time it was not given.
+ * A string that is neither an instant nor a day comes back unchanged. That is `relative()`'s own
+ * contract — a formatter must never invent a time it was not given — and it is weaker here than it
+ * reads, because `Date.parse` accepts far more than an instant: `'2026'` and `'Sept 8'` both parse
+ * to real dates. Nothing in this product hands it either, and the honest statement is that this
+ * rejects what `Date.parse` rejects rather than what a person would call malformed.
+ *
+ * THREE BOUNDARIES A REVIEW MEASURED AND FOUND WRONG, each one comparison apart:
+ *
+ *   · `Math.round(mins / 5) * 5` is **60** at 58 and 59 minutes, so the ladder read
+ *     *55 min → 60 min → 1h* — two spellings of an hour, one of them in the band that is supposed to
+ *     stop below it.
+ *   · `Math.round(1439 / 60)` is 24, so 23h59m read **"24h ago"** beside a real day.
+ *   · The handover past a day threw the time of day away — `slice(0, 10)` and then `relative()`,
+ *     which anchors at noon — so an instant exactly 24 hours old, read at midnight, said **"today"**.
+ *     That is the failure this function exists to end, surviving one band further out. It counts
+ *     whole days from the real gap now and shares `relative()`'s ladder rather than delegating to it.
  */
 export function since(iso: string, now: number = Date.now()): string {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return relative(iso, now);
   if (DAY.test(iso)) return relative(iso, now);
+
   const ms = t - now;
   const n = Math.abs(ms);
-  if (n >= 86_400_000) return relative(new Date(t).toISOString().slice(0, 10), now);
   if (n < 60_000) return 'just now';
+
   const mins = Math.round(n / 60_000);
-  const size = mins < 15 ? `${mins} min` : mins < 60 ? `${Math.round(mins / 5) * 5} min` : `${Math.round(mins / 60)}h`;
+  /* Capped at the top of each range rather than rounded past it, so no band ever spells the one
+     above it. `Math.round` alone gave `60 min` and `24h`. */
+  const size =
+    mins < 15
+      ? `${mins} min`
+      : mins < 60
+        ? `${Math.min(55, Math.round(mins / 5) * 5)} min`
+        : n < 86_400_000
+          ? `${Math.min(23, Math.round(mins / 60))}h`
+          : band(Math.round(n / 86_400_000));
   return ms > 0 ? `in ${size}` : `${size} ago`;
 }
 

@@ -26,6 +26,7 @@
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, labelOf, list, noticed, PAGE, PAGES, readableFields, REGISTERS, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { searchable } from '$lib/record/find.ts';
   import type { Entry } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
@@ -484,9 +485,21 @@
    */
   const siftable = $derived(!arriving && result.total >= ENOUGH_TO_SIFT);
 
-  /** Where a field that is not an enum IS filtered: the column's sort, or the search box. */
-  /** The fields the search box matches, named where the search box is. */
-  const searched = $derived(filterable.filter((f) => f.type !== 'enum' && kindOf(f) === 'search').map(labelOf));
+  /**
+   * THE FIELDS THE BOX ACTUALLY MATCHES, READ FROM THE DECLARATION.
+   *
+   * This derived them from `filterable` — indexed, non-enum, non-numeric — which is a different set
+   * from `search: true`, and after the box became the `matches` operator it was a set with almost
+   * nothing in common. Measured on the shipped seed, the note under the box read *"Party and Project
+   * are matched by the search box"* on `obligations`, where the only searchable field is `what`, and
+   * *"Project and Track"* on `tasks`, where it is also `what` alone. Typing a project name found
+   * nothing under a sentence promising it would.
+   *
+   * A sentence explaining the interface is against the house rule to begin with; one that explains
+   * it wrongly teaches somebody the product is smaller than it is — which is the argument its own
+   * sibling was deleted for.
+   */
+  const searched = $derived(searchable(id).map(labelOf));
 
   const kindOf = (f: { type: string }): 'search' | 'sort' =>
     f.type === 'money' || f.type === 'int' || f.type === 'decimal' || f.type === 'day' || f.type === 'instant'
@@ -1048,7 +1061,9 @@
         query={emptyKind === 'no-results' ? [q, saidPlainly(id, whereOf(filters))].filter(Boolean).join(' · ') : undefined}
         body={emptyKind === 'no-data-yet'
           ? `${decl.name} holds ${decl.holds}.`
-          : undefined}
+          : emptyKind === 'no-results' && q
+            ? copy.searchesOnly(searched)
+            : undefined}
         agentPrompt={emptyKind === 'no-data-yet'
           ? `read my record, then add every ${decl.one} you find`
           : undefined}

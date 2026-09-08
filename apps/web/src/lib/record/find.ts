@@ -39,13 +39,20 @@ import type { Entry, FieldDecl } from './schema.ts';
 /**
  * The fields a register says are worth searching, in declared order.
  *
- * `fts.ts`: `if (!f.search || f.retired) continue`. A `secret` never reaches here because it never
- * reaches a projection at all — the record indexes what a key opens, never the key.
+ * `fts.ts`, both halves: `if (!f.search || f.retired) continue`. The `retired` half was missing here
+ * and the key was missing from the app's `FieldDecl` entirely, so a retired searchable field went on
+ * answering queries in the browser and stopped answering them in the record — the same defect as the
+ * missing `search` key, on the same line of the same file this comment quotes.
+ *
+ * AND `secret` IS BELT AND BRACES rather than the dead branch it reads as. A `secret` should never
+ * carry `search: true`; if one ever does, the record's projection would index the value of a
+ * credential, and this is the layer that would put it on a results page. `secret-grep` guards the
+ * record and this guards the screen.
  */
 export function searchable(register: string): FieldDecl[] {
   const reg = REGISTERS[register];
   if (!reg) return [];
-  return reg.fields.filter((f) => f.search === true && f.type !== 'secret');
+  return reg.fields.filter((f) => f.search === true && f.retired !== true && f.type !== 'secret');
 }
 
 /**
@@ -65,6 +72,9 @@ export function projected(register: string, entry: Entry): string {
   for (const f of searchable(register)) {
     const shown = display(register, f.id, entry.fields[f.id]);
     if (shown === null) continue;
+    /* Whitespace collapsed and trimmed, exactly as `projectedText` does it: a value typed across two
+       lines is one run of words to the tokeniser, and an empty one is dropped rather than leaving a
+       blank line, which is a token boundary that means nothing. */
     const text = shown.replace(/\s+/gu, ' ').trim();
     if (text) lines.push(text);
   }
@@ -80,12 +90,32 @@ export function projected(register: string, entry: Entry): string {
  * *no matches*.
  */
 export function terms(q: string): string[] | null {
-  const words = q
-    .toLowerCase()
+  const words = fold(q)
     .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
     .split(/\s+/u)
     .filter(Boolean);
   return words.length ? words : null;
+}
+
+/**
+ * Lower case and no diacritics — what the record's own index does, and this did not.
+ *
+ * `0001_kernel.ts` builds `entry_fts` with `tokenize = 'unicode61 remove_diacritics 2'`, under a
+ * comment about Arabic and English in one record. So FTS5 finds *Zürich* by typing `zurich` and this
+ * found it only by typing `Zürich` — a divergence a differential test over the seed cannot see,
+ * because the seed's non-ASCII is em-dashes and arrows. It is the ONE property of the record's
+ * tokeniser this file did not have, and it is the one that decides whether somebody with an accent
+ * in their name is findable.
+ *
+ * NFD then drop the combining marks: `ü` is `u` + U+0308, and U+0308 is in `\p{M}`.
+ *
+ * A `function` AND NOT A `const`, and `tokensOf` too. `data.ts` calls `answers()` while its own
+ * module body is still evaluating — the run-log receipts count the way the record counts — and
+ * `data.ts` and `find.ts` import each other, so a `const` arrow here is in its temporal dead zone
+ * when that call lands. A hoisted declaration is not. The cycle is deliberate and this is its cost.
+ */
+function fold(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/\p{M}+/gu, '');
 }
 
 /**
@@ -94,13 +124,14 @@ export function terms(q: string): string[] | null {
  * Exported because the questions group has no declaration to read and still has to answer the same
  * query the same way — a word that means one thing in eight groups and another in the ninth is a
  * query nobody can reason about.
+ *
+ * IT IS LITERALLY `terms()`, and being able to say that is the point: a review pinned `terms`
+ * against `ftsQuery` and left this one unpinned, and the sentence above claims they tokenise
+ * identically. Two functions that must agree and one of them checked is how they stop agreeing.
  */
-export const tokensOf = (text: string): string[] =>
-  text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
-    .split(/\s+/u)
-    .filter(Boolean);
+export function tokensOf(text: string): string[] {
+  return terms(text) ?? [];
+}
 
 /**
  * Does this row answer that query?

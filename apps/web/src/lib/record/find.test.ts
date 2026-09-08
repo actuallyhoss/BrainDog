@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { ftsQuery, projectedText } from '@braindog/kernel';
 
 import { answers, projected, searchable, terms, tokensOf, why } from './find.ts';
-import { REGISTERS, ROWS, applyFilters, display, search } from './api.ts';
+import { QUESTIONS, DECIDED, REGISTERS, ROWS, applyFilters, display, search } from './api.ts';
 import type { Entry } from './schema.ts';
 
 const rows = (...fields: Record<string, unknown>[]): Entry[] => fields.map((f, i) => ({ seq: i + 1, fields: f }) as Entry);
@@ -37,6 +37,20 @@ test('THE SEARCHABLE FIELDS ARE THE DECLARED ONES, AND THE APP CAN NOW SEE THEM'
      of its seven fields are searchable, and one of the two is not the title. */
   assert.deepEqual(searchable('services').map((f) => f.id), ['name', 'provider']);
   assert.ok(searchable('services').length < (REGISTERS.services?.fields.length ?? 0));
+
+  /* AND THE FLAG IS `=== true`, not truthy, and not ignored. Dropping the `search` test entirely or
+     loosening it to `!!f.search` both stayed green, because every field in the seed either declares
+     `true` or declares nothing — so a probe field is what makes the difference visible. */
+  const decl = REGISTERS.services!;
+  const held = decl.fields;
+  (decl as { fields: unknown }).fields = [...held, { id: 'probe', type: 'text' }, { id: 'probe2', type: 'secret', search: true }];
+  try {
+    const ids = searchable('services').map((f) => f.id);
+    assert.ok(!ids.includes('probe'), 'a field declaring nothing was searched');
+    assert.ok(!ids.includes('probe2'), 'a SECRET declaring `search: true` was searched, and it would be printed on a results page');
+  } finally {
+    (decl as { fields: unknown }).fields = held;
+  }
 });
 
 test('A REGISTER WHOSE TITLE IS NOT SEARCHABLE HOLDS ROWS NOBODY CAN FIND BY NAME', () => {
@@ -74,20 +88,51 @@ test('the projection is the kernel’s, string for string', () => {
   assert.ok(checked >= 90, `only ${checked} rows were compared, so this proves very little`);
 });
 
+/**
+ * FOLDING, WHICH THE RECORD DOES ONE LAYER LOWER THAN `ftsQuery`.
+ *
+ * `0001_kernel.ts` builds `entry_fts` with `tokenize = 'unicode61 remove_diacritics 2'`, so FTS5
+ * strips the marks off both the stored text and the query at match time; `ftsQuery` only quotes the
+ * words. A browser with no tokeniser has to do it itself, before the words are terms — so the
+ * comparison is against `ftsQuery` OF THE FOLDED QUERY, which is the string FTS5 is effectively
+ * matching. Comparing against the raw one asserts that the browser does not fold, which is the
+ * defect.
+ */
+const folded = (q: string) => q.toLowerCase().normalize('NFD').replace(/\p{M}+/gu, '');
+
 test('the tokeniser is the kernel’s too', () => {
   /* `ftsQuery` is the whole of what the record does with what was typed: lower-case, strip
      everything that is not a letter/number/space, split, and prefix-match each word. Comparing
      against the query STRING it builds is the honest check — a reimplementation that drifted on
      punctuation or on the empty case would still look right beside a prose description of it. */
-  for (const q of ['ren', 'Kiln', 'kiln.example', 're-new', '  spaced  out ', 'owed to me', 'ünicode', '2026', '']) {
+  for (const q of ['ren', 'Kiln', 'kiln.example', 're-new', '  spaced  out ', 'owed to me', 'ünicode', 'Zürich café', '2026', '']) {
     const mine = terms(q);
-    const theirs = ftsQuery(q);
+    const theirs = ftsQuery(folded(q));
     if (mine === null) {
       assert.equal(theirs, null, `\`${q}\`: the browser found no query and the record found one`);
       continue;
     }
     assert.equal(mine.map((w) => `"${w}"*`).join(' AND '), theirs, `\`${q}\` tokenises differently`);
   }
+});
+
+test('AND A NAME WITH AN ACCENT IN IT IS FINDABLE WITHOUT ONE', () => {
+  /* `remove_diacritics 2` is on the index, under a comment about Arabic and English in one record.
+     So the record finds *Zürich* by `zurich` and this found it only by `Zürich` — invisible to a
+     differential test over the seed, whose non-ASCII is em-dashes and arrows, and decisive for
+     anybody whose name has a mark in it. */
+  const row = rows({ what: 'Zürich café renewal' })[0]!;
+  for (const q of ['zurich', 'Zürich', 'cafe', 'café', 'ZURICH'])
+    assert.equal(answers('obligations', row, q), true, `\`${q}\` did not find \`Zürich café renewal\``);
+  assert.equal(answers('obligations', row, 'zurick'), false, 'folding turned into a fuzzy match');
+});
+
+test('and `tokensOf` is the same function as `terms`, rather than a copy that says it is', () => {
+  /* The comment claimed both sides tokenise identically, `terms` was pinned against `ftsQuery`, and
+     this one was pinned by nothing — so the half the questions group uses could drift on
+     punctuation, on case or on folding while the assertion above stayed green. */
+  for (const text of ['Renewals due', 'kiln.example', 'Zürich café', '  ', '', 'owed_to_me'])
+    assert.deepEqual(tokensOf(text), terms(text) ?? []);
 });
 
 /* ── prefix, not substring ────────────────────────────────────────────────── */
@@ -179,25 +224,84 @@ test('a row found by something other than its title says which', () => {
     if (h.title.toLowerCase().includes('kiln')) assert.equal(h.why, undefined, `${h.title} explained a match anybody can see`);
 });
 
-test('why() names a searchable field and never the title', () => {
-  const some = rows({ name: 'kiln.example', provider: 'Nordhaven Registry', note: 'renewed by hand' })!;
-  assert.equal(why('services', some[0]!, 'nordhaven', 'kiln.example'), 'Nordhaven Registry');
-  assert.equal(why('services', some[0]!, 'kiln', 'kiln.example'), null, 'the title answered and it explained anyway');
-  assert.equal(why('services', some[0]!, 'renewed', 'kiln.example'), null, '`note` is not searchable and was offered as the reason');
+test('why() NAMES THE FIELD THAT ANSWERED, not the first one it looked at', () => {
+  /**
+   * Five of six mutations to `why()` survived, and the reason is one register: `services` has
+   * exactly one non-title searchable field, so *"the first one"* and *"the one that matched"* were
+   * the same string and nothing could tell them apart. A fixture with TWO of them can.
+   *
+   * `why()` also has to use the same matcher as `answers()`. A row is in the list because `answers`
+   * put it there; if `why` decides with `includes` or with `some` instead of `every`, it explains
+   * the row with a field that did not answer — which is the two-matchers-disagreeing failure this
+   * whole file exists to end, one function further in.
+   */
+  const decl = REGISTERS.services!;
+  const held = decl.fields;
+  /* A second searchable non-title field, put back at the end. The alternative is asserting against
+     whichever register happens to have two, which is a fixture nothing guarantees. */
+  (decl as { fields: unknown }).fields = [...held, { id: 'note', type: 'text', label: 'Note', search: true }];
+  try {
+    const row = rows({ name: 'kiln.example', provider: 'Nordhaven Registry', note: 'renewed by Tallow in March' })[0]!;
+    assert.equal(why('services', row, 'nordhaven', 'kiln.example'), 'Nordhaven Registry');
+    /* THE SECOND ONE, which is the assertion that could not fail before. */
+    assert.equal(why('services', row, 'tallow', 'kiln.example'), 'renewed by Tallow in March', 'it named the first searchable field rather than the one that matched');
+    /* Both terms must be in ONE field, the way `answers` requires them in one row — no, in one row:
+       a reason that spans two fields is not a reason either of them gives. */
+    assert.equal(why('services', row, 'nordhaven tallow', 'kiln.example'), null, 'it offered a field that answered half the query');
+    /* A PREFIX, never a substring: `answers` finds `ren` in `renewed` and not in `children`, and a
+       reason found by `includes` would explain rows that are not in the list. */
+    assert.equal(why('services', row, 'allow', 'kiln.example'), null, '`why` matched the middle of a token');
+    assert.equal(why('services', row, 'kiln', 'kiln.example'), null, 'the title answered and it explained anyway');
+  } finally {
+    (decl as { fields: unknown }).fields = held;
+  }
+  const plain = rows({ name: 'kiln.example', provider: 'Nordhaven Registry', note: 'renewed by hand' })[0]!;
+  assert.equal(why('services', plain, 'renewed', 'kiln.example'), null, '`note` is not searchable and was offered as the reason');
+});
+
+test('a retired field answers nothing, in the browser as in the record', () => {
+  /* `fts.ts`: `if (!f.search || f.retired) continue`. The app's `FieldDecl` had no `retired` key at
+     all, so a retired searchable field went on answering here and stopped answering there. */
+  const decl = REGISTERS.services!;
+  const held = decl.fields;
+  (decl as { fields: unknown }).fields = [...held, { id: 'note', type: 'text', search: true, retired: true }];
+  try {
+    assert.ok(!searchable('services').some((f) => f.id === 'note'), 'a retired field is still searched');
+    assert.equal(answers('services', rows({ name: 'kiln.example', note: 'tallow' })[0]!, 'tallow'), false);
+  } finally {
+    (decl as { fields: unknown }).fields = held;
+  }
 });
 
 /* ── and the words are the same words everywhere ──────────────────────────── */
 
-test('the questions group answers the same query the same way', () => {
-  /* A question is not a register row and has no declaration to read. It used to use `includes()`
-     while every other group used the declaration, so one query meant two things on one screen. */
-  const found = search('ren', 9_999);
-  const decide = found.groups.find((g) => g.kind === 'Decide');
-  for (const h of decide?.hits ?? [])
-    assert.ok(
-      tokensOf(h.title).some((t) => t.startsWith('ren')),
-      `a question matched \`ren\` on nothing that starts with it: ${h.title}`,
-    );
+test('THE QUESTIONS GROUP ANSWERS THE SAME QUERY THE SAME WAY', () => {
+  /**
+   * A question is not a register row and has no declaration to read. It used `includes()` while every
+   * other group read the declaration, so one query meant two things on one screen — and the test
+   * written for that could not fail: it asserted every `ren` hit starts a token, and no question
+   * title on the seed contains `ren` mid-word, so `includes` and `startsWith` gave the same answer.
+   *
+   * A query that IS a mid-word substring of a question title is the whole check.
+   */
+  const mid = [...QUESTIONS, ...DECIDED].flatMap((q) =>
+    tokensOf(q.title).flatMap((tok) => (tok.length > 4 ? [tok.slice(2, 5)] : [])),
+  );
+  assert.ok(mid.length > 0, 'no question title has a word long enough to have a middle');
+  for (const q of mid.slice(0, 12)) {
+    const decide = search(q, 9_999).groups.find((g) => g.kind === 'Decide');
+    for (const h of decide?.hits ?? [])
+      assert.ok(
+        tokensOf(h.title).some((tok) => tok.startsWith(q)),
+        `\`${q}\` matched the middle of a word in a question title: ${h.title}`,
+      );
+  }
+
+  /* AND A QUESTION IS STILL FOUND BY ITS SPOKEN ID, whole, which is the one thing about that group
+     that is not a text match — and was untested. */
+  const one = [...QUESTIONS, ...DECIDED][0]!;
+  const byId = search(one.id, 9_999).groups.find((g) => g.kind === 'Decide');
+  assert.ok(byId?.hits.some((h) => h.spoken === one.id), `${one.id} does not resolve as a spoken id`);
 });
 
 test('display() is what is searched, so an enum reads as the words it shows', () => {

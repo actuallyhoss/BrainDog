@@ -318,7 +318,19 @@ export const copy = {
      to begin with; one that explains it wrongly teaches somebody the product is smaller than it is.
      Sorting is a fact about the table, and the table says it — every header is a button. */
   filterBySearch: (fields: string[]): string =>
-    `${list(fields)} ${fields.length === 1 ? 'is' : 'are'} matched by the search box.`,
+    `The box searches ${list(fields)}.`,
+  /**
+   * AND THE EMPTY STATE SAYS IT TOO, because that is where somebody is when it matters.
+   *
+   * The box is `34 §6`'s `matches` operator over the register's `search:` fields, which is narrower
+   * than the scan it replaced — rightly, per `fts.ts` (*"an index over everything answers every query
+   * with everything"*), and at a cost: an amount, a state word or a counterparty's name that used to
+   * find rows now finds none. Enum words are recoverable from the chips in the same bar. A REF is
+   * not: `party` and `thing` have no chip and no other text surface, so *"38 rows, none matching:
+   * halden"* over a list where nine rows are Halden's is a dead end unless the screen says where the
+   * words it does read come from.
+   */
+  searchesOnly: (fields: string[]): string => `This box reads ${list(fields)}. For anything else, use the filters above.`,
 
   displayOptions: 'Display',
   display: 'Display',

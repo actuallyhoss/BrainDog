@@ -10,7 +10,7 @@
  * for `lib/data/call.ts` is the whole of what the wiring costs.
  */
 
-import { day as fmtDay, money, relative, integer, MISSING } from 'braindog-render';
+import { day as fmtDay, money, relative, since, integer, MISSING } from 'braindog-render';
 
 import { amountOf, currencyOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
@@ -284,7 +284,16 @@ export function display(register: string, field: string, value: unknown): string
     case 'day':
       return `${fmtDay(String(value))}`;
     case 'instant':
-      return relative(String(value).slice(0, 10), NOW);
+      /**
+       * `since`, NOT A DAY WITH THE TIME CUT OFF.
+       *
+       * This was `relative(String(value).slice(0, 10), NOW)` — the truncation every caller in the
+       * app had learned to write, because `relative()` takes a day and hands back its argument when
+       * given anything else. So the miss was hidden and the time went with it: `sessions.last_seen`
+       * and `updates.at` are instants, and a session seen two hours ago and one seen eleven hours
+       * ago both read *today*. One formatter, on the one function every cell goes through.
+       */
+      return since(String(value), NOW);
     case 'int':
       return integer(Number(value));
     case 'duration': {
@@ -504,7 +513,9 @@ export function applyFilters(register: string, entries: Entry[], filters: Filter
    * This filtered on `display()` over EVERY field, which is the shape `fts.ts` opens by ruling out,
    * and it is why the door on `/search` landed somewhere else: the page counted title matches and
    * linked to a list matching everything. Both sides read the declaration now; `find.ts` is the one
-   * matcher, and `search.test.ts` asserts the two answers are the same set.
+   * matcher, and `find.test.ts`'s *"EVERY GROUP'S COUNT IS THE NUMBER OF ROWS ITS OWN DOOR LANDS
+   * ON"* asserts the two answers are the same set. (This named `search.test.ts`, which asserts no
+   * such thing — a miscitation inside the comment written to fix a miscitation.)
    */
   if (q) out = out.filter((e) => answers(register, e, q));
   return out;
@@ -1659,7 +1670,11 @@ export type SearchHit = {
 };
 
 /**
- * Everything in the record whose title contains what was typed.
+ * Everything in the record that answers what was typed — by the declaration, not by the title.
+ *
+ * THIS HEADING SAID "whose title contains" for a version and a half after it stopped being true. The
+ * correction went in forty-eight lines below, inside the loop, which is the append-a-correction shape
+ * this codebase keeps finding: a reader who stops at the summary has read the old behaviour.
  *
  * THE CUT IS TAKEN ACROSS THE SOURCES, NOT INSIDE THE FIRST ONE. This returned from inside the
  * register loop the moment it hit the cap, and the palette asks for eight — so `obligations`, first
@@ -1738,6 +1753,25 @@ export function search(q: string, limit = 24): SearchResult {
        same way, over the one piece of text a question has. The id still resolves whole. */
     if (want.every((w) => tokensOf(q2.title).some((t) => t.startsWith(w))) || q2.id.toLowerCase() === needle)
       questions.push({ title: q2.title, detail: q2.decided ? 'Decided' : 'Open question', href: `/decide/${q2.id}`, kind: 'Decide', icon: 'decide', spoken: q2.id });
+  /**
+   * AND THE PAGES, because the screen's own sentence promised them.
+   *
+   * `/search`'s empty state reads *"Every list, every decision, and every page — by the words in
+   * them"*, and this function walked registers and questions. So `renewals` and `overview` — both
+   * page titles the palette finds one keystroke away — answered *"Nothing in the record matches"* on
+   * the surface `19 §2` calls the structured fallback for when the palette was not enough. The
+   * promise shipped as the route became a first-class destination, which is the worst moment for it
+   * to be false.
+   *
+   * No door: `/p/*` is not a filtered list, so the group discloses its cap in a sentence like the
+   * questions do.
+   */
+  const found: SearchHit[] = [];
+  for (const [slug, p] of Object.entries(pages()))
+    if (p.nav && p.placed !== false && want.every((w) => tokensOf(p.title).some((t) => t.startsWith(w))))
+      found.push({ title: p.title, detail: p.nav.section, href: `/p/${slug}`, kind: 'Pages', icon: iconFor(p.icon, 'grid') });
+  if (found.length) groups.push(found);
+
   /* Questions FIRST in the rotation: a decision waiting on you is the one thing in the record that
      is about today, and it is the one source that can never be more than a handful of rows. */
   if (questions.length) groups.unshift(questions);

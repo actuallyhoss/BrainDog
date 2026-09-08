@@ -20,6 +20,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { copy } from '../copy.ts';
+  import { terms, tokensOf } from '../record/find.ts';
   import { overlays } from '../a11y/keys.svelte.ts';
   import { REGISTERS, ROWS, VIEWS, iconFor, search, type NavEntry, type SearchHit } from '../record/api.ts';
   import Kbd from '../ui/Kbd.svelte';
@@ -106,6 +107,26 @@
     total = 0;
     drawn = 0;
     const needle = text.toLowerCase();
+    /**
+     * ONE QUERY MEANS ONE THING IN THIS DIALOG, and four groups still disagreed.
+     *
+     * The records group is prefix-on-token; commands, pages, saved views and registers were
+     * `.toLowerCase().includes(needle)`. So in one list: `ate` found *Updates*, `enew` found
+     * *Renewals*, `ing` found *Settings* and *Lapsing*, and none of those would have found a row.
+     * `api.ts`'s own comment argues the questions group had to converge because *"a query that means
+     * one thing in eight groups and another in the ninth is a query nobody can reason about"* — which
+     * is exactly as true of four groups in one dialog.
+     *
+     * `19 §7`'s rule is STRICT PREFIX for commands and destinations, so this is also what that
+     * section asks for: Raycast's rule, and the only mechanism found that keeps a growing action
+     * index from rotting.
+     */
+    const starts = (title: string) => {
+      const want = terms(text);
+      if (!want) return true;
+      const has = tokensOf(title);
+      return want.every((w) => has.some((tok) => tok.startsWith(w)));
+    };
     const out: Row[] = [];
 
     // Exact spoken id first, always. It is the string a person heard out loud.
@@ -118,7 +139,7 @@
     // keeps a growing action index from rotting (19 §7).
     if (prefix === null || prefix === '>') {
       const exact = COMMANDS.filter((c) => c.title.toLowerCase().startsWith(needle));
-      const rest = COMMANDS.filter((c) => !exact.includes(c) && c.title.toLowerCase().includes(needle));
+      const rest = COMMANDS.filter((c) => !exact.includes(c) && starts(c.title));
       out.push(...[...exact, ...rest].map((c) => ({ ...c, complete: c.title })));
     }
 
@@ -129,13 +150,13 @@
          from a list from a row. Both declarations already name an icon; the rail has been drawing
          them all along and this was throwing them away. */
       for (const entry of nav)
-        if (entry.title.toLowerCase().includes(needle))
+        if (starts(entry.title))
           out.push({ id: `p-${entry.id}`, title: entry.title, detail: `${entry.section} page`, href: entry.href, group: copy.pages, icon: entry.icon, complete: entry.title });
       /* THE SAVED VIEWS. `/v/<key>` is a real route with two real views on it and NOTHING in the
          app produced that address — 356 lines and eight copy keys behind a door with no handle. A
          view is a named list, which is what this section of the palette is for. */
       for (const [key, v] of Object.entries(VIEWS))
-        if (v.name.toLowerCase().includes(needle) || (REGISTERS[v.register]?.name ?? '').toLowerCase().includes(needle))
+        if (starts(v.name) || starts(REGISTERS[v.register]?.name ?? ''))
           out.push({
             id: `v-${key}`,
             title: v.name,
@@ -146,7 +167,7 @@
             complete: v.name,
           });
       for (const r of Object.values(REGISTERS))
-        if (r.name.toLowerCase().includes(needle))
+        if (starts(r.name))
           /* The count, not a definition of the word "register". A row that explains the app's own
              vocabulary is a row nobody needed, and it was doing it in every search. */
           out.push({ id: `r-${r.id}`, title: r.name, detail: `${(ROWS[r.id] ?? []).length} rows`, href: `/r/${r.id}`, group: copy.pages, icon: iconFor(r.icon, 'rows'), complete: r.name });
@@ -238,7 +259,10 @@
        and reading it does not subscribe to anything. Reading `flat` subscribes to `rows`, which is
        what recomputes it. Delete this line and the announcement freezes on the first query. */
     void flat;
-    const said = drawn === 0 ? '' : copy.showingOf(drawn, total);
+    /* AND A LIST WITH ROWS IN IT SAYS SOMETHING. `drawn` counts record hits, so `>` and `/` — which
+       never produce any — announced nothing at all, permanently, on a dialog full of results. The
+       count is about the record's answer when there is one and about the list when there is not. */
+    const said = drawn > 0 ? copy.showingOf(drawn, total) : flat.length > 0 ? copy.showingOf(flat.length, flat.length) : '';
     const t = setTimeout(() => (announced = said), 250);
     return () => clearTimeout(t);
   });

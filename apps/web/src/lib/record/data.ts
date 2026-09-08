@@ -41,6 +41,9 @@ export { LOOKUPS, NOW, TODAY } from '@braindog/seed';
 export const PAGES = SEED_PAGES as unknown as Record<string, PageDecl>;
 import { NOW } from '@braindog/seed';
 import type { Counted } from '@braindog/kernel';
+/* `find.ts` reads `REGISTERS` from this module; the cycle is fine in ESM because `answers` is only
+   called at render time, and it is the point — the receipts count the way the record counts. */
+import { answers } from './find.ts';
 
 /** The eight registers, as this app types them. The seed's shape is a superset of this one. */
 export const REGISTERS = SEED_REGISTERS as unknown as Record<string, RegisterDecl>;
@@ -347,17 +350,19 @@ const counted = (register: string, keep: (e: Entry) => boolean): string => {
  * is a receipt: `10 §7` has the refusal teach, and a receipt that reports a count the record cannot
  * produce is a receipt nobody can check.
  *
- * `search` matches on the title field only (`api.ts`), which is what an agent's `search` tool does,
- * so this counts the same way rather than a way that flatters the number.
+ * `search` reads the register's `search:` fields (`find.ts`), which is what an agent's `search` tool
+ * does, so this counts the same way rather than a way that flatters the number — and it counts it by
+ * CALLING that matcher rather than by carrying a third copy of one.
+ *
+ * IT HELD ITS OWN `title.includes()`, which stopped agreeing with the record the day the box became
+ * `34 §6`'s `matches` operator, and the sentence above is precisely the argument against that: a
+ * receipt reporting a count the record cannot produce is a receipt nobody can check.
  */
 const searched = (needle: string): string => {
-  const want = needle.toLowerCase();
   let rows = 0;
   let lists = 0;
   for (const [id, entries] of Object.entries(ROWS)) {
-    const title = REGISTERS[id]?.title;
-    if (!title) continue;
-    const hit = entries.filter((e) => String(e.fields[title] ?? '').toLowerCase().includes(want)).length;
+    const hit = entries.filter((e) => answers(id, e, needle)).length;
     if (hit) {
       rows += hit;
       lists++;
@@ -394,7 +399,13 @@ export const JOBS: Record<string, Job> = {
          have. The input says what the agent would actually write. */
       { seq: 1, tool: 'list', input: 'things where lane is earning', out: counted('things', (e) => e.fields.lane === 'earning'), ok: true },
       { seq: 2, tool: 'read', input: 'tracks#1', out: 'Variable axis QA — nine instances', ok: true },
-      { seq: 3, tool: 'search', input: 'mastering pass', out: searched('mastering pass'), ok: true },
+      /* A GETTER, so the count is taken when a screen reads it rather than while this module is
+         still evaluating. `searched()` now calls the record's own matcher, which lives in `find.ts`,
+         which reads `REGISTERS` from here — a deliberate cycle, and an eager call inside it lands in
+         the temporal dead zone of whichever module ESM happened to start second. Deferring the call
+         to first read is the whole fix, and it is also more honest: a receipt is a thing the screen
+         asks for. */
+      { seq: 3, tool: 'search', input: 'mastering pass', get out() { return searched('mastering pass'); }, ok: true },
     ],
   },
 };
@@ -417,7 +428,7 @@ export const JOB: Job = {
       ok: true,
     },
     { seq: 3, tool: 'read', input: 'inbox since 2026-08-01', out: arrivals(), ok: true },
-    { seq: 4, tool: 'search', input: 'Fenwick', out: searched('Fenwick'), ok: true },
+    { seq: 4, tool: 'search', input: 'Fenwick', get out() { return searched('Fenwick'); }, ok: true },
     { seq: 5, tool: 'propose', input: 'merge services#6 and services#13 — same provider, same renewal', out: 'PROPOSAL_UNCITED — a proposal must attach the rows it read', ok: false },
     {
       seq: 6,

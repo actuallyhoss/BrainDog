@@ -908,9 +908,15 @@
                 <span class="who-detail">
                   {copy.keyCan[t.scope] ?? t.scope} · {copy.overSurface(t.surface)}
                 </span>
+                <!-- `since` FOR THE INSTANT AND `relative` FOR THE DAYS, and the mixture is the
+                     point rather than an inconsistency: `created` and `expires` are days and
+                     `lastUsed` is an instant. This row had `relative` on all three, so it printed
+                     `made 4w ago · used 2026-09-03T10:00:00.000Z · ends in 8w` — the same defect the
+                     commit above it was written to fix, ninety lines further down the same block,
+                     found by a review rather than by me. -->
                 <span class="who-detail">
                   {copy.madeWhen(relative(t.created, NOW))} ·
-                  {t.lastUsed ? copy.usedWhen(relative(t.lastUsed, NOW)) : copy.neverUsed} ·
+                  {t.lastUsed ? copy.usedWhen(since(t.lastUsed, NOW)) : copy.neverUsed} ·
                   {copy.endsWhen(relative(t.expires, NOW))}
                 </span>
                 <span class="who-do">

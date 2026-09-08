@@ -68,7 +68,7 @@ test('THE SAME QUESTION BUILT IN A DIFFERENT KEY ORDER IS THE SAME QUESTION', ()
 
 test('and a genuinely different question still refuses the cursor', () => {
   /* The guard has to keep refusing, or normalising the key would have replaced one silent wrong
-     answer with another. Three ways to be different: the filter, the query, the order. */
+     answer with another. Four ways to be different: the filter, the query, the order, the field. */
   const first = page({ filters: [{ field: 'state', op: 'in', values: ['open'] }] });
   assert.ok(first.cursor);
   for (const opts of [
@@ -78,6 +78,46 @@ test('and a genuinely different question still refuses the cursor', () => {
     { filters: [{ field: 'direction', op: 'in', values: ['open'] }] },
   ])
     assert.equal(page({ ...opts, cursor: first.cursor }).stale, true, `a cursor resolved into ${JSON.stringify(opts)}`);
+});
+
+test('EVERY PART OF THE QUESTION IS IN THE KEY, AND THREE OF THEM WERE NOT CHECKED', () => {
+  /**
+   * A review dropped `register`, dropped `q`, and dropped the filter `.sort()` from `questionKey`
+   * one at a time and every test stayed green. The `q` case looked covered by the test above and was
+   * not: adding `q: 'kiln'` SHRINKS the answer, so the cursor row is gone and `cursorAt` returns
+   * `-1` whatever the key says. The assertion was true and proved nothing — the third time that
+   * shape has appeared on this tree.
+   *
+   * A question that differs ONLY in the part being tested, over a set that still contains the cursor
+   * row, is the check. Each pair below matches the same rows in the same order.
+   */
+  /* `limit: 1`, so the cursor lands on a row BOTH queries below contain — the whole point of the
+     fixture is that `cursorAt` can resolve it either way. */
+  const wide = list('obligations', { limit: 1, q: 'r' });
+  assert.ok(wide.cursor, 'the fixture no longer pages');
+
+  /* `register`: the same cursor, the same shape of question, a different list. */
+  assert.equal(list('services', { limit: 1, q: 'r', cursor: wide.cursor }).stale, true, '`register` is not in the key');
+
+  /* `q`: TWO QUERIES THAT BOTH CONTAIN THE CURSOR ROW, so `cursorAt` can find it either way and only
+     the key can tell them apart. That is what the assertion above could not do — adding a query
+     shrank the answer, the row was gone, and `-1` came back whatever the key said. */
+  const held = wide.entries[wide.entries.length - 1]!;
+  const other = list('obligations', { limit: 200, q: 'a' });
+  assert.ok(other.entries.some((e: Entry) => e.seq === held.seq), 'the two queries do not overlap on the cursor row, so this proves nothing');
+  assert.equal(list('obligations', { limit: 1, q: 'a', cursor: wide.cursor }).stale, true, '`q` is not in the key');
+
+  /* TWO FILTERS, because one cannot detect a sort. The same pair in both orders is the same
+     question, and a key that does not sort them makes it two. */
+  const pair = [
+    { field: 'state', op: 'in' as const, values: ['open', 'part', 'paid'] },
+    { field: 'direction', op: 'in' as const, values: ['owed_to_me', 'owed_by_me'] },
+  ];
+  const asIs = list('obligations', { limit: 2, filters: pair });
+  assert.ok(asIs.cursor, 'the two-filter fixture no longer pages');
+  const flipped = list('obligations', { limit: 2, filters: [pair[1]!, pair[0]!], cursor: asIs.cursor });
+  assert.equal(flipped.stale, false, 'the same two filters in the other order were a different question');
+  assert.ok(flipped.entries.length > 0);
 });
 
 test('an ordering flip is still stale, which is the row-skip this guard was built for', () => {
@@ -111,12 +151,14 @@ test('`⇥` CANNOT LAND ON A ROW THAT IS NOT A COMPLETION', () => {
   assert.doesNotMatch(overflow[0], /complete/u, 'the overflow row became completable again');
 });
 
-test('the announced count is the record’s answer, not every row in the dialog', () => {
+test('the announced count is the record’s answer when there is one, and the list when there is not', () => {
   /* `flat.length` counted the command rows, the register destinations and the overflow row itself —
      the sentence whose whole job is to say the answer was cut, counted as one of the things it was
-     counting. */
-  assert.match(PALETTE, /copy\.showingOf\(drawn, total\)/u, 'the status line counts rows again');
-  assert.doesNotMatch(PALETTE, /copy\.showingOf\(flat\.length/u);
+     counting. And then `drawn === 0 ? ''` went too far the other way: `>` and `/` never produce a
+     record hit, so a dialog full of results announced nothing at all, permanently. */
+  assert.match(PALETTE, /drawn > 0 \? copy\.showingOf\(drawn, total\)/u, 'the status line counts rows again');
+  assert.match(PALETTE, /flat\.length > 0 \? copy\.showingOf\(flat\.length, flat\.length\)/u, 'a list of pages or commands announces nothing');
+  assert.doesNotMatch(PALETTE, /const said = flat\.length === 0/u);
 });
 
 test('and `@` compares against people, not against the whole record', () => {

@@ -122,7 +122,12 @@
                   <span class="line-title">{hit.title}</span>
                 </span>
                 <span class="line-amount"></span>
-                <span class="line-when">{hit.detail}</span>
+                <!-- WHY IT IS HERE, and this page needed it more than the palette did. `nordhaven`
+                     draws four services named after none of it, because `services.provider` is
+                     declared searchable — and this column showed the state instead. The palette got
+                     the fix and the results page, which is where somebody goes when the palette's
+                     ranked list was not enough, did not. -->
+                <span class="line-when">{hit.why ?? hit.detail}</span>
               </a>
             </li>
           {/each}

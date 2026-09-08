@@ -45,6 +45,16 @@ export type FieldDecl = {
    */
   search?: boolean;
   /**
+   * THE FIELD IS STILL DECLARED AND IS NO LONGER READ — the key on the same line of `fts.ts`.
+   *
+   * `if (!f.search || f.retired) continue`. The `search` half was added here after a review found
+   * the mirror could not see it, under the sentence *"a key the mirror cannot see is the same defect
+   * as a key the record accepts and ignores"* — and `retired` was left out of the same fix, on the
+   * same line of the same file it quotes. A retired searchable field goes on answering queries in
+   * the browser and stops answering them in the record.
+   */
+  retired?: boolean;
+  /**
    * This day is a DEADLINE: a date the row is measured against, so past it is late.
    *
    * Opt-in, and it has to be, because the row's tone was taken from the first indexed `day` field

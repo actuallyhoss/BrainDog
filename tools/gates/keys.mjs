@@ -96,10 +96,20 @@ const focusFirstCell = async (page) => {
  */
 const RECIPES = {
   'palette-slash': { route: '/', press: ['/'] },
-  /* Every destination the row names, from a route that is none of them — otherwise the letter that
-     lands where you already are reports itself dead. */
+  /**
+   * Every destination the row names, from a route that is none of them AND HAS NO BARE BINDINGS OF
+   * ITS OWN.
+   *
+   * It ran on `/r/obligations`, where `p` is `peek` and `v` is `display` on the grid's own key
+   * handler — and the layout's `g`-armed branch `return`s without `stopPropagation`, so the grid
+   * fires too and the snapshot changes whatever the chord did. Measured: deleting `p` and `v` from
+   * the chord map left the gate reporting **18 checked, 0 dead**. Two of the seven letters could not
+   * fail, on the gate written to make exactly that impossible.
+   *
+   * `/decide` binds nothing bare, so a change there is the navigation and nothing else.
+   */
   goto: {
-    runs: ['h', 'd', 'i', 's', 'v', 'p', ','].map((letter) => ({ route: '/r/obligations', press: ['g', letter] })),
+    runs: ['h', 'd', 'i', 's', 'v', 'p', ','].map((letter) => ({ route: '/decide', press: ['g', letter] })),
   },
   'goto-nav': { route: '/inbox', press: ['g', '1'] },
   help: { route: '/', press: ['?'] },
