@@ -53,6 +53,23 @@ const CASES = [
   { gate: 'css-rules', expect: /findings/, findings: 1 },
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
+
+  /* THE FOUR HALVES OF `graph`, ONE FIXTURE EACH. A gate with three checks and one fixture is a
+     gate with one check under test and two that have never been asked to fire — and this one's
+     three are independent: a cycle is found in the manifests, an undeclared import in the source,
+     and a relative escape in a specifier that resolves outside its own package.
+
+     EACH FIXTURE CARRIES ITS OWN `docs/31-STACK.md`, because the gate reads the order out of the
+     document rather than holding a copy of it. A fixture without one has no order at all, every
+     package in it is unranked, and all four would go red for the same wrong reason.
+
+     `graph-cycle` names its seeded file TWICE on purpose: a cycle inside a total order always
+     contains an edge that points up it, so the same manifest line is reported by the cycle check
+     and by the direction check. Two findings is the honest number. */
+  { gate: 'graph-cycle', run: 'graph', expect: /cycle —/, findings: 2 },
+  { gate: 'graph-direction', run: 'graph', expect: /points up the order/, findings: 1 },
+  { gate: 'graph-undeclared', run: 'graph', expect: /undeclared import/, findings: 1 },
+  { gate: 'graph-escape', run: 'graph', expect: /cross-package relative import/, findings: 1 },
   { gate: 'secret-grep', expect: /reaches a log/, findings: 1 },
   /* THE SAME LEAK UNDER THE NAME THE CODE USES. `52 §6`'s example is `console.log(plaintext)` and no
      file here has ever held a variable called that; the key hierarchy calls its secrets `plain`,

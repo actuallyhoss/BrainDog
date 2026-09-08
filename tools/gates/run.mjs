@@ -36,6 +36,11 @@ const GATES = [
   /* The banned surface: one kernel, three runtimes, and a source file that imports a driver has
      chosen one of them. Cheap and early, beside the other greps. */
   ['stack', ['node', [join(here, 'stack.mjs')]]],
+
+  /* THE OTHER HALF OF `31 §3`. `stack` is layer 4 — the runtime surface a package may not name.
+     This is layers 3 and 5: the seventeen-row order, acyclicity, and the relative import that
+     climbs out of its own package, which pnpm resolves happily and which nothing else can see. */
+  ['graph', ['node', [join(here, 'graph.mjs')]]],
   /* THE ONE THAT GUARDS THE PROMISE THE PRODUCT IS BUILT ON: a credential never goes in the record,
      and never in a log. It is a grep, so it belongs beside the other greps and costs nothing. */
   ['secret-grep', ['node', [join(here, 'secret-grep.mjs')]]],

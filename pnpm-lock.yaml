@@ -35,6 +35,10 @@ importers:
       '@braindog/record':
         specifier: workspace:*
         version: link:../../packages/record
+    devDependencies:
+      '@braindog/client':
+        specifier: workspace:*
+        version: link:../../packages/client
 
   apps/site:
     dependencies:
@@ -137,10 +141,6 @@ importers:
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports
-    devDependencies:
-      '@braindog/selfhost':
-        specifier: workspace:*
-        version: link:../../apps/selfhost
 
   packages/declare:
     dependencies:

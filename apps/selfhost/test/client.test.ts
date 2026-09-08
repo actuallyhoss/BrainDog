@@ -4,6 +4,12 @@
  * There is no mock here on purpose. A client tested against a fake is a client that agrees with the
  * fake, and the two places this one has to be right — the verb it picks and the shape it hands back —
  * are exactly the two a fake would get wrong in the same way the client does.
+ *
+ * AND IT LIVES WITH THE SERVER RATHER THAN WITH THE CLIENT. It was `packages/client/test/`, which
+ * gave `@braindog/client` a devDependency on `@braindog/selfhost` and a relative import that climbed
+ * three directories out of the package into an app — `31 §1`: a package may name a capability, only
+ * an app may name a runtime, and that package named one. The test is unchanged; the only thing that
+ * moved is which side of the boundary it sits on, which is the side that has the runtime.
  */
 
 import { test } from 'node:test';
@@ -14,9 +20,9 @@ import { join } from 'node:path';
 
 import { codeOf, conflicted } from '@braindog/ports';
 
-import { createClient } from '../src/index.ts';
+import { createClient } from '@braindog/client';
 import { ROUTES } from '@braindog/host';
-import { start } from '../../../apps/selfhost/src/server.ts';
+import { start } from '../src/server.ts';
 
 const OBLIGATIONS = {
   id: 'register.obligations',

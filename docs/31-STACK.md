@@ -58,8 +58,18 @@ paths above — `cloudflare:*`, `process`, `Buffer`, `__dirname`, and bare `fetc
 ```
 
 **Acyclicity is proved by exhibiting a total order** in which every package's dependencies have
-strictly lower indices — a cycle would require an edge that increases the index. Thirteen packages,
-then the four apps; apps import packages and never each other:
+strictly lower indices — a cycle would require an edge that increases the index. Sixteen packages,
+then the five apps; apps import packages and never each other.
+
+THIS TABLE HAD SEVENTEEN ROWS AND THE TREE HAS TWENTY-ONE WORKSPACES. `skin`, `seed`, `client` and
+`site` were built, wired into the apps, and named nowhere in the order — so the proof above covered
+a graph that was not the graph, and the four packages whose direction nothing could check were the
+four nobody had thought about. Found by `tools/gates/graph.mjs`, which is what the gate is for: an
+order stated in prose is a claim, and a claim about a package it does not name is not even wrong.
+
+A row marked *(unbuilt)* is specified and not yet in the tree; the rank is reserved so the packages
+around it do not renumber when it arrives. `Depends on` is measured from the manifests, and a
+devDependency is an edge — a build-time import is an import.
 
 | # | Package | Depends on |
 |---|---|---|
@@ -67,21 +77,25 @@ then the four apps; apps import packages and never each other:
 | 2 | `ports` | — |
 | 3 | `where` | 2 — the `Refusal` type only ([ADR-065](16-DECISIONS.md)) |
 | 4 | `theme` | — |
-| 5 | `fixtures` | — |
-| 6 | `kernel` | 2, 3 |
-| 7 | `declare` | 1, 3 — and 2 for the `Refusal` type; its one runtime dependency, `yaml`, sits behind `./yaml` ([ADR-063](16-DECISIONS.md)) |
-| 8 | `extract` | 3 — and 2 for the `Refusal` type |
-| 9 | `record` | 2, 3, 4, 6, 7, 8 — `./directory` is a subpath, not a package |
-| 10 | `mcp` | 6 (types), 9 (types) — the wrapper sits above what it wraps |
-| 11 | `spark` | 2, 3, 9 — Phase B7; ports `{ Sql, Clock, Inference }`, hosted by `apps/worker/src/do/spark.ts` |
-| 12 | `connect` | 2, 8, 9 |
-| 13 | `host` | 2, 6, 9, 10, 11, 12 — platform-neutral ([ADR-064](16-DECISIONS.md)) |
-| 14 | `web` | 1, 3, 4, 9 (types) — `theme` in the editor's own chunk |
-| 15 | `cli` | 1, 2, 3, 6, 7, 11 — `11` for `@braindog/spark/prompts` and nothing else of it |
-| 16 | `worker` | 1–4, 7–13 — and `web`'s `build/` as the asset directory, never an import |
-| 17 | `selfhost` | 1–4, 6–13 — and `web`'s `build/` as the asset directory, never an import |
+| 5 | `skin` | 4, at build time only — `scripts/theme.mjs` solves the palette and writes `house.css` and `alpha.css`. No JavaScript ships from this package; both apps import its CSS |
+| 6 | `fixtures` | — *(unbuilt)* |
+| 7 | `kernel` | 2, 3 |
+| 8 | `declare` | 2, 7 — and `yaml` behind `./yaml` ([ADR-063](16-DECISIONS.md)). **7 is the edge the boundary table below says must not exist**; see the note under it |
+| 9 | `extract` | 2, 3 *(unbuilt)* |
+| 10 | `seed` | 2, 3, 7, 8 — the demonstration record, as declarations. A devDependency of `web` and of nothing that ships |
+| 11 | `record` | 1, 2, 3, 7, 8 — `./directory` is a subpath, not a package. **1 is the other edge the boundary table forbids** |
+| 12 | `mcp` | 2, 11 (types) — the wrapper sits above what it wraps |
+| 13 | `spark` | 2, 3, 11 *(unbuilt)* — Phase B7; ports `{ Sql, Clock, Inference }`, hosted by `apps/worker/src/do/spark.ts` |
+| 14 | `connect` | 2, 9, 11 *(unbuilt)* |
+| 15 | `host` | 2, 11 — platform-neutral ([ADR-064](16-DECISIONS.md)) |
+| 16 | `client` | 2, 15 — the typed client, and the third way into the route table |
+| 17 | `web` | 1, 4, 5, 7, 10 — `render` and `skin` at build time, `seed` for the demonstration record |
+| 18 | `site` | 5 — the marketing site is the same design system with fewer screens, and imports nothing else |
+| 19 | `cli` | 1, 2, 3, 7, 8, 13 *(unbuilt)* — `13` for `@braindog/spark/prompts` and nothing else of it |
+| 20 | `worker` | 2, 7, 11, 15 — and `web`'s `build/` as the asset directory, never an import |
+| 21 | `selfhost` | 2, 7, 11, 15, 16 — `16` is a devDependency: the client's integration test runs against this server, because the test needs a runtime and only an app may name one |
 
-**Twelve workspaces at the §1b shape, fifteen at the end of Phase A, seventeen at platform.** The
+**Sixteen workspaces in the tree today, twenty-one at platform.** The
 order is also the build order, so `pnpm -r run build` reproduces it for free. *(An earlier draft had
 no `spark` package, then no `connect` row and no `host`; and it placed `mcp` below `record`, which
 put the wrapper under the thing it wraps — iteration 2 swapped them, [ADR-064](16-DECISIONS.md).)*
@@ -101,6 +115,26 @@ put the wrapper under the thing it wraps — iteration 2 swapped them, [ADR-064]
 | **The Directory is `@braindog/record/directory`** | a fourteenth package for tables that share `record`'s port, schema discipline and tests ([51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D10) |
 | **`record` ⇏ `render`** | markup in the record, and therefore markup in the `.dog` |
 | **`fixtures` is a devDependency everywhere** | 402 lines of one person's seed data shipping in a bundle — the exact defect the clean room exists to avoid |
+
+**Two of those absences are not absent.** The order above permits both, because both point down
+it, so `graph` is green on them and the table is where the disagreement lives:
+
+- **`declare` → `kernel`** — `packages/declare/src/index.ts` imports `KINDS`, `digest` and `jcs`.
+  The row says the absence prevents *"`braindog pack lint` needing a database"*, and a pack does
+  still lint offline: the three imports are constants and pure functions, and nothing in that path
+  opens one. But the edge is declared in the manifest, so the argument now rests on what `kernel`
+  happens to export rather than on a boundary — and the day somebody adds a database call behind
+  one of those three names, nothing says so.
+- **`record` → `render`** — `packages/record/src/index.ts` imports `PRIMITIVES_VERSION`. The row
+  says the absence prevents *"markup in the record, and therefore markup in the `.dog`"*, and a
+  version constant is not markup. It is also the edge into the **MIT** package, which is the one
+  boundary here with a legal consequence — and it points the safe way (`render` has in-degree 0
+  still, because this is an edge OUT of it, not in).
+
+Both are the same shape: a boundary stated as an absence, holding today because of what is on the
+other end. `52 §5.2`'s algorithm is the order and only the order, so a gate built from it cannot see
+either — which is written down here rather than fixed, because closing them means moving two
+constants and that is a decision, not a chore.
 
 ### The one compromise, named
 
