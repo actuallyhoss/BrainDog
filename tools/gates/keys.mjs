@@ -85,12 +85,22 @@ const focusFirstCell = async (page) => {
  * How each bare binding is exercised, by id.
  *
  * `press` is a list of Playwright key names, sent in order — which is how a SEQUENCE is tested at
- * all: `g` on its own arms a prefix and changes nothing anybody can see, so `goto` presses `g` then
- * `h` and the change is the navigation.
+ * all: `g` on its own arms a prefix and changes nothing anybody can see, so a `goto` run presses `g`
+ * then a letter and the change is the navigation.
+ *
+ * `runs` IS THE PLURAL, AND IT EXISTS BECAUSE ONE RUN WAS NOT ENOUGH. The registry advertises
+ * `g then h d i s v p ,` — seven destinations on one row — and this gate proved the row by pressing
+ * `g h` and nothing else. So `s` could be deleted from the chord map and 344 tests, `dead-copy` and
+ * this gate all stayed green, which is the exact defect it was written to make impossible: *"a key we
+ * print that nothing binds"*. A row that advertises seven letters is checked on seven letters.
  */
 const RECIPES = {
   'palette-slash': { route: '/', press: ['/'] },
-  goto: { route: '/r/obligations', press: ['g', 'h'] },
+  /* Every destination the row names, from a route that is none of them — otherwise the letter that
+     lands where you already are reports itself dead. */
+  goto: {
+    runs: ['h', 'd', 'i', 's', 'v', 'p', ','].map((letter) => ({ route: '/r/obligations', press: ['g', letter] })),
+  },
   'goto-nav': { route: '/inbox', press: ['g', '1'] },
   help: { route: '/', press: ['?'] },
 
@@ -192,26 +202,33 @@ for (const row of rows) {
     await page.addInitScript(() => {
       addEventListener('keydown', (e) => e.key === 'y' && e.stopImmediatePropagation(), true);
     });
-  await page.goto(`http://localhost:${PORT}${recipe.route}`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
-  await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-  if (recipe.setup) await recipe.setup(page).catch(() => {});
-  await page.waitForTimeout(140);
+  /* One recipe or several — a row that advertises several keys is proved on each of them, and a
+     single dead letter fails the row. */
+  const runs = recipe.runs ?? [recipe];
+  let alive = 0;
+  for (const run of runs) {
+    await page.goto(`http://localhost:${PORT}${run.route}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+    await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+    if (run.setup) await run.setup(page).catch(() => {});
+    await page.waitForTimeout(140);
 
-  const before = await page.evaluate(SNAPSHOT);
-  for (const k of recipe.press) {
-    await page.keyboard.press(k);
-    await page.waitForTimeout(160);
-  }
-  const after = await page.evaluate(SNAPSHOT);
+    const before = await page.evaluate(SNAPSHOT);
+    for (const key of run.press) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(160);
+    }
+    const after = await page.evaluate(SNAPSHOT);
 
-  if (before === after) {
-    dead.push(`${row.id} (${row.scope}) — the sheet prints "${row.key}"; ${recipe.press.join(' then ')} on ${recipe.route} changes nothing`);
-    process.stdout.write('!');
-  } else {
-    process.stdout.write('.');
+    if (before === after) {
+      dead.push(`${row.id} (${row.scope}) — the sheet prints "${row.key}"; ${run.press.join(' then ')} on ${run.route} changes nothing`);
+      process.stdout.write('!');
+    } else {
+      alive++;
+      process.stdout.write('.');
+    }
   }
-  checked++;
+  if (alive === runs.length) checked++;
   await context.close();
 }
 

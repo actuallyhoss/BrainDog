@@ -37,6 +37,20 @@
     keys?: string | undefined;
     icon?: IconName | undefined;
     spoken?: string | undefined;
+    /**
+     * WHAT `⇥` TURNS THE QUERY INTO, when this row is one a query can become.
+     *
+     * Absent means completion skips the row. It has to be a field rather than a rule about titles,
+     * because the row that broke this HAS a title — the overflow row reads *All 484 matches for
+     * “ren”*, and pressing `⇥` on it wrote that sentence into the box and dropped the list to
+     * *Nothing matches*. The comment above it asserted that could not happen, on the grounds that
+     * *"completion reads `flat[cursor]` only when the row carries a `title` a query can become"* —
+     * which was a description of a guard that was never written. This is the guard.
+     *
+     * `19 §7`'s Raycast rule is the whole reason `⇥` exists here, and this file's own header names
+     * losing a half-typed query as the failure it is copied to avoid.
+     */
+    complete?: string | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -51,6 +65,11 @@
     { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, keys: 'g v', icon: 'vault' },
     { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, keys: 'g p', icon: 'packs' },
     { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, keys: 'g ,', icon: 'settings' },
+    /* THE ONE `g`-CHORD THE SHORTCUT TEACHER DID NOT TEACH. `g s` was bound, the `?` sheet
+       advertised it, and `/search` appeared in no nav, no tab bar, no More sheet and not here — so
+       typing `sear` found nothing, and on a phone the route was reachable only from the palette's
+       overflow row, which is to say only from inside the cap it exists to relieve. */
+    { id: 'c-search', title: copy.search, href: '/search', group: copy.destinations, keys: 'g s', icon: 'search' },
     { id: 'c-audit', title: copy.audit, href: '/audit', group: copy.destinations, icon: 'clock' },
       { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, keys: '?', icon: 'keyboard' },
   ];
@@ -68,13 +87,24 @@
     return { prefix, text: prefix ? raw.slice(1).trim() : raw };
   });
 
-  /* How many rows the record matched, beside how many are drawn. Set inside `rows` so one search
-     runs per keystroke rather than two, and read by the status line below. */
+  /**
+   * How many rows the record matched, beside how many of them are drawn.
+   *
+   * BOTH NUMBERS USED TO BE THE WRONG ONES. The numerator was `flat.length` — every row in the
+   * list, command rows and register destinations and the overflow row itself — so `ren` announced
+   * *14 of 484* over twelve record hits. The denominator ignored the prefix, so `@ha` announced
+   * *2 of 5*: the `@` filter had narrowed the list to people and the total still counted the rows
+   * it had just excluded. The honest answer there is *2 of 2*.
+   *
+   * Set inside `rows` so one search runs per keystroke rather than two.
+   */
   let total = 0;
+  let drawn = 0;
 
   const rows = $derived.by((): Row[] => {
     const { prefix, text } = parsed;
     total = 0;
+    drawn = 0;
     const needle = text.toLowerCase();
     const out: Row[] = [];
 
@@ -89,7 +119,7 @@
     if (prefix === null || prefix === '>') {
       const exact = COMMANDS.filter((c) => c.title.toLowerCase().startsWith(needle));
       const rest = COMMANDS.filter((c) => !exact.includes(c) && c.title.toLowerCase().includes(needle));
-      out.push(...exact, ...rest);
+      out.push(...[...exact, ...rest].map((c) => ({ ...c, complete: c.title })));
     }
 
     if (prefix === null || prefix === '/') {
@@ -100,7 +130,7 @@
          them all along and this was throwing them away. */
       for (const entry of nav)
         if (entry.title.toLowerCase().includes(needle))
-          out.push({ id: `p-${entry.id}`, title: entry.title, detail: `${entry.section} page`, href: entry.href, group: copy.pages, icon: entry.icon });
+          out.push({ id: `p-${entry.id}`, title: entry.title, detail: `${entry.section} page`, href: entry.href, group: copy.pages, icon: entry.icon, complete: entry.title });
       /* THE SAVED VIEWS. `/v/<key>` is a real route with two real views on it and NOTHING in the
          app produced that address — 356 lines and eight copy keys behind a door with no handle. A
          view is a named list, which is what this section of the palette is for. */
@@ -113,12 +143,13 @@
             href: `/v/${key}`,
             group: copy.pages,
             icon: 'filter',
+            complete: v.name,
           });
       for (const r of Object.values(REGISTERS))
         if (r.name.toLowerCase().includes(needle))
           /* The count, not a definition of the word "register". A row that explains the app's own
              vocabulary is a row nobody needed, and it was doing it in every search. */
-          out.push({ id: `r-${r.id}`, title: r.name, detail: `${(ROWS[r.id] ?? []).length} rows`, href: `/r/${r.id}`, group: copy.pages, icon: iconFor(r.icon, 'rows') });
+          out.push({ id: `r-${r.id}`, title: r.name, detail: `${(ROWS[r.id] ?? []).length} rows`, href: `/r/${r.id}`, group: copy.pages, icon: iconFor(r.icon, 'rows'), complete: r.name });
     }
 
     /* `@` IS PEOPLE, AND IT MATCHED NOTHING. The footer of this palette prints `@ people` and this
@@ -134,10 +165,26 @@
      */
     if ((prefix === null || prefix === '#' || prefix === '@') && text.length > 1) {
       const found = search(text, 12);
-      total = found.total;
       const kept = found.hits.filter((hit) => prefix !== '@' || hit.href.startsWith(`/r/${PEOPLE}/`));
+      /* THE TOTAL IS THE SCOPE'S, NOT THE RECORD'S. `@` narrows to one register, so the number the
+         status line compares against has to be that register's count — read off the group `search()`
+         already returns rather than recounted, so the two can never disagree. */
+      total = prefix === '@' ? (found.groups.find((g) => g.href?.startsWith(`/r/${PEOPLE}?`))?.total ?? kept.length) : found.total;
+      drawn = kept.length;
       for (const hit of kept)
-        out.push({ id: `h-${hit.href}`, title: hit.title, detail: hit.detail, href: hit.href, group: copy.records, spoken: hit.spoken, icon: hit.icon });
+        out.push({
+          id: `h-${hit.href}`,
+          title: hit.title,
+          /* AND WHY IT IS IN THE LIST, when the title does not contain what was typed. `services`
+             declares its provider searchable, so `nordhaven` now reaches three domains named after
+             none of it — useful, and unreadable without the reason. */
+          detail: hit.why ?? hit.detail,
+          href: hit.href,
+          group: copy.records,
+          spoken: hit.spoken,
+          icon: hit.icon,
+          complete: hit.title,
+        });
 
       /**
        * AND THE OVERFLOW IS A ROW, NOT A CAPTION.
@@ -148,15 +195,21 @@
        * cannot. The shape already ships in this product at `r/[register]/[seq]`, where a capped
        * backlink list ends in `All 400 →`.
        *
-       * `⇥` completes and must never land on it, which it cannot: completion reads `flat[cursor]`
-       * only when the row carries a `title` a query can become, and this one's href is the query.
+       * `⇥` NEVER LANDS ON IT, and it used to. The row carries no `complete`, which is the guard the
+       * sentence that used to be here only described — pressing `⇥` on it wrote *All 484 matches for
+       * “ren”* into the box.
+       *
+       * AND `@` GETS ONE TOO. It was suppressed for that prefix, so a capped list of people was
+       * silent — exactly the defect being fixed for the unprefixed case, on the branch where the cap
+       * bites soonest because the filter throws most of the budget away. Its door is the people
+       * register rather than `/search`, because `@` is already a question about one list.
        */
-      if (prefix !== '@' && found.total > kept.length)
+      if (total > drawn)
         out.push({
           id: 'all',
-          title: copy.allMatches(found.total, text),
+          title: copy.allMatches(total, text),
           detail: '',
-          href: `/search?q=${encodeURIComponent(text)}`,
+          href: prefix === '@' ? `/r/${PEOPLE}?q=${encodeURIComponent(text)}` : `/search?q=${encodeURIComponent(text)}`,
           group: copy.records,
           icon: 'search',
         });
@@ -176,7 +229,16 @@
   let announced = $state('');
 
   $effect(() => {
-    const said = flat.length === 0 ? '' : copy.showingOf(flat.length, total);
+    /* `drawn` AND NOT `flat.length`. The status line is about the record's ANSWER, and `flat` is
+       every row in the dialog — the commands, the destinations, and the overflow row whose entire
+       job is to say the answer was cut. Announcing *14 of 484* over twelve hits counted the
+       sentence about the cap as one of the things it was counting.
+
+       `flat` is still READ, because `drawn` is a plain variable assigned inside the `rows` derived
+       and reading it does not subscribe to anything. Reading `flat` subscribes to `rows`, which is
+       what recomputes it. Delete this line and the announcement freezes on the first query. */
+    void flat;
+    const said = drawn === 0 ? '' : copy.showingOf(drawn, total);
     const t = setTimeout(() => (announced = said), 250);
     return () => clearTimeout(t);
   });
@@ -223,10 +285,12 @@
       e.preventDefault();
       run(flat[cursor]);
     } else if (e.key === 'Tab') {
-      // Complete the query. Nothing else.
+      /* Complete the query. Nothing else — and only into a row that says what it completes to. A
+         row without `complete` swallows the key rather than passing focus out of the dialog, which
+         is what `⇥` means inside a combobox. */
       e.preventDefault();
       const top = flat[cursor];
-      if (top) q = (parsed.prefix ?? '') + top.title;
+      if (top?.complete !== undefined) q = (parsed.prefix ?? '') + top.complete;
     }
   }
 
@@ -337,8 +401,14 @@
     display: none;
   }
 
-  @media (pointer: coarse), (width < 640px) {
-    .p-count {
+  /* THE COUNT IS THE SAME COUNT ON EVERY SCREEN, and this rule was written INSIDE the phone's media
+     block. In the built CSS it came out as
+     `@media (pointer:coarse),not (min-width:640px){.p-count{…}}`, so on a desktop the number
+     rendered at `--t-ui` (15px) instead of `--t-xs` (12px), wrapped, and lost its tabular figures —
+     which is the one property a count that changes on every keystroke actually needs, because
+     proportional digits make it twitch. `css-rules` did not see it; a brace in the wrong place is
+     valid CSS. */
+  .p-count {
     margin: 0;
     color: var(--dim);
     font-size: var(--t-xs);
@@ -346,7 +416,8 @@
     white-space: nowrap;
   }
 
-  .p-esc {
+  @media (pointer: coarse), (width < 640px) {
+    .p-esc {
       display: none;
     }
 

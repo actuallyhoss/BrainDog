@@ -105,13 +105,39 @@ test('no filters and no query is the whole list, untouched', () => {
 
 /* ── search ──────────────────────────────────────────────────────────────── */
 
-test('search matches what is on the screen, not what is in the row', () => {
-  // A DELIBERATE CHOICE with a real consequence: the query runs against `display()`, so a person
-  // who reads "GBP 4,800.00" and types "4,800" finds it. Typing the stored minor units does not,
-  // and should not — nobody has ever read 480000 off this screen.
+/**
+ * THE BOX IS ONE OPERATOR AND THE REGISTER SAYS WHAT IT READS.
+ *
+ * This block used to assert the opposite, under a comment beginning *"A DELIBERATE CHOICE"* — the
+ * query ran `display()` over every field, so typing `4,800` found a money row and typing `owed to
+ * me` found an enum. Three documents say it is not that. `50 §5.2` step 6: *"text → the search box
+ * as `matches`"*. `29 §5`: *"the search box (`matches:`, FTS5 over the register's `search:`
+ * fields)"*. `34 §6`: *"over the register's `search:` fields; whole-token, case-folded"*. And
+ * `fts.ts` gives the reason the flag exists at all — *"an index over everything answers every query
+ * with everything … a search that returns the row because its `note` happens to contain ‘invoice’
+ * is a search whose results a person stops reading."*
+ *
+ * The deliberate choice was also a defect one door along: `/search` counted title matches and linked
+ * to a list matching every value, so *All 30 in Obligations →* landed on 37 rows. One matcher now,
+ * read from the declaration, and `search.test.ts` asserts the two answers are the same set.
+ *
+ * `13 §5.2`'s `no-results` state carries the cost: the register names the fields it searched, so
+ * somebody who typed an amount is told where the amount lives rather than shown an empty list.
+ */
+
+test('THE BOX READS THE DECLARATION, AND MONEY IS NOT ON IT', () => {
   const money = rows({ amount: { amount: 480_000, currency: 'GBP' } }, { amount: { amount: 96_000, currency: 'GBP' } });
-  assert.deepEqual(seqs(applyFilters('obligations', money, [], '4,800')), [1]);
+  /* Neither spelling. The rendered one used to work and the stored one never did, and a box that
+     answers one of the two is a box whose rule nobody can state. `obligations` declares `search`
+     on `what` alone. */
+  assert.deepEqual(seqs(applyFilters('obligations', money, [], '4,800')), []);
   assert.deepEqual(seqs(applyFilters('obligations', money, [], '480000')), []);
+});
+
+test('and a searchable field IS on it, whatever else the row holds', () => {
+  const some = rows({ what: 'Kiln retainer', amount: { amount: 1, currency: 'GBP' } }, { what: 'Portage invoice' });
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'kiln')), [1]);
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'portage')), [2]);
 });
 
 test('search is case-insensitive', () => {
@@ -120,13 +146,45 @@ test('search is case-insensitive', () => {
   assert.deepEqual(seqs(applyFilters('people', people, [], 'halden')), [1]);
 });
 
-test('search reaches an enum by the words it shows, not the identifier it stores', () => {
-  // `owed_to_me` renders as "owed to me", so that is what a person types.
-  assert.deepEqual(seqs(applyFilters('obligations', OBL, [], 'owed to me')), [1, 2]);
+test('IT IS A PREFIX ON WHOLE WORDS, NOT A SUBSTRING', () => {
+  /* `ftsQuery` builds `"word"*`, so a term matches the START of a token and not its middle. That is
+     the difference between finding *Renewals* by typing `ren` — which is what anybody expects — and
+     finding *children* by it, which is what `includes()` did and what makes a result list stop
+     being worth reading. */
+  const some = rows({ what: 'Renewals due' }, { what: 'The children of the estate' });
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'ren')), [1]);
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'renew')), [1]);
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'ildren')), []);
+});
+
+test('two words are AND, in any order, and need not be adjacent', () => {
+  /* `"a"* AND "b"*` is over the ROW, not over positions — so both terms must appear and neither
+     order nor adjacency is required. A box that demanded the exact phrase would refuse the way
+     people actually type, which is the important half of the word first and the qualifier after. */
+  const some = rows({ what: 'Kiln annual retainer' }, { what: 'Retainer for Portage' });
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'kiln retainer')), [1]);
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'retainer kiln')), [1]);
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'retainer')), [1, 2]);
+});
+
+test('punctuation separates rather than matching, the way FTS5 tokenises', () => {
+  /* `ftsQuery` strips everything that is not a letter, a number or a space BEFORE splitting, so
+     `kiln.example` is two tokens on both sides of the comparison and a typed dot cannot fail to
+     match a stored one. */
+  const some = rows({ what: 'kiln.example renewal' }, { what: 'Something else' });
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'kiln.example')), [1]);
+  assert.deepEqual(seqs(applyFilters('obligations', some, [], 'kiln example')), [1]);
 });
 
 test('a filter and a query are both applied', () => {
-  const out = applyFilters('obligations', OBL, [{ field: 'state', op: 'in', values: ['open'] }], 'owed to me');
+  /* Its own rows, because `OBL` carries no searchable field — which is the point of the fixture it
+     is used for and would make this test pass by matching nothing. */
+  const both = rows(
+    { state: 'open', what: 'Kiln retainer' },
+    { state: 'paid', what: 'Kiln licence' },
+    { state: 'open', what: 'Portage invoice' },
+  );
+  const out = applyFilters('obligations', both, [{ field: 'state', op: 'in', values: ['open'] }], 'kiln');
   assert.deepEqual(seqs(out), [1]);
 });
 

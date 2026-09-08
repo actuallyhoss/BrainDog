@@ -192,7 +192,6 @@
          rows held 4,001 rows and 102,681 nodes and took eight seconds to settle. -->
     {#if result.entries.length > 0 && rowsAsCards()}
       <RowCards register={view.register} entries={shown} />
-      <CapLine shown={shown.length} total={result.matched} />
     {:else}
     <div class="table-slot" class:gone={result.entries.length === 0}>
       <Table
@@ -207,10 +206,21 @@
     </div>
     {/if}
 
-    <!-- THE LIST'S OWN CAP LINE. `Table` used to draw it from `aria-rowcount`, which is `-1` while a
-         filtered list pages, so the sentence vanished in the state it exists for. -->
+    <!--
+      ONE CAP LINE, FOR WHICHEVER BODY IS DRAWING.
+
+      There were two on a phone: the cards branch drew one UNCONDITIONALLY and this one drew a second
+      at the cap, so at 2,000 rows on a narrow screen the same sentence appeared twice. The card one
+      also carried `shown.length` where this carries `DOM_CAP`, so the two could print different
+      numbers.
+
+      And the comment that used to sit here justified itself with *"`Table` used to draw it from
+      `aria-rowcount`, which is `-1` while a filtered list pages"* — true of the register, and this
+      route does not page at all and passes `result.matched`, never `-1`. It was the register's
+      reason, copied onto a screen it is not about.
+    -->
     {#if shown.length >= DOM_CAP}
-      <CapLine shown={DOM_CAP} total={result.matched} />
+      <CapLine shown={shown.length} total={result.matched} />
     {/if}
   </div>
 {/if}

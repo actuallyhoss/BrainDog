@@ -33,6 +33,18 @@ export type FieldDecl = {
   /** Only indexed fields may be filtered on, and only eight are offered (50 §5.2). */
   index?: boolean;
   /**
+   * THIS FIELD IS PART OF WHAT THE ROW IS FOUND BY — and the browser's own mirror did not have it.
+   *
+   * The seed declares it on nine fields and this type dropped it on the floor, so the app could not
+   * have read the declaration even if it had wanted to: `search()` matched titles and the register's
+   * text box matched every rendered value, and neither is what `34 §6` and `29 §5` say the record
+   * does. A declared key the mirror cannot see is the same defect as a declared key the record
+   * accepts and ignores, one layer out.
+   *
+   * `fts.ts` on why it is opt-in: *"an index over everything answers every query with everything."*
+   */
+  search?: boolean;
+  /**
    * This day is a DEADLINE: a date the row is measured against, so past it is late.
    *
    * Opt-in, and it has to be, because the row's tone was taken from the first indexed `day` field

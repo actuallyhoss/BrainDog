@@ -14,6 +14,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
+  import { onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { MISSING } from 'braindog-render';
@@ -246,6 +247,13 @@
    * Archive is page-local state that writes nothing — the record does still hold 38 — so `total` is
    * 38 and says so. What the sweep actually found is one level down and is in the backlog: a
    * destructive control in a mock-up that hides rows the record still has.
+   *
+   * A FILTER IS A DIFFERENT MATTER, and it is what `asked` below is for. `50 §5.2` step 6 makes the
+   * head's denominator the ANSWER's size while filtering — *"`Matches n of N` is exact when
+   * `cursor === null`, else `200+ of N`"* — and the head was counting against the register's size in
+   * every state. At the cap under `?q=a` it read *2,000 of 2,614* three inches above a cap line
+   * reading *Showing 2,000 of 2,545*, which is two answers to one question on one screen. Each
+   * number was defensible alone and the pair was not.
    */
   const result = $derived({
     ...found,
@@ -265,6 +273,16 @@
    * way the screen counts it.
    */
   const loaded = $derived(result.entries.length);
+
+  /**
+   * WHAT THE HEAD COUNTS AGAINST: the answer while filtering, the list otherwise.
+   *
+   * Unfiltered the two are the same number, so this changes nothing on the ordinary screen. Filtered
+   * they are not, and the head and the cap line have to be talking about the same denominator or one
+   * of them is wrong wherever they are both visible — which is exactly at the cap, the one place the
+   * cap line exists for.
+   */
+  const denominator = $derived(filters.length || q ? result.matched : result.total);
 
   /**
    * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
@@ -491,12 +509,19 @@
    * something nobody thinks of as navigation.
    *
    * THE THROTTLE ALSO PAYS FOR ITSELF ON THE OTHER SIDE. Every keystroke re-ran `applyFilters`,
-   * which formats every field of every row through `display()`; at five thousand rows that is seven
-   * full scans for one word. Scoping the scan to the register's declared search fields is the real
-   * fix and needs a `search:` key the declaration does not have yet — filed — but not doing it seven
-   * times is free.
+   * which formatted every field of every row through `display()`; at five thousand rows that was
+   * seven full scans for one word. The scan is the register's declared `search:` fields now
+   * (`find.ts`) — one or two per row instead of every one — which is both the faster answer and the
+   * one `34 §6` says the box gives.
+   *
+   * AND THE TIMER IS CANCELLED WHEN THE PAGE GOES. It was not, so a `goto` fired 150 ms after you
+   * had already clicked away, on whatever route you had arrived at: typing `rent` and clicking a nav
+   * link inside the throttle landed you on **`/inbox?q=rent`**, and clicking on from there gave
+   * `/r/services?q=rent` — a list filtered by a word typed into a different one, showing its empty
+   * state. A pending write to a URL is only ever about the page that scheduled it.
    */
   let typing: ReturnType<typeof setTimeout> | undefined;
+  onDestroy(() => clearTimeout(typing));
 
   function setQuery(value: string) {
     clearTimeout(typing);
@@ -843,7 +868,7 @@
     title={decl.name}
     count={whole ? result.matched : drawn}
     atLeast={!whole && drawn < DOM_CAP}
-    total={result.total}
+    total={denominator}
     define="list"
   >
     <!--

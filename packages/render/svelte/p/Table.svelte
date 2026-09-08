@@ -182,6 +182,19 @@
       {/if}
     </li>
   {/each}
+
+  <!-- THE PHONE PAGES TOO, and this sentinel was deleted while the grid's was kept.
+
+       It was added the day paging was built and removed the next, as collateral in a change about
+       the CAP LINE — so `Table`'s own surviving comment (*"`cap` stays here, because its other job
+       is deciding whether there is a sentinel to observe"*) was true of one body out of two. Not
+       reachable from this repository today, because the one route that pages branches on
+       `rowsAsCards()` itself and never asks this component for cards; reachable by the first caller
+       that passes `onmore` and is read on a phone, which gets a list that stops at page one with
+       nothing on screen saying so. That is the exact bug the deleted line was written for. -->
+  {#if onmore && !(cap !== undefined && rows.length >= cap)}
+    <li class="sentinel" aria-hidden="true"></li>
+  {/if}
 </ul>
 {:else}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->

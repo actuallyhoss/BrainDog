@@ -14,6 +14,7 @@ import { day as fmtDay, money, relative, integer, MISSING } from 'braindog-rende
 
 import { amountOf, currencyOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
+import { answers, terms, tokensOf, why } from './find.ts';
 import { PATHS, type IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
 import {
@@ -493,15 +494,19 @@ export function applyFilters(register: string, entries: Entry[], filters: Filter
   const w = compile(register, whereOf(filters));
   let out = filters.length ? entries.filter((e) => matches(e, w, NOW)) : entries;
 
-  if (q) {
-    const needle = q.toLowerCase();
-    out = out.filter((e) =>
-      Object.entries(e.fields).some(([k, v]) => {
-        const shown = display(register, k, v);
-        return shown ? shown.toLowerCase().includes(needle) : false;
-      }),
-    );
-  }
+  /**
+   * THE TEXT BOX IS ONE OPERATOR, AND IT IS NOT A SCAN OVER EVERY COLUMN.
+   *
+   * `50 §5.2` step 6: *"text → the search box as `matches`"*. `29 §5` says what that is — *"`matches:`,
+   * FTS5 over the register's `search:` fields"* — and `34 §6` gives the semantics: whole-token,
+   * case-folded, over the register's searchable fields.
+   *
+   * This filtered on `display()` over EVERY field, which is the shape `fts.ts` opens by ruling out,
+   * and it is why the door on `/search` landed somewhere else: the page counted title matches and
+   * linked to a list matching everything. Both sides read the declaration now; `find.ts` is the one
+   * matcher, and `search.test.ts` asserts the two answers are the same set.
+   */
+  if (q) out = out.filter((e) => answers(register, e, q));
   return out;
 }
 
@@ -1583,12 +1588,33 @@ export function list(
  * The question is part of the cursor now. `33 §2` calls a cursor opaque, and this is what opaque
  * buys: a cursor from a different question does not resolve, so the answer is `stale` — start again —
  * rather than a page from the middle of somewhere else.
+ *
+ * AND THE SAME QUESTION HASHES THE SAME WAY, WHICHEVER ORDER IT WAS BUILT IN. This was
+ * `JSON.stringify` over the options as handed in, and `JSON.stringify` preserves key order — so
+ * `{ field, op, values }` and `{ op, values, field }` were two different questions over the same 38
+ * rows in the same order, as were `values: ['open','part','paid']` and `['paid','part','open']`, and
+ * `sort: { field, dir }` and `{ dir, field }`. A caller that rebuilt its options object with a
+ * different key order got `stale` on every `more()`: refetch page one, keep the new cursor, fire the
+ * observer, `stale` again — an unbounded reset loop that never advances a row. That is precisely
+ * *"the first caller that did not reset"* the paragraph above names, arriving through the guard
+ * rather than past it.
+ *
+ * A filter is written out field by field in a fixed order; the filters and each `values` list are
+ * SORTED, because `state in (open, paid)` and `state in (paid, open)` are the same question and a
+ * reader who dragged a chip has not asked a new one.
  */
 const questionKey = (
   register: string,
   opts: { filters?: Filter[]; q?: string; sort?: { field: string; dir: 'asc' | 'desc' } },
 ): string => {
-  const said = JSON.stringify([register, opts.filters ?? [], opts.q ?? '', opts.sort ?? null]);
+  const said = JSON.stringify([
+    register,
+    (opts.filters ?? [])
+      .map((f) => [f.field, f.op, [...f.values].sort()] as const)
+      .sort((x, y) => (x[0] === y[0] ? x[1].localeCompare(y[1]) : x[0].localeCompare(y[0]))),
+    opts.q ?? '',
+    opts.sort ? [opts.sort.field, opts.sort.dir] : null,
+  ]);
   let h = 5381;
   for (let i = 0; i < said.length; i++) h = ((h * 33) ^ said.charCodeAt(i)) >>> 0;
   return h.toString(36);
@@ -1628,6 +1654,8 @@ export type SearchHit = {
   /** The glyph its own register or question type declares, so the palette need not guess. */
   icon: IconName;
   spoken?: string;
+  /** The searchable field that answered, when the title did not — `find.ts`'s `why`. */
+  why?: string;
 };
 
 /**
@@ -1668,20 +1696,31 @@ export type SearchResult = {
 
 export function search(q: string, limit = 24): SearchResult {
   const needle = q.trim().toLowerCase();
-  if (!needle) return { hits: [], total: 0, groups: [] };
+  const want = terms(q);
+  if (!want) return { hits: [], total: 0, groups: [] };
 
   const groups: SearchHit[][] = [];
 
   for (const [id, r] of Object.entries(REGISTERS)) {
     const group: SearchHit[] = [];
     for (const e of ROWS[id] ?? []) {
+      /* THE DECLARATION DECIDES, not this loop. `title.includes(needle)` could not find a row by its
+         provider or by the body of its update, and the door this function draws pointed at a list
+         that could. One matcher, read from `search:` — see `find.ts`. */
+      if (!answers(id, e, q)) continue;
       const title = String(e.fields[r.title] ?? '');
-      if (!title.toLowerCase().includes(needle)) continue;
       group.push({
         title,
         /* The register's own name is the GROUP heading these rows sit under, so repeating it on
            every row said the same word twice, eight times down the list. */
         detail: display(id, r.state ?? '', e.fields[r.state ?? '']) ?? '',
+        /* AND WHY IT IS HERE, when the title does not contain what was typed. Broadening the match
+           past the title means rows arrive under a name that does not answer the query, and a result
+           somebody cannot connect to their own typing is one they stop trusting. */
+        ...(() => {
+          const said = why(id, e, q, title);
+          return said === null ? {} : { why: said };
+        })(),
         href: `/r/${id}/${e.seq}`,
         kind: r.name,
         icon: iconFor(r.icon, 'rows'),
@@ -1693,7 +1732,11 @@ export function search(q: string, limit = 24): SearchResult {
 
   const questions: SearchHit[] = [];
   for (const q2 of [...QUESTIONS, ...DECIDED])
-    if (q2.title.toLowerCase().includes(needle) || q2.id.toLowerCase() === needle)
+    /* THE SAME TOKENISATION AS THE ROWS ABOVE. A question is not a register row and has no
+       declaration to read, but a query that means one thing in eight groups and something else in
+       the ninth is a query nobody can reason about — so the words are split and prefix-matched the
+       same way, over the one piece of text a question has. The id still resolves whole. */
+    if (want.every((w) => tokensOf(q2.title).some((t) => t.startsWith(w))) || q2.id.toLowerCase() === needle)
       questions.push({ title: q2.title, detail: q2.decided ? 'Decided' : 'Open question', href: `/decide/${q2.id}`, kind: 'Decide', icon: 'decide', spoken: q2.id });
   /* Questions FIRST in the rotation: a decision waiting on you is the one thing in the record that
      is about today, and it is the one source that can never be more than a handful of rows. */

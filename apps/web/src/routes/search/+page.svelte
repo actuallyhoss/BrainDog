@@ -16,6 +16,7 @@
   the reason the register's search box does: seven characters is not seven places you have been.
 -->
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { titleOf } from '$lib/title.ts';
@@ -40,8 +41,13 @@
 
   /* THROTTLED `replaceState`, which `19 §5` asks for by name: *"pushState for discrete intent so
      Back undoes a filter, throttled replaceState for typing"*. A history entry per keystroke makes
-     Back a character-by-character rewind of something nobody thinks of as navigation. */
+     Back a character-by-character rewind of something nobody thinks of as navigation.
+
+     AND IT IS CANCELLED WHEN THE PAGE GOES. Typing here and clicking Home inside the 150 ms landed
+     on `/?q=…` — the home screen wearing a query it has no box for. A pending write to a URL
+     belongs to the page that scheduled it and to no other. */
   let pending: ReturnType<typeof setTimeout> | undefined;
+  onDestroy(() => clearTimeout(pending));
 
   function typed(value: string) {
     clearTimeout(pending);
@@ -85,9 +91,26 @@
   {:else}
     {#each found.groups as group}
       <Section title={group.kind} count={group.total}>
+        <!--
+          A CAPPED GROUP SAYS SO WHETHER OR NOT IT HAS A DOOR.
+
+          This was `group.href && group.total > PER_LIST`, and the questions group's `href` is `null`
+          by construction — `/decide` is not a filtered list. So with fourteen matching decisions the
+          page drew *Decide 14*, ten rows, and nothing: four rows dropped in silence, on the screen
+          built because the palette dropped rows in silence. Latent on the shipped seed and live from
+          the eleventh decision.
+
+          The door is still a link where there is one. Where there is not, the same fact is a
+          sentence — which is all the reader needed: not *where the rest is*, but *that there is a
+          rest*.
+        -->
         {#snippet aside()}
-          {#if group.href && group.total > PER_LIST}
-            <a class="all" href={group.href}>{copy.allIn(group.total, group.kind)}<Icon name="arrow" size="s" /></a>
+          {#if group.total > PER_LIST}
+            {#if group.href}
+              <a class="all" href={group.href}>{copy.allIn(group.total, group.kind)}<Icon name="arrow" size="s" /></a>
+            {:else}
+              <span class="all all-noway">{copy.showingOf(PER_LIST, group.total)}</span>
+            {/if}
           {/if}
         {/snippet}
         <ul class="ledger">
@@ -110,6 +133,15 @@
 </div>
 
 <style>
+  /* THE SAME PLACE AND NOT THE SAME AFFORDANCE. A count that is not a link must not be underlined,
+     coloured as one, or take the pointer — `13 §5.2`: a control is a control, and the corollary is
+     that a thing which is not one may not dress as one. */
+  .all-noway {
+    color: var(--dim);
+    text-decoration: none;
+    cursor: default;
+  }
+
   .page {
     display: flex;
     flex-direction: column;
