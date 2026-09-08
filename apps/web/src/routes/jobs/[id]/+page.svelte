@@ -121,7 +121,10 @@
   </ol>
 
   <p class="note">
-    {copy.mockNotice} A real run polls every 700 ms while it is live and stops on a terminal status.
+    <!-- AND NOT HOW IT IS BUILT. "A real run polls every 700 ms while it is live and stops on a
+         terminal status" is `23 §7`'s explaining-the-interface, in milliseconds, to somebody
+         watching a job. -->
+    {copy.mockNotice}
   </p>
 </div>
 {/if}

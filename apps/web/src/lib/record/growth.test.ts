@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { DOM_CAP, columnsFor, list, search } from './api.ts';
+import { DOM_CAP, PAGE, columnsFor, list, search } from './api.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 import type { Entry } from './schema.ts';
 
@@ -140,20 +140,29 @@ test('a filter over five thousand rows narrows to the rows it names', () => {
  * — that wants a browser gate counting nodes per route at three record sizes, and it is filed — but
  * a route that has a cap and quietly loses it is, which is the regression this class actually has.
  */
-const CAPPED: readonly (readonly [route: string, what: string])[] = [
-  ['r/[register]/+page.svelte', 'the register grid and its phone cards'],
-  ['v/[view]/+page.svelte', 'the saved view, which is the same list'],
-  ['audit/+page.svelte', 'the log, which grows with writes'],
-  ['inbox/+page.svelte', 'arrivals that matched no rule'],
-  ['decide/+page.svelte', 'every decision ever taken'],
-  ['t/[track]/+page.svelte', 'a track’s updates and its sessions'],
+/**
+ * Every route, the list it draws, and the expression that has to be capped.
+ *
+ * THE THIRD COLUMN IS THE POINT. The first version of this asserted `src.includes('DOM_CAP')`, which
+ * a surviving import satisfies — removing `/inbox`'s cap entirely, leaving only the unused import
+ * and the `<CapLine>`, left the test green. A review that broke it on purpose found that out.
+ * Naming the expression means the assertion is about the list being sliced rather than about the
+ * word appearing in the file.
+ */
+const CAPPED: readonly (readonly [route: string, what: string, capped: RegExp])[] = [
+  ['r/[register]/+page.svelte', 'the register grid and its phone cards', /entries\.slice\(0, DOM_CAP\)/],
+  ['v/[view]/+page.svelte', 'the saved view, which is the same list', /result\.entries\.slice\(0, DOM_CAP\)/],
+  ['audit/+page.svelte', 'the log, which grows with writes', /matched\.slice\(0, DOM_CAP\)/],
+  ['inbox/+page.svelte', 'arrivals that matched no rule', /INBOX\.slice\(0, DOM_CAP\)/],
+  ['decide/+page.svelte', 'every decision ever taken', /DECIDED\.slice\(0, DOM_CAP\)/],
+  ['t/[track]/+page.svelte', 'a track’s updates and its sessions', /updates\.slice\(0, DOM_CAP\)/],
 ];
 
 test('every list surface applies the cap, and there is one cap', () => {
   const routes = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes');
-  for (const [route, what] of CAPPED) {
+  for (const [route, what, capped] of CAPPED) {
     const src = readFileSync(join(routes, route), 'utf8');
-    assert.ok(src.includes('DOM_CAP'), `${route} draws ${what} and does not read the cap`);
+    assert.match(src, capped, `${route} draws ${what} and the list itself is not capped`);
     assert.ok(
       !/const DOM_CAP\s*=/.test(src),
       `${route} declares its own cap, so there are two numbers for one rule`,
@@ -170,12 +179,111 @@ test('and every capped list draws the line that says so', () => {
   const routes = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes');
   for (const route of ['audit/+page.svelte', 'inbox/+page.svelte', 'decide/+page.svelte', 't/[track]/+page.svelte']) {
     const src = readFileSync(join(routes, route), 'utf8');
-    assert.ok(src.includes('<CapLine'), `${route} caps its list and never says so`);
+    /* The line has to be ABOUT the capped list, so it carries the count — a bare `<CapLine />` with
+       no numbers would satisfy a substring check and say nothing. */
+    assert.match(src, /<CapLine shown=\{[^}]+\} total=\{[^}]+\} \/>/, `${route} caps its list and never says so`);
   }
   for (const route of ['r/[register]/+page.svelte', 'v/[view]/+page.svelte']) {
     const src = readFileSync(join(routes, route), 'utf8');
     assert.ok(/cap=\{DOM_CAP\}/.test(src), `${route} slices to the cap and does not pass it to Table`);
   }
+});
+
+
+/* ── a page, and where the next one starts ───────────────────────────────── */
+
+/**
+ * `13 §4.3` GIVES THREE MECHANISMS AND THE TREE HAD ONE AND A HALF.
+ *
+ * Rowgroups: built. The cap line: built. The **200-row keyset pages**: absent — `list` took a filter
+ * and a sort and returned every row, so `DOM_CAP` was not the end of a paging sequence, it was a
+ * substitute for one. `Table` had declared an `onmore` prop and rendered a sentinel since it was
+ * written, with no call site and no `IntersectionObserver` anywhere in the repo.
+ *
+ * What has to hold is that walking the cursor is the same answer, cut up: every row exactly once, in
+ * the same order, with nothing repeated across a boundary and nothing dropped at one.
+ */
+test('walking the cursor yields the whole answer, once each, in order', () => {
+  at('obligations', 5_000, () => {
+    const whole = list('obligations', { sort: { field: 'amount', dir: 'asc' } }).entries.map((e) => e.seq);
+
+    const walked: number[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    for (;;) {
+      const page = list('obligations', {
+        sort: { field: 'amount', dir: 'asc' },
+        limit: PAGE,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      assert.equal(page.stale, false, 'a cursor this walk produced did not resolve');
+      assert.ok(page.entries.length <= PAGE, `a page held ${page.entries.length} rows`);
+      walked.push(...page.entries.map((e) => e.seq));
+      pages++;
+      assert.ok(pages < 200, 'the walk did not terminate');
+      if (page.cursor === null) break;
+      cursor = page.cursor;
+    }
+
+    assert.deepEqual(walked, whole, 'the pages are not the answer');
+    assert.equal(new Set(walked).size, walked.length, 'a row came back on two pages');
+    assert.equal(pages, Math.ceil(whole.length / PAGE), `${pages} pages for ${whole.length} rows`);
+  });
+});
+
+test('a page is capped at the contract ceiling, and no limit means the whole answer', () => {
+  /* `33 §2`: `limit` 25 by default, 200 at most. A caller asking for more gets the ceiling rather
+     than what it asked for, and a caller asking for nothing gets everything — which is what a count,
+     a metric and a forecast read, and why paging is something a GRID does rather than the API. */
+  at('obligations', 5_000, () => {
+    assert.equal(list('obligations', { limit: 10_000 }).entries.length, PAGE);
+    assert.equal(list('obligations', { limit: 1 }).entries.length, 1);
+    assert.equal(list('obligations').entries.length, 5_000);
+    assert.equal(list('obligations').cursor, null, 'the whole answer still offered a next page');
+  });
+});
+
+test('a cursor from another answer is stale, not an empty page', () => {
+  /**
+   * THE ONE FAILURE THAT LOOKS LIKE SUCCESS. If the row a cursor names has left the answer — the
+   * filter moved, the row was archived — returning `[]` is indistinguishable from reaching the end
+   * of the list, and the grid would stop with two thirds of the rows unfetched and nothing on screen
+   * saying so. `stale` makes the caller start again, which is what `50 §5.2` step 5 already requires
+   * of a changed order.
+   */
+  at('obligations', 500, () => {
+    const first = list('obligations', { limit: PAGE });
+    assert.equal(first.stale, false);
+    assert.ok(first.cursor !== null);
+
+    /* The same cursor against an answer that cannot contain it. */
+    const elsewhere = list('obligations', {
+      limit: PAGE,
+      cursor: first.cursor!,
+      filters: [{ field: 'seq', op: 'is', values: ['-1'] }],
+    });
+    assert.equal(elsewhere.stale, true, 'a cursor that resolves to nothing reported a normal page');
+    assert.deepEqual(elsewhere.entries, []);
+    assert.equal(elsewhere.cursor, null);
+  });
+});
+
+test('the cap is the end of the sequence, not a slice of it', () => {
+  /* `DOM_CAP` is 2,000 and a page is 200, so the grid stops after ten pages — and the row it stops
+     at has to be the two-thousandth of the answer, not the two-thousandth of a re-sliced one. */
+  at('obligations', 5_000, () => {
+    const whole = list('obligations').entries.map((e) => e.seq);
+    const walked: number[] = [];
+    let cursor: string | undefined;
+    while (walked.length < DOM_CAP) {
+      const page = list('obligations', { limit: PAGE, ...(cursor === undefined ? {} : { cursor }) });
+      walked.push(...page.entries.map((e) => e.seq));
+      if (page.cursor === null) break;
+      cursor = page.cursor;
+    }
+    assert.equal(walked.length, DOM_CAP);
+    assert.deepEqual(walked, whole.slice(0, DOM_CAP), 'the first 2,000 paged are not the first 2,000');
+  });
 });
 
 void NOW;

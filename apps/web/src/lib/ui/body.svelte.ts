@@ -24,18 +24,15 @@
  * second surface that renders the component without asking this question gets the old behaviour
  * rather than two bodies stacked on top of each other.
  */
-const CARDS = '(width < 640px)';
 
-let cards = $state(false);
-
-/* `typeof window`, because this module is imported by tests and by the SSR pass that `adapter-static`
-   runs to produce the shell. Neither has a viewport, and the answer for a page with no window is the
-   grid — the same default the stylesheet has. */
-if (typeof window !== 'undefined') {
-  const mq = window.matchMedia(CARDS);
-  cards = mq.matches;
-  mq.addEventListener('change', (e) => (cards = e.matches));
-}
-
-/** True where a list draws two-line cards rather than a grid (`13 §10`). */
-export const rowsAsCards = (): boolean => cards;
+/**
+ * ONE SUBSCRIPTION, AND IT IS THE PACKAGE'S. `Table` asks the same question one layer down — it
+ * carries its own card body and had the identical defect, 54,786 hidden nodes of 83,871 on a
+ * desktop register — so the answer moved into `braindog-render/svelte` where both layers can read
+ * it. Two `matchMedia` listeners could disagree for a paint, which would draw a register's cards
+ * inside a grid, or neither body at all.
+ *
+ * Re-exported rather than re-implemented, so the app keeps its own name for it and there is still
+ * exactly one place the 640px line is written down in code.
+ */
+export { rowsAsCards } from 'braindog-render/svelte';

@@ -278,8 +278,14 @@ test('EVERY BLOCK BOUND TO AN EMPTY LIST SAYS "nothing here yet", not "nothing m
         });
         /* NOT "every block refuses" — the claim is that whatever IS empty is not called a filter
            result. A kind that REDUCES has nothing to be empty: a `stat` over an empty list reads
-           GBP 0.00 and a `gauge` reads 0 of 22,000, and both are true answers rather than absences.
-           `19 §6`'s five states are about a list with nothing in it. */
+           GBP 0.00 and a `gauge` reads GBP 0.00 of GBP 220.00, and both are true answers rather
+           than absences. `19 §6`'s five states are about a list with nothing in it.
+
+           THE NUMBER THIS USED TO QUOTE WAS THE BUG IT WAS ILLUSTRATING. It said "0 of 22,000",
+           which is what the gauge printed when nothing matched — `total()` reports no currency over
+           an empty set, so both figures fell out of `display()` and rendered as raw minor units.
+           The claim was right and the evidence was the defect; the target is a declared constant of
+           GBP 220.00 whether or not a row matches it. */
         if (!refusal) continue;
         assert.equal(refusal.kind, 'no-data-yet', `${slug}: "${block.heading}" called an empty list a filter result`);
         assert.ok(refusal.action, `${slug}: "${block.heading}" offered nothing to do about it`);

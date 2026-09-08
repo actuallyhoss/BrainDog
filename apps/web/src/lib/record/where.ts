@@ -113,8 +113,12 @@ export function resolveDay(word: string, now: number): string | null {
    * predicate is a second language somebody has to learn". A field's VALUE was taught both
    * spellings and its DATE never was. This is the same rule, one operand along.
    *
-   * The set is closed and it is exactly what `spokenDay` emits — no more, so this stays a compiler
-   * and not a parser of English.
+   * The set is closed, and it is a HAIR wider than what `spokenDay` emits: `1 days from now` and
+   * `3 day ago` are accepted, and so is a doubled space. That is deliberate and worth saying rather
+   * than claiming an exact match — the printer never produces them, but a person retyping a filter
+   * they read will get the plural wrong, and refusing them would teach that the sentence on screen
+   * is not quite the sentence the record takes. It is still a compiler: nothing outside this shape
+   * resolves, and `2 years from now` is `null` because `34 §1.1`'s units are `d`, `w` and `m`.
    */
   const prose = /^(\d{1,4})\s+(day|days|week|weeks|month|months)\s+(from now|ago)$/.exec(word);
   if (prose) {

@@ -36,9 +36,9 @@
 
 import { money, parse, relative } from 'braindog-render';
 import { KINDS, isKind } from 'braindog-render';
-import { NOW, REGISTERS, display, type BlockResult } from './api.ts';
+import { NOW, REGISTERS, ROWS, display, type BlockResult } from './api.ts';
 import { declaredValue } from './where.ts';
-import { asMoney, merge, mixedFix, total, type Total } from './money.ts';
+import { asMoney, currencyOf, merge, mixedFix, total, type Total } from './money.ts';
 
 /**
  * The rest of the groups, as one group.
@@ -154,7 +154,26 @@ function gaugeRows(block: BlockResult): string[] {
      line, and neither of them means anything if the figure is a sum of two units. */
   if (sum.mixed.length) return [`${escapeCell(label)} | ${escapeCell(mixedFix(sum.mixed))} |  | warn`];
   const amount = sum.amount;
-  const fmt = (n: number) => display(block.register ?? '', of, asMoney(n, sum.currency)) ?? String(n);
+  /**
+   * THE CURRENCY IS THE FIELD'S, NOT THE MATCHED SET'S.
+   *
+   * `total()` reports `currency: null` when nothing matched — correctly, because no row supplied
+   * one — and `asMoney(n, null)` makes a value `display()` cannot format, so BOTH numbers fell
+   * through to `String(n)` and printed raw minor units. `/p/estate` on a young record read
+   * **"Every month  0  of 22,000"** where the declaration says GBP 220.00, three hundred pixels from
+   * a tile reading "no more than GBP 3,000.00" — so a person in their first week saw a monthly
+   * ceiling of "22,000" beside a yearly one of £3,000.
+   *
+   * `13 §4.2`: a truncated figure is not shortened, it is wrong; a figure that has lost its unit is
+   * the same failure, and the target had never had a unit to lose — it is a declared constant that
+   * does not change when a filter matches nothing. So the code falls back to the currency the FIELD
+   * holds anywhere in the register, which is what both numbers are denominated in either way.
+   */
+  const declared =
+    sum.currency ??
+    (ROWS[block.register ?? ''] ?? []).map((e) => currencyOf(e.fields[of])).find(Boolean) ??
+    null;
+  const fmt = (n: number) => display(block.register ?? '', of, asMoney(n, declared)) ?? String(n);
   /* The tone is the reading, and it is the whole point of a gauge: over the line is `bad`, close to
      it is `warn`, under it is nothing at all — a gauge that is fine should not be coloured. */
   const tone = amount > target ? ' | bad' : amount > target * 0.85 ? ' | warn' : '';
@@ -456,7 +475,12 @@ const UNITS: Record<string, string> = { d: 'day', w: 'week', m: 'month' };
 /* `today`, `yesterday` and `tomorrow` are already English and pass through; `+90d` is not. That is
    the whole of `resolveDay`'s grammar and the whole of what a block ever writes. */
 const spokenDay = (word: string): string => {
-  const rel = /^([+-])(\d+)([dwmy])$/.exec(word.trim());
+  /* THREE UNITS IN THE PATTERN TOO, and dropping `y` from the table alone made it worse than before.
+     `+2y` still matched, `UNITS.y` was gone, and `?? 'day'` turned two YEARS into "2 days from now"
+     — which the compiler then accepted, resolving to a date two years out. It had been loudly wrong;
+     it became silently wrong. `34 §1.1`'s EBNF is `unit = "d" | "w" | "m"`, so a `+2y` this build
+     cannot read passes through verbatim and is refused by name. */
+  const rel = /^([+-])(\d+)([dwm])$/.exec(word.trim());
   if (!rel) return word;
   const [, sign, n, unit] = rel as unknown as [string, string, string, string];
   const noun = UNITS[unit] ?? 'day';

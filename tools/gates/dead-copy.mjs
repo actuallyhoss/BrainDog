@@ -47,8 +47,10 @@ const ALLOWED = new Map([
   ['tagline', 'UNBUILT — the marketing line. `apps/site` types its own; this one has no home in the app.'],
   ['promoted', 'UNBUILT — a suggested page moving into the rail writes nothing yet (29 §2 needs a nav write).'],
   ['restored', 'UNBUILT — Settings → backups (53 §5.4). No restore control exists.'],
-  ['marked', 'UNBUILT — the read mark. `member.seen_at` (ADR-036) has no surface.'],
-  ['markAllRead', 'UNBUILT — same read mark.'],
+  /* `markAllRead` LEFT THIS LIST WHEN IT GOT A SURFACE, and the gate is what noticed: an excuse that
+     outlives its reason is the same defect as a sentence with no renderer, one direction along.
+     `marked` is the per-item form and stays — the browser's mark is one instant, not a flag a row. */
+  ['marked', 'UNBUILT — the PER-ROW read mark. Home marks the whole feed with one instant instead.'],
   ['rankedBy', 'UNBUILT — 19 §6\'s "For You" ordering.'],
   ['noFilters', 'UNBUILT — the filter bar\'s own empty state; the bar is hidden under 8 rows instead.'],
   ['displayOptions', 'UNBUILT — the display menu names its sections directly.'],

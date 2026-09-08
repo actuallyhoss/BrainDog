@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { labelOf } from './api.ts';
+import { display, labelOf } from './api.ts';
 import { saidPlainly } from './blocks.ts';
 import { NOW, PAGES, REGISTERS, ROWS, VIEWS } from './data.ts';
 import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
@@ -312,11 +312,12 @@ const rowsFor = (register: string, where: string): string => {
     .join(',');
 };
 
-const roundTrips = (register: string, where: string, from: string) => {
+/** Whether it actually asserted anything — see the count at the call site. */
+const roundTrips = (register: string, where: string, from: string): boolean => {
   const first = compile(register, where);
   /* A TEMPLATE'S `{{name}}` IS NOT A FILTER YET. `for:` expands it per row before anything draws;
      until then it does not compile on either side of the trip, which is a different finding. */
-  if (first.bad.length) return;
+  if (first.bad.length) return false;
   const said = saidPlainly(register, where);
   const back = compile(register, said);
   assert.deepEqual(back.bad, [], `${from}: the record refuses its own sentence — "${said}"`);
@@ -325,19 +326,24 @@ const roundTrips = (register: string, where: string, from: string) => {
     rowsFor(register, where),
     `${from}: "${where}" and the "${said}" it prints select different rows`,
   );
+  return true;
 };
 
 test('every filter a declared page prints is one the record reads back', () => {
+  /* THE COUNT IS OF ASSERTIONS, NOT OF BLOCKS. It incremented once per block whether or not
+     `roundTrips` asserted anything — and `roundTrips` returns early on a filter that does not
+     compile, which four of the twelve do because they are templates holding `{{name}}`. So the
+     floor of eight was satisfied by twelve blocks of which only eight were tested, and making every
+     filter in the seed refuse to compile left this green. `roundTrips` reports what it did. */
   let checked = 0;
   for (const [slug, page] of Object.entries(PAGES)) {
     for (const block of page.blocks ?? []) {
       const source = String(block.source ?? '');
       if (!block.where || !source.startsWith('register.')) continue;
-      roundTrips(source.slice('register.'.length), block.where, `/p/${slug}`);
-      checked++;
+      if (roundTrips(source.slice('register.'.length), block.where, `/p/${slug}`)) checked++;
     }
   }
-  assert.ok(checked >= 8, `only ${checked} declared page filters were reachable to check`);
+  assert.equal(checked, 8, `${checked} declared page filters round-tripped; eight of the twelve compile today`);
 });
 
 test('and every filter a saved view prints', () => {
@@ -373,17 +379,43 @@ test('a clause written with the label the screen shows is the same clause', () =
 });
 
 test('the id wins over a label, so one field cannot answer for another', () => {
-  /* A register is free to label one field with another's id. If the label branch ran first, a
-     predicate naming a real field would silently be compiled against a different column. */
+  /**
+   * THE COLLISION IS MADE, NOT WAITED FOR.
+   *
+   * The first version of this walked the seed looking for a field whose LABEL is another field's
+   * ID, found none — no register declares one — and asserted
+   * `compile(…).register === 'obligations'`, which is a tautology because `compile` echoes its
+   * first argument straight into that key. Putting the label branch ahead of the id branch, the
+   * exact defect this test is named for, left it green. A review that broke it on purpose found
+   * that out; nothing else could have.
+   *
+   * So the register is made to declare the collision and put back. `due` is labelled `state`, and
+   * `state is open` must still be the ENUM field — which it is only while the id branch runs first.
+   */
   const decl = REGISTERS.obligations!;
-  const ids = new Set(decl.fields.map((f) => f.id));
-  for (const field of decl.fields) {
-    const label = labelOf(field).toLowerCase();
-    if (!ids.has(label) || label === field.id) continue;
-    assert.equal(compile('obligations', `${label} is x`).register, 'obligations');
+  const due = decl.fields.find((f) => f.id === 'due')!;
+  const kept = due.label;
+  try {
+    (due as { label?: string }).label = 'state';
+    const w = compile('obligations', 'state is open');
+    assert.deepEqual(w.bad, [], 'a label collision made a real field unreadable');
+    assert.deepEqual(
+      w.clauses.map((c) => c.field),
+      ['state'],
+      'a label took a predicate away from the field whose id it borrowed',
+    );
+    /* AND THE LABEL STILL RESOLVES WHERE THERE IS NO ID TO BEAT, or the id-first rule has simply
+       switched labels off. The value is read out of the record so the clause is about the field
+       rather than about whether a name was typed correctly. */
+    const one = ROWS.obligations![0]!;
+    const party = display('obligations', 'party', one.fields.party)!;
+    const byLabel = compile('obligations', `Party is ${party}`);
+    assert.deepEqual(byLabel.bad, [], `the label Party did not reach the field party`);
+    assert.deepEqual(byLabel.clauses.map((c) => c.field), ['party']);
+  } finally {
+    if (kept === undefined) delete (due as { label?: string }).label;
+    else (due as { label?: string }).label = kept;
   }
-  /* And the plain statement of it, which holds whatever the seed happens to declare. */
-  assert.deepEqual(compile('obligations', 'state is open').bad, []);
 });
 
 test('the prose day is the machine day, to the day', () => {
@@ -398,6 +430,18 @@ test('the prose day is the machine day, to the day', () => {
   ] as const) {
     assert.equal(resolveDay(prose, NOW), resolveDay(machine, NOW), `${prose} is not ${machine}`);
   }
+});
+
+test('a year is not a day, in either direction', () => {
+  /* `spokenDay`'s table dropped `y` and its PATTERN kept it, so `+2y` matched, missed the table and
+     fell to `?? 'day'`: "2 years from now" became **"2 days from now"**, which then compiled. It had
+     been loudly wrong and became silently wrong, resolving to a date two years out. `34 §1.1`'s
+     EBNF is `unit = "d" | "w" | "m"`, so a unit this build does not read passes through untouched
+     and is refused by name. */
+  assert.equal(saidPlainly('services', 'renews before +2y'), 'renews before +2y');
+  assert.equal(resolveDay('+2y', NOW), null);
+  assert.equal(resolveDay('2 years from now', NOW), null);
+  assert.deepEqual(compile('services', 'renews before +2y').clauses, []);
 });
 
 test('and nothing else in English is a day', () => {

@@ -28,6 +28,20 @@ export type Pref = {
   /** Whether bare letters act inside a focused grid. */
   chars?: boolean | undefined;
   /**
+   * The instant you last marked the activity feed read.
+   *
+   * "SINCE YOU WERE AWAY" NEVER ADVANCED. Home's feed reads a module constant and nothing anywhere
+   * stored a mark, so the fifth session showed the same six items as the first — a heading making a
+   * claim about the reader's own history that is the same claim for ever. `19 §6` calls this half of
+   * Home the answer to *"what happened while you were not looking"*, and `copy.markAllRead` had been
+   * sitting in `copy.ts` with no call site waiting for it.
+   *
+   * PER DEVICE, like everything else here, and that is the honest place for it: what you have looked
+   * at on this screen is not a fact about the record. The real record has `member.seen_at` for the
+   * account-wide version (`33 §2`'s `whatsNew` cursor), and this is the browser's half of it.
+   */
+  seen?: string | undefined;
+  /**
    * Which columns you have hidden, per register.
    *
    * 50 §5.2 names it `prefs.columns[register]`, and the store did not exist — so untick a column,

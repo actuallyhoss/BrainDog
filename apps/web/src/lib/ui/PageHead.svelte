@@ -20,6 +20,7 @@
     title,
     count,
     total,
+    atLeast,
     kicker,
     actions,
     id,
@@ -34,6 +35,15 @@
     hue?: number | undefined;
     count?: number | undefined;
     total?: number | undefined;
+    /**
+     * Whether `count` is a floor rather than the answer.
+     *
+     * `50 §5.2` step 6: *"`Matches n of N` is exact when `cursor === null`, else `200+ of N`."* A
+     * grid holding the first page of a longer answer knows two numbers — how many it has and how
+     * many there are — and printing the first as though it were the second is the quiet lie paging
+     * introduces. The `+` is the whole of the difference.
+     */
+    atLeast?: boolean | undefined;
     kicker?: string | undefined;
     id?: string | undefined;
     /**
@@ -78,8 +88,8 @@
     </div>
     {#if count !== undefined}
       <p class="count num">
-        {count.toLocaleString('en')}{#if total !== undefined && total !== count}<span class="of"
-            >&nbsp;of {total.toLocaleString('en')}</span
+        {count.toLocaleString('en')}{#if atLeast}<span class="more-sign">+</span>{/if}{#if total !== undefined && (atLeast || total !== count)}<span
+            class="of">&nbsp;of {total.toLocaleString('en')}</span
           >{/if}
       </p>
     {/if}
@@ -88,6 +98,11 @@
 </header>
 
 <style>
+  /* Same size as the figure, dimmed: it modifies the number rather than being part of it. */
+  .more-sign {
+    color: var(--dim);
+  }
+
   /* Sticky, and `--sticky` is what `scroll-padding-block` is set from, so keyboard focus never
      lands underneath it (WCAG 2.4.11). Paid once, in app.css. */
   /* No margin of its own: it is either there or it is not, and a head that reserved the space

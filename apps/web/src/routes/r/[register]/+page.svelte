@@ -24,7 +24,8 @@
   import * as pref from '$lib/pref.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, labelOf, list, noticed, PAGES, readableFields, REGISTERS, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, labelOf, list, noticed, PAGE, PAGES, readableFields, REGISTERS, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import type { Entry } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -160,6 +161,72 @@
    */
   let archived = $state(new Set<number>());
 
+  /**
+   * THE ANSWER, ONE PAGE AT A TIME — `13 §4.3`, and the mechanism that was missing.
+   *
+   * The spec's three parts are rowgroups of 100, **200-row keyset pages**, and a 2,000-row cap with
+   * a visible line. Two were built. The pages were not, so `DOM_CAP` was not the end of a sequence,
+   * it was a substitute for one: every row was materialised, filtered, sorted and then thrown away
+   * past two thousand.
+   *
+   * `pages` IS AN ACCUMULATOR AND `cursor` IS WHERE THE NEXT ONE STARTS. Both reset when the
+   * QUESTION changes — the register, the filters, the search, the order — because a cursor is a
+   * position in one answer and means nothing in another. `50 §5.2` step 5 says exactly that: with a
+   * non-null cursor, changing the order refetches page 1.
+   *
+   * THE EFFECT READS ITS OWN DEPENDENCIES DELIBERATELY. `id`, `filters`, `q` and `sort` are touched
+   * before anything else so Svelte re-runs this when any of them moves, and nothing else in the body
+   * can quietly add a dependency that resets the list mid-scroll.
+   */
+  let pages = $state<Entry[][]>([]);
+  let cursor = $state<string | null>(null);
+  /* The answer this page set belongs to. A cursor from a different question is not a cursor. */
+  let asked = $state('');
+
+  const question = $derived(JSON.stringify([id, filters, q, sort ?? null]));
+
+  $effect(() => {
+    const now = question;
+    if (now === asked) return;
+    asked = now;
+    const first = list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE });
+    pages = [first.entries];
+    cursor = first.cursor;
+  });
+
+  /**
+   * The next page, or nothing.
+   *
+   * IT STOPS AT THE CAP, WHICH IS WHAT MAKES THE CAP THE END OF A SEQUENCE rather than a slice. At
+   * two thousand rows `Table` swaps the sentinel for the line that says so, so nothing asks again.
+   *
+   * A STALE CURSOR STARTS OVER. `list` answers `stale` when the row a cursor names is no longer in
+   * the answer, which means the question moved under the reader — and the honest response is the
+   * first page of the new answer, not an empty page that reads as the end of the list.
+   */
+  function more() {
+    if (cursor === null) return;
+    if (loaded >= DOM_CAP) return;
+    const next = list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE, cursor });
+    if (next.stale) {
+      pages = [list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE }).entries];
+      cursor = null;
+      return;
+    }
+    pages = [...pages, next.entries];
+    cursor = next.cursor;
+  }
+
+  const loaded = $derived(pages.reduce((n, p) => n + p.length, 0));
+
+  /**
+   * The whole answer's SIZE, which is not the same as the rows in hand.
+   *
+   * `list` with no `limit` walks the same filter, so this costs what the old code cost and buys the
+   * two counts every surface on this screen reads: how many rows matched, and how many the register
+   * holds. The real record answers both from `index` without walking anything, which is the point of
+   * separating them here rather than counting `pages`.
+   */
   const found = $derived(list(id, { filters, q, ...(sort ? { sort } : {}) }));
   /**
    * `total` IS WHAT THE LIST HOLDS, AND ARCHIVING HERE HOLDS NOTHING.
@@ -176,8 +243,56 @@
    */
   const result = $derived({
     ...found,
-    entries: found.entries.filter((e) => !archived.has(e.seq)),
+    /* THE ROWS IN HAND, not the whole answer. `matched` stays the answer's size, because that is
+       what the head counts and what "38 rows, none matching" is about. */
+    entries: pages.flat().filter((e) => !archived.has(e.seq)),
     matched: found.entries.filter((e) => !archived.has(e.seq)).length,
+  });
+  /** Whether the reader is looking at all of it. Everything honest on this screen turns on it. */
+  const whole = $derived(cursor === null);
+
+  /**
+   * `aria-rowcount`, which `50 §5.2` step 4 gives three states and this screen gave one.
+   *
+   * *"`N` from `index` when unfiltered, `-1` while filtered and paging, the exact count once
+   * `cursor` is null."* `-1` is the ARIA spelling of *I do not know yet*, and it is the honest
+   * answer for a filtered list still being paged: the total is knowable only by finishing the walk,
+   * and a screen reader told "row 12 of 38" while the grid is still fetching has been told a number
+   * that may move under it.
+   */
+  const rowCount = $derived(whole ? result.matched : filters.length || q ? -1 : result.total);
+
+  /**
+   * THE SENTINEL, AND THE OBSERVER `50 §5.2` STEP 4 SPECIFIES.
+   *
+   * `Table` has declared an `onmore` prop and rendered a `<div class="sentinel">` since it was
+   * written, and across `apps` and `packages` there was not one call site and not one
+   * `IntersectionObserver` — a mechanism with its middle removed. This is the middle.
+   *
+   * IT WATCHES WHATEVER BODY IS ON THE SCREEN. The grid and the card list are one at a time now, so
+   * the observer re-attaches when the body changes rather than holding a node that has been
+   * unmounted; `body` is the element that wraps both, and the effect re-runs when it moves.
+   *
+   * `rootMargin` FETCHES BEFORE THE READER ARRIVES. A page that starts loading when the sentinel is
+   * already visible is a page that stutters at every boundary; 600px is about two screens of rows at
+   * this row height.
+   */
+  let body = $state<HTMLElement | undefined>(undefined);
+
+  $effect(() => {
+    const el = body?.querySelector('.sentinel');
+    if (!el) return;
+    /* THE ROOT IS THE APP'S SCROLLER, NOT THE VIEWPORT. `+layout.svelte` makes `#main` "the ONE
+       scroll container" so the rail never moves and the window shows one scrollbar — which means
+       the window never scrolls, the sentinel never enters the viewport, and an observer with the
+       default root fires exactly once, at load, and never again. Measured: page one drew and eight
+       scrolls to the bottom added nothing. */
+    const io = new IntersectionObserver((entries) => entries[0]?.isIntersecting && more(), {
+      root: body?.closest('#main') ?? null,
+      rootMargin: '600px',
+    });
+    io.observe(el);
+    return () => io.disconnect();
   });
   const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns));
 
@@ -599,6 +714,11 @@
 
   /** The register's own states, so the menu is the vocabulary rather than a list typed here. */
   const states = $derived(decl?.fields.find((f) => f.id === decl.state)?.values ?? []);
+  /* AND ITS OWN NAME FOR THE COLUMN, so the verb over the menu says what the header says. */
+  const stateLabel = $derived.by(() => {
+    const f = decl?.fields.find((x) => x.id === decl.state);
+    return f ? labelOf(f) : 'state';
+  });
 
   const emptyKind = $derived(
     result.total === 0 ? 'no-data-yet' : q || filters.length ? 'no-results' : 'cleared',
@@ -632,7 +752,8 @@
        for it, which is what "in the sentence that needs it" means. -->
   <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
-    count={result.matched}
+    count={whole ? result.matched : loaded}
+    atLeast={!whole && loaded < DOM_CAP}
     total={result.total}
     define="list"
   >
@@ -855,8 +976,8 @@
             <Icon name="copy" size="s" />{copy.copyIds}
           </Button>
           {#if states.length}
-            <Menu label={copy.setState}>
-              {#snippet trigger()}<span class="picked-verb"><Icon name="edit" size="s" />{copy.setState}</span>{/snippet}
+            <Menu label={copy.setState(stateLabel)}>
+              {#snippet trigger()}<span class="picked-verb"><Icon name="edit" size="s" />{copy.setState(stateLabel)}</span>{/snippet}
               {#each states as state}
                 <button
                   class="mi"
@@ -879,6 +1000,7 @@
         </div>
       {/if}
 
+      <div class="body-slot" bind:this={body}>
       {#if rowsAsCards()}
       <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} picked={selected}>
         {#snippet action(e)}
@@ -906,7 +1028,22 @@
       <!-- AND THE CAP LINE COMES WITH THE BODY. `Table` draws its own outside the grid, so the
            phone could see it while the table was merely hidden; with the table gone from the
            document, the card list has to say it. -->
-      <CapLine shown={Math.min(result.matched, DOM_CAP)} total={result.matched} />
+      <!-- ONLY AT THE CAP. This read `Math.min(matched, DOM_CAP)` against the whole answer, so it
+           rendered on page ONE — "Showing 2,000 of 2,614" over two hundred rows, which is two wrong
+           numbers at once. The cap line is not "there is more"; the head's `+` says that. It is
+           "this is as far as it goes, narrow the filter or export", and that is only true here. -->
+      {#if loaded >= DOM_CAP}
+        <CapLine shown={DOM_CAP} total={result.matched} />
+      {/if}
+      <!-- The card list's own sentinel, for the reason `Table` has one: with the grid absent from
+           the document there is nothing else for the observer to watch, and a phone would stop at
+           page one with no way to ask for page two. -->
+      <!-- A SENTINEL MEANS "THERE MAY BE MORE". A list whose answer arrived in one page has none,
+           and neither does one at the cap — the line above says why it stopped. `Table` takes the
+           same signal as the absence of `onmore`. -->
+      {#if !whole && loaded < DOM_CAP}
+        <div class="sentinel" aria-hidden="true"></div>
+      {/if}
       {:else}
       <div class="table-slot">
         <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
@@ -915,8 +1052,9 @@
         <Table
           {columns}
           {rows}
-          total={result.matched}
+          total={rowCount}
           cap={DOM_CAP}
+          {...whole ? {} : { onmore: more }}
           label={decl.name}
           {sort}
           selected={selectedKeys}
@@ -956,6 +1094,7 @@
         </Table>
       </div>
       {/if}
+      </div>
     {/if}
   </div>
 

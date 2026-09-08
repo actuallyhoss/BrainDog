@@ -25,6 +25,7 @@
 -->
 <script lang="ts">
   import CapLine from './CapLine.svelte';
+  import { rowsAsCards } from '../cards.svelte.ts';
   import type { Snippet } from 'svelte';
   import { TONES } from '../../src/index.ts';
   import { chunkRows, type Column, type TableRow } from '../types.ts';
@@ -140,6 +141,18 @@
   {/each}
 {/snippet}
 
+<!--
+  ONE BODY AT A TIME, IN THE DOCUMENT AND NOT ONLY IN THE STYLESHEET.
+
+  `blocks.css` hides whichever of these two does not belong at the current width, which builds both
+  and shows one. Measured on a desktop register of 2,614 rows: the hidden `.table-cards` subtree was
+  **54,786 nodes of the 83,871 under `#main` — 65% of the document**, none of it on the screen, and
+  `13 §4.3`'s cap on the DOM was therefore being paid twice at every width.
+
+  The stylesheet rules stay as the safety net they should always have been: a host that renders this
+  without the branch gets one body rather than two stacked on each other.
+-->
+{#if rowsAsCards()}
 <ul class="table-cards">
   {#each rows as row (row.key)}
     <li>
@@ -170,8 +183,15 @@
       {/if}
     </li>
   {/each}
+  <!-- THE SENTINEL BELONGS TO WHICHEVER BODY IS ON THE SCREEN. It used to live only inside the
+       grid, which was survivable while both bodies were built and one was hidden; with the branch
+       above, a phone would have had nothing to observe and the list would have stopped at page one
+       with no way to ask for page two. -->
+  {#if onmore && !(cap !== undefined && rows.length >= cap)}
+    <li class="sentinel" aria-hidden="true"></li>
+  {/if}
 </ul>
-
+{:else}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="table-region" role="group" tabindex="0" aria-label={label ?? 'Rows'}>
   <div
@@ -264,17 +284,20 @@
   </div>
 </div>
 
+{/if}
+
 <!-- The way past the cap is a filter or an export, never a virtualised scroll: virtualisation
      breaks find-in-page, breaks the scrollbar as a position cue, and only HIDES the measured wall,
      which is DOM construction (13 §4.3).
 
-     OUTSIDE THE SCROLLER, AND OUTSIDE THE GRID. Two reasons, and both were bugs. It sat inside
-     `.table-region`, which is `display: none` below 640px now that rows become cards — so the one
-     line telling a phone it was looking at 2,000 of 4,181 rows was the line the phone could not
-     see. And it was a `<p>` among the rows of a `role="grid"`, where the only permitted children
-     are rows and rowgroups; a screen reader walking the grid met a paragraph.
+     OUTSIDE BOTH BODIES. It used to sit inside `.table-region`, so the one line telling a reader
+     they were looking at 2,000 of 4,181 rows was drawn only in the body a desktop sees — and it was
+     a `<p>` among the rows of a `role="grid"`, where the only permitted children are rows and
+     rowgroups, so a screen reader walking the grid met a paragraph. Out here it belongs to the list
+     rather than to whichever body is drawing it, which is what the branch above made necessary:
+     when the grid is not rendered at all, a line inside it is not hidden, it is absent.
 
-     THE SENTENCE ITSELF IS `CapLine`, because four other lists in the product needed it and were
+     THE SENTENCE ITSELF IS `CapLine`, because five other lists in the product needed it and were
      rendering every row they held instead. -->
 {#if cap !== undefined && rows.length >= cap}
   <CapLine shown={cap} total={total} />

@@ -90,6 +90,30 @@ export function resolveDay(word: string, nowMs: number): string | null {
       break;
   }
 
+  /**
+   * AND THE SAME DAY WRITTEN THE WAY A SCREEN WRITES IT.
+   *
+   * Every declared page prints its filter as a sentence, and `+90d` is a machine duration nobody
+   * types or says, so the printer turns it into "90 days from now". That sentence is the record's
+   * own restatement of the declaration — what somebody reads when they ask what a page filters on,
+   * and what an agent copies when it asks the same question.
+   *
+   * IT WAS TAUGHT TO ONE OF THE TWO PARSERS. The browser's compiler learned it and this one, which
+   * is what the MCP surface and every agent actually talk to, went on answering `null` — so the two
+   * `where` implementations disagreed in a NEW direction one commit after an audit filed them for
+   * disagreeing in the old one. `50 §1` says there should not be two; while there are, a fix that
+   * lands on one of them is half a fix.
+   *
+   * The set is closed and is exactly what the printer emits. It stays a compiler, not a parser of
+   * English.
+   */
+  const prose = /^(\d{1,4})\s+(day|days|week|weeks|month|months)\s+(from now|ago)$/.exec(word);
+  if (prose) {
+    const [, n, noun, way] = prose as unknown as [string, string, string, string];
+    const unit = noun.startsWith('day') ? 'd' : noun.startsWith('week') ? 'w' : 'm';
+    return resolveDay(`${way === 'ago' ? '-' : '+'}${n}${unit}`, nowMs);
+  }
+
   const m = RELATIVE.exec(word);
   if (!m) return null;
   const n = Number(m[2]) * (m[1] === '-' ? -1 : 1);

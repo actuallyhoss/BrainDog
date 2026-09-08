@@ -472,15 +472,41 @@ test('and the same tile with rows under it does carry one', () => {
   );
 });
 
-test('nothing overdue on a list that HAS rows is still good news', () => {
-  /* The distinction stated the other way round: zero matched is a real answer, and this must not
-     have become "no data" when the fix went in. `overdue` is `lte: 0`, so an empty match is the
-     good case, and a build that read `rows === 0` instead of `held === 0` would silence it. */
+test('nothing MATCHED on a list that HAS rows is still good news', () => {
+  /**
+   * THE DIRECTION `held` WAS INTRODUCED FOR, AND THE ONE NOTHING TESTED.
+   *
+   * Zero matched is a real answer — nothing overdue, on thirty-eight obligations, is the good news
+   * the figure exists to deliver — and zero HELD is not an answer at all. A build reading `rows`
+   * where it should read `held` silences the first, which is the whole reason the two are separate
+   * fields.
+   *
+   * The first version of this picked `overdue`, which on the seed matches TWO rows and reads GBP
+   * 10,540. Its premise was false, so swapping `held` for `rows` changed nothing and the test
+   * stayed green through the exact substitution it was written to catch. No shipped metric has
+   * `rows === 0` with `held > 0`, so the state has to be made: the register keeps its rows and the
+   * predicate is narrowed to one no row can satisfy.
+   */
   const decl = Object.values(METRICS).find((d) => d.source === 'register.obligations' && 'lte' in d.target && d.target.lte === 0);
-  if (!decl) return;
-  const reading = read(decl as MetricDecl, NOW);
-  assert.ok(reading.held > 0, 'the seed has no obligations, so this proves nothing');
-  assert.equal(metric(decl.metric).tone, reading.value === 0 ? 'good' : 'warn');
+  assert.ok(decl, 'the seed declares no obligations metric with a target of nothing');
+
+  const kept = ROWS.obligations!;
+  try {
+    /* Rows that exist and cannot match: the state field carries a value the predicate never asks
+       for, so `held` stays 38 and `rows` falls to 0. */
+    ROWS.obligations = kept.map((e) => ({ ...e, fields: { ...e.fields, state: 'paid' } }));
+    const narrowed = { ...decl, where: 'state is open' } as MetricDecl;
+    const reading = read(narrowed, NOW);
+    assert.equal(reading.rows, 0, 'the predicate was supposed to match nothing');
+    assert.ok(reading.held > 0, 'the register was supposed to keep its rows');
+    assert.equal(meetsTarget(narrowed, reading.value), true, 'nothing owed is on the right side of "should be nothing"');
+  } finally {
+    ROWS.obligations = kept;
+  }
+
+  /* And on the seed as it stands, the same metric still carries a verdict rather than a shrug. */
+  const tone = metric(decl.metric).tone;
+  assert.ok(tone === 'good' || tone === 'warn', `a figure over thirty-eight rows reports "${tone}"`);
 });
 
 /* ── the words under every figure in the product ─────────────────────────── */

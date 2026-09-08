@@ -370,8 +370,16 @@
    *
    * One column when there is one column.
    */
-  .shell[data-rail='off'] {
-    grid-template-columns: var(--rail-back) minmax(0, 1fr);
+  /* AND SCOPED TO THE WIDTH THE RAIL EXISTS AT, because the first version of this fix reproduced
+     the bug it fixed, one breakpoint down. `.shell[data-rail='off']` is (0,2,0) and the phone rule
+     below is (0,1,0), so an unscoped declaration here outranked it — while `--rail-back` was scoped
+     to `>= 900px` and stayed `0px`. Below 900 the grid became `0px 1fr` and `.body`, the only
+     in-flow item, auto-placed into the ZERO track: measured 0px wide at both 899 and 390, on a
+     preference that persists in a cookie. A register rendered thirty-eight cards into nothing. */
+  @media (width >= 900px) {
+    .shell[data-rail='off'] {
+      grid-template-columns: var(--rail-back) minmax(0, 1fr);
+    }
   }
 
   .shell[data-rail='off'] .rail-slot {

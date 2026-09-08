@@ -19,19 +19,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { iconFor,
-    AUDIT,
-    backlinks,
-    NOW,
-    REGISTERS,
-    display,
-    dirOf,
-    entry,
-    identityOf,
-    labelOf,
-    readableFields,
-    values,
-  } from '$lib/record/api.ts';
+  import { actorOf, AUDIT, backlinks, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, values } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -210,7 +198,10 @@
           <dt>Id</dt>
           <dd class="mono">{id}#{row.seq}</dd>
           <dt>Added</dt>
-          <dd>{relative(row.created.slice(0, 10), NOW)} by {row.by}</dd>
+          <!-- IN WORDS, like the other two surfaces that answer "who changed my record". `actorOf`
+               moved into `api.ts` when Home and `/audit` were found spelling the same two actors two
+               ways; this route reads the same `AUDIT` array and was the third. -->
+          <dd>{relative(row.created.slice(0, 10), NOW)} by {actorOf(row.by)}</dd>
         </dl>
 
         {#if history.length}
@@ -218,7 +209,7 @@
           <ol class="history">
             {#each history as e}
               <li>
-                <span class="history-by">{e.by}</span>
+                <span class="history-by">{actorOf(e.by)}</span>
                 <span class="history-note">{e.note}</span>
                 <span class="history-when">{relative(e.at.slice(0, 10), NOW)}</span>
               </li>

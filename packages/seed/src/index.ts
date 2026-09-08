@@ -905,13 +905,22 @@ export const PAGES: Record<string, SeedPage> = {
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
         ],
         order: [{ field: 'due', dir: 'asc' }],
-        empty: 'Nothing outstanding.',
+        /* EACH SIDE OF THE LEDGER SAYS ITS OWN NOTHING. All three blocks on this page read "Nothing
+           outstanding.", so on an empty record the identical sentence printed on both sides — what
+           you are owed and what you owe, told apart by a heading and nothing else. */
+        empty: 'Nobody owes you anything.',
         limit: 50,
       },
       {
         kind: 'note',
         tone: 'bad',
-        heading: 'Late',
+        /* THE HEADING NAMES THE SIDE OF THE LEDGER IT IS ABOUT. "Late" sat immediately below the
+           receivables table and above the payables blocks, so reading downwards it attached to the
+           table it followed and read as *who is late paying you* — while its body says "Something
+           you owe". The same confusion has already bitten this block once: the sentence used to
+           interpolate the age of a receivable under a `when:` gated on payables. The figure was
+           fixed and the heading was the other half of it. */
+        heading: 'Late to pay',
         span: 5,
         /* THE SENTENCE IS ABOUT THE RECORD, not about one studio's counterparty. It named a
            contract the reader has never signed, in the danger colour, on every Money page in every
@@ -942,7 +951,13 @@ export const PAGES: Record<string, SeedPage> = {
            was wrong and the two disagreed anyway, which is the shape of a number somebody quotes from
            the wrong panel. A part-paid obligation is money still owed. */
         where: 'direction is owed by me, state is open or part',
-        empty: 'You owe nobody anything.',
+        /* ONE FACT, ONE SENTENCE. This block and "Who you owe" below it share a predicate — the
+           comment above says so — and said the same nothing two ways: "You owe nobody anything."
+           stacked directly over "Nothing outstanding.", with the identical filter printed verbatim
+           under both. On a record in its first week that is the first thing on the money page.
+           `19 §6` Partial is right that an empty block stays; it does not ask for the same nothing
+           said twice. The one below keeps the sentence, because it is the one holding the rows. */
+        empty: 'Nothing to break down.',
       },
       {
         kind: 'table',

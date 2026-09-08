@@ -146,9 +146,38 @@ test('EVERY SETTINGS AREA HAS SOMETHING TO SAY, and it is not the same something
      to a user — `23 §7` forbids explaining the interface, `19 §9` calls `shell` and `mock-up`
      internal vocabulary reaching a user, and `13 §5.2` requires a `no-data-yet` state to be
      specific about what will be here and to carry a real action. It had none. */
-  const stub = 'not wired in the mock-up';
-  for (const line of Object.values(copy) as unknown[])
-    if (typeof line === 'string') assert.ok(!line.includes(stub), `the stub sentence survives: ${line}`);
+  /**
+   * THE WORDS, NOT ONE SENTENCE.
+   *
+   * This forbade the literal `not wired in the mock-up`, which was deleted — and the bigger call
+   * site went on rendering *"A frontend mock-up. Nothing writes, and no request leaves the page."*
+   * on all twelve settings areas, on `/jobs/<id>` and on `/decide/<id>`. A test naming one sentence
+   * catches that sentence; `19 §9` names the WORDS, so this does too, and a new sentence carrying
+   * one cannot slip past by being differently phrased.
+   *
+   * Every value is walked, including the functions — a banned word inside a template is on the
+   * screen exactly as much as one inside a literal, and `copy.ts` is now half functions.
+   */
+  const BANNED = ['mock-up', 'mockup', 'the shell', 'predicate', 'declaration', 'projection'];
+  const said = (v: unknown): string[] => {
+    if (typeof v === 'string') return [v];
+    if (typeof v === 'function') {
+      try {
+        return [String((v as (...a: unknown[]) => unknown)('x', 1, 'y'))];
+      } catch {
+        return [String(v)];
+      }
+    }
+    if (v && typeof v === 'object') return Object.values(v as Record<string, unknown>).flatMap(said);
+    return [];
+  };
+
+  for (const line of Object.values(copy).flatMap(said))
+    for (const word of BANNED)
+      assert.ok(
+        !line.toLowerCase().includes(word),
+        `\`${word}\` reaches a reader: ${line.slice(0, 90)}`,
+      );
 });
 
 test('the connector rows are `25 §9`\u2019s three states, and the paused one names what to reconnect', () => {

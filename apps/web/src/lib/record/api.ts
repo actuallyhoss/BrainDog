@@ -762,7 +762,14 @@ export function metric(id: string): Metric {
         id,
         label: 'Runway',
         value: `Over ${walk.horizon} days`,
-        note: `nothing dated takes ${money(walk.from, walk.currency ?? 'GBP')} under`,
+        /* "TAKES X UNDER" HAS NO OBJECT, so a reader supplies one and reads *under X* — which the
+           walk directly below it then breaks, twice, under a green tick. The floor is zero (the
+           crossing test is `balance < 0`); `X` is where the walk STARTS. Measured on a three-row
+           record: "nothing dated takes GBP 5,000.00 under" over a table showing that balance falling
+           to GBP 3,636.00 on the same day. This branch only ever renders on a small record — at
+           twelve rows the walk crosses and the tile flips — so it is week one's sentence, which is
+           the week nothing had ever looked at. */
+        note: `starts at ${money(walk.from, walk.currency ?? 'GBP')} and nothing dated takes it under`,
         /* THE TICK NEEDS SOMETHING TO HAVE BEEN WALKED. With an opening balance declared on the page
            and no dated movement anywhere in the record, the note is true — nothing takes it under,
            because there is no nothing — and a green tick over it is a verdict on a walk that did not
@@ -780,7 +787,13 @@ export function metric(id: string): Metric {
     };
   }
 
-  if (id === 'open-questions')
+  if (id === 'open-questions') {
+    /* AND THIS ONE RETURNS BEFORE THE EMPTY GUARD BELOW, so it kept the tick a record with nothing
+       in it has not earned: `Open questions · 0 · no more than 3 · ✓`. It is the same defect the
+       guard was written for, on `/decide` — which `19 §2` names as one of the three spine screens,
+       and which the commit that added the guard edited in the same breath. A figure over an empty
+       list is not good news; it is not news. */
+    const none = QUESTIONS.length === 0 && DECIDED.length === 0;
     return {
       id,
       label: 'Open questions',
@@ -788,10 +801,13 @@ export function metric(id: string): Metric {
       /* A LITERAL THAT `targetLine` WOULD HAVE WRITTEN. Every other target on every other tile went
          from `target ≤ X` to a sentence; this one is typed out here, so it stayed — on `/decide`,
          which `19 §2` names as one of the three spine screens. */
-      note: targetLine({ format: 'int', target: { lte: 3 } } as Parameters<typeof targetLine>[0]),
-      tone: QUESTIONS.length > 3 ? 'warn' : 'good',
+      note: none
+        ? copy.nothingIn('Decisions')
+        : targetLine({ format: 'int', target: { lte: 3 } } as Parameters<typeof targetLine>[0]),
+      ...(none ? {} : { tone: QUESTIONS.length > 3 ? ('warn' as const) : ('good' as const) }),
       href: '/decide',
     };
+  }
 
   /* `project-owed:Kiln` — the document, and the thing it is about. The parameter is everything after
      the FIRST colon, because a project can be called anything and a name with a colon in it is a
@@ -1468,11 +1484,76 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): { ent
  */
 export const DOM_CAP = 2_000;
 
-export function list(register: string, opts: { filters?: Filter[]; q?: string; sort?: { field: string; dir: 'asc' | 'desc' } } = {}) {
+/** `33 §2`: `list` answers 25 rows by default and 200 at most, plus a cursor. */
+export const PAGE = 200;
+
+/**
+ * One page of a list, and where the next one starts.
+ *
+ * `13 §4.3` SPECIFIES THREE MECHANISMS AND THIS TREE HAD ONE AND A HALF. Rows arrive in *"200-row
+ * keyset pages into rowgroups of 100 under `content-visibility`; the DOM caps at 2,000 with a
+ * visible cap line"*. The rowgroups are built and correct. The cap line is built and correct. The
+ * pages did not exist: this function took a filter and a sort and returned every row the register
+ * held, so `DOM_CAP` was not the END of a paging sequence, it was a substitute for one.
+ *
+ * KEYSET, NOT OFFSET, WHICH IS WHY THE CURSOR NAMES A ROW. `33 §2` chose it deliberately: an offset
+ * shifts under a concurrent write, so page two silently skips or repeats whatever moved across the
+ * boundary. The cursor here is the `seq` of the last row of the page before, and the next page
+ * starts after that ROW rather than at that COUNT — so a row inserted above it changes nothing.
+ *
+ * A CURSOR THAT NO LONGER RESOLVES IS `stale`, NOT AN EMPTY PAGE. If the answer changed underneath —
+ * the filter moved, the row was archived — the honest response is to say the sequence is broken and
+ * let the caller start again. Returning `[]` would look like the end of the list, which is the one
+ * answer that is indistinguishable from a correct one.
+ *
+ * NO `limit` MEANS THE WHOLE ANSWER, which every existing caller wants and which is what a count,
+ * a metric and a forecast read. Paging is something a *grid* does.
+ *
+ * AND THE MOCK RECOMPUTES THE FILTER PER PAGE, which the real record does not. That is worth saying
+ * plainly rather than hiding: this is a fidelity exercise in the SHAPE of the answer, not in its
+ * cost. Its value is that it forces the head count, `⌘a`, the sort chips and the empty states to be
+ * written against a PARTIAL answer — which is what `call('list', …)` will return, and what none of
+ * them assumed while this returned everything.
+ */
+export function list(
+  register: string,
+  opts: {
+    filters?: Filter[];
+    q?: string;
+    sort?: { field: string; dir: 'asc' | 'desc' };
+    /** Rows per page. Clamped to `33 §2`'s ceiling of 200. Absent means the whole answer. */
+    limit?: number;
+    /** The `seq` of the last row of the previous page. */
+    cursor?: string;
+  } = {},
+) {
   const all = ROWS[register] ?? [];
   const filtered = applyFilters(register, all, opts.filters ?? [], opts.q);
   const sorted = opts.sort ? sortRows(register, filtered, opts.sort.field, opts.sort.dir) : filtered;
-  return { entries: sorted, total: all.length, matched: filtered.length };
+
+  if (opts.limit === undefined)
+    return { entries: sorted, total: all.length, matched: filtered.length, cursor: null, stale: false };
+
+  const limit = Math.min(Math.max(1, Math.floor(opts.limit)), PAGE);
+  let from = 0;
+  if (opts.cursor !== undefined) {
+    const at = sorted.findIndex((e) => String(e.seq) === opts.cursor);
+    if (at === -1) return { entries: [], total: all.length, matched: filtered.length, cursor: null, stale: true };
+    from = at + 1;
+  }
+
+  const page = sorted.slice(from, from + limit);
+  const last = page[page.length - 1];
+  return {
+    entries: page,
+    total: all.length,
+    matched: filtered.length,
+    /* NULL AT THE END OF THE ANSWER, and only there. A cursor pointing at the last row would ask the
+       caller for one more page that is always empty, and an observer watching a sentinel would keep
+       firing at the bottom of a finished list. */
+    cursor: last && from + limit < sorted.length ? String(last.seq) : null,
+    stale: false,
+  };
 }
 
 /**

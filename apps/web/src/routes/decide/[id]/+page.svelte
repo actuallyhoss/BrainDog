@@ -191,7 +191,7 @@
               </header>
               <p class="card-body">{option.body}</p>
               <Button weight={highlighted === option.key ? 'primary' : 'quiet'} onclick={() => choose(option.key)}>
-                {copy.chooseThis}
+                {copy.chooseThis(option.title)}
               </Button>
             </article>
           {/each}
@@ -452,11 +452,14 @@
     font-size: var(--t-ui);
   }
 
-  /* A HEADING IS AS TALL AS ITS DESCENDERS. `display: flex` on an `h2` collapses its box to the
-     content height — measured 18.297px against a `line-height` of 18.3 — and the field below it
-     starts flush at that boundary, so the tails of "Why" and "yet" were painted over by the
-     textarea. The commit-reason panel uses the same `h2` and escaped only because a sub-line
-     happens to sit between it and its field. `line-height` first, and space under it. */
+  /* A HEADING IS AS TALL AS ITS DESCENDERS, AND HAS ROOM UNDER IT. Measured 18.297px against a
+     `line-height` of 18.3, with the textarea starting flush at that boundary, so the tails of "Why"
+     and "yet" were painted over. An earlier version of this comment blamed `display: flex` for
+     collapsing the box; that is wrong — the `display: block` sibling `.options-title` measures the
+     same 18.297px, because the height comes from the line box either way. What fixed it is the two
+     declarations below: a line-height with room for a descender, and space between the heading and
+     the field. The commit-reason panel uses the same `h2` and escaped only because a sub-line
+     happens to sit between it and its field. */
   .commit-title {
     display: flex;
     align-items: center;

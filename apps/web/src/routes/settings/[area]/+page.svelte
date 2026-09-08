@@ -796,7 +796,9 @@
       </Section>
     {/if}
 
-    <p class="mock">{copy.mockNotice} {PACKS.length} packs, {Object.keys(REGISTERS).length} lists.</p>
+    <!-- AND WITHOUT THE TALLY. "8 packs, 8 lists" welded a count nobody can act on to a sentence
+         about the build, on all twelve areas. Both numbers are on the screens that own them. -->
+    <p class="mock">{copy.mockNotice}</p>
   </div>
 </div>
 {/if}

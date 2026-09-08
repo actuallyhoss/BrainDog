@@ -328,6 +328,40 @@ test('a gauge sums past the cut too', () => {
   assert.ok(Math.abs(Number((drawn[0]?.cells[1] ?? '').replace(/[^0-9.]/g, '')) * 100 - truth) < 200);
 });
 
+test('a gauge keeps its currency when nothing matches', () => {
+  /**
+   * BOTH FIGURES LOST THEIR UNIT THE MOMENT THE FILTER MATCHED NOTHING.
+   *
+   * `total()` reports `currency: null` over an empty set — correctly, no row supplied one — and
+   * `asMoney(n, null)` is a value `display()` cannot format, so the value AND the declared target
+   * fell through to `String(n)` and printed raw minor units. `/p/estate` on a one-row record read
+   * **"Every month  0  of 22,000"** where the declaration says GBP 220.00, three hundred pixels from
+   * a tile reading "no more than GBP 3,000.00".
+   *
+   * It is the state of somebody's first week and nothing had ever looked at it. The target is a
+   * declared constant: it does not change when a filter matches nothing, so it cannot lose a unit
+   * it never took from the rows.
+   */
+  const kept = ROWS.services;
+  try {
+    /* THE ROWS STAY AND THE FILTER MISSES, which is the state that was measured: a young record
+       whose services exist and are not on a monthly cycle. A register with NO rows at all has no
+       currency anywhere to find — a money field declares none, only its values carry one — so that
+       case is a gap in the declaration rather than in this code, and it is filed as one. */
+    ROWS.services = kept!.map((e) => ({ ...e, fields: { ...e.fields, cycle: 'yearly' } }));
+    const block = page('estate')?.blocks.find((b) => b.kind === 'gauge');
+    assert.ok(block, 'the estate page has no gauge');
+    const drawn = toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
+    assert.equal(drawn.length, 1, 'a gauge is one row');
+    const [, value, target] = drawn[0]!.cells;
+    assert.match(String(value), /^[A-Z]{3}\s/, `the value lost its currency: ${value}`);
+    assert.match(String(target), /^[A-Z]{3}\s/, `the target lost its currency: ${target}`);
+    assert.doesNotMatch(String(target), /^\d/, 'the target printed as raw minor units');
+  } finally {
+    ROWS.services = kept!;
+  }
+});
+
 test('chips count every matching row, and the counts add to the matched total', () => {
   withExtra(80, 100_000, () => {
     const block = page('money')?.blocks.find((b) => b.kind === 'chips');

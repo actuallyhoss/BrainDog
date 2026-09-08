@@ -25,4 +25,9 @@ export { default as Inline } from './p/Inline.svelte';
 export { default as List } from './p/List.svelte';
 export { default as Table } from './p/Table.svelte';
 export { default as CapLine } from './p/CapLine.svelte';
+
+/* Which body a list draws, as a fact both layers read — `Table` chooses between its own two, and a
+   host chooses between this component and its own card list. Two subscriptions could disagree for a
+   paint; see the module for the 54,786 hidden nodes that argument is about. */
+export { rowsAsCards } from './cards.svelte.ts';
 export { default as Media } from './p/Media.svelte';

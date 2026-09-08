@@ -66,7 +66,11 @@ export const copy = {
   watchRun: 'Watch the run',
   /** The predicate of an unfiltered list, said as a person would say it. */
   everything: 'everything in it',
-  notWritten: (what: string) => `${what}, but nothing was written. This is a mock-up of the record.`,
+  /* WHAT WOULD HAVE HAPPENED, AND THAT IT DID NOT. The second half used to name the build —
+     "This is a mock-up of the record" — which `19 §9` bans and which answers a question nobody
+     asked: the reader wants to know whether their action stuck, not what stage the software is at.
+     Three sentences said it three ways; they say one thing one way now. */
+  notWritten: (what: string) => `${what}, but nothing was saved yet.`,
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
   showMe: 'Show me',
   thatIs: 'that is',
@@ -87,9 +91,9 @@ export const copy = {
    */
   willAdd: (name: string, span: number) =>
     `Adds a ${name} to the end of the page, ${span === 12 ? 'the full width' : `${span} twelfths wide`}.`,
-  bound: (name: string, page: string) => `Added a ${name} to ${page}. Nothing was written; this is a mock-up.`,
+  bound: (name: string, page: string) => `Added a ${name} to ${page}. Nothing was saved yet.`,
   blockLink: 'a link to this block',
-  blockAdded: (name: string) => `Added a ${name}. Nothing was written; this is a mock-up.`,
+  blockAdded: (name: string) => `Added a ${name}. Nothing was saved yet.`,
 
   /* The picker groups by PURPOSE, because somebody adding a block knows they want to show a list
      and does not know that `todo` and `timeline` share a primitive while `chips` does not. */
@@ -149,7 +153,7 @@ export const copy = {
     stat: 'two or three figures across the top',
   } as Record<string, string>,
   arrangedNotSaved: (title: string) =>
-    `${title} rearranged here. Nothing was written; this is a mock-up of the record.`,
+    `${title} rearranged here. Nothing was saved yet.`,
   arrangeNothing: 'Nothing moved.',
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
@@ -166,7 +170,7 @@ export const copy = {
   deferHint: 'What has to happen first',
   deferAction: 'Park it',
   wakeOn: 'Wake me on',
-  deferred: (on: string) => `Parked until ${on}. Nothing was written; this is a mock-up.`,
+  deferred: (on: string) => `Parked until ${on}. Nothing was saved yet.`,
   required: 'required',
   nothingToUndo: 'Nothing to undo.',
   archived: (id: string) => `Archived ${id}.`,
@@ -189,6 +193,9 @@ export const copy = {
      to the rest, which is the same shape the needs-you list already uses. */
   moreInTheLog: (n: number) => `${n.toLocaleString('en')} more in the log`,
   markAllRead: 'Mark all read',
+  /* THE `cleared` STATE FOR THE FEED, which is a feed you have worked through rather than a record
+     with nothing in it. `19 §6` gives this state no action, because there is nothing to do. */
+  nothingNew: 'Nothing new since you last looked.',
 
   /* decide and the gate */
   openQuestions: 'Open questions',
@@ -196,7 +203,12 @@ export const copy = {
   costOfDelay: 'Cost of deciding late',
   theOptions: 'The options',
   recommended: 'Recommended',
-  chooseThis: 'Choose this',
+  /* VERB + NOUN, which `19 §2` asks for and "Choose this" is not — it is verb plus pronoun, and
+     the noun is a hundred and seventy pixels away in an `<h3>` nothing associates with the button.
+     Three of them on `/decide/<id>` gave a screen reader the same three words three times, on one of
+     the three spine screens; and at 390px the third button sits below the fold, so the option's name
+     and the control that takes it are never on screen together. */
+  chooseThis: (option: string) => `Choose ${option}`,
   yourReason: 'Your reason',
   /* WHY THE COMMIT IS REFUSING, said where the refusal is. A decision is immutable once made, so the
      reason is the whole of what anybody reading it in six weeks will have. */
@@ -232,7 +244,7 @@ export const copy = {
   noneChosen: 'None',
   yes: 'Yes',
   secretsLiveInTheVault: 'Keys and tokens go in the Vault. A row records what one opens.',
-  savedNothing: 'Nothing was written. This is a mock-up of the record, not the record.',
+  savedNothing: 'Nothing was saved yet.',
   /**
    * WHAT A LEVEL MEANS, IN ONE CELL. There were two: a chip printing the enum (`write`) and, three
    * inches away, a sentence collapsing three levels into two with a ternary — so S. Marchetti's row
@@ -348,7 +360,12 @@ export const copy = {
      and not leave usefully, which is what this one was: implemented, drawn, and consumed by
      nothing. Verb + Noun, like every other action here. */
   copyIds: 'Copy ids',
-  setState: 'Set state',
+  /* THE REGISTER'S OWN WORD FOR ITS OWN COLUMN. `things` labels its state field **Status**, so a
+     hardcoded "Set state" put one field's three names on one screen — `lane` in the schema, Status
+     in the header, state on the verb, two of them visible at once. The menu's VALUES already come
+     from the declaration, which is why they were right; only the verb was typed. It is wrong the
+     first time anybody labels theirs, which is exactly what a pack author does. */
+  setState: (field: string) => `Set ${field.toLowerCase()}`,
   archiveSelected: 'Archive them',
   clearFilters: 'Clear filters',
   saveAsView: 'Save as a view',
@@ -770,8 +787,17 @@ export const copy = {
   scopePalette: 'In the palette',
   scopeNav: 'In the sidebar',
 
-  /* the mock-up's own line, and the only one that is about the mock-up */
-  mockNotice: 'A frontend mock-up. Nothing writes, and no request leaves the page.',
+  /**
+   * WHAT IT MEANS TO THE READER, not what it is to whoever built it.
+   *
+   * It read *"A frontend mock-up. Nothing writes, and no request leaves the page."* on all twelve
+   * settings areas, on `/jobs/<id>` and on `/decide/<id>` — `19 §9` names `mock-up` as internal
+   * vocabulary reaching a user, and `access.test.ts` was written to forbid exactly this, but forbade
+   * one literal that has since been deleted while the bigger call site stayed. "Nothing writes" is
+   * the schema's word for it; "no request leaves the page" is a fact about the network that no
+   * reader asked for. What they need is whether their typing survives.
+   */
+  mockNotice: 'Nothing you do here is saved yet.',
 } as const;
 
 export type Copy = typeof copy;

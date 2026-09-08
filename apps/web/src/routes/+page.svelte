@@ -16,6 +16,7 @@
   import { parse, relative, TONES } from 'braindog-render';
   import { Block, Degraded } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
+  import * as pref from '$lib/pref.ts';
   import { NOW, ROWS, actorOf, metric } from '$lib/record/api.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -49,6 +50,38 @@
    * needs-you list already uses, pointing at the surface that exists to hold the rest.
    */
   const NEWS_CAP = 8;
+
+  /**
+   * WHAT HAPPENED SINCE YOU LAST LOOKED — WHICH THIS SCREEN COULD NOT ANSWER.
+   *
+   * The feed read a module constant and nothing anywhere stored a mark, so the fifth session showed
+   * the same six items as the first. `19 §6` calls this half of Home the answer to *"what happened
+   * while you were not looking"*, and it was a heading making a claim about the reader's own history
+   * that was the same claim for ever — beside a register head that is scrupulous about its count.
+   *
+   * `copy.markAllRead` had been in `copy.ts` with no call site, waiting for exactly this.
+   *
+   * THE MARK IS AN INSTANT, NOT A FLAG. A per-item read state is a second store to keep in step with
+   * a log that only grows; a timestamp is one string, it survives a new arrival correctly, and it is
+   * what the real record already uses — `33 §2`'s `whatsNew` takes a cursor and `member.seen_at` is
+   * its account-wide default. This is the browser's half of the same idea.
+   *
+   * UNSET MEANS EVERYTHING IS NEW, which is what a first visit should be: nothing has been looked at
+   * because there has been no visit to look during.
+   */
+  let seen = $state(pref.read().seen);
+
+  const fresh = $derived(data.whatsNew.filter((item) => !seen || item.at > seen));
+
+  function markRead() {
+    /* The newest item's own instant, not the wall clock. Marking read means "I have seen these",
+       and an arrival written a second later must not be swallowed by a mark taken a second after
+       that — which is the race a `Date.now()` here would lose silently and rarely. */
+    const newest = data.whatsNew.reduce((a, item) => (item.at > a ? item.at : a), '');
+    if (!newest) return;
+    seen = newest;
+    pref.write({ seen: newest });
+  }
 
   const dueSoon = $derived(
     (ROWS.obligations ?? [])
@@ -140,7 +173,12 @@
         {#each lapsing as s}
           <li>
             <a class="line" href="/r/services/{s.seq}">
-              <span class="seq"><Icon name="service" size="s" />#{s.seq}</span>
+              <!-- THE SPOKEN ID, QUALIFIED, because this is the one list in the product that mixes
+                   registers. `19 §9` makes the row number the thing you can say out loud — "It has a
+                   number you can say: #125" — and that only holds inside one list: a lapsing service
+                   and an overdue obligation both drew `#2` here, told apart by a twelve-pixel glyph.
+                   `services#2` is what the clipboard copies and what `/audit` prints. -->
+              <span class="seq"><Icon name="service" size="s" />services#{s.seq}</span>
               <span class="line-main">
                 <span class="line-title">{s.fields.name} is lapsing</span>
               </span>
@@ -158,7 +196,7 @@
           {@const owed = e.fields.direction === 'owed_to_me'}
           <li>
             <a class="line" href="/r/obligations/{e.seq}">
-              <span class="seq"><Icon name="obligation" size="s" />#{e.seq}</span>
+              <span class="seq"><Icon name="obligation" size="s" />obligations#{e.seq}</span>
               <span class="line-main">
                 <span class="line-title">{e.fields.what}</span>
               </span>
@@ -197,9 +235,20 @@
       {/each}
     </Section>
 
-    <Section title={copy.sinceAway} count={data.whatsNew.length}>
+    <Section title={copy.sinceAway} count={fresh.length}>
+      {#snippet aside()}
+        {#if fresh.length > 0}
+          <button type="button" class="mark" onclick={markRead}>{copy.markAllRead}</button>
+        {/if}
+      {/snippet}
+      <!-- NOTHING NEW IS A STATE, AND IT IS `cleared`. A feed that has been read is a feed you have
+           worked through, which is the one empty state `19 §6` gives no action — there is nothing to
+           do, and that is the message. -->
+      {#if fresh.length === 0}
+        <Empty kind="cleared" title={copy.nothingNew} />
+      {:else}
       <ul class="feed">
-        {#each data.whatsNew.slice(0, NEWS_CAP) as item}
+        {#each fresh.slice(0, NEWS_CAP) as item}
           <li>
             <a class="event" href={item.href}>
               <!-- The agent that wrote it, named. Never a sparkle badge: across thirteen experiments
@@ -217,17 +266,47 @@
            whole shape is "here is what happened". `19 §2` gives `/audit` that job, so the overflow
            points at it — and it now also fires for the rows this screen itself is not drawing, which
            the record's flag knew nothing about. -->
-      {#if data.sinceCapped || data.whatsNew.length > NEWS_CAP}
+      {#if data.sinceCapped || fresh.length > NEWS_CAP}
         <a class="more" href="/audit">
-          {data.sinceCapped ? copy.andMore : copy.moreInTheLog(data.whatsNew.length - NEWS_CAP)}
+          {data.sinceCapped ? copy.andMore : copy.moreInTheLog(fresh.length - NEWS_CAP)}
           <Icon name="arrow" size="s" />
         </a>
+      {/if}
       {/if}
     </Section>
   </aside>
 </div>
 
 <style>
+  /* A verb in a section head, not a button: it sits beside a heading and must not compete with the
+     rows under it. Same shape as the `.more` link at the foot of the same section. */
+  .mark {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--dim);
+    font: inherit;
+    font-size: var(--t-xs);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+
+  .mark:hover {
+    color: var(--ink);
+  }
+
+  /* THE ID COLUMN HOLDS A QUALIFIED ID HERE. The ledger's default first track is `12ch`, which fits
+     `#125` and truncates `obligations#12` — and this is the one list in the product that mixes
+     registers, so the qualifier is the part that makes the number sayable. Scoped, and above 640px
+     for the reason `/audit` and `/decide` carry the same guard: below it the row is a card, and a
+     component `<style>` is unlayered and beats `@layer components`. */
+  @media (width >= 640px) {
+    .ledger :global(.line) {
+      grid-template-columns: 16ch minmax(0, 1fr) auto 9ch;
+    }
+  }
+
   .page {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;

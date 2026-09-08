@@ -63,6 +63,27 @@ test('THE NAV ORDER SURVIVES A RELOAD', () => {
   assert.deepEqual(pref.read().nav, ['/p/money', '/r/obligations', '/']);
 });
 
+test('the activity mark survives, so "since you were away" can advance', () => {
+  /**
+   * HOME'S FEED MADE A CLAIM ABOUT THE READER'S OWN HISTORY AND NOTHING STORED ONE.
+   *
+   * "Since you were away" read a module constant and there was no mark anywhere — not in the cookie,
+   * not in `localStorage` — so the fifth session showed the same six items as the first. `19 §6`
+   * calls this half of Home the answer to *"what happened while you were not looking"*, and
+   * `copy.markAllRead` sat unused waiting for the store that did not exist.
+   *
+   * AN INSTANT, NOT A PER-ITEM FLAG: one string that survives a new arrival correctly, and the same
+   * shape the real record uses (`33 §2`'s `whatsNew` cursor, defaulting to `member.seen_at`).
+   */
+  jar();
+  assert.equal(pref.read().seen, undefined, 'a first visit has looked at nothing');
+  pref.write({ seen: '2026-09-03T09:00:00Z' });
+  assert.equal(pref.read().seen, '2026-09-03T09:00:00Z');
+  /* And it is replaced, not accumulated — marking read twice leaves one mark. */
+  pref.write({ seen: '2026-09-04T09:00:00Z' });
+  assert.equal(pref.read().seen, '2026-09-04T09:00:00Z');
+});
+
 test('a cookie this build cannot read is not a crash', () => {
   // A preference from an older version, or one somebody edited. The default is the right answer and
   // the next write replaces it.
