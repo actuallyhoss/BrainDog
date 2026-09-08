@@ -802,6 +802,10 @@ const EXTRACTORS = [
   'first', 'nth', 'default',
 ] as const;
 
+/** `43 §4.3`'s two ceilings on a combinator's arguments: `first` takes 2–8 forms, `nth` counts 1–64. */
+const FIRST_ARMS = 8;
+const NTH_CEILING = 64;
+
 /** `42 §4.7`: what `inbox_raw` holds, and therefore everything a `match:` can be about. */
 const MATCH_FIELDS = ['from', 'to', 'subject', 'body', 'channel', 'state', 'ts'] as const;
 
@@ -951,17 +955,70 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
       );
   }
 
-  const held = form as { first?: unknown; nth?: { of?: unknown }; default?: { of?: unknown } };
-  if (Array.isArray(held.first))
+  const held = form as {
+    first?: unknown;
+    nth?: { n?: unknown; of?: unknown };
+    default?: { value?: unknown; of?: unknown };
+  };
+
+  /* A COMBINATOR'S OWN ARGUMENTS, WHICH NOTHING CHECKED. The key was checked against the thirteen
+     and the inner forms were walked, and everything between the two went through: `first: []` with
+     no arms, `nth: { n: 0 }`, a `default` carrying no `value`. Each of those installs, matches, and
+     reads nothing — which is the shape this whole function exists to stop, one level in.
+
+     `EXTRACTOR_UNKNOWN` IS THE CODE, and it is the code the depth ceiling above already uses. Its
+     row in `07 §3` reads "a key outside the thirteen", and a `first` with one arm is not the `first`
+     form — the thirteen are shapes and not spellings. */
+  if ('first' in form) {
+    if (!Array.isArray(held.first) || held.first.length < 2 || held.first.length > FIRST_ARMS)
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.first takes 2 to ${FIRST_ARMS} forms, and this is ${Array.isArray(held.first) ? `${held.first.length}` : JSON.stringify(held.first ?? null)}. One way of reading a field is that form on its own.`,
+        at,
+      );
     for (const [i, inner] of held.first.entries()) {
       const fault = extractorFault(inner, `${at}.first[${i}]`, depth + 1);
       if (fault) return fault;
     }
-  for (const [key, inner] of [['nth', held.nth?.of], ['default', held.default?.of]] as const)
-    if (inner !== undefined) {
-      const fault = extractorFault(inner, `${at}.${key}.of`, depth + 1);
-      if (fault) return fault;
-    }
+  }
+
+  if ('nth' in form) {
+    const n = held.nth?.n;
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > NTH_CEILING)
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.nth.n is ${JSON.stringify(n ?? null)}, and it counts candidates from 1 to ${NTH_CEILING}.`,
+        at,
+      );
+  }
+
+  /* A `default` WITH NO `value` IS NOT A DEFAULT. It is the one form whose whole purpose is to make
+     a field optional, and without the key it makes it required again — silently, because the field
+     then reads as missing exactly as it did before anybody wrote the fallback. */
+  if ('default' in form && !(held.default !== null && typeof held.default === 'object' && 'value' in held.default))
+    return bad(
+      'EXTRACTOR_UNKNOWN',
+      `${at}.default carries no value, and the value is the whole of what a default is. Every declared field is required; this is the only way to make one optional.`,
+      at,
+    );
+
+  /* THE `of:` OF WHICHEVER COMBINATOR IS PRESENT, and only of one that is. The first version of
+     this loop read `held.nth?.of` and `held.default?.of` unconditionally and refused an absent one
+     — which is every plain form there is, so `{ money: … }` would have been refused as a `nth`
+     carrying no `of`. Caught by the tests in the same commit; kept here because the shape of the
+     mistake is the reason a check runs against real declarations before it is believed. */
+  for (const key of ['nth', 'default'] as const) {
+    if (!(key in form)) continue;
+    const inner = held[key]?.of;
+    if (inner === undefined)
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.${key} carries no of:, and a combinator reads a form rather than the payload.`,
+        at,
+      );
+    const fault = extractorFault(inner, `${at}.${key}.of`, depth + 1);
+    if (fault) return fault;
+  }
   return null;
 }
 

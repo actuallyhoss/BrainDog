@@ -54,18 +54,59 @@ export type Confidence = (typeof CONFIDENCES)[number];
 const worse = (a: Confidence, b: Confidence): Confidence =>
   CONFIDENCES.indexOf(a) <= CONFIDENCES.indexOf(b) ? a : b;
 
-/** The nine, and the anchors any of them may carry. */
+/**
+ * The thirteen forms of `07 §3` — ten extractors that read the text, and three combinators that take
+ * a form. Any extractor may carry one anchor.
+ *
+ * THIS SAID "THE NINE" AND LISTED TEN, and it held ten of the thirteen. `declare.ts` has always
+ * checked a form's key against all thirteen, so an ingest declaring `first:` INSTALLED CLEANLY and
+ * then extracted nothing: every arm below missed, `extract` fell off the end and returned `null`,
+ * and the field was reported as one the pattern could not read — naming the field rather than the
+ * form that is not implemented. A published vocabulary with three unimplemented members is worse
+ * than one that refuses them, because the refusal at least reaches the person who wrote it.
+ */
 export type Extractor =
   | { after: string }
   | { before: string }
-  | { between: [string, string] }
-  | { text: { after?: string; before?: string; between?: [string, string] } }
-  | { money: { currency?: string; sep?: string; after?: string; before?: string; between?: [string, string] } }
-  | { date: { format: string; after?: string; before?: string; between?: [string, string] } }
-  | { int: { after?: string; before?: string; between?: [string, string] } }
-  | { decimal: { sep?: string; after?: string; before?: string; between?: [string, string] } }
-  | { enum: { map: Record<string, string>; after?: string; before?: string; between?: [string, string] } }
-  | { lookup: { register: string; by: string; after?: string; before?: string; between?: [string, string] } };
+  | { between: readonly [string, string] }
+  | { text: { after?: string; before?: string; between?: readonly [string, string] } }
+  | { money: { currency?: string; sep?: string; after?: string; before?: string; between?: readonly [string, string] } }
+  | { date: { format: string; after?: string; before?: string; between?: readonly [string, string] } }
+  | { int: { after?: string; before?: string; between?: readonly [string, string] } }
+  | { decimal: { sep?: string; after?: string; before?: string; between?: readonly [string, string] } }
+  | { enum: { map: Record<string, string>; after?: string; before?: string; between?: readonly [string, string] } }
+  | { lookup: { register: string; by: string; after?: string; before?: string; between?: readonly [string, string] } }
+  /* READONLY, because a declaration is data a pack or a `.dog` file handed over, and `as const` is
+     how every fixture in this repository writes one. */
+  | { first: readonly Extractor[] }
+  | { nth: { n: number; of: Extractor } }
+  | { default: { value: Json; of: Extractor } };
+
+/**
+ * What reading one field ACTUALLY DID — `43 §4.3`'s outcome, so `43 §5.1`'s confidence rule has
+ * something to read.
+ *
+ * FOUR OF THE SIX. `ambiguous` and `invalid` belong to a scanner that returns every match and to a
+ * field-shape check against `34 §3`; this runtime has neither, and a word it can never emit would be
+ * a promise in a type. The four it can tell apart are the four below.
+ */
+export type FieldOutcome = 'exact' | 'chosen' | 'defaulted' | 'missing';
+
+/** What one field's form yielded, and how. */
+export type Extracted = { value: Json | null; outcome: FieldOutcome };
+
+/** `43 §4.3`'s three combinators: they take a form's candidates rather than reading the payload. */
+const COMBINATORS = ['first', 'nth', 'default'] as const;
+
+/**
+ * `43 §4.3`'s nesting ceiling, enforced HERE as well as at install.
+ *
+ * `declare.ts` refuses a form nested more than three deep, and that is where a person finds out. It
+ * is not where a declaration necessarily arrives: a `.dog` import and a pack both reach `arrive`,
+ * and this walk is over a structure a stranger wrote. Past the ceiling a form yields nothing, which
+ * is the same answer as a form that read nothing — a payload produces an outcome, never a throw.
+ */
+const NESTING = 3;
 
 export type IngestDecl = {
   ingest: string;
@@ -239,10 +280,17 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     const extracted: Record<string, unknown> = {};
     const missed: string[] = [];
 
+    /* THE OUTCOME PER FIELD, not only the value — `43 §5.1` step 7 files a row by the worst of them
+       and this loop used to keep the value alone. */
+    const soft: string[] = [];
+
     for (const [field, form] of Object.entries(matched.extract)) {
-      const value = extract(deps, form, text);
-      if (value === null) missed.push(field);
-      else extracted[field] = value;
+      const got = resolve(deps, form, text);
+      if (got.value === null) missed.push(field);
+      else {
+        extracted[field] = got.value;
+        if (got.outcome !== 'exact') soft.push(field);
+      }
     }
 
     /* THE CEILING IS PART OF THE DECLARATION AND THE OUTCOME IS PART OF THE PAYLOAD, and the lower of
@@ -267,19 +315,32 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       });
     }
 
-    /* A FIELD THE PATTERN COULD NOT READ IS `needs-review`, and everything else this vocabulary can
-       do reads cleanly or returns nothing — there is no combinator here that chooses or defaults, so
-       there is no honest third outcome to derive. */
-    const confidence = worse(missed.length ? 'needs-review' : 'exact', ceiling);
+    /* `43 §5.1` STEP 7, ALL THREE LEVELS. A field the pattern could not read is `needs-review`; a
+       field it CHOSE between two forms, or DEFAULTED in because the payload did not carry one, is
+       `proposed` — read by the record, not sent by anybody, and therefore a thing a person should
+       see before it is a row.
+
+       THE MIDDLE LEVEL HAD NO WAY TO BE REACHED and this comment said so: "there is no combinator
+       here that chooses or defaults, so there is no honest third outcome to derive". There are three
+       now, and `proposed` stopped being a level only a declared ceiling could produce. */
+    const confidence = worse(
+      missed.length ? 'needs-review' : soft.length ? 'proposed' : 'exact',
+      ceiling,
+    );
 
     /* A FAILURE DOWNGRADES RATHER THAN DISCARDS. The bytes stay, the reason is on them, and the
        extraction goes in front of a person as a `rowset` they can accept — which is the only thing
        that makes a pattern nobody has approved yet safe to leave switched on. */
     if (confidence !== 'exact') {
       const state = confidence === 'proposed' ? 'proposed' : 'review';
+      /* THE REASON NAMES FIELD IDS AND NOTHING OUT OF THE PAYLOAD — `43 §6`'s leak rule. The middle
+         arm is new with the combinators: "files at ${ceiling}" was the only explanation this could
+         give, and it is a false one when the ceiling is `exact` and a field defaulted. */
       const reason = missed.length
         ? `${matched.ingest} could not read ${missed.join(', ')} out of this one.`
-        : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
+        : soft.length
+          ? `${matched.ingest} chose or defaulted ${soft.join(', ')} rather than reading them, so what it read is proposed rather than written.`
+          : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
       store(state, reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', confidence);
 
@@ -512,9 +573,97 @@ export function propose(deps: ProposeDeps, channel: Channel, headers: Record<str
  * claim than not writing one.
  */
 export function extract(deps: IngestDeps, form: Extractor, text: string): Json | null {
-  const anchored = slice(form as Record<string, unknown>, text);
-  if (anchored === null) return null;
+  return resolve(deps, form, text).value;
+}
 
+/**
+ * The same read, with `43 §4.3`'s outcome attached.
+ *
+ * TWO ENTRY POINTS BECAUSE TWO CALLERS WANT DIFFERENT THINGS. A person testing a pattern wants the
+ * value; `arrive` wants to know whether the value was CHOSEN between two forms or DEFAULTED in
+ * because the payload did not carry one, because `43 §5.1` files those at `proposed` and a straight
+ * read at `exact`. Collapsing them is how a defaulted field gets written as though a bank had sent
+ * it.
+ */
+export function resolve(deps: IngestDeps, form: Extractor, text: string): Extracted {
+  return resolveAt(deps, form, text, 1);
+}
+
+function resolveAt(deps: IngestDeps, form: Extractor, text: string, depth: number): Extracted {
+  const missing: Extracted = { value: null, outcome: 'missing' };
+  if (form === null || typeof form !== 'object' || depth > NESTING) return missing;
+
+  /* `first` RUNS EVERY ARM AND NOT ONLY UNTIL ONE ANSWERS, which is the one thing about it that is
+     not obvious. The value is the first arm that yielded — but the OUTCOME depends on how many did,
+     and a walk that stopped at the first could not tell one from two. `43 §5.3` says so in the same
+     breath: "run each form in order; collect which yielded", k forms is k passes. Two banks wording
+     the same amount two ways is exactly when a person should be asked to look. */
+  if ('first' in form) {
+    const arms = Array.isArray(form.first) ? form.first : [];
+    let picked: Json | null = null;
+    let yielded = 0;
+    for (const arm of arms) {
+      const got = candidatesAt(deps, arm, text, depth + 1);
+      if (got.length === 0) continue;
+      yielded += 1;
+      picked ??= got[0]!;
+    }
+    if (picked === null) return missing;
+    return { value: picked, outcome: yielded > 1 ? 'chosen' : 'exact' };
+  }
+
+  if ('nth' in form) {
+    const { n, of } = form.nth;
+    if (!Number.isInteger(n) || n < 1) return missing;
+    const got = candidatesAt(deps, of, text, depth + 1);
+    const at = got[n - 1];
+    return at === undefined ? missing : { value: at, outcome: 'exact' };
+  }
+
+  /* `default` KEEPS `of`'s OUTCOME WHEN `of` ANSWERED. Only the fallback is `defaulted`; a `first`
+     inside a `default` that chose is still a choice, and flattening both to one word would file an
+     ordinary read at `proposed` every time somebody wrote a fallback for it. */
+  if ('default' in form) {
+    const got = resolveAt(deps, form.default.of, text, depth + 1);
+    if (got.value !== null) return got;
+    return { value: form.default.value, outcome: 'defaulted' };
+  }
+
+  const got = candidatesAt(deps, form, text, depth);
+  return got.length === 0 ? missing : { value: got[0]!, outcome: 'exact' };
+}
+
+/**
+ * Every candidate one form yields over one text, in text order — `43 §5.3`'s candidate contract.
+ *
+ * THE CANDIDATES COME FROM THE ANCHOR, AND THAT IS THIS RUNTIME'S CEILING. `43 §5.4`'s scanners
+ * yield every match INSIDE a slice as well: `{ money: {} }` over "EGP 10 and EGP 20" is two
+ * candidates there and one here, because this file parses the first number of a slice rather than
+ * walking it. What it does implement is the other half and the half `nth` is usually written for —
+ * each occurrence of the anchor is a slice, and the slices' values concatenate. So
+ * `nth: { n: 2, of: { money: { after: 'EGP', currency: 'EGP' } } }` reads the second amount, and a
+ * bare form still reads the first, byte for byte what it read before.
+ *
+ * A COMBINATOR HAS AT MOST ONE CANDIDATE. It takes a form's candidates and returns one value, so
+ * `nth: { n: 2, of: { first: [...] } }` is nothing — correctly, and for the same reason the
+ * specification counts combinators separately.
+ */
+function candidatesAt(deps: IngestDeps, form: Extractor, text: string, depth: number): Json[] {
+  if (form === null || typeof form !== 'object' || depth > NESTING) return [];
+  if (COMBINATORS.some((key) => key in form)) {
+    const got = resolveAt(deps, form, text, depth);
+    return got.value === null ? [] : [got.value];
+  }
+  const out: Json[] = [];
+  for (const anchored of slices(form as Record<string, unknown>, text)) {
+    const got = value(deps, form, anchored);
+    if (got !== null) out.push(got);
+  }
+  return out;
+}
+
+/** One of the ten value forms over one slice. The anchors are already applied. */
+function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null {
   if ('after' in form || 'before' in form || 'between' in form) return anchored.trim() || null;
   if ('text' in form) return anchored.replace(/\s+/g, ' ').trim() || null;
 
@@ -571,31 +720,63 @@ export function extract(deps: IngestDeps, form: Extractor, text: string): Json |
   return null;
 }
 
-/** The anchors, which any form may carry. `null` when an anchor is not in the text at all. */
-function slice(form: Record<string, unknown>, text: string): string | null {
+/**
+ * Every slice the anchors name, in text order. No anchor is the whole text, once; an anchor that is
+ * nowhere in the text is no slices, which is how a form reads nothing rather than reading the lot.
+ *
+ * THIS RETURNED ONE SLICE AND `nth` NEEDS THE LIST. `43 §5.3` is explicit — "each occurrence of the
+ * anchor literal, advancing past every hit, yields one slice; candidates concatenate in text order"
+ * — and the single-slice version was the first occurrence, which is candidate 1 and still is, byte
+ * for byte, for every declaration that exists.
+ *
+ * NOTHING THIS RETURNS FIRST HAS MOVED, and the reason is worth stating because it is the only thing
+ * that makes the change safe to make under money: every slice is a SUFFIX of the one before it, so a
+ * `before` or a closing `B` that is missing from the first slice is missing from all of them. An
+ * occurrence that yields nothing can therefore only be the tail, and skipping it rather than ending
+ * the walk is a rule that can change candidate 2 onward and never candidate 1.
+ */
+function slices(form: Record<string, unknown>, text: string): string[] {
   const inner = (Object.values(form)[0] ?? {}) as Record<string, unknown>;
   const spec = 'after' in form || 'before' in form || 'between' in form ? form : inner;
 
-  let out = text;
-  if (Array.isArray(spec.between)) {
-    const [a, b] = spec.between as [string, string];
-    const from = out.indexOf(a);
-    if (from < 0) return null;
-    const rest = out.slice(from + a.length);
-    const to = rest.indexOf(b);
-    return to < 0 ? null : rest.slice(0, to);
+  /* AN EMPTY LITERAL IS NOT AN ANCHOR. `indexOf('')` is 0 at every index, so walking one would cut
+     the text into one slice per character; `43 §4.3` requires a literal of at least one character
+     and `declare` refuses a shorter one. Treated here as no anchor at all, which is what the
+     single-slice walk did with it. */
+  const literal = (at: unknown): string | null => (typeof at === 'string' && at.length > 0 ? at : null);
+
+  const between = Array.isArray(spec.between) ? (spec.between as [string, string]) : null;
+  if (between !== null) {
+    const [a, b] = between;
+    const out: string[] = [];
+    if (literal(a) === null) return out;
+    for (let at = text.indexOf(a); at >= 0; at = text.indexOf(a, at + a.length)) {
+      const rest = text.slice(at + a.length);
+      const to = rest.indexOf(b);
+      /* AN `A` WITH NO `B` YIELDS NOTHING AND DOES NOT END THE WALK — `43 §4.3`, verbatim. */
+      if (to >= 0) out.push(rest.slice(0, to));
+    }
+    return out;
   }
-  if (typeof spec.after === 'string') {
-    const at = out.indexOf(spec.after);
-    if (at < 0) return null;
-    out = out.slice(at + spec.after.length);
+
+  const after = literal(spec.after);
+  const before = literal(spec.before);
+  const cut = (slice: string): string | null => {
+    if (before === null) return slice;
+    const at = slice.indexOf(before);
+    return at < 0 ? null : slice.slice(0, at);
+  };
+
+  if (after !== null) {
+    const out: string[] = [];
+    for (let at = text.indexOf(after); at >= 0; at = text.indexOf(after, at + after.length)) {
+      const slice = cut(text.slice(at + after.length));
+      if (slice !== null) out.push(slice);
+    }
+    return out;
   }
-  if (typeof spec.before === 'string') {
-    const at = out.indexOf(spec.before);
-    if (at < 0) return null;
-    out = out.slice(0, at);
-  }
-  return out;
+  const whole = cut(text);
+  return whole === null ? [] : [whole];
 }
 
 /** The first number in a run of text, with its separators. `null` when there is none. */

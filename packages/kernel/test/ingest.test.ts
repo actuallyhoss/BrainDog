@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrive, extractField, ingestDay, openRecord, type Arrived, type Declaration, type Kernel } from '../src/index.ts';
+import { arrive, extractField, extractOutcome, ingestDay, openRecord, type Arrived, type Declaration, type Kernel } from '../src/index.ts';
 import { EXPONENT, exponentOf } from '../src/ingest.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -248,6 +248,84 @@ test('and `null` is "not there", never zero and never the empty string', () => {
   assert.equal(extractField(deps, { int: {} }, 'there are 4.1 of them'), null, 'an int is a whole number');
 });
 
+test('THE THREE COMBINATORS ARE IMPLEMENTED, and until they were an ingest installed and read nothing', () => {
+  /* `declare.ts` has always checked a form's key against all thirteen of `07 §3`, and the runtime
+     held ten. So a declaration saying `first:` passed the linter, installed, matched arrivals, and
+     then reported the field as one the pattern could not read — naming the field rather than the
+     form nobody had written. */
+
+  // `first` — the reason no regular expression is needed when one bank words it differently.
+  const either = {
+    first: [{ money: { after: 'EGP ', currency: 'EGP' } }, { money: { after: 'E£', currency: 'EGP' } }],
+  } as const;
+  assert.deepEqual(extractField(deps, either, 'debited E£ 40.00 today'), { amount: 4000, currency: 'EGP' });
+  assert.deepEqual(extractField(deps, either, 'debited EGP 12.50 today'), { amount: 1250, currency: 'EGP' });
+  assert.equal(extractField(deps, either, 'debited USD 12.50 today'), null, 'no arm yielded');
+
+  // `nth` — the second occurrence of the anchor, which is what a statement line looks like.
+  const second = { nth: { n: 2, of: { money: { after: 'EGP ', currency: 'EGP' } } } } as const;
+  assert.deepEqual(extractField(deps, second, 'fee EGP 5.00 and total EGP 45.00'), {
+    amount: 4500,
+    currency: 'EGP',
+  });
+  assert.equal(extractField(deps, second, 'fee EGP 5.00 only'), null, 'fewer candidates than n');
+  assert.equal(extractField(deps, { nth: { n: 0, of: { int: {} } } } as never, 'x 4'), null, 'n is 1-based');
+
+  // `default` — the only way to make a declared field optional.
+  const optional = { default: { value: 0, of: { int: { after: 'tip ' } } } } as const;
+  assert.equal(extractField(deps, optional, 'tip 7 pounds'), 7);
+  assert.equal(extractField(deps, optional, 'no tip at all'), 0, 'the value, not null');
+});
+
+test('and each combinator says HOW it read, because 43 §5.1 files a choice at `proposed`', () => {
+  /* A defaulted field was not sent by anybody and a chosen one was read two ways. Both are rows a
+     person should see before they are rows, and the confidence level that says so — `proposed` —
+     was previously reachable only by declaring it as a ceiling. */
+  const one = { first: [{ int: { after: 'a ' } }, { int: { after: 'b ' } }] } as const;
+  assert.deepEqual(extractOutcome(deps, one, 'a 1 only'), { value: 1, outcome: 'exact' }, 'one arm yielded');
+  assert.deepEqual(extractOutcome(deps, one, 'a 1 and b 2'), { value: 1, outcome: 'chosen' }, 'two did');
+
+  assert.deepEqual(extractOutcome(deps, { default: { value: 0, of: { int: { after: 'tip ' } } } }, 'no tip'), {
+    value: 0,
+    outcome: 'defaulted',
+  });
+  assert.deepEqual(extractOutcome(deps, { default: { value: 0, of: { int: { after: 'tip ' } } } }, 'tip 7'), {
+    value: 7,
+    outcome: 'exact',
+  }, "`of` answered, so it keeps `of`'s outcome");
+
+  assert.deepEqual(extractOutcome(deps, { int: { after: 'q ' } }, 'nothing'), { value: null, outcome: 'missing' });
+});
+
+test('a form nested past three deep yields nothing, and never a walk that does not end', () => {
+  /* `declare` refuses it at install, and a `.dog` import or a pack reaches `arrive` without passing
+     the linter. A payload produces an outcome, never a throw. */
+  const deep = { first: [{ first: [{ first: [{ first: [{ int: {} }] }] }] }] } as never;
+  assert.equal(extractField(deps, deep, 'there are 41'), null);
+
+  const cyclic = { first: [] } as { first: unknown[] };
+  cyclic.first.push(cyclic);
+  assert.equal(extractField(deps, cyclic as never, 'there are 41'), null);
+});
+
+test('AN ANCHOR YIELDS EVERY OCCURRENCE, and candidate 1 is what it always read', () => {
+  /* The candidates come from the anchor: `43 §5.3`'s other half — every match inside one slice — is
+     this runtime's stated ceiling, so `{ money: {} }` over two amounts is still one candidate. */
+  assert.equal(extractField(deps, { after: 'ref: ' }, 'ref: A and ref: B'), 'A and ref: B', 'candidate 1');
+  assert.equal(extractField(deps, { nth: { n: 2, of: { after: 'ref: ' } } } as never, 'ref: A and ref: B'), 'B');
+
+  const pair = { between: ['at ', ' on'] } as const;
+  assert.equal(extractField(deps, pair, 'at Halden on Mon and at Oslo on Fri'), 'Halden');
+  assert.equal(extractField(deps, { nth: { n: 2, of: pair } } as never, 'at Halden on Mon and at Oslo on Fri'), 'Oslo');
+
+  /* AN `A` WITH NO `B` IS NOT A CANDIDATE AND DOES NOT END THE WALK — `43 §4.3`. Only the tail can
+     be that occurrence: every slice is a suffix of the one before it, so a `B` missing from the
+     first slice is missing from all of them. Which is why this rule cannot move candidate 1, and
+     why the walk having to survive it matters only from candidate 2 on. */
+  assert.equal(extractField(deps, pair, 'at Halden on Mon, then at Oslo'), 'Halden');
+  assert.equal(extractField(deps, { nth: { n: 2, of: pair } } as never, 'at Halden on Mon, then at Oslo'), null);
+});
+
 /* ── the boundaries ──────────────────────────────────────────────────────── */
 
 test('a channel that is not a channel, and an arrival with no hash, are refused', async () => {
@@ -355,6 +433,53 @@ test('and `proposed` parks the arrival in its own state, so the two are told apa
   assert.equal(sql.one<{ state: string }>('SELECT state FROM inbox_raw')?.state, 'proposed');
   assert.match(out.reason ?? '', /proposed rather than written/);
   assert.equal(k.count('transactions'), 0);
+  sql.close();
+});
+
+test('AND A DEFAULTED FIELD IS `proposed` UNDER AN `exact` DECLARATION, which nothing could produce before', async () => {
+  /* `43 §5.1` step 7 has three levels and this record could only reach two of them: a field the
+     pattern missed, or a ceiling somebody declared. A value the RECORD supplied — defaulted in
+     because the payload did not carry one, or chosen between two forms — is neither, and writing it
+     at `exact` says a bank sent a number the record invented. */
+  const { k, sql } = await record(
+    HSBC({
+      extract: {
+        merchant: { text: { between: ['at ', ' on'] } },
+        amount: { money: { after: 'EGP', currency: 'EGP' } },
+        date: { date: { format: 'DD/MM/YY', after: ' on ' } },
+        ref: { default: { value: 'none', of: { text: { after: 'ref: ' } } } },
+      },
+    }),
+  );
+  const out = value<Arrived>(send(k));
+
+  assert.equal(out.confidence, 'proposed', 'a defaulted field under an exact declaration');
+  assert.equal(out.state, 'proposed');
+  assert.match(out.reason ?? '', /chose or defaulted ref/);
+  assert.equal(k.count('transactions'), 0, 'proposed writes nothing until somebody accepts it');
+
+  /* AND THE REASON NAMES FIELD IDS AND NOTHING OUT OF THE PAYLOAD — `43 §6`'s leak rule. */
+  assert.doesNotMatch(out.reason ?? '', /Halden|4471|1,316/);
+  sql.close();
+});
+
+test('and a payload that carries the field reads at `exact`, so a fallback costs nothing', async () => {
+  const { k, sql } = await record(
+    HSBC({
+      extract: {
+        merchant: { text: { between: ['at ', ' on'] } },
+        amount: { money: { after: 'EGP', currency: 'EGP' } },
+        date: { date: { format: 'DD/MM/YY', after: ' on ' } },
+        ref: { default: { value: 'none', of: { text: { between: ['ref: ', '.'] } } } },
+      },
+    }),
+  );
+  const out = value<Arrived>(send(k, `${MAIL} ref: A-91.`));
+  assert.equal(out.confidence, 'exact');
+  assert.equal(k.count('transactions'), 1);
+  type Page = { rows: { fields: Record<string, unknown> }[] };
+  const wrote = value<Page>(k.list({ register: 'transactions', limit: 10 }));
+  assert.equal(wrote.rows[0]?.fields.ref, 'A-91', 'the payload won, not the fallback');
   sql.close();
 });
 

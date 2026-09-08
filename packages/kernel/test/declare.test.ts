@@ -992,6 +992,38 @@ test('AN EXTRACTOR IS ONE OF THE THIRTEEN, and a fourteenth returns null on an a
   assert.equal(refusedWith(ingest({ extract: { a: 'money' } })), 'EXTRACTOR_UNKNOWN');
 });
 
+test("and a COMBINATOR'S OWN ARGUMENTS, which went through unread", () => {
+  /* The key was checked against the thirteen and the inner forms were walked, and everything in
+     between was accepted: `first: []` with no arms, `nth: { n: 0 }`, a `default` with no `value`.
+     All three install, match arrivals and read nothing — the same silence the check above exists to
+     break, one level in. `43 §4.3` puts the ceilings at 2–8 arms and 1–64 candidates. */
+  assert.equal(refusedWith(ingest({ extract: { a: { first: [{ int: {} }] } } })), 'EXTRACTOR_UNKNOWN', 'one arm');
+  assert.equal(refusedWith(ingest({ extract: { a: { first: [] } } })), 'EXTRACTOR_UNKNOWN', 'no arms');
+  assert.equal(refusedWith(ingest({ extract: { a: { first: { int: {} } } } })), 'EXTRACTOR_UNKNOWN', 'not a list');
+  assert.equal(
+    refusedWith(ingest({ extract: { a: { first: Array.from({ length: 9 }, () => ({ int: {} })) } } })),
+    'EXTRACTOR_UNKNOWN',
+    'nine arms',
+  );
+
+  assert.equal(refusedWith(ingest({ extract: { a: { nth: { n: 0, of: { int: {} } } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { nth: { n: 1.5, of: { int: {} } } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { nth: { n: 65, of: { int: {} } } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { nth: { of: { int: {} } } } } })), 'EXTRACTOR_UNKNOWN', 'no n');
+  assert.equal(refusedWith(ingest({ extract: { a: { nth: { n: 2 } } } })), 'EXTRACTOR_UNKNOWN', 'no of');
+
+  /* A `default` WITH NO `value` MAKES THE FIELD REQUIRED AGAIN, silently — it reads as missing
+     exactly as it did before anybody wrote the fallback. */
+  const said = validateDeclaration(ingest({ extract: { a: { default: { of: { int: {} } } } } }));
+  assert.equal(said?.code, 'EXTRACTOR_UNKNOWN');
+  assert.match(said?.fix ?? '', /only way to make one optional/);
+  assert.equal(refusedWith(ingest({ extract: { a: { default: { value: null, of: { int: {} } } } } })), null, 'null is a value');
+
+  // And the plain ten still install: the first version of this check refused every one of them.
+  assert.equal(refusedWith(ingest({ extract: { a: { money: { currency: 'EGP' } } } })), null);
+  assert.equal(refusedWith(ingest({ extract: { a: { int: {} } } })), null);
+});
+
 test('A MATCH IS ABOUT WHAT AN ARRIVAL HOLDS, and a field it does not hold matches nothing', () => {
   /* `42 §4.7`: `inbox_raw` holds `from to subject body channel state ts`. A `match:` naming anything
      else compiles to a predicate over a path that is never non-null — so the pattern matches

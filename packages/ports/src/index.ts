@@ -52,26 +52,17 @@ export interface Clock {
  * `wake()` IS NOT PART OF THE ALARM — it is the outbox doorbell, and it is the one piece of I/O a
  * record performs. A lost doorbell costs latency and never a notification, because the outbox row is
  * still `pending` and the next request drains it.
- */
-export interface Scheduler {
-  /** When the alarm is currently set for, or `null` if it is not set. */
-  get(): Promise<number | null>;
-  set(atMs: number): Promise<void>;
-  clear(): Promise<void>;
-  /** Tell whatever drains the outbox that there is something in it. Never carries the payload. */
-  wake(): Promise<void>;
-}
-
-/**
- * The alarm, as a port.
  *
- * ONE ALARM PER CUSTOMER, always set to the earliest pending row or not set at all. That invariant
- * is what an object per customer buys: the alternative is a cron worker fanning out across every
- * tenant, waking records that have nothing to do in order to ask them.
+ * THIS WAS WRITTEN TWICE, byte for byte, comment and all, twenty lines apart. TypeScript merges two
+ * interfaces of one name without a word — that is declaration merging working as designed — so it
+ * compiled, `tsc --noEmit` was clean, and every consumer got the same shape either way. The cost was
+ * not the duplication. It is that a method added to one copy and not the other is not an error
+ * either — merging is a union — so the two would have drifted apart quietly, and the reader who
+ * jumped to the first would have been reading half the port.
  *
- * `wake()` IS NOT PART OF THE ALARM — it is the outbox doorbell, and it is the one piece of I/O a
- * record performs. A lost doorbell costs latency and never a notification, because the outbox row is
- * still `pending` and the next request drains it.
+ * There is no lint rule in this repository to catch the class, and one duplicate does not earn a
+ * gate. The backlog carries the question of whether a duplicate exported declaration in a package's
+ * `src` is worth a check of its own.
  */
 export interface Scheduler {
   /** When the alarm is currently set for, or `null` if it is not set. */
