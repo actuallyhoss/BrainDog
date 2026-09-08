@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { PAGE, list, search } from './api.ts';
+import { ftsQuery } from '@braindog/kernel';
 import { ROWS } from './data.ts';
 import type { Entry } from './schema.ts';
 
@@ -173,6 +174,25 @@ test('a capped `@` list is not silent', () => {
      was partial. That is the defect the row was added for, on the prefix it skipped. */
   assert.doesNotMatch(PALETTE, /if \(prefix !== '@' && found\.total > kept\.length\)/u);
   assert.match(PALETTE, /if \(total > drawn\)/u);
+});
+
+test('A TYPED QUERY THAT CANNOT BE ONE MATCHES NOTHING, AND AN EMPTY ONE IS NOT A QUERY', () => {
+  /**
+   * `answers()` returns `true` when a query tokenises to nothing, and that is right for the box on a
+   * register — no query is no filter, and a cleared box shows the list. The palette inherited it and
+   * meant the opposite: typing `?` or `-` or `.` matched every command, page, saved view and
+   * register, and the dialog filled with twenty rows announcing "20".
+   *
+   * The difference is whether anything was typed, and both halves are here: nothing typed is the
+   * default list and announces nothing; something typed that cannot be a query matches nothing,
+   * which is the same answer `ftsQuery` gives the record.
+   */
+  assert.match(PALETTE, /if \(!want\) return text\.trim\(\) === '';/u, 'a punctuation-only query matches everything again');
+  assert.match(PALETTE, /const said = !parsed\.text \? ''/u, 'an unopened question is answered with a number');
+  /* And the record agrees: a query with no letters and no digits is not a query. */
+  assert.equal(ftsQuery('?'), null);
+  assert.equal(search('?', 9_999).total, 0);
+  assert.equal(search('', 9_999).total, 0);
 });
 
 test('`/search` is a destination the palette teaches', () => {

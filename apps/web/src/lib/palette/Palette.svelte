@@ -123,7 +123,19 @@
      */
     const starts = (title: string) => {
       const want = terms(text);
-      if (!want) return true;
+      /**
+       * A FILTER BOX AND A SEARCH BOX MEAN OPPOSITE THINGS BY A QUERY THAT TOKENISES TO NOTHING.
+       *
+       * `answers()` returns `true` for it, and that is right for the box on a register: no query is
+       * no filter, and a cleared box shows the list. Here it meant that typing `?` or `-` or `.` —
+       * one character, no letters, no digits — matched every command, every page, every saved view
+       * and every register, and the dialog filled with twenty rows announcing "20".
+       *
+       * The difference is whether anything was TYPED. Nothing typed is the default list, which is
+       * what a freshly opened palette should show. Something typed that cannot be a query matched
+       * nothing, and saying so is the honest answer — the same answer the record would give.
+       */
+      if (!want) return text.trim() === '';
       const has = tokensOf(title);
       return want.every((w) => has.some((tok) => tok.startsWith(w)));
     };
@@ -138,7 +150,11 @@
     // Strict-prefix aliases outrank fuzzy matching. It is the only verified mechanism found that
     // keeps a growing action index from rotting (19 §7).
     if (prefix === null || prefix === '>') {
-      const exact = COMMANDS.filter((c) => c.title.toLowerCase().startsWith(needle));
+      /* THE FIFTH RULE IN A DIALOG SAID TO HAVE ONE. `19 §7`'s strict-prefix aliases outrank fuzzy
+         matching, and that is about ORDER rather than about membership — so the exact set is the
+         subset of what `starts()` already admits whose title begins with what was typed, rather than
+         a separate `.toLowerCase().startsWith()` answering a different question. */
+      const exact = COMMANDS.filter((c) => starts(c.title) && c.title.toLowerCase().startsWith(needle));
       const rest = COMMANDS.filter((c) => !exact.includes(c) && starts(c.title));
       out.push(...[...exact, ...rest].map((c) => ({ ...c, complete: c.title })));
     }
@@ -259,10 +275,15 @@
        and reading it does not subscribe to anything. Reading `flat` subscribes to `rows`, which is
        what recomputes it. Delete this line and the announcement freezes on the first query. */
     void flat;
-    /* AND A LIST WITH ROWS IN IT SAYS SOMETHING. `drawn` counts record hits, so `>` and `/` — which
-       never produce any — announced nothing at all, permanently, on a dialog full of results. The
-       count is about the record's answer when there is one and about the list when there is not. */
-    const said = drawn > 0 ? copy.showingOf(drawn, total) : flat.length > 0 ? copy.showingOf(flat.length, flat.length) : '';
+    /**
+     * AND A LIST WITH ROWS IN IT SAYS SOMETHING — once something has been typed.
+     *
+     * `drawn` counts record hits, so `>` and `/`, which never produce any, announced nothing at all
+     * on a dialog full of results. And the other edge is the freshly opened palette: no query, every
+     * destination listed, and a confident **"20"** about a list nobody asked for. A status line is
+     * the answer to a question; with no question there is no answer, and the silence is correct.
+     */
+    const said = !parsed.text ? '' : drawn > 0 ? copy.showingOf(drawn, total) : flat.length > 0 ? copy.showingOf(flat.length, flat.length) : '';
     const t = setTimeout(() => (announced = said), 250);
     return () => clearTimeout(t);
   });

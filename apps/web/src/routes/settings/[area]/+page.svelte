@@ -537,12 +537,20 @@
                   lists* — which is the sentence "invite the bookkeeper" makes.
                 -->
                 <div class="segment segment-sm" role="group" aria-label={copy.levelFor(p.name)}>
+                  <!-- THE SIXTH OPTION IS NOT A LEVEL, AND ONLY THE COMMENT SAID SO. It rendered as
+                       the first of six identical chips with the same `aria-pressed`, inside a group
+                       labelled "What <name> can do" — so a screen reader heard six equivalent levels
+                       and the screen showed six equivalent chips. `13 §5.1`: the meaning cannot live
+                       in the styling alone. The accessible name says what it is, and the chip is set
+                       apart from the ladder beside it. -->
                   {#each [null, ...LEVELS] as level}
                     <button
                       type="button"
                       class="seg"
+                      class:seg-none={level === null}
                       data-on={p.level === level ? '' : undefined}
                       aria-pressed={p.level === level ? 'true' : 'false'}
+                      aria-label={level === null ? copy.noRecordLevelMeans : undefined}
                       disabled={(lastOwner(p) && level !== 'owner') || (self(p) && level !== p.level)}
                       aria-describedby={lastOwner(p) && level !== 'owner'
                         ? 'last-owner'
@@ -577,6 +585,12 @@
                     {#each p.scoped as ex}
                       <li>
                         <span class="ex-list">{REGISTERS[ex.register]?.name ?? ex.register}</span>
+                        <!-- THE LEVEL, AND THEN WHAT IT MEANS. The cell showed the sentence alone — the
+                             same sentence the record level one line up already shows — so you could
+                             not see at a glance whether an exception was above or below it, which is
+                             the one thing a matrix is for. The word is the comparison; the sentence
+                             is what the word means. -->
+                        <span class="ex-word">{ex.level}</span>
                         <span class="ex-level">{copy.levelMeans[ex.level] ?? ex.level}</span>
                         <Button
                           weight="bare"
@@ -595,7 +609,11 @@
                 {/if}
                 <!-- `45 §5.6` HAS ONE METHOD FOR ALL OF IT: `invite` takes the record level and the
                      register map together, so adding an exception is the same call as changing a
-                     level. One control, because one call. -->
+                     level. One control, because one call.
+
+                     IN ITS OWN ROW, because as the next sibling after the `<ul>` it floated up beside
+                     the list on a wide screen and read as belonging to the first exception. -->
+                <div class="ex-add">
                 <Button
                   weight="bare"
                   onclick={() =>
@@ -604,6 +622,7 @@
                       { intent: 'warn' },
                     )}
                 ><Icon name="plus" size="s" />{copy.addException}</Button>
+                </div>
               </div>
             </li>
           {/each}
@@ -1476,17 +1495,55 @@
     list-style: none;
   }
 
+  /* ONE LAYOUT FOR EVERY ROW. `flex-wrap` made the shape depend on how long the register's name is,
+     so one person's two exceptions rendered two different ways — one 64px tall with the control
+     wrapped, the next 36px with the control nine pixels ABOVE its own label. A grid gives every row
+     the same three columns and the same height. */
   .exceptions li {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(6ch, max-content) minmax(6ch, max-content) 1fr auto;
     align-items: baseline;
     gap: var(--sp-2);
+  }
+
+  /* AND THE CONTROL DROPS TO ITS OWN LINE ON A PHONE. Two `max-content` columns, a sentence and a
+     44px button do not fit in 320px — the list ran 391px wide and the row 376 — and the column that
+     cannot shrink is the one holding a register's name. `13 §10`: below 640 a row becomes a card, and
+     a card puts its verb underneath. */
+  @media (width < 640px) {
+    .exceptions li {
+      grid-template-columns: minmax(0, max-content) minmax(0, max-content) 1fr;
+    }
+
+    .exceptions li :global(.btn) {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
   }
 
   .ex-list {
     color: var(--ink);
     font-weight: 600;
     font-size: var(--t-sm);
+  }
+
+  /* AND IT IS SET APART FROM THE LADDER. Five rungs and a sixth thing that is not one of them,
+     rendered identically, is a control whose own comment insists on a distinction the screen does
+     not make. A separator rather than a colour: `13 §5.1` again. */
+  .seg-none {
+    margin-inline-end: var(--sp-2);
+    border-inline-end: 1px solid var(--line);
+    padding-inline-end: var(--sp-3);
+  }
+
+  /* The ladder word, which is what one exception is compared against another by. */
+  .ex-word {
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
+  .ex-add {
+    margin-block-start: var(--sp-1);
   }
 
   .ex-level {

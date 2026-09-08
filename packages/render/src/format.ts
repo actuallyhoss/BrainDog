@@ -96,10 +96,23 @@ export function day(iso: string): string {
 const band = (n: number): string =>
   n === 0 ? '' : n <= 14 ? `${n}d` : n <= 60 ? `${Math.round(n / 7)}w` : n < 365 ? `${Math.round(n / 30)}mo` : `${(n / 365).toFixed(n < 730 ? 1 : 0)}y`;
 
+/**
+ * WHICH CALENDAR DAY A MOMENT FALLS ON, counted from the epoch — the unit both functions band.
+ *
+ * `relative()` rounded the NOON-OFFSET: `Math.round((noon(day) - now) / 86_400_000)`. With `now` at
+ * midday that gives the calendar answer, and it drifts by a whole band the further `now` sits from
+ * noon — at midnight, yesterday's date read **"today"**. `since()` rounded ELAPSED time, so a moment
+ * 36 hours old was "2d ago" beside a `day` cell for the same afternoon reading "1d ago". Two
+ * functions, two units, one table.
+ *
+ * They count days now, both of them, and a day is a day rather than a distance from lunchtime.
+ */
+const dayIndex = (ms: number): number => Math.floor(ms / 86_400_000);
+
 export function relative(iso: string, now: number = Date.now()): string {
   const t = noon(iso);
   if (t === null) return iso;
-  const days = Math.round((t - now) / 86_400_000);
+  const days = dayIndex(t) - dayIndex(now);
   const size = band(Math.abs(days));
   if (size === '') return 'today';
   return days > 0 ? `in ${size}` : `${size} ago`;
@@ -138,9 +151,14 @@ export function relative(iso: string, now: number = Date.now()): string {
  *     stop below it.
  *   · `Math.round(1439 / 60)` is 24, so 23h59m read **"24h ago"** beside a real day.
  *   · The handover past a day threw the time of day away — `slice(0, 10)` and then `relative()`,
- *     which anchors at noon — so an instant exactly 24 hours old, read at midnight, said **"today"**.
- *     That is the failure this function exists to end, surviving one band further out. It counts
- *     whole days from the real gap now and shares `relative()`'s ladder rather than delegating to it.
+ *     which anchored at noon — so an instant exactly 24 hours old, read at midnight, said **"today"**.
+ *     That is the failure this function exists to end, surviving one band further out.
+ *
+ * AND THEN IT COUNTED ELAPSED 24-HOUR PERIODS, which is a third unit. A moment 36 hours old came out
+ * "2d ago" beside a `day` cell for the same afternoon reading "1d ago" — for twelve hours out of
+ * every twenty-four, past a day, an `instant` column and a `day` column in one table disagreed by a
+ * whole band. The comment here claimed they could not. Both count CALENDAR DAYS now, which is the
+ * thing each was reaching for: `dayIndex` above, and `relative()`'s own ladder below it.
  */
 export function since(iso: string, now: number = Date.now()): string {
   const t = Date.parse(iso);
@@ -161,7 +179,7 @@ export function since(iso: string, now: number = Date.now()): string {
         ? `${Math.min(55, Math.round(mins / 5) * 5)} min`
         : n < 86_400_000
           ? `${Math.min(23, Math.round(mins / 60))}h`
-          : band(Math.round(n / 86_400_000));
+          : band(Math.abs(dayIndex(t) - dayIndex(now)));
   return ms > 0 ? `in ${size}` : `${size} ago`;
 }
 

@@ -98,16 +98,31 @@ export function terms(q: string): string[] | null {
 }
 
 /**
- * Lower case and no diacritics — what the record's own index does, and this did not.
+ * Lower case, and diacritics dropped from Latin letters only — what the record's index actually does.
  *
- * `0001_kernel.ts` builds `entry_fts` with `tokenize = 'unicode61 remove_diacritics 2'`, under a
- * comment about Arabic and English in one record. So FTS5 finds *Zürich* by typing `zurich` and this
- * found it only by typing `Zürich` — a divergence a differential test over the seed cannot see,
- * because the seed's non-ASCII is em-dashes and arrows. It is the ONE property of the record's
- * tokeniser this file did not have, and it is the one that decides whether somebody with an accent
- * in their name is findable.
+ * `0001_kernel.ts` builds `entry_fts` with `tokenize = 'unicode61 remove_diacritics 2'`, so FTS5
+ * finds *Zürich* by typing `zurich` and this file found it only by typing *Zürich*. That was the one
+ * property of the record's tokeniser this did not have, and it decides whether somebody with an
+ * accent in their name is findable at all.
  *
- * NFD then drop the combining marks: `ü` is `u` + U+0308, and U+0308 is in `\p{M}`.
+ * AND THEN IT OVERSHOT, IN THE DIRECTION THAT DRAWS A DOOR ONTO AN EMPTY PAGE. Stripping every
+ * `\p{M}` is more than `remove_diacritics 2` does. Measured against a real FTS5 table over
+ * `node:sqlite`:
+ *
+ *   · `zurich` → finds `Zurich cafe` AND `Zürich café`      — folded
+ *   · `viet`   → finds `Việt`                              — folded
+ *   · `محمد`   → finds `محمد` and NOT `مُحَمَّد`      — harakat are NOT folded
+ *   · `ωμεγα` → finds `ωμεγα` and NOT `Ωμέγα`      — Greek tonos is NOT folded
+ *   · `lodz`   → finds nothing; `Ł` is a letter, not a diacritic, on both sides
+ *
+ * A browser more permissive than the record is a palette that draws a row whose `All N →` door lands
+ * on an empty page — the exact class of defect one matcher was written to end, arriving through the
+ * fix for it. So the mark comes off only when the letter underneath is ASCII, which is what those
+ * five measurements say `remove_diacritics 2` means. `find.test.ts` asserts them against real FTS5
+ * rather than against this sentence.
+ *
+ * NFD FIRST, because `ü` is one codepoint until it is decomposed into `u` + U+0308. The pairs that
+ * are kept stay decomposed, which is harmless: both sides of every comparison come through here.
  *
  * A `function` AND NOT A `const`, and `tokensOf` too. `data.ts` calls `answers()` while its own
  * module body is still evaluating — the run-log receipts count the way the record counts — and
@@ -115,7 +130,10 @@ export function terms(q: string): string[] | null {
  * when that call lands. A hoisted declaration is not. The cycle is deliberate and this is its cost.
  */
 function fold(text: string): string {
-  return text.toLowerCase().normalize('NFD').replace(/\p{M}+/gu, '');
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/(\p{L})(\p{M}+)/gu, (whole, base: string) => (/^[a-z]$/u.test(base) ? base : whole));
 }
 
 /**

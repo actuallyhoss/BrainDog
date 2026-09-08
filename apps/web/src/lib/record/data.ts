@@ -464,7 +464,12 @@ export const PEOPLE_ACCESS: Person[] = [
   /* AN INVITATION THAT HAS NOT BEEN ACCEPTED IS A DIFFERENT STATE FROM ACCESS, and the screen had
      no way to hold one — so somebody who had invited a bookkeeper could not tell whether the link
      had been used. `12 §3`: single-use, 24 hours, bound to one email. */
-  { id: 'jo', name: 'J. Okonkwo', level: 'append', scoped: [{ register: 'sessions', level: 'read' }], email: 'j@okonkwo.example', since: null, suspended: null },
+  /* AN EXCEPTION THAT WIDENS, which the seed did not have.
+     `sm` narrows (write → read on people) and `pv` holds nothing on the record, so every "widening"
+     in the fixture came from `rung(null) = -1` — the test asserting the matrix runs BOTH ways was
+     satisfied by the bookkeeper's own absence of a level. A contractor who may file expenses
+     everywhere and DECIDE on the one track they run is the shape that makes it real. */
+  { id: 'jo', name: 'J. Okonkwo', level: 'append', scoped: [{ register: 'sessions', level: 'read' }, { register: 'tracks', level: 'decide' }], email: 'j@okonkwo.example', since: null, suspended: null },
 ];
 
 /* ── the way back in ──────────────────────────────────────────────────────────── */

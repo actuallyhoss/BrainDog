@@ -16,6 +16,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { DatabaseSync } from 'node:sqlite';
+
 import { ftsQuery, projectedText } from '@braindog/kernel';
 
 import { answers, projected, searchable, terms, tokensOf, why } from './find.ts';
@@ -97,8 +99,16 @@ test('the projection is the kernel’s, string for string', () => {
  * comparison is against `ftsQuery` OF THE FOLDED QUERY, which is the string FTS5 is effectively
  * matching. Comparing against the raw one asserts that the browser does not fold, which is the
  * defect.
+ *
+ * THIS USED TO BE A COPY OF `find.ts`'S OWN FOLD, which made the assertion a tautology over the
+ * app's assumption — it could only ever prove that this file agrees with itself. The test below
+ * replaces it with the real thing.
  */
-const folded = (q: string) => q.toLowerCase().normalize('NFD').replace(/\p{M}+/gu, '');
+const folded = (q: string) =>
+  q
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/(\p{L})(\p{M}+)/gu, (whole, base: string) => (/^[a-z]$/u.test(base) ? base : whole));
 
 test('the tokeniser is the kernel’s too', () => {
   /* `ftsQuery` is the whole of what the record does with what was typed: lower-case, strip
@@ -116,15 +126,52 @@ test('the tokeniser is the kernel’s too', () => {
   }
 });
 
-test('AND A NAME WITH AN ACCENT IN IT IS FINDABLE WITHOUT ONE', () => {
-  /* `remove_diacritics 2` is on the index, under a comment about Arabic and English in one record.
-     So the record finds *Zürich* by `zurich` and this found it only by `Zürich` — invisible to a
-     differential test over the seed, whose non-ASCII is em-dashes and arrows, and decisive for
-     anybody whose name has a mark in it. */
-  const row = rows({ what: 'Zürich café renewal' })[0]!;
-  for (const q of ['zurich', 'Zürich', 'cafe', 'café', 'ZURICH'])
-    assert.equal(answers('obligations', row, q), true, `\`${q}\` did not find \`Zürich café renewal\``);
-  assert.equal(answers('obligations', row, 'zurick'), false, 'folding turned into a fuzzy match');
+test('AND THE FOLD IS THE RECORD\u2019S FOLD, MEASURED AGAINST A REAL FTS5 TABLE', () => {
+  /**
+   * Two defects in opposite directions, and the second arrived inside the fix for the first.
+   *
+   * The browser did not fold at all, so *Zürich* was findable only by typing the umlaut. Then it
+   * folded EVERY `\p{M}`, which is more than `remove_diacritics 2` does — and a browser more
+   * permissive than the record is a palette that draws a row whose `All N →` door lands on an empty
+   * page, which is the exact class of defect one matcher exists to end.
+   *
+   * SO THE ASSERTION IS THE DATABASE. Every pair below is run through the same virtual table the
+   * migration declares, and the browser has to agree with whatever it answers — not with a
+   * description of it, and not with a copy of the browser's own rule.
+   */
+  const db = new DatabaseSync(':memory:');
+  db.exec("CREATE VIRTUAL TABLE t USING fts5(x, tokenize='unicode61 remove_diacritics 2')");
+  const insert = db.prepare('INSERT INTO t (x) VALUES (?)');
+  const match = db.prepare('SELECT count(*) AS n FROM t WHERE x = ? AND t MATCH ?');
+
+  /* Latin marks fold; Arabic harakat, Greek tonos and `Ł` do not. The comment about Arabic and
+     English in one record is on the migration, which makes the third row the one that matters. */
+  const pairs: [string, string][] = [
+    ['Zurich cafe', 'zurich'],
+    ['Zürich café', 'zurich'],
+    ['Zürich café', 'cafe'],
+    ['Zürich café', 'café'],
+    ['Zürich café', 'zurick'],
+    ['Việt Nam', 'viet'],
+    ['مُحَمَّد', 'محمد'],
+    ['محمد', 'محمد'],
+    ['Ωμέγα', 'ωμεγα'],
+    ['Ωμέγα', 'ωμέγα'],
+    ['Łódź', 'lodz'],
+    ['Łódź', 'łodz'],
+  ];
+  for (const [text] of pairs) insert.run(text);
+
+  let checked = 0;
+  for (const [text, q] of pairs) {
+    const query = ftsQuery(q);
+    const theirs = query === null ? true : (match.get(text, query) as { n: number }).n > 0;
+    const mine = answers('obligations', rows({ what: text })[0]!, q);
+    assert.equal(mine, theirs, `\`${q}\` over \`${text}\`: the browser says ${mine} and the record says ${theirs}`);
+    checked += 1;
+  }
+  db.close();
+  assert.equal(checked, pairs.length);
 });
 
 test('and `tokensOf` is the same function as `terms`, rather than a copy that says it is', () => {

@@ -115,10 +115,23 @@ test('and the matrix runs in both directions, or half of it is decorative', () =
    * screen that only ever narrows teaches the wrong model. Both directions have to be in the seed,
    * or nothing on any screen ever shows one.
    */
-  const rung = (l: string | null) => (l === null ? -1 : LEVELS.indexOf(l as Level));
-  const pairs = PEOPLE_ACCESS.flatMap((p) => p.scoped.map((ex) => rung(ex.level) - rung(p.level)));
-  assert.ok(pairs.some((d) => d < 0), 'no exception narrows a record level');
-  assert.ok(pairs.some((d) => d > 0), 'no exception widens one, so the screen can only ever take away');
+  /**
+   * AND `null` IS NOT A RUNG BELOW `read`, which is what made this test unfalsifiable.
+   *
+   * It scored `rung(null) = -1`, so every scoped grant held by somebody with no record level counted
+   * as a widening — and the bookkeeper, who holds nothing on the record by design, supplied every
+   * positive number in the fixture. The seed contained no exception that actually rose above a
+   * record level, and the assertion that says one must could not fail.
+   *
+   * A person with no record level is excluded here rather than scored: their exceptions are the only
+   * thing they hold, so they are neither wider nor narrower than anything.
+   */
+  const rung = (l: Level) => LEVELS.indexOf(l);
+  const scored = PEOPLE_ACCESS.filter((p) => p.level !== null);
+  const pairs = scored.flatMap((p) => p.scoped.map((ex) => rung(ex.level) - rung(p.level!)));
+  assert.ok(pairs.length >= 2, 'not enough exceptions on people who hold a record level to say anything');
+  assert.ok(pairs.some((n) => n < 0), 'no exception narrows a record level');
+  assert.ok(pairs.some((n) => n > 0), 'no exception widens one, so the screen can only ever take away');
 });
 
 test('the hint says one rule rather than two that contradict each other', () => {

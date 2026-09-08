@@ -396,6 +396,35 @@ test('AN INSTANT IS SAID IN THE UNIT IT MATTERS IN, WHICH NOTHING HERE COULD DO'
   assert.equal(since('', NOW), '');
 });
 
+test('AND PAST A DAY IT SAYS WHAT THE DAY COLUMN SAYS, AT EVERY HOUR OF THE CLOCK', () => {
+  /**
+   * The claim that used to be a sentence. `relative()` rounded a NOON-OFFSET and `since()` rounded
+   * ELAPSED time, so past a day they disagreed by a whole band for twelve hours out of every
+   * twenty-four — an `instant` column and a `day` column naming the same afternoon, in one table,
+   * differing. And `relative()` alone was wrong near midnight: yesterday's date read **"today"**.
+   *
+   * Both count calendar days now, so this is checkable rather than assertable: four hundred hours
+   * back from four different times of day, and the two have to give the same answer every time.
+   * A prose claim about two functions agreeing is the kind that survives its own falsification.
+   */
+  let compared = 0;
+  for (const at of [0, 6, 12, 23]) {
+    const now = Date.UTC(2026, 8, 8, at);
+    for (let h = 24; h <= 400; h += 1) {
+      const iso = new Date(now - h * 3_600_000).toISOString();
+      assert.equal(since(iso, now), relative(iso.slice(0, 10), now), `${h}h before ${at}:00`);
+      compared += 1;
+    }
+  }
+  assert.ok(compared > 1_500, `only ${compared} comparisons`);
+
+  /* AND THE MIDNIGHT CASE THAT STARTED IT, on `relative()` alone. */
+  const midnight = Date.UTC(2026, 8, 8, 0);
+  assert.equal(relative('2026-09-07', midnight), '1d ago', 'yesterday read as today at midnight');
+  assert.equal(relative('2026-09-08', midnight), 'today');
+  assert.equal(relative('2026-09-09', midnight), 'in 1d');
+});
+
 test('a day is formatted, and a malformed one renders as what the author typed', () => {
   assert.equal(day('2026-04-10'), '10 Apr 2026');
   assert.equal(formatTyped('date', '31 Sep', NOW), null);
