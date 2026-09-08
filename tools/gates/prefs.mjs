@@ -21,9 +21,26 @@
  * question that was never asked. Each check names the token or attribute it measures, so a red line
  * says which preference stopped reaching the DOM rather than that something is wrong.
  *
- * IT DOES NOT COVER `keys`, `columns`, `previewDismissed` OR `suggestPages`. Those need a keystroke,
- * a menu or a state this fixture does not reach; a check that pretended to cover them would be the
- * thing this file exists to catch. What is here is what can be measured by loading a page.
+ * WHAT IT DOES NOT COVER, AND THE LIST HAD DRIFTED FROM THE TYPE IT GUARDS. It used to name `keys`,
+ * `columns`, `previewDismissed` and `suggestPages` — and `Pref` has never had `previewDismissed` or
+ * `suggestPages`, while four real fields went unmentioned. The file written to catch an excuse that
+ * outlives its reason had grown one of its own.
+ *
+ * `Pref` holds ten: `scheme`, `text`, `density`, `theme`, `sidebar`, `chars`, `seen`, `columns`,
+ * `nav`, `defined`. This covers five — `text`, `density`, `scheme`, `sidebar`, `nav` — which is
+ * everything a page LOAD can settle. The other five each need something a fixture cannot do by
+ * loading a URL:
+ *
+ *   - `theme`   an accent is chosen by pressing a swatch, and the difference is a palette rather
+ *               than one token. **A duplicate swatch that repainted nothing lived here for months**
+ *               precisely because this gate could not reach it; `theme.test.ts` asserts the
+ *               invariant instead — no suggestion is the house colour.
+ *   - `chars`   needs a keystroke, and `keys` (the gate next door) is the one that presses keys.
+ *   - `seen`    needs a click on Home's *Mark all read*, and its effect is an absence.
+ *   - `columns` needs the Display sheet opened and a column unticked.
+ *   - `defined` is spent once per device and cannot be re-read.
+ *
+ * A check that pretended to cover any of them would be the thing this file exists to catch.
  */
 
 import { createReadStream } from 'node:fs';

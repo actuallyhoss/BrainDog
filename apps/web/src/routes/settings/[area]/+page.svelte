@@ -201,6 +201,23 @@
   const owners = $derived(PEOPLE_ACCESS.filter((p) => p.level === 'owner' && p.since).length);
   const lastOwner = (who: Person) => who.level === 'owner' && owners <= 1;
 
+  /**
+   * AND YOU CANNOT TAKE YOUR OWN OWNERSHIP AWAY FROM THIS SCREEN.
+   *
+   * `lastOwner` is a fact about the RECORD — how many owners exist — and never about *you*, so with
+   * a second owner present every control on your own row went live, `read` included, with no
+   * confirmation. The toast would have read "You would move from owner to read across this record",
+   * after which you cannot reach this screen to undo it: the one action on the surface that removes
+   * your own way back.
+   *
+   * It is a REFUSAL WITH A ROUTE, not a wall. `45 §5.6` has one method for every level change, and
+   * another owner can still do this to you — which is the point of there being more than one. What
+   * is refused is doing it to yourself, alone, by pressing a segment.
+   */
+  const self = (who: Person) => who.id === me.person;
+  /** The signed-in person's own row, which is where their name and address live. */
+  const mine = $derived(PEOPLE_ACCESS.find((p) => p.id === me.person));
+
   function promote(decl: PageDecl) {
     toasts.push(copy.notWritten(`${decl.title} would be placed at the end of its section in your nav`), { intent: 'warn' });
   }
@@ -301,6 +318,12 @@
       </Section>
     {:else if area === 'keyboard'}
       <Section title={copy.characterKeys}>
+        <!-- THE SENTENCE THAT SAYS WHAT THE SWITCH DOES. It was written, and allow-listed in
+             `dead-copy` as *"UNBUILT — `/settings/keyboard` is a heading and two unexplained
+             buttons"* — the gate knowing, in those words, that a compound noun and two buttons were
+             all a reader got. `19 §4` calls this the app's WCAG 2.1.4 conformance; a switch whose
+             effect nobody states is a switch nobody turns on deliberately. -->
+        <p class="hint">{copy.characterKeysHint}</p>
         <div class="segment" role="group" aria-label={copy.characterKeys}>
           <button type="button" class="seg" data-on={chars ? '' : undefined} onclick={() => (chars = true)}>{copy.on}</button>
           <button type="button" class="seg" data-on={!chars ? '' : undefined} onclick={() => (chars = false)}>{copy.off}</button>
@@ -374,8 +397,8 @@
                 <Button
                   weight="bare"
                   tone="bad"
-                  disabled={lastOwner(p)}
-                  aria-describedby={lastOwner(p) ? 'last-owner' : undefined}
+                  disabled={lastOwner(p) || self(p)}
+                  aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
                   onclick={() =>
                     toasts.push(
                       copy.notWritten(`Every one of ${p.name}'s access rows would be removed, with one access.revoke per list`),
@@ -392,8 +415,12 @@
                       class="seg"
                       data-on={p.level === level ? '' : undefined}
                       aria-pressed={p.level === level ? 'true' : 'false'}
-                      disabled={lastOwner(p) && level !== 'owner'}
-                      aria-describedby={lastOwner(p) && level !== 'owner' ? 'last-owner' : undefined}
+                      disabled={(lastOwner(p) && level !== 'owner') || (self(p) && level !== p.level)}
+                      aria-describedby={lastOwner(p) && level !== 'owner'
+                        ? 'last-owner'
+                        : self(p) && level !== p.level
+                          ? 'own-level'
+                          : undefined}
                       onclick={() => levelChange(p, level)}
                     >{level}</button>
                   {/each}
@@ -410,6 +437,8 @@
              refusal — a disabled control whose reason arrives only after you press it is a control
              that has already wasted the press. -->
         <p class="hint" id="last-owner">{copy.lastOwner}</p>
+        <!-- BESIDE THE CONTROL, NOT AFTER THE PRESS, for the reason the line above it gives. -->
+        <p class="hint" id="own-level">{copy.ownLevel}</p>
       </Section>
 
       <Section title={copy.inviteTitle}>
@@ -452,7 +481,7 @@
       <Section title={copy.passkeys} count={PASSKEYS.length}>
         <p class="hint">{copy.passkeyHow}</p>
         {#if PASSKEYS.length === 0}
-          <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy} />
+          <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(AUTH_METHODS.magic)} />
         {:else}
           <ul class="ledger">
             {#each PASSKEYS as k}
@@ -514,7 +543,12 @@
       -->
       <Section title={copy.you}>
         <ul class="facts">
-          <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{me.person}</span></li>
+          <!-- THE EMAIL, NOT THE PERSON ID. It printed `you` — the schema's own id for the signed-in
+               human — while `/settings/people` one click away renders the same person as "You" with
+               an address and a join date. `19 §9` bans a word the schema uses about itself, and an
+               address is what an invitation binds to and what identifies you across the records
+               listed below. -->
+          <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{mine?.email ?? mine?.name ?? me.person}</span></li>
           <li><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{copy.levelMeans[me.level] ?? me.level}</span></li>
         </ul>
         <p class="hint">{copy.identityOutside}</p>
@@ -554,6 +588,13 @@
            to say `active`, it has to say so in the heading. -->
       <Section title={copy.connected} count={DEVICES.length}>
         <p class="hint">{copy.connectedHow}</p>
+        <!-- A DESIGNED EMPTY, NOT AN EMPTY `<ul>`. Four of the twelve areas rendered a heading, a
+             `0`, one sentence and nothing at all — and this is one of the two where `13 §5.2`'s
+             copyable agent prompt is most obviously the right thing, because the way a machine gets
+             here is a command somebody runs on it. -->
+        {#if DEVICES.length === 0}
+          <Empty kind="no-data-yet" title={copy.noDevices} body={copy.noDevicesWhy} agentPrompt={copy.enrollPrompt} />
+        {/if}
 <ul class="whos">
           {#each DEVICES as d}
             <li class="who" data-intent={d.state === 'denied' ? 'bad' : d.state === 'pending' ? 'warn' : undefined}>
@@ -601,6 +642,12 @@
       -->
       <Section title={copy.sources} count={SOURCES.length}>
         <p class="hint">{copy.sourcesHow}</p>
+        <!-- AND THE HINT ABOVE IS ABOUT MEMBERS OF THIS SET. "A figure fed by one of these shows a
+             gap…" is a sentence about connectors, on a screen with none — so the state has to say
+             there are none before that line makes sense. -->
+        {#if SOURCES.length === 0}
+          <Empty kind="no-data-yet" title={copy.noSources} body={copy.noSourcesWhy} agentPrompt={copy.ingestPrompt} />
+        {/if}
 <ul class="whos">
           {#each SOURCES as src}
             <li class="who" data-intent={src.state === 'ok' ? undefined : src.state === 'paused' ? 'bad' : 'warn'}>
@@ -637,8 +684,16 @@
 
                    And the credential by the LABEL the vault indexes it under. A pull failure names
                    what to reconnect; naming the value would put a secret on a settings screen. -->
+              <!-- THE CREDENTIAL NAMES WHAT TO RECONNECT, WHICH ONLY AN AUTH FAILURE HAS. The
+                   suffix was unconditional, so a 429 read "The provider answered 429 three times.
+                   It retries on its own. — Kestrel ingest" and pointed the reader at a credential
+                   that is fine. `25 §9`'s own drawn mock names one on exactly one row — the 401 —
+                   and gives the failing row its try count instead. It is right for
+                   `PULL_AUTH_REJECTED` and wrong for the other six codes in the family. -->
               {#if src.error}
-                <p class="who-why">{src.error.fix} — {src.error.credential}</p>
+                <p class="who-why">
+                  {src.error.fix}{#if src.error.code === 'PULL_AUTH_REJECTED'}{' — '}{src.error.credential}{/if}
+                </p>
               {/if}
             </li>
           {/each}
@@ -675,7 +730,13 @@
         … disaster recovery, not portability."
       -->
       <Section title={copy.kept} count={SNAPSHOTS.length}>
+        <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
+             first backup has not run it describes a policy over nothing, above nothing. -->
+        {#if SNAPSHOTS.length === 0}
+          <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
+        {:else}
         <p class="hint">{copy.keptHow(SNAPSHOTS_KEPT)}</p>
+        {/if}
         <ul class="ledger">
           {#each SNAPSHOTS as snap}
             <li>

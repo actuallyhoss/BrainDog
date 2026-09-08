@@ -290,7 +290,11 @@ export const copy = {
     owner: 'Can change everything, and invite people',
     decide: 'Can change rows, and answer questions',
     write: 'Can add and change rows',
-    append: 'Can add rows, and not read the rest',
+    /* `20 §1`: `append` is *"`create`, `propose` and `log` — and no read … an appender sees nothing,
+       **not even what it filed**"*. "Not the rest" said the opposite — that they can read their own
+       submissions — which is wrong in the PERMISSIVE direction, on the control that decides who can
+       see somebody's business. */
+    append: 'Can add rows, and read nothing',
     read: 'Can read, cannot change',
   } as Record<string, string>,
   /* THE SAME ANSWER `/decide` GIVES TO THE SAME QUESTION. A disabled control says why it is
@@ -616,7 +620,11 @@ export const copy = {
   } as const,
 
   /* the settings areas `19 §2` says an earlier draft dropped */
-  whoCanSee: 'Who can see this record',
+  /* AND SO DOES THIS ONE. **Who can see this record · 4** stood over four rows, one of which is an
+     invitation that has not been accepted, at level `append`, which reads nothing — so three of the
+     four could see the record and the fourth could not, for two independent reasons, both printed
+     within two hundred pixels of the heading counting them. */
+  whoCanSee: 'People on this record',
   /* `19 §9` bans `ceiling` and `scope` by name and says: say WHAT THEY CAN SEE. And it says the
      thing this line exists for — a level here is over the whole record, not one list. */
   accessScope: 'A level here covers every list. Nobody is added to a new list until you add them.',
@@ -628,6 +636,10 @@ export const copy = {
   removeAccess: 'Remove',
   /* `LEVEL_REQUIRED`'s own fix sentence, verbatim (45 §5.6). */
   lastOwner: 'A record keeps at least one owner.',
+  /* THE ONE ACTION THAT REMOVES YOUR OWN WAY BACK. `45 §5.6` gives every level change one method,
+     and another owner can still do this to you — which is what a second owner is for. What is
+     refused is doing it to yourself, alone, from the screen you would then be locked out of. */
+  ownLevel: 'You cannot change your own level here. Another owner can.',
   inviteTitle: 'Invite somebody',
   inviteHow: 'The link is single-use, good for 24 hours, and bound to the one address you send it to.',
   invitePerson: 'Invite a person',
@@ -638,8 +650,24 @@ export const copy = {
   passkeys: 'Passkeys',
   passkeyHow: 'A passkey is how you get back in. Keep more than one, on more than one device.',
   noPasskeys: 'No passkey yet.',
-  /* `13 §5.2`: be specific about what will be here. On this screen that sentence is the stakes. */
-  noPasskeysWhy: 'Without one, the only way back into this record is an email link.',
+  /**
+   * `13 §5.2`: be specific about what will be here. On this screen that sentence is the stakes —
+   * AND THE STAKES DEPEND ON THE DEPLOYMENT.
+   *
+   * There was one sentence, ungated: *"Without one, the only way back into this record is an email
+   * link."* The magic-link SECTION four blocks down is gated on `AUTH_METHODS.magic`, with a comment
+   * quoting `49 §5.6` — *"so the screen never offers it"* — but the gate was on the section and not
+   * on this. With no passkeys and no SMTP the screen read "the only way back in is an email link"
+   * and then nothing, because the block that would have explained the link had deleted itself.
+   *
+   * That is the hole `19 §2` names by name — *"left a passkey-primary product with no designed way
+   * back in"* — reopened inside the fix for it, on the one screen where believing a false promise
+   * costs the record. `49 §5.7` has the self-host answer, and it is a person rather than a link.
+   */
+  noPasskeysWhy: (magic: boolean) =>
+    magic
+      ? 'Without one, the only way back into this record is an email link.'
+      : 'This server cannot send an email link, so without a passkey there is no way back in on your own — ask whoever runs it.',
   addPasskey: 'Add a passkey',
   addedWhen: (ago: string) => `added ${ago}`,
   usedWhen: (ago: string) => `used ${ago}`,
@@ -700,7 +728,24 @@ export const copy = {
   thisOne: 'you are here',
 
   /* agents — `12 §6.1`'s device grants */
-  connected: 'Connected machines',
+  /* THE HEADING SAYS WHAT IT COUNTS. It said **Connected machines** over four rows whose own state
+     words are `connected`, `connected`, `waiting for you`, `you said no` — so the number counted two
+     machines the same screen calls not-connected. A previous fix reasoned carefully about the
+     NUMBER, concluded "if the heading is to say `active`, it has to say so in the heading", and left
+     the heading saying Connected. This is the other half of it. */
+  connected: 'Machines that have asked',
+  /* `13 §5.2` GIVES `no-data-yet` A CONTENT CONTRACT: what this is for, and — where it applies — the
+     copyable prompt. Four settings areas rendered a heading, a `0` and an empty `<ul>`; these two
+     are the ones where a machine or a connector is what fills the list, so the prompt is the thing
+     that fills it. */
+  noDevices: 'No machine has asked yet.',
+  noDevicesWhy: 'A machine that wants to act as you asks here first, and waits until you say yes.',
+  enrollPrompt: 'braindog runner enroll',
+  noSources: 'Nothing feeds this record yet.',
+  noSourcesWhy: 'A connector pulls rows in on a schedule — a mailbox, a bank feed, a repository — and reports here when it fails.',
+  ingestPrompt: 'read my record, then set up a connector for the mailbox I file invoices in',
+  noSnapshots: 'No sealed copy yet.',
+  noSnapshotsWhy: 'A snapshot is the whole record at one moment, kept so you can go back to it.',
   connectedHow: 'A machine asks, and you approve it here on a device you are already holding.',
   deviceState: {
     pending: 'waiting for you',

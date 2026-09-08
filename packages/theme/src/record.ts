@@ -136,8 +136,20 @@ export function recordTheme(
  * and a gate greps for it: the moment a swatch list is written in a settings screen it is a second
  * place the product's colours are decided.
  */
+/**
+ * The suggested accents — suggestions, not the set: any colour that clears the floors goes in.
+ *
+ * **BRICK WAS THE HOUSE COLOUR.** `ACCENTS[0]` was `#CF413A` and so is `BRAND_RED`, so the row
+ * offered seven choices of which two were one choice, at opposite ends, with two different toasts —
+ * and pressing Brick moved the tick, wrote the cookie, built a stylesheet and announced *"Brick is
+ * this record's colour"* over **zero pixels of difference**: a diff of 25 palette tokens across a
+ * register found every one identical but for hex casing and a leading zero.
+ *
+ * That is this codebase's signature defect — a control that reports success and changes nothing —
+ * on the one screen whose entire subject is visible change. A suggestion that is already the default
+ * is not a suggestion; the House control beside them is how you choose it.
+ */
 export const ACCENTS: readonly { name: string; hex: string }[] = [
-  { name: 'Brick', hex: '#CF413A' },
   { name: 'Moss', hex: '#2F6F4E' },
   { name: 'Ink blue', hex: '#1B4FA8' },
   { name: 'Plum', hex: '#8A3E7A' },

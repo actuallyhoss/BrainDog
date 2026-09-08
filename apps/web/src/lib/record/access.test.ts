@@ -43,10 +43,23 @@ test('and every one of them has a sentence, so no enum reaches a screen', () => 
      doing in the other direction — a chip printing `write` beside a cell reading `Read only`. */
   assert.equal(new Set(said).size, LEVELS.length, 'two levels say the same thing');
 
-  /* AND `append` IS THE ONE THAT IS NOT WHAT IT SOUNDS LIKE. `20 §1`: "`create`, `propose` and
-     `log` — and NO READ. The conservative half: an appender sees nothing, not even what it filed."
-     A sentence that let a reader assume otherwise would hand a contractor the whole record. */
-  assert.match(copy.levelMeans.append ?? '', /not read/);
+  /**
+   * AND `append` IS THE ONE THAT IS NOT WHAT IT SOUNDS LIKE. `20 §1`: *"`create`, `propose` and
+   * `log` — and NO READ. The conservative half: an appender sees nothing, **not even what it
+   * filed**."* A sentence that lets a reader assume otherwise hands a contractor the whole record.
+   *
+   * THIS USED TO ASSERT `/not read/`, WHICH THE WRONG SENTENCE SATISFIED. *"Can add rows, and not
+   * read the rest"* matched it and says the opposite of the rule — that an appender can read their
+   * own submissions — while the correct sentence, *"and read nothing"*, did not match at all. The
+   * comment had the rule right and the regex was satisfied by the bug, which is the third time a
+   * test on this tree has been found proving a true claim with a false example.
+   *
+   * So it tests the MEANING in both directions: nothing that implies a partial read, and something
+   * that says none.
+   */
+  const append = copy.levelMeans.append ?? '';
+  assert.doesNotMatch(append, /the rest|their own|what they filed|own rows/i, `append implies a partial read: "${append}"`);
+  assert.match(append, /read nothing|no read|cannot read|reads nothing/i, `append does not say it reads nothing: "${append}"`);
   /* AND NOTHING ELSE. A sentence for a level that does not exist is a sentence nobody reads. */
   for (const key of Object.keys(copy.levelMeans))
     assert.ok((LEVELS as readonly string[]).includes(key), `levelMeans.${key} is not a level`);

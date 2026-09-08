@@ -18,6 +18,7 @@ import {
   toHex,
 } from './color.ts';
 import { HOUSE, HIGH_CONTRAST, HOUSE_SEED } from './index.ts';
+import { ACCENTS } from './record.ts';
 import {
   BRAND_RED,
   INKS,
@@ -383,4 +384,29 @@ test('and a near-white surface giving up almost all of its chroma does NOT fail'
   // almost no chroma to have. As a fraction that reads as a catastrophe; as an amount it is 0.010.
   assert.deepEqual(refusals(checkScheme(HOUSE, 'light')).filter((f) => f.check === 'J'), []);
   assert.ok((HOUSE.clipped.light.s3 ?? 0) > 0, 'the fixture must actually clip there for this to mean anything');
+});
+
+/* ── a suggested colour is a suggestion ──────────────────────────────────── */
+
+test('no suggested accent is the house colour, and none is a duplicate of another', () => {
+  /**
+   * `ACCENTS[0]` WAS `#CF413A` AND SO IS `BRAND_RED`.
+   *
+   * Seven controls in a row, of which two were one choice, at opposite ends, with two different
+   * toasts — and the one calling itself "Brick" reported *"Brick is this record's colour"*, wrote the
+   * preference, built an adopted stylesheet, and produced **zero pixels of difference**: a diff of
+   * 25 palette tokens across a register found every one identical but for hex casing.
+   *
+   * A control that reports success and changes nothing is this codebase's signature defect, and it
+   * had reached the one screen whose entire subject is visible change. The House control beside the
+   * swatches is how somebody chooses the house colour; a suggestion that is already the default is
+   * not a suggestion.
+   */
+  const house = BRAND_RED.toUpperCase();
+  for (const a of ACCENTS)
+    assert.notEqual(a.hex.toUpperCase(), house, `${a.name} is the house colour, so choosing it changes nothing`);
+
+  const seen = new Set(ACCENTS.map((a) => a.hex.toUpperCase()));
+  assert.equal(seen.size, ACCENTS.length, 'two suggested accents are the same colour');
+  assert.ok(ACCENTS.length >= 4, 'too few suggestions to be a row of choices');
 });

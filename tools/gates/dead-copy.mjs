@@ -67,7 +67,6 @@ const ALLOWED = new Map([
   ['screenshotOn', 'UNBUILT — 19 §6\'s screenshot mode.'],
   ['screenshotOff', 'UNBUILT — same.'],
   ['appearance', 'UNBUILT — `/settings/[area]` title-cases the area id rather than naming it.'],
-  ['characterKeysHint', 'UNBUILT — `/settings/keyboard` is a heading and two unexplained buttons.'],
 ]);
 
 const files = [];
