@@ -10,13 +10,15 @@
     "./base.css": "./base.css",
     "./a11y.css": "./a11y.css",
     "./house.css": "./house.css",
-    "./mark.ts": "./mark.ts"
+    "./mark.ts": "./mark.ts",
+    "./alpha.css": "./alpha.css"
   },
   "files": [
     "tokens.css",
     "base.css",
     "a11y.css",
     "house.css",
+    "alpha.css",
     "mark.ts"
   ],
   "scripts": {

@@ -19,6 +19,10 @@
      with it the rule that no installed theme can reach the a11y layer — is established before any
      other stylesheet is parsed. */
   import '@braindog/skin/tokens.css';
+  /* AND THE PALETTE THIS BUILD IS FOR, which `tokens.css` used to `@import` on everybody's behalf.
+     `BRAINDOG_ENV` aliases this specifier, so an alpha build resolves it to `alpha.css` and ships
+     one palette rather than two — 28 §4. */
+  import '@braindog/skin/house.css';
   import '@braindog/skin/base.css';
   import '@braindog/skin/a11y.css';
 
@@ -32,6 +36,10 @@
   import { copy } from '$lib/copy.ts';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
+  import { assets } from '$app/paths';
+
+  import { named } from '$lib/env.ts';
+  import EnvBadge from '$lib/ui/EnvBadge.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import TabBar from '$lib/ui/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
@@ -241,8 +249,38 @@
     <Mark height={26} tone="inherit" />
   </button>
 
+  <!--
+    AND THE WORD FOR WHICH DEPLOYMENT THIS IS, beside the mark, which is where `EnvBadge`'s own
+    header has said it lives since it was written.
+
+    IT WAS NEVER MOUNTED. The component existed, `copy.alpha` existed, `env.ts` existed, and
+    `grep -rn EnvBadge` over the whole repository returned one file: its own. So the accessibility
+    argument the component makes — 13 §5.1, meaning may not live in the styling alone, and about one
+    reader in twelve cannot tell alpha's accent from production's — was written down, reviewed, and
+    then not in the product. Outside the launcher button, because the button opens the palette and
+    the label is not a control.
+  -->
+  <div class="env-slot"><EnvBadge /></div>
+
   <Palette bind:open={palette.open} nav={data.nav} />
 {/if}
+
+<!--
+  AND THE FAVICON, WHICH IS WHAT A TAB SHOWS WHEN IT IS NOT THE ACTIVE ONE.
+
+  `app.html` names `mark.svg` and cannot know which deployment this build is: it is static HTML, and
+  the environment is a `define`. `packages/theme` has generated `mark-alpha.svg` in the alpha accent
+  since the accent was measured, and the only thing that referenced it was its own filename.
+
+  `named` folds to `false` in the shipped build, so this element is not in the production bundle at
+  all — production keeps `app.html`'s icon and gains nothing. In alpha this link comes later in the
+  head than `app.html`'s, which is the one that wins.
+-->
+<svelte:head>
+  {#if named}
+    <link rel="icon" href="{assets}/mark-alpha.svg" type="image/svg+xml" />
+  {/if}
+</svelte:head>
 
 <Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>
   <Keymap />
@@ -496,6 +534,24 @@
     transition:
       transform var(--d-state) var(--ease-out),
       background var(--d-state) var(--ease-out);
+  }
+
+  /**
+   * THE DEPLOYMENT'S WORD, PINNED WHERE THE MARK IS. The badge itself is an inline label and knows
+   * nothing about placement — that is the shell's, and this is the shell. Directly above the
+   * launcher, so the word and the mark are read as one thing, on every screen that has chrome.
+   *
+   * `pointer-events: none` because it is a label and not a control: it must never take a click
+   * meant for the 52px disc under it, and there is nothing to do to it. It is also why the wrapper
+   * is safe to leave in the tree when `named` folds to `false` — an empty box of no size that
+   * catches nothing.
+   */
+  .env-slot {
+    position: fixed;
+    inset-block-end: calc(var(--sp-5) + 52px + var(--sp-2));
+    inset-inline-end: var(--sp-5);
+    z-index: var(--z-hint);
+    pointer-events: none;
   }
 
   .launcher:hover {

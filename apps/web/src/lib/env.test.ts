@@ -14,6 +14,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { ENVIRONMENTS as PAINTED } from '@braindog/theme';
 
@@ -50,4 +52,50 @@ test('production is not a member of the list', () => {
      build's chrome have nothing extra in it at all rather than something that says "Production". */
   assert.ok(!(ENVIRONMENTS as readonly string[]).includes(''));
   assert.ok(!(ENVIRONMENTS as readonly string[]).includes('production'));
+});
+
+/**
+ * AND THE FOUR PLACES THE MECHANISM HAS TO BE PLUGGED IN, checked as source.
+ *
+ * Every one of them was missing, and every one of them was described in the present tense by a
+ * comment somewhere: `env.ts` said "`vite.config.ts` substitutes a literal" and nothing defined
+ * `__BRAINDOG_ENV__`; `EnvBadge.svelte` said "it is in the DOM on every screen that has chrome" and
+ * `grep -rn EnvBadge` over the whole repository returned its own file; the same header said
+ * "`title.ts` carries the other half" and `title.ts` had no environment in it at all; and
+ * `tokens.css` `@import`ed the production palette on every deployment's behalf. Four halves of one
+ * mechanism, each with prose asserting it was whole.
+ *
+ * A SOURCE GREP IS THE RIGHT SHAPE HERE AND IT IS WORTH SAYING WHY. What went wrong was not a
+ * behaviour — nothing computed the wrong answer, and there was nothing to compute, which is exactly
+ * why no behavioural test failed. `named` folds to `false` under `node --test`, so a test that
+ * rendered the shell would draw the production chrome and pass. The defect was that four wires were
+ * not connected, and the cheapest honest check for a wire is to look for it.
+ */
+const read = (rel: string): string => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+
+test('the build substitutes the environment, and throws on one it does not know', () => {
+  const config = read('../../vite.config.ts');
+  assert.match(config, /__BRAINDOG_ENV__:\s*JSON\.stringify\(ENV\)/, 'vite.config.ts defines nothing');
+  assert.match(config, /throw new Error/, 'an unknown BRAINDOG_ENV builds production quietly');
+  assert.match(config, /ENVIRONMENTS/, 'the list is retyped rather than imported');
+});
+
+test('the shell draws the word, and the palette follows the deployment', () => {
+  const layout = read('../routes/+layout.svelte');
+  assert.match(layout, /<EnvBadge \/>/, 'the badge is not mounted anywhere');
+  assert.match(layout, /@braindog\/skin\/house\.css/, 'the app does not import a palette it can alias');
+  assert.match(layout, /mark-alpha\.svg/, 'the deployment has no favicon of its own');
+
+  /* NOT A `doesNotMatch` OVER THE WHOLE FILE, because the comment that replaced the `@import`
+     quotes the line it replaced — so the first version of this assertion failed on the paragraph
+     explaining why it exists. A statement is a line that starts with one. */
+  const tokens = read('../../../../packages/skin/tokens.css');
+  const imports = tokens.split(/\r?\n/u).filter((line) => line.trimStart().startsWith('@import'));
+  assert.deepEqual(imports, [], 'the shared token layer drags one palette into every deployment');
+});
+
+test('and the tab says which deployment it is', () => {
+  const title = read('./title.ts');
+  assert.match(title, /from '\$lib\/env\.ts'/, 'title.ts does not know what a deployment is');
+  assert.match(title, /copy\.alpha/, 'the word in the tab is not the word on the screen');
 });

@@ -8,6 +8,10 @@
 -->
 <script lang="ts">
   import '@braindog/skin/tokens.css';
+  /* AND THE PALETTE THIS BUILD IS FOR, which `tokens.css` used to `@import` on everybody's behalf.
+     `BRAINDOG_ENV` aliases this specifier, so an alpha build resolves it to `alpha.css` and ships
+     one palette rather than two — 28 §4. */
+  import '@braindog/skin/house.css';
   import '@braindog/skin/base.css';
   import '@braindog/skin/a11y.css';
   import '../app.css';

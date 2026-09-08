@@ -1,5 +1,9 @@
+import { fileURLToPath } from 'node:url';
+
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+
+import { ENVIRONMENTS } from '@braindog/theme';
 
 /**
  * WHICH RECORD THIS BUILD SHOWS — `BRAINDOG_VARIANT`, and it exists because three separate findings
@@ -26,9 +30,45 @@ import { defineConfig } from 'vite';
  */
 const VARIANT = process.env.BRAINDOG_VARIANT ?? '';
 
+/**
+ * WHICH DEPLOYMENT THIS BUILD IS FOR — `BRAINDOG_ENV`, and `src/lib/env.ts` has described this
+ * substitution in the present tense since it was written. It did not exist. `__BRAINDOG_ENV__` was
+ * declared in `app.d.ts`, read in `env.ts`, and defined by nothing: `typeof __BRAINDOG_ENV__` was
+ * `'undefined'` in every build there has ever been, `named` was permanently `false`, and the
+ * environment mechanism was four halves — a measured accent, a generated stylesheet, a favicon and
+ * a label — with no build that could switch any of them on.
+ *
+ * IT THROWS ON A VALUE IT DOES NOT KNOW, which is the check `env.ts` says happens "earlier and
+ * better" than a runtime membership test. A typo in a deploy command is a build that fails here,
+ * loudly, rather than a deployment that quietly ships production's chrome under alpha's hostname —
+ * and a runtime check could not replace it without costing the fold that keeps alpha's chrome out
+ * of the production bundle entirely.
+ *
+ * `ENVIRONMENTS` comes from `@braindog/theme` rather than being retyped, because the package that
+ * decides which deployments have a PALETTE is the one that decides which are deployments. 50 §1
+ * admits `@braindog/theme` for the build; this is the build.
+ */
+const ENV = process.env.BRAINDOG_ENV ?? '';
+if (ENV !== '' && !(ENVIRONMENTS as readonly string[]).includes(ENV))
+  throw new Error(
+    `BRAINDOG_ENV is ${JSON.stringify(ENV)}, and the deployments are ${ENVIRONMENTS.join(', ')} or nothing for production.`,
+  );
+
+/**
+ * AND THE PALETTE FOLLOWS THE ENVIRONMENT, by resolving one specifier to a different file.
+ *
+ * `packages/theme` has generated `alpha.css` since the accent was measured, and nothing could load
+ * it: `tokens.css` `@import`ed `house.css` on every app's behalf, so a deployment's colours were
+ * decided by a file shared with every other deployment. The layout imports the palette by name now
+ * and this line is what makes the name mean the right file — one palette in the bundle, chosen at
+ * build time, with nothing to switch at run time.
+ */
+const PALETTE = fileURLToPath(new URL(`../../packages/skin/${ENV === '' ? 'house' : ENV}.css`, import.meta.url));
+
 export default defineConfig({
   plugins: [sveltekit()],
-  define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT) },
+  define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT), __BRAINDOG_ENV__: JSON.stringify(ENV) },
+  resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   server: { port: 5183, strictPort: true },
   preview: { port: 5183, strictPort: true },
   build: { target: 'es2022', cssMinify: 'lightningcss' },

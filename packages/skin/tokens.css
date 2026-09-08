@@ -14,7 +14,19 @@
 
 @layer tokens, theme, a11y, components;
 
-@import './house.css';
+/**
+ * THE PALETTE IS NOT IMPORTED HERE, AND IT USED TO BE.
+ *
+ * `@import './house.css'` sat on this line, so every file that reached for the type scale got the
+ * PRODUCTION palette welded to it — this file is shared by both apps and every deployment, and
+ * there is no expression in CSS for "the palette this build is for". `packages/theme` has generated
+ * `alpha.css` since the deployment work landed and nothing could load it: the environment had a
+ * measured accent, a stylesheet, a favicon and a label, and wore production's colours regardless.
+ *
+ * An app imports its own palette now, immediately after this file — `@braindog/skin/house.css`, or
+ * whatever `BRAINDOG_ENV` aliases that specifier to. The layer statement above still comes first,
+ * which is the property that mattered: no palette anyone installs can reach the a11y layer.
+ */
 
 @layer tokens {
   /* ── Faces ──────────────────────────────────────────────────────────────

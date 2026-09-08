@@ -17,8 +17,27 @@
  * they ARE.
  */
 
+import { copy } from '$lib/copy.ts';
+import { ENV, named } from '$lib/env.ts';
+
 /** One place, because it appears seventeen times and a typo in one of them is invisible. */
 export const PRODUCT = 'BrainDog';
+
+/**
+ * AND THE DEPLOYMENT IS PART OF THE NAME — `BrainDog Alpha`, in the tab.
+ *
+ * `EnvBadge`'s header has said "it is also in the tab title, and that is not redundancy" since it
+ * was written, and this file had no environment in it at all: no `ENV`, no `named`, nothing. The
+ * badge is only drawn where there is chrome to draw it in — `/start` and `/s/<token>` carry no
+ * shell (50 §5.13 step 6) — and a tab is read while looking at something else, which is the whole
+ * argument for a title in the first place. Two windows side by side, one on alpha and one on the
+ * real record, are told apart by their tabs before either is looked at.
+ *
+ * IT FOLDS. `named` is a `define`d literal, so in the shipped build this whole expression is
+ * `'BrainDog'` and the lookup is not in the bundle.
+ */
+const DEPLOYMENT: Record<string, string> = { alpha: copy.alpha };
+const HERE = named ? `${PRODUCT} ${DEPLOYMENT[ENV] ?? ''}`.trim() : PRODUCT;
 
 /**
  * `titleOf('Invoice 2026-041', 'Obligations')` → `Invoice 2026-041 · Obligations · BrainDog`.
@@ -27,4 +46,4 @@ export const PRODUCT = 'BrainDog';
  * call site. With nothing to say it is just the product, which is the right answer for a shell.
  */
 export const titleOf = (...parts: (string | false | null | undefined)[]): string =>
-  [...parts.filter((p): p is string => Boolean(p && p.trim())), PRODUCT].join(' · ');
+  [...parts.filter((p): p is string => Boolean(p && p.trim())), HERE].join(' · ');
