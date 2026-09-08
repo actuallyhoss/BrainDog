@@ -100,6 +100,12 @@ const CASES = [
   /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both — or neither —
      is a gate that is counting keys rather than finding dead ones. */
   { gate: 'dead-copy', expect: /nobody reads/, findings: 1 },
+
+  /* AND THE SHAPE `dead-copy` COULD NOT SEE: a sentence whose only renderer is a module nothing
+     imports. It cost a real one — `copy.alpha`, the word that tells the alpha deployment apart from
+     the real record, named only by a component that had never been mounted. A grep over source said
+     it was rendered. */
+  { gate: 'dead-copy-orphan', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
 ];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */

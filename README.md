@@ -101,7 +101,15 @@ them are built.
 | `apps/site` | the marketing site |
 | `apps/worker` | the Cloudflare host |
 | `apps/selfhost` | the Node host |
-| `tools/gates` | 19 gates, each tested against a seeded violation |
+| `tools/gates` | 21 gates, each tested against a seeded violation — 28 of them |
+
+## Running it
+
+`alpha.brain.dog` is the deployment this repository builds on every push to `master` — the same
+Worker and the same frontend, wearing a different accent and a word so nobody confuses the two
+windows. [DEPLOYMENT.md](DEPLOYMENT.md) records every build setting it runs under, including the one
+environment variable the whole deployment identity hangs on, because otherwise that lives in a
+dashboard and a dashboard is not reviewable.
 
 ## Contributing
 

@@ -30,7 +30,9 @@
  */
 
 import { readFile, readdir } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+
+import { skipDir } from './lib.mjs';
 
 const ROOT = process.env.BRAINDOG_GATE_ROOT ?? process.cwd();
 const SRC = join(ROOT, 'apps', 'web', 'src');
@@ -72,6 +74,11 @@ const ALLOWED = new Map([
 const files = [];
 async function walk(dir) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
+    /* THE SAME DIRECTORIES EVERY OTHER GREP GATE SKIPS, and this was the only one that skipped
+       none. Nothing under `src/` is skipped today, so this changes no number — it is here because
+       the incident `lib.mjs` records is a scratch directory somebody left behind, and a scratch
+       file naming a `copy.*` key would have kept that key alive from a file nobody ships. */
+    if (skipDir(e.name)) continue;
     const at = join(dir, e.name);
     if (e.isDirectory()) await walk(at);
     /* A TEST IS NOT A RENDERER. `deployment.test.ts` names twelve `copy.*` keys to assert the Cloud
@@ -84,8 +91,29 @@ async function walk(dir) {
 }
 await walk(SRC);
 
+/**
+ * A COMMENT IS NOT A CALL SITE.
+ *
+ * This greps raw file text, so a key named in prose counted as rendered — and this repository's
+ * comments name keys constantly. Three do it today: `pref.ts` explains why `copy.markAllRead` left
+ * the allow-list, `data.ts` discusses `copy.lastDecided`, `schema.ts` `copy.levelMeans`. All three
+ * are alive for other reasons, so the gate is not wrong about them; it is one deletion away from
+ * being propped up by its own commentary, which is the shape `refusals` and `secret-grep` were
+ * caught in.
+ *
+ * `flags.mjs` already had this exact function and the same paragraph. It is copied rather than
+ * shared because the two gates want different things blanked — `flags` also blanks import
+ * specifiers, and `copy` is never an import specifier.
+ */
+const blank = (m) => m.replace(/[^\n]/g, ' ');
+const readable = (text) =>
+  text
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + blank(m.slice(p.length)));
+
 const sources = new Map();
-for (const f of files) sources.set(f, await readFile(f, 'utf8'));
+for (const f of files) sources.set(f, readable(await readFile(f, 'utf8')));
 
 const copySrc = sources.get(COPY);
 if (!copySrc) {
@@ -93,17 +121,58 @@ if (!copySrc) {
   process.exit(3);
 }
 
-/* TOP-LEVEL KEYS ONLY — two spaces of indent. A nested key is reached through its parent, and
-   `copy.defines.list` is a use of `defines`; the unit test in `define.test.ts` is what checks that
-   every member of a nested table is named. */
-const keys = [...copySrc.matchAll(/^ {2}([a-zA-Z]\w*)\s*:/gm)].map((m) => m[1]);
+/**
+ * A MODULE NOTHING IMPORTS IS NOT A RENDERER.
+ *
+ * This treated all 81 non-copy files as renderers, and four of them are reachable from no route.
+ * One of them, `EnvBadge.svelte`, was the only consumer of `copy.alpha` — so the word that tells
+ * the alpha deployment apart from the real record was reported as rendered by a component that had
+ * never been mounted, for as long as both existed. That is this gate's own subject: a sentence
+ * written, reviewed, shipped and read by nobody, hidden one level up from the string.
+ *
+ * REACHABILITY FROM `src/routes`, because that is what SvelteKit renders. A file is a renderer if a
+ * route imports it, or if something a route imports imports it. Measured on the tree the day this
+ * landed: 4 orphans out of 81 files, 1 of which named a key — 0 false positives.
+ */
+const routes = files.filter((f) => f.includes(`${sep}routes${sep}`));
+const reachable = new Set(routes);
+for (const queue = [...routes]; queue.length > 0; ) {
+  const at = queue.pop();
+  /* THE SPECIFIER AS WRITTEN, then resolved two ways — `$lib/x.ts` is the app's own alias for
+     `src/lib/x.ts`, and a relative one is relative to the importer. Anything else is a package, and
+     a package does not hold this app's copy. */
+  for (const m of (sources.get(at) ?? '').matchAll(/from\s*['"]([^'"\n]+)['"]/gu)) {
+    const spec = m[1];
+    const to = spec.startsWith('$lib/')
+      ? join(SRC, 'lib', spec.slice(5))
+      : spec.startsWith('.')
+        ? resolve(dirname(at), spec)
+        : null;
+    if (to === null || reachable.has(to) || !sources.has(to)) continue;
+    reachable.add(to);
+    queue.push(to);
+  }
+}
+
+/**
+ * TOP-LEVEL KEYS ONLY — two spaces of indent. A nested key is reached through its parent, and
+ * `copy.defines.list` is a use of `defines`; the unit test in `define.test.ts` is what checks that
+ * every member of a nested table is named.
+ *
+ * A QUOTED KEY AND A `_`-PREFIXED ONE ARE SENTENCES TOO. The pattern read one character class and
+ * nothing else, so `'not-found': …` — the plainest way to write a key that is not an identifier —
+ * was not a key this gate had ever heard of. There is no such key in `copy.ts` today and the
+ * widened pattern finds the same 399, which is the point: it costs nothing now, and it is not
+ * sitting there waiting to be wrong on the day somebody writes one.
+ */
+const keys = [...copySrc.matchAll(/^ {2}(?:['"]([^'"]+)['"]|([A-Za-z_$]\w*))\s*:/gmu)].map((m) => m[1] ?? m[2]);
 
 const dead = [];
 for (const key of keys) {
   const used = new RegExp(String.raw`\bcopy\.${key}\b|\bcopy\[['"]${key}['"]\]`);
   let found = false;
   for (const [f, s] of sources) {
-    if (f === COPY) continue;
+    if (f === COPY || !reachable.has(f)) continue;
     if (used.test(s)) {
       found = true;
       break;
@@ -120,7 +189,15 @@ const unexpected = dead.filter((k) => !ALLOWED.has(k));
 const revived = [...ALLOWED.keys()].filter((k) => keys.includes(k) && !dead.includes(k));
 const gone = [...ALLOWED.keys()].filter((k) => !keys.includes(k));
 
-console.log(`  dead-copy: ${keys.length} sentences, ${dead.length} unrendered (${ALLOWED.size} known)`);
+/* BOTH SIDES OF THE WALK, PRINTED — because a number a gate does not print is a number nobody
+   checks, and the first version of this line counted `copy.ts` on one side and not the other, so a
+   two-file fixture reported "3 of 2". If the two ever read the same the reachability walk has
+   stopped narrowing anything, which is either good news or a resolver quietly matching nothing, and
+   from outside those look identical. */
+const renderers = [...reachable].filter((f) => f !== COPY).length;
+console.log(
+  `  dead-copy: ${keys.length} sentences, ${dead.length} unrendered (${ALLOWED.size} known), over ${renderers} of ${files.length - 1} files a route reaches`,
+);
 
 if (unexpected.length) {
   console.error('\n  a sentence this product types and nobody reads:');
