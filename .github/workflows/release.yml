@@ -128,8 +128,16 @@ jobs:
               git log --no-merges --format='- %s' "${previous}..${TAG}"
               printf '\n**Full changelog**: %s/compare/%s...%s\n' "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" "$previous" "$TAG"
             else
-              printf '## Changes\n\n'
-              git log --no-merges --format='- %s' "$TAG"
+              # THE FIRST RELEASE DOES NOT ENUMERATE ITS OWN HISTORY. With no previous tag the
+              # line this replaces printed every commit ever made - 310 of them at the first
+              # tag - and a release note nobody scrolls to the end of tells a reader less than
+              # four sentences do. What a first release owes somebody is what the thing is and
+              # how far along it is, and both of those already have a home.
+              printf '## The first release\n\n'
+              printf 'The commit log is the changelog from here; this tag is where the count starts.\n\n'
+              printf 'For what works today and what does not, read [REPORT.md](%s/blob/%s/REPORT.md).\n' \
+                "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" "$TAG"
+              printf '\n%s commits precede this tag.\n' "$(git rev-list --count "$TAG")"
             fi
             printf '\n---\n\n'
             printf 'The asset is the built browser client, static, unpacking to `build/`. Serve it from any\n'

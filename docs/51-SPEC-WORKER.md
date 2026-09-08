@@ -182,7 +182,7 @@ request's record; a `bearer` auth carries a hash, never the secret; `system` is 
 | Bearer | `Authorization: Bearer <rec_id>.<secret>` — `^rec_[0-9A-HJKMNP-TV-Z]{26}\.[A-Za-z0-9_-]{43}$` | the record id routes; `sha256(secret)` is what `token.hash` and `device_grant.token_hash` hold. 32 random bytes, shown once (§13 D3) |
 | Session cookie | `sid=<43 chars>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000` | `session.id_hash = sha256(sid)`; re-issued when `rotated_at` is over 24 h old (33 §10: 30 days, rotating) |
 | Record cookie | `rec=<rec_id>; HttpOnly; Secure; SameSite=Lax; Path=/` | which of the person's records a browser request means; set at sign-in and by `/auth/switch/<slug>` (§13 D4) |
-| Session hint | `Braindog-Session: {"spoken":"S42","client_id":"…","host":"…","repo":"…"}` | ASCII JSON ≤ 512 bytes; malformed → ignored; MCP carries the same under `_meta` and 44 parses it |
+| Session hint | `BrainDog-Session: {"spoken":"S42","client_id":"…","host":"…","repo":"…"}` | ASCII JSON ≤ 512 bytes; malformed → ignored; MCP carries the same under `_meta` and 44 parses it |
 | Share token | `/s/<rec_id>.<b64url JCS{id,slug,exp,k}>.<b64url HMAC-SHA-256>` | key = `HKDF-SHA-256(KEK, info 'braindog/share')`; `k` = `kek_id`; `exp` RFC 3339; verified in the Worker, revocation checked by the record (§13 D5) |
 | WebSocket push | `{ "version": 1234, "registers": ["obligations", "decision"] }` | outgoing only; never a row — 22 §5 |
 | Runner push | `{ "t": "job", "id": "<job id>" }` | a doorbell; the claim is `claimJob()` over HTTP — 33 §11 |
@@ -248,7 +248,7 @@ The skeleton in 33 §7 lacked `send_email`, `analytics_engine_datasets`, `rateli
    If `row.rotate`, mint a new `sid` and add `Set-Cookie` to the eventual response.
 3. Cookie auth on a mutating method (`POST`, `PUT`) requires `Origin` equal to `https://<PUBLIC_HOST>` or
    `Sec-Fetch-Site: same-origin` → else **403** `FORBIDDEN` (12 §8 CSRF). Bearer requests skip this.
-4. `session` from `Braindog-Session` if valid; `now = Date.now()`; `surface` from the route: `/api/*` cookie → `web`,
+4. `session` from `BrainDog-Session` if valid; `now = Date.now()`; `surface` from the route: `/api/*` cookie → `web`,
    `/api/*` bearer → `cli`, `/mcp` → `mcp`.
 5. Rate limit: bearer → `RL_READ.limit({ key: hash })`, and for `create update propose log` also `RL_WRITE`;
    cookie → `RL_READ.limit({ key: 'p:' + person })`. `success: false` → **429**, bare body, `Retry-After: 60`.

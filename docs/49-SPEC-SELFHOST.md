@@ -193,8 +193,8 @@ anywhere is `BootRefused`. The five enforced ceilings are the adapter's; the hos
 | timer, poller, snapshot job | `{ kind: 'system' }` | `alarm` |
 | `/in/*` | `{ kind: 'system' }` | `webhook` · `email` |
 
-`session` is filled from four request headers when present — `X-Braindog-Session`, `X-Braindog-Client-Id`,
-`X-Braindog-Host`, `X-Braindog-Repo` → `{ spoken, client_id, host, repo }`; over `/mcp` the handler reads
+`session` is filled from four request headers when present — `X-BrainDog-Session`, `X-BrainDog-Client-Id`,
+`X-BrainDog-Host`, `X-BrainDog-Repo` → `{ spoken, client_id, host, repo }`; over `/mcp` the handler reads
 `_meta` itself. `now = clock.now()`.
 
 ### 4.7 · Routes as data
@@ -829,7 +829,7 @@ so its row is what this spec needs from it:
 | 15 | **Sign-up is closed on a self-host**: persons come from `braindog init` and invitations; an unknown email at `/auth/magic/start` gets 200 and no mail | 33 §10 Sign up row: "Cloud; self-host: `init` and invitations" |
 | 16 | `session.authed_at` (a ninth column, not a ninth table) records the last proof; rotation every 24 h of use with a sliding 30-day expiry never moves it; VAULT requires it within 15 minutes | 33 §10 `session` row |
 | 17 | Lockout constants: ten strikes, fifteen minutes, capped counter, keys `ip:` `email:` `mint:` `device:`; device codes and share tokens on the record's `auth_fail` | 12 §8 (the numbers) |
-| 18 | `CallContext.session` comes from `X-Braindog-Session`, `-Client-Id`, `-Host`, `-Repo` on `/api/*`; `/mcp` reads `_meta` | 33 §2; 48 sends them |
+| 18 | `CallContext.session` comes from `X-BrainDog-Session`, `-Client-Id`, `-Host`, `-Repo` on `/api/*`; `/mcp` reads `_meta` | 33 §2; 48 sends them |
 | 19 | The host signs: the final page of a streamed `POST /api/export` and every snapshot use one `sign()` over the record's `vault_key(purpose = 'signing')`, unwrapped with the KEK | 33 §9 Export rows: "the Worker or the self-host signs" |
 | 20 | One sick record does not stop the host: `SCHEMA_MISMATCH` / `SCHEMA_NEWER` is per record, 503 on its routes only | 33 §9 Migrations row (self-host clause) |
 | 21 | `main.ts` carries `init <slug> [--owner]` and `dev [--port]` (48 §5.14's contract); a slug is `^[a-z][a-z0-9-]{1,31}$`; `init` generates the record DEK, the connector DEK and the Ed25519 signing pair, wraps them under the KEK and hands them to `createRecord`; the inbound-email capability lives at `<slug>/inbound.token` (0600); `dev` prints mail and its throwaway `BRAINDOG_TOKEN` to stderr | 33 §5 `init` row (the owner flag, the token file); 34 §4 (a slug grammar row); 33 §6 |

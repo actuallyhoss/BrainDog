@@ -190,7 +190,7 @@ Six principal kinds, counted. **Who declares what:** `Refusal` and `RefusalCode`
 structurally.
 
 The host builds `CallContext` on every request — `@braindog/host`'s `resolveContext(req, lookups)` reads the `rec`
-cookie, the bearer (found by its hash) or the operation grant, and the session hints from the one `Braindog-Session`
+cookie, the bearer (found by its hash) or the operation grant, and the session hints from the one `BrainDog-Session`
 header on `/api/*` or from `_meta.session` on `/mcp` (the one `_meta` key read; every other key is ignored — 44 §4.2);
 the alarm and the queue build a `system` context. The record derives `actor` and `ctx.scope` from it, runs the `op`
 reach check itself, and never trusts a caller-supplied actor. There is no 412: a stale `version` is a 409 whose body
