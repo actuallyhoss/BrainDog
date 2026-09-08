@@ -246,10 +246,13 @@ const indexesOn = (sql: NodeSql, register: string): string[] =>
     .map((r) => r.name)
     .filter((n) => n.startsWith(`entry_i_${register}__`) || n.startsWith(`entry_u_${register}__`));
 
-const withFields = (fields: unknown[]): Declaration => ({
+const withFields = (fields: unknown[], extra: Record<string, unknown> = {}): Declaration => ({
   ...OBLIGATIONS,
-  body: { ...OBLIGATIONS.body, fields } as never,
+  body: { ...OBLIGATIONS.body, fields, ...extra } as never,
 });
+
+/** The code a declaration is refused with, or `null` when it installs. */
+const refusedWith = (decl: Declaration): string | null => validateDeclaration(decl)?.code ?? null;
 
 test('AN INDEX IS DROPPED WHEN THE DECLARATION STOPS ASKING FOR IT', async () => {
   /* `CREATE INDEX IF NOT EXISTS` and nothing else meant the indexes outlived the declaration: take
@@ -392,4 +395,144 @@ test('MOVING `state:` TO ANOTHER FIELD RE-MIRRORS THE ROWS THAT ALREADY EXIST', 
   );
   assert.equal(sql.one<{ state: string | null }>('SELECT state FROM entry')?.state, null);
   sql.close();
+});
+
+/** `OBLIGATIONS` declares a `state` field; a case about something else must not inherit it. */
+const NO_STATE = { state: undefined };
+
+/* ── the checks a register did not have ─────────────────────────────────── */
+
+test('A FIELD TYPE THAT IS NOT ONE IS REFUSED, and the refusal guesses', () => {
+  /**
+   * `04 §5`'s first worked example, and it installed clean: *"`register.invoices.fields[4].type
+   * 'currency'` — did you mean 'money'?"*
+   *
+   * `FieldType` was a TypeScript union and only that. A union checks a caller inside this repository;
+   * a pack is untyped text written by somebody else, which is the entire population this check
+   * exists for. `type: 'currency'` reached `coerce`, fell through its switch, and the field then
+   * held whatever JSON arrived — on a register somebody declared to hold money.
+   */
+  const said = validateDeclaration(withFields([{ id: 'what', type: 'currency' }], NO_STATE));
+  assert.equal(said?.code, 'FIELD_TYPE_UNKNOWN');
+  assert.match(said?.fix ?? '', /did you mean 'money'\?/, 'the refusal names no alternative');
+  assert.equal(said?.at, 'what', 'a refusal names the field that was wrong (04 §5)');
+
+  /* A FIELD WITH NO TYPE AT ALL, which is the commoner mistake and the same silence. */
+  assert.equal(refusedWith(withFields([{ id: 'what' }], NO_STATE)), 'FIELD_TYPE_UNKNOWN');
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 7 }], NO_STATE)), 'FIELD_TYPE_UNKNOWN');
+
+  /**
+   * AND IT GUESSES BY WHAT PEOPLE ARRIVE WITH, not by how many letters two words share.
+   *
+   * `currency` is not a near-miss for `money` by any string measure — the first version of this
+   * answered `document`, which shares more characters. The resemblance is that somebody coming from
+   * a spreadsheet, an ORM or another record tool brings THAT tool's vocabulary. Edit distance is
+   * the fallback, for slips rather than for words.
+   */
+  const guessFor = (type: string): string =>
+    /did you mean '([a-z]+)'/.exec(validateDeclaration(withFields([{ id: 'what', type }], NO_STATE))?.fix ?? '')?.[1] ?? '—';
+  for (const [said, meant] of [
+    ['currency', 'money'], ['string', 'text'], ['datetime', 'instant'], ['boolean', 'bool'],
+    ['select', 'enum'], ['relation', 'ref'], ['attachment', 'file'], ['password', 'secret'],
+    ['array', 'list'], ['float', 'decimal'], ['integer', 'int'], ['date', 'day'],
+    ['markdown', 'document'],
+    /* and the slips */
+    ['mony', 'money'], ['tex', 'text'], ['instnt', 'instant'], ['decimel', 'decimal'],
+  ] as const)
+    assert.equal(guessFor(said), meant, `${said} should suggest ${meant}`);
+
+  /* AND THE GUESS IS NOT ALWAYS THERE. Something with nothing near it says so plainly rather than
+     sending somebody after the closest string by accident — a wrong suggestion is worse than none,
+     because it is followed. */
+  for (const noise of ['zzz', 'xylophone', 'q'])
+    assert.equal(guessFor(noise), '—', `${noise} should suggest nothing`);
+
+  /* The sixteen still install. This is the assertion that would catch a check that refuses
+     everything — a gate that is red for every input is as useless as one that is never red. */
+  for (const type of ['text', 'document', 'int', 'duration', 'decimal', 'money', 'quantity', 'day', 'instant', 'bool', 'ref', 'file', 'url', 'email', 'secret', 'json'])
+    assert.equal(refusedWith(withFields([{ id: 'what', type }], NO_STATE)), null, `${type} is a type and was refused`);
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'enum', values: ['a'] }], NO_STATE)), null);
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'list', of: 'text' }], NO_STATE)), null);
+});
+
+test('and a list says what it holds, which is never another list', () => {
+  /* `list<T>` carries its element type in `of`. A list of lists is a shape the write path has no
+     coercion for and the `where:` compiler cannot index. */
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'list' }], NO_STATE)), 'FIELD_TYPE_UNKNOWN');
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'list', of: 'list' }], NO_STATE)), 'FIELD_TYPE_UNKNOWN');
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'list', of: 'nope' }], NO_STATE)), 'FIELD_TYPE_UNKNOWN');
+});
+
+test('AN ENUM WITH NO VALUES IS A FIELD THAT REFUSES EVERYTHING', () => {
+  /* `02 §1`: an enum is *"a string in `values`"*. With no `values`, every write to it fails
+     coercion — after the pack installed and the form drew a control with nothing in it. */
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'enum' }], NO_STATE)), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'enum', values: [] }], NO_STATE)), 'DECLARATION_INVALID');
+});
+
+test('SIXTY-FIVE FIELDS IS A DATABASE, NOT A REGISTER', () => {
+  /* `02 §5`'s ceiling, and its own sentence for why. Each one becomes a control in a form, a line
+     in an MCP schema and a term in a `json_extract` plan. */
+  const many = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i === 0 ? 'what' : `f${i}`, type: 'text' }));
+  assert.equal(refusedWith(withFields(many(64), NO_STATE)), null, 'sixty-four is the ceiling, not one past it');
+  const said = validateDeclaration(withFields(many(65), NO_STATE));
+  assert.equal(said?.code, 'FIELDS_OVER_CAP');
+  assert.match(said?.fix ?? '', /65 fields/, 'the refusal does not say how many there were');
+});
+
+test('and nine indexed fields is one past the ceiling', () => {
+  /* `02 §5`: eight, *"each a partial expression index, which costs storage and write time rather
+     than a column. Unbounded indexing is how a 10 GB budget and a write-row bill disappear."* */
+  const indexed = (n: number) =>
+    Array.from({ length: 10 }, (_, i) => ({ id: i === 0 ? 'what' : `f${i}`, type: 'text', ...(i < n ? { index: true } : {}) }));
+  assert.equal(refusedWith(withFields(indexed(8), NO_STATE)), null);
+  assert.equal(refusedWith(withFields(indexed(9), NO_STATE)), 'INDEXES_OVER_CAP');
+
+  /* `unique` COUNTS TOO, and it is the half somebody forgets: a `unique:` is an index with a
+     constraint on it, and eight of each is sixteen indexes on one register. */
+  const mixed = Array.from({ length: 10 }, (_, i) => ({
+    id: i === 0 ? 'what' : `f${i}`,
+    type: 'text',
+    ...(i < 5 ? { index: true } : i < 9 ? { unique: true } : {}),
+  }));
+  assert.equal(refusedWith(withFields(mixed, NO_STATE)), 'INDEXES_OVER_CAP');
+});
+
+test('A STATE FIELD IS ALWAYS AN ENUM', () => {
+  /* `02 §1` and `04 §5`. A `state:` naming a `text` field gives the register a lifecycle with no
+     transitions the record can check — so every `move` in every rule against it is unenforceable,
+     which is the one thing a state field is for. */
+  const said = validateDeclaration(
+    withFields([{ id: 'what', type: 'text' }, { id: 'state', type: 'text' }], { state: 'state' }),
+  );
+  assert.equal(said?.code, 'STATE_NOT_ENUM');
+  assert.deepEqual(said?.allowed, ['enum']);
+  assert.equal(
+    refusedWith(withFields([{ id: 'what', type: 'text' }, { id: 'state', type: 'enum', values: ['open'] }], { state: 'state' })),
+    null,
+  );
+});
+
+test('AND `search:` TAKES WHAT THE INDEX CAN TAKE', () => {
+  /* `02 §1` closes it at text, document, enum, url, email and `list<text>`. `04 §5`'s example is
+     this one exactly: *"search names amount, which is money."* A money field named here produced an
+     FTS column of `[object Object]` and a search that quietly matched nothing — the failure mode
+     that looks like an empty record. */
+  const said = validateDeclaration(
+    withFields([{ id: 'what', type: 'text' }, { id: 'amount', type: 'money' }], { ...NO_STATE, search: ['what', 'amount'] }),
+  );
+  assert.equal(said?.code, 'SEARCH_FIELD_TYPE');
+  assert.match(said?.fix ?? '', /which is money/);
+  assert.equal(said?.at, 'amount');
+
+  for (const type of ['text', 'document', 'url', 'email'])
+    assert.equal(refusedWith(withFields([{ id: 'what', type }], { ...NO_STATE, search: ['what'] })), null, `${type} is searchable`);
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'enum', values: ['a'] }], { ...NO_STATE, search: ['what'] })), null);
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'list', of: 'text' }], { ...NO_STATE, search: ['what'] })), null, 'list<text> is searchable');
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'list', of: 'int' }], { ...NO_STATE, search: ['what'] })), 'SEARCH_FIELD_TYPE');
+
+  /* AND A SEARCH FIELD THAT IS NOT A FIELD. Naming one that does not exist is the same class of
+     silence: the index is built over nothing and the register searches by title alone. */
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'text' }], { ...NO_STATE, search: ['nope'] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'text' }], { ...NO_STATE, search: 'what' })), 'DECLARATION_INVALID');
 });

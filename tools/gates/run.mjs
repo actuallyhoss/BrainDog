@@ -48,6 +48,11 @@ const GATES = [
   /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
      code path forgets — which holds only while the CHECK and the document agree about what it is. */
   ['closed-lists', ['node', [join(here, 'closed-lists.mjs')]]],
+  /* THE NINETY-NINE REFUSAL CODES, which had no `RefusalCode` type and so no list at all. A code is
+     the one part of a refusal a caller can branch on, and `10 §7` builds the agent contract on it:
+     the refusal teaches, and it teaches from a code stable across versions. Beside `event-kinds`
+     because it is the same shape over the corpus's other large vocabulary. */
+  ['refusals', ['node', [join(here, 'refusals.mjs')]]],
   /* THE RULE THE WHOLE ADDITIVE STORY RESTS ON (02 §1). A register the kernel ships is a name no
      pack can own — and breaking it is always the shortest path. */
   ['no-declarations-in-kernel', ['node', [join(here, 'no-declarations-in-kernel.mjs')]]],

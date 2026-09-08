@@ -22,26 +22,26 @@ import type { Refusal } from '@braindog/ports';
 /** Canonical JSON: what a field holds once it is in the record. */
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 
-/** The sixteen, plus the two containers. `list<T>` carries its element type in `of`. */
-export type FieldType =
-  | 'text'
-  | 'document'
-  | 'int'
-  | 'duration'
-  | 'decimal'
-  | 'money'
-  | 'quantity'
-  | 'day'
-  | 'instant'
-  | 'bool'
-  | 'enum'
-  | 'ref'
-  | 'file'
-  | 'url'
-  | 'email'
-  | 'secret'
-  | 'list'
-  | 'json';
+/**
+ * The sixteen, plus the two containers. `list<T>` carries its element type in `of`.
+ *
+ * AN ARRAY, BECAUSE A UNION CHECKS NOTHING AT INSTALL. This was a TypeScript type and only that, so
+ * the list existed at compile time in a package whose whole job is admitting declarations written
+ * somewhere else — and `type: 'currency'` installed clean, which is `04 §5`'s own worked example of
+ * `FIELD_TYPE_UNKNOWN` (*"did you mean 'money'?"*). A pack is untyped text from another author; a
+ * union cannot see it.
+ *
+ * `02 §1` is the authority for the members and calls the cost of a new one out loud: *"a
+ * seventeenth is five pieces of work and a new way to be wrong"* — a validator, a form control, a
+ * renderer, a `where:` compilation and a line in the MCP schema. A list a person can count is what
+ * makes that sentence checkable.
+ */
+export const FIELD_TYPES = [
+  'text', 'document', 'int', 'duration', 'decimal', 'money', 'quantity', 'day', 'instant', 'bool',
+  'enum', 'ref', 'file', 'url', 'email', 'secret', 'list', 'json',
+] as const;
+
+export type FieldType = (typeof FIELD_TYPES)[number];
 
 export type FieldDecl = {
   id: string;

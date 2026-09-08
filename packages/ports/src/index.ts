@@ -132,8 +132,119 @@ export type Conflict = {
   actor: string;
 };
 
+/**
+ * THE NINETY-NINE, AND `30 §6` SAYS THIS PACKAGE IS WHERE THEY LIVE.
+ *
+ * *"The type `Refusal` (with `RefusalCode`) is a type-only export of `@braindog/ports`, the lowest
+ * shared package, because `where` raises one and sits below the kernel."* It did not exist. `code`
+ * was `string`, so a refusal could carry any word at all. `refusals.mjs` counts it: **39 of the 99
+ * emitted, 60 emitted by nothing, and 22 more that are not in the registry at all** — including
+ * `DECLARATION_INVALID`, the catch-all this build leans on hardest.
+ *
+ * (An earlier draft of this paragraph said 41 · 58 · 24, from a review that counted by hand. The
+ * gate's numbers are the ones here, because they are the ones anybody can reproduce — which is the
+ * whole argument for having the gate.)
+ *
+ * A code is the one part of a refusal a caller can branch on. `10 §7` builds the agent contract on
+ * it — *"the refusal teaches"* — and an agent teaches itself from a code that is stable across
+ * versions. An invented code is a `fix` sentence with a shouty prefix.
+ *
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"Ninety-nine, counted, in eight families
+ * — 41 pack and declaration · 13 grammar · 18 write path · 7 auth and vault · 6 format and
+ * lifecycle · 2 dialect · 5 spark · 7 connector."* A sentence that counts is a sentence that can be
+ * wrong, so the shape is kept and `refusals.mjs` checks both the total and the eight sizes against
+ * the document — the same gate shape `event-kinds` uses for the one other list that has to say the
+ * same thing in two places.
+ *
+ * TWO THINGS THAT LOOK LIKE CODES AND ARE NOT: JSON-RPC's `-32602` and the `Http` port's four error
+ * names. They are vocabularies, mapped onto a code where one applies (`PULL_ORIGIN_REFUSED`) and
+ * otherwise never on the wire as a refusal. The storage adapter's own thirteen (`30 §13`) are a
+ * third list and stay thirteen — they name what the DRIVER refused, not what the FORMAT refused.
+ */
+
+/** Pack and declaration — 41. */
+const PACK = [
+  'KIND_UNKNOWN', 'FIELD_TYPE_UNKNOWN', 'FIELDS_OVER_CAP', 'INDEXES_OVER_CAP', 'PATTERN_OVER_CAP',
+  'METRIC_NEEDS_TARGET_OR_WINDOW', 'MIXED_CURRENCY', 'CONTRAST_FLOOR', 'REQUIRED_ON_POPULATED', 'ID_RENAMED',
+  'COLOUR_OUTSIDE_THEME', 'DEPENDENCY_UNRESOLVED', 'CREATE_UNBOUNDED', 'CREATE_OVER_BOUND',
+  'CREATE_FOREIGN_REGISTER', 'TRANSITION_ILLEGAL', 'GROUP_BY_TWICE', 'GROUP_BY_CARDINALITY',
+  'RATIO_MIXED_SOURCE', 'RATIO_MIXED_CURRENCY', 'QUANTITY_MIXED_UNIT', 'STATE_NOT_ENUM',
+  'FORMAT_OUT_OF_RANGE', 'PRIMITIVES_OUT_OF_RANGE', 'BAND_EDGES_MISMATCH', 'SERIES_HAS_NO_TEXT',
+  'REQUIRED_WHEN_OP_UNSUPPORTED', 'PREDICATE_CYCLE', 'SEQ_PREFIX_TAKEN', 'SEARCH_FIELD_TYPE',
+  'FIELD_TYPE_CHANGED', 'PROVIDES_MISMATCH', 'PLAN_STALE', 'THEME_VALUE_INVALID', 'INTENT_INSEPARABLE',
+  'THEME_LADDER_ORDER', 'PACK_MALFORMED', 'PROVIDES_CONFLICT', 'REMOTE_ASSET', 'SECRET_IN_PACK',
+  'WOULD_ORPHAN',
+] as const;
+
+/** Grammar — 13. */
+const GRAMMAR = [
+  'PREDICATE_TOO_DEEP', 'VIA_TWICE', 'VIA_NESTED_SUBQUERY', 'MONEY_LITERAL_NEEDS_CURRENCY',
+  'QUANTITY_LITERAL_NEEDS_UNIT', 'MATCH_FIELD_UNKNOWN', 'MATCH_OP_UNSUPPORTED', 'CONTAINS_TOO_LONG',
+  'RELATIVE_LITERAL_UNKNOWN', 'RELATIVE_UNIT_FOR_DAY', 'EXTRACTOR_UNKNOWN', 'DATE_FORMAT_INVALID',
+  'PATH_INVALID',
+] as const;
+
+/** Write path — 18. */
+const WRITE = [
+  'REGISTER_UNKNOWN', 'FIELD_UNKNOWN', 'ROW_LOCKED', 'HUMAN_ONLY', 'TEXT_JSON_QUOTED',
+  'TEXT_ESCAPED_NEWLINE', 'INT_OUT_OF_RANGE', 'VALUE_MALFORMED', 'REQUIRED_MISSING', 'ENUM_VALUE_UNKNOWN',
+  'OUT_OF_BOUNDS', 'IMMUTABLE_FIELD', 'UNIQUE_VIOLATION', 'ALREADY_KNOWN', 'REF_REGISTER_MISMATCH',
+  'DELETE_WHILE_REFERENCED', 'VERSION_STALE', 'LEVEL_REQUIRED',
+] as const;
+
+/** Auth and vault — 7. */
+const AUTH = [
+  'UNAUTHORIZED', 'FORBIDDEN', 'NEEDS_BROWSER_SESSION', 'WRONG_KEY', 'GRANT_REVOKED', 'DEVICE_CODE_EXPIRED',
+  'DEVICE_CODE_TRIES',
+] as const;
+
+/** Format and lifecycle — 6. */
+const LIFECYCLE = [
+  'FORMAT_NEWER_THAN_READER', 'CHECKSUM_MISMATCH', 'SIGNATURE_INVALID', 'IMPORT_NOT_EMPTY',
+  'SCHEMA_MISMATCH', 'SCHEMA_NEWER',
+] as const;
+
+/** Dialect — 2. */
+const DIALECT = [
+  'DIALECT_ARITY', 'DIALECT_KIND_UNKNOWN',
+] as const;
+
+/** Spark — 5. */
+const SPARK = [
+  'PROPOSAL_UNCITED', 'PROPOSAL_NO_ROWS', 'PROPOSAL_SCHEMA', 'PREDICTION_UNMEASURABLE', 'SPARK_BUDGET_SPENT',
+] as const;
+
+/** Connector — 7. */
+const CONNECTOR = [
+  'PULL_AUTH_REJECTED', 'PULL_PROVIDER_UNAVAILABLE', 'PULL_REQUEST_REFUSED', 'PULL_EXPECT_FAILED',
+  'PULL_SHAPE_MISMATCH', 'PULL_ORIGIN_REFUSED', 'PULL_LEASE_EDGE',
+] as const;
+/** The ninety-nine, in `30 §6`'s order. */
+export const REFUSAL_CODES = [
+  ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SPARK, ...CONNECTOR,
+] as const;
+
+export type RefusalCode = (typeof REFUSAL_CODES)[number];
+
+/** Whether a string is one. For a boundary deciding whether it can hand a code to a caller. */
+export const isRefusalCode = (code: string): code is RefusalCode =>
+  (REFUSAL_CODES as readonly string[]).includes(code);
+
 export type Refusal = {
-  /** SCREAMING_SNAKE, from the closed list in `30-BLUEPRINT` §6. */
+  /**
+   * One of the ninety-nine. `30-BLUEPRINT` §6, and the list is above.
+   *
+   * STILL `string`, AND THE GATE IS WHY. Typing it `RefusalCode` compiles against 41 sites carrying
+   * 22 codes that are not in the registry — `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and
+   * the rest. Some of those are concepts `30 §6` is missing and should gain by amendment; some are
+   * placeholders (`UNIMPLEMENTED`, `INTERNAL`, `SOMETHING_NOBODY_MAPPED`) that should not exist at
+   * all; and telling them apart is a judgement per site, not a rename.
+   *
+   * So `refusals.mjs` holds the number instead, as a budget that may only go down. That is the
+   * honest intermediate: the list is real, the drift is measured, and a twenty-third invented code
+   * is red today — rather than a type change that would have to be landed with 41 hurried guesses
+   * behind it. The field narrows the day the budget reaches zero.
+   */
   code: string;
   /** What was wrong, where, and what to do. No apology, no blame. */
   fix: string;

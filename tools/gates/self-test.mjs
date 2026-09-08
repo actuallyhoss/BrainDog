@@ -57,6 +57,12 @@ const CASES = [
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },
   { gate: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
   { gate: 'closed-lists', expect: /the migration admits/, findings: 1 },
+  /* ONE LINE NAMES THE CODE, and the fixture drops exactly one. The gate reports two findings for
+     it — the missing code, and the family whose size no longer matches — and only the first can
+     name it, because the second is about a count. `findings` here is *lines that name the seeded
+     token*, not *findings the gate made*, and conflating them is how a fixture ends up asserting a
+     number that means something else. */
+  { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1 },
   { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
   /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both — or neither —
      is a gate that is counting keys rather than finding dead ones. */

@@ -21,7 +21,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { jsonPath } from '@braindog/where';
 
-import type { Json } from './coerce.ts';
+import { FIELD_TYPES, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
 import { spanMs } from './vault.ts';
@@ -78,7 +78,95 @@ export const indexName = (kind: 'i' | 'u' | 'k', register: string, field?: strin
 /** A money value is an object, so it takes TWO indexes: one per half. Likewise a quantity. */
 const PARTS: Record<string, string[]> = { money: ['amount', 'currency'], quantity: ['value', 'unit'] };
 
-type FieldLike = { id: string; type: string; index?: boolean; unique?: boolean; retired?: boolean };
+type FieldLike = {
+  id: string;
+  type: string;
+  of?: string;
+  values?: unknown;
+  index?: boolean;
+  unique?: boolean;
+  retired?: boolean;
+};
+
+/** `02 §5`'s caps table, and the sentence each one is there to make true. */
+const FIELD_CEILING = 64;
+const INDEX_CEILING = 8;
+
+/** What the full-text index can take. `02 §1`, and `SEARCH_FIELD_TYPE` is the code for the rest. */
+const SEARCHABLE = ['text', 'document', 'enum', 'url', 'email'] as const;
+
+/**
+ * The word another tool would have used for one of ours.
+ *
+ * `04 §5`'s worked example is *"`type 'currency'` — did you mean 'money'?"*, and `currency` is not
+ * a near-miss for `money` by any string measure — a character-overlap heuristic answered `document`.
+ * The resemblance is not lexical. It is that somebody arriving from a spreadsheet, an ORM or another
+ * record tool brings THAT tool's vocabulary, and every name here is one of those: `string`,
+ * `boolean`, `datetime`, `select`, `relation`, `attachment`. Guessing well means knowing what they
+ * came from, not how many letters two words share.
+ *
+ * `10 §7` is the reason it is worth the table: the refusal teaches. A message that only says *not a
+ * type* sends somebody to read a document; this one lets them fix the line they are looking at.
+ */
+const SPOKEN_AS: Record<string, string> = {
+  currency: 'money', amount: 'money', price: 'money', cost: 'money',
+  string: 'text', varchar: 'text', char: 'text', str: 'text', uuid: 'text',
+  markdown: 'document', md: 'document', richtext: 'document', longtext: 'document', prose: 'document',
+  integer: 'int', number: 'int', num: 'int', bigint: 'int', serial: 'int',
+  float: 'decimal', double: 'decimal', numeric: 'decimal', real: 'decimal',
+  date: 'day', dateonly: 'day',
+  datetime: 'instant', timestamp: 'instant', time: 'instant', ts: 'instant',
+  boolean: 'bool', checkbox: 'bool', toggle: 'bool',
+  select: 'enum', choice: 'enum', option: 'enum', dropdown: 'enum', status: 'enum',
+  relation: 'ref', link: 'url', foreign: 'ref', fk: 'ref', lookup: 'ref',
+  attachment: 'file', image: 'file', photo: 'file', upload: 'file', blob: 'file',
+  password: 'secret', token: 'secret', apikey: 'secret', credential: 'secret',
+  object: 'json', map: 'json', dict: 'json',
+  array: 'list', multi: 'list', tags: 'list',
+  measure: 'quantity', unit: 'quantity', weight: 'quantity',
+  interval: 'duration', elapsed: 'duration', seconds: 'duration',
+  mail: 'email', 'e-mail': 'email', uri: 'url', href: 'url',
+};
+
+/** How many single-character edits apart two words are. Levenshtein, iterative, two rows. */
+function distance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++)
+      row[j] = Math.min(
+        (previous[j] ?? 0) + 1,
+        (row[j - 1] ?? 0) + 1,
+        (previous[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    previous = row;
+  }
+  return previous[b.length] ?? 0;
+}
+
+/**
+ * The nearest type to something that is not one, or `null` when nothing is near.
+ *
+ * The table first, because a name from another tool is a deliberate word and not a slip. Then edit
+ * distance, for the slips: `mony`, `tex`, `instnt`. A third of the word is the ceiling — past that
+ * the guess is noise, and a wrong suggestion is worse than none because it is followed.
+ */
+function nearest(said: string): string | null {
+  const want = said.toLowerCase().replace(/[\s_]+/gu, '');
+  const spoken = SPOKEN_AS[want];
+  if (spoken !== undefined) return spoken;
+
+  let best: string | null = null;
+  let score = Number.POSITIVE_INFINITY;
+  for (const type of FIELD_TYPES) {
+    const n = distance(want, type);
+    if (n < score) {
+      score = n;
+      best = type;
+    }
+  }
+  return score <= Math.max(1, Math.floor(want.length / 3)) ? best : null;
+}
 
 /**
  * The `CREATE INDEX` statements a register declaration implies.
@@ -178,8 +266,11 @@ function digestBody(decl: Declaration): Refusal | null {
  * security boundary, not a tidiness rule.
  */
 export function validate(decl: Declaration): Refusal | null {
+  /* `KIND_UNKNOWN` IS THE CODE `04 §5` GIVES THIS, and it was emitted by nothing while this line
+     answered `DECLARATION_INVALID`. A registry entry no source file produces is a code a caller
+     cannot handle and a fixture nobody can write — which is the whole subject of `30 §6`. */
   if (!KINDS.includes(decl.kind))
-    return bad('DECLARATION_INVALID', `${decl.kind} is not a kind of declaration.`, 'kind', KINDS);
+    return bad('KIND_UNKNOWN', `${decl.kind} is not one of the eight kinds of declaration.`, 'kind', KINDS);
   const own = ownId(decl);
   if (decl.id !== `${decl.kind}.${own}`)
     return bad(
@@ -246,6 +337,16 @@ export function validate(decl: Declaration): Refusal | null {
   if (!Array.isArray(fields) || fields.length === 0)
     return bad('DECLARATION_INVALID', `${id} declares no fields, so it can hold nothing.`, 'fields');
 
+  /* `02 §5`'s ceiling, and its own sentence for why: *"a register with more than that is a
+     database, not a register."* Sixty-five installed clean, and every one of them became a control
+     in a form, a line in an MCP schema and a term in a `json_extract` plan. */
+  if (fields.length > FIELD_CEILING)
+    return bad(
+      'FIELDS_OVER_CAP',
+      `${id} declares ${fields.length} fields. The ceiling is ${FIELD_CEILING} — a register with more than that is a database, not a register.`,
+      'fields',
+    );
+
   const seen = new Set<string>();
   for (const raw of fields) {
     const f = raw as unknown as FieldLike;
@@ -263,7 +364,45 @@ export function validate(decl: Declaration): Refusal | null {
       );
     if (seen.has(f.id)) return bad('DECLARATION_INVALID', `${id} declares ${f.id} twice.`, f.id);
     seen.add(f.id);
+
+    /**
+     * A TYPE THAT IS NOT ONE, WHICH IS `04 §5`'s FIRST WORKED EXAMPLE and installed clean.
+     *
+     * `FieldType` was a TypeScript union and only that, so nothing checked it at the boundary this
+     * package exists to guard — a pack is untyped text written by somebody else. `type: 'currency'`
+     * reached `coerce`, fell through its switch, and the field then held whatever JSON arrived. A
+     * field with no `type` at all did the same.
+     */
+    if (typeof f.type !== 'string' || !(FIELD_TYPES as readonly string[]).includes(f.type)) {
+      const guess = typeof f.type === 'string' ? nearest(f.type) : null;
+      return bad(
+        'FIELD_TYPE_UNKNOWN',
+        `${id}.${f.id}: type ${JSON.stringify(f.type ?? null)} is not one of the sixteen${guess ? ` — did you mean '${guess}'?` : '.'}`,
+        f.id,
+        FIELD_TYPES as unknown as string[],
+      );
+    }
+    /* A `list<T>` CARRIES ITS ELEMENT TYPE, and `of: 'list'` is not one — a list of lists is a shape
+       the write path has no coercion for and the `where:` compiler cannot index. */
+    if (f.type === 'list' && (typeof f.of !== 'string' || f.of === 'list' || !(FIELD_TYPES as readonly string[]).includes(f.of)))
+      return bad(
+        'FIELD_TYPE_UNKNOWN',
+        `${id}.${f.id} is a list and names ${JSON.stringify(f.of ?? null)} as what it holds.`,
+        f.id,
+        FIELD_TYPES.filter((t) => t !== 'list') as unknown as string[],
+      );
+    /* AN ENUM WITH NO VALUES IS A FIELD THAT REFUSES EVERYTHING. `02 §1`: an enum is *"a string in
+       `values`"*, so with no `values` every write to it fails coercion — after the pack installed
+       and the form drew a control with nothing in it. */
+    if (f.type === 'enum' && (!Array.isArray(f.values) || f.values.length === 0))
+      return bad('DECLARATION_INVALID', `${id}.${f.id} is an enum and lists no values, so nothing could ever be written to it.`, f.id);
   }
+
+  /* `02 §5`: eight, *"each a partial expression index, which costs storage and write time"*. The
+     table's own note: a series' `key:` is one index and is not counted. */
+  const indexed = (fields as unknown as FieldLike[]).filter((f) => f.index === true || f.unique === true);
+  if (indexed.length > INDEX_CEILING)
+    return bad('INDEXES_OVER_CAP', `${id}: ${indexed.length} indexed fields; the ceiling is ${INDEX_CEILING}.`, 'fields');
 
   /* A `unique:` ON A PARTED TYPE WAS BUILT AS TWO PLAIN INDEXES. `money` and `quantity` are objects,
      so they index in two halves — and `f.unique && !part` is never true for either, which meant the
@@ -288,6 +427,36 @@ export function validate(decl: Declaration): Refusal | null {
   const state = decl.body.state;
   if (state !== undefined && (typeof state !== 'string' || !seen.has(state)))
     return bad('DECLARATION_INVALID', `${id} names ${String(state)} as its state, and has no such field.`, 'state', [...seen]);
+
+  /* `state` IS ALWAYS AN ENUM (`02 §1`, `04 §5`). A `state:` naming a `text` field gives the
+     register a lifecycle with no transitions the record can check, so every `move` in every rule
+     against it is unenforceable — which is the one thing a state field is FOR. */
+  if (typeof state === 'string') {
+    const held = (fields as unknown as FieldLike[]).find((f) => f.id === state);
+    if (held && held.type !== 'enum')
+      return bad('STATE_NOT_ENUM', `${id}.${state}: state is a reserved id and is always an enum.`, state, ['enum']);
+  }
+
+  /* `search:` TAKES WHAT THE INDEX CAN TAKE. `02 §1` closes it at text, document, enum, url, email
+     and `list<text>`; a `money` field named here produced an FTS column of `[object Object]` and a
+     search that quietly matched nothing. */
+  const search = decl.body.search;
+  if (search !== undefined) {
+    if (!Array.isArray(search))
+      return bad('DECLARATION_INVALID', `${id}'s search is a list of field names.`, 'search');
+    for (const name of search) {
+      const f = (fields as unknown as FieldLike[]).find((x) => x.id === name);
+      if (!f) return bad('DECLARATION_INVALID', `${id} searches ${String(name)}, and has no such field.`, 'search', [...seen]);
+      const takes = (SEARCHABLE as readonly string[]).includes(f.type) || (f.type === 'list' && f.of === 'text');
+      if (!takes)
+        return bad(
+          'SEARCH_FIELD_TYPE',
+          `${id}'s search names ${f.id}, which is ${f.type}. search: takes text, document, enum, url, email and list<text>.`,
+          f.id,
+          [...SEARCHABLE, 'list<text>'],
+        );
+    }
+  }
 
   return null;
 }
