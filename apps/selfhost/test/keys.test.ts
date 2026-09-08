@@ -225,9 +225,19 @@ test('A HALF-WRITTEN KEY FILE IS NEVER LEFT BEHIND', async () => {
     assert.equal(readFileSync(file).length, 32);
     assert.deepEqual(readdirSync(dir), ['kek'], 'a temp file was left in the data directory');
 
-    /* AND THE OLD FAILURE IS STILL A SENTENCE if somebody has one on disk from before. */
+    /* AND THE OLD FAILURE IS STILL A SENTENCE if somebody has one on disk from before.
+
+       `mode: 0o600`, AND THIS TEST PASSED ON WINDOWS AND ONLY THERE. `openKeyStore` checks the
+       permission bits before it reads the file, and it skips that check on Windows because the bit
+       is advisory there and the ACL is the real permission (`49 §4.4`). So on Windows the length
+       refusal fired and the assertion held; on Linux the file arrived 0644 under the default umask,
+       the MODE refusal fired first, and the test failed on the sentence it was not about.
+
+       CI found it on its first green run. A fixture that leaves a permission to the umask is a
+       fixture that asserts a different thing on each host — and the one host it was never run on is
+       the one both deployments use. */
     const empty = join(dir, 'empty');
-    writeFileSync(empty, '');
+    writeFileSync(empty, '', { mode: 0o600 });
     await assert.rejects(() => openKeyStore(empty), /is 0 bytes and a key is 32/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
