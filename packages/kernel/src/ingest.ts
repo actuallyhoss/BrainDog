@@ -620,6 +620,16 @@ function slice(form: Record<string, unknown>, text: string): string | null {
  *   - `CLF`: ISO 4, `Intl` 4, `braindog-render`'s table 2. A hundredfold, the other way.
  *   - `MGA`: ISO 2, `Intl` 0.
  *
+ * AND `CLF` WAS IN THAT LIST AND NOT IN THE TABLE BELOW IT. The paragraph naming the hundredfold
+ * error sat four lines above a table that did not have the row, so both copies fell to `?? 2` and
+ * `money(1_000_000, 'CLF')` printed `CLF 10,000.00` for `CLF 100.0000`. `UYW` is the other
+ * exponent-4 code and was missing from both as well — they are the only two in ISO 4217.
+ *
+ * The drift test named `CLF` explicitly and passed, because it compared the two tables to each other
+ * and they were wrong in the same way. It compares the UNION of their keys against ISO now: agreement
+ * between two copies is not correctness, and a check that enumerates one side's keys cannot see a
+ * code the other side has.
+ *
  * AND THIS TABLE IS `braindog-render`'s, BYTE FOR BYTE. The two cannot be one module: `render` is the
  * published block dialect and depends on no `@braindog/*` package, and the kernel must not depend on
  * a published renderer. So they are two copies with a test that compares them — which is the same
@@ -630,6 +640,7 @@ function slice(form: Record<string, unknown>, text: string): string | null {
  * are read.
  */
 export const EXPONENT: Readonly<Record<string, number>> = {
+  CLF: 4, UYW: 4,
   BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3,
   BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0,
   PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0,

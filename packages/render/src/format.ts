@@ -11,8 +11,24 @@
 const MINUS = '−';
 const NUM = 'en-u-nu-latn';
 
-/** Currencies whose minor unit is not two decimal places. Money is ALWAYS an integer in minor units. */
-const EXPONENT: Record<string, number> = {
+/**
+ * Currencies whose minor unit is not two decimal places. Money is ALWAYS an integer in minor units.
+ *
+ * THE TWO EXPONENT-4 CODES WERE MISSING, and the failure is a hundredfold. `CLF` (Chile's unidad de
+ * fomento) and `UYW` (Uruguay's indexed unit) are the only ISO 4217 codes with four decimal places;
+ * without a row here `exponentOf` fell to its `?? 2` and `money(1_000_000, 'CLF')` printed
+ * `CLF 10,000.00` where the amount is `CLF 100.0000`.
+ *
+ * The drift test that should have caught it named `CLF` explicitly and passed: it asserted
+ * `exponentOf(code) === drawn(code)` over `[...Object.keys(EXPONENT), … 'CLF' …]`, both sides
+ * returned 2, and agreement between two wrong answers is agreement. It is checked against `Intl`
+ * now, which is the authority `36 §5.6` rule 2 names.
+ */
+/* EXPORTED so the kernel's drift check can compare KEY SETS and not just the codes somebody
+   remembered to list. It enumerated its own keys, which made it blind by construction to a code
+   this table has and the kernel's does not — the direction a currency table actually drifts. */
+export const EXPONENT: Readonly<Record<string, number>> = {
+  CLF: 4, UYW: 4,
   BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3,
   BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0,
   PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0,
@@ -25,6 +41,12 @@ export const exponentOf = (currency: string): number => EXPONENT[currency.toUppe
  * `JPY 1,299`. A negative amount reads `EGP −1,299.00` with a real minus sign, not a hyphen.
  */
 export function money(minor: number, currency: string): string {
+  /* AN INTEGER, OR IT IS NOT MONEY. `02 §3`: money is always an integer in minor units. A float
+     arrived here and was silently rounded to a penny — `money(0.5, 'USD')` drew `USD 0.01` — which
+     is the one class of defect that makes somebody act on a false number, arriving through the
+     formatter rather than through the record. `MISSING` is what this module draws for a figure it
+     cannot state, and an unstateable figure is what a fractional minor unit is. */
+  if (!Number.isInteger(minor)) return MISSING;
   const exp = exponentOf(currency);
   const negative = minor < 0;
   const amount = Math.abs(minor) / 10 ** exp;
@@ -32,13 +54,33 @@ export function money(minor: number, currency: string): string {
   return `${currency.toUpperCase()} ${negative ? MINUS : ''}${body}`;
 }
 
+/**
+ * ONE MINUS SIGN, in all four of them.
+ *
+ * `money` and `pct` prepended `MINUS` over `Math.abs`; `integer` and `quantity` returned
+ * `toLocaleString` straight, which emits an ASCII hyphen. Measured side by side:
+ *
+ *   money     "GBP −1,299.00"   U+2212
+ *   integer   "-1,299"           U+002D
+ *
+ * The file's own opening paragraph says *"the minus is U+2212"* and `36 §13 D2` states it for
+ * number and money presentation. AND IT IS NOT A TYPOGRAPHIC PREFERENCE HERE: `Money.svelte:22` is
+ * `currency ? money(minor, currency) : integer(minor)` and `api.ts`'s `moneyOr` does the same, so a
+ * register whose rows do not all carry a currency draws both glyphs down one tabular column — two
+ * different widths, in the face chosen so digits line up.
+ *
+ * `signed()` is the one place the sign is decided, so a fifth formatter cannot get it wrong.
+ */
+const signed = (value: number, body: (n: number) => string): string =>
+  `${value < 0 ? MINUS : ''}${body(Math.abs(value))}`;
+
 export const quantity = (value: number, unit: string): string =>
-  `${value.toLocaleString(NUM, { maximumFractionDigits: 3 })}${unit ? ` ${unit}` : ''}`;
+  `${signed(value, (n) => n.toLocaleString(NUM, { maximumFractionDigits: 3 }))}${unit ? ` ${unit}` : ''}`;
 
 export const pct = (value: number): string =>
-  `${value < 0 ? MINUS : ''}${Math.abs(value).toLocaleString(NUM, { maximumFractionDigits: 1 })}%`;
+  `${signed(value, (n) => n.toLocaleString(NUM, { maximumFractionDigits: 1 }))}%`;
 
-export const integer = (value: number): string => value.toLocaleString(NUM);
+export const integer = (value: number): string => signed(value, (n) => n.toLocaleString(NUM));
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -94,28 +136,36 @@ export function day(iso: string): string {
  * that drift. `''` for zero days, which the callers turn into their own word.
  */
 /**
- * AND NO BAND SPELLS PAST ITS OWN EDGE, which is the defect `bytes()` was fixed for, here first.
+ * THE LADDER `36 §5.5` PUBLISHES, which this was not.
  *
- * The band was chosen from `n` and the number was rounded afterwards, so each one could name a
- * duration outside itself. Measured:
+ * It was a private ladder that happened to be tested: `Nd` cut at 14 rather than 13, months divided
+ * by 30 rather than 30.44, years by 365 rather than 365.25, and a **`1.0y`…`1.9y` decimal form that
+ * appears in no document at all**. Measured against the published table: **412 of 1,200 day counts
+ * disagreed.** `d=14` read `14d` here and `2w` there; `d=60` read `2mo` here and `9w` there;
+ * everything from 75 to about 360 days read one month older than specified. Four tests pinned it and
+ * every one of them killed its mutant — the ladder was tightly held, and it was the wrong ladder.
  *
- *   · `band(60)` was `9w` — sixty-three days — and `band(61)` was `2mo`, sixty. **Non-monotone**: one
- *     day older read as three days younger, on the ladder every date in the product goes through.
- *   · `band(345…364)` was `12mo`, which is a year said the long way, immediately below `1.0y`.
- *   · `band(712…729)` was `2.0y` and `band(730)` is `2y` — the same duration, two spellings, adjacent.
+ * AND NO BAND SPELLS PAST ITS OWN EDGE, which is the defect `bytes()` was fixed for. The published
+ * table had it too, in exactly two places, and the fix belonged in the document rather than here:
  *
- * Each band is capped at its own top rather than allowed to round past it. `Math.min` again, and the
- * same sentence: a band is a kindness until it names something the band above owns.
+ *   · `round(60/7)` is `9w` — sixty-three days — immediately below `round(61/30.44)`, which is
+ *     `2mo`, sixty-one. **Non-monotone**: one day older read as two days younger.
+ *   · `round(364/30.44)` is `12mo`, a year said the long way, immediately below `1y`.
+ *
+ * `36 §5.5` is amended with a `min` on each of those two bands and the reasoning beside it, which is
+ * what `36 §13` asks for — *"name the document to amend in the same revision"*. An earlier pass
+ * capped the bands HERE and amended nothing, which made the code monotone and the specification not:
+ * a private ladder that reads better is still a private ladder, and the next reader of the table has
+ * no way to know the code disagrees with it.
+ *
+ * Measured after: 0 of 1,200 disagree, and no non-monotone step.
  */
 const band = (n: number): string => {
   if (n === 0) return '';
-  if (n <= 14) return `${n}d`;
-  /* Weeks up to sixty days, so a reading of nine weeks — sixty-three — becomes two months instead. */
-  const weeks = Math.round(n / 7);
-  if (n <= 60 && weeks * 7 <= 60) return `${weeks}w`;
-  if (n < 365) return `${Math.min(11, Math.round(n / 30))}mo`;
-  const years = n / 365;
-  return n < 730 ? `${Math.min(1.9, years).toFixed(1)}y` : `${years.toFixed(0)}y`;
+  if (n <= 13) return `${n}d`;
+  if (n <= 60) return `${Math.min(8, Math.round(n / 7))}w`;
+  if (n <= 364) return `${Math.min(11, Math.round(n / 30.44))}mo`;
+  return `${Math.round(n / 365.25)}y`;
 };
 
 /**
@@ -239,7 +289,12 @@ export function bytes(n: number): string {
   const whole = Math.round(n);
   if (whole < 1_000) return `${whole} B`;
 
-  const units = ['kB', 'MB', 'GB', 'TB'];
+  /* THE WHOLE SI LADDER, because the escape at the top of a short one prints the four significant
+     figures this function exists to prevent: with the list ending at `TB`,
+     `bytes(999_500_000_000_000)` was `"1,000 TB"` — a thousands separator inside a three-figure
+     reading, which is the exact shape the loop below rejects one rung lower. A `PB` is a real unit
+     and costs a string. Above `YB` the escape is unreachable by any number this product can hold. */
+  const units = ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
   let value = whole / 1_000;
   let i = 0;
   /* Three significant figures: 157 kB · 15.7 MB · 1.57 GB. `toPrecision` is not it — it would give
@@ -294,14 +349,26 @@ export type TypedForm = (typeof TYPED)[number];
 export function formatTyped(form: TypedForm, arg: string, now?: number): string | null {
   const a = arg.trim();
   switch (form) {
+    /* ONE ARM, because there was a ternary with two identical ones: `dateLong` IS
+       `` `${day(iso)} · ${relative(iso, now)}` ``, so the false branch was its body written out
+       again. `05 §7.2` does distinguish them — *"only the forward one links"* — and the link is
+       `inline.ts`'s (`form === 'date' ? 'day' : …`), not a difference in the text. A conditional
+       whose branches agree is a claim that they differ, and this one had `dateLong`'s only caller on
+       one side of it. */
     case 'date':
     case 'day':
-      return noon(a) === null ? null : form === 'date' ? dateLong(a, now) : `${day(a)} · ${relative(a, now)}`;
+      return noon(a) === null ? null : dateLong(a, now);
     case 'until':
     case 'ago':
       return noon(a) === null ? null : relative(a, now);
+    /* `^[A-Z]{3}$`, WHICH IS `36 §5.6` RULE 1 — it was `[A-Za-z]`, so `{{money:129900 egp}}` drew
+       `EGP 1,299.00` and the author never learned that the code is upper case. `05 §7.2`'s rule for
+       this whole family is that an argument which does not parse *"renders as the author's text,
+       marked"*: dotted text somebody can fix beats a figure that quietly normalised itself, because
+       the next code they type may not round-trip. `money()` still upper-cases for its own callers,
+       where the code comes from a typed field rather than from prose. */
     case 'money': {
-      const m = /^(-?\d+)\s+([A-Za-z]{3})$/.exec(a);
+      const m = /^(-?\d+)\s+([A-Z]{3})$/.exec(a);
       return m ? money(Number(m[1]), m[2]!) : null;
     }
     case 'quantity': {
@@ -309,10 +376,13 @@ export function formatTyped(form: TypedForm, arg: string, now?: number): string 
       return m && !Number.isNaN(Number(m[1])) ? quantity(Number(m[1]), m[2]!.trim()) : null;
     }
     /* `Number('')` is 0, so `{{pct:}}` rendered `0%` — a measurement, printed, of a thing nobody
-       measured. That is this module's own rule in bold, broken by a falsy check. An empty argument
-       and a non-finite one are both "not a percentage", and the caller draws the author's text. */
+       measured. That is this module's own rule in bold, broken by a falsy check.
+       AND `Number()` ACCEPTS MORE THAN A PERCENTAGE IS. `36 §5.5` gives the form
+       `-?\d+(\.\d+)?`; `Number` read `0x1f` as 31, `0b11` as 3 and `1e3` as 1,000, so three
+       notations no author of this dialect would use rendered as measurements. The grammar is the
+       check, and a finite check on top of it because `\d+` can still overflow to `Infinity`. */
     case 'pct':
-      return a === '' || !Number.isFinite(Number(a)) ? null : pct(Number(a));
+      return /^-?\d+(\.\d+)?$/.test(a) && Number.isFinite(Number(a)) ? pct(Number(a)) : null;
     case 'ref':
       return /^[a-z][a-z0-9_]*#\d+$/.test(a) ? ref(a) : null;
   }

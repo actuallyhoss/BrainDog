@@ -681,9 +681,31 @@ test('THE MINOR UNIT IS ISO 4217’S, AND ONE TABLE SAYS IT', async () => {
      depend on a published renderer — so this is the thing that keeps the two copies one answer. A
      record that stores in one minor unit and draws in another is wrong money on a screen, which is
      the only class of defect that makes somebody act on a false number. */
+  /* THE TWO EXPONENT-4 CODES, which are the only two in ISO 4217 and were in neither table. The
+     paragraph above `EXPONENT` named `CLF` as *"a hundredfold, the other way"* and the table four
+     lines below it did not have the row, so both copies fell to `?? 2`. */
+  assert.equal(exponentOf('CLF'), 4, 'the unidad de fomento is quoted to four places');
+  assert.equal(exponentOf('UYW'), 4, 'so is the unidad previsional');
+
   /* BY PATH, because the kernel does not depend on the renderer and must not — this is a test
-     reading the other copy, which is what a drift check is. */
-  const { exponentOf: drawn } = await import('../../render/src/format.ts');
-  for (const code of [...Object.keys(EXPONENT), 'GBP', 'EUR', 'USD', 'CLF', 'MGA', 'HUF', 'ZZZ'])
+     reading the other copy, which is what a drift check is.
+
+     THE UNION OF BOTH KEY SETS. It enumerated `Object.keys(EXPONENT)` plus a handful of literals,
+     so a code the RENDERER had and the kernel did not was invisible to it by construction — and
+     that is the direction a table drifts, because the renderer is where a wrong minor unit is
+     noticed. `CLF` was in the literals and it passed anyway: both sides returned 2, and agreement
+     between two wrong answers is agreement. */
+  const { exponentOf: drawn, EXPONENT: DRAWN } = await import('../../render/src/format.ts');
+  for (const code of new Set([...Object.keys(EXPONENT), ...Object.keys(DRAWN), 'GBP', 'EUR', 'USD', 'MGA', 'HUF', 'ZZZ']))
     assert.equal(exponentOf(code), drawn(code), `${code}: the record stores one minor unit and draws another`);
+
+  /* AND BOTH AGREE WITH SOMETHING THAT IS NOT THE OTHER ONE. Every override is deliberate and
+     argued above — `IQD`, `MGA` — so the check is: where the two tables and `Intl` all speak, they
+     agree, and where they do not, the disagreement is one of the three this file names. */
+  const ARGUED = new Set(['IQD', 'MGA']);
+  for (const code of Object.keys(EXPONENT)) {
+    if (ARGUED.has(code)) continue;
+    const cldr = new Intl.NumberFormat('en', { style: 'currency', currency: code }).resolvedOptions().maximumFractionDigits;
+    assert.equal(EXPONENT[code], cldr, `${code} differs from CLDR and is not one of the overrides this file argues for`);
+  }
 });

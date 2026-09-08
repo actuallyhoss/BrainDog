@@ -6,7 +6,7 @@ import { parse, splitRow } from './parse.ts';
 import { toHTML } from './html.ts';
 import { chunkRows } from '../svelte/types.ts';
 import { inline, safeHref, text } from './inline.ts';
-import { bytes, money, pct, relative, since, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
+import { bytes, integer, money, pct, quantity, relative, since, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
@@ -325,8 +325,26 @@ test('relative time is banded and signed both ways', () => {
   assert.equal(relative('2026-09-03', NOW), 'today');
   assert.equal(relative('2026-09-10', NOW), 'in 7d');
   assert.equal(relative('2026-10-15', NOW), 'in 6w');
-  assert.equal(relative('2026-08-20', NOW), '14d ago');
-  assert.equal(relative('2025-09-03', NOW), '1.0y ago');
+  assert.equal(relative('2026-08-20', NOW), '2w ago');
+  assert.equal(relative('2025-09-03', NOW), '1y ago');
+
+  /* THE MINUS, IN ALL FOUR FORMATTERS. `money` and `pct` prepended U+2212 over `Math.abs`;
+     `integer` and `quantity` returned `toLocaleString` straight, which is an ASCII hyphen — and
+     `Money.svelte` picks between `money()` and `integer()` on whether the row carries a currency,
+     so both glyphs landed in one tabular column at two different widths. */
+  for (const [what, drawn] of [
+    ['money', money(-129900, 'GBP')],
+    ['pct', pct(-46.3)],
+    ['integer', integer(-1299)],
+    ['quantity', quantity(-1.4, 'm')],
+  ] as const) {
+    assert.ok(drawn.includes('−'), `${what} draws ${JSON.stringify(drawn)} without a real minus`);
+    assert.ok(!drawn.includes('-'), `${what} draws ${JSON.stringify(drawn)} with an ASCII hyphen`);
+  }
+  /* AND NEGATIVE ZERO IS NOT NEGATIVE. `-0 < 0` is false, so the sign never appears — asserted
+     because `Math.abs` over a hand-written `value < 0` is exactly where a `-0` leaks a lone minus. */
+  assert.equal(integer(-0), '0');
+  assert.equal(pct(-0), '0%');
 });
 
 test('AN INSTANT IS SAID IN THE UNIT IT MATTERS IN, WHICH NOTHING HERE COULD DO', () => {
@@ -428,7 +446,7 @@ test('AND PAST A DAY IT SAYS WHAT THE DAY COLUMN SAYS, AT EVERY HOUR OF THE CLOC
    * These are absolute: a day is a day, counted from midnight UTC, which is what the whole fix means.
    */
   const noon = Date.UTC(2026, 8, 8, 12);
-  for (const [days, said] of [[1, '1d ago'], [2, '2d ago'], [14, '14d ago'], [21, '3w ago']] as const) {
+  for (const [days, said] of [[1, '1d ago'], [2, '2d ago'], [14, '2w ago'], [21, '3w ago']] as const) {
     assert.equal(since(new Date(noon - days * 86_400_000).toISOString(), noon), said, `${days} days back`);
     assert.equal(relative(new Date(noon - days * 86_400_000).toISOString().slice(0, 10), noon), said);
   }
@@ -505,6 +523,18 @@ test('A SIZE IS SAID IN THE UNIT THAT TELLS TWO FILES APART', () => {
      printing it as `-1 B` is how it reaches a screen unnoticed. */
   for (const n of [-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) assert.equal(bytes(n), MISSING);
 
+  /* AND NEVER FOUR FIGURES, AT ANY SIZE. The unit list stopped at `TB`, so the loop's escape —
+     `i === units.length - 1` — returned whatever the top rung held: `bytes(999_500_000_000_000)`
+     was `"1,000 TB"`, a thousands separator inside a three-figure reading, which is the exact shape
+     this function rejects one rung lower. The escape is not the bug; a ladder shorter than the
+     numbers handed to it is. */
+  assert.equal(bytes(999_500_000_000_000), '1.00 PB');
+  for (let e = 0; e < 24; e++)
+    for (let m = 1; m < 10; m += 0.017) {
+      const figure = bytes(m * 10 ** e).split(' ')[0]!.replaceAll(',', '').replace('.', '').replace(/^0+/u, '');
+      assert.ok(figure.length <= 3, `${m * 10 ** e} reads ${bytes(m * 10 ** e)}`);
+    }
+
   /* Monotone, which is the property a list of them is read for. */
   let last = -1;
   for (let n = 0; n < 5_000_000; n += 1_237) {
@@ -514,34 +544,53 @@ test('A SIZE IS SAID IN THE UNIT THAT TELLS TWO FILES APART', () => {
   }
 });
 
-test('NO BAND SPELLS PAST ITS OWN EDGE, AND THE LADDER ONLY GOES ONE WAY', () => {
+test('THE LADDER IS `36 §5.5`’S, AND IT ONLY GOES ONE WAY', () => {
   /**
-   * The band was chosen from the number of days and the number was rounded afterwards, so each band
-   * could name a duration the band above owns:
+   * IT WAS A PRIVATE LADDER THAT HAPPENED TO BE TESTED. `Nd` cut at 14 rather than 13, months
+   * divided by 30 rather than 30.44, years by 365 rather than 365.25, and a **`1.0y`…`1.9y` decimal
+   * form that appears in no document at all**. Measured against the published table: **412 of 1,200
+   * day counts disagreed**, and four tests — including this one — pinned every one of them.
    *
-   *   · `60d` read **`9w`** — sixty-three days — and `61d` read `2mo`, sixty. One day older read as
-   *     three days younger, on the ladder every date in this product goes through.
-   *   · `345…364d` read `12mo`, which is a year said the long way, immediately below `1.0y`.
-   *   · `712…729d` read `2.0y` and `730d` reads `2y` — the same duration, two spellings, adjacent.
+   * A test that kills its mutants is not a test that checks the right answer. These assertions now
+   * come off `36 §5.5`'s table, boundary by boundary, so the thing being asserted is the document.
+   *
+   * AND NO BAND SPELLS PAST ITS OWN EDGE — which the table itself broke in two places, so the fix
+   * belonged there and `36 §5.5` carries the amendment and its reasoning:
+   *
+   *   · `round(60/7)` is `9w`, sixty-three days, immediately below `round(61/30.44)` = `2mo`,
+   *     sixty-one. One day older read as two days younger, on the ladder every date in this product
+   *     goes through. Capped at `8w`.
+   *   · `round(364/30.44)` is `12mo`, a year said the long way, immediately below `1y`. Capped at
+   *     `11mo`.
    *
    * The same defect `bytes()` was fixed for, twenty lines down and older.
    */
   const at = (d: number) => new Date(NOW - d * 86_400_000).toISOString().slice(0, 10);
-  assert.equal(relative(at(14), NOW), '14d ago');
-  assert.equal(relative(at(15), NOW), '2w ago');
+  /* `1–13 → Nd`, and the cut is at 13. It was at 14, which put `14d` beside a `2w` that the table
+     gives to 14 — one duration, two spellings, on the boundary itself. */
+  assert.equal(relative(at(13), NOW), '13d ago');
+  assert.equal(relative(at(14), NOW), '2w ago');
+  /* `14–60 → Nw` at round(d/7), capped at its own top. */
+  assert.equal(relative(at(17), NOW), '2w ago');
+  assert.equal(relative(at(18), NOW), '3w ago');
   assert.equal(relative(at(59), NOW), '8w ago');
-  assert.equal(relative(at(60), NOW), '2mo ago', 'nine weeks is sixty-three days');
-  assert.equal(relative(at(344), NOW), '11mo ago');
+  assert.equal(relative(at(60), NOW), '8w ago', 'nine weeks is sixty-three days');
+  /* `61–364 → Nmo` at round(d/30.44) — not 30, which is what read one month old too early from
+     about seventy-five days on. */
+  assert.equal(relative(at(61), NOW), '2mo ago');
+  assert.equal(relative(at(75), NOW), '2mo ago', 'a divisor of 30 read this as three months');
+  assert.equal(relative(at(105), NOW), '3mo ago');
   assert.equal(relative(at(364), NOW), '11mo ago', 'twelve months is a year said the long way');
-  assert.equal(relative(at(365), NOW), '1.0y ago');
-  assert.equal(relative(at(729), NOW), '1.9y ago');
-  assert.equal(relative(at(730), NOW), '2y ago', 'the same duration spelled two ways, adjacent');
+  /* `≥365 → Ny` at round(d/365.25), a whole number. The `1.0y`…`1.9y` form was ours. */
+  assert.equal(relative(at(365), NOW), '1y ago');
+  assert.equal(relative(at(729), NOW), '2y ago');
+  assert.equal(relative(at(730), NOW), '2y ago');
 
   /* MONOTONE OVER EIGHT YEARS, which is the property a ladder is read for and the one a per-band
      rounding breaks silently: a list sorted by date read out of order by one row in sixty. */
   const days = (said: string) => {
     const n = Number.parseFloat(said);
-    return said.endsWith('d ago') ? n : said.endsWith('w ago') ? n * 7 : said.endsWith('mo ago') ? n * 30 : n * 365;
+    return said.endsWith('d ago') ? n : said.endsWith('w ago') ? n * 7 : said.endsWith('mo ago') ? n * 30.44 : n * 365.25;
   };
   let previous = 0;
   for (let d = 1; d <= 3_000; d += 1) {
@@ -559,6 +608,23 @@ test('a day is formatted, and a malformed one renders as what the author typed',
   assert.equal(formatTyped('money', '129900 EGP', NOW), 'EGP 1,299.00');
   assert.equal(formatTyped('money', '1299 EGP', NOW), 'EGP 12.99');
   assert.equal(formatTyped('ref', 'tasks#241', NOW), '#241');
+
+  /* THE LITERAL GRAMMARS ARE `36 §5.5` AND `§5.6`'S, and two of them were `Number()`'s instead.
+     `05 §7.2`'s rule for the whole family is that an argument which does not parse renders as the
+     author's text, MARKED — so accepting more than the grammar is not leniency, it is a figure
+     drawn from something nobody meant as a figure. */
+  assert.equal(formatTyped('pct', '0x1f', NOW), null, 'hex read as 31%');
+  assert.equal(formatTyped('pct', '0b11', NOW), null, 'binary read as 3%');
+  assert.equal(formatTyped('pct', '1e3', NOW), null, 'exponent notation read as 1,000%');
+  assert.equal(formatTyped('pct', '-46.3', NOW), '−46.3%', 'and the published form still parses');
+  assert.equal(formatTyped('money', '129900 egp', NOW), null, '`36 §5.6` rule 1 is `^[A-Z]{3}$`');
+  assert.equal(formatTyped('money', '129900 EGP', NOW), 'EGP 1,299.00');
+
+  /* AND A FRACTIONAL MINOR UNIT IS NOT MONEY. `02 §3`. It was rounded to a penny in silence —
+     `money(0.5, 'USD')` drew `USD 0.01` — which is a false number arriving through the formatter. */
+  assert.equal(money(0.5, 'USD'), MISSING);
+  assert.equal(money(-0.5, 'USD'), MISSING);
+  assert.equal(money(1, 'USD'), 'USD 0.01');
 });
 
 test('a percentage carries no colour, on purpose', () => {

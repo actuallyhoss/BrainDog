@@ -302,9 +302,16 @@ argument marked unresolved; `null` renders `—`; otherwise `v` is the argument.
 |---|---|
 | 0 | `today` |
 | 1 – 13 | `Nd` |
-| 14 – 60 | `Nw`, N = round(d / 7) |
-| 61 – 364 | `Nmo`, N = round(d / 30.44) |
+| 14 – 60 | `Nw`, N = **min(8,** round(d / 7)**)** |
+| 61 – 364 | `Nmo`, N = **min(11,** round(d / 30.44)**)** |
 | ≥ 365 | `Ny`, N = round(d / 365.25) |
+
+*The two `min` caps are an amendment, made because the table as first written was **not monotone**
+and named one duration twice. `round(60 / 7)` is `9w` — sixty-three days — sitting immediately below
+`round(61 / 30.44)`, which is `2mo`, sixty-one: **one day older read as two days younger**, on the
+ladder every date in this product goes through. And `round(364 / 30.44)` is `12mo`, which is a year
+said the long way, immediately below `1y`. **A band may never name a duration the band above owns**,
+and its cap is its own top. Measured over 1–1200 days: two bad steps before, none after.*
 
 Future: `in N…`. Past: `N… ago`. Absolute form: `D Mon YYYY`, English abbreviations, no leading zero.
 
