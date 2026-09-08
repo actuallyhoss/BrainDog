@@ -22,9 +22,10 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
     AUTH_METHODS, DEPLOYMENT, DEVICES, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS,
-    REGISTERS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, boot, pages,
+    REGISTERS, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, boot, pages,
   } from '$lib/record/api.ts';
-  import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
+  import { LEVELS, type Level, type Person, type Device } from '$lib/record/schema.ts';
+  import { CODE_DIGITS, approve } from '$lib/record/device.ts';
   import { TONES, relative } from 'braindog-render';
 
   /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
@@ -35,6 +36,37 @@
   /* Bytes as a person reads them. One decimal, because 2.1 MB and 2.14 MB say the same thing and
      the second one asks to be read twice. */
   const size = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
+
+  /**
+   * THE CODE-ENTRY CONTROL'S STATE, and the device rows are part of it.
+   *
+   * `19 §2` gives this area three things and the screen had one of them. This is the second: the
+   * field a person types into after `braindog runner enroll` prints six digits and the URL that
+   * lands here. Everything the typing DOES lives in `device.ts`, which is a pure module `node --test`
+   * can import — the four lines here are the assignment.
+   *
+   * `devices` starts as the seed and is not the seed: a wrong guess spends a try on every waiting
+   * row, and five deny them all. That is a change to the record, so the list this page draws has to
+   * be the one the attempt handed back rather than the constant it started from.
+   */
+  let typed = $state('');
+  let devices = $state<Device[]>([...DEVICES]);
+  let said = $state<{ tone: 'good' | 'bad'; line: string } | null>(null);
+
+  function tryCode(e: SubmitEvent) {
+    e.preventDefault();
+    const attempt = approve(devices, typed, NOW);
+    devices = attempt.rows;
+    if (attempt.result.ok) {
+      const { label, reach } = { label: attempt.result.value.label, reach: attempt.result.value.reach };
+      said = { tone: 'good', line: copy.approvedNow(label, copy.reachMeans[reach] ?? reach) };
+      typed = '';
+      return;
+    }
+    /* THE REFUSAL IS THE RECORD'S OWN, `fix` and all. `30 §6`'s sentences are written to be read by
+       whoever hit them, so wrapping one in a friendlier apology would be replacing the useful half. */
+    said = { tone: 'bad', line: attempt.result.refusal.fix };
+  }
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -581,22 +613,81 @@
         single most important line this table can produce — a denial that leaves no trace is a
         break-in attempt nobody can see afterwards.
       -->
+      <!--
+        THE FIELD COMES FIRST, because of who is standing here.
+
+        Four documents make `${origin}/settings/agents` the address a machine PRINTS (`33 §10`,
+        `49 §5.9`, `26 §2.3`, `53 §5`), so the person arriving is holding six digits their terminal
+        just showed them and looking for the box. Putting the list first would mean scrolling past
+        five rows of history to reach the one control they came for.
+
+        A `<form>` rather than a button, so Enter submits — the whole interaction is type-six-digits-
+        and-go, and a control that needs the mouse for the last step of that is a control somebody
+        types into and then hunts around.
+      -->
+      <Section title={copy.enterCode}>
+        <p class="hint">{copy.enterCodeHow}</p>
+        <form class="code-form" onsubmit={tryCode}>
+          <label class="code-label" for="user-code">{copy.codeLabel}</label>
+          <div class="code-row">
+            <div class="field field-lg">
+              <!--
+                PASTE IS NEVER BLOCKED, and neither is the space. `12 §3` names paste as the reason
+                this field satisfies WCAG 2.2's accessible-authentication criterion for free, and
+                `48 §5.2` step 3 prints the code AS TWO GROUPS — `enter  314 159` — so a field that
+                refused the space would be refusing the exact string it told you to read. `normalise`
+                drops everything that is not a digit and truncates nothing.
+
+                `inputmode="numeric"` for the phone keypad, `autocomplete="one-time-code"` so a
+                password manager or an OS handoff can fill it, and no `maxlength`: a seven-digit
+                entry is a mistake worth refusing out loud rather than silently trimming to six.
+              -->
+              <input
+                class="field-input code-input"
+                id="user-code"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder={'0'.repeat(CODE_DIGITS)}
+                bind:value={typed}
+                aria-describedby={said ? 'user-code-said' : undefined}
+                aria-invalid={said?.tone === 'bad' ? 'true' : undefined}
+              />
+            </div>
+            <Button weight="primary" type="submit">{copy.codeGo}</Button>
+          </div>
+          <!-- `13 §7`'s `role="status"`: the answer is announced where it is read, rather than as a
+               toast that has gone by the time somebody using a screen reader reaches it. Its tone is
+               carried by `data-intent` AND by the word itself, because `13 §5.1` forbids colour from
+               carrying meaning alone. -->
+          {#if said}
+            <p class="code-said" id="user-code-said" role="status" data-intent={said.tone}>{said.line}</p>
+          {/if}
+        </form>
+      </Section>
+
       <!-- THE COUNT IS THE ROWS BENEATH IT. This counted only the ACTIVE machines and then drew all
            four — 2 over a list of four — which is the one `Section` in the product whose number and
            list disagreed, on the screen where "how many machines can act as me" is the whole
            question. A pending request and a denial are rows you are meant to see; if the heading is
-           to say `active`, it has to say so in the heading. -->
-      <Section title={copy.connected} count={DEVICES.length}>
+           to say `active`, it has to say so in the heading.
+
+           AND IT COUNTS `devices`, NOT `DEVICES`. The list this page draws is the one the last
+           attempt handed back: five wrong codes deny every waiting row, which changes what is on the
+           screen, and a heading reading the constant would go on counting a state the record left. -->
+      <Section title={copy.connected} count={devices.length}>
         <p class="hint">{copy.connectedHow}</p>
         <!-- A DESIGNED EMPTY, NOT AN EMPTY `<ul>`. Four of the twelve areas rendered a heading, a
              `0`, one sentence and nothing at all — and this is one of the two where `13 §5.2`'s
              copyable agent prompt is most obviously the right thing, because the way a machine gets
              here is a command somebody runs on it. -->
-        {#if DEVICES.length === 0}
+        {#if devices.length === 0}
           <Empty kind="no-data-yet" title={copy.noDevices} body={copy.noDevicesWhy} agentPrompt={copy.enrollPrompt} />
         {/if}
 <ul class="whos">
-          {#each DEVICES as d}
+          {#each devices as d}
             <li class="who" data-intent={d.state === 'denied' ? 'bad' : d.state === 'pending' ? 'warn' : undefined}>
               <div class="who-head">
                 {#if d.state === 'denied' || d.state === 'pending'}
@@ -607,6 +698,24 @@
                 <span class="who-detail">
                   {copy.deviceState[d.state]} · {copy.overSurface(d.surface)} ·
                   {d.lastSeen ? copy.usedWhen(relative(d.lastSeen, NOW)) : copy.askedWhen(relative(d.at, NOW))}
+                </span>
+                <!--
+                  WHAT IT WOULD BE ALLOWED TO DO, WHICH IS THE THING BEING DECIDED.
+
+                  `49 §5.9` step 2.3: *"the screen said what it was about to grant before the click"*.
+                  The row said what was ASKING — a name, a surface, a time — and never what approving
+                  it would let it do, so Approve and Deny sat under a sentence that could not tell a
+                  ten-minute one-shot export from a ninety-day bearer that runs code as you.
+
+                  And `ua` beside it, `30 §1`'s "second free-text column the approver reads",
+                  attributed rather than asserted because the column is trusted for nothing. Its
+                  meaning turns on the reach: for the four operation grants it is the SUBJECT the
+                  command sent — what would be exported, imported or installed.
+                -->
+                <span class="who-detail who-reach">
+                  {copy.reachMeans[d.reach] ?? d.reach}{#if d.ua} ·
+                    {d.reach === 'login' || d.reach === 'runner' ? copy.saysItIs(d.ua) : copy.aboutWhat(d.ua)}
+                  {/if}
                 </span>
                 <span class="who-do">
                   {#if d.state === 'pending'}
@@ -626,6 +735,58 @@
                       onclick={() => toasts.push(copy.notWritten(`${d.name} would stop being able to act as you`), { intent: 'bad' })}
                     >{copy.revoke}</Button>
                   {/if}
+                </span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </Section>
+
+      <!--
+        THE THIRD OF THIS AREA'S THREE THINGS, and the one with no surface anywhere in the product.
+
+        `12 §3`: *"Every token records `last_used_at` and the surface it was used from, and the app
+        lists them with a revoke button. A credential you cannot see being used is a credential you
+        cannot know is stolen."* The list above is the REQUEST — who asked, and when. This is the
+        RESULT, and they are not the same set: a `login` grant mints a key and is itself never a
+        bearer, an operation grant makes a key that lives ten minutes, and a key can outlive the row
+        that made it. Nothing on any of forty-two routes answered *what can act as me right now*.
+
+        NEVER THE KEY ITSELF. `12 §3`'s first paragraph and this product's first promise: the record
+        keeps `sha256(secret)` and the secret is shown once, at the moment it is made, on the machine
+        that made it. What a list can honestly hold is what the key OPENS — a name, what it can do,
+        where it was last used from, and when it stops working.
+      -->
+      <Section title={copy.keys} count={TOKENS.length}>
+        <p class="hint">{copy.keysHow}</p>
+        {#if TOKENS.length === 0}
+          <Empty kind="no-data-yet" title={copy.noKeys} body={copy.noKeysWhy} />
+        {/if}
+        <ul class="whos">
+          {#each TOKENS as t}
+            <!-- THE ONE NOBODY HAS EVER USED IS THE ONE TO LOOK AT, and a list that draws it exactly
+                 like the other two has buried the only row that needed the reader. `13 §5.1`: the
+                 tone is carried by the words `never used` as well as by the mark. -->
+            <li class="who" data-intent={t.lastUsed === null ? 'warn' : undefined}>
+              <div class="who-head">
+                {#if t.lastUsed === null}
+                  <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
+                {:else}<Icon name="session" size="s" />{/if}
+                <span class="who-name">{t.label}</span>
+                <span class="who-detail">
+                  {copy.keyCan[t.scope] ?? t.scope} · {copy.overSurface(t.surface)}
+                </span>
+                <span class="who-detail">
+                  {copy.madeWhen(relative(t.created, NOW))} ·
+                  {t.lastUsed ? copy.usedWhen(relative(t.lastUsed, NOW)) : copy.neverUsed} ·
+                  {copy.endsWhen(relative(t.expires, NOW))}
+                </span>
+                <span class="who-do">
+                  <Button
+                    weight="bare"
+                    tone="bad"
+                    onclick={() => toasts.push(copy.notWritten(`${t.label} would stop working immediately, and your own session would not`), { intent: 'bad' })}
+                  >{copy.revokeKey}</Button>
                 </span>
               </div>
             </li>
@@ -947,6 +1108,19 @@
     font-size: var(--t-sm);
   }
 
+  /* WHAT IT WOULD BE ALLOWED TO DO GETS ITS OWN LINE, at full width.
+
+     It is the sentence the decision is made from, and as a third `1 1 24ch` clause it would have
+     landed wherever the name's length happened to leave room — sometimes beside the state, sometimes
+     under it, never twice the same across five rows. `100%` puts it on one line of its own, under
+     the name, which is where the eye goes after reading who is asking.
+
+     `--ink2` rather than `--dim`: the row's other clauses are context and this one is the question. */
+  .who-reach {
+    flex: 1 1 100%;
+    color: var(--ink2);
+  }
+
   /* The controls sit at the end of the head line and never shrink: a button that wraps its own
      label is a button somebody reads twice. */
   .who-do {
@@ -1040,6 +1214,47 @@
 
   /* The hint sits above the control it explains, not beside it: a sentence in a column beside a
      row of swatches is read after the choice has been made. */
+  /* THE CODE-ENTRY CONTROL.
+
+     The field and its button sit on one line and wrap to two below about 420px, where a 44px button
+     beside a field wide enough for six digits stops fitting. Nothing here sets a colour: the ring is
+     `controls.css`'s, on the wrapper, and the answer's tone comes from `[data-intent]`. */
+  .code-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
+  }
+
+  .code-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .code-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* SIX DIGITS AND NO MORE ROOM THAN SIX DIGITS NEED. A field stretched across the panel invites a
+     sentence; one sized to its content says what belongs in it without a word. `ch` on a tabular
+     face is the honest unit, and `font-variant-numeric` keeps the six from jumping about as they
+     are typed — proportional digits reflow the whole field on every keystroke. */
+  .code-input {
+    flex: 0 1 12ch;
+    font-size: var(--t-md);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.18em;
+  }
+
+  .code-said {
+    margin: 0;
+    color: var(--tone, var(--ink2));
+    font-size: var(--t-sm);
+  }
+
   .hint {
     margin: 0 0 var(--sp-3);
     max-width: var(--measure);

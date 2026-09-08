@@ -448,14 +448,117 @@ export type Source = {
  * *"I said no to a request I did not make"* is the single most important line the table can
  * produce — a denial that leaves no trace is a break-in attempt nobody can see afterwards.
  */
+/**
+ * What a device grant reaches — `30 §1`'s `CHECK (reach IN (…))`, all six.
+ *
+ * TWO OF THEM ARE LONG-LIVED AND FOUR ARE ONE OPERATION. `login` and `runner` mint a ninety-day
+ * bearer; `export`, `import`, `pack` and `token` are the OPERATION GRANT of `48 §13 D1` — one named
+ * ADMIN operation, ten minutes, single-use, resolved to the approver. That difference is the whole
+ * of what a person is deciding when they press Approve, so it cannot be left off the row.
+ *
+ * WRITTEN HERE RATHER THAN IMPORTED, because this file is the record as the BROWSER sees it and the
+ * kernel is the record as the record sees it. `device.test.ts` asserts the two agree, which is the
+ * check that would actually catch a seventh reach — a shared import would only make them impossible
+ * to disagree about in the one direction that never happens.
+ */
+export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token'] as const;
+export type Reach = (typeof REACHES)[number];
+
+/**
+ * `read ⊂ propose ⊂ write`. There is no `admin` and there is deliberately no fourth (ADR-060).
+ *
+ * Same argument as `REACHES` for why it is spelled here: `device.test.ts` compares it against the
+ * kernel's own `SCOPES`.
+ */
+export const SCOPES = ['read', 'propose', 'write'] as const;
+export type Scope = (typeof SCOPES)[number];
+
 export type Device = {
   id: string;
   name: string;
   /** `33 §2`'s six: `web · mcp · cli · email · webhook · alarm`. */
   surface: 'web' | 'mcp' | 'cli' | 'email' | 'webhook' | 'alarm';
-  state: 'pending' | 'active' | 'denied' | 'revoked';
+  /**
+   * ALL SIX THE DDL DEFINES, and the screen could draw four.
+   *
+   * `30 §1`: `CHECK (status IN ('pending','approved','active','expired','denied','revoked'))`. The
+   * two that were missing are not exotic ones — **`approved` is the state a row is in for the seconds
+   * between your click and the machine's next poll**, which is to say the screen had no way to show
+   * you that approving had worked, and `expired` is what every pending row becomes ten minutes after
+   * it was made, which is the single most common end a device grant has.
+   *
+   * A reader who cannot see `approved` presses the button twice.
+   */
+  state: 'pending' | 'approved' | 'active' | 'expired' | 'denied' | 'revoked';
+  /**
+   * WHAT APPROVING IT WOULD ALLOW — `device_grant.reach`, one of `30 §6`'s six.
+   *
+   * `49 §5.11` step 3: *"the screen said what it was about to grant before the click"*, and the row
+   * said what was ASKING and never what it would be allowed to do. The six are not interchangeable:
+   * `login` mints a ninety-day write token, `runner` is the job bearer that executes code, and the
+   * other four are one operation each, expiring in ten minutes.
+   */
+  reach: Reach;
+  /**
+   * `device_grant.ua` — what the asking device said it was.
+   *
+   * `30 §1` calls it *"the second free-text column the approver reads"*, and `48 §5.2` notes the CLI
+   * sends none, so an absent one is a fact rather than a gap. For the four operation reaches it is
+   * the `subject` the command sends: the thing that would be exported, imported or packed.
+   */
+  ua: string | null;
+  /**
+   * Wrong guesses spent against this record — `device_grant.tries`, and five is the end of it.
+   *
+   * IT IS ON THE ROW AND NOT ON THE FORM, because `49 §5.11` step 2.1 spends the try on **every**
+   * pending row: *"every pending row pays for a wrong guess"*. That is deliberate — a counter per row
+   * would let a guesser buy five more attempts by starting a second enrolment — and it means a
+   * mistyped code is a cost to somebody else's pending request, which is why the field below refuses
+   * a malformed one rather than sending it.
+   */
+  tries: number;
+  /**
+   * A STAND-IN FOR `code_hash`, AND THE PROPERTY IT PRESERVES IS THE ONE THAT MATTERS.
+   *
+   * The real column is `sha256(id ‖ ':' ‖ user_code)` — the poll id as its salt, no host secret in
+   * the formula, so a leaked table cannot approve itself. This mock has no crypto (the record makes
+   * no outbound calls and imports no `node:` module) and uses the same small hash `list()` uses for
+   * its cursors. **It is not a security control and nothing here is.** What it is, is a record that
+   * does not hold the code in clear — so nobody reading `data.ts` learns the wrong shape, and no
+   * screen can be built that reads a code out of the row it is meant to be checking.
+   */
+  codeHash: string;
   at: string;
   lastSeen: string | null;
+};
+
+/**
+ * A token this record has minted, as `12 §3` requires the app to list them.
+ *
+ * *"Every token records `last_used_at` and the surface it was used from, and the app lists them."*
+ * The screen showed the machines that had ASKED and never the tokens that resulted, so there was no
+ * surface anywhere in the product answering *what can act as me right now* — which is the question
+ * `/settings/agents` exists for.
+ *
+ * NEVER THE TOKEN. `12 §6` and this product's first promise: the record indexes what a key opens,
+ * never the key. A label, a scope, a surface and two dates.
+ */
+export type Token = {
+  id: string;
+  label: string;
+  /**
+   * `read ⊂ propose ⊂ write`, and the list is the kernel's rather than a fourth copy of it.
+   *
+   * There is no `admin` (ADR-060): the ladder stops below `decide`, so an agent may put a question in
+   * front of a person and may not answer its own. A screen that offered a fourth word would be
+   * offering something no token can hold.
+   */
+  scope: Scope;
+  /** `last_surface` — where it was last used from, which is half of what makes a stolen one visible. */
+  surface: Device['surface'];
+  created: string;
+  lastUsed: string | null;
+  expires: string;
 };
 
 export type Job = {

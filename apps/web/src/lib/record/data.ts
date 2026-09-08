@@ -25,6 +25,7 @@ import type {
   NewsItem,
   PackInfo,
   Device,
+  Token,
   PageDecl,
   Passkey,
   Person,
@@ -534,9 +535,50 @@ export const SOURCES: Source[] = [
 /* ── agents ────────────────────────────────────────────────────────────────── */
 
 /** `12 §6.1`. The denied row is kept deliberately — see the type. */
+/**
+ * `at` IS AN INSTANT AND NOT A DAY, on every one of these.
+ *
+ * A device code lives ten minutes (`49 §5.9`). A column recorded to the day cannot say whether a
+ * pending request is live or four hours dead — `day(0)` parses to midnight, so under the shipped
+ * seed's noon every waiting grant was already twelve hours expired while the screen drew it as
+ * waiting for you. The one field on this table that a person makes a decision from was stored at a
+ * resolution 72 times coarser than the decision.
+ */
 export const DEVICES: Device[] = [
-  { id: 'dg_01', name: 'Claude Code, this laptop', surface: 'mcp', state: 'active', at: day(-31), lastSeen: day(0) },
-  { id: 'dg_02', name: 'braindog CLI, studio desktop', surface: 'cli', state: 'active', at: day(-88), lastSeen: day(-2) },
-  { id: 'dg_03', name: 'Codex, unknown machine', surface: 'mcp', state: 'pending', at: day(0), lastSeen: null },
-  { id: 'dg_04', name: 'Unrecognised request, Frankfurt', surface: 'mcp', state: 'denied', at: day(-6), lastSeen: null },
+  { id: 'dg_01', name: 'Claude Code, this laptop', surface: 'mcp', state: 'active', reach: 'login', ua: 'Claude Code 2.4 on macOS', tries: 0, codeHash: '', at: stamp(-24 * 31), lastSeen: stamp(-2) },
+  { id: 'dg_02', name: 'braindog CLI, studio desktop', surface: 'cli', state: 'active', reach: 'runner', ua: null, tries: 0, codeHash: '', at: stamp(-24 * 88), lastSeen: stamp(-24 * 2) },
+  /* THE PENDING ROW IS THE ONE THE APPROVER READS, so it carries both columns `49 §5.11` names —
+     what it would be allowed to do, and what it says it is. `runner` is the heaviest of the six: a
+     ninety-day bearer that claims jobs and executes code, which is worth knowing before the click.
+
+     ITS `codeHash` IS THE FINGERPRINT OF A CODE THAT EXISTS NOWHERE. It was generated once and the
+     code was discarded, so the shipped mock cannot be approved by anybody — which is exactly the
+     behaviour of the real thing, where the six digits live on the other machine. `12 §6.1`:
+     "Guessing it does not get you in." The success path is exercised in `device.test.ts`, which
+     builds its own rows and knows its own codes. */
+  { id: 'dg_03', name: 'Codex, unknown machine', surface: 'mcp', state: 'pending', reach: 'runner', ua: 'codex-cli 0.9 on Linux', tries: 0, codeHash: '176iuyp', at: stamp(-0.05), lastSeen: null },
+  { id: 'dg_04', name: 'Unrecognised request, Frankfurt', surface: 'mcp', state: 'denied', reach: 'login', ua: null, tries: 5, codeHash: '', at: stamp(-24 * 6), lastSeen: null },
+  /* AN OPERATION GRANT THAT NOBODY GOT TO IN TIME — `48 §13 D1`'s ten minutes, and the state four of
+     these rows end in. `ua` here is the `subject` the command sent: for `export` it is what would
+     have been exported, which is the only thing that makes the request decidable. */
+  { id: 'dg_05', name: 'braindog export, studio desktop', surface: 'cli', state: 'expired', reach: 'export', ua: 'the whole record', tries: 0, codeHash: '', at: stamp(-3), lastSeen: null },
+];
+
+/**
+ * The tokens this record has minted — `12 §3`'s list, which no screen had.
+ *
+ * Two of them are the grants above resolved: `dg_01`'s `login` reach minted a ninety-day write
+ * token, and `dg_02`'s `runner` reach is the job bearer itself. The third is an MCP read token
+ * nobody has used, which is the row worth having a list for.
+ */
+export const TOKENS: Token[] = [
+  { id: 'tk_01', label: 'Claude Code, this laptop', scope: 'write', surface: 'mcp', created: day(-31), lastUsed: stamp(-2), expires: day(59) },
+  /* TWO DAYS LEFT, and the row exists to be the one that says so. A ninety-day token that stops
+     working on a Tuesday morning is the most common way an agent quietly falls off a record, and
+     the list is where somebody could have seen it coming. */
+  { id: 'tk_02', label: 'braindog CLI, studio desktop', scope: 'write', surface: 'cli', created: day(-88), lastUsed: stamp(-24 * 2), expires: day(2) },
+  /* NEVER USED. `12 §3`: "A credential you cannot see being used is a credential you cannot know is
+     stolen" — and the inverse is this row, a live key nothing has ever presented, which is the one
+     worth revoking and the one no screen was showing. */
+  { id: 'tk_03', label: 'Reporting, read only', scope: 'read', surface: 'mcp', created: day(-12), lastUsed: null, expires: day(78) },
 ];
