@@ -6,7 +6,9 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "vite dev",
-    "build": "pnpm --filter @braindog/skin theme && vite build",
+    "build": "pnpm --filter @braindog/skin theme && vite build && pnpm run build:variants",
+    "//build:variants": "The other record. A screen that branches on a fact about the record has a half the shipped seed cannot draw — the Cloud sentences shipped once and rendered nowhere — so the browser gates measure a second build. Four seconds, and it is what makes `dead-copy` counting a key inside a dead `{#if}` survivable.",
+    "build:variants": "node -e \"process.env.BRAINDOG_VARIANT='cloud';require('child_process').execSync('npx vite build',{stdio:'inherit'})\"",
     "preview": "vite preview",
     "test": "node --test",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"

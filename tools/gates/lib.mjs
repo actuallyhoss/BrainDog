@@ -97,4 +97,11 @@ export function keyPaths() {
  * directory is.
  */
 const BUILT = new Set(['node_modules', 'build', 'dist', 'shots']);
-export const skipDir = (name) => name.startsWith('.') || BUILT.has(name);
+
+/**
+ * AND A VARIANT BUILD IS A BUILD. `build-cloud/` is the same output for a different record, and the
+ * moment it existed every grep gate started reading minified CSS as though it were a component —
+ * `css-rules` reported fourteen colour literals in `Button.css`, which is the compiled form of rules
+ * that name only tokens. A built directory is built whatever the record inside it is.
+ */
+export const skipDir = (name) => name.startsWith('.') || BUILT.has(name) || name.startsWith('build-');

@@ -10,7 +10,16 @@ import adapter from '@sveltejs/adapter-static';
  */
 export default {
   kit: {
-    adapter: adapter({ fallback: 'index.html', precompress: false, strict: false }),
+    /* A VARIANT BUILD GOES SOMEWHERE ELSE. `adapter-static` writes the pages, not Vite's `outDir`, so
+       `BRAINDOG_VARIANT=cloud` would otherwise overwrite the shipped record's build — and the next
+       gate to run would measure the wrong one silently. The default is unchanged. */
+    adapter: adapter({
+      pages: process.env.BRAINDOG_VARIANT ? `build-${process.env.BRAINDOG_VARIANT}` : 'build',
+      assets: process.env.BRAINDOG_VARIANT ? `build-${process.env.BRAINDOG_VARIANT}` : 'build',
+      fallback: 'index.html',
+      precompress: false,
+      strict: false,
+    }),
     alias: { $lib: 'src/lib' },
     files: { assets: 'static' },
     version: { pollInterval: 0 },

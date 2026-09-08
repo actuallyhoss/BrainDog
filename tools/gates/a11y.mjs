@@ -44,6 +44,15 @@ const REPO = join(import.meta.dirname, '..', '..');
  */
 const APPS = [
   { name: 'web', root: join(REPO, 'apps', 'web', 'build'), routes: null, spa: true },
+  /**
+   * THE OTHER RECORD, for the half of every host branch the shipped seed cannot draw.
+   *
+   * `BRAINDOG_VARIANT=cloud` writes `build-cloud/`, and only the two routes that branch are worth
+   * running: the point is that the Cloud side is drawn at all and passes the same rules, not a second
+   * sweep of a build that differs by one constant. Skipped with a line when it is not built, because
+   * "we did not check this" must not look like "there was nothing here".
+   */
+  { name: 'cloud', root: join(REPO, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'], spa: true, optional: true },
   { name: 'site', root: join(REPO, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], spa: false },
 ];
 const AXE = join(REPO, 'node_modules', 'axe-core', 'axe.min.js');
@@ -175,9 +184,17 @@ const mute = new Map();
 for (const app of APPS) {
   if (!(await stat(app.root).catch(() => null))) {
     /* NOT A PASS. Skipping one app silently dropped the marketing site from every run that did not
-       build it, and the gate still printed its own green line. */
-    console.log(`  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`);
-    skipped.push(app.name);
+       build it, and the gate still printed its own green line.
+
+       AN `optional` APP IS A VARIANT RECORD, not a missing build — it is written only when somebody
+       asks for it, so its absence is a smaller sentence and not a skip that shows up beside the
+       marketing site's. It still says what was not measured. */
+    console.log(
+      app.optional
+        ? `  a11y: no ${app.name} record built — \`BRAINDOG_VARIANT=${app.name} pnpm --filter @braindog/web build\` draws the other half of every host branch.`
+        : `  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`,
+    );
+    if (!app.optional) skipped.push(app.name);
     continue;
   }
   current = app;

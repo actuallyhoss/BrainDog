@@ -20,3 +20,8 @@ packages/theme/proof.txt
 
 # the a11y gate writes its run here
 .a11y.log
+
+# A variant build — the same output for a different record, written by
+# `BRAINDOG_VARIANT=<name> vite build` so the browser gates can measure the half
+# of every branch the shipped seed cannot draw. Never committed: it is a build.
+build-*/

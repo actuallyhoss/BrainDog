@@ -37,6 +37,23 @@ import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
+
+/**
+ * A SECOND RECORD, FOR THE HALF OF EVERY BRANCH THE FIRST ONE CANNOT DRAW.
+ *
+ * The app renders one seed, so a screen that branches on a fact about the record has a side no gate
+ * can reach. `/settings/backups` and `/settings/billing` branch on the host, and the Cloud side
+ * shipped **eight sentences that drew nowhere** — invisible to `svelte-check`, which says nothing
+ * about a branch that cannot be taken, and counted as rendered by `dead-copy`, which greps source.
+ *
+ * `BRAINDOG_VARIANT=cloud pnpm --filter @braindog/web build` writes `build-cloud/`. If it is there,
+ * the routes that branch are measured on it too; if it is not, the run says so rather than quietly
+ * covering less. It is the same rule as `unsampled`: "we did not check this" must not look like
+ * "there was nothing here".
+ */
+const VARIANTS = [
+  { name: 'cloud', root: join(REPO, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'] },
+];
 const L = budget('layout');
 const PORT = L.port;
 
@@ -105,12 +122,16 @@ const bps = (await breakpoints()).sort((a, b) => a - b);
    different layouts that both have to hold. */
 const widths = [...new Set([...FLOOR, ...bps.flatMap((b) => [b - 1, b])])].sort((a, b) => a - b);
 
+/* WHICH BUILD IS ON THE PORT. One server, pointed at the record under measurement — a second server
+   would be a second port, and this file already knows what a port collision costs. */
+let serving = ROOT;
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
   const rel = decodeURIComponent(url.pathname).slice(1);
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
-    const file = join(ROOT, candidate);
+    const file = join(serving, candidate);
     const info = await stat(file).catch(() => null);
     if (!info?.isFile()) continue;
     res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
@@ -119,53 +140,29 @@ const server = createServer(async (req, res) => {
   // The same SPA fallback the app is deployed behind, keyed on extensions we actually serve.
   if (!Object.hasOwn(TYPES, extname(rel))) {
     res.writeHead(200, { 'content-type': TYPES['.html'] });
-    return createReadStream(join(ROOT, 'index.html')).pipe(res);
+    return createReadStream(join(serving, 'index.html')).pipe(res);
   }
   res.writeHead(404).end();
 });
 await new Promise((r) => server.listen(PORT, r));
 
+const present = [];
+for (const v of VARIANTS) if (await stat(v.root).catch(() => null)) present.push(v);
+if (present.length < VARIANTS.length)
+  console.log(
+    `  layout: ${VARIANTS.length - present.length} variant(s) not built — ` +
+      `\`BRAINDOG_VARIANT=cloud pnpm --filter @braindog/web build\` measures the other half of every host branch.`,
+  );
+
 const browser = await chromium.launch();
-const findings = [];
-let checked = 0;
-
-for (const width of widths) {
-  /**
-   * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
-   *
-   * `05 §6` and `13 §7`: density follows the POINTER, never the width — `--ctl-h` is 44 on a coarse
-   * pointer and **36** on a fine one, measured in the built page. (Two comments in this repo say 32,
-   * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
-   * measure every width this product has and never once see the size a thumb gets.
-   */
-  const context = await browser.newContext({
-    viewport: { width, height: L.viewportHeightPx },
-    reducedMotion: 'reduce',
-    hasTouch: width < 640,
-    isMobile: width < 640,
-  });
-  const page = await context.newPage();
-  process.stdout.write(`    ${String(width).padStart(4)}px `);
-
-  for (const route of ROUTES) {
-    await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('#main *', { timeout: L.readyTimeoutMs }).catch(() => {});
-    // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
-    await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-    /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading
-       is put into `#main` — the exact bug this gate is named after — and the run must go red. It is
-       here rather than in a fixture tree because the thing under test is a real browser over a real
-       build, and there is no smaller way to hold that. */
-    if (process.env.BRAINDOG_GATE_SEED)
-      await page.evaluate(() => {
-        const h = document.createElement('h2');
-        h.textContent = 'seeded';
-        h.style.cssText = 'width:2000px;white-space:nowrap';
-        document.getElementById('main')?.prepend(h);
-      });
-    await page.waitForTimeout(L.settleMs);
-
-    const out = await page.evaluate(([w, slack, COARSE]) => {
+/**
+ * WHAT ONE PAGE IS MEASURED FOR, hoisted so the variant pass runs the identical check.
+ *
+ * It was an inline arrow inside the width loop, which is fine while there is one loop. A second
+ * pass over a second record with a COPY of this would be two rules wearing one name — the exact
+ * shape this repo keeps finding — so it is named once and passed to both.
+ */
+const MEASURE = ([w, slack, COARSE]) => {
       const hits = [];
       if (document.documentElement.scrollWidth > w + slack) {
         hits.push(`the DOCUMENT scrolls sideways (${document.documentElement.scrollWidth}px)`);
@@ -246,7 +243,49 @@ for (const width of widths) {
         for (const s of [...new Set(small)].slice(0, 3)) hits.push(`a target under 44px on a coarse pointer: ${s}`);
       }
       return [...new Set(hits)].slice(0, 4);
-    }, [width, L.widthTolerancePx, width < 640]);
+};
+
+const findings = [];
+let checked = 0;
+
+for (const width of widths) {
+  /**
+   * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
+   *
+   * `05 §6` and `13 §7`: density follows the POINTER, never the width — `--ctl-h` is 44 on a coarse
+   * pointer and **36** on a fine one, measured in the built page. (Two comments in this repo say 32,
+   * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
+   * measure every width this product has and never once see the size a thumb gets.
+   */
+  const context = await browser.newContext({
+    viewport: { width, height: L.viewportHeightPx },
+    reducedMotion: 'reduce',
+    hasTouch: width < 640,
+    isMobile: width < 640,
+  });
+  const page = await context.newPage();
+  process.stdout.write(`    ${String(width).padStart(4)}px `);
+
+  for (const route of ROUTES) {
+    await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#main *', { timeout: L.readyTimeoutMs }).catch(() => {});
+    // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
+    await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+    /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading
+       is put into `#main` — the exact bug this gate is named after — and the run must go red. It is
+       here rather than in a fixture tree because the thing under test is a real browser over a real
+       build, and there is no smaller way to hold that. */
+    if (process.env.BRAINDOG_GATE_SEED)
+      await page.evaluate(() => {
+        const h = document.createElement('h2');
+        h.textContent = 'seeded';
+        h.style.cssText = 'width:2000px;white-space:nowrap';
+        document.getElementById('main')?.prepend(h);
+      });
+    await page.waitForTimeout(L.settleMs);
+
+
+    const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
 
     checked++;
     process.stdout.write(out.length ? '!' : '.');
@@ -255,6 +294,39 @@ for (const width of widths) {
   process.stdout.write('\n');
   await context.close();
 }
+
+/**
+ * The variants, at the widths that matter for them.
+ *
+ * Only the routes that branch, and only on a phone and a desktop — the point is that the OTHER half
+ * of the branch is drawn at all and holds together, not a second full sweep of a build that differs
+ * from the first by one constant.
+ */
+for (const v of present) {
+  serving = v.root;
+  for (const width of [400, 1200]) {
+    const context = await browser.newContext({
+      viewport: { width, height: L.viewportHeightPx },
+      reducedMotion: 'reduce',
+      hasTouch: width < 640,
+      isMobile: width < 640,
+    });
+    const page = await context.newPage();
+    process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);
+    for (const route of v.routes) {
+      await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('#main *', { timeout: L.readyTimeoutMs }).catch(() => {});
+      await page.waitForTimeout(L.settleMs);
+      const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
+      checked++;
+      process.stdout.write(out.length ? '!' : '.');
+      for (const o of out) findings.push(`${v.name}${route} @${width}  ${o}`);
+    }
+    process.stdout.write('\n');
+    await context.close();
+  }
+}
+serving = ROOT;
 
 await browser.close();
 server.close();

@@ -49,6 +49,25 @@ import { answers } from './find.ts';
 export const REGISTERS = SEED_REGISTERS as unknown as Record<string, RegisterDecl>;
 
 /**
+ * WHICH RECORD THIS BUILD SHOWS, and the only place in the app that asks.
+ *
+ * `vite.config.ts` substitutes a literal, so in the shipped build this is `''`, every `VARIANT ===`
+ * below folds to `false`, and the variant rows are not in the bundle. There is no runtime switch:
+ * the flag is gone by the time anything runs.
+ *
+ * IT EXISTS BECAUSE A SCREEN THAT BRANCHES ON THE RECORD HAS A HALF NO GATE CAN REACH. Three
+ * findings, all the same shape: `/search`'s disclosure for a group with no door needs eleven
+ * decisions and the seed has four; the two designed empty states on `/settings/agents` need a record
+ * with no machines and no keys; and every Cloud sentence needs a record that is not self-hosted —
+ * which shipped eight sentences that drew nowhere while `dead-copy`, a grep over source, counted
+ * them as rendered.
+ *
+ * A VARIANT IS A REAL RECORD, not a mock of one. It changes what the record HOLDS and nothing about
+ * how the screens read it, which is the only way the gate's answer is evidence about the product.
+ */
+const VARIANT = typeof __BRAINDOG_VARIANT__ === 'string' ? __BRAINDOG_VARIANT__ : '';
+
+/**
  * The seed's rows, given the numbers, versions and authors a record would have given them.
  *
  * `seq` IS THE POSITION, because that is what the record does: rows are numbered as they arrive,
@@ -514,7 +533,10 @@ export const AUTH_METHODS = { passkey: true, magic: true } as const;
  * The seed can only be one of them, so the other half is exercised by `deployment.test.ts` rather
  * than by a browser gate — which is the shape the seed-variant harness in the backlog is for.
  */
-export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = { kind: 'self-host', since: day(-612) };
+export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = {
+  kind: VARIANT === 'cloud' ? 'cloud' : 'self-host',
+  since: day(-612),
+};
 
 /* ── backups ───────────────────────────────────────────────────────────────── */
 
