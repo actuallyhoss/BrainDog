@@ -306,7 +306,12 @@
     position: fixed;
     display: inline-flex;
     align-items: center;
-    min-block-size: var(--ctl-h);
+    /* `--tap`, NOT `--ctl-h`. `--ctl-h` is 44 on a coarse pointer and 36 on a fine one, and this
+       control's entire audience is somebody using a keyboard on a laptop — a FINE pointer. It
+       measured 41 there after being "fixed", which is the number the fix was written against, for
+       the reader it was written for. The layout gate runs the target rule only below 640px, so it
+       could not see the half that mattered. */
+    min-block-size: var(--tap);
     inset-block-start: var(--sp-2);
     inset-inline-start: var(--sp-2);
     z-index: var(--z-hint);

@@ -19,6 +19,10 @@ import { defineConfig } from 'vite';
  *
  * `''` is the shipped record. Every other value is a variant, and `data.ts` is the only file that
  * reads it.
+ *
+ * WHERE THE BUILD GOES IS `svelte.config.js`'S, not this file's. `build.outDir` is in SvelteKit's
+ * enforced config, so setting it here did nothing except print *"the following Vite config options
+ * will be overridden by SvelteKit"* on every build — four times, once per record.
  */
 const VARIANT = process.env.BRAINDOG_VARIANT ?? '';
 
@@ -27,11 +31,5 @@ export default defineConfig({
   define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT) },
   server: { port: 5183, strictPort: true },
   preview: { port: 5183, strictPort: true },
-  build: {
-    target: 'es2022',
-    cssMinify: 'lightningcss',
-    /* A variant never overwrites the record. The gates serve whichever directory they asked for, and
-       `bundle` measures the shipped one. */
-    outDir: VARIANT ? `build-${VARIANT}` : 'build',
-  },
+  build: { target: 'es2022', cssMinify: 'lightningcss' },
 });

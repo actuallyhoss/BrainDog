@@ -320,7 +320,13 @@ export function compile(register: string, where: string | undefined): Where {
     const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
     const dated = decl?.type === 'day' || decl?.type === 'instant';
     const one = rest.trim();
-    if (dated && !/\s+or\s+/i.test(rest) && resolveDay(one, Date.now()) !== null) {
+    /* `op === 'is'` AND NOT MERELY "not before or after". `before` and `after` are consumed above,
+       and `is not` fell straight through here — so the negation was DROPPED and `due is not today`
+       compiled to the same clause as `due is today`. Reachable from a URL, not only a typed
+       sentence: `whereOf` maps `not-in` to `is not`, so `?f=due:not-in:2026-09-14` returned the
+       complement of what the chip said. A filter that quietly inverts is the one failure a
+       declarative surface must not have. */
+    if (op === 'is' && dated && !/\s+or\s+/i.test(rest) && resolveDay(one, Date.now()) !== null) {
       clauses.push({ field, op: 'on', day: one });
       continue;
     }

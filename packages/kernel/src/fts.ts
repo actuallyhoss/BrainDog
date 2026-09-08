@@ -33,7 +33,15 @@ export function projectedText(fields: readonly Searchable[], values: Record<stri
     if (!f.search || f.retired) continue;
     const raw = values[f.id];
     if (raw === undefined || raw === null || raw === '') continue;
-    const text = (Array.isArray(raw) ? raw.map((v) => String(v)).join(' ') : String(raw)).replace(/\s+/g, ' ').trim();
+    /* NFC HERE TOO, OR THE QUERY COMPOSES AND THE INDEX DOES NOT. `ftsQuery` normalises what was
+       typed; `unicode61` normalises neither, and it folds NFD marks only where they ARE marks. Hangul
+       jamo and kana voicing are letters, not marks — so a name stored decomposed became a different
+       token from the same name typed composed, and was findable by nothing. One end normalised is
+       worse than neither. */
+    const text = (Array.isArray(raw) ? raw.map((v) => String(v)).join(' ') : String(raw))
+      .normalize('NFC')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (text) lines.push(text);
   }
   return lines.join('\n');

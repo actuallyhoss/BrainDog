@@ -53,6 +53,8 @@ const APPS = [
    * "we did not check this" must not look like "there was nothing here".
    */
   { name: 'cloud', root: join(REPO, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'], spa: true, optional: true },
+  { name: 'quiet', root: join(REPO, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'], spa: true, optional: true },
+  { name: 'busy', root: join(REPO, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'], spa: true, optional: true },
   { name: 'site', root: join(REPO, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], spa: false },
 ];
 const AXE = join(REPO, 'node_modules', 'axe-core', 'axe.min.js');
@@ -191,7 +193,7 @@ for (const app of APPS) {
        marketing site's. It still says what was not measured. */
     console.log(
       app.optional
-        ? `  a11y: no ${app.name} record built — \`BRAINDOG_VARIANT=${app.name} pnpm --filter @braindog/web build\` draws the other half of every host branch.`
+        ? `  a11y: no ${app.name} record built — \`pnpm --filter @braindog/web build\` draws the other half of every host branch.`
         : `  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`,
     );
     if (!app.optional) skipped.push(app.name);

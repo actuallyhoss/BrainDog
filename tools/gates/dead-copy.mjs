@@ -74,6 +74,11 @@ async function walk(dir) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     const at = join(dir, e.name);
     if (e.isDirectory()) await walk(at);
+    /* A TEST IS NOT A RENDERER. `deployment.test.ts` names twelve `copy.*` keys to assert the Cloud
+       half exists at all, and every one of them then counted as rendered — so a screen could lose its
+       only call site and this gate would say nothing, propped up by the file asserting the sentence
+       is there. The gate's whole subject is a string that is reviewable and unrendered. */
+    else if (/\.test\.ts$/.test(e.name)) continue;
     else if (/\.(ts|svelte)$/.test(e.name)) files.push(at);
   }
 }

@@ -223,17 +223,34 @@ export function bytes(n: number): string {
   /* Three significant figures: 157 kB · 15.7 MB · 1.57 GB. `toPrecision` is not it — it would give
      `1.00e+3` for the very case this loop exists to catch. */
   const places = (v: number) => (v >= 100 ? 0 : v >= 10 ? 1 : 2);
+  /**
+   * ONE ROUNDING, AND IT IS THE RENDERER'S — the climb reads its own output.
+   *
+   * It rounded twice with two different rules: `toFixed` rounds the exact binary double,
+   * `toLocaleString` rounds the shortest decimal. They disagree on every `.5` tie, so `1005` printed
+   * `1.00 kB` where the renderer would have said `1.01`, and `9995` — the example this function was
+   * fixed for — printed `9.99 kB` instead of `10.0 kB`. Wrong in the digit, which is worse than the
+   * four-digit band it replaced. Doing the arithmetic by hand cannot help: `1.005 * 100` is
+   * `100.49999999999999`.
+   *
+   * So the string is produced first and the climb asks whether THAT spilled. There is no second
+   * opinion to disagree with.
+   */
+  const say = (v: number) => {
+    const p = places(v);
+    return v.toLocaleString(NUM, { minimumFractionDigits: p, maximumFractionDigits: p });
+  };
   for (;;) {
-    const rounded = Number(value.toFixed(places(value)));
-    if (rounded < 1_000 || i === units.length - 1) {
-      value = rounded;
-      break;
-    }
+    /* TWICE, BECAUSE ROUNDING MOVES THE BOUNDARY. `9.995` has two decimal places and rounds to
+       `10.00`, which has one — four significant figures, the defect this loop exists to prevent,
+       arriving through the rounding rather than through the unit. Saying the rounded number again
+       settles it, and a second pass cannot move it further: `10.0` is already at its own precision. */
+    const once = Number(say(value).replaceAll(',', ''));
+    const text = say(once);
+    if (once < 1_000 || i === units.length - 1) return `${text} ${units[i]}`;
     value /= 1_000;
     i += 1;
   }
-  const p = places(value);
-  return `${value.toLocaleString(NUM, { minimumFractionDigits: p, maximumFractionDigits: p })} ${units[i]}`;
 }
 
 export const yesno = (v: boolean): string => (v ? 'yes' : 'no');

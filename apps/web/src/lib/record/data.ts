@@ -151,6 +151,31 @@ export const QUESTIONS: Question[] = [
   },
 ];
 
+/**
+ * `busy` IS A RECORD WITH ENOUGH HISTORY TO OVERFLOW A GROUP.
+ *
+ * `/search` draws ten rows per list and says so when there are more — and for a group with no door,
+ * which is what the questions are, it says the count in a sentence instead of a link. That branch
+ * needs eleven matching decisions and the record holds four, so the disclosure written to close
+ * *"the exact defect this route exists to fix, one door along"* had never been drawn.
+ *
+ * They are the same decision, taken repeatedly, which is what a real record accumulates: a renewal
+ * question every year, answered the same way each time.
+ */
+const OLD_RENEWALS: Question[] = Array.from({ length: 12 }, (_, i) => ({
+  id: `D${20 - i}`,
+  title: `Renewal terms for the ${2025 - i} licence year`,
+  cost: 'The invoice goes out on the anniversary either way.',
+  rank: 0,
+  opened: stamp(-24 * 400 * (i + 1)),
+  entity: 'Kiln',
+  options: [
+    { key: 'same', title: 'Same terms', body: 'Nothing has changed on either side.' },
+    { key: 'raise', title: 'Raise it', body: 'Costs have moved and the licence has not.' },
+  ],
+  decided: { option: 'same', reason: 'Nothing had changed on either side.', by: 'you', at: stamp(-24 * 399 * (i + 1)) },
+}));
+
 export const DECIDED: Question[] = [
   {
     id: 'D41',
@@ -170,6 +195,7 @@ export const DECIDED: Question[] = [
       at: stamp(-2180),
     },
   },
+  ...(VARIANT === 'busy' ? OLD_RENEWALS : []),
 ];
 
 /* ── inbox ───────────────────────────────────────────────────────────────── */
@@ -583,7 +609,7 @@ export const SNAPSHOTS_KEPT = 30;
  * The record's own signing key, public half — and it is not a credential.
  *
  * `53 §4` says where it lives: *"generated on first run; the public half in **Settings → export**
- * and at the well-known URL 03 §4 names"*. `03 §4` says what it is for: *"so a customer can verify a
+ * and, when the hosts serve it, at the well-known URL 03 §4 names"*. `03 §4` says what it is for: *"so a customer can verify a
  * backup they downloaded a year ago against a key they can independently fetch"*, and what the
  * signature claims — *"this file was produced by that instance, and no row has changed since"*.
  * `53 §5.4` has the operator copy it from this screen into
@@ -600,7 +626,11 @@ export const SNAPSHOTS_KEPT = 30;
  * half short enough to read down a phone.
  */
 export const SIGNING_KEY = {
-  keyId: '9f2c41ab7e05d38c',
+  /* `03 §4`: *"`key_id` is the first 16 hex characters of SHA-256 over the public key"* — and it was
+     sixteen hex characters of nothing in particular. The key was corrected and the fingerprint
+     beside it was not, so a person copying both from this screen would have had `braindog verify`
+     answer `SIGNATURE_INVALID` and conclude the tool was broken. It is `sha256(raw)[0:16]` now. */
+  keyId: 'aebc6474874dc50c',
   /* FORTY-THREE CHARACTERS, which is what 32 bytes of base64url is. It was 48 — 36 bytes of ASCII
      text spelling a sentence — under a test whose own message said "a 32-byte key is ~43 base64url
      characters" and whose range admitted it anyway. A key of the wrong length on the screen a person
@@ -651,7 +681,7 @@ export const SOURCES: Source[] = [
  * waiting for you. The one field on this table that a person makes a decision from was stored at a
  * resolution 72 times coarser than the decision.
  */
-export const DEVICES: Device[] = [
+const ALL_DEVICES: Device[] = [
   { id: 'dg_01', name: 'Claude Code, this laptop', surface: 'mcp', state: 'active', reach: 'login', ua: 'Claude Code 2.4 on macOS', tries: 0, codeHash: '', at: stamp(-24 * 31), lastSeen: stamp(-2) },
   { id: 'dg_02', name: 'braindog CLI, studio desktop', surface: 'cli', state: 'active', reach: 'runner', ua: null, tries: 0, codeHash: '', at: stamp(-24 * 88), lastSeen: stamp(-24 * 2) },
   /* THE PENDING ROW IS THE ONE THE APPROVER READS, so it carries both columns `49 §5.11` names —
@@ -673,6 +703,10 @@ export const DEVICES: Device[] = [
   { id: 'dg_05', name: 'braindog export, studio desktop', surface: 'cli', state: 'expired', reach: 'export', ua: 'the whole record', tries: 0, codeHash: '', at: stamp(-3), lastSeen: null },
 ];
 
+/* `quiet` is the record on the day it is installed. `.filter()` on the literal would widen every
+   `'mcp'` to `string`, so the list is typed first and narrowed after. */
+export const DEVICES: Device[] = VARIANT === 'quiet' ? [] : ALL_DEVICES;
+
 /**
  * The tokens this record has minted — `12 §3`'s list, which no screen had.
  *
@@ -680,7 +714,7 @@ export const DEVICES: Device[] = [
  * token, and `dg_02`'s `runner` reach is the job bearer itself. The third is an MCP read token
  * nobody has used, which is the row worth having a list for.
  */
-export const TOKENS: Token[] = [
+const ALL_TOKENS: Token[] = [
   { id: 'tk_01', label: 'Claude Code, this laptop', scope: 'write', surface: 'mcp', created: day(-31), lastUsed: stamp(-2), expires: day(59) },
   /* TWO DAYS LEFT, and the row exists to be the one that says so. A ninety-day token that stops
      working on a Tuesday morning is the most common way an agent quietly falls off a record, and
@@ -690,4 +724,15 @@ export const TOKENS: Token[] = [
      stolen" — and the inverse is this row, a live key nothing has ever presented, which is the one
      worth revoking and the one no screen was showing. */
   { id: 'tk_03', label: 'Reporting, read only', scope: 'read', surface: 'mcp', created: day(-12), lastUsed: null, expires: day(78) },
+  /**
+   * `quiet` IS A RECORD NOBODY HAS CONNECTED ANYTHING TO, which is what the two designed empty states
+   * on `/settings/agents` are for and what no gate could reach.
+   *
+   * `13 §5.2` gives `no-data-yet` a content contract — what this is for, and the copyable prompt —
+   * and both states were statically unreachable on a record that ships five machines and three keys.
+   * A review called them dead code; they are not dead, they are the state a person is in on the day
+   * they install this, and nothing had ever drawn them.
+   */
 ];
+
+export const TOKENS: Token[] = VARIANT === 'quiet' ? [] : ALL_TOKENS;

@@ -228,7 +228,11 @@ export function invite(
     args.person,
     RECORD,
   )?.level;
-  if (now === 'owner' && args.level !== 'owner' && owners(deps.sql) <= 1)
+  /* `counts()` LIKE THE OTHER TWO. `remove` and `suspend` were moved onto it and this was left
+     reading the raw row, so with a ghost `'*' owner` and one real owner, `invite` refused to demote
+     and `remove` allowed it — three methods, two answers about one row, which is the split the
+     predicate was extracted to end. */
+  if (counts(deps.sql, args.person) && args.level !== 'owner' && owners(deps.sql) <= 1)
     return no<Member>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'level' });
 
   const at = instant(deps.nowMs);
@@ -413,6 +417,10 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
  */
 /**
  * Is this person one of the owners `owners()` is counting?
+ *
+ * (The block below belongs to `owners()`. It was moved above this one when `counts()` was added, so
+ * the most load-bearing comment in the file documented nothing and `owners()` had none — TypeScript
+ * attaches only the nearer block.)
  *
  * THE GUARD AND THE COUNT HAVE TO ASK ONE QUESTION. `remove` and `suspend` read the raw `member` row
  * — `register === '*' && level === 'owner'` — while `owners()` joins `person` and skips the suspended

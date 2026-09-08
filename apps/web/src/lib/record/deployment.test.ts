@@ -38,13 +38,23 @@ test('THE HOST IS A FACT ABOUT THE RECORD, NOT A COMPILE-TIME CONSTANT', () => {
   /* `as const` on the value is what made every Cloud branch unreachable. The union is the honest
      type: a record is on one host or the other, and the screens branch on which. */
   assert.ok(['self-host', 'cloud'].includes(DEPLOYMENT.kind));
-  /* THE EXPORT LINE, not the file. A bare grep matches the paragraph above it explaining why the
-     literal is gone — an assertion catching its own evidence, which this tree has now done twice. */
+  /**
+   * THE DECLARATION, not the file and not its first line.
+   *
+   * A bare grep matches the paragraph above it explaining why the literal is gone — an assertion
+   * catching its own evidence. A single-LINE grep was the over-correction: the declaration became
+   * multi-line in the same pass, so `as const` could go back on line two and this stayed green.
+   * The check is the statement, from `export const DEPLOYMENT` to the `;` that ends it.
+   */
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'data.ts'), 'utf8');
-  const line = /^export const DEPLOYMENT.*$/mu.exec(src)?.[0] ?? '';
-  assert.ok(line, 'DEPLOYMENT is no longer a single-line export');
-  assert.doesNotMatch(line, /as const/u, 'the host is pinned to a literal again');
-  assert.match(line, /'self-host' \| 'cloud'/u);
+  const at = src.indexOf('export const DEPLOYMENT');
+  assert.ok(at > 0, 'DEPLOYMENT is gone');
+  const decl = src.slice(at, src.indexOf('};', at) + 2);
+  assert.doesNotMatch(decl, /as const/u, 'the host is pinned to a literal again');
+  assert.match(decl, /'self-host' \| 'cloud'/u);
+  /* AND IT IS DERIVED FROM THE VARIANT, not hardcoded to either host — which is the mutation that
+     silently kills the whole harness while every gate goes on printing "over four records". */
+  assert.match(decl, /VARIANT === 'cloud' \? 'cloud' : 'self-host'/u, 'the host no longer follows the variant');
 });
 
 test('every branch on the host has two sides, and they say different things', () => {
@@ -117,4 +127,39 @@ test('and the delete field does not put the answer in the box', () => {
   assert.doesNotMatch(field, /placeholder=\{boot\(\)\.index\.slug\}/u, 'the placeholder is the answer again');
   /* The label still says it, because the person has to know what to type. */
   assert.match(AREA, /copy\.typeSlug\(boot\(\)\.index\.slug\)/u);
+});
+
+
+/* ── the other records ────────────────────────────────────────────────── */
+
+test('EVERY VARIANT IS BUILT AND MEASURED, OR IT IS A FILE NOBODY RUNS', () => {
+  /**
+   * Three findings needed three records: the Cloud half of every host branch, a record with nothing
+   * connected (the two designed empty states on `/settings/agents`), and one with enough decided
+   * questions for `/search` to cut a group that has no door.
+   *
+   * A variant that `data.ts` narrows on and no gate loads is worse than no variant — it looks like
+   * coverage in a diff. So the three lists are held together: what the record branches on, what the
+   * build script writes, and what the browser gates measure.
+   */
+  const data = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'data.ts'), 'utf8');
+  const pkg = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json'), 'utf8');
+  const gates = ['layout', 'a11y'].map((g) =>
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'tools', 'gates', `${g}.mjs`), 'utf8'),
+  );
+
+  const named = [...data.matchAll(/VARIANT === '([a-z]+)'/gu)].map((m) => m[1]!);
+  assert.ok(named.length >= 3, `the record branches on ${named.length} variants`);
+  for (const v of new Set(named)) {
+    assert.ok(pkg.includes(`'${v}'`), `\`${v}\` is a record nothing builds`);
+    for (const [i, src] of gates.entries()) assert.ok(src.includes(`build-${v}`), `\`${v}\` is built and ${['layout', 'a11y'][i]} does not measure it`);
+  }
+});
+
+test('and a variant build is a build, so no grep gate reads it as source', () => {
+  /* The moment `build-cloud/` existed, `css-rules` reported fourteen colour literals in
+     `Button.css` — the compiled form of rules that name only tokens. A built directory is built
+     whatever record is inside it. */
+  const lib = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'tools', 'gates', 'lib.mjs'), 'utf8');
+  assert.match(lib, /name\.startsWith\('build-'\)/u, 'a variant build is read as source again');
 });

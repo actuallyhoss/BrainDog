@@ -326,6 +326,36 @@ test('`is <a date>` ON A DATE FIELD MATCHED NOTHING, ON EVERY REGISTER, ALWAYS',
   for (const c of [before, said, after]) assert.equal(matches(rows2[2]!, c, NOW), false);
 });
 
+test('`is not <a date>` IS NOT `is <a date>`', () => {
+  /**
+   * The date path was gated on the field's type and not on the OPERATOR, and `before`/`after` are
+   * consumed above it — so `is not` fell straight through and the negation was dropped. `due is not
+   * today` compiled to the same clause as `due is today`.
+   *
+   * Reachable from a URL rather than only a typed sentence: `whereOf` maps `not-in` to `is not`, and
+   * the register parses `?f=<field>:<op>:<values>` with no operator check, so
+   * `?f=due:not-in:2026-09-14` returned the complement of what the chip said. A filter that quietly
+   * inverts is the one failure a declarative surface must not have.
+   */
+  const some = rows({ due: '2026-09-03' }, { due: '2026-09-14' }, { due: null });
+  const is = compile('obligations', 'due is 2026-09-14');
+  const isNot = compile('obligations', 'due is not 2026-09-14');
+  assert.deepEqual(explain(is), []);
+  assert.deepEqual(explain(isNot), []);
+  assert.notDeepEqual(is, isNot, '`is not` compiles to the same clause as `is`');
+
+  const yes = some.filter((e) => matches(e, is, NOW)).map((e) => e.seq);
+  const no = some.filter((e) => matches(e, isNot, NOW)).map((e) => e.seq);
+  assert.deepEqual(yes, [2]);
+  /* A row with no date is not the named day, so it is in the negation — `34 §6`: every positive
+     operator is false on a missing value, and `not` is how a person says "and the empty ones". */
+  assert.deepEqual(no, [1, 3]);
+  assert.equal(yes.length + no.length, some.length, 'the two do not partition the rows');
+
+  /* The same through the URL shape, which is where it was reachable. */
+  assert.deepEqual(seqs(applyFilters('obligations', some, [{ field: 'due', op: 'not-in', values: ['2026-09-14'] }])), [1, 3]);
+});
+
 test('and an enum whose value is the word `today` is untouched', () => {
   /* The date path is taken only when the FIELD is a date. A register that really holds the word
      would otherwise stop being filterable by it — the fix eating a case it was not about. */

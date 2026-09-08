@@ -177,3 +177,33 @@ test('a rebuild produces exactly what the writes produced', async () => {
   assert.deepEqual(after, before, 'the rebuild disagrees with what the writes wrote');
   sql.close();
 });
+
+
+test('A NAME PASTED OUT OF FINDER FINDS THE ROW IT NAMES', async () => {
+  /**
+   * `unicode61` normalises nothing, and a combining mark is a token separator — so `mañana` stored
+   * precomposed and typed DECOMPOSED, which is what macOS produces, built `"man"* AND "ana"*`: two
+   * tokens, no match, for a query that is character-for-character the stored value.
+   *
+   * AND NORMALISING ONE END IS WORSE THAN NEITHER. `ftsQuery` composed first and `projectedText` did
+   * not, which fixed Latin — where `remove_diacritics 2` folds the marks anyway — and broke Hangul
+   * and kana, whose jamo and voicing marks are LETTERS rather than marks and are neither folded nor
+   * split. A name stored decomposed became a different token from the same name typed composed, and
+   * was findable by nothing at all.
+   */
+  const sql = openSqlite();
+  sql.exec("CREATE VIRTUAL TABLE t USING fts5(x, tokenize='unicode61 remove_diacritics 2')");
+  const fields = [{ id: 'n', type: 'text', search: true }];
+
+  const names = ['mañana', '김민준', 'がっこう', 'Zürich'];
+  for (const name of names) for (const form of ['NFC', 'NFD'] as const) sql.exec('INSERT INTO t (x) VALUES (?)', projectedText(fields, { n: name.normalize(form) }));
+
+  for (const name of names)
+    for (const typed of ['NFC', 'NFD'] as const) {
+      const q = ftsQuery(name.normalize(typed));
+      assert.ok(q, `${name} in ${typed} produced no query`);
+      const n = sql.one<{ n: number }>('SELECT count(*) AS n FROM t WHERE t MATCH ?', q)?.n ?? 0;
+      assert.equal(n, 2, `${name} typed ${typed} found ${n} of the 2 rows holding it`);
+    }
+  sql.close();
+});

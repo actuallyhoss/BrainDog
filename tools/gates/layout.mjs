@@ -46,13 +46,19 @@ const ROOT = join(REPO, 'apps', 'web', 'build');
  * shipped **eight sentences that drew nowhere** — invisible to `svelte-check`, which says nothing
  * about a branch that cannot be taken, and counted as rendered by `dead-copy`, which greps source.
  *
- * `BRAINDOG_VARIANT=cloud pnpm --filter @braindog/web build` writes `build-cloud/`. If it is there,
+ * `pnpm --filter @braindog/web build` writes `build-cloud/`. If it is there,
  * the routes that branch are measured on it too; if it is not, the run says so rather than quietly
  * covering less. It is the same rule as `unsampled`: "we did not check this" must not look like
  * "there was nothing here".
  */
 const VARIANTS = [
   { name: 'cloud', root: join(REPO, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'] },
+  /* A record nobody has connected anything to — the two designed empty states on `/settings/agents`,
+     which `13 §5.2` gives a content contract and which no gate could reach. */
+  { name: 'quiet', root: join(REPO, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'] },
+  /* Enough decided questions for `/search` to have to cut a group that has no door — the disclosure
+     written to close *"the exact defect this route exists to fix, one door along"*. */
+  { name: 'busy', root: join(REPO, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'] },
 ];
 const L = budget('layout');
 const PORT = L.port;
@@ -304,7 +310,9 @@ for (const width of widths) {
  */
 for (const v of present) {
   serving = v.root;
-  for (const width of [400, 1200]) {
+  /* The floor and a desktop. `FLOOR` is the gate's own — a numeric literal here would be the
+     thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for. */
+  for (const width of [...FLOOR, bps[bps.length - 1] ?? 1_200]) {
     const context = await browser.newContext({
       viewport: { width, height: L.viewportHeightPx },
       reducedMotion: 'reduce',
@@ -316,6 +324,18 @@ for (const v of present) {
     for (const route of v.routes) {
       await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('#main *', { timeout: L.readyTimeoutMs }).catch(() => {});
+      /* THE SAME PREPARATION, or "the identical check" is only true of the function. An un-laid-out
+         rowgroup has no geometry and cannot overflow; the seed is what makes this pass answerable by
+         `self-test`, which otherwise passes on the main loop alone however little the variant pass
+         measures. */
+      await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+      if (process.env.BRAINDOG_GATE_SEED)
+        await page.evaluate(() => {
+          const h = document.createElement('h2');
+          h.textContent = 'seeded';
+          h.style.cssText = 'width:2000px;white-space:nowrap';
+          document.getElementById('main')?.prepend(h);
+        });
       await page.waitForTimeout(L.settleMs);
       const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
       checked++;
