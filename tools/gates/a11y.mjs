@@ -43,7 +43,7 @@ const REPO = join(import.meta.dirname, '..', '..');
  * rather than a shell, so it needs no fallback and has no states to drive.
  */
 const APPS = [
-  { name: 'web', root: join(REPO, 'apps', 'web', 'build'), routes: null, spa: true },
+  { name: 'web', root: join(REPO, 'apps', 'web', 'build'), routes: null, spa: true, states: true },
   /**
    * THE OTHER RECORD, for the half of every host branch the shipped seed cannot draw.
    *
@@ -52,6 +52,18 @@ const APPS = [
    * sweep of a build that differs by one constant. Skipped with a line when it is not built, because
    * "we did not check this" must not look like "there was nothing here".
    */
+  /* `states` IS NOT `spa`, AND THEY WERE ONE FLAG. `spa` says *serve the shell for a route with no
+     file*, which every variant needs; running the thirteen state scenarios is a different question,
+     and every variant answered yes to it because the two facts shared a boolean.
+
+     ALL THIRTEEN SCENARIOS STAND ON `/r/obligations`, `/`, `/p/kiln` AND `/r/nope` — routes no
+     variant changes. A variant differs in `DEPLOYMENT`, `DEVICES`, `TOKENS` and `DECIDED`, which is
+     why each one names the two or three routes where that shows. So the three variants contributed
+     **156 audits of 156 identical pages** — 13 scenarios x 4 passes x 3 variants, 44% of this
+     gate's run, spent proving that opening the palette on a record with no machines connected draws
+     the same palette.
+
+     A variant earns `states: true` the day a scenario lands on a route it changes. */
   { name: 'cloud', root: join(REPO, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'], spa: true, optional: true },
   { name: 'quiet', root: join(REPO, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'], spa: true, optional: true },
   { name: 'busy', root: join(REPO, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'], spa: true, optional: true },
@@ -201,8 +213,16 @@ for (const app of APPS) {
   }
   current = app;
 
-for (const scheme of ['dark', 'light']) {
-  for (const width of A.widths) {
+/**
+ * A SEEDED RUN IS A NEGATIVE, AND A NEGATIVE NEEDS ONE PAGE. The same argument as `layout.mjs`'s:
+ * `self-test` runs this gate again with `BRAINDOG_GATE_SEED=intent` to prove it goes red on an
+ * intent with no glyph, and it was proving that over 356 page-runs. The seeded anchor is prepended
+ * to every page, so one scheme at one width says it. Only when the seed is set.
+ */
+const SEEDED = Boolean(process.env.BRAINDOG_GATE_SEED);
+
+for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
+  for (const width of SEEDED ? A.widths.slice(0, 1) : A.widths) {
     const context = await browser.newContext({
       viewport: { width, height: 900 },
       colorScheme: scheme,
@@ -325,8 +345,9 @@ for (const scheme of ['dark', 'light']) {
       await audit(route);
     }
 
-    /* States are the record app's. The site is three prerendered pages with nothing to drive. */
-    if (!app.spa) {
+    /* States are the record app's. The site is three prerendered pages with nothing to drive, and a
+       variant's record changes none of the routes the scenarios stand on. */
+    if (!app.states) {
       process.stdout.write('\n');
       await context.close();
       continue;

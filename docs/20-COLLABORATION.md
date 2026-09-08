@@ -112,9 +112,16 @@ And there is a sharper, disqualifying reason for a record whose premise is an ap
 
 > **`member` rows are materialised per person. There is no "everyone" layer** — with two to five
 > people that layer is four rows, so write the four rows. When a preset changes, the rows are
-> **rewritten**, and every rewrite emits `access.grant` or `access.revoke` — `{ person, register }` in
-> `target`, the levels in `from_v`/`to_v`, `why` in `note` ([30-BLUEPRINT](30-BLUEPRINT.md) §2). *An
-> earlier draft emitted `access.changed`, which the forty-kind CHECK does not admit.*
+> **rewritten**, and every rewrite emits `access.grant` or `access.revoke` — the person id in
+> `target`, `target_kind 'member'`, the **register in `field`**, the levels in `from_v`/`to_v`, `why`
+> in `note` ([30-BLUEPRINT](30-BLUEPRINT.md) §2; the shape is
+> [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.6's). *An earlier draft emitted `access.changed`, which the
+> forty-kind CHECK does not admit — and a later one put `{ person, register }` together in `target`,
+> which is amended here: the row that changed is a `member` row, not a person, so `target_kind` names
+> the table, `target` names the row it hangs off and `field` names the register. Three columns the
+> DDL already has, doing what they are for. A pair packed into one string leaves `event_target`'s
+> index nothing to seek on and makes "what did they hold on obligations" a query somebody has to
+> parse a string for.*
 
 | Property | Consequence |
 |---|---|

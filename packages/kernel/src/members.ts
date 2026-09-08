@@ -457,6 +457,22 @@ const owners = (sql: Sql): number =>
  * `null` IS A REAL VALUE FOR `from_v` and means *they held nothing here*, which is different from a
  * grant that lowered something. The column is nullable for exactly that.
  */
+/**
+ * The one event a level change writes — and three documents gave it three shapes.
+ *
+ * `45 §5.6` is the method's own specification and the most precise: *"`target` = person id,
+ * `target_kind 'member'`, `field` = register, `from_v` = old level or NULL, `to_v` = new level or
+ * NULL, `note = why`"*. `20 §1` says `{ person, register }` in `target`. This wrote
+ * `target = 'person:<id>'` with `target_kind = 'person'`.
+ *
+ * `45 §5.6` WINS, AND IT IS RIGHT ON THE MERITS. The row being changed is a `member` row, not a
+ * person — the person is unchanged; what moved is what they hold over one register. `target_kind`
+ * names the table, `target` names the row it hangs off, and `field` names the register: three
+ * columns the DDL already has, doing what they are for. `20 §1`'s pair packs two of them into one
+ * string and leaves `event_target`'s index nothing to seek on. **`20 §1` is amended to agree**, in
+ * the same revision, the way `36 §5.5` was: a corpus with two shapes for one event is a corpus
+ * where the next reader picks one at random.
+ */
 function event(
   deps: MemberDeps,
   at: string,
@@ -474,8 +490,8 @@ function event(
     at,
     by,
     kind,
-    `person:${person}`,
-    'person',
+    person,
+    'member',
     register,
     was,
     level,

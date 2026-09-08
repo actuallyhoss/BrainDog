@@ -204,7 +204,7 @@ test('AN INVITATION IS THE WHOLE OF WHAT SOMEBODY HOLDS, INCLUDING WHEN IT NAMES
   assert.deepEqual(access(sql, 'p_a')!.levels, {}, 'a demotion left an owner grant on one register standing');
 
   /* And the revocation is on the ledger, not silent. */
-  const revoked = events(sql).filter((e) => e.target === 'person:p_a' && e.kind === 'access.revoke');
+  const revoked = events(sql).filter((e) => e.target === 'p_a' && e.kind === 'access.revoke');
   assert.deepEqual(revoked.map((e) => [e.field, e.from_v, e.to_v]), [['payroll', 'owner', null]]);
 });
 
@@ -355,7 +355,7 @@ test('and the event lands after the row it is about', async () => {
      event does. */
   const { sql, deps } = await withSpare();
   value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'write', registers: { payroll: 'read' } }));
-  for (const e of events(sql).filter((x) => x.target === 'person:p_a' && x.kind === 'access.grant')) {
+  for (const e of events(sql).filter((x) => x.target === 'p_a' && x.kind === 'access.grant')) {
     const row = sql.one<{ level: Level }>('SELECT level FROM member WHERE person_id = ? AND register = ?', 'p_a', e.field);
     assert.ok(row, `an \`access.grant\` names ${e.field} and no member row holds it`);
     assert.equal(row.level, e.to_v);
@@ -372,15 +372,15 @@ test('AND THE REASON REACHES THE LEDGER, WHICH IS THE HALF THAT WAS STILL MISSIN
    */
   const { sql, deps } = await withSpare();
   value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read', why: 'reconciling the September ledger' }));
-  const grant = events(sql).find((e) => e.target === 'person:p_a' && e.kind === 'access.grant')!;
+  const grant = events(sql).find((e) => e.target === 'p_a' && e.kind === 'access.grant')!;
   assert.equal(grant.note, 'reconciling the September ledger');
 
   value(remove(deps, 'p_root', 'p_a', 'the engagement ended'));
-  assert.equal(events(sql).find((e) => e.target === 'person:p_a' && e.kind === 'access.revoke')!.note, 'the engagement ended');
+  assert.equal(events(sql).find((e) => e.target === 'p_a' && e.kind === 'access.revoke')!.note, 'the engagement ended');
 
   value(invite(deps, 'p_root', { person: 'p_b', email: 'b@example.test', level: 'read' }));
   value(suspend(deps, 'p_root', 'p_b', true, 'away for a fortnight'));
-  assert.equal(events(sql).find((e) => e.target === 'person:p_b' && e.kind === 'access.revoke')!.note, 'away for a fortnight');
+  assert.equal(events(sql).find((e) => e.target === 'p_b' && e.kind === 'access.revoke')!.note, 'away for a fortnight');
 });
 
 test('and suspending somebody who holds nothing invents nothing', async () => {
@@ -576,7 +576,7 @@ test('EVERY CHANGE WRITES ONE EVENT PER REGISTER, AND THAT IS NOT BOOKKEEPING', 
      event naming a list would make the answer a string somebody has to parse."* */
   const { sql, deps } = await withSpare();
   value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read', registers: { payroll: 'write' } }));
-  const wrote = events(sql).filter((e) => e.target === 'person:p_a');
+  const wrote = events(sql).filter((e) => e.target === 'p_a');
   assert.equal(wrote.length, 2, 'one invitation over two registers did not write two events');
   assert.deepEqual(wrote.map((e) => [e.kind, e.field, e.from_v, e.to_v]).sort(), [
     ['access.grant', '*', null, 'read'],
@@ -585,8 +585,14 @@ test('EVERY CHANGE WRITES ONE EVENT PER REGISTER, AND THAT IS NOT BOOKKEEPING', 
   for (const e of wrote) {
     /* `target_kind` SELECTED, not defaulted. This read `e.target_kind ?? 'person'` over a query that
        did not select the column, which is a tautology wearing an assertion's clothes — the one
-       failure mode this file exists to catch. */
-    assert.equal(e.target_kind, 'person');
+       failure mode this file exists to catch.
+
+       AND IT IS `member`, NOT `person`. `45 §5.6` fixes the shape — *"`target` = person id,
+       `target_kind 'member'`, `field` = register"* — and this wrote `target = 'person:<id>'` with
+       `target_kind = 'person'`, which is a third spelling beside `20 §1`'s. The row that changed is
+       a `member` row; the person is untouched. */
+    assert.equal(e.target_kind, 'member');
+    assert.equal(e.target, 'p_a', '`45 §5.6`: the target is the person id, bare');
     assert.equal(e.actor, 'p_root', 'the event does not say who did it');
   }
 });
@@ -599,7 +605,7 @@ test('A REGISTER LEFT OUT OF A SECOND INVITATION IS REVOKED OUT LOUD', async () 
   value(invite(deps, 'p_root', { person: 'p_a', level: 'read', registers: { payroll: 'write' } }));
 
   assert.deepEqual(access(sql, 'p_a')!.levels, { payroll: 'write' });
-  const revoked = events(sql).filter((e) => e.target === 'person:p_a' && e.kind === 'access.revoke');
+  const revoked = events(sql).filter((e) => e.target === 'p_a' && e.kind === 'access.revoke');
   assert.deepEqual(revoked.map((e) => [e.field, e.from_v, e.to_v]), [['obligations', 'write', null]], 'the register that was dropped left no trace');
 });
 
@@ -617,7 +623,7 @@ test('removal writes one revoke per register, and keeps the person', async () =>
   value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read', registers: { payroll: 'write' } }));
   value(remove(deps, 'p_root', 'p_a'));
 
-  const revoked = events(sql).filter((e) => e.target === 'person:p_a' && e.kind === 'access.revoke');
+  const revoked = events(sql).filter((e) => e.target === 'p_a' && e.kind === 'access.revoke');
   assert.equal(revoked.length, 2);
   /* *"The person row stays. Every event they ever wrote names them, and a history whose actors
      cannot be resolved is a history that reads as a list of identifiers."* */

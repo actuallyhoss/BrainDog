@@ -1655,7 +1655,19 @@ const cursorAt = (rows: readonly Entry[], key: string, cursor: string): number =
  */
 export const actorOf = (by: string): string => {
   const rule = /^rule\.(.+)$/.exec(by);
-  return rule ? `${rule[1]!.replace(/[._]/g, ' ')} rule` : by;
+  if (rule) return `${rule[1]!.replace(/[._]/g, ' ')} rule`;
+  /* THE TWO ACTORS THAT ARE NEITHER PEOPLE NOR RULES. `30 §3` closes the grammar at five shapes and
+     two of them are bare words: `spark` is the assistant — *"only ever on `suggest`, `propose` or
+     `predict`, never on a row write"* — and `system` is *"migrations, purges, the scheduler itself,
+     the dead-letter suggestion"*.
+
+     They arrived on this screen the day the ledger gained a nightly backup and a proposal, and they
+     arrived as themselves: a filter chip reading `system` beside one reading `You`. `19 §9` is
+     about exactly that — the schema's word on a surface a person reads — and *who backed up my
+     record* is answered by "the record itself", not by a principal name. */
+  if (by === 'system') return 'the record itself';
+  if (by === 'spark') return 'the assistant';
+  return by;
 };
 
 export const registerOf = (id: string): RegisterDecl | undefined => REGISTERS[id];

@@ -278,6 +278,27 @@ const MEASURE = ([w, slack, COARSE]) => {
 const findings = [];
 let checked = 0;
 
+/**
+ * A SEEDED RUN IS A NEGATIVE, AND A NEGATIVE NEEDS ONE PAGE.
+ *
+ * `self-test.mjs` runs this whole gate a second time with `BRAINDOG_GATE_SEED` set, to prove it goes
+ * red on a 2000px heading inside `#main`. It was proving that over **627 page-runs** — the full
+ * sweep, every route, every width, four records and the marketing site — to establish one fact. The
+ * browser work therefore ran twice on every `pnpm gates`: about 1,966 page-runs for a tree whose
+ * real sweep is 627 of them, and roughly an hour of wall clock, which is this loop's binding
+ * constraint.
+ *
+ * The seeded heading is 2000px wide, so it overflows at every width on every route: the first route
+ * at the floor width proves exactly what the full sweep proved. This narrowing applies ONLY when the
+ * seed is set — a real run is never scoped, so the gate cannot be quietened by an environment
+ * variable.
+ */
+if (process.env.BRAINDOG_GATE_SEED) {
+  widths.length = 1;
+  ROUTES.length = 1;
+  present.length = 0;
+}
+
 for (const width of widths) {
   /**
    * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
