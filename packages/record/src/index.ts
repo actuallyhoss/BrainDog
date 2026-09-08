@@ -981,18 +981,18 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * AN INVITATION IS THE WHOLE OF WHAT THEY HOLD, not a patch: a register left out of a second one
      * is a register taken away, revoked out loud rather than left standing.
      */
-    async invite(args: { person: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level> }, ctx: CallContext) {
+    async invite(args: { person: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level>; why?: string }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       return tail(kernel.invite(actorOf(ctx), args ?? ({} as never)));
     },
 
     /** Take somebody off. Never the last owner, and every register they held is revoked out loud. */
-    async removeMember(args: { person: string }, ctx: CallContext) {
+    async removeMember(args: { person: string; why?: string }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.person) return no('REQUIRED_MISSING', 'Who?', { at: 'person' });
-      return tail(kernel.removeMember(actorOf(ctx), args.person));
+      return tail(kernel.removeMember(actorOf(ctx), args.person, args.why));
     },
 
     /**

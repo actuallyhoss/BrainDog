@@ -162,7 +162,185 @@ test('and somebody who is not on the record at all is `null`, not an empty ceili
   assert.equal(access(sql, 'p_nobody'), null);
 });
 
+/* ── the ways it failed OPEN ──────────────────────────────────────────────── */
+
+test('A `member` ROW WITH NO PERSON IS NOT A LEVEL', async () => {
+  /**
+   * `access()` filtered with `NOT EXISTS (… p.suspended_at IS NOT NULL)`, which with no `person` row
+   * finds nothing and is therefore TRUE — so every row came back and a `member('p_ghost','*','owner')`
+   * with no person made its holder an owner of the record: the vault, the export, `invite`.
+   *
+   * And the record could not be got out of it. `owners()` DOES join `person`, so it did not count
+   * the ghost — `suspend` answered `OUT_OF_BOUNDS`, `remove` answered `LEVEL_REQUIRED`, and demoting
+   * the real owner was refused because the ghost was invisible to the count and visible to the
+   * ladder. Reachable from a `.dog` import carrying `member` without `person`.
+   */
+  const { sql, deps } = await withSpare();
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_ghost', '*', 'owner')");
+  assert.equal(access(sql, 'p_ghost'), null, 'a membership with nobody behind it was a level');
+
+  /* AND THE RECORD IS STILL GETTABLE-OUT-OF: the real owner can be demoted, because the ghost was
+     never an owner and `owners()` was right all along. */
+  value(invite(deps, 'p_root', { person: 'p_b', email: 'b@example.test', level: 'owner' }));
+  value(invite(deps, 'p_root', { person: 'p_root', level: 'write' }));
+  assert.equal(access(sql, 'p_root')!.level, 'write');
+});
+
+test('AN INVITATION IS THE WHOLE OF WHAT SOMEBODY HOLDS, INCLUDING WHEN IT NAMES NO REGISTERS', async () => {
+  /**
+   * The revocation sweep was guarded on `if (args.registers)`, so `invite({ person, level: 'read' })`
+   * — an owner moving somebody down, which is the ordinary thing this method is for — kept every
+   * scoped grant. `{level:'read'}` left `payroll: owner` standing while the identical call with
+   * `registers: {}` revoked it: two spellings of one intention, opposite outcomes, and `registers`
+   * is typed optional at every boundary above this one.
+   *
+   * `45 §5.6` is a full replacement in both cases.
+   */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read', registers: { payroll: 'owner' } }));
+  assert.equal(access(sql, 'p_a')!.levels.payroll, 'owner');
+
+  value(invite(deps, 'p_root', { person: 'p_a', level: 'read' }));
+  assert.deepEqual(access(sql, 'p_a')!.levels, {}, 'a demotion left an owner grant on one register standing');
+
+  /* And the revocation is on the ledger, not silent. */
+  const revoked = events(sql).filter((e) => e.target === 'person:p_a' && e.kind === 'access.revoke');
+  assert.deepEqual(revoked.map((e) => [e.field, e.from_v, e.to_v]), [['payroll', 'owner', null]]);
+});
+
+test('THE READ MARK SURVIVES A LEVEL CHANGE', async () => {
+  /* `45 §5.6`: *"keeping the old `'*'` row's `seen_at`"*. A level change deletes the `'*'` row and
+     re-inserts it, and `seen_at` went with it — so an administrative change somebody else made reset
+     the unread badge for the whole record. */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read' }));
+  sql.exec("UPDATE member SET seen_at = '2026-09-01T00:00:00.000Z' WHERE person_id = 'p_a' AND register = '*'");
+
+  value(invite(deps, 'p_root', { person: 'p_a', level: 'write' }));
+  assert.equal(members(sql).find((m) => m.person_id === 'p_a')!.seen_at, '2026-09-01T00:00:00.000Z', 'a level change reset the read mark');
+
+  /* Even through the drop-and-restore, which is the path that deletes the row outright. */
+  value(invite(deps, 'p_root', { person: 'p_a', registers: { payroll: 'read' } }));
+  value(invite(deps, 'p_root', { person: 'p_a', level: 'read', registers: { payroll: 'read' } }));
+  assert.equal(members(sql).find((m) => m.person_id === 'p_a')!.seen_at, null, 'the record level was gone, so the mark on it is gone with it');
+});
+
 /* ── suspension ───────────────────────────────────────────────────────────── */
+
+test('A SUSPENDED PERSON IS NOT INVITED THROUGH', async () => {
+  /**
+   * `invite` never read `suspended_at`, so suspending somebody and then changing their level wrote
+   * `grant · * · read→owner` on a person the revoke two rows above had just taken to nothing — the
+   * ledger stopped being replayable, and the new level came live the moment they were un-suspended
+   * with no event saying so.
+   */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read' }));
+  value(suspend(deps, 'p_root', 'p_a', true));
+  const before = events(sql).length;
+
+  const said = refusal(invite(deps, 'p_root', { person: 'p_a', level: 'owner' }));
+  assert.equal(said.code, 'LEVEL_REQUIRED');
+  assert.equal(said.at, 'person');
+  assert.match(said.fix, /suspended/iu);
+  assert.equal(events(sql).length, before, 'a refused invitation wrote to the ledger');
+
+  /* And un-suspending gives back exactly what was suspended, not something typed in between. */
+  value(suspend(deps, 'p_root', 'p_a', false));
+  assert.equal(access(sql, 'p_a')!.level, 'read');
+});
+
+/* ── what `invite` hands back ─────────────────────────────────────────────── */
+
+test('IT RETURNS THE PERSON IT WAS ABOUT, WITH WHAT THEY NOW HOLD', async () => {
+  /* Every other test here is `value(invite(…))`, which asserts `.ok` and throws the answer away — so
+     the return value of this module's main method was never once inspected, and mutations returning
+     a blank member or the WRONG PERSON both survived. A caller that renders the answer would have
+     drawn somebody else's access. */
+  const { sql, deps } = await withSpare();
+  const back = value<{ person_id: string; email: string | null; level: Level | null; scoped: { register: string; level: Level }[] }>(
+    invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', name: 'A. Person', level: 'read', registers: { payroll: 'write' } }),
+  );
+  assert.equal(back.person_id, 'p_a');
+  assert.equal(back.email, 'a@example.test');
+  assert.equal(back.level, 'read');
+  assert.deepEqual(back.scoped, [{ register: 'payroll', level: 'write' }]);
+  assert.deepEqual(back, members(sql).find((m) => m.person_id === 'p_a'), 'the answer is not what the listing says');
+});
+
+test('and the listing holds one row per person, merged', async () => {
+  /* `members()` folds a person's `'*'` row and their scoped rows into one entry, and nothing called
+     it on somebody holding both — so a mutation returning one person twice, or letting the last row
+     win, stayed green on the function every People screen is drawn from. */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read', registers: { payroll: 'write', obligations: 'decide' } }));
+  const all = members(sql);
+  assert.equal(new Set(all.map((m) => m.person_id)).size, all.length, 'somebody is listed twice');
+  const a = all.filter((m) => m.person_id === 'p_a');
+  assert.equal(a.length, 1);
+  assert.equal(a[0]!.level, 'read', 'the record level was overwritten by a scoped row');
+  assert.equal(a[0]!.scoped.length, 2);
+});
+
+test('a refusal writes nothing at all, not even the person', async () => {
+  /* The `person` upsert sits after the validation for a reason, and nothing held it there: moving it
+     above the register check leaves a `person` row for an invitation that was refused — somebody on
+     the record's mirror who was never invited to it. */
+  const { sql, deps } = await withSpare();
+  const before = sql.one<{ n: number }>('SELECT count(*) AS n FROM person')!.n;
+  const events0 = events(sql).length;
+  assert.equal(refusal(invite(deps, 'p_root', { person: 'p_x', email: 'x@example.test', level: 'read', registers: { ledger: 'read' } })).code, 'REGISTER_UNKNOWN');
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM person')!.n, before, 'a refused invitation left a person behind');
+  assert.equal(events(sql).length, events0, 'a refused invitation wrote an event');
+  assert.equal(access(sql, 'p_x'), null);
+});
+
+test('and the event lands after the row it is about', async () => {
+  /* An event written before the `INSERT` is an audit that records grants the transaction may not
+     make. Both are in one statement sequence here; the check is that the row exists whenever the
+     event does. */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'write', registers: { payroll: 'read' } }));
+  for (const e of events(sql).filter((x) => x.target === 'person:p_a' && x.kind === 'access.grant')) {
+    const row = sql.one<{ level: Level }>('SELECT level FROM member WHERE person_id = ? AND register = ?', 'p_a', e.field);
+    assert.ok(row, `an \`access.grant\` names ${e.field} and no member row holds it`);
+    assert.equal(row.level, e.to_v);
+  }
+});
+
+test('AND THE REASON REACHES THE LEDGER, WHICH IS THE HALF THAT WAS STILL MISSING', async () => {
+  /**
+   * `45 §5.6`: `note = why`. The column was plumbed through `members.ts` and the three facades above
+   * it took no `why` at all, so `note` was `NULL` on every access event in the product — and this
+   * file's own `events()` helper selected the column and asserted nothing about it, which is why a
+   * mutation hard-wiring it to `null` stayed green. Half of *"every access change in this record was
+   * unattributed"* survived the commit that said it was fixed.
+   */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read', why: 'reconciling the September ledger' }));
+  const grant = events(sql).find((e) => e.target === 'person:p_a' && e.kind === 'access.grant')!;
+  assert.equal(grant.note, 'reconciling the September ledger');
+
+  value(remove(deps, 'p_root', 'p_a', 'the engagement ended'));
+  assert.equal(events(sql).find((e) => e.target === 'person:p_a' && e.kind === 'access.revoke')!.note, 'the engagement ended');
+
+  value(invite(deps, 'p_root', { person: 'p_b', email: 'b@example.test', level: 'read' }));
+  value(suspend(deps, 'p_root', 'p_b', true, 'away for a fortnight'));
+  assert.equal(events(sql).find((e) => e.target === 'person:p_b' && e.kind === 'access.revoke')!.note, 'away for a fortnight');
+});
+
+test('and suspending somebody who holds nothing invents nothing', async () => {
+  /* The defect this file is named for, in the function it was found in: `suspend` used to write one
+     event about `'*'` with the level defaulted to `read`. Somebody removed and then suspended holds
+     no rows at all, and the honest number of events for that is zero. */
+  const { sql, deps } = await withSpare();
+  value(invite(deps, 'p_root', { person: 'p_a', email: 'a@example.test', level: 'read' }));
+  value(remove(deps, 'p_root', 'p_a'));
+  const before = events(sql).length;
+  value(suspend(deps, 'p_root', 'p_a', true));
+  assert.equal(events(sql).length, before, 'suspending somebody who holds nothing wrote an access event');
+});
+
 
 test('A SUSPENDED PERSON HOLDS NOTHING, AND THE LADDER READS IT', async () => {
   /* The column existed and nothing could set it: `invite` wrote `NULL`, provisioning wrote `NULL`,

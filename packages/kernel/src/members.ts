@@ -69,11 +69,27 @@ export function access(
      to remove them, and it has to actually stop them while you decide.
 
      THE JOIN, not two queries: a person row that disappeared between them is a person whose access
-     was computed from half a record. */
+     was computed from half a record.
+
+     AND IT FAILED OPEN ON EXACTLY THAT CASE. The predicate was
+     `NOT EXISTS (… p.id = m.person_id AND p.suspended_at IS NOT NULL)` — which, with no `person`
+     row at all, has nothing to find, so `NOT EXISTS` is true and every `member` row came back. A
+     `member` row whose person is missing made its holder whatever level that row said, and the
+     comment above claimed to be about that case.
+
+     Measured: a record carrying `member('p_ghost', '*', 'owner')` and no `person('p_ghost')` gave
+     `access('p_ghost') → owner` — the vault, the export, `invite`. `owners()` DOES join `person`, so
+     it did not count the ghost: `suspend` answered `OUT_OF_BOUNDS`, `remove` answered
+     `LEVEL_REQUIRED`, and demoting the real owner was refused because the ghost was invisible to the
+     count and visible to the ladder. That is the state `owners()`'s own comment says there is *"no
+     way back in short of raw SQL on the file"* from, reached from a `.dog` import.
+
+     An `INNER JOIN` is the fix and it is the shape the sentence above always described: a level
+     belongs to a person, so no person is no level. */
   const rows = sql.all<{ register: string; level: Level }>(
-    `SELECT m.register AS register, m.level AS level FROM member m
-     WHERE m.person_id = ?
-       AND NOT EXISTS (SELECT 1 FROM person p WHERE p.id = m.person_id AND p.suspended_at IS NOT NULL)`,
+    `SELECT m.register AS register, m.level AS level
+       FROM member m JOIN person p ON p.id = m.person_id
+      WHERE m.person_id = ? AND p.suspended_at IS NULL`,
     person,
   );
   const whole = rows.find((r) => r.register === RECORD);
@@ -181,13 +197,30 @@ export function invite(
       return no<Member>('ENUM_VALUE_UNKNOWN', `${String(level)} is not a level.`, { at: register, allowed: LEVELS });
   }
 
+  /**
+   * A SUSPENDED PERSON IS NOT INVITED THROUGH.
+   *
+   * `invite` never looked at `suspended_at`, so suspending somebody and then changing their level
+   * wrote a grant naming a level they did not hold, from a level they did not hold — `from_v: 'read'`
+   * on a person the revoke two rows above had just taken to nothing. The ledger stopped being
+   * replayable, which is the property `suspend`'s own comment claims for it, and the new rows came
+   * live the moment they were un-suspended without any event saying so.
+   *
+   * Suspension is *"stop somebody without deciding about them"*. Deciding about them is what this
+   * method is, so it says which one you are doing.
+   */
+  if (deps.sql.one<{ n: number }>('SELECT count(*) AS n FROM person WHERE id = ? AND suspended_at IS NOT NULL', args.person)?.n)
+    return no<Member>('LEVEL_REQUIRED', 'They are suspended. Let them back in first, then change what they reach.', { at: 'person' });
+
   /* THE LAST OWNER CANNOT BE MOVED DOWN, and this is the same check `remove` makes for the same
      reason: the state it prevents is one nobody inside the product can get out of. */
-  const now = deps.sql.one<{ level: Level }>(
-    'SELECT level FROM member WHERE person_id = ? AND register = ?',
+  const held = deps.sql.one<{ level: Level; seen_at: string | null }>(
+    'SELECT level, seen_at FROM member WHERE person_id = ? AND register = ?',
     args.person,
     RECORD,
-  )?.level;
+  );
+  const now = held?.level;
+  const seen = held?.seen_at ?? null;
   if (now === 'owner' && args.level !== 'owner' && owners(deps.sql) <= 1)
     return no<Member>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'level' });
 
@@ -225,19 +258,36 @@ export function invite(
       register,
     )?.level;
     if (had === level) continue;
+    /* THE READ MARK SURVIVES A LEVEL CHANGE. `45 §5.6`: *"keeping the old `'*'` row's `seen_at`"*.
+       Dropping the record level deletes the row and `seen_at` with it, so restoring the level put
+       somebody back to having read nothing — the unread badge for the whole record, reset by an
+       administrative change they did not make. `seen` is carried across the delete. */
     deps.sql.exec(
-      `INSERT INTO member (person_id, register, level) VALUES (?, ?, ?)
+      `INSERT INTO member (person_id, register, level, seen_at) VALUES (?, ?, ?, ?)
        ON CONFLICT (person_id, register) DO UPDATE SET level = excluded.level`,
       args.person,
       register,
       level,
+      register === RECORD ? (seen ?? null) : null,
     );
     event(deps, at, by, 'access.grant', args.person, register, level, had ?? null, args.why ?? null);
   }
 
-  /* A REGISTER LEFT OUT OF A SECOND INVITATION IS A REGISTER TAKEN AWAY, and it is revoked out loud
-     rather than left standing. An invitation is the whole of what somebody holds, not a patch. */
-  if (args.registers)
+  /**
+   * A REGISTER LEFT OUT OF AN INVITATION IS A REGISTER TAKEN AWAY, and it is revoked out loud rather
+   * than left standing. An invitation is the whole of what somebody holds, not a patch.
+   *
+   * AND "LEFT OUT" INCLUDES LEAVING THE KEY OFF ENTIRELY. This was guarded on `if (args.registers)`,
+   * so `invite({ person, level: 'read' })` — an owner moving somebody down to read, which is the
+   * ordinary thing this method is for — kept every scoped grant they held. Measured:
+   * `{level:'read', registers:{payroll:'owner'}}` then `{level:'read'}` left `payroll: owner`
+   * standing, while the identical call with `registers: {}` revoked it. Two spellings of the same
+   * intention, opposite outcomes, and `packages/record/src/index.ts` types `registers` optional, so
+   * every client that omits it takes the permissive one.
+   *
+   * `45 §5.6` is a full replacement in both cases: delete the rows, re-insert from what was sent.
+   */
+  {
     for (const row of deps.sql.all<{ register: string; level: Level }>(
       'SELECT register, level FROM member WHERE person_id = ? AND register <> ?',
       args.person,
@@ -247,6 +297,7 @@ export function invite(
         deps.sql.exec('DELETE FROM member WHERE person_id = ? AND register = ?', args.person, row.register);
         event(deps, at, by, 'access.revoke', args.person, row.register, null, row.level, args.why ?? null);
       }
+  }
 
   return ok(members(deps.sql).find((m) => m.person_id === args.person)!);
 }

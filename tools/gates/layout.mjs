@@ -130,9 +130,18 @@ const findings = [];
 let checked = 0;
 
 for (const width of widths) {
+  /**
+   * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
+   *
+   * `05 §6` and `13 §7`: density follows the POINTER, never the width — `--ctl-h` is 44 on a coarse
+   * pointer and 32 on a fine one. A gate that only ever emulated a mouse could measure every width
+   * this product has and never once see the size a thumb gets.
+   */
   const context = await browser.newContext({
     viewport: { width, height: L.viewportHeightPx },
     reducedMotion: 'reduce',
+    hasTouch: width < 640,
+    isMobile: width < 640,
   });
   const page = await context.newPage();
   process.stdout.write(`    ${String(width).padStart(4)}px `);
@@ -155,7 +164,7 @@ for (const width of widths) {
       });
     await page.waitForTimeout(L.settleMs);
 
-    const out = await page.evaluate(([w, slack]) => {
+    const out = await page.evaluate(([w, slack, COARSE]) => {
       const hits = [];
       if (document.documentElement.scrollWidth > w + slack) {
         hits.push(`the DOCUMENT scrolls sideways (${document.documentElement.scrollWidth}px)`);
@@ -193,8 +202,47 @@ for (const width of widths) {
           `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} reaches ${Math.round(r.right)}px`,
         );
       }
+      /**
+       * AND EVERY CONTROL IS 44 x 44, WHICH NOTHING MEASURED.
+       *
+       * `packages/skin/a11y.css` states the rule and names the exact failure it is written against:
+       * *"Both axes: a control grown only in height measures 38x44 and fails."* `13 §7` designs the
+       * targets at 44 x 44 CSS px counting `::before`, and `REPORT.md` has claimed for weeks that
+       * every route was measured on a phone with no target under 44px — measured by hand, once, with
+       * no gate behind it. A review then found the six-option level segment on `/settings/people` at
+       * **43 x 36**, on the primary control of that screen.
+       *
+       * WCAG 2.5.8 is 24px and this product designs to 44. The gate holds the product's number.
+       *
+       * The box is the union of the element and its `::before`, because a chevron drawn as a 20px
+       * glyph inside a 44px pseudo-element is a 44px target and the element's own rect is not.
+       * Anything with zero area is not on screen and is not a target.
+       */
+      if (COARSE) {
+        const box = (el) => {
+          const r = el.getBoundingClientRect();
+          const b = getComputedStyle(el, '::before');
+          const w = parseFloat(b.width);
+          const h = parseFloat(b.height);
+          return [Math.max(r.width, Number.isFinite(w) ? w : 0), Math.max(r.height, Number.isFinite(h) ? h : 0)];
+        };
+        const small = [];
+        for (const el of document.querySelectorAll('#main button, #main a[href], #main [role="button"], #main input:not([type="hidden"]), #main select, #main summary')) {
+          if (el.closest('[hidden], [aria-hidden="true"]')) continue;
+          const [w2, h2] = box(el);
+          if (w2 === 0 || h2 === 0) continue;
+          /* HALF A PIXEL OF SLACK. A 44px control measures 43.99 whenever a border, a transform or a
+             fractional font metric lands between the box and the device pixel — `/audit`'s spoken-id
+             links reported 44x44 and failed on the raw comparison. The rule is 44 CSS px; a gate
+             that fires on rounding is a gate somebody switches off. */
+          if (w2 >= 43.5 && h2 >= 43.5) continue;
+          const name = `${el.tagName.toLowerCase()}.${String(el.className || '').split(' ').filter(Boolean).slice(0, 2).join('.')}`;
+          small.push(`${name} is ${Math.round(w2)}x${Math.round(h2)} — "${(el.textContent ?? '').trim().slice(0, 24)}"`);
+        }
+        for (const s of [...new Set(small)].slice(0, 3)) hits.push(`a target under 44px on a coarse pointer: ${s}`);
+      }
       return [...new Set(hits)].slice(0, 4);
-    }, [width, L.widthTolerancePx]);
+    }, [width, L.widthTolerancePx, width < 640]);
 
     checked++;
     process.stdout.write(out.length ? '!' : '.');

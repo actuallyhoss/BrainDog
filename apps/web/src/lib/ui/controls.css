@@ -57,6 +57,11 @@
   .field-input {
     flex: 1;
     align-self: stretch;
+    /* AND THE STRETCH IS TWO PIXELS SHORT. The wrapper is `--ctl-h` INCLUDING its 1px border, so a
+       stretched child fills the content box and measures 42 on a coarse pointer — under the rule the
+       wrapper was sized to meet, on the element that actually takes the pointer. `13 §7` counts the
+       target, not its container. */
+    min-block-size: var(--ctl-h);
     min-inline-size: 0;
     border: 0;
     background: none;

@@ -783,6 +783,11 @@ test('and somebody with only a named register holds nothing on the record itself
   // "No access to the record" and "read on the record" are different, and a listing that showed
   // them the same would have somebody revoke the wrong one.
   const { api, sql } = await studio();
+  /* THE PERSON ROW TOO. `access()` used to return `member` rows for a person who is not in the
+     record, which made a stray membership a level — see `members.test.ts`'s *"A `member` ROW WITH NO
+     PERSON IS NOT A LEVEL"*. This fixture was written against that fail-open and is a scoped member
+     now rather than a ghost. */
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_3', 'three@example.test', 'Three')");
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_3', 'obligations', 'write')");
 
   const listed = value<{ person_id: string; level: string | null }[]>(await api.members(owner));
@@ -803,6 +808,7 @@ test('AND OWNER OF ONE REGISTER IS NOT OWNER OF THE RECORD', async () => {
      'owner' } })` is a legitimate thing to write, and it used to hand over the credential index,
      the export, `invite`, `createToken` and `setDeclaration` with it. */
   const { api, sql } = await studio();
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_9', 'nine@example.test', 'Nine')");
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_9', 'obligations', 'owner')");
   const held = api.kernel.access('p_9');
   assert.equal(held?.level, null, 'owner of one register was owner of the record');

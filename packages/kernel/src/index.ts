@@ -2004,17 +2004,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     created: (): boolean => recordIdentity(sql) !== null,
 
     /** Put somebody on, or move them. An invitation is the whole of what they hold, not a patch. */
+    /* `why` REACHES THE LEDGER OR IT IS NOT WRITTEN. `45 §5.6` gives the access event `note = why`,
+       `members.ts` writes it, and these three facades took no `why` at all — so `note` was `NULL` on
+       every access event in the product and the column was plumbing that never carried anything. An
+       audit that says who was granted what and never why is half an audit, on the one table whose
+       entries are decisions about other people. */
     invite: (
       by: string,
-      args: { person: string; email?: string; name?: string; level?: MemberLevel; registers?: Record<string, MemberLevel> },
+      args: { person: string; email?: string; name?: string; level?: MemberLevel; registers?: Record<string, MemberLevel>; why?: string },
     ): Result<Member> => transaction(() => invite(memberDeps(), by, args)),
 
     /** Take somebody off. Never the last owner, and their person row stays. */
     /** Stop somebody without deciding about them, or start them again. */
-    suspendMember: (by: string, person: string, on: boolean): Result<null> =>
-      transaction(() => suspend(memberDeps(), by, person, on)),
+    suspendMember: (by: string, person: string, on: boolean, why?: string): Result<null> =>
+      transaction(() => suspend(memberDeps(), by, person, on, why)),
 
-    removeMember: (by: string, person: string): Result<null> => transaction(() => remove(memberDeps(), by, person)),
+    removeMember: (by: string, person: string, why?: string): Result<null> => transaction(() => remove(memberDeps(), by, person, why)),
 
     /* ── agent tokens ───────────────────────────────────── */
 

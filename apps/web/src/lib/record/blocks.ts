@@ -34,7 +34,7 @@
  * inferring from the space available, not from the data).
  */
 
-import { money, parse, relative } from 'braindog-render';
+import { money, parse } from 'braindog-render';
 import { KINDS, isKind } from 'braindog-render';
 import { NOW, REGISTERS, ROWS, display, type BlockResult } from './api.ts';
 import { declaredValue } from './where.ts';
@@ -218,11 +218,15 @@ function projectRows(block: BlockResult, cells: number): string[] {
       const field = fields[n];
       if (!field || !entry) return '';
       /* An `instant` on a row that is a live thing reads as an age, not a timestamp: a session's
-         `last_seen` is "8m ago", which is the only form of it anybody says out loud. */
-      const raw = entry.fields[field];
-      return (typeof raw === 'string' && field.endsWith('_seen')
-        ? relative(raw.slice(0, 10), NOW)
-        : display(block.register ?? '', field, raw)) ?? '';
+         `last_seen` is "8m ago", which is the only form of it anybody says out loud.
+
+         AND THAT IS WHAT `display()` DOES NOW, so the special case is gone. It named one field
+         suffix and routed it around the dispatch — `relative(raw.slice(0, 10))`, the truncation the
+         formatter work exists to end — so `/p/kiln`'s Agents block read `today · today · 1d ago` while
+         `/r/sessions`, one click away, read `just now · 6 min ago · 3h ago` for the same three rows.
+         A block and a register disagreeing about the same field is exactly the split one dispatch is
+         for, and the fix is a deletion. */
+      return display(block.register ?? '', field, entry.fields[field]) ?? '';
     });
     /**
      * THE TICK, for a kind that has one.

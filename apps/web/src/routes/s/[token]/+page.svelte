@@ -183,9 +183,13 @@
     border-block-end: 1px solid var(--line);
   }
 
+  /* 114x26 on a phone. It is a link out of a SHARED page — the one screen somebody arrives at from
+     a message, on a device they are holding — so it is the first target a stranger to this product
+     ever tries. `13 §7`'s 44 on both axes. */
   .brand {
     display: flex;
     align-items: center;
+    min-block-size: var(--ctl-h);
     gap: 9px;
     text-decoration: none;
   }

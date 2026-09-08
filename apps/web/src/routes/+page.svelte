@@ -280,8 +280,17 @@
 <style>
   /* A verb in a section head, not a button: it sits beside a heading and must not compete with the
      rows under it. Same shape as the `.more` link at the foot of the same section. */
+  /* 70x18 ON A COARSE POINTER, on the one control that changes what the feed says. `13 §7` designs
+     targets at 44 x 44 on BOTH axes, and `a11y.css` names the exact failure a height-only fix
+     produces. The visible underline stays 18px tall; the target is the padding around it, which is
+     what `.tap` does everywhere else in this product and what a text-styled button needs most. */
   .mark {
-    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    min-inline-size: var(--ctl-h);
+    justify-content: center;
+    padding: 0 var(--sp-2);
     background: none;
     border: 0;
     color: var(--dim);

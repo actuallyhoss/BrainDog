@@ -16,13 +16,39 @@ import { join, relative } from 'node:path';
 
 import { skipDir } from './lib.mjs';
 
-/** One address per dynamic segment, by the segment's own name. */
+/**
+ * One address per dynamic segment, by the segment's own name — or several, where one is a lie.
+ *
+ * ONE SAMPLE IS RIGHT FOR A ROW AND WRONG FOR A ROUTE THAT IS TWELVE SCREENS. `/settings/[area]` was
+ * sampled as `appearance`, so **eleven of the twelve settings areas were measured by neither browser
+ * gate** — not the People matrix, not the agents code field, not backups, not export, not the twelve
+ * areas' own controls. A review found a control at 43x36 on `/settings/people` and the gate that
+ * exists to measure exactly that had never loaded the page.
+ *
+ * `/r/[register]` stays at one, and that is the right call for the opposite reason: eight registers
+ * draw the same component from the same declaration, so the ninth teaches nothing a browser gate can
+ * see. The settings areas share a route file and nothing else — twelve different screens behind one
+ * `{:else if}` chain, which is precisely a case where the sample IS the coverage.
+ */
 const SAMPLES = {
   '[register]': 'obligations',
   '[seq]': '1',
   '[id]': 'SG31',
   '[slug]': 'money',
-  '[area]': 'appearance',
+  '[area]': [
+    'appearance',
+    'identity',
+    'recovery',
+    'people',
+    'agents',
+    'ingest',
+    'keyboard',
+    'navigation',
+    'notifications',
+    'backups',
+    'billing',
+    'export',
+  ],
   '[track]': '2',
   '[view]': 'obligations.overdue',
   '[token]': '9f2a7c41d8b3',
@@ -56,18 +82,26 @@ export async function routesOf(appRoot, extra = []) {
     const rel = relative(join(appRoot, 'src', 'routes'), dir).replace(/[\\/]+/g, '/');
     const pattern = rel === '' ? '/' : `/${rel}`;
     const segments = pattern === '/' ? [] : pattern.slice(1).split('/');
-    const filled = [];
+    /* A SAMPLE MAY BE SEVERAL, so one pattern can yield several addresses. `filled` is a list of
+       lists and the addresses are its cross product — which is one address for every route that has
+       a single sample per segment, and twelve for the settings route. */
+    let filled = [[]];
     let missing = null;
     for (const s of segments) {
-      if (!s.startsWith('[')) filled.push(s);
-      else {
-        const sample = BY_ROUTE[pattern] ?? SAMPLES[s];
-        if (sample === undefined) missing = s;
-        else filled.push(sample);
+      if (!s.startsWith('[')) {
+        filled = filled.map((f) => [...f, s]);
+        continue;
       }
+      const sample = BY_ROUTE[pattern] ?? SAMPLES[s];
+      if (sample === undefined) {
+        missing = s;
+        break;
+      }
+      const options = Array.isArray(sample) ? sample : [sample];
+      filled = filled.flatMap((f) => options.map((o) => [...f, o]));
     }
     if (missing) unsampled.push(`${pattern} — no sample for ${missing}`);
-    else routes.push(filled.length === 0 ? '/' : `/${filled.join('/')}`);
+    else for (const f of filled) routes.push(f.length === 0 ? '/' : `/${f.join('/')}`);
   }
 
   return { routes: [...routes, ...extra].sort(), unsampled };

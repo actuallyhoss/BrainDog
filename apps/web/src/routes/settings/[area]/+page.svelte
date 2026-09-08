@@ -1583,6 +1583,21 @@
     letter-spacing: 0.18em;
   }
 
+  /* A BASE64 KEY HAS NO SPACES IN IT, so it is one 43-character word and it reached 432px inside a
+     400px screen. `13 §10` and the layout gate's first rule: the page body never scrolls sideways. */
+  .wrap {
+    overflow-wrap: anywhere;
+  }
+
+  /* THE ONE PLACE A MONOSPACE FACE IS RIGHT. `Money.svelte` argues against it for figures — a mono
+     face gives the thousands separator a full character width — and a key is not a figure: it is a
+     string somebody compares character by character against another screen. */
+  .mono {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+    font-size: var(--t-sm);
+    letter-spacing: 0;
+  }
+
   .code-said {
     margin: 0;
     color: var(--tone, var(--ink2));
@@ -1641,8 +1656,14 @@
     line-height: var(--lh-body);
   }
 
+  /* AND THE TRACK WRAPS, which `controls.css` already decided for the register's chips and this copy
+     of the pattern did not: *"the alternative hides a state with no way to know it is there"*. Six
+     44px-wide options is 374px, so at 320 and 360 the level control ran off the screen — and the one
+     that went first is `owner`. A second line costs nothing; a sixth option nobody can reach costs
+     the whole control. */
   .segment {
     display: inline-flex;
+    flex-wrap: wrap;
     gap: 3px;
     padding: 3px;
     background: var(--sunk);
@@ -1653,11 +1674,17 @@
   /* `--ctl-h`, LIKE EVERY OTHER CONTROL. Nine of these on `/settings/appearance` were 28px tall on
      a phone — the screen whose own Text and Density controls are about making things easier to
      use. `05 §6`: density follows the pointer, never the width. */
+  /* BOTH AXES, and this had one. `a11y.css` states the rule and the exact failure it is written
+     against — *"a control grown only in height measures 38x44 and fails"* — and a short label like
+     `On` or `read` measured **43 x 44**: the height was right and the width was the label. Found by
+     the layout gate the day it learned to measure targets, on three settings areas at four widths. */
   .seg {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     min-block-size: var(--ctl-h);
+    min-inline-size: var(--ctl-h);
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
