@@ -11,7 +11,7 @@
     "build:variants": "node -e \"for (const v of ['cloud','quiet','busy']) { process.env.BRAINDOG_VARIANT=v; require('child_process').execSync('npx vite build',{stdio:'inherit'}); }\"",
     "preview": "vite preview",
     "test": "node --test",
-    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
     "@braindog/kernel": "workspace:*",

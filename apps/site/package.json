@@ -9,7 +9,7 @@
     "dev": "vite dev",
     "build": "pnpm --filter @braindog/skin theme && vite build",
     "preview": "vite preview",
-    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
     "svelte": "5.57.0"
