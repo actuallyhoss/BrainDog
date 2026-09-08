@@ -48,6 +48,26 @@ const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', i
 const SOURCE = /\b(?:plaintext|plainText|decrypted|secretValue|plain|dek|kek|root|pkcs8)\b/i;
 
 /**
+ * `root` IS THE ONE AMBIGUOUS NAME ON THAT LIST, and it cost a false positive the day the sinks
+ * were widened: `packages/skin/scripts/theme.mjs` logs `path.slice(root.length + 1)`, where `root`
+ * is the repository directory and the whole line is a build message telling somebody to run
+ * `pnpm theme`.
+ *
+ * The other eight names are only ever a key. `root` is a key in `apps/selfhost/src/keys.ts` and a
+ * directory, a DOM node or a tree everywhere else — so on its own it is not evidence, and a gate
+ * that reports a build script for printing a path is a gate somebody adds an exemption to. The
+ * exemption is the real cost: the next genuine leak in that file is exempted with it.
+ *
+ * So `root` counts only in a file that is ALSO about keys. That is a weaker test than the other
+ * eight get, and it is the honest one — the file where a root key leaks is a file that unwraps
+ * something, and `keys.ts` names `kek`, `dek` and `unwrap` in its first thirty lines. A file that
+ * says `root` and nothing else has no key in it to leak.
+ */
+const KEY_FILE = /\b(?:kek|dek|pkcs8|unwrap|vault_key|age1|plaintext|passphrase)\b/i;
+const STRONG = /\b(?:plaintext|plainText|decrypted|secretValue|plain|dek|kek|pkcs8)\b/i;
+const sourceIn = (args, whole) => STRONG.test(args) || (/\broot\b/i.test(args) && KEY_FILE.test(whole));
+
+/**
  * What keeps or transmits. `52 §5.2`'s five, and every one of them outlives the process.
  *
  * `push(` IS WEB PUSH AND NOT `Array.prototype.push`, which is why the source has to appear in the
@@ -192,7 +212,7 @@ for (const top of ['packages', 'apps'])
       for (const m of text.matchAll(sink.re)) {
         const raw = argsOf(text, m.index + m[0].length - 1);
         const args = sink.bound ? bound(raw) : raw;
-        if (SOURCE.test(args))
+        if (sourceIn(args, text))
           findings.push({
             where: `${rel}:${lineOf(text, m.index)}`,
             why: `a plaintext reaches ${sink.id}`,
