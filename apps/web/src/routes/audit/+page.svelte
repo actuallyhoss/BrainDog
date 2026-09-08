@@ -22,29 +22,85 @@
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
+  /* THE URL IS NOT TYPED. `?kind=` carries whatever somebody pasted, and the words this screen
+     shows come from a map over the forty — so the string is checked against the vocabulary before
+     it is used as a place in it, rather than indexing the map with a stranger and rendering
+     `undefined.word`. `isEventKind` is the kernel's own guard, beside the list. */
+  import { isEventKind } from '@braindog/kernel';
+  import type { EventKind } from '$lib/record/schema.ts';
 
   /**
-   * What an event kind is called, and what it looks like.
+   * What an event kind is called, and what it looks like — all forty of them.
    *
-   * `entry.create` and `declaration.set` are the write path's own vocabulary. They are precise and
-   * they are not English, and this is the one screen a person opens to answer "what happened",
-   * which is a question in English. The id stays the thing the log is keyed on; the word beside it
-   * is what the reader came for.
+   * THIS COMMENT USED TO SAY THESE WERE *"the write path's own vocabulary"*, and that sentence is
+   * why seven invented strings sat here for as long as they did: they read like a schema, so nobody
+   * checked them against one. `entry.create`, `entry.update`, `entry.archive`, `question.open`,
+   * `question.decide`, `declaration.set` and `pack.install` are not kinds. The write path's
+   * vocabulary is `30 §2`'s forty, closed by a `CHECK` the database enforces, and not one of those
+   * seven would survive an `INSERT`.
+   *
+   * `Record<EventKind, …>` RATHER THAN `Record<string, …>`, and the fallback is gone with it. A
+   * `?? { word: k.replace(/[.]/g, ' ') }` turns any string into a plausible-looking English word,
+   * which is exactly how a ledger full of kinds the record cannot write rendered as a tidy screen
+   * for months. A forty-first kind is a kernel migration (`30 §2` rule 1); it should also be a
+   * compile error here, because a kind nobody has named in English is a row this screen cannot
+   * explain.
+   *
+   * The word is the verb, first, then what it was done to — "Created services#6". `Page changed`
+   * read as a verb phrase once the target became a title ("Page changed Overview"), which is the
+   * whole reason the column is ordered that way.
    */
-  const KIND: Record<string, { word: string; icon: IconName }> = {
-    'entry.create': { word: 'Created', icon: 'plus' },
-    'entry.update': { word: 'Changed', icon: 'edit' },
-    'entry.archive': { word: 'Archived', icon: 'archive' },
-    'question.open': { word: 'Asked', icon: 'decide' },
-    'question.decide': { word: 'Decided', icon: 'check' },
-    /* `Page changed` READ AS A VERB PHRASE ONCE THE TARGET BECAME A TITLE: "Page changed Overview".
-       Every sibling row is "Created services#6" or "Changed obligations#1" — verb first, then what
-       it was done to. */
-    'declaration.set': { word: 'Changed the page', icon: 'doc' },
-    'pack.install': { word: 'Installed', icon: 'packs' },
+  const KIND: Record<EventKind, { word: string; icon: IconName }> = {
+    /* Rows */
+    create: { word: 'Created', icon: 'plus' },
+    edit: { word: 'Changed', icon: 'edit' },
+    state: { word: 'Moved', icon: 'arrow' },
+    link: { word: 'Linked', icon: 'link' },
+    tag: { word: 'Tagged', icon: 'tag' },
+    untag: { word: 'Untagged', icon: 'tag' },
+    delete: { word: 'Deleted', icon: 'trash' },
+    restore: { word: 'Restored', icon: 'back' },
+    purge: { word: 'Purged', icon: 'trash' },
+    note: { word: 'Noted', icon: 'doc' },
+    /* Governance */
+    decide: { word: 'Decided', icon: 'check' },
+    supersede: { word: 'Superseded', icon: 'history' },
+    suggest: { word: 'Asked', icon: 'decide' },
+    resolve: { word: 'Closed', icon: 'check' },
+    predict: { word: 'Predicted', icon: 'observe' },
+    score: { word: 'Scored', icon: 'observe' },
+    /* Declarations */
+    install: { word: 'Installed', icon: 'packs' },
+    uninstall: { word: 'Uninstalled', icon: 'packs' },
+    upgrade: { word: 'Upgraded', icon: 'packs' },
+    declare: { word: 'Changed the page', icon: 'doc' },
+    retire: { word: 'Retired', icon: 'archive' },
+    /* Credentials — `30 §2` rule 2: every read is an event, with its actor. */
+    'grant.add': { word: 'Stored a credential', icon: 'vault' },
+    'grant.read': { word: 'Read a credential', icon: 'vault' },
+    'grant.rotate': { word: 'Rotated a credential', icon: 'vault' },
+    'grant.revoke': { word: 'Revoked a credential', icon: 'vault' },
+    'grant.bind': { word: 'Bound a credential', icon: 'vault' },
+    /* Ingest */
+    arrive: { word: 'Arrived', icon: 'inbox' },
+    match: { word: 'Matched', icon: 'inbox' },
+    extract: { word: 'Read an arrival', icon: 'inbox' },
+    propose: { word: 'Proposed', icon: 'decide' },
+    pull: { word: 'Fetched', icon: 'refresh' },
+    /* Access */
+    'access.grant': { word: 'Gave access', icon: 'people' },
+    'access.revoke': { word: 'Took access away', icon: 'people' },
+    'share.open': { word: 'Opened a link', icon: 'link' },
+    'share.close': { word: 'Closed a link', icon: 'link' },
+    /* Lifecycle */
+    export: { word: 'Backed up', icon: 'archive' },
+    import: { word: 'Imported', icon: 'download' },
+    erase: { word: 'Erased', icon: 'trash' },
+    migrate: { word: 'Migrated', icon: 'refresh' },
+    'restore.pitr': { word: 'Put the record back', icon: 'back' },
   };
 
-  const kindOf = (k: string) => KIND[k] ?? { word: k.replace(/[.]/g, ' '), icon: 'doc' as IconName };
+  const kindOf = (k: EventKind) => KIND[k];
 
   /**
    * WHAT IT WAS DONE TO. A spoken id stays a spoken id — `services#6` is the product's own way of
@@ -52,9 +108,18 @@
    * not stay is `page.money`, which is a DECLARATION id: the page has a title, every other screen
    * uses it, and this was the one place printing the key instead.
    */
+  /** The half of a `45 §5.1` target a person says out loud: `suggestion:SG31` is `SG31`. */
+  const spoken = (target: string): string =>
+    /^(?:suggestion|decision|prediction):(.+)$/.exec(target)?.[1] ?? target;
+
   const targetOf = (target: string): string => {
     const page = /^page\.([a-z0-9_-]+)$/.exec(target);
-    return page ? (PAGES[page[1]!]?.title ?? target) : target;
+    if (page) return PAGES[page[1]!]?.title ?? target;
+    /* `45 §5.1`'s governance shape: `<kind>:<spoken id>` — `suggestion:SG31`, `decision:D41`.
+       The spoken id is the half a person says out loud and the half every other screen prints; the
+       prefix is there so the ledger's `target` column is unambiguous across tables, and printing it
+       here would be printing the schema at somebody who asked what happened. */
+    return spoken(target);
   };
 
   /**
@@ -70,7 +135,11 @@
    */
   const href = (target: string): string => {
     const page = /^page\.([a-z0-9_]+)$/.exec(target);
-    return page ? `/p/${page[1]}` : `/${encodeURIComponent(target)}`;
+    if (page) return `/p/${page[1]}`;
+    /* AND THE PREFIX COMES OFF THE LINK TOO, or it is a link to nothing. `/suggestion:SG31` is not
+       a route — the spoken-id resolver takes `SG31`, which is the id the rest of the product uses.
+       The prefix belongs to the ledger's storage, not to the address bar. */
+    return `/${encodeURIComponent(spoken(target))}`;
   };
 
   /**
@@ -174,7 +243,7 @@
       title={AUDIT.length === 0 ? copy.auditNone : copy.noneMatching(AUDIT.length, 'entries')}
       query={AUDIT.length === 0
         ? undefined
-        : [who ? actorOf(who) : '', what ? kindOf(what).word : ''].filter(Boolean).join(' · ')}
+        : [who ? actorOf(who) : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
       body={AUDIT.length === 0 ? copy.auditHolds : undefined}
     >
       {#snippet actions()}
@@ -198,8 +267,12 @@
                  (WCAG 2.1.1). Making the row's subject reachable is the fix that a reader also
                  wanted anyway — an audit line names a row, and the next question is always what
                  that row says now. -->
+            <!-- AND A NIGHTLY BACKUP IS ABOUT NO ROW. `target` is nullable in the DDL and the
+                 ledger now has kinds that use the nullability, so the link is drawn when there is
+                 something to link to and the verb stands alone when there is not — rather than an
+                 empty anchor, which is a keyboard stop that goes nowhere and reads as nothing. -->
             <span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
-              <a class="target tap" href={href(e.target)}>{targetOf(e.target)}</a></span>
+              {#if e.target}<a class="target tap" href={href(e.target)}>{targetOf(e.target)}</a>{/if}</span>
           </span>
           <span class="line-amount note">{e.note}</span>
           <span class="line-when">{since(e.at, NOW)}</span>

@@ -49,10 +49,15 @@ const NOTES = {
 
 async function record() {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW), sign: SIGNER });
+  /* THE CLOCK IS RETURNED, so a test that is about time can move it. It was created inline and
+     dropped, which meant every event in every fixture carried one timestamp — fine for the tests
+     that do not care, and silently fatal for the read mark, whose whole subject is which of two
+     moments is later. */
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock, sign: SIGNER });
   const out = await api.kernel.install([OBLIGATIONS, NOTES]);
   assert.ok(out.ok);
-  return { api, sql };
+  return { api, sql, clock };
 }
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -472,20 +477,48 @@ test('A NOTE IS A `note`, AND IT DOES NOT MOVE THE ROW', async () => {
 test('A READ MARK BELONGS TO A PERSON, and is never an event', async () => {
   /* An agent polling a record has no attention to mark, and letting a token move it would mean a
      person coming back to a record their own agent had marked as read. */
-  const { api, sql } = await record();
+  const { api, sql, clock } = await record();
   assert.ok(
     api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok,
   );
+  /* TWO EVENTS AT LEAST, AND AT TWO DIFFERENT TIMES.
+     The first draft of this made two writes under `fixedClock`, so every event carried the same
+     `ts` — and "a smaller `upTo` does not move the mark back" was asserted over a ladder with no
+     rungs. Dropping the `MAX()` guard altogether left it green. A mark measured in time needs the
+     clock to have moved, or the test is about a list of one value. */
+  assert.ok((await api.create({ register: 'obligations', fields: { what: 'One' } }, owner)).ok);
+  clock.advance(60_000);
+  assert.ok((await api.create({ register: 'obligations', fields: { what: 'Two' } }, owner)).ok);
   const before = sql.all('SELECT 1 FROM event').length;
 
-  const out = value<{ seen_at: string | null }>(await api.markRead(owner));
+  const out = value<{ seen_at: string | null; upTo: number }>(await api.markRead(undefined, owner));
   assert.ok(out.seen_at, 'nothing was marked');
-  /* THE RECORD'S CLOCK. The mark is guarded by `MAX()`, so one stamped from a wall clock ahead of
-     the record's is a mark no later read can ever move. */
-  assert.equal(out.seen_at, new Date(NOW).toISOString(), 'the mark came from the wall clock');
+  /* THE RECORD'S CLOCK, AND IT IS AN EVENT'S. The mark is guarded by `MAX()`, so a value stamped
+     from a wall clock ahead of the record's would be a mark no later read could ever move. `45
+     §5.2` avoids that entirely by naming an event and taking that event's own `ts`; this used
+     `clock.now()` and carried a comment about the hazard it had made for itself. */
+  const newest = sql.one<{ ts: string; rowid: number }>('SELECT rowid, ts FROM event ORDER BY rowid DESC LIMIT 1');
+  assert.ok(newest, 'the record has no events, so the mark below is measured against nothing');
+  assert.equal(out.upTo, newest.rowid, 'no argument means everything, which is what the button says');
+  assert.equal(out.seen_at, newest.ts, "the mark is the event's own time, not the clock's");
   assert.equal(sql.all('SELECT 1 FROM event').length, before, 'a read became a write to the record');
 
-  const tried = await api.markRead(token('write'));
+  /* `45 §5`'S OWN REGRESSION CASE, which could not be written against a method with no `upTo`:
+     *"`upTo: 40` then `upTo: 30` → `seen_at` stays at event 40's `ts`."* A phone that was asleep
+     for a week and wakes up reporting where it had got to must not move the mark backwards. */
+  const older = sql.one<{ ts: string; rowid: number }>('SELECT rowid, ts FROM event ORDER BY rowid ASC LIMIT 1');
+  assert.ok(older && older.rowid !== newest.rowid, 'one event only, so there is no ladder to walk back down');
+  const back = value<{ seen_at: string | null }>(await api.markRead({ upTo: older.rowid }, owner));
+  assert.equal(back.seen_at, newest.ts, 'a smaller upTo moved the mark back');
+
+  /* AND AN `upTo` THAT NAMES NOTHING LEAVES IT ALONE. SQLite's scalar `max()` returns NULL if any
+     argument is NULL, so `45 §5.2`'s literal SQL sets `seen_at` to NULL for an event that is not
+     there — a replayed call after a restore, a client one migration behind — and **erases the
+     mark**, which is the failure the `MAX()` is written to prevent, arriving through the guard. */
+  const gone = value<{ seen_at: string | null }>(await api.markRead({ upTo: 999_999 }, owner));
+  assert.equal(gone.seen_at, newest.ts, 'an unknown event erased the mark');
+
+  const tried = await api.markRead(undefined, token('write'));
   assert.equal(tried.ok, false);
   assert.equal((tried as { refusal: { code: string } }).refusal.code, 'PERSON_REQUIRED');
   sql.close();
@@ -938,7 +971,7 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
   for (const [name, call] of [
     ['members', () => api.members(them)],
     ['whoami', () => api.whoami(them)],
-    ['markRead', () => api.markRead(them)],
+    ['markRead', () => api.markRead(undefined, them)],
   ] as const) {
     const out = await call();
     assert.equal((out as { refusal?: { code: string } }).refusal?.code, 'FORBIDDEN', name);

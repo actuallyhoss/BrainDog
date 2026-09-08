@@ -448,7 +448,14 @@ Steps 4–6 are `tail()`; every method that writes through the kernel ends with 
 
 **`markRead`**
 
-1. `person` only. `UPDATE member SET seen_at = MAX(COALESCE(seen_at, ''), (SELECT ts FROM event WHERE rowid = ?)) WHERE person_id = ? AND register = '*'` — RFC 3339 UTC strings order chronologically, so a smaller `upTo` never moves the mark back. Not an event (ADR-036). `value: null`.
+1. `person` only. `UPDATE member SET seen_at = MAX(COALESCE(seen_at, ''), COALESCE((SELECT ts FROM event WHERE rowid = ?), '')) WHERE person_id = ? AND register = '*'` — RFC 3339 UTC strings order chronologically, so a smaller `upTo` never moves the mark back. Not an event (ADR-036). `value: null`.
+
+   *The second `COALESCE` is an amendment. SQLite's scalar `max()` returns NULL if **any** argument
+   is NULL, so an `upTo` naming an event that is not there — a replayed call after a restore, a
+   client one migration behind — set `seen_at` to NULL and **erased the mark**: the exact failure
+   the `MAX()` is written to prevent, arriving through the guard. Measured:
+   `MAX(COALESCE(seen_at,''), (SELECT ts FROM e WHERE rowid = 999))` is `null`. An unknown id now
+   leaves the mark where it was, which is what "never moves it back" has to mean.*
 
 ### 5.3 · READ+
 

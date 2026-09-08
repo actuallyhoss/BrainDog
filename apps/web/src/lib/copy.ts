@@ -663,6 +663,16 @@ export const copy = {
   /* AN INVITATION OUT IS NOT ACCESS, and the two were one row. Somebody who had invited a
      bookkeeper could not tell whether the link had been used. */
   inviteOut: 'invited, not accepted yet',
+  /* THE READ MARK, WHICH `20 §6` PUTS ON THE *WORTH BUILDING* SIDE of its table: "who has seen the
+     thing that binds them", against live cursors and avatar stacks on the other. A decision binds
+     people who were not in the room, so whether they have looked is the question a record can
+     answer and a chat cannot — and this screen showed what everybody MAY do and nothing about
+     whether any of them had been. */
+  lastLooked: (ago: string) => `last looked ${ago}`,
+  /* NOT "never" ON ITS OWN, WHICH READS AS AN ACCUSATION and is ambiguous besides: somebody whose
+     invitation is still out has also never looked, and that is a different sentence. This one is
+     only ever drawn for somebody who has accepted. */
+  neverLooked: 'has not opened it',
   removeAccess: 'Remove',
   /* `LEVEL_REQUIRED`'s own fix sentence, verbatim (45 §5.6). */
   lastOwner: 'A record keeps at least one owner.',

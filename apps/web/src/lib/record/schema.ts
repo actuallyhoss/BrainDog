@@ -346,12 +346,46 @@ export type Credential = {
   stale?: boolean;
 };
 
+/**
+ * THE FORTY KINDS AN EVENT CAN HAVE, WHICH THE BROWSER HELD NONE OF — AND NEVER NEEDED TO.
+ *
+ * `kind` was `string`, and every value in the seed was invented here: `entry.create`,
+ * `entry.update`, `question.open`, `declaration.set`, plus `entry.archive`, `question.decide` and
+ * `pack.install` in `/audit`'s display map. Seven strings, none of them a kind, on the one screen
+ * whose entire subject is what this record recorded. The `CHECK` in migration 0001 would have
+ * refused all eight seeded rows.
+ *
+ * It is the failure this file already names twenty lines above about a different list: **a closed
+ * list typed as `string` is a closed list nothing closes.**
+ *
+ * AND THE LIST WAS ONE IMPORT AWAY THE WHOLE TIME. `packages/kernel/src/events.ts` has held the
+ * forty since it was written, `index.ts` exports them, `apps/web` already depends on the kernel and
+ * already imports four other things from it — and `event-kinds.mjs` exists solely to keep five
+ * copies of this vocabulary agreeing. Declaring a sixth here would have been the same mistake in a
+ * newer file. `30 §2` rule 1: a new kind is a kernel migration, so the kernel is where the list
+ * lives and everything else reads it.
+ */
+import type { EventKind } from '@braindog/kernel';
+export type { EventKind };
+
 export type AuditEvent = {
   seq: number;
   at: string;
   by: string;
-  kind: string;
-  target: string;
+  kind: EventKind;
+  /**
+   * OPTIONAL, because `target` is nullable in the DDL and the ledger had no kind that used the
+   * nullability. `30 §1`: `target TEXT` with no `NOT NULL`, and `02 §871`'s field table calls it
+   * optional in as many words. A nightly `export` is about the record, not about a row in it — no
+   * document gives that event a target, and `string` forced one to be invented before the event
+   * could be written down at all. A required field on a nullable column is a fixture that can only
+   * hold the rows somebody already thought of.
+   *
+   * The shape, when there is one, is `45 §5.1`'s: a spoken id (`services#6`), a declaration id
+   * (`page.money`), or `<kind>:<spoken id>` for the governance rows — `suggestion:SG31`,
+   * `decision:D41`, `prediction:<id>`.
+   */
+  target?: string;
   note: string;
   version: number;
 };
@@ -464,6 +498,23 @@ export type Person = {
    * now; for a while it was a column the interface could show and the ladder could not enforce.
    */
   suspended: string | null;
+  /**
+   * `member.seen_at` — how far they have read, and the one column of `member` the mirror lacked.
+   *
+   * `20 §6` is a table of what is worth building against what is theatre, and this is on the left:
+   * *"**Read marks on decisions** — who has seen the thing that binds them"*, against *"currently
+   * viewing"* on the right. The whole argument for it is that a decision binds people who were not
+   * in the room, so the question a record can answer and a chat cannot is whether they have looked.
+   *
+   * The kernel has had the column since migration 0001 and `markRead` since `45 §5.2`; `members()`
+   * returns it per person. The browser's `Person` carried the matrix and the suspension and stopped
+   * one column short, so the People screen showed what everybody MAY do and nothing about whether
+   * any of them had been.
+   *
+   * `null` is *they have not*, which is a different sentence from *a long time ago* and has to read
+   * as one.
+   */
+  seen: string | null;
 };
 
 /**

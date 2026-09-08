@@ -103,6 +103,111 @@ export const ROWS: Record<string, Entry[]> = {
   updates: entriesOf('updates'),
 };
 
+/* ── where this record runs ───────────────────────────────────────────────────── */
+
+/**
+ * SELF-HOST OR CLOUD, and three areas answer differently.
+ *
+ * `33 §9`: "A self-host has no PITR and does not serve `restore`", and `Snapshots.restore(id)`
+ * throws there. `53 §5.10` puts the whole billing ladder "in the Worker and nothing in the record,
+ * so the record package stays billing-agnostic" — which means a self-hosted record has nothing to
+ * bill and no state to show.
+ *
+ * `03 §6` on exactly this case: "PITR is Cloud-only and this is documented, NOT HIDDEN." So the
+ * areas stay and say which deployment they are on, rather than vanishing — `50 §2.2` admits all
+ * twelve with no per-deployment conditional, and `ADR-024` found that hiding items to reduce
+ * clutter made feature discovery worse.
+ */
+/**
+ * WHICH HOST THIS RECORD IS ON — and `as const` made it a compile-time constant.
+ *
+ * `kind: 'self-host' as const` pins the literal type, so `{#if DEPLOYMENT.kind !== 'self-host'}` is
+ * statically false and every Cloud branch on every settings screen is unreachable code that
+ * `svelte-check` cannot complain about and `dead-copy` counts as rendered — a grep for
+ * `copy.<key>` finds a key inside a dead `{#if}`. Eight sentences shipped to the browser and drew
+ * nowhere, including the restore control a commit was named for.
+ *
+ * The union is the honest type: a record IS on one host or the other, and the screens branch on it.
+ * The seed can only be one of them, so the other half is exercised by `deployment.test.ts` rather
+ * than by a browser gate — which is the shape the seed-variant harness in the backlog is for.
+ */
+export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = {
+  kind: VARIANT === 'cloud' ? 'cloud' : 'self-host',
+  since: day(-612),
+};
+
+/* ── backups ───────────────────────────────────────────────────────────────── */
+
+/** Four of the thirty kept. `53 §5.4`: nightly at 03:00 local on a self-host, thirty retained. */
+/**
+ * Four of the thirty kept, DERIVED from the clock and from the record.
+ *
+ * Both halves were typed and both were wrong. The ids read `2026-09-07 … 2026-09-04` while their
+ * own `at` values are `day(0) … day(-3)` — 2026-09-03 back to 08-31 — so each row printed an id
+ * four days after the date its own relative phrase resolved to, and all four sat in the future of a
+ * record whose today is Thursday 3 September. This is the only screen that says when the last sealed
+ * copy was taken and it carries no other absolute date to check against.
+ *
+ * And the counts said 1,206 rows for a record that holds 93 — the rail's own tallies, 38 + 16 + 4 +
+ * 6 + 5 + 5 + 5 + 14 — at 2.1 MB, which is 23 KB a row. The nightly DELTAS were right, which is what
+ * made an invented absolute figure read as a derived one.
+ *
+ * A snapshot is a copy of the record, so its size comes from the record. `bytes` is the one estimate
+ * left and it is marked as one: a `.dog` is a SQLite file, so it is rows plus pages plus the schema
+ * rather than a sum of field lengths, and this seed has no SQLite to ask.
+ */
+const snapshotAt = (back: number): Snapshot => {
+  const at = day(back);
+  const rows = Object.values(ROWS).reduce((n, list) => n + list.length, 0) - back * -2;
+  return { id: at, at, bytes: 24_576 + rows * 1_460, rows, failed: null };
+};
+
+/**
+ * Four nights, and one of them did not run.
+ *
+ * `12 §8` is the whole argument for this screen: *"A backup that silently gave up is worse than
+ * none."* A failed night writes an `export` event with `note: 'failed: <reason>'` and opens a
+ * suggestion; a self-host raises it as a QUESTION (`49 §5.13`) rather than a toast nobody was there
+ * to see. The list held four identical successes, so the state the feature exists to make visible
+ * was the one state it could not draw.
+ */
+export const SNAPSHOTS: Snapshot[] = [0, -1, -2, -3].map(snapshotAt).map((s, i) =>
+  /* LAST NIGHT, not a night two better ones have since replaced.
+     It was the third row, which made it a failure the record had already recovered from — and a
+     question about a night two later snapshots superseded is a question nobody would leave open.
+     `49 §5.13` words it *"Last night's snapshot failed"* because that is when it matters: the newest
+     sealed copy is now a day older than it should be, and tonight will fail for the same reason. */
+  i === 0 ? { ...s, bytes: 0, rows: 0, failed: 'the record was mid-import and would not hold still' } : s,
+);
+
+export const SNAPSHOTS_KEPT = 30;
+
+/**
+ * When the nightly runs, which is the host's and not ours.
+ *
+ * `53 §4` gives Cloud a cron: `17 3 * * *` UTC. `49 §5.13` gives a self-host 02:00 UTC plus
+ * `hash(slug) mod 60` minutes, which for this record's slug is 41. They land on opposite sides of a
+ * 03:00 write, which is why the ledger below numbers itself from the order rather than carrying a
+ * seq typed beside each row: a hand-numbered ladder would have been right on one host.
+ */
+const NIGHTLY = DEPLOYMENT.kind === 'cloud' ? 'T03:17:00.000Z' : 'T02:41:00.000Z';
+
+/** The nights that produced nothing — the input to both the ledger and the gate. */
+const FAILED_NIGHTS = SNAPSHOTS.filter((s) => s.failed !== null);
+
+/**
+ * How far back the newest sealed copy now is, said the way this product says durations.
+ *
+ * NOT "one night". The gap is to the newest night that WORKED, which is not the night before the
+ * one that failed whenever two fail in a row — and a queue that ranks by the cost of being wrong
+ * cannot state that cost from a constant.
+ */
+const nightsSince = (snap: Snapshot): string => {
+  const kept = SNAPSHOTS.filter((s) => s.failed === null && s.at < snap.at).map((s) => s.at).sort();
+  const newest = kept[kept.length - 1];
+  return newest === undefined ? 'No sealed copy has ever been taken' : `The newest sealed copy is from ${newest}`;
+};
+
 /* ── declared pages ───────────────────────────────────────────────────────── */
 
 
@@ -116,7 +221,7 @@ export const QUESTIONS: Question[] = [
     id: 'SG31',
     title: 'Does Kiln licence per-seat, per-product, or one flat studio price?',
     cost: 'Two clients are waiting on a quote, and the September issue announces the pricing.',
-    rank: 1,
+    rank: 2,
     opened: stamp(-96),
     entity: 'Kiln',
     options: [
@@ -129,7 +234,7 @@ export const QUESTIONS: Question[] = [
     id: 'SG29',
     title: 'Does Portage keep sending from portagemail.example, or move to the apex?',
     cost: 'The sending reputation takes about six weeks to rebuild, so a move made after the list doubles is a move made twice.',
-    rank: 2,
+    rank: 3,
     opened: stamp(-51),
     entity: 'Portage',
     options: [
@@ -141,7 +246,7 @@ export const QUESTIONS: Question[] = [
     id: 'SG27',
     title: 'Does Tallow get retired, or parked for another year?',
     cost: 'Parking costs GBP 14.00 a year and one line of attention every time this record is read.',
-    rank: 3,
+    rank: 4,
     opened: stamp(-140),
     entity: 'Tallow',
     options: [
@@ -149,7 +254,52 @@ export const QUESTIONS: Question[] = [
       { key: 'park', title: 'Park it another year', body: 'Keep the name. The only cost is the renewal and the attention.' },
     ],
   },
-];
+  /**
+   * THE NIGHT THAT DID NOT RUN, ASKED AS A QUESTION.
+   *
+   * `12 §8` is the sentence the backups screen was built on — *"a failed night writes an `export`
+   * event with `note: 'failed: <reason>'` and **opens a `suggestion`** (re-run the snapshot)"* — and
+   * `49 §5.13` says a self-host raises it HERE rather than as a toast: *"Last night's snapshot
+   * failed"*, with *Run it now* and *Ignore*. The screen learned to draw the failed row and neither
+   * of the two things `12 §8` requires happened: the ledger had no `export` row and the gate had no
+   * question. Three surfaces, one night, and only the one you had to go looking for knew about it.
+   *
+   * `12 §8`'s own argument for why: *"A backup that silently gave up is worse than none."* A
+   * failure nobody is shown is a failure that silently gave up, whatever the archive page says.
+   *
+   * DERIVED FROM THE SNAPSHOT, so a fixture that stops failing cannot leave the question behind.
+   */
+  ...FAILED_NIGHTS.map((snap, i) => ({
+    id: `SG${34 + i}`,
+    title: `The snapshot on ${snap.at} did not run`,
+    /* WHAT IT COSTS, in the terms this queue ranks by — and the cost of a missed night is the
+       distance back to the last night that worked. */
+    cost: `${nightsSince(snap)}, and the reason has not gone away: ${snap.failed ?? ''}. Tonight will fail the same way.`,
+    /* RANKED FIRST. `19 §4` ranks by the cost of being wrong, and everything else in this queue is
+       a price or a name; this one is whether the record still exists tomorrow. */
+    rank: 1,
+    opened: `${snap.at}${NIGHTLY}`,
+    entity: 'This record',
+    options: [
+      { key: 'run', title: 'Run it now', body: 'Take a sealed copy immediately. It counts against the thirty like any other night.', recommended: true },
+      { key: 'ignore', title: 'Ignore it', body: 'Tonight’s run will try again. If the reason has not gone away it will fail again, and ask again.' },
+    ],
+  })),
+]
+  /**
+   * RANKED AT THE SOURCE, because two screens read this list and only one of them sorted.
+   *
+   * `19 §4`: *"Ranked by the cost of being wrong, never by age."* `/decide` sorts; home renders
+   * `boot().questions` in array order, and the array was in the order somebody typed the questions.
+   * That was invisible while the ranks happened to be 1, 2, 3 down the file — and the moment a
+   * question was appended with rank 1 (the failed backup, which is whether the record still exists
+   * tomorrow), the surface a person LANDS on put it fourth of four.
+   *
+   * A list whose order is a fact about it should arrive ordered, rather than every reader being
+   * trusted to remember. `/decide` still sorts, because a screen whose whole subject is the ranking
+   * should not depend on somebody else having done it.
+   */
+  .sort((a, b) => a.rank - b.rank);
 
 /**
  * `busy` IS A RECORD WITH ENOUGH HISTORY TO OVERFLOW A GROUP.
@@ -194,6 +344,33 @@ export const DECIDED: Question[] = [
       by: 'you',
       at: stamp(-2180),
     },
+  },
+  /**
+   * THE PROPOSAL THAT PUT TWO ROWS IN THE RECORD, and the ledger recorded the rows without it.
+   *
+   * `45 §5` — `infer.draft` opens a suggestion by `spark` and writes `propose` *"when `payload.raw`
+   * names an arrival"*; an accepted `rowset` body *"writes its rows"*. The two `create` events three
+   * hours ago are those rows, and until now they arrived out of nowhere: an invoice landed in the
+   * inbox, two services appeared, and nothing in between was written down. The one chain in this
+   * record that runs arrival → assistant → person → rows had its middle two links missing.
+   *
+   * It also makes `30 §3`'s invariant testable at all. That section closes the `spark` actor to
+   * three kinds and calls it *"an invariant with a test"* — `event WHERE actor='spark' AND kind NOT
+   * IN ('suggest','propose','predict')` must always be empty — and a ledger with no `spark` row
+   * satisfies it the way an empty list satisfies anything.
+   */
+  {
+    id: 'SG33',
+    title: 'Add the two services on the Fenwick invoice?',
+    cost: 'The invoice is already paid either way; what is at stake is whether the record knows what it is paying for.',
+    rank: 0,
+    opened: stamp(-3),
+    entity: 'Fenwick Cloud',
+    options: [
+      { key: 'accept', title: 'Add both', body: 'Object storage and the Workers plan, with the renewal dates from the invoice.', recommended: true },
+      { key: 'ignore', title: 'Leave them out', body: 'The invoice stays in the inbox and the services stay unrecorded.' },
+    ],
+    decided: { option: 'accept', reason: 'Both are live and both renew; an invoice line nobody has a row for is the thing this record exists to stop.', by: 'you', at: stamp(-3) },
   },
   ...(VARIANT === 'busy' ? OLD_RENEWALS : []),
 ];
@@ -329,16 +506,96 @@ export const SUSPENDED: string | null = null;
 
 /* ── the audit log ───────────────────────────────────────────────────────── */
 
-export const AUDIT: AuditEvent[] = [
-  { seq: 4192, at: stamp(-3), by: 'claude', kind: 'entry.create', target: 'services#6', note: 'Object storage, from the Fenwick invoice', version: 4192 },
-  { seq: 4191, at: stamp(-3), by: 'claude', kind: 'entry.create', target: 'services#7', note: 'Workers plan, from the Fenwick invoice', version: 4191 },
-  { seq: 4188, at: stamp(-9), by: 'rule.reply', kind: 'entry.update', target: 'obligations#1', note: 'added a note: “Chased twice. 45-day terms expired 3 August.”', version: 4188 },
-  { seq: 4181, at: stamp(-14), by: 'you', kind: 'entry.update', target: 'tasks#12', note: 'state from open to done', version: 4181 },
-  { seq: 4174, at: stamp(-26), by: 'rule.renewal', kind: 'entry.update', target: 'services#2', note: 'state from live to lapsing', version: 4174 },
-  { seq: 4160, at: stamp(-31), by: 'codex', kind: 'question.open', target: 'SG31', note: 'Kiln licensing model', version: 4160 },
-  { seq: 4102, at: stamp(-49), by: 'claude', kind: 'entry.update', target: 'people#4', note: 'added a note: “Year end is 31 March”', version: 4102 },
-  { seq: 4061, at: stamp(-96), by: 'you', kind: 'declaration.set', target: 'page.money', note: 'Added the Overdue stat cell', version: 4061 },
+/**
+ * THE RECORD'S OWN LEDGER, IN A VOCABULARY THE RECORD CANNOT WRITE.
+ *
+ * Every `kind` here was invented: `entry.create`, `entry.update`, `question.open`,
+ * `declaration.set`, and three more in `/audit`'s display map — `entry.archive`, `question.decide`,
+ * `pack.install`. The forty kinds are `30 §2`, closed by a `CHECK` in migration 0001, and **none of
+ * these seven is among them.** All eight rows would have been refused by the database whose contents
+ * this claims to be, on the one screen whose entire subject is what the record recorded.
+ *
+ * `/audit`'s comment called them *"the write path's own vocabulary"*, which is the sentence that
+ * kept it — they read like a schema, so nobody checked them against one. The write path's
+ * vocabulary is `create` · `edit` · `state` · `suggest` · `declare`, and it is those five here now.
+ *
+ * `EVENT_KINDS` types the field, so a ninth invented row is a compile error rather than a filter
+ * chip; `event-kinds.mjs` reads that array as its sixth source, so the browser's copy cannot drift
+ * from the migration's again.
+ */
+const WRITTEN: AuditEvent[] = [
+  { seq: 4192, at: stamp(-3), by: 'claude', kind: 'create', target: 'services#6', note: 'Object storage, from the Fenwick invoice', version: 4192 },
+  { seq: 4191, at: stamp(-3), by: 'claude', kind: 'create', target: 'services#7', note: 'Workers plan, from the Fenwick invoice', version: 4191 },
+  /* THE ARRIVAL THAT CAUSED THE TWO ROWS ABOVE, and it was the missing half of the story. `45 §5`:
+     `infer.draft` opens the suggestion and writes `propose` *"when `payload.raw` names an arrival"*,
+     actor `spark`. `30 §3` closes that actor to three kinds and calls the closure *"an invariant
+     with a test"* — `event WHERE actor='spark' AND kind NOT IN ('suggest','propose','predict')` must
+     always be empty. The ledger had no `spark` row at all, so the invariant held over nothing. */
+  { seq: 4190, at: stamp(-3), by: 'spark', kind: 'propose', target: 'suggestion:SG33', note: 'Two services on the Fenwick invoice, from in_8f21', version: 4190 },
+  { seq: 4188, at: stamp(-9), by: 'rule.reply', kind: 'edit', target: 'obligations#1', note: 'added a note: “Chased twice. 45-day terms expired 3 August.”', version: 4188 },
+  /* `state`, NOT `edit`. `30 §2` keeps them apart in the Rows group deliberately: a state move is
+     the change a transition rule can refuse, and it was one word inside a free-text note. */
+  { seq: 4181, at: stamp(-14), by: 'you', kind: 'state', target: 'tasks#12', note: 'state from open to done', version: 4181 },
+  { seq: 4174, at: stamp(-26), by: 'rule.renewal', kind: 'state', target: 'services#2', note: 'state from live to lapsing', version: 4174 },
+  /* `suggest`, and the target grammar `45 §5.1` writes: `suggestion:SG<n>`. A question opening is a
+     suggestion opening — there is no `question.*` kind, because a question IS a suggestion with an
+     `options` body (`33 §2`). */
+  { seq: 4160, at: stamp(-31), by: 'codex', kind: 'suggest', target: 'suggestion:SG31', note: 'Kiln licensing model', version: 4160 },
+  { seq: 4102, at: stamp(-49), by: 'claude', kind: 'edit', target: 'people#4', note: 'added a note: “Year end is 31 March”', version: 4102 },
+  { seq: 4061, at: stamp(-96), by: 'you', kind: 'declare', target: 'page.money', note: 'Added the Overdue stat cell', version: 4061 },
 ];
+
+/**
+ * WHAT THE NIGHTLY WROTE, WHICH THE LEDGER HAD NEVER HEARD OF.
+ *
+ * `12 §8` requires two things of a failed night and the record did neither: *"a failed night writes
+ * an `export` event with `note: 'failed: <reason>'` and opens a `suggestion`"*. `/settings/backups`
+ * drew the failure; `/audit` — the screen whose whole subject is what happened to this record —
+ * showed a ledger in which every night ran, because there were no `export` rows in it at all. Two
+ * screens, one night, two stories, on the pair whose entire job is that the record is checkable.
+ *
+ * DERIVED FROM `SNAPSHOTS`, not typed beside it. That was the actual defect: the archive list and
+ * the ledger were two hand-written arrays about the same four nights, and two hand-written arrays
+ * about one fact is the shape every disagreement in this record has had. There is one array now and
+ * the ledger reads it.
+ *
+ * `note` on a good night is the row count, because `12 §8` says the walk *"records row counts in
+ * the object's metadata so 'it is backed up' is checkable"* — a night that says only that it
+ * happened is not checkable.
+ */
+const NIGHTLY_EVENTS: AuditEvent[] = SNAPSHOTS.flatMap((snap) => {
+  const at = `${snap.at}${NIGHTLY}`;
+  /* THESE TWO NUMBERS ORDER THE PAIR A FAILED NIGHT WRITES, AND NOTHING ELSE. `AUDIT` numbers the
+     whole ledger from its own sort, and the tiebreak only fires between two rows at the same
+     instant — so a descending ladder across the nights was four numbers nothing read. Two rows one
+     night apart are already ordered by the night. */
+  const by = 'system';
+  if (snap.failed === null)
+    return [{ seq: 0, at, by, kind: 'export' as const, note: `${snap.rows} rows, sealed`, version: 0 }];
+  return [
+    { seq: 1, at, by, kind: 'suggest' as const, target: `suggestion:SG${34 + FAILED_NIGHTS.indexOf(snap)}`, note: 'Re-run the snapshot', version: 1 },
+    /* `12 §8`'S EXACT STRING. `note: 'failed: <reason>'` — and `30 §2` is explicit that this is
+       how a blocked night is recorded: *"`blocker` is not an event kind."* */
+    { seq: 0, at, by, kind: 'export' as const, note: `failed: ${snap.failed}`, version: 0 },
+  ];
+});
+
+/**
+ * The ledger, in one order, numbered from it.
+ *
+ * A `seq` IS A PLACE IN THIS LIST, not a number typed beside a row — which is what `30 §1` makes it
+ * (`event.version` is the rowid) and what `/audit`'s footer says out loud: *"a version number is a
+ * place in this list."* Typing them worked while every row was hand-written; the nightly's minute is
+ * the host's, 03:17 UTC on Cloud and 02:41 here, so the same night falls on either side of a 03:00
+ * write depending on which host you are reading — and a typed ladder would have been right on one.
+ *
+ * Ties keep the order they were written in, which is what makes a write that produced two events
+ * (a failed night: the `export` and the `suggest` it opened) read as one thing that happened.
+ */
+const TOP = 4192;
+export const AUDIT: AuditEvent[] = [...WRITTEN, ...NIGHTLY_EVENTS]
+  .sort((a, b) => (a.at === b.at ? b.seq - a.seq : a.at < b.at ? 1 : -1))
+  .map((e, i) => ({ ...e, seq: TOP - i, version: TOP - i }));
 
 /**
  * THE AUDIT IS THE SOURCE, and every other surface quotes it.
@@ -352,8 +609,8 @@ export const AUDIT: AuditEvent[] = [
  * with its own ledger has no provenance — the ledger is what makes "who put this here" answerable at
  * all, and 20 §8 is the reason there is one.
  */
-for (const event of AUDIT) {
-  if (event.kind !== 'entry.create') continue;
+for (const event of WRITTEN) {
+  if (event.kind !== 'create' || event.target === undefined) continue;
   const [register, seq] = event.target.split('#');
   const row = (ROWS[register ?? ''] ?? []).find((e) => e.seq === Number(seq));
   if (row) {
@@ -495,17 +752,33 @@ JOBS[JOB.id] = JOB;
  * nowhere. What that cost is not abstract: the one sentence `members.ts` gives as the reason the
  * feature exists could not be expressed on the screen that exists for it.
  */
+/**
+ * FOUR PEOPLE AND FOUR READ MARKS, and the shape of the set is the point.
+ *
+ * `20 §6` puts read marks on the *worth building* side of its table — *"who has seen the thing
+ * that binds them"* — against live cursors and typing indicators on the other. The one question a
+ * record can answer that a chat cannot is whether somebody has looked at the decision they are
+ * bound by, and a seed where everybody had looked recently could not show the answer that matters.
+ *
+ * So: you are current, one person is a week behind the newest event, the bookkeeper has never
+ * opened it at all, and the contractor's invitation is still out — which is a different `null` from
+ * the bookkeeper's and has to read as one.
+ */
 export const PEOPLE_ACCESS: Person[] = [
-  { id: 'you', name: 'You', level: 'owner', scoped: [], email: 'you@thestudio.example', since: day(-612), suspended: null },
+  { id: 'you', name: 'You', level: 'owner', scoped: [], email: 'you@thestudio.example', since: day(-612), suspended: null, seen: stamp(-3) },
   /* AN OWNER HELD TO `read` ON ONE LIST — `members.ts`'s own example, and the direction people
      assume is impossible. A scoped level that could only narrow the record level would make the
      other row below impossible instead. */
-  { id: 'sm', name: 'S. Marchetti', level: 'write', scoped: [{ register: 'people', level: 'read' }], email: 's.marchetti@example.com', since: day(-181), suspended: null },
+  { id: 'sm', name: 'S. Marchetti', level: 'write', scoped: [{ register: 'people', level: 'read' }], email: 's.marchetti@example.com', since: day(-181), suspended: null, seen: stamp(-24 * 8) },
   /* THE BOOKKEEPER, AND `level: null` IS THE POINT OF HER. Nothing on the record itself — not the
      list of lists, not search, not a page — and `read` on the two lists she was asked to reconcile.
      `45 §5.1`: with no `'*'` row the ceiling is exactly the named registers, so a pack that installs
      a fifteenth list tomorrow gives her nothing, which is `20 §1`'s *"private until granted"*. */
-  { id: 'pv', name: 'Pell & Vine', level: null, scoped: [{ register: 'obligations', level: 'read' }, { register: 'services', level: 'read' }], email: 'accounts@pellvine.example', since: day(-96), suspended: null },
+  /* ACCEPTED NINETY-SIX DAYS AGO AND HAS NEVER OPENED IT. `null` here is not the contractor's
+     `null` below — hers is *the invitation is still out*, this one is *they are in and have not
+     looked* — and an owner deciding whether the reconciliation is happening needs those to be two
+     sentences on the screen rather than one blank cell. */
+  { id: 'pv', name: 'Pell & Vine', level: null, scoped: [{ register: 'obligations', level: 'read' }, { register: 'services', level: 'read' }], email: 'accounts@pellvine.example', since: day(-96), suspended: null, seen: null },
   /* AN INVITATION THAT HAS NOT BEEN ACCEPTED IS A DIFFERENT STATE FROM ACCESS, and the screen had
      no way to hold one — so somebody who had invited a bookkeeper could not tell whether the link
      had been used. `12 §3`: single-use, 24 hours, bound to one email. */
@@ -514,7 +787,7 @@ export const PEOPLE_ACCESS: Person[] = [
      in the fixture came from `rung(null) = -1` — the test asserting the matrix runs BOTH ways was
      satisfied by the bookkeeper's own absence of a level. A contractor who may file expenses
      everywhere and DECIDE on the one track they run is the shape that makes it real. */
-  { id: 'jo', name: 'J. Okonkwo', level: 'append', scoped: [{ register: 'sessions', level: 'read' }, { register: 'tracks', level: 'decide' }], email: 'j@okonkwo.example', since: null, suspended: null },
+  { id: 'jo', name: 'J. Okonkwo', level: 'append', scoped: [{ register: 'sessions', level: 'read' }, { register: 'tracks', level: 'decide' }], email: 'j@okonkwo.example', since: null, suspended: null, seen: null },
 ];
 
 /* ── the way back in ──────────────────────────────────────────────────────────── */
@@ -531,79 +804,7 @@ export const PASSKEYS: Passkey[] = [
  */
 export const AUTH_METHODS = { passkey: true, magic: true } as const;
 
-/* ── where this record runs ───────────────────────────────────────────────────── */
 
-/**
- * SELF-HOST OR CLOUD, and three areas answer differently.
- *
- * `33 §9`: "A self-host has no PITR and does not serve `restore`", and `Snapshots.restore(id)`
- * throws there. `53 §5.10` puts the whole billing ladder "in the Worker and nothing in the record,
- * so the record package stays billing-agnostic" — which means a self-hosted record has nothing to
- * bill and no state to show.
- *
- * `03 §6` on exactly this case: "PITR is Cloud-only and this is documented, NOT HIDDEN." So the
- * areas stay and say which deployment they are on, rather than vanishing — `50 §2.2` admits all
- * twelve with no per-deployment conditional, and `ADR-024` found that hiding items to reduce
- * clutter made feature discovery worse.
- */
-/**
- * WHICH HOST THIS RECORD IS ON — and `as const` made it a compile-time constant.
- *
- * `kind: 'self-host' as const` pins the literal type, so `{#if DEPLOYMENT.kind !== 'self-host'}` is
- * statically false and every Cloud branch on every settings screen is unreachable code that
- * `svelte-check` cannot complain about and `dead-copy` counts as rendered — a grep for
- * `copy.<key>` finds a key inside a dead `{#if}`. Eight sentences shipped to the browser and drew
- * nowhere, including the restore control a commit was named for.
- *
- * The union is the honest type: a record IS on one host or the other, and the screens branch on it.
- * The seed can only be one of them, so the other half is exercised by `deployment.test.ts` rather
- * than by a browser gate — which is the shape the seed-variant harness in the backlog is for.
- */
-export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = {
-  kind: VARIANT === 'cloud' ? 'cloud' : 'self-host',
-  since: day(-612),
-};
-
-/* ── backups ───────────────────────────────────────────────────────────────── */
-
-/** Four of the thirty kept. `53 §5.4`: nightly at 03:00 local on a self-host, thirty retained. */
-/**
- * Four of the thirty kept, DERIVED from the clock and from the record.
- *
- * Both halves were typed and both were wrong. The ids read `2026-09-07 … 2026-09-04` while their
- * own `at` values are `day(0) … day(-3)` — 2026-09-03 back to 08-31 — so each row printed an id
- * four days after the date its own relative phrase resolved to, and all four sat in the future of a
- * record whose today is Thursday 3 September. This is the only screen that says when the last sealed
- * copy was taken and it carries no other absolute date to check against.
- *
- * And the counts said 1,206 rows for a record that holds 93 — the rail's own tallies, 38 + 16 + 4 +
- * 6 + 5 + 5 + 5 + 14 — at 2.1 MB, which is 23 KB a row. The nightly DELTAS were right, which is what
- * made an invented absolute figure read as a derived one.
- *
- * A snapshot is a copy of the record, so its size comes from the record. `bytes` is the one estimate
- * left and it is marked as one: a `.dog` is a SQLite file, so it is rows plus pages plus the schema
- * rather than a sum of field lengths, and this seed has no SQLite to ask.
- */
-const snapshotAt = (back: number): Snapshot => {
-  const at = day(back);
-  const rows = Object.values(ROWS).reduce((n, list) => n + list.length, 0) - back * -2;
-  return { id: at, at, bytes: 24_576 + rows * 1_460, rows, failed: null };
-};
-
-/**
- * Four nights, and one of them did not run.
- *
- * `12 §8` is the whole argument for this screen: *"A backup that silently gave up is worse than
- * none."* A failed night writes an `export` event with `note: 'failed: <reason>'` and opens a
- * suggestion; a self-host raises it as a QUESTION (`49 §5.13`) rather than a toast nobody was there
- * to see. The list held four identical successes, so the state the feature exists to make visible
- * was the one state it could not draw.
- */
-export const SNAPSHOTS: Snapshot[] = [0, -1, -2, -3].map(snapshotAt).map((s, i) =>
-  i === 2 ? { ...s, bytes: 0, rows: 0, failed: 'the record was mid-import and would not hold still' } : s,
-);
-
-export const SNAPSHOTS_KEPT = 30;
 
 /**
  * The record's own signing key, public half — and it is not a credential.

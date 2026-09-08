@@ -103,7 +103,7 @@ import { sparkMayWrite } from './spark.ts';
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkDogl, keyIdOf, b64url, manifestBytes, signDogl, type Signature, type Signer } from './dogl.ts';
 export { SPARK, SPARK_KINDS, sparkMayWrite } from './spark.ts';
-export { coerce, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
+export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
@@ -1907,31 +1907,56 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
 
     /**
-     * The read mark: how far this person has read.
+     * The read mark: how far this person has read — measured in EVENTS, not in clock time.
+     *
+     * `45 §5.2` passes `upTo`, an event rowid, and takes the mark from that event's own `ts`:
+     * `MAX(COALESCE(seen_at, ''), (SELECT ts FROM event WHERE rowid = ?))`. This took no argument
+     * and stamped `clock.now()` instead, which is a different fact — *when you last pressed the
+     * button* rather than *how far you have read* — and it made the whole method unreplayable: the
+     * same call twice gives two answers, and a client that knows it has read to event 40 has no way
+     * to say so.
+     *
+     * AND THE `MAX()` GUARD WAS THEN AGAINST A WALL CLOCK. The old comment here described the
+     * hazard it had just created — *"a value stamped from a wall clock ahead of the record's is a
+     * mark no later read can ever move, pinned in the future for as long as the record lags"* — and
+     * that hazard does not exist in the specified form, because an event's `ts` IS the record's
+     * clock. `45 §5`'s own regression case is `upTo: 40` then `upTo: 30`, and it could not be
+     * written against a method with no `upTo`.
      *
      * `MAX()` ONLY, so a phone that was asleep for a week cannot move the mark backwards when it
      * wakes up and reports where it had got to. And it is NOT an event: a read is not a write to
      * the record, or every glance at a screen would be a line in somebody's history.
+     *
+     * ONE DEVIATION FROM `45 §5.2`'s SQL, and it is the guard failing on its own terms. SQLite's
+     * scalar `max()` returns NULL if any argument is NULL, so an `upTo` naming an event that is not
+     * there — a replayed call after a restore, a client one migration behind — sets `seen_at` to
+     * NULL and **erases the mark entirely**. Measured: `MAX(COALESCE(seen_at,''), (SELECT ts FROM e
+     * WHERE rowid = 999))` is `null`. The subselect gets its own `COALESCE`, so an unknown id leaves
+     * the mark exactly where it was, which is what "never moves it back" has to mean — and
+     * **`45 §5.2` is amended to carry it**, in the same revision, rather than left disagreeing.
      */
-    markRead: (person: string): number => {
-      /* THE RECORD'S CLOCK, and it matters more here than anywhere. The mark is guarded by `MAX()`,
-         so a value stamped from a wall clock ahead of the record's is a mark no later read can ever
-         move — pinned in the future for as long as the record lags. */
-      const at = instant(clock.now());
-      return transaction(() => {
+    markRead: (person: string, upTo: number): string | null => {
+      transaction(() => {
         sql.exec(
-          "UPDATE member SET seen_at = MAX(COALESCE(seen_at, ''), ?) WHERE person_id = ? AND register = '*'",
-          at,
+          `UPDATE member SET seen_at = MAX(COALESCE(seen_at, ''), COALESCE((SELECT ts FROM event WHERE rowid = ?), ''))
+            WHERE person_id = ? AND register = '*'`,
+          upTo,
           person,
         );
-        return Number(sql.one<{ v: number | null }>('SELECT MAX(rowid) AS v FROM event')?.v ?? 0);
       });
+      return (
+        sql.one<{ seen_at: string | null }>("SELECT seen_at FROM member WHERE person_id = ? AND register = '*'", person)
+          ?.seen_at ?? null
+      );
     },
 
-    /** How far this person had read, or `null` if they have not. */
-    seenAt: (person: string): string | null =>
-      sql.one<{ seen_at: string | null }>("SELECT seen_at FROM member WHERE person_id = ? AND register = '*'", person)
-        ?.seen_at ?? null,
+    /** The newest event, which is what a client that has read everything passes as `upTo`. */
+    newestEvent: (): number => Number(sql.one<{ v: number | null }>('SELECT MAX(rowid) AS v FROM event')?.v ?? 0),
+
+    /* `seenAt()` WAS HERE AND IS GONE. Its only caller was `markRead`'s own return — it wrote the
+       mark, then read it back through a second method — and `markRead` returns the mark now, which
+       is what `45 §5.2`'s SQL leaves in the row. `members()` carries `seen_at` per person for
+       everything else, so a third way to ask the same column would be a third way to drift. */
 
     /* ── who is on the record ────────────────────────────── */
 

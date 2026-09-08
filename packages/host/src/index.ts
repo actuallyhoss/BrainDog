@@ -87,7 +87,7 @@ export const ROUTES: readonly Route[] = [
      the record is a GET a proxy may replay and a browser may prefetch. */
   { name: 'export', group: 'ADMIN', writes: true, what: 'The record as a file: line per row, and it imports back.' },
   { name: 'import', group: 'ADMIN', writes: true, what: 'A file into an EMPTY record. Anything else is a merge nobody asked for.' },
-  { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read. A person only, and never an event.' },
+  { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
   { name: 'log', group: 'DATA', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
   { name: 'create', group: 'DATA', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
@@ -186,7 +186,7 @@ export type RecordSurface = {
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
   whoami(ctx: never): Promise<Result<unknown>>;
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
-  markRead(ctx: never): Promise<Result<unknown>>;
+  markRead(args: { upTo?: number } | undefined, ctx: never): Promise<Result<unknown>>;
   log(args: never, ctx: never): Promise<Result<unknown>>;
   governance(args: never, ctx: never): Promise<Result<unknown>>;
   propose(args: never, ctx: never): Promise<Result<unknown>>;
@@ -226,7 +226,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     dryRun: (a, ctx) => api.dryRun(a as never, ctx as never),
     whoami: (_a, ctx) => api.whoami(ctx as never),
     digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
-    markRead: (_a, ctx) => api.markRead(ctx as never),
+    markRead: (a, ctx) => api.markRead(a as { upTo?: number } | undefined, ctx as never),
     log: (a, ctx) => api.log(a as never, ctx as never),
     governance: (a, ctx) => api.governance(a as never, ctx as never),
     propose: (a, ctx) => api.propose(a as never, ctx as never),

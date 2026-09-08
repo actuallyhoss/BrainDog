@@ -399,9 +399,15 @@ test('A SNAPSHOT IS DATED BY THE CLOCK AND COUNTED FROM THE RECORD', () => {
   assert.equal(SNAPSHOTS[0]!.at.slice(0, 10), new Date(NOW).toISOString().slice(0, 10), 'the newest copy is not from today');
 
   /* And the counts said 1,206 rows for a record holding 93. The nightly DELTAS were right, which is
-     what made an invented absolute figure read as a derived one. */
+     what made an invented absolute figure read as a derived one.
+     THE NEWEST COPY THAT WORKED, not the newest row: a failed night sealed nothing, so it counts
+     nothing, and asserting the record's row count against it would be asserting that the failure
+     did not happen. */
   const held = Object.values(ROWS).reduce((n, list) => n + list.length, 0);
-  assert.equal(SNAPSHOTS[0]!.rows, held, `the newest copy claims ${SNAPSHOTS[0]!.rows} rows and the record holds ${held}`);
+  const sealed = SNAPSHOTS.find((s) => s.failed === null);
+  assert.ok(sealed, 'every night in the seed failed, so there is no copy to count');
+  assert.equal(sealed.rows, held - (SNAPSHOTS.indexOf(sealed) * 2), `the newest sealed copy claims ${sealed.rows} rows and the record holds ${held}`);
+  for (const snap of SNAPSHOTS) if (snap.failed !== null) assert.equal(snap.rows, 0, 'a night that failed sealed rows');
   /* Older copies hold fewer, because rows were added since. Monotonic over the nights that RAN — a
      night that failed kept nothing, and zero is not a smaller record, it is no record. */
   const ran = SNAPSHOTS.filter((s) => s.failed === null);

@@ -9,7 +9,9 @@ files, ~50 Svelte screens, 27 browser harnesses, and 120 commits of recorded rea
 its features was traced to its mechanism — the route, the table, the derivation, the test — and
 mapped onto BrainDog. **Traced on 2026-09-02 from `C:\Tools\legacy` at `14fe0d7`**, including the
 vault and job runner that landed on 2026-09-01 and are not yet in the brain's own skill — and **re-checked
-against `2451e4f`**, the five commits that followed the same day (§2.4).
+against `2451e4f`**, the five commits that followed the same day (§2.4), and **re-traced on
+2026-09-08 against `4521455`**, the five after that (§2.5). The second re-trace is the first to find
+things that do **not** fit, and §2.5 says which.
 
 The method mattered more than the list: a feature was only counted as *obtainable* if a specific
 BrainDog mechanism produces it. **Where none did, this document adds the mechanism** and says so.
@@ -170,6 +172,42 @@ placed; nothing in them needed a new mechanism, and four of them carried a lesso
 | `d75939a` | the claim long-polls: 15.4 s → under 1.5 s *and* 43,200 → ≈4,300 requests a day; twenty seconds not thirty; an abort at wait + 10; `idle_ms` kept for a runner that cannot hold a connection | [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 · [33-CONTRACTS](33-CONTRACTS.md) §11 |
 | `04c714b` | two money-audit findings: the forecast joined net worth to liquid cash and was right by coincidence; a draft wiped by its own screen finishing loading; and *assert on the code shape, never on the file* | [08-METRICS](08-METRICS-AND-ANALYTICS.md) §3 · [22-FRONTEND](22-FRONTEND.md) §7 · §10 below |
 | `2451e4f` | an e2e file defaulted to a dev-server port copied from a scratch file | [22-FRONTEND](22-FRONTEND.md) §7 · 18 §6 |
+
+### 2.5 · The five commits after that, and the four things that do not fit
+
+`3815e44` · `db8b295` · `cec7178` · `45f4a9c` · `4521455` — 2,151 insertions across 19 files. About
+twenty-one of the changes are covered by the mapping above or obtainable with no change here: the
+rule-specificity ordering is already [07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §6's *"priority
+ascending → longest literal → id"*; the bulk recategorise is `braindog rule apply`; the multi-currency
+forecast and its ghost baseline stay native; the partial-day exclusion is
+[08-METRICS](08-METRICS-AND-ANALYTICS.md) §2.4's `partial` bucket; the staleness banner is
+[25-CONNECTORS](25-CONNECTORS.md) §9. No MCP tool was added — the new route is reached through
+`brain_api` — so §1's twenty-two-tool count still holds.
+
+**Four do not fit, and this is the first pass to find any.** They are recorded here rather than
+resolved, because each is a decision about this specification and not an oversight in it.
+
+| | What the brain does | The rule it meets | What has to give |
+|---|---|---|---|
+| **1** | `feeds.js` keeps `revenue.*` in **whole dollars** and `metrics.aov` as a **float**, and `feeds.js:89` divides a minor-units figure by 100 to get there. Hourly, on a cron, since `4521455` | [02-DATA-MODEL](02-DATA-MODEL.md) §3: *"Money is always an integer in minor units, with its own currency."* The file states the divergence as policy at `feeds.js:19-23` | The port ×100s, stamps `USD`, and rewrites six read sites. §1's line 48 already assumes the ×100 **silently**, and covers neither `revenue.*` nor `metrics.*` |
+| **2** | `job.cost_usd` is a `REAL`, rendered to **four decimal places** — a hundredth of a cent — because an LLM bill is quoted finer than the minor unit | [30-BLUEPRINT](30-BLUEPRINT.md) §1 declares `cost_minor INTEGER`, so a $0.0031 run rounds to zero. [ADR-032](16-DECISIONS.md)'s reversal clause names *"a regulator requiring more precision"* and says none exists | Either a declared scale for a job cost, or this document says the four-dp reading is not carried. Currently decided by omission |
+| **3** | `churn30d = cancels / (subs + cancels)` over **two endpoints**; `coinNetPerWeek` scales a delta by `7/span`, where `span` is the measured gap between two snapshots | [08-METRICS](08-METRICS-AND-ANALYTICS.md) §2.2: *"Depth: one, in either direction … never a combinator over a combinator"*, and *"both operands read the same rows … a join is refused"* | A bounded second level, or these two stop being metrics — and lose `target`, `window`, `compare:` and §2.4's comparability gate |
+| **4** | `merchantOf` is three regexes, one of which strips a trailing processor reference (`P456425701`) that has **no literal anchor** — it is a shape. It runs at READ time over rows already stored | [07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §3: *"No regular expressions … zero `RegExp` in the package, enforced by a lint rule"* | A string-slicing `derive:` shape (§5's seven do not include one), or an extractor plus a way to re-derive over stored rows |
+
+And six additions the re-trace asks of the specification, none of them a new mechanism: a method that
+runs **one pull now** (47 §4.1 / 45 §5.6 / 30 §5 — ADMIN has `ruleApply` and no connector equivalent); a
+**read-triggered refresh** when the stored rows are stale (47 §4.1 — connectors are scheduled-only);
+`30 §2`'s **`blocker` sentence**, which resolves it to an `export` event and now needs to name a failed
+`pull` too; the string slice above; **a block that acts** (06 §1.1 / 42 §4.6 — the new unfiled screen
+offers a picker that writes a rule, and no v1 block kind writes anything); and **an FX as-of with no
+forward fill** (45 §5 — the brain drops a day with no rate rather than borrowing a neighbour's:
+*"A gap in the line is honest; a point that is quietly wrong is not."*).
+
+Two invariants re-checked and clean: no new component writes a colour literal, and no credential
+moved into the record. One that cannot be called either way: `bakeNumbers` **throws**, and the route
+catches it into `{ error }`. [47-SPEC-CONNECT](47-SPEC-CONNECT.md) §1 requires *"a provider's
+behaviour is never an exception"* — the behaviour maps exactly, the shape is inverted, so the port is
+a control-flow rewrite rather than a translation.
 
 ## 3 · The data-model additions
 

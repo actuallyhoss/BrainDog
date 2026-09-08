@@ -727,12 +727,17 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * AND IT IS NOT AN EVENT. Every glance at a screen would otherwise be a line in somebody's
      * history, and the history is the thing that has to stay worth reading.
      */
-    async markRead(ctx: CallContext) {
+    /* `upTo` IS AN EVENT, and it took none. `45 §5.2` gives the argument and the SQL that reads
+       that event's own `ts`; without it the mark was the wall clock at the moment of the call —
+       *when you pressed the button*, not *how far you have read*. Omitting it marks everything,
+       which is what the button on the home screen means and what the client sent before. */
+    async markRead(args: { upTo?: number } | undefined, ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       if (ctx.principal.kind !== 'person')
         return no('PERSON_REQUIRED', 'A read mark belongs to a person, and a token is not one.', { at: 'principal' });
-      return ok({ at: kernel.markRead(ctx.principal.id), seen_at: kernel.seenAt(ctx.principal.id) });
+      const upTo = args?.upTo ?? kernel.newestEvent();
+      return ok({ upTo, seen_at: kernel.markRead(ctx.principal.id, upTo) });
     },
 
     /**

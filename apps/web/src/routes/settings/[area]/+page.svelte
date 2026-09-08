@@ -503,8 +503,17 @@
                 <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
                      tells two people with one name apart. And WHEN, because access with no date is
                      a list you cannot audit. -->
+                <!-- AND WHETHER THEY HAVE LOOKED. `20 §6` — *"Read marks on decisions: who has
+                     seen the thing that binds them"* — is the one row of its table this screen
+                     could not draw: `member.seen_at` has been in the DDL since migration 0001 and
+                     `members()` returns it per person, and the browser's mirror stopped one column
+                     short. So the screen said what four people MAY do and nothing about whether any
+                     of them had been.
+
+                     ONLY FOR SOMEBODY WHO HAS ACCEPTED. An invitation still out has also never been
+                     looked at, and saying so twice in one line is saying nothing. -->
                 <span class="who-detail">
-                  {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
+                  {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
                 </span>
                 <span class="who-do">
                 <Button

@@ -701,7 +701,7 @@ test('A ROW AND THE LEDGER AGREE ABOUT WHO PUT IT THERE', () => {
      row's history is checkable. A record whose provenance disagrees with its own ledger has no
      provenance. */
   for (const event of AUDIT) {
-    if (event.kind !== 'entry.create') continue;
+    if (event.kind !== 'create' || event.target === undefined) continue;
     const [register, seq] = event.target.split('#');
     const row = (ROWS[register!] ?? []).find((e) => e.seq === Number(seq));
     assert.ok(row, `${event.target} is in the audit and not in the record`);
@@ -712,7 +712,7 @@ test('A ROW AND THE LEDGER AGREE ABOUT WHO PUT IT THERE', () => {
   /* AND THE "WHILE YOU WERE AWAY" LINE COUNTS WHAT THE LEDGER HOLDS. It said four services and the
      audit records two, on the surface whose whole job is telling you what happened while you were
      not looking. */
-  const made = AUDIT.filter((e) => e.kind === 'entry.create' && e.target.startsWith('services#')).length;
+  const made = AUDIT.filter((e) => e.kind === 'create' && e.target?.startsWith('services#')).length;
   const line = NEWS.find((n) => n.text.includes('services from the Fenwick invoice'));
   assert.ok(line, 'the away list no longer mentions the Fenwick services, so this test proves nothing');
   assert.match(line.text, new RegExp(`Added ${made} services`), 'the away list and the audit disagree about how many');
