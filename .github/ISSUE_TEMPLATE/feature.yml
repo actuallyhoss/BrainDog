@@ -1,0 +1,85 @@
+name: Feature request
+description: Something the product should do and does not.
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **The design is the source of truth.** [`docs/`](../tree/master/docs) is 54 numbered
+        documents, and most feature requests are answered by one of them — either it is already
+        specified and unbuilt, or it was considered and refused with the reason written down.
+
+        Please look first. [`docs/17-OPEN-QUESTIONS.md`](../blob/master/docs/17-OPEN-QUESTIONS.md)
+        holds what the design does not settle, and
+        [`docs/16-DECISIONS.md`](../blob/master/docs/16-DECISIONS.md) holds every decision with its
+        rejected alternatives and what would reverse it. A request that argues against a specific
+        ADR is far more useful than one that does not know it exists.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What cannot be done today
+      description: >
+        The situation, not the solution. What did you try to record, ask or automate, and what
+        happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should happen
+      description: >
+        If this is a declaration — a register, page, block, ingest, rule, metric, theme or digest —
+        write it as YAML. A proposal that is expressible as a pack is a proposal that needs no code.
+    validations:
+      required: true
+
+  - type: textarea
+    id: document
+    attributes:
+      label: Which document this belongs in
+      description: >
+        By number, and the section. If it belongs in no existing document, say which one it sits
+        nearest and why a new section is needed.
+      placeholder: "`07 §4` — the extractor list. This is an eleventh extractor."
+    validations:
+      required: true
+
+  - type: textarea
+    id: adr
+    attributes:
+      label: Which decision it argues against, if any
+      description: >
+        An ADR number, and what would reverse it. Every ADR ends with a "would reverse it" line;
+        quoting it and saying whether your case meets it is the fastest route to a yes.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: shape
+    attributes:
+      label: What shape is it
+      description: >
+        Extensions are data. Where data is not enough, the extension is an agent — never a script.
+      options:
+        - A declaration — it could ship as a pack
+        - A kernel or write-path change
+        - A screen or an interaction
+        - An agent-surface change (a tool, a resource, a prompt)
+        - An operational or hosting change
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you post
+      options:
+        - label: I have checked `docs/16-DECISIONS.md` and `docs/17-OPEN-QUESTIONS.md`.
+          required: true
+        - label: >
+            This does not require running code supplied by a pack, a colour or font value outside
+            the theme, a ninth declaration kind, or a token scope above `write`.
+          required: true

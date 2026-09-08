@@ -1,0 +1,115 @@
+name: Bug report
+description: Something behaves differently from the way a document says it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security defects do not go here.** If this is a vulnerability — anything touching
+        credentials, the vault, tokens, the operation grant, export integrity, the agent surface or
+        pack installation — close this and read [SECURITY.md](../blob/master/SECURITY.md) instead.
+
+        A good report names the defect. The house convention is to say what was wrong before saying
+        what should happen instead.
+
+  - type: textarea
+    id: defect
+    attributes:
+      label: What is wrong
+      description: >
+        One or two sentences. Name the defect, not the feature it is near. If you can attach a
+        number to it — how many rows, how many pixels, how many of N — attach it.
+      placeholder: The saved view rendered every row it held; on 2,614 rows the first paint was 4,001 rows.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened, and which document says so
+      description: >
+        Cite the document by number and section — `13 §4.3`, `04 §5`, `ADR-060`. If no document
+        covers it, say so plainly; that is a finding in itself and the issue is still worth having.
+      placeholder: |
+        `13 §4.3` asks for 200-row keyset pages into a 2,000-row cap with a visible line.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce it
+      description: >
+        The call, the declaration, the pack, or the click path. Use synthetic data — invented names,
+        `.example` hosts, no real credential and no real amount.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: refusal
+    attributes:
+      label: Refusal code, if there was one
+      description: >
+        `UPPER_SNAKE`. Which code was raised — or which one should have been raised and was not.
+      placeholder: FIELD_TYPE_UNKNOWN
+    validations:
+      required: false
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface
+      options:
+        - Web app (apps/web)
+        - MCP / an agent client
+        - CLI (braindog)
+        - Self-host (apps/selfhost)
+        - Cloud / Worker (apps/worker)
+        - A pack, or an install diff
+        - The renderer (braindog-render)
+        - Something else / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: host
+    attributes:
+      label: Where it runs
+      options:
+        - Self-host
+        - BrainDog Cloud
+        - Neither — a local checkout
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: >
+        The tuple from `GET /api/version` — `app <date>+<sha> · format <n> · kernel <n> ·
+        primitives <n>` — or the commit sha you are on.
+      placeholder: app 2026.09.08+4521455 · format 1 · kernel 1 · primitives 1
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Node version and browser, where relevant
+      placeholder: Node 24.13.0 · Chrome 151 · Windows 11
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you post
+      options:
+        - label: This reproduces on unmodified `master`, not only on a fork.
+          required: true
+        - label: There is no real credential, payee, email address or amount anywhere in this report.
+          required: true
+        - label: This is not a vulnerability. (If it is, use private reporting instead.)
+          required: true

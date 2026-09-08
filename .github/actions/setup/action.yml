@@ -1,0 +1,46 @@
+name: setup
+description: Node, pnpm and a frozen install — the three steps every job in this repository starts with.
+
+# ONE COPY, BECAUSE THE THREE STEPS HAVE TO BE THE SAME THREE STEPS.
+#
+# They are repeated in five jobs across three workflows, and the failure mode of five copies is not
+# tedium — it is one of them being a minor behind. This repository runs on native type-stripping
+# (`node --experimental-strip-types`), which is the part of Node that has moved most between
+# releases; a job pinned to 24.12 while the rest are on 24.13 does not fail, it passes differently,
+# and the gate that then goes red goes red on the wrong machine. The same argument covers
+# `--frozen-lockfile`: a single job installing without it resolves a version nothing else has, and
+# the run that proves the tree is green proves it about a tree nobody has.
+#
+# `pnpm/action-setup` COMES FIRST AND TAKES NO VERSION. `packageManager` in the root manifest names
+# pnpm 11.25.0 with its integrity hash, so the version lives in the file the developer's own corepack
+# reads; passing it here as well would be the second copy this file exists to prevent. It has to
+# precede `setup-node` because `cache: pnpm` asks the pnpm binary where its store is.
+
+inputs:
+  registry-url:
+    description: >-
+      Write an .npmrc for this registry. Set by release.yml's publish job alone; every other job
+      talks to no registry but the one the lockfile already resolved against.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        # PINNED TO THE PATCH, per 52 §2 — every job pins `node-version: 24.13.0`. The root
+        # manifest's `engines` says `>=24.13`, which is a floor for a developer and would be a
+        # moving target here.
+        node-version: 24.13.0
+        # Keyed on pnpm-lock.yaml by the action itself, and it caches the pnpm STORE rather than
+        # `node_modules` — the store survives a lockfile change with most of its content still
+        # useful, and a cached `node_modules` would hand the workspace a symlink farm built against
+        # a different lockfile.
+        cache: pnpm
+        registry-url: ${{ inputs.registry-url }}
+
+    - run: pnpm install --frozen-lockfile
+      shell: bash

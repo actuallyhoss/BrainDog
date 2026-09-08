@@ -1,0 +1,69 @@
+# Who is asked to review what.
+#
+# One maintainer today, so every line resolves to the same handle. The file is not therefore
+# pointless: it is the list of paths where a second reviewer will be added first, and it makes the
+# load-bearing directories explicit — a change under `docs/`, `tools/gates/` or the vault is a
+# different kind of change from one under `apps/web/src/routes/`.
+#
+# Ordering is last-match-wins, so the general rule is first and the sharp edges are last.
+#
+# NOTE: replace @actuallyhoss with the maintainer's GitHub handle before committing. CODEOWNERS is silently
+# inert when it names a handle that cannot review the repository, which is the same failure mode as
+# a gate that passes by examining nothing.
+
+*                                   @actuallyhoss
+
+# ── The design, which is the source of truth ──────────────────────────────────────────────────────
+# Code that disagrees with a document is a defect in one of the two. Amending a document is a
+# decision, not an edit.
+/docs/                              @actuallyhoss
+/docs/16-DECISIONS.md               @actuallyhoss
+/docs/12-SECURITY.md                @actuallyhoss
+/BUILD.md                           @actuallyhoss
+/README.md                          @actuallyhoss
+/REPORT.md                          @actuallyhoss
+
+# ── Governance, licensing and disclosure ──────────────────────────────────────────────────────────
+/LICENSE                            @actuallyhoss
+/LICENSING.md                       @actuallyhoss
+/SECURITY.md                        @actuallyhoss
+/CONTRIBUTING.md                    @actuallyhoss
+/CODE_OF_CONDUCT.md                 @actuallyhoss
+/.github/                           @actuallyhoss
+
+# ── The things that decide whether a green run means anything ─────────────────────────────────────
+/tools/gates/                       @actuallyhoss
+/tools/gates/clean-room.txt         @actuallyhoss   # maintained by the maintainer alone; never edited in a PR
+/tools/gates/negative/              @actuallyhoss
+/tools/gates/budgets.json           @actuallyhoss
+/.github/workflows/                 @actuallyhoss
+
+# ── Supply chain ──────────────────────────────────────────────────────────────────────────────────
+# A dependency is an ADR, not a line in a manifest (ADR-046).
+/package.json                       @actuallyhoss
+/pnpm-lock.yaml                     @actuallyhoss
+/pnpm-workspace.yaml                @actuallyhoss
+/.gitattributes                     @actuallyhoss
+/tsconfig.base.json                 @actuallyhoss
+
+# ── The record's core ─────────────────────────────────────────────────────────────────────────────
+# One write path, an append-only ledger, and the closed lists the whole product is typed against.
+/packages/kernel/                   @actuallyhoss
+/packages/ports/                    @actuallyhoss
+/packages/record/                   @actuallyhoss
+/packages/declare/                  @actuallyhoss
+
+# ── The agent surface ─────────────────────────────────────────────────────────────────────────────
+# Every register, to every agent, over one protocol. Eight tools, fixed.
+/packages/mcp/                      @actuallyhoss
+/packages/spark/                    @actuallyhoss
+
+# ── The published packages, which carry a different licence ───────────────────────────────────────
+# MIT, no BrainDog imports, an SPDX header on every source file.
+/packages/render/                   @actuallyhoss
+/apps/cli/                          @actuallyhoss
+
+# ── The hosts ─────────────────────────────────────────────────────────────────────────────────────
+/apps/selfhost/                     @actuallyhoss
+/apps/worker/                       @actuallyhoss
+/apps/worker/wrangler.jsonc         @actuallyhoss

@@ -1,43 +1,112 @@
 name: ci
+
+# 52 §2's `ci.yml`, less the browser: install, typecheck, the whole suite, and the fourteen gates
+# that read source. The five that need a built app and a real browser are `gates.yml`'s, and the
+# reason for the split is at the top of that file.
+#
+# WHAT THIS COSTS IS THE POINT OF IT. The suite is 1,308 tests in about 90 seconds and the source
+# gates are greps; the two browser gates alone are 627 page-runs and 212 audits, about nineteen
+# minutes. A single workflow carrying both is one that gets cancelled, ignored, or made
+# `continue-on-error` within a month — and a check nobody waits for is a check that is not run.
+#
+# ACTIONS ARE PINNED TO A MAJOR, which is 52 §8's rule and not the strongest one available. A major
+# tag is mutable: `actions/checkout@v4` is whatever the tag points at this morning, so a compromised
+# publisher reaches this repository without a commit here. A 40-character SHA closes that and costs
+# an update mechanism, because a pinned digest is a digest nobody bumps. The mechanism is
+# `.github/renovate.json5`, which has `pinDigests: true` for the `github-actions` manager — turn
+# Renovate on and the four tags below become digests with the tag beside them in a comment, kept
+# current by a pull request rather than by somebody remembering. Until then a major tag from
+# `actions/*` and `pnpm/*` is the exposure this repository has accepted, and it is written down here
+# rather than left as an omission.
+
 on:
   push:
+    branches: [master]
+  # 52 §2 says `on: push, pull_request` with no branch filter. A bare `push:` beside
+  # `pull_request:` runs this twice for every commit on a branch that has a pull request open —
+  # same commit, same result, twice the minutes — so `push` is master alone and the branch's runs
+  # come from the pull request.
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  # A superseded run is measuring a tree nobody will merge. Keyed on the pull request where there is
+  # one, so two open branches do not cancel each other; `github.ref` alone would be `refs/pull/N/merge`
+  # here and would work, but reads as though it were about the branch, which it is not.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  check:
+    # PINNED, NOT `ubuntu-latest`. GitHub rolls that label to a new image about once a year and the
+    # rollout is silent; the same commit then compiles against a different libc, a different browser
+    # build and a different font set. `gates.yml` is where that actually changes a measurement, and
+    # the two workflows agree on the runner so a red gate there can be reproduced from a green run
+    # here.
+    runs-on: ubuntu-24.04
+    # 52 §7 budgets this workflow at 20 minutes. It runs in about five; the budget is the ceiling at
+    # which a hung browser or a wedged install is killed rather than left to burn six hours.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.13.0
-          cache: pnpm
+      - uses: ./.github/actions/setup
 
-      - run: pnpm install --frozen-lockfile
-
-      # Types first: a type error makes every failure below it harder to read.
+      # FIRST, and for the reason `run.mjs` gives about its own first gate: a type error invalidates
+      # every result under it, and `svelte-check` over `apps/web` is the half of the tree the other
+      # steps exercise least directly.
       - run: pnpm typecheck
 
       - run: pnpm test
 
-      # The gates need an artefact to measure, and `bundle` is the reason the budget is a budget
-      # rather than an aspiration.
-      - run: pnpm --filter @braindog/web build
+      # THE GATES THAT READ SOURCE. Named as an exclusion rather than as a list of the fourteen,
+      # because a list of what to run stops running the gate somebody adds tomorrow and says nothing
+      # about it; an exclusion picks it up, and if the new gate turns out to need a build it exits 3,
+      # which `run.mjs` makes red under CI. The failure that arrives is then a sentence naming the
+      # gate rather than a green run that checked one thing fewer than it claims.
+      #
+      # `typecheck` is excluded because it is the step above — `run.mjs` runs it first, and running
+      # `svelte-check` over `apps/web` twice in one job is a minute spent to learn nothing.
+      #
+      # `bundle`, `keys`, `prefs`, `layout` and `a11y` all read `apps/web/build`, and this job does
+      # not build. Not building is deliberate: `bundle`'s staleness guard makes the build a
+      # PREREQUISITE rather than a step, so a job that builds must build everything the gates
+      # measure — `build/`, the three variant records and the marketing site — and that is
+      # `gates.yml`.
+      #
+      # NEEDS `--except`, which `run.mjs` does not have on master. The patch is beside this file at
+      # `tools/gates/run.mjs`; without it this step runs all nineteen gates, reports five skips, and
+      # is red under CI.
+      - run: pnpm gates -- --except typecheck,bundle,keys,prefs,layout,a11y
 
-      # The site builds too, and `strict: true` on its adapter means a route that quietly stopped
-      # prerendering fails here rather than shipping blank.
+  build:
+    # A SECOND JOB RATHER THAN FIVE MORE STEPS, because it answers a different question and can
+    # answer it at the same time. `check` asks whether the tree is correct; this asks whether it
+    # still produces a product — and until `gates.yml` runs on merge, nothing else on a pull request
+    # does. `adapter-static` with `strict: true` fails here when a route quietly stops prerendering,
+    # which is the defect that ships as a blank page rather than as an error.
+    runs-on: ubuntu-24.04
+    # Four Vite builds for the app (the shipped record plus the cloud, quiet and busy variants) and
+    # one for the site.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - run: pnpm --filter @braindog/web build
       - run: pnpm --filter @braindog/site build
 
-      - run: pnpm gates
-
-      # Screenshots are ARTEFACTS FOR A HUMAN, never an assertion: rendering can vary with the host
-      # OS, version, settings, hardware and power source, so a pixel diff fails on whitespace and
-      # passes on layout bugs (22 §10).
-      - name: screens
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: screens
-          path: apps/web/shots
-          if-no-files-found: ignore
+      # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE.
+      #
+      # Both builds begin with `pnpm --filter @braindog/skin theme`, which WRITES `tokens.css` and
+      # the favicons. So a committed palette that no longer matches the generator is quietly
+      # repaired here — and the `theme` gate, which is `theme.mjs --check`, then compares the
+      # regenerated file against itself and passes. That is a gate measuring its own output: the
+      # drift it exists to catch is invisible to it in exactly the workflow that is supposed to
+      # catch it.
+      #
+      # One line closes it, and it closes the general case rather than the palette: after a build,
+      # every tracked file is as committed, or the build generates something a person has not
+      # reviewed.
+      - run: git diff --exit-code

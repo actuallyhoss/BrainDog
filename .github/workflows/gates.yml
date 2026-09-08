@@ -1,0 +1,137 @@
+name: gates
+
+# THE WHOLE NINETEEN, AND WHEN THEY RUN.
+#
+# `pnpm gates` is about nineteen minutes, and nearly all of it is two gates driving a headless
+# browser over a built app: `layout` is 627 page-runs (every route, at both sides of every
+# breakpoint the stylesheets declare, plus three floor widths) and `a11y` is 212 axe audits (every
+# route, two schemes, two widths, plus the site). The other seventeen are seconds.
+#
+# THE CHOICE, MADE EXPLICITLY: on merge to master, on a weekly schedule, on demand, and on a pull
+# request only when it carries the `full-gates` label.
+#
+#   - NOT EVERY PULL REQUEST. Nineteen minutes on every push to every branch is a queue, and a
+#     queue is where `continue-on-error` gets added. The measurable cost of not doing it is that a
+#     layout or contrast regression is found after the merge rather than before — on a repository
+#     with one committer and no release, that is a red master for the length of one fix, which is
+#     the cheaper of the two prices.
+#   - MERGE TO MASTER, ALWAYS. Master is the tree everything else is measured against; a green
+#     master is the claim this workflow exists to keep true.
+#   - THE LABEL IS THE ESCAPE HATCH, and it is a considered part of the answer rather than a
+#     hedge. A change to `apps/web/src`, `packages/skin` or `tools/gates` is exactly the change
+#     whose breakage these gates catch, and putting `full-gates` on that pull request buys the
+#     nineteen minutes back before the merge. `labeled` is in the trigger list so adding the label
+#     starts the run rather than waiting for the next push.
+#   - AND WEEKLY, BECAUSE TWO OF THESE GATES MEASURE SOMETHING THAT MOVES ON ITS OWN. Chromium and
+#     axe-core decide what `a11y` reports and a runner image decides what `layout` measures. None
+#     of those arrive as a commit, so nothing above would ever notice them; Monday morning is
+#     early enough to find out before the week's work is stacked on top.
+#
+# NO `paths:` FILTER, AND THAT IS NOT AN OVERSIGHT. A docs-only commit looks skippable and is not:
+# `event-kinds`, `closed-lists` and `refusals` read the design documents as a SOURCE — the CHECK in
+# the migration, the table in `30-BLUEPRINT`, and the prose around it must all count the same forty
+# kinds — so `paths-ignore: docs/**` would be a hole precisely where the corpus contradicts itself.
+# The nineteen minutes are already paid for by the trigger list; buying them again with a filter
+# that can be wrong is a bad trade.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    # Monday, 05:00 UTC. An hour before anything else scheduled in this repository, so a browser
+    # download and an npm registry read are not competing with one.
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gates-${{ github.event.pull_request.number || github.ref }}
+  # CANCELS SUPERSEDED MASTER RUNS TOO, which is the less obvious half. Three pushes in ten minutes
+  # would otherwise queue 57 minutes of browser to report on two trees that no longer exist; the
+  # last one is the tree, and it is the one worth the runner.
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    # A pull request runs this only when it is asked to. Written as "not a pull request, or
+    # labelled" so a push, a schedule and a manual dispatch need no clause of their own — a new
+    # trigger added above is included by default rather than silently skipped.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-gates')
+    runs-on: ubuntu-24.04
+    # 52 §7 BUDGETS THIS AT 5 MINUTES AND THAT NUMBER IS FROM BEFORE THE GATES MOVED. The spec put
+    # the rendered-box work in Playwright specs under `ci.yml`'s `pnpm test:browser` and left
+    # `gates.yml` holding scripts alone; the tree instead drives the browser from inside
+    # `layout.mjs`, `a11y.mjs`, `keys.mjs` and `prefs.mjs`, so this job is the whole pyramid above
+    # the unit tests. 35 minutes is the measured nineteen, plus a build, plus the first-run browser
+    # download on a cold cache, plus room for one retry-free bad day. It is a ceiling for a hang,
+    # not a budget: 52 §7's real budget belongs in `budgets.json`, and there is no `ci` section
+    # there to hold it.
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      # KEYED ON THE BROWSER'S VERSION, NOT THE LOCKFILE. Chromium is ~150 MB and changes when
+      # `@playwright/test` changes; `pnpm-lock.yaml` changes whenever anything does, so a lockfile
+      # key would throw the browser away most weeks for a reason that has nothing to do with it.
+      # `node -p` reads the resolved version out of the installed package, so the key cannot drift
+      # from what `pnpm exec playwright` is about to run. The path is relative rather than a bare
+      # specifier: a package's `exports` map is free to hide its own manifest, and this needs no
+      # resolver's permission to read a file.
+      - id: browser
+        run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: browser-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ steps.browser.outputs.version }}
+
+      # CHROMIUM ONLY — the four browser gates ask for `chromium` and nothing else, and installing
+      # the other two is 300 MB nothing opens (52 §10 records the deliberate ceiling).
+      - if: steps.browser-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      # The cache holds the browser, never the system libraries it links against — those live in
+      # the image, and a restored cache with no `install-deps` is a browser that exits before it
+      # renders a page.
+      - if: steps.browser-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # THE BUILD IS A PREREQUISITE, NOT A STEP, AND ALL FIVE ROOTS MATTER. `bundle` refuses a build
+      # older than the newest source; `layout` and `a11y` measure `apps/web/build`, the three
+      # variant records (`build-cloud`, `build-quiet`, `build-busy` — the halves of every host
+      # branch the shipped seed cannot draw), and `apps/site/build`, which is the first page a
+      # stranger sees. `pnpm --filter @braindog/web build` writes the first four; the site is its
+      # own app and its own build.
+      #
+      # A missing root is not a quiet loss of coverage: the gate exits 3, `run.mjs` calls that a
+      # skip, and a skip under CI is red.
+      - run: pnpm --filter @braindog/web build
+      - run: pnpm --filter @braindog/site build
+
+      # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE — the same line as `ci.yml`'s build job,
+      # and here it is load-bearing rather than tidy. Both builds start with
+      # `pnpm --filter @braindog/skin theme`, which WRITES `tokens.css` and the favicons; the
+      # `theme` gate below is `theme.mjs --check`. Without this line the build regenerates the
+      # palette, the gate compares the regenerated file against itself, and a committed palette
+      # that has drifted from its generator passes the one check written to catch it.
+      - run: git diff --exit-code
+
+      # ALL NINETEEN. No `--only`, no `--except`, no `--allow-skip`: this is the job that has every
+      # prerequisite, so a skip here is a fact about the build above and is correctly red.
+      - run: pnpm gates
+
+      # THE A11Y GATE'S OWN RUN, which it writes to `.a11y.log` — the per-route, per-scheme detail
+      # behind a summary line that names counts. It is an ARTEFACT FOR A PERSON and never an
+      # assertion (22 §10); nothing reads it back.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-log
+          path: .a11y.log
+          if-no-files-found: ignore

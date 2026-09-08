@@ -79,6 +79,61 @@ const GATES = [
   ['a11y', ['node', [join(here, 'a11y.mjs')]]],
 ];
 
+/**
+ * Which of them this run is asking for — `52 §2`'s flags, less `--negative`.
+ *
+ *   node tools/gates/run.mjs --except layout,a11y,keys,prefs,bundle    the ones that read source
+ *   node tools/gates/run.mjs --only theme                              that one
+ *   node tools/gates/run.mjs --allow-skip bundle                       a skip there is not red
+ *
+ * SELECTION IS NOT TOLERANCE, and `52 §6` is about the other thing: *"there is no `skip`, `only`,
+ * `retry` or `allow-failure` on a gate"* forbids a red gate being waved through, and nothing here
+ * changes what a red gate does. What this picks is which JOB asks the question, and it exists
+ * because five of the nineteen need a built app and a real browser — nineteen minutes of one — while
+ * the fourteen that read source cost under a minute. One workflow cannot hold both answers: at
+ * nineteen minutes on every push the run is cancelled or ignored, and at fourteen gates on merge
+ * alone the browser ones report after the commit that broke them has landed.
+ *
+ * `--except`, AND NOT A LIST OF THE FAST ONES, is the whole reason it is spelt this way. A workflow
+ * that names what it runs stops running the gate somebody adds tomorrow, silently and for ever — the
+ * same defect as a gate that cannot fail, one level up again. A workflow that names what it
+ * EXCLUDES picks the new one up; and if the new one turns out to need a build it exits 3, which is
+ * red under CI, so what arrives is a sentence naming the gate rather than a green run that checked
+ * one thing fewer than it claims.
+ *
+ * A NAME THAT MATCHES NOTHING IS EXIT 2. `--except a11y,ally` would otherwise run everything and
+ * report success, and a typo that widens coverage is not the failure mode worth guarding — a typo
+ * that narrows it is, and `--only bundel` is that one.
+ */
+const list = (flag) => {
+  const at = process.argv.indexOf(flag);
+  if (at === -1) return null;
+  const value = process.argv[at + 1];
+  if (!value || value.startsWith('--')) {
+    console.error(`  ${flag} takes a comma-separated list of gate names.`);
+    process.exit(2);
+  }
+  return value.split(',').map((s) => s.trim()).filter(Boolean);
+};
+
+const NAMES = GATES.map(([name]) => name);
+const only = list('--only');
+const except = list('--except') ?? [];
+const allowSkip = list('--allow-skip') ?? [];
+
+const misspelt = [...(only ?? []), ...except, ...allowSkip].filter((n) => !NAMES.includes(n));
+if (misspelt.length) {
+  console.error(`  no such gate: ${misspelt.join(', ')}. The ${GATES.length} are: ${NAMES.join(', ')}.`);
+  process.exit(2);
+}
+
+const SELECTED = GATES.filter(([name]) => (only === null || only.includes(name)) && !except.includes(name));
+if (SELECTED.length === 0) {
+  console.error('  that selection is empty, and a run of no gates must not read as a run of every gate.');
+  process.exit(2);
+}
+const omitted = NAMES.filter((n) => !SELECTED.some(([name]) => name === n));
+
 const failed = [];
 
 /**
@@ -93,22 +148,31 @@ const failed = [];
  */
 const skipped = [];
 
-for (const [name, [cmd, args, opts]] of GATES) {
+for (const [name, [cmd, args, opts]] of SELECTED) {
   process.stdout.write(`\n▸ ${name}\n`);
   const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: false, ...opts });
   if (r.status === 3) skipped.push(name);
   else if (r.status !== 0) failed.push(name);
 }
 
-if (skipped.length && process.env.CI) failed.push(...skipped);
+/* `--allow-skip` NAMES THE PREREQUISITE THIS JOB DOES NOT HAVE, one gate at a time, so that the job
+   which does have it still goes red. A blanket "skips are fine here" is the same waiver the
+   paragraph above refuses. */
+const disallowed = skipped.filter((name) => !allowSkip.includes(name));
+if (disallowed.length && process.env.CI) failed.push(...disallowed);
 
 // NAMED, not counted. "1 of 8 gates failed" over a screen of eight gates' output is a search.
-const ran = GATES.length - skipped.length;
+const ran = SELECTED.length - skipped.length;
 const aside = skipped.length === 0 ? '' : ', and ' + skipped.length + ' could not run: ' + skipped.join(', ');
+/* AND A RUN THAT WAS ASKED FOR LESS SAYS SO. "14 of 14 gates passed" beside a nineteen-gate corpus
+   is the sentence a subset would otherwise print, and it reads as the whole thing. */
+const unasked = omitted.length === 0 ? '' : '\n  ' + omitted.length + ' were not asked for: ' + omitted.join(', ') + '.';
 console.log(
-  failed.length === 0
-    ? '\n  ' + ran + ' of ' + GATES.length + ' gates passed' + aside + '.\n'
-    : '\n  ' + [...new Set(failed)].length + ' of ' + GATES.length + ' gates failed: ' + [...new Set(failed)].join(', ') + '.\n',
+  (failed.length === 0
+    ? '\n  ' + ran + ' of ' + SELECTED.length + ' gates passed' + aside + '.'
+    : '\n  ' + [...new Set(failed)].length + ' of ' + SELECTED.length + ' gates failed: ' + [...new Set(failed)].join(', ') + '.') +
+    unasked +
+    '\n',
 );
 
 if (failed.length) process.exitCode = 1;

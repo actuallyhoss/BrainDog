@@ -1,0 +1,88 @@
+# Static analysis over the source and over the workflows themselves.
+#
+# THIS IS A SIXTH WORKFLOW AND `52 §2` NAMES FIVE. It is added deliberately and the deviation is
+# recorded here rather than discovered later: `52 §8` says every workflow declares `permissions:`,
+# that the default is `contents: read`, and that "nothing has `write` but the OIDC id-token".
+# CodeQL needs `security-events: write` to upload a SARIF result, and it uses three marketplace
+# actions where 52 §8 allows four in total. Both rows of that table need amending, or this file
+# needs deleting — it should not sit here quietly contradicting the specification.
+#
+# WHY IT EARNS THE EXCEPTION. The gates in `tools/gates/` are greps and browser sweeps written
+# against defects this project already shipped. They are excellent at the invariants somebody wrote
+# down and blind to the ones nobody thought of, which is the half CodeQL covers: taint from an
+# untrusted arrival to a sink, a path traversal on the asset route, an unchecked redirect, a
+# comparison that is not constant-time on a token hash. `secret-grep` asks "does a plaintext appear
+# next to a sink"; CodeQL asks "does a value reach one". Those are different questions.
+#
+# WHAT IT WILL NOT CATCH, so nobody mistakes a green run for a security review: every invariant in
+# `12-SECURITY.md` that is architectural rather than lexical — that the record makes no outbound
+# call, that VAULT is cookie-only, that a pack has no interpreter to reach, that the AAD binds a
+# ciphertext to its record. Those are the gates' job and the specification's, and a scanner has no
+# opinion about them.
+#
+# `actions` IS IN THE MATRIX ON PURPOSE. `deploy.yml` holds the one deploy-scoped Cloudflare token
+# in this repository, and workflow injection is the way that token leaves. A `${{ }}` interpolation
+# of untrusted input into a `run:` block is the finding that matters most here, and it is the one no
+# gate in `tools/gates/` looks for.
+
+name: codeql
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    # Monday morning, an hour after `gate1.yml`. A scheduled run is what catches a query that was
+    # written after the code was — most CodeQL findings on a stable tree arrive that way, not from
+    # a commit.
+    - cron: '0 7 * * 1'
+
+# Read-only by default; the job below adds the one write it cannot avoid.
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyse:
+    name: analyse (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      # The one write. It uploads the SARIF result and nothing else.
+      security-events: write
+      # Read-only, and both are needed: `actions` so the analysis can read workflow files,
+      # `contents` so it can read the tree.
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # NO BUILD, AND THAT IS NOT A SHORTCUT. Node 24 strips types and runs `.ts` directly, so
+          # there is no compile step to observe (BUILD.md, toolchain). A build mode that waited for
+          # one would analyse nothing and report green, which is this repository's signature defect.
+          build-mode: none
+          # `security-and-quality` over the default `security-extended`: the quality queries are
+          # where the "complete-looking thing that reports success and does nothing" class shows up
+          # — an unreachable condition, an unused result, a comparison that can never be true. Every
+          # audit of this tree has found that class, so the noise is worth paying for.
+          queries: security-and-quality
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}

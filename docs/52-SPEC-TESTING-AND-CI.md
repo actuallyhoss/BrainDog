@@ -639,14 +639,34 @@ exists (§10).
 | Boundary | Rule |
 |---|---|
 | Secrets in CI | two, and no more: `CLOUDFLARE_API_TOKEN` (deploy-scoped, environment `production`, `deploy.yml` only) and the npm OIDC identity (`id-token: write`, `release.yml` only). No npm token, no classic token, no long-lived anything (12 §8; 31 §6) |
-| Workflow permissions | every workflow declares `permissions:`; the default is `contents: read`; `gate1.yml` adds `issues: read`; nothing has `write` but the OIDC id-token |
-| Actions | four, pinned to a major: `actions/checkout@v4`, `pnpm/action-setup@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`. `wrangler` and `playwright` run from the lockfile, never from a marketplace action |
+| Workflow permissions | every workflow declares `permissions:`; the default is `contents: read`; `gate1.yml` adds `issues: read`; `release.yml`'s app job adds `contents: write` to create the release; `codeql.yml` adds `security-events: write`, which is the only way an analysis reports. Nothing else has `write` but the OIDC id-token. *An earlier draft of this row said "nothing has `write` but the OIDC id-token" and was written before either workflow existed; a release that cannot create a release and an analysis that cannot file an alert are not tighter, they are inert.* |
+| Actions | six, pinned to a major: `actions/checkout@v4`, `pnpm/action-setup@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`, `actions/cache@v4`, and `github/codeql-action/*@v3` as one publisher. `wrangler` and `playwright` run from the lockfile, never from a marketplace action. **A major tag is mutable**, so a compromised publisher reaches this repository without a commit in it; `renovate.json5` sets `pinDigests`, which rewrites each to a 40-character sha with the tag in a trailing comment and then maintains it — the only pinning that is both safe and current. *An earlier draft said four and named a cache action in none of the five workflows it specified.* |
 | Installs | `pnpm install --frozen-lockfile` in every job; `minimumReleaseAge: 1440` and `linkWorkspacePackages: false` in `pnpm-workspace.yaml` (31 §3) — a package under 24 h old never installs, a typo'd internal name fails loudly |
 | The deploy | `deploy-parity` runs after every `wrangler deploy`, in the same job, and a red parity fails the deploy run — a green deploy serving a stale asset has happened three times before (30 §14) |
 | What a gate may read | the repository, `build/`, and the live host named by `DEPLOY_HOST`. No gate reads a secret; `deploy-parity` fetches unauthenticated routes only |
 | What a test may hold | fixtures are synthetic: no real payee, credential, email or amount; `clean-room` and `secret-grep` run over `packages/fixtures/**` too |
 | Logs | a gate's line carries a path, a count, a hash, a code — never a field value or a body (35 §2). `deploy-parity` prints hashes, not HTML |
 | Provenance | npm provenance is automatic under trusted publishing; `release.yml` step 8 verifies the version landed, and a consumer may verify the attestation against this repository and `release.yml` |
+
+### 8.1 · A sixth workflow, and why the list in §2 is five
+
+§2 names `ci.yml`, `gates.yml`, `deploy.yml`, `release.yml` and `gate1.yml`. `codeql.yml` is a sixth,
+and it is here rather than folded into `ci.yml` for one reason: **the analysis has to be able to
+write a security alert, and nothing else in the repository may write anything.** A job with
+`security-events: write` inside `ci.yml` would put that permission on the same workflow file as the
+test run, and a workflow's permissions are read by whoever changes it next.
+
+Its second matrix leg is `actions`, which analyses the workflow files themselves. That is not
+symmetry: `deploy.yml` holds a Cloudflare token scoped to the account that serves `brain.dog`, and
+**workflow injection is the way that token leaves** — an untrusted `github.event.*` value interpolated
+into a `run:` block. No gate in `tools/gates/` looks for it, and none reasonably could, because the
+thing being analysed is a shell string assembled by a YAML template at run time.
+
+*The three rows above were amended in the revision that added this workflow rather than after it,
+because a specification that contradicts the tree is worse than one that is silent: the next reader
+cannot tell which of the two is the mistake.*
+
+---
 
 ## 9 · Tests and gates
 
