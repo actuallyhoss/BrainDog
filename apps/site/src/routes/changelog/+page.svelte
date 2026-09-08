@@ -173,7 +173,12 @@
     text-wrap: pretty;
   }
 
+  /* 48x23 beside a status line. Small because it reads as an aside, and it is still a link
+     somebody presses with a thumb. */
   .status-link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap, 44px);
     font-size: var(--t-ui);
     font-weight: 600;
   }

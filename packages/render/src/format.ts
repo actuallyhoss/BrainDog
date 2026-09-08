@@ -93,8 +93,30 @@ export function day(iso: string): string {
  * SHARED, because `since()` needs the same ladder past a day and the alternative is two band tables
  * that drift. `''` for zero days, which the callers turn into their own word.
  */
-const band = (n: number): string =>
-  n === 0 ? '' : n <= 14 ? `${n}d` : n <= 60 ? `${Math.round(n / 7)}w` : n < 365 ? `${Math.round(n / 30)}mo` : `${(n / 365).toFixed(n < 730 ? 1 : 0)}y`;
+/**
+ * AND NO BAND SPELLS PAST ITS OWN EDGE, which is the defect `bytes()` was fixed for, here first.
+ *
+ * The band was chosen from `n` and the number was rounded afterwards, so each one could name a
+ * duration outside itself. Measured:
+ *
+ *   · `band(60)` was `9w` — sixty-three days — and `band(61)` was `2mo`, sixty. **Non-monotone**: one
+ *     day older read as three days younger, on the ladder every date in the product goes through.
+ *   · `band(345…364)` was `12mo`, which is a year said the long way, immediately below `1.0y`.
+ *   · `band(712…729)` was `2.0y` and `band(730)` is `2y` — the same duration, two spellings, adjacent.
+ *
+ * Each band is capped at its own top rather than allowed to round past it. `Math.min` again, and the
+ * same sentence: a band is a kindness until it names something the band above owns.
+ */
+const band = (n: number): string => {
+  if (n === 0) return '';
+  if (n <= 14) return `${n}d`;
+  /* Weeks up to sixty days, so a reading of nine weeks — sixty-three — becomes two months instead. */
+  const weeks = Math.round(n / 7);
+  if (n <= 60 && weeks * 7 <= 60) return `${weeks}w`;
+  if (n < 365) return `${Math.min(11, Math.round(n / 30))}mo`;
+  const years = n / 365;
+  return n < 730 ? `${Math.min(1.9, years).toFixed(1)}y` : `${years.toFixed(0)}y`;
+};
 
 /**
  * WHICH CALENDAR DAY A MOMENT FALLS ON, counted from the epoch — the unit both functions band.

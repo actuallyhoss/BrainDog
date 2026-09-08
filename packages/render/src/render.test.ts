@@ -514,6 +514,43 @@ test('A SIZE IS SAID IN THE UNIT THAT TELLS TWO FILES APART', () => {
   }
 });
 
+test('NO BAND SPELLS PAST ITS OWN EDGE, AND THE LADDER ONLY GOES ONE WAY', () => {
+  /**
+   * The band was chosen from the number of days and the number was rounded afterwards, so each band
+   * could name a duration the band above owns:
+   *
+   *   · `60d` read **`9w`** — sixty-three days — and `61d` read `2mo`, sixty. One day older read as
+   *     three days younger, on the ladder every date in this product goes through.
+   *   · `345…364d` read `12mo`, which is a year said the long way, immediately below `1.0y`.
+   *   · `712…729d` read `2.0y` and `730d` reads `2y` — the same duration, two spellings, adjacent.
+   *
+   * The same defect `bytes()` was fixed for, twenty lines down and older.
+   */
+  const at = (d: number) => new Date(NOW - d * 86_400_000).toISOString().slice(0, 10);
+  assert.equal(relative(at(14), NOW), '14d ago');
+  assert.equal(relative(at(15), NOW), '2w ago');
+  assert.equal(relative(at(59), NOW), '8w ago');
+  assert.equal(relative(at(60), NOW), '2mo ago', 'nine weeks is sixty-three days');
+  assert.equal(relative(at(344), NOW), '11mo ago');
+  assert.equal(relative(at(364), NOW), '11mo ago', 'twelve months is a year said the long way');
+  assert.equal(relative(at(365), NOW), '1.0y ago');
+  assert.equal(relative(at(729), NOW), '1.9y ago');
+  assert.equal(relative(at(730), NOW), '2y ago', 'the same duration spelled two ways, adjacent');
+
+  /* MONOTONE OVER EIGHT YEARS, which is the property a ladder is read for and the one a per-band
+     rounding breaks silently: a list sorted by date read out of order by one row in sixty. */
+  const days = (said: string) => {
+    const n = Number.parseFloat(said);
+    return said.endsWith('d ago') ? n : said.endsWith('w ago') ? n * 7 : said.endsWith('mo ago') ? n * 30 : n * 365;
+  };
+  let previous = 0;
+  for (let d = 1; d <= 3_000; d += 1) {
+    const now = days(relative(at(d), NOW));
+    assert.ok(now >= previous, `${d} days reads ${relative(at(d), NOW)}, younger than the day before it`);
+    previous = now;
+  }
+});
+
 test('a day is formatted, and a malformed one renders as what the author typed', () => {
   assert.equal(day('2026-04-10'), '10 Apr 2026');
   assert.equal(formatTyped('date', '31 Sep', NOW), null);

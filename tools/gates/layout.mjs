@@ -52,6 +52,18 @@ const ROOT = join(REPO, 'apps', 'web', 'build');
  * "there was nothing here".
  */
 const VARIANTS = [
+  /**
+   * THE MARKETING SITE, which no layout gate has ever measured.
+   *
+   * `a11y` serves it and runs `wcag21aa`; `target-size` is `wcag22aa` and axe has no overflow rule,
+   * so the one surface a stranger sees FIRST was checked for neither of the two things this gate
+   * exists for. A review applied the rule by hand and found the document scrolling sideways at 320px
+   * with the call-to-action entirely off the screen.
+   *
+   * It sits in this list because a second build root is exactly what the variant pass already does.
+   * It is not a variant of the record — it is a different app — and the mechanism does not care.
+   */
+  { name: 'site', root: join(REPO, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'] },
   { name: 'cloud', root: join(REPO, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'] },
   /* A record nobody has connected anything to — the two designed empty states on `/settings/agents`,
      which `13 §5.2` gives a content contract and which no gate could reach. */
@@ -221,6 +233,18 @@ const MEASURE = ([w, slack, COARSE]) => {
        * The box is the union of the element and its `::before`, because a chevron drawn as a 20px
        * glyph inside a 44px pseudo-element is a 44px target and the element's own rect is not.
        * Anything with zero area is not on screen and is not a target.
+       */
+      /**
+       * COARSE ONLY, AND THAT IS THE DESIGN RATHER THAN A GAP IN THE GATE.
+       *
+       * A review suggested running this on both pointers, and doing so reports every segmented
+       * control in the product: `--ctl-h` is 44 on a coarse pointer and **36 on a fine one**, and
+       * `05 §6` is explicit that density follows the pointer — 36px under a mouse is what this
+       * product chose, not a defect. WCAG 2.5.8 asks 24 and this design gives 36 there and 44 under a
+       * thumb.
+       *
+       * The skip link, which is what prompted it, is a different argument and is fixed at the
+       * control rather than here: its audience reaches it by keyboard, and it takes `--tap`.
        */
       if (COARSE) {
         const box = (el) => {

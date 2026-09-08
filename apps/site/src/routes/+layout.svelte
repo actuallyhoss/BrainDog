@@ -64,7 +64,13 @@
 </footer>
 
 <style>
+  /* 127x41 — four pixels under, on every page, on the control a keyboard user reaches first. The web
+     app had the identical defect in the identical rule; both take `--tap`, which is 44 whatever the
+     pointer is, because the audience for this one is not using a pointer at all. */
   .skip {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap, 44px);
     position: fixed;
     inset-block-start: var(--sp-2);
     inset-inline-start: var(--sp-2);
@@ -94,19 +100,38 @@
     border-block-end: 1px solid var(--line);
   }
 
+  /**
+   * IT WRAPPED NOWHERE AND RAN 472px WIDE INSIDE A 320px SCREEN.
+   *
+   * A brand, four links and a call-to-action in one non-wrapping row, so the whole document scrolled
+   * sideways on every page of the marketing site and the *Open the app* button — the one control the
+   * site exists to be pressed — sat entirely off the right edge. Measured on all three pages at 320
+   * and 360.
+   *
+   * It survived because no layout gate had ever loaded this app: `a11y` serves it and runs
+   * `wcag21aa`, which has no overflow rule and whose `target-size` is `wcag22aa`. The shop window
+   * was the least-measured surface in the repository.
+   *
+   * `flex-wrap` and a smaller gap below the fold of a phone. The row still reads left to right; it
+   * just takes two lines when two lines is what fits.
+   */
   .bar-in,
   .foot-in {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-5);
+    gap: var(--sp-3) var(--sp-5);
     max-inline-size: 1140px;
     margin-inline: auto;
     padding: var(--sp-3) var(--sp-5);
   }
 
+  /* 129x29, on the first target anybody who is not a user ever presses. `13 §7`: 44 on both axes
+     under a thumb. */
   .brand {
     display: flex;
     align-items: center;
+    min-block-size: var(--tap, 44px);
     gap: 10px;
     text-decoration: none;
   }
@@ -126,7 +151,11 @@
     margin-inline-start: auto;
   }
 
+  /* 71x35 under a thumb. The padding grew the box and not the target. */
   .links a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap, 44px);
     padding: 6px var(--sp-3);
     border-radius: var(--r-sm);
     color: var(--ink2);
@@ -213,7 +242,12 @@
     text-transform: uppercase;
   }
 
+  /* 108x20 in a column with `--sp-2` between them — three links in a 60px band, which is the
+     classic wrong-link tap. The column keeps its rhythm; each row becomes its own target. */
   .foot-col a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap, 44px);
     color: var(--ink2);
     font-size: var(--t-sm);
     text-decoration: none;
