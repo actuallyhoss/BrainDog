@@ -671,6 +671,10 @@ export const copy = {
   addPasskey: 'Add a passkey',
   addedWhen: (ago: string) => `added ${ago}`,
   usedWhen: (ago: string) => `used ${ago}`,
+  /* SHARED WITH THE KEYS LIST at the foot of `agents`, which says the same thing about a token
+     nobody has presented. Two spellings of one sentence is how a product ends up saying "never used"
+     in one list and "not used yet" in the next. (This note used to sit beside `endsWhen`, 154 lines
+     down, explaining a key that was not the one under it.) */
   neverUsed: 'never used',
   remove: 'Remove',
   lastPasskey: 'This is your only passkey, so it cannot be removed. Add a second one first.',
@@ -825,9 +829,6 @@ export const copy = {
     write: 'can read and change rows',
   } as Record<string, string>,
   madeWhen: (ago: string) => `made ${ago}`,
-  /* `neverUsed` is the recovery area's, and it says the same thing about a passkey nobody has
-     presented. Two spellings of one sentence is how a product ends up saying "never used" in one
-     list and "not used yet" in the next. */
   endsWhen: (when: string) => `ends ${when}`,
   revokeKey: 'Revoke',
 

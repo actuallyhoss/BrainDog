@@ -47,8 +47,16 @@
     gap: var(--sp-3);
   }
 
+  /* THE INPUT FILLS THE BOX IT SITS IN, and it used to sit inside it.
+
+     Measured at 390px with a coarse pointer: `.field.field-lg` is 44px tall and correct, and the
+     `<input>` inside it was **28px** — so sixteen of those forty-four were dead. The wrapper has no
+     click handler and nothing else in it takes the pointer, so the target a thumb actually has to
+     hit to focus the field was 28px on the axis `13 §7` measures. A container sized to the rule with
+     a control smaller than the rule inside it passes every automated check and fails the hand. */
   .field-input {
     flex: 1;
+    align-self: stretch;
     min-inline-size: 0;
     border: 0;
     background: none;

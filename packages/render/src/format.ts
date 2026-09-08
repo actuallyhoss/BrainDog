@@ -101,6 +101,42 @@ export function relative(iso: string, now: number = Date.now()): string {
   return days > 0 ? `in ${size}` : `${size} ago`;
 }
 
+/**
+ * AN INSTANT, SAID IN THE UNIT IT MATTERS IN — which nothing in this package could do.
+ *
+ * `relative()` takes a DAY. It is anchored on `/^\d{4}-\d{2}-\d{2}$/` and returns its argument
+ * unchanged when the pattern misses, so an instant handed to it rendered as
+ * `2026-09-03T11:57:00.000Z` on screen. Every caller in the app had learned to `.slice(0, 10)`
+ * first, which hides the miss and throws the time away with it — so a device grant three minutes old
+ * and one eleven hours old both read *today*, on the one table whose entire decision is whether ten
+ * minutes have passed (`12 §6.1`, `49 §5.9`).
+ *
+ * BANDED, AND THE BAND TIGHTENS WHERE THE DECISION IS. `relative()`'s argument is that nobody plans
+ * around "in 47 days", and the same holds for "44 minutes" — so this rounds to five below the hour.
+ * Inside the first quarter of an hour it does NOT round, because that is the window a device grant
+ * lives in: ten minutes (`49 §5.9`), and "10 min ago" rounded from twelve is the difference between
+ * a request you can still approve and one that is over. A band is a kindness until it is the number
+ * somebody is deciding on.
+ *
+ * Past a day it hands over to `relative()` rather than growing a second set of bands, so one date
+ * cannot be said two ways by two functions.
+ *
+ * A string that is neither an instant nor a day comes back unchanged, which is `relative()`'s own
+ * contract: a formatter must never invent a time it was not given.
+ */
+export function since(iso: string, now: number = Date.now()): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return relative(iso, now);
+  if (DAY.test(iso)) return relative(iso, now);
+  const ms = t - now;
+  const n = Math.abs(ms);
+  if (n >= 86_400_000) return relative(new Date(t).toISOString().slice(0, 10), now);
+  if (n < 60_000) return 'just now';
+  const mins = Math.round(n / 60_000);
+  const size = mins < 15 ? `${mins} min` : mins < 60 ? `${Math.round(mins / 5) * 5} min` : `${Math.round(mins / 60)}h`;
+  return ms > 0 ? `in ${size}` : `${size} ago`;
+}
+
 /** `date:` links to the calendar and `day:` does not — a future date raises "what else is then". */
 export const dateLong = (iso: string, now?: number): string => `${day(iso)} · ${relative(iso, now)}`;
 

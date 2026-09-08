@@ -50,17 +50,24 @@ export type Attempt = { rows: Device[]; result: { ok: true; value: Approved } | 
 const no = (code: string, fix: string, at = 'user_code'): Attempt['result'] => ({ ok: false, refusal: { code, fix, at } });
 
 /**
- * Everything that is not a digit, gone — and nothing else changed.
+ * The separators a code is printed with, gone. Everything else stays and is refused.
  *
  * `12 §3`: *"paste is never blocked on the fallback code field"*, and the thing people paste is what
  * `48 §5.2` step 3 printed at them: `Open <uri> and enter  314 159`. A field that rejects the space
  * it told you to read is a field that rejects its own output. Hyphens for the same reason, and the
  * non-breaking space a terminal or a chat client will have substituted on the way.
  *
- * IT DOES NOT TRUNCATE. Seven digits is not a code with a typo you can guess the shape of; it is a
+ * IT USED TO STRIP EVERY NON-DIGIT, which made the refusal sentence beside it untrue — it says
+ * *"spaces are fine; nothing else is"* and `314x159` was silently accepted as `314159`. That is not
+ * a cosmetic disagreement: an accepted entry SPENDS A TRY ON EVERY WAITING ROW, so a paste that
+ * dragged a word in with it cost somebody else's enrolment one of its five, which is the exact harm
+ * the shape check exists to prevent. Seven digits was refused out loud and arbitrary letters were
+ * swallowed.
+ *
+ * IT DOES NOT TRUNCATE. Seven digits is not a code with a typo whose shape you can guess; it is a
  * mistake, and `wellFormed` refuses it rather than approving whatever the first six happen to be.
  */
-export const normalise = (typed: string): string => typed.replace(/\D+/gu, '');
+export const normalise = (typed: string): string => typed.replace(/[\s\u00a0\u2000-\u200b_.\u2010-\u2015-]+/gu, '');
 
 /** Six digits and nothing else. */
 export const wellFormed = (code: string): boolean => new RegExp(`^\\d{${CODE_DIGITS}}$`, 'u').test(code);
@@ -68,10 +75,21 @@ export const wellFormed = (code: string): boolean => new RegExp(`^\\d{${CODE_DIG
 /**
  * `sha256(id ‖ ':' ‖ user_code)`'s stand-in, and the same djb2 `list()` hashes a question with.
  *
- * **This is not a security control.** The real record has a real digest and this browser mock has no
- * crypto at all. What it preserves is the shape that a reader of this codebase must not learn wrong:
- * the poll id salts the code, so two grants showing the same six digits do not collide, and the row
- * does not contain the code — no screen can be built that checks a code by reading one.
+ * **This is not a security control, and a review proved exactly how much it is not.** It is djb2
+ * folded to 32 bits over a domain of one million codes, so brute-forcing every six-digit string
+ * takes under a second in Node — and against the fingerprint this file used to ship in `data.ts` it
+ * returned a single preimage. The comment beside that row claimed the code "exists nowhere" and the
+ * test named `THE SHIPPED RECORD CANNOT BE APPROVED BY ANYBODY` proved it by trying four guesses.
+ * Four guesses is not a proof; the search space is small enough to enumerate.
+ *
+ * The salt argument was inverted too. `sha256(id ‖ code)` resists preimage because SHA-256 does, not
+ * because of the salt — the salt is there so two grants showing the same six digits do not collide.
+ * That property this does preserve, and it is the only one claimed now.
+ *
+ * WHAT THE SHIPPED SEED DOES INSTEAD is carry no fingerprint at all: the empty string, which this
+ * function cannot return (its shortest output is one character), so no code matches it by
+ * construction rather than by hope. `device.test.ts` asserts that, and builds its own rows with its
+ * own codes for the success path.
  */
 export function fingerprint(id: string, code: string): string {
   const text = `${id}:${code}`;
@@ -109,7 +127,21 @@ export function approve(rows: readonly Device[], typed: string, nowMs: number): 
   if (!wellFormed(code))
     return {
       rows: [...rows],
-      result: no('VALUE_MALFORMED', `A device code is ${CODE_DIGITS} digits. Spaces are fine; nothing else is.`),
+      /* WHICH WAY IT WAS WRONG, because the three are three different mistakes and one sentence for
+         all of them is a sentence that stops being read. It is also what makes a second identical
+         attempt announce anything at all: a `role="status"` whose text is byte-identical to what it
+         already holds is not a change, so a reader who mistypes twice hears nothing the second
+         time. */
+      result: no(
+        'VALUE_MALFORMED',
+        /\d/u.test(code) && !/^\d+$/u.test(code)
+          ? `A device code is ${CODE_DIGITS} digits and a space. There is something else in this one.`
+          : code.length === 0
+            ? `Type the ${CODE_DIGITS} digits the machine is showing.`
+            : code.length < CODE_DIGITS
+              ? `That is ${code.length} digit${code.length === 1 ? '' : 's'}. A device code is ${CODE_DIGITS}.`
+              : `That is ${code.length} digits. A device code is ${CODE_DIGITS}, so this is not one with an extra on the end.`,
+      ),
     };
 
   const next = rows.map((d): Device => {

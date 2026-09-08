@@ -469,9 +469,12 @@ export type Source = {
  * of what a person is deciding when they press Approve, so it cannot be left off the row.
  *
  * WRITTEN HERE RATHER THAN IMPORTED, because this file is the record as the BROWSER sees it and the
- * kernel is the record as the record sees it. `device.test.ts` asserts the two agree, which is the
- * check that would actually catch a seventh reach — a shared import would only make them impossible
- * to disagree about in the one direction that never happens.
+ * kernel is the record as the record sees it. `device.test.ts` reads the six back out of the
+ * migration's own `CHECK (reach IN (…))` and asserts they agree — which it did not do when this
+ * paragraph first claimed it did: it asserted the list had six members and no duplicates, which a
+ * renamed reach satisfies. There is no exported reach list to import; the list lives as SQL text,
+ * and `tools/gates/closed-lists.mjs` says in its own header that the `as const` half of that
+ * comparison "is not here yet".
  */
 export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token'] as const;
 export type Reach = (typeof REACHES)[number];
@@ -530,14 +533,21 @@ export type Device = {
    */
   tries: number;
   /**
-   * A STAND-IN FOR `code_hash`, AND THE PROPERTY IT PRESERVES IS THE ONE THAT MATTERS.
+   * A STAND-IN FOR `code_hash`, AND IT PRESERVES ONE PROPERTY RATHER THAN THE TWO IT CLAIMED.
    *
-   * The real column is `sha256(id ‖ ':' ‖ user_code)` — the poll id as its salt, no host secret in
-   * the formula, so a leaked table cannot approve itself. This mock has no crypto (the record makes
-   * no outbound calls and imports no `node:` module) and uses the same small hash `list()` uses for
-   * its cursors. **It is not a security control and nothing here is.** What it is, is a record that
-   * does not hold the code in clear — so nobody reading `data.ts` learns the wrong shape, and no
-   * screen can be built that reads a code out of the row it is meant to be checking.
+   * The real column is `sha256(id ‖ ':' ‖ user_code)`, with the poll id as its salt and no host
+   * secret in the formula. This mock has no crypto — the record makes no outbound calls and imports
+   * no `node:` module — and uses the same small hash `list()` uses for its cursors.
+   *
+   * THIS COMMENT USED TO END *"so a leaked table cannot approve itself"*, and that is false of the
+   * stand-in and was the wrong reason even for the real one. djb2 folded to 32 bits over a million
+   * six-digit codes is a lookup table, and a review built it in under a second. What makes the real
+   * column safe is SHA-256; what the salt buys, here and there, is that two grants showing the same
+   * six digits do not collide.
+   *
+   * The property that IS preserved is the one this product is built on: the record does not hold the
+   * code in clear. Nobody reading `data.ts` learns the wrong shape, and no screen can be built that
+   * reads a code out of the row it is meant to be checking.
    */
   codeHash: string;
   at: string;

@@ -551,12 +551,14 @@ export const DEVICES: Device[] = [
      what it would be allowed to do, and what it says it is. `runner` is the heaviest of the six: a
      ninety-day bearer that claims jobs and executes code, which is worth knowing before the click.
 
-     ITS `codeHash` IS THE FINGERPRINT OF A CODE THAT EXISTS NOWHERE. It was generated once and the
-     code was discarded, so the shipped mock cannot be approved by anybody — which is exactly the
-     behaviour of the real thing, where the six digits live on the other machine. `12 §6.1`:
-     "Guessing it does not get you in." The success path is exercised in `device.test.ts`, which
-     builds its own rows and knows its own codes. */
-  { id: 'dg_03', name: 'Codex, unknown machine', surface: 'mcp', state: 'pending', reach: 'runner', ua: 'codex-cli 0.9 on Linux', tries: 0, codeHash: '176iuyp', at: stamp(-0.05), lastSeen: null },
+     ITS `codeHash` IS EMPTY, WHICH IS THE ONLY HONEST WAY TO SAY WHAT THIS ROW IS. It shipped as a
+     real fingerprint under a comment claiming the code behind it "exists nowhere" — and a review
+     enumerated all one million six-digit strings in under a second and found the one that matched.
+     The mock's hash is djb2 folded to 32 bits; a million guesses is not a search space.
+     `fingerprint` cannot return the empty string, so nothing matches this row at all, which is the
+     property the paragraph was reaching for and could not have had. The success path is exercised in
+     `device.test.ts`, which builds its own rows and knows its own codes. */
+  { id: 'dg_03', name: 'Codex, unknown machine', surface: 'mcp', state: 'pending', reach: 'runner', ua: 'codex-cli 0.9 on Linux', tries: 0, codeHash: '', at: stamp(-0.05), lastSeen: null },
   { id: 'dg_04', name: 'Unrecognised request, Frankfurt', surface: 'mcp', state: 'denied', reach: 'login', ua: null, tries: 5, codeHash: '', at: stamp(-24 * 6), lastSeen: null },
   /* AN OPERATION GRANT THAT NOBODY GOT TO IN TIME — `48 §13 D1`'s ten minutes, and the state four of
      these rows end in. `ua` here is the `subject` the command sent: for `export` it is what would

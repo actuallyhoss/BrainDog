@@ -26,7 +26,7 @@
   } from '$lib/record/api.ts';
   import { LEVELS, type Level, type Person, type Device } from '$lib/record/schema.ts';
   import { CODE_DIGITS, approve } from '$lib/record/device.ts';
-  import { TONES, relative } from 'braindog-render';
+  import { TONES, relative, since } from 'braindog-render';
 
   /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
      `the studio` — and one of the two was a literal. */
@@ -52,6 +52,37 @@
   let typed = $state('');
   let devices = $state<Device[]>([...DEVICES]);
   let said = $state<{ tone: 'good' | 'bad'; line: string } | null>(null);
+  let codeField = $state<HTMLInputElement | undefined>(undefined);
+
+  /** The row's Approve, and anything else that means *the code goes here*. */
+  const focusCode = () => codeField?.focus();
+
+  /**
+   * WHICH OF THE SIX STATES CARRIES A MARK, and which colour it is.
+   *
+   * Written once, because it was written twice — inline on the `data-intent` and again on the glyph —
+   * and both copies named two of the four states that need one. `13 §5.1`: colour never carries
+   * meaning alone, so a state that earns an intent earns a glyph in the same breath, and one map is
+   * how they cannot drift apart.
+   */
+  const DEVICE_TONE: Record<string, 'good' | 'warn' | 'bad' | undefined> = {
+    pending: 'warn',
+    approved: 'good',
+    expired: 'warn',
+    denied: 'bad',
+  };
+
+  /**
+   * A NEW ATTEMPT CLEARS THE LAST ANSWER, and this had to be said out loud because it was not.
+   *
+   * `aria-invalid` and `aria-describedby` were set on submit and cleared only by the NEXT submit, so
+   * the field stayed marked invalid while somebody typed the correct code into it — announcing a
+   * refusal that was about a value no longer in the box.
+   */
+  function retype(value: string) {
+    typed = value;
+    said = null;
+  }
 
   function tryCode(e: SubmitEvent) {
     e.preventDefault();
@@ -64,7 +95,9 @@
       return;
     }
     /* THE REFUSAL IS THE RECORD'S OWN, `fix` and all. `30 §6`'s sentences are written to be read by
-       whoever hit them, so wrapping one in a friendlier apology would be replacing the useful half. */
+       whoever hit them, so wrapping one in a friendlier apology would be replacing the useful half.
+       The field KEEPS what was typed on a refusal: six digits with one wrong is a thing to correct,
+       and a box that empties itself makes you read the code off the other machine again. */
     said = { tone: 'bad', line: attempt.result.refusal.fix };
   }
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -651,20 +684,27 @@
                 autocapitalize="off"
                 spellcheck="false"
                 placeholder={'0'.repeat(CODE_DIGITS)}
-                bind:value={typed}
-                aria-describedby={said ? 'user-code-said' : undefined}
+                bind:this={codeField}
+                value={typed}
+                oninput={(e) => retype((e.currentTarget as HTMLInputElement).value)}
+                aria-describedby="user-code-said"
                 aria-invalid={said?.tone === 'bad' ? 'true' : undefined}
               />
             </div>
             <Button weight="primary" type="submit">{copy.codeGo}</Button>
           </div>
-          <!-- `13 §7`'s `role="status"`: the answer is announced where it is read, rather than as a
-               toast that has gone by the time somebody using a screen reader reaches it. Its tone is
-               carried by `data-intent` AND by the word itself, because `13 §5.1` forbids colour from
-               carrying meaning alone. -->
-          {#if said}
-            <p class="code-said" id="user-code-said" role="status" data-intent={said.tone}>{said.line}</p>
-          {/if}
+          <!--
+            `13 §7`'s `role="status"`: the answer is announced where it is read, rather than as a
+            toast that has gone by the time somebody using a screen reader reaches it. Its tone is
+            carried by `data-intent` AND by the word itself, because `13 §5.1` forbids colour from
+            carrying meaning alone.
+
+            THE REGION IS ALWAYS IN THE DOCUMENT, EMPTY OR NOT. It was inside `{#if said}`, so the
+            element and its first sentence arrived in the same paint — and a live region inserted
+            together with its content is not reliably announced by any screen reader. The region has
+            to be there first for a change to be a change. It takes no space while empty.
+          -->
+          <p class="code-said" id="user-code-said" role="status" data-intent={said?.tone}>{said?.line ?? ''}</p>
         </form>
       </Section>
 
@@ -688,16 +728,28 @@
         {/if}
 <ul class="whos">
           {#each devices as d}
-            <li class="who" data-intent={d.state === 'denied' ? 'bad' : d.state === 'pending' ? 'warn' : undefined}>
+            <li class="who" data-intent={DEVICE_TONE[d.state]}>
               <div class="who-head">
-                {#if d.state === 'denied' || d.state === 'pending'}
-                  <span class="glyph" role="img" aria-label={d.state === 'denied' ? TONES.bad.label : TONES.warn.label}
-                    >{d.state === 'denied' ? TONES.bad.glyph : TONES.warn.glyph}</span>
+                <!-- ALL FOUR TONED STATES, and it marked two. `approved` and `expired` fell through
+                     to the plain session glyph with no intent, so a request that had run out of time
+                     drew identically to a connected machine — and a row LOST its mark at the moment
+                     you approved it, which reads as the approval having undone something. `13 §5.1`:
+                     the word is the meaning and the mark is the redundancy, so both move together. -->
+                {#if DEVICE_TONE[d.state]}
+                  <span class="glyph" role="img" aria-label={TONES[DEVICE_TONE[d.state]!].label}
+                    >{TONES[DEVICE_TONE[d.state]!].glyph}</span>
                 {:else}<Icon name="session" size="s" />{/if}
                 <span class="who-name">{d.name}</span>
+                <!-- `since` AND NOT `relative`. These columns are instants, and `relative()` takes a
+                     DAY — it is anchored on a `YYYY-MM-DD` pattern and hands back its argument when
+                     the pattern misses, so every row on this screen printed
+                     `2026-09-03T11:57:00.000Z`. Truncating to the day, which is what every other
+                     caller does, would render a three-minute-old request and an eleven-hour-old one
+                     both as *today* — on the table whose whole decision is whether ten minutes have
+                     passed. -->
                 <span class="who-detail">
                   {copy.deviceState[d.state]} · {copy.overSurface(d.surface)} ·
-                  {d.lastSeen ? copy.usedWhen(relative(d.lastSeen, NOW)) : copy.askedWhen(relative(d.at, NOW))}
+                  {d.lastSeen ? copy.usedWhen(since(d.lastSeen, NOW)) : copy.askedWhen(since(d.at, NOW))}
                 </span>
                 <!--
                   WHAT IT WOULD BE ALLOWED TO DO, WHICH IS THE THING BEING DECIDED.
@@ -713,16 +765,26 @@
                   command sent — what would be exported, imported or installed.
                 -->
                 <span class="who-detail who-reach">
-                  {copy.reachMeans[d.reach] ?? d.reach}{#if d.ua} ·
-                    {d.reach === 'login' || d.reach === 'runner' ? copy.saysItIs(d.ua) : copy.aboutWhat(d.ua)}
-                  {/if}
+                  <!-- The separator carries its own spaces. Svelte trims the leading whitespace of a
+                       block, so `…{#if d.ua} ·` rendered `for ninety days· says it is …`. -->
+                  {copy.reachMeans[d.reach] ?? d.reach}{#if d.ua}{' · '}{d.reach === 'login' || d.reach === 'runner'
+                      ? copy.saysItIs(d.ua)
+                      : copy.aboutWhat(d.ua)}{/if}
                 </span>
                 <span class="who-do">
                   {#if d.state === 'pending'}
-                    <Button
-                      weight="primary"
-                      onclick={() => toasts.push(copy.notWritten(`Approving asks for the six-digit code ${d.name} is showing, so you are looking at the device that asked`), { intent: 'warn' })}
-                    >{copy.approve}</Button>
+                    <!--
+                      IT TAKES YOU TO THE FIELD, because there is nothing else it could honestly do.
+                      `12 §6.1`: *"what the code proves is that the approver is looking at the device
+                      that asked"* — so a button on the row that approved without a code would be
+                      approving on the strength of the request having been made, which is the whole
+                      thing the flow exists to prevent.
+                      It used to push a toast DESCRIBING that, which left the screen with two Approve
+                      affordances: a primary one that did nothing and explained, and the real one in
+                      another section. A control that names the step it cannot take should be the
+                      step.
+                    -->
+                    <Button weight="primary" onclick={focusCode}>{copy.approve}</Button>
                     <Button
                       weight="bare"
                       tone="bad"
