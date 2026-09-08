@@ -624,7 +624,13 @@ test('A KEY FILE THAT IS NOT A KEY COSTS NOBODY THE NAME THEY WANTED', () => {
   const data = scratch();
   try {
     mkdirSync(data, { recursive: true });
-    writeFileSync(join(data, 'kek'), 'too short');
+    /* `mode: 0o600`, AND IT IS THE ASSERTION BELOW THAT NEEDS IT. `openKeyStore` checks the
+       permission bits before the length, and skips that check on Windows where the bit is advisory
+       (`49 §4.4`). Written with no mode, this file arrives 0644 under a default umask, and on Linux
+       the run refuses `mode 644` instead of `is 9 bytes` — so the test passes here and fails there,
+       on a sentence it is not about. The third fixture in this repository with that shape; the
+       other two are in `keys.test.ts`, behind a `writeKey` helper for the same reason. */
+    writeFileSync(join(data, 'kek'), 'too short', { mode: 0o600 });
 
     const out = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
     assert.equal(out.code, 1);

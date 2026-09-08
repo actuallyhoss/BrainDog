@@ -45,11 +45,31 @@ test('THE KEY FILE IS MADE ONCE and read back the same', async () => {
   }
 });
 
+/**
+ * A KEY FILE FIXTURE, WITH ITS OWN MODE, AND THE MODE IS THE WHOLE POINT OF THE HELPER.
+ *
+ * `openKeyStore` checks in this order: is it a regular file, are the permission bits 0600, is it 32
+ * bytes. It SKIPS the mode check on Windows, because the bit is advisory there and the ACL is the
+ * real permission (`49 §4.4`).
+ *
+ * So a fixture written with no mode arrives 0644 under a default umask, and on Linux the MODE
+ * refusal fires before the length refusal the test is about — while on Windows the same test passes,
+ * because the check it trips over is not run. Two tests in this file were written that way and both
+ * were green here for months; CI found them on Linux, one per run, because the first one it hit
+ * stopped the file.
+ *
+ * A fixture that leaves a permission to the umask asserts a different thing on each host, and the
+ * host it is never run on is the one both deployments use. There is one way to write a key file in
+ * this file now, and it carries the mode.
+ */
+const writeKey = (file: string, contents: string | Uint8Array): void =>
+  writeFileSync(file, contents, { mode: 0o600 });
+
 test('A FILE THAT IS NOT A KEY IS A SENTENCE, not a silent short key', async () => {
   const dir = scratch();
   try {
     const file = join(dir, 'kek');
-    writeFileSync(file, 'hunter2');
+    writeKey(file, 'hunter2');
     await assert.rejects(() => openKeyStore(file), /is 7 bytes and a key is 32/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -227,17 +247,10 @@ test('A HALF-WRITTEN KEY FILE IS NEVER LEFT BEHIND', async () => {
 
     /* AND THE OLD FAILURE IS STILL A SENTENCE if somebody has one on disk from before.
 
-       `mode: 0o600`, AND THIS TEST PASSED ON WINDOWS AND ONLY THERE. `openKeyStore` checks the
-       permission bits before it reads the file, and it skips that check on Windows because the bit
-       is advisory there and the ACL is the real permission (`49 §4.4`). So on Windows the length
-       refusal fired and the assertion held; on Linux the file arrived 0644 under the default umask,
-       the MODE refusal fired first, and the test failed on the sentence it was not about.
-
-       CI found it on its first green run. A fixture that leaves a permission to the umask is a
-       fixture that asserts a different thing on each host — and the one host it was never run on is
-       the one both deployments use. */
+       `writeKey`, not `writeFileSync` — see the helper's own note. This one and the seven-byte
+       case above are the two that were green on Windows and red on Linux. */
     const empty = join(dir, 'empty');
-    writeFileSync(empty, '', { mode: 0o600 });
+    writeKey(empty, '');
     await assert.rejects(() => openKeyStore(empty), /is 0 bytes and a key is 32/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
