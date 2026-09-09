@@ -57,21 +57,33 @@
      serve the same directory, and the whole point of alpha is that the bytes are the same
      bytes. */
   "env": {
-    /* THERE IS NO ALPHA SITE, AND THE REASON IS ON THE LINE BELOW: two Workers cannot share one
-       Custom Domain. `alpha.brain.dog` belongs to the RECORD — that is the deployment being
-       rehearsed, and BrainDog Alpha is a thing somebody logs into, not a page they read.
+    /* THERE IS AN ALPHA SITE NOW, AND THE REASON THERE WAS NOT IS GONE.
+       This said: "two Workers cannot share one Custom Domain. `alpha.brain.dog` belongs to the
+       RECORD." True while the record answered `alpha.brain.dog`, and the record has moved to
+       `app.alpha.brain.dog` — so the name is free, and the scheme is one label per surface with the
+       environment in front of it:
 
-       A marketing page has no state, no migration and no data to lose; the failure a rehearsal
-       exists to catch cannot happen to it. When there is a marketing change worth previewing, the
-       honest shape is `wrangler versions upload` on this Worker, which gives a preview URL without
-       a second name and without a second environment to keep in step. */
-    /* THE APEX, AND `www` IS NOT HERE. A Worker can hold several Custom Domains, but this one has
-       no code, so it cannot redirect — and giving it code to move `www` to the apex would be
-       writing a request handler for a redirect that Cloudflare performs at the edge for free. The
-       `www` → apex redirect is a single dashboard Redirect Rule; REPORT.md §1 has it as a numbered
-       step. Two Workers cannot share one Custom Domain, so nothing else may claim `brain.dog`. */
+         brain.dog              app.brain.dog              mcp.brain.dog
+         alpha.brain.dog        app.alpha.brain.dog        mcp.alpha.brain.dog
+
+       THE PARAGRAPH IT REPLACES ALSO ARGUED THE SITE DOES NOT NEED ONE, and that argument was
+       weaker than it read: "a marketing page has no state, so the failure a rehearsal exists to
+       catch cannot happen to it." A rehearsal is not only about data. A marketing site's failures
+       are a broken link, a claim the product does not back, and a page that reads wrong at 390px,
+       and every one of those is easier to see on a real hostname than in a preview URL nobody
+       shares. It also costs nothing: the bytes are the same bytes, which is what the top-level
+       `assets` key already says.
+
+       THE APEX, AND `www` IS NOT HERE. A Worker can hold several Custom Domains, but this one has
+       no code, so it cannot redirect, and giving it code to move `www` to the apex would be writing
+       a request handler for a redirect Cloudflare performs at the edge for free. The `www` → apex
+       redirect is a single dashboard Redirect Rule; REPORT.md §1 has it as a numbered step. */
     "production": {
       "routes": [{ "pattern": "brain.dog", "custom_domain": true }]
+    },
+
+    "alpha": {
+      "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }]
     }
   }
 }

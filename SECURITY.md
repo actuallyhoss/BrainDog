@@ -26,7 +26,7 @@ app <YYYY.MM.DD>+<sha7> · format <user_version> · kernel <migration> · primit
 | **Self-host, from `master`** | the current `master` | fixes land on `master` and self-hosters pull. There is no LTS branch, and there will not be one until there is a release cadence to justify it |
 | **Self-host, an older checkout** | no | tell us anyway if the defect still reproduces on `master` |
 | **`braindog-render`** (npm, MIT) | latest published minor | the renderer is a separate MIT package with no BrainDog dependency |
-| **`braindog-cli`** (npm, AGPL-3.0-only) | latest published minor | |
+| **`braindog-cli`** (npm, Apache-2.0) | latest published minor | |
 | **`.dog` format** | `format 1` | the format revision bumps only when an older reader would *misread* a newer file ([`docs/03-DOG-FORMAT.md`](docs/03-DOG-FORMAT.md) §7) |
 
 A fork is not supported. If you have changed the write path, the vault or either host, reproduce it

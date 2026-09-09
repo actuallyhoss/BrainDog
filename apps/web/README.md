@@ -178,4 +178,4 @@ bugs.
 
 ---
 
-AGPL-3.0-only. The renderer is MIT and lives in `packages/render`.
+Apache-2.0. The renderer is MIT and lives in `packages/render`.

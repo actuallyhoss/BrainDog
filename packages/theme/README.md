@@ -148,4 +148,4 @@ colour library nobody can check.
 
 ---
 
-AGPL-3.0-only, with the rest of BrainDog.
+Apache-2.0, with the rest of BrainDog.

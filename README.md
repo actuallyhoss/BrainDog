@@ -15,8 +15,7 @@ Your agents get a key to it. Claude, Codex and Cursor read and write the same ro
 and every row records who wrote it and when. Nothing is edited in place, so nothing is quietly lost.
 You can ask what the record said last Tuesday and it will tell you.
 
-One SQLite file per record. Open source under AGPL-3.0, and it runs on your own machine if you want
-it to.
+One SQLite file per record. Apache-2.0, and it runs on your own machine if you want it to.
 
 ```
 git clone https://github.com/actuallyhoss/braindog
@@ -125,5 +124,5 @@ worth reading before your first pull request. `SECURITY.md` is how to report a v
 
 ## Licence
 
-AGPL-3.0-only, except `packages/render`, which is MIT so that the block dialect can be used
-anywhere. `LICENSING.md` explains the split.
+Apache-2.0, except `packages/render`, which is MIT so the block dialect can be embedded anywhere.
+`LICENSING.md` explains the split.

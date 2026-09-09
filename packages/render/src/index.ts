@@ -1,8 +1,10 @@
 /**
  * `braindog-render` — the block dialect, MIT.
  *
- * Separately licensed from the app on purpose: AGPL on a library kills adoption, and the renderer
- * is the piece other people have a reason to use.
+ * Separately licensed from the app on purpose. The app is Apache-2.0 and this is MIT, because the
+ * block dialect is meant to be embedded anywhere, including in code that is not open at all. MIT
+ * asks nothing of whoever embeds it, and the renderer is the piece other people have a reason to
+ * use.
  *
  * The root exports are `parse` · `toHTML` · `KINDS` · `PRIMITIVES` · `PRIMITIVES_VERSION`. There is
  * no `expand`: kinds expansion belongs to `declare`, not here (ADR-045). The Svelte components live

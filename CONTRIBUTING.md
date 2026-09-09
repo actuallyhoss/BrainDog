@@ -262,7 +262,7 @@ Two licences, by path ([`LICENSING.md`](LICENSING.md), [ADR-041](docs/16-DECISIO
 
 | Path | Licence |
 |---|---|
-| everything not listed below | **AGPL-3.0-only** — the root `LICENSE` |
+| everything not listed below | **Apache-2.0**, the root `LICENSE` |
 | `packages/render/**` | **MIT** — `packages/render/LICENSE`, and an SPDX header on the first line of every source file |
 
 By opening a pull request you agree your contribution is licensed under the licence of the path it

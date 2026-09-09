@@ -2,8 +2,9 @@
 
 **A block dialect an agent gets right first time, and two renderers held to one accessibility tree.**
 
-MIT, zero dependencies, and separately licensed from the app on purpose: AGPL on a library kills
-adoption, and this is the piece other people have a reason to use.
+MIT, zero dependencies, and separately licensed from the app on purpose. The app is Apache-2.0 and
+this is MIT, because the block dialect is meant to be embedded anywhere, including in code that is
+not open at all, and MIT asks nothing of whoever embeds it.
 
 ```
 npm i braindog-render
@@ -183,4 +184,4 @@ hundred random byte strings parse and render without throwing.
 
 ---
 
-MIT. Part of [BrainDog](https://github.com/quartz/braindog), which is AGPL-3.0-only.
+MIT. Part of [BrainDog](https://github.com/actuallyhoss/braindog), which is Apache-2.0.

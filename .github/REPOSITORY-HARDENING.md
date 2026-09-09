@@ -182,7 +182,7 @@ Target: `master`. Enforcement: active.
       body. The house commit convention is one declarative subject and an argued body; a merge that
       concatenates six work-in-progress subjects destroys it.
 - [ ] **Automatically delete head branches after merge.**
-- [ ] **Confirm the licence is detected** as AGPL-3.0-only, and that `packages/render/LICENSE` is
+- [ ] **Confirm the licence is detected** as Apache-2.0, and that `packages/render/LICENSE` is
       detected separately as MIT.
 
 ## 12 · Worth doing, with a caveat

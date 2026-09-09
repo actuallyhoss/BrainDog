@@ -20,15 +20,20 @@ export const firstRun = {
 
      THE FIRST SCREEN SETS THE CEILING. It used to open with "What do you want to stop forgetting?"
      over three narrow nouns — an invoice, a domain, a decision — and somebody reading that meets a
-     reminders app with a database under it. The record is the whole of a business that isn't code,
-     and a first run that asks about a domain renewal has already decided it is something smaller.
+     reminders app with a database under it. The record is the whole of a business that is not just
+     code, and a first run that asks about a domain renewal has already decided it is something
+     smaller.
 
      So the scope is stated before the question is asked, and the choices are the PARTS OF A
      BUSINESS rather than three things worth remembering. The mechanic underneath is unchanged and
      still right (19 §6): one row, typed by hand, no pack vocabulary, nothing to approve. You are
      not picking a plan or a template — you are picking where to start, which is a different
      sentence and the reason there are five of them now instead of three. */
-  firstLede: "Everything about your business that isn't code.",
+  /* NOT "that isn't code", WHICH READS AS A BOUNDARY THE PRODUCT DOES NOT HAVE. A repository, a
+     deploy and a bug are all things a record holds; what it is not is a place to keep the code
+     itself. "Not just code" says the same thing without telling a developer their work is out of
+     scope. */
+  firstLede: 'Everything about your business that is not just code.',
   firstBody:
     'Money, the estate it runs on, the people, the projects, and the decisions behind ' +
     'them. Typed, versioned, and readable by every agent you use.',

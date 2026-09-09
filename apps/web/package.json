@@ -3,11 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "vite dev",
     "build": "pnpm --filter @braindog/skin theme && pnpm run build:variants && vite build",
-    "//build:variants": "BEFORE the main build, and that order is load-bearing: `.svelte-kit/output/client` is shared between builds and `bundle` reads its manifest from there, so building a variant LAST left the gate measuring the variant\u2019s chunks against the shipped build\u2019s `index.html` \u2014 and a variant build refreshed the mtime the staleness guard reads, laundering a stale `build/` past the check whose own comment says it exists because 116 bytes got three commits past it. The other record. A screen that branches on a fact about the record has a half the shipped seed cannot draw — the Cloud sentences shipped once and rendered nowhere — so the browser gates measure a second build. Four seconds, and it is what makes `dead-copy` counting a key inside a dead `{#if}` survivable.",
+    "//build:variants": "BEFORE the main build, and that order is load-bearing: `.svelte-kit/output/client` is shared between builds and `bundle` reads its manifest from there, so building a variant LAST left the gate measuring the variant\u2019s chunks against the shipped build\u2019s `index.html` \u2014 and a variant build refreshed the mtime the staleness guard reads, laundering a stale `build/` past the check whose own comment says it exists because 116 bytes got three commits past it. The other record. A screen that branches on a fact about the record has a half the shipped seed cannot draw \u2014 the Cloud sentences shipped once and rendered nowhere \u2014 so the browser gates measure a second build. Four seconds, and it is what makes `dead-copy` counting a key inside a dead `{#if}` survivable.",
     "build:variants": "node -e \"for (const v of ['cloud','quiet','busy']) { process.env.BRAINDOG_VARIANT=v; require('child_process').execSync('npx vite build',{stdio:'inherit'}); }\"",
     "preview": "vite preview",
     "test": "node --test",

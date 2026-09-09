@@ -194,11 +194,26 @@
        the script and these are two scripts.
        ----------------------------------------------------------------------------------------- */
     "alpha": {
-      /* ONE LABEL DEEP, AND THAT IS A TLS CONSTRAINT RATHER THAN A PREFERENCE. Universal SSL on a
-         full-setup zone covers the apex and first-level subdomains only, so `app.alpha.brain.dog`
-         has no certificate without Advanced Certificate Manager or Total TLS. `app-alpha` is
-         free, and identical in every other respect. REPORT.md §1 argues it at length. */
-      "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }],
+      /* TWO LABELS DEEP, AND THE ARGUMENT AGAINST IT WAS TRUE AND IS NOT ANY MORE.
+         This said: "one label deep, and that is a TLS constraint rather than a preference.
+         Universal SSL on a full-setup zone covers the apex and first-level subdomains only, so
+         `app.alpha.brain.dog` has no certificate without Advanced Certificate Manager or Total
+         TLS." Correct about Universal SSL, and wrong about this zone: `brain.dog` already carries
+         two ACTIVE advanced certificates, one for `*.app.brain.dog` and one for
+         `*.alpha.brain.dog`, both managed and both renewing. Checked in the dashboard rather than
+         assumed, because the comment it replaces was also written from a general rule.
+
+         So the naming is a naming decision again, and the decision is the obvious one: the
+         environment is a label and the surface is a label in front of it.
+
+           brain.dog              app.brain.dog              mcp.brain.dog
+           alpha.brain.dog        app.alpha.brain.dog        mcp.alpha.brain.dog
+
+         The apex and `alpha.brain.dog` are the marketing site; `app.*` is this Worker. `mcp.*` is
+         reserved and deliberately not claimed here: the MCP transport is not built, and pointing
+         that hostname at this script would answer an MCP address with the app's shell, which is the
+         shape of lie this repository spends most of its comments hunting. */
+      "routes": [{ "pattern": "app.alpha.brain.dog", "custom_domain": true }],
 
       /* `PUBLIC_HOST` IS THE CSRF CHECK. 51 §5.1 step 3 compares `Origin` against
          `https://<PUBLIC_HOST>` on every cookie-authenticated mutation, so a `PUBLIC_HOST` copied
@@ -219,7 +234,7 @@
          — rather than an undefined binding. It is a var 51 §4.1's `Env` does not list; adding it
          is an amendment, and REPORT.md §8 names why `/api/version` cannot answer without it. */
       "vars": {
-        "PUBLIC_HOST": "alpha.brain.dog",
+        "PUBLIC_HOST": "app.alpha.brain.dog",
         "AI_GATEWAY": "braindog-alpha",
         "AGE_RECIPIENT": "age1<alpha-recipient>",
         "SPARK_ENDPOINT": "",
