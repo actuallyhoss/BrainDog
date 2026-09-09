@@ -153,7 +153,14 @@ const RECIPES = {
      The loop is capped, so a register with no Project column is a walk that ends rather than a gate
      that hangs. */
   related: {
-    route: GRID,
+    /* `/r/tasks` AND NOT `/r/obligations`, WHICH IS WHERE EVERY OTHER GRID RECIPE RUNS.
+       `o` follows the ref the focused cell points at, so the register under test has to draw one.
+       Obligations stopped drawing its two: a list now opens on the fields its declaration nominates
+       rather than on every field marked `index: true`, and neither `party` nor `thing` is among
+       them for that register. The key is not dead, and this recipe was reporting it dead because it
+       was pressing it on a screen with nothing to follow. Tasks draws Project by default and is the
+       same grid with the same handler. */
+    route: '/r/tasks',
     setup: async (page) => {
       await focusFirstCell(page);
       const at = () =>

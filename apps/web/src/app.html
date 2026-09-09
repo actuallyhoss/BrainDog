@@ -37,9 +37,6 @@
          palette solved against a higher contrast floor, and an accent overwrote it. -->
     <script>try{var p=JSON.parse(decodeURIComponent((document.cookie.match(/(?:^|; )bd_pref=([^;]*)/)||[])[1]||'{}')),d=document.documentElement;p.scheme&&d.setAttribute('data-scheme',p.scheme),d.setAttribute('data-text',p.text||'base'),d.setAttribute('data-density',p.density||'comfortable'),p.contrast&&d.setAttribute('data-theme','hc')}catch(e){}</script>
 
-    %sveltekit.head%
-  </head>
-  <body data-sveltekit-preload-data="hover">
     <!--
       THE FIRST PAINT WAS A BLACK RECTANGLE, MEASURED AT UP TO 2.5 SECONDS.
 
@@ -50,51 +47,46 @@
       that second of the ten things costing a person the most, and observed that no amount of copy
       editing closes a gap that happens before any copy exists.
 
-      SO THE SHELL DRAWS THE SHAPE OF ITSELF. Not a spinner, which says "something is happening" and
-      nothing else, and not a skeleton of the CONTENT, which would be a drawing of rows this shell
-      cannot know the number of and would flash into a different arrangement. The rail is a fixed
-      width on every screen above 900px and the ground is a token: two rectangles, no text, no
-      motion, and the app paints over them.
+      SO THE SHELL DRAWS THE SHAPE OF ITSELF: the rail's width and the ground, in the tokens the app
+      uses. Not a spinner, which says something is happening and nothing else, and not a skeleton of
+      the CONTENT, which would be a drawing of rows this shell cannot know the number of.
 
-      IT IS REMOVED BY THE APP EXISTING, and by no script. `body:has(#main)` is true the moment the
-      shell mounts, and `#main` is the one element both the shell and the bare surface draw, so
-      there is nothing to run, nothing to time and nothing to clean up. If the bundle never arrives
-      the frame stays: a reader on a failed load sees the product's own shape rather than a black
-      page, which is the more honest of the two.
+      IT IS A PSEUDO-ELEMENT AND ADDS NO NODE TO THE BODY. It goes when `#main` arrives, by `:has()`,
+      so nothing runs and nothing is timed, and if the bundle never arrives it stays, which is the
+      more honest of the two failures.
 
-      `:has()` AND NOT A `z-index` STACK. `%sveltekit.body%` mounts into a `display: contents`
-      wrapper, which has no box, so it can carry no stacking context and nothing inside it can be
-      told to paint above a positioned sibling. Removing the frame outright is simpler than
-      arranging for it to be covered, and it is one selector.
+      AND NOTHING IN THIS FILE MAY SPELL A KIT PLACEHOLDER, WHICH IS HOW THE FIRST VERSION OF THIS
+      COMMENT BROKE THE WHOLE APP. It quoted the body placeholder, in prose, to explain itself.
+      SvelteKit substitutes the FIRST occurrence and leaves the rest: the comment was filled with the
+      app and the real one, in the body below, shipped as literal text. Measured: `main#main` absent
+      from every route, thirty-nine elements on the page, no console error, no page error, an empty
+      screen. It went to staging and served there.
 
-      NO COLOUR LITERALS: both are the same tokens the rail and the body use, and `colour-grep`
-      reads this file.
+      So the two names are written apart in prose here, `sveltekit` and `body` in separate words,
+      and the only complete spellings in this file are the two that are meant to be replaced.
     -->
-    <div class="boot" aria-hidden="true">
-      <div class="boot-rail"></div>
-    </div>
     <style>
-      .boot {
+      body::before {
+        content: "";
         position: fixed;
         inset: 0;
-        display: flex;
-        background: var(--bg, Canvas);
+        background: linear-gradient(90deg, var(--sunk, Canvas) 0 var(--rail, 232px), var(--bg, Canvas) var(--rail, 232px));
       }
 
-      body:has(#main) .boot {
-        display: none;
-      }
-      .boot-rail {
-        flex: none;
-        inline-size: var(--rail, 232px);
-        background: var(--sunk, Canvas);
-      }
       @media (width < 900px) {
-        .boot-rail {
-          display: none;
+        body::before {
+          background: var(--bg, Canvas);
         }
       }
+
+      body:has(#main)::before {
+        content: none;
+      }
     </style>
+
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

@@ -15,7 +15,7 @@
   import type { Snippet } from 'svelte';
 
   import Icon from './Icon.svelte';
-  import { drew } from './screen.svelte.ts';
+  import { drew, undrew } from './screen.svelte.ts';
   import type { IconName } from './icons.ts';
 
   export type EmptyKind = 'no-data-yet' | 'no-results' | 'cleared' | 'no-permission' | 'error';
@@ -88,7 +88,14 @@
    * are a screen that has an answer and the answer is nothing. A gate measures a designed empty
    * state normally and must not measure a refusal, which is the whole reason they are told apart.
    */
-  $effect(() => drew(kind === 'error' ? 'refused' : 'empty'));
+  $effect(() => {
+    const said = kind === 'error' ? 'refused' : 'empty';
+    drew(said);
+    /* AND IT IS TAKEN BACK WHEN THIS GOES. An `Empty` mounts for a frame on a list whose first page
+       is still being assembled, and without the teardown that frame set the answer for the life of
+       the screen: thirty-nine rows drawn and `data-screen="empty"` over them. */
+    return () => undrew(said);
+  });
 </script>
 
 <div class="empty" data-kind={kind} class:compact>

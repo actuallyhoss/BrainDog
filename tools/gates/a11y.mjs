@@ -148,8 +148,14 @@ const STATES = [
   { name: 'empty: not found', route: '/r/nope', keys: [], expect: '.empty[data-kind="error"]' },
   /* A TOAST, WHICH IS ONE KEYSTROKE AWAY AND WAS IN FRONT OF NO SCENARIO. The list covered sheets,
      menus, the palette, arrange mode and two empty states; the surface that appears after almost
-     every action in this mock-up appeared in none of them. `e` on a focused row raises one. */
-  { name: 'toast', route: '/r/obligations', keys: ['e'], expect: '.toast' },
+     every action in this mock-up appeared in none of them.
+
+     `Backspace` AND NOT `e`. `e` used to answer with a sentence about what it would have done, and
+     it opens the cell for editing now, so the key this scenario was built on stopped raising a
+     toast the day it started doing its job. Archive is the verb that still raises one, and it is
+     the better subject anyway: it is the toast a person actually meets, it carries an Undo, and a
+     toast with a control in it is the harder thing for this gate to be right about. */
+  { name: 'toast', route: '/r/obligations', keys: ['Backspace'], expect: '.toast' },
 ];
 
 const TYPES = {

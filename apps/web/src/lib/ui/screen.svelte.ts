@@ -45,7 +45,7 @@ export type Settled = 'ready' | 'empty' | 'refused';
  * stop. So a call is evidence of a settled screen only once it has come back, and a screen with a
  * call still out is not settled whatever else it has said.
  */
-const s = $state({ pending: 0, calls: 0, refused: false, drew: null as Settled | null });
+const s = $state({ pending: 0, calls: 0, refused: false, ready: false, empties: 0, refusals: 0 });
 
 /** A call started. */
 export function opened(): void {
@@ -60,19 +60,31 @@ export function closed(ok: boolean): void {
 }
 
 /**
- * A route, or an `Empty`, saying what it drew.
+ * A route saying it drew, and an `Empty` saying what it is.
  *
- * IT ONLY EVER UPGRADES, and the order the two callers run in is why. A route says `ready` and the
- * `Empty` inside it says `empty`, and which of those two effects Svelte runs first is a fact about
- * component trees rather than about the screen. Ranking them makes the answer the same either way:
- * a refusal is the strongest thing true of a screen, a designed empty state is next, and `ready` is
- * the claim anything else makes. Last-write-wins would have made `data-screen` depend on effect
- * order, which is the kind of thing that is right in every test and wrong once in production.
+ * THE EMPTY AND THE REFUSAL ARE COUNTED, NOT LATCHED, and the first version latched them. It ranked
+ * the three values and kept the strongest, so an `Empty` that mounted for one frame while the first
+ * page of rows was still being assembled set `empty` for the life of the screen, and nothing could
+ * take it back. Measured on `/r/obligations`: thirty-nine rows in the DOM, zero elements with the
+ * empty class, and `data-screen="empty"`. A gate reading that would have measured a full list and
+ * been told it was blank.
+ *
+ * A COUNT RETRACTS ITSELF, which is the whole reason it is a count. `Empty` increments on mount and
+ * decrements on destroy, so the answer is about what is on the screen NOW rather than about what
+ * has ever been on it, and the order the effects run in stops mattering: `refused` wins over
+ * `empty` and `empty` over `ready` because of what is present, not because of who spoke last.
  */
-const RANK: Record<Settled, number> = { ready: 0, empty: 1, refused: 2 };
-
 export function drew(what: Settled): void {
-  if (s.drew === null || RANK[what] > RANK[s.drew]) s.drew = what;
+  if (what === 'ready') s.ready = true;
+  else if (what === 'empty') s.empties++;
+  else s.refusals++;
+}
+
+/** The other half of `drew`, for a component that is going away. `ready` is not retractable: a
+    route that drew once has drawn, and it is the claim the counts are measured against. */
+export function undrew(what: Settled): void {
+  if (what === 'empty') s.empties = Math.max(0, s.empties - 1);
+  else if (what === 'refused') s.refusals = Math.max(0, s.refusals - 1);
 }
 
 /**
@@ -85,7 +97,9 @@ export function leaving(): void {
   s.pending = 0;
   s.calls = 0;
   s.refused = false;
-  s.drew = null;
+  s.ready = false;
+  s.empties = 0;
+  s.refusals = 0;
 }
 
 /**
@@ -119,6 +133,8 @@ export function settled(): Settled | undefined {
    * above takes the attribute away until the answer lands: the claim stops being available exactly
    * when it stops being true, without the route being edited again.
    */
-  if (s.drew !== null) return s.drew;
+  if (s.refusals > 0) return 'refused';
+  if (s.empties > 0) return 'empty';
+  if (s.ready) return 'ready';
   return s.calls > 0 ? 'ready' : undefined;
 }

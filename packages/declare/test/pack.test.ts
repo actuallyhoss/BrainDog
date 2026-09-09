@@ -20,7 +20,7 @@ const value = <T>(r: unknown): T => {
 };
 
 const refusal = (r: unknown) => {
-  const x = r as { ok: boolean; refusal: { code: string; fix: string; at?: string } };
+  const x = r as { ok: boolean; refusal: { code: string; fix: string; at?: string; allowed?: readonly string[] } };
   assert.equal(x.ok, false, 'this was supposed to be refused');
   return x.refusal;
 };
