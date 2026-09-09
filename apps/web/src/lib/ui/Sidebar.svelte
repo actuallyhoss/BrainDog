@@ -162,6 +162,55 @@
 
   const here = (href: string) => page.url.pathname === href;
   const under = (href: string) => page.url.pathname.startsWith(href);
+  /**
+   * WHICH SECTIONS THIS PERSON HAS PUT AWAY.
+   *
+   * THIRTY-FOUR ITEMS OF NAVIGATION, UNCHANGING, ON EVERY SCREEN. A friction pass counted them:
+   * twenty-seven links plus the record switcher under seven headings, in a nested scroller whose
+   * content is 916px inside 574px of space. The consequence was in every screenshot that pass took:
+   * one item sliced horizontally in half by the scroller boundary, permanently, at the default
+   * window size. It is tenth of the ten things it found costing a person the most, and it is the
+   * only one of the ten that is on screen the entire time.
+   *
+   * A SECTION AND NOT AN ITEM, because a rail is already the reader's to reorder and to hide from
+   * (`19 §3`), one row at a time, and nobody hides twenty rows one at a time. A person who does not
+   * run projects wants the whole Projects heading gone, and wants it gone on every screen, and
+   * wants it back the day they do.
+   *
+   * IT IS NOT THE SAME MECHANISM AS `Hide`. Hiding takes a page out of the rail and into a holding
+   * pen; this folds a heading somebody still wants. The difference is whether the thing comes back
+   * on its own: a folded section opens the moment the reader is looking at something inside it, and
+   * a hidden page never returns until they say so.
+   *
+   * PER DEVICE, like every other key in `pref.ts`, and `19 §3` says it should not be: nav order,
+   * hidden pages, pins and dismissals must survive a change of device. `50 §10` owns that deviation
+   * and names the migration; this is one more key on the wrong side of it and the screen does not
+   * claim otherwise.
+   */
+  let shut = $state(new Set(pref.read().railShut ?? []));
+
+  function fold(section: string) {
+    const next = new Set(shut);
+    if (next.has(section)) next.delete(section);
+    else next.add(section);
+    shut = next;
+    pref.write({ railShut: [...next] });
+  }
+
+  /**
+   * A SECTION HOLDING WHAT YOU ARE LOOKING AT IS NEVER SHUT.
+   *
+   * Folding is about what a person does not use, and the screen they are on is proof they are using
+   * it. Without this, arriving from the palette or from a link inside a folded section shows a rail
+   * with no `aria-current` anywhere in it: the product's own answer to "where am I" disappears
+   * exactly when a reader is most likely to need it.
+   */
+  const openHere = (entries: NavEntry[]) => entries.some((e) => here(e.href));
+  const isShut = (section: string, entries: NavEntry[]) => shut.has(section) && !openHere(entries);
+
+  /* The registers are not a declared section, so they carry their own test: the same rule, over the
+     one list this rail draws without asking `arrange` for it. */
+  const listsShut = $derived(shut.has(copy.lists) && !registers.some((r) => under(`/r/${r.id}`)));
 
   void ({} as RegisterDecl);
 </script>
@@ -238,8 +287,31 @@
   <div class="scroll">
     <!-- Declared. Sections and order come from `page` rows, and the user's arrangement wins. -->
     {#each sections as [section, entries]}
-      <h2 class="section">{section}</h2>
-      <ul class="group">
+      <!--
+        THE HEADING IS THE CONTROL. A separate chevron beside it would be a second target the width
+        of a glyph, on a row that is already exactly the right size to press, and `19 §3` gives the
+        rail a right-click menu for the per-item verbs rather than a column of controls.
+
+        `aria-expanded` ON A BUTTON INSIDE THE HEADING, not on the heading itself: a `<h2>` is not
+        interactive and giving it a role would take the heading out of the document outline, which
+        is what a screen reader uses to skip a section it does not want. The button names what it
+        controls, so "Projects, collapsed, button" is the whole announcement.
+      -->
+      {@const folded = isShut(section, entries)}
+      <h2 class="section">
+        <button
+          type="button"
+          class="fold"
+          aria-expanded={!folded}
+          onclick={() => fold(section)}
+        >
+          <span class="fold-mark" aria-hidden="true" data-shut={folded ? '' : undefined}>
+            <Icon name="chevronDown" size="s" />
+          </span>
+          {section}
+        </button>
+      </h2>
+      <ul class="group" hidden={folded}>
         {#each entries as entry}
           <li>
             <!-- A page about a THING wears that thing's colour. The hue is chosen once at create
@@ -270,8 +342,15 @@
 
     <!-- The registers themselves. Native, never pack-positioned: a page can be uninstalled with the
          pack that declared it, and the collections underneath it still have to be reachable. -->
-    <h2 class="section">{copy.lists}</h2>
-    <ul class="group">
+    <h2 class="section">
+      <button type="button" class="fold" aria-expanded={!listsShut} onclick={() => fold(copy.lists)}>
+        <span class="fold-mark" aria-hidden="true" data-shut={listsShut ? '' : undefined}>
+          <Icon name="chevronDown" size="s" />
+        </span>
+        {copy.lists}
+      </button>
+    </h2>
+    <ul class="group" hidden={listsShut}>
       {#each registers as r}
         <li>
           <a class="item tap" href="/r/{r.id}" aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
@@ -572,13 +651,51 @@
      opposite way; see blocks.css. */
   .section {
     margin: var(--sp-5) 0 var(--sp-1);
-    padding-inline: var(--sp-3);
     color: var(--dim);
     font-family: var(--font-ui);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
+  }
+
+  /* THE WHOLE HEADING IS THE TARGET, so the padding moves off the `h2` and onto the button: a
+     control the width of its own text, in a rail, is a control people miss. `--tap` is the floor on
+     a coarse pointer and this row is eleven-point type, so the invisible hit box is doing the work
+     the drawing cannot. */
+  .fold {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: start;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+
+  .fold:hover {
+    color: var(--ink2);
+  }
+
+  /* THE MARK TURNS RATHER THAN BEING SWAPPED. Two glyphs would be two things to keep in step and
+     one of them would eventually be the wrong way round; a rotation is the same drawing making the
+     same promise, and it says which way the section is about to go. */
+  .fold-mark {
+    display: grid;
+    flex: none;
+    place-items: center;
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .fold-mark[data-shut] {
+    transform: rotate(-90deg);
   }
 
   .scroll .section:first-child {

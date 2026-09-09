@@ -716,8 +716,16 @@ export const copy = {
      * invoice, a domain and a person are three things a reader already owns.
      */
     row: 'one thing you are keeping track of: an invoice, a domain, a person',
-    page: 'a screen made of blocks. It is a row, so you can change it',
-    block: 'one thing on a page: a table, a figure, a note',
+    /* IT DEFINED THE WORD AND THEN UNTAUGHT IT. `a screen made of blocks. It is a row, so you can
+       change it` introduces `block`, which the reader has not met, and then says a page is a row,
+       which is true of how it is stored and is not a thing anybody needed to know at the moment
+       they first opened one. A friction pass counted `block` as tax for exactly this: the sentence
+       teaching it was doing two other jobs at the same time.
+
+       WHAT IS LEFT IS WHAT A READER CAN DO WITH IT. `block` is defined on its own, one line down,
+       on the screen where somebody meets one. */
+    page: 'a screen you arrange yourself, made of pieces that each read from a list',
+    block: 'one piece of a page: a table, a figure, a note',
   } as const,
 
   /* the settings areas `19 §2` says an earlier draft dropped */

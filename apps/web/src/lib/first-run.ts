@@ -144,9 +144,16 @@ export const firstRun = {
    * so, and `agentCommand` is gone rather than commented out, so nothing can render it by accident.
    */
   agentTitle: 'Set it up in your agent',
+  /* `MCP server` WAS THE SECOND UNDEFINED WORD ON THE FIRST SCREEN. A friction pass counted it as
+     tax and noted that the product explains it nowhere at all: a reader who does not already know
+     what MCP is meets an acronym in the second sentence of the product, on the screen where they
+     have the least reason to look it up. The clause is now in the sentence that needs it, which is
+     `19 §6`'s own rule, and the acronym stays because it is the word the reader will type into
+     their agent's settings and a product that hides it has helped nobody. */
   agentBody:
-    'The record is an MCP server. Add it once and the agent you already have can make the ' +
-    'lists, fill the first rows, and read the record from then on.',
+    'Your agent can read and write this record directly, over MCP: the connector standard Claude, ' +
+    'Codex and Cursor already speak. Add it once and the agent you have can make the lists, fill ' +
+    'the first rows, and read the record from then on.',
   agentNotYet:
     'The address is not open yet. Nothing here needs it: everything on this screen works without an agent, and the record will hand you the command when there is one to hand over.',
 

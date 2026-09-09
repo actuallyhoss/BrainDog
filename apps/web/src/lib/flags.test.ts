@@ -57,6 +57,7 @@ test('a flag name is never also a preference', () => {
     nav: true,
     defined: true,
     sampleSaid: true,
+    railShut: true,
   };
   for (const name of Object.keys(FLAGS))
     assert.ok(!(name in prefKeys), `${name} is a flag and a preference. It has to be one of them.`);

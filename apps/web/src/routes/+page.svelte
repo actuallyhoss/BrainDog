@@ -171,11 +171,27 @@
       <ul class="ledger">
         {#each data.questions as q}
           <li>
-            <!-- THREE ROW TYPES INTERLEAVE IN THIS ONE LIST — a question, a lapsing service and
-                 an obligation — and the only thing separating them was the shape of the id. A glyph
-                 per type says what each row IS before the eye reaches the words. -->
+            <!--
+              THREE ROW TYPES INTERLEAVE IN THIS ONE LIST: a question, a lapsing service and an
+              obligation. A glyph per type says what each row IS before the eye reaches the words,
+              which is what the id used to be doing badly.
+
+              THE ID IS GONE FROM THE LEADING COLUMN, AND THE GLYPH IS WHY IT CAN BE. A friction
+              pass counted ten opaque identifiers printed as the leftmost column of the screen whose
+              whole job is "what needs me today": `SG34`, `SG31`, `services#2`, `obligations#20`.
+              `SG` is expanded nowhere in the product, so a new person has no way to learn it, and
+              seventy numbers on a screen that needs about three is what the pass measured this
+              screen at.
+
+              THE ARGUMENT THAT PUT IT THERE WAS ABOUT COLLISION: this is the one list that mixes
+              registers, and a lapsing service and an overdue obligation both drew `#2`. That is a
+              collision between two IDS, and it disappears with them. What tells the rows apart is
+              the glyph and the sentence, which is what a reader was using anyway. The id has not
+              gone anywhere: `y` copies it, the row's own screen prints it, and `/audit` still leads
+              with it, because those are the three places somebody wants a number they can say.
+            -->
             <a class="line line-tall" href="/decide/{q.id}">
-              <span class="seq"><Icon name="decide" size="s" />{q.id}</span>
+              <span class="seq"><Icon name="decide" size="s" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{q.cost}</span>
@@ -189,12 +205,7 @@
         {#each lapsing as s}
           <li>
             <a class="line" href="/r/services/{s.seq}">
-              <!-- THE SPOKEN ID, QUALIFIED, because this is the one list in the product that mixes
-                   registers. `19 §9` makes the row number the thing you can say out loud — "It has a
-                   number you can say: #125" — and that only holds inside one list: a lapsing service
-                   and an overdue obligation both drew `#2` here, told apart by a twelve-pixel glyph.
-                   `services#2` is what the clipboard copies and what `/audit` prints. -->
-              <span class="seq"><Icon name="service" size="s" />services#{s.seq}</span>
+              <span class="seq"><Icon name="service" size="s" /></span>
               <span class="line-main">
                 <span class="line-title">{s.fields.name} is lapsing</span>
               </span>
@@ -212,7 +223,7 @@
           {@const owed = e.fields.direction === 'owed_to_me'}
           <li>
             <a class="line" href="/r/obligations/{e.seq}">
-              <span class="seq"><Icon name="obligation" size="s" />obligations#{e.seq}</span>
+              <span class="seq"><Icon name="obligation" size="s" /></span>
               <span class="line-main">
                 <span class="line-title">{e.fields.what}</span>
               </span>
@@ -321,14 +332,17 @@
     color: var(--ink);
   }
 
-  /* THE ID COLUMN HOLDS A QUALIFIED ID HERE. The ledger's default first track is `12ch`, which fits
-     `#125` and truncates `obligations#12` — and this is the one list in the product that mixes
-     registers, so the qualifier is the part that makes the number sayable. Scoped, and above 640px
-     for the reason `/audit` and `/decide` carry the same guard: below it the row is a card, and a
-     component `<style>` is unlayered and beats `@layer components`. */
+  /* THE FIRST TRACK IS A GLYPH NOW, AND IT WAS SIXTEEN CHARACTERS OF ID. It held a qualified id,
+     `obligations#12`, because this is the one list in the product that mixes registers and two rows
+     from two lists both drew `#2`. Nothing carries the id here any more: the glyph tells the rows
+     apart and the sentence beside it says which one this is, so sixteen characters of leading
+     column become one drawing and the words start where the eye does.
+
+     Scoped, and above 640px for the reason `/audit` and `/decide` carry the same guard: below it the
+     row is a card, and a component `<style>` is unlayered and beats `@layer components`. */
   @media (width >= 640px) {
     .ledger :global(.line) {
-      grid-template-columns: 16ch minmax(0, 1fr) auto 9ch;
+      grid-template-columns: 2ch minmax(0, 1fr) auto 9ch;
     }
   }
 

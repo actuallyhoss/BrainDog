@@ -127,6 +127,18 @@ export type Pref = {
    * takes it away for good.
    */
   sampleSaid?: boolean | undefined;
+  /**
+   * Which rail sections this person has folded away.
+   *
+   * THIRTY-FOUR ITEMS OF NAVIGATION ON EVERY SCREEN, in a nested scroller that cut one of them in
+   * half at the default window size. The rail was already the reader's to reorder and to hide from
+   * one row at a time, and nobody hides twenty rows one at a time.
+   *
+   * SECTION NAMES AND NOT IDS, because a section IS its heading: `arrange()` groups by the `section`
+   * string a page declares, and there is no other handle on one. A section that is renamed comes
+   * back open, which is the right answer: it is not the section that was put away.
+   */
+  railShut?: string[] | undefined;
 };
 
 const NAME = 'bd_pref';
