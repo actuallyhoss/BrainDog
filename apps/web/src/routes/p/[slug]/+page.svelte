@@ -649,8 +649,8 @@
               <p class="block-slice" role="status">
                 {block.source === 'forecast.runway'
                   ? copy.ofWhichWalked(block.shown, block.total, block.horizon ?? 180)
-                  : copy.ofWhichDrawn(block.shown, block.total)}{#if to}
-                  &nbsp;— <a class="tap" href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
+                  : copy.ofWhichDrawn(block.shown, block.total)}.{#if to}
+                  <a class="tap" href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
                 {/if}
               </p>
             {/if}

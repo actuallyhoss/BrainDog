@@ -360,14 +360,14 @@ export function unreadable(decl: MetricDecl): string[] {
 
   for (const key of Object.keys(decl))
     if (!READS_KEY.has(key))
-      out.push(`${key}: is published in 08 and not read by this build — the figure would be the ungrouped one`);
+      out.push(`${key}: is published in 08 and not read by this build. The figure would be the ungrouped one`);
 
   const value = decl.value as Record<string, unknown> | undefined;
   if (!value || typeof value !== 'object') out.push('value: is missing');
   else if (!('ratio' in value) && !('diff' in value)) {
     const named = Object.keys(value);
     if (!named.some((k) => READS_AGGREGATION.includes(k)))
-      out.push(`value: ${named.join(', ') || 'nothing'} — this build reads ${READS_AGGREGATION.join(' · ')}`);
+      out.push(`value: ${named.join(', ') || 'nothing'} is not an aggregation this build reads. It reads ${READS_AGGREGATION.join(' · ')}`);
   } else {
     const pair = ('ratio' in value ? value.ratio : value.diff) as { of?: object; per?: object } | undefined;
     for (const side of ['of', 'per'] as const) {
@@ -378,7 +378,7 @@ export function unreadable(decl: MetricDecl): string[] {
   }
 
   if (decl.format && !decl.format.startsWith('money.') && !READS_FORMAT.includes(decl.format))
-    out.push(`format: ${decl.format} — this build writes money.<CUR> · ${READS_FORMAT.join(' · ')}`);
+    out.push(`format: ${decl.format} is not a format this build writes. It writes money.<CUR> · ${READS_FORMAT.join(' · ')}`);
 
   return out;
 }
@@ -400,7 +400,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   /* A TEMPLATE IS NOT A METRIC UNTIL IT HAS ITS PARAMETER. Read as it stands, `thing is {{it}}`
      would fail the register's value check and report "thing has no value {{it}}" — technically
      true and useless. It is named for what it is instead. */
-  if (isTemplate(decl)) refusals.push(`${decl.metric}: is a template — read it as ${decl.metric}:<name>`);
+  if (isTemplate(decl)) refusals.push(`${decl.metric}: is a template. Read it as ${decl.metric}:<name>`);
 
   /* THE SHAPE OF THE TARGET, not only its presence. `docs/08` writes it three times as
      `{ lte: { amount, currency } }`, and a target of an object compared with `<=` is neither true
@@ -409,7 +409,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const bound = decl.target && ('lte' in decl.target ? decl.target.lte : decl.target.gte);
   if (decl.target && typeof bound !== 'number')
     refusals.push(
-      `${decl.metric}: target takes a number in the figure's own units — { lte: 400000 } for money in minor units, not { lte: { amount, currency } }`,
+      `${decl.metric}: target takes a number in the figure's own units. Write { lte: 400000 } for money in minor units, not { lte: { amount, currency } }`,
     );
 
   /* AND THE AGGREGATION. `08` §2.2 publishes eleven and this build reads six; the other five reached
@@ -421,7 +421,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
 
   const shift = decl.window ? windowMs(decl.window) : null;
   if (decl.window && shift === null)
-    refusals.push(`${decl.metric}: ${decl.window} is not a window — write 30d, 4w or 3m`);
+    refusals.push(`${decl.metric}: ${decl.window} is not a window. Write 30d, 4w or 3m`);
 
   if (register && REGISTERS[register])
     refusals.push(...explain(compile(register, decl.where)).map((r) => `${decl.metric}: ${r}`));

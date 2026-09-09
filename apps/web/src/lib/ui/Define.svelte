@@ -32,13 +32,17 @@
      could, re-running would spend a second word without anybody having read the first. */
   // svelte-ignore state_referenced_locally
   const say = teach(noun) ? copy.defines[noun] : null;
+
+  /* THE CLAUSE IS A SENTENCE, so it needs its own capital. `copy.defines` is written lowercase
+     because it is a glossary of clauses; the one place they are read is here, in a line. */
+  const said = say === null ? null : `${say[0]!.toUpperCase()}${say.slice(1)}`;
 </script>
 
 <!-- A CLAUSE IS PART OF A SENTENCE AND ENDS LIKE ONE. Every call site puts this at the end of a
      line, and the line already ended with a full stop before the dash arrived — so `/start` read
      "One real row is enough. You can delete it later. — one thing in a list. It has a number you can
      say", a fragment trailing off a finished paragraph. The clause closes itself. -->
-{#if say}<span class="define">— {say}.</span>{/if}
+{#if said}<span class="define">{said}.</span>{/if}
 
 <style>
   /* Dimmer and smaller than the sentence it joins: it is an aside inside a line, and a clause that

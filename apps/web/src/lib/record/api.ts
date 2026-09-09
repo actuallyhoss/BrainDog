@@ -140,8 +140,8 @@ export type Noticed = {
  * twelve times, and the honest line says so rather than drawing an empty strip.
  */
 const FIXES: Readonly<Record<string, string>> = {
-  ENUM_VALUE_UNKNOWN: 'the value being written is not one this field declares — either widen the field or fix what writes it',
-  REQUIRED_MISSING: 'something keeps arriving without it — either it is not really required, or whatever sends these rows never had it',
+  ENUM_VALUE_UNKNOWN: 'the value being written is not one this field declares. Either widen the field or fix what writes it',
+  REQUIRED_MISSING: 'something keeps arriving without it. Either it is not really required, or whatever sends these rows never had it',
   TYPE_MISMATCH: 'what arrives is not the shape this field declares',
   REF_NOT_FOUND: 'the row it points at is not in this record yet',
   OUT_OF_BOUNDS: 'the value is outside the range this field declares',
@@ -1187,7 +1187,7 @@ export function packDiff(pack: PackInfo): PackDiff {
     seeds: '1 example row, marked example, clearable in one action',
     /* AND THIS ONE IS A GUARANTEE, not a measurement. `04 §3.2`: "A pack physically cannot read a
        row at install time, so \"0 rows read\" is a guarantee." */
-    touches: 'nothing you have written — 0 rows read, 0 of your rows changed',
+    touches: 'nothing you have written: 0 rows read, 0 of your rows changed',
     unread: !pack.installed,
   };
 }
@@ -1371,7 +1371,7 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
         columns: [],
         entries: [],
         matched: [],
-        refusals: [`${e instanceof Error ? e.message : String(e)} — this block could not be read`],
+        refusals: [`this block could not be read: ${e instanceof Error ? e.message : String(e)}`],
         rows: [],
         shown: 0,
         total: 0,
@@ -1410,7 +1410,7 @@ function readBlock(b: PageBlock): BlockResult {
          - a key the type does not carry at all — `when:` is in 06 §1.1 and is not read anywhere.
        All three are the block's own error, so they go where `explain()` goes. */
     const said = [...refusals];
-    if (b.source && !register) said.push(`source: ${b.source} — this build reads register.<id> and forecast.runway`);
+    if (b.source && !register) said.push(`source: ${b.source} is not a source this build reads. It reads register.<id> and forecast.runway`);
     if (register) {
       /* `seq` is a column and not a field: it is on the ROW rather than in its fields, and `toRows`
          renders it as `#4`. Any pack may name it, so it belongs in the set a column may resolve to

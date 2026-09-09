@@ -1021,7 +1021,7 @@
                nowhere in this build that shows a field's own declaration; a link that went to a
                filter matching nothing would be worse than the plain word. -->
           {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}this register{/if}
-          were refused over {seen.days} days — {seen.fix}.
+          were refused over {seen.days} days: {seen.fix}.
           <!-- NO `title`. It carried `seen.why` — the same fact as the sentence beside it, in the
                schema's spelling, in an attribute no touch device shows and no keyboard reaches. Two
                tellings of one thing, one of them unreachable. -->

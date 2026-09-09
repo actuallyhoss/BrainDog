@@ -60,7 +60,7 @@ export const firstRun = {
      which manufactures work is the failure. */
   secondHeading: 'One kind of thing is a list. Two is a record.',
   secondBody:
-    'Rows in one list can point at rows in another — an invoice at the client it is for, a renewal at the project it belongs to — and that is where the record starts answering questions you did not ask it.',
+    'Rows in one list can point at rows in another: an invoice at the client it is for, a renewal at the project it belongs to. That is where the record starts answering questions you did not ask it.',
 
   /* AND THE WORD *PACK*, FOR THE FIRST TIME IN THE PRODUCT, DEFINED IN PLACE. It does not appear on
      screen one at all: selecting a pack means reading an install diff written in the language of

@@ -58,8 +58,8 @@
       heading
       title={bare ? `“${raw}” could be in any of your lists.` : `Nothing answers to “${raw}”.`}
       body={bare
-        ? 'Every list has a #1, so a number on its own does not say which. Put the list in front of it — obligations#4, or tasks#7.'
-        : 'An id is a list and a number, like obligations#4 — or the short code a thing was given, like SG31.'}
+        ? 'Every list has a #1, so a number on its own does not say which. Put the list in front of it: obligations#4, or tasks#7.'
+        : 'An id is a list and a number, like obligations#4, or the short code a thing was given, like SG31.'}
     >
       <!-- IT SAID `Search` AND WENT HOME, beside a second button that also went home. Two controls,
            one behaviour, and the one with the magnifying glass was named for something it did not

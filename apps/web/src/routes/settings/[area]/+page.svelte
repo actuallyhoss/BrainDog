@@ -678,7 +678,7 @@
                   weight="bare"
                   onclick={() =>
                     toasts.push(
-                      copy.notWritten(`One list would be picked, and ${p.name} given a different level on it — one invite, one access.grant naming that list`),
+                      copy.notWritten(`One list would be picked, and ${p.name} given a different level on it, which takes one invite and one access.grant naming that list`),
                       { intent: 'warn' },
                     )}
                 ><Icon name="plus" size="s" />{copy.addException}</Button>
@@ -1110,7 +1110,7 @@
                    `PULL_AUTH_REJECTED` and wrong for the other six codes in the family. -->
               {#if src.error}
                 <p class="who-why">
-                  {src.error.fix}{#if src.error.code === 'PULL_AUTH_REJECTED'}{' — '}{src.error.credential}{/if}
+                  {src.error.fix}{#if src.error.code === 'PULL_AUTH_REJECTED'}{' · '}{src.error.credential}{/if}
                 </p>
               {/if}
             </li>
@@ -1243,7 +1243,7 @@
           </ul>
           <div class="row-actions">
             <Button
-              onclick={() => toasts.push(copy.notWritten('A time would be picked, and the record put back to it — every write after it gone, and the audit ending there plus one restore.pitr row'), { intent: 'bad' })}
+              onclick={() => toasts.push(copy.notWritten('A time would be picked, and the record put back to it, with every write after it gone and the audit ending there plus one restore.pitr row'), { intent: 'bad' })}
             >{copy.restoreTo}</Button>
             <!-- `53 §5.5`'s precondition: *"the owner knows the last good instant — `/audit` shows
                  every write with its time"*. The control that answers it is one link away. -->
@@ -1285,7 +1285,7 @@
         <div class="row-actions">
           <Button
             onclick={() =>
-              toasts.push(copy.notWritten('The whole record would be written to one .dog file — a SQLite database you can open with sqlite3'))}
+              toasts.push(copy.notWritten('The whole record would be written to one .dog file, a SQLite database you can open with sqlite3'))}
           >{copy.export}</Button>
           <Button
             weight="bare"
@@ -1315,7 +1315,7 @@
           <Button
             weight="bare"
             onclick={() =>
-              toasts.push(copy.notWritten('The rows would be written without where each one came from — a clean handover'))}
+              toasts.push(copy.notWritten('The rows would be written without where each one came from, which is a clean handover'))}
           >{copy.exportRows}</Button>
         </div>
       </Section>

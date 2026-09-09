@@ -57,7 +57,7 @@ test('THE DEAD BUTTON SAYS WHICH FIELDS, and reads as English for one and for th
      input; printing it again in the footer put the same words on screen twice. */
   assert.equal(
     copy.rowFieldProblem(['Amount']),
-    'Amount cannot be stored as typed — the reason is under the field.',
+    'Amount cannot be stored as typed. The reason is under the field.',
   );
   assert.match(copy.rowFieldProblem(['Amount', 'Paid']), /^Amount and Paid /);
 });

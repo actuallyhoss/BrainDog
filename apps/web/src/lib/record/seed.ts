@@ -243,7 +243,7 @@ export function seedBlock(kind: string, register: string): PageBlock | null {
 
   return {
     kind,
-    heading: partition ? `${decl.name} — ${partition.value.replace(/_/g, ' ')}` : decl.name,
+    heading: partition ? `${decl.name}: ${partition.value.replace(/_/g, ' ')}` : decl.name,
     span: spec.minSpan,
     source: `register.${register}`,
     columns,

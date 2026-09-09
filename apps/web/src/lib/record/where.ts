@@ -253,10 +253,10 @@ function allowed(register: string, field: string): string[] | null {
  * COPIED rather than imported because this module is the mock of the record and must answer with no
  * server at all — copied byte for byte, so the day it is wired the sentence does not change.
  */
-const WRONG_SHAPE = 'where: takes a sentence — `state is open, due before +30d` — and not a tree of objects.';
+const WRONG_SHAPE = 'where: takes a sentence like `state is open, due before +30d`, and not a tree of objects.';
 
 const cannotSay = (text: string): string =>
-  `${text} — that is not something a filter can say. Write is, is not, before or after.`;
+  `${text}: that is not something a filter can say. Write is, is not, before or after.`;
 
 export function compile(register: string, where: string | undefined): Where {
   const clauses: Clause[] = [];
@@ -286,14 +286,14 @@ export function compile(register: string, where: string | undefined): Where {
 
     const field = fieldOf(register, name);
     if (!field) {
-      bad.push(`${text} — there is no field called ${name}`);
+      bad.push(`${text}: there is no field called ${name}`);
       continue;
     }
 
     if (op === 'before' || op === 'after') {
       const word = rest.trim();
       if (resolveDay(word, Date.now()) === null) {
-        bad.push(`${text} — ${word} is not a date`);
+        bad.push(`${text}: ${word} is not a date`);
         continue;
       }
       clauses.push({ field, op, day: word });
@@ -350,13 +350,13 @@ export function compile(register: string, where: string | undefined): Where {
     );
     if (reach) {
       bad.push(
-        `${text} — "${UNIMPLEMENTED.filter((w) => reach.toLowerCase().startsWith(w)).sort((a, b) => b.length - a.length)[0]}" is not an operator this build reads. It reads: is · is not · before · after`,
+        `${text}: "${UNIMPLEMENTED.filter((w) => reach.toLowerCase().startsWith(w)).sort((a, b) => b.length - a.length)[0]}" is not an operator this build reads. It reads is · is not · before · after`,
       );
       continue;
     }
 
     if (unknown.length) {
-      bad.push(`${text} — ${field} has no value ${unknown.join(' or ')}`);
+      bad.push(`${text}: ${field} has no value ${unknown.join(' or ')}`);
       continue;
     }
     clauses.push({ field, op: op === 'is not' ? 'is not' : 'is', values });

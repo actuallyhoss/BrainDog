@@ -395,7 +395,7 @@ export const INBOX: InboxItem[] = [
   { id: 'in_8f19', arrived: stamp(-9), from: 'ap@halden.example', subject: 'RE: Invoice 2026-041', body: 'Apologies for the delay. This is with our finance team and should clear in the next payment run on the 12th.' },
   { id: 'in_8f14', arrived: stamp(-26), from: 'noreply@nordhaven.example', subject: 'Renewal reminder: kilnfonts.example', body: 'kilnfonts.example expires on 30 August 2026. Auto-renew is OFF for this name.', suggestion: 'Take the renewal date from the subject line of arrivals like this one.' },
   { id: 'in_8f11', arrived: stamp(-31), from: 'sm@marchetti.example', subject: 'September availability', body: 'I can do Tuesdays and Thursdays through September, and the first week of October is free if you want the migration done in one block.' },
-  { id: 'in_8f07', arrived: stamp(-48), from: 'hello@pellvine.example', subject: 'Year end — what we need from you', body: 'Bank statements to 31 March, the fixed asset list, and any invoices raised after the year end that relate to work done before it.' },
+  { id: 'in_8f07', arrived: stamp(-48), from: 'hello@pellvine.example', subject: 'Year end: what we need from you', body: 'Bank statements to 31 March, the fixed asset list, and any invoices raised after the year end that relate to work done before it.' },
   { id: 'in_8f02', arrived: stamp(-73), from: 'support@ledgerpost.example', subject: 'Sending domain not verified', body: 'portagemail.example has no DKIM record. Messages are being sent, but a growing share will land in spam until this is fixed.' },
 ];
 
@@ -420,7 +420,7 @@ export const PACKS: PackInfo[] = [
   { id: 'people', name: 'People', blurb: 'Collaborators, contractors, accountants.', version: '1.0.3', installed: true, registers: ['people'], pages: [], author: 'braindog' },
   { id: 'work', name: 'Work', blurb: 'Tasks, tracks, dates.', version: '1.1.0', installed: true, registers: ['tasks'], pages: ['work'], author: 'braindog' },
   { id: 'portfolio', name: 'Portfolio', blurb: 'The things you run, and the plan for each.', version: '1.0.0', installed: true, registers: ['things'], pages: [], author: 'braindog' },
-  { id: 'agents', name: 'Agents', blurb: 'Learnings, skills, credentials — what each tool is for, and what it opens.', version: '0.9.2', installed: false, registers: ['learnings', 'skills', 'credentials'], pages: ['agents'], author: 'braindog', titles: { learnings: 'Learnings', skills: 'Skills', credentials: 'Credentials', agents: 'Agents' } },
+  { id: 'agents', name: 'Agents', blurb: 'Learnings, skills and credentials: what each tool is for, and what it opens.', version: '0.9.2', installed: false, registers: ['learnings', 'skills', 'credentials'], pages: ['agents'], author: 'braindog', titles: { learnings: 'Learnings', skills: 'Skills', credentials: 'Credentials', agents: 'Agents' } },
   /* IT WANTS TO SIT ABOVE YOUR MONEY PAGE, AND IT DOES NOT GET TO. `04 §4`'s worked example is this
      pack, and the record had no way to hold the fact — so the diff's `CHANGES` section was behind a
      condition that could never be true and the three sentences about it rendered nowhere. A trust
@@ -443,10 +443,10 @@ export const NEWS: NewsItem[] = [
      contradicted the claim, on the surface whose whole job is telling you what happened while you
      were not looking. The audit is the source: everything else quotes it. */
   { at: stamp(-3), by: 'claude', text: 'Added 2 services from the Fenwick invoice', href: '/r/services', tone: 'info' },
-  { at: stamp(-9), by: 'rule.reply', text: 'Halden replied on 2026-041 — payment run on the 12th', href: '/r/obligations/1', tone: 'good' },
+  { at: stamp(-9), by: 'rule.reply', text: 'Halden replied on 2026-041: payment run on the 12th', href: '/r/obligations/1', tone: 'good' },
   { at: stamp(-14), by: 'you', text: 'Marked Kerning pass, lowercase done', href: '/r/tasks/12' },
-  { at: stamp(-26), by: 'rule.renewal', text: 'kilnfonts.example moved to lapsing — auto-renew is off', href: '/r/services/2', tone: 'bad' },
-  { at: stamp(-31), by: 'codex', text: 'Opened SG31 — the Kiln licensing question', href: '/decide/SG31', tone: 'warn' },
+  { at: stamp(-26), by: 'rule.renewal', text: 'kilnfonts.example moved to lapsing because auto-renew is off', href: '/r/services/2', tone: 'bad' },
+  { at: stamp(-31), by: 'codex', text: 'Opened SG31, the Kiln licensing question', href: '/decide/SG31', tone: 'warn' },
   { at: stamp(-49), by: 'claude', text: 'Set the year-end date on Pell & Vine', href: '/r/people/4' },
 ];
 
@@ -713,7 +713,7 @@ export const JOBS: Record<string, Job> = {
          filter is IGNORED rather than run, which is the one failure a declarative surface must not
          have. The input says what the agent would actually write. */
       { seq: 1, tool: 'list', input: 'things where lane is earning', out: counted('things', (e) => e.fields.lane === 'earning'), ok: true },
-      { seq: 2, tool: 'read', input: 'tracks#1', out: 'Variable axis QA — nine instances', ok: true },
+      { seq: 2, tool: 'read', input: 'tracks#1', out: 'Variable axis QA, nine instances', ok: true },
       /* A GETTER, so the count is taken when a screen reads it rather than while this module is
          still evaluating. `searched()` now calls the record's own matcher, which lives in `find.ts`,
          which reads `REGISTERS` from here — a deliberate cycle, and an eager call inside it lands in
@@ -744,7 +744,7 @@ export const JOB: Job = {
     },
     { seq: 3, tool: 'read', input: 'inbox since 2026-08-01', out: arrivals(), ok: true },
     { seq: 4, tool: 'search', input: 'Fenwick', get out() { return searched('Fenwick'); }, ok: true },
-    { seq: 5, tool: 'propose', input: 'merge services#6 and services#13 — same provider, same renewal', out: 'PROPOSAL_UNCITED — a proposal must attach the rows it read', ok: false },
+    { seq: 5, tool: 'propose', input: 'merge services#6 and services#13: same provider, same renewal', out: 'PROPOSAL_UNCITED: a proposal must attach the rows it read', ok: false },
     {
       seq: 6,
       tool: 'list',
@@ -879,7 +879,7 @@ export const SOURCES: Source[] = [
     lastAt: day(-4),
     nextAt: null,
     points: 0,
-    error: { code: 'PULL_AUTH_REJECTED', fix: 'Reconnect the credential — the provider rejected it; the connector is paused until you do.', credential: 'Tallyard bookkeeping', at: day(-4) },
+    error: { code: 'PULL_AUTH_REJECTED', fix: 'Reconnect the credential. The provider rejected it, and the connector is paused until you do.', credential: 'Tallyard bookkeeping', at: day(-4) },
   },
 ];
 

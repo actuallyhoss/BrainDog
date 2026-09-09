@@ -60,7 +60,7 @@
          printed empty — `06 §1`, a warning that does not apply teaches people to ignore warnings. -->
     {#if d.changes.length}
       <dt>{copy.diffChanges}</dt>
-      <dd>{#each d.changes as c}<p>{c} — {copy.diffNavKept}</p>{/each}</dd>
+      <dd>{#each d.changes as c}<p>{c}: {copy.diffNavKept}</p>{/each}</dd>
     {/if}
     {#if d.conflicts.length}
       <dt>{copy.diffConflicts}</dt>
@@ -118,7 +118,7 @@
               tone="bad"
               onclick={() =>
                 toasts.push(
-                  copy.notWritten(`${pack.name} and everything it declares would be removed, with the diff shown first — the rows it created stay`),
+                  copy.notWritten(`${pack.name} and everything it declares would be removed, with the diff shown first, and the rows it created would stay`),
                   { intent: 'warn' },
                 )}
             >{copy.uninstall}</Button>
