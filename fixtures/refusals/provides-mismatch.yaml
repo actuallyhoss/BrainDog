@@ -1,0 +1,5 @@
+code:   PROVIDES_MISMATCH
+via:    lint
+raises: packages/declare/src/index.ts
+at:     provides
+fix:    Delete the written-out list, or make it name exactly what this pack declares.

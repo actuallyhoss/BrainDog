@@ -294,7 +294,43 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     });
   }
 
-  manifest.provides = declarations.map((d) => d.id).sort();
+  /**
+   * `provides` IS DERIVED, AND A WRITTEN-OUT ONE HAS TO AGREE WITH THE DERIVATION.
+   *
+   * IT WAS ASSIGNED OVER. `04 §5` line 92 is explicit: *"derived. It may be written out for a
+   * reader, and if it is, it must equal the derived list, `PROVIDES_MISMATCH` otherwise"*, with the
+   * sentence to say when it does not: *"provides lists register.fx; no declaration provides it"*.
+   * This computed the derivation and overwrote whatever the manifest said, so a pack could claim to
+   * provide something it does not and the claim was deleted rather than refused.
+   *
+   * WHAT THAT COSTS IS THE ONE THING `provides` IS FOR. `04 §5` states it one heading down:
+   * *"`provides` is `kind.id`, and that is what makes conflict detectable"*. A person reads the
+   * manifest to decide whether to install a pack, and the list they read is the list the code was
+   * throwing away: the reader is told what will land, and the record installs whatever the file
+   * happens to contain. The two are the same on an honest pack and differ on exactly the one that
+   * matters.
+   *
+   * DERIVED IS STILL WHAT IS STORED, so the checksum and the conflict check are unchanged: the
+   * written-out list is checked and then replaced by the list it had to equal.
+   */
+  const derived = declarations.map((d) => d.id).sort();
+  /* `doc.provides` AND NOT `manifest.provides`. The manifest above is built with `provides: []`
+     because the type requires the key, so asking it whether the AUTHOR wrote one is asking a
+     question it always answers the same way. The document is the only thing that knows. */
+  if (Array.isArray(doc.provides)) {
+    const said = [...(doc.provides as unknown[])].map(String).sort();
+    const missing = said.filter((id) => !derived.includes(id));
+    const extra = derived.filter((id) => !said.includes(id));
+    if (missing.length > 0 || extra.length > 0)
+      return no<Pack>(
+        'PROVIDES_MISMATCH',
+        missing.length > 0
+          ? `provides lists ${missing.join(', ')}; no declaration provides ${missing.length === 1 ? 'it' : 'them'}.`
+          : `${extra.join(', ')} ${extra.length === 1 ? 'is' : 'are'} declared here and provides does not list ${extra.length === 1 ? 'it' : 'them'}.`,
+        { at: 'provides', allowed: derived },
+      );
+  }
+  manifest.provides = derived;
   /* `provides` IS OMITTED FROM THE HASH because it is derived from the declarations that are
      already in it — hashing both would let one pack have two checksums for one file. */
   const { provides: _provides, ...hashed } = manifest;

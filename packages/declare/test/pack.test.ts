@@ -77,6 +77,38 @@ const packOf = async (over: Record<string, unknown> = {}): Promise<Pack> => valu
 
 /* ── reading the document ────────────────────────────────────────────────── */
 
+test('A `provides` THAT DISAGREES WITH THE DECLARATIONS IS REFUSED, and it used to be overwritten', async () => {
+  /* `04 §5` line 92: derived, "it may be written out for a reader, and if it is, it must equal the
+     derived list, `PROVIDES_MISMATCH` otherwise". This computed the derivation and assigned over
+     whatever the manifest said, so a pack could claim to provide something it does not and the
+     claim was DELETED rather than refused.
+
+     WHAT THAT COSTS IS THE ONE THING `provides` EXISTS FOR, which `04 §5` states one heading down:
+     "`provides` is `kind.id`, and that is what makes conflict detectable". A person reads the
+     manifest to decide whether to install a pack; the list they read was the list being thrown
+     away. The two agree on an honest pack and differ on exactly the one that matters. */
+  const said = refusal(await normalise(DOC({ provides: ['register.obligations', 'rule.chase', 'register.fx'] })));
+  assert.equal(said.code, 'PROVIDES_MISMATCH');
+  assert.match(said.fix, /provides lists register\.fx; no declaration provides it/u);
+  assert.equal(said.at, 'provides');
+  assert.deepEqual(said.allowed, ['register.obligations', 'rule.chase']);
+
+  /* AND THE OTHER DIRECTION, which is the one a reader is more likely to meet: a pack that grew a
+     declaration and whose written-out list was not updated with it. Silence there would install
+     something nobody read about. */
+  const short = refusal(await normalise(DOC({ provides: ['register.obligations'] })));
+  assert.equal(short.code, 'PROVIDES_MISMATCH');
+  assert.match(short.fix, /rule\.chase is declared here and provides does not list it/u);
+
+  /* AND A LIST THAT AGREES IS ACCEPTED, in any order, because a set written down by hand is not an
+     ordering somebody chose. */
+  const fine = value<Pack>(await normalise(DOC({ provides: ['rule.chase', 'register.obligations'] })));
+  assert.deepEqual(fine.manifest.provides, ['register.obligations', 'rule.chase']);
+
+  /* AND A PACK THAT WRITES NONE STILL GETS ONE, because it is derived and the checksum omits it. */
+  assert.deepEqual((await packOf()).manifest.provides, ['register.obligations', 'rule.chase']);
+});
+
 test('A PACK IS A DOCUMENT, and its kind is the key that is there', async () => {
   /* `{ register: 'obligations', … }` — the word is both the kind and the name, which is what makes
      a pack readable as a document rather than as a serialisation. */

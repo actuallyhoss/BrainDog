@@ -18,7 +18,12 @@
     <meta name="color-scheme" content="light dark" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Everything about your business that isn't code, in one record your agents can write to." />
+    <!-- `not just code`, AND IT SAID `isn't code`. `first-run.ts` carries the argument and the rest
+         of the product was changed to match it: a repository, a deploy and a bug are all things a
+         record holds, and what it is not is a place to keep the code itself. "Isn't code" reads as
+         a boundary the product does not have, and it tells a developer their work is out of scope.
+         This one line was missed, in the one place nobody reads and every crawler does. -->
+    <meta name="description" content="Everything about your business that is not just code, in one record your agents can write to." />
     <link rel="icon" href="%sveltekit.assets%/mark.svg" type="image/svg+xml" />
 
     <!-- ONE statement, static bytes, so its SHA-256 is the single hash in the hosts' script-src.
@@ -35,6 +40,61 @@
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
+    <!--
+      THE FIRST PAINT WAS A BLACK RECTANGLE, MEASURED AT UP TO 2.5 SECONDS.
+
+      `+layout.ts` sets `ssr = false` and `50 §13 D1/D2` means it: one `build/`, host-agnostic, no
+      server renders a request. That decision is not in question here. What follows from it is that
+      the body is empty until the bundle boots, and a friction pass measured fifteen of fifteen
+      routes returning the identical 4,456-byte shell with a DOMContentLoaded of 2,526ms. It ranked
+      that second of the ten things costing a person the most, and observed that no amount of copy
+      editing closes a gap that happens before any copy exists.
+
+      SO THE SHELL DRAWS THE SHAPE OF ITSELF. Not a spinner, which says "something is happening" and
+      nothing else, and not a skeleton of the CONTENT, which would be a drawing of rows this shell
+      cannot know the number of and would flash into a different arrangement. The rail is a fixed
+      width on every screen above 900px and the ground is a token: two rectangles, no text, no
+      motion, and the app paints over them.
+
+      IT IS REMOVED BY THE APP EXISTING, and by no script. `body:has(#main)` is true the moment the
+      shell mounts, and `#main` is the one element both the shell and the bare surface draw, so
+      there is nothing to run, nothing to time and nothing to clean up. If the bundle never arrives
+      the frame stays: a reader on a failed load sees the product's own shape rather than a black
+      page, which is the more honest of the two.
+
+      `:has()` AND NOT A `z-index` STACK. `%sveltekit.body%` mounts into a `display: contents`
+      wrapper, which has no box, so it can carry no stacking context and nothing inside it can be
+      told to paint above a positioned sibling. Removing the frame outright is simpler than
+      arranging for it to be covered, and it is one selector.
+
+      NO COLOUR LITERALS: both are the same tokens the rail and the body use, and `colour-grep`
+      reads this file.
+    -->
+    <div class="boot" aria-hidden="true">
+      <div class="boot-rail"></div>
+    </div>
+    <style>
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        background: var(--bg, Canvas);
+      }
+
+      body:has(#main) .boot {
+        display: none;
+      }
+      .boot-rail {
+        flex: none;
+        inline-size: var(--rail, 232px);
+        background: var(--sunk, Canvas);
+      }
+      @media (width < 900px) {
+        .boot-rail {
+          display: none;
+        }
+      }
+    </style>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>
