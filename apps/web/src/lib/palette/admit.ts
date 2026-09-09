@@ -36,6 +36,7 @@
  * nothing watching it turns a mistake into an absence nobody notices.
  */
 
+import { BINDINGS } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
 import { terms, tokensOf } from '../record/find.ts';
 import type { IconName } from '../ui/icons.ts';
@@ -83,14 +84,15 @@ export type Command = {
 export type Refusal = 'object-first' | 'not-everywhere' | 'unsayable';
 
 /**
- * The one sentence this file needs that `copy.ts` does not hold.
+ * The registry's own label for the undo binding, READ from the registry.
  *
- * It is the registry's own label for the undo binding, repeated here because
- * `a11y/keys.svelte.ts` uses runes and so cannot be imported by a plain module or by
- * `node --test`. `palette.test.ts` reads the registry as text and asserts the two spellings still
- * match, so a copy of a sentence cannot outlive the sentence it copies.
+ * IT WAS A COPY OF THE SENTENCE, under a comment explaining that `a11y/keys.svelte.ts` uses runes
+ * and so cannot be imported by a plain module or by `node --test`, with a test in `palette.test.ts`
+ * that read the registry as TEXT and grepped it for the same string. That was an honest answer to a
+ * real constraint and the constraint is gone: the bindings are data and they live in a plain
+ * `bindings.ts` now, so the label can simply be the label.
  */
-export const UNDO_LAST = 'Undo the last change';
+export const UNDO_LAST = BINDINGS.find((b) => b.id === 'undo')?.label ?? '';
 
 /**
  * A segment somebody still has to fill in: `/r/:register/:seq`, `/r/[register]`, `/p/{slug}`.

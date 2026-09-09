@@ -244,11 +244,38 @@ export const copy = {
 
   rowActions: 'What you can do here',
   editValue: (field: string) => `Change ${field.toLowerCase()}`,
+  /* WHY THIS CELL IS NOT THE EDITOR, said when somebody asks for it rather than only drawn.
+     The pencil appears on an editable cell and on no other, which answers the question for anybody
+     looking at that cell with a pointer. `e` is a keyboard binding on a sheet that advertises it
+     for every cell, so pressing it on a money or a ref did nothing at all and said nothing: the
+     silence a bound key is never allowed to answer with (19 §4). */
+  cellOpensRow: (field: string, why: string) =>
+    `${field} is ${why}, so it is changed on the row rather than in the list. Press Enter to open the row.`,
+  /* ONE REASON PER TYPE, AND THERE WERE TWO REASONS FOR SIX TYPES. The first version of this
+     branched on `money` and gave everything else "a row in another list", so pressing `e` on an
+     update's `When` answered *When is a row in another list*, which is not true of an instant and
+     is not true of a document either. A wrong sentence is worse than the silence it replaced,
+     because silence is not a claim. Anything not named here falls back to the shape of the value,
+     which is the one thing that is true of all of them. */
+  cellWhy: {
+    money: 'an amount and a currency',
+    ref: 'a row in another list',
+    document: 'a piece of writing rather than a value',
+    instant: 'a moment down to the second',
+    duration: 'a length of time with its own unit',
+    bool: 'a yes or no with nothing to type',
+    secret: 'held by the vault and never drawn in full',
+  } as Record<string, string | undefined>,
+  cellWhyElse: 'more than one value',
   setTo: (state: string) => `Set to ${state}`,
   markArchived: 'Archived',
   markNotWritten: 'Not saved',
   markNeeds: (fields: string) => `Needs ${fields}`,
   undoRow: 'Put back',
+  /* The confirmation AFTER `Put back`, and not a second copy of the button. A toast that
+     repeats the verb reads like the command rather than like the outcome, which leaves
+     somebody pressing it again to find out whether the first press worked. */
+  undoneRow: (row: string) => `${row} was taken back. It was never saved.`,
   undoRowOf: (row: string) => `Put ${row} back`,
   archiveRow: (row: string) => `Archive ${row}`,
   moreOn: (row: string) => `More on ${row}`,
@@ -863,6 +890,13 @@ export const copy = {
   /* A ROW IS NAMED BY ITS NUMBER, and "no obligation CALLED #9999" is not English. `19 §642`: a row
      "has a number you can say" — so the sentence says it the way somebody would. */
   noSuchNumber: (one: string, seq: number | string) => `There is no ${one} #${seq}.`,
+  /* A NEGATIVE NUMBER IS NOT A NUMBER ANYBODY TYPED. `pending` hands an unwritten row a negative
+     sequence so it can never collide with a real one, and a link to that row is good for exactly as
+     long as the tab is open. Saying "There is no obligation #-1" to somebody who followed their own
+     link back after a reload tells them nothing they can act on; saying that the row was never
+     saved does. */
+  neverSaved: (one: string) =>
+    `That ${one.toLowerCase()} was never saved, so it is gone. Nothing typed into this product is kept until the record is given it.`,
   theseExist: (kind: string, names: readonly string[]) =>
     `${kind} on this record: ${names.join(' · ')}.`,
 

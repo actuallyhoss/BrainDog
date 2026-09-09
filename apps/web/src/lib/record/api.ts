@@ -1890,7 +1890,11 @@ export function search(q: string, limit = 24): SearchResult {
   const found: SearchHit[] = [];
   for (const [slug, p] of Object.entries(pages()))
     if (p.nav && p.placed !== false && want.every((w) => tokensOf(p.title).some((t) => t.startsWith(w))))
-      found.push({ title: p.title, detail: p.nav.section, href: `/p/${slug}`, kind: 'Pages', icon: iconFor(p.icon, 'grid') });
+      /* THE GROUP IS HEADED BY THE WORD THE PRODUCT USES FOR IT, AND IT WAS NOT. This wrote the
+         literal `Pages` while the rail, the sheet and every other surface say `Pages and lists`
+         out of `copy.pages`, so the palette and the navigation named the same thing twice and
+         differently. One word, in the file that owns the words. */
+      found.push({ title: p.title, detail: p.nav.section, href: `/p/${slug}`, kind: copy.pages, icon: iconFor(p.icon, 'grid') });
   if (found.length) groups.push(found);
 
   /* Questions FIRST in the rotation: a decision waiting on you is the one thing in the record that

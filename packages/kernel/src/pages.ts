@@ -65,6 +65,13 @@ export type PageBlock = {
 const READS = new Set([
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
   'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon',
+  /* AND THE KEYS A RESULT CARRIES, BECAUSE A BLOCK THAT CAME OUT OF HERE CAN GO BACK IN. `block()`
+     is a public call and `BlockResult` is a `PageBlock` with the answer on it, so reading one back
+     - to redraw it with one column changed, which is what a caller adjusting a block actually does
+     - reported `rows`, `matched` and `refusals` as keys this record does not read. That was hidden
+     for as long as every branch below overwrote the refusal list, and it is a false refusal either
+     way: they are keys this file wrote. */
+  'rows', 'matched', 'readings', 'walk', 'refusals',
 ]);
 
 export type PageDecl = {
@@ -258,6 +265,17 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
 
   const base: BlockResult = { ...block, rows: [], matched: 0, refusals: unread };
 
+  /**
+   * AND `unread` HAS TO SURVIVE THE RETURN THAT SPREADS `base`, WHICH IT DID NOT.
+   *
+   * The comment above says the misspelt key is said whatever else the block turns out to be, and it
+   * was true of exactly one path: the eight returns below each write their own `refusals:` over the
+   * spread, so a block that both misspelt a key AND named a source nobody publishes reported only
+   * the source. The author fixed the source, redeployed, and met the second sentence they could have
+   * had the first time. Every refusal this function knows about goes back in one list.
+   */
+  const also = (...more: readonly Refusal[]): Refusal[] => [...unread, ...more];
+
   /* AND A BLOCK WHOSE CONDITION IS NOT MET DRAWS NOTHING, before any query runs. `drawn` is on the
      result rather than implied by an empty one, because "the condition was false" and "the query
      matched nothing" are different facts and a renderer that cannot tell them apart draws the empty
@@ -306,13 +324,11 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     if (typeof block.opening !== 'number' || !Array.isArray(block.from))
       return {
         ...base,
-        refusals: [
-          {
-            code: 'REQUIRED_MISSING',
-            fix: 'A cash walk names what is liquid today (`opening:`) and the legs it reads (`from:`). A runway seeded from a balance nobody declared is a forecast that looks like a fact.',
-            at: 'opening',
-          },
-        ],
+        refusals: also({
+          code: 'REQUIRED_MISSING',
+          fix: 'A cash walk names what is liquid today (`opening:`) and the legs it reads (`from:`). A runway seeded from a balance nobody declared is a forecast that looks like a fact.',
+          at: 'opening',
+        }),
       };
     /* `NOT_IN_THIS_BUILD` RATHER THAN `UNIMPLEMENTED`, and the distinction below it is the one that
        matters to whoever wrote the block: `08 §2.6` and `06 §3` PUBLISH these computed sources, so a
@@ -322,24 +338,22 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
        tell "wait" from "you made this up". */
     const walk = deps.runway(block.opening, block.from, block.horizon);
     if (!walk)
-      return { ...base, refusals: [{ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }] };
-    return { ...base, walk, matched: walk.steps.length, refusals: walk.refusals };
+      return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }) };
+    return { ...base, walk, matched: walk.steps.length, refusals: also(...walk.refusals) };
   }
   if (COMPUTED.has(block.source))
     return {
       ...base,
-      refusals: [
-        { code: 'NOT_IN_THIS_BUILD', fix: `${block.source} is computed, and this record does not compute it yet.`, at: 'source' },
-      ],
+      refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: `${block.source} is computed, and this record does not compute it yet.`, at: 'source' }),
     };
 
   const register = block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
   const schema = register ? deps.schemaOf(register) : null;
   if (!register || !schema)
-    return { ...base, refusals: [{ code: 'SOURCE_UNKNOWN', fix: `${block.source} is not a source this record reads.`, at: 'source' }] };
+    return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: `${block.source} is not a source this record reads.`, at: 'source' }) };
 
   const said = predicateOf(block.where, schema, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: said.bad };
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
 
   /* A LIMIT OF ZERO DRAWS NOTHING, which is what it says. `Math.max(1, …)` turned it into one row —
      a block declaring it wanted no rows and getting one is a block nobody can write. */
@@ -354,7 +368,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     limit,
     ...(block.order?.length ? { order: block.order } : {}),
   });
-  if (!listed.ok) return { ...base, refusals: refused(listed) ? [listed.refusal] : [] };
+  if (!listed.ok) return { ...base, refusals: refused(listed) ? also(listed.refusal) : also() };
 
   /* THE COLUMNS ARE CHECKED AGAINST THE REGISTER. A column naming a field nobody declared renders as
      an empty cell under a heading that promises one, which reads as "no value" rather than as "no
@@ -370,9 +384,12 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (unknown.length)
     return {
       ...base,
-      refusals: [
-        { code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) },
-      ],
+      refusals: also({
+        code: 'FIELD_UNKNOWN',
+        fix: `${register} has no field called ${unknown.join(', ')}.`,
+        at: 'columns',
+        allowed: Object.keys(schema.fields),
+      }),
     };
 
   return { ...base, rows: listed.value.rows, matched: listed.value.matched };

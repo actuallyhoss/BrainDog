@@ -85,6 +85,14 @@ test('A REQUIRED FIELD THE FILTER CANNOT ANSWER IS NAMED, not silently dropped',
 });
 
 test('and each one is named by its own label, which is what the field is called on screen', () => {
-  for (const f of unansweredBy('obligations', {}))
-    assert.ok(f.label.length > 0 && f.label !== f.id.toUpperCase(), `${f.id} has no readable label`);
+  /* THE SECOND HALF OF THIS USED TO BE `f.label !== f.id.toUpperCase()`, WHICH NOTHING COULD FAIL.
+     Every id in this record is lower case and `labelOf` capitalises the first letter, so the
+     comparison was between "Direction" and "DIRECTION" and it was true whatever `labelOf` did. What
+     the sentence under the capture field actually needs is a name a person recognises, so what is
+     checked is that: not the raw id, and no snake_case left in it. */
+  for (const f of unansweredBy('obligations', {})) {
+    assert.ok(f.label.length > 0, `${f.id} has no label at all`);
+    assert.notEqual(f.label, f.id, `${f.id} is shown to a reader as its own id`);
+    assert.doesNotMatch(f.label, /_/u, `${f.id}'s label still carries an underscore`);
+  }
 });

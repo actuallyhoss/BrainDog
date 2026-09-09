@@ -62,9 +62,14 @@ async function record(...decls: Declaration[]): Promise<{ k: Kernel; sql: NodeSq
   const k = await openRecord(sql, fixedClock(NOW));
   assert.ok((await k.install([OBLIGATIONS, OPEN_COUNT, ...decls])).ok);
   for (const row of [
-    { what: 'Small', amount: gbp(10_000), due: day(3), state: 'open' },
-    { what: 'Large', amount: gbp(900_000), due: day(1), state: 'open' },
-    { what: 'Middle', amount: gbp(50_000), due: day(2), state: 'open' },
+    /* THE THREE AMOUNTS ARE CHOSEN SO THE TWO ORDERS DISAGREE, and they used to agree. They were
+       10,000, 900,000 and 50,000 minor units, whose JSON sorts as text into "10000" < "50000" <
+       "900000" - the same sequence the numbers give. So the test below, whose whole subject is that
+       a money must not sort by its JSON, passed either way and could not fail. At 900, 1,000 and
+       50,000 the text order is Middle, Large, Small and the numeric order is Small, Middle, Large. */
+    { what: 'Small', amount: gbp(900), due: day(3), state: 'open' },
+    { what: 'Large', amount: gbp(50_000), due: day(1), state: 'open' },
+    { what: 'Middle', amount: gbp(1_000), due: day(2), state: 'open' },
   ])
     assert.ok(k.create('obligations', row, { actor: 'p_1' }).ok);
   return { k, sql };
@@ -126,6 +131,28 @@ test('A KEY THIS RECORD DOES NOT READ IS SAID, and it used to be ignored', () =>
       assert.equal(said.length, 1, 'the unreadable key was not named');
       assert.match(said[0]?.fix ?? '', /wehn: is not a key this record reads/u);
       assert.equal(said[0]?.at, 'wehn', 'the refusal does not point at the key');
+      sql.close();
+    },
+  );
+});
+
+test('and it survives a block that is wrong about a second thing as well', () => {
+  /* THE UNREAD KEY WAS BUILT INTO THE BASE RESULT AND THEN SPREAD OVER. Eight returns below the
+     base wrote their own `refusals:`, so a block that both misspelt a key and named a source nobody
+     publishes reported only the source: the author fixed that, redeployed, and met the second
+     sentence they could have had the first time. */
+  return record(pageOf({ kind: 'table', source: 'forecast.runway', limti: 5 })).then(
+    ({ k, sql }) => {
+      const said = (blocks(k.page('invoicing'))[0]?.refusals ?? []) as { code: string; fix: string; at?: string }[];
+      assert.equal(said.length, 2, 'both mistakes were not reported at once');
+      assert.ok(
+        said.some((r) => /limti: is not a key this record reads/u.test(r.fix)),
+        'the misspelt key was dropped by the source refusal',
+      );
+      assert.ok(
+        said.some((r) => r.code === 'REQUIRED_MISSING'),
+        'the missing opening balance was not named',
+      );
       sql.close();
     },
   );

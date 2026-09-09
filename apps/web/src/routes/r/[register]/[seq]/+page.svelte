@@ -15,6 +15,8 @@
   import { holeLabel, relative, since } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
+  import { goto } from '$app/navigation';
+  import * as pending from '$lib/record/pending.svelte.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -34,7 +36,22 @@
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
   const decl = $derived(REGISTERS[id]);
-  const row = $derived(entry(id, seq));
+
+  /**
+   * THE ROW MAY NOT BE IN THE RECORD YET, AND THIS SCREEN USED TO SAY IT DID NOT EXIST.
+   *
+   * `entry()` reads `ROWS`, which is what the record holds. A row somebody typed into the capture
+   * line is in `pending` instead, wearing a NEGATIVE sequence so it can never collide with a real
+   * one, and the list draws it with `Not saved` on it. Opening that row landed on "There is no
+   * obligation #-1" - the product telling somebody the thing they had just typed, and could see one
+   * screen back, was not there. The list and the detail were reading two different sets of rows.
+   *
+   * They are read in that order because a written row is the truth: if the same number ever
+   * answered from both, the record wins.
+   */
+  const written = $derived(entry(id, seq));
+  const unwritten = $derived(written ? undefined : pending.of(id).find((r) => r.seq === seq));
+  const row = $derived(written ?? unwritten);
 
   /* WHAT POINTS AT THIS ROW. A `ref` declares `to:` and nothing declared the other direction, so a
      person's page could not show the invoices that are theirs — which is the half somebody opens a
@@ -83,12 +100,17 @@
   function onkeydown(e: KeyboardEvent) {
     if (typing() || silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (!row) return;
-    if (e.key === 'y') {
+    /* NOT ON A ROW THE RECORD HAS NOT GOT. `obligations#-1` is not a number anybody can say, and a
+       link to it resolves for as long as this tab is open and no longer, so copying either would
+       hand somebody a reference that is already wrong. The keys say why rather than doing nothing,
+       because a key that is silent is the drift `19 §4` exists to prevent. */
+    if (e.key === 'y' || e.key === 'Y') {
       e.preventDefault();
-      void clipboard.putSpoken(id, row.seq);
-    } else if (e.key === 'Y') {
-      e.preventDefault();
-      void clipboard.putLink(id, row.seq);
+      if (unwritten) {
+        toasts.push(copy.notWritten('This row has no number to copy'), { intent: 'warn' });
+        return;
+      }
+      void (e.key === 'y' ? clipboard.putSpoken(id, row.seq) : clipboard.putLink(id, row.seq));
     }
   }
 
@@ -118,21 +140,59 @@
          id to quote; no filter ran, so "nothing matched" describes something that did not happen.
          It names the number, because `19 §642` is that a row "has a number you can say" and this is
          the screen where saying it did not work. -->
-    <Empty kind="error" heading title={decl ? copy.noSuchNumber(decl.one, seq) : copy.noSuch('list', id)}>
+    <Empty
+      kind="error"
+      heading
+      title={decl ? (seq < 0 ? copy.neverSaved(decl.one) : copy.noSuchNumber(decl.one, seq)) : copy.noSuch('list', id)}
+    >
       {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
     </Empty>
   </div>
 {:else}
-  <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={decl.name} title={String(row.fields[decl.title] ?? '')} id="#{row.seq}">
+  <PageHead
+    icon={iconFor(decl?.icon, 'rows')}
+    kicker={decl.name}
+    title={String(row.fields[decl.title] ?? '')}
+    id={unwritten ? undefined : `#${row.seq}`}
+  >
     {#snippet actions()}
+      <!-- THE NUMBER IS THE FIRST THING THIS HEADER SAYS, and for an unwritten row there is no
+           number, so it says what the row IS instead. `#-1` is the sequence `pending` hands out to
+           keep an unwritten row from colliding with a real one; it is machinery and it was never
+           meant to be read out. -->
+      {#if unwritten}
+        <Chip label={copy.markNotWritten} tone="warn" />
+      {/if}
       <!-- IT SAID `y` AND NOTHING WAS BOUND, and the button itself had no handler either — two
            lies in one control, on the screen where somebody most wants a row's id to paste into a
            message. The button was fixed and the KEY was not, under a comment claiming both were:
            this route registered no key listener at all while its own header printed one. -->
-      <Button weight="bare" onclick={() => clipboard.putSpoken(id, row.seq)}>
-        <Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" />
-      </Button>
-      <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>{copy.editRow}</Button>
+      {#if !unwritten}
+        <Button weight="bare" onclick={() => clipboard.putSpoken(id, row.seq)}>
+          <Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" />
+        </Button>
+      {/if}
+      <!-- `Put back` AND NOT `Archive`, because there is nothing to archive: the row is in this tab
+           and nowhere else. It is the same verb the list offers on the same row, which is the point
+           — a row that can be taken back in one place and not the other is two products. -->
+      {#if unwritten}
+        <Button
+          weight="quiet"
+          onclick={() => {
+            /* THE NAME IS READ BEFORE THE ROW GOES, and the row goes after the navigation rather
+               than before it. Dropping first makes `row` undefined on this screen for as long as
+               `goto` takes, which draws "There is no obligation #-1" over the top of the press that
+               was working: the error this whole change exists to remove, flashed on the way out. */
+            const named = String(row.fields[decl.title] ?? decl.one.toLowerCase());
+            void goto(`/r/${id}`).then(() => {
+              pending.drop(id, seq);
+              toasts.push(copy.undoneRow(named));
+            });
+          }}>{copy.undoRow}</Button
+        >
+      {:else}
+        <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>{copy.editRow}</Button>
+      {/if}
     {/snippet}
   </PageHead>
 

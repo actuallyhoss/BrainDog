@@ -37,8 +37,8 @@
  *
  *         ADMIN  → `admin(ctx)`             owner, in a browser, no token of any kind (45 §5.6)
  *         VAULT  → `vault(ctx)`             the same ceiling, plus the vault's own rule
- *         READ+  → `guard` or `scoped`      a whole-record read; `scoped` is the register-blind form
- *         DATA   → `guard(ctx, …, register)` a named register, so the level per register applies
+ *         READ+  → `guard` or `scoped`      any token, subject to scope
+ *         DATA   → `guard` or `scoped`      the same requirement, and `SCOPED` below says why
  *
  *   c · Every method has one at all, before anything else in its body reads an argument.
  *
@@ -56,23 +56,55 @@ import { fileURLToPath } from 'node:url';
 const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
 
+/**
+ * ONE LIST, SHARED BY DATA AND `READ+`, BECAUSE THEY SHARE ONE REQUIREMENT.
+ *
+ * IT USED TO BE TWO LISTS SPELT IDENTICALLY, under a header claiming DATA meant
+ * `guard(ctx, …, register)`. The code never asked for the register and the two groups were therefore
+ * indistinguishable to this gate, which is the worse half of the defect: a gate whose comment
+ * promises a distinction its code does not draw reads to the next person as a check that already
+ * exists, so the check nobody wrote looks written. Two bindings holding the same value is also two
+ * lines a reader has to compare before learning they are the same. One name, and the reason beside
+ * it.
+ *
+ * `30 §5` GIVES BOTH GROUPS THE SAME REACHABILITY: *"any token, subject to scope"*. What separates
+ * them there is how MCP exposes them, the eight tools against the resources, which is a fact about
+ * the transport and is `router-groups`'s question rather than this one.
+ *
+ * AND HOLDING DATA TO A NAMED REGISTER WOULD BE RED ON THREE HONEST METHODS TODAY. `search` is
+ * register-blind by design and calls `scoped(ctx, 'read')`, because it searches every register the
+ * caller can see; `decide` and `markRead` are about the caller rather than about a register and
+ * take none. Which LEVEL and which REGISTER a method needs stays a decision per method, for the
+ * reason this file's header already gives: a table of them here would be a second copy of the code
+ * rather than a check on it.
+ */
+const SCOPED = ['guard', 'scoped'];
+
 /** Which guard each group implies. `JOBS` is here for the day the job routes land in this surface. */
 const IMPLIES = {
   ADMIN: ['admin'],
   VAULT: ['vault'],
   JOBS: ['vault', 'admin'],
-  'READ+': ['guard', 'scoped'],
-  DATA: ['guard', 'scoped'],
+  'READ+': SCOPED,
+  DATA: SCOPED,
 };
 
 /**
- * Routes served from somewhere other than `packages/record`'s own surface.
+ * `ELSEWHERE` IS GONE, AND WHAT IT COST WAS TWO CHECKS THAT COULD NOT FIRE.
  *
- * RECORDED, NOT WAIVED, in the shape `router-groups` uses for the same problem. A name here is a
- * promise that the method is real and checked elsewhere; a name that stops being routed is a
- * finding, so the list cannot rot into an allowlist nobody reads.
+ * It recorded routes served from somewhere other than `packages/record`'s own surface, in the shape
+ * `router-groups` uses for the same problem, and it was an empty object: every routed name is a
+ * method in that file. So both halves of it were unreachable. The `continue` at the top of the loop
+ * below was never taken, and the loop that checked each recorded name is still routed never ran
+ * once. Nothing under `negative/` could have seeded either, because the list lives in this file
+ * rather than in a fixture tree, so an entry that proved them would also be an entry the real tree
+ * has no reason to carry.
+ *
+ * A ROUTE SERVED ELSEWHERE IS LOUD NOW RATHER THAN WAIVED. It lands on "packages/record's surface
+ * has no method by that name", which is the honest report until somebody decides otherwise, and the
+ * day one exists `router-groups`'s `UNENUMERATED` is the shape to copy: the entry it gains is then
+ * a diff a reviewer sees, rather than a mechanism that was already there asserting nothing.
  */
-const ELSEWHERE = {};
 
 const findings = [];
 
@@ -109,8 +141,6 @@ const guardOf = (body) => {
 };
 
 for (const route of routes) {
-  if (ELSEWHERE[route.name] !== undefined) continue;
-
   const body = bodies.get(route.name);
   if (body === undefined) {
     findings.push(
@@ -136,11 +166,6 @@ for (const route of routes) {
     );
   }
 }
-
-/* AND EVERY RECORDED DEVIATION IS STILL A ROUTE. */
-for (const name of Object.keys(ELSEWHERE))
-  if (!routes.some((r) => r.name === name))
-    findings.push(`this gate records ${name} as checked elsewhere and nothing routes it`);
 
 if (findings.length === 0) {
   const shape = Object.keys(IMPLIES)

@@ -86,12 +86,35 @@ test('EVERY KIND GETS THE SURFACE, which is the whole defect', () => {
 });
 
 test('a block that HAS something to draw refuses nothing', () => {
+  /* THIS USED TO RECOMPUTE `draw()`'s OWN PREDICATE AND COULD NOT FAIL. The `drawn` expression was
+     character for character the test `draw()` applies to decide whether to hand back a refusal, so
+     `if (refusal) continue` guaranteed the assertion under it: a tautology dressed as a check, on
+     the one claim that matters here.
+
+     WHAT IT ASKS NOW IS ABOUT THE BLOCK, not about the function. A block carries its own evidence -
+     rows for a table, readings for a stat, a walk for a forecast, fenced text for everything else -
+     and that evidence exists or it does not, independently of anything `draw()` believes. The two
+     answers disagreeing is exactly the defect worth catching. */
+  let asked = 0;
   for (const block of page('money')?.blocks ?? []) {
-    const { refusal, segments } = draw(block);
+    const { refusal } = draw(block);
     if (refusal) continue;
-    const drawn = block.kind === 'table' ? block.rows.length : segments.some((s) => s.type !== 'block' || s.rows.length > 0);
-    assert.ok(drawn, `${block.heading} drew nothing and reported no reason`);
+    asked += 1;
+    /* Every key a block can carry its content in: a table has rows, a chips or bar block has
+       entries, a stat has its read metrics, a forecast has a walk and everything else has the
+       fenced text it was written with. */
+    const held = block as unknown as Record<string, unknown>;
+    const many = (key: string) => Array.isArray(held[key]) && (held[key] as unknown[]).length > 0;
+    const drawn =
+      many('rows') ||
+      many('entries') ||
+      many('metrics') ||
+      many('readings') ||
+      ((held.walk as { steps?: unknown[] } | undefined)?.steps?.length ?? 0) > 0 ||
+      String(held.body ?? '').trim() !== '';
+    assert.ok(drawn, `${block.heading} refused nothing and holds nothing to draw`);
   }
+  assert.ok(asked > 0, 'every block on the money page refused, so the loop above asserted nothing');
 });
 
 test('the seeded pages refuse nothing at all, so no page ships a broken declaration', () => {

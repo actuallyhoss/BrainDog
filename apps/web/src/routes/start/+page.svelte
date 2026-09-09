@@ -45,7 +45,15 @@
   let problems = $state<string[]>([]);
   /** What the form holds, so the submit can put the row somewhere rather than describing it. */
   let taken = $state<Fields>({});
-  /** The sequence the pending row was given, so the offer below can point at it. */
+  /**
+   * The sequence the pending row was given.
+   *
+   * IT WAS WRITTEN AND READ NOWHERE, and what that cost is one row per press. This screen does not
+   * navigate away from its own outcome, so the form is still on screen with everything still in it
+   * and the button still live: correcting a typo and pressing again is the ordinary thing to do,
+   * and it left a second row rather than a corrected one. Holding the sequence is what lets the
+   * second press mean what somebody meant by it.
+   */
   let made = $state<number | null>(null);
 
   /**
@@ -159,6 +167,10 @@
        on somebody else's outcome, which is the same bug the `picked === null` guard above had in a
        different place. */
     said = false;
+    /* AND THE ROW GOES WITH IT. `made` is a sequence inside ONE register's waiting list, so carrying
+       it across a change of choice would point the next press's `replace` at a row in a list nobody
+       is looking at. The row already added stays where it is and keeps its own `Put back`. */
+    made = null;
   });
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
@@ -193,8 +205,15 @@
      * product and one exception. The sentence under this form already says nothing was saved; what
      * changes is that the row exists to be looked at while that is true.
      */
-    made = pending.add(choice.key, taken);
-    toasts.push(copy.notWritten(`the first row in ${choice.label} would be written`));
+    /* PRESSING AGAIN CORRECTS THE ROW, it does not add another. `replace` answers `false` when the
+       row is no longer waiting, which is what happens after `Put back` on the list, and then this
+       adds one as it did the first time rather than quietly restoring a row somebody removed. */
+    if (made !== null && pending.replace(choice.key, made, taken)) {
+      toasts.push(copy.notWritten(`the first row in ${choice.label} would be changed`));
+    } else {
+      made = pending.add(choice.key, taken);
+      toasts.push(copy.notWritten(`the first row in ${choice.label} would be written`));
+    }
     said = true;
   }
 

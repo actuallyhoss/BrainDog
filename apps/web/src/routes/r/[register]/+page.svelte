@@ -657,7 +657,12 @@
    * sentence under the grid listing four type names would be a legend about a mechanism, read once
    * and never again, for a question the cell can answer itself.
    */
-  const EDITABLE = new Set(['text', 'enum', 'day', 'int', 'decimal', 'pct']);
+  /* `pct` WAS IN THIS SET AND IS NOT A TYPE. `FieldType` is text, document, money, day, instant,
+     int, decimal, enum, bool, ref, secret and duration; a percentage is a `decimal` with a format on
+     it. The entry matched nothing, so it neither added a type nor took one away, which is exactly
+     why it sat here unread: a set with a word in it that no field can ever carry reads as a
+     decision somebody made and is not one. */
+  const EDITABLE = new Set(['text', 'enum', 'day', 'int', 'decimal']);
 
   let editing = $state<{ seq: number; field: string } | null>(null);
   let editValue = $state('');
@@ -667,37 +672,94 @@
   const fieldOf = (field: string) => decl?.fields.find((f) => f.id === field);
   const editableHere = (field: string) => EDITABLE.has(fieldOf(field)?.type ?? '');
 
+  /** Why a cell is not the editor, in the reader's words rather than as a type name. */
+  const notEditableBecause = (field: string): string =>
+    copy.cellWhy[fieldOf(field)?.type ?? ''] ?? copy.cellWhyElse;
+
+  /**
+   * THE VALUE THE READER IS LOOKING AT, which is not the value the record holds.
+   *
+   * The grid draws `pending` rows and the record's rows with `edits` patched over the top, and the
+   * editor read `entry()` alone. Three things followed from that one line, all of them silent:
+   *
+   * A SECOND EDIT OF THE SAME CELL OPENED ON THE ORIGINAL. Change a title, press `e` on it again,
+   * and the box holds what the record still says rather than what the row on screen says. Anybody
+   * who then pressed Enter without retyping had quietly reverted their own change.
+   *
+   * A PENDING ROW OPENED EMPTY. `entry()` reads `ROWS` and a row somebody typed into the capture
+   * line is not in `ROWS`, so every cell of the row they had just created offered a blank box.
+   *
+   * AND TYPING THE RECORD'S VALUE BACK WAS READ AS "nothing changed". `commitEdit` compared against
+   * the record too, so undoing an edit BY HAND returned early with the patch still in the map: the
+   * cell went on showing the edited value, and the row went on wearing `Not saved` for a change the
+   * person had just typed away.
+   */
+  const shownValue = (seq: number, field: string): unknown => {
+    const patch = edits.get(seq);
+    if (patch && Object.hasOwn(patch, field)) return patch[field];
+    const held = entry(id, seq) ?? pending.of(id).find((r) => r.seq === seq);
+    return held?.fields[field];
+  };
+
+  const asText = (v: unknown) => (v === null || v === undefined ? '' : String(v));
+
   function openEditor(seq: number, field: string) {
-    if (!editableHere(field)) return;
-    const now = entry(id, seq)?.fields[field] ?? edits.get(seq)?.[field];
+    if (!editableHere(field)) {
+      /* A BOUND KEY DOES NOT ANSWER WITH SILENCE. `19 §4`'s sheet advertises `e` for the grid with
+         no condition on it, and `money` and `ref` are deliberately not editable here because each is
+         two decisions and a cell that took one of them would write half a value. That argument is
+         sound and it was never said out loud: the press did nothing, drew nothing and reported
+         nothing, on the two types where a person is most likely to try. */
+      const f = fieldOf(field);
+      if (f) toasts.push(copy.cellOpensRow(labelOf(f), notEditableBecause(field)), { intent: 'warn' });
+      return;
+    }
     editing = { seq, field };
-    editValue = now === null || now === undefined ? '' : String(now);
+    editValue = asText(shownValue(seq, field));
   }
 
   function commitEdit() {
     const at = editing;
     if (!at) return;
     editing = null;
-    const was = entry(id, at.seq)?.fields[at.field];
     const said = editValue.trim();
     /* NOTHING CHANGED IS NOT AN EDIT. A receipt for a value somebody looked at and left alone is a
        row wearing `Not saved` for no reason, and after three of those the chip stops being read. */
-    if (said === (was === null || was === undefined ? '' : String(was))) return;
+    if (said === asText(shownValue(at.seq, at.field))) return;
 
+    /* AND TYPING THE ORIGINAL BACK IS NOT AN EDIT EITHER, IT IS AN UNDO. The comparison above is
+       against what is on screen, so this one is against what the record holds: reaching the record's
+       own value by hand drops the patch and takes the receipt with it, rather than recording a
+       change from a value to itself. */
+    const held = entry(id, at.seq);
     const next = new Map(edits);
-    next.set(at.seq, { ...(next.get(at.seq) ?? {}), [at.field]: said === '' ? null : said });
+    const patch = { ...(next.get(at.seq) ?? {}) };
+    if (held && said === asText(held.fields[at.field])) {
+      delete patch[at.field];
+      if (Object.keys(patch).length === 0) next.delete(at.seq);
+      else next.set(at.seq, patch);
+      edits = next;
+      if (!next.has(at.seq)) clearReceipt(at.seq);
+      return;
+    }
+
+    next.set(at.seq, { ...patch, [at.field]: said === '' ? null : said });
     edits = next;
     receipt(at.seq, {
       mark: copy.markNotWritten,
       intent: 'warn',
       undo: () => {
         const back = new Map(edits);
-        const patch = { ...(back.get(at.seq) ?? {}) };
-        delete patch[at.field];
-        if (Object.keys(patch).length === 0) back.delete(at.seq);
-        else back.set(at.seq, patch);
+        const left = { ...(back.get(at.seq) ?? {}) };
+        delete left[at.field];
+        if (Object.keys(left).length === 0) back.delete(at.seq);
+        else back.set(at.seq, left);
         edits = back;
-        clearReceipt(at.seq);
+        /* AND ONLY WHEN THERE IS NOTHING LEFT TO REPORT. Undoing one cell of a row that has two
+           unsaved cells on it cleared the row's whole receipt, so the second change stayed in the
+           map and on the screen with nothing marking it: an unsaved value wearing the record's
+           face, which is the one thing the receipt exists to prevent. */
+        if (!back.has(at.seq)) clearReceipt(at.seq);
       },
     });
     toasts.push(copy.notWritten(`${id}#${at.seq} ${labelOf(fieldOf(at.field)!) .toLowerCase()} would be ${said || 'cleared'}`), {
@@ -736,9 +798,16 @@
    * THE KEY IS `seq`, WHICH IS THE STABLE ONE. `focus.row` is an index into whatever is on screen
    * and moves when a filter does; `#7` is `#7` under every sort this list has.
    */
+  /* AND A ZERO IS THE ONLY NUMBER THAT IS NOT A ROW. This read `said > 0`, which was right on the
+     day it was written and wrong the day `pending` started minting NEGATIVE sequences for rows
+     somebody has typed and the record has not been given. Pressing `p` on an unwritten row wrote
+     `?row=-1` into the URL, made a real history entry, and opened nothing; the row menu's Peek item
+     was equally dead, and the `?` sheet advertises the key with no condition on it. The detail
+     route learnt about pending rows and this drawer did not, so `/r/obligations/-1` opened and `p`
+     on the same row did nothing at all. */
   const peeked = $derived.by(() => {
     const said = Number(page.url.searchParams.get('row'));
-    return Number.isInteger(said) && said > 0 ? said : null;
+    return Number.isInteger(said) && said !== 0 ? said : null;
   });
 
   const peek = (seq: number | null) =>
@@ -747,7 +816,9 @@
       else p.set('row', String(seq));
     });
 
-  const peekedEntry = $derived(peeked === null ? undefined : entry(id, peeked));
+  const peekedEntry = $derived(
+    peeked === null ? undefined : (entry(id, peeked) ?? pending.of(id).find((r) => r.seq === peeked)),
+  );
 
   /** Only INDEXED fields are offered, in declaration order, at most eight. A filter on an unindexed
       field is a promise the storage cannot keep at 5,000 rows. */
@@ -978,8 +1049,14 @@
       const row = result.entries[focus.row];
       if (row) {
         e.preventDefault();
+        /* AND THE CARET STAYS ON THE ROW, which is where the person is looking. This walked it up
+           one with `Math.min(focus.row, length - 2)`, left over from when archiving took the row off
+           the screen and something had to happen to a caret pointing past the end. `archive()`
+           writes a receipt and removes nothing, on purpose: the row is drawn where it was, wearing
+           what happened to it, so the reader can check they hit the right one. The only press the
+           old line could ever change was one on the LAST row, which jumped the caret to the
+           second-to-last for no reason a person could see. */
         archive(row.seq);
-        focus = { ...focus, row: Math.min(focus.row, result.entries.length - 2) };
       }
     } else if (e.key === 'Home') {
       /* Bare `Home`/`End` are ROW ends; with the modifier they are REGISTER ends. The distinction is
@@ -1120,8 +1197,15 @@
 
   function archiveSelected() {
     const seqs = picked.map((e) => e.seq);
+    /* AND EACH ROW GETS ITS OWN `Put back`, WHICH THE BULK PATH DID NOT GIVE IT. Archiving one row
+       writes a receipt carrying an undo, so the row keeps a way back for as long as it is drawn.
+       Archiving eight wrote eight receipts with no undo on any of them and put the only way back in
+       a toast that expires after ten seconds: same verb, same rows, one of the two reversible after
+       a pause. The toast keeps its own undo for all of them at once, which is the thing a person
+       reaches for immediately; the row keeps the one they find later. */
     const next = new Map(receipts);
-    for (const seq of seqs) next.set(seq, { mark: copy.markArchived, intent: 'warn' as const });
+    for (const seq of seqs)
+      next.set(seq, { mark: copy.markArchived, intent: 'warn' as const, undo: () => clearReceipt(seq) });
     receipts = next;
     selected = new Set();
     /* ONE ROW IS NOT "1 obligations". The register declares both spellings — `name` for the list
@@ -1763,7 +1847,7 @@
   <Sheet
     open={peeked !== null}
     title={String(peekedEntry?.fields[decl.title] ?? '')}
-    id="#{peeked ?? ''}"
+    id={peeked !== null && peeked > 0 ? `#${peeked}` : undefined}
     onclose={() => peek(null)}
   >
     {#if peekedEntry}
@@ -1784,6 +1868,12 @@
       </dl>
     {/if}
     {#snippet footer()}
+      <!-- AN UNWRITTEN ROW SAYS SO HERE TOO, and it does not get a number. `#-1` is the sequence
+           `pending` hands out to keep it from colliding with a real row; it is machinery, and the
+           header printed it. The row itself opens, because the detail route now finds it. -->
+      {#if peeked !== null && peeked < 0}
+        <Chip label={copy.markNotWritten} tone="warn" />
+      {/if}
       <Button weight="primary" href="/r/{id}/{peeked}"><Icon name="external" size="s" />{copy.openRow}</Button>
       <Button weight="bare" onclick={() => peek(null)}><Icon name="close" size="s" />{copy.close}</Button>
     {/snippet}
@@ -1992,14 +2082,19 @@
            it submits: a form whose only submit control is elsewhere and unassociated has no submit
            button at all, and a browser refuses implicit submission on a form with more than one
            text field. Obligations draws four. So `RowForm` ceasing to swallow Enter bought nothing
-           on this screen until the button said which form it belongs to. -->
+           on this screen until the button said which form it belongs to.
+
+           AND NO `onclick`, WHICH ADDED THE ROW TWICE. It carried `onclick={addTypedRow}` as well,
+           so one press ran the handler and then submitted `#new-row`, whose `onsubmit` runs the
+           same handler: two rows, `#-1` and `#-2`, and two identical toasts. Enter did it too, by
+           firing a click at the default button. The submit path is the one that has to exist for
+           Enter, so it is the only one. -->
       <Button
         weight="primary"
         type="submit"
         form="new-row"
         disabled={problems.length > 0}
         aria-describedby={problems.length > 0 ? 'new-row-why' : undefined}
-        onclick={addTypedRow}
       >
         {copy.addRow} {decl.one}
       </Button>

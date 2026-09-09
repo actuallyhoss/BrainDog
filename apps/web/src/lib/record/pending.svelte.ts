@@ -59,6 +59,30 @@ export function of(register: string): Entry[] {
   return rows.get(register) ?? [];
 }
 
+/**
+ * Put different fields on a row that is already waiting, and say whether there was one.
+ *
+ * THE FIRST-RUN SCREEN ADDED A SECOND ROW EVERY TIME THE BUTTON WAS PRESSED. It stays on its own
+ * outcome by design, with the form still filled in and the button still live, so correcting a typo
+ * and pressing again is the ordinary thing for somebody to do: three presses left three rows in the
+ * list that screen then offers to open, the first two of them the wrong answer, and nothing said so.
+ *
+ * A ROW THAT IS NOT THERE IS NOT REPLACED, and the caller is told. That is what makes this safe to
+ * call after `Put back` has taken the row away: the answer is `false` and the caller adds instead of
+ * silently writing a row back that somebody had just removed.
+ */
+export function replace(register: string, seq: number, fields: Fields): boolean {
+  const held = rows.get(register);
+  if (!held) return false;
+  const at = held.findIndex((r) => r.seq === seq);
+  const was = held[at];
+  if (!was) return false;
+  const next = [...held];
+  next[at] = { ...was, fields, version: was.version + 1 };
+  rows.set(register, next);
+  return true;
+}
+
 /** Take one back out. The inverse of `add`, which is what `Put back` calls. */
 export function drop(register: string, seq: number): void {
   const held = rows.get(register);

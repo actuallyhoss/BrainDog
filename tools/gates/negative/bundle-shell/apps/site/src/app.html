@@ -1,0 +1,21 @@
+<!doctype html>
+<!--
+  The seeded violation, and it is the one this repository actually shipped.
+
+  The comment below spells the body placeholder a second time, to explain what it is. The build
+  replaces the FIRST occurrence and leaves the rest, so this comment takes the substitution and the
+  real one further down ships as literal text. The app then does not mount, on any route, with no
+  error anywhere: %sveltekit.body% is where the application goes.
+
+  The head placeholder is spelt once, so a count of one finding is what proves the gate reports the
+  placeholder that is wrong rather than every placeholder it reads.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

@@ -46,7 +46,11 @@ import { budget, readiness } from './lib.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
-const REGISTRY = join(REPO, 'apps', 'web', 'src', 'lib', 'a11y', 'keys.svelte.ts');
+/* `bindings.ts` AND NOT `keys.svelte.ts`. The registry used to live in the module that dispatches
+   it, which uses runes, so nothing loadable by `node --test` could import it and the list of chords
+   a browser owns had no test at all. The data is a plain module now and the dispatcher re-exports
+   it; this gate reads the data. */
+const REGISTRY = join(REPO, 'apps', 'web', 'src', 'lib', 'a11y', 'bindings.ts');
 const PORT = budget('keys').port;
 
 /**

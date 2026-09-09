@@ -3,15 +3,23 @@
   screens.
 
   IT WAS A 680px CENTRED DIALOG and that is the wrong shape for what is in it. This surface lists
-  every command, every page, every saved list, every figure, every open question and every row the
-  record answers with. In a centred box that is a column of thirty-two rows with two thirds of the
-  screen dimmed and empty, and the page you are navigating FROM hidden underneath it. So it is now
-  full height, hard against the inline end, at two thirds of the width: the room is what lets a
-  question's whole sentence, a figure's reading and a row's reason sit on the line beside the name
-  instead of being cut at an ellipsis, and the height is what lets the groups be read rather than
-  scrolled. The remaining third still shows the page you came from, which is what makes it read as
-  a panel on the app rather than a modal over it. `C:\Tools\legacy`'s Spark is the reference and its
-  own comment makes the same argument in the same words.
+  every command, every page, every saved list, every figure, every open question, the rows you
+  changed last and every row the record answers with. In a centred box that is a column of
+  thirty-two rows with two thirds of the screen dimmed and empty, and the page you are navigating
+  FROM hidden underneath it. So it is now full height, hard against the inline end, at two thirds
+  of the width: the room is what lets a question's whole sentence, a figure's reading and a row's
+  reason sit on the line beside the name instead of being cut at an ellipsis, and the height is
+  what lets the groups be read rather than scrolled. The remaining third still shows the page you
+  came from, which is what makes it read as a panel on the app rather than a modal over it.
+  `C:\Tools\legacy`'s Spark is the reference and its own comment makes the same argument in the
+  same words.
+
+  AND THE OBJECTS COME FIRST IN IT. The groups used to be ranked commands, destinations, pages,
+  figures, decisions, with everything the record answered with underneath all of them, so typing
+  four letters of the row on the screen behind the panel drew every command, page and figure that
+  matched before it drew the row.
+  `loop/REWORK.md` phase 3 item 5 asks for the other order and `rankOf` below is where it is
+  written down.
 
   STILL A `<dialog>`. The element is not the shape: it is the focus trap, the inert background and
   the Escape that this surface would otherwise have to reimplement, and every one of those is
@@ -43,13 +51,13 @@
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { TONES } from 'braindog-render';
+  import { TONES, since } from 'braindog-render';
   import { copy } from '../copy.ts';
   import { terms, tokensOf } from '../record/find.ts';
   import { BINDINGS, overlays } from '../a11y/keys.svelte.ts';
   import { METRICS } from '../record/declared.ts';
   import { isTemplate, unreadable } from '../record/metrics.ts';
-  import { QUESTIONS, REGISTERS, ROWS, VIEWS, iconFor, metric, search, type NavEntry } from '../record/api.ts';
+  import { AUDIT, NOW, QUESTIONS, REGISTERS, ROWS, VIEWS, entry, iconFor, metric, search, type NavEntry } from '../record/api.ts';
   import { toasts } from '../ui/toast.svelte.ts';
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -98,31 +106,57 @@
   const PEOPLE = 'people';
 
   /**
-   * The two headings this file needs that `copy.ts` does not hold.
+   * The three headings this file needs that `copy.ts` does not hold.
    *
    * A figure is not a page and not a row, and the record's own word for one is the word the money
    * page prints over them. `OPEN_QUESTION` is the same sentence `search()` puts on a decision, so
    * a question found by typing and a question listed with nothing typed read identically.
+   *
+   * `RECENT` says CHANGED rather than visited, because the ledger it is read from is a record of
+   * writes and this build stores nothing at all about where a person has been. A heading promising
+   * the second and delivering the first is one somebody would notice within a day.
    */
   const FIGURES = 'Figures';
   const OPEN_QUESTION = 'Open question';
+  const RECENT = 'Recently changed';
 
   /**
-   * WHAT ORDER THE GROUPS COME IN, and why it is not the order they were built in.
+   * WHAT ORDER THE GROUPS COME IN, and the commands used to be second in it.
    *
-   * `19 §7`'s strict-prefix aliases outrank fuzzy matching, so the things you can NAME come before
-   * the things you are searching for. Everything the record answers with keeps the order `search()`
-   * put it in, which is the round-robin across the lists rather than declaration order.
+   * It was records, commands, destinations, pages, figures, decisions, and everything the record
+   * answers with underneath all of them. The argument was `19 §7`'s rule that strict-prefix aliases
+   * outrank fuzzy matching, and that rule is about two commands standing beside each other: it was
+   * being used to rank a command above a row. Typing four letters of the obligation on the screen
+   * behind the panel drew every command, page and figure that matched first, and the row itself
+   * under all of them. That is a menu of screens with the answer at the bottom of it.
+   *
+   * `loop/REWORK.md` phase 3 item 5 asks for the other shape: a panel that reaches the OBJECTS the
+   * record holds, with the commands as the section underneath. So an exact spoken id comes first,
+   * because it is the one thing somebody heard said out loud; then the record's own lists; then
+   * what is waiting on you; then the figures; then the screens; and the commands last. The
+   * strict-prefix rule is untouched and still decides the order INSIDE the commands group, which is
+   * the pair of rows it was written about.
+   *
+   * A HEADING THIS FILE DID NOT WRITE IS A REGISTER'S NAME. `search()` heads each group with the
+   * list it came out of, and those names are data rather than copy, so they are recognised rather
+   * than listed here. Anything else falls in with the pages, which is where a reader would look for
+   * a heading nobody has ranked.
+   *
+   * `search()` USED TO HEAD ITS PAGE GROUP `Pages` while the rail, the sheet and this table all say
+   * `Pages and lists`, so one thing had two names across two files and the rank below was reached by
+   * a fallback rather than by the key that is sitting right there. It says `copy.pages` now.
    */
   const RANK: Record<string, number> = {
     [copy.records]: 0,
-    [copy.commands]: 1,
-    [copy.destinations]: 2,
-    [copy.pages]: 3,
+    [RECENT]: 2,
+    [copy.decide]: 3,
     [FIGURES]: 4,
-    [copy.decide]: 5,
+    [copy.pages]: 5,
+    [copy.destinations]: 6,
+    [copy.commands]: 7,
   };
-  const rankOf = (group: string): number => RANK[group] ?? 6;
+  const REGISTER_NAMES = new Set(Object.values(REGISTERS).map((r) => r.name));
+  const rankOf = (group: string): number => RANK[group] ?? (REGISTER_NAMES.has(group) ? 1 : 5);
 
   /**
    * HOW MANY ROWS THE PANEL DRAWS, and it is not the twenty a centred box could hold.
@@ -153,6 +187,15 @@
    * than the panel is a screen: `/decide` is the door, and it is one row up in this same list.
    */
   const OPEN_CAP = 6;
+
+  /**
+   * AND HOW MANY OF THE LEDGER'S ROWS, which is the shortest list in the panel on purpose.
+   *
+   * Five, because this is the one source whose value falls off a cliff: the row you changed last is
+   * worth a press and the eleventh one back is a row you would type the name of. `/audit` holds the
+   * rest of the ledger and is one row up in this same list.
+   */
+  const RECENT_CAP = 5;
 
   /** 34 §4's two regexes: a prefixed spoken id, and `register#seq`. `#125` is plain text. */
   const SPOKEN = /^([A-Z]{1,3})(\d+)$/;
@@ -323,6 +366,60 @@
     }
 
     /**
+     * THE ROWS YOU CHANGED LAST, WHICH THIS PANEL COULD NOT REACH WITHOUT BEING TOLD THEIR NAMES.
+     *
+     * An open palette listed the commands, the pages, the saved views, the registers, the figures
+     * and the questions, and not one row of the record. To get back to the obligation you edited ten
+     * minutes ago you had to remember what it was called and type it, which is the whole failure
+     * `loop/REWORK.md` phase 3 item 5 describes: a surface that reaches the screens objects live on
+     * rather than the objects.
+     *
+     * NOTHING NEW IS STORED TO DO IT. The ledger already knows: `AUDIT` is newest first, and every
+     * write against a row carries `register#seq` as its target, which is the same sentence the query
+     * box takes. A visit is not a write and this build records none, so this is what was changed
+     * rather than what was looked at, and the heading says so.
+     *
+     * AND THE STANDING RULE DECIDES WHICH ONES. A target is a row id, a declaration id
+     * (`page.money`) or a governance id (`suggestion:SG31`), and only the first of those is a thing
+     * with a page to open. One naming a register this record does not hold, a seq that is no longer
+     * there, or a row whose title field is empty, is not built rather than drawn as a line that
+     * cannot be pressed.
+     *
+     * Only with an empty query, for the same reason the questions below it are: past that `search()`
+     * is already answering, and a second source for the same rows would draw each of them twice.
+     */
+    if (prefix === null && text === '') {
+      const seen = new Set<string>();
+      for (const event of AUDIT) {
+        if (seen.size >= RECENT_CAP) break;
+        /* THE REGEX THE QUERY BOX ALREADY USES. A ledger target and a typed `tasks#125` are the
+           same sentence, so reading them two ways would be two grammars for one thing. */
+        const [target, register, seq] = QUALIFIED.exec(event.target ?? '') ?? [];
+        if (target === undefined || register === undefined || seq === undefined) continue;
+        if (seen.has(target)) continue;
+        const held = REGISTERS[register];
+        const row = entry(register, Number(seq));
+        if (!held || !row) continue;
+        const title = String(row.fields[held.title] ?? '').trim();
+        if (!title) continue;
+        seen.add(target);
+        out.push({
+          id: `n-${target}`,
+          title,
+          /* WHEN, IN THE UNIT `/audit` SAYS IT IN. The ledger's own screen reads `since(e.at, NOW)`
+             over the same events, and a row that said "3d ago" here and "2d ago" there would be two
+             stories about one write. */
+          detail: `${held.name} · ${since(event.at, NOW)}`,
+          href: `/r/${register}/${seq}`,
+          group: RECENT,
+          spoken: `#${seq}`,
+          icon: iconFor(held.icon, 'rows'),
+          complete: title,
+        });
+      }
+    }
+
+    /**
      * AND WHAT IS WAITING ON YOU, WITH NOTHING TYPED.
      *
      * `search()` reaches the decisions the moment two characters are in the box, and before that
@@ -350,8 +447,8 @@
          than the pages, because `/` is the prefix somebody types to see pages and `#` is not, and
          the total has to lose them with the rows or the count is about a list nobody is shown. */
       const twice = prefix === null;
-      const asPages = found.groups.find((g) => g.kind === 'Pages')?.total ?? 0;
-      const kept = found.hits.filter((hit) => (prefix !== '@' || hit.href.startsWith(`/r/${PEOPLE}/`)) && !(twice && hit.kind === 'Pages'));
+      const asPages = found.groups.find((g) => g.kind === copy.pages)?.total ?? 0;
+      const kept = found.hits.filter((hit) => (prefix !== '@' || hit.href.startsWith(`/r/${PEOPLE}/`)) && !(twice && hit.kind === copy.pages));
       /* THE TOTAL IS THE SCOPE'S, NOT THE RECORD'S. `@` narrows to one register, so the number the
          status line compares against has to be that register's count, read off the group `search()`
          already returns rather than recounted, so the two can never disagree. */
@@ -480,6 +577,52 @@
   const RUN = keyFor('palette-run') ?? '↵';
   const COMPLETE = keyFor('palette-complete') ?? '⇥';
 
+  /**
+   * THE ID A ROW ANSWERS TO, so that `aria-activedescendant` has something to point at.
+   *
+   * The options carried no ids and the query box carried no `aria-activedescendant`, so a screen
+   * reader following the input heard the list change and never heard which row `↓` had moved to.
+   * The highlight was a background tint and nothing else: readable by eye, and invisible to the one
+   * reader who has no other way to know what `↵` is about to run.
+   *
+   * THE PUNCTUATION IS FOLDED RATHER THAN TRUSTED. A record hit's id is built out of its address, so
+   * it carries slashes and query strings, and an IDREF is a token: a space or a quote in one breaks
+   * the reference with no error anywhere. The prefix letters (`c-`, `p-`, `h-`) keep the families
+   * apart, so folding cannot collapse two rows onto one id.
+   */
+  const optionId = (id: string): string => `palette-opt-${id.replace(/[^\w-]+/gu, '-')}`;
+
+  /**
+   * Which one of them the query box is pointing at, or nothing when the list is empty.
+   *
+   * `flat[cursor]` and not `cursor`, because the attribute has to name a row that is on screen: a
+   * cursor past the end of a list that just got shorter would point at an id no element holds, and a
+   * dangling `aria-activedescendant` is read as no active option at all.
+   */
+  const activeId = $derived.by(() => {
+    const row = flat[cursor];
+    return row ? optionId(row.id) : undefined;
+  });
+
+  /**
+   * AND THE ACTIVE ROW IS BROUGHT ONTO THE SCREEN, which nothing did while it was only a tint.
+   *
+   * The panel draws up to sixty rows in a scroller, and `↓` moved a highlight without moving the
+   * list, so holding the key ran the cursor off the bottom and left `↵` pointing at a row nobody
+   * could see. The comment on the cursor reset above already names this as the reason a stale
+   * cursor was survivable at twenty rows and is not at sixty; it is the same defect one press
+   * later.
+   *
+   * `block: 'nearest'` is what makes it safe under the pointer: a row already on screen is not
+   * scrolled at all, so `onmouseenter` moving the cursor cannot yank the list out from under the
+   * hand that is moving over it.
+   */
+  $effect(() => {
+    const id = activeId;
+    if (id === undefined) return;
+    document.getElementById(id)?.scrollIntoView({ block: 'nearest' });
+  });
+
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
@@ -531,13 +674,29 @@
     } else if (e.key === 'Enter') {
       e.preventDefault();
       run(flat[cursor]);
-    } else if (e.key === 'Tab') {
-      /* Complete the query. Nothing else, and only into a row that says what it completes to. A
-         row without `complete` swallows the key rather than passing focus out of the panel, which
-         is what `⇥` means inside a combobox. */
-      e.preventDefault();
+    } else if (e.key === 'Tab' && !e.shiftKey) {
+      /**
+       * `⇥` COMPLETES THE QUERY, AND IT USED TO SWALLOW `⇧⇥` AS WELL.
+       *
+       * The branch tested the key and never the modifier, and called `preventDefault()` before it
+       * had worked out whether there was anything to complete. So shift-tab ran a FORWARD completion
+       * and then ate the press, and backwards focus movement was dead everywhere inside the panel.
+       * Below 640px that was the whole keyboard route to the close button, which is the only dismiss
+       * control a phone has: `Esc` is not on the keyboard and the click-outside test cannot be true
+       * at `100vw`.
+       *
+       * So the key is taken only when it is doing the one job this file's header claims for it, a
+       * plain `⇥` on a row that says what it completes to. Every other press is handed back to the
+       * browser, which moves focus within the `<dialog>` and cannot move it out, because a modal
+       * dialog is a focus trap and that is one of the three reasons this surface is one. The options
+       * are `tabindex="-1"`, so what focus reaches is the panel's own controls rather than sixty
+       * rows that would take the arrow keys away from the box that handles them.
+       */
       const top = flat[cursor];
-      if (top?.complete !== undefined) q = (parsed.prefix ?? '') + top.complete;
+      if (top?.complete !== undefined) {
+        e.preventDefault();
+        q = (parsed.prefix ?? '') + top.complete;
+      }
     }
   }
 
@@ -576,6 +735,7 @@
       role="combobox"
       aria-expanded="true"
       aria-controls="palette-list"
+      aria-activedescendant={activeId}
       aria-label={copy.paletteLabel}
       placeholder={copy.palettePlaceholder}
       spellcheck="false"
@@ -605,18 +765,38 @@
     </button>
   </div>
 
-  <div class="p-body" id="palette-list" role="listbox" aria-label={copy.paletteLabel}>
-    {#each groups as [group, items]}
-      <p class="p-group">{group}</p>
-      {#each items as row (row.id)}
-        {@render result(row)}
+  <!--
+    THE SCROLLER AND THE LISTBOX ARE TWO ELEMENTS NOW, AND THEY USED TO BE ONE.
+
+    `role="listbox"` sat on the scrolling body, and a listbox owns options and groups and nothing
+    else. Inside it were two paragraphs: the heading over each group, and the sentence a query that
+    matches nothing leaves behind. Both are prose, and prose in a listbox is a child the role does
+    not admit, which is the kind of defect that reads as the list being broken rather than as a
+    caption being in the wrong box.
+
+    So the box that scrolls is the box that scrolls, the listbox is inside it and holds only rows,
+    and each heading is now a `role="group"` around the rows it heads, named by the same words it
+    prints. The printed heading is `aria-hidden`, because the group's own name already says it and a
+    reader who heard both would hear every heading twice.
+  -->
+  <div class="p-body">
+    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel}>
+      {#each groups as [group, items]}
+        <div role="group" aria-label={group}>
+          <p class="p-group" aria-hidden="true">{group}</p>
+          {#each items as row (row.id)}
+            {@render result(row)}
+          {/each}
+        </div>
       {/each}
-    {/each}
-    {#if overflow}{@render result(overflow)}{/if}
+      {#if overflow}{@render result(overflow)}{/if}
+    </div>
     {#if flat.length === 0}
       <!-- A query matching nothing falls through to a fallback row when a model is configured.
            Without one the row, the status call and every "Ask BrainDog" button do not exist: ABSENT,
-           not disabled (23 §8). This record has no model, so this is what you get. -->
+           not disabled (23 §8). This record has no model, so this is what you get.
+
+           OUTSIDE THE LISTBOX, because it is a sentence about the list rather than a row in it. -->
       <p class="p-none">{copy.noMatches} “{q}”</p>
     {/if}
   </div>
@@ -637,7 +817,9 @@
     type="button"
     class="p-row"
     role="option"
+    id={optionId(row.id)}
     aria-selected={index === cursor}
+    tabindex={-1}
     data-cursor={index === cursor ? '' : undefined}
     onmouseenter={() => (cursor = index)}
     onclick={() => run(row)}
@@ -720,9 +902,10 @@
    *
    * It was `min(680px, 100vw - 16px)` by `min(72dvh, 620px)`, floating over the centre, which is
    * what a command palette looks like everywhere and is wrong for this one. This surface lists the
-   * commands, the pages, the saved lists, the figures, the open questions and whatever the record
-   * answers with: in a 680px box that is a column with two thirds of a 1440px screen dimmed and
-   * empty beside it, and the page you are navigating FROM completely hidden.
+   * commands, the pages, the saved lists, the figures, the open questions, the rows you changed
+   * last and whatever the record answers with: in a 680px box that is a column with two thirds of
+   * a 1440px screen dimmed and empty beside it, and the page you are navigating FROM completely
+   * hidden.
    *
    * Two thirds of the width, full height, hard against the inline end. Floored so it is still a
    * panel on a small laptop and capped so it does not become the whole page on an ultrawide. The
@@ -854,7 +1037,27 @@
     font-size: var(--t-xs);
   }
 
+  /**
+   * THE BOX THAT SCROLLS IS THE LISTBOX, AND FOR A MOMENT IT WAS THE WRAPPER AROUND IT.
+   *
+   * Splitting the scroller from the listbox fixed prose sitting inside a role that does not admit
+   * it, and it broke `scrollable-region-focusable`: the options are `tabindex="-1"` because a
+   * combobox that moves focus with `aria-activedescendant` must not put its rows in the tab order,
+   * so the wrapper became a scrolling region with nothing focusable in it and axe was right to say
+   * so. The exemption axe grants is for a combobox's own popup, and the popup is the element the
+   * input names in `aria-controls`. So the scroll belongs on that element rather than on a plain
+   * `div` wrapped around it, which is also the truer description: what a person scrolls is the list.
+   */
   .p-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    /* A flex child's floor is its content, so without this the list cannot be shorter than its rows
+       and the panel grows instead of scrolling. */
+    min-block-size: 0;
+  }
+
+  #palette-list {
     flex: 1;
     padding: var(--sp-2) var(--sp-3);
     overflow-y: auto;

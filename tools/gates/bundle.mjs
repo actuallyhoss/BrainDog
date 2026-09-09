@@ -28,6 +28,66 @@ const brotli = (buf) =>
 
 const KB = (n) => `${(n / 1024).toFixed(1)} KB`;
 
+/**
+ * EVERY SHELL IN THE WORKSPACE, BEFORE ANY NUMBER AND BEFORE A BUILD IS EVEN LOOKED FOR.
+ *
+ * `app.html` carries `%sveltekit.head%` and `%sveltekit.body%`, and the build replaces the FIRST
+ * occurrence of each and leaves the rest. So a second spelling anywhere in that file, in a comment
+ * for instance, takes the substitution and the real one ships as literal text. This repository's own
+ * `apps/web/src/app.html` did exactly that, to explain itself.
+ *
+ * WHAT IT COSTS IS EVERYTHING AND IT SAYS NOTHING. The app does not mount: no console error, no
+ * page error, an empty screen on every route, a build that succeeds, a typecheck that passes and a
+ * deploy that goes out. It reached staging and served there.
+ *
+ * IT IS COUNTED IN THE SOURCE, WHICH IS THE HALF THIS GATE DID NOT HAVE. Further down, the same
+ * defect is caught in `apps/web/build/index.html`, and that check has two limits it does not say out
+ * loud: it needs a build, and it is about the one app whose size this gate reports. Exactly one
+ * spelling of each name is the only arrangement the substitution can survive, so counting them in
+ * the source is the same fact one step earlier, on a file that is always there, for every app in the
+ * workspace.
+ *
+ * AND `apps/site` IS THE APP THAT NEEDED IT. It is a second SvelteKit app, with its own `app.html`
+ * carrying twenty lines of comment about Open Graph and colour schemes, and until now nothing in
+ * this suite read a line of its source. A site that never mounts is three blank pages on the one
+ * surface a stranger sees first.
+ *
+ * THE SHELLS ARE FOUND RATHER THAN LISTED, so a third app is checked the day it exists and not the
+ * day somebody remembers this file. An empty list is a finding for the same reason `clean-room`'s
+ * empty tripwire list is: a gate that found nothing to read must not report that it read everything.
+ */
+const PLACEHOLDERS = ['%sveltekit.head%', '%sveltekit.body%'];
+const shells = [];
+for (const app of await readdir(join(process.cwd(), 'apps'), { withFileTypes: true }).catch(() => [])) {
+  if (!app.isDirectory()) continue;
+  const at = join(process.cwd(), 'apps', app.name, 'src', 'app.html');
+  if (await stat(at).then((s) => s.isFile(), () => false)) shells.push([`apps/${app.name}/src/app.html`, at]);
+}
+
+const shellFindings = [];
+if (shells.length === 0) shellFindings.push('no apps/*/src/app.html anywhere, so this gate read no shell at all');
+for (const [name, at] of shells) {
+  const source = await readFile(at, 'utf8');
+  for (const placeholder of PLACEHOLDERS) {
+    /* `split` RATHER THAN A REGEX WITH A `g` FLAG, because the names carry a `.` and a `%` and the
+       escaping is one more thing that can be wrong in a check whose whole value is that it cannot. */
+    const times = source.split(placeholder).length - 1;
+    if (times !== 1) shellFindings.push(`${name} spells ${placeholder} ${times} time(s), and the build replaces the first of them`);
+  }
+}
+
+if (shellFindings.length > 0) {
+  console.error('\n  bundle: a shell the build cannot substitute.\n');
+  for (const f of shellFindings) console.error(`    ${f}`);
+  console.error(
+    '\n  The build replaces the FIRST occurrence of each placeholder and leaves the rest, so a\n' +
+      '  second spelling anywhere in the file, in a comment for instance, takes the substitution and\n' +
+      '  the real one ships as literal text. The app then does not mount at all, on any route, with\n' +
+      '  no error anywhere. Spell the two names apart in prose.\n',
+  );
+  process.exit(1);
+}
+
 let manifest;
 let built;
 try {

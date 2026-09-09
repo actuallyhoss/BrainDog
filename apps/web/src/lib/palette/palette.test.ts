@@ -7,9 +7,12 @@
  *
  * NOT THE MARKUP. A `.svelte` file cannot be imported by `node --test`, and a regex over source
  * proves a shape rather than a behaviour, so everything here that can run is run: `admits` and
- * `commands` are ordinary functions in `admit.ts` for exactly that reason. The two assertions that
- * do read source read the KEYMAP REGISTRY, because the claim being checked is a claim about two
- * files agreeing, which is the one thing running one of them cannot show.
+ * `commands` are ordinary functions in `admit.ts` for exactly that reason.
+ *
+ * TWO ASSERTIONS USED TO READ THE KEYMAP AS TEXT, because the registry lived in a module with runes
+ * in it and nothing loadable by `node --test` could import it. The bindings are data and they live
+ * in a plain `a11y/bindings.ts` now, so both read the registry itself: a grep over source proves
+ * that a string appears in a file, and what these two claims are about is what the product holds.
  *
  * `50 §9` runs these with `node --test` from `apps/web`, like every other test beside them.
  */
@@ -21,13 +24,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ACTS, COMMANDS, UNDO_LAST, admits, commands, type Command } from './admit.ts';
+import { BINDINGS, type Binding } from '../a11y/bindings.ts';
+import { copy } from '../copy.ts';
 import { METRICS } from '../record/declared.ts';
 import { isTemplate, unreadable } from '../record/metrics.ts';
-import { QUESTIONS, REGISTERS, VIEWS, metric, search } from '../record/api.ts';
+import { AUDIT, QUESTIONS, REGISTERS, VIEWS, entry, metric, search } from '../record/api.ts';
 
 const src = (...parts: string[]) => readFileSync(join(fileURLToPath(new URL('../', import.meta.url)), ...parts), 'utf8');
 
-const REGISTRY = src('a11y', 'keys.svelte.ts');
 
 /** A command that passes, so a fixture below can fail on one property at a time. */
 const good: Command = { id: 'fixture', title: 'Open the vault', href: '/vault', group: 'Go to', icon: 'vault' };
@@ -109,11 +113,11 @@ test('the standing rule reaches the objects too, not only the commands', () => {
 
 /* ── the keys printed on the rows come out of the registry ────────────────── */
 
-/** The registry's declaration line for one binding id, so the assertion below reads one row. */
-function registryRow(id: string): string {
-  const at = REGISTRY.indexOf(`id: '${id}'`);
-  assert.ok(at > 0, `the registry has no binding called "${id}"`);
-  return REGISTRY.slice(at, REGISTRY.indexOf('\n', at));
+/** The registry's own row for one binding id, so the assertion below reads one binding. */
+function registryRow(id: string): Binding {
+  const held = BINDINGS.find((b) => b.id === id);
+  assert.ok(held, `the registry has no binding called "${id}"`);
+  return held;
 }
 
 test('every binding a row prints is one the registry actually holds', () => {
@@ -124,18 +128,23 @@ test('every binding a row prints is one the registry actually holds', () => {
      that checks the id is real. */
   for (const c of COMMANDS) {
     if (c.binding === undefined) continue;
-    assert.match(registryRow(c.binding), /scope: 'document'/u, `${c.id} names the binding "${c.binding}", which is not a document-level one`);
+    assert.equal(registryRow(c.binding).scope, 'document', `${c.id} names the binding "${c.binding}", which is not a document-level one`);
   }
   /* AND THE TWO THE PANEL ITSELF PRINTS ON THE CURSOR ROW. They moved off the footer legend, so if
      the registry loses them the rows go bare and nothing else says so. */
-  for (const id of ['palette-run', 'palette-complete']) assert.ok(REGISTRY.includes(`id: '${id}'`), `the registry lost ${id}`);
+  for (const id of ['palette-run', 'palette-complete'])
+    assert.ok(
+      BINDINGS.some((b) => b.id === id),
+      `the registry lost ${id}`,
+    );
 });
 
-test('the one sentence copied out of the registry still matches the registry', () => {
-  /* `a11y/keys.svelte.ts` uses runes, so a plain module cannot import it and the undo row's label
-     is typed twice. A copied sentence that outlives the sentence it copies is the whole reason
-     `dead-copy` exists; this is the same check for the one string that had to be duplicated. */
-  assert.ok(REGISTRY.includes(`label: '${UNDO_LAST}'`), `the registry no longer says "${UNDO_LAST}"`);
+test('the undo row is labelled by the binding rather than by a copy of it', () => {
+  /* THE LABEL WAS TYPED TWICE and this test grepped the registry's source for the copy. It reads
+     the binding now, so the only way the two can disagree is if the binding stops existing, which
+     is what this asserts. */
+  assert.equal(UNDO_LAST, registryRow('undo').label);
+  assert.ok(UNDO_LAST.length > 0, 'the undo binding is gone and the row would print an empty label');
 });
 
 /* ── the reach: objects, not only destinations ────────────────────────────── */
@@ -149,7 +158,7 @@ test('THE SURFACE REACHES ROWS, PAGES AND DECISIONS, not only the screens they l
   const found = search('re', 9_999);
   const kinds = new Set(found.groups.map((g) => g.kind));
   assert.ok(kinds.has('Decide'), 'no decision is reachable by typing');
-  assert.ok(kinds.has('Pages'), 'no page is reachable by typing');
+  assert.ok(kinds.has(copy.pages), 'no page is reachable by typing');
   const registers = new Set(Object.values(REGISTERS).map((r) => r.name));
   assert.ok([...kinds].some((k) => registers.has(k)), 'no register row is reachable by typing');
   /* AND EVERY HIT IS AN ADDRESS. A result that cannot be opened is a result that wastes the one
@@ -180,6 +189,44 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
   /* AND THE ONES IT DROPS REALLY ARE UNREADABLE, so the filter is not throwing away rows that work. */
   for (const [id, decl] of Object.entries(METRICS))
     if (isTemplate(decl)) assert.match(decl.where ?? '', /\{\{/u, `${id} is dropped as a template and carries no parameter`);
+});
+
+test('AND IT REACHES THE ROWS YOU CHANGED LAST, off a ledger the record was already keeping', () => {
+  /* An open palette listed the commands, the pages, the saved views, the registers, the figures and
+     the questions, and not one row of the record: getting back to the obligation you edited ten
+     minutes ago meant remembering what it was called and typing it. The panel reads `AUDIT` for
+     that group, and nothing new is stored to do it.
+
+     WHAT THIS GUARDS IS AN ABSENCE. The source is a filter over a ledger whose targets are three
+     different grammars, a row id and a declaration id and a governance id, and only the first of
+     them is a thing with a page to open. If the row targets stopped resolving the group would stop
+     being drawn: no error, no empty state, one section of the panel gone. */
+  const ROW_TARGET = /^([a-z][a-z0-9_]*)#(\d+)$/u;
+  const reached: string[] = [];
+  const seen = new Set<string>();
+  for (const event of AUDIT) {
+    const found = ROW_TARGET.exec(event.target ?? '');
+    if (!found) continue;
+    const [target, register = '', seq] = found;
+    if (seen.has(target)) continue;
+    const held = REGISTERS[register];
+    const row = entry(register, Number(seq));
+    if (!held || !row) continue;
+    seen.add(target);
+    reached.push(String(row.fields[held.title] ?? '').trim());
+  }
+  /* Five is the panel's own cap on this group, which lives in the component and cannot be imported
+     here. A ledger that reaches four rows draws a short group and says nothing about it. */
+  assert.ok(reached.length >= 5, `the ledger reaches ${reached.length} rows and the panel draws five`);
+  for (const title of reached) assert.ok(title.length > 0, 'a row the panel would draw has no name to print');
+  /* AND NEWEST FIRST, because "recently changed" is a claim about ORDER and `AUDIT` is the only
+     thing making it. Sorted the other way the group would draw the five oldest writes in the record
+     under a heading that says the opposite, which is a lie no reader could catch. */
+  let previous = '';
+  for (const event of AUDIT) {
+    if (previous !== '') assert.ok(event.at <= previous, 'the ledger is no longer newest first');
+    previous = event.at;
+  }
 });
 
 test('every act the palette can perform is a named one, so no row smuggles in an argument', () => {

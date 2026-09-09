@@ -90,7 +90,22 @@ const CASES = [
      three correct methods, so a count of one is what proves the gate distinguishes them rather than
      reporting every route it reads. */
   { gate: 'guards', expect: /routed as ADMIN and is guarded by guard\(\)/, findings: 1 },
+  /* THE OTHER DIRECTION, AND THE ONE THAT IS SILENT IN REVIEW. `guards` had a single fixture, a
+     method routed ADMIN and guarded `guard()`, so the gate was proved to catch a ceiling that is too
+     LOW. A ceiling that is too high reads as care: `create` routed DATA and guarded `admin(ctx)`
+     refuses every token and takes the eight MCP tools with it, and nothing had ever asked this gate
+     to notice. The fixture's other five methods put DATA and `READ+` under both `guard` and
+     `scoped`, so one finding is an assertion that those two groups share one list rather than an
+     assertion that the gate went red about something. */
+  { gate: 'guards-data', run: 'guards', expect: /routed as DATA and is guarded by admin\(\)/, findings: 1 },
   { gate: 'closed-lists', expect: /the migration admits/, findings: 1 },
+  /* THE SHELL CHECK, WHICH READS EVERY `apps/*\/src/app.html` IN THE WORKSPACE. It is in `bundle`
+     because that gate already reads a built shell, and until now it read only the built one, only
+     for `apps/web`, and only when there was a build. The source form needs neither, and it reaches
+     `apps/site`, which nothing in this suite had ever read a line of. The fixture spells the body
+     placeholder twice and the head placeholder once, so a count of one is what proves the gate
+     reports the placeholder that is wrong rather than every placeholder it finds. */
+  { gate: 'bundle-shell', run: 'bundle', expect: /a shell the build cannot substitute/, findings: 1 },
   /* ONE LINE NAMES THE CODE, and the fixture drops exactly one. The gate reports two findings for
      it — the missing code, and the family whose size no longer matches — and only the first can
      name it, because the second is about a count. `findings` here is *lines that name the seeded

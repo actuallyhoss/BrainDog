@@ -308,10 +308,32 @@ let checked = 0;
  * seed is set — a real run is never scoped, so the gate cannot be quietened by an environment
  * variable.
  */
+/**
+ * AND ONE VARIANT PAGE-RUN, WHICH USED TO BE NONE.
+ *
+ * `present.length = 0` was the line here, so the seeded run never entered the variant pass at all.
+ * The pass has its own copy of the wait, its own copy of the preparation and its own copy of the
+ * seed, and the comment beside that seed says it is *"what makes this pass answerable by
+ * `self-test`"*. It was not: the block could not execute under the only environment that sets the
+ * variable, so the second half of this gate had never once been asked to go red. That half is the
+ * half that measures the marketing site and the three records the shipped seed cannot draw, which
+ * is to say the half nothing else in the suite covers.
+ *
+ * ONE VARIANT AND ONE OF ITS ROUTES, for the reason the paragraph above gives about the main loop:
+ * a 2000px heading overflows at every width on every route, so the first of each proves what the
+ * whole sweep proves and the rest is wall clock. Which variant it is depends on what has been
+ * built, and the pass is the same code whichever it is.
+ *
+ * A RUN WITH NO VARIANT BUILT SAYS SO, because "we did not check this" must not look like "there
+ * was nothing here". `self-test` reads that sentence and reports the variant half as unproved
+ * rather than counting it.
+ */
 if (process.env.BRAINDOG_GATE_SEED) {
   widths.length = 1;
   ROUTES.length = 1;
-  present.length = 0;
+  present.length = Math.min(present.length, 1);
+  if (present.length === 0) console.log('  layout: no variant is built, so the variant pass is not under test on this run.');
+  else present[0] = { ...present[0], routes: present[0].routes.slice(0, 1) };
 }
 
 for (const width of widths) {
@@ -377,11 +399,16 @@ for (const width of widths) {
  * of the branch is drawn at all and holds together, not a second full sweep of a build that differs
  * from the first by one constant.
  */
+/* The floor and a desktop. `FLOOR` is the gate's own — a numeric literal here would be the
+   thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for. */
+const variantWidths = [...FLOOR, bps[bps.length - 1] ?? 1_200];
+/* AND ONE OF THEM UNDER THE SEED. The seeded heading is 2000px wide, so the narrowest width proves
+   what four of them prove, and the other three are three browser contexts on every `pnpm gates`. */
+if (process.env.BRAINDOG_GATE_SEED) variantWidths.length = 1;
+
 for (const v of present) {
   serving = v.root;
-  /* The floor and a desktop. `FLOOR` is the gate's own — a numeric literal here would be the
-     thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for. */
-  for (const width of [...FLOOR, bps[bps.length - 1] ?? 1_200]) {
+  for (const width of variantWidths) {
     const context = await browser.newContext({
       viewport: { width, height: L.viewportHeightPx },
       reducedMotion: 'reduce',

@@ -131,9 +131,23 @@
    * THE FIRST VALUE IS STILL THE DEFAULT, because a declaration's first enum value is what a row
    * starts as and a picker opened on nothing makes somebody choose before they have read the form.
    * What changed is that it is now a starting point rather than the only point.
+   *
+   * AND THEN IT HELD THE CHOICE IN A MAP NOTHING ELSE READ, WHICH IS THE SAME BUG ONE STEP ALONG.
+   *
+   * That fix made the segments pressable and put the value in `chosen`, and `chosen` was read
+   * by exactly one thing: the segments' own `tabindex`, `data-on` and `aria-checked`. The effect
+   * that builds `taken` reads `typed` and `ticked`, so the control moved, announced
+   * `aria-checked="true"` on the value somebody pressed, and contributed nothing to the row. Twelve
+   * of the thirteen enums this record declares are four values or fewer, so on nearly every form in
+   * the product pressing a segment was a drawing of a press. A row added from `/r/obligations`
+   * arrived with `Which way` and `State` both showing an em dash, and the submit button was live
+   * with two required fields absent because `missing` excused enums on the same test.
+   *
+   * ONE MAP. `typed` is where a `<select>`, a text box and a date already put their answers, and it
+   * is what `taken` reads, so a segment writing anywhere else can only ever be a second source of
+   * truth with one reader.
    */
-  let chosen = $state<Record<string, string>>({});
-  const pick = (f: FieldDecl): string => chosen[f.id] ?? f.values?.[0] ?? '';
+  const pick = (f: FieldDecl): string => typed[f.id] ?? f.values?.[0] ?? '';
 
   /**
    * WHAT A PERSON HAS TYPED INTO A MONEY FIELD, and whether the record would take it.
@@ -163,10 +177,12 @@
     const out: Record<string, string> = {};
     for (const f of readableFields(register)) {
       if (first && f.deadline && f.type === 'day') out[f.id] = soon;
-      /* AND A LONG ENUM OPENS ON ITS FIRST VALUE, the same as the segmented control beside it — a
-         `<select>` bound to `undefined` shows nothing chosen, which is not what a register with a
-         nine-value enum means by "the default". */
-      if (f.type === 'enum' && (f.values?.length ?? 0) > 4 && f.values?.[0]) out[f.id] = f.values[0];
+      /* AND AN ENUM OPENS ON ITS FIRST VALUE, whichever control it draws as. This seeded only the
+         `<select>` arm, on the argument that a select bound to `undefined` shows nothing chosen;
+         the segmented control beside it looked selected and was not, so the two arms of one field
+         type disagreed about what "the default" means and only the long one carried its answer into
+         the row. */
+      if (f.type === 'enum' && f.values?.[0]) out[f.id] = f.values[0];
     }
     return out;
   };
@@ -218,12 +234,17 @@
    *
    * `f.required` was already rendered beside the label and enforced nowhere — a form that marks a
    * field required and takes it empty has told somebody a rule and then not kept it, which is worse
-   * than never marking it. `enum` and `bool` are never in here: a segmented control opens on its
-   * first value and an unchecked box is `false`, so both always carry an answer.
+   * than never marking it. `bool` is never in here: an unchecked box is `false`, which is an answer.
+   *
+   * AN ENUM USED TO BE EXCUSED HERE TOO, on the argument that a segmented control always carries an
+   * answer, and that argument was true of the drawing and false of the row: the value went into a
+   * map `taken` never read, so the excuse kept the button live over two required fields that
+   * arrived empty. Now that every enum is seeded into `typed` the excuse is not needed, and an enum
+   * that somehow declares no values is caught rather than waved through.
    */
   const missing = $derived(
     fields
-      .filter((f) => f.required && f.type !== 'bool' && !(f.type === 'enum' && (f.values?.length ?? 0) <= 4))
+      .filter((f) => f.required && f.type !== 'bool')
       .filter((f) => (typed[f.id] ?? '').trim() === '')
       /* THE LABEL ON THE SCREEN, not the declaration's. On the first run the title field is asked
          for as a fact — "Your first invoice" — and this sentence went on naming it `Description`,
@@ -312,7 +333,7 @@
               tabindex={pick(f) === value ? 0 : -1}
               data-on={pick(f) === value ? '' : undefined}
               aria-checked={pick(f) === value ? 'true' : 'false'}
-              onclick={() => (chosen = { ...chosen, [f.id]: value })}
+              onclick={() => (typed = { ...typed, [f.id]: value })}
               onkeydown={(e) => {
                 const values = f.values ?? [];
                 const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
@@ -322,7 +343,7 @@
                    with ends, and stopping at one would make the last value the expensive one. */
                 const next = values[(i + step + values.length) % values.length];
                 if (next === undefined) return;
-                chosen = { ...chosen, [f.id]: next };
+                typed = { ...typed, [f.id]: next };
                 (e.currentTarget.parentElement?.children[(i + step + values.length) % values.length] as HTMLElement | undefined)?.focus();
               }}
             >
