@@ -91,6 +91,12 @@ const CASES = [
      name it, because the second is about a count. `findings` here is *lines that name the seeded
      token*, not *findings the gate made*, and conflating them is how a fixture ends up asserting a
      number that means something else. */
+  /* ONE BYPASS, AND THE FIXTURE'S KERNEL IS OTHERWISE HONEST: three of its four writers call
+     `sparkMayWrite`, and the fourth appends the event itself. That is `spark.ts`'s own "a sixth
+     writer would be a sixth call" written as a tree. One finding, because the other three still
+     refuse and the query returns exactly the row the bypass wrote. */
+  { gate: 'spark-actor', expect: /spark wrote \w+, in the seed record/, findings: 1 },
+
   { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1 },
 
   /* TWO CODES NAMED IN ONE SOURCE FILE AND ONE OF THEM FIXTURED, and the seeded violation is the

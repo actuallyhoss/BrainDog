@@ -14,11 +14,30 @@
 
   `replaceState`, so Back returns to wherever they came from rather than to a redirect that fires
   again.
+
+  AND IT DREW A BLANK PAGE WITH NO TITLE while the redirect ran. The effect fires after mount, so
+  for one frame or several on a cold load this route was an empty document whose tab said nothing:
+  a person who typed the address watched a blank screen and had no way to tell it from a broken one.
+  A title and one line cost nothing and are correct even if the redirect never lands, which on a
+  slow first load is a real state and not a hypothetical.
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { titleOf } from '$lib/title.ts';
+  import { copy } from '$lib/copy.ts';
 
   $effect(() => {
     void goto('/settings/appearance', { replaceState: true });
   });
 </script>
+
+<svelte:head><title>{titleOf(copy.settings)}</title></svelte:head>
+
+<p class="going" role="status">{copy.settingsGoing}</p>
+
+<style>
+  .going {
+    padding: var(--sp-6) var(--sp-5);
+    color: var(--dim);
+  }
+</style>

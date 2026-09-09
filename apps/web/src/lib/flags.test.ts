@@ -48,6 +48,7 @@ test('a flag name is never also a preference', () => {
     text: true,
     density: true,
     theme: true,
+    contrast: true,
     sidebar: true,
     chars: true,
     suggestPages: true,

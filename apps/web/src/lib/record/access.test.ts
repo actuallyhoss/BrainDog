@@ -346,9 +346,19 @@ test('and the two areas that report rather than offer say which deployment this 
   assert.ok(['self-host', 'cloud'].includes(DEPLOYMENT.kind));
   assert.notEqual(copy.restoreSelfHost, copy.restoreCloud);
   assert.notEqual(copy.billingSelfHost, copy.billingCloud);
-  /* `49 §8` asks for one line, here, and names the reason: the key "is what a self-hoster must back
-     up separately". A copy sealed with a key that is only inside the copy cannot be opened. */
-  assert.match(copy.theKeyIs, /back that key up somewhere else/i);
+  /* `49 §8` asks for this, here, and names the reason: the key "is what a self-hoster must back up
+     separately". A copy sealed with a key that is only inside the copy cannot be opened.
+
+     TWO SENTENCES NOW, AND THE SECOND ONE IS THE FIX. It was one, and it gave an instruction over a
+     section holding no button, no link and no value: back up a key the screen would not show you.
+     `12 §8` keeps the age identity outside the product on purpose, so the answer was never to print
+     it here; it was to say where it already is. The assertion moved with the clause rather than
+     being deleted, because what `49 §8` requires is that the instruction is on this screen and not
+     which sentence carries it. */
+  const key = `${copy.theKeyIs} ${copy.theKeyWhere}`;
+  assert.match(key, /copy that file somewhere else/i);
+  assert.match(key, /cannot be opened/i);
+  assert.match(copy.theKeyWhere, /age identity file/i, 'the screen no longer says where the key is');
   /**
    * `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some".
    *

@@ -58,6 +58,18 @@ const GATES = [
      the one part of a refusal a caller can branch on, and `10 §7` builds the agent contract on it:
      the refusal teaches, and it teaches from a code stable across versions. Beside `event-kinds`
      because it is the same shape over the corpus's other large vocabulary. */
+  /* THE ONE INVARIANT `30` STATES AS SQL, ASKED OF A REAL RECORD. `30 §3` closes the `spark` actor
+     to suggest, propose and predict and calls it "an invariant with a test": the assistant proposes
+     and a person decides. This materialises the seed through the real write path, offers the record
+     the four writes a model may not make, and runs `30 §3`'s query over what came back.
+
+     IT MAKES THE WRITES BEFORE IT QUERIES, and that is the whole reason it is worth having.
+     `52 §5.2` says to materialise the record and run the query, and in this tree that is green off
+     an empty table: the seed writes no `spark` event at all, so the filter filters nothing. A gate
+     that passes because its subject is absent is the failure this directory exists to catch, and it
+     was specified that way. The only gate here that builds a record, and at about 150ms it is still
+     a grep's price. */
+  ['spark-actor', ['node', [join(here, 'spark-actor.mjs')]]],
   ['refusals', ['node', [join(here, 'refusals.mjs')]]],
 
   /* AND THE OTHER HALF OF `30 §6`'s LAST PARAGRAPH: *"every `code` has a fixture that produces

@@ -8,6 +8,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { copy } from './copy.ts';
 import { firstRun } from './first-run.ts';
@@ -60,4 +62,42 @@ test('THE DEAD BUTTON SAYS WHICH FIELDS, and reads as English for one and for th
     'Amount cannot be stored as typed. The reason is under the field.',
   );
   assert.match(copy.rowFieldProblem(['Amount', 'Paid']), /^Amount and Paid /);
+});
+
+/**
+ * FIRST RUN DOES NOT NAVIGATE AWAY FROM ITS OWN OUTCOME.
+ *
+ * `commit` pushed the honest toast and called `goto` in the same tick, and the toast did not
+ * survive. Measured on the deployed build: at 700ms the sentence is in the DOM and the URL is still
+ * `/start`; at 2,200ms the URL is `/r/obligations?first=1`, the live region is present and empty,
+ * and a marker set before the click survived, so the store was never reloaded. The mechanism was
+ * never identified, and the fix does not depend on identifying it: the highest-stakes control in
+ * the product must report where the person is standing.
+ *
+ * A SOURCE READ, AND THAT IS THE HONEST SHAPE FOR IT. There is no behaviour to drive here without a
+ * browser, and the browser gates cannot see it because the outcome only exists after a submit they
+ * do not perform. What went wrong was one call in one function, so one call in one function is what
+ * this checks.
+ */
+const startPage = readFileSync(fileURLToPath(new URL('../routes/start/+page.svelte', import.meta.url)), 'utf8');
+
+test('THE FIRST ROW REPORTS WHERE THE PERSON IS STANDING, and does not navigate', () => {
+  const commit = startPage.slice(startPage.indexOf('function commit('), startPage.indexOf('function commit(') + 600);
+  assert.match(commit, /toasts\.push\(copy\.notWritten/u, 'the honest toast is gone');
+  assert.doesNotMatch(commit, /goto\(/u, 'commit navigates away from its own outcome again');
+
+  /* AND THE OUTCOME IS ON THE SCREEN, not only in a toast that a later navigation can take with it. */
+  assert.match(startPage, /firstRun\.keptNothing[^A-Za-z]/u, 'the outcome is not rendered');
+  assert.match(startPage, /role="status"/u, 'the outcome is not announced');
+
+  /* THE WAY ONWARD IS OFFERED AND NOT TAKEN. The list is still reachable; it is a control now. */
+  assert.match(startPage, /firstRun\.seeTheList\(/u, 'there is no way onward');
+  assert.match(startPage, /\/r\/\$\{choice\.key\}\?first=1/u, 'the way onward lost its address');
+});
+
+test('and the answer is reset when the question changes', () => {
+  /* Going Back and choosing a different list must not arrive pre-answered, which is the same bug
+     the `picked === null` guard in that effect had in a different place. */
+  const effect = startPage.slice(startPage.indexOf('honoured = asked;'), startPage.indexOf('honoured = asked;') + 400);
+  assert.match(effect, /said = false/u, 'the outcome outlives the choice it belongs to');
 });

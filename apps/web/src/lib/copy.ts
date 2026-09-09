@@ -572,6 +572,24 @@ export const copy = {
   accentHouse: 'House',
   accentSet: (name: string) => `${name} is this record's colour.`,
   accentReset: 'Back to the house colour.',
+  /* `/settings` REDIRECTS, AND DREW NOTHING WHILE IT DID. One line, so the frame before the
+     redirect lands is a page rather than a blank document with no title. */
+  settingsGoing: 'Opening Appearance.',
+  /**
+   * THE PALETTE THAT SHIPPED AND COULD NOT BE TURNED ON.
+   *
+   * `packages/theme` solves a second palette against a higher contrast floor and `theme.mjs` writes
+   * it into `house.css` behind `html[data-theme='hc']`, byte-compared on every build. Nothing in
+   * the app ever set that attribute, so it was sixteen checks' worth of work that no reader could
+   * reach. What stood in its way was the record accent, which was being written into the same
+   * attribute and read by nothing.
+   *
+   * NAMED FOR WHAT IT DOES AND NOT FOR THE STANDARD IT MEETS. "WCAG AAA" is a fact about a document
+   * somebody else wrote; "more contrast" is a fact about the screen in front of you (`19 §9`).
+   */
+  contrast: 'More contrast',
+  contrastHint:
+    'A second palette, solved against a higher floor. Every surface, ink and boundary is further apart, and the accent you chose is kept.',
   /* A FIGURE THAT CANNOT BE WORKED OUT, said to the person reading the tile rather than to whoever
      wrote the declaration. What was here was the author's sentence — "group_by: is published in 08
      and not read by this build", "{ lte: 400000 } for money in minor units" — under a headline
@@ -916,7 +934,11 @@ export const copy = {
   interruptCapIs: 'One urgent interruption an hour.',
   unreadCount: 'Unread',
   unreadCountIs: 'One number, on the record, in one place.',
-  muteAtSource: 'To stop one of these, change the rule that raises it. There is no switch here that would.',
+  /* IT POINTED AT A SCREEN THAT DOES NOT EXIST. "Change the rule that raises it" is a route this
+     product has not got: there is no rules screen, no link, and nothing in the nav that reaches
+     one. Advice a reader cannot follow is worse than no advice, because they go looking. What is
+     true is that a rule raised it and the rule is named on the row itself. */
+  muteAtSource: 'There is no switch here. Each of these is raised by a rule, and the rule is named on the row.',
 
   /* backups — `53 §5.4` */
   kept: 'What is kept',
@@ -968,8 +990,22 @@ export const copy = {
   snapshotNow: 'Take one now',
   theKey: 'The key',
   /* `49 §8` asks for exactly this line. */
+  /**
+   * IT TOLD SOMEBODY TO BACK UP A KEY IT WOULD NOT SHOW THEM.
+   *
+   * The section had no button, no link and no value in it: *"Back that key up somewhere else, or
+   * the copies cannot be opened"* over an empty box. `49 §8` asks for the sentence and the sentence
+   * is right; a screen that gives an instruction and then withholds the one thing needed to follow
+   * it is the same defect as a control that does nothing.
+   *
+   * WHERE THE KEY IS IS THE HONEST ANSWER, and on a self-host it is a file on their own disk rather
+   * than anything this screen could print. `12 §8` keeps the age identity outside the product on
+   * purpose, so the fix is not to reveal it here; it is to say where it lives.
+   */
   theKeyIs:
-    'These copies are sealed with a key that is not inside them. Back that key up somewhere else, or the copies cannot be opened.',
+    'These copies are sealed with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
+  theKeyWhere:
+    'On a self-host it is the age identity file you made when you set the record up. Copy that file somewhere else, or these backups cannot be opened.',
   restore: 'Going back',
   restoreSelfHost: 'This record is self-hosted, so going back means restoring one of the copies above by hand.',
   restoreCloud: 'Any point in the last thirty days, not only the nightly copies.',

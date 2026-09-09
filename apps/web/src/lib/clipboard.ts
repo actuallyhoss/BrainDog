@@ -18,10 +18,29 @@ import { toasts } from './ui/toast.svelte.ts';
  * Put `text` on the clipboard and say so. `label` is what the toast quotes; the text by default.
  * `said` overrides the sentence for a surface that has its own — first run says where to paste it.
  */
+/**
+ * A HANG IS NOT A REJECTION, and this only caught the rejection.
+ *
+ * Chrome does not reject `writeText` when the document is not focused. It never settles. So the one
+ * control that matters for verifying a backup, the public signing key on the export screen, was a
+ * silent no-op in exactly that state: no toast, no error, nothing, and a person pressing it twice
+ * gets nothing twice. Reproduced repeatedly while driving the deployed build, which is how it was
+ * found, because a focused tab never shows it.
+ *
+ * A DEADLINE AND NOT A LONGER WAIT. The clipboard is a synchronous act from the reader's side; if
+ * it has not happened in a second it is not going to, and saying so is the whole job of this
+ * module. `Promise.race` rather than an abort, because there is nothing to abort: the write may
+ * still land later, and the sentence is about what this product can honestly report.
+ */
+const DEADLINE = 1_000;
+
 export async function put(text: string, label = text, said?: string): Promise<void> {
   try {
-    await navigator.clipboard.writeText(text);
-    toasts.push(said ?? copy.copied(label));
+    const wrote = await Promise.race([
+      navigator.clipboard.writeText(text).then(() => true),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), DEADLINE)),
+    ]);
+    toasts.push(wrote ? (said ?? copy.copied(label)) : copy.copyRefused, wrote ? {} : { intent: 'warn' });
   } catch {
     toasts.push(copy.copyRefused, { intent: 'warn' });
   }

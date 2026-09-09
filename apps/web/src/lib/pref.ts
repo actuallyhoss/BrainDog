@@ -21,8 +21,27 @@ export type Pref = {
   scheme?: 'light' | 'dark' | undefined;
   text?: 'sm' | 'base' | 'md' | undefined;
   density?: 'compact' | 'comfortable' | 'roomy' | undefined;
-  /** A record's own accent, once a record has one. Read by `app.html` before anything renders. */
+  /**
+   * A record's own accent, once a record has one.
+   *
+   * IT IS NOT AN ATTRIBUTE. `accent.ts` builds a whole palette from it and adopts a stylesheet, so
+   * the value is read by JavaScript and by nothing else. `app.html` used to stamp it onto
+   * `data-theme` before first paint, which bought nothing (there is no CSS rule anywhere that reads
+   * a `data-theme` other than `hc`) and cost the high-contrast palette its own attribute.
+   */
   theme?: string | undefined;
+  /**
+   * The high-contrast palette, which shipped and was unreachable.
+   *
+   * `packages/theme` solves it against a higher floor, `theme.mjs` writes it into `house.css` behind
+   * `html[data-theme='hc']`, and `--check` byte-compares it on every build. Nothing in
+   * `apps/web/src` ever set that attribute to `hc`. So a whole generated palette, validated by
+   * sixteen checks, could not be turned on by the person it is for.
+   *
+   * WHAT WAS IN ITS WAY WAS THE ACCENT. `data-theme` carried two meanings, and the one that was
+   * written was the one nothing read.
+   */
+  contrast?: boolean | undefined;
   /** `false` folds the rail. `undefined` is open, which is what a first visit should be. */
   sidebar?: boolean | undefined;
   /** Whether bare letters act inside a focused grid. */
@@ -140,9 +159,27 @@ export function write(change: Pref): Pref {
  * ONE FUNCTION FOR BOTH HALVES, because they were two and the second one was never written. An
  * attribute set without a cookie is a preference that lasts until the next navigation.
  */
-export function apply(key: 'scheme' | 'text' | 'density' | 'theme', value: string | null): void {
+export function apply(key: 'scheme' | 'text' | 'density', value: string | null): void {
   if (typeof document === 'undefined') return;
   if (value === null) document.documentElement.removeAttribute(`data-${key}`);
   else document.documentElement.setAttribute(`data-${key}`, value);
   write({ [key]: value ?? undefined } as Pref);
+}
+
+/**
+ * The high-contrast palette, on or off.
+ *
+ * ITS OWN FUNCTION AND NOT A FOURTH KEY IN `apply`, because the attribute and the preference do not
+ * share a name or a shape: the preference is a boolean and the attribute is the literal `hc`. Every
+ * other pair above is `data-<key>` carrying the value, and pretending this one is too would mean
+ * `apply('contrast', 'hc')` with the caller holding a string that means true.
+ *
+ * `theme` LEFT `apply` AT THE SAME TIME, and for the mirror reason: it never had an attribute worth
+ * setting. `accent.ts` adopts a stylesheet, and `data-theme` is the high-contrast palette's switch.
+ */
+export function contrast(on: boolean): void {
+  if (typeof document === 'undefined') return;
+  if (on) document.documentElement.setAttribute('data-theme', 'hc');
+  else document.documentElement.removeAttribute('data-theme');
+  write({ contrast: on || undefined });
 }

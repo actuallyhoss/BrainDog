@@ -107,6 +107,28 @@ const CASES = [
     probe: () => getComputedStyle(document.body).backgroundColor,
   },
   {
+    /**
+     * `contrast` — the second palette, which shipped and had no control at all.
+     *
+     * `packages/theme` solves it against a higher floor, `theme.mjs` writes it into `house.css`
+     * behind `html[data-theme='hc']`, and `--check` byte-compares it on every build. Nothing in the
+     * app ever set that attribute, so sixteen checks' worth of generated work was unreachable by
+     * the reader it exists for, and no gate could say so: this list is hand-written, so a
+     * preference nobody adds a case for is a preference nobody measures.
+     *
+     * THE INK AND NOT THE GROUND. The high-contrast grounds are close to the ordinary ones by
+     * design, because what a contrast palette moves is the DISTANCE between a surface and what sits
+     * on it. Probing `background-color` would compare `#F8F9EE` against `#F3F3E9` and call a five
+     * per cent difference a pass; the ink moves from `#26261F` to `#181812`, which is the thing the
+     * palette is for.
+     */
+    name: 'contrast',
+    what: 'the ink against the ground (28 §4)',
+    route: '/',
+    values: [{}, { contrast: true }],
+    probe: () => getComputedStyle(document.body).color,
+  },
+  {
     name: 'sidebar',
     what: 'whether the rail is drawn',
     route: '/',

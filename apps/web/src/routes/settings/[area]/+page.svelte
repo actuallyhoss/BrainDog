@@ -212,6 +212,10 @@
   let scheme = $state<'light' | 'system' | 'dark'>(held.scheme ?? 'system');
   let text = $state<'sm' | 'base' | 'md'>(held.text ?? 'base');
   let density = $state<'compact' | 'comfortable' | 'roomy'>(held.density ?? 'comfortable');
+  /* THE HIGH-CONTRAST PALETTE, WHICH SHIPPED AND HAD NO CONTROL. Off unless somebody said
+     otherwise: it is a second palette solved against a higher floor, not a correction to a broken
+     one, so the default is the palette everything else is drawn against. */
+  let moreContrast = $state(held.contrast ?? false);
   let chars = $state(held.chars ?? true);
   /* ON UNLESS SOMEBODY SAID OTHERWISE. No document states the default; `29 §3`'s triggers are
      described as firing, so on is the only reading consistent with the section. */
@@ -235,6 +239,13 @@
     accentWrong = null;
     accent = hex;
     toasts.push(hex ? copy.accentSet(ACCENTS.find((a) => a.hex === hex)?.name ?? hex) : copy.accentReset);
+  }
+
+  /* THE ONE PREFERENCE WHOSE ATTRIBUTE IS NOT ITS VALUE: the switch is a boolean and the attribute
+     is the literal `hc`, so it has its own writer rather than a fourth key in `apply`. */
+  function pickContrast(on: boolean) {
+    moreContrast = on;
+    pref.contrast(on);
   }
 
   function pickScheme(v: 'light' | 'system' | 'dark') {
@@ -420,6 +431,42 @@
               {label}
             </button>
           {/each}
+        </div>
+      </Section>
+
+      <!--
+        THE PALETTE THAT COULD NOT BE TURNED ON.
+
+        `packages/theme` solves a second palette against a higher contrast floor, `theme.mjs` writes
+        it into `house.css` behind `html[data-theme='hc']`, and `theme.mjs --check` byte-compares it
+        on every build. Nothing in `apps/web/src` ever set that attribute, so sixteen checks' worth
+        of generated work was unreachable by the reader it exists for.
+
+        WHAT WAS IN ITS WAY WAS THE ACCENT. `data-theme` carried two meanings and only one of them
+        was ever read: `house.css` has four `data-theme` selectors and all four say `hc`, while
+        `accent.ts` builds its palette into an adopted stylesheet and needs no attribute at all. The
+        one being written was the one nothing read.
+
+        A SWITCH AND NOT A SEGMENT, because it is one thing that is on or off, and `13 §5.1` wants
+        the state said in something other than styling: `aria-pressed` carries it.
+      -->
+      <Section title={copy.contrast}>
+        <p class="hint">{copy.contrastHint}</p>
+        <div class="segment" role="group" aria-label={copy.contrast}>
+          <button
+            type="button"
+            class="seg"
+            aria-pressed={moreContrast}
+            data-on={moreContrast ? '' : undefined}
+            onclick={() => pickContrast(true)}>{copy.on}</button
+          >
+          <button
+            type="button"
+            class="seg"
+            aria-pressed={!moreContrast}
+            data-on={!moreContrast ? '' : undefined}
+            onclick={() => pickContrast(false)}>{copy.off}</button
+          >
         </div>
       </Section>
 
@@ -808,18 +855,38 @@
         <p class="hint">{copy.identityOutside}</p>
       </Section>
 
+      <!-- "RECORDS YOU CAN OPEN" OVER TWO ROWS YOU COULD NOT OPEN. A heading that names an action
+           above a list that does not offer it is the plainest kind of lie a screen can tell, and
+           this one told it about the one thing the section exists for.
+
+           THE ROW IS THE CONTROL, AND IT REPORTS THE SAME THING THE RAIL'S SWITCHER DOES. That menu
+           had already solved this honestly: `href="/"` so it is a real link with a real address for
+           the keyboard and the middle button, and a handler that says what would happen rather than
+           silently doing nothing, because the record this build draws is a fixture. Two surfaces
+           offering one act must not answer it two ways, so this is that answer and not a second
+           one. The record you are already in is not a link at all: you are in it. -->
       <Section title={copy.yourRecords} count={me.records.length}>
         <ul class="ledger">
           {#each me.records as r}
+            {@const here = r.slug === boot().index.slug}
             <li>
-              <div class="line">
+              <svelte:element
+                this={here ? 'div' : 'a'}
+                class="line"
+                href={here ? undefined : '/'}
+                role={here ? undefined : 'link'}
+                onclick={here
+                  ? undefined
+                  : (e: MouseEvent) => {
+                      e.preventDefault();
+                      toasts.push(copy.notWritten(`${r.name} would open, with its own registers and pages`));
+                    }}
+              >
                 <span class="seq"><Icon name="rows" size="s" /></span>
                 <span class="line-main"><span class="line-title">{r.name}</span></span>
                 <span class="line-amount"><span class="means">{copy.levelMeans[r.level] ?? r.level}</span></span>
-                <span class="line-when">
-                  {#if r.slug === boot().index.slug}{copy.thisOne}{/if}
-                </span>
-              </div>
+                <span class="line-when">{#if here}{copy.thisOne}{/if}</span>
+              </svelte:element>
             </li>
           {/each}
         </ul>
@@ -1082,11 +1149,20 @@
                   {copy.pointsIn(src.points)}
                 </span>
                 <span class="who-do">
+                  <!-- THE FAILING ROW HAD NO CONTROL AT ALL, and it is the row with the warning
+                       glyph on it. Only `paused` got Reconnect and Retry now, so a source flagged
+                       `failing` with zero rows in offered the reader nothing to do about it. The
+                       two states want different things and neither wants nothing: a paused
+                       connector needs its credential back, and a failing one needs to be asked
+                       again, which is the whole of what "it retries on its own" leaves a person
+                       able to hurry. -->
                   {#if src.state === 'paused'}
                     <Button
                       weight="primary"
                       onclick={() => toasts.push(copy.notWritten(`${src.error?.credential ?? src.name} would be reconnected, and the schedule started again`), { intent: 'warn' })}
                     >{copy.reconnect}</Button>
+                  {/if}
+                  {#if src.state !== 'ok'}
                     <Button
                       weight="bare"
                       onclick={() => toasts.push(copy.notWritten(`${src.name} would run once, now`), { intent: 'warn' })}
@@ -1214,7 +1290,12 @@
            SEPARATELY — Settings → backups says so in one line." A snapshot sealed with a key that
            is only inside the snapshot is a snapshot nobody can open. -->
       <Section title={copy.theKey}>
+        <!-- IT GAVE AN INSTRUCTION AND WITHHELD THE ONE THING NEEDED TO FOLLOW IT. This section had
+             no button, no link and no value: "Back that key up somewhere else, or the copies cannot
+             be opened" over an empty box. `12 §8` keeps the age identity outside the product on
+             purpose, so the fix is not to print it here; it is to say where it already is. -->
         <p class="hint">{copy.theKeyIs}</p>
+        <p class="hint">{copy.theKeyWhere}</p>
       </Section>
 
       <!-- `03 §6`: "PITR is Cloud-only and this is DOCUMENTED, NOT HIDDEN." `33 §9`: a self-host

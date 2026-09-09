@@ -69,6 +69,35 @@ export const firstRun = {
   secondPacks:
     'A pack is a list somebody else already worked out the fields for, with the figures and the pages that go with it. Nothing installs without you reading what it would change.',
 
+  /**
+   * SCREEN 2b: WHAT HAPPENED TO THE ROW THEY JUST TYPED.
+   *
+   * There was no screen here. `commit` pushed the honest toast and navigated in the same tick, and
+   * the toast did not survive the navigation: measured on the deployed build, at 700ms the sentence
+   * is in the DOM and the URL is still `/start`, and at 2,200ms the URL has changed and the live
+   * region is present and empty. So the highest-stakes control in the product reported nothing at
+   * all, and what it reported nothing about was landing on thirty-eight rows of a fictional studio
+   * under a four-paragraph lesson about lists.
+   *
+   * THE FIX IS NOT A LONGER-LIVED TOAST. A screen must not navigate away from its own outcome; that
+   * is what made the receipt losable, and it is also what made the answer confusing even when the
+   * toast worked. The form stays exactly where it is with everything they typed still in it, which
+   * IS the receipt, and the outcome is a sentence under the button they pressed.
+   *
+   * IT SAYS WHAT IS TRUE AND NOT WHAT STAGE THE BUILD IS AT (`19 §9`). "Nothing was saved yet" is
+   * the same sentence forty other controls give, so a person meets one product rather than one
+   * product and one apology.
+   */
+  keptNothing: 'Nothing was saved yet.',
+  keptNothingWhy:
+    'This record cannot be written to from the browser yet, so what you typed is still on this screen and nowhere else. It is safe to leave it and come back.',
+  /* AND THE WAY ONWARD IS AN OFFER, NAMED FOR WHAT IS THERE. It used to be the only path and it was
+     taken without asking: a list of somebody else's invoices, arrived at with no explanation, reads
+     as the row having been written and gone somewhere strange. Named, it reads as what it is. */
+  seeTheList: (label: string) => `See ${label} as it comes`,
+  seeTheListWhy:
+    'The lists arrive with a worked example in them, so there is something to read before you have written anything.',
+
   /** The label above the first field. Written per choice, because "Your first money" is not English. */
   firstField: {
     obligations: 'Your first invoice',
@@ -85,14 +114,30 @@ export const firstRun = {
 
      It stays an OFFER and never a requirement. First run has to work on a fresh self-host with
      nothing configured (19 §6), so nothing below this line is a step. */
+  /**
+   * AND IT PRINTED A COMMAND NOBODY COULD RUN.
+   *
+   * `claude mcp add --transport http braindog https://mcp.brain.dog`, on the first screen of the
+   * product, ready to copy. `mcp.brain.dog` answers 525: the MCP transport is not built and that
+   * hostname is deliberately unclaimed, because pointing it at the Worker would answer an MCP
+   * address with the app's shell.
+   *
+   * `23 §3.1` IS THE RULE THIS BROKE, and it is the same rule `askBrainDog` obeys four hundred
+   * lines away: a capability with no model behind it is *"not there, not greyed out"*. An offer
+   * that cannot be taken is worse than an absent one, because the person spends their first minute
+   * pasting it into a terminal and reading an error, and the product taught them that in its first
+   * thirty seconds.
+   *
+   * THE SENTENCES STAY AND THE COMMAND GOES. What the section says about the record being an MCP
+   * server is true and worth saying; what it cannot do yet is hand over a working address. It says
+   * so, and `agentCommand` is gone rather than commented out, so nothing can render it by accident.
+   */
   agentTitle: 'Set it up in your agent',
   agentBody:
     'The record is an MCP server. Add it once and the agent you already have can make the ' +
     'lists, fill the first rows, and read the record from then on.',
-  agentCommand: 'claude mcp add --transport http braindog https://mcp.brain.dog',
-  agentNote: 'Codex, Cursor and anything else that speaks MCP take the same URL.',
-  agentCopy: 'Copy the command',
-  agentCopied: 'Copied. Paste it where your agent is running.',
+  agentNotYet:
+    'The address is not open yet. Nothing here needs it: everything on this screen works without an agent, and the record will hand you the command when there is one to hand over.',
 
   /* THE VOCABULARY MOVED TO `copy.ts` AND IS NOW RENDERED.
      

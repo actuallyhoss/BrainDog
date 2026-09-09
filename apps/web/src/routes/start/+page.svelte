@@ -21,7 +21,6 @@
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { addKey } from '$lib/start.ts';
-  import * as clipboard from '$lib/clipboard.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import Define from '$lib/ui/Define.svelte';
   import Mark from '$lib/ui/Mark.svelte';
@@ -129,6 +128,12 @@
    * on `picked` at all, and a genuinely different `?add=` — an in-app navigation to another one —
    * still lands where it says.
    */
+  /**
+   * WHETHER THIS SCREEN HAS ALREADY ANSWERED. Reset by the effect below whenever the choice changes,
+   * so going Back and picking a different list does not arrive pre-answered.
+   */
+  let said = $state(false);
+
   let honoured: string | null = null;
 
   /* AND IT MIRRORS THE ADDRESS BOTH WAYS, which is the half that makes Back mean anything.
@@ -143,6 +148,10 @@
     if (asked === honoured) return;
     honoured = asked;
     picked = (asked ? addKey(asked, CHOICES) : undefined) ?? null;
+    /* AND THE ANSWER GOES WITH THE QUESTION. Going Back and choosing a different list must not land
+       on somebody else's outcome, which is the same bug the `picked === null` guard above had in a
+       different place. */
+    said = false;
   });
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
@@ -163,28 +172,19 @@
        text field submits a form whatever its button looks like. */
     if (problems.length > 0) return;
     toasts.push(copy.notWritten(`the first row in ${choice.label} would be written`));
-    /* AND IT SAYS WHERE IT CAME FROM. `19 §6`'s screen two is "the register, with their one row in
-       it" — the screen you LAND on, not a standing property of a record that happens to hold one
-       register. Reading it off the register count alone made it unreachable on any record with a
-       second list, which includes every record anybody demonstrates. */
-    void goto(`/r/${choice.key}?first=1`);
+    said = true;
   }
 
   /**
-   * IT SAID "Copied." WHETHER OR NOT ANYTHING WAS COPIED.
+   * THE COPY BUTTON WENT WITH THE COMMAND IT COPIED.
    *
-   * `navigator.clipboard?.writeText(…).catch(…)` — the `?.` short-circuits the WHOLE chain, the
-   * `.catch` included, so with no Clipboard API the expression is `undefined` and the toast fires
-   * anyway. A rejected write was swallowed the same way. Verified by removing `navigator.clipboard`
-   * at runtime: the button reported "Copied. Paste it where your agent is running." and the
-   * clipboard still held whatever was there before.
-   *
-   * `navigator.clipboard` IS ABSENT OVER PLAIN HTTP, which is how a self-host is first opened — so
-   * the environment where this lies is the one this screen exists for. `clipboard.ts` was written
-   * for exactly this and says why in its own header; this was the one caller that did not use it.
+   * It was worth keeping the argument that killed its predecessor, because the next person to add a
+   * copy button here will need it: `navigator.clipboard?.writeText(…).catch(…)` short-circuits the
+   * WHOLE chain including the `.catch`, so with no Clipboard API the expression is `undefined` and
+   * the success toast fires anyway. `navigator.clipboard` is absent over plain HTTP, which is how a
+   * self-host is first opened, so the environment where that lies is the one this screen exists
+   * for. `clipboard.ts` exists for exactly this and reports the failure.
    */
-  const copyCommand = () =>
-    void clipboard.put(firstRun.agentCommand, firstRun.agentCommand, firstRun.agentCopied);
 </script>
 
 <svelte:window onkeydown={key} />
@@ -233,23 +233,13 @@
       <section class="agent" aria-labelledby="agent-h">
         <h2 class="agent-h" id="agent-h"><Icon name="session" size="m" />{firstRun.agentTitle}</h2>
         <p class="agent-body">{firstRun.agentBody}</p>
-        <div class="agent-cmd">
-          <!-- Focusable, because at 390 the command is wider than the card and scrolls. A scrolling
-               box a keyboard cannot reach is a box a keyboard cannot read (WCAG 2.1.1) — the same
-               fix the sheet body and the declaration block already carry.
-
-               NO `aria-label` ON IT. `code` is a name-prohibited role, so the attribute was dropped
-               by the browser and did nothing — and the string it carried was the COPY BUTTON's
-               label, so the first screen of the product had two focusable controls announcing "Copy
-               the command", the first of which copied nothing. What a reader needs here is the
-               command, which the element already is. -->
-          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <code tabindex="0">{firstRun.agentCommand}</code>
-          <button type="button" class="agent-copy tap" onclick={copyCommand} aria-label={firstRun.agentCopy}>
-            <Icon name="copy" size="s" />
-          </button>
-        </div>
-        <p class="agent-note">{firstRun.agentNote}</p>
+        <!-- AND NOT THE COMMAND, because the address in it does not answer. `mcp.brain.dog` returns
+             525: the transport is not built and the hostname is deliberately unclaimed, since
+             pointing it at the Worker would answer an MCP address with the app's shell. `23 §3.1`
+             is the rule, and it is the one `askBrainDog` already obeys: a capability with no model
+             behind it is not there, not greyed out. A command that cannot be run is worse than an
+             absent one, because somebody spends their first minute pasting it into a terminal. -->
+        <p class="agent-note">{firstRun.agentNotYet}</p>
       </section>
     {:else}
       <h1 class="question step">{choice.field}</h1>
@@ -301,6 +291,31 @@
                same place instead of disagreeing about where "back" is. -->
           <Button weight="bare" onclick={() => void goto('/start')}>{copy.goBack}</Button>
         </div>
+
+        <!--
+          WHAT HAPPENED, UNDER THE BUTTON THAT DID IT.
+
+          This screen used to navigate to `/r/<key>?first=1` in the same tick as the toast, and the
+          toast did not survive: measured on the deployed build, the sentence is in the DOM at 700ms
+          with the URL still `/start`, and gone at 2,200ms with the URL changed. So the one control
+          `19 §6` is written around reported nothing, and what it reported nothing about was landing
+          on thirty-eight rows of a fictional studio.
+
+          A SCREEN DOES NOT NAVIGATE AWAY FROM ITS OWN OUTCOME. The form stays where it is with
+          everything still in it, which is the receipt a person can actually check, and the answer
+          is a sentence they are already looking at. `role="status"` rather than `alert`: they
+          pressed the button, so nothing here needs to interrupt what they were reading (13 §7).
+        -->
+        {#if said}
+          <div class="kept" role="status">
+            <p class="kept-what">{firstRun.keptNothing}</p>
+            <p class="kept-why">{firstRun.keptNothingWhy}</p>
+            <p class="kept-why">{firstRun.seeTheListWhy}</p>
+            <div class="actions">
+              <Button href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(choice.label)}</Button>
+            </div>
+          </div>
+        {/if}
       </form>
 
     {/if}
@@ -308,6 +323,33 @@
 </div>
 
 <style>
+  /**
+   * The outcome, set apart from the form without being an alarm.
+   *
+   * A HAIRLINE ABOVE IT AND NOTHING ELSE. A tinted panel would make "nothing was saved" read as a
+   * failure, and it is not one: the person did the thing correctly and the build cannot keep it
+   * yet. `--edge` and the ordinary ground say "this is a different part of the screen" and stop
+   * there.
+   */
+  .kept {
+    display: grid;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-5);
+    padding-block-start: var(--sp-5);
+    border-block-start: 1px solid var(--edge);
+  }
+
+  .kept-what {
+    font-weight: 600;
+  }
+
+  .kept-why {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    max-inline-size: 52ch;
+  }
+
   /* The register's own rule, said where the refusal is. Ink rather than the warn hue: nobody has
      done anything wrong yet. */
   .first-why {
@@ -542,44 +584,6 @@
     line-height: var(--lh-body);
   }
 
-  .agent-cmd {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-block-start: var(--sp-3);
-    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
-    background: var(--bg);
-    border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
-    border-radius: var(--r-sm);
-  }
-
-  .agent-cmd code {
-    flex: 1;
-    min-inline-size: 0;
-    overflow-x: auto;
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    white-space: nowrap;
-  }
-
-  .agent-copy {
-    display: grid;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    flex: none;
-    background: none;
-    border: 0;
-    border-radius: var(--r-sm);
-    color: var(--dim);
-    cursor: pointer;
-  }
-
-  .agent-copy:hover {
-    background: color-mix(in srgb, var(--ink) 8%, transparent);
-    color: var(--ink);
-  }
 
   .agent-note {
     margin-block-start: var(--sp-2);

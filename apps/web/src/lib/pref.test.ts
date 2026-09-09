@@ -9,6 +9,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import * as pref from './pref.ts';
 
@@ -95,4 +97,39 @@ test('and an absent document reads empty rather than throwing', () => {
   delete (globalThis as { document?: unknown }).document;
   assert.deepEqual(pref.read(), {});
   pref.write({ scheme: 'dark' });
+});
+
+/**
+ * THE HIGH-CONTRAST PALETTE HAS A SWITCH, AND IT DID NOT.
+ *
+ * `packages/theme` solves a second palette against a higher contrast floor, `theme.mjs` writes it
+ * into `house.css` behind `html[data-theme='hc']`, and `--check` byte-compares it on every build.
+ * Nothing in `apps/web/src` ever set that attribute, so a whole generated palette validated by
+ * sixteen checks could not be turned on by the reader it exists for.
+ *
+ * WHAT WAS IN ITS WAY IS WHAT THIS ALSO CHECKS. `data-theme` carried two meanings and only one was
+ * read: `house.css` has four `data-theme` selectors and all four say `hc`, while the record accent
+ * was being written into the same attribute by `app.html` and by `accent.ts`. The one that was
+ * written was the one nothing read.
+ */
+test('the contrast palette has a switch, and the accent does not fight it for the attribute', () => {
+  const house = readFileSync(fileURLToPath(new URL('../../../../packages/skin/house.css', import.meta.url)), 'utf8');
+  const selectors = [...house.matchAll(/data-theme=(['"])([^'"]+)\1/gu)].map((m) => m[2]);
+  assert.ok(selectors.length > 0, 'house.css no longer carries a data-theme palette');
+  assert.deepEqual([...new Set(selectors)], ['hc'], 'data-theme means something other than hc again');
+
+  /* THE BOOT SCRIPT WRITES IT, so the palette is on before first paint rather than after a flash. */
+  const boot = readFileSync(fileURLToPath(new URL('../app.html', import.meta.url)), 'utf8');
+  assert.match(boot, /p\.contrast&&d\.setAttribute\('data-theme','hc'\)/u, 'the shell does not boot the contrast palette');
+  assert.doesNotMatch(boot, /setAttribute\('data-theme',\s*p\.theme\)/u, 'the accent claims data-theme again');
+
+  /* AND THE ACCENT DOES NOT TOUCH IT. Its palette is an adopted stylesheet and needs no attribute. */
+  const accent = readFileSync(fileURLToPath(new URL('./accent.ts', import.meta.url)), 'utf8');
+  const code = accent.replace(/\/\*[\s\S]*?\*\//gu, '');
+  assert.doesNotMatch(code, /data-theme/u, 'accent.ts writes data-theme again');
+
+  /* THE CONTROL EXISTS, on the screen that owns every other palette decision. */
+  const appearance = readFileSync(fileURLToPath(new URL('../routes/settings/[area]/+page.svelte', import.meta.url)), 'utf8');
+  assert.match(appearance, /pickContrast\(true\)/u, 'nothing turns the contrast palette on');
+  assert.match(appearance, /aria-pressed=\{moreContrast\}/u, 'the switch does not say which state it is in');
 });
