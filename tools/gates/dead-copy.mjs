@@ -46,7 +46,7 @@ const COPY = join(SRC, 'lib', 'copy.ts');
  */
 const ALLOWED = new Map([
   ['askBrainDog', 'CORRECT — 23 §3.1: with no model the assistant is absent, not disabled. The sentence waits.'],
-  ['tagline', 'UNBUILT — the marketing line. `apps/site` types its own; this one has no home in the app.'],
+  ['tagline', 'UNBUILT — the slogan. `apps/site` renders it; the app has no surface that says its own name.'],
   ['promoted', 'UNBUILT — a suggested page moving into the rail writes nothing yet (29 §2 needs a nav write).'],
   ['restored', 'UNBUILT — Settings → backups (53 §5.4). No restore control exists.'],
   /* `markAllRead` LEFT THIS LIST WHEN IT GOT A SURFACE, and the gate is what noticed: an excuse that

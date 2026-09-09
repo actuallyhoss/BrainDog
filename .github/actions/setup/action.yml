@@ -19,7 +19,7 @@ description: Node, pnpm and a frozen install — the three steps every job in th
 inputs:
   registry-url:
     description: >-
-      Write an .npmrc for this registry. Set by release.yml's publish job alone; every other job
+      Write an .npmrc for this registry. Set by tag.yml's publish job alone; every other job
       talks to no registry but the one the lockfile already resolved against.
     required: false
     default: ''

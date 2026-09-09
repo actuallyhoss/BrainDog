@@ -62,7 +62,7 @@ Target: `master`. Enforcement: active.
 ## 3 · Tags
 
 - [ ] **Ruleset on `render-v*` and `cli-v*`.** Target: tags. Restrict deletions, block force pushes,
-      restrict creation to the maintainer. `release.yml` fires on these tags and publishes to npm
+      restrict creation to the maintainer. `tag.yml` fires on these tags and publishes to npm
       with OIDC; a tag anybody can create is a publish anybody can trigger.
 
 ## 4 · Secrets
@@ -147,10 +147,10 @@ Target: `master`. Enforcement: active.
 ## 9 · Publishing
 
 - [ ] **npm trusted publishing configured** for `braindog-render` and `braindog-cli`, bound to this
-      repository and to `release.yml`. Provenance is then automatic and needs no `--provenance` flag.
+      repository and to `tag.yml`. Provenance is then automatic and needs no `--provenance` flag.
 - [ ] **No classic npm token exists** on the maintainer's npm account. Delete any that do; a token
       that exists is a token that can be stolen, and trusted publishing means none is needed.
-- [ ] **`release.yml` has `id-token: write` and nothing else that writes.**
+- [ ] **`tag.yml` has `id-token: write` and nothing else that writes.**
 
 ## 10 · The account, which is the real single point of failure
 
