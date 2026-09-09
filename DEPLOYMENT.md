@@ -3,13 +3,30 @@
 Every setting that decides what a deployment *is*, written down — because until this file existed
 the answer lived in a dashboard, and a dashboard is not reviewable.
 
-## The three hosts
+## The hosts
+
+One label per surface, with the environment in front of it.
 
 | Host | What runs there | Deployed by | State |
 |---|---|---|---|
-| **`alpha.brain.dog`** | `apps/worker` with `apps/web`'s `build/` as its asset directory, built as **BrainDog Alpha** | Cloudflare Workers Builds `braindog-alpha`, on every push to `master` | live |
-| **`app.brain.dog`** | the same two, built as production | Cloudflare Workers Builds `braindog-production`, on every push to `release` | live |
-| **`brain.dog`** | `apps/site`, the marketing site | not wired yet | not live |
+| **`brain.dog`** | `apps/site`, the marketing site | not wired yet, see below | not live |
+| **`app.brain.dog`** | `apps/worker` with `apps/web`'s `build/` as its asset directory | Workers Builds `braindog-production`, on every push to `release` | live |
+| **`mcp.brain.dog`** | reserved | nothing | not claimed |
+| **`alpha.brain.dog`** | `apps/site`, the same bytes | `braindog-site-alpha`, deployed by hand for now | live |
+| **`app.alpha.brain.dog`** | the record, built as **BrainDog Alpha** | Workers Builds `braindog-alpha`, on every push to `master` | live |
+| **`mcp.alpha.brain.dog`** | reserved | nothing | not claimed |
+
+`mcp.*` is deliberately unclaimed. The MCP transport is not built, and pointing that hostname at the
+Worker would answer an MCP address with the app's shell. `apps/web`'s first-run screen does print
+`claude mcp add --transport http braindog https://mcp.brain.dog`, which is a command nobody can run,
+and that is a defect filed in `loop/BACKLOG.md` rather than a reason to claim the name.
+
+**`brain.dog` is blocked on three A records.** The apex carries `172.239.193.194`,
+`172.236.103.15` and `172.234.212.77`, all proxied, all pointing at an origin that answers nothing,
+which is why the hostname returns 520 today. Cloudflare refuses to attach a Worker to a hostname
+that has externally managed DNS, so those three have to be deleted before
+`wrangler deploy --env production` can claim it. The values are written down here so the change is
+reversible. Mail is unaffected: the MX, SPF and DKIM records are separate.
 
 `wrangler.jsonc` holds both environments; `wrangler deploy --env alpha --dry-run` and
 `--env production --dry-run` are what check them without deploying.
@@ -60,8 +77,8 @@ Durable Object migrations are in `wrangler.jsonc` and apply themselves on deploy
 ## Checking a deployment without opening a browser
 
 ```
-curl -s -o /dev/null -w '%{http_code}\n' https://alpha.brain.dog/          # 200, the shell
-curl -s https://alpha.brain.dog/api/health                                  # a typed refusal, not a 500
+curl -s -o /dev/null -w '%{http_code}\n' https://app.brain.dog/           # 200, the shell
+curl -s https://app.brain.dog/api/health                                   # a typed refusal, not a 500
 ```
 
 The API answering `{"ok":false,"refusal":{"code":"UNAUTHORIZED","fix":"…"}}` with a 401 is the
@@ -89,6 +106,8 @@ branch builds are off, so a branch cannot take the hostname.
 
 ## What is not automated, and should be
 
-- **The marketing site has no build project**, and `apps/site/wrangler.jsonc` is ready for one.
+- **The marketing site has no build project.** `alpha.brain.dog` was deployed by hand with
+  `wrangler deploy --env alpha`, which is fine once and wrong as a habit: the site is then whatever
+  somebody last pushed from a laptop. Two projects are wanted, matching the Worker's pair.
 - **Nothing in CI runs `wrangler deploy --dry-run`**, so a binding removed from `wrangler.jsonc`
   fails at deploy time rather than at pull-request time.

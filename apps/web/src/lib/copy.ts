@@ -210,7 +210,7 @@ export const copy = {
   /* NOT `noneMatching`, which counts the rows a LIST holds and reads "0 rows, none matching" here —
      a search is over every list at once, so there is no single total to count against. */
   searchNone: 'Nothing in the record matches:',
-  searchWhere: 'Every list, every decision, and every page — by the words in them.',
+  searchWhere: 'Every list, every decision, and every page, by the words in them.',
   allIn: (n: number, list: string) => `All ${n.toLocaleString('en')} in ${list}`,
   allMatches: (n: number, q: string) => `All ${n.toLocaleString('en')} matches for “${q}”`,
   showingOf: (shown: number, total: number) => (shown >= total ? `${shown}` : `${shown} of ${total}`),
@@ -315,7 +315,7 @@ export const copy = {
      which is the thing `/decide` was just fixed for. This one names the field and says where the
      reason is. */
   rowFieldProblem: (names: string[]): string =>
-    `${list(names)} cannot be stored as typed — the reason is under the field.`,
+    `${list(names)} cannot be stored as typed. The reason is under the field.`,
   noFilters: 'Nothing here can be filtered yet.',
   /* WHERE A FIELD IS FILTERED INSTEAD, said once for all of them rather than as a headed section
      each. Three fieldsets carrying a legend and one sentence read as three controls that failed to
@@ -380,7 +380,7 @@ export const copy = {
   /* THE RECORD ITSELF IS EMPTY, which is a different sentence from every list being empty and from
      nothing needing you. It is the state of the first hour and nothing could say it. */
   recordEmpty: 'Nothing in the record yet.',
-  recordEmptyBody: 'A record holds what a business is made of — what you owe and are owed, what it runs on, who is involved, and the decisions behind them.',
+  recordEmptyBody: 'A record holds what a business is made of: what you owe and are owed, what it runs on, who is involved, and the decisions behind them.',
   startHere: 'Start here',
   noPacksYet: 'No packs installed.',
   noPacksBody: 'A pack adds ready-made lists and pages. The ones below are ready to install.',
@@ -559,7 +559,7 @@ export const copy = {
   /* MONEY IS AN INTEGER IN MINOR UNITS, and this is the one place a person types one. The sentence
      says what to do rather than what is wrong: "not a number" is a verdict, and "digits and at most
      one point" is an instruction. */
-  moneyShape: 'An amount is digits and at most one point — 1234.56, or -50.',
+  moneyShape: 'An amount is digits and at most one point. 1234.56, or -50.',
   moneyPlaces: (exp: number): string =>
     exp === 0
       ? 'This currency has no smaller unit, so an amount is a whole number.'
@@ -595,7 +595,7 @@ export const copy = {
     const why = codes.includes('CONTRAST_FLOOR')
       ? 'text on some of its surfaces would not be readable'
       : codes.includes('INTENT_INSEPARABLE')
-        ? 'two of the four meanings — good, watch, wrong, note — would look the same to somebody who does not see red and green apart'
+        ? 'two of the four meanings, good and wrong, would look the same to somebody who does not see red and green apart'
         : codes.includes('THEME_LADDER_ORDER')
           ? 'its surfaces would not stack in order, so a card would not read as sitting on the page'
           : 'a full palette cannot be solved from it';
@@ -636,7 +636,7 @@ export const copy = {
      */
     row: 'one thing you are keeping track of: an invoice, a domain, a person',
     page: 'a screen made of blocks. It is a row, so you can change it',
-    block: 'one thing on a page — a table, a figure, a note',
+    block: 'one thing on a page: a table, a figure, a note',
   } as const,
 
   /* the settings areas `19 §2` says an earlier draft dropped */
@@ -663,7 +663,7 @@ export const copy = {
   /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
      the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */
   noRecordLevel: 'nothing',
-  noRecordLevelMeans: 'Nothing on this record itself — only the lists named below, and nothing that is added later.',
+  noRecordLevelMeans: 'Nothing on this record itself. Only the lists named below, and nothing that is added later.',
   addException: 'Different on one list',
   removeException: 'Back to their level',
   suspendedSince: (ago: string) => `stopped ${ago}`,
@@ -722,7 +722,7 @@ export const copy = {
   noPasskeysWhy: (magic: boolean) =>
     magic
       ? 'Without one, the only way back into this record is an email link.'
-      : 'This server cannot send an email link, so without a passkey there is no way back in on your own — ask whoever runs it.',
+      : 'This server cannot send an email link, so without a passkey there is no way back in on your own. Ask whoever runs it.',
   addPasskey: 'Add a passkey',
   addedWhen: (ago: string) => `added ${ago}`,
   usedWhen: (ago: string) => `used ${ago}`,
@@ -801,7 +801,7 @@ export const copy = {
   noDevicesWhy: 'A machine that wants to act as you asks here first, and waits until you say yes.',
   enrollPrompt: 'braindog runner enroll',
   noSources: 'Nothing feeds this record yet.',
-  noSourcesWhy: 'A connector pulls rows in on a schedule — a mailbox, a bank feed, a repository — and reports here when it fails.',
+  noSourcesWhy: 'A connector pulls rows in on a schedule from a mailbox, a bank feed or a repository, and reports here when it fails.',
   ingestPrompt: 'read my record, then set up a connector for the mailbox I file invoices in',
   noSnapshots: 'No sealed copy yet.',
   noSnapshotsWhy: 'A snapshot is the whole record at one moment, kept so you can go back to it.',
@@ -815,7 +815,7 @@ export const copy = {
      unnameable on the screen. */
   deviceState: {
     pending: 'waiting for you',
-    approved: 'approved — waiting for the machine',
+    approved: 'approved, waiting for the machine',
     active: 'connected',
     expired: 'ran out of time',
     /* `12 §6.1`: a denied row is KEPT. "I said no to a request I did not make" is the single most
@@ -868,7 +868,7 @@ export const copy = {
   enterCodeHow: 'A machine asking for access shows six digits. Typing them here is how you say the machine in front of you is the one that asked.',
   codeLabel: 'The six digits it is showing',
   codeGo: 'Approve it',
-  approvedNow: (label: string, means: string) => `${label} is approved — it can ${means}. It becomes connected the next time it asks.`,
+  approvedNow: (label: string, means: string) => `${label} is approved and it can ${means}. It becomes connected the next time it asks.`,
 
   /* the tokens — `12 §3`, and the first of this area's three things to have no surface at all.
 
@@ -927,7 +927,7 @@ export const copy = {
      sentence obscured by talking about the nightly copies. */
   /* navigation — `29 §4`'s one global switch, which `19 §2` says is why this area exists */
   suggestPages: 'Suggest new pages',
-  suggestPagesHint: 'When a list grows or you keep asking the same question, this record offers a page for it. Nothing is ever placed for you — an offer sits in the list below until you promote it.',
+  suggestPagesHint: 'When a list grows or you keep asking the same question, this record offers a page for it. Nothing is ever placed for you. An offer sits in the list below until you promote it.',
   suggested: 'Waiting for you',
   suggestOff: 'Not offering anything.',
   suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
@@ -939,7 +939,7 @@ export const copy = {
      any of the three apps — the one sentence on this screen asserting a live endpoint, where every
      other unwritten action goes through `notWritten`. `03 §4` specifies the URL; the product has not
      got it yet, and the sentence says what is true today. */
-  theSignatureIs: 'Every export and every backup is signed. This is the public half of the key that signs them, and it opens nothing — which is why it is safe to hand to anybody checking a copy.',
+  theSignatureIs: 'Every export and every backup is signed. This is the public half of the key that signs them. It opens nothing, which is why it is safe to hand to anybody checking a copy.',
   keyFingerprint: 'Fingerprint',
   keyPublic: 'Public key',
   copyKey: 'Copy the key',
@@ -963,7 +963,7 @@ export const copy = {
   restoreLoses: 'What it costs',
   restoreLosesWhat: 'Every change made after the moment you pick. There is no way to bring them back except restoring forward again.',
   restoreBack: 'If it was wrong',
-  restoreBackHow: 'Restore to the instant just before — that is a point in time too, for thirty days.',
+  restoreBackHow: 'Restore to the instant just before. That is a point in time too, for thirty days.',
   rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
   snapshotNow: 'Take one now',
   theKey: 'The key',
