@@ -41,7 +41,31 @@ export type PageBlock = {
   horizon?: number;
   empty?: string;
   target?: number;
+  /**
+   * The condition a block draws under. `06 §1.1` publishes it and the kernel did not read it.
+   *
+   * A red note about an overdue invoice on a record with no invoices is the one thing a `when:`
+   * exists to prevent, and the browser has evaluated it since it was written while this side drew
+   * every block unconditionally. Two implementations of one page, disagreeing about which blocks
+   * are on it.
+   */
+  when?: { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number; not?: number };
+  /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
+  drawn?: boolean;
 };
+
+/**
+ * Every key a block declaration may carry, so one it cannot is NAMED rather than ignored.
+ *
+ * A LIST AND NOT A TYPE CHECK, because a declaration arrives as JSON from a pack somebody else
+ * wrote and TypeScript is not there at the moment it is read. The browser has had this since a
+ * agent wrote `06 §1.1`'s own worked example, got `when:` silently dropped, and shipped a block
+ * that always drew; the kernel accepted anything at all.
+ */
+const READS = new Set([
+  'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
+  'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon',
+]);
 
 export type PageDecl = {
   page: string;
@@ -75,7 +99,12 @@ export type PageDeps = {
   metric: (id: string) => MetricDecl | null;
   /** One reading. It is a callback rather than SQL because this layer runs queries it did not write. */
   read: (decl: MetricDecl) => Result<Reading>;
-  list: (q: { register: string; where?: Predicate | undefined; limit?: number }) => Result<{ rows: Entry[]; matched: number }>;
+  list: (q: {
+    register: string;
+    where?: Predicate | undefined;
+    limit?: number;
+    order?: { field: string; dir?: 'asc' | 'desc' }[];
+  }) => Result<{ rows: Entry[]; matched: number }>;
   schemaOf: (register: string) => Schema | null;
   /** The field that titles a row of this register — what a template's slug is made from. */
   titleOf: (register: string) => string | null;
@@ -189,8 +218,51 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
  * cannot answer, a metric that is not declared — comes back as a refusal ON THE BLOCK, so the page
  * around it still draws.
  */
+/**
+ * Whether a block's `when:` is satisfied, given the figure it names.
+ *
+ * A FIGURE THAT CANNOT BE READ DOES NOT DRAW THE BLOCK. The alternative, drawing it anyway, is how a
+ * red note about an overdue invoice appears on a record with no invoices at all. A `when:` naming a
+ * metric nobody declared is the same answer for the same reason: the condition is unknown, and
+ * drawing on an unknown is guessing.
+ *
+ * A CONDITION WITH NO TEST IN IT IS NOT A CONDITION. `{ metric: 'overdue' }` with no comparison does
+ * not draw, because the author meant something and the block waits until they say what.
+ */
+function drawnWhen(deps: PageDeps, block: PageBlock): boolean {
+  const when = block.when;
+  if (!when) return true;
+  const decl = deps.metric(when.metric.split(':')[0] ?? '');
+  if (!decl) return false;
+  const at = when.metric.indexOf(':');
+  const read = deps.read(at < 0 ? decl : (fill(decl, null, when.metric.slice(at + 1)) as MetricDecl));
+  if (!read.ok) return false;
+  const v = read.value.value;
+  if (v === null) return false;
+  if (when.gt !== undefined) return v > when.gt;
+  if (when.gte !== undefined) return v >= when.gte;
+  if (when.lt !== undefined) return v < when.lt;
+  if (when.lte !== undefined) return v <= when.lte;
+  if (when.is !== undefined) return v === when.is;
+  if (when.not !== undefined) return v !== when.not;
+  return false;
+}
+
 export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
-  const base: BlockResult = { ...block, rows: [], matched: 0, refusals: [] };
+  /* A KEY THIS BUILD DOES NOT READ IS SAID, and it is said whatever else the block turns out to be:
+     a `cells` block with a misspelt key and a `table` block with one are the same mistake, and the
+     stat arm below returns before any other check runs. */
+  const unread = Object.keys(block)
+    .filter((key) => !READS.has(key))
+    .map((key): Refusal => ({ code: 'DECLARATION_INVALID', fix: `${key}: is not a key this record reads.`, at: key }));
+
+  const base: BlockResult = { ...block, rows: [], matched: 0, refusals: unread };
+
+  /* AND A BLOCK WHOSE CONDITION IS NOT MET DRAWS NOTHING, before any query runs. `drawn` is on the
+     result rather than implied by an empty one, because "the condition was false" and "the query
+     matched nothing" are different facts and a renderer that cannot tell them apart draws the empty
+     state of a block that was never meant to be on the page. */
+  if (!drawnWhen(deps, block)) return { ...base, drawn: false };
 
   if (block.kind === 'stat' || block.cells) {
     return {
@@ -273,7 +345,15 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      a block declaring it wanted no rows and getting one is a block nobody can write. */
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   if (limit === 0) return { ...base, matched: 0 };
-  const listed = deps.list({ register, where: said.predicate, limit });
+  /* THE ORDER GOES TO THE QUERY, not to the page after it. Sorting the rows that came back is
+     sorting a page that was already chosen: "the five largest" would be five arbitrary rows put in
+     order, which is a different answer and an invisible one. */
+  const listed = deps.list({
+    register,
+    where: said.predicate,
+    limit,
+    ...(block.order?.length ? { order: block.order } : {}),
+  });
   if (!listed.ok) return { ...base, refusals: refused(listed) ? [listed.refusal] : [] };
 
   /* THE COLUMNS ARE CHECKED AGAINST THE REGISTER. A column naming a field nobody declared renders as

@@ -89,8 +89,25 @@ const IDENT = /^[a-z][a-z0-9_]{0,31}$/;
 /** A money or quantity value is an OBJECT, so its number lives one level down. */
 const NUMERIC_SUBPATH: Record<string, string> = { money: '.amount', quantity: '.value' };
 
-const extract = (field: string, type: string, part = ''): string =>
+/**
+ * The SQL that reads one field, and it is EXPORTED so the sort and the filter cannot disagree.
+ *
+ * `31 §2` states the reason for `kernel -> where` in exactly these terms: this package owns
+ * `jsonPath`, so `CREATE INDEX … json_extract(fields,'$.due')` and `WHERE
+ * json_extract(fields,'$.due') < ?` are the same string, which is the difference between the
+ * planner using the partial expression index and scanning it. An `ORDER BY` is the third place that
+ * string has to be identical, and the kernel had no way to say it: `list` took no order at all, so
+ * a page block declaring one was sorted by whatever the browser did afterwards, over the page it
+ * had already been given.
+ *
+ * A MONEY OR QUANTITY SORTS BY ITS NUMBER, which is what `NUMERIC_SUBPATH` is for and why this is
+ * one function rather than a caller building a path. Sorting `money` as an object sorts by the JSON
+ * text, so `GBP 9.00` lands above `GBP 10.00`.
+ */
+export const fieldSql = (field: string, type: string, part = ''): string =>
   `json_extract(fields, '${jsonPath(field)}${part || NUMERIC_SUBPATH[type] || ''}')`;
+
+const extract = fieldSql;
 
 /** The half of a compound value that is not its number: a currency, a unit. */
 const QUALIFIER: Record<string, { part: string; key: string }> = {

@@ -23,7 +23,7 @@ import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } fro
 import { attempt } from './tx.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
-import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, fieldSql, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, jcs, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 import { checkDogl, exportDogl, importDogl, signDogl, type Section, type Signer } from './dogl.ts';
@@ -711,6 +711,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * make a block's `where:` and a caller's `where:` different things with the same name.
      */
     where?: Predicate | string;
+    /**
+     * What to sort by, and it had no way to be said.
+     *
+     * `list` ordered by `updated_at DESC, id DESC` and took no order at all, so a page block
+     * declaring `order:` was sorted by whatever read it afterwards, over the page it had already
+     * been handed. That is a different answer from the one it asked for: "the five largest" is not
+     * "five arbitrary rows, sorted". The register grid has the same hole one level up.
+     *
+     * THE SQL COMES FROM `where`, not from a path built here. `31 §2` is explicit that this package
+     * imports `jsonPath` so the index and the predicate are the same string; an `ORDER BY` is the
+     * third place that has to hold, and `fieldSql` is now exported for it.
+     */
+    order?: { field: string; dir?: 'asc' | 'desc' }[];
     limit?: number;
     cursor?: string | null;
     includeDeleted?: boolean;
@@ -736,10 +749,49 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        exception is not. */
     const limit = Math.min(Math.max(1, Math.floor(Number(q.limit)) || 50), 500);
     const deleted = q.includeDeleted === true ? '' : ' AND deleted_at IS NULL';
+
+    /**
+     * THE ORDER, AND THE TWO THINGS IT IS REFUSED FOR.
+     *
+     * A CURSOR AND AN ORDER ARE ONE QUERY OR THE OTHER. The cursor is keyset pagination on
+     * `updated_at|id` — that is what the `WHERE (updated_at < ? OR …)` clause below IS — and a
+     * different sort key makes the clause select the wrong rows rather than fewer of them. Silently
+     * ignoring one of the two would hand back a page that is neither what was asked for nor
+     * detectably wrong, which is worse than saying so.
+     *
+     * AND A FIELD THE REGISTER DOES NOT DECLARE IS NOT A SORT. `json_extract` on an absent key is
+     * `NULL` for every row, so an unknown field sorts by nothing at all and looks like the default
+     * order with extra steps. `seq` is admitted because it is a column rather than a field, the
+     * same exception the column check makes.
+     */
+    let sort = 'ORDER BY updated_at DESC, id DESC';
+    if (q.order?.length) {
+      if (typeof q.cursor === 'string' && q.cursor !== '')
+        return no(
+          'WHERE_OPERATOR_UNSUPPORTED',
+          'A cursor pages by when a row last changed, so it cannot also sort by a field. Ask for the whole answer, or page in the record order.',
+          { at: 'order' },
+        );
+      const parts: string[] = [];
+      for (const o of q.order) {
+        if (o.field !== 'seq' && !Object.hasOwn(schema.fields, o.field))
+          return no('FIELD_UNKNOWN', `${q.register} has no field called ${o.field}.`, {
+            at: 'order',
+            allowed: Object.keys(schema.fields),
+          });
+        const dir = o.dir === 'asc' ? 'ASC' : 'DESC';
+        parts.push(o.field === 'seq' ? `seq ${dir}` : `${fieldSql(o.field, schema.fields[o.field]?.type ?? 'text')} ${dir}`);
+      }
+      /* `id` LAST, ALWAYS. Two rows with the same value have no order otherwise, so the same query
+         can return them in two orders on two runs and a reader watching a list re-render sees rows
+         swap places for no reason. */
+      sort = `ORDER BY ${parts.join(', ')}, id DESC`;
+    }
+
     const [at, afterId] = (typeof q.cursor === 'string' ? q.cursor : '').split('|');
     const page = at
       ? sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) AND (updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
+          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) AND (updated_at < ? OR (updated_at = ? AND id < ?)) ${sort} LIMIT ?`,
           q.register,
           ...c.params,
           at,
@@ -748,7 +800,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           limit + 1,
         )
       : sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) ORDER BY updated_at DESC, id DESC LIMIT ?`,
+          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) ${sort} LIMIT ?`,
           q.register,
           ...c.params,
           limit + 1,
@@ -767,7 +819,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     const rows = page.slice(0, limit).map(hydrate);
     const more = page.length > limit;
     const last = rows.at(-1);
-    return ok({ rows, matched, cursor: more && last ? `${last.updated_at}|${last.id}` : null });
+    /* AND A SORTED ANSWER HANDS BACK NO CURSOR, because the cursor it would hand back is a position
+       in an order this page is not in. `null` says "there is no next page from here", which is true
+       of a query that refuses to be paged. */
+    const paging = q.order?.length ? null : more && last ? `${last.updated_at}|${last.id}` : null;
+    return ok({ rows, matched, cursor: paging });
   }
 
   /** `MAX(event.rowid)`, which is the record's version: what changed since is a range scan. */
@@ -1223,7 +1279,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
     read: (decl) => evaluateMetric(sql, decl, evalContext()),
     list: (q) => {
-      const out = list({ register: q.register, ...(q.where ? { where: q.where } : {}), ...(q.limit ? { limit: q.limit } : {}) });
+      /* AND THE ORDER GOES THROUGH. It was dropped here, silently, which is the one place a
+         forwarded query can be wrong without anybody seeing it: the block asked, `list` could
+         answer, and this wrapper rebuilt the query without the key. */
+      const out = list({
+        register: q.register,
+        ...(q.where ? { where: q.where } : {}),
+        ...(q.limit ? { limit: q.limit } : {}),
+        ...(q.order?.length ? { order: q.order } : {}),
+      });
       return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched }) : out;
     },
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
