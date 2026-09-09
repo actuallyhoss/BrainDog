@@ -796,7 +796,7 @@ Golden palettes (22 roles × two themes × two schemes):
 | dev | `@types/node` | matching 24.13 | `node:test`, `node:assert/strict`, `performance` |
 
 `erasableSyntaxOnly`: closed lists are `as const` arrays with derived unions; no `enum`, no `namespace`, no
-parameter properties. Every local import carries `.ts`. Licence `AGPL-3.0-only` (31 §4).
+parameter properties. Every local import carries `.ts`. Licence `Apache-2.0` (31 §4).
 
 ---
 

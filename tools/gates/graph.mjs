@@ -26,12 +26,12 @@
  *   > That last row is the whole argument for building the gate in commit one. It is thirty lines
  *   > on day one and an archaeology project at day 400.
  *
- * `render` sits at rank 1 in the table below and depends on nothing, and that is the row with a
- * legal consequence: it is what keeps the MIT tarball free of AGPL code. Rank 1 is also how this
- * gate holds it — every edge out of `render` points up the order, so there is no dependency it can
- * acquire that check (b) does not go red on. Every other row is the same mechanism protecting
- * something cheaper.
- *
+ * `render` sits at rank 1 in the table below and depends on nothing, and that is the row that has to
+ * hold: it is what keeps `braindog-render` a package somebody can embed. A library that drags eight
+ * workspace packages behind it is not embeddable whatever its licence says, and the tarball on npm
+ * is the only artefact where that is visible. Rank 1 is how this gate holds it: every edge out of
+ * `render` points up the order, so there is no dependency it can acquire that check (b) does not go
+ * red on. Every other row is the same mechanism protecting something cheaper.
  * WHAT IT DOES NOT CHECK, SAID OUT LOUD. `31 §2` carries a second table, *"Each boundary, by what
  * it prevents"*, naming edges that must be ABSENT even though the order permits them:
  * `declare ⇏ kernel`, `record ⇏ render`, `where ⇏ kernel`, `declare ⇎ theme`. An absence is not a
@@ -563,9 +563,9 @@ if (findings.length) {
   console.error(`\n  graph: ${findings.length} finding(s) over ${census} in ${ms}ms — 31 §2, 31 §3 layers 3 and 5\n`);
   for (const f of findings) console.error(`    ${f.where}\n        ${f.what} — ${f.why}\n`);
   console.error(
-    '  The order in 31 §2 IS the proof of acyclicity, and render having in-degree 0 is the only\n' +
-      '  boundary here with a legal consequence. Grafana Loki #13019 is what this looks like at\n' +
-      '  day 400: Apache code importing AGPL code, reproduced by staff, still unchecked two years on.\n',
+    '  The order in 31 §2 IS the proof of acyclicity, and render having in-degree 0 is the row that\n' +
+      '  keeps the published package embeddable. Grafana Loki #13019 is what an unchecked package\n' +
+      '  boundary looks like at day 400: reproduced by staff, and still open two years on.\n',
   );
   process.exitCode = 1;
 } else if (scanned === 0) {

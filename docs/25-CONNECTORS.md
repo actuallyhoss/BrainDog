@@ -460,7 +460,7 @@ scope is *which project*, not *which verb*; Netlify has none.
 this year for exactly the predicted reason: every new self-hoster degrades every existing one.**
 
 So: **prefer the API key and refuse OAuth where a key exists** — that removes a broker, a redirect, a
-refresh loop and a secret from the build. **Never ship a client secret in AGPL source.** Where OAuth
+refresh loop and a secret from the build. **Never ship a client secret in published source.** Where OAuth
 is unavoidable, take Home Assistant's two-path model: a Cloud broker at a distinct hostname that
 holds only the client secret and never sees the record, and a self-host path where the user
 registers their own app. **Complete, not crippled** — the same asymmetry

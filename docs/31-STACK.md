@@ -104,7 +104,7 @@ put the wrapper under the thing it wraps — iteration 2 swapped them, [ADR-064]
 
 | Edge, or its absence | Prevents |
 |---|---|
-| **`render` has in-degree 0** | the MIT tarball containing AGPL code. **The only boundary here with a legal consequence** — §4 |
+| **`render` has in-degree 0** | the published MIT tarball containing code from a package it does not ship. **The boundary that makes the renderer embeddable, and the one gate 1a is measured through** — §4 |
 | **`record`'s ports are exactly `{ Sql, Scheduler, Clock }`** | [ADR-002](16-DECISIONS.md) becoming a comment. No `Http`, no `Inference`, no `Dispatch`. *"The record cannot speak"* becomes *"the record has no object to speak with"*. The one outbound act — the outbox doorbell — is `Scheduler.wake()`: Cloud `OUTBOX_Q.send({ record })`, self-host a no-op |
 | **`kernel` → `where`** | the index and the predicate disagreeing. `where` owns `jsonPath`, `searchText`, `derive` and `toSchema`, and the kernel imports them — so `CREATE INDEX … json_extract(fields,'$.due')` and `WHERE json_extract(fields,'$.due') < ?` are **the same string**, which is the difference between the planner using the partial expression index and scanning it; and the stored `unique:` fingerprint and the compiled inline share one definition. `compile()` returns the whole `WHERE` clause and the kernel never splices a fragment ([38-SPEC-WHERE](38-SPEC-WHERE.md) §13; [41-SPEC-KERNEL](41-SPEC-KERNEL.md)) |
 | **`where` ⇏ `kernel`, and takes one *type* from `ports`** | shipping the SQL schema to the browser. The query builder round-trips `parse(print(t)) ≡ t` client-side, so `where` has a fourth runtime; the `Refusal` type it imports from `ports` is erased at build and costs the browser nothing. Split: `where` (parse · print · validate) and `where/sql` (compile) — and there is no `where/text`; the text lens is `declare`'s. The client imports only the first |
@@ -127,9 +127,9 @@ it, so `graph` is green on them and the table is where the disagreement lives:
   one of those three names, nothing says so.
 - **`record` → `render`** — `packages/record/src/index.ts` imports `PRIMITIVES_VERSION`. The row
   says the absence prevents *"markup in the record, and therefore markup in the `.dog`"*, and a
-  version constant is not markup. It is also the edge into the **MIT** package, which is the one
-  boundary here with a legal consequence — and it points the safe way (`render` has in-degree 0
-  still, because this is an edge OUT of it, not in).
+  version constant is not markup. It is also the edge into the **MIT** package, the one package
+  published to strangers, and it points the safe way (`render` has in-degree 0 still, because this
+  is an edge OUT of it, not in).
 
 Both are the same shape: a boundary stated as an absence, holding today because of what is on the
 other end. `52 §5.2`'s algorithm is the order and only the order, so a gate built from it cannot see
@@ -206,17 +206,29 @@ tsconfig, and **the thing that enforces a seventeen-row table should be as small
 
 ## 4 · The licence boundary
 
-AGPL-3.0-only app, MIT renderer, one repository. This is the only boundary here with a legal
-consequence, and the research turned up one model to copy and one to avoid.
+Apache-2.0 app, MIT renderer, one repository. Two licences, by path, and the whole of this section
+is about making every scanner agree with that one sentence.
+
+**Apache-2.0 for the product.** The business is the hosted record and the data in it, not the
+source, so the licence has no work to do beyond getting out of the way. What it adds over MIT is an
+explicit patent grant and a trademark clause, both of which matter for a product with a company
+behind it and neither of which costs an adopter anything.
+
+**MIT for `packages/render`.** The block dialect is meant to be embedded anywhere, including in code
+that is not open at all, and MIT asks nothing of whoever embeds it. The root `LICENSING.md` is the
+routing table, and it is the file a person reads; the rules below are what keep a machine reading
+the same thing.
+
+The research turned up one model to copy and one to avoid.
 
 | | |
 |---|---|
-| **Copy Grafana** | root `LICENSE` is the plain AGPLv3 text; root `package.json` is `AGPL-3.0-only, private: true`; `packages/grafana-ui` carries its own `LICENSE` and `"license": "Apache-2.0"`; a root **`LICENSING.md`** routes paths to SPDX names. **GitHub's licence API reports the repo as `agpl-3.0`** — one licence, the restrictive one |
-| **Avoid cal.com** | root `LICENSE` is 21 lines of plain MIT; root `package.json` has **no `license` field at all**. **GitHub's API reports the whole repo as `MIT`** — for a codebase whose app is AGPL and whose `ee/` tree is commercial |
+| **Copy Grafana** | root `LICENSE` is the plain text of the app's own licence; root `package.json` names that same SPDX id and is `private: true`; `packages/grafana-ui` carries its own `LICENSE` and its own `"license"` field; a root **`LICENSING.md`** routes paths to SPDX names. **GitHub's licence API then reports one licence for the repository, the root one**, and the exception is discoverable by anyone who looks for it |
+| **Avoid cal.com** | root `LICENSE` is 21 lines of plain MIT; root `package.json` has **no `license` field at all**. **GitHub's API reports the whole repo as `MIT`** — for a codebase whose app is AGPL and whose `ee/` tree is commercial. The root file is what every scanner believes, so a root file that is not the app's licence is a claim nobody meant to make |
 
-### The failure mode is not legal — it is that the free half will not build
+### The failure mode is that the separable half will not build
 
-Three reproductions of the same shape, permissive code importing copyleft code in one repo:
+Three reproductions of the same shape: a package a repository advertises as separable, that is not.
 
 | | |
 |---|---|
@@ -231,20 +243,28 @@ Three reproductions of the same shape, permissive code importing copyleft code i
 
 | # | Rule |
 |---|---|
-| 1 | **The root `LICENSE` is the AGPLv3 text and nothing else.** GitHub's own guidance: *"simplify your LICENSE file and note the complexity somewhere else."* Put MIT at the root and you have told every scanner the whole app is MIT — and that is not retroactively fixable for anyone who relied on it |
-| 2 | **`LICENSING.md` routes paths to SPDX names.** Six lines, Grafana's shape |
+| 1 | **The root `LICENSE` is the Apache-2.0 text and nothing else.** GitHub's own guidance: *"simplify your LICENSE file and note the complexity somewhere else."* Put MIT at the root and you have told every scanner the whole app is MIT, dropping the patent grant and the trademark clause that are the reason for choosing Apache-2.0 at all, and that is not retroactively fixable for anyone who relied on it |
+| 2 | **`LICENSING.md` routes paths to SPDX names.** Grafana's shape, and short enough that it stays true |
 | 3 | **The filename must be exactly `LICENSE`.** With a `files` field set, npm auto-includes `LICENSE`/`LICENCE`/`COPYING`/`README*` and **silently drops `LICENSE_APACHE2` or `NOTICE`** |
-| 4 | **A real file, not just the field** — otherwise a scanner falls back to the repo root and reports the renderer as AGPL |
+| 4 | **A real file, not just the field** — otherwise a scanner falls back to the repo root and reports the renderer as `Apache-2.0` |
 | 5 | **Never `"SEE LICENSE IN LICENSE"`.** It renders as *unknown* to every policy gate, and gates treat unknown as block. Use the bare identifier |
-| 6 | **SPDX headers on `packages/render/src/**` only** — the only thing that protects a single file copied out. Headers on 300 AGPL files is churn nobody maintains |
-| 7 | **`AGPL-3.0-only`, not `-or-later`** — "or later" hands a future FSF the ability to change your terms |
+| 6 | **SPDX headers on `packages/render/src/**` only** — the only thing that protects a single file copied out. Everything else is covered by the root `LICENSE`, and headers on 300 files is churn nobody maintains |
+| 7 | **No `NOTICE` file, and that is a choice.** Apache-2.0 §4(d) binds a redistributor only when the work it took actually carries one, so shipping a `NOTICE` would hand every adopter an obligation for the sake of a copyright line. It would also be the exact file rule 3 says npm silently drops, which is an obligation created and then packaged away |
 | 8 | **The closure is enforced on the artefact, not the intent.** `npm pack --dry-run --json`, then assert: every entry is under `dist/`/`src/`/`test/fixtures/` or is `LICENSE`/`README`/`package.json`; `dependencies` is empty; the built ESM contains no `@braindog/` and no `../../`; both LICENSE files start with the right words |
 
+**The `render` boundary is an engineering rule first, and the gate is what holds it.** `render` has
+in-degree 0 in the package graph and `tools/gates/graph.mjs` asserts it, because a renderer with
+zero dependencies is what makes it embeddable at all and what makes gate 1a a registry query for
+`depends:braindog-render`. The licence reads the same line rather than driving it: a tarball
+published as MIT should contain only what its own `LICENSE` covers, so an import out of the
+repository and into `render` is a finding for two independent reasons. One check, two jobs, thirty
+lines.
+
 **The sole-copyright-holder point, because it changes the risk.** Bitwarden, Element, Grafana, n8n
-and cal.com all require a CLA precisely so they *can* do this. A sole holder has it for free, can
-relicense either half at will, and cannot be sued by a contributor for a mistake. **The residual
-risk is downstream confusion, not legal exposure** — which is why every control above is about
-signalling.
+and cal.com all require a CLA precisely so they *can* change a licence. A sole holder has that for
+free, can relicense either half at will, and cannot be sued by a contributor for a mistake. **The
+residual risk is downstream confusion, not legal exposure**, which is why every control above is
+about signalling.
 
 **Refused: a separate repo for the renderer.** It has the best record in the survey — Element split
 its SDK from its clients and produced *zero* "what licence is this?" issues. Refused for
@@ -319,7 +339,7 @@ the Cloudflare plugin's Vitest, and under any host a self-hoster supplies to cer
 
 ## 6 · Publishing
 
-**Two packages: `braindog-render` (MIT) and `braindog-cli` (AGPL).** Unscoped, because gate 1a is
+**Two packages: `braindog-render` (MIT) and `braindog-cli` (Apache-2.0).** Unscoped, because gate 1a is
 literally a registry query for `depends:braindog-render`.
 
 `braindog`, `braindog-render`, `braindog-cli`, `braindog-mcp` and the `@braindog` scope are **all

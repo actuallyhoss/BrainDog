@@ -268,7 +268,7 @@ switch.
 
 **Why off:** a founder locking themselves out of their own hosting credentials is more likely than
 the operator reading them. And the strongest honest answer to "can you read my data" is
-self-hosting, which AGPL makes real.
+self-hosting, which a free and complete self-host build makes real.
 
 **Rejected:** on by default (support becomes unable to help with the most valuable data), and
 absent entirely (no answer for a customer who wants one).
@@ -347,23 +347,44 @@ the `MIN(due_at)` indirection but not the one table, because the self-host loop 
 
 ---
 
-## ADR-016 · AGPL for the app, MIT for the renderer
+## ADR-016 · Apache-2.0 for the app, MIT for the renderer
 
-**Decided.** Carried forward from D41 and unchanged.
+**Decided.** Two licences, by path. Everything is `Apache-2.0` except `packages/render/**`, which is
+`MIT`. The root `LICENSING.md` is the routing table.
 
-**Why the split:** AGPL stops a competitor hosting our code closed. AGPL on a *library* kills its
-adoption, and the renderer is the gate-1 distribution instrument.
+**Why Apache-2.0 for the app:** the business is the hosted record and the data in it, not the
+source, so the licence has no job beyond getting out of the way of an adopter. What Apache-2.0 adds
+over a bare MIT is an explicit patent grant and a trademark clause. Both matter for a product with a
+company behind it, and neither costs an adopter anything.
 
-**Recorded consequence:** AGPL does not stop a rehost of the *name*. Only a trademark does — which
-is why the UK TM3 filing is trigger-gated on the first paying subscriber rather than date-gated.
+**Why MIT for the renderer:** the block dialect is meant to be embedded anywhere, including in code
+that is not open at all, and MIT asks nothing at all of whoever embeds it. Apache-2.0's attribution
+mechanics are small, and they are still more than zero for a five-file library whose whole pitch is
+that it costs nothing to take.
 
-**The licence is `AGPL-3.0-only`, never `-or-later`**, and the layout that makes the split legible
-to scanners is [ADR-041](16-DECISIONS.md), from [31-STACK](31-STACK.md) §4: root `LICENSE` is the
-AGPLv3 text, `LICENSING.md` routes paths to SPDX names, `packages/render/LICENSE` is MIT with SPDX
-headers on `packages/render/src/**` only.
+**Rejected: a copyleft core, `AGPL-3.0-only`, in Grafana's shape.** The argument for it is that the
+network clause is what stops somebody hosting this product, closed, in competition with the hosted
+one. It does not survive contact with who actually reads a licence here. The realistic risk at this
+stage is not a competitor reselling a self-hostable business database; it is nobody adopting the
+thing at all, because the licence makes a company's lawyer say no. The network clause falls hardest
+on ordinary self-hosting users, who are exactly the audience this product is for, while a
+well-resourced competitor could comply and compete anyway. **PostHog is the reference for where the
+permissive answer lands**: a permissive core, and the business in the hosted product.
 
-**Would reverse it:** a competitor hosting the *renderer* as a product — which would argue for AGPL
-on the library and accept the adoption cost knowingly.
+**Rejected: one licence for the whole repository.** MIT everywhere gives up the patent grant on the
+product; Apache-2.0 everywhere puts an attribution obligation on the one artefact that exists to be
+copied without thinking about it. The split is two files and a router, and [ADR-041](16-DECISIONS.md)
+is what keeps a scanner from misreading it.
+
+**Recorded consequence:** a permissive licence does not stop a rehost of the *name*, and Apache-2.0
+§6 declines to license the trademark rather than protecting one that does not exist yet. Only a
+registration does. The UK TM3 filing is trigger-gated on the first paying subscriber rather than
+date-gated, and the name is now the only thing in this design that a rehost cannot simply take.
+
+**Would reverse it:** a hosted rehost of the *product* taking real revenue, which is the case the
+copyleft argument was for and the only evidence that would revive it; or a patent claim from an
+adopter, which would argue for Apache-2.0 on the renderer too and accept the attribution cost
+knowingly.
 
 ---
 
@@ -943,23 +964,37 @@ one vendor binding — or a measured regression in its refusal quality.
 
 ## ADR-041 · The licence layout follows Grafana
 
-**Decided.** Root `LICENSE` is the AGPLv3 text only; root `package.json` is `AGPL-3.0-only,
+**Decided.** Root `LICENSE` is the Apache-2.0 text only; root `package.json` is `Apache-2.0,
 private: true`; `LICENSING.md` routes paths to SPDX names; `packages/render/LICENSE` is MIT, the
-filename exactly `LICENSE`, with SPDX headers on `packages/render/src/**` only; never `SEE LICENSE
-IN`; the closure is enforced on `npm pack --dry-run --json` output from commit one; one repository
-until a second committer or a bypassed gate ([31-STACK](31-STACK.md) §4).
+filename exactly `LICENSE`, with SPDX headers on `packages/render/src/**` only; no `NOTICE` file, so
+no adopter inherits an attribution obligation; never `SEE LICENSE IN`; the closure is enforced on
+`npm pack --dry-run --json` output from commit one; one repository until a second committer or a
+bypassed gate ([31-STACK](31-STACK.md) §4).
 
-**Rejected:** cal.com's shape — MIT at the root of an AGPL app. GitHub's API then reports the whole
-repository as MIT, which is not retroactively fixable for anyone who relied on it.
+**This is a signalling layout, and the thing it signals is `packages/render`.** Every scanner in the
+supply chain reads the root file and believes it, so the exception has to be stated in three places
+that agree: its own `LICENSE`, its own `license` field, and a header on each source file, which is
+the only one of the three that travels with a single file copied out.
 
-**Would reverse it:** a second committer, or one bypass of the closure gate — either moves the
-renderer to its own repository.
+**`render` keeps in-degree 0, and that is an engineering rule the licence agrees with.**
+`tools/gates/graph.mjs` asserts it. The reason it exists is that a renderer with zero dependencies
+is what makes it embeddable and what makes gate 1a a registry query for `depends:braindog-render`.
+That a tarball published as MIT should also contain only what its own `LICENSE` covers is the second
+job the same check does, and neither job needs the other to be worth thirty lines.
+
+**Rejected:** cal.com's shape, MIT at the root over a differently licensed app. GitHub's API then
+reports the whole repository as MIT, which is not retroactively fixable for anyone who relied on it,
+and here it would silently drop the patent grant that is half the reason for
+[ADR-016](16-DECISIONS.md).
+
+**Would reverse it:** a second committer, or one bypass of the closure gate. Either moves the
+renderer to its own repository, where the routing problem does not exist.
 
 ---
 
 ## ADR-042 · Two published packages, trusted publishing, three record version numbers, no app semver
 
-**Decided.** `braindog-render` (MIT) and `braindog-cli` (AGPL), unscoped; `braindog`,
+**Decided.** `braindog-render` (MIT) and `braindog-cli` (Apache-2.0), unscoped; `braindog`,
 `braindog-mcp` and `@braindog` reserved and never published under this design. Publishing is OIDC
 trusted publishing per package, `0.0.1` by hand first. The version surface is the tuple
 `app <date>+<sha> · format <user_version> · kernel <migration> · primitives <PRIMITIVES_VERSION>` —

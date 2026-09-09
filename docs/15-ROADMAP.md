@@ -213,8 +213,9 @@ the bundle — are asserted, and every number lives in `tools/gates/budgets.json
 | It is the riskiest thing to get wrong later | the dialect is a public contract the moment an agent writes it |
 | It de-risks the aesthetic | the blocks are most of what the product looks like |
 
-**AGPL for the app, MIT for the renderer.** AGPL on a library kills adoption, and this library is
-the distribution instrument.
+**Apache-2.0 for the app, MIT for the renderer** ([ADR-016](16-DECISIONS.md)). This library is the
+distribution instrument, and MIT asks nothing at all of whoever embeds it, which is the whole point
+of shipping it first.
 
 The clean-room cost is real: the prior plan extracted 528 lines plus 1,043 lines of existing tests
 in 2.5 days. Writing and testing it from nothing is 10. The tests are most of why anybody would

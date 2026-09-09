@@ -36,7 +36,7 @@ stage 3 and **this spec specifies** (§2.7) — `@braindog/where` (the root: par
 **Runs.** SvelteKit 2.70.3 / Svelte 5.57.0 as a **static shell**: `adapter-static` with `fallback: 'index.html'` and
 `ssr = false`. One `build/` directory is the Worker's `ASSETS` binding (51 §7, `not_found_handling:
 'single-page-application'`) and the self-host's disk root (22 §9). No request is ever rendered on a server — §13 D1.
-Licence `AGPL-3.0-only`.
+Licence `Apache-2.0`.
 
 ---
 

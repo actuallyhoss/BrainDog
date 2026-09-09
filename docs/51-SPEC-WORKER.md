@@ -6,7 +6,7 @@ implementation of the nine ports, and the `wrangler.jsonc` that binds them. Deri
 [30-BLUEPRINT](30-BLUEPRINT.md) §8, §13 · [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2 ·
 [22-FRONTEND](22-FRONTEND.md) §5 · [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1 · [12-SECURITY](12-SECURITY.md) §6, §8 ·
 [02-DATA-MODEL](02-DATA-MODEL.md) §9–§10 · [16-DECISIONS](16-DECISIONS.md) ADR-021, ADR-044, ADR-061 ·
-[31-STACK](31-STACK.md) §3, §8. Phase 5 of [BUILD.md](../BUILD.md). Licence `AGPL-3.0-only`.
+[31-STACK](31-STACK.md) §3, §8. Phase 5 of [BUILD.md](../BUILD.md). Licence `Apache-2.0`.
 
 > **Platform facts.** Everything the design documents verified is cited. Every platform fact this spec needs and
 > the documents do not state is written as an assumption in §13 and marked *verify*; nothing below asserts one.

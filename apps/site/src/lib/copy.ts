@@ -3,21 +3,27 @@
  *
  * Same discipline as the record app's `copy.ts` and for a sharper reason here: marketing copy is
  * where a product lies to itself. One file means one pass to check that every claim on this site is
- * a thing the software does — and where a claim is about something not built yet, it says so in the
+ * a thing the software does, and where a claim is about something not built yet, it says so in the
  * sentence rather than in a footnote nobody reads.
  *
- * THE VOICE, in four rules:
+ * THE VOICE, in five rules:
  *   - Say what it does. Never sell it, never adjective it, never "powerful" or "seamless".
  *   - A CTA is Verb + Noun. Never "Get Started", never "Learn More".
  *   - A number is a real number or it is absent. No "10x", no "up to".
  *   - Say the limits out loud. A page that lists only strengths is a page nobody believes twice,
  *     and the buyer here reads specifications for a living.
+ *   - NO EM DASHES, anywhere a person reads. A sentence that only worked because of the dash was
+ *     two sentences. Write them as two, or use a colon.
+ *
+ * The vocabulary is `19 §9`'s. `register`, `row`, `pack`, `page` and `block` are defined in the
+ * clause that first uses them; `predicate`, `projection`, `declaration`, `ceiling`, `extractor` and
+ * `key` are internal words and never appear here.
  */
 
 export const site = {
   product: 'BrainDog',
-  /** The one sentence. It is the repository's own first line, unchanged. */
-  tagline: "Everything about your business that isn't code.",
+  /** The slogan. It is the README's headline, unchanged, and it takes no full stop. */
+  tagline: 'Give your business a memory',
 
   nav: {
     pricing: 'Pricing',
@@ -28,10 +34,12 @@ export const site = {
   },
 
   hero: {
-    title: "Everything about your business that isn't code.",
+    title: 'Give your business a memory',
     body:
-      'Money owed, renewals, hosting, credentials, decisions and the reasons for them. One typed ' +
-      'record every agent you use can read and write, and that renders itself as a web app.',
+      'A company knows a great deal that never reaches its codebase. What it is owed and by whom. ' +
+      'What renews on Tuesday. Which key opens which account. Who decided the thing nobody can ' +
+      'remember deciding. BrainDog keeps all of it in one database instead: typed, append-only, ' +
+      'and readable by every agent you use.',
     primary: 'Start a record',
     secondary: 'Read the design',
     caption: 'The record app. Cream in light, warm charcoal in dark, and the same palette generated for both.',
@@ -42,53 +50,67 @@ export const site = {
       kicker: 'It is a database',
       title: 'Typed rows, not a pile of notes.',
       body:
-        'A register declares its fields and their types, and every row obeys them. Money is an integer in ' +
-        'minor units with its own currency, so two currencies can never be added by accident. A date is a ' +
-        'date. A reference to another row is a reference, not a name someone retyped.',
+        'A register is a typed collection: obligations, domains, people. It declares its fields and ' +
+        'their types, and every row is checked against them on the way in. Money is an integer in ' +
+        'minor units with its own currency, so two currencies can never be added by accident. A date ' +
+        'is a date. A reference to another row is a reference, not a name someone retyped.',
       note: 'The grid is a CSS grid with declared column tracks, not a <table>, because at eight columns and five thousand rows table layout stops being free.',
     },
     agents: {
       kicker: 'For your agents',
       title: 'They already know how to use it.',
       body:
-        'The record is an MCP server. Every agent you run gets the same tool surface you get, scoped to ' +
-        'one record, with a per-tool audit line. There is no scraping, no browser automation and no ' +
-        'second copy of your data for the model to read.',
-      /* Real calls, wrapped to fit a narrow column rather than scrolled sideways. A code block the
-         reader has to drag is a code block nobody finishes. */
+        'The record is an MCP server. An agent gets the same typed tools you get, scoped to one ' +
+        'record, and every call it makes is in the audit log with the agent named. There is no ' +
+        'scraping, no browser automation and no second copy of your data for the model to read.',
+      /* Real tool names and real argument shapes, checked against `packages/mcp/src/index.ts`. Wrapped
+         to fit a narrow column rather than scrolled sideways: a code block the reader has to drag is
+         a code block nobody finishes. */
       code: [
-        '# any session. no adapter, no SDK',
+        '# every session, over MCP.',
+        '# no adapter, no SDK',
         '',
-        'braindog.list',
-        '  obligations',
-        '  where state is open',
-        '    and due before 2026-10-01',
+        'list {',
+        '  "register": "obligations",',
+        '  "where": {',
+        '    "field": "state",',
+        '    "is": "open"',
+        '  }',
+        '}',
         '',
-        'braindog.set',
-        '  obligations#4',
-        '  state: paid',
+        'update {',
+        '  "spoken": "obligations#4",',
+        '  "patch": { "state": "paid" },',
+        '  "version": 7',
+        '}',
         '',
-        '# signed, and in the audit log',
-        '# with the agent named',
+        '# send the version you read.',
+        '# a stale write is refused,',
+        '# never merged behind you.',
       ].join('\n'),
+      note:
+        'Sixteen tools are written and tested against the record. The transport that carries them ' +
+        'is not connected yet, so no agent can reach a hosted record today. That is the next thing ' +
+        'after the browser client.',
     },
     pages: {
       kicker: 'A page is a row',
       title: 'The screens are data too.',
       body:
-        'A page is a declaration: which blocks, over which query, in which order and how wide. Editing one ' +
-        'is editing a row, so it versions, diffs and reverts like everything else, and a pack can ship a ' +
-        'page the same way it ships a register.',
+        'A page is a screen made of blocks, and a block is one thing on it: a table, a figure, a ' +
+        'note. Which blocks, over which rows, in which order and how wide is all written down, and ' +
+        'editing it is editing a row. So it versions and diffs like everything else, and a pack can ' +
+        'ship a page the same way it ships a register.',
       note: 'Sixteen block kinds over eight primitives. A pack may invent a kind; it may never write a colour, a font or a spacing value.',
     },
     project: {
       kicker: 'Per project',
       title: 'A page that is about one thing.',
       body:
-        'Point every block on a page at one project and it stops being a dashboard and starts being that ' +
-        "project's page: what is open on it, which of your agents are working on it right now, what it is " +
-        'owed, what it costs to keep alive. Agent sessions are a register like any other, so they draw like ' +
-        'any other.',
+        'Point every block on a page at one project and it stops being a dashboard and starts being ' +
+        "that project's page: what is open on it, which of your agents are working on it right now, " +
+        'what it is owed, what it costs to keep alive. Agent sessions are a register like any other, ' +
+        'so they draw like any other.',
       note: 'Nothing about it is a new kind of thing. It is the same blocks over the same registers with `thing is Kiln` on the front.',
     },
     tracks: {
@@ -119,60 +141,72 @@ export const site = {
       kicker: 'Arrange it',
       title: 'Order and span. Nothing else.',
       body:
-        'Drag to reorder, or move with the keyboard. It is the same operation either way. Set a width in twelfths. ' +
-        'That is the whole vocabulary, and it is why you cannot make one of these pages ugly: spacing, type, ' +
-        'colour, radius and density all come from the theme, so there is no word for ugly to say.',
+        'Drag to reorder, or move with the keyboard. It is the same operation either way. Set a width ' +
+        'in twelfths. That is the whole vocabulary, and it is why you cannot make one of these pages ' +
+        'ugly: spacing, type, colour, radius and density all come from the theme, so there is no word ' +
+        'for ugly to say.',
       note: 'Each kind knows the narrowest it survives, and the control refuses below it rather than clamping. A table at a third of a page is not a narrow table, it is an unreadable one.',
     },
     vault: {
       kicker: 'Credentials',
       title: 'The vault indexes what a key opens. Never the key.',
       body:
-        'A row records that the Fenwick deploy key exists, what it unlocks and when it was last rotated. ' +
-        'The secret itself is encrypted under a separate envelope, revealed once, and every reveal is in ' +
-        'the audit log with your name on it. Agents are refused the vault outright.',
+        'A row records that the Fenwick deploy key exists, what it unlocks and when it was last ' +
+        'rotated. The secret itself is encrypted under a separate envelope, revealed once, and every ' +
+        'reveal is in the audit log with your name on it. Agents are refused the vault outright.',
     },
     own: {
       kicker: 'Your data',
       title: 'The record is a file you own.',
       body:
-        'Export is one signed file with every row, every declaration and every event in it. Not a CSV per ' +
-        'table with the relationships thrown away. Self-hosting runs the same code from the same file, so ' +
-        'leaving is a copy rather than a migration.',
+        'A record is one SQLite file, which a command-line tool that already ships with your ' +
+        'computer can read. Export is one signed file with every row, every declaration and every ' +
+        'event in it, not a CSV per table with the relationships thrown away. Self-hosting runs the ' +
+        'same packages from the same file, so leaving is a copy rather than a migration.',
     },
   },
 
   pricing: {
     title: 'Two ways to run it.',
     body: 'The same software either way. Hosting is the only thing being sold.',
+    /**
+     * THE STATE OF BOTH PLANS, above the prices rather than under them.
+     *
+     * A price on a page is an offer, and neither of these can be accepted yet. Saying so once, in
+     * plain words, is what lets the rest of the page describe the plans in the present tense.
+     */
+    status:
+      'Neither plan is open yet. The record app is live and you can use it, hosting has no billing ' +
+      'and no sign-up, and the self-host boots but still needs its authentication finished. These ' +
+      'are the prices for when they open, published early so nobody has to ask.',
     self: {
       name: 'Self-hosted',
       price: 'Free',
       unit: 'and complete',
-      body: 'Every feature, no seat count, no key to phone home for. AGPL-3.0-only.',
+      body: 'Every feature, no seat count, no key to phone home for. Apache-2.0.',
       points: [
         'One process, one file, one port',
-        'The same MCP surface',
+        'The same registers, pages and rules',
         'Your own domain and your own backups',
       ],
-      cta: 'Read the install',
+      cta: 'Read the build',
     },
     hosted: {
       name: 'Hosted',
       price: '$12',
       unit: 'per month, per record',
-      body: 'One isolated database per customer, backed up, with inbound email and the Kennel wired in.',
+      body: 'One isolated database per record, run on Cloudflare, with nothing shared between customers.',
       points: [
-        'Daily signed backups, thirty days deep',
-        'An inbound address per record',
+        'One database per record, never a shared table',
+        'The same software as the self-hosted build',
         'Export the whole file whenever you like',
       ],
-      cta: 'Start a record',
+      cta: 'Open the app',
     },
     honest:
-      'No free hosted tier, on purpose. A free tier on a per-customer database is a per-customer cost with ' +
-      'no revenue against it, and the way that ends is a product that quietly gets worse for the people ' +
-      'paying for it.',
+      'No free hosted tier, on purpose. A free tier on a per-customer database is a per-customer ' +
+      'cost with no revenue against it, and the way that ends is a product that quietly gets worse ' +
+      'for the people paying for it.',
   },
 
   /** Stated because a page that lists only strengths is a page nobody believes twice. */
@@ -190,14 +224,14 @@ export const site = {
       },
       {
         title: 'A pack never runs code.',
-        body: 'An extension is a set of declarations, checked before installation. That closes the whole class of supply-chain attack, and it means some things you might want a pack to do are things a pack cannot do.',
+        body: 'A pack is a file that adds registers and pages. It is readable text, checked before installation, and nothing in it runs. That closes the whole class of supply-chain attack, and it means some things you might want a pack to do are things a pack cannot do.',
       },
     ],
   },
 
   footer: {
-    tagline: "Everything about your business that isn't code.",
-    licence: 'AGPL-3.0-only',
+    tagline: 'Give your business a memory',
+    licence: 'Apache-2.0',
     columns: [
       {
         title: 'Product',
@@ -209,16 +243,25 @@ export const site = {
       {
         title: 'Open source',
         links: [
-          { label: 'Source', href: 'https://github.com/braindog/braindog' },
-          { label: 'The design, in full', href: 'https://github.com/braindog/braindog/tree/main/docs' },
-          { label: 'Licence', href: 'https://www.gnu.org/licenses/agpl-3.0.en.html' },
+          { label: 'Source', href: 'https://github.com/actuallyhoss/braindog' },
+          { label: 'The design, in full', href: 'https://github.com/actuallyhoss/braindog/tree/master/docs' },
+          { label: 'Licence', href: 'https://www.apache.org/licenses/LICENSE-2.0' },
         ],
       },
     ],
   },
 } as const;
 
-/** The app's own address. One constant, because it appears in six places. */
+/**
+ * The three addresses, in one place, because between them they appear a dozen times.
+ *
+ * `SOURCE` and `DOCS` were `github.com/braindog/braindog` on a branch called `main`. That
+ * organisation is a stranger's repository called *teste*, and this repository's branch is `master`,
+ * so every Source and Design link on the site went somewhere that was either wrong or missing.
+ * `DEPLOYMENT.md` names the real one: `actuallyhoss/BrainDog`.
+ */
 export const APP = 'https://app.brain.dog';
-export const SOURCE = 'https://github.com/braindog/braindog';
-export const DOCS = 'https://github.com/braindog/braindog/tree/main/docs';
+export const SOURCE = 'https://github.com/actuallyhoss/braindog';
+export const DOCS = 'https://github.com/actuallyhoss/braindog/tree/master/docs';
+/** The build instructions, which is what a self-hoster is actually sent to. */
+export const BUILD = 'https://github.com/actuallyhoss/braindog/blob/master/BUILD.md';

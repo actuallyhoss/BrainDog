@@ -318,10 +318,10 @@ Invariants: exactly one of `ok` or `skip`; a red line carries all four of `what`
 
 1. `execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd })` → `files[].path`.
 2. Every path matches `^(dist|src|test/fixtures)/` or is `LICENSE`, `README.md`, `package.json`.
-3. `package.json`: `dependencies` absent or `{}`; `license` is exactly `MIT` or `AGPL-3.0-only`; never `SEE LICENSE IN`.
+3. `package.json`: `dependencies` absent or `{}`; `license` is exactly `MIT` or `Apache-2.0`; never `SEE LICENSE IN`.
 4. Every `dist/**/*.js`: contains neither `@braindog/` nor `../../`.
 5. `packages/render/LICENSE` begins `MIT License`; root `LICENSE` and `apps/cli/LICENSE` begin
-   `GNU AFFERO GENERAL PUBLIC LICENSE` and are byte-equal.
+   `Apache License` and are byte-equal.
 6. Every `packages/render/src/**/*.ts` first line is `// SPDX-License-Identifier: MIT`.
 
 **`clean-room`** ([BUILD.md](../BUILD.md))

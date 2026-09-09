@@ -295,6 +295,22 @@ const CODE_LITERAL = /(['"])([A-Z][A-Z0-9_]{2,})\1/g;
 const named = new Map();
 let scanned = 0;
 
+/**
+ * A CODE NAMED IN A COMMENT IS NOT AN EMITTER.
+ *
+ * This scanned raw file text, and the paragraph above naming two codes as an example put both of
+ * them into this gate's count by being written. A gate whose number moves when somebody EXPLAINS
+ * it is a gate reading its own commentary, and it is the third time that shape has turned up in
+ * this directory: dead-copy counted a copy key named in prose, flags counted a flag named in prose,
+ * and both blank comments for exactly this reason.
+ */
+const blank = (m) => m.replace(/[^\n]/g, ' ');
+const readable = (text) =>
+  text
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + blank(m.slice(p.length)));
+
 function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -306,7 +322,7 @@ function walk(dir) {
     const where = rel(path);
     if (where.endsWith('packages/ports/src/index.ts')) continue;
     scanned += 1;
-    for (const m of readFileSync(path, 'utf8').matchAll(CODE_LITERAL))
+    for (const m of readable(readFileSync(path, 'utf8')).matchAll(CODE_LITERAL))
       if (registry.has(m[2])) named.set(m[2], [...new Set([...(named.get(m[2]) ?? []), where])]);
   }
 }

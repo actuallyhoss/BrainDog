@@ -27,7 +27,7 @@ writes into `ingest_receipt`.
 | scan every input in one advancing pass | contain a `RegExp` — there is none, and a lint rule proves it (§8) |
 
 **Imports:** `@braindog/where` for the `Predicate` type and the reference evaluator, and nothing else
-(31 §2 row 8). No `node:*` import anywhere under `src/` (31 §3, layer 4). Licence `AGPL-3.0-only`; private,
+(31 §2 row 8). No `node:*` import anywhere under `src/` (31 §3, layer 4). Licence `Apache-2.0`; private,
 never published.
 
 **Callers:** `record` (the pipeline), `spark` (the proposal loop's scoring), `connect` (`readRows`, `select`,

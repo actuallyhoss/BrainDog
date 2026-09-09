@@ -168,7 +168,7 @@ Five source files, one generated file, one script. Counted.
 
 ```
 packages/mcp/
-├── package.json                  @braindog/mcp · private · AGPL-3.0-only · "exports": { ".": "./src/index.ts" }
+├── package.json                  @braindog/mcp · private · Apache-2.0 · "exports": { ".": "./src/index.ts" }
 │                                 dependencies: @braindog/declare workspace:*, valibot 1.4.2 (the pin declare uses)
 │                                 devDependencies: @valibot/to-json-schema (§11), fast-check 4.9.0
 │                                 scripts: test = node --test test/ · gen = node scripts/gen-schemas.ts · typecheck = tsc -p .

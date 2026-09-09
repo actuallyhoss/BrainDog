@@ -1,6 +1,6 @@
 # 48 · apps/cli — specification
 
-The `braindog` command: the `braindog-cli` package on npm, AGPL-3.0-only, unscoped, one published file, no
+The `braindog` command: the `braindog-cli` package on npm, Apache-2.0, unscoped, one published file, no
 runtime dependencies ([33-CONTRACTS](33-CONTRACTS.md) §5, [31-STACK](31-STACK.md) §6). Mode: ponytail. Node's
 `util.parseArgs`, `fetch`, `node:sqlite` through the ports adapter, WebCrypto — the standard library all the
 way down.
@@ -86,9 +86,9 @@ Shape in §4.1. `BRAINDOG_TOKEN` wins over the file and is never written to it.
 
 ```
 apps/cli/
-├── package.json          name braindog-cli · license AGPL-3.0-only · type module · bin { braindog: dist/braindog.mjs }
+├── package.json          name braindog-cli · license Apache-2.0 · type module · bin { braindog: dist/braindog.mjs }
 │                         files [dist] · engines { node: ">=24.13" } · dependencies {}
-├── LICENSE               the AGPLv3 text — a real file, exact name (31 §4 rules 3–4)
+├── LICENSE               the Apache-2.0 text — a real file, exact name (31 §4 rules 3–4)
 ├── README.md
 ├── tsconfig.json         strict · verbatimModuleSyntax · erasableSyntaxOnly · noEmit
 ├── src/
@@ -561,7 +561,7 @@ test Ed25519 key held in `test/`. Golden files are compared as parsed JSON.
 Twenty-four, counted. CI rows ([33-CONTRACTS](33-CONTRACTS.md) §8): `ci.yml` runs T1–T16, T18–T24 on every
 push and T17 nightly; `gates.yml`'s `licence-closure` runs `npm pack --dry-run --json` on `apps/cli` — only
 `dist/braindog.mjs`, `LICENSE`, `README.md`, `package.json`; `dependencies` empty; the bundle contains no
-`@braindog/` and no `../../`; `LICENSE` starts with the AGPL words (31 §4 rule 8); `graph` asserts the six
+`@braindog/` and no `../../`; `LICENSE` starts with the Apache-2.0 words (31 §4 rule 8); `graph` asserts the six
 imports of §1 point down the order; `release.yml` builds and publishes through trusted publishing, `0.0.1` by
 hand first (31 §6).
 

@@ -1,30 +1,169 @@
 <!--
-  The changelog, and it opens by saying nothing has shipped.
+  The changelog, and it opens with the state of the product.
 
   14 §5 calls this "the single highest-leverage community artefact for a solo product: proof of
-  life". Proof of life is only proof if it is true, so the first thing on the page is the status —
-  design complete, the browser client being built, no release. A changelog that hides a pre-release
-  product behind a list of internal commits is a changelog that will be caught.
+  life". Proof of life is only proof if it is true, so the first thing on the page is the status.
 
-  Entries are the repository's own, dated, in its own words. Each says what changed and — where the
-  change was a reversal — what the earlier answer was and why it was wrong, which is the same rule
-  the design documents follow and the reason they are worth reading.
+  IT SAID "NOTHING HAS SHIPPED YET" FOR SIX DAYS AFTER SOMETHING DID. The app has been deployed from
+  this repository on every push since 2026-09-08, from two hostnames, and the newest entry under that
+  sentence was dated 2026-09-03. A changelog that is stale is worse than no changelog: the artefact
+  whose entire job is to prove the thing is alive was the best evidence on the site that it was not.
+
+  Entries are the repository's own, dated, in its own words, and drawn from its commit subjects,
+  which are already written as release notes. Each says what changed and, where the change was a
+  reversal, what the earlier answer was and why it was wrong. That is the same rule the design
+  documents follow and the reason they are worth reading.
+
+  NO LINK TO A RELEASES PAGE. This repository tags and does not publish GitHub Releases, so a link
+  to one would be a 404 with a promise attached.
 -->
 <script lang="ts">
-  import { SOURCE, site } from '$lib/copy.ts';
+  import { APP, SOURCE, site } from '$lib/copy.ts';
 
   type Entry = { date: string; title: string; body: string; kind: 'shipped' | 'changed' | 'fixed' };
 
   const STATUS = {
-    title: 'Nothing has shipped yet.',
+    title: 'The app is live. Nothing is for sale yet.',
     body:
-      'The design is complete and audited. Fifty-four documents, in the open, in this repository. ' +
-      'The browser client is being built now against a synthetic record; the kernel, the self-host and ' +
-      'the Worker come after it. There is no release to install and no record to sign up for. This page ' +
-      'exists so that is a fact you can check rather than one you have to ask about.',
+      'The record app is deployed from this repository on every push, and you can open it and use ' +
+      'it. It draws a synthetic record rather than yours: the kernel behind it is about a third ' +
+      'built, and there is no sign-up, no billing and no release to install. The design is ' +
+      'fifty-four documents in the open, and REPORT.md is the running account of what is built and ' +
+      'what is not. This page exists so that is a fact you can check rather than one you have to ' +
+      'ask about.',
   };
 
   const ENTRIES: Entry[] = [
+    {
+      date: '2026-09-09',
+      kind: 'shipped',
+      title: 'The app is deployed, from two hostnames and one build',
+      body:
+        'Every push to the main branch builds and deploys the record app; a second hostname takes ' +
+        'the same two packages from a branch that only moves forward from a green build. The ' +
+        'staging one wears its own accent, its own badge and its own word in the tab, because two ' +
+        'windows of the same product open beside each other is the confusion the whole mechanism ' +
+        'exists to prevent. All four halves of that mechanism had a paragraph beside them asserting ' +
+        'they were whole, and none of them was connected: nothing defined the variable the accent ' +
+        'hung on, one component was imported by no file but its own, and the stylesheet loaded the ' +
+        'other deployment\'s palette on everybody\'s behalf.',
+    },
+    {
+      date: '2026-09-09',
+      kind: 'fixed',
+      title: 'Four gates were asked what input would make them fire',
+      body:
+        'A gate that has never failed may not work. Each source gate was asked what input would ' +
+        'produce its report and whether such an input reaches it, and the answers were 1 of 7, 3 of ' +
+        '10, a check that could not see the file it was about, and the worst at 2 of 16. That last ' +
+        'one could not see the function every refusal in the codebase is built by, and could not see ' +
+        'a ternary, which was hiding a code that appears nowhere else in the tree.',
+    },
+    {
+      date: '2026-09-09',
+      kind: 'fixed',
+      title: 'Six dependency advisories to zero',
+      body:
+        'Three packages moved off version ranges with known holes in them, and the audit reports ' +
+        'nothing. Nothing published inside the last twenty-four hours installs here, because the ' +
+        'newest version of anything is exactly what an attacker who has just taken a maintainer\'s ' +
+        'account publishes. Taking the newest release that satisfies that policy is a decision. ' +
+        'Taking the newest release is the absence of one.',
+    },
+    {
+      date: '2026-09-08',
+      kind: 'shipped',
+      title: 'The empty record, which nothing had ever looked at',
+      body:
+        'The screen somebody sees the hour they install went six audits unmeasured, because two ' +
+        'usability passes could not reach it in a browser and a verification pass recorded it as ' +
+        'unreachable. It was telling them their finances were healthy, four green ticks over four ' +
+        'zeroes, because zero is under every target. That was under 996 pixels of the same three ' +
+        'sentences repeated four times, on a home screen reading "Nothing needs you today", which is ' +
+        'the sentence for a record you have worked through.',
+    },
+    {
+      date: '2026-09-08',
+      kind: 'fixed',
+      title: 'No list renders more than it admits to',
+      body:
+        'On 2,614 rows the first paint was 4,001 rows and 102,681 nodes, and eight seconds to ' +
+        'settle. Every list drew every row it held, and "one body at a time" was enforced with a ' +
+        'display rule, which hides one body and builds both. It is 201 rows and 3,137 nodes now, ' +
+        'paging to the cap as you scroll, with the head reading 200+ of 2,614 while it does.',
+    },
+    {
+      date: '2026-09-08',
+      kind: 'fixed',
+      title: 'The module that decides who can see your business had no test',
+      body:
+        'One function is what every call checks, one method is behind grant, raise, lower and ' +
+        'remove, and a last-owner check in three places prevents a state nobody inside the product ' +
+        'can get out of. Nothing anywhere exercised any of it, on a module that has already shipped ' +
+        'two authorisation defects in opposite directions. Twenty-five mutations are caught now, and ' +
+        'one of them found a last-owner guard that could never fire, because the check above it had ' +
+        'already refused every case that reached it.',
+    },
+    {
+      date: '2026-09-08',
+      kind: 'shipped',
+      title: 'Somewhere to type the code every machine prints',
+      body:
+        'Four documents make one settings area the address a signing-in machine sends you to, and ' +
+        'that area had a read-only list with no input in it at all, under an Approve button whose ' +
+        'own message mentioned a six-digit code no control on the page could accept. Two of the six ' +
+        'states the schema defines had no word either, including the one a request sits in between ' +
+        'your click and the machine noticing.',
+    },
+    {
+      date: '2026-09-07',
+      kind: 'changed',
+      title: 'Usability is a lens every iteration, not a phase',
+      body:
+        'Twelve settings screens called themselves a mock-up, and seven of them said the same ' +
+        'sentence, which was about the build rather than about the setting. A phone read a money ' +
+        'page through a 356-pixel window onto a 450-pixel table. Every route is measured on a phone ' +
+        'by a gate now rather than by hand: no clipping, no sideways scroll, and no target under 44 ' +
+        'pixels under a thumb.',
+    },
+    {
+      date: '2026-09-06',
+      kind: 'shipped',
+      title: 'A record can create itself, and says who wrote it',
+      body:
+        'Nothing in this repository could make a new record until this week. It can now, with the ' +
+        'key hierarchy a record was previously created without, and a record file records which ' +
+        'build wrote it and refuses to open if it does not say.',
+    },
+    {
+      date: '2026-09-05',
+      kind: 'shipped',
+      title: 'The backend, from the schema up',
+      body:
+        'Fourteen iterations: the schema and the ledger that keeps it honest, then the sixteen types ' +
+        'in and out, then the write path, which is the only thing that changes a record. Then who ' +
+        'may ask what, in one place. Then search, the vault, rules, the outbox, and the file a ' +
+        'customer can take with them.',
+    },
+    {
+      date: '2026-09-04',
+      kind: 'shipped',
+      title: 'Order and span, and a page that is about one project',
+      body:
+        'Arranging a page is two operations and no more. The block picker draws every tile rather ' +
+        'than naming it. A page can be pointed at one project, a session can be pinned to a track, ' +
+        'and the money page walks the runway to the first day the balance goes under and names the ' +
+        'row that crosses it.',
+    },
+    {
+      date: '2026-09-04',
+      kind: 'shipped',
+      title: 'brain.dog, which is this site',
+      body:
+        'Prerendered, every page finished HTML on disk, and readable with scripting off. It imports ' +
+        'the record app\'s design system rather than resembling it, so a token that changes there ' +
+        'changes here.',
+    },
     {
       date: '2026-09-03',
       kind: 'changed',
@@ -109,7 +248,12 @@
   <div class="status">
     <h2 class="status-title">{STATUS.title}</h2>
     <p class="status-body">{STATUS.body}</p>
-    <a class="status-link" href={SOURCE}>{site.nav.source}</a>
+    <!-- Two links, because the sentence above makes two checkable claims: that you can open it, and
+         that the account of what is built is in the open. -->
+    <p class="status-links">
+      <a class="status-link" href={APP}>{site.nav.open}</a>
+      <a class="status-link" href={SOURCE}>{site.nav.source}</a>
+    </p>
   </div>
 </section>
 
@@ -173,6 +317,13 @@
     text-wrap: pretty;
   }
 
+  .status-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-5);
+  }
+
   /* 48x23 beside a status line. Small because it reads as an aside, and it is still a link
      somebody presses with a thumb. */
   .status-link {
@@ -183,10 +334,20 @@
     font-weight: 600;
   }
 
+  /**
+   * `margin-block`, NOT `margin`.
+   *
+   * The rule above gives `.head, .log` a 900px measure and `margin-inline: auto` to centre it, and
+   * this block then set `margin: 0` at the same specificity and later in the file, so the shorthand
+   * reset the inline margins the rule above had just set. The heading was centred in the viewport
+   * and the entries under it were flush against the left edge: on a 1440px window the dates sat 245
+   * pixels to the left of the title they belonged to, on a page whose entire content is that one
+   * column. The list has been off-axis since the page was written.
+   */
   .log {
     display: flex;
     flex-direction: column;
-    margin: 0;
+    margin-block: 0;
     padding-block-end: var(--sp-6);
     list-style: none;
   }

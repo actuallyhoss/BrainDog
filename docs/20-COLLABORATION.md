@@ -454,7 +454,7 @@ irreversibly.
 That is already true of this design ([02-DATA-MODEL](02-DATA-MODEL.md) §8: `event` is append-only
 and has no foreign key to `entry`, so deleting a row cannot delete its history). It costs nothing
 to claim, no competitor claims it, and for a record holding money and credentials it is the same
-*checkable* trust argument that AGPL plus a complete self-host makes.
+*checkable* trust argument that published source plus a complete self-host makes.
 
 **And it is structural rather than aspirational, which is the part that makes it believable.** The
 credential boundary is what makes an audit log true — *an audit log you can bypass is decoration.*

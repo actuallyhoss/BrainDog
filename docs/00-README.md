@@ -12,9 +12,9 @@ agreed.
 > roadmap), and **the index model would have failed at the twelfth installed pack**
 > ([02-DATA-MODEL](02-DATA-MODEL.md) §1).
 
-BrainDog is everything about a business that isn't code — money owed, renewals, hosting,
+BrainDog is everything about a business that is not just code: money owed, renewals, hosting,
 credentials, decisions and their reasons — in one typed database that every agent writes to
-over MCP, and that renders itself as a web app. Open source under AGPL-3.0-only, self-hostable free
+over MCP, and that renders itself as a web app. Open source under Apache-2.0, self-hostable free
 and complete, hosted at $12/mo (D41).
 
 ---

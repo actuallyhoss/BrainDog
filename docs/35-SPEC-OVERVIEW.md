@@ -41,7 +41,7 @@ reading: a spec traces the whole flow before it picks the smallest shape.
 | Logging | a log line never carries a field value, a credential, a prompt or a raw payload — the code, the id and the shape only ([12-SECURITY](12-SECURITY.md) §8) |
 | Comments | explain *why*, in full sentences, at the decision — never what the next line does. A `ponytail:` comment names a ceiling and its upgrade path |
 | Money and time | integers in minor units with a currency; RFC 3339 UTC instants; `YYYY-MM-DD` days; never a float for a figure ([02-DATA-MODEL](02-DATA-MODEL.md) §3–§4) |
-| Licence | `packages/render/**` MIT with an SPDX header on every source file; everything else `AGPL-3.0-only` ([31-STACK](31-STACK.md) §4) |
+| Licence | `packages/render/**` MIT with an SPDX header on every source file; everything else `Apache-2.0` ([31-STACK](31-STACK.md) §4) |
 | Size | a package is a handful of files. A spec that needs more than about eight source files is describing two packages, or an abstraction that should not exist |
 
 ## 3 · The template

@@ -397,7 +397,7 @@ response echoes the client's `X-Request-Id`, and both hosts log it. A request na
 
 ## 5 · The CLI — `braindog`
 
-One bundled file (`esbuild`), the `braindog-cli` package (AGPL); `yaml` and `valibot` ride inside it through `declare`
+One bundled file (`esbuild`), the `braindog-cli` package (Apache-2.0); `yaml` and `valibot` ride inside it through `declare`
 ([ADR-046](16-DECISIONS.md), [ADR-063](16-DECISIONS.md)) and nothing else does. Every command has `--json`.
 
 | Command | Does |

@@ -37,7 +37,7 @@
   <Shot
     name="home"
     eager
-    alt="The BrainDog home screen: three open questions, overdue money, and what changed since you last looked."
+    alt="The BrainDog home screen: the open questions waiting on a decision, the money that is late in both directions, and what changed since you last looked."
     caption={site.hero.caption}
   />
 </section>
@@ -63,6 +63,10 @@
       <p class="kicker">{s.agents.kicker}</p>
       <h2 class="row-title">{s.agents.title}</h2>
       <p class="row-body">{s.agents.body}</p>
+      <!-- THE LIMIT, in the section that makes the claim rather than in a footnote. The tools are
+           written and the transport is not, and a buyer who reads specifications will find that out
+           in about four minutes. Better it comes from us. -->
+      <p class="row-note">{s.agents.note}</p>
     </div>
     <pre class="code"><code>{s.agents.code}</code></pre>
   </div>
@@ -76,7 +80,9 @@
       <p class="row-body">{s.pages.body}</p>
       <p class="row-note">{s.pages.note}</p>
     </div>
-    <Shot name="money" alt="A declared page: three figures, a table of what is owed to you, a note, and a bar chart by counterparty." />
+    <!-- `declared page` was the word here, and `19 §9` bans it: say the thing's own name. It also
+         described three figures and a bar chart, on a page that has four figures and no chart. -->
+    <Shot name="money" alt="The money page: four figures against their targets, how many obligations sit in each state, and a table walking the balance forward to the day it goes under." />
   </div>
 </section>
 
@@ -194,11 +200,14 @@
     padding-block: var(--sp-8) var(--sp-7);
   }
 
+  /* One rule and not two. There were two `.hero-copy` blocks in this file, thirty lines apart, and
+     the second set `max-inline-size: none` over the first one's `24ch` — so the measure the first
+     rule existed to set had never once applied. */
   .hero-copy {
-    max-inline-size: 24ch;
+    max-inline-size: none;
   }
 
-  /* `clamp` and not a media query, because the headline's job is to fit — a step scale gives you
+  /* `clamp` and not a media query, because the headline's job is to fit. A step scale gives you
      one size that is slightly too big at 900px and another slightly too small at 901. */
   .hero-title {
     font-size: clamp(40px, 6.4vw, 68px);
@@ -214,10 +223,6 @@
     font-size: var(--t-lg);
     line-height: 1.5;
     text-wrap: pretty;
-  }
-
-  .hero-copy {
-    max-inline-size: none;
   }
 
   .hero-actions {
@@ -269,6 +274,19 @@
   .row-narrow {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
+  }
+
+  /**
+   * THE FLIPPED ROW WAS GIVING THE SCREENSHOT THE NARROW COLUMN.
+   *
+   * `.row` is 5fr of copy beside 7fr of picture, and `order: 2` on the copy moved it to the second
+   * track without moving the track widths with it. So the one section whose whole argument is a
+   * screenshot got 5fr of it and the sentence got 7fr: the money page rendered at 41% of the row and
+   * its own type was five pixels tall, which is the exact failure the `typed` section above is a
+   * full-width band to avoid. The columns swap with the content.
+   */
+  .row-flip {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
   }
 
   .stack {

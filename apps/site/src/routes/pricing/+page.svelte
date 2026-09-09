@@ -9,7 +9,7 @@
   reads as a price somebody is embarrassed by, and the reason is a good one.
 -->
 <script lang="ts">
-  import { APP, DOCS, site } from '$lib/copy.ts';
+  import { APP, BUILD, site } from '$lib/copy.ts';
 
   const p = site.pricing;
 </script>
@@ -22,6 +22,10 @@
 <section class="head">
   <h1 class="title">{p.title}</h1>
   <p class="lede">{p.body}</p>
+  <!-- ABOVE THE PRICES, NOT UNDER THEM. A price on a page is an offer, and neither of these can be
+       accepted today. Saying so once, before the cards, is what lets the cards describe the plans in
+       the present tense without the page lying. -->
+  <p class="status">{p.status}</p>
 </section>
 
 <section class="plans">
@@ -38,7 +42,10 @@
           <li><span class="tick" aria-hidden="true">✓</span>{point}</li>
         {/each}
       </ul>
-      <a class="btn" class:btn-primary={i === 1} href={i === 1 ? `${APP}/start` : DOCS}>{plan.cta}</a>
+      <!-- The self-hosted card sends you to BUILD.md, which is the thing it says it is. It used to
+           send you to the whole `docs/` tree, which is fifty-four specification documents and not an
+           install. -->
+      <a class="btn" class:btn-primary={i === 1} href={i === 1 ? APP : BUILD}>{plan.cta}</a>
     </article>
   {/each}
 </section>
@@ -72,6 +79,22 @@
     color: var(--ink2);
     font-size: var(--t-lg);
     line-height: 1.5;
+  }
+
+  /* The same rule the changelog's status box uses: a warn-coloured edge, a quiet ground, and no
+     icon. It is a fact about the state of the product, not an alarm. */
+  .status {
+    margin-block-start: var(--sp-5);
+    max-inline-size: 68ch;
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-inline-start: 3px solid var(--warn);
+    border-radius: var(--r-md);
+    color: var(--ink2);
+    font-size: var(--t-ui);
+    line-height: 1.6;
+    text-wrap: pretty;
   }
 
   .plans {

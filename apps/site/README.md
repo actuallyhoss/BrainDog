@@ -53,9 +53,17 @@ software does. The voice, in four rules:
 - A number is a real number or it is absent. No "10×", no "up to".
 - Say the limits out loud. A page that lists only strengths is a page nobody believes twice, and
   the buyer here reads specifications for a living.
+- No em dashes in anything a person reads. A sentence that only worked because of the dash was two
+  sentences; write them as two, or use a colon. `grep -c '—' build/*.html` is the check.
 
-Which is why the changelog opens by saying nothing has shipped, the pricing page has no feature
-matrix, and the landing page ends on three things the product will not do.
+Which is why the changelog opens with the state of the product, the pricing page says out loud that
+neither plan is open yet, the section about agents says which half of the MCP surface is connected,
+and the landing page ends on three things the product will not do.
+
+**The claims go stale faster than the code does.** `copy.ts` is checked against `REPORT.md` rather
+than against last week's copy: the changelog said *"Nothing has shipped yet"* for six days after the
+app was deployed, and the pricing page sold inbound email and the Kennel, neither of which exists.
+Re-read both files together before changing either.
 
 ## Shooting it
 

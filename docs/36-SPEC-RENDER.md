@@ -554,7 +554,7 @@ Toolchain from the root: Node 24.13.0, pnpm 11.25.0, ESLint flat with `eslint-pl
 ## 12 · Build order
 
 **Before this:** nothing in `packages/`. The repository skeleton only — `.gitattributes` with `* text=auto eol=lf`
-(31 §7), the root `LICENSE` (AGPLv3 text) and `LICENSING.md` (31 §4), `pnpm-workspace.yaml`, the `graph` and
+(31 §7), the root `LICENSE` (the Apache-2.0 text) and `LICENSING.md` (31 §4), `pnpm-workspace.yaml`, the `graph` and
 `licence-closure` gate scripts.
 
 **This unblocks:**

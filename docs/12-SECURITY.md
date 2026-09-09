@@ -1,8 +1,8 @@
 # 12 · Security
 
 This record holds money owed, renewal dates, and credentials. The trust argument is the product,
-and AGPL plus a complete free self-host is what makes the claim **checkable** rather than
-promised.
+and published source plus a complete free self-host is what makes the claim **checkable** rather
+than promised.
 
 ---
 
@@ -334,8 +334,10 @@ Operationally: access to a customer's record requires a named reason recorded in
 the diagnosis order of [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.15 — the tuple, the refusal state,
 `observation`, `event`, the `system` suggestions, and only then a row — and support never asks for a
 vault passphrase. **The strongest available answer to "can you read
-my data" is "self-host, and here is the complete build"** — which is what AGPL and D41 buy, and
-why the self-host must never be a crippled tier.
+my data" is "self-host, and here is the complete build"** — which is what publishing the source and
+D41 buy together, and why the self-host must never be a crippled tier. The licence is permissive, so
+it is the *complete build* half of that sentence doing the work, not an obligation the licence puts
+on anybody.
 
 ---
 

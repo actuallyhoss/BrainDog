@@ -39,7 +39,7 @@
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { join, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
@@ -192,7 +192,41 @@ const invented = new Map();
 const emitted = new Set();
 let scanned = 0;
 
+/**
+ * A SEEDED VIOLATION IS NOT AN EMITTER, and this counted two of them.
+ *
+ * `tools/gates/negative/` holds one small tree per gate, each seeded with the defect that gate is
+ * meant to report. They are `.ts` files under `tools/`, so this walk read them like any other
+ * source — and the day `refusal-fixtures` landed its negative, which seeds a `bad('ROW_LOCKED')`
+ * and a `bad('HUMAN_ONLY')` for its own gate to find, this gate's headline went from 75 emitted to
+ * 77. Two codes the PRODUCT emits nowhere, counted as emitted, because another gate needed
+ * something to fail on.
+ *
+ * That is the shape this file exists to catch, arriving through the front door: a number propped
+ * up by a fixture rather than by the thing it claims to measure. It was caught by two gates
+ * disagreeing — `refusal-fixtures` said 75 named and this said 77 emitted — which is the argument
+ * for having both.
+ */
+const SEEDED = `${sep}negative${sep}`;
+
+/**
+ * A CODE NAMED IN A COMMENT IS NOT AN EMITTER.
+ *
+ * This scanned raw file text, and the paragraph above naming two codes as an example put both of
+ * them into this gate's count by being written. A gate whose number moves when somebody EXPLAINS
+ * it is a gate reading its own commentary, and it is the third time that shape has turned up in
+ * this directory: dead-copy counted a copy key named in prose, flags counted a flag named in prose,
+ * and both blank comments for exactly this reason.
+ */
+const blank = (m) => m.replace(/[^\n]/g, ' ');
+const readable = (text) =>
+  text
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + blank(m.slice(p.length)));
+
 function walk(dir) {
+  if (`${dir}${sep}`.includes(SEEDED)) return;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (!skipDir(entry.name) && entry.name !== 'node_modules') walk(join(dir, entry.name));
@@ -201,7 +235,7 @@ function walk(dir) {
     if (!['.ts', '.svelte', '.mjs'].includes(extname(entry.name))) continue;
     scanned += 1;
     const where = join(dir, entry.name).slice(root.length + 1).replaceAll('\\', '/');
-    for (const m of readFileSync(join(dir, entry.name), 'utf8').matchAll(EMITTED))
+    for (const m of readable(readFileSync(join(dir, entry.name), 'utf8')).matchAll(EMITTED))
       /* BOTH ARMS OF A TERNARY, and `m[2]` is `undefined` for the ordinary one-code case. */
       for (const code of [m[1], m[2]]) {
         if (code === undefined) continue;
