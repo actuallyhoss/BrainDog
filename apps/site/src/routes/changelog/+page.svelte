@@ -28,9 +28,9 @@
       'The record app is deployed from this repository on every push, and you can open it and use ' +
       'it. It draws a synthetic record rather than yours: the kernel behind it is about a third ' +
       'built, and there is no sign-up, no billing and no release to install. The design is ' +
-      'fifty-four documents in the open, and REPORT.md is the running account of what is built and ' +
-      'what is not. This page exists so that is a fact you can check rather than one you have to ' +
-      'ask about.',
+      'fifty-four documents, written before the code and still the only thing it is built from, ' +
+      'and they open with the source. This page is what there is to read until then, and it is ' +
+      'written the same way: what is built, what is not, and what is wrong with what is.',
   };
 
   const ENTRIES: Entry[] = [
@@ -241,6 +241,14 @@
 <svelte:head>
   <title>Changelog · BrainDog</title>
   <meta name="description" content={STATUS.body} />
+  <!-- THE CANONICAL AND THE PREVIEW, from the same two sentences the page already has, so there is
+       one description per page rather than two that can disagree. The canonical matters because
+       `www` 301s here and a preview fetcher that followed the redirect would otherwise cite the
+       hostname it started from. -->
+  <link rel="canonical" href="https://brain.dog/changelog" />
+  <meta property="og:url" content="https://brain.dog/changelog" />
+  <meta property="og:title" content="Changelog · BrainDog" />
+  <meta property="og:description" content={STATUS.body} />
 </svelte:head>
 
 <section class="head">
@@ -248,11 +256,12 @@
   <div class="status">
     <h2 class="status-title">{STATUS.title}</h2>
     <p class="status-body">{STATUS.body}</p>
-    <!-- Two links, because the sentence above makes two checkable claims: that you can open it, and
-         that the account of what is built is in the open. -->
+    <!-- ONE LINK WHILE THE REPOSITORY IS PRIVATE, and it was two. The second offered the source as
+         the check on the sentence above it, and answered 404: the only outbound action in the block
+         whose entire subject is that its claims are checkable. -->
     <p class="status-links">
       <a class="status-link" href={APP}>{site.nav.open}</a>
-      <a class="status-link" href={SOURCE}>{site.nav.source}</a>
+      {#if SOURCE}<a class="status-link" href={SOURCE}>{site.nav.source}</a>{/if}
     </p>
   </div>
 </section>

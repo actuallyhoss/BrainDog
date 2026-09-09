@@ -15,6 +15,27 @@
          This comment ships in the bytes, so it holds to the same rule the copy does: no em dashes
          anywhere in the served HTML, which is a thing `grep` can check rather than a thing somebody
          has to remember. -->
+    <!--
+      A SHARED LINK HAD NO PREVIEW AT ALL. No Open Graph, no Twitter card, no canonical: an audit of
+      the live pages found every one of them missing, so this site pasted into a message, a post or
+      a chat showed a bare URL. For a page whose entire job is to be the first thing somebody sees,
+      that is the first thing somebody sees.
+
+      IN THE SHELL AND NOT PER PAGE, for the parts that do not vary: the site name, the type, the
+      card format and the image. The three pages set their own `og:title` and `og:description` from
+      their own `<title>` and description in `+layout.svelte`, so there is one sentence per page and
+      not two that can disagree.
+
+      `og:image` IS THE PRODUCT AND NOT A LOGO. The screenshot on the home page is what the product
+      looks like, it is already in `static/`, and a preview card is one of the two places a stranger
+      decides whether to click. An absolute URL, because a preview is fetched by somebody else's
+      server and a relative one resolves against nothing.
+    -->
+    <meta property="og:site_name" content="BrainDog" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://brain.dog/shots/home-light.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

@@ -20,6 +20,14 @@
 <svelte:head>
   <title>BrainDog</title>
   <meta name="description" content={site.hero.body} />
+  <!-- THE CANONICAL AND THE PREVIEW, from the same two sentences the page already has, so there is
+       one description per page rather than two that can disagree. The canonical matters because
+       `www` 301s here and a preview fetcher that followed the redirect would otherwise cite the
+       hostname it started from. -->
+  <link rel="canonical" href="https://brain.dog/" />
+  <meta property="og:url" content="https://brain.dog/" />
+  <meta property="og:title" content="BrainDog" />
+  <meta property="og:description" content={site.hero.body} />
 </svelte:head>
 
 <section class="hero">
@@ -28,7 +36,12 @@
     <p class="hero-body">{site.hero.body}</p>
     <div class="hero-actions">
       <a class="btn btn-primary" href="{APP}/start">{site.hero.primary}</a>
-      <a class="btn" href={DOCS}>{site.hero.secondary}</a>
+      <!-- THE SECOND ACTION IS THE CHANGELOG WHILE THE DESIGN IS NOT READABLE. It pointed at the
+           `docs/` tree in a private repository, so the one thing this page offers a reader who is
+           not ready to open the app was a 404. The changelog is the honest substitute: it is the
+           account of what is built and what is not, it is on this site, and it is what the design
+           link was being read for. -->
+      <a class="btn" href={DOCS ?? '/changelog'}>{DOCS ? site.hero.secondary : site.nav.changelog}</a>
     </div>
   </div>
 

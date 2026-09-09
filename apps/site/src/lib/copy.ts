@@ -158,11 +158,17 @@ export const site = {
     own: {
       kicker: 'Your data',
       title: 'The record is a file you own.',
+      /* TWO SENTENCES CORRECTED AGAINST WHAT IS BUILT, both found by an audit of the live pages.
+         `a command-line tool that already ships with your computer` is false on Windows, which has
+         no `sqlite3`, and this is the paragraph a Windows reader reads to decide whether their data
+         is theirs. And `one signed file` is not built yet: `BACKLOG.md` records that a `.dog`
+         carries no signature. A promise about leaving is the one promise on a page like this that
+         has to be exactly true, because it is the promise somebody checks on the way out. */
       body:
-        'A record is one SQLite file, which a command-line tool that already ships with your ' +
-        'computer can read. Export is one signed file with every row, every declaration and every ' +
-        'event in it, not a CSV per table with the relationships thrown away. Self-hosting runs the ' +
-        'same packages from the same file, so leaving is a copy rather than a migration.',
+        'A record is one SQLite file, in the format every operating system has a free reader for. ' +
+        'Export is one file with every row, every declaration and every event in it, not a CSV per ' +
+        'table with the relationships thrown away. Self-hosting runs the same packages from the ' +
+        'same file, so leaving is a copy rather than a migration.',
     },
   },
 
@@ -182,8 +188,13 @@ export const site = {
     self: {
       name: 'Self-hosted',
       price: 'Free',
-      unit: 'and complete',
-      body: 'Every feature, no seat count, no key to phone home for. Apache-2.0.',
+      /* `and yours to run` AND IT SAID `and complete`, with `Every feature` under it. It is not
+         complete: a running self-host cannot open its own vault, which `BACKLOG.md` records, so the
+         one claim on this card that a reader could act on and find untrue was the word `complete`.
+         The rest of the card is true, and `no seat count, no key to phone home for` is the thing
+         somebody choosing this plan actually wants to know. */
+      unit: 'and yours to run',
+      body: 'No seat count, no key to phone home for. Apache-2.0.',
       points: [
         'One process, one file, one port',
         'The same registers, pages and rules',
@@ -241,27 +252,37 @@ export const site = {
         ],
       },
       {
-        title: 'Open source',
-        links: [
-          { label: 'Source', href: 'https://github.com/actuallyhoss/braindog' },
-          { label: 'The design, in full', href: 'https://github.com/actuallyhoss/braindog/tree/master/docs' },
-          { label: 'Licence', href: 'https://www.apache.org/licenses/LICENSE-2.0' },
-        ],
+        /* THE TWO DEAD LINKS ARE GONE AND THE HEADING IS NOT A PROMISE ANY MORE. `Source` and
+           `The design, in full` both 404 while the repository is private, in a footer column headed
+           *Open source*: three claims, two of them uncheckable, on every page of the site. The
+           licence is the one that is true today and it is what the column now says. */
+        title: 'Licence',
+        links: [{ label: 'Apache-2.0', href: 'https://www.apache.org/licenses/LICENSE-2.0' }],
       },
     ],
   },
 } as const;
 
 /**
- * The three addresses, in one place, because between them they appear a dozen times.
+ * The addresses, in one place, because between them they appear a dozen times.
  *
- * `SOURCE` and `DOCS` were `github.com/braindog/braindog` on a branch called `main`. That
- * organisation is a stranger's repository called *teste*, and this repository's branch is `master`,
- * so every Source and Design link on the site went somewhere that was either wrong or missing.
- * `DEPLOYMENT.md` names the real one: `actuallyhoss/BrainDog`.
+ * `SOURCE`, `DOCS` AND `BUILD` ARE `null` BECAUSE THE REPOSITORY IS PRIVATE, and a link that 404s
+ * is worse than an absent one on the page whose whole argument is that you can check things. An
+ * audit of the live site counted SEVEN rendered instances across four URLs, every one of them a
+ * 404 to a stranger, including the only outbound action in the pricing page's free plan and the
+ * only one in the changelog's status block. `BACKLOG.md` recorded five and missed those two.
+ *
+ * THEY WERE POINTING AT THE RIGHT REPOSITORY. An earlier fix corrected them from
+ * `github.com/braindog/braindog` on a branch called `main`, which is a stranger's repository called
+ * *teste*; the address is right and the repository is not readable. Nothing here can fix that:
+ * making it public is one setting and it is not this file's to change.
+ *
+ * `null` AND NOT A DIFFERENT URL, so every call site has to decide what to draw when there is no
+ * address, and the type makes it decide. A placeholder would have put the same dead link back
+ * through a variable.
  */
 export const APP = 'https://app.brain.dog';
-export const SOURCE = 'https://github.com/actuallyhoss/braindog';
-export const DOCS = 'https://github.com/actuallyhoss/braindog/tree/master/docs';
+export const SOURCE: string | null = null;
+export const DOCS: string | null = null;
 /** The build instructions, which is what a self-hoster is actually sent to. */
-export const BUILD = 'https://github.com/actuallyhoss/braindog/blob/master/BUILD.md';
+export const BUILD: string | null = null;

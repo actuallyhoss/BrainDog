@@ -17,6 +17,14 @@
 <svelte:head>
   <title>Pricing · BrainDog</title>
   <meta name="description" content={p.body} />
+  <!-- THE CANONICAL AND THE PREVIEW, from the same two sentences the page already has, so there is
+       one description per page rather than two that can disagree. The canonical matters because
+       `www` 301s here and a preview fetcher that followed the redirect would otherwise cite the
+       hostname it started from. -->
+  <link rel="canonical" href="https://brain.dog/pricing" />
+  <meta property="og:url" content="https://brain.dog/pricing" />
+  <meta property="og:title" content="Pricing · BrainDog" />
+  <meta property="og:description" content={p.body} />
 </svelte:head>
 
 <section class="head">
@@ -42,10 +50,22 @@
           <li><span class="tick" aria-hidden="true">✓</span>{point}</li>
         {/each}
       </ul>
-      <!-- The self-hosted card sends you to BUILD.md, which is the thing it says it is. It used to
-           send you to the whole `docs/` tree, which is fifty-four specification documents and not an
-           install. -->
-      <a class="btn" class:btn-primary={i === 1} href={i === 1 ? APP : BUILD}>{plan.cta}</a>
+      <!--
+        THE SELF-HOSTED CARD HAS NO ACTION WHILE THE REPOSITORY IS PRIVATE, and it had one that
+        answered 404. It sent you to `BUILD.md`, which is the thing it says it is and is not
+        readable, so the free plan this page recommends had no route into it at all: the only
+        outbound action on the card, dead, under the word Free.
+
+        AN ABSENT CONTROL AND NOT A DISABLED ONE. `19 §6`'s rule, applied to a marketing page: a
+        control that cannot act is absent rather than greyed, and a greyed button under a price is a
+        product telling you it does not want your business. The sentence above the cards already
+        says neither plan is open yet, which is what a reader needs and is true of both.
+      -->
+      {#if i === 1}
+        <a class="btn btn-primary" href={APP}>{plan.cta}</a>
+      {:else if BUILD}
+        <a class="btn" href={BUILD}>{plan.cta}</a>
+      {/if}
     </article>
   {/each}
 </section>

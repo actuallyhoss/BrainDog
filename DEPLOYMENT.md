@@ -52,6 +52,36 @@ an unknown path 404 rather than the shell, `www.brain.dog` 301 to the apex, `alp
 `wrangler.jsonc` holds both environments; `wrangler deploy --env alpha --dry-run` and
 `--env production --dry-run` are what check them without deploying.
 
+## What the zone does, beyond DNS
+
+Three settings that are not records and are not in any file here, so they are written down for the
+same reason the rest of this document exists.
+
+| Setting | Where | State | Why |
+|---|---|---|---|
+| **Always Use HTTPS** | SSL/TLS, Edge Certificates | **on**, set 2026-09-09 | `http://brain.dog` served the full page with a 200 and no redirect. Every origin in this zone is a Worker and none of them redirects, so there is no loop to cause. |
+| **www to apex** | Rules, Redirect Rules | on | `https://www.*` to `https://${1}`, 301, query string preserved. |
+| **Block AI Bots** | AI Crawl Control | **on**, and it is not this repository's to change | See below. |
+
+### Block AI Bots, and why it is left alone
+
+Cloudflare's managed `robots.txt` disallows Amazonbot, Applebot-Extended, Bytespider, CCBot,
+ClaudeBot, Claude-User, FacebookBot, Google-Extended, Google-CloudVertexBot, GPTBot and
+meta-externalagent, and it overrides the `robots.txt` this repository ships in
+`apps/site/static/`. That file is still worth having: it is what serves the day the managed one is
+switched off, and it carries the sitemap.
+
+**The split is defensible and one row of it is not.** Cloudflare separates AI Crawler, which is
+training and bulk collection, from AI Assistant, which is one person asking an assistant a question
+about your site. `ChatGPT-User` and `DuckAssistBot` are AI Assistant and are allowed;
+`Claude-User`, which is the same thing for the same reason, is filed under AI Crawler and is
+blocked. So a person asking ChatGPT what BrainDog is gets an answer and a person asking Claude does
+not, on the marketing site of a product whose argument is that your agents can read your record.
+
+It is one switch and it is a decision about training data as well as about assistants, which makes
+it the owner's rather than this repository's. The per-crawler toggles cannot be used while the
+zone-level setting is on: the dashboard says so in a tooltip on every row it governs.
+
 ## Why Workers Builds and not a GitHub Action
 
 **No API token passes through anybody.** Cloudflare's GitHub App builds from the repository and

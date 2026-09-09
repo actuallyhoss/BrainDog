@@ -1,0 +1,17 @@
+# BrainDog's own, and it replaces Cloudflare's managed default.
+#
+# THAT DEFAULT BLOCKED CLAUDEBOT, GPTBOT, GOOGLE-EXTENDED, APPLEBOT-EXTENDED, CCBOT,
+# META-EXTERNALAGENT, AMAZONBOT AND BYTESPIDER, and nobody here chose it: it is what the dashboard
+# switches on for a new zone. This product's entire argument is that your agents can read and write
+# your record, and its marketing site was telling the agents somebody would ask about it not to
+# read it. A person asking Claude "what is BrainDog" got nothing, from the one page written to
+# answer that question.
+#
+# THREE PAGES OF PROSE, NO ACCOUNT, NO DATA. There is nothing here to protect: the record app is a
+# different hostname, it is behind authentication, and it is not in this file's zone of concern.
+# `app.brain.dog` is deliberately absent from the sitemap below for that reason.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://brain.dog/sitemap.xml

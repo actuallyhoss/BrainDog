@@ -37,8 +37,13 @@
     <nav class="links" aria-label="Site">
       <a href="/pricing" aria-current={here('/pricing') ? 'page' : undefined}>{site.nav.pricing}</a>
       <a href="/changelog" aria-current={here('/changelog') ? 'page' : undefined}>{site.nav.changelog}</a>
-      <a href={DOCS}>{site.nav.docs}</a>
-      <a href={SOURCE}>{site.nav.source}</a>
+      <!-- `Design` AND `Source` ARE ABSENT WHILE THE REPOSITORY IS PRIVATE. They were two of the
+           four links in the header of every page and both 404. A link in a site's own navigation
+           that answers 404 is the loudest thing a site can say about how carefully it was made,
+           and this one appeared three times, on three pages, above a paragraph arguing that its
+           claims are checkable. They come back with the repository, from one constant. -->
+      {#if DOCS}<a href={DOCS}>{site.nav.docs}</a>{/if}
+      {#if SOURCE}<a href={SOURCE}>{site.nav.source}</a>{/if}
     </nav>
 
     <a class="cta" href={APP}>{site.nav.open}</a>

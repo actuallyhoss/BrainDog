@@ -335,7 +335,6 @@ export const copy = {
   noneChosen: 'None',
   yes: 'Yes',
   secretsLiveInTheVault: 'Keys and tokens go in the Vault. A row records what one opens.',
-  savedNothing: 'Nothing was saved yet.',
   /**
    * WHAT A LEVEL MEANS, IN ONE CELL. There were two: a chip printing the enum (`write`) and, three
    * inches away, a sentence collapsing three levels into two with a ternary — so S. Marchetti's row
