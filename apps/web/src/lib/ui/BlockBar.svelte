@@ -64,19 +64,30 @@
     {/if}
   </div>
 
+  <!--
+    ABSENT AT THE ENDS, NOT GREYED THERE.
+
+    These were the only disabled controls in the product carrying no explanation. `19 §6`'s rule is
+    that a control which cannot act is absent rather than greyed out, and every other disabled
+    control here points at a sentence saying why with `aria-describedby`. There is no sentence to
+    write for this one: "this block is already first" is a fact the reader can see, from the block's
+    position, which is the thing they are looking at.
+
+    A DISABLED CONTROL TELLS YOU A THING EXISTS AND REFUSES TO SAY WHY IT WILL NOT WORK, and at the
+    end of a list of three that is two grey buttons out of six on the screen. Absent, the bar has
+    the verbs that can act and nothing else.
+  -->
   <div class="moves">
-    <button type="button" class="icon-btn" disabled={at === 0} onclick={() => onmove(at - 1)} aria-label={copy.moveUp}>
-      <Icon name="arrowUp" size="s" />
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      disabled={at === count - 1}
-      onclick={() => onmove(at + 1)}
-      aria-label={copy.moveDown}
-    >
-      <Icon name="arrowDown" size="s" />
-    </button>
+    {#if at > 0}
+      <button type="button" class="icon-btn" onclick={() => onmove(at - 1)} aria-label={copy.moveUp}>
+        <Icon name="arrowUp" size="s" />
+      </button>
+    {/if}
+    {#if at < count - 1}
+      <button type="button" class="icon-btn" onclick={() => onmove(at + 1)} aria-label={copy.moveDown}>
+        <Icon name="arrowDown" size="s" />
+      </button>
+    {/if}
     <button type="button" class="icon-btn" onclick={onremove} aria-label={copy.removeBlock}>
       <Icon name="close" size="s" />
     </button>

@@ -73,7 +73,7 @@
    * declared type, so one `bind:this` per branch is nine places to forget — and the form is always
    * there, in document order, so its first focusable descendant IS the first field.
    */
-  let form = $state<HTMLFormElement | undefined>(undefined);
+  let form = $state<HTMLElement | undefined>(undefined);
   let placed = false;
 
   $effect(() => {
@@ -247,7 +247,22 @@
   });
 </script>
 
-<form class="row-form" bind:this={form} onsubmit={(e) => e.preventDefault()}>
+<!--
+  A `div` AND NOT A `form`, WHICH IS THE FIX FOR TWO THINGS AT ONCE.
+
+  IT WAS A `<form>` WITH `onsubmit={(e) => e.preventDefault()}`, and on the first-run screen it sat
+  INSIDE another `<form>`. Nested forms are invalid HTML: the parser closes the outer one at the
+  inner tag, and this survives only because `ssr = false` builds the DOM by script rather than by
+  the parser. It would have broken the moment anything server-rendered it.
+
+  AND IT SWALLOWED ENTER. `preventDefault` on submit means pressing Enter in any field of a new-row
+  sheet did nothing at all, with no feedback: the true silent no-op, and the one thing a person
+  types Enter for. A `div` has no submit to swallow, so the key reaches whichever screen owns the
+  control that acts on it, which is where the decision about what a row IS already lives.
+
+  The element is still the caret's anchor, which is the only thing the ref was ever for.
+-->
+<div class="row-form" bind:this={form}>
   {#each fields as f, i}
     <div class="row-field" data-type={f.type}>
       <!-- `for` ONLY WHERE THERE IS SOMETHING TO POINT AT. The segmented branch renders no element
@@ -336,7 +351,7 @@
       {copy.secretsLiveInTheVault}
     </p>
   {/if}
-</form>
+</div>
 
 <style>
   .row-form {

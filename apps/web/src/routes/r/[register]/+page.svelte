@@ -98,6 +98,8 @@
   /* WHAT THE FORM WOULD REFUSE, held here so the BUTTON can be disabled by it. Asking the form on
      click could only ever answer after the press. */
   let problems = $state<string[]>([]);
+  /** What the sheet's form holds, so the submit can put the row somewhere rather than describing it. */
+  let taken = $state<Fields>({});
   let displayOpen = $state(false);
   let bindOpen = $state(false);
 
@@ -536,6 +538,27 @@
    */
   const inherited = $derived(inheritedFrom(id, filters));
   const unanswered = $derived(unansweredBy(id, inherited));
+
+  /**
+   * The row the sheet was filled in with.
+   *
+   * IT CLOSED THE SHEET AND SAID `Nothing was saved yet.` AFTER THE SHEET WAS GONE, with no mention
+   * of what would have been written. A friction pass called it out as the one write control in the
+   * app using the bare string where forty others use the descriptive one, and it is the most
+   * expensive control on the screen to reach: a press, a dialog, a form, a submit.
+   *
+   * THE SAME PLACE THE CAPTURE LINE AND THE FIRST-RUN SCREEN PUT A ROW. Three surfaces in this
+   * product take a row from a person and none of them can write one yet; holding the answer in
+   * three different ways would be three things to change on the day one of them can.
+   */
+  function addTypedRow() {
+    if (problems.length > 0 || !decl) return;
+    const named = display(id, decl.title, taken[decl.title]) ?? '';
+    const seq = pending.add(id, taken);
+    receipt(seq, { mark: copy.markNotWritten, intent: 'warn', undo: () => pending.drop(id, seq) });
+    closeCreate();
+    toasts.push(copy.notWritten(`${decl.one} ${named}`.trim()), { intent: 'warn' });
+  }
 
   function captureRow() {
     const said = capture.trim();
@@ -1927,7 +1950,22 @@
   <Sheet bind:open={createOpen} onclose={closeCreate} title="{copy.newRow} {decl.one}">
     <!-- No `autofocus` here: `Sheet` puts the caret in the first field after `showModal()`, which is
          the only moment it can, and it does it for every sheet that carries one. -->
-    <RowForm register={id} bind:problems />
+    <!--
+      `form` HERE, AND NOT INSIDE `RowForm`. The control that decides what a row IS belongs to the
+      screen that owns the row, and the screen that owns it is the one that can put it somewhere.
+      `RowForm` used to be a `<form>` with `preventDefault` on submit, which swallowed Enter in
+      every field of every new-row sheet in the product: the one key a person presses when they have
+      finished typing, answered by nothing at all.
+    -->
+    <form
+      id="new-row"
+      onsubmit={(e) => {
+        e.preventDefault();
+        addTypedRow();
+      }}
+    >
+      <RowForm register={id} bind:problems bind:taken />
+    </form>
     {#snippet footer()}
       <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED, which is `/decide`'s answer to the same
            question and was not this one's. The button was live with every required field empty and
@@ -1939,10 +1977,7 @@
         weight="primary"
         disabled={problems.length > 0}
         aria-describedby={problems.length > 0 ? 'new-row-why' : undefined}
-        onclick={() => {
-          closeCreate();
-          toasts.push(copy.savedNothing, { intent: 'warn' });
-        }}
+        onclick={addTypedRow}
       >
         {copy.addRow} {decl.one}
       </Button>

@@ -909,6 +909,14 @@
     white-space: nowrap;
   }
 
+  /* THE POINTER SAYS SO ONLY WHERE A PRESS DOES SOMETHING. `Table` draws `data-acts` on a cell whose
+     row has an `onactivate`, which is the register grid and a saved view; a declared page supplies
+     none, so every cell of every table on `/p/*` used to answer a click by calling nothing. The
+     handlers are gone from those and this is the half a reader sees before pressing. */
+  .td[data-acts] {
+    cursor: pointer;
+  }
+
   [data-align='end'] {
     text-align: end;
     font-variant-numeric: tabular-nums;

@@ -244,6 +244,24 @@
           >
             {#each columns as column, c}
               {@const value = row.cells[c] ?? null}
+              <!--
+                THE HANDLERS ARE THERE ONLY WHERE THERE IS SOMETHING TO ACTIVATE, and they used to be
+                unconditional. The card branch above records the same defect and fixes its own half:
+                `onactivate` is supplied by two call sites, the register grid and a saved view, and a
+                declared page passes none, so every cell of every table on `/p/*` carried a click
+                handler and an Enter handler that called nothing. A cell that answers a press by
+                doing nothing is indistinguishable from a broken one, which is the rule this whole
+                product is built on.
+
+                THE ROVING `tabindex` STAYS EITHER WAY, and that is not an inconsistency. It is what
+                makes a grid navigable for READING: a composite widget with one tab stop, arrow keys
+                inside it, and a caret a screen reader can follow along a row. A table you cannot put
+                the caret in is a table a keyboard cannot read, which is a bigger loss than a cell
+                that is focusable and has nothing to do.
+
+                `data-acts` IS FOR THE POINTER. Without it the cursor is the only thing left saying a
+                cell can be pressed, and it was saying it everywhere.
+              -->
               <span
                 class="td"
                 role="gridcell"
@@ -251,8 +269,9 @@
                 data-align={column.align ?? 'start'}
                 data-truncate={column.truncate ?? 'end'}
                 data-lead={c === lead ? '' : undefined}
-                onclick={() => onactivate?.(row)}
-                onkeydown={(e) => e.key === 'Enter' && onactivate?.(row)}
+                data-acts={onactivate ? '' : undefined}
+                onclick={onactivate ? () => onactivate(row) : undefined}
+                onkeydown={onactivate ? (e) => e.key === 'Enter' && onactivate(row) : undefined}
               >
                 <!-- IN THE FIRST CELL, AND AT ITS HEAD.
 

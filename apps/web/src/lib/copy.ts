@@ -192,9 +192,20 @@ export const copy = {
   deferred: (on: string) => `Parked until ${on}. Nothing was saved yet.`,
   required: 'required',
   nothingToUndo: 'Nothing to undo.',
-  archived: (id: string) => `Archived ${id}.`,
-  restored: (id: string) => `Restored ${id}.`,
-  marked: (id: string, state: string) => `${id} is ${state}.`,
+  /**
+   * IT CLAIMED SUCCESS IN THE PAST TENSE FOR SOMETHING THAT DOES NOT PERSIST.
+   *
+   * `Archived tasks#9.` with an Undo beside it, and a reload brings the row back. A friction pass
+   * listed it under "things that lie", and it is the sharpest kind of lie this product can tell:
+   * every other write control in the app says `notWritten`, so a reader learns that this product
+   * tells them when nothing happened, and then meets the one that does not.
+   *
+   * THE ROW ITSELF NOW CARRIES THE RECEIPT, so the toast is the backup for a row that has scrolled
+   * away, and it says the same thing the chip says. The past tense goes with the claim.
+   */
+  archived: (id: string) => `${id} would be archived. Nothing was saved yet.`,
+  restored: (id: string) => `${id} is back. Nothing had been saved.`,
+  marked: (id: string, state: string) => `${id} would be ${state}. Nothing was saved yet.`,
   copied: (what: string) => `Copied ${what}.`,
   copyRefused: 'The browser would not give this page the clipboard.',
 
