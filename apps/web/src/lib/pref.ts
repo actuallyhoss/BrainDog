@@ -112,6 +112,21 @@ export type Pref = {
    * store that is left. One key, named here rather than added quietly.
    */
   defined?: string[] | undefined;
+  /**
+   * Whether the bar saying this is a sample record has been put away.
+   *
+   * A STRANGER LANDED ON SOMEBODY ELSE'S COMPANY WITH NO EXPLANATION. The app boots into a complete
+   * synthetic business, which is the right decision: an empty product demonstrates nothing, and
+   * `loop/REWORK.md` records that the sample is the most nearly finished part of the onboarding.
+   * What was missing was the sentence saying so and the way out of it. Without them the first
+   * screen reads as a product that has decided who you are.
+   *
+   * A DISMISSAL AND NOT A TIMER. `19 §3` puts dismissals in the set that must survive a change of
+   * device and this cookie is per device, which is the same honest deviation every other key here
+   * carries. The bar is put away once, by the person, and it is the record's own emptiness that
+   * takes it away for good.
+   */
+  sampleSaid?: boolean | undefined;
 };
 
 const NAME = 'bd_pref';

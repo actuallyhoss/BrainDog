@@ -82,6 +82,27 @@
 
   let railOff = $state(pref.read().sidebar === false);
 
+  /**
+   * The bar saying this is a sample record, and the way out of it.
+   *
+   * A STRANGER LANDED ON SOMEBODY ELSE'S COMPANY WITH NO EXPLANATION. Booting into a complete
+   * synthetic business is the right decision, because an empty product demonstrates nothing: the
+   * missing half was the sentence saying what it is. Without it the first screen reads as a product
+   * that has already decided who you are, which `loop/REWORK.md` names as the single largest piece
+   * of the onboarding friction.
+   *
+   * IT GOES AWAY WHEN THE RECORD IS SOMEBODY'S. Every record this build can open is the sample, so
+   * the test is the dismissal and not a property of the data. When a real record can be opened the
+   * test becomes whether this one is it, and the bar disappears on its own for everybody who has
+   * one, which is the state that needs no dismissal at all.
+   */
+  let sampleSaid = $state(pref.read().sampleSaid === true);
+
+  function putSampleAway() {
+    sampleSaid = true;
+    pref.write({ sampleSaid: true });
+  }
+
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */
   function toggleRail() {
@@ -223,6 +244,21 @@
     </div>
 
     <main id="main" class="body">
+      <!-- ABOVE THE SCREEN AND INSIDE THE SCROLLER, so it is the first thing read and the first
+           thing to leave when the reader scrolls. A fixed strip across the top of every screen is a
+           permanent tax on the height of every screen, and this is a sentence somebody reads once. -->
+      {#if !sampleSaid}
+        <aside class="sample" role="note">
+          <p class="sample-said">
+            <strong>{copy.sampleWhat}</strong>
+            {copy.sampleWhy}
+          </p>
+          <span class="sample-acts">
+            <a class="sample-go" href="/start">{copy.sampleStart}</a>
+            <button type="button" class="sample-away" onclick={putSampleAway}>{copy.samplePutAway}</button>
+          </span>
+        </aside>
+      {/if}
       {@render children()}
     </main>
   </div>
@@ -470,6 +506,66 @@
 
   .rail-back button:hover {
     background: var(--s2);
+    color: var(--ink);
+  }
+
+  /* THE SAMPLE BAR. A note, not an alarm: nothing is wrong and nothing is urgent, and the day it
+     looks like an error is the day it gets dismissed unread. It is the same treatment the register
+     screen gives what the record noticed, for the same reason. */
+  .sample {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3) var(--sp-5);
+    align-items: baseline;
+    justify-content: space-between;
+    margin: var(--sp-5) var(--sp-6) 0;
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .sample-said {
+    flex: 1 1 32ch;
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 1.55;
+  }
+
+  .sample-said strong {
+    color: var(--ink);
+  }
+
+  .sample-acts {
+    display: inline-flex;
+    gap: var(--sp-3);
+    align-items: center;
+  }
+
+  .sample-go {
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--accent);
+    border: 1px solid var(--accent-edge);
+    border-radius: var(--r-sm);
+    color: var(--accent-ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .sample-away {
+    padding: var(--sp-2) var(--sp-3);
+    background: none;
+    border: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .sample-away:hover {
     color: var(--ink);
   }
 

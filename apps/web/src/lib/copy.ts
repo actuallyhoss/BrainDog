@@ -187,6 +187,30 @@ export const copy = {
   copied: (what: string) => `Copied ${what}.`,
   copyRefused: 'The browser would not give this page the clipboard.',
 
+  /* The chip on a row that has just been acted on. One word, in the past tense, so the row says
+     what happened to it where the row is rather than in a toast at the other end of the screen. */
+  /* The bar over a sample record. It says what the record is, and where the way out is: a stranger
+     landing on somebody else's company with no explanation is the first screen this product had. */
+  sampleWhat: 'This is a sample record.',
+  sampleWhy: 'A whole small business, made up, so you can see what a record holds before you have one. Nothing here is yours and nothing you do to it is saved.',
+  sampleStart: 'Start your own',
+  samplePutAway: 'Put this away',
+
+  rowActions: 'What you can do here',
+  markArchived: 'Archived',
+  markNotWritten: 'Not saved',
+  undoRow: 'Put back',
+  undoRowOf: (row: string) => `Put ${row} back`,
+  archiveRow: (row: string) => `Archive ${row}`,
+  moreOn: (row: string) => `More on ${row}`,
+
+  /* The capture line: one field at the top of a register, and the only decision in it is the words. */
+  captureIn: (one: string) => `Add a ${one.toLowerCase()}`,
+  captureHint: 'Press Enter to add it. Everything else can wait.',
+  captureInherits: (what: string) => `Takes ${what} from the filter you are looking at.`,
+  captureAdd: 'Add',
+  captureNeeds: (fields: string) => `This register also needs ${fields}, so it opens the full form.`,
+
   /* home */
   needsYou: 'What needs you',
   sinceAway: 'Since you were away',

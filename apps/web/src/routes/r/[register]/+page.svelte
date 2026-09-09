@@ -17,7 +17,7 @@
   import { onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { MISSING } from 'braindog-render';
+  import { MISSING, type Tone } from 'braindog-render';
   import { Table } from 'braindog-render/svelte';
   import { declaredValue } from '$lib/record/where.ts';
   import { copy } from '$lib/copy.ts';
@@ -25,9 +25,9 @@
   import * as pref from '$lib/pref.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, labelOf, list, noticed, PAGE, PAGES, readableFields, REGISTERS, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, labelOf, list, noticed, NOW, PAGE, PAGES, readableFields, REGISTERS, toRows, type Filter, whereOf } from '$lib/record/api.ts';
   import { searchable } from '$lib/record/find.ts';
-  import type { Entry } from '$lib/record/schema.ts';
+  import type { Entry, Fields } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -44,6 +44,7 @@
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
+  import Chip from '$lib/ui/Chip.svelte';
 
 
   const id = $derived(page.params.register ?? '');
@@ -152,16 +153,76 @@
   const columns = $derived([
     { field: 'select', label: copy.select, hideLabel: true, width: '3ch', align: 'start' as const, truncate: 'never' as const },
     ...columnsFor(id).filter((c) => !hidden.has(c.field)),
+    /**
+     * THE VERBS, AND THE RECEIPT, IN THE ROW.
+     *
+     * EVERY FREQUENT VERB WAS BEHIND A MODAL. The editing path was `Sheet` wrapping `RowForm`,
+     * opened from the register page, and in the record this product is modelled on **61% of what a
+     * person does to a row could not be done where the row is drawn** before the equivalent change
+     * was made there. That one choice is most of what makes this screen read as enterprise
+     * software: the list is a place you look things up from and go somewhere else to act.
+     *
+     * ONE COLUMN, TWO STATES. A row that has just been acted on shows what happened and the way
+     * back; every other row shows the verbs. They cannot both be true of one row, so they share a
+     * cell rather than competing for the width of two.
+     *
+     * `hideLabel`, because the header of a column of controls is not a heading, and `truncate:
+     * 'never'`, because a truncated verb is a different verb.
+     */
+    { field: 'act', label: copy.rowActions, hideLabel: true, width: '11ch', align: 'end' as const, truncate: 'never' as const },
   ]);
   /**
-   * Archived rows, in the mock-up, held in the page rather than in the record.
+   * WHAT JUST HAPPENED TO A ROW, DRAWN WHERE THE ROW WAS.
    *
-   * A destructive action here is UNDONE, never confirmed. A confirmation dialog asks its question
-   * before anything has happened, when the reader knows the least they ever will about it, and the
-   * answer is always yes — which is why people stop reading them. Ten seconds of undo, with the row
-   * named in the past tense, gives back the one thing a dialog cannot.
+   * IT WAS A SET OF ARCHIVED SEQUENCES AND THE ROW LEFT THE SCREEN. That is the single change with
+   * the most evidence behind it in `loop/REWORK.md`: of eighty-five human writes over thirteen days
+   * in the record this product is modelled on, **thirteen reversed the write immediately before
+   * them, and twelve of those landed inside five seconds**, across four different verbs. They had
+   * one cause. The row vanished, so the only way to check you had hit the right one was to do the
+   * opposite and look.
+   *
+   * A ROW IN THIS MAP IS DRAWN WHERE IT ALREADY WAS, whatever its state now is, wearing a chip that
+   * says what happened and offering the inverse. It stays until the QUESTION changes, because the
+   * next question is a new screen and a receipt for a row that is no longer in the answer is a row
+   * the reader did not ask for.
+   *
+   * A DESTRUCTIVE ACTION IS UNDONE, NEVER CONFIRMED. A confirmation dialog asks its question before
+   * anything has happened, when the reader knows the least they ever will about it, and the answer
+   * is always yes, which is why people stop reading them. The receipt gives back the one thing a
+   * dialog cannot: the row, named in the past tense, still where it was.
    */
-  let archived = $state(new Set<number>());
+  type Receipt = {
+    /** One or two words in the past tense. `Archived`, `Restored`, `Undone`. */
+    mark: string;
+    /* `Tone` FROM THE RENDERER, not a fifth vocabulary written here. `13 §5.1` is that meaning may
+       not live in styling alone, and `Chip` enforces it: there is no way to draw a tone in this
+       app without its glyph, so the word and the glyph carry the meaning and the hue agrees. */
+    intent?: Tone | undefined;
+    /** The inverse. Absent when there is nothing to put back, which a receipt still records. */
+    undo?: () => void;
+  };
+  let receipts = $state(new Map<number, Receipt>());
+
+  /**
+   * Rows added on this screen, in front of the answer.
+   *
+   * NOTHING IS WRITTEN, AND THE ROW SAYS SO. The record is not behind this screen yet, so the row
+   * is drawn where it will be, wearing `warn` and the words, rather than a toast that says one
+   * thing while the list says another. The moment a write path exists this becomes an optimistic
+   * write and the chip becomes the receipt for it: the shape does not change, only what it is
+   * waiting on.
+   */
+  let drafts = $state<Entry[]>([]);
+  let draftSeq = 0;
+
+  const receipt = (seq: number, r: Receipt) => {
+    receipts = new Map(receipts).set(seq, r);
+  };
+  const clearReceipt = (seq: number) => {
+    const next = new Map(receipts);
+    next.delete(seq);
+    receipts = next;
+  };
 
   /**
    * THE ANSWER, ONE PAGE AT A TIME — `13 §4.3`, and the mechanism that was missing.
@@ -194,6 +255,10 @@
     const first = list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE });
     pages = [first.entries];
     cursor = first.cursor;
+    /* AND THE RECEIPTS GO WITH THE ANSWER THEY WERE ABOUT. A chip saying `archived` beside a row
+       the reader has just filtered TO is a chip about a different screen: the receipt exists to
+       hold a row in place through one action, not to follow it around the product. */
+    receipts = new Map();
   });
 
   /**
@@ -261,8 +326,12 @@
     /* THE ROWS IN HAND, not the whole answer. `matched` is the answer's SIZE — what the head counts
        against, and what "38 rows, none matching" is about. What the head PRINTS while paging is
        `drawn`, the rows actually on screen; the two were conflated and the head over-reported. */
-    entries: pages.flat().filter((e) => !archived.has(e.seq)),
-    matched: found.entries.filter((e) => !archived.has(e.seq)).length,
+    /* AND A ROW THAT JUST CHANGED IS STILL HERE. This filtered archived rows OUT, so the row left
+       the screen the instant it was touched and the reader's only way to check they had hit the
+       right one was to do the opposite and look. `receipts` is what keeps it: the row is drawn
+       where it was, wearing what happened to it, until the question changes. */
+    entries: [...drafts, ...pages.flat()],
+    matched: found.entries.length + drafts.length,
   });
   /**
    * THE ROWS IN HAND, WHICH IS NOT THE ROWS FETCHED.
@@ -399,15 +468,102 @@
     return [copy.aToZ, copy.zToA];
   };
 
+  /**
+   * Archive one row: no dialog, and the row does not move.
+   *
+   * THE TOAST IS NOT THE RECEIPT. It was, and a toast is at the wrong end of the screen from the
+   * thing it is about, gone in ten seconds, and stacked three deep after three archives. The chip
+   * is ON THE ROW, next to what the row says, for as long as the reader is looking at this answer.
+   * The toast stays for the archive done from the keyboard with the row off screen.
+   */
   function archive(seq: number) {
-    archived = new Set([...archived, seq]);
-    toasts.push(copy.archived(`${id}#${seq}`), {
+    receipt(seq, { mark: copy.markArchived, undo: () => clearReceipt(seq) });
+    toasts.push(copy.archived(`${id}#${seq}`), { undo: () => clearReceipt(seq) });
+  }
+
+  /* ── capture: one line, first on the page, with no decisions attached ────── */
+
+  /**
+   * ADD A ROW BY TYPING ITS NAME AND PRESSING ENTER.
+   *
+   * THE ONLY WAY IN WAS A MODAL ASKING FOR EVERY DECLARED FIELD, up front. In the record this
+   * product is modelled on, twenty-five of eighty-five writes over thirteen days were adds, and the
+   * add used to be the fifth thing down the page at roughly y=1400 of a 3416px document. Moving it
+   * to one line at the top, with the submit control inside the field and only present once there is
+   * something to add, is the change that made those twenty-five cheap.
+   *
+   * WHAT IT DOES NOT ASK. Everything the filter already says. Looking at `?f=state:is:open` means
+   * the answer to "what state" is on screen, and asking again is asking a person to repeat
+   * themselves to a machine that heard them. Everything else is left unset for an agent or a person
+   * to fill in later, which is what a record with a shape is for.
+   */
+  let capture = $state('');
+
+  /**
+   * What the filter answers on the reader's behalf: every `is` chip on a field this register
+   * declares.
+   *
+   * `is` AND NOTHING ELSE. `state is open` names one value and inheriting it is unambiguous;
+   * `due before +30d` and `state in [open, late]` name a SET, and picking a member of a set for
+   * somebody is guessing at the one moment they have not said.
+   */
+  const inherited = $derived.by(() => {
+    const out: Fields = {};
+    for (const f of filters) {
+      if (f.op !== 'is') continue;
+      const field = decl?.fields.find((x) => x.id === f.field);
+      if (!field || field.id === decl?.title) continue;
+      /* ONE VALUE, and `is` is the operator that has exactly one. `values` is a list because `in`
+         needs one; reading `values[0]` off any other operator would be picking a member of a set
+         for somebody at the one moment they have not said which. */
+      const only = f.values.length === 1 ? f.values[0] : undefined;
+      if (only === undefined) continue;
+      const said = declaredValue(id, f.field, only);
+      if (said !== null && said !== undefined) out[f.field] = said;
+    }
+    return out;
+  });
+
+  /**
+   * Required fields the line cannot answer, so it says so rather than writing a row that is short.
+   *
+   * A CAPTURE LINE THAT SILENTLY DROPPED A REQUIRED FIELD would be the shape this repository keeps
+   * finding: a control that reports success and leaves the record in a state the declaration
+   * refuses. When there is one, Enter opens the full form instead, which is where those fields are.
+   */
+  const unanswered = $derived(
+    (decl?.fields ?? []).filter(
+      (f) => f.required && f.id !== decl?.title && !(f.id in inherited),
+    ),
+  );
+
+  function captureRow() {
+    const said = capture.trim();
+    if (!said) return;
+    if (unanswered.length > 0) {
+      createOpen = true;
+      return;
+    }
+    /* NEGATIVE SEQUENCES, so a draft can never collide with a row the record has. The spoken id is
+       what every other thing on this screen addresses a row by, and two rows answering to
+       `obligations#7` is the one collision that would make the receipt point at the wrong row. */
+    const title = decl?.title;
+    if (!title) return;
+    draftSeq -= 1;
+    const seq = draftSeq;
+    drafts = [
+      { seq, version: 1, created: new Date(NOW).toISOString(), by: 'you', fields: { ...inherited, [title]: said } },
+      ...drafts,
+    ];
+    receipt(seq, {
+      mark: copy.markNotWritten,
+      intent: 'warn',
       undo: () => {
-        const next = new Set(archived);
-        next.delete(seq);
-        archived = next;
+        drafts = drafts.filter((d) => d.seq !== seq);
+        clearReceipt(seq);
       },
     });
+    capture = '';
   }
 
   const copyId = (seq: number) => clipboard.putSpoken(id, seq);
@@ -819,7 +975,9 @@
 
   function archiveSelected() {
     const seqs = picked.map((e) => e.seq);
-    archived = new Set([...archived, ...seqs]);
+    const next = new Map(receipts);
+    for (const seq of seqs) next.set(seq, { mark: copy.markArchived });
+    receipts = next;
     selected = new Set();
     /* ONE ROW IS NOT "1 obligations". The register declares both spellings — `name` for the list
        and `one` for a row of it — and this read only the first, so every single-row bulk archive
@@ -830,9 +988,9 @@
       ),
       {
         undo: () => {
-          const next = new Set(archived);
-          for (const seq of seqs) next.delete(seq);
-          archived = next;
+          const back = new Map(receipts);
+          for (const seq of seqs) back.delete(seq);
+          receipts = back;
           selected = new Set(seqs);
         },
       },
@@ -1034,6 +1192,58 @@
       </aside>
     {/if}
 
+    <!--
+      CAPTURE, FIRST ON THE PAGE.
+
+      IT WAS A MODAL BEHIND A BUTTON, asking for every declared field. The add is the most frequent
+      write a person makes to a list and it was the most expensive one on this screen: a press, a
+      dialog, a form, a submit, a dismissal. This is a press and a return key.
+
+      THE SUBMIT CONTROL IS INSIDE THE FIELD AND ONLY EXISTS ONCE THERE IS SOMETHING TO ADD, which
+      is the one place a button of this kind is not clutter: it appears exactly when it can do
+      something, so it is never a control a reader has to learn to ignore.
+
+      `form` AND `type="submit"` RATHER THAN A KEYDOWN HANDLER, because Enter in a single-field form
+      is the platform's own behaviour and a phone's keyboard prints "Go" for it without being asked.
+    -->
+    {#if !arriving}
+      <form
+        class="capture"
+        onsubmit={(e) => {
+          e.preventDefault();
+          captureRow();
+        }}
+      >
+        <label class="capture-label" for="capture">{copy.captureIn(decl.one)}</label>
+        <div class="capture-field">
+          <input
+            id="capture"
+            class="capture-input"
+            type="text"
+            autocomplete="off"
+            bind:value={capture}
+            placeholder={copy.captureIn(decl.one)}
+            aria-describedby="capture-why"
+          />
+          <!-- Present only once there is something to add. -->
+          {#if capture.trim()}<button type="submit" class="capture-go">{copy.captureAdd}</button>{/if}
+        </div>
+        <p class="capture-why" id="capture-why">
+          {#if unanswered.length > 0}
+            {copy.captureNeeds(unanswered.map((f) => labelOf(f).toLowerCase()).join(', '))}
+          {:else if Object.keys(inherited).length > 0}
+            {copy.captureInherits(
+              Object.keys(inherited)
+                .map((f) => labelOf(decl.fields.find((x) => x.id === f)!).toLowerCase())
+                .join(' and '),
+            )}
+          {:else}
+            {copy.captureHint}
+          {/if}
+        </p>
+      </form>
+    {/if}
+
     {#if rows.length === 0}
       <!-- THE QUERY IS QUOTED VERBATIM, in its own line and in the id face, rather than folded into
            the title as a curly-quoted fragment of a sentence. That is where a predicate stops being
@@ -1204,6 +1414,57 @@
               >
                 {#if selected.has(seq)}<Icon name="check" size="s" />{/if}
               </button>
+            {:else if column.field === 'act'}
+              <!--
+                THE ROW'S OWN VERBS, AND ITS RECEIPT, IN THE CELL THE ROW ALREADY HAS.
+
+                `tabindex="-1"` ON EVERY CONTROL, like the picker two cells over and for the same
+                reason: a grid is a composite widget with exactly one tab stop, so at five hundred
+                rows a focusable control per row is fifteen hundred tab stops. The keyboard path is
+                the one the `?` sheet already advertises and this is the pointer path.
+
+                `stopPropagation` ON EVERY ONE, because the cell activates the row: without it,
+                archiving a row opened it on the way out.
+              -->
+              {@const said = receipts.get(seq)}
+              {@const name = display(id, decl.title, entry(id, seq)?.fields[decl.title]) ?? `#${seq}`}
+              {#if said}
+                <span class="said">
+                  <Chip label={said.mark} tone={said.intent} />
+                  {#if said.undo}
+                    <button
+                      type="button"
+                      class="verb"
+                      tabindex="-1"
+                      aria-label={copy.undoRowOf(name)}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        said.undo?.();
+                      }}>{copy.undoRow}</button>
+                  {/if}
+                </span>
+              {:else}
+                <span class="verbs">
+                  <button
+                    type="button"
+                    class="verb icon"
+                    tabindex="-1"
+                    aria-label={copy.archiveRow(name)}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      archive(seq);
+                    }}><Icon name="archive" size="s" /></button>
+                  <button
+                    type="button"
+                    class="verb icon"
+                    tabindex="-1"
+                    aria-label={copy.moreOn(name)}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      openCardMenu(seq, e.currentTarget);
+                    }}><Icon name="more" size="s" /></button>
+                </span>
+              {/if}
             {:else if ident}
               <IdentityMark identity={ident} />
             {:else if value === null}
@@ -1645,6 +1906,112 @@
 
   /* The pointer's way in. It is `tabindex="-1"` — a grid has one tab stop — so it never takes focus
      and never needs a focus ring; the keyboard path is `x`, which the `?` sheet advertises. */
+  /* ── capture, and the verbs on the row ────────────────────────────────── */
+
+  /* ONE LINE, AND IT LOOKS LIKE ONE. The label is for a screen reader and for nobody else: the
+     field's own placeholder says the same words, and a visible label above a single-field form
+     turns one line into three. */
+  .capture {
+    margin: 0 0 var(--sp-4);
+  }
+
+  .capture-label {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .capture-field {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding-inline: var(--sp-4);
+    background: var(--s1);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+  }
+
+  /* THE RING IS ON THE BOX AND NOT ON THE INPUT, because the submit control is inside the box: a
+     ring around the text alone would draw a line between the field and its own button. It is the
+     same move `/search` makes for the same reason. */
+  .capture-field:focus-within {
+    border-color: var(--accent);
+  }
+
+  .capture-input {
+    flex: 1;
+    min-inline-size: 0;
+    padding-block: var(--sp-3);
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+  }
+
+  .capture-input:focus-visible {
+    /* focus-ok: the caret indicates focus, and `.capture-field:focus-within` above carries the
+       state change for the box the reader actually sees. */
+    outline: none;
+  }
+
+  .capture-go {
+    padding: 2px var(--sp-3);
+    background: var(--accent);
+    border: 1px solid var(--accent-edge);
+    border-radius: var(--r-sm);
+    color: var(--accent-ink);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .capture-why {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    line-height: 1.5;
+  }
+
+  /* THE VERBS ARE QUIET UNTIL THE ROW IS. A column of controls at full contrast on every row of a
+     list is a column that competes with the data for the reader's eye, and the data is what they
+     came for. They come up on hover and on keyboard focus, and they are always in the accessibility
+     tree, so nothing is hidden from anybody who is not using a pointer. */
+  .verbs,
+  .said {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    justify-content: flex-end;
+  }
+
+  .verb {
+    padding: 1px var(--sp-2);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    cursor: pointer;
+  }
+
+  .verb.icon {
+    display: grid;
+    place-items: center;
+    padding: 2px;
+    opacity: 0.45;
+  }
+
+  .verb:hover,
+  .verb:focus-visible {
+    border-color: var(--edge);
+    color: var(--ink);
+    opacity: 1;
+  }
+
   .pick {
     display: grid;
     place-items: center;
