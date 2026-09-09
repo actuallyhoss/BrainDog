@@ -1,0 +1,5 @@
+code:   MATCH_OP_UNSUPPORTED
+via:    where
+raises: packages/where/src/index.ts
+at:     what
+fix:    Use an operator this field's type supports.

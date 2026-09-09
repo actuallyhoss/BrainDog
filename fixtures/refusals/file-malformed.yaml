@@ -1,0 +1,5 @@
+code:   FILE_MALFORMED
+via:    import
+raises: packages/kernel/src/dogl.ts
+at:     record
+fix:    Re-export it from the record it came from.

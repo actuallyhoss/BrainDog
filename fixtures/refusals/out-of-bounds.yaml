@@ -1,0 +1,5 @@
+code:   OUT_OF_BOUNDS
+via:    write
+raises: packages/kernel/src/index.ts
+at:     fields.amount
+fix:    Send a value between the declared bounds.

@@ -1,0 +1,5 @@
+code:   ENUM_VALUE_UNKNOWN
+via:    write
+raises: packages/kernel/src/index.ts
+at:     fields.state
+fix:    Send one of the values the enum declares.

@@ -415,6 +415,16 @@ const byteLength = (text: string): number => new TextEncoder().encode(text).leng
 export type Known = ReadonlyMap<string, Record<string, Json>>;
 
 /**
+ * Which pack declared each declaration, or `null` for the record's own.
+ *
+ * SEPARATE FROM `Known` BECAUSE IT IS A DIFFERENT FACT. `Known` is what a declaration SAYS, read
+ * out of its body; this is who PUT IT THERE, which lives in a column and not in the body — a pack
+ * cannot claim ownership of a register by writing a key into it, which is the whole reason the
+ * column exists.
+ */
+export type Owners = ReadonlyMap<string, string | null>;
+
+/**
  * A page declaration, checked against `06 §1.1` and `42 §4.5`.
  *
  * NOTHING CHECKED ONE, and a page is the declaration with the most ways to be quietly wrong,
@@ -1093,9 +1103,42 @@ function patternFault(node: unknown, id: string): Refusal | null {
  * the table with its condition deleted — and the diff cannot print `SPAWNS` for it, so the one screen
  * the whole trust model rests on would say nothing about the rule that fills the record.
  */
-function createFault(id: string, action: { create?: unknown }, register: unknown, installed?: Known): Refusal | null {
+function createFault(
+  id: string,
+  action: { create?: unknown },
+  register: unknown,
+  installed?: Known,
+  owners?: Owners,
+  ownPack?: string | null,
+): Refusal | null {
   const spec = action.create as { register?: unknown; each?: unknown; bound?: unknown } | undefined;
   if (spec === undefined || spec === null || typeof spec !== 'object') return null;
+
+  /**
+   * `04 §5`'s THIRD CREATE CODE, WHICH HAD NO EMITTER ANYWHERE.
+   *
+   * *"A `create` into a register another pack owns — `rule.x writes register.invoices, declared by
+   * freelancer-uk. A pack generates only into its own registers"*. The registry listed the code, the
+   * table specified it, `30 §6` counted it, and nothing in this tree could raise it: a pack a
+   * stranger wrote could declare a rule that generated rows into a register belonging to a pack the
+   * record already trusted, and the install diff would show `SPAWNS` against somebody else's data.
+   *
+   * TWO NAMED PACKS THAT DIFFER, AND NOTHING ELSE. A rule the record itself declared has no pack and
+   * is refused nothing — it is the record's own record. A pack creating into a register NOBODY owns
+   * is the harder case and is deliberately allowed here: `04 §5`'s sentence reads "only into its own
+   * registers", which would refuse a pack writing into the user's own register, and that is a
+   * compatibility decision with a cost rather than a bug with a fix. It is in the backlog under its
+   * own line rather than settled quietly by whoever wrote this check.
+   */
+  if (typeof spec.register === 'string' && ownPack != null && owners) {
+    const theirs = owners.get(`register.${spec.register}`);
+    if (theirs != null && theirs !== ownPack)
+      return bad(
+        'CREATE_FOREIGN_REGISTER',
+        `${id} writes register.${spec.register}, declared by ${theirs}. A pack generates only into its own registers.`,
+        'register',
+      );
+  }
 
   if (spec.bound === undefined)
     return bad('CREATE_UNBOUNDED', `${id}: create has no bound. A generator with no ceiling fills the record.`, 'bound');
@@ -1139,7 +1182,7 @@ function createFault(id: string, action: { create?: unknown }, register: unknown
  * rather than about one — a page's registers and a `create`'s axes — and a caller with no view of the
  * record must get the same answer it always got rather than a refusal it cannot act on.
  */
-export function validate(decl: Declaration, installed?: Known): Refusal | null {
+export function validate(decl: Declaration, installed?: Known, owners?: Owners): Refusal | null {
   /* `KIND_UNKNOWN` IS THE CODE `04 §5` GIVES THIS, and it was emitted by nothing while this line
      answered `DECLARATION_INVALID`. A registry entry no source file produces is a code a caller
      cannot handle and a fixture nobody can write — which is the whole subject of `30 §6`. */
@@ -1192,7 +1235,7 @@ export function validate(decl: Declaration, installed?: Known): Refusal | null {
           );
       }
       if ('create' in action) {
-        const unbounded = createFault(decl.id, action, (decl.body as { register?: unknown }).register, installed);
+        const unbounded = createFault(decl.id, action, (decl.body as { register?: unknown }).register, installed, owners, decl.pack ?? null);
         if (unbounded) return unbounded;
       }
     }
@@ -1376,7 +1419,7 @@ export async function installDeclarations(
   batch: readonly Declaration[],
   transaction: <T>(fn: () => T) => T,
 ): Promise<Result<Installed[]>> {
-  const staged = await stageDeclarations(batch, knownTo(sql, batch));
+  const staged = await stageDeclarations(batch, knownTo(sql, batch), ownersTo(sql, batch));
   /* PASSED THROUGH WHOLE. Rebuilding the envelope by hand dropped whichever arm the rebuild did
      not know about, and there are three of them now. */
   if (!staged.ok) return staged;
@@ -1395,6 +1438,20 @@ export async function installDeclarations(
  * a read of what is there, not part of the write, and putting it inside would make a caller that
  * opened its own transaction unable to join.
  */
+/** Who declared what, from the column rather than from the body — see `Owners`. */
+function ownersTo(sql: Sql, batch: readonly Declaration[]): Owners {
+  const owners = new Map<string, string | null>();
+  for (const row of sql.all<{ id: string; pack_id: string | null }>(
+    'SELECT id, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0',
+  ))
+    owners.set(row.id, row.pack_id);
+  /* THE BATCH OVERLAYS THE TABLE, exactly as `knownTo` does — a pack installing a register and a
+     rule that writes into it in one call must not refuse itself because the register is not in the
+     table yet. */
+  for (const decl of batch) owners.set(decl.id, decl.pack ?? null);
+  return owners;
+}
+
 function knownTo(sql: Sql, batch: readonly Declaration[]): Known {
   const known = new Map<string, Record<string, Json>>();
   for (const row of sql.all<{ id: string; body: string }>(
@@ -1423,9 +1480,10 @@ function knownTo(sql: Sql, batch: readonly Declaration[]): Known {
 export async function stageDeclarations(
   batch: readonly Declaration[],
   known?: Known,
+  owners?: Owners,
 ): Promise<Result<(sql: Sql, now: number, transaction: <T>(fn: () => T) => T) => Result<Installed[]>>> {
   for (const decl of batch) {
-    const wrong = validate(decl, known);
+    const wrong = validate(decl, known, owners);
     if (wrong) return { ok: false, refusal: wrong };
   }
   const sums = await Promise.all(batch.map((d) => digest(jcs(d.body))));

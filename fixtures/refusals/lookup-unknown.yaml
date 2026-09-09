@@ -1,0 +1,5 @@
+code:   LOOKUP_UNKNOWN
+via:    rpc
+raises: packages/kernel/src/metrics.ts
+at:     value
+fix:    Fix the name of the factor table.

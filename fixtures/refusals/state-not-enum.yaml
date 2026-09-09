@@ -1,0 +1,5 @@
+code:   STATE_NOT_ENUM
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     state
+fix:    Declare state as an enum.

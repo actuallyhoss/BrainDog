@@ -1,0 +1,5 @@
+code:   EXTRACTOR_UNKNOWN
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     extract
+fix:    Use one of the thirteen extractor forms.

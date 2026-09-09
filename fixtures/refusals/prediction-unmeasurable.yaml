@@ -1,0 +1,5 @@
+code:   PREDICTION_UNMEASURABLE
+via:    rpc
+raises: packages/kernel/src/govern.ts
+at:     body.prediction.measure
+fix:    Name something this record already measures.

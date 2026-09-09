@@ -41,6 +41,14 @@ export function apply(accent: string | null): { ok: true } | { ok: false; refusa
   if (accent === null) {
     if (sheet) sheet.replaceSync('');
     pref.write({ theme: undefined });
+    /* AND THE ATTRIBUTE GOES WITH THE PREFERENCE. `app.html` stamps `data-theme` before first paint
+       so there is no flash of the wrong palette, and putting the house colour back cleared the
+       sheet and the cookie and left the attribute standing — so the document said
+       `data-theme="#2F6F4E"` while `--accent` was the house red and the cookie held no theme at
+       all. Nothing reads it today, which is the whole reason it survived; `house.css` matches
+       `html[data-theme='hc']` for the high-contrast palette, so the day that becomes reachable a
+       stale accent in this attribute is a reader's contrast setting silently overwritten. */
+    document.documentElement.removeAttribute('data-theme');
     return { ok: true };
   }
 
@@ -53,6 +61,7 @@ export function apply(accent: string | null): { ok: true } | { ok: false; refusa
     return { ok: true };
   }
 
+  document.documentElement.setAttribute('data-theme', accent);
   sheet ??= new CSSStyleSheet();
   sheet.replaceSync(built.value.css);
   if (!document.adoptedStyleSheets.includes(sheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];

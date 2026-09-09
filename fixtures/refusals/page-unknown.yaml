@@ -1,0 +1,5 @@
+code:   PAGE_UNKNOWN
+via:    rpc
+raises: packages/kernel/src/pages.ts
+at:     slug
+fix:    Open one of the slugs this record declares.

@@ -1,0 +1,5 @@
+code:   FORBIDDEN
+via:    rpc
+raises: packages/kernel/src/token.ts
+at:     authorization
+fix:    Use a credential that reaches this method.

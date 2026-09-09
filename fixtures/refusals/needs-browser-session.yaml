@@ -1,0 +1,5 @@
+code:   NEEDS_BROWSER_SESSION
+via:    rpc
+raises: packages/record/src/index.ts
+at:     principal
+fix:    Open this from the app.

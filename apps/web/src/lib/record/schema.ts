@@ -616,7 +616,12 @@ export type Device = {
    *
    * A reader who cannot see `approved` presses the button twice.
    */
-  state: 'pending' | 'approved' | 'active' | 'expired' | 'denied' | 'revoked';
+  /* `locked` IS NOT `denied`, AND THE DIFFERENCE IS WHOSE DECISION IT WAS. A row that runs out of
+     wrong codes is closed by the record, not refused by a person; filing it as `denied` made the
+     screen say "you said no" about a request nobody had answered. Four mistyped digits are a typo,
+     and the record asserting a decision the reader never made is the worst thing this table can do
+     (`12 §6.1`). */
+  state: 'pending' | 'approved' | 'active' | 'expired' | 'denied' | 'locked' | 'revoked';
   /**
    * WHAT APPROVING IT WOULD ALLOW — `device_grant.reach`, one of `30 §6`'s six.
    *

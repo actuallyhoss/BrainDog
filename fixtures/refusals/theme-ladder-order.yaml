@@ -1,0 +1,5 @@
+code:   THEME_LADDER_ORDER
+via:    install
+raises: packages/theme/src/checks.ts
+at:     roles.dark.surface
+fix:    Order the surface ladder one way.

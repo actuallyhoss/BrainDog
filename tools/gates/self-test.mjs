@@ -92,6 +92,13 @@ const CASES = [
      token*, not *findings the gate made*, and conflating them is how a fixture ends up asserting a
      number that means something else. */
   { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1 },
+
+  /* TWO CODES NAMED IN ONE SOURCE FILE AND ONE OF THEM FIXTURED, and the seeded violation is the
+     second — which is the rule that matters, because a code the tree already hands to callers with
+     no fixture is the enumeration rotting in the direction that costs something. The file names two
+     codes on purpose: a gate counting fixtures rather than finding gaps would report zero or two
+     here, and only "one" is the right answer. */
+  { gate: 'refusal-fixtures', expect: /and has no fixture/, findings: 1 },
   /* ONE, and the fixture holds two flags so the count means something: one declared and never
      read, one declared and read. A gate that reported both would be counting flags rather than
      finding dead ones. */

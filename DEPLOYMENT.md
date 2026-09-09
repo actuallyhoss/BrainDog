@@ -7,8 +7,8 @@ the answer lived in a dashboard, and a dashboard is not reviewable.
 
 | Host | What runs there | Deployed by | State |
 |---|---|---|---|
-| **`alpha.brain.dog`** | `apps/worker` with `apps/web`'s `build/` as its asset directory, built as **BrainDog Alpha** | Cloudflare Workers Builds, on every push to `master` | live |
-| **`app.brain.dog`** | the same two, built as production | not wired yet — deliberately | not live |
+| **`alpha.brain.dog`** | `apps/worker` with `apps/web`'s `build/` as its asset directory, built as **BrainDog Alpha** | Cloudflare Workers Builds `braindog-alpha`, on every push to `master` | live |
+| **`app.brain.dog`** | the same two, built as production | Cloudflare Workers Builds `braindog-production`, on every push to `release` | live |
 | **`brain.dog`** | `apps/site`, the marketing site | not wired yet | not live |
 
 `wrangler.jsonc` holds both environments; `wrangler deploy --env alpha --dry-run` and
@@ -68,11 +68,27 @@ The API answering `{"ok":false,"refusal":{"code":"UNAUTHORIZED","fix":"…"}}` w
 correct healthy answer: a refusal is a value, and one arriving over the wire with its `fix` sentence
 intact is the whole posture working end to end.
 
+## `braindog-production` — the settings, verbatim
+
+| Setting | Value |
+|---|---|
+| Repository | `actuallyhoss/BrainDog` |
+| Production branch | **`release`** |
+| Builds for non-production branches | **off** |
+| Root directory | `/apps/worker` |
+| Build command | `pnpm install --frozen-lockfile && pnpm --filter @braindog/web build` |
+| Deploy command | `npx wrangler deploy --env production` |
+
+**No `BRAINDOG_ENV`, and that absence is the setting.** Production is the absence of an environment
+rather than one of them — `env.ts` fails to production, so a build that loses its `define` renders
+the shipped product rather than a half-labelled alpha one, and there is nothing here to lose.
+
+**A production deploy is a merge somebody makes**, not a push they forgot was a push: `release` only
+moves forward from a `master` that has been green, and nothing else can reach it — non-production
+branch builds are off, so a branch cannot take the hostname.
+
 ## What is not automated, and should be
 
-- **Production has no trigger.** The intended shape is a `release` branch that only ever moves
-  forward from a green `master`, so a production deploy is a merge somebody makes rather than a
-  push somebody forgets is a push.
 - **The marketing site has no build project**, and `apps/site/wrangler.jsonc` is ready for one.
 - **Nothing in CI runs `wrangler deploy --dry-run`**, so a binding removed from `wrangler.jsonc`
   fails at deploy time rather than at pull-request time.

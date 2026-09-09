@@ -1,0 +1,5 @@
+code:   TEXT_JSON_QUOTED
+via:    write
+raises: packages/kernel/src/coerce.ts
+at:     fields.what
+fix:    Send the text itself, not the result of stringifying it.

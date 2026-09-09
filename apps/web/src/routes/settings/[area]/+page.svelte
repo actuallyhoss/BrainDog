@@ -75,6 +75,10 @@
     approved: 'good',
     expired: 'warn',
     denied: 'bad',
+    /* WARN AND NOT BAD, because nothing went wrong that anybody has to answer for. The request was
+       closed by the record after four mistyped codes; the machine asks again and it works. `bad` is
+       for a refusal somebody made. */
+    locked: 'warn',
   };
 
   /**
@@ -161,9 +165,37 @@
    * centring would scroll the list for no reason, which reads as the page moving under you.
    * `block: 'nearest'` keeps it from scrolling the PAGE to reach a strip that is already on screen.
    */
+  /**
+   * The areas whose controls are actually kept — measured, not assumed.
+   *
+   * A LIST AND NOT A PREDICATE, because there is nothing on an area to ask. `pref.ts` knows which
+   * KEYS persist and this file knows which area draws which control; the join between them lives
+   * nowhere, so it is written here, next to the sentence it decides. Three today. The day a fourth
+   * area writes a preference this is the line that has to change, and the sentence going stale is
+   * a sentence a reader can see is wrong, which is the failure that produced it.
+   */
+  const KEEPS = new Set(['appearance', 'keyboard', 'navigation']);
+
   let rail = $state<HTMLElement | undefined>(undefined);
 
+  /**
+   * AND IT RAN ONCE, WHICH IS THE BUG THE PARAGRAPH ABOVE SAYS IT FIXED.
+   *
+   * The effect read `rail` and nothing else. `rail` is a stable element reference, and SvelteKit
+   * does not remount `[area]/+page.svelte` when only the parameter changes — so this fired at mount
+   * and never again. Measured on the deployed build, phone width, tapping Billing → Export →
+   * Appearance → Ingest: `scrollLeft` 0, 0, 0, 0. Calling the same body by hand on the same page
+   * moved it 0 → 497, so `scrollIntoView` was never the problem; being called was. A direct load of
+   * `/settings/billing` scrolled correctly, which is exactly why this survived review — the one
+   * path a person tests by hand is the one path that was a mount.
+   *
+   * READING `area` IS THE FIX, and it has to be read INSIDE the effect: an effect tracks what it
+   * touches while it runs, and a value referenced only in the comment above it is not touched. It
+   * is otherwise unused here, which is why `void` says so out loud rather than leaving the next
+   * reader to delete a line that looks like nothing.
+   */
   $effect(() => {
+    void area;
     rail
       ?.querySelector('[aria-current="page"]')
       ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
@@ -341,6 +373,16 @@
         set: any colour that passes goes in, and one that does not says which floor it missed rather
         than being quietly approximated.
       -->
+      <!--
+        AND EVERY ONE OF THESE SAYS WHICH IS ON, to something that is not a stylesheet.
+
+        Fifteen buttons on this screen — six swatches and nine segments — carried `data-on` and no
+        `aria-pressed`. Measured on the deployed build: `aria-pressed` was `null` on all fifteen,
+        so a screen reader heard "Light button, System button, Dark button" and could not tell
+        which one the record was in. `13 §5.1` is that the meaning cannot live in the styling
+        alone, and the People matrix four hundred lines down cites that rule and gets it right —
+        which is the tell: the fix was known here, written down here, and applied to one group.
+      -->
       <Section title={copy.accentTitle}>
         <p class="hint">{copy.accentHint}</p>
         <div class="swatches" role="group" aria-label={copy.accentTitle}>
@@ -348,6 +390,7 @@
             <button
               type="button"
               class="swatch"
+              aria-pressed={accent === a.hex}
               data-on={accent === a.hex ? '' : undefined}
               style="--swatch:{a.hex}"
               aria-label={a.name}
@@ -356,7 +399,13 @@
               {#if accent === a.hex}<Icon name="check" size="s" />{/if}
             </button>
           {/each}
-          <button type="button" class="swatch swatch-off" data-on={accent === null ? '' : undefined} onclick={() => pickAccent(null)}>
+          <button
+            type="button"
+            class="swatch swatch-off"
+            aria-pressed={accent === null}
+            data-on={accent === null ? '' : undefined}
+            onclick={() => pickAccent(null)}
+          >
             {copy.accentHouse}
           </button>
         </div>
@@ -366,7 +415,7 @@
       <Section title={copy.scheme}>
         <div class="segment" role="group" aria-label={copy.scheme}>
           {#each [['light', copy.schemeLight, 'sun'], ['system', copy.schemeSystem, 'monitor'], ['dark', copy.schemeDark, 'moon']] as const as [v, label, icon]}
-            <button type="button" class="seg" data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}>
+            <button type="button" class="seg" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}>
               <Icon name={icon} size="s" />
               {label}
             </button>
@@ -380,6 +429,7 @@
             <button
               type="button"
               class="seg"
+              aria-pressed={text === v}
               data-on={text === v ? '' : undefined}
               onclick={() => ((text = v), set('text', v))}>{label}</button
             >
@@ -393,6 +443,7 @@
             <button
               type="button"
               class="seg"
+              aria-pressed={density === v}
               data-on={density === v ? '' : undefined}
               onclick={() => ((density = v), set('density', v))}>{label}</button
             >
@@ -408,8 +459,8 @@
              effect nobody states is a switch nobody turns on deliberately. -->
         <p class="hint">{copy.characterKeysHint}</p>
         <div class="segment" role="group" aria-label={copy.characterKeys}>
-          <button type="button" class="seg" data-on={chars ? '' : undefined} onclick={() => (chars = true)}>{copy.on}</button>
-          <button type="button" class="seg" data-on={!chars ? '' : undefined} onclick={() => (chars = false)}>{copy.off}</button>
+          <button type="button" class="seg" aria-pressed={chars} data-on={chars ? '' : undefined} onclick={() => (chars = true)}>{copy.on}</button>
+          <button type="button" class="seg" aria-pressed={!chars} data-on={!chars ? '' : undefined} onclick={() => (chars = false)}>{copy.off}</button>
         </div>
       </Section>
     {:else if area === 'navigation'}
@@ -429,8 +480,8 @@
       <Section title={copy.suggestPages}>
         <p class="hint">{copy.suggestPagesHint}</p>
         <div class="segment" role="group" aria-label={copy.suggestPages}>
-          <button type="button" class="seg" data-on={suggestPages ? '' : undefined} onclick={() => (suggestPages = true)}>{copy.on}</button>
-          <button type="button" class="seg" data-on={!suggestPages ? '' : undefined} onclick={() => (suggestPages = false)}>{copy.off}</button>
+          <button type="button" class="seg" aria-pressed={suggestPages} data-on={suggestPages ? '' : undefined} onclick={() => (suggestPages = true)}>{copy.on}</button>
+          <button type="button" class="seg" aria-pressed={!suggestPages} data-on={!suggestPages ? '' : undefined} onclick={() => (suggestPages = false)}>{copy.off}</button>
         </div>
         <!-- `19 §3` and `29 §4` both say this belongs to the record and not to the device, and there
              is no table in `30 §1` that could hold it — `50 §10` owns the deviation. The screen says
@@ -1349,8 +1400,14 @@
     {/if}
 
     <!-- AND WITHOUT THE TALLY. "8 packs, 8 lists" welded a count nobody can act on to a sentence
-         about the build, on all twelve areas. Both numbers are on the screens that own them. -->
-    <p class="mock">{copy.mockNotice}</p>
+         about the build, on all twelve areas. Both numbers are on the screens that own them.
+
+         AND NOT THE SAME SENTENCE ON ALL TWELVE. Three areas have controls that really do persist —
+         appearance writes four preferences, keyboard one, navigation one, and every one of them
+         survives a reload — and this told their readers otherwise, four lines under a line saying
+         the opposite. A disclaimer that is false where it matters most does not protect the mock;
+         it teaches people to discount the half that works. -->
+    <p class="mock">{KEEPS.has(area) ? copy.mockNoticeSome : copy.mockNotice}</p>
   </div>
 </div>
 {/if}

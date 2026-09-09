@@ -1,0 +1,5 @@
+code:   WOULD_ORPHAN
+via:    install
+raises: packages/declare/src/index.ts
+at:     register.obligations
+fix:    Move the rows first.

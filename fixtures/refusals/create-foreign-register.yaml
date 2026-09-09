@@ -1,0 +1,5 @@
+code:   CREATE_FOREIGN_REGISTER
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     register
+fix:    Generate only into a register this pack declares.

@@ -1,0 +1,5 @@
+code:   MIXED_CURRENCY
+via:    rpc
+raises: packages/kernel/src/metrics.ts
+at:     amount
+fix:    Split the figure so each half holds one currency.

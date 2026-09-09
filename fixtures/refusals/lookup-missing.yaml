@@ -1,0 +1,5 @@
+code:   LOOKUP_MISSING
+via:    rpc
+raises: packages/kernel/src/metrics.ts
+at:     period
+fix:    Add a factor for the value the rows carry.

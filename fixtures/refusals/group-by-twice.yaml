@@ -1,0 +1,5 @@
+code:   GROUP_BY_TWICE
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     group_by
+fix:    Group by one field.

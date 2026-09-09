@@ -1,0 +1,5 @@
+code:   PATTERN_OVER_CAP
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     when
+fix:    Use 'matches', which searches the full-text index instead.

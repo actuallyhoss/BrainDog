@@ -813,6 +813,11 @@ export const copy = {
     /* `12 §6.1`: a denied row is KEPT. "I said no to a request I did not make" is the single most
        important line this table can produce. */
     denied: 'you said no',
+    /* AND THE ONE THAT USED TO BORROW THAT SENTENCE. A request closed because the code was mistyped
+       too many times is the record's decision and not the reader's, and it was filed as `denied` —
+       so four typos put "you said no" beside a request nobody had answered. The lockout is right and
+       stays; what it is called was wrong. */
+    locked: 'too many wrong codes',
     revoked: 'you disconnected it',
   } as Record<string, string>,
   overSurface: (surface: string) => `over ${surface}`,
@@ -1018,6 +1023,20 @@ export const copy = {
    * reader asked for. What they need is whether their typing survives.
    */
   mockNotice: 'Nothing you do here is saved yet.',
+  /**
+   * AND THE FOUR AREAS WHERE THAT SENTENCE IS FALSE.
+   *
+   * `mockNotice` was rendered outside the area branch, so it appeared on all twelve — including the
+   * three where every control genuinely persists. On `/settings/navigation` it sat four lines under
+   * `perDevice`'s *"This setting is remembered on this device"*: two sentences, one screen, one
+   * scroll, saying opposite things. Measured on the deployed build: accent, colour scheme, text
+   * size, density, character keys and page suggestions all write `bd_pref` and all survive a
+   * reload, under a footer telling the reader they do not.
+   *
+   * The one blanket disclaimer that exists to protect the mock had become the thing teaching people
+   * not to trust the half that works.
+   */
+  mockNoticeSome: 'The settings above are kept on this device. Nothing else here is saved yet.',
 } as const;
 
 export type Copy = typeof copy;

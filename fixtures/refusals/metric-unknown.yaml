@@ -1,0 +1,5 @@
+code:   METRIC_UNKNOWN
+via:    rpc
+raises: packages/kernel/src/pages.ts
+at:     metric
+fix:    Name a metric this record declares and may read.

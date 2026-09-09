@@ -1,0 +1,5 @@
+code:   REF_UNKNOWN
+via:    where
+raises: packages/where/src/sentence.ts
+at:     thing
+fix:    Write the row before the rule that names it.

@@ -1,0 +1,5 @@
+code:   DIALECT_ARITY
+via:    render
+raises: packages/render/src/parse.ts
+at:     blocks[0].rows[2]
+fix:    Give the row the cells its kind takes.

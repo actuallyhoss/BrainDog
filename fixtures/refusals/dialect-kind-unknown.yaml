@@ -1,0 +1,5 @@
+code:   DIALECT_KIND_UNKNOWN
+via:    render
+raises: packages/render/src/parse.ts
+at:     blocks[0].kind
+fix:    Name one of the sixteen kinds.

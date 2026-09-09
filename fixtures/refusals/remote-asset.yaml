@@ -1,0 +1,5 @@
+code:   REMOTE_ASSET
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     theme.brand.roles.dark.ink
+fix:    Set the token to a value and load nothing from elsewhere.

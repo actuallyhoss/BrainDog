@@ -1,0 +1,5 @@
+code:   CONTAINS_TOO_LONG
+via:    where
+raises: packages/where/src/index.ts
+at:     what
+fix:    Shorten the literal to forty bytes.

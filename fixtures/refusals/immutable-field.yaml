@@ -1,0 +1,5 @@
+code:   IMMUTABLE_FIELD
+via:    write
+raises: packages/kernel/src/index.ts
+at:     fields.ref
+fix:    Add a new field instead of changing this one.

@@ -1,0 +1,5 @@
+code:   SIGNATURE_INVALID
+via:    import
+raises: packages/kernel/src/dogl.ts
+at:     dog_sig.sig
+fix:    Re-export it from the record it came from.

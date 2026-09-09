@@ -1,0 +1,5 @@
+code:   METRIC_NEEDS_TARGET_OR_WINDOW
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     target
+fix:    Give the metric a target or a comparison window.

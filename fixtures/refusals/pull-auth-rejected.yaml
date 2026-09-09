@@ -1,0 +1,5 @@
+code:   PULL_AUTH_REJECTED
+via:    rpc
+raises: apps/web/src/lib/record/data.ts
+at:     credential
+fix:    Reconnect the credential.

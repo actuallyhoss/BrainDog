@@ -1,0 +1,5 @@
+code:   CONTRAST_FLOOR
+via:    install
+raises: packages/theme/src/checks.ts
+at:     roles.dark.ink
+fix:    Move the role further from the ground.

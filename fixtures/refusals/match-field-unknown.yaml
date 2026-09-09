@@ -1,0 +1,5 @@
+code:   MATCH_FIELD_UNKNOWN
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     match
+fix:    Match on from, to, subject, body, channel, state or ts.

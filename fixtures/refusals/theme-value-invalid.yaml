@@ -1,0 +1,5 @@
+code:   THEME_VALUE_INVALID
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     theme.brand.seed.accent
+fix:    Pick a colour with some chroma in it.

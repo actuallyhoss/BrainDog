@@ -1,0 +1,5 @@
+code:   DEVICE_CODE_TRIES
+via:    rpc
+raises: apps/web/src/lib/record/device.ts
+at:     user_code
+fix:    Ask the device to start again.

@@ -1,0 +1,5 @@
+code:   CREATE_UNBOUNDED
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     bound
+fix:    Give the create a bound.

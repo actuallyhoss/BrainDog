@@ -1,0 +1,5 @@
+code:   DEPENDENCY_UNRESOLVED
+via:    install
+raises: packages/kernel/src/declare.ts
+at:     requires
+fix:    Install the pack that declares it first.

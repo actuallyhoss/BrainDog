@@ -1,0 +1,5 @@
+code:   PULL_PROVIDER_UNAVAILABLE
+via:    rpc
+raises: apps/web/src/lib/record/data.ts
+at:     source
+fix:    Wait for the provider; it retries on its own.

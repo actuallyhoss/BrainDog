@@ -1,0 +1,5 @@
+code:   LEVEL_REQUIRED
+via:    rpc
+raises: packages/kernel/src/members.ts
+at:     level
+fix:    Make somebody else an owner first.

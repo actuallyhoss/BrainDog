@@ -9,8 +9,9 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -58,6 +59,13 @@ const GATES = [
      the refusal teaches, and it teaches from a code stable across versions. Beside `event-kinds`
      because it is the same shape over the corpus's other large vocabulary. */
   ['refusals', ['node', [join(here, 'refusals.mjs')]]],
+
+  /* AND THE OTHER HALF OF `30 §6`'s LAST PARAGRAPH: *"every `code` has a fixture that produces
+     it."* `refusals` counts which codes the tree emits and says 37 are emitted by nothing; this
+     holds the other 75 to a file each, keyed by the `via` that raises it — which is what turns that
+     37 from a search into a burn-down. Beside `refusals` because they are two halves of one
+     sentence. */
+  ['refusal-fixtures', ['node', [join(here, 'refusal-fixtures.mjs')]]],
   /* A FLAG IS A DECISION THAT HAS NOT BEEN TAKEN, and the failure it becomes is permanent
      branching. This asks six questions of the list, of which the load-bearing one is whether the
      flag is read at all — `dead-copy`'s own hole is that a statically-false `{#if}` counts as
@@ -88,6 +96,51 @@ const GATES = [
   ['layout', ['node', [join(here, 'layout.mjs')]]],
   ['a11y', ['node', [join(here, 'a11y.mjs')]]],
 ];
+
+/**
+ * A GATE FILE NOBODY REGISTERED IS A GATE NOBODY RUNS, and nothing said so.
+ *
+ * `52 §5.1` step 1 is *"list `tools/gates/*.mjs` minus `run.mjs`, `lib.mjs`, `self-test.mjs`"* and
+ * this file holds a hard-coded array instead — which is exactly the failure the `--except` comment
+ * below argues against, one level down: *"a workflow that names what it runs stops running the gate
+ * somebody adds tomorrow, silently and for ever."* Two gates were written and left unregistered in
+ * one week; both were caught by a person noticing, which is not a mechanism.
+ *
+ * IT IS NOT A DIRECTORY SCAN REPLACING THE ARRAY, and the array stays. It carries two things a scan
+ * cannot: the ORDER, which is load-bearing — `typecheck` first because a type error invalidates
+ * everything under it, `self-test` second because it is what makes the rest mean anything, the two
+ * browser gates last because they are nineteen minutes — and the entries that are not files in this
+ * directory at all, like `theme`, which runs `packages/skin/scripts/theme.mjs --check`.
+ *
+ * So the scan is the CHECK and not the source. Adding a gate is still a line in this file;
+ * forgetting the line is now loud, before a single gate has run.
+ *
+ * AND WHAT COUNTS AS A GATE IS DERIVED RATHER THAN LISTED. The first version of this held
+ * `['run.mjs', 'lib.mjs', 'self-test.mjs']` as a literal — `52 §5.1`'s own three — and reported
+ * `routes.mjs`, which is not a gate: it exports `routesOf` and `a11y` and `layout` both import it.
+ * A hand-written list of exceptions is the same defect as a hand-written list of gates, one line
+ * further down, so the rule is derived instead: **a file another file in this directory imports is
+ * a library, and the two runners are the two runners.** `routes.mjs` earns its exemption by being
+ * imported, and the day somebody adds a second shared helper it earns the same one for free.
+ */
+const RUNNERS = new Set(['run.mjs', 'self-test.mjs']);
+const here_files = readdirSync(here).filter((name) => name.endsWith('.mjs'));
+const imported = new Set(
+  here_files.flatMap((name) =>
+    [...readFileSync(join(here, name), 'utf8').matchAll(/from '\.\/([\w.-]+\.mjs)'/gu)].map((m) => m[1]),
+  ),
+);
+const registered = new Set(
+  GATES.flatMap(([, [, argv]]) => (Array.isArray(argv) ? argv.filter((a) => typeof a === 'string' && a.endsWith('.mjs')) : []))
+    .map((p) => basename(p)),
+);
+const unregistered = here_files.filter((name) => !RUNNERS.has(name) && !imported.has(name) && !registered.has(name));
+if (unregistered.length > 0) {
+  console.error(
+    `\n  ${unregistered.join(', ')} in tools/gates/ and in no GATES entry — a gate nobody registered is a gate nobody runs.`,
+  );
+  process.exit(1);
+}
 
 /**
  * Which of them this run is asking for — `52 §2`'s flags, less `--negative`.

@@ -1,0 +1,5 @@
+code:   SEARCH_FIELD_TYPE
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     amount
+fix:    Search a text, document, enum, url, email or list<text> field.

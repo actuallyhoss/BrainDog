@@ -1,0 +1,5 @@
+code:   UNAUTHORIZED
+via:    rpc
+raises: apps/selfhost/src/server.ts
+at:     authorization
+fix:    Send a credential this record knows.

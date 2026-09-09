@@ -1,0 +1,5 @@
+code:   GRANT_REVOKED
+via:    rpc
+raises: packages/kernel/src/vault.ts
+at:     id
+fix:    Bind a new grant.

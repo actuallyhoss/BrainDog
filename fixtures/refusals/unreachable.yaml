@@ -1,0 +1,5 @@
+code:   UNREACHABLE
+via:    rpc
+raises: packages/client/src/index.ts
+at:     base
+fix:    Check the network and the record's address.

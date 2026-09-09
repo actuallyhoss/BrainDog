@@ -1,0 +1,5 @@
+code:   PACK_MALFORMED
+via:    lint
+raises: packages/declare/src/index.ts
+at:     declarations
+fix:    Fix the file so it reads as one pack document.

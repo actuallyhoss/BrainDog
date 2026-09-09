@@ -1,0 +1,5 @@
+code:   FIELDS_OVER_CAP
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     fields
+fix:    Split the register, or drop the fields nobody reads.

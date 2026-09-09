@@ -742,17 +742,72 @@ test('A GENERATOR WITH NO CEILING IS REFUSED AT INSTALL, and again at run time',
     assert.equal((out as { refusal: { at?: string } }).refusal.at, at);
   }
 
-  // And a bound its own declared axes can exceed is wrong today rather than at the thousandth row.
+  /* AND A `create` WITH NO `bound:` AT ALL IS `CREATE_UNBOUNDED`, which is the code `04 §5`'s table
+     gives it. `42 §4` step 13 puts it on ABSENCE specifically, "before the generic missing-key
+     mapping" — so `bound: 0` and `bound: 501` above stay `OUT_OF_BOUNDS`, because a bound that is
+     present and unusable is a value outside a range and that is what that code says. */
+  const unbounded = EXPAND();
+  delete (unbounded.body as { then: { create: Record<string, unknown> }[] }).then[0]!.create.bound;
+  const none = await k.install([unbounded]);
+  assert.equal(none.ok, false);
+  assert.equal((none as { refusal: { code: string } }).refusal.code, 'CREATE_UNBOUNDED');
+  assert.match((none as { refusal: { fix: string } }).refusal.fix, /no ceiling fills the record/u);
+
+  const zero = EXPAND();
+  Object.assign((zero.body as { then: { create: Record<string, unknown> }[] }).then[0]!.create, { bound: 0 });
+  assert.equal(((await k.install([zero])) as { refusal: { code: string } }).refusal.code, 'OUT_OF_BOUNDS');
+
+  /* And a bound its own declared axes can exceed is wrong today rather than at the thousandth row.
+
+     UNDER `04 §5`'s OWN CODE AND ITS OWN SENTENCE. This asserted `OUT_OF_BOUNDS`'s wording, which
+     is the write path's code for a value outside a field's range — so the two correctly-coded
+     checks in `declare.ts` were shadowed by this one, and `CREATE_OVER_BOUND` was a code the
+     registry listed, a gate counted as emitted, and no caller could ever see. */
   const overrun = EXPAND();
   Object.assign((overrun.body as { then: { create: Record<string, unknown> }[] }).then[0]!.create, { each: ['season'], bound: 1 });
   const out = await k.install([overrun]);
   assert.equal(out.ok, false);
-  assert.match((out as { refusal: { fix: string } }).refusal.fix, /can make 2 rows/);
+  assert.equal((out as { refusal: { code: string } }).refusal.code, 'CREATE_OVER_BOUND');
+  assert.match((out as { refusal: { fix: string } }).refusal.fix, /season \(2\) = 2 exceeds bound 1/u);
 
   // A rule that creates and does not say once_per would run the generator on every write.
   const loose = EXPAND();
   delete (loose.body as Record<string, unknown>).once_per;
   assert.equal((await k.install([loose])).ok, false);
+  sql.close();
+});
+
+test('A PACK GENERATES ONLY INTO ITS OWN REGISTERS, and the code for that had no emitter anywhere', async () => {
+  /* `04 §5` names three create codes. `CREATE_UNBOUNDED` and `CREATE_OVER_BOUND` were raised under
+     the write path's `OUT_OF_BOUNDS`; `CREATE_FOREIGN_REGISTER` was raised by nothing at all — the
+     registry listed it, `30 §6` counted it, and a pack a stranger wrote could declare a rule that
+     generated rows into a register belonging to a pack the record already trusted. The install diff
+     would have shown `SPAWNS` against somebody else's data and named no owner.
+
+     OWNERSHIP IS THE COLUMN AND NOT THE BODY. A pack cannot claim a register by writing a key into
+     it, which is why `Owners` is read from `declaration.pack_id` rather than out of `Known`. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([{ ...STYLES, pack: 'studio' }, { ...SKUS, pack: 'studio' }])).ok);
+
+  const trespass = { ...EXPAND(), pack: 'somebody-else' };
+  const out = await k.install([trespass]);
+  assert.equal(out.ok, false, 'a rule from another pack generated into studio-owned rows');
+  assert.equal((out as { refusal: { code: string } }).refusal.code, 'CREATE_FOREIGN_REGISTER');
+  assert.equal((out as { refusal: { at?: string } }).refusal.at, 'register');
+  assert.match((out as { refusal: { fix: string } }).refusal.fix, /declared by studio/u);
+
+  // Its own pack is fine, which is the whole of what a pack is allowed to do.
+  assert.ok((await k.install([{ ...EXPAND(), pack: 'studio' }])).ok, 'a pack cannot write into itself');
+
+  /* AND A REGISTER NOBODY OWNS IS NOT ANOTHER PACK'S. `04 §5`'s sentence reads "only into its own
+     registers", which would also refuse this — a compatibility decision with a cost, and it is in
+     the backlog under its own line rather than settled quietly by whoever wrote the check. */
+  const plain = openSqlite();
+  const k2 = await openRecord(plain, fixedClock(NOW));
+  assert.ok((await k2.install([STYLES, SKUS])).ok);
+  assert.ok((await k2.install([{ ...EXPAND(), pack: 'somebody-else' }])).ok, 'an unowned register is refused');
+  plain.close();
   sql.close();
 });
 

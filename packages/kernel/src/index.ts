@@ -630,6 +630,26 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (!target)
         return { code: 'REGISTER_UNKNOWN', fix: `${id} creates rows in ${spec.register}, and there is no such register.`, at: 'register' };
 
+      /* `04 §5` HAS A CODE FOR THIS AND THIS DID NOT USE IT.
+         The table names three: `CREATE_UNBOUNDED` for a `create` with no `bound:`,
+         `CREATE_OVER_BOUND` for a declared cardinality past it, and `CREATE_FOREIGN_REGISTER`.
+         `declare.ts`'s `createFault` raises the first two under their own names, correctly — and
+         this function runs FIRST at install and refused the same two declarations as
+         `OUT_OF_BOUNDS`, which is the write path's code for a VALUE outside a field's range. So the
+         registry said the code was emitted, `createFault` said the code was emitted, and no caller
+         could ever have seen either of them: two correctly-coded checks shadowed by one that was
+         not, in the file that runs first.
+
+         AN ABSENT BOUND AND A BOUND OF `"lots"` ARE DIFFERENT FACTS. `42 §4` step 13 puts
+         `CREATE_UNBOUNDED` on absence, "before the generic missing-key mapping" — so a bound that
+         is present and unusable keeps `OUT_OF_BOUNDS`, which is what it is. */
+      if (spec.bound === undefined)
+        return {
+          code: 'CREATE_UNBOUNDED',
+          fix: `${id}: create has no bound. A generator with no ceiling fills the record.`,
+          at: 'bound',
+        };
+
       const bound = Math.floor(Number(spec.bound));
       if (!Number.isFinite(bound) || bound < 1 || bound > CREATE_CEILING)
         return {
@@ -646,6 +666,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const from = shape(rule.register);
       let cardinality = 1;
       let knowable = each.length > 0;
+      const counted: string[] = [];
       for (const field of each) {
         const kind = from?.fields[field] as { type?: string; values?: readonly string[] } | undefined;
         if (!kind)
@@ -663,13 +684,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
            A `list` HAS NO DECLARED LENGTH, and multiplying by zero for it turned the whole check
            off — including for `enum × list`, where half of it was knowable. Unknown means the
            check does not apply, not that the product is nothing. */
-        if (kind.values?.length) cardinality *= kind.values.length;
-        else knowable = false;
+        if (kind.values?.length) {
+          cardinality *= kind.values.length;
+          counted.push(`${field} (${kind.values.length})`);
+        } else knowable = false;
       }
       if (knowable && cardinality > bound)
         return {
-          code: 'OUT_OF_BOUNDS',
-          fix: `${id} can make ${cardinality} rows from what ${rule.register} declares, and its bound is ${bound}.`,
+          /* `04 §5`'s own code and its own sentence shape: *"sizes (8) × colours (12) = 96 exceeds
+             bound 60"*. This said `OUT_OF_BOUNDS` and read like a field range. */
+          code: 'CREATE_OVER_BOUND',
+          fix: `${id}: ${counted.join(' × ')} = ${cardinality} exceeds bound ${bound}.`,
           at: 'bound',
         };
     }

@@ -200,7 +200,10 @@ test('and a bound over a list axis is unchecked rather than checked against zero
     }),
   ]);
   assert.equal(enums.ok, false);
-  assert.match((enums as { refusal: { fix: string } }).refusal.fix, /can make 2 rows/);
+  /* `04 §5`'s code and its sentence — this asserted `OUT_OF_BOUNDS`'s wording, which shadowed
+     `CREATE_OVER_BOUND` everywhere it could have been raised. */
+  assert.equal((enums as { refusal: { code: string } }).refusal.code, 'CREATE_OVER_BOUND');
+  assert.match((enums as { refusal: { fix: string } }).refusal.fix, /season \(2\) = 2 exceeds bound 1/u);
   sql.close();
 });
 

@@ -1,0 +1,5 @@
+code:   INT_OUT_OF_RANGE
+via:    write
+raises: packages/kernel/src/coerce.ts
+at:     fields.count
+fix:    Send a whole number this record can hold exactly.

@@ -160,7 +160,10 @@ export function approve(rows: readonly Device[], typed: string, nowMs: number): 
 
   if (next.some((d) => d.state === 'pending' && d.tries >= CODE_TRIES))
     return {
-      rows: next.map((d) => (d.state === 'pending' ? { ...d, state: 'denied' } : d)),
+      /* `locked`, NOT `denied`. The lockout is correct and stays — a code a stranger can guess is a
+         code worth rate-limiting — but it is the RECORD closing the request, and filing it under the
+         state that means "a person refused this" made the screen assert a decision nobody took. */
+      rows: next.map((d) => (d.state === 'pending' ? { ...d, state: 'locked' } : d)),
       result: no('DEVICE_CODE_TRIES', 'Ask the device to start again.'),
     };
 

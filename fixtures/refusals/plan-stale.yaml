@@ -1,0 +1,5 @@
+code:   PLAN_STALE
+via:    rpc
+raises: packages/declare/src/index.ts
+at:     planHash
+fix:    Read the plan again.

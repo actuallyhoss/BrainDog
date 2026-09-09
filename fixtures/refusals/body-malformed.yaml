@@ -1,0 +1,5 @@
+code:   BODY_MALFORMED
+via:    rpc
+raises: packages/host/src/index.ts
+at:     body
+fix:    Send a JSON object as the body.

@@ -1,0 +1,5 @@
+code:   KIND_UNKNOWN
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     kind
+fix:    Name one of the eight kinds of declaration.

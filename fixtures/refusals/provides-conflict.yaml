@@ -1,0 +1,5 @@
+code:   PROVIDES_CONFLICT
+via:    install
+raises: packages/declare/src/index.ts
+at:     register.obligations
+fix:    Retire the other pack's declaration first.

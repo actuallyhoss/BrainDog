@@ -1,0 +1,5 @@
+code:   RECORD_UNAVAILABLE
+via:    rpc
+raises: apps/selfhost/src/server.ts
+at:     record
+fix:    Un-suspend an owner of this record.

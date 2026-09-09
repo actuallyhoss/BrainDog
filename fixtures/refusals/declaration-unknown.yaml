@@ -1,0 +1,5 @@
+code:   DECLARATION_UNKNOWN
+via:    rpc
+raises: packages/kernel/src/declare.ts
+at:     ids
+fix:    Name a declaration this record has installed.

@@ -1,0 +1,5 @@
+code:   TRANSITION_ILLEGAL
+via:    rpc
+raises: packages/kernel/src/govern.ts
+at:     status
+fix:    Reopen it first, or decide the one that is still open.

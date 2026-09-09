@@ -1,0 +1,5 @@
+code:   FIELD_TYPE_UNKNOWN
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     what
+fix:    Did you mean 'money'?

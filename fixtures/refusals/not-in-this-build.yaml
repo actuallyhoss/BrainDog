@@ -1,0 +1,5 @@
+code:   NOT_IN_THIS_BUILD
+via:    rpc
+raises: packages/kernel/src/metrics.ts
+at:     value
+fix:    Deploy a build that computes it.

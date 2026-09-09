@@ -1,0 +1,5 @@
+code:   CREATE_OVER_BOUND
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     bound
+fix:    Raise the bound, or cross fewer fields.

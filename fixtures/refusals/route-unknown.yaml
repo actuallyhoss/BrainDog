@@ -1,0 +1,5 @@
+code:   ROUTE_UNKNOWN
+via:    rpc
+raises: packages/host/src/index.ts
+at:     method
+fix:    Call one of the methods this record publishes.

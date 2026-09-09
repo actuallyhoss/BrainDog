@@ -1,0 +1,5 @@
+code:   SCHEMA_MISMATCH
+via:    import
+raises: packages/kernel/src/migrate.ts
+at:     migration[3]
+fix:    Restore the migration text and add a new migration instead.

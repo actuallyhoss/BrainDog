@@ -1,0 +1,5 @@
+code:   UNIQUE_VIOLATION
+via:    write
+raises: packages/kernel/src/index.ts
+at:     fields.ref
+fix:    Give the row a value nothing else holds.

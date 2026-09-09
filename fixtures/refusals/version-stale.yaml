@@ -1,0 +1,5 @@
+code:   VERSION_STALE
+via:    write
+raises: packages/declare/src/index.ts
+at:     version
+fix:    Read the row again and re-apply the change.

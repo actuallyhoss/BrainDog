@@ -150,7 +150,7 @@ test('a wrong guess volunteers no count, because the record does not send one', 
   assert.ok(!/\d/u.test(said), `the miss leaked a number the wire does not carry: ${said}`);
 });
 
-test('THE FIFTH WRONG CODE DENIES EVERY PENDING ROW, AND KEEPS THEM', () => {
+test('THE FIFTH WRONG CODE LOCKS EVERY PENDING ROW, AND KEEPS THEM', () => {
   let rows: Device[] = [waiting('dg_a', '314159'), waiting('dg_b', '271828')];
   let last = approve(rows, '000000', NOW);
   for (let i = 1; i < CODE_TRIES; i += 1) {
@@ -161,9 +161,14 @@ test('THE FIFTH WRONG CODE DENIES EVERY PENDING ROW, AND KEEPS THEM', () => {
   assert.equal(last.result.ok === false && last.result.refusal.code, 'DEVICE_CODE_TRIES');
   /* `49 §5.9` step 2.4 gives the fix verbatim. */
   assert.equal(last.result.ok === false && last.result.refusal.fix, 'Ask the device to start again.');
-  assert.deepEqual(last.rows.map((d) => d.state), ['denied', 'denied']);
-  /* `12 §6.1`: a denied row is KEPT. "I said no to a request I did not make" is the single most
-     important line this table can produce, and a row deleted at denial cannot produce it. */
+  /* `locked` AND NOT `denied`, and this test asserted the wrong word for the life of the feature.
+     The lockout is the RECORD closing the request after four mistyped codes; `denied` is a person
+     refusing one, and the screen renders that as "you said no". So four typos put a decision beside
+     a request nobody had answered — the exact failure `12 §6.1` is about, produced by the table
+     written to prevent it. */
+  assert.deepEqual(last.rows.map((d) => d.state), ['locked', 'locked']);
+  /* `12 §6.1`: the row is KEPT. "I said no to a request I did not make" is the single most
+     important line this table can produce, and a row deleted at the lockout cannot produce it. */
   assert.equal(last.rows.length, 2);
 });
 
@@ -172,7 +177,7 @@ test('and a sixth attempt after the denial finds nothing left to charge', () => 
   for (let i = 1; i < CODE_TRIES; i += 1) out = approve(out.rows, '000000', NOW);
   const after = approve(out.rows, '000000', NOW);
   assert.equal(after.result.ok === false && after.result.refusal.code, 'FORBIDDEN');
-  assert.deepEqual(after.rows.map((d) => d.state), ['denied'], 'a denied row went round again');
+  assert.deepEqual(after.rows.map((d) => d.state), ['locked'], 'a locked row went round again');
 });
 
 /* ── the right code ───────────────────────────────────────────────────────── */
@@ -245,14 +250,14 @@ test('and the boundary itself is decided, rather than left to whichever comparis
   assert.equal(approve([at(CODE_MINUTES * 60_000)], '314159', NOW).result.ok, false, 'it was still alive at its own expiry');
 });
 
-test('the expired rows are not swept into the denial', () => {
-  /* The fifth wrong code denies every PENDING row. A row that had already run out of time is not
+test('the expired rows are not swept into the lockout', () => {
+  /* The fifth wrong code locks every PENDING row. A row that had already run out of time is not
      pending and never was denied by anybody — `12 §6.1` keeps a denied row because it is the line
      *"I said no to a request I did not make"*, and a row nobody said no to must not carry it. */
   let out = approve([waiting('dg_a', '314159'), waiting('dg_b', '271828', { at: new Date(NOW - 20 * 60_000).toISOString() })], '000000', NOW);
   for (let i = 1; i < CODE_TRIES; i += 1) out = approve(out.rows, '000000', NOW);
   assert.equal(out.result.ok === false && out.result.refusal.code, 'DEVICE_CODE_TRIES');
-  assert.deepEqual(out.rows.map((d) => d.state), ['denied', 'expired']);
+  assert.deepEqual(out.rows.map((d) => d.state), ['locked', 'expired']);
 });
 
 test('every refusal says where it is about, which is the field somebody is looking at', () => {
