@@ -930,8 +930,13 @@ export const PAGES: Record<string, SeedPage> = {
         span: 12,
         source: 'register.obligations',
         where: 'direction is owed to me, state is open or part',
+        /* NO `#` COLUMN, AND THREE PAGE TABLES LED WITH ONE. Nine characters of spoken id, at the
+           head of a table whose question is who owes me and how much, repeated once per row: on a
+           page a friction pass measured at ninety-three numbers for a question needing two or
+           three, the id is the one column that answers none of it. It is what `y` copies, what the
+           row's own screen prints and what `/audit` leads with, which are the three places somebody
+           wants a number they can say out loud. A block on a page is not one of them. */
         columns: [
-          { field: 'seq', label: '#', width: '9ch', align: 'end' },
           { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
           { field: 'party', label: 'Party', width: 'minmax(12ch,20ch)' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
@@ -999,7 +1004,6 @@ export const PAGES: Record<string, SeedPage> = {
         source: 'register.obligations',
         where: 'direction is owed by me, state is open or part',
         columns: [
-          { field: 'seq', label: '#', width: '9ch', align: 'end' },
           { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
@@ -1288,7 +1292,6 @@ export const PAGES: Record<string, SeedPage> = {
            register-and-kind inside the reader, and a heading is not evaluated. */
         where: 'state is not done or dropped',
         columns: [
-          { field: 'seq', label: '#', width: '9ch', align: 'end' },
           { field: 'what', label: 'What', width: 'minmax(20ch,1fr)', link: true },
           { field: 'thing', label: 'Thing', width: 'minmax(10ch,16ch)' },
           { field: 'state', label: 'State', width: '12ch' },
