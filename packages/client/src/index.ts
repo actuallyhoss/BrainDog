@@ -34,6 +34,36 @@ export type ClientOptions = {
   fetch?: typeof globalThis.fetch;
 };
 
+/**
+ * The wire shapes, written here because this is the side that reads them.
+ *
+ * THEY ARE NOT IMPORTED FROM `@braindog/record`. `31 §2` gives this package two edges, `ports` and
+ * `host`, and the record is neither: the client sits above a route TABLE, which is a list of names,
+ * and the shapes behind those names are the contract it is asserting rather than a type it is
+ * borrowing. `apps/selfhost/test/client.test.ts` is where the two sides are held together, because
+ * only an app may name a runtime and the check needs a server to answer.
+ */
+
+/** `boot`, and `now` is the record's own instant. See `Boot` in `@braindog/record`. */
+export type Boot = {
+  registers: { id: string; name: string; count: number }[];
+  /** ISO 8601, UTC. What day the record thinks it is, which is not always what day the reader does. */
+  now: string;
+};
+
+/** `33 §4` line 356, six keys. `app` is `null` on a host that was not told what it is running. */
+export type Version = {
+  version: number;
+  format: number;
+  kernel: number;
+  primitives: number;
+  app: string | null;
+  spark: boolean;
+};
+
+/** One page of rows, with the keyset cursor that reaches the next one. */
+export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
+
 const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
 const NAMES = new Set(ROUTES.map((r) => r.name));
 
@@ -123,19 +153,42 @@ export function createClient(options: ClientOptions) {
 
   return {
     call,
-    boot: () => call<{ registers: { id: string; name: string; count: number }[] }>('boot'),
-    version: () => call<number>('version'),
+    boot: () => call<Boot>('boot'),
+    version: () => call<Version>('version'),
     schema: (register: string) => call<unknown>('schema', { register }),
     get: (register: string, seq: number) => call<unknown>('get', { register, seq }),
-    list: (args: { register: string; where?: unknown; limit?: number; cursor?: string | null }) =>
-      call<{ rows: unknown[]; matched: number; cursor: string | null }>('list', args as Record<string, unknown>),
+    list: (args: {
+      register: string;
+      where?: unknown;
+      limit?: number;
+      cursor?: string | null;
+      order?: { field: string; dir?: 'asc' | 'desc' }[];
+    }) => call<Page<unknown>>('list', args as Record<string, unknown>),
     search: (q: string, limit?: number) =>
-      call<{ register: string; seq: number | null; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }) }),
+      call<{ register: string; seq: number; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }) }),
     history: (register: string, seq: number) => call<unknown[]>('history', { register, seq }),
     create: (args: { register: string; fields: Record<string, unknown>; note?: string }) =>
       call<unknown>('create', args as Record<string, unknown>),
     update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) =>
       call<unknown>('update', args as Record<string, unknown>),
+
+    /* THE READ+ METHODS THE APP NEEDS AND HAD NO NAME FOR.
+       `call(name, args)` already reached all of these — it validates the name against the table and
+       picks the verb from it — so this was never a reachability gap, it was a typing one. A screen
+       written against `call('governance', { … })` gets no help with the argument name and no error
+       when the route is renamed, which is the whole reason the table is typed at all. */
+    pages: () => call<unknown[]>('pages'),
+    page: (slug: string) => call<unknown>('page', { slug }),
+    metric: (metric: string) => call<unknown>('metric', { metric }),
+    packs: () => call<unknown[]>('packs'),
+    governance: (args: { register?: string; id?: string; status?: string; limit?: number } = {}) =>
+      call<unknown>('governance', args as Record<string, unknown>),
+    members: () => call<unknown[]>('members'),
+    listTokens: () => call<unknown[]>('listTokens'),
+    listGrants: () => call<unknown[]>('listGrants'),
+    whoami: () => call<unknown>('whoami'),
+    planPack: (args: { doc: unknown; source?: { kind: string; ref?: string } }) =>
+      call<unknown>('planPack', args as Record<string, unknown>),
   };
 }
 

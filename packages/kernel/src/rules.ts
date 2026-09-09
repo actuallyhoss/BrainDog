@@ -599,7 +599,7 @@ export type DryRun = {
  * NO WRITES, and not merely that they are skipped: nothing here calls the write path at all, so
  * there is no path by which a preview becomes a change.
  */
-export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Result<DryRun> {
+export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW): Result<DryRun> {
   const schema = deps.schemaOf(candidate.register);
   if (!schema)
     return {
@@ -629,7 +629,12 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = 5000): Resu
   const rows = deps.sql.all<{ id: string }>(
     'SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY seq LIMIT ?',
     candidate.register,
-    Math.max(1, Math.floor(limit)),
+    /* CLAMPED AT BOTH ENDS, and it was clamped at one. `Math.max(1, …)` stopped a limit of zero and
+       let a limit of a billion through: the caller sends the rule AND the ceiling, and this loop
+       calls `deps.entry(id)` and `matches` per row on a single-threaded object. `applyRule` below
+       has taken `Math.min(…, MOST)` since it was written; this is the same clamp on the read half.
+       A preview of more rows than a person will read is not a preview. */
+    Math.min(Math.max(1, Math.floor(limit)), PREVIEW),
   );
 
   for (const { id } of rows) {
@@ -743,6 +748,15 @@ export type Applied = {
 /** One page of a bulk apply. Past it, run it again — a `while` nobody can stop is not a feature. */
 const PAGE = 200;
 const MOST = 1000;
+
+/**
+ * The most rows a preview reads, and its default: the same number, so the parameter narrows and
+ * never widens.
+ *
+ * HIGHER THAN `MOST` BECAUSE IT WRITES NOTHING. A preview's cost is one scan; an apply's cost is a
+ * scan and a write per match, and a notification per match after that.
+ */
+const PREVIEW = 5000;
 
 /**
  * Run one rule over the rows that are already there.

@@ -242,7 +242,11 @@ export function tools(api: RecordApi) {
       const boot = await api.boot(ctx);
       if (!boot.ok) return boot;
       const version = await api.version(ctx);
-      return { ok: true, value: { ...boot.value, version: version.ok ? version.value : null } };
+      /* `.version.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT and not a bare number. It
+         returned one, and this line spread the whole object under the key an agent reads as "what
+         changed since": an agent holding `{ version: { version: 41, ... } }` as its cursor would
+         send the object back and get a range scan from nothing. */
+      return { ok: true, value: { ...boot.value, version: version.ok ? version.value.version : null } };
     },
 
     schema: (args, ctx) => api.schema({ register: String(args.register) }, ctx),

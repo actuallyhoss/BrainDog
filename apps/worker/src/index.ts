@@ -40,6 +40,16 @@ type Env = {
   /** The doorbell. Its message is `{ record }` and never a payload — 51 §13 D16. */
   INGRESS: Queue<{ record: string }>;
   EMAIL?: EmailBinding;
+  /**
+   * `<date>+<sha>`, overwritten at deploy time by `--var`, declared empty in `wrangler.jsonc`.
+   *
+   * IT IS DECLARED SO THE FAILURE IS `""`. An undefined binding is a crash at cold start on a
+   * deploy that forgot the flag; an empty string is a value `deploy-parity` reads and rejects
+   * (`52 §13 #17`), which is a red gate rather than a dead record.
+   */
+  BRAINDOG_BUILD?: string;
+  /** Empty when no Spark is wired, so `/api/spark/*` is not routed at all (`33 §4`). */
+  SPARK_ENDPOINT?: string;
 };
 
 /** The `Sql` port over the Durable Object's own SQLite. Storage in the same thread as the code. */
@@ -111,6 +121,15 @@ export class Record$ extends DurableObject<Env> {
         sql: storageSql(this.ctx.storage),
         clock: { now: () => Date.now() },
         scheduler: this.#alarm,
+        /* WHAT THIS DEPLOYMENT IS, because the record cannot know. `/api/version` answers `33 §4`'s
+           six keys and two of them are facts about the host: which build is serving, and whether
+           there is a Spark behind it. An empty `BRAINDOG_BUILD` becomes `null` rather than `""` —
+           the record says "I was not told" and `deploy-parity` reads a missing build instead of
+           comparing against the empty string and finding it merely unequal. */
+        build: {
+          app: this.env.BRAINDOG_BUILD ?? '',
+          spark: Boolean(this.env.SPARK_ENDPOINT),
+        },
         /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. */

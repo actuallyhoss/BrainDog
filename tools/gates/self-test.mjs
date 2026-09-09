@@ -85,6 +85,11 @@ const CASES = [
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },
   { gate: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
+  /* THE REAL DEFECT, KEPT VERBATIM. `members` was routed ADMIN and guarded `guard(ctx, 'read')`, and
+     thirteen of the fourteen ADMIN routes called `admin`. The fixture holds that one line beside
+     three correct methods, so a count of one is what proves the gate distinguishes them rather than
+     reporting every route it reads. */
+  { gate: 'guards', expect: /routed as ADMIN and is guarded by guard\(\)/, findings: 1 },
   { gate: 'closed-lists', expect: /the migration admits/, findings: 1 },
   /* ONE LINE NAMES THE CODE, and the fixture drops exactly one. The gate reports two findings for
      it — the missing code, and the family whose size no longer matches — and only the first can

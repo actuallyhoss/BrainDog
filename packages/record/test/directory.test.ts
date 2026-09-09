@@ -294,6 +294,55 @@ test('and a closed record takes nobody, because its name may already be somebody
   sql.close();
 });
 
+test('A DIRECTORY OPENS ON A DRIVER THAT REFUSES `PRAGMA`, and it threw out of its first line', async () => {
+  /* THIS IS THE CLOUD HOST. A Durable Object's SQLite authorizer refuses `PRAGMA`, and this file
+     read `PRAGMA user_version` unguarded as the very first thing `createDirectory` does — so the
+     call threw `not authorized: SQLITE_AUTH` before a table was created, on every request. The
+     Directory is opened lazily on the first call, so the whole tenant map was unreachable on the
+     deployed host: `route()` asks `directory.knows(named)` before it addresses a record, and that
+     question answered with a 500 rather than with true or false. A well-formed bearer for a record
+     nobody has came back `500 INTERNAL` where `33 §4` says 401.
+     
+     THE KERNEL HAD ALREADY LEARNED THIS. `migrate.ts` wraps its own `PRAGMA user_version` in a
+     try/catch with the reason written beside it: "a driver may not expose PRAGMA". The tenant map
+     was the one place that had not had the lesson.
+
+     THE FAKE REFUSES EXACTLY WHAT THE PLATFORM REFUSES and nothing else, so a green here is a claim
+     about the Cloud host rather than about a mock: every other statement goes to real SQLite. */
+  const real = openSqlite();
+  const refusesPragma: NodeSql = {
+    ...real,
+    exec: (text: string, ...params: unknown[]) => {
+      if (/^\s*PRAGMA\b/iu.test(text)) throw new Error('not authorized: SQLITE_AUTH');
+      return real.exec(text, ...(params as never[]));
+    },
+    one: <T,>(text: string, ...params: unknown[]) => {
+      if (/^\s*PRAGMA\b/iu.test(text)) throw new Error('not authorized: SQLITE_AUTH');
+      return real.one<T>(text, ...(params as never[]));
+    },
+  } as NodeSql;
+
+  const d = createDirectory(refusesPragma, fixedClock(NOW));
+  const made = value<Named & { person: string }>(
+    (value<Person>(d.person$('ada@example.com', 'Ada')), d.provision({ slug: 'the-studio', email: 'ada@example.com' })),
+  );
+
+  /* AND IT ANSWERS THE ONE QUESTION THE ROUTER ASKS FIRST. `knows` is what stops a forged bearer
+     minting an empty billable record, and it is the call that was throwing. */
+  assert.equal(d.knows(made.record), true);
+  assert.equal(d.knows('rec_00000000000000000000000000'), false, 'a record nobody has is not one of ours');
+
+  /* THE ROW IS WHERE THE VERSION WENT, since the pragma could not take it. Opening a second time
+     over the same storage has to read it back, or the DDL is the only thing that ever ran and a
+     directory at version 1 would never be migrated forward on this host. */
+  assert.equal(
+    Number(real.one<{ value: string }>("SELECT value FROM dir_meta WHERE key = 'version'")?.value),
+    DIRECTORY_VERSION,
+  );
+  assert.doesNotThrow(() => createDirectory(refusesPragma, fixedClock(NOW)));
+  real.close();
+});
+
 test('A DIRECTORY WRITTEN BY A NEWER BUILD IS NOT OPENED', async () => {
   /* `CREATE TABLE IF NOT EXISTS` over a newer schema is silent: every statement is a no-op, the
      object opens, and the first `resolve` answers out of columns this build does not know the

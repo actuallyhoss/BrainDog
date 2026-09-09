@@ -368,6 +368,37 @@ const CANDIDATE: RuleDecl = {
   then: [{ set: { field: 'chase', to: 'a letter' } }, { tag: 'late' }],
 };
 
+test('A PREVIEW IS CLAMPED AT BOTH ENDS, and it was clamped at one', async () => {
+  /* `Math.max(1, …)` stopped a limit of zero and let a limit of a billion through. The CALLER sends
+     the rule and the ceiling together, and the loop behind them calls `entry(id)` and `matches` per
+     row on a single-threaded object, so `{ limit: 1e9 }` is a scan of the whole register with a
+     predicate the caller also wrote. `applyRule` has taken `Math.min(…, MOST)` since it was written;
+     the read half took nothing.
+
+     ASSERTED ON THE `LIMIT` THAT REACHES SQLITE rather than by making five thousand rows, because
+     the number in the query IS the clamp: a test that counted rows would pass on a register too
+     small to reach the ceiling, which is every register in every test in this file. */
+  const sql = openSqlite();
+  const seen: number[] = [];
+  const watched: NodeSql = {
+    ...sql,
+    all: <T,>(text: string, ...params: unknown[]) => {
+      if (/SELECT id FROM entry WHERE register = \? AND deleted_at IS NULL ORDER BY seq LIMIT \?/u.test(text))
+        seen.push(Number(params[1]));
+      return sql.all<T>(text, ...(params as never[]));
+    },
+  } as NodeSql;
+
+  const k = await openRecord(watched, fixedClock(NOW));
+  assert.ok((await k.install([OBLIGATIONS, PEOPLE])).ok);
+
+  value<DryRun>(k.dryRun(CANDIDATE, 1e9));
+  value<DryRun>(k.dryRun(CANDIDATE, 0));
+  value<DryRun>(k.dryRun(CANDIDATE));
+  assert.deepEqual(seen, [5000, 1, 5000], 'a preview read as many rows as the caller asked for');
+  sql.close();
+});
+
 test('A DRY RUN SAYS WHAT A RULE WOULD DO, BEFORE ANYBODY TURNS IT ON', async () => {
   /* A rule changes rows while nobody is looking. The honest way to introduce one is to say "this
      matches three rows, wins on two, loses one to `already`" — and every product that ships rules

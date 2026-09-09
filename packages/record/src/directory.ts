@@ -102,6 +102,20 @@ CREATE TABLE IF NOT EXISTS dir_member (
   added_at TEXT NOT NULL,
   PRIMARY KEY (person, record)
 );
+
+-- THE SCHEMA REVISION, IN A ROW, BECAUSE A PRAGMA IS NOT AVAILABLE EVERYWHERE.
+-- This read PRAGMA user_version and wrote it, unguarded, and a Durable Object's SQLite
+-- authorizer refuses the statement: "not authorized: SQLITE_AUTH", thrown out of the first line
+-- of createDirectory. Since the Directory is opened on the FIRST call, the whole tenant map was
+-- unreachable on the Cloud host, and a well-formed bearer for a record nobody has came back
+-- 500 INTERNAL instead of 401. The kernel had already met this and wrapped its own PRAGMA in a
+-- try/catch with the reason beside it ("a driver may not expose PRAGMA"); this is the same
+-- lesson, learned in the one place that had not had it. The row is the truth, the pragma is a
+-- courtesy to sqlite3 on a self-host's file, and neither is load-bearing alone.
+CREATE TABLE IF NOT EXISTS dir_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
 
 export type Person = { id: string; email: string; name: string | null; created_at: string };
@@ -145,12 +159,43 @@ const TO_2 = [
   'ALTER TABLE dir_member DROP COLUMN level',
 ];
 
+/**
+ * Run it, and answer `null` when the driver will not.
+ *
+ * A NARROW HELPER AND NOT A GENERAL ONE. It wraps exactly the two statements whose availability
+ * differs between `node:sqlite` and a Durable Object, and `null` is "this driver could not answer"
+ * rather than "the answer is nothing" — which is why every caller of it says what to do with the
+ * `null` rather than treating it as a zero.
+ */
+const attempt = <T>(fn: () => T): T | null => {
+  try {
+    return fn();
+  } catch {
+    return null;
+  }
+};
+
 export function createDirectory(sql: Sql, clock: Clock) {
   /* THE VERSION IS READ BEFORE THE DDL RUNS. `CREATE TABLE IF NOT EXISTS` over a newer schema is
      silent: every statement is a no-op, the object opens, and the first `resolve` answers from
      columns this build does not know the meaning of. A record refuses in that situation and the
-     tenant map — which is the thing that decides WHICH record anybody reaches — did not. */
-  const version = Number(sql.one<{ user_version: number }>('PRAGMA user_version')?.user_version ?? 0);
+     tenant map — which is the thing that decides WHICH record anybody reaches — did not.
+
+     BOTH READS THROW ON THE HOST THEY ARE NOT FOR, so both are guarded. `dir_meta` does not exist
+     until the DDL below has run once, and `PRAGMA user_version` is refused outright by a Durable
+     Object's authorizer — which is what made this function throw `SQLITE_AUTH` out of its first
+     line on the Cloud host, taking the whole tenant map with it.
+
+     THE HIGHER OF THE TWO, and not the row in preference to the pragma. A newer build writes both,
+     so either one reading high is a directory this build must not open; taking the row alone would
+     let a downgrade past the check by reading the one source the newer build had also written low.
+     A missing source is `0` here rather than a veto, because 0 is what a fresh directory is. */
+  const stored = attempt(() => {
+    const row = sql.one<{ value: string }>("SELECT value FROM dir_meta WHERE key = 'version'");
+    return row ? Number(row.value) : null;
+  });
+  const pragma = attempt(() => Number(sql.one<{ user_version: number }>('PRAGMA user_version')?.user_version ?? 0));
+  const version = Math.max(stored ?? 0, pragma ?? 0);
   if (version > DIRECTORY_VERSION)
     throw new Error(
       `This directory was written by a newer BrainDog: it is at version ${version} and this build reads ${DIRECTORY_VERSION}. Upgrade, or point at a different data directory.`,
@@ -168,7 +213,14 @@ export function createDirectory(sql: Sql, clock: Clock) {
     sql.transactionSync(() => {
       for (const statement of TO_2) sql.exec(statement);
     });
-  if (version < DIRECTORY_VERSION) sql.exec(`PRAGMA user_version = ${DIRECTORY_VERSION}`);
+  /* THE ROW IS WRITTEN EVERY TIME AND THE PRAGMA IS BEST EFFORT. Unconditional, because a directory
+     that has been running on a version this build already reads may still have no `dir_meta` row —
+     it was a pragma until today — and the row is what the next open reads first. */
+  sql.exec(
+    "INSERT INTO dir_meta (key, value) VALUES ('version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    String(DIRECTORY_VERSION),
+  );
+  if (version < DIRECTORY_VERSION) attempt(() => sql.exec(`PRAGMA user_version = ${DIRECTORY_VERSION}`));
 
   const mint = ulids(() => clock.now());
   const at = (): string => new Date(clock.now()).toISOString();

@@ -79,11 +79,19 @@ Durable Object migrations are in `wrangler.jsonc` and apply themselves on deploy
 ```
 curl -s -o /dev/null -w '%{http_code}\n' https://app.brain.dog/           # 200, the shell
 curl -s https://app.brain.dog/api/health                                   # a typed refusal, not a 500
+curl -s -H 'authorization: Bearer rec_0000000000000000000000000.x' https://app.brain.dog/api/boot
 ```
 
 The API answering `{"ok":false,"refusal":{"code":"UNAUTHORIZED","fix":"…"}}` with a 401 is the
 correct healthy answer: a refusal is a value, and one arriving over the wire with its `fix` sentence
 intact is the whole posture working end to end.
+
+**The third line is the one that used to lie.** A well-formed bearer for a record nobody has came
+back `500 INTERNAL`, `not authorized: SQLITE_AUTH`, because `route()` asks the Directory whether the
+address is one of ours before it addresses anything, and opening the Directory read
+`PRAGMA user_version` unguarded on a platform whose SQLite authorizer refuses `PRAGMA`. The tenant
+map was unreachable on this host and nothing said so, because the only way to reach that line is to
+present a credential the host has never issued. The revision lives in a `dir_meta` row now.
 
 ## `braindog-production` — the settings, verbatim
 

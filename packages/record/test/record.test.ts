@@ -273,11 +273,52 @@ test('a refusal from the kernel comes back as a value, with its sentence intact'
 
 test('the record’s version moves with a write and not with a read', async () => {
   const { api, sql } = await record();
-  const before = value<number>(await api.version(owner));
+  /* `.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT. It returned a bare number, so the route
+     carried the polling cursor and nothing else the contract names: `deploy-parity` reads `app` and
+     `50 §5.13` step 3 reads `spark`, and both read a number. */
+  const at = async (): Promise<number> => value<{ version: number }>(await api.version(owner)).version;
+
+  const before = await at();
   value(await api.list({ register: 'obligations' }, owner));
-  assert.equal(value<number>(await api.version(owner)), before);
+  assert.equal(await at(), before);
   value(await api.create({ register: 'obligations', fields: { what: 'a' } }, owner));
-  assert.ok(value<number>(await api.version(owner)) > before);
+  assert.ok((await at()) > before);
+  sql.close();
+});
+
+test('and it says what this build is and what is serving it, which nothing asked before', async () => {
+  /* `33 §4` line 356: `{ version, format, kernel, primitives, app, spark: boolean }`. A record cannot
+     know its own build — it is the same code under a Worker, a test and the CLI — so the host tells
+     it, and a host that was not told says `null` rather than the empty string it was handed. */
+  const sql = openSqlite();
+  const api = await createRecordApi({
+    sql,
+    clock: fixedClock(NOW),
+    sign: SIGNER,
+    build: { app: '2026-09-09+abc1234', spark: true },
+  });
+  const v = value<Record<string, unknown>>(await api.version(owner));
+  assert.deepEqual(Object.keys(v).sort(), ['app', 'format', 'kernel', 'primitives', 'spark', 'version']);
+  assert.equal(v.app, '2026-09-09+abc1234');
+  assert.equal(v.spark, true);
+  assert.equal(v.format, 1);
+  assert.equal(v.primitives, 1);
+  assert.ok(typeof v.kernel === 'number' && v.kernel >= 1);
+  sql.close();
+
+  const bare = openSqlite();
+  const untold = await createRecordApi({ sql: bare, clock: fixedClock(NOW), sign: SIGNER, build: { app: '', spark: false } });
+  assert.equal(value<{ app: string | null }>(await untold.version(owner)).app, null, 'an empty build is a name, not a silence');
+  bare.close();
+});
+
+test('AND `boot` SAYS WHAT INSTANT IT ANSWERED AS OF', async () => {
+  /* A record is opened with an injected clock so a fixture can pin one instant, and the sample
+     record this product demonstrates itself with is exactly such a fixture: its rows are dated
+     relative to a pinned day. A reader dating them against its own clock puts every band, deadline
+     tone and window some number of days out and gets no error while doing it. */
+  const { api, sql } = await record();
+  assert.equal(value<{ now: string }>(await api.boot(owner)).now, new Date(NOW).toISOString());
   sql.close();
 });
 
@@ -793,8 +834,11 @@ test('and no token invites anybody, and a register nobody has is refused', async
   assert.equal((await api.invite({ person: 'p_2', level: 'read', registers: { ghosts: 'read' } }, owner)).ok, false);
   assert.equal(sql.all("SELECT 1 FROM member WHERE person_id = 'p_2'").length, 0, 'a refused invitation left a row');
 
-  // But the colleague list is a read: it is not a secret who is on a record you are on.
-  assert.ok((await api.members(token('read'))).ok);
+  /* AND NO TOKEN LISTS THE COLLEAGUES EITHER. This asserted the opposite, on the argument that a
+     colleague list is not a secret — but the list carries every member's EMAIL ADDRESS, which is
+     not the same fact as who is on the record, and `ROUTES` has called this method ADMIN all along
+     (45 §5.6: an owner, in a browser, and no token of any kind). */
+  assert.equal(refusal(await api.members(token('read'))).code, 'NEEDS_BROWSER_SESSION');
   sql.close();
 });
 
@@ -1008,6 +1052,62 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
   // And the register they WERE invited to is still theirs to write into.
   assert.equal(refusal(await api.list({ register: 'obligations' }, them)).code, 'LEVEL_REQUIRED', 'append does not read');
   assert.ok((await api.create({ register: 'obligations', fields: { what: 'Filed' } }, them)).ok, 'append could not append');
+  sql.close();
+});
+
+test('A COLLEAGUE LIST IS AN OWNER QUESTION, because it carries every colleague\u2019s email', async () => {
+  /* `members` was routed ADMIN in `ROUTES` and guarded `guard(ctx, "read")` in the one place
+     authorisation happens, so a member invited to READ ONE REGISTER could list every colleague's
+     email address. Thirteen of the fourteen ADMIN routes call `admin`; this one called `guard`, and
+     `router-groups` was green throughout because that gate compares the route table against `30 §5`
+     and never against the code. The `guards` gate compares them now. */
+  const { api, sql } = await studio();
+  value(await api.invite({ person: 'p_9', email: 'sam@example.com', level: 'read' }, owner));
+  const held = api.kernel.access('p_9')!;
+  const them: CallContext = {
+    principal: { kind: 'person', id: 'p_9', level: held.level },
+    ...(held.registers === null ? {} : { registers: held.registers }),
+    levels: held.levels,
+  };
+
+  assert.ok(refusal(await api.members(them)).code, 'a record-wide reader listed every member');
+  const mine = value<{ email: string | null }[]>(await api.members(owner));
+  assert.ok(mine.some((m) => m.email === 'sam@example.com'), 'the owner cannot see what the reader could');
+
+  /* AND NO TOKEN REACHES IT AT ALL, which is the other half of what ADMIN means (45 §5.6): an
+     agent's bearer is not a browser session, however much its holder owns. */
+  assert.equal(refusal(await api.members(token('write', 'owner'))).code, 'NEEDS_BROWSER_SESSION');
+  sql.close();
+});
+
+/* \u2500\u2500 a read does not write a row the reader chose \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+
+test('A READ COUNTS A REGISTER THIS RECORD HAS, and it counted whatever the caller sent', async () => {
+  /* `guard` admits a reader with a record-wide `read` for any name, so `list` observed the string it
+     was given before `kernel.list` had ever looked at it: `?register=<anything>` inserted a row
+     keyed by the caller's own text and kept it for four hundred days. The signal is "which of MY
+     registers has nobody opened" (24 §4.2), and a name that is not one of them is not an answer to
+     it. Two facts in one: a read stops being a write the reader controls, and the count stops being
+     diluted by names the record does not have. */
+  const { api, sql } = await record();
+  await api.list({ register: 'atlantis' }, owner);
+  assert.equal(
+    sql.all("SELECT 1 FROM observation WHERE kind = 'register.read' AND subject = 'atlantis'").length,
+    0,
+    'a register nobody declared was counted as read',
+  );
+
+  value(await api.list({ register: 'obligations' }, owner));
+  assert.equal(sql.all("SELECT 1 FROM observation WHERE kind = 'register.read' AND subject = 'obligations'").length, 1);
+  sql.close();
+});
+
+test('and a page is counted when it draws, not when it is asked for', async () => {
+  /* Same shape one route over: `page` observed `args.slug` before `kernel.page` had said whether
+     there is such a page. "A page nobody opens" is a question about the pages this record declares. */
+  const { api, sql } = await record();
+  await api.page({ slug: 'atlantis' }, owner);
+  assert.equal(sql.all("SELECT 1 FROM observation WHERE kind = 'page.render'").length, 0, 'a page nobody declared was counted');
   sql.close();
 });
 

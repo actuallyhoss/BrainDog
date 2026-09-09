@@ -286,6 +286,14 @@ export async function start(options: {
    * that only wants the routes should not have to mint a key file.
    */
   keys?: KeyStore | undefined;
+  /**
+   * What to answer `/api/version`'s `app` with, when it is not `BRAINDOG_BUILD` in the environment.
+   *
+   * A PARAMETER RATHER THAN A `process.env` WRITE IN THE TEST. Setting the variable to check the
+   * answer makes the check order-dependent on every other test in the process, and the one thing
+   * this value has to be is the value this server was started with.
+   */
+  build?: string | undefined;
 } & (
     | {
         /**
@@ -411,6 +419,12 @@ export async function start(options: {
     scheduler,
     delivers: options.delivers ?? [],
     sign,
+    /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
+       the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
+       from a checkout has none, and the record then says `app: null` rather than inventing one.
+       No `SPARK_ENDPOINT`: `31 §2` has this host at rank 21 and `spark` at 13 and unbuilt, so
+       claiming a Spark here would be claiming something nothing serves. */
+    build: { app: options.build ?? env.BRAINDOG_BUILD ?? '', spark: false },
   });
 
   const refused = api.kernel.refused();

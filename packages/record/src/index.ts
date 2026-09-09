@@ -35,6 +35,7 @@ import {
   type Entry,
   type Kernel,
   FORMAT_VERSION,
+  KERNEL_MIGRATION,
   TRAVELS,
   type OutboxKind,
   carryingOf,
@@ -236,6 +237,66 @@ export function reaches(ctx: CallContext, register: string): Refusal | null {
 
 export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 
+/**
+ * What `boot` answers, and why the record's own instant is on it.
+ *
+ * THE CLOCK IS A PROPERTY OF THE ANSWER, not of the reader. A record is opened with an injected
+ * `clock` (`33 §2`) so a fixture pins one instant, and the sample record this product demonstrates
+ * itself with is exactly such a fixture: its rows are dated relative to a pinned day. A browser that
+ * dates them against its own `Date.now()` puts every band, deadline tone and `+30d` window some
+ * number of days out, and gets no error while doing it: the dates parse, the arithmetic runs, the
+ * screen is confidently wrong. So the record says what day it is answering as of, and the client
+ * holds the offset.
+ *
+ * ON `boot` AND NOT ON `version`, because `boot` is the one call every client makes before it draws
+ * anything, and `33 §4` fixes `version`'s six keys, so a seventh there would be this repository
+ * disagreeing with its own contract. A long session needs no second read: the offset between the
+ * record's instant and the reader's is constant, and the reader's own clock ticks.
+ */
+export type Boot = {
+  registers: { id: string; name: string; count: number }[];
+  /** ISO 8601, UTC. The instant the record answered as of. */
+  now: string;
+};
+
+/**
+ * `33 §4`, line 356, verbatim: `{ version, format, kernel, primitives, app, spark: boolean }`.
+ *
+ * IT WAS A BARE NUMBER. `version()` returned `MAX(event.rowid)` and nothing else, so the polling
+ * fallback worked and everything else the route is specified to carry was missing: `deploy-parity`
+ * (`33 §8`) reads `app` to prove the host is serving the build that was deployed, and `50 §5.13`
+ * step 3 reads `spark` to decide whether the Spark surface exists at all. Both read a number.
+ */
+export type Version = {
+  /** `MAX(event.rowid)`: what changed since is a range scan from here. */
+  version: number;
+  /** The `.dog` format revision this build reads (`03 §11`). */
+  format: number;
+  /** How many kernel migrations this build carries. */
+  kernel: number;
+  /** `PRIMITIVES_VERSION` (`31 §6`): which renderer a pack may require. */
+  primitives: number;
+  /**
+   * `<date>+<sha>`, the deployed build, or `null`.
+   *
+   * NULL RATHER THAN A PLACEHOLDER. The record cannot know its own build, because it is the same
+   * code under a Worker, a test and the CLI, so the host tells it and a host that was not told says
+   * nothing. `deploy-parity` comparing a real build against the literal `unknown` would pass on a
+   * host that has no idea what it is running, which is the one thing that check exists to catch.
+   */
+  app: string | null;
+  /** Whether `SPARK_ENDPOINT` is set, so `/api/spark/*` is routed at all (`33 §4`). */
+  spark: boolean;
+};
+
+/**
+ * What the host knows about itself and the record does not.
+ *
+ * Optional, because a test, the CLI and a self-host started by hand all open a record without one,
+ * and a required field here would make every one of them invent a value.
+ */
+export type Build = { app: string; spark: boolean };
+
 export type RecordDeps = {
   sql: Sql;
   clock: Clock;
@@ -254,6 +315,13 @@ export type RecordDeps = {
    * arrived as a key would be that rule broken at the one boundary it exists to protect.
    */
   sign?: Signer | undefined;
+  /**
+   * What this host is running, for `version` (`33 §4`).
+   *
+   * THE HOST TELLS THE RECORD, and never the other way round. The build is a fact about the
+   * deployment, and the same record code runs under a Worker, a test and the CLI.
+   */
+  build?: Build | undefined;
 };
 
 export async function createRecordApi(deps: RecordDeps) {
@@ -261,10 +329,11 @@ export async function createRecordApi(deps: RecordDeps) {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
     ...(deps.sign === undefined ? {} : { sign: deps.sign }),
   });
-  return { ...api(kernel, deps.scheduler), kernel };
+  return { ...api(kernel, deps), kernel };
 }
 
-function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'build'>) {
+  const { clock, scheduler, build } = deps;
   /**
    * After every write: re-arm the alarm, then ring the doorbell.
    *
@@ -474,7 +543,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
      * The first call any client makes, and it is scoped — a caller sees the registers they may
      * touch and not the ones they may not, because a list of names is itself information.
      */
-    async boot(ctx: CallContext): Promise<Result<{ registers: { id: string; name: string; count: number }[] }>> {
+    async boot(ctx: CallContext): Promise<Result<Boot>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const out: { id: string; name: string; count: number }[] = [];
@@ -482,7 +551,7 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
         if (reaches(ctx, id)) continue;
         out.push({ id, name: decl.name, count: kernel.count(id) });
       }
-      return ok({ registers: out });
+      return ok({ registers: out, now: new Date(clock.now()).toISOString() });
     },
 
     /** What a register holds, so a caller can write a correct row on the first try. */
@@ -504,7 +573,17 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
     },
 
     async list(
-      args: { register: string; where?: Predicate; limit?: number; cursor?: string | null },
+      args: {
+        register: string;
+        where?: Predicate;
+        limit?: number;
+        cursor?: string | null;
+        /* THE ORDER REACHES THE KERNEL, and it did not. `kernel.list` grew one; this signature did
+           not name it, so the one line below that forwards `args` carried it at runtime and no
+           caller could write it without the type complaining. A parameter reachable only by lying
+           to the type checker is a parameter nobody uses. */
+        order?: { field: string; dir?: 'asc' | 'desc' }[];
+      },
       ctx: CallContext,
     ): Promise<Result<Page<Entry>>> {
       const stop = guard(ctx, 'read', args.register);
@@ -531,7 +610,12 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
          thousand reads of one register on one day are one row and one increment. It makes a read a
          write, which is the price of the question: a record that cannot say which of its registers
          nobody has opened in six months cannot suggest retiring one. */
-      kernel.observe([{ kind: 'register.read', subject: args.register }]);
+      /* A REGISTER THIS RECORD DECLARES, and it was whatever the caller sent. `guard` admits a
+         reader with a record-level `read` for any name, so `GET /api/list?register=<anything>`
+         inserted an observation row keyed by the caller's own string and kept it for four hundred
+         days. The signal is "which of MY registers has nobody opened", and a name that is not one
+         of them is not an answer to it. */
+      if (kernel.register(args.register)) kernel.observe([{ kind: 'register.read', subject: args.register }]);
 
       return kernel.list(args);
     },
@@ -617,13 +701,19 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       /* THE OTHER HALF OF "never read, never rendered" (24 §4.2). One row per page per day, and the
          finding is the page that has none — a page nobody opens is a page whose blocks cost a query
          every time the schedule runs and tell nobody anything. */
-      if (typeof args?.slug === 'string' && args.slug) kernel.observe([{ kind: 'page.render', subject: args.slug }]);
       /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote, and `.split` on an
          absent one threw a TypeError out of the route — a refusal is a value here, an exception is
          not, and the exception did not even reach the client: the request simply hung. */
       if (typeof args?.slug !== 'string' || !args.slug)
         return no('REQUIRED_MISSING', 'A page is asked for by its slug.', { at: 'slug' });
       const out = kernel.page(args.slug);
+      /* AND THE OBSERVATION IS AFTER THE ANSWER, not before it. It ran first, on the caller's raw
+         slug, so `GET /api/page?slug=<anything>` inserted a row keyed by whatever a reader typed and
+         kept it for four hundred days: a read that writes, with the subject chosen by the reader.
+         It is also the wrong signal. "A page nobody opens" (24 §4.2) is a question about the pages
+         this record DECLARES, and a row for a page that does not exist answers nothing while
+         diluting the count that does. */
+      if (out.ok) kernel.observe([{ kind: 'page.render', subject: args.slug }]);
       if (!out.ok) return out;
       return ok({
         ...out.value,
@@ -988,9 +1078,23 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
 
     /* ── ADMIN: WHO IS ON THE RECORD ───────────────────── */
 
-    /** Everybody on it, with what they hold and where. A read: a colleague list is not a secret. */
+    /**
+     * Everybody on it, with what they hold and where.
+     *
+     * `admin`, AND IT WAS `guard(ctx, 'read')` ON THE ARGUMENT THAT A COLLEAGUE LIST IS NOT A
+     * SECRET. Two things were wrong with that. The list carries every member's EMAIL ADDRESS
+     * (`members.ts:159`), which is not the same fact as who is on the record; and `ROUTES` calls
+     * this method ADMIN (`host/src/index.ts:79`), which `45 §5.6` defines as an owner in a browser.
+     * So the route table published a ceiling that the one place authorisation actually happens did
+     * not apply, and a member invited to READ ONE REGISTER could list every colleague's email.
+     *
+     * IT WAS THE ONLY ONE OF FOURTEEN. Every other ADMIN route calls `admin`; this called `guard`.
+     * A lone disagreement with thirteen agreements is not a design, and `router-groups` could not
+     * see it because that gate compares the table against `30 §5` and never against the code. The
+     * `guards` gate does now, which is the repair that survives the next method somebody adds.
+     */
     async members(ctx: CallContext) {
-      const stop = guard(ctx, 'read');
+      const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.members());
     },
@@ -1250,10 +1354,23 @@ function api(kernel: Kernel, scheduler?: Scheduler | undefined) {
       );
     },
 
-    /** The record's version: what changed since is a range scan from here. */
-    async version(ctx: CallContext): Promise<Result<number>> {
+    /** What this record is at, and what is reading it. `33 §4`, line 356. */
+    async version(ctx: CallContext): Promise<Result<Version>> {
       const stop = guard(ctx, 'read');
-      return stop ? { ok: false, refusal: stop } : ok(kernel.version());
+      return stop
+        ? { ok: false, refusal: stop }
+        : ok({
+            version: kernel.version(),
+            format: FORMAT_VERSION,
+            kernel: KERNEL_MIGRATION,
+            primitives: PRIMITIVES_VERSION,
+            /* `||`, so the empty string is `null` too. `BRAINDOG_BUILD` is declared empty in
+               `wrangler.jsonc` and overwritten at deploy; a deploy that forgets the flag leaves
+               `""`, and answering `app: ""` says "this build is called nothing" rather than "I was
+               not told what I am". `deploy-parity` reads the second and cannot read the first. */
+            app: build?.app || null,
+            spark: build?.spark ?? false,
+          });
     },
   };
 }

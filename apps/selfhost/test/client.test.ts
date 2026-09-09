@@ -45,9 +45,14 @@ const OBLIGATIONS = {
    the code — a killed run still holding a socket, another checkout, a reserved range — and it fails
    on whichever test happens to land on the number, which changes every time one is inserted. */
 
-async function connected(token?: string) {
+async function connected(token?: string, build?: string) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-client-'));
-  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, ...(token === undefined ? {} : { token }) });
+  const running = await start({
+    file: join(dir, 'record.sqlite'),
+    port: 0,
+    ...(token === undefined ? {} : { token }),
+    ...(build === undefined ? {} : { build }),
+  });
   const at = (running.server.address() as { port: number }).port;
   assert.ok((await running.api.kernel.install([OBLIGATIONS])).ok);
   const client = createClient({ base: `http://127.0.0.1:${at}`, ...(token === undefined ? {} : { token }) });
@@ -123,6 +128,73 @@ test('search comes back with enough to draw a result without fetching it', async
     const hits = value<{ register: string; seq: number; title: string }[]>(await c.client.search('hal'));
     assert.equal(hits.length, 1);
     assert.equal(hits[0]?.title, 'Invoice 41');
+  } finally {
+    await c.close();
+  }
+});
+
+/* ── what day the record thinks it is ────────────────────────────────────── */
+
+test('THE RECORD SAYS WHAT INSTANT IT ANSWERED AS OF, and nothing asked it before', async () => {
+  /* A record is opened with an injected clock so a fixture can pin one instant, and the sample
+     record this product demonstrates itself with is exactly such a fixture: its rows are dated
+     relative to a pinned day. A reader dating them against its own `Date.now()` puts every band,
+     deadline tone and window some number of days out and gets no error while doing it. The dates
+     parse, the arithmetic runs, the screen is confidently wrong. */
+  const c = await connected();
+  try {
+    const boot = value<{ now: string }>(await c.client.boot());
+    assert.match(boot.now, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u, 'the instant is not an ISO instant');
+
+    /* WITHIN A MINUTE OF THIS PROCESS, because this server runs the real clock. The assertion that
+       matters is not the value: it is that the value CAME FROM THE RECORD. A reader can only hold
+       an offset if the number crossed the wire. */
+    const drift = Math.abs(Date.parse(boot.now) - Date.now());
+    assert.ok(drift < 60_000, `the record's instant is ${drift}ms from this process's`);
+  } finally {
+    await c.close();
+  }
+});
+
+test("and `version` answers 33 §4's six keys, where it answered one number", async () => {
+  /* `deploy-parity` (33 §8) reads `app` to prove the host is serving the build that was deployed
+     and `50 §5.13` step 3 reads `spark` to decide whether the Spark surface exists at all. Both
+     read a bare `MAX(event.rowid)`, which has neither. */
+  const c = await connected('sekret', '2026-09-09+abc1234');
+  try {
+    const v = value<Record<string, unknown>>(await c.client.version());
+    assert.deepEqual(Object.keys(v).sort(), ['app', 'format', 'kernel', 'primitives', 'spark', 'version']);
+    assert.equal(typeof v.version, 'number');
+    assert.equal(v.format, 1);
+    assert.ok(typeof v.kernel === 'number' && v.kernel >= 1, 'the kernel migration count is not a count');
+    assert.equal(v.primitives, 1);
+    assert.equal(v.app, '2026-09-09+abc1234', 'the host was told what it is running and did not say');
+    assert.equal(v.spark, false, 'a host with no Spark endpoint claimed a Spark');
+  } finally {
+    await c.close();
+  }
+});
+
+test('a host that was not told what it is running says so, rather than saying it is called nothing', async () => {
+  /* `BRAINDOG_BUILD` is declared empty in `wrangler.jsonc` and overwritten at deploy. A deploy that
+     forgets the flag leaves `""`, and answering `app: ""` says "this build is called nothing"
+     rather than "I was not told what I am". `deploy-parity` reads the second and cannot read the
+     first: `"" !== "2026-09-09+abc"` is merely unequal, which is what a WRONG build also looks
+     like, and the two failures want different repairs. */
+  const c = await connected(undefined, '');
+  try {
+    assert.equal(value<{ app: string | null }>(await c.client.version()).app, null);
+  } finally {
+    await c.close();
+  }
+});
+
+test("and the version a caller polls is the one that moves when the record is written", async () => {
+  const c = await connected();
+  try {
+    const before = value<{ version: number }>(await c.client.version()).version;
+    value(await c.client.create({ register: 'obligations', fields: { what: 'Invoice 41' } }));
+    assert.ok(value<{ version: number }>(await c.client.version()).version > before, 'a write did not move the version');
   } finally {
     await c.close();
   }
