@@ -543,7 +543,15 @@
     align-items: center;
   }
 
+  /* `--ctl-h`, WHICH IS 44 ON A COARSE POINTER AND 32 ON A FINE ONE. `05 §6` and `13 §7`: density
+     follows the POINTER and never the width. These were `padding` alone and measured 122x38 and
+     102x36 on a phone, on every screen in the product at once, which is the only reason the number
+     was small enough to notice. `min-block-size` and not `block-size`, because a label that wraps
+     grows and 44 is the floor rather than the size. */
   .sample-go {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
     padding: var(--sp-2) var(--sp-4);
     background: var(--accent);
     border: 1px solid var(--accent-edge);
@@ -556,6 +564,9 @@
   }
 
   .sample-away {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
     padding: var(--sp-2) var(--sp-3);
     background: none;
     border: 0;

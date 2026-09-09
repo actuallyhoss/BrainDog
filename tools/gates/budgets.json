@@ -33,7 +33,7 @@
     "//widthTolerancePx": "52 §4 records 0. One pixel is the recorded deviation, and it is sub-pixel rounding rather than a widened budget: `scrollWidth` is an integer rounded up from a fractional layout, so a page laid out to exactly the viewport reports one more than it. At 0 the gate is red on every route for a rounding mode.",
     "widthTolerancePx": 1,
     "settleMs": 60,
-    "readyTimeoutMs": 5000,
+    "//readyTimeoutMs": "GONE, and it is `ready.settleTimeoutMs` below. It was this gate's private name for a wait all four browser gates make, and the other three spelt the number as a bare literal 5000 in the script, which is the thing lib.mjs opens by forbidding. One wait, one number, one section, and the same expiry rule for every gate that opens a page.",
     "findingsShown": 40,
     "port": 5189
   },
@@ -44,6 +44,11 @@
       390
     ],
     "port": 5186
+  },
+  "ready": {
+    "//": "How long a screen has to say what it settled into, shared by the four gates that open a browser. Absence past it is a FINDING and never a skip: the wait this replaces ended in `.catch(() => {})`, so a page that had drawn nothing was measured anyway and the gate reported green over it.",
+    "//settleTimeoutMs": "Ten seconds, which is twice the 5000 it replaces, and the extra five cost nothing on a healthy run: a settled screen ends the wait the moment `data-screen` appears, so the budget is only ever spent by a page that is already a finding. It has to cover a cold entry chunk plus a serial boot() then list() on a loaded CI runner, because a budget that fires on a slow runner is a red somebody widens rather than reads.",
+    "settleTimeoutMs": 10000
   },
   "cssRules": {
     "//": "13 §8. How far back a `focus-ok:` waiver may sit from the rule it excuses.",

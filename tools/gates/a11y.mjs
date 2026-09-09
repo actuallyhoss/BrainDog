@@ -31,7 +31,7 @@ import { extname, join, normalize } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget } from './lib.mjs';
+import { budget, readiness } from './lib.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -72,6 +72,22 @@ const APPS = [
 const AXE = join(REPO, 'node_modules', 'axe-core', 'axe.min.js');
 const A = budget('a11y');
 const PORT = A.port;
+
+/**
+ * WHAT THIS GATE IS ALLOWED TO AUDIT.
+ *
+ * `networkidle` is a race and not a contract. It means 500ms with no request in flight, which today
+ * usually covers a call issued during hydration because the entry chunks keep the network busy right
+ * up to it. A call issued from an `$effect` after paint, or the second of a serial pair, or a loaded
+ * runner, each open a gap wider than that, and then `#main *` matched the chrome and axe audited the
+ * chrome: `html-has-lang`, `landmark-one-main` and the contrast of a rail, with zero rows for
+ * `color-contrast`, zero row menus for `button-name` and zero `[data-intent]` for the rule this file
+ * argues hardest for. Green, over nothing.
+ *
+ * From `APPS[0]`, the record app, because that is the shell the contract belongs to. The marketing
+ * site is `spa: false` and is passed as prerendered below.
+ */
+const ready = readiness('a11y', budget('ready').settleTimeoutMs, APPS[0].root);
 
 /* Every surface at rest. */
 /**
@@ -192,6 +208,14 @@ const skipped = [];
 let checked = 0;
 /** Scenarios whose keystroke did not produce the state it names — a silently dead key. */
 const broken = [];
+/**
+ * Pages that were never in a state to audit, which is a different sentence from `broken`.
+ *
+ * IT USED TO BE SAID AS `broken`, AND THAT SENT READERS INTO THE KEY HANDLER. A scenario whose route
+ * never settled printed `after n, no dialog[open]`, which reads as a dead keystroke and is a bug in
+ * the gate's timing. These say the route never settled, and name the route.
+ */
+const unsettled = [];
 /** `element[intent] -> Set<'route scheme@width'>`: a meaning carried by colour and nothing else. */
 const mute = new Map();
 
@@ -235,10 +259,13 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
        gate people learn to kill. One line per pass, flushed as it goes. */
 
 
-    /** Loads a route, waits for it to be real, and injects axe. */
+    /** Loads a route, waits for it to be real, injects axe, and RETURNS what the screen settled into. */
     const open = async (route) => {
       await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'networkidle' });
-      await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+      /* The one readiness site in this gate, because every load goes through here. The `5000` that
+         used to be written on this line was a bare literal in a directory whose shared file opens by
+         forbidding them; the number is `ready.settleTimeoutMs` now, and its expiry is a value. */
+      const state = await ready.settled(page, !app.spa);
       /* Two things, and the second is about the gate being TRUSTWORTHY rather than about the app.
          An un-laid-out rowgroup has no colours to measure, which is why the screenshots do it too.
          And every transition is killed outright: `reducedMotion` suppresses the animations that
@@ -271,6 +298,7 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
           document.getElementById('main')?.prepend(el);
         });
       await page.addScriptTag({ content: axeSource });
+      return state;
     };
 
     const audit = async (where) => {
@@ -341,7 +369,17 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
 
     process.stdout.write(`    ${(app.name + '     ').slice(0, 5)} ${(scheme + '@' + width + '   ').slice(0, 11)} `);
     for (const route of app.routes ?? ROUTES) {
-      await open(route);
+      const where = `${app.name} ${route} ${scheme}@${width}`;
+      const unmeasured = ready.check(where, route, await open(route));
+      /* AUDITING AN UNSETTLED PAGE IS THE FAILURE, NOT THE FALLBACK. Axe over a document with no
+         `h1` fails `page-has-heading-one` on every route, which is the sixty-four-findings-that-say-
+         nothing failure the SPA fallback comment above already records happening once. A red that
+         blames the app for the gate's timing is a red somebody widens the rule to silence. */
+      if (unmeasured) {
+        unsettled.push(unmeasured);
+        process.stdout.write('~');
+        continue;
+      }
       await audit(route);
     }
 
@@ -356,7 +394,16 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
     process.stdout.write(' ');
     for (const st of STATES) {
       if (st.desktop && width < 900) continue;
-      await open(st.route);
+      const unmeasured = ready.check(`${app.name} ${st.name} ${scheme}@${width}`, st.route, await open(st.route));
+      /* THE ROUTE BEFORE THE KEYSTROKE. A scenario whose page never settled has no grid for the key
+         to act on, and reporting that as `no dialog[open]` is the gate accusing the app of its own
+         timing. `/r/nope` is in `MAY_REFUSE`, so `empty: not found` still runs on a refusal, which
+         is the state it exists to audit. */
+      if (unmeasured) {
+        unsettled.push(unmeasured);
+        process.stdout.write('~');
+        continue;
+      }
       // Focus the grid first: bare letters act only inside one, which is the point of the rule.
       /* SHORT timeouts, and they matter. Both of these clicks are speculative — a page surface has
          no `[role="row"]` at all — and Playwright's default is to wait thirty seconds before
@@ -417,7 +464,29 @@ if (broken.length) {
   for (const b of broken) console.error(`      ${b}`);
 }
 
-if (found.size || contrast || broken.length || mute.size) process.exitCode = 1;
+/* A PAGE THAT COULD NOT BE AUDITED IS A FINDING, and it is in the first condition rather than the
+   second on purpose: a route that never settles must not fall through to the exit-3 branch, because
+   exit 3 is a skip and CI runs master with no `--allow-skip`. Every exit-3 path in this gate is still
+   a `stat()` on a build directory, decided before a browser is launched, which is what keeps a real
+   failure from turning into one. */
+if (unsettled.length) {
+  console.error(`
+  ${unsettled.length} page(s) were never in a state to audit:`);
+  for (const u of unsettled) console.error(`      ${u}`);
+}
+
+/**
+ * AND A RUN THAT AUDITED NO SCREEN WITH THE RECORD ON IT IS RED.
+ *
+ * Everything this gate is for lives on a drawn screen: `color-contrast` over rows and cells,
+ * `button-name` on row menus, the `aria-selected` states, and `intent-without-glyph`, whose measured
+ * finding was sixteen rows on `/r/obligations`. Over chrome alone every one of them has zero elements
+ * to look at and reports zero violations.
+ */
+const blind = ready.nothingDrawn();
+if (blind) console.error(`\n  ${blind}`);
+
+if (found.size || contrast || broken.length || mute.size || unsettled.length || blind) process.exitCode = 1;
 /* AND A RUN THAT LOOKED AT NOTHING IS A SKIP, exit 3 — not the green line it used to print. */
 else if (skipped.length) {
   console.log(`  a11y: skipped ${skipped.join(', ')} — no build.`);

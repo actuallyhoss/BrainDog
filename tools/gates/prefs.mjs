@@ -52,11 +52,24 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget } from './lib.mjs';
+import { budget, readiness } from './lib.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
 const PORT = budget('prefs').port;
+
+/**
+ * WHEN A PROBE IS ALLOWED TO BE BELIEVED, and for this gate that is a question about false REDS.
+ *
+ * Four of the seven cases read the record: `text` measures a grid cell, `suggestPages` counts
+ * `#main .ledger li`, `nav` joins the rail's hrefs. Over a screen that has not drawn, all three
+ * settings come back `no element`, `0` and `''`, the values are identical, and this gate prints
+ * exactly the sentence it is named for: a preference that reached the cookie and not the page. The
+ * repair somebody reaches for under time pressure is to weaken the probe, and a weakened probe is
+ * permanently vacuous. So an unsettled or refused load is reported as what it is, and its case is not
+ * compared at all.
+ */
+const ready = readiness('prefs', budget('ready').settleTimeoutMs, ROOT);
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -189,10 +202,15 @@ await new Promise((r) => server.listen(PORT, r));
 
 const browser = await chromium.launch();
 const findings = [];
+/** Loads that never drew, kept apart from the findings so neither sentence is read as the other. */
+const unsettled = [];
 let checked = 0;
 
 for (const test of CASES) {
   const seen = new Map();
+  /* A CASE IS COMPARED ONLY IF EVERY LOAD IN IT WAS REAL. Two probes of two screens, one of which
+     was never there, is not a comparison of a preference. */
+  let comparable = true;
   for (const value of test.values) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
@@ -204,7 +222,14 @@ for (const test of CASES) {
     ]);
     const page = await context.newPage();
     await page.goto(`http://localhost:${PORT}${test.route}`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+    const unmeasured = ready.check(`${test.name} ${JSON.stringify(value)}`, test.route, await ready.settled(page));
+    if (unmeasured) {
+      unsettled.push(unmeasured);
+      comparable = false;
+      process.stdout.write('~');
+      await context.close();
+      continue;
+    }
     /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=prefs` pins the two
        tokens the checks read, which is exactly the shape of the bug this gate is named after — a
        preference reaching the cookie and a constant reaching the page — and the run must go red. */
@@ -216,6 +241,8 @@ for (const test of CASES) {
     checked++;
     process.stdout.write('.');
   }
+
+  if (!comparable) continue;
 
   /* EVERY VALUE DISTINCT, not merely "some pair differs". Three settings where two agree is a
      control with a step that does nothing, which is the same defect one notch smaller. */
@@ -234,10 +261,33 @@ process.stdout.write('\n');
 await browser.close();
 server.close();
 
-console.log(`  prefs: ${checked} page-runs over ${CASES.length} preferences, ${findings.length} finding(s)`);
+console.log(
+  `  prefs: ${checked} page-runs over ${CASES.length} preferences, ${findings.length} finding(s)` +
+    (unsettled.length ? `, ${unsettled.length} load(s) on a page that never drew` : ''),
+);
 
 if (findings.length) {
   console.error('\n  a preference that reaches the cookie and not the page:');
   for (const f of findings) console.error(`      ${f}`);
-  process.exitCode = 1;
 }
+
+/* NOT UNDER THE HEADING ABOVE. "A preference that reaches the cookie and not the page" is a claim
+   about the app, and a page that never drew is a claim about the load: printing the second under the
+   first is how somebody ends up editing a probe to silence a host that was not answering. */
+if (unsettled.length) {
+  console.error('\n  a preference whose screen was never there to measure:');
+  for (const u of unsettled) console.error(`      ${u}`);
+}
+
+/**
+ * AND A RUN WHERE NO SCREEN DREW IS RED even when every case came back distinct.
+ *
+ * Three of the seven cases read tokens off `documentElement` and `body`, which `app.html` sets from
+ * the cookie before first paint and which are true of an empty document as well as a full one. Those
+ * three would pass over a product that drew nothing at all, so the aggregate is what keeps a clean
+ * `prefs` run from meaning less than it says.
+ */
+const blind = ready.nothingDrawn();
+if (blind) console.error(`\n  ${blind}`);
+
+if (findings.length || unsettled.length || blind) process.exitCode = 1;

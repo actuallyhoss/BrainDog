@@ -1,8 +1,8 @@
 /**
  * Whether the palette is open, held where a page can reach it.
  *
- * IT WAS LOCAL TO THE SHELL, and that is why a button labelled *Search* went Home. `/[id]` — the
- * screen you land on after typing an id that resolves to nothing — offered two controls, `Search`
+ * IT WAS LOCAL TO THE SHELL, and that is why a button labelled *Search* went Home. `/[id]`, the
+ * screen you land on after typing an id that resolves to nothing, offered two controls: `Search`
  * with a magnifying glass and `Home`, and both navigated to `/`. Two controls, one behaviour, one of
  * them named for something else, on the screen whose entire purpose is "you were looking for
  * something and it is not here".

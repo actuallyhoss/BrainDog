@@ -206,8 +206,13 @@ test('`/search` is a destination the palette teaches', () => {
      way around. The chords still work; `?` and Settings → Keyboard are where they are taught. What
      this test is actually about is that `/search` is REACHABLE from the palette, and that is what
      it checks. */
-  assert.match(PALETTE, /id: 'c-search'[^\n]*href: '\/search'/u);
-  assert.doesNotMatch(PALETTE, /keys: 'g /u, 'a chord is printed beside a destination again');
+  /* THE LIST MOVED TO `admit.ts`, so the rule that decides what is in it could be RUN rather than
+     described: a palette command has to pass three tests, and a rule written in prose beside a list
+     is a rule nothing applies. Both claims here are unchanged and both are still about the same
+     declaration, one file over. */
+  const ADMIT = src('lib', 'palette', 'admit.ts');
+  assert.match(ADMIT, /id: 'c-search'[^\n]*href: '\/search'/u);
+  assert.doesNotMatch(ADMIT, /keys: 'g /u, 'a chord is printed beside a destination again');
 });
 
 test('the count is styled on every screen, not only on a phone', () => {

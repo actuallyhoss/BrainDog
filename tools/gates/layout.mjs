@@ -32,7 +32,7 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget, skipDir } from './lib.mjs';
+import { budget, readiness, skipDir } from './lib.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -63,7 +63,11 @@ const VARIANTS = [
    * It sits in this list because a second build root is exactly what the variant pass already does.
    * It is not a variant of the record — it is a different app — and the mechanism does not care.
    */
-  { name: 'site', root: join(REPO, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'] },
+  /* `prerendered` IS A FACT ABOUT THIS ROOT AND NOT A WAIVER. The site makes no call, so it has
+     nothing to settle and no `data-screen` to carry, and holding it to the readiness contract would
+     be six ten-second timeouts on three pages that were finished when the document loaded. Every
+     other root here is the record app with a different record inside it. */
+  { name: 'site', root: join(REPO, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], prerendered: true },
   { name: 'cloud', root: join(REPO, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'] },
   /* A record nobody has connected anything to — the two designed empty states on `/settings/agents`,
      which `13 §5.2` gives a content contract and which no gate could reach. */
@@ -134,6 +138,17 @@ if (!(await stat(ROOT).catch(() => null))) {
   console.log('  layout: no build to check. `pnpm build` first, and CI does.');
   process.exit(3);
 }
+
+/**
+ * WHAT THIS GATE IS ALLOWED TO CALL A MEASUREMENT.
+ *
+ * It used to be `waitForSelector('#main *').catch(() => {})`, and the swallow is the part that
+ * mattered: a page that had rendered nothing was measured anyway, and an empty document never
+ * scrolls sideways and holds no control under 44px, so the gate would have printed `0 finding(s)`
+ * over 627 page-runs of chrome and exited 0. Built from `ROOT` because the contract is a property
+ * of the record app's shell and every variant of it is the same shell.
+ */
+const ready = readiness('layout', budget('ready').settleTimeoutMs, ROOT);
 
 const bps = (await breakpoints()).sort((a, b) => a - b);
 /* One pixel either side of each. `width < 900px` is on at 899 and off at 900, and those are two
@@ -319,7 +334,16 @@ for (const width of widths) {
 
   for (const route of ROUTES) {
     await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('#main *', { timeout: L.readyTimeoutMs }).catch(() => {});
+    /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
+       served off disk is a script tag that imports the client, and `#main` does not exist until it
+       has run. This wait is the only thing between the gate and an empty document, which is why its
+       expiry is a finding and not a `catch`. */
+    const unmeasured = ready.check(`${route} @${width}`, route, await ready.settled(page));
+    if (unmeasured) {
+      findings.push(unmeasured);
+      process.stdout.write('!');
+      continue;
+    }
     // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
     await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
     /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading
@@ -368,7 +392,14 @@ for (const v of present) {
     process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);
     for (const route of v.routes) {
       await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('#main *', { timeout: L.readyTimeoutMs }).catch(() => {});
+      /* THE SAME READINESS, or the variant pass is the half of this gate that can still go green
+         over nothing. The site is prerendered and says so in `VARIANTS`. */
+      const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await ready.settled(page, v.prerendered));
+      if (unmeasured) {
+        findings.push(unmeasured);
+        process.stdout.write('!');
+        continue;
+      }
       /* THE SAME PREPARATION, or "the identical check" is only true of the function. An un-laid-out
          rowgroup has no geometry and cannot overflow; the seed is what makes this pass answerable by
          `self-test`, which otherwise passes on the main loop alone however little the variant pass
@@ -404,3 +435,18 @@ console.log(
 for (const f of findings.slice(0, L.findingsShown)) console.error(`      ${f}`);
 if (findings.length > L.findingsShown) console.error(`      ...and ${findings.length - L.findingsShown} more`);
 if (findings.length) process.exitCode = 1;
+
+/**
+ * AND A SWEEP THAT NEVER SAW THE RECORD IS RED, however clean every page in it was.
+ *
+ * This is the one thing the per-page check cannot say. A host answering nothing draws the error card
+ * on every route and a record with nothing in it draws the empty one, and both of those sweep to
+ * `0 finding(s)`: an `Empty` card is `max-inline-size: 56ch` and cannot overflow at any width. The
+ * gate exists to measure a table, a card list and a row, so a run that measured none of them is a
+ * run that asserted nothing about the thing it is for.
+ */
+const blind = ready.nothingDrawn();
+if (blind) {
+  console.error(`  ${blind}`);
+  process.exitCode = 1;
+}

@@ -42,12 +42,26 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget } from './lib.mjs';
+import { budget, readiness } from './lib.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
 const REGISTRY = join(REPO, 'apps', 'web', 'src', 'lib', 'a11y', 'keys.svelte.ts');
 const PORT = budget('keys').port;
+
+/**
+ * WHEN THE `before` SNAPSHOT IS ALLOWED TO BE TAKEN, and this gate needed it more than the other
+ * three.
+ *
+ * The verdict below is `before === after`, and `SNAPSHOT` includes
+ * `document.body.innerHTML.length`. The wait that used to stand here was `networkidle`, a swallowed
+ * selector and a fixed 140ms, so a response landing between the two snapshots moved that number and
+ * the row was counted ALIVE whatever the key did. This gate, whose whole subject is "a key we print
+ * that nothing binds", would have reported `0 dead` over a build with every handler deleted. Waiting
+ * for the screen to settle first is the whole of the repair: `before` is then taken after the
+ * response, and the only thing left that can move the length is the key.
+ */
+const ready = readiness('keys', budget('ready').settleTimeoutMs, ROOT);
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -124,13 +138,37 @@ const RECIPES = {
   display: { route: GRID, setup: focusFirstCell, press: ['v'] },
   'copy-id': { route: GRID, setup: focusFirstCell, press: ['y'] },
   /* `o` FOLLOWS THE REF THE FOCUSED CELL POINTS AT, so the cell has to be one. On a cell with no
-     `to:` there is nothing related and nothing should happen — which is why this walks right to the
-     Project column rather than pressing it where it lands. */
+     `to:` there is nothing related and nothing should happen, which is why this walks to the Project
+     column rather than pressing it where it lands.
+
+     IT WALKED A FIXED EIGHT AND LANDED ON THE CLAMP. `ArrowRight` stops at the last column, and
+     Project happened to BE the last column, so eight presses from a caret that starts on column two
+     overshot by two and arrived anyway. Adding a trailing column of row verbs moved the clamp one
+     place along and the key went dead: not because `o` broke, but because the recipe had been
+     asserting the position of the end of the row rather than the position of a `ref`.
+
+     IT WALKS UNTIL THE CARET IS ON THE COLUMN IT MEANS. The header row names the columns and a
+     grid has exactly one tab stop, so both ends of the question are readable from the page: which
+     column is Project, and which column the caret is on. Neither is counted from out here any more.
+     The loop is capped, so a register with no Project column is a walk that ends rather than a gate
+     that hangs. */
   related: {
     route: GRID,
     setup: async (page) => {
       await focusFirstCell(page);
-      for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowRight');
+      const at = () =>
+        page.evaluate(() => {
+          const heads = [...document.querySelectorAll('[role="columnheader"]')];
+          const want = heads.findIndex((h) => (h.textContent ?? '').trim().toLowerCase() === 'project');
+          const cell = document.querySelector('[role="gridcell"][tabindex="0"]');
+          const now = cell ? [...(cell.parentElement?.children ?? [])].indexOf(cell) : -1;
+          return { want, now };
+        });
+      for (let i = 0; i < 14; i++) {
+        const { want, now } = await at();
+        if (want < 0 || now < 0 || now === want) break;
+        await page.keyboard.press(now > want ? 'ArrowLeft' : 'ArrowRight');
+      }
     },
     press: ['o'],
   },
@@ -181,6 +219,14 @@ const SNAPSHOT = () => {
 const browser = await chromium.launch();
 const dead = [];
 const uncovered = [];
+/**
+ * Runs whose page was never in a state to press a key on, which is its own sentence.
+ *
+ * NOT `dead`, AND THAT DISTINCTION IS THE POINT. "The sheet prints `y` and nothing answers it" sends
+ * somebody into the key handler. A route that never drew is a fact about the route, and it must not
+ * be reported as a fact about the binding.
+ */
+const unsettled = [];
 let checked = 0;
 let skipped = 0;
 
@@ -218,7 +264,12 @@ for (const row of rows) {
   let alive = 0;
   for (const run of runs) {
     await page.goto(`http://localhost:${PORT}${run.route}`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+    const unmeasured = ready.check(`${row.id} on ${run.route}`, run.route, await ready.settled(page));
+    if (unmeasured) {
+      unsettled.push(unmeasured);
+      process.stdout.write('~');
+      continue;
+    }
     await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
     if (run.setup) await run.setup(page).catch(() => {});
     await page.waitForTimeout(140);
@@ -246,7 +297,12 @@ process.stdout.write('\n');
 await browser.close();
 server.close();
 
-console.log(`  keys: ${checked} bare binding(s) pressed in their own scope, ${skipped} skipped, ${dead.length} dead`);
+console.log(
+  `  keys: ${checked} bare binding(s) pressed in their own scope, ${skipped} skipped, ${dead.length} dead` +
+    /* SAID IN THE SUMMARY AND NOT ONLY IN THE DETAIL, because this number is the one that decides
+       what the other three mean: a run with unsettled pages pressed fewer keys than it looks. */
+    (unsettled.length ? `, ${unsettled.length} run(s) on a page that never drew` : ''),
+);
 
 if (uncovered.length) {
   console.error('\n  a binding in the registry that this gate does not exercise:');
@@ -260,4 +316,20 @@ if (dead.length) {
   console.error('  what is bound. Bind it, or take the row out of the registry.');
 }
 
-if (dead.length || uncovered.length) process.exitCode = 1;
+if (unsettled.length) {
+  console.error('\n  a run whose page never drew, so the key was never really pressed at it:');
+  for (const u of unsettled) console.error(`      ${u}`);
+}
+
+/**
+ * AND A RUN WHERE NO ROUTE DREW IS RED.
+ *
+ * A recipe stands on a precondition: `o` follows the ref the focused cell points at, `j` moves down
+ * a row that has to exist. Over screens with no rows every one of them is silent for a reason that
+ * has nothing to do with its binding, and this gate would then be reporting on the record rather
+ * than on the registry.
+ */
+const blind = ready.nothingDrawn();
+if (blind) console.error(`\n  ${blind}`);
+
+if (dead.length || uncovered.length || unsettled.length || blind) process.exitCode = 1;
