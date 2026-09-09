@@ -9,40 +9,45 @@ One label per surface, with the environment in front of it.
 
 | Host | What runs there | Deployed by | State |
 |---|---|---|---|
-| **`brain.dog`** | `apps/site`, the marketing site | not wired yet, see below | not live |
+| **`brain.dog`** | `apps/site`, the marketing site | `wrangler deploy --env production`, by hand for now | **live** |
+| **`www.brain.dog`** | nothing: a 301 to the apex | a Redirect Rule, not a Worker | live |
 | **`app.brain.dog`** | `apps/worker` with `apps/web`'s `build/` as its asset directory | Workers Builds `braindog-production`, on every push to `release` | live |
 | **`mcp.brain.dog`** | reserved | nothing | not claimed |
 | **`alpha.brain.dog`** | `apps/site`, the same bytes | `braindog-site-alpha`, deployed by hand for now | live |
 | **`app.alpha.brain.dog`** | the record, built as **BrainDog Alpha** | Workers Builds `braindog-alpha`, on every push to `master` | live |
 | **`mcp.alpha.brain.dog`** | reserved | nothing | not claimed |
 
-`mcp.*` is deliberately unclaimed, **and `mcp.brain.dog` is not.** Measured 2026-09-09:
-`mcp.alpha.brain.dog` does not resolve, which is correct, and `https://mcp.brain.dog/` answers
-**525**, which is a TLS handshake failing between Cloudflare and an origin. A 525 is not what an
-unclaimed name answers: it means a record exists and points somewhere that cannot complete a
-handshake. Whatever is there is serving an MCP address with a certificate error rather than with
-nothing, which is the same defect as the apex below and one hostname further out. It is on the same
-list, and it is the same permission to fix.
+`mcp.*` is deliberately unclaimed, and both names now resolve to nothing, which is the honest
+answer for a service that is not built. `mcp.brain.dog` used to answer 525: a `*.brain.dog` CNAME
+was claiming it, and every other name in the zone with it. A wildcard means no name is ever
+unclaimed. It is gone.
 
-The MCP transport is not built, and pointing that hostname at the
-Worker would answer an MCP address with the app's shell. `apps/web`'s first-run screen does print
+The MCP transport is not built, and pointing that hostname at the Worker would answer an MCP
+address with the app's shell. `apps/web`'s first-run screen does print
 `claude mcp add --transport http braindog https://mcp.brain.dog`, which is a command nobody can run,
 and that is a defect filed in `loop/BACKLOG.md` rather than a reason to claim the name.
 
-**`brain.dog` is blocked on three A records.** The apex carries `172.239.193.194`,
-`172.236.103.15` and `172.234.212.77`, all proxied, all pointing at an origin that answers nothing,
-which is why the hostname returns 520 today. Re-measured 2026-09-09 and unchanged: the apex still
-answers 520, while `alpha.brain.dog`, `app.brain.dog` and `app.alpha.brain.dog` all answer 200.
+**`brain.dog` was blocked on three A records, and they are gone.** The apex carried
+`172.239.193.194`, `172.236.103.15` and `172.234.212.77`, all proxied, all pointing at an origin
+that answered nothing, which is why the hostname returned 520. Cloudflare refuses to attach a Worker
+to a hostname whose DNS it does not control, so those three had to go before
+`wrangler deploy --env production` could claim it. Deleted 2026-09-09, values kept above so the
+change is reversible. Mail was unaffected and was checked afterwards: the three MX records, the SPF
+line and the DKIM key are all still there.
 
-**The change needs a token nothing here has.** `wrangler` is logged in with an OAuth token whose
-zone scope is READ: it lists the zone and is refused on `dns_records`, with a 10000 authentication
-error. Deleting these needs a Cloudflare API token carrying `Zone:DNS:Edit` on this zone and
-nothing else, or thirty seconds in the dashboard. No such token exists in this checkout, and one is
-not minted here: `12 §6`'s rule is that a credential is never in the record, and the same argument
-covers a repository. Cloudflare refuses to attach a Worker to a hostname
-that has externally managed DNS, so those three have to be deleted before
-`wrangler deploy --env production` can claim it. The values are written down here so the change is
-reversible. Mail is unaffected: the MX, SPF and DKIM records are separate.
+**The wildcard went in the same pass**, for the reason under `mcp.*` above: `*.brain.dog` was a
+proxied CNAME to the apex, so every name in the zone resolved to whatever the apex was, and the one
+name this document says must stay unclaimed was claimed by a record nobody wrote it for.
+
+**`www` is a redirect and not a second copy of the site.** A Worker can hold several custom domains
+and this one has no code, so it cannot redirect; serving the same three pages on two hostnames is
+the duplicate-content problem `workers_dev: false` already exists to avoid. So `www.brain.dog` keeps
+its proxied CNAME and a Redirect Rule sends `https://www.*` to `https://${1}` with a 301, query
+string preserved, because a campaign parameter that survives the click is the whole point of one.
+
+Measured after the change: `brain.dog` 200 serving `apps/site`, `/pricing` and `/changelog` 200,
+an unknown path 404 rather than the shell, `www.brain.dog` 301 to the apex, `alpha.brain.dog`,
+`app.brain.dog` and `app.alpha.brain.dog` all 200, both `mcp.*` names absent.
 
 `wrangler.jsonc` holds both environments; `wrangler deploy --env alpha --dry-run` and
 `--env production --dry-run` are what check them without deploying.
@@ -130,8 +135,12 @@ branch builds are off, so a branch cannot take the hostname.
 
 ## What is not automated, and should be
 
-- **The marketing site has no build project.** `alpha.brain.dog` was deployed by hand with
-  `wrangler deploy --env alpha`, which is fine once and wrong as a habit: the site is then whatever
-  somebody last pushed from a laptop. Two projects are wanted, matching the Worker's pair.
+- **The marketing site has no build project.** Both `alpha.brain.dog` and now `brain.dog` were
+  deployed by hand, with `wrangler deploy --env alpha` and `--env production`. That is fine once and
+  wrong as a habit: the site is then whatever somebody last pushed from a laptop, and the apex is the
+  one hostname where that shows. Two projects are wanted, matching the Worker's pair.
+- **The `www` redirect is a dashboard rule and is in no file here.** It is one Redirect Rule, and
+  the rest of this document exists because a setting that lives only in a dashboard is a setting
+  nobody can review. Its terms: `https://www.*` to `https://${1}`, 301, query string preserved.
 - **Nothing in CI runs `wrangler deploy --dry-run`**, so a binding removed from `wrangler.jsonc`
   fails at deploy time rather than at pull-request time.
