@@ -81,10 +81,31 @@ test('THE DEAD BUTTON SAYS WHICH FIELDS, and reads as English for one and for th
  */
 const startPage = readFileSync(fileURLToPath(new URL('../routes/start/+page.svelte', import.meta.url)), 'utf8');
 
+/** Where a top-level function in a `<script>` block ends: a newline, two spaces, a brace. */
+const BODY_END = `
+  }`;
+
 test('THE FIRST ROW REPORTS WHERE THE PERSON IS STANDING, and does not navigate', () => {
-  const commit = startPage.slice(startPage.indexOf('function commit('), startPage.indexOf('function commit(') + 600);
+  /* THE WHOLE FUNCTION, not a fixed number of characters of it. This sliced 600 and the argument
+     above the toast grew past that, so the assertion started reading a comment and failing about a
+     line that had not moved. A slice measured in bytes is a slice that fails on prose. */
+  const at = startPage.indexOf('function commit(');
+  const commit = startPage.slice(at, startPage.indexOf(BODY_END, at));
   assert.match(commit, /toasts\.push\(copy\.notWritten/u, 'the honest toast is gone');
   assert.doesNotMatch(commit, /goto\(/u, 'commit navigates away from its own outcome again');
+
+  /**
+   * AND THE ROW IS MADE, which is the whole of what a friction pass ranked first of ten.
+   *
+   * Four clicks, twenty-five keystrokes, six decisions, three screens, and zero rows: this screen
+   * asks for one true fact about somebody's own business, takes it, and the list it then offers
+   * holds thirty-eight rows belonging to a fictional studio with theirs nowhere in it. It is not a
+   * write and it does not claim to be. `pending` holds it for the life of the tab and the list
+   * draws it wearing `Not saved`, which is the same receipt every other verb in this product
+   * leaves.
+   */
+  assert.match(commit, /pending\.add\(choice\.key, taken\)/u, 'the row the person typed goes nowhere');
+  assert.match(startPage, /bind:taken/u, 'the form holds what was typed and hands out nothing');
 
   /* AND THE OUTCOME IS ON THE SCREEN, not only in a toast that a later navigation can take with it. */
   assert.match(startPage, /firstRun\.keptNothing[^A-Za-z]/u, 'the outcome is not rendered');
@@ -92,6 +113,9 @@ test('THE FIRST ROW REPORTS WHERE THE PERSON IS STANDING, and does not navigate'
 
   /* THE WAY ONWARD IS OFFERED AND NOT TAKEN. The list is still reachable; it is a control now. */
   assert.match(startPage, /firstRun\.seeTheList\(/u, 'there is no way onward');
+  /* AND IT SAYS WHAT IS THERE. The sentence used to explain why somebody else's rows are on the
+     screen and said nothing about the one thing the person had just done. */
+  assert.match(startPage, /firstRun\.rowIsThere/u, 'the outcome does not say where the row went');
   assert.match(startPage, /\/r\/\$\{choice\.key\}\?first=1/u, 'the way onward lost its address');
 });
 

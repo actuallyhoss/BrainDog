@@ -42,7 +42,8 @@ export type Settled = 'ready' | 'empty' | 'refused';
  * BOTH, BECAUSE ONE OF THEM CANNOT TELL THE TWO SILENCES APART. `pending === 0` is true before the
  * first call has started as well as after the last one has come back, and the first of those is a
  * shell with nothing on it: attaching the attribute there is precisely the failure this exists to
- * stop. So a screen is settled only once it has made a call AND has none outstanding.
+ * stop. So a call is evidence of a settled screen only once it has come back, and a screen with a
+ * call still out is not settled whatever else it has said.
  */
 const s = $state({ pending: 0, calls: 0, refused: false, drew: null as Settled | null });
 
@@ -58,9 +59,20 @@ export function closed(ok: boolean): void {
   if (!ok) s.refused = true;
 }
 
-/** A route, or an `Empty`, saying what it drew. */
+/**
+ * A route, or an `Empty`, saying what it drew.
+ *
+ * IT ONLY EVER UPGRADES, and the order the two callers run in is why. A route says `ready` and the
+ * `Empty` inside it says `empty`, and which of those two effects Svelte runs first is a fact about
+ * component trees rather than about the screen. Ranking them makes the answer the same either way:
+ * a refusal is the strongest thing true of a screen, a designed empty state is next, and `ready` is
+ * the claim anything else makes. Last-write-wins would have made `data-screen` depend on effect
+ * order, which is the kind of thing that is right in every test and wrong once in production.
+ */
+const RANK: Record<Settled, number> = { ready: 0, empty: 1, refused: 2 };
+
 export function drew(what: Settled): void {
-  s.drew = what;
+  if (s.drew === null || RANK[what] > RANK[s.drew]) s.drew = what;
 }
 
 /**
@@ -88,7 +100,25 @@ export function leaving(): void {
  * showing an error, and the gate that measures it is not measuring the screen.
  */
 export function settled(): Settled | undefined {
-  if (s.pending > 0 || s.calls === 0) return undefined;
+  if (s.pending > 0) return undefined;
   if (s.refused) return 'refused';
-  return s.drew ?? 'ready';
+  /**
+   * A SCREEN THAT SAID WHAT IT DREW IS SETTLED, WHETHER OR NOT IT CALLED ANYTHING.
+   *
+   * THE FIRST VERSION REQUIRED A CALL, and every screen in this app computes its content
+   * synchronously today, so nothing would ever have settled and the attribute would never have
+   * appeared: the contract would have been written and dead, which is the shape this repository
+   * exists to catch. `data/call.ts` makes the same argument about itself in the file next door, and
+   * `flags.ts` quotes it: a seam with no caller is not written.
+   *
+   * IT IS STILL NOT VACUOUS, and the property that matters is untouched. Chrome carries no
+   * attribute: mounting the shell settles nothing, because the value comes from a route SAYING what
+   * it drew or from a call coming back, and a rail and a tab bar do neither. What has changed is
+   * that a synchronous screen can make the claim honestly, which it can, because it is true of that
+   * screen right now. The day it fetches, `opened()` puts `pending` above zero and the first line
+   * above takes the attribute away until the answer lands: the claim stops being available exactly
+   * when it stops being true, without the route being edited again.
+   */
+  if (s.drew !== null) return s.drew;
+  return s.calls > 0 ? 'ready' : undefined;
 }

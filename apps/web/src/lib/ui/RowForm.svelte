@@ -20,7 +20,7 @@
 -->
 <script lang="ts">
   import { NOW, REGISTERS, ROWS, currencyFor, labelOf, readableFields } from '../record/api.ts';
-  import type { FieldDecl } from '../record/schema.ts';
+  import type { FieldDecl, Fields } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
   import { copy } from '../copy.ts';
   import { firstRun } from '../first-run.ts';
@@ -40,6 +40,7 @@
     label,
     autofocus = false,
     problems = $bindable<string[]>([]),
+    taken = $bindable<Fields>({}),
   }: {
     register: string;
     first?: boolean;
@@ -47,6 +48,16 @@
     label?: string | undefined;
     autofocus?: boolean;
     problems?: string[];
+    /**
+     * WHAT SOMEBODY ACTUALLY TYPED, so the screen that owns the submit can do something with it.
+     *
+     * IT WENT NOWHERE. This form held every value and handed out only `problems`, so the two
+     * screens that submit it could say whether the row was valid and not what the row was. On the
+     * first run that is the whole defect a friction pass ranked first of ten: four clicks,
+     * twenty-five keystrokes and zero rows, because the one control that matters had nothing to
+     * pass on.
+     */
+    taken?: Fields;
   } = $props();
 
   /**
@@ -163,6 +174,35 @@
 
   /** `bool` is never missing: unchecked is an answer, and it is the one the record stores. */
   let ticked = $state<Record<string, boolean>>({});
+
+  /**
+   * The typed values, in the shapes the record stores, handed back to whoever owns the submit.
+   *
+   * A `money` IS AN AMOUNT AND A CURRENCY and the box holds only the amount, so it is put back
+   * together here rather than at the two call sites: a screen that reconstructed it would be a
+   * second place that knows the minor-unit exponent, and the first thing to drift.
+   *
+   * AN EMPTY BOX IS AN ABSENT KEY AND NOT AN EMPTY STRING. A write stores neither, and a row
+   * carrying `note: ''` reads as a note somebody wrote and left blank.
+   */
+  $effect(() => {
+    const out: Fields = {};
+    for (const f of readableFields(register)) {
+      if (f.type === 'bool') {
+        if (ticked[f.id] !== undefined) out[f.id] = ticked[f.id]!;
+        continue;
+      }
+      const raw = (typed[f.id] ?? '').trim();
+      if (raw === '') continue;
+      if (f.type === 'money') {
+        const exp = exponentOf(currencyFor(register, f.id) ?? 'GBP');
+        out[f.id] = { amount: Math.round(Number(raw) * 10 ** exp), currency: currencyFor(register, f.id) ?? 'GBP' };
+        continue;
+      }
+      out[f.id] = f.type === 'int' || f.type === 'decimal' ? Number(raw) : raw;
+    }
+    taken = out;
+  });
 
   const wrong = (f: FieldDecl): string | null => {
     const raw = (typed[f.id] ?? '').trim();

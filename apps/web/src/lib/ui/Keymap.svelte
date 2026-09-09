@@ -13,16 +13,18 @@
   const TITLE: Record<Scope, string> = {
     document: copy.scopeDocument,
     grid: copy.scopeGrid,
+    board: copy.scopeBoard,
     page: copy.scopePage,
     gate: copy.scopeGate,
     palette: copy.scopePalette,
     nav: copy.scopeNav,
   };
 
-  /* One glyph per scope, so the six groups read as six places rather than six paragraphs. */
+  /* One glyph per scope, so the groups read as places rather than as paragraphs. */
   const GLYPH = {
     document: 'home',
     grid: 'rows',
+    board: 'board',
     page: 'doc',
     gate: 'decide',
     palette: 'search',

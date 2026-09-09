@@ -45,6 +45,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import Chip from '$lib/ui/Chip.svelte';
+  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import * as pending from '$lib/record/pending.svelte.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -204,20 +206,37 @@
   let receipts = $state(new Map<number, Receipt>());
 
   /**
-   * Rows added on this screen, in front of the answer.
+   * What has been changed on this screen and not written.
    *
-   * NOTHING IS WRITTEN, AND THE ROW SAYS SO. The record is not behind this screen yet, so the row
-   * is drawn where it will be, wearing `warn` and the words, rather than a toast that says one
-   * thing while the list says another. The moment a write path exists this becomes an optimistic
-   * write and the chip becomes the receipt for it: the shape does not change, only what it is
-   * waiting on.
+   * ONE PATCH PER ROW, applied over the answer. The record is not behind this screen yet, so an
+   * edit that vanished on the next keystroke would be a control that does nothing; an edit that
+   * claimed to be saved would be worse. The value the reader typed is what the row shows, the row
+   * wears `Not saved`, and `Put back` drops the patch: the same receipt every other verb on this
+   * screen leaves, because it is the same promise.
    */
-  let drafts = $state<Entry[]>([]);
-  let draftSeq = 0;
+  let edits = $state(new Map<number, Fields>());
 
   const receipt = (seq: number, r: Receipt) => {
     receipts = new Map(receipts).set(seq, r);
   };
+  /**
+   * What this row is wearing, which is not always something that happened on this screen.
+   *
+   * A PENDING ROW CARRIES ITS MARK WHETHER OR NOT ANYBODY IS STILL LOOKING AT THE PRESS THAT MADE
+   * IT. `receipts` is cleared whenever the question changes, because a chip saying `archived` beside
+   * a row somebody has just filtered TO is a chip about a different screen. A row that has not been
+   * written is not like that: it is unwritten on every screen, for as long as the tab is open, and
+   * the one place it is drawn is the one place that has to say so. A person who typed a row on the
+   * first run, went to the list, filtered it, and found their row wearing nothing would have been
+   * told it was saved by the absence of the sentence saying it was not.
+   *
+   * NEGATIVE SEQUENCES ARE THE TEST, because that is what `pending` mints and what nothing else in
+   * the record can be.
+   */
+  const receiptFor = (seq: number): Receipt | undefined =>
+    receipts.get(seq) ??
+    (seq < 0 ? { mark: copy.markNotWritten, intent: 'warn' as const, undo: () => pending.drop(id, seq) } : undefined);
+
   const clearReceipt = (seq: number) => {
     const next = new Map(receipts);
     next.delete(seq);
@@ -330,8 +349,15 @@
        the screen the instant it was touched and the reader's only way to check they had hit the
        right one was to do the opposite and look. `receipts` is what keeps it: the row is drawn
        where it was, wearing what happened to it, until the question changes. */
-    entries: [...drafts, ...pages.flat()],
-    matched: found.entries.length + drafts.length,
+    /* AND WHAT HAS BEEN EDITED HERE IS WHAT THE ROW SHOWS. A cell that took a value and then drew
+       the old one is a control that reports success and does nothing, which is the shape this
+       repository hunts. The patch is over the answer rather than in it: `pages` still holds what
+       the record returned, so `Put back` is dropping a key rather than reversing an arithmetic. */
+    entries: [...pending.of(id), ...pages.flat()].map((e) => {
+      const patch = edits.get(e.seq);
+      return patch ? { ...e, fields: { ...e.fields, ...patch } } : e;
+    }),
+    matched: found.entries.length + pending.of(id).length,
   });
   /**
    * THE ROWS IN HAND, WHICH IS NOT THE ROWS FETCHED.
@@ -519,12 +545,11 @@
        `obligations#7` is the one collision that would make the receipt point at the wrong row. */
     const title = decl?.title;
     if (!title) return;
-    draftSeq -= 1;
-    const seq = draftSeq;
-    drafts = [
-      { seq, version: 1, created: new Date(NOW).toISOString(), by: 'you', fields: { ...inherited, [title]: said } },
-      ...drafts,
-    ];
+    /* THE SAME PLACE THE FIRST-RUN SCREEN PUTS ITS ROW. A row typed here and a row typed on `/start`
+       are the same kind of thing, waiting on the same missing write path, and holding one of them
+       in this component and the other in a module would be two answers to one question: the second
+       screen to need it would have found the wrong one. */
+    const seq = pending.add(id, { ...inherited, [title]: said });
     /**
      * THE ROW IS ADDED EVEN WHEN THE REGISTER WANTS MORE, and the chip says what it wants.
      *
@@ -543,7 +568,7 @@
       mark: unanswered.length > 0 ? copy.markNeeds(unanswered.map((f) => f.label.toLowerCase()).join(', ')) : copy.markNotWritten,
       intent: 'warn',
       undo: () => {
-        drafts = drafts.filter((d) => d.seq !== seq);
+        pending.drop(id, seq);
         clearReceipt(seq);
       },
     });
@@ -567,6 +592,80 @@
     const said = state.replace(/_/g, ' ');
     receipt(seq, { mark: said, intent: 'warn', undo: () => clearReceipt(seq) });
     toasts.push(copy.notWritten(`${id}#${seq} would be set to ${said}`), { intent: 'warn' });
+  }
+
+  /* ── editing a value where it is drawn ───────────────────────────────────── */
+
+  /**
+   * CHANGING A VALUE YOU ARE LOOKING AT COST A FULL ROUTE CHANGE.
+   *
+   * A friction pass measured the path: click a cell, land on a read-only detail page, press *Edit
+   * the row*, get a toast. In-place editing was advertised on the `?` sheet as `e`, was reachable
+   * only from the keyboard, was announced nowhere on screen, and answered the press with a sentence
+   * saying what it would have done. It is eighth of the ten things that cost a person the most,
+   * and it is the one a person does most often after reading.
+   *
+   * THE CELL IS THE EDITOR. Not a drawer over the list, not a form on another screen: the value is
+   * already drawn in a box of exactly the right width, and the cheapest possible edit is that box
+   * becoming writable where it sits. Enter commits, Escape cancels, and the caret is put in it.
+   *
+   * FOUR TYPES AND NOT ALL OF THEM, said out loud rather than half-built. `text`, `enum`, `day` and
+   * the plain numbers are one value in one box and are editable here. A `money` is an amount AND a
+   * currency and a `ref` is a row in another register: both are two decisions, and a cell that took
+   * one of the two would write half a value. Those open the row, which is where the second decision
+   * has somewhere to go.
+   *
+   * WHICH IS WHICH IS DRAWN AND NOT EXPLAINED. The pencil appears on an editable cell and on no
+   * other, so the answer is in front of the reader at the moment they are looking at that cell. A
+   * sentence under the grid listing four type names would be a legend about a mechanism, read once
+   * and never again, for a question the cell can answer itself.
+   */
+  const EDITABLE = new Set(['text', 'enum', 'day', 'int', 'decimal', 'pct']);
+
+  let editing = $state<{ seq: number; field: string } | null>(null);
+  let editValue = $state('');
+
+
+
+  const fieldOf = (field: string) => decl?.fields.find((f) => f.id === field);
+  const editableHere = (field: string) => EDITABLE.has(fieldOf(field)?.type ?? '');
+
+  function openEditor(seq: number, field: string) {
+    if (!editableHere(field)) return;
+    const now = entry(id, seq)?.fields[field] ?? edits.get(seq)?.[field];
+    editing = { seq, field };
+    editValue = now === null || now === undefined ? '' : String(now);
+  }
+
+  function commitEdit() {
+    const at = editing;
+    if (!at) return;
+    editing = null;
+    const was = entry(id, at.seq)?.fields[at.field];
+    const said = editValue.trim();
+    /* NOTHING CHANGED IS NOT AN EDIT. A receipt for a value somebody looked at and left alone is a
+       row wearing `Not saved` for no reason, and after three of those the chip stops being read. */
+    if (said === (was === null || was === undefined ? '' : String(was))) return;
+
+    const next = new Map(edits);
+    next.set(at.seq, { ...(next.get(at.seq) ?? {}), [at.field]: said === '' ? null : said });
+    edits = next;
+    receipt(at.seq, {
+      mark: copy.markNotWritten,
+      intent: 'warn',
+      undo: () => {
+        const back = new Map(edits);
+        const patch = { ...(back.get(at.seq) ?? {}) };
+        delete patch[at.field];
+        if (Object.keys(patch).length === 0) back.delete(at.seq);
+        else back.set(at.seq, patch);
+        edits = back;
+        clearReceipt(at.seq);
+      },
+    });
+    toasts.push(copy.notWritten(`${id}#${at.seq} ${labelOf(fieldOf(at.field)!) .toLowerCase()} would be ${said || 'cleared'}`), {
+      intent: 'warn',
+    });
   }
 
   const copyId = (seq: number) => clipboard.putSpoken(id, seq);
@@ -878,8 +977,14 @@
       e.preventDefault();
       selected = new Set();
     } else if (e.key === 'e' || e.key === 'F2') {
+      /* THE KEY WAS ON THE `?` SHEET AND ANSWERED WITH A SENTENCE about what it would have done.
+         The cell under the caret is the one that opens: `focus.col` is where the grid's own caret
+         is, which is what the reader is looking at, and going to any other cell would be the
+         product choosing for them. */
       e.preventDefault();
-      toasts.push(copy.notWritten('The cell would open for editing in place'), { intent: 'warn' });
+      const row = result.entries[focus.row];
+      const field = columns[focus.col]?.field;
+      if (row && field) openEditor(row.seq, field);
     }
   }
 
@@ -1011,6 +1116,21 @@
   const emptyKind = $derived(
     result.total === 0 ? 'no-data-yet' : q || filters.length ? 'no-results' : 'cleared',
   );
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(decl?.name)}</title></svelte:head>
@@ -1177,12 +1297,20 @@
       <aside class="seen" role="note">
         <Icon name="observe" size="s" />
         <p class="seen-said">
-          <strong>{seen.n} writes</strong> to
+          <!-- `saves` AND `rejected`, WHICH WERE `writes` AND `refused`. Both are this product's own
+               words for the mechanism, and this banner sits on the front of the busiest list in the
+               product: a friction pass counted it as three tax words in one sentence, met by
+               somebody who came to look at their invoices. A write is a save and a refusal is a
+               rejection, in every product a person has used before this one. The CODE stays, in
+               the quiet strip below, because the sentence is for the person and the code is for
+               whoever they ask for help: showing only the friendly half leaves that person nothing
+               to search for. -->
+          <strong>{seen.n} saves</strong> to
           <!-- A NAME AND NOT A LINK. The writes were REFUSED, so there are no rows to filter to and
                nowhere in this build that shows a field's own declaration; a link that went to a
                filter matching nothing would be worse than the plain word. -->
           {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}this register{/if}
-          were refused over {seen.days} days: {seen.fix}.
+          were rejected over {seen.days} days: {seen.fix}.
           <!-- NO `title`. It carried `seen.why` — the same fact as the sentence beside it, in the
                schema's spelling, in an attribute no touch device shows and no keyboard reaches. Two
                tellings of one thing, one of them unreachable. -->
@@ -1417,6 +1545,53 @@
               >
                 {#if selected.has(seq)}<Icon name="check" size="s" />{/if}
               </button>
+            {:else if editing?.seq === seq && editing.field === column.field}
+              <!--
+                THE CELL BECOMES THE EDITOR, in the box the value is already drawn in.
+
+                `autofocus` IS RIGHT HERE AND WRONG ALMOST EVERYWHERE ELSE. The rule against it is
+                about a caret moving on page load, before the reader has decided anything; this
+                element exists only because they just asked for it, and an editor that opens without
+                the caret in it is an editor that costs a second gesture to use.
+
+                ENTER COMMITS AND ESCAPE CANCELS, and blurring commits too: a person who clicks away
+                has finished with the cell, and throwing their typing away for it is the behaviour
+                every spreadsheet taught them not to expect. `stopPropagation` on the keys, or the
+                grid's own handler reads them as navigation and the caret leaves mid-word.
+              -->
+              {@const f = fieldOf(column.field)}
+              {#if f?.type === 'enum'}
+                <!-- svelte-ignore a11y_autofocus -->
+                <select
+                  class="cell-edit"
+                  autofocus
+                  bind:value={editValue}
+                  onclick={(e) => e.stopPropagation()}
+                  onchange={commitEdit}
+                  onblur={commitEdit}
+                  onkeydown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Escape') editing = null;
+                  }}
+                >
+                  {#each f.values ?? [] as v}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
+                </select>
+              {:else}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input
+                  class="cell-edit"
+                  autofocus
+                  type={f?.type === 'day' ? 'date' : f?.type === 'text' ? 'text' : 'number'}
+                  bind:value={editValue}
+                  onclick={(e) => e.stopPropagation()}
+                  onblur={commitEdit}
+                  onkeydown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') commitEdit();
+                    else if (e.key === 'Escape') editing = null;
+                  }}
+                />
+              {/if}
             {:else if column.field === 'act'}
               <!--
                 THE ROW'S OWN VERBS, AND ITS RECEIPT, IN THE CELL THE ROW ALREADY HAS.
@@ -1429,7 +1604,7 @@
                 `stopPropagation` ON EVERY ONE, because the cell activates the row: without it,
                 archiving a row opened it on the way out.
               -->
-              {@const said = receipts.get(seq)}
+              {@const said = receiptFor(seq)}
               {@const name = display(id, decl.title, entry(id, seq)?.fields[decl.title]) ?? `#${seq}`}
               {#if said}
                 <span class="said">
@@ -1472,6 +1647,37 @@
               <IdentityMark identity={ident} />
             {:else if value === null}
               <span class="missing">—</span>
+            {:else if editableHere(column.field)}
+              <!--
+                THE POINTER PATH, AND IT WAS KEYBOARD ONLY. `e` has been on the `?` sheet since the
+                grid was written, so the capability existed for anybody who already knew it was
+                there, which is nobody on their first afternoon.
+
+                THE PENCIL IS A BUTTON AND NOT A DOUBLE CLICK. A double click is what a spreadsheet
+                taught everybody and it is invisible: nothing on the screen says the gesture exists,
+                and a single click on this cell already means what it means everywhere else here,
+                open the row. Two meanings on one target would make the list dangerous to browse.
+                A control that is drawn is a control somebody finds.
+
+                IT APPEARS ON HOVER AND ON KEYBOARD FOCUS AND TAKES NO SPACE OTHERWISE. A permanent
+                glyph in every cell of every row is a column of noise over the data somebody came to
+                read, and a capability that says so nowhere is a capability nobody uses.
+
+                `tabindex="-1"`, LIKE THE PICKER TWO CELLS OVER. A grid is a composite widget with
+                exactly one tab stop; at five hundred rows and eight editable columns a focusable
+                control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
+                sheet has advertised since the grid was written.
+              -->
+              <span class="cell-said">{value}<button
+                  type="button"
+                  class="cell-pen"
+                  tabindex="-1"
+                  aria-label={copy.editValue(labelOf(fieldOf(column.field)!))}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    openEditor(seq, column.field);
+                  }}
+                ><Icon name="edit" size="s" /></button></span>
             {:else}{value}{/if}
           {/snippet}
         </Table>
@@ -1927,6 +2133,62 @@
 
   /* The pointer's way in. It is `tabindex="-1"` — a grid has one tab stop — so it never takes focus
      and never needs a focus ring; the keyboard path is `x`, which the `?` sheet advertises. */
+  /* ── editing a value where it is drawn ────────────────────────────────── */
+
+  /* THE EDITOR IS THE CELL, so it takes the cell's box and none of its own. A control that grew the
+     row would push every row below it down the instant somebody started typing, which is the one
+     thing a list must not do while a person is reading it. */
+  .cell-edit {
+    inline-size: 100%;
+    min-inline-size: 0;
+    padding: 0 2px;
+    background: var(--s1);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+  }
+
+  .cell-said {
+    display: inline-flex;
+    gap: var(--sp-2);
+    align-items: center;
+    min-inline-size: 0;
+  }
+
+  /* PRESENT IN THE TREE AND INVISIBLE UNTIL IT IS WANTED. `opacity` and not `display: none`, because
+     a control removed from the box changes the cell's width the moment a pointer enters it, and a
+     column that reflows under the cursor is a column you cannot click accurately. */
+  .cell-pen {
+    display: grid;
+    flex: none;
+    place-items: center;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink2);
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  /* `:global(.td)`, BECAUSE THE CELL IS DRAWN BY `Table` AND NOT BY THIS FILE. Svelte scopes a
+     selector to the component that wrote it, so `.td:hover .cell-pen` matched nothing and compiled
+     to an unused rule: the pencil was in the tree, at zero opacity, for ever. The child half stays
+     scoped, which is what keeps this from reaching any other cell in the product. */
+  :global(.td):hover .cell-pen,
+  :global(.td):focus-within .cell-pen,
+  .cell-pen:focus-visible {
+    opacity: 0.55;
+  }
+
+  .cell-pen:hover,
+  .cell-pen:focus-visible {
+    color: var(--ink);
+    opacity: 1;
+  }
+
   /* ── capture, and the verbs on the row ────────────────────────────────── */
 
   /* ONE LINE, AND IT LOOKS LIKE ONE. The label is for a screen reader and for nobody else: the

@@ -28,6 +28,7 @@
      `undefined.word`. `isEventKind` is the kernel's own guard, beside the list. */
   import { isEventKind } from '@braindog/kernel';
   import type { EventKind } from '$lib/record/schema.ts';
+  import { drew } from '../../lib/ui/screen.svelte.ts';
 
   /**
    * What an event kind is called, and what it looks like — all forty of them.
@@ -176,6 +177,21 @@
     else next.delete(key);
     void goto(`?${next}`, { replaceState: false, noScroll: true, keepFocus: true });
   };
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(copy.audit)}</title></svelte:head>

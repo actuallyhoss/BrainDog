@@ -112,9 +112,27 @@ export const LOOKUPS: Record<string, Record<string, number>> = {
 export const REGISTERS: Record<string, SeedRegister> = {
   obligations: {
     id: 'obligations',
-    name: 'Obligations',
+    /**
+     * `Money`, AND IT WAS `Obligations`.
+     *
+     * IT IS THE FIRST WORD A STRANGER READS AFTER THEIR FIRST ACTION, and it was a word the
+     * product never showed them. The first-run screen offers five cards and the first is **Money**,
+     * "What you owe, and what you are owed"; choosing it landed on a screen whose largest type said
+     * *Obligations*, defined nowhere. A friction pass measured the whole first run and put this one
+     * word above the other twenty-nine together, for that reason: every other tax word is met by
+     * somebody already oriented, and this one is met by somebody who has just been told what they
+     * were choosing and finds it renamed.
+     *
+     * THE ID IS UNTOUCHED. `obligations` is what the URL says, what a predicate says, and what an
+     * agent writes, and `19 §9`'s rule is the one Slack follows rather than the one Notion follows:
+     * the interface says the word a person would say, for life, and the API keeps its own. Renaming
+     * the id would be a migration; renaming the label is a label.
+     */
+    name: 'Money',
     icon: 'obligation',
-    one: 'obligation',
+    /* `item`, because half of these are owed to you and half by you: `bill` is wrong for an invoice
+       you sent and `invoice` is wrong for a tax payment. */
+    one: 'item',
     holds: 'what you owe and what you are owed, with a date and a currency',
     title: 'what',
     /* WHICH WAY THE MONEY GOES, on the one screen that could not say. A card shows three declared
@@ -129,8 +147,12 @@ export const REGISTERS: Record<string, SeedRegister> = {
     pack: 'money-core',
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
-      { id: 'party', type: 'ref', to: 'people', index: true },
-      { id: 'direction', type: 'enum', values: ['owed_by_me', 'owed_to_me'], index: true, required: true },
+      /* `Who`, AND IT WAS `Party`. A column header is read at a glance by somebody scanning for a
+         name, and `Party` is a legal word for the same thing that reads as a social event. */
+      { id: 'party', label: 'Who', type: 'ref', to: 'people', index: true },
+      /* `Which way`, AND IT WAS `Direction`. The values already read as English: "owed by me" and
+         "owed to me". The header above them was the only abstract word in the pair. */
+      { id: 'direction', label: 'Which way', type: 'enum', values: ['owed_by_me', 'owed_to_me'], index: true, required: true },
       { id: 'amount', type: 'money', required: true },
       { id: 'due', type: 'day', index: true, deadline: true, required: true, remind: ['-7d', '0d'] },
       { id: 'state', type: 'enum', values: ['open', 'part', 'paid', 'written_off'], index: true, required: true },
@@ -222,8 +244,11 @@ export const REGISTERS: Record<string, SeedRegister> = {
   sessions: {
     id: 'sessions',
     icon: 'session',
-    name: 'Sessions',
-    one: 'session',
+    /* `Agent runs`, AND IT WAS `Sessions`. A session is a word this product's own author uses and
+       nobody else does: it is in the rail and as a block heading on a project page, and the thing
+       it names is one agent doing one piece of work. */
+    name: 'Agent runs',
+    one: 'run',
     holds: 'what each agent is doing in this record, and what it has touched',
     title: 'doing',
     mobile: ['doing', 'agent', 'state'],
@@ -273,8 +298,12 @@ export const REGISTERS: Record<string, SeedRegister> = {
   tracks: {
     id: 'tracks',
     icon: 'rows',
-    name: 'Tracks',
-    one: 'track',
+    /* `Threads`, AND IT WAS `Tracks`. It appears in the rail on every screen and as a column on
+       Tasks, and it was never explained anywhere: a reader meets it cold and it reads as music or
+       as shipping. A thread of work is the thing this holds and it is the word people already use
+       for it. The id stays `tracks`, which is what the URL and a predicate say. */
+    name: 'Threads',
+    one: 'thread',
     holds: 'the lines of work you are in the middle of, and what each one is waiting on',
     title: 'name',
     mobile: ['name', 'thing', 'state'],
@@ -842,7 +871,11 @@ export const PAGES: Record<string, SeedPage> = {
           { metric: 'owed-to-you', label: 'Owed to you' },
           { metric: 'due-30d', label: 'Due in 30 days' },
           { metric: 'overdue', label: 'Overdue to pay' },
-          { metric: 'runway', label: 'Runway' },
+          /* `How long the money lasts` AND IT WAS `Runway`. A stat tile carries four words and a
+             number, so the label IS the explanation: `Runway` is a startup word for a fact every
+             business owner already thinks about in a sentence, and this is that sentence. The
+             metric id stays `runway`, which is what a declaration and a predicate say. */
+          { metric: 'runway', label: 'How long the money lasts' },
         ],
       },
       {

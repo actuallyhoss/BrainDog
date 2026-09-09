@@ -1,0 +1,62 @@
+/**
+ * Rows somebody typed on this screen that the record has not been given yet.
+ *
+ * THE FIRST-RUN SCREEN DID NOT PRODUCE THE ROW IT PROMISED, AND DID NOT SAY SO. A friction pass
+ * measured the whole path and ranked it first of the ten things costing a person the most: four
+ * clicks, twenty-five keystrokes, six decisions, three screens, and zero rows. The screen asks for
+ * one true fact about your own business, takes it, and the list you arrive at holds thirty-eight
+ * rows belonging to a fictional studio with yours nowhere among them.
+ *
+ * THE HONEST FIX IS NOT A WRITE PATH, WHICH DOES NOT EXIST YET. It is that the row somebody typed
+ * is the row they then see, wearing the truth about itself. This module is where it waits: added on
+ * one screen, drawn on another, marked `Not saved`, and dropped by the same `Put back` every other
+ * verb in the product offers.
+ *
+ * IT IS NOT A CACHE AND IT IS NOT STORAGE. It lives for as long as the tab does. A row that
+ * survived a reload would be a row this product had promised to keep, and it cannot keep one: an
+ * unwritten row that comes back tomorrow looking saved is worse than one that is honestly gone.
+ * `pref.ts` is per device and is for preferences; a row is not a preference.
+ *
+ * NEGATIVE SEQUENCES, so a pending row can never collide with one the record has. The spoken id is
+ * what every screen addresses a row by, and two rows answering to `obligations#7` is the one
+ * collision that would put a receipt, a menu or an edit on the wrong one.
+ */
+
+import type { Entry, Fields } from './schema.ts';
+import { NOW } from './data.ts';
+
+const rows = $state(new Map<string, Entry[]>());
+
+let next = 0;
+
+/** Add one, and hand back the sequence it was given so a caller can point a receipt at it. */
+export function add(register: string, fields: Fields): number {
+  next -= 1;
+  const seq = next;
+  const row: Entry = { seq, version: 1, created: new Date(NOW).toISOString(), by: 'you', fields };
+  rows.set(register, [row, ...(rows.get(register) ?? [])]);
+  return seq;
+}
+
+/** What is waiting for one register, newest first. Empty for a register nobody has typed into. */
+export function of(register: string): Entry[] {
+  return rows.get(register) ?? [];
+}
+
+/** Take one back out. The inverse of `add`, which is what `Put back` calls. */
+export function drop(register: string, seq: number): void {
+  const held = rows.get(register);
+  if (!held) return;
+  const left = held.filter((r) => r.seq !== seq);
+  if (left.length === 0) rows.delete(register);
+  else rows.set(register, left);
+}
+
+/**
+ * Whether anything is waiting anywhere.
+ *
+ * FOR THE ONE SENTENCE THAT HAS TO BE TRUE ACROSS SCREENS. A person who typed a row on the first
+ * run and then went somewhere else has an unwritten row in this product, and no screen but the one
+ * it belongs to would otherwise say so.
+ */
+export const anyPending = (): number => [...rows.values()].reduce((n, r) => n + r.length, 0);

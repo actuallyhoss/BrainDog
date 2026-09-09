@@ -39,14 +39,17 @@ test('a register nothing was observed about is silent', () => {
 test('the field is named the way the rest of the product names it', () => {
   // `direction`, not `Direction` by accident and not `direction` raw: it goes through `labelOf`,
   // so a pack that relabels the field relabels this sentence too.
-  assert.equal(noticed('obligations')?.field?.label, 'Direction');
+  assert.equal(noticed('obligations')?.field?.label, 'Which way');
 });
 
 test('the refusal code survives, whole', () => {
   // The friendly clause is for the person and the code is for whoever supports them. Showing only
   // the clause leaves nothing to search for; the code is what appears in the logs.
   const seen = noticed('obligations');
-  assert.match(seen?.fix ?? '', /not one this field declares/);
+  /* `allows` AND IT SAID `declares`. The sentence is for the person reading their own list and
+     `declares` is this product's word for the mechanism; the CODE is what survives whole, because
+     it is what whoever supports them will search for. */
+  assert.match(seen?.fix ?? '', /not one this field allows/);
   assert.equal(seen?.code, 'ENUM_VALUE_UNKNOWN');
 });
 

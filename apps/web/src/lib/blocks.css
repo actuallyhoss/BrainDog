@@ -338,6 +338,46 @@
     font-size: var(--t-sm);
   }
 
+  /* ── board: the move ────────────────────────────────────────────────────
+     A card is draggable only where the host passed `onmove`, so every rule below describes a board
+     that can actually be changed. A board that cannot draws none of these attributes at all. */
+
+  .card[draggable='true'] {
+    cursor: grab;
+    /* The pointer picks up the CARD, not the words in it: a native drag that begins as a text
+       selection drags the sentence and leaves the card sitting where it was. */
+    user-select: none;
+  }
+
+  .card[data-carrying] {
+    cursor: grabbing;
+    opacity: 0.45;
+  }
+
+  /* THE COLUMN THAT WOULD TAKE IT, and only while a drop there would do something: the card's own
+     column stays dark, which is how "this changes nothing" gets said without a message. An inset
+     ring rather than a border, so no column changes width and the four stacks do not shift under
+     the card being carried. */
+  .board-col[data-drop] {
+    background: color-mix(in srgb, var(--accent) 10%, var(--s1));
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+  /* NOT SAVED, IN WORDS: the register's receipt chip, in the one place a card has room for it.
+     Untoned on purpose, because a word carries its own meaning and needs no hue to do it. */
+  .card-mark {
+    align-self: start;
+    margin-block-start: var(--sp-1);
+    padding: 1px 6px;
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+
   .card-detail {
     color: var(--dim);
     font-size: var(--t-xs);
@@ -656,6 +696,18 @@
     color: var(--earn);
     font-size: var(--t-xs);
     align-self: center;
+  }
+
+  /* THE SAME BOX, WHETHER OR NOT IT CAN ACT. `List` draws a `<button>` where the host gave it
+     somewhere to put the answer and a `<span>` where it did not, and a user-agent button arrives
+     wearing its own face: a system colour behind it and its own padding inside. Nothing on the
+     screen may move when a callback appears, so the control is reset back to the drawing it
+     replaced. Colour and size are the rule above's, at higher specificity. */
+  button.item-marker {
+    appearance: none;
+    padding: 0;
+    background: none;
+    cursor: pointer;
   }
 
   .item-marker[data-done='yes'] {

@@ -7,7 +7,7 @@
   police afterwards (50 §2.7).
 -->
 <script lang="ts">
-  import { KINDS, TONES, inline, type Block, type RenderOptions } from '../src/index.ts';
+  import { KINDS, TONES, inline, type Block, type RenderOptions, type Row } from '../src/index.ts';
   import Text from './Text.svelte';
   import Panel from './p/Panel.svelte';
   import Grid from './p/Grid.svelte';
@@ -18,7 +18,30 @@
   import Table from './p/Table.svelte';
   import Media from './p/Media.svelte';
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
+  let {
+    block,
+    opts = {},
+    onmove,
+    ontick,
+  }: {
+    block: Block;
+    opts?: RenderOptions;
+    /**
+     * TWO PRIMITIVES CAN BE CHANGED AND THE OTHER SIX CANNOT, so two callbacks cross this component
+     * and reach exactly the ones that take them.
+     *
+     * THEY ARE NOT ON `RenderOptions`. Every member of that type is a READ: a resolver, a link
+     * builder, a clock. Putting a write callback on it would give `toHTML` a key it can never
+     * honour, and the two renderers are equal by construction rather than by a promise.
+     *
+     * A PRIMITIVE WITH NO CALLBACK DRAWS NOTHING INTERACTIVE AT ALL, which is `19 §6`'s rule
+     * applied one layer down: a control that cannot act is absent rather than greyed out. So an
+     * embedder who wants a read-only board or a read-only checklist gets one by passing nothing,
+     * and the markup is what it has always been.
+     */
+    onmove?: ((row: Row, to: string) => void) | undefined;
+    ontick?: ((row: Row, done: boolean) => void) | undefined;
+  } = $props();
 
   const PRIMITIVE = { panel: Panel, grid: Grid, rows: Rows, proportional: Proportional, inline: InlineRun, list: List, media: Media };
 
@@ -55,6 +78,12 @@
     {#if comparison}
       <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length + 1} label={block.heading} />
     {/if}
+  {:else if spec.primitive === 'grid'}
+    <!-- BY NAME rather than through `Draw`, because the callback belongs to one primitive: handed
+         to the union the other six are in, it is a prop none of them declares. -->
+    <Grid {block} {opts} {onmove} />
+  {:else if spec.primitive === 'list'}
+    <List {block} {opts} {ontick} />
   {:else if Draw}
     <Draw {block} {opts} />
   {:else}

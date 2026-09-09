@@ -27,6 +27,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import { drew } from '../../lib/ui/screen.svelte.ts';
 
   const q = $derived(route.url.searchParams.get('q') ?? '');
 
@@ -58,6 +59,21 @@
       void goto(`?${next}`, { replaceState: true, noScroll: true, keepFocus: true });
     }, 150);
   }
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(q || copy.search)}</title></svelte:head>

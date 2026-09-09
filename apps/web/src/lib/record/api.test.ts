@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, isProse, labelOf, metric, packDiff, page, search, toRows } from './api.ts';
+import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, isProse, labelOf, metric, packDiff, page, readableFields, search, toRows } from './api.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
@@ -88,17 +88,42 @@ test('an int is grouped', () => {
   assert.equal(display('sessions', 'wrote', 12_400), '12,400');
 });
 
-test('THE DEFAULT COLUMNS INCLUDE EVERY `index:` FIELD, and the word is the one the record uses', () => {
-  /* This read `f.indexed` while the declaration said `index:`, which is one letter and no error:
-     `undefined` is falsy, so the grid quietly fell back to the title and the three mobile fields and
-     the filter bar offered nothing. Nothing failed — there was just less of the register on screen
-     than the register declares. */
+test('A LIST OPENS ON WHAT ANSWERS ITS QUESTION, and it used to open on every `index:` field', () => {
+  /**
+   * `index: true` MEANS FAST TO FILTER, NOT WORTH READING, and this asserted the opposite.
+   *
+   * The rule it guarded was real once: `columnsFor` read `f.indexed` while the declaration said
+   * `index:`, one letter and no error, so the grid quietly fell back to the title and the mobile
+   * fields and nothing failed. The fix was right and the test then froze the wrong half of it.
+   *
+   * A friction pass counted what that cost. `/r/obligations` drew nine columns over thirty-nine
+   * rows: 180 numbers, 88 controls and 597 words on a screen whose question is what do I owe and
+   * what am I owed. `services` indexes five fields because a page filters on five, which is a
+   * decision about SQL taken by whoever wrote the declaration, and it was being read as an
+   * editorial one.
+   *
+   * WHAT IS ASSERTED NOW IS THE EDITORIAL SET the declaration actually nominates: the title, the
+   * fields it puts on a card where there is room for three, the state a reader scans to compare,
+   * and the deadline the row's whole tone is computed from. A red row with nothing on it saying
+   * why is the one thing leaving the deadline off would cost.
+   */
   for (const [id, decl] of Object.entries(REGISTERS)) {
     const shown = new Set(columnsFor(id).map((c) => c.field));
-    for (const f of decl.fields)
-      if (f.index) assert.ok(shown.has(f.id), `${id}.${f.id} is declared index: and is not a column`);
+    const must = [decl.title, ...decl.mobile, ...(decl.state ? [decl.state] : []), ...decl.fields.filter((f) => f.deadline).map((f) => f.id)];
+    for (const f of must) assert.ok(shown.has(f), `${id}.${f} answers this list's question and is not a column`);
+    assert.ok(shown.size <= 7, `${id} opens on ${shown.size} columns, which is a database rather than an answer`);
   }
-  // And there is at least one, or the assertion above is vacuous.
+});
+
+test('and every `index:` field is still offerable as a filter, which is what indexing is for', () => {
+  /* The half of the old rule that was always true. A filter on an unindexed field is a scan, which
+     is what `query.scan` exists to notice, so the filter bar draws exactly the indexed ones: the
+     declaration's storage decision belongs there and not in the column set. */
+  for (const [id, decl] of Object.entries(REGISTERS)) {
+    const offerable = new Set(readableFields(id).map((f) => f.id));
+    for (const f of decl.fields)
+      if (f.index) assert.ok(offerable.has(f.id), `${id}.${f.id} is declared index: and cannot be filtered on`);
+  }
   assert.ok(Object.values(REGISTERS).some((r) => r.fields.some((f) => f.index)), 'no register declares an index');
 });
 

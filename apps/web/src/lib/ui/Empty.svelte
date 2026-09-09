@@ -15,6 +15,7 @@
   import type { Snippet } from 'svelte';
 
   import Icon from './Icon.svelte';
+  import { drew } from './screen.svelte.ts';
   import type { IconName } from './icons.ts';
 
   export type EmptyKind = 'no-data-yet' | 'no-results' | 'cleared' | 'no-permission' | 'error';
@@ -74,6 +75,20 @@
     'no-permission': 'lock',
     error: 'alert',
   };
+
+  /**
+   * THE HALF OF THE READINESS CONTRACT THAT COSTS NO ROUTE ANYTHING.
+   *
+   * Eighteen of the nineteen `+page.svelte` files import this component, so `empty` and `refused`
+   * land in one file rather than in eighteen, and a screen drawing one of these five states says so
+   * without its route being edited.
+   *
+   * THE FIVE KINDS MAP ONTO TWO VALUES WITHOUT INVENTING A VOCABULARY. `error` is already this
+   * component's refusal state, which is what the request id below is keyed on, and the other four
+   * are a screen that has an answer and the answer is nothing. A gate measures a designed empty
+   * state normally and must not measure a refusal, which is the whole reason they are told apart.
+   */
+  $effect(() => drew(kind === 'error' ? 'refused' : 'empty'));
 </script>
 
 <div class="empty" data-kind={kind} class:compact>

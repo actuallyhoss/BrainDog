@@ -115,6 +115,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import { drew } from '../../../lib/ui/screen.svelte.ts';
 
   /* Twelve rows with a glyph each, because this rail's own CSS says it "IS the same thing" as the
      app's rail, and the app's rail has never had a row without one. A list of twelve bare words is
@@ -347,6 +348,21 @@
   function promote(decl: PageDecl) {
     toasts.push(copy.notWritten(`${decl.title} would be placed at the end of its section in your nav`), { intent: 'warn' });
   }
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(known?.label, copy.settings)}</title></svelte:head>
@@ -1269,7 +1285,7 @@
                     {#if DEPLOYMENT.kind === 'self-host'}
                       <Button
                         weight="bare"
-                        onclick={() => toasts.push(copy.notWritten(`${snap.id} would be downloaded, sealed, as it sits on disk`), { intent: 'warn' })}
+                        onclick={() => toasts.push(copy.notWritten(`${snap.id} would be downloaded exactly as it sits on disk, signed`), { intent: 'warn' })}
                       >{copy.download}</Button>
                     {/if}
                   {/if}
@@ -1281,7 +1297,7 @@
         <div class="row-actions">
           <Button
             weight="primary"
-            onclick={() => toasts.push(copy.notWritten('A sealed copy of the whole record would be written now, and counted against the thirty'), { intent: 'warn' })}
+            onclick={() => toasts.push(copy.notWritten('A backup of the whole record would be written now, and counted against the thirty'), { intent: 'warn' })}
           >{copy.snapshotNow}</Button>
         </div>
       </Section>

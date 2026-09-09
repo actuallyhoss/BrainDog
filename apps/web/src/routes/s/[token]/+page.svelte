@@ -23,6 +23,7 @@
   import Mark from '$lib/ui/Mark.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import { drew } from '../../../lib/ui/screen.svelte.ts';
 
   /**
    * What this token opens — and `null` when it opens nothing.
@@ -51,6 +52,21 @@
   const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW };
 
   const token = $derived(state.params.token ?? '');
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf('Shared')}</title></svelte:head>

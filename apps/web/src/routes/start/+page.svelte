@@ -31,6 +31,9 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { drew } from '../../lib/ui/screen.svelte.ts';
+  import * as pending from '$lib/record/pending.svelte.ts';
+  import type { Fields } from '$lib/record/schema.ts';
 
   /* The five live in `copy.ts` with every other sentence in the product, so the scope this screen
      claims can be checked against the rest of it in one pass rather than found in a component. */
@@ -40,6 +43,10 @@
   /* What the generated form would refuse, bound out of it so the button can be dead while it is
      true rather than answering a press with a toast. */
   let problems = $state<string[]>([]);
+  /** What the form holds, so the submit can put the row somewhere rather than describing it. */
+  let taken = $state<Fields>({});
+  /** The sequence the pending row was given, so the offer below can point at it. */
+  let made = $state<number | null>(null);
 
   /**
    * The number under each choice, and it did nothing.
@@ -171,6 +178,22 @@
     /* THE BUTTON IS ALREADY DISABLED WHEN THIS IS TRUE. Kept as the second door, because Enter in a
        text field submits a form whatever its button looks like. */
     if (problems.length > 0) return;
+    /**
+     * AND THE ROW IS THE ROW THEY THEN SEE, which it was not.
+     *
+     * A friction pass ranked this first of the ten things costing a person the most, and the
+     * measurement is the whole argument: four clicks, twenty-five keystrokes, six decisions, three
+     * screens, **zero rows**. The list this screen offers to open holds thirty-eight rows belonging
+     * to a fictional studio and the one thing the person typed is nowhere in it, with nothing on
+     * either screen saying why.
+     *
+     * IT IS NOT A WRITE AND IT DOES NOT CLAIM TO BE. `pending` holds it for the life of the tab,
+     * the list draws it where it will be, and it wears `Not saved` on the row: the same receipt
+     * every other verb in this product leaves, so a person meets one product rather than one
+     * product and one exception. The sentence under this form already says nothing was saved; what
+     * changes is that the row exists to be looked at while that is true.
+     */
+    made = pending.add(choice.key, taken);
     toasts.push(copy.notWritten(`the first row in ${choice.label} would be written`));
     said = true;
   }
@@ -185,6 +208,21 @@
    * self-host is first opened, so the environment where that lies is the one this screen exists
    * for. `clipboard.ts` exists for exactly this and reports the failure.
    */
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:window onkeydown={key} />
@@ -273,6 +311,7 @@
             autofocus
             label={firstRun.firstField[choice.key]}
             bind:problems
+            bind:taken
           />
         {/key}
 
@@ -310,7 +349,7 @@
           <div class="kept" role="status">
             <p class="kept-what">{firstRun.keptNothing}</p>
             <p class="kept-why">{firstRun.keptNothingWhy}</p>
-            <p class="kept-why">{firstRun.seeTheListWhy}</p>
+            <p class="kept-why">{firstRun.rowIsThere}</p>
             <div class="actions">
               <Button href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(choice.label)}</Button>
             </div>

@@ -295,7 +295,10 @@ test('THE QUOTED QUERY IS THE READER’S WORDS, not the column’s', () => {
      `whereOf(filters)` — the sentence the EVALUATOR reads, which spells the stored value. So a
      reader who pressed a chip labelled "owed to me" was shown `direction is owed_to_me` and asked to
      check a filter in a spelling they had never seen. */
-  assert.equal(saidPlainly('obligations', 'direction is owed_to_me'), 'direction is owed to me');
+  /* `which way`, WHICH IS WHAT THE COLUMN IS CALLED NOW. The printer reads `decl.label`, so the
+     sentence follows the label rather than the field id: that is the whole mechanism, and it means
+     a pack that renames a field renames every filter sentence about it. */
+  assert.equal(saidPlainly('obligations', 'direction is owed_to_me'), 'which way is owed to me');
   assert.equal(saidPlainly('obligations', 'state is paid'), 'state is paid');
   /* A relative day becomes the phrase, for the same reason: `+30d` is not something anybody typed. */
   assert.equal(saidPlainly('services', 'renews before +30d'), 'renews before 30 days from now');

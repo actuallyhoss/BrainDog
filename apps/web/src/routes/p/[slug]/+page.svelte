@@ -33,6 +33,7 @@
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropIndex, spanOf as declaredSpan } from '$lib/record/arrange.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { drew } from '../../../lib/ui/screen.svelte.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const result = $derived(readPage(slug));
@@ -410,6 +411,21 @@
       : '',
   );
 
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(result?.page?.title)}</title></svelte:head>
@@ -462,7 +478,11 @@
         <span class="source-slot">
           <Button weight="bare" href="?src={showSource ? '0' : '1'}">
             <Icon name="code" size="s" />
-            {showSource ? 'Page' : 'Source'}
+            <!-- `How this page is built` AND IT WAS `Source`. It sits top right on every page beside
+                 `Edit layout`, and `Source` is a developer's word for the thing: a reader who does
+                 not write code reads it as an origin or a supplier. Two literals in markup were
+                 also the last two on this screen, so they move to `copy.ts` with everything else. -->
+            {showSource ? copy.pageBack : copy.pageSource}
             <Kbd keys="⇧E" />
           </Button>
         </span>
@@ -621,9 +641,26 @@
                 <!-- A FIGURE IS A DOOR, and the address is the metric's own: `hrefFor` derives it
                      from the same predicate the figure is computed over, so a tile and the list it
                      opens cannot disagree. -->
+                <!--
+                  THE TWO PRIMITIVES A READER CAN CHANGE, GIVEN SOMEWHERE TO PUT THE ANSWER.
+
+                  A friction pass ranked both: a board with fourteen cards across four columns and
+                  no way to move one was fourth of ten, and a checkbox drawn beside a task that was
+                  an `<img>` was fifth. Both had the same cause, one layer down: the primitive
+                  refuses to draw an interactive control unless the host hands it a callback, and
+                  no host ever did. So the capability was written, correct, and unreachable.
+
+                  THE TOAST IS THE BACKUP AND THE MARK ON THE CARD IS THE ANSWER, which is how
+                  `archive` works on the register list. Nothing is written: the record is not behind
+                  this screen yet, and both primitives say so on the thing that moved rather than
+                  only in a message at the other end of the screen.
+                -->
                 {#if segment.type === 'block'}<Block
                     block={segment}
                     opts={{ ...opts, cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
+                    onmove={(row, to) => toasts.push(copy.cardMovedTo(row.cells[1] ?? copy.cardFallback, to), { intent: 'warn' })}
+                    ontick={(row, done) =>
+                      toasts.push(copy.taskTicked(row.cells[0] ?? copy.cardFallback, done), { intent: 'warn' })}
                   />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}

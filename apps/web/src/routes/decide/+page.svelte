@@ -4,22 +4,168 @@
   Ranking by age is what turns a decision queue into a backlog: the oldest question is usually the
   one nobody has needed to answer. Ranking by what deciding late costs puts the expensive one first
   and makes the order arguable, which is the point (19 §2).
+
+  AND THE OPTIONS ON A CARD ARE NOW THE ANSWER, WHICH FOR A LONG TIME THEY ONLY LOOKED LIKE.
+
+  This screen printed every option as one `<span class="q-options">` reading "Per seat · Per product ·
+  One studio price", inside the card's own link. Nine printed answers across the queue, none of them
+  pressable, every one of them landing on `/decide/<id>` with nothing selected. Answering meant a
+  second screen, a choice, and then a paragraph of prose before the commit button would turn on.
+  `loop/research-friction.md` §6 ranks that ninth of the ten things that cost a person the most.
+
+  A CARD CANNOT HOLD A BUTTON INSIDE ITS LINK, so the shape had to change first: a button inside an
+  anchor is invalid HTML and an ambiguous target. `RowCards.svelte` had already answered this for the
+  register: the anchor and the row's verbs are SIBLINGS under one card. This follows it rather
+  than inventing a second answer.
+
+  `/decide/<id>` KEEPS EVERYTHING IT HAD. It is where a decision is examined: the cost, the option
+  bodies, the recommendation, the defer with its wake date, and a commit that takes a named decider
+  and a written reason and cannot be edited afterwards. What changed is that the common case no
+  longer has to go there.
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
+  import { tick } from 'svelte';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED, DOM_CAP, NOW, metric } from '$lib/record/api.ts';
+  import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
+  import type { Question } from '$lib/record/schema.ts';
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Button from '$lib/ui/Button.svelte';
+  import Chip from '$lib/ui/Chip.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { drew } from '../../lib/ui/screen.svelte.ts';
 
   let { data } = $props();
 
   const open = $derived([...data.questions].sort((a, b) => a.rank - b.rank));
   const target = metric('open-questions');
+
+  /**
+   * SENTENCES THAT BELONG IN `copy.ts` AND ARE NOT THERE YET.
+   *
+   * `50 §3` gives that file the job of being the one place a sentence is typed, so the
+   * no-over-explaining rule is reviewable in one read. These six are local only because `copy.ts`
+   * was being edited elsewhere on the day this landed, and moving them is a rename rather than a
+   * redesign. Everything already in `copy.ts` is used from there: `reasonHint` is the field's
+   * placeholder and `markNotWritten` is the chip, both unchanged.
+   */
+  /* THE SENTENCES MOVED TO `copy.ts`, WHERE EVERY OTHER UI LITERAL IN THIS PRODUCT LIVES. They were
+     local because the file that owns them was being edited elsewhere at the same time; `19 §9`'s
+     rule is one place, so a word cannot be changed on one screen and not on another. */
+  const SAY = {
+    answered: copy.answeredOption,
+    putBack: copy.takeItBack,
+    putBackOf: copy.takeItBackOf,
+    whyLabel: copy.whyForLater,
+    reasonMissing: copy.reasonMissing,
+    reasonThin: copy.reasonThinNudge,
+  } as const;
+
+  /**
+   * ANSWERS MADE HERE, KEYED BY QUESTION.
+   *
+   * A `Map` rather than a field on the question, because the seed is the record and this screen has
+   * no business editing it. Re-assigned rather than mutated on every change: Svelte 5 proxies
+   * objects and arrays and not `Map`, which is the same reason the register grid writes
+   * `receipts = new Map(receipts).set(…)`.
+   *
+   * IT DOES NOT SURVIVE LEAVING THE SCREEN, and that is deliberate rather than unfinished. An
+   * answer here is not a write, so carrying it across a navigation would be this screen remembering
+   * something the record does not know, which is the defect this repository hunts hardest.
+   */
+  let answers = $state(new Map<string, Answer>());
+
+  /**
+   * ONE PRESS ANSWERS THE QUESTION, AND THE REASON IS ASKED FOR AFTERWARDS. The decision, and why.
+   *
+   * What was here before: the reason was REQUIRED, on a second screen, before the commit button
+   * would turn on, and the requirement was satisfied by ONE CHARACTER, at which point the product
+   * asked "That will not mean anything in six weeks. Keep it anyway?". Every part of that argument
+   * is correct except where it was made. Put in front of the answer it is an obstacle, and an
+   * obstacle a single keystroke clears is not protecting the record from anything: it buys typing,
+   * not a reason.
+   *
+   * SO THE DEMAND MOVED TO WHERE ITS VALUE IS, WHICH IS AFTER THE PRESS AND FOR AS LONG AS IT GOES
+   * UNANSWERED. The answer costs one press. The card then holds an open field with the six-week
+   * argument standing under it, and an answer with no prose behind it keeps saying so, on the card,
+   * where the person who made it can see the gap they left. The reason is the whole subject of this
+   * queue and it is asked for every time; it is not allowed to stop the queue moving.
+   *
+   * `/decide/<id>` STILL REQUIRES IT, and that is not an inconsistency. Going there is choosing the
+   * ceremony: the option bodies, the recommendation, a named decider and a row that cannot be edited
+   * afterwards. Two screens, two acts. This one is answering a question you have already thought
+   * about, and the receipt says exactly which of the two it was.
+   *
+   * THE RECOMMENDATION IS NOT MARKED HERE, and that is the same argument `/decide/<id>` makes about
+   * never pre-selecting it: with the answer one press away, a "Recommended" badge beside a button
+   * turns rubber-stamping the machine into the cheapest thing on the screen. It is shown on the
+   * screen where the option bodies are, next to the reasoning it came from.
+   */
+  async function take(q: Question, key: string) {
+    const a = answerFor(q, key, new Date(NOW).toISOString());
+    /* A key this question does not offer answers nothing. It cannot happen from these buttons; it
+       is the guard for the day something else presses. */
+    if (!a) return;
+    answers = record(answers, a);
+
+    /**
+     * THE UNDO IS OFFERED IMMEDIATELY, WHICH IS ONLY HONEST BECAUSE NOTHING IS OUT.
+     *
+     * `loop/REWORK.md` §4's rule is that the inverse waits for the write to land, because a stack
+     * entry for something that has not happened would write the old value over a record the server
+     * never moved. This app is a synchronous mock over `@braindog/seed`: there is no request, so
+     * there is no window in which that could be true. The day there is one, this offer moves into
+     * the response and the chip below becomes the pending state.
+     */
+    toasts.push(copy.notWritten(wouldRecord(a)), {
+      intent: 'warn',
+      undo: () => (answers = withdraw(answers, q.id)),
+    });
+
+    /* THE PRESSED CONTROL IS GONE, SO FOCUS HAS TO BE PUT SOMEWHERE. Without this it falls to the
+       document and a keyboard user is at the top of the page with no idea what happened. It lands
+       on the inverse of what they just did, which is the one control they might want next. */
+    await tick();
+    document.getElementById(`undo-${q.id}`)?.focus();
+  }
+
+  /**
+   * AND TAKING IT BACK PUTS THE FOCUS BACK TOO, on the option that was pressed.
+   *
+   * The same hole as `take`, in the other direction: this time the control that disappears is the
+   * undo, and without this the round trip ends with focus on the document and the card somewhere
+   * above. It lands on the button they chose rather than the first one, because that is the one they
+   * were looking at and it is now pressable again.
+   *
+   * The toast's own undo does not come through here. It is pressed from the toast stack, where
+   * focus is already somewhere else, and every undo in this product behaves the same way from there.
+   */
+  async function putBack(q: Question, option: string) {
+    answers = withdraw(answers, q.id);
+    await tick();
+    document.getElementById(`opt-${q.id}-${option}`)?.focus();
+  }
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says. Answering a card writes nothing and fetches nothing, so it does not move.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(copy.decide)}</title></svelte:head>
@@ -33,15 +179,19 @@
   {#if open.length === 0}
     <Empty kind="cleared" title={copy.noQuestions} body="{copy.lastDecided} {since(DECIDED[0]?.decided?.at ?? '', NOW)}." />
   {:else}
+    <!-- THE COUNTS DO NOT MOVE WHEN A CARD IS ANSWERED, and they are right not to. Nothing was
+         written, so nothing left the queue: a heading that counted down would be this screen
+         claiming a state the record has never heard of. -->
     <Section title={copy.openQuestions} count={open.length}>
       {#snippet aside()}
         <span class="target">{target.note}</span>
       {/snippet}
 
       <ol class="queue">
-        {#each open as q, i}
-          <li>
-            <a class="q" href="/decide/{q.id}">
+        {#each open as q, i (q.id)}
+          {@const said = answers.get(q.id)}
+          <li class="q">
+            <a class="q-open" href="/decide/{q.id}">
               <span class="q-rank num">{i + 1}</span>
               <span class="q-body">
                 <span class="q-head">
@@ -49,23 +199,75 @@
                   {#if q.entity}<span class="q-entity">{q.entity}</span>{/if}
                   <span class="q-age">opened {since(q.opened, NOW)}</span>
                 </span>
-                <span class="q-title">{q.title}</span>
+                <span class="q-title" id="q-{q.id}-title">{q.title}</span>
                 <span class="q-cost">{q.cost}</span>
-                <!-- WHAT THE CHOICES ARE, NOT THREE CONTROLS THAT MAKE THEM. These were pill-shaped,
-                     boxed and bordered, inside the card's own link — so three targets that looked
-                     like three choices were one: clicking "One studio price" landed on the question
-                     with nothing preselected, byte-identical to clicking anywhere else on the card.
-                     `13 §5.2`'s rule is that a control is a control; the inverse holds, and a thing
-                     that is not one must not dress as one.
-
-                     They stay, because knowing a decision has three options and what they are is
-                     most of why this row is scannable. They read as the sentence they are. Picking
-                     one from here is a real feature and it is filed as one: it needs the card to
-                     stop being a single link, which is a change to a spine screen, not a style. -->
-                <span class="q-options">{q.options.map((o) => o.title).join(' · ')}</span>
               </span>
               <Icon name="chevron" size="m" />
             </a>
+
+            <!-- THE VERBS, BESIDE THE LINK AND NOT INSIDE IT. One card, two regions, separated by a
+                 rule so the boundary is visible rather than inferred: above it opens the question,
+                 below it answers it. -->
+            <div class="q-act">
+              {#if said}
+                {@const state = reasonState(said.reason)}
+                <div class="said">
+                  <!-- NOT SAVED, SAID ON THE CARD. `Chip` is what draws it, because the tone comes
+                       with its glyph and there is no way in this app to render an intent without one
+                       (13 §5.1). An answered card that only went amber says nothing at all to a
+                       screen reader and nothing to anybody who does not see amber. -->
+                  <Chip label={copy.markNotWritten} tone="warn" />
+                  <span class="said-what">{SAY.answered(said.title)}</span>
+                  <!-- THE ROW STAYS AND OFFERS THE WAY BACK. Of eighty-five human writes over
+                       thirteen days in the record this product is modelled on, thirteen reversed the
+                       write immediately before them and twelve landed inside five seconds, because
+                       the row vanished and the only way to check you had hit the right one was to do
+                       the opposite and look. There is no confirmation dialog in this product for the
+                       same reason: it asks before anything has happened, when the reader knows the
+                       least they ever will (REWORK §1, §4). -->
+                  <Button
+                    weight="bare"
+                    id="undo-{q.id}"
+                    aria-label={SAY.putBackOf(q.title)}
+                    onclick={() => putBack(q, said.option)}
+                  >{SAY.putBack}</Button>
+                </div>
+
+                <div class="why">
+                  <label class="why-label" for="why-{q.id}">{SAY.whyLabel}</label>
+                  <textarea
+                    id="why-{q.id}"
+                    class="why-field"
+                    rows="2"
+                    placeholder={copy.reasonHint}
+                    spellcheck="true"
+                    aria-describedby={state === 'written' ? undefined : `why-note-${q.id}`}
+                    value={said.reason}
+                    oninput={(e) => (answers = setReason(answers, q.id, e.currentTarget.value))}
+                  ></textarea>
+                  <!-- THE ARGUMENT, STANDING RATHER THAN BLOCKING. It says nothing once there is a
+                       sentence worth reading in six weeks: a note that never goes away is a note
+                       nobody reads, and the reader has already done the thing it asks for. -->
+                  {#if state !== 'written'}
+                    <p class="why-note" id="why-note-{q.id}">
+                      {state === 'missing' ? SAY.reasonMissing : SAY.reasonThin}
+                    </p>
+                  {/if}
+                </div>
+              {:else}
+                <!-- Named by the question, because "Per seat" repeated down a queue of nine is
+                     three words with no subject. -->
+                <div class="q-options" role="group" aria-labelledby="q-{q.id}-title">
+                  <!-- THE HOUSE CONTROL, not a button styled to look like one. `Button` carries the
+                       invisible 44 x 44 hit box, the press state and a fill whose contrast against
+                       its own label is already solved; an option button hand-rolled here would be a
+                       second control with the same job and its own drift. -->
+                  {#each optionsOf(q) as o (o.key)}
+                    <Button id="opt-{q.id}-{o.key}" onclick={() => take(q, o.key)}>{o.title}</Button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
           </li>
         {/each}
       </ol>
@@ -116,23 +318,36 @@
     list-style: none;
   }
 
+  /**
+   * THE CARD IS THE LIST ITEM NOW, AND THE LINK IS THE TOP OF IT.
+   *
+   * It used to be the `<a>` itself, with the rank, the body and the chevron inside, which is
+   * precisely why the options could only ever be a printed sentence. `overflow: hidden` so the
+   * rule under the link stops at the corner radius rather than squaring it off.
+   */
   .q {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--sp-4);
-    align-items: start;
-    padding: var(--sp-4);
+    display: flex;
+    flex-direction: column;
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
     box-shadow: var(--raise);
-    color: var(--ink);
-    text-decoration: none;
+    overflow: hidden;
     transition: border-color var(--d-state) var(--ease-out);
   }
 
   .q:hover {
     border-color: var(--edge);
+  }
+
+  .q-open {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--sp-4);
+    align-items: start;
+    padding: var(--sp-4);
+    color: var(--ink);
+    text-decoration: none;
   }
 
   /* The rank is the argument, so it is drawn like one: big, quiet, and first. */
@@ -183,16 +398,71 @@
     font-size: var(--t-ui);
   }
 
+  .q :global(.icon) {
+    align-self: center;
+    color: var(--dim);
+  }
 
+  /* WHERE THE LINK STOPS AND THE CONTROLS START, drawn rather than left to be inferred. The two
+     regions are siblings and a person has to be able to see that the row below is not part of the
+     thing above it. */
+  .q-act {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  /* WRAPPING, NOT SCROLLING. Three options at 320px are three lines of buttons; a horizontal
+     scroller here would hide the third answer behind a gesture on the screen whose whole subject is
+     that all the answers are visible. */
   .q-options {
-    margin-block-start: var(--sp-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .said {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .said-what {
+    color: var(--ink2);
+    font-size: var(--t-ui);
+  }
+
+  .why {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .why-label {
     color: var(--dim);
     font-size: var(--t-xs);
   }
 
-  .q :global(.icon) {
-    align-self: center;
+  .why-field {
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--sunk);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-ui);
+    resize: vertical;
+  }
+
+  .why-note {
+    max-inline-size: var(--measure);
     color: var(--dim);
+    font-size: var(--t-xs);
   }
 
   /* The row shape is `$lib/ui/rows.css`; the decided list uses three of its four columns. */

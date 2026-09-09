@@ -14,6 +14,21 @@
 
   And THE RECOMMENDATION IS DISPLAYED, NEVER PRE-SELECTED. If it were highlighted on open, three
   keystrokes would rubber-stamp the machine's answer with a reason typed under its influence (19 §4).
+
+  THIS IS NO LONGER THE ONLY WAY TO ANSWER, AND IT IS BETTER FOR IT. `/decide` used to print a
+  question's options as a sentence inside the card's own link, so every answer in the queue came
+  through here: open the question, choose, write prose, commit. The cards press now. One press
+  records an answer, the reason is asked for after it and never blocks it, the card keeps saying it
+  is not saved, and the way back is on the row.
+
+  So the two screens are two different acts rather than one act and its detour. The card answers a
+  question you have already thought about. THIS screen is where one gets EXAMINED: the cost of
+  deciding late, the body of every option, the recommendation beside the reasoning it came from, the
+  defer with its wake date, and a commit that takes a named decider and a written reason and cannot
+  be edited afterwards. Everything below is unchanged, and the reason is still required, because
+  that is the ceremony somebody came here for. What both screens now share is one sentence for what
+  a decision would write: `record/answer.ts`, so the two cannot drift into telling different stories
+  about one act.
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
@@ -21,6 +36,7 @@
   import { copy } from '$lib/copy.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, NOW, QUESTIONS } from '$lib/record/api.ts';
+  import { answerFor, wouldRecord } from '$lib/record/answer.ts';
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -28,6 +44,7 @@
   import Kbd from '$lib/ui/Kbd.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { drew } from '../../../lib/ui/screen.svelte.ts';
 
   const question = $derived([...QUESTIONS, ...DECIDED].find((q) => q.id === page.params.id));
 
@@ -121,18 +138,37 @@
    * created from an arrival. This one — the immutable row, with a person's name and their reason on
    * it, that the whole gate exists to slow down — said "nothing writes" and stopped. The one act
    * worth describing described itself least.
+   *
+   * AND THE SENTENCE IS NOT TYPED HERE ANY MORE. `/decide` answers the same question with one press
+   * on the card and owes its reader the same receipt; this screen assembled its own copy of the
+   * words out of `question.options.find(…)` and a template literal, which is two spellings of one
+   * act sitting a refactor away from disagreeing. Both read it out of `record/answer.ts` now, and
+   * `answerFor` is what refuses a key the question does not offer rather than printing `undefined`
+   * into the middle of a receipt, which is what the old `?? committing` fallback did with a blank
+   * question id beside it.
    */
   let committed = $state(false);
   function commit() {
+    const a = committing ? answerFor(question, committing, new Date(NOW).toISOString()) : null;
+    if (!a) return;
     committed = true;
-    const chosen = question?.options.find((o) => o.key === committing)?.title ?? committing;
-    toasts.push(
-      copy.notWritten(
-        `${chosen} would be recorded as the decision on ${question?.id ?? ''}, with your reason and your name, and the question closed`,
-      ),
-      { intent: 'warn' },
-    );
+    toasts.push(copy.notWritten(wouldRecord({ ...a, reason })), { intent: 'warn' });
   }
+
+  /**
+   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   *
+   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
+   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
+   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
+   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
+   * the other claim, and it is true of this screen today.
+   *
+   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
+   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
+   * this line says.
+   */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(question?.title, copy.decide)}</title></svelte:head>

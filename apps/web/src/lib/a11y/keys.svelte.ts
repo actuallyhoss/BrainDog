@@ -27,7 +27,7 @@ import { silenced } from './chars.ts';
 
 export { silenced };
 
-export type Scope = 'document' | 'grid' | 'page' | 'gate' | 'palette' | 'nav';
+export type Scope = 'document' | 'grid' | 'board' | 'page' | 'gate' | 'palette' | 'nav';
 
 
 export type Binding = {
@@ -100,6 +100,29 @@ export const BINDINGS: Binding[] = [
   { id: 'delete', scope: 'grid', key: 'Delete', label: 'Delete, with an undo toast', bare: false },
   { id: 'save-view', scope: 'grid', key: '⌥V  ⌥B', label: 'Save the filter as a view, or bind it as a block', bare: false },
 
+  /**
+   * THE BOARD, WHICH BOUND THREE THINGS AND PRINTED NONE OF THEM.
+   *
+   * `19 §4` is that the sheet documents the bindings by READING them, so it cannot drift from what
+   * is bound. A board's arrows are the primitive's own composite behaviour rather than a dispatcher
+   * binding, which is exactly the argument that keeps a thing off this list and then off the sheet:
+   * the reader is told a grid moves with arrows, meets a board, and finds arrows that do something
+   * else. Its own scope rather than `grid`, so a register list does not advertise a card it has not
+   * got.
+   *
+   * `bare: false` ON ALL THREE. None is a bare character, so none is subject to the *Character
+   * keys* switch, and the two move chords are modified, which is what keeps them out of WCAG
+   * 2.1.4's single-character exception.
+   *
+   * `⇧←  ⇧→` AND `⌥↑  ⌥↓` FOR ONE VERB. `⌥↑ ⌥↓` is this registry's own `nav-move`, "Move the
+   * focused item", so the board answers the key the product already teaches; its horizontal
+   * spelling is unavailable because `Alt` with a horizontal arrow is the browser's Back and Forward
+   * and is on `NEVER_BIND`. `⇧←  ⇧→` is the same verb on the axis a board is drawn on.
+   */
+  { id: 'card-col', scope: 'board', key: '←  →', label: 'Move between columns', bare: false },
+  { id: 'card-row', scope: 'board', key: '↑  ↓', label: 'Move up and down a column', bare: false },
+  { id: 'card-move', scope: 'board', key: '⇧←  ⇧→   ⌥↑  ⌥↓', label: 'Move the focused card to the next column', bare: false },
+
   { id: 'block-move', scope: 'page', key: 'j  k', label: 'Move between blocks', bare: true },
   { id: 'block-enter', scope: 'page', key: '↵  Esc', label: 'Enter the block, or leave it', bare: false },
   { id: 'block-source', scope: 'page', key: 'o', label: 'Open the list behind this, filtered', bare: true },
@@ -122,7 +145,7 @@ export const BINDINGS: Binding[] = [
   { id: 'nav-menu', scope: 'nav', key: '⇧F10', label: 'Move up, Move down, Move to top, Hide', bare: false },
 ];
 
-export const SCOPE_ORDER: Scope[] = ['document', 'grid', 'page', 'gate', 'palette', 'nav'];
+export const SCOPE_ORDER: Scope[] = ['document', 'grid', 'board', 'page', 'gate', 'palette', 'nav'];
 
 /** The ONE test. No screen implements its own, and the rule it encodes is never relaxed. */
 export function typing(): boolean {

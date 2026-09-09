@@ -97,6 +97,17 @@ export const firstRun = {
   seeTheList: (label: string) => `See ${label} as it comes`,
   seeTheListWhy:
     'The lists arrive with a worked example in them, so there is something to read before you have written anything.',
+  /**
+   * AND THE ROW THEY TYPED IS IN IT.
+   *
+   * IT USED TO SAY THE LISTS ARRIVE WITH AN EXAMPLE IN THEM, which is true and was the wrong thing
+   * to say here: it explains what somebody else's rows are doing on the screen and says nothing
+   * about the one thing the person just did. A friction pass ranked that exact gap first of ten,
+   * measured as four clicks, twenty-five keystrokes and zero rows. The row is now at the top of the
+   * list, marked, and this sentence is what tells them to look for it.
+   */
+  rowIsThere:
+    'It is at the top of the list, marked as not saved, next to the worked examples the lists arrive with.',
 
   /** The label above the first field. Written per choice, because "Your first money" is not English. */
   firstField: {

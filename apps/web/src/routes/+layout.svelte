@@ -34,6 +34,7 @@
   import * as pref from '$lib/pref.ts';
   import { restore as restoreAccent } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
+  import { leaving, settled } from '$lib/ui/screen.svelte.ts';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
   import { assets } from '$app/paths';
@@ -49,7 +50,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { goto } from '$app/navigation';
+  import { beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
 
   let { data, children } = $props();
@@ -96,6 +97,10 @@
    * test becomes whether this one is it, and the bar disappears on its own for everybody who has
    * one, which is the state that needs no dismissal at all.
    */
+  /* CLEARED ON EVERY NAVIGATION, or `data-screen` is the PREVIOUS screen's answer for exactly as
+     long as this one takes to arrive, which is the window every browser gate measures in. */
+  beforeNavigate(leaving);
+
   let sampleSaid = $state(pref.read().sampleSaid === true);
 
   function putSampleAway() {
@@ -221,7 +226,7 @@
        the window simply had two thirds of itself below a fold that could not be crossed: `/s/<token>`
        is 2,628px of projected page in a 993px window, and the only part anybody could read was the
        first third. That is the artefact somebody hands an accountant. -->
-  <main id="main" class="bare">{@render children()}</main>
+  <main id="main" class="bare" data-screen={settled()}>{@render children()}</main>
 {:else}
   <div class="shell" data-rail={railOff ? 'off' : undefined}>
     <div class="rail-slot">
@@ -243,7 +248,7 @@
       </button>
     </div>
 
-    <main id="main" class="body">
+    <main id="main" class="body" data-screen={settled()}>
       <!-- ABOVE THE SCREEN AND INSIDE THE SCROLLER, so it is the first thing read and the first
            thing to leave when the reader scrolls. A fixed strip across the top of every screen is a
            permanent tax on the height of every screen, and this is a sentence somebody reads once. -->

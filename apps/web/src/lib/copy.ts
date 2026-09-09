@@ -45,8 +45,15 @@ export const copy = {
   close: 'Close',
 
   /* Arranging a page. Verb + Noun on every action, and the mode's own name is a verb: you are
-     doing something to the page, not entering a place. */
-  arrange: 'Arrange',
+     doing something to the page, not entering a place.
+
+     `Edit layout` AND IT WAS `Arrange`. A friction pass counted thirty-six product words a stranger
+     meets on the first run path and the five screens after it, and put this one on the list for a
+     specific reason: it is a control in the top right of every page, it is a real English word, and
+     it is not the word for the thing. "Arrange" is what you do to flowers; a reader looking for the
+     way to move a block reads past it. `19 §9`'s rule is the one Slack follows and not the one
+     Notion follows: the interface says the word a person would say. */
+  arrange: 'Edit layout',
   arrangeDone: 'Done',
   arrangeCancel: 'Cancel',
   width: 'Width',
@@ -60,9 +67,13 @@ export const copy = {
   removeBlock: 'Remove this block',
   addBlock: 'Add a block',
 
-  /* Binding a saved view onto a page — 21 §3.4's sentence, with the two halves the view already
-     answered stated rather than asked. */
-  bindBlock: 'Bind as a block',
+  /* Putting a saved view onto a page. `21 §3.4`'s sentence, with the two halves the view already
+     answered stated rather than asked.
+
+     `Put this on a page` AND IT WAS `Bind as a block`. Two invented words in a three-word button:
+     nothing in the product ever says what binding is, and `block` is defined once, on a different
+     screen, once per device, for ever. A button is the wrong place to introduce a vocabulary. */
+  bindBlock: 'Put this on a page',
 
   /* THE ONE SENTENCE A MOCK-UP OWES ITS READER. A control that does nothing at all is
      indistinguishable from a broken one, so every action that cannot happen here says what it
@@ -196,7 +207,28 @@ export const copy = {
   sampleStart: 'Start your own',
   samplePutAway: 'Put this away',
 
+  /* What a board and a checklist say when they move something the record has not been given yet.
+     The mark on the card or the row is the answer; this is for the reader whose card has scrolled
+     away, which is the same division `archive` makes on the register list. */
+  cardMovedTo: (title: string, to: string) => `${title} would move to ${to}, and nothing was saved yet.`,
+  taskTicked: (title: string, done: boolean) =>
+    `${title} would be marked ${done ? 'done' : 'not done'}, and nothing was saved yet.`,
+  cardFallback: 'The card',
+
+  /* Answering a question where it is drawn. The options used to be a printed span inside the card's
+     own link, so the thing that looked like the answer was decoration and answering meant a second
+     screen and a paragraph of prose. */
+  answeredOption: (option: string) => `Answered: ${option}`,
+  takeItBack: 'Take it back',
+  /* The visible words start the accessible name rather than being a different sentence, so "take it
+     back" said out loud reaches the control a person is looking at (WCAG 2.5.3). */
+  takeItBackOf: (title: string) => `Take it back: ${title}`,
+  whyForLater: 'Why, for whoever reads this in six weeks',
+  reasonMissing: 'No reason yet. The answer is kept either way, and in six weeks it will say what was chosen and not why.',
+  reasonThinNudge: 'That will not mean much in six weeks. It is kept either way.',
+
   rowActions: 'What you can do here',
+  editValue: (field: string) => `Change ${field.toLowerCase()}`,
   setTo: (state: string) => `Set to ${state}`,
   markArchived: 'Archived',
   markNotWritten: 'Not saved',
@@ -451,7 +483,10 @@ export const copy = {
   makeRule: 'Make it a rule',
   notThisOne: 'Leave it for another rule',
   fileIt: 'File it as a row',
-  archiveArrival: 'Archive the arrival',
+  /* `Archive this` AND IT WAS `Archive the arrival`. An `arrival` is what the record calls a thing
+     that came in through an ingest, and the inbox is the one screen where the reader is looking at
+     an email. Naming it after the mechanism that carried it is naming it after the plumbing. */
+  archiveArrival: 'Archive this',
   /* WHAT THE VERSION IS FOR, rather than what it is. Every change moves it by one, so it names a
      moment — which is the only thing anybody does with it. */
   auditVersion: (n: string): string =>
@@ -467,7 +502,9 @@ export const copy = {
     `Deleting ${record} removes every list, page and row in it. It cannot be undone.`,
   deleteRecord: (record: string): string => `Delete ${record}`,
   showExample: 'Show an example row',
-  peek: 'Peek at the row',
+  /* `Preview` AND IT WAS `Peek`. It is printed as a keyboard hint on every list, `p peek`, which is
+     a word the product invented for a thing every other product calls a preview. */
+  peek: 'Preview the row',
   openRow: 'Open the row',
   copyId: 'Copy id',
   copyLink: 'Copy link',
@@ -847,8 +884,16 @@ export const copy = {
   noSources: 'Nothing feeds this record yet.',
   noSourcesWhy: 'A connector pulls rows in on a schedule from a mailbox, a bank feed or a repository, and reports here when it fails.',
   ingestPrompt: 'read my record, then set up a connector for the mailbox I file invoices in',
-  noSnapshots: 'No sealed copy yet.',
-  noSnapshotsWhy: 'A snapshot is the whole record at one moment, kept so you can go back to it.',
+  /* `backup` AND IT WAS `sealed copy` AND `snapshot`, WHICH ARE TWO WORDS FOR ONE IDEA. A friction
+     pass found them competing on the same screen: `/decide` said "The newest sealed copy is from
+     2026-09-02" and a card beside it was titled `Snapshot`. Neither is the word a person uses, and
+     having two of them means a reader who learns one still meets the other.
+
+     THE SEALING IS NOT LOST, it moves to where it is the point: the sentence about the key, three
+     screens down, where somebody is being told why a copy can be proved to be theirs. Above that,
+     what they want to know is that there is a backup and how old it is. */
+  noSnapshots: 'No backup yet.',
+  noSnapshotsWhy: 'A backup is the whole record at one moment, kept so you can go back to it.',
   connectedHow: 'A machine asks, and you approve it here on a device you are already holding.',
   /* ALL SIX THE RECORD CAN BE IN, and four of them had a word.
 
@@ -1002,8 +1047,8 @@ export const copy = {
   deleteCosts: 'A final copy is kept for the rest of today, in case you change your mind within the hour. Within thirty days nothing of this record is left anywhere.',
   typeSlug: (slug: string) => `Type ${slug} to confirm`,
 
-  keptCloud: (n: number) => `A sealed copy of the whole record every night. The ${n} newest are kept, plus the latest.`,
-  keptSelfHost: (n: number) => `A sealed copy of the whole record every night, on this machine. The ${n} newest are kept.`,
+  keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
+  keptSelfHost: (n: number) => `A backup of the whole record every night, on this machine. The ${n} newest are kept.`,
   snapshotFailed: 'nothing kept',
   download: 'Download',
   restoreTo: 'Restore to a time',
@@ -1013,7 +1058,7 @@ export const copy = {
   restoreBack: 'If it was wrong',
   restoreBackHow: 'Restore to the instant just before. That is a point in time too, for thirty days.',
   rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
-  snapshotNow: 'Take one now',
+  snapshotNow: 'Back up now',
   theKey: 'The key',
   /* `49 §8` asks for exactly this line. */
   /**
@@ -1041,8 +1086,12 @@ export const copy = {
   billingSelfHost: 'This record runs on your own machine. There is nothing to bill and no subscription to lapse.',
   billingCloud: 'Payment is up to date. If it ever lapses the record turns read-only, and export keeps working.',
 
-  /** Names the source block so tabbing into it says which page's declaration it is. */
-  declarationOf: (page: string) => `Source of ${page}`,
+  /** Names the source block so tabbing into it says which page it is the workings of. */
+  declarationOf: (page: string) => `How ${page} is built`,
+  /* The toggle top right of every page. `Source` was a developer's word for it, read by somebody
+     who does not write code as an origin or a supplier. */
+  pageSource: 'How this is built',
+  pageBack: 'Back to the page',
 
   /**
    * A BLOCK ADMITS THAT IT IS SHOWING A SLICE.
@@ -1068,7 +1117,10 @@ export const copy = {
    * the extra line is not a discrepancy, and promises nothing it cannot give.
    */
   ofWhichWalked: (drawn: number, total: number, days: number) =>
-    `The next ${drawn.toLocaleString('en')} of ${total.toLocaleString('en')} movements over ${days} days`,
+    /* `payments in and out` AND IT WAS `movements`. A movement is a bookkeeper's word for the thing
+       and this line sits under a table of dated amounts on a screen a business owner opens to see
+       what is coming: the reader knows what a payment is and does not have to be taught. */
+    `The next ${drawn.toLocaleString('en')} of ${total.toLocaleString('en')} payments in and out over ${days} days`,
 
   /* the keymap sheet */
   keymap: 'Keyboard',
@@ -1077,6 +1129,7 @@ export const copy = {
   keymapHint: 'Bare letters act only inside a list you have clicked into.',
   scopeDocument: 'Anywhere',
   scopeGrid: 'In a list',
+  scopeBoard: 'On a board',
   scopePage: 'On a page',
   scopeGate: 'At the gate',
   scopePalette: 'In the palette',

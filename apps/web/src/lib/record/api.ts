@@ -140,11 +140,11 @@ export type Noticed = {
  * twelve times, and the honest line says so rather than drawing an empty strip.
  */
 const FIXES: Readonly<Record<string, string>> = {
-  ENUM_VALUE_UNKNOWN: 'the value being written is not one this field declares. Either widen the field or fix what writes it',
+  ENUM_VALUE_UNKNOWN: 'the value being saved is not one this field allows. Either widen the field or fix what writes it',
   REQUIRED_MISSING: 'something keeps arriving without it. Either it is not really required, or whatever sends these rows never had it',
-  TYPE_MISMATCH: 'what arrives is not the shape this field declares',
+  TYPE_MISMATCH: 'what arrives is not the shape this field allows',
   REF_NOT_FOUND: 'the row it points at is not in this record yet',
-  OUT_OF_BOUNDS: 'the value is outside the range this field declares',
+  OUT_OF_BOUNDS: 'the value is outside the range this field allows',
   IMMUTABLE: 'this field is settled once written, and something keeps trying to change it',
 };
 
@@ -401,11 +401,38 @@ const WIDTH: Record<string, string> = {
 /** Quantities, dates and counts end. Text and refs start. */
 const END = new Set(['money', 'day', 'instant', 'int', 'decimal', 'duration']);
 
+/**
+ * WHICH COLUMNS A LIST OPENS WITH, and it used to be every indexed field.
+ *
+ * A FRICTION PASS COUNTED THE COST. `/r/obligations` drew nine columns over thirty-nine rows: 180
+ * numbers, 88 controls and 597 words on a screen whose question is "what do I owe and what am I
+ * owed". Every one of those columns is a defensible column, and the eight of them together are the
+ * reason the screen reads as a database rather than as an answer. It is seventh of the ten things
+ * the pass found costing a person the most, and the only one on that list that is a decision about
+ * DEFAULTS rather than a thing to build.
+ *
+ * `index: true` MEANS FAST TO FILTER, NOT WORTH READING. That is the mistake this made: it is a
+ * storage decision, taken by whoever wrote the declaration for reasons about SQL, and it was being
+ * read as an editorial one. `services` indexes its provider, its type, its renewal, its cycle and
+ * its state, because a page filters on all five, and none of that is an argument for five columns.
+ *
+ * WHAT A REGISTER ALREADY SAYS IT IS ABOUT. `mobile` is the three fields the declaration nominates
+ * for a card where there is room for three, which is exactly the editorial judgement wanted here;
+ * `title` is what the row IS; `state` is the one field a reader scans a list to compare; and a
+ * `deadline` field is the one the tone of the whole row is computed from, so leaving it off would
+ * draw a red row with nothing on it explaining why. Obligations opens at five columns instead of
+ * nine and answers the same question.
+ *
+ * NOTHING IS LOST AND THE WAY BACK ALREADY EXISTED. The display sheet on every list offers every
+ * readable field and remembers what a reader turns on, per register, in `pref.columns`. This
+ * changes which side of that switch a column starts on, and the switch has been there since the
+ * screen was written.
+ */
 export function columnsFor(register: string): Column[] {
   const r = REGISTERS[register];
   if (!r) return [];
   const wanted = new Set<string>([r.title, ...r.mobile, ...(r.state ? [r.state] : [])]);
-  for (const f of r.fields) if (f.index) wanted.add(f.id);
+  for (const f of r.fields) if (f.deadline) wanted.add(f.id);
 
   const cols: Column[] = [
     // The spoken id truncates in the MIDDLE if it ever has to, keeping prefix and suffix.
