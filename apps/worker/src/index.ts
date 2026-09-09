@@ -376,12 +376,33 @@ const json = (body: unknown, status: number): Response =>
 /**
  * The one answer to every way of not being let in.
  *
- * ONE SENTENCE FOR ALL THREE — no bearer, a bearer this record does not know, and a name no record
+ * ONE SENTENCE FOR ALL THREE: no bearer, a bearer this record does not know, and a name no record
  * has. They were three different answers, and the difference between the third and the other two is
- * readable without any credential at all: it said which names exist.
+ * readable without any credential at all, because it said which names exist.
+ *
+ * AND THE SENTENCE SAID SOMETHING NOBODY COULD DO. `Mint one from the app` was measured against the
+ * live host by an audit reading it as a stranger would: whoever hits this IS at the app, there is
+ * no sign-up on it, and the product's own changelog says so in as many words. So the one refusal
+ * every agent and every developer meets first pointed them at a door that is not there.
+ *
+ * `10 §7` MAKES THE REFUSAL THE TEACHER, and what this one has to teach is which of the two
+ * situations somebody is in: a token they can mint, on a record that has been provisioned, or a
+ * host that is not open yet. It cannot tell them apart, because saying which record exists is the
+ * thing the single sentence exists to avoid. So it says what is true of both, and names the one
+ * place that is honest about which: the changelog, on the marketing site, with no credential
+ * needed to read it.
  */
 const unauthorized = (): Response =>
-  json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record needs a bearer it knows. Mint one from the app.' } }, 401);
+  json(
+    {
+      ok: false,
+      refusal: {
+        code: 'UNAUTHORIZED',
+        fix: 'This record takes a bearer token it already knows, and there is no way to be issued one yet: sign-up is not built. https://brain.dog/changelog says what is.',
+      },
+    },
+    401,
+  );
 
 /**
  * The Worker resolves WHO is asking, and the record decides what they may do.

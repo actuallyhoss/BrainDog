@@ -238,6 +238,10 @@ export const copy = {
   reasonMissing: 'No reason yet. The answer is kept either way, and in six weeks it will say what was chosen and not why.',
   reasonThinNudge: 'That will not mean much in six weeks. It is kept either way.',
 
+  /* What the record would do, on the row, so "what needs you" shows its thinking rather than four
+     questions and none. The word is a verb because the record is the one recommending. */
+  recommends: 'Recommends',
+
   rowActions: 'What you can do here',
   editValue: (field: string) => `Change ${field.toLowerCase()}`,
   setTo: (state: string) => `Set to ${state}`,

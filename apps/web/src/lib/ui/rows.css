@@ -122,6 +122,20 @@
     white-space: nowrap;
   }
 
+  /* WHAT THE RECORD WOULD DO, under the reason it matters. It reads as a conclusion rather than as
+     more detail, so it is the ink the row's own title uses rather than the dimmed one: a
+     recommendation set in the same grey as the supporting sentence is a recommendation nobody
+     reads. It never wraps, because the option titles are short by design and a two-line conclusion
+     under a two-line reason is a card, not a row. */
+  .line-pick {
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .line-amount {
     color: var(--ink2);
     font-variant-numeric: tabular-nums;

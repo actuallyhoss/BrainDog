@@ -195,6 +195,24 @@
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{q.cost}</span>
+                <!--
+                  THE SCREEN SHOWS ITS ANSWER RATHER THAN ASKING, and it was only asking.
+
+                  The record already carries a recommendation on one option of every open question,
+                  and Home drew the question and the reason it matters and stopped there: a reader
+                  scanning "what needs you" met four questions and no thinking, and had to open each
+                  one to find that the record had already done it. The product this one is measured
+                  against puts the recommendation on the row for exactly that reason.
+
+                  IT IS NOT A SHORTCUT TO ANSWERING. The row is a link to the question's own screen,
+                  where the reasoning and the other options are; there is no press here that
+                  answers, so the recommendation costs a reader nothing and saves them an opening.
+                  On `/decide`, where one press now answers, the mark is deliberately absent: it
+                  would make rubber-stamping the machine the cheapest act on the screen.
+                -->
+                {#if q.options?.find((o) => o.recommended)}
+                  <span class="line-pick">{copy.recommends} {q.options.find((o) => o.recommended)?.title}</span>
+                {/if}
               </span>
               <span class="line-amount"></span>
               <span class="line-when">{since(q.opened, NOW)}</span>
