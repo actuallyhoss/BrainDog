@@ -1,16 +1,19 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/media/banner-dark.svg">
-  <img src=".github/media/banner-light.svg" width="830"
-       alt="BrainDog — a typed, append-only database for what a business knows that isn't code.">
+  <img src=".github/media/banner-light.svg" width="830" alt="BrainDog">
 </picture>
 
-A typed, append-only database for the things a small business knows that aren't code: money owed,
-renewal dates, hosting, credentials, people, projects, and the decisions behind them.
+# Give your business a memory.
 
-It exists because agents needed somewhere shared to write. Claude, Codex and Cursor can all read and
-write the same rows over MCP, and so can you, through a web app the record renders for itself.
+Everything a company knows that isn't code — what it is owed, what renews on Tuesday, which key
+opens what, who decided the thing nobody can remember deciding — lives in somebody's head, six
+spreadsheets and a Slack thread. This is one database for all of it: typed, append-only, and yours.
 
-Open source, AGPL-3.0. Self-host it, or don't.
+Your agents get a key to it. Claude, Codex and Cursor read and write the same rows you do, over
+MCP, and every row remembers who put it there and when. Nothing is edited in place, so nothing is
+quietly lost — you can always ask what it said last Tuesday, and it can tell you.
+
+One SQLite file. Open source, AGPL-3.0. Self-host it, or don't.
 
 ```
 git clone https://github.com/actuallyhoss/braindog

@@ -33,8 +33,14 @@ export type AlarmStore = {
  * would be a second copy of something that may have changed by the time it is read. A lost message
  * costs latency and never a notification, because the outbox row is still `pending` and the next
  * request drains it — the outbox is the source of truth and the queue is a doorbell.
+ *
+ * IT RETURNS `unknown` AND NOT `void`, so the caller may hand over anything that resolves. This was
+ * `Promise<void>` and `Queue.send()` began returning a `QueueSendResponse` in the platform types,
+ * which made the one production caller — the only one there has ever been — a type error. The
+ * doorbell has never had a return value: what it answers with is the platform's business, and
+ * writing that down as `void` was a claim about a call this file does not make.
  */
-export type Doorbell = () => Promise<void>;
+export type Doorbell = () => Promise<unknown>;
 
 export function alarmScheduler(store: AlarmStore, ring?: Doorbell | undefined): Scheduler {
   return {
@@ -56,6 +62,11 @@ export function alarmScheduler(store: AlarmStore, ring?: Doorbell | undefined): 
       if ((await store.getAlarm()) !== null) await store.deleteAlarm();
     },
 
-    wake: () => ring?.() ?? Promise.resolve(),
+    /* THE PORT'S `wake()` IS `Promise<void>` AND THE DOORBELL'S RETURN IS DISCARDED HERE, which is
+       the honest place to drop it: `31 §2` says the record's one outbound act carries no answer
+       back, so whatever the platform hands the ringer is not a value the kernel may see. */
+    wake: async () => {
+      await ring?.();
+    },
   };
 }

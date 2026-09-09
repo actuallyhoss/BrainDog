@@ -35,7 +35,6 @@
     href: string;
     group: string;
     detail?: string | undefined;
-    keys?: string | undefined;
     icon?: IconName | undefined;
     spoken?: string | undefined;
     /**
@@ -60,19 +59,19 @@
   let cursor = $state(0);
 
   const COMMANDS: Row[] = [
-    { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, keys: 'g h', icon: 'home' },
-    { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, keys: 'g d', icon: 'decide' },
-    { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, keys: 'g i', icon: 'inbox' },
-    { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, keys: 'g v', icon: 'vault' },
-    { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, keys: 'g p', icon: 'packs' },
-    { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, keys: 'g ,', icon: 'settings' },
-    /* THE ONE `g`-CHORD THE SHORTCUT TEACHER DID NOT TEACH. `g s` was bound, the `?` sheet
-       advertised it, and `/search` appeared in no nav, no tab bar, no More sheet and not here — so
-       typing `sear` found nothing, and on a phone the route was reachable only from the palette's
-       overflow row, which is to say only from inside the cap it exists to relieve. */
-    { id: 'c-search', title: copy.search, href: '/search', group: copy.destinations, keys: 'g s', icon: 'search' },
+    { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, icon: 'home' },
+    { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, icon: 'decide' },
+    { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox' },
+    { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault' },
+    { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs' },
+    { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, icon: 'settings' },
+    /* THE ROUTE THE SHORTCUT TEACHER DID NOT TEACH. `g s` was bound, the `?` sheet advertised it,
+       and `/search` appeared in no nav, no tab bar, no More sheet and not here — so typing `sear`
+       found nothing, and on a phone the route was reachable only from the palette's overflow row,
+       which is to say only from inside the cap it exists to relieve. */
+    { id: 'c-search', title: copy.search, href: '/search', group: copy.destinations, icon: 'search' },
     { id: 'c-audit', title: copy.audit, href: '/audit', group: copy.destinations, icon: 'clock' },
-      { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, keys: '?', icon: 'keyboard' },
+    { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, icon: 'keyboard' },
   ];
 
 /** Which register `@` narrows to. Named once, so the footer's promise and the filter cannot drift. */
@@ -420,7 +419,6 @@
           <span class="p-title">{row.title}</span>
           {#if row.spoken}<span class="p-spoken">{row.spoken}</span>{/if}
           {#if row.detail}<span class="p-detail">{row.detail}</span>{/if}
-          {#if row.keys}<Kbd keys={row.keys} />{/if}
         </button>
       {/each}
     {:else}

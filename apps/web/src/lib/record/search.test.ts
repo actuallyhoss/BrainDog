@@ -197,10 +197,17 @@ test('A TYPED QUERY THAT CANNOT BE ONE MATCHES NOTHING, AND AN EMPTY ONE IS NOT 
 
 test('`/search` is a destination the palette teaches', () => {
   /* `g s` was bound, the `?` sheet advertised it, and the route appeared in no nav and not in
-     `COMMANDS` — where every other `g`-chord destination appears with its binding printed. Typing
-     `sear` found nothing, and on a phone the route was reachable only from the overflow row, which
-     is to say only from inside the cap it exists to relieve. */
-  assert.match(PALETTE, /id: 'c-search'[^\n]*href: '\/search'[^\n]*keys: 'g s'/u);
+     `COMMANDS`. Typing `sear` found nothing, and on a phone the route was reachable only from the
+     overflow row, which is to say only from inside the cap it exists to relieve.
+
+     THE BINDING IS NO LONGER PRINTED BESIDE IT, and this assertion used to require that it was.
+     Every destination row carried its chord — `g h`, `g d`, `g i` — two letters and no explanation
+     of what two letters are, on the one surface a person reaches for when they do not know their
+     way around. The chords still work; `?` and Settings → Keyboard are where they are taught. What
+     this test is actually about is that `/search` is REACHABLE from the palette, and that is what
+     it checks. */
+  assert.match(PALETTE, /id: 'c-search'[^\n]*href: '\/search'/u);
+  assert.doesNotMatch(PALETTE, /keys: 'g /u, 'a chord is printed beside a destination again');
 });
 
 test('the count is styled on every screen, not only on a phone', () => {

@@ -39,7 +39,6 @@
   import { assets } from '$app/paths';
 
   import { named } from '$lib/env.ts';
-  import EnvBadge from '$lib/ui/EnvBadge.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import TabBar from '$lib/ui/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
@@ -248,19 +247,6 @@
   <button type="button" class="launcher tap" onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
     <Mark height={26} tone="inherit" />
   </button>
-
-  <!--
-    AND THE WORD FOR WHICH DEPLOYMENT THIS IS, beside the mark, which is where `EnvBadge`'s own
-    header has said it lives since it was written.
-
-    IT WAS NEVER MOUNTED. The component existed, `copy.alpha` existed, `env.ts` existed, and
-    `grep -rn EnvBadge` over the whole repository returned one file: its own. So the accessibility
-    argument the component makes — 13 §5.1, meaning may not live in the styling alone, and about one
-    reader in twelve cannot tell alpha's accent from production's — was written down, reviewed, and
-    then not in the product. Outside the launcher button, because the button opens the palette and
-    the label is not a control.
-  -->
-  <div class="env-slot"><EnvBadge /></div>
 
   <Palette bind:open={palette.open} nav={data.nav} />
 {/if}
@@ -514,8 +500,12 @@
      rather than as the one thing allowed to float. A solid disc of the only saturated colour on
      the screen already sits above everything; it does not need help.
 
-     It lifts on hover instead. Motion says "this is a control" without adding a material the rest
-     of the interface does not have. */
+     AND NO LIFT ON HOVER EITHER, WHICH IS THE SAME ARGUMENT ONE STEP FURTHER. It rose two pixels
+     under the cursor, on the reasoning that motion says "this is a control" without adding a
+     material the rest of the interface does not have. Nothing else in this app moves under a
+     cursor, so the movement said "this control is from somewhere else" — the same failure the
+     shadow had, in a different channel. A solid disc of the only saturated colour on the screen is
+     already the most obviously clickable thing on it. */
   .launcher {
     position: fixed;
     inset-block-end: var(--sp-5);
@@ -531,45 +521,9 @@
     border-radius: 999px;
     color: var(--accent-ink);
     cursor: pointer;
-    transition:
-      transform var(--d-state) var(--ease-out),
-      background var(--d-state) var(--ease-out);
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  /**
-   * THE DEPLOYMENT'S WORD, PINNED WHERE THE MARK IS. The badge itself is an inline label and knows
-   * nothing about placement — that is the shell's, and this is the shell. Directly above the
-   * launcher, so the word and the mark are read as one thing, on every screen that has chrome.
-   *
-   * `pointer-events: none` because it is a label and not a control: it must never take a click
-   * meant for the 52px disc under it, and there is nothing to do to it. It is also why the wrapper
-   * is safe to leave in the tree when `named` folds to `false` — an empty box of no size that
-   * catches nothing.
-   */
-  .env-slot {
-    position: fixed;
-    inset-block-end: calc(var(--sp-5) + 52px + var(--sp-2));
-    inset-inline-end: var(--sp-5);
-    z-index: var(--z-hint);
-    pointer-events: none;
-  }
-
-  .launcher:hover {
-    transform: translateY(-2px);
-  }
-
-  .launcher:active {
-    transition-duration: var(--d-press);
-    transform: translateY(0);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .launcher,
-    .launcher:hover,
-    .launcher:active {
-      transform: none;
-    }
-  }
 
   @media (width < 900px) {
     .rail-slot {

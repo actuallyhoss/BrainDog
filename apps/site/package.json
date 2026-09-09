@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "description": "brain.dog — the marketing site. Prerendered, no JavaScript required to read it.",
+  "description": "brain.dog \u2014 the marketing site. Prerendered, no JavaScript required to read it.",
   "scripts": {
     "build": "pnpm --filter @braindog/skin theme && vite build",
     "deploy:production": "wrangler deploy --env production",
@@ -23,6 +23,6 @@
     "svelte-check": "4.7.6",
     "typescript": "6.0.3",
     "vite": "8.2.2",
-    "wrangler": "4.42.0"
+    "wrangler": "4.129.0"
   }
 }

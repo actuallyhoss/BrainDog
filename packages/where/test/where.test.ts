@@ -344,6 +344,35 @@ test('`contains` IS `instr` AND NEVER `LIKE`, because a LIKE pattern has two dif
   assert.equal(compile({ field: 'what', contains: 'x'.repeat(41) }, SCHEMA).bad[0]?.code, 'CONTAINS_TOO_LONG');
   assert.equal(compile({ field: 'what', starts: 'x'.repeat(41) }, SCHEMA).bad[0]?.code, 'CONTAINS_TOO_LONG');
   assert.equal(compile({ field: 'what', contains: 'x'.repeat(40) }, SCHEMA).bad.length, 0);
+
+  /* AND THE CEILING IS MEASURED ON THE PATTERN, NOT ON THE LITERAL. This checked the raw string,
+     and the string that reaches SQLite is the escaped one plus a `%` — so forty bytes of `%`
+     compiled to an eighty-one-byte `LIKE` pattern and went past the check whose own comment says it
+     exists to stop a pattern reaching a platform's fifty-byte ceiling. */
+  const wild = compile({ field: 'what', starts: '%'.repeat(40) }, SCHEMA);
+  assert.equal(wild.bad[0]?.code, 'CONTAINS_TOO_LONG', 'forty per-cent signs escape to eighty bytes');
+  assert.match(wild.bad[0]?.fix ?? '', /escape to 80/u, 'the refusal names the number it measured');
+
+  /* Twenty-one escape to forty-two, which is over. Twenty escape to exactly forty, which is not —
+     and the anchoring `%` is outside the measure, because escape DOUBLING is the defect and one
+     wildcard byte is not. A forty-byte literal of ordinary characters is still allowed. */
+  assert.equal(compile({ field: 'what', ends: '%'.repeat(21) }, SCHEMA).bad[0]?.code, 'CONTAINS_TOO_LONG');
+  assert.equal(compile({ field: 'what', ends: '%'.repeat(20) }, SCHEMA).bad.length, 0);
+  assert.equal(compile({ field: 'what', starts: 'x'.repeat(40) }, SCHEMA).bad.length, 0);
+
+  // The escape reaches `_` and `\` too, which are the other two characters `LIKE` reads.
+  assert.equal(compile({ field: 'what', starts: '_'.repeat(21) }, SCHEMA).bad[0]?.code, 'CONTAINS_TOO_LONG');
+
+  /* A LITERAL WITH NOTHING TO ESCAPE STILL GETS THE PLAIN SENTENCE, because a refusal reading "at
+     most 40 bytes, and this one is 40" is a bug report about the record rather than a fix. */
+  assert.match(
+    compile({ field: 'what', starts: 'x'.repeat(41) }, SCHEMA).bad[0]?.fix ?? '',
+    /at most 40 bytes, and this one is 41[.]/u,
+  );
+
+  /* AND `contains` STILL MEASURES THE LITERAL, which is not an inconsistency: it compiles to `instr`
+     with the value bound, so there is no pattern to overrun. Forty per-cent signs are forty bytes. */
+  assert.equal(compile({ field: 'what', contains: '%'.repeat(40) }, SCHEMA).bad.length, 0);
 });
 
 test('AND `empty` IS THE THREE WAYS A VALUE IS ABSENT, because an import carries what it carries', () => {

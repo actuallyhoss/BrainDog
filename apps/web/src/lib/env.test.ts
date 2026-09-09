@@ -80,11 +80,16 @@ test('the build substitutes the environment, and throws on one it does not know'
   assert.match(config, /ENVIRONMENTS/, 'the list is retyped rather than imported');
 });
 
-test('the shell draws the word, and the palette follows the deployment', () => {
+test('the shell says which deployment it is, and the palette follows it', () => {
+  /* THE BADGE IN THE CORNER IS GONE, and that was a call, not an oversight. It sat above the
+     launcher and read as decoration on the one control that is meant to be the only floating thing
+     on the screen. What `13 §5.1` actually requires is that the deployment is not carried by colour
+     ALONE — and it is not: the tab reads `· BrainDog Alpha` and the favicon is the alpha mark, both
+     of which are legible to a reader who cannot tell the two accents apart, and both of which are
+     visible from outside the window rather than only inside it. */
   const layout = read('../routes/+layout.svelte');
-  assert.match(layout, /<EnvBadge \/>/, 'the badge is not mounted anywhere');
-  assert.match(layout, /@braindog\/skin\/house\.css/, 'the app does not import a palette it can alias');
-  assert.match(layout, /mark-alpha\.svg/, 'the deployment has no favicon of its own');
+  assert.match(layout, /@braindog\/skin\/house\.css/u, 'the app does not import a palette it can alias');
+  assert.match(layout, /mark-alpha\.svg/u, 'the deployment has no favicon of its own');
 
   /* NOT A `doesNotMatch` OVER THE WHOLE FILE, because the comment that replaced the `@import`
      quotes the line it replaced — so the first version of this assertion failed on the paragraph

@@ -25,3 +25,28 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+
+# WHERE A TRANSITIVE VERSION IS DECIDED HERE RATHER THAN BY WHOEVER DEPENDS ON IT.
+#
+# An override is a claim that this repository knows better than a package's own manifest, so each
+# one says which advisory it answers and what it would cost to drop it. The right fix for any of
+# these is the dependency shipping a bumped range; an override is what holds the line until it does.
+#
+#   cookie   GHSA-pxg6-pf52-xh8x. `cookie` before 0.7.0 accepts a name, path or domain containing
+#            out-of-bounds characters, so a caller that concatenates untrusted input into one can
+#            write a second cookie. `@sveltejs/kit@2.70.3` asks for `^0.6.0` and pins 0.6.0.
+#
+#            THE EXPOSURE HERE IS SMALL AND THAT IS NOT THE ARGUMENT. This app is `ssr = false` and
+#            static, so the server-side cookie path barely runs — but "we do not use the vulnerable
+#            path" is a claim about today's code that nobody re-checks, and the fix is a range bump
+#            that costs nothing. 0.7.x is the same API with the validation added; 1.x and 2.x change
+#            the signature `kit` calls.
+#   sharp    GHSA-rgj7-g3m4-5g8c. `sharp` before 0.35.4 bundles a libheif with two vulnerabilities of
+#            its own. It arrives twice: `packages/skin` uses it to generate the favicons from the
+#            mark, and `wrangler` pulls it through `miniflare`. Neither path decodes an image a
+#            stranger sent — one reads a mark in this repository and the other is a dev server — but
+#            a bundled native decoder is precisely the dependency whose blast radius is not obvious
+#            from the call site, and 0.35.4 is a patch release of the version already installed.
+overrides:
+  cookie: ^0.7.2
+  sharp: ^0.35.4

@@ -449,11 +449,37 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            pattern, so it has no ceiling, and it needs no escape: a value containing `%` is a value.
            `starts` and `ends` keep `LIKE`, because a prefix IS a pattern; their literals are held
            to the same forty bytes so neither can reach a platform's limit. */
-        if (byteLength(value) > CONTAINS_MAX) {
+
+        /* AND THE MEASURE IS TAKEN ON WHAT SHIPS, WHICH IS NOT WHAT WAS TYPED.
+           This measured the raw literal, and the string that reaches SQLite is the ESCAPED one plus
+           a `%`: every `\`, `%` and `_` in the value doubles on the way in. So a forty-byte literal
+           of `%%%…` compiled to an eighty-one-byte `LIKE` pattern and went straight past the check
+           whose own paragraph, three lines up, says it exists to stop a pattern reaching a
+           platform's fifty-byte ceiling. The failure it was written to prevent, produced by the
+           check itself.
+
+           `contains` still measures the literal, and that is not an inconsistency: it compiles to
+           `instr` with the value as a bound parameter, so there is no pattern to overrun and the cap
+           there is a bound on work rather than on a limit. The two ops measure different strings
+           because they ARE different strings.
+
+           THE MEASURE IS THE ESCAPED LITERAL AND NOT THE WHOLE PATTERN, so the anchoring `%` is
+           outside it. The defect was escape DOUBLING — one character becoming two, without limit —
+           and a single wildcard byte is not that. Counting it would refuse a forty-byte literal
+           somebody has been allowed to write since this cap existed, to buy one byte of a ten-byte
+           margin the cap already leaves under the platform's fifty. */
+        const escaped = op === 'contains' ? value : value.replace(/[\\%_]/g, (c) => `\\${c}`);
+        const pattern = op === 'contains' ? value : op === 'starts' ? `${escaped}%` : `%${escaped}`;
+
+        if (byteLength(escaped) > CONTAINS_MAX) {
           bad.push(
             refuse(
               'CONTAINS_TOO_LONG',
-              `${field} ${op} takes at most ${CONTAINS_MAX} bytes, and this one is ${byteLength(value)}.`,
+              byteLength(escaped) === byteLength(value)
+                ? `${field} ${op} takes at most ${CONTAINS_MAX} bytes, and this one is ${byteLength(value)}.`
+                : /* THE SENTENCE SAYS WHICH NUMBER IT MEASURED, because a refusal reading "at most 40
+                     bytes, and this one is 21" teaches nothing and reads as a bug in the record. */
+                  `${field} ${op} takes at most ${CONTAINS_MAX} bytes as a LIKE pattern, and this one is ${byteLength(value)} bytes that escape to ${byteLength(escaped)}.`,
               field,
             ),
           );
@@ -461,8 +487,6 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         }
         if (op === 'contains') return `(${path} IS NOT NULL AND instr(lower(${path}), lower(${put(value)})) > 0)`;
 
-        const escaped = value.replace(/[\\%_]/g, (c) => `\\${c}`);
-        const pattern = op === 'starts' ? `${escaped}%` : `%${escaped}`;
         return `(${path} IS NOT NULL AND ${path} LIKE ${put(pattern)} ESCAPE '\\')`;
       }
 
