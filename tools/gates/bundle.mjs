@@ -156,7 +156,39 @@ for (const f of allCss) {
   else routeCss += size;
 }
 
-const shell = brotli(await readFile(join(BUILD, 'index.html')));
+const shellHtml = await readFile(join(BUILD, 'index.html'), 'utf8');
+
+/**
+ * THE SHELL STILL HOLDS A TEMPLATE PLACEHOLDER, WHICH MEANS THE APP IS NOT IN IT.
+ *
+ * `app.html` carries two of them, one for the head and one for the body, and the build replaces
+ * each. It replaces the FIRST occurrence of each and leaves the rest, so a second spelling anywhere
+ * in that file, in a comment for instance, takes the substitution and the real one ships as literal
+ * text. A comment in this repository's own `app.html` did exactly that, to explain itself.
+ *
+ * WHAT IT COSTS IS EVERYTHING AND IT SAYS NOTHING. The app does not mount: no console error, no
+ * page error, an empty screen on every route, a build that succeeds, a typecheck that passes and a
+ * deploy that goes out. It reached staging and served there. Four browser gates would have caught
+ * it eventually and each of them takes minutes; this is a substring search over one file.
+ *
+ * IT IS HERE RATHER THAN IN ITS OWN GATE because this is the gate that already reads the built
+ * shell, and the question is about that file. A build whose shell is not a shell has no budget
+ * worth reporting, so it is checked before the numbers rather than beside them.
+ */
+const LEFTOVER = /%sveltekit\.(head|body)%/g;
+const leftover = [...new Set([...shellHtml.matchAll(LEFTOVER)].map((m) => m[0]))];
+if (leftover.length > 0) {
+  console.error(
+    `\n  bundle: the built shell still contains ${leftover.join(' and ')}.\n\n` +
+      '  The build replaces the FIRST occurrence of each placeholder and leaves the rest, so a\n' +
+      '  second spelling anywhere in `apps/web/src/app.html`, in a comment for instance, takes the\n' +
+      '  substitution and the real one ships as literal text. The app then does not mount at all,\n' +
+      '  on any route, with no error anywhere. Spell the two names apart in prose.\n',
+  );
+  process.exit(1);
+}
+
+const shell = brotli(Buffer.from(shellHtml, 'utf8'));
 
 const font = async (f) => (await stat(join(BUILD, 'fonts', f))).size;
 
