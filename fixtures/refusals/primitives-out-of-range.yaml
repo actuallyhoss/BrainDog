@@ -1,0 +1,5 @@
+code:   PRIMITIVES_OUT_OF_RANGE
+via:    install
+raises: packages/declare/src/index.ts
+at:     requires.primitives
+fix:    Update BrainDog, or ask the author for a build against the primitives this record renders.

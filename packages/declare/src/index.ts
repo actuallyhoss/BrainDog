@@ -627,16 +627,38 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
     });
   }
 
-  for (const need of [
-    ['format', diff.requires.format] as const,
-    ['primitives', diff.requires.primitives] as const,
-  ])
-    if (!need[1].ok)
-      return no<Applied>(
-        'OUT_OF_BOUNDS',
-        `${diff.pack.id} needs ${need[0]} ${need[1].wanted} and this record is at ${need[1].has}.`,
-        { at: `requires.${need[0]}` },
-      );
+  /**
+   * EACH HAS ITS OWN CODE, and both said `OUT_OF_BOUNDS`.
+   *
+   * `04 §5` gives them separate rows with separate repairs, and the difference is not cosmetic:
+   * `FORMAT_OUT_OF_RANGE` is *"requires format 2; this record is format 1. Update BrainDog"*, and
+   * `PRIMITIVES_OUT_OF_RANGE` is *"requires primitives 2; this record renders primitives 1. Update
+   * BrainDog, or ask the author for a primitives-1 build"*. The second repair has a second half,
+   * because a pack author can ship a primitives-1 build and cannot ship a format-1 one.
+   *
+   * `OUT_OF_BOUNDS` IS THE CODE FOR A NUMBER OUTSIDE ITS RANGE, which is true of both and is what
+   * makes it the wrong answer: an agent branching on it learns that something was too big. `30 §6`
+   * publishes two codes for this and both were emitted by nothing, which is how it was found.
+   *
+   * A MISSING PACK KEEPS `OUT_OF_BOUNDS` below, because `04 §5` gives that case no code of its own.
+   */
+  /* WRITTEN OUT RATHER THAN LOOPED, so the code sits where `refusals.mjs` reads one: a literal
+     handed to the constructor. In a tuple it is a string in an array and the gate that counts what
+     the product emits sees nothing, which is how both of these came to be published in `30 §6` and
+     emitted by nothing. Two calls, four lines, and the sentences can differ. */
+  if (!diff.requires.format.ok)
+    return no<Applied>(
+      'FORMAT_OUT_OF_RANGE',
+      `${diff.pack.id} needs format ${diff.requires.format.wanted} and this record is at ${diff.requires.format.has}. Update BrainDog.`,
+      { at: 'requires.format' },
+    );
+
+  if (!diff.requires.primitives.ok)
+    return no<Applied>(
+      'PRIMITIVES_OUT_OF_RANGE',
+      `${diff.pack.id} needs primitives ${diff.requires.primitives.wanted} and this record renders ${diff.requires.primitives.has}. Update BrainDog, or ask the author for a build against the primitives this record renders.`,
+      { at: 'requires.primitives' },
+    );
 
   const missing = diff.requires.packs.find((p) => !p.ok);
   if (missing)

@@ -480,6 +480,55 @@ test('and three currencies in one `not_in` still balance', () => {
   assert.equal((c.sql.match(/\?/g) ?? []).length, c.params.length);
 });
 
+test('A MONEY LITERAL WITH NO CURRENCY IS REFUSED, and it used to match every currency', () => {
+  /* `qualifier` returned the empty string for a half that is missing, so `amount over 1000` with no
+     currency compiled to a bare number comparison over `$.amount.amount`. A hundred thousand yen
+     and a thousand pounds are the same integer, and the answer came back confidently mixed. This
+     file's own subject is that comparing only the numbers is the mistake minor units exist to make
+     impossible; the guard against a mixed RANGE was written and the guard against no currency at
+     all was not.
+
+     `30 §6` line 916 specifies the code and it was emitted by nothing. */
+  for (const leaf of [
+    { field: 'amount', is: { amount: 48_000 } },
+    { field: 'amount', not: { amount: 48_000 } },
+    { field: 'amount', gt: { amount: 1_000 } },
+    { field: 'amount', lte: { amount: 1_000 } },
+    { field: 'amount', between: [{ amount: 1, currency: 'GBP' }, { amount: 2 }] },
+    { field: 'amount', in: [{ amount: 1, currency: 'GBP' }, { amount: 2 }] },
+    { field: 'amount', not_in: [{ amount: 2 }] },
+  ] as const) {
+    const c = compile(leaf as never, SCHEMA);
+    assert.equal(c.bad[0]?.code, 'MONEY_LITERAL_NEEDS_CURRENCY', JSON.stringify(leaf));
+    assert.match(c.bad[0]?.fix ?? '', /matches every currency/u, 'the sentence does not say what it would have done');
+    /* AND IT MATCHES NOTHING, which is this package's answer to a clause it could not compile: a
+       refused predicate returns no rows rather than all of them, so a filter that is wrong is
+       visibly wrong rather than quietly generous. */
+    assert.equal(c.sql, '0 = 1', 'a refused leaf compiled to something that can match');
+  }
+
+  /* AND A COMPLETE ONE IS UNTOUCHED, which is what keeps the guard from being a filter that refuses
+     the question rather than answering it. */
+  assert.deepEqual(compile({ field: 'amount', is: { amount: 48_000, currency: 'GBP' } }, SCHEMA).bad, []);
+});
+
+test('and a quantity says UNIT, because that is the word the repair uses', () => {
+  /* `30 §6` gives the two cases separate codes for one reason: the sentence differs by a word, and
+     a person told to send a currency for a field measured in metres has been told to do something
+     they cannot do. */
+  const c = compile({ field: 'effort', is: { value: 3 } } as never, SCHEMA);
+  assert.equal(c.bad[0]?.code, 'QUANTITY_LITERAL_NEEDS_UNIT');
+  assert.match(c.bad[0]?.fix ?? '', /needs a unit/u);
+  assert.deepEqual(compile({ field: 'effort', is: { value: 3, unit: 'h' } } as never, SCHEMA).bad, []);
+});
+
+test('and `empty` and `present` are not literals, so they carry no currency and are not refused', () => {
+  /* They ask whether the FIELD has anything in it. Demanding a currency of a question about absence
+     would refuse the one predicate that has no value to qualify. */
+  assert.deepEqual(compile({ field: 'amount', empty: true }, SCHEMA).bad, []);
+  assert.deepEqual(compile({ field: 'amount', present: true }, SCHEMA).bad, []);
+});
+
 test('A RANGE IN TWO CURRENCIES IS NOT A RANGE', () => {
   /* The qualifier was taken from the low bound alone, so a range written from GBP 200 to USD 300
      silently reread the ceiling as GBP 300 — a plausible answer to a question nobody asked. */

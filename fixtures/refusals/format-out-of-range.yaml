@@ -1,0 +1,5 @@
+code:   FORMAT_OUT_OF_RANGE
+via:    install
+raises: packages/declare/src/index.ts
+at:     requires.format
+fix:    Update BrainDog: this pack needs a newer record format.

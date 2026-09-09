@@ -1,0 +1,5 @@
+code:   QUANTITY_LITERAL_NEEDS_UNIT
+via:    where
+raises: packages/where/src/index.ts
+at:     effort
+fix:    Give the comparison a unit, or it matches every unit in the register.

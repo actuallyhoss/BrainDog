@@ -16,14 +16,30 @@ One label per surface, with the environment in front of it.
 | **`app.alpha.brain.dog`** | the record, built as **BrainDog Alpha** | Workers Builds `braindog-alpha`, on every push to `master` | live |
 | **`mcp.alpha.brain.dog`** | reserved | nothing | not claimed |
 
-`mcp.*` is deliberately unclaimed. The MCP transport is not built, and pointing that hostname at the
+`mcp.*` is deliberately unclaimed, **and `mcp.brain.dog` is not.** Measured 2026-09-09:
+`mcp.alpha.brain.dog` does not resolve, which is correct, and `https://mcp.brain.dog/` answers
+**525**, which is a TLS handshake failing between Cloudflare and an origin. A 525 is not what an
+unclaimed name answers: it means a record exists and points somewhere that cannot complete a
+handshake. Whatever is there is serving an MCP address with a certificate error rather than with
+nothing, which is the same defect as the apex below and one hostname further out. It is on the same
+list, and it is the same permission to fix.
+
+The MCP transport is not built, and pointing that hostname at the
 Worker would answer an MCP address with the app's shell. `apps/web`'s first-run screen does print
 `claude mcp add --transport http braindog https://mcp.brain.dog`, which is a command nobody can run,
 and that is a defect filed in `loop/BACKLOG.md` rather than a reason to claim the name.
 
 **`brain.dog` is blocked on three A records.** The apex carries `172.239.193.194`,
 `172.236.103.15` and `172.234.212.77`, all proxied, all pointing at an origin that answers nothing,
-which is why the hostname returns 520 today. Cloudflare refuses to attach a Worker to a hostname
+which is why the hostname returns 520 today. Re-measured 2026-09-09 and unchanged: the apex still
+answers 520, while `alpha.brain.dog`, `app.brain.dog` and `app.alpha.brain.dog` all answer 200.
+
+**The change needs a token nothing here has.** `wrangler` is logged in with an OAuth token whose
+zone scope is READ: it lists the zone and is refused on `dns_records`, with a 10000 authentication
+error. Deleting these needs a Cloudflare API token carrying `Zone:DNS:Edit` on this zone and
+nothing else, or thirty seconds in the dashboard. No such token exists in this checkout, and one is
+not minted here: `12 §6`'s rule is that a credential is never in the record, and the same argument
+covers a repository. Cloudflare refuses to attach a Worker to a hostname
 that has externally managed DNS, so those three have to be deleted before
 `wrangler deploy --env production` can claim it. The values are written down here so the change is
 reversible. Mail is unaffected: the MX, SPF and DKIM records are separate.

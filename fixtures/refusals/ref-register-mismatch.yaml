@@ -1,0 +1,5 @@
+code:   REF_REGISTER_MISMATCH
+via:    write
+raises: packages/kernel/src/coerce.ts
+at:     thing
+fix:    Name a row of the register this field points at, or change what it points at.

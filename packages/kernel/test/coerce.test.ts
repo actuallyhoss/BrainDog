@@ -210,6 +210,30 @@ test('a ref takes a row id or a spoken one, and resolves the spoken one', () => 
   assert.equal(spoken('obligations', 41), 'obligations#41');
 });
 
+test('A REF INTO THE WRONG REGISTER IS REFUSED, and it used to resolve and store the row', () => {
+  /* `field.to` was read in this case for one thing: building the sentence in the malformed branch.
+     So `invoices#3` written into a field declared `to: contacts` resolved the INVOICES row and
+     stored its id, and every read afterwards followed the reference into the wrong register and
+     found a row that is a real row. Nothing malformed, nothing missing, nothing refused, and the
+     answer wrong: which is why `30 §6` publishes a code for it, and why that code was emitted by
+     nothing. */
+  const rowId = 'Z'.repeat(26);
+  const found = { refId: () => rowId };
+  const said = refuse(f('ref', { to: 'people' }), 'invoices#3', found);
+  assert.equal(said.code, 'REF_REGISTER_MISMATCH');
+  assert.deepEqual(said.allowed, ['people'], 'the refusal does not say which register it takes');
+  assert.match(said.fix, /points at people/u);
+
+  /* `REF_UNKNOWN` IS THE OTHER ONE AND THE LINE BETWEEN THEM IS THE REPAIR. `30 §6` draws it in as
+     many words: that one has nothing to point at, this one points at the wrong thing. Repoint this;
+     write the missing row for that. */
+  assert.match(refuse(f('ref', { to: 'people' }), 'people#41', { refId: () => null }).fix, /no such row/u);
+
+  /* AND A `ref` WITH NO DECLARED TARGET TAKES ANY REGISTER, because that is what leaving `to:` off
+     a declaration means. Inventing a refusal here would refuse a shape `declare` accepts. */
+  assert.equal(take(f('ref', {}), 'invoices#3', found), rowId);
+});
+
 test('a list coerces every element, and a refusal names the one that failed', () => {
   assert.deepEqual(take(f('list', { of: 'int' }), ['1', 2, 3]), [1, 2, 3]);
   const r = refuse(f('list', { of: 'int' }), [1, 'two', 3]);

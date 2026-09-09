@@ -303,6 +303,56 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
       return false;
     };
 
+    /**
+     * A MONEY LITERAL CARRIES ITS CURRENCY AND A QUANTITY CARRIES ITS UNIT, or it is refused.
+     *
+     * `qualifier` RETURNED THE EMPTY STRING FOR A HALF THAT IS MISSING, so `amount over 1000` with
+     * no currency compiled to a bare number comparison and matched every currency in the register:
+     * a hundred thousand yen and a thousand pounds are the same integer, and the answer came back
+     * confidently mixed. This file's own header says it in as many words twenty lines up: comparing
+     * only the numbers is *"the exact mistake minor units exist to make impossible"*. The guard
+     * against a mixed RANGE was written; the guard against no currency at all was not.
+     *
+     * `30 §6` line 916 SPECIFIES BOTH CODES for exactly this and both were emitted by nothing:
+     * *"a literal without its currency or unit is refused"*. Two codes rather than one, because the
+     * repair is a different word: send a currency, or send a unit.
+     *
+     * IT RUNS OVER EVERY VALUE THE OPERATOR TAKES, which is why it is a function rather than one
+     * check: `between` carries two and `in` carries a list, and a rule that only read the scalar
+     * would leave the range and the list compiling to the same silent match-everything.
+     */
+    const money = decl.type === 'money';
+    const carriesUnit = (v: unknown): boolean => {
+      const q = QUALIFIER[decl.type];
+      if (!q) return true;
+      const half = typeof v === 'object' && v !== null ? (v as Record<string, unknown>)[q.key] : undefined;
+      if (half !== undefined && half !== null && half !== '') return true;
+      /* TWO CALLS AND NOT A TERNARY INSIDE ONE, so `refusals.mjs` can see both codes: it reads an
+         emitted code as a literal after the constructor, crossing at most a condition with no quote
+         in it, and `decl.type === 'money'` has one. Its header says why the pattern is that narrow:
+         one that chewed through a whole file for an upper-case string would report enum values as
+         refusal codes. */
+      bad.push(
+        money
+          ? refuse(
+              'MONEY_LITERAL_NEEDS_CURRENCY',
+              `${field} is money, so this comparison needs a currency: { amount, currency }. Without one it matches every currency in the register.`,
+              field,
+            )
+          : refuse(
+              'QUANTITY_LITERAL_NEEDS_UNIT',
+              `${field} is a quantity, so this comparison needs a unit: { value, unit }. Without one it matches every unit in the register.`,
+              field,
+            ),
+      );
+      return false;
+    };
+    if (QUALIFIER[decl.type] && op !== 'empty' && op !== 'present') {
+      const said = leaf[op];
+      const each = Array.isArray(said) ? said : [said];
+      if (!each.every(carriesUnit)) return '';
+    }
+
     switch (op) {
       /* THE THREE WAYS A VALUE IS ABSENT. A write stores none of them — `null`, `''` and `[]` all
          remove the key — but an IMPORT carries whatever the other record held, and a row written

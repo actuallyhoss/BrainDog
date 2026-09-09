@@ -333,6 +333,11 @@ function read(
   const params: (string | number)[] = [schema.register, ...w.params];
 
   if ('ratio' in decl.value || 'diff' in decl.value) {
+    /* HOISTED SO THE REFUSAL BELOW READS ITS CODE FROM A CONSTRUCTOR AND NOT FROM A TERNARY WHOSE
+       CONDITION HOLDS A QUOTE: `refusals.mjs` cannot cross one, and would count neither code.
+       The narrowing has to stay inline, because `'ratio' in decl.value` is what tells the type
+       checker which half of the union it is holding, and a boolean does not carry that. */
+    const ratio = 'ratio' in decl.value;
     const pair = 'ratio' in decl.value ? decl.value.ratio : decl.value.diff;
     const of = one(sql, schema, pair.of, where, params, lookups);
     const per = one(sql, schema, pair.per, where, params, lookups);
@@ -342,11 +347,30 @@ function read(
        neither against the other, so GBP − USD came out as a number labelled GBP — the same failure
        this file's header is written against, arrived at through the guard against it. */
     if (of.value.unit !== per.value.unit)
-      return no<Read>(
-        'MIXED_CURRENCY',
-        `one half of this figure is in ${of.value.unit ?? 'no unit'} and the other in ${per.value.unit ?? 'no unit'}, and two currencies are never subtracted either`,
-        { at: 'value' },
-      );
+      /* `RATIO_MIXED_CURRENCY` FOR A RATIO, AND `MIXED_CURRENCY` FOR A DIFF, because `04 §5` gives
+         them separate rows with separate sentences: the ratio's is *"revenue is USD, spend is EGP.
+         Name an fx source, or scope the predicate to one currency"*, and the plain one is about a
+         mixed-currency AGGREGATION. Both arms said `MIXED_CURRENCY`, so a code the specification
+         publishes was emitted by nothing and an agent branching on it could not tell a division of
+         two currencies from a sum across three. `30 §6` counts a code nothing emits, which is how
+         this was found. */
+      /* THE CONDITION IS HOISTED SO THE CODE SITS AFTER THE CONSTRUCTOR. `refusals.mjs` reads an
+         emitted code as a quoted literal after `no(`, crossing at most a ternary condition that
+         holds no quote of its own, and it says why in its own header: a pattern that chewed through
+         a whole file looking for an upper-case string would start reporting enum values as refusal
+         codes. `'ratio' in decl.value` inline would put a quote in that condition and hide both
+         codes from the gate that counts them. */
+      return ratio
+        ? no<Read>(
+            'RATIO_MIXED_CURRENCY',
+            `one half of this figure is in ${of.value.unit ?? 'no unit'} and the other in ${per.value.unit ?? 'no unit'}, and two currencies are never divided either`,
+            { at: 'value' },
+          )
+        : no<Read>(
+            'MIXED_CURRENCY',
+            `one half of this figure is in ${of.value.unit ?? 'no unit'} and the other in ${per.value.unit ?? 'no unit'}, and two currencies are never subtracted either`,
+            { at: 'value' },
+          );
 
     const a = of.value.value;
     const b = per.value.value;
@@ -481,13 +505,27 @@ function aggregate(
       `SELECT ${unitExpr} AS u, ${fn}(${expr}) AS v, count(${expr}) AS n FROM entry WHERE ${where} AND ${expr} IS NOT NULL GROUP BY u ORDER BY u`,
       ...params,
     );
+    /* Hoisted for the same reason as the ratio above: the gate that counts emitted codes will not
+       cross a ternary condition carrying a quote, and both arms below are codes it has to see. */
+    const money = type === 'money';
     if (groups.length === 0) return ok({ value: kind === 'sum' ? 0 : null, unit: null, rows, refusals: [] });
     if (groups.length > 1)
-      return no<Read>(
-        'MIXED_CURRENCY',
-        `these rows are in ${groups.map((g) => g.u ?? 'no unit').join(' and ')}, and two ${type === 'money' ? 'currencies' : 'units'} are never added`,
-        { at: field, allowed: groups.map((g) => String(g.u ?? '')) },
-      );
+      /* AND A QUANTITY SAYS SO IN ITS OWN CODE. `04 §5` gives the unit case its own row, *"a
+         `quantity` aggregation across units"*, with its own sentence: *"sums consumption across m,
+         cm and g. Scope the predicate to one unit"*. The sentence below has said "units" since it
+         was written and the code said `MIXED_CURRENCY`, which is a sentence about money attached to
+         a figure about metres. */
+      return money
+        ? no<Read>(
+            'MIXED_CURRENCY',
+            `these rows are in ${groups.map((g) => g.u ?? 'no unit').join(' and ')}, and two currencies are never added`,
+            { at: field, allowed: groups.map((g) => String(g.u ?? '')) },
+          )
+        : no<Read>(
+            'QUANTITY_MIXED_UNIT',
+            `these rows are in ${groups.map((g) => g.u ?? 'no unit').join(' and ')}, and two units are never added`,
+            { at: field, allowed: groups.map((g) => String(g.u ?? '')) },
+          );
     const only = groups[0]!;
     return ok({ value: only.v === null ? null : Number(only.v), unit: only.u, rows, refusals: [] });
   }

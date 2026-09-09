@@ -1,0 +1,5 @@
+code:   MONEY_LITERAL_NEEDS_CURRENCY
+via:    where
+raises: packages/where/src/index.ts
+at:     amount
+fix:    Give the comparison a currency, or it matches every currency in the register.

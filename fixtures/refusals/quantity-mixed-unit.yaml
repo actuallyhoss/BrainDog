@@ -1,0 +1,5 @@
+code:   QUANTITY_MIXED_UNIT
+via:    rpc
+raises: packages/kernel/src/metrics.ts
+at:     amount
+fix:    Scope the predicate to one unit.

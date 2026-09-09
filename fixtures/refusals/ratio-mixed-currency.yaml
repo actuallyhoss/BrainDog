@@ -1,0 +1,5 @@
+code:   RATIO_MIXED_CURRENCY
+via:    rpc
+raises: packages/kernel/src/metrics.ts
+at:     value
+fix:    Name an fx source, or scope the predicate so both halves are one currency.

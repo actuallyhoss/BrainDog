@@ -257,6 +257,37 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       if (ULID.test(s)) return good(s);
       const said = parseSpoken(s);
       if (!said) return malformed(`${at} takes a row id or a spoken id like ${field.to ?? 'register'}#41.`);
+
+      /**
+       * THE REGISTER THE FIELD DECLARES, AND IT WAS NEVER COMPARED.
+       *
+       * `field.to` was read in this case for exactly one thing: building the sentence in the line
+       * above. So `invoices#3` written into a field declared `to: contacts` resolved the INVOICES
+       * row and stored its id, and every read afterwards followed the reference into the wrong
+       * register and found a row that is a real row. Nothing is malformed, nothing is missing,
+       * nothing refuses, and the answer is wrong: the shape this repository keeps finding, in the
+       * one place where the record's own referential integrity lives.
+       *
+       * `REF_REGISTER_MISMATCH` AND NOT `REF_UNKNOWN`, and `30 §6` line 774 draws the line in as
+       * many words: `REF_UNKNOWN` has nothing to point at, and this one points at the wrong thing.
+       * The repairs differ, so the codes do: repoint this one, write the missing row for that one.
+       *
+       * `field.to` UNSET IS NOT A MISMATCH. A `ref` with no declared target accepts any register,
+       * which is what `41 §4`'s own optionality means, and inventing a refusal for it here would
+       * refuse a declaration `declare` accepts.
+       */
+      if (field.to !== undefined && said.register !== field.to)
+        return bad(
+          'REF_REGISTER_MISMATCH',
+          `${at} points at ${field.to}, and ${s} is a ${said.register} row. Name a ${field.to} row, or change what this field points at.`,
+          at,
+          /* `allowed`, WHICH IS THE ONE SHAPE `Refusal` HAS FOR "SEND THIS INSTEAD". `50 §2.5`
+             types the browser's own `Refusal` with `found` and `wanted`; `packages/ports` has
+             neither, and inventing them at one call site would be a second refusal shape reaching a
+             caller that reads the first. One register, because a field points at one. */
+          { allowed: [field.to] },
+        );
+
       const id = look.refId?.(said.register, said.seq) ?? null;
       if (!id) return malformed(`${at} names ${s}, and there is no such row.`);
       return good(id);
