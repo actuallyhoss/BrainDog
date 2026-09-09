@@ -197,8 +197,10 @@ export const copy = {
   samplePutAway: 'Put this away',
 
   rowActions: 'What you can do here',
+  setTo: (state: string) => `Set to ${state}`,
   markArchived: 'Archived',
   markNotWritten: 'Not saved',
+  markNeeds: (fields: string) => `Needs ${fields}`,
   undoRow: 'Put back',
   undoRowOf: (row: string) => `Put ${row} back`,
   archiveRow: (row: string) => `Archive ${row}`,
@@ -209,7 +211,7 @@ export const copy = {
   captureHint: 'Press Enter to add it. Everything else can wait.',
   captureInherits: (what: string) => `Takes ${what} from the filter you are looking at.`,
   captureAdd: 'Add',
-  captureNeeds: (fields: string) => `This register also needs ${fields}, so it opens the full form.`,
+  captureNeeds: (fields: string) => `Add it now and fill in ${fields} after. The row says what it is still missing.`,
 
   /* home */
   needsYou: 'What needs you',

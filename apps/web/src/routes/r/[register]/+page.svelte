@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, labelOf, list, noticed, NOW, PAGE, PAGES, readableFields, REGISTERS, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, inheritedFrom, labelOf, list, noticed, NOW, PAGE, PAGES, readableFields, REGISTERS, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
@@ -500,50 +500,20 @@
   let capture = $state('');
 
   /**
-   * What the filter answers on the reader's behalf: every `is` chip on a field this register
-   * declares.
+   * What the filter answers on the reader's behalf, and what it cannot.
    *
-   * `is` AND NOTHING ELSE. `state is open` names one value and inheriting it is unambiguous;
-   * `due before +30d` and `state in [open, late]` name a SET, and picking a member of a set for
-   * somebody is guessing at the one moment they have not said.
+   * BOTH LIVE IN `record/api.ts` AND NOT HERE. They are the piece of this screen that can write a
+   * WRONG VALUE rather than an ugly one: the URL carries the readable form of a value and the record
+   * stores the declared one, so an inheritance that reconciled the two spellings loosely would put
+   * a reader's prose in a field and nothing would say so. That is a thing to have a test for, and a
+   * `$derived` inside a component is not reachable from one.
    */
-  const inherited = $derived.by(() => {
-    const out: Fields = {};
-    for (const f of filters) {
-      if (f.op !== 'is') continue;
-      const field = decl?.fields.find((x) => x.id === f.field);
-      if (!field || field.id === decl?.title) continue;
-      /* ONE VALUE, and `is` is the operator that has exactly one. `values` is a list because `in`
-         needs one; reading `values[0]` off any other operator would be picking a member of a set
-         for somebody at the one moment they have not said which. */
-      const only = f.values.length === 1 ? f.values[0] : undefined;
-      if (only === undefined) continue;
-      const said = declaredValue(id, f.field, only);
-      if (said !== null && said !== undefined) out[f.field] = said;
-    }
-    return out;
-  });
-
-  /**
-   * Required fields the line cannot answer, so it says so rather than writing a row that is short.
-   *
-   * A CAPTURE LINE THAT SILENTLY DROPPED A REQUIRED FIELD would be the shape this repository keeps
-   * finding: a control that reports success and leaves the record in a state the declaration
-   * refuses. When there is one, Enter opens the full form instead, which is where those fields are.
-   */
-  const unanswered = $derived(
-    (decl?.fields ?? []).filter(
-      (f) => f.required && f.id !== decl?.title && !(f.id in inherited),
-    ),
-  );
+  const inherited = $derived(inheritedFrom(id, filters));
+  const unanswered = $derived(unansweredBy(id, inherited));
 
   function captureRow() {
     const said = capture.trim();
     if (!said) return;
-    if (unanswered.length > 0) {
-      createOpen = true;
-      return;
-    }
     /* NEGATIVE SEQUENCES, so a draft can never collide with a row the record has. The spoken id is
        what every other thing on this screen addresses a row by, and two rows answering to
        `obligations#7` is the one collision that would make the receipt point at the wrong row. */
@@ -555,8 +525,22 @@
       { seq, version: 1, created: new Date(NOW).toISOString(), by: 'you', fields: { ...inherited, [title]: said } },
       ...drafts,
     ];
+    /**
+     * THE ROW IS ADDED EVEN WHEN THE REGISTER WANTS MORE, and the chip says what it wants.
+     *
+     * THE FIRST VERSION BOUNCED TO THE FULL FORM instead, which is the modal this line exists to
+     * replace arriving one keystroke later. Obligations require a direction, an amount, a due date
+     * and a state beyond the title, so on the register a person opens most often the fast path
+     * never ran once.
+     *
+     * IT IS LINEAR'S GRACE WINDOW, WHICH `loop/REWORK.md` NAMES AS THE HIGHEST-VALUE SINGLE STEAL
+     * for this product: a row is allowed to be incomplete for the minutes right after it is
+     * captured, because the alternative is that the thing in somebody's head has to survive a form
+     * before it can be written down. The row is here, it is named, and what it still needs is on
+     * it, so the form is a place to go rather than a gate to pass.
+     */
     receipt(seq, {
-      mark: copy.markNotWritten,
+      mark: unanswered.length > 0 ? copy.markNeeds(unanswered.map((f) => f.label.toLowerCase()).join(', ')) : copy.markNotWritten,
       intent: 'warn',
       undo: () => {
         drafts = drafts.filter((d) => d.seq !== seq);
@@ -564,6 +548,25 @@
       },
     });
     capture = '';
+  }
+
+  /**
+   * Move one row's state, from the row.
+   *
+   * IT TOOK THREE PRESSES AND A BULK BAR. The only way to change one row's state was to select it,
+   * reach the bar that appears when something is selected, and use the menu there. The state is the
+   * verb a person reaches for most on a list of obligations, and it was the one the row menu did
+   * not carry.
+   *
+   * THE RECEIPT IS THE ANSWER AND THE TOAST IS THE BACKUP, the same way `archive` works: the chip
+   * is on the row, beside what the row says, and the toast is for the reader whose row has scrolled
+   * away. Nothing is written until the record is behind this screen, and the chip says which state
+   * it would be rather than claiming the move happened.
+   */
+  function setRowState(seq: number, state: string) {
+    const said = state.replace(/_/g, ' ');
+    receipt(seq, { mark: said, intent: 'warn', undo: () => clearReceipt(seq) });
+    toasts.push(copy.notWritten(`${id}#${seq} would be set to ${said}`), { intent: 'warn' });
   }
 
   const copyId = (seq: number) => clipboard.putSpoken(id, seq);
@@ -1230,11 +1233,11 @@
         </div>
         <p class="capture-why" id="capture-why">
           {#if unanswered.length > 0}
-            {copy.captureNeeds(unanswered.map((f) => labelOf(f).toLowerCase()).join(', '))}
+            {copy.captureNeeds(unanswered.map((f) => f.label.toLowerCase()).join(', '))}
           {:else if Object.keys(inherited).length > 0}
             {copy.captureInherits(
               Object.keys(inherited)
-                .map((f) => labelOf(decl.fields.find((x) => x.id === f)!).toLowerCase())
+                .map((f) => (decl.fields.find((x) => x.id === f)?.label ?? f).toLowerCase())
                 .join(' and '),
             )}
           {:else}
@@ -1686,6 +1689,24 @@
         <Icon name="check" size="s" />
         <span class="mi-name">{selected.has(seq) ? copy.deselect : copy.select}</span><Kbd keys="x" />
       </button>
+      <!-- THE REGISTER'S OWN STATES, WHICH THIS MENU DID NOT CARRY.
+           Five verbs, and the one a person reaches for most on a list of obligations was not among
+           them: the only way to move a row's state was to select it and use the bulk bar, which is
+           three presses to change one row. The values come from the declaration rather than from a
+           list typed here, so a pack that adds a state gets a menu item.
+
+           NOT THE STATE IT IS ALREADY IN. An item that sets a row to where it already is does
+           nothing and looks like it did something, and `19 §6`'s rule for a control that cannot act
+           is that it is absent rather than greyed. -->
+      {#if states.length > 0}
+        <hr class="mi-rule" />
+        {#each states.filter((v) => v !== entry(id, seq)?.fields[decl.state ?? '']) as state}
+          <button class="mi" role="menuitem" type="button" onclick={() => setRowState(seq, state)}>
+            <Icon name="check" size="s" />
+            <span class="mi-name">{copy.setTo(state.replace(/_/g, ' '))}</span>
+          </button>
+        {/each}
+      {/if}
       <hr class="mi-rule" />
       <button class="mi" role="menuitem" type="button" onclick={() => archive(seq)}>
         <Icon name="archive" size="s" />

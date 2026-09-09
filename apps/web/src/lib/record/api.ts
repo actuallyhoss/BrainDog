@@ -48,12 +48,12 @@ import {
 } from './data.ts';
 import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
-import { compile, explain, matches } from './where.ts';
+import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { findingsFrom } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
-import type { Entry, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
+import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 
 /**
  * The currency the rows of one money field are in, or `null` when they are not all one.
@@ -462,6 +462,62 @@ export function toRows(register: string, entries: Entry[], columns: Column[]): T
     tone: toneOf(register, e),
     cells: columns.map((c) => (c.field === 'seq' ? `#${e.seq}` : display(register, c.field, e.fields[c.field]))),
   }));
+}
+
+/**
+ * What the capture line can answer on the reader's behalf, from the filter they are looking at.
+ *
+ * ASKING AGAIN FOR WHAT IS ALREADY ON SCREEN is asking a person to repeat themselves to a machine
+ * that heard them. Looking at `?f=state:is:open` means the answer to "what state" is in the address,
+ * and a one-line add that then demanded it would be a modal with fewer fields.
+ *
+ * IT IS DELIBERATELY NARROW, and each exclusion is a way of writing a wrong value in silence:
+ *
+ *   `is` AND NOTHING ELSE. `in` and `before` name a SET. Picking a member of a set for somebody is
+ *   guessing at the one moment they have not said which, and the guess would be stored as if they
+ *   had.
+ *
+ *   THE TITLE IS NEVER INHERITED, because the title is what the reader is typing.
+ *
+ *   ENUM AND TEXT ONLY. The URL carries the READABLE form of a value and the record stores the
+ *   declared one: `direction is owed to me` on screen is `owed_to_me` underneath, which is exactly
+ *   what `declaredValue` exists to reconcile. It reconciles the two spellings of a DECLARED value
+ *   and passes anything else through unchanged, so a money, a day or a reference would arrive here
+ *   as the reader's prose and be written as the field's value. A `day` is worse than merely wrong:
+ *   `due is today` is a moving value frozen at the instant somebody typed a row.
+ *
+ *   AN ENUM VALUE THE FIELD DOES NOT DECLARE IS DROPPED. `declaredValue` returns its input when
+ *   nothing matches, which is right for a filter (the answer is no rows) and wrong for a write (the
+ *   answer would be a row nobody can read).
+ */
+export function inheritedFrom(register: string, filters: readonly Filter[]): Fields {
+  const decl = REGISTERS[register];
+  if (!decl) return {};
+  const out: Fields = {};
+  for (const f of filters) {
+    if (f.op !== 'is' || f.values.length !== 1) continue;
+    const field = decl.fields.find((x) => x.id === f.field);
+    if (!field || field.id === decl.title) continue;
+    if (field.type !== 'enum' && field.type !== 'text') continue;
+    const said = declaredValue(register, f.field, f.values[0]!);
+    if (field.type === 'enum' && !field.values?.includes(said)) continue;
+    out[f.field] = said;
+  }
+  return out;
+}
+
+/**
+ * The required fields that line cannot answer, so it can say so rather than writing a short row.
+ *
+ * A CAPTURE LINE THAT SILENTLY DROPPED A REQUIRED FIELD would be the shape this repository keeps
+ * finding: a control that reports success and leaves the record in a state the declaration refuses.
+ */
+export function unansweredBy(register: string, held: Fields): { id: string; label: string }[] {
+  const decl = REGISTERS[register];
+  if (!decl) return [];
+  return decl.fields
+    .filter((f) => f.required && f.id !== decl.title && !(f.id in held))
+    .map((f) => ({ id: f.id, label: labelOf(f) }));
 }
 
 /* ── filters and order ────────────────────────────────────────────────────── */
