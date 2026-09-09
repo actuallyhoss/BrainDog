@@ -275,29 +275,67 @@
         {label && f.id === decl?.title ? label : labelOf(f)}
         <!-- Required is marked on the LABEL and spelled out, never as a bare asterisk: an asterisk
              is a convention you have to already know, and it is announced as "star". -->
+        <!-- AND THE ATTRIBUTE, NOT ONLY THE WORD. A friction pass counted the word `required` five
+             times on the first-run form over zero fields carrying it: the form said the rule and
+             the browser did not know it, so a screen reader announced nothing, autofill treated
+             every field alike, and the only thing enforcing it was this component's own count. The
+             submit is still what refuses, with a sentence naming the fields; this is the browser
+             being told the same fact. -->
         {#if f.required}<span class="row-required">{copy.required}</span>{/if}
       </label>
 
       {#if f.type === 'enum' && (f.values?.length ?? 0) <= 4}
-        <div class="segmented" role="group" aria-labelledby={labelId(f)}>
-          {#each f.values ?? [] as value}
+        <!--
+          A RADIOGROUP AND NOT FOUR TOGGLE BUTTONS, WHICH IS FOUR TAB STOPS.
+
+          It was `role="group"` over buttons carrying `aria-pressed`, which is a legitimate pattern
+          for four independent toggles and is the wrong one for four values of one field: every
+          segment took its own tab stop, so a friction pass counted twelve tab stops serving five
+          fields on the first-run form, and a screen reader announced four separate pressed states
+          rather than one choice with four options.
+
+          A RADIOGROUP IS ONE TAB STOP AND THE ARROWS MOVE INSIDE IT, which is the same composite
+          pattern the grid and the board already use, and it announces "Direction, owed to me, radio
+          button, 2 of 2". Roving `tabindex`, so tabbing lands on the chosen value rather than on
+          the first one: what is selected is where the caret belongs.
+
+          THE ARROWS SELECT AS THEY MOVE, which is what a radiogroup does and what makes it one tab
+          stop rather than one tab stop and a confirm. Nothing here is destructive and every value
+          is one press from every other, so there is nothing to protect a reader from.
+        -->
+        <div class="segmented" role="radiogroup" aria-labelledby={labelId(f)}>
+          {#each f.values ?? [] as value, i}
             <button
               type="button"
               class="segment"
+              role="radio"
+              tabindex={pick(f) === value ? 0 : -1}
               data-on={pick(f) === value ? '' : undefined}
-              aria-pressed={pick(f) === value ? 'true' : 'false'}
+              aria-checked={pick(f) === value ? 'true' : 'false'}
               onclick={() => (chosen = { ...chosen, [f.id]: value })}
+              onkeydown={(e) => {
+                const values = f.values ?? [];
+                const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+                if (step === 0) return;
+                e.preventDefault();
+                /* WRAPPING, because a radiogroup wraps: it is a ring of values rather than a list
+                   with ends, and stopping at one would make the last value the expensive one. */
+                const next = values[(i + step + values.length) % values.length];
+                if (next === undefined) return;
+                chosen = { ...chosen, [f.id]: next };
+                (e.currentTarget.parentElement?.children[(i + step + values.length) % values.length] as HTMLElement | undefined)?.focus();
+              }}
             >
               {value.replace(/_/g, ' ')}
             </button>
           {/each}
         </div>
       {:else if f.type === 'enum'}
-        <select class="row-input" id={id(f)} bind:value={typed[f.id]}>
+        <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
           {#each f.values ?? [] as value}<option value={value}>{value.replace(/_/g, ' ')}</option>{/each}
         </select>
       {:else if f.type === 'ref'}
-        <select class="row-input" id={id(f)} bind:value={typed[f.id]}>
+        <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
           <option value="">{copy.noneChosen}</option>
           {#each options(f) as o}<option value={String(o.value)}>{o.label}</option>{/each}
         </select>
@@ -314,6 +352,7 @@
             type="text"
             inputmode="decimal"
             placeholder="0.00"
+            required={f.required}
             bind:value={typed[f.id]}
             aria-invalid={wrong(f) ? 'true' : undefined}
             aria-describedby={wrong(f) ? `${id(f)}-why` : undefined}
@@ -328,19 +367,19 @@
              the first thing anybody sees. Four weeks is a plausible term somebody overwrites, and
              `deadline:` is the register saying which field is the one a date belongs on. -->
         <div class="field">
-          <input class="field-input" id={id(f)} type="date" bind:value={typed[f.id]} />
+          <input class="field-input" id={id(f)} type="date" required={f.required} bind:value={typed[f.id]} />
         </div>
       {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
         <div class="field">
-          <input class="field-input num" id={id(f)} type="text" inputmode="decimal" bind:value={typed[f.id]} />
+          <input class="field-input num" id={id(f)} type="text" inputmode="decimal" required={f.required} bind:value={typed[f.id]} />
           {#if f.unit}<span class="money-unit">{f.unit}</span>{/if}
         </div>
       {:else if f.type === 'bool'}
         <label class="row-check"><input id={id(f)} type="checkbox" bind:checked={ticked[f.id]} /> {copy.yes}</label>
       {:else if f.type === 'document'}
-        <textarea class="row-input row-area" id={id(f)} rows="4" bind:value={typed[f.id]}></textarea>
+        <textarea class="row-input row-area" id={id(f)} rows="4" required={f.required} bind:value={typed[f.id]}></textarea>
       {:else}
-        <div class="field"><input class="field-input" id={id(f)} type="text" bind:value={typed[f.id]} /></div>
+        <div class="field"><input class="field-input" id={id(f)} type="text" required={f.required} bind:value={typed[f.id]} /></div>
       {/if}
     </div>
   {/each}

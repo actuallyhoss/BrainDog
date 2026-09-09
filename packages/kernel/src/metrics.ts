@@ -346,7 +346,31 @@ function read(
     /* AND THE TWO HALVES AGAINST EACH OTHER. Each was checked for a mixed currency INSIDE itself and
        neither against the other, so GBP − USD came out as a number labelled GBP — the same failure
        this file's header is written against, arrived at through the guard against it. */
-    if (of.value.unit !== per.value.unit)
+    /**
+     * A RATIO OF TWO DIFFERENT UNITS IS A RATE, AND ONLY A DIFF NEEDS THEM TO MATCH.
+     *
+     * This refused both, so `cost per hour` and `average invoice size` were refused as mixed
+     * currencies: GBP over hours, GBP over a count. Dividing one unit by another is the entire
+     * point of a rate, and refusing it took a whole family of ordinary figures off the table.
+     *
+     * `04 §5` NAMES THE CASE PRECISELY and it is narrower than the check was: *"a `ratio` of two
+     * different CURRENCIES"*, with the repair *"revenue is USD, spend is EGP. Name an fx source, or
+     * scope the predicate to one currency"*. Two currencies, not two units, because GBP over USD is
+     * a number with no meaning and GBP over hours is a rate.
+     *
+     * A DIFF STILL NEEDS THEM EQUAL, whatever they are: subtracting hours from pounds is not a
+     * quantity that exists, and that is what the check was written for.
+     *
+     * A CURRENCY IS THREE UPPER-CASE LETTERS, which is ISO 4217 and is what `money` stores in its
+     * `currency` half. A `quantity` stores `h`, `d`, `m`: no unit this record can hold is spelled
+     * like a currency and means something else, so the test is on the value rather than on a type
+     * that would have to be threaded down through two aggregations to get here.
+     */
+    const currency = (u: string | null | undefined) => typeof u === 'string' && /^[A-Z]{3}$/u.test(u);
+    const clash = ratio
+      ? currency(of.value.unit) && currency(per.value.unit) && of.value.unit !== per.value.unit
+      : of.value.unit !== per.value.unit;
+    if (clash)
       /* `RATIO_MIXED_CURRENCY` FOR A RATIO, AND `MIXED_CURRENCY` FOR A DIFF, because `04 §5` gives
          them separate rows with separate sentences: the ratio's is *"revenue is USD, spend is EGP.
          Name an fx source, or scope the predicate to one currency"*, and the plain one is about a

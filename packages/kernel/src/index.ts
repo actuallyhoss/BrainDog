@@ -765,6 +765,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * same exception the column check makes.
      */
     let sort = 'ORDER BY updated_at DESC, id DESC';
+    /**
+     * COERCED AT THE EDGE, LIKE `limit` AND `cursor` ABOVE, and it was not.
+     *
+     * `q.order` arrives from a query string: `packages/host` JSON-decodes every value, so the caller
+     * chooses the shape as well as the contents. This gated on `q.order?.length` and then iterated,
+     * so `?order={"length":1}` passed the gate, threw inside the loop and answered **500**. The
+     * argument for coercing the other two is written four lines up and applies here word for word:
+     * a refusal is a value at this boundary and an exception is not.
+     *
+     * AND A DIRECTION THAT IS NOT ONE IS REFUSED RATHER THAN READ AS DESCENDING. `o.dir === 'asc'
+     * ? 'ASC' : 'DESC'` takes `descnding`, `1`, `null` and `{}` and sorts the other way: a typo
+     * that answers with a correct-looking list in the wrong order, which is the one kind of wrong
+     * answer a reader cannot see.
+     */
+    if (q.order !== undefined && !Array.isArray(q.order))
+      return no('VALUE_MALFORMED', 'An order is a list of { field, dir }.', { at: 'order' });
+    for (const o of q.order ?? []) {
+      if (typeof o !== 'object' || o === null || typeof (o as { field?: unknown }).field !== 'string')
+        return no('VALUE_MALFORMED', 'Each part of an order names a field.', { at: 'order' });
+      const dir = (o as { dir?: unknown }).dir;
+      if (dir !== undefined && dir !== 'asc' && dir !== 'desc')
+        return no('ENUM_VALUE_UNKNOWN', `An order is asc or desc, and this one is ${JSON.stringify(dir)}.`, {
+          at: 'order',
+          allowed: ['asc', 'desc'],
+        });
+    }
     if (q.order?.length) {
       if (typeof q.cursor === 'string' && q.cursor !== '')
         return no(

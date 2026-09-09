@@ -183,6 +183,37 @@ test('and a money sorts by its number rather than by its JSON', () => {
   });
 });
 
+test('AN ORDER FROM A QUERY STRING IS A VALUE, NOT AN EXCEPTION', async () => {
+  /* `packages/host` JSON-decodes every query value, so the caller chooses the SHAPE as well as the
+     contents. This gated on `q.order?.length` and then iterated, so `?order={"length":1}` passed
+     the gate, threw inside the loop, and answered 500 to a read. The argument for coercing `limit`
+     and `cursor` is written four lines above it and applies word for word: a refusal is a value at
+     this boundary and an exception is not. */
+  const { k, sql } = await record();
+  for (const bad of [{ length: 1 }, 'due', 7, { 0: { field: 'due' }, length: 1 }] as unknown[]) {
+    const said = k.list({ register: 'obligations', order: bad as never });
+    assert.equal(said.ok, false, JSON.stringify(bad));
+    assert.equal((said as { refusal: { code: string } }).refusal.code, 'VALUE_MALFORMED');
+  }
+  assert.equal(k.list({ register: 'obligations', order: [{} as never] }).ok, false, 'a part naming no field was taken');
+
+  /* AND A DIRECTION THAT IS NOT ONE IS REFUSED RATHER THAN READ AS DESCENDING. `dir === 'asc' ?
+     'ASC' : 'DESC'` took `descnding`, `1` and `null` and sorted the other way: a typo that answers
+     with a correct-looking list in the wrong order, which is the one kind of wrong answer a reader
+     cannot see. */
+  for (const dir of ['descnding', 1, null, {}] as unknown[]) {
+    const said = k.list({ register: 'obligations', order: [{ field: 'due', dir: dir as never }] });
+    assert.equal(said.ok, false, JSON.stringify(dir));
+    assert.equal((said as { refusal: { code: string; allowed?: readonly string[] } }).refusal.code, 'ENUM_VALUE_UNKNOWN');
+    assert.deepEqual((said as { refusal: { allowed?: readonly string[] } }).refusal.allowed, ['asc', 'desc']);
+  }
+
+  /* AND THE TWO SHAPES THAT ARE RIGHT STILL ANSWER, or the guard has refused the feature. */
+  assert.equal(k.list({ register: 'obligations', order: [{ field: 'due' }] }).ok, true);
+  assert.equal(k.list({ register: 'obligations', order: [{ field: 'due', dir: 'asc' }] }).ok, true);
+  sql.close();
+});
+
 test('a sort on a field the register does not declare is refused, not ignored', async () => {
   /* `json_extract` on an absent key is `NULL` for every row, so an unknown field sorts by nothing at
      all and looks like the default order with extra steps. */

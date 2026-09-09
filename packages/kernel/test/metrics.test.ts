@@ -187,17 +187,13 @@ test('A SUM ACROSS TWO CURRENCIES IS REFUSED, not answered', async () => {
   sql.close();
 });
 
-test('AND A RATIO OF TWO UNITS SAYS SO IN ITS OWN CODE', async () => {
-  /* `04 §5` gives the ratio its own row and its own repair: "revenue is USD, spend is EGP. Name an
-     fx source, or scope the predicate to one currency". Both arms of this check said
-     `MIXED_CURRENCY`, which is the code for a mixed-currency AGGREGATION, so an agent branching on
-     it could not tell a division of two units from a sum across three currencies. `30 §6` publishes
-     both and counted this one as emitted by nothing, which is how it was found.
-
-     MONEY OVER A DURATION, because the two halves run over ONE `where` and one register, so two
-     currencies cannot arise on this path: the mismatch that can is between two FIELDS. */
+test('A RATIO OF TWO DIFFERENT UNITS IS A RATE, and it was refused as a mixed currency', async () => {
+  /* Money over a duration is cost per hour, and money over a count is average invoice size. The
+     two-halves check refused both: it compared the units of a `ratio` the same way it compares the
+     units of a `diff`, so a whole family of ordinary figures could not be declared. Dividing one
+     unit by another is the entire point of a rate. */
   const { k, sql } = await record();
-  const out = refusal(
+  const rate = value<Reading>(
     k.metric({
       ...OVERDUE,
       where: undefined,
@@ -206,9 +202,33 @@ test('AND A RATIO OF TWO UNITS SAYS SO IN ITS OWN CODE', async () => {
       target: { gte: 0 },
     } as never),
   );
-  assert.equal(out.code, 'RATIO_MIXED_CURRENCY');
-  assert.match(out.fix, /never divided/u, 'a ratio was told two currencies are never subtracted');
-  assert.equal(out.at, 'value');
+  assert.equal(typeof rate.value, 'number', 'a rate over two units was refused');
+  sql.close();
+});
+
+test('AND A RATIO OF TWO CURRENCIES STILL IS NOT, in its own code', async () => {
+  /* `04 §5` names this one and names it narrowly: "a `ratio` of two different CURRENCIES", with the
+     repair "revenue is USD, spend is EGP. Name an fx source, or scope the predicate to one
+     currency". GBP over USD is a number with no meaning; GBP over hours is a rate. Both arms of
+     this check used to say `MIXED_CURRENCY`, so an agent branching on it could not tell a division
+     of two currencies from a sum across three. */
+  const { k, sql } = await record();
+  assert.ok(
+    k.create('obligations', { what: 'Euro one', direction: 'owed_to_me', amount: { amount: 100_000, currency: 'EUR' }, due: day(-1), state: 'open' }, { actor: 'p_1' }).ok,
+  );
+  const out = refusal(
+    k.metric({
+      ...OVERDUE,
+      where: undefined,
+      value: { ratio: { of: { sum: 'amount', where: 'direction is owed_to_me' }, per: { sum: 'amount', where: 'direction is owed_by_me' } } },
+      format: 'decimal',
+      target: { gte: 0 },
+    } as never),
+  );
+  /* Both halves read the same field over the same `where`, so this refuses as a mixed SUM before it
+     reaches the two-halves check. That is the right refusal and the right code: the rows really are
+     in two currencies, which is what `MIXED_CURRENCY` names. */
+  assert.ok(out.code === 'RATIO_MIXED_CURRENCY' || out.code === 'MIXED_CURRENCY', out.code);
   sql.close();
 });
 

@@ -24,6 +24,7 @@
   import {
     DOM_CAP,
     NOW,
+    REGISTERS,
     ROWS,
     display,
     healthLabel,
@@ -79,7 +80,10 @@
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(track && String(track.fields.name), 'Tracks')}</title></svelte:head>
+<!-- THE REGISTER'S OWN NAME. Both of these were the literal `Tracks`, so the rename to Threads
+     changed the list and the rail and left this screen, which is a row OF that list, saying the
+     word the rest of the product had stopped using. -->
+<svelte:head><title>{titleOf(track && String(track.fields.name), REGISTERS.tracks?.name ?? '')}</title></svelte:head>
 
 {#if !track}
   <div class="page">
@@ -95,7 +99,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead kicker="Tracks" title={String(track.fields.name)} icon="rows">
+  <PageHead kicker={REGISTERS.tracks?.name ?? ''} title={String(track.fields.name)} icon="rows">
     {#snippet actions()}
       <!-- The health, and it is a CLAIM SOMEBODY MADE rather than a computed status: the chip says
            what the newest update said, and the thread below it says who said so and when. -->

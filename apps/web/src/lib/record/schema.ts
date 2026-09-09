@@ -72,6 +72,16 @@ export type FieldDecl = {
    * `0.2` is a number of some unit the field forgot to name.
    */
   unit?: string;
+  /**
+   * The field this one makes readable, if it makes one readable.
+   *
+   * A COLUMN OF AMOUNTS ON UNSTATED PERIODS CANNOT BE READ: `GBP 340.00` beside `GBP 5.00` is not a
+   * comparison until one says yearly and the other monthly. `services.cycle` is that field for
+   * `services.cost`, and when the default column set narrowed to what a register nominates the
+   * amounts stayed and the period went, which is the exact thing the seed's comment on that field
+   * predicts. So the pair is declared rather than inferred, and it travels together.
+   */
+  qualifies?: string;
 };
 
 /**

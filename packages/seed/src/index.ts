@@ -53,6 +53,16 @@ export type SeedField = FieldDecl & {
   immutable?: boolean;
   /** The date this row is ABOUT, for tone. Declared, never the first `day` field the register has. */
   deadline?: boolean;
+  /**
+   * The field this one makes readable, if it makes one readable.
+   *
+   * A COLUMN OF AMOUNTS ON UNSTATED PERIODS CANNOT BE READ: `GBP 340.00` beside `GBP 5.00` is not a
+   * comparison until one says yearly and the other monthly. `cycle` is that field for `cost`, and
+   * when the default column set narrowed to what a register nominates, the amounts stayed and the
+   * period went. The comment on `cycle` below had already predicted exactly that, which is why the
+   * pair is declared here rather than inferred by whatever draws the columns.
+   */
+  qualifies?: string;
   /** In the search index. A register whose title is not searchable is a register nobody can find. */
   search?: boolean;
   /** Lead times. NOBODY SETS A REMINDER: the field declares them and the record derives the rows. */
@@ -184,7 +194,7 @@ export const REGISTERS: Record<string, SeedRegister> = {
          cannot be read: `GBP 340.00` beside `GBP 5.00` is not a comparison until one says yearly and
          the other monthly. `columnsFor` draws every indexed field, so the period travels with the
          amount and neither is a guess. */
-      { id: 'cycle', type: 'enum', values: ['monthly', 'yearly', 'two_yearly'], index: true, required: true },
+      { id: 'cycle', qualifies: 'cost', type: 'enum', values: ['monthly', 'yearly', 'two_yearly'], index: true, required: true },
       { id: 'state', type: 'enum', values: ['live', 'lapsing', 'cancelled'], index: true, required: true },
       { id: 'points_at', label: 'Target', type: 'text' },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },

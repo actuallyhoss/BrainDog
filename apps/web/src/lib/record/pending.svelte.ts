@@ -22,10 +22,26 @@
  * collision that would put a receipt, a menu or an edit on the wrong one.
  */
 
+import { SvelteMap } from 'svelte/reactivity';
+
 import type { Entry, Fields } from './schema.ts';
 import { NOW } from './data.ts';
 
-const rows = $state(new Map<string, Entry[]>());
+/**
+ * `SvelteMap`, AND IT WAS A PLAIN `Map` IN `$state`, WHICH IS NOT REACTIVE.
+ *
+ * `$state` proxies plain objects and arrays and hands anything else back unchanged, so every
+ * `rows.set` and `rows.delete` below wrote to a `Map` nothing was watching. The whole module was
+ * inert: the capture line emptied its box and drew no row, `Put back` on a pending row left it
+ * there, and the first-run screen appeared to work only because arriving at the list is a fresh
+ * mount that reads the map once.
+ *
+ * THE RULE WAS ALREADY WRITTEN DOWN IN THIS DIRECTORY, in a file added the same afternoon:
+ * `answer.ts` says "a helper that mutated in place would work in a test and draw nothing in a
+ * browser". This is that, one file over, and it is the shape this repository exists to catch:
+ * three screens took a row from a person, reported success, and changed nothing they could see.
+ */
+const rows = new SvelteMap<string, Entry[]>();
 
 let next = 0;
 

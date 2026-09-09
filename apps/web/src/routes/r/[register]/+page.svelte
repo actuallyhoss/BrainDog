@@ -278,8 +278,19 @@
     cursor = first.cursor;
     /* AND THE RECEIPTS GO WITH THE ANSWER THEY WERE ABOUT. A chip saying `archived` beside a row
        the reader has just filtered TO is a chip about a different screen: the receipt exists to
-       hold a row in place through one action, not to follow it around the product. */
+       hold a row in place through one action, not to follow it around the product.
+
+       AND SO DOES EVERYTHING ELSE THIS SCREEN HOLDS ABOUT ONE ROW. SvelteKit reuses this component
+       across the `[register]` parameter, so `edits` was keyed on a bare sequence and survived a
+       walk from one register to another: an unwritten change to `obligations#3` was drawn over
+       `tasks#3`, on a row it was never about, wearing no receipt because the receipts had been
+       cleared. `capture` kept a half-typed row in the box of a different list, and `editing`
+       pointed at a cell that no longer exists. The question changing is the moment all four stop
+       being about anything. */
     receipts = new Map();
+    edits = new Map();
+    capture = '';
+    editing = null;
   });
 
   /**
@@ -505,7 +516,10 @@
    * The toast stays for the archive done from the keyboard with the row off screen.
    */
   function archive(seq: number) {
-    receipt(seq, { mark: copy.markArchived, undo: () => clearReceipt(seq) });
+    /* `warn`, LIKE EVERY OTHER RECEIPT ON THIS SCREEN. This was the one drawn with no tone, beside
+       four that pass one, and it says `Archived` over a row nothing happened to: the toast beside
+       it says "would be archived. Nothing was saved yet." Same fact, two registers. */
+    receipt(seq, { mark: copy.markArchived, intent: 'warn', undo: () => clearReceipt(seq) });
     toasts.push(copy.archived(`${id}#${seq}`), { undo: () => clearReceipt(seq) });
   }
 
@@ -1107,7 +1121,7 @@
   function archiveSelected() {
     const seqs = picked.map((e) => e.seq);
     const next = new Map(receipts);
-    for (const seq of seqs) next.set(seq, { mark: copy.markArchived });
+    for (const seq of seqs) next.set(seq, { mark: copy.markArchived, intent: 'warn' as const });
     receipts = next;
     selected = new Set();
     /* ONE ROW IS NOT "1 obligations". The register declares both spellings — `name` for the list
@@ -1973,8 +1987,16 @@
            about the actual reason. `aria-describedby` points at the sentence so the greying is not
            the only cue. -->
       {#if problems.length > 0}<p class="drawer-why" id="new-row-why">{problems[0]}</p>{/if}
+      <!-- `type="submit"` AND `form`, WHICH IS WHAT MAKES ENTER WORK. `Button` defaults to
+           `type="button"`, and this control lives in the Sheet's footer snippet, outside the form
+           it submits: a form whose only submit control is elsewhere and unassociated has no submit
+           button at all, and a browser refuses implicit submission on a form with more than one
+           text field. Obligations draws four. So `RowForm` ceasing to swallow Enter bought nothing
+           on this screen until the button said which form it belongs to. -->
       <Button
         weight="primary"
+        type="submit"
+        form="new-row"
         disabled={problems.length > 0}
         aria-describedby={problems.length > 0 ? 'new-row-why' : undefined}
         onclick={addTypedRow}

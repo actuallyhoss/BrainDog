@@ -433,6 +433,23 @@ export function columnsFor(register: string): Column[] {
   if (!r) return [];
   const wanted = new Set<string>([r.title, ...r.mobile, ...(r.state ? [r.state] : [])]);
   for (const f of r.fields) if (f.deadline) wanted.add(f.id);
+  /**
+   * AND A FIELD THAT MAKES A COLUMN BESIDE IT READABLE, which is the case the first cut of this
+   * dropped and the declaration had already written down.
+   *
+   * `services` puts `cost` on its card and its `cycle` is what makes the number mean anything:
+   * the seed says so where the field is declared, in as many words, *"a column of amounts on
+   * unstated periods cannot be read: `GBP 340.00` beside `GBP 5.00` is not a comparison until one
+   * says yearly and the other monthly"*. Narrowing the default set to the fields a card nominates
+   * took the period off and left the amounts, which is the exact thing that comment predicts.
+   *
+   * `qualifies:` IS THE DECLARATION SAYING SO, rather than this function knowing that a register
+   * called services has a field called cycle. A field that makes another one readable is a fact
+   * about the pair, and the pair travels together or neither is worth drawing. It costs one key on
+   * one field and it is the register's to set, which is where every other decision about what a
+   * list shows already lives.
+   */
+  for (const f of r.fields) if (f.qualifies !== undefined && wanted.has(f.qualifies)) wanted.add(f.id);
 
   const cols: Column[] = [
     // The spoken id truncates in the MIDDLE if it ever has to, keeping prefix and suffix.
@@ -1105,7 +1122,11 @@ export function boot() {
       id: `track-${t.seq}`,
       title: String(t.fields.name),
       href: `/t/${t.seq}`,
-      section: 'Tracks',
+      /* THE REGISTER'S OWN NAME, NOT A SECOND SPELLING OF IT. This was the literal `Tracks`, so
+         renaming the register to Threads renamed the list, the page heading, the palette and the
+         rail's own Lists section, and left the rail section above these rows saying the old word.
+         One string, read from the declaration, cannot drift from it. */
+      section: REGISTERS.tracks?.name ?? 'Threads',
       order: 10 + n,
       icon: 'rows',
     });

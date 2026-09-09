@@ -298,6 +298,13 @@
         controls, so "Projects, collapsed, button" is the whole announcement.
       -->
       {@const folded = isShut(section, entries)}
+      <!-- `data-shut` AND NOT `hidden`. `hidden` is a user-agent rule, `[hidden] { display: none }`,
+           and this component sets an author-origin `display: flex` on the same element: author
+           beats user agent at every specificity, so the list stayed on screen at full height while
+           `aria-expanded="false"` sat over it. Worse than inert, because a screen reader was told
+           the section was collapsed and then walked into every link in it. Nothing in this
+           repository defines `[hidden]`, so the attribute has never worked on a styled element
+           here. -->
       <h2 class="section">
         <button
           type="button"
@@ -311,7 +318,7 @@
           {section}
         </button>
       </h2>
-      <ul class="group" hidden={folded}>
+      <ul class="group" data-shut={folded ? '' : undefined} inert={folded || undefined} aria-hidden={folded || undefined}>
         {#each entries as entry}
           <li>
             <!-- A page about a THING wears that thing's colour. The hue is chosen once at create
@@ -350,7 +357,7 @@
         {copy.lists}
       </button>
     </h2>
-    <ul class="group" hidden={listsShut}>
+    <ul class="group" data-shut={listsShut ? '' : undefined} inert={listsShut || undefined} aria-hidden={listsShut || undefined}>
       {#each registers as r}
         <li>
           <a class="item tap" href="/r/{r.id}" aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
@@ -601,6 +608,13 @@
     padding-inline-start: calc(var(--sp-3) + 20px + var(--sp-3));
     color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  /* THE SHUT SECTION, AND IT IS AN AUTHOR RULE BECAUSE THE RULE BELOW IS ONE. `hidden` did nothing
+     here: it is a user-agent declaration and `display: flex` two lines down is an author one, so
+     the list stayed at full height under a heading announcing itself collapsed. */
+  .group[data-shut] {
+    display: none;
   }
 
   .group {
