@@ -49,7 +49,10 @@ import type { Entry } from './schema.ts';
 
 export type Clause =
   | { field: string; op: 'is' | 'is not'; values: string[] }
-  | { field: string; op: 'before' | 'after' | 'on'; day: string };
+  /* `not on` IS THE NEGATION OF `on` AND IT DID NOT EXIST. Without it, `is not` over a dated field
+     had nowhere to go and fell through to the string branch below, where "today" is compared as
+     the word `today` against a stored date. See the parse. */
+  | { field: string; op: 'before' | 'after' | 'on' | 'not on'; day: string };
 
 export type Where = {
   /** The register it was compiled against. A value means nothing without one. */
@@ -326,8 +329,20 @@ export function compile(register: string, where: string | undefined): Where {
        sentence: `whereOf` maps `not-in` to `is not`, so `?f=due:not-in:2026-09-14` returned the
        complement of what the chip said. A filter that quietly inverts is the one failure a
        declarative surface must not have. */
-    if (op === 'is' && dated && !/\s+or\s+/i.test(rest) && resolveDay(one, Date.now()) !== null) {
-      clauses.push({ field, op: 'on', day: one });
+    /**
+     * AND `is not` COMES HERE TOO, WHICH IT DID NOT.
+     *
+     * The comment above is about a negation being DROPPED, and the fix for that put `is not` back on
+     * the string branch, where a relative word is compared as a word: `due is not today` became
+     * "the due field does not hold the text `today`", which is true of every row that has a date
+     * and of every row that has none. The whole register came back and looked like an answer.
+     *
+     * THE KERNEL'S STRUCTURED FORM ALREADY RESOLVED IT, so the two renderings of one grammar gave
+     * different answers over the same rows: `{ due, not: 'today' }` returned three and
+     * `due is not today` returned thirty-nine. Same defect, same week, one engine along.
+     */
+    if ((op === 'is' || op === 'is not') && dated && !/\s+or\s+/i.test(rest) && resolveDay(one, Date.now()) !== null) {
+      clauses.push({ field, op: op === 'is' ? 'on' : 'not on', day: one });
       continue;
     }
 
@@ -382,9 +397,14 @@ export function matches(entry: Entry, w: Where, now: number): boolean {
       return c.op === 'is' ? hit : !hit;
     }
 
-    // A missing date is not "before" anything. Counting it would put rows with no due date into an
-    // overdue list, which is a list somebody acts on.
-    if (typeof raw !== 'string' || !raw) return false;
+    /* A missing date is not "before" anything. Counting it would put rows with no due date into an
+       overdue list, which is a list somebody acts on.
+
+       AND IT IS NOT THE NAMED DAY EITHER, so it IS in the negation. `34 §6`: every positive operator
+       is false on a missing value, and `not` is how a person says "and the empty ones". That was the
+       behaviour before `not on` existed, because `is not` went through the value branch where a row
+       with nothing in the field matches no value and the negation therefore keeps it. */
+    if (typeof raw !== 'string' || !raw) return c.op === 'not on';
     const day = resolveDay(c.day, now);
     if (day === null) return false;
     /* THE DAY THE VALUE FALLS ON, for all three. `before` and `after` are exclusive of the day named
@@ -392,7 +412,7 @@ export function matches(entry: Entry, w: Where, now: number): boolean {
        today` say what it looks like it says. An instant is compared by its date, because a person
        asking for today means the day and not the second. */
     const at = raw.slice(0, 10);
-    return c.op === 'before' ? at < day : c.op === 'after' ? at > day : at === day;
+    return c.op === 'before' ? at < day : c.op === 'after' ? at > day : c.op === 'on' ? at === day : at !== day;
   });
 }
 

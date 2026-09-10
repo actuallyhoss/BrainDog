@@ -212,6 +212,10 @@
      one list this rail draws without asking `arrange` for it. */
   const listsShut = $derived(shut.has(copy.lists) && !registers.some((r) => under(`/r/${r.id}`)));
 
+  /* AND THE SECTION ITSELF GOES WHEN THERE IS NOTHING UNDER IT. A heading over an empty group is a
+     fold that opens onto nothing, which is worse than the eight links it replaced. */
+  const anyList = $derived(registers.length > 0);
+
   void ({} as RegisterDecl);
 </script>
 
@@ -349,6 +353,7 @@
 
     <!-- The registers themselves. Native, never pack-positioned: a page can be uninstalled with the
          pack that declared it, and the collections underneath it still have to be reachable. -->
+    {#if anyList}
     <h2 class="section">
       <button type="button" class="fold" aria-expanded={!listsShut} onclick={() => fold(copy.lists)}>
         <span class="fold-mark" aria-hidden="true" data-shut={listsShut ? '' : undefined}>
@@ -358,6 +363,9 @@
       </button>
     </h2>
     <ul class="group" data-shut={listsShut ? '' : undefined} inert={listsShut || undefined} aria-hidden={listsShut || undefined}>
+      <!-- Every list this rail is given, and it is given only the ones that hold something: the
+           filter is on `index.registers` in `api.ts`, because the phone's More sheet draws the same
+           list and the two must not be able to disagree. -->
       {#each registers as r}
         <li>
           <a class="item tap" href="/r/{r.id}" aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
@@ -380,6 +388,7 @@
         </li>
       {/each}
     </ul>
+    {/if}
 
     {#if pen.length}
       <!-- A holding pen. An update that adds a page lands HIDDEN and nothing moves; re-showing one

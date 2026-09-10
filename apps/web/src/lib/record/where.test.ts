@@ -116,6 +116,40 @@ test('`today` resolves against the record clock, not the wall clock', () => {
   for (const e of overdue) assert.ok(String(e.fields.due) < today);
 });
 
+test('`due is not today` IS A DAY AND NOT THE WORD, and it used to return the whole register', () => {
+  /* `is not` over a dated field had nowhere to go and fell through to the string branch, where the
+     comparison is "the due field does not hold the text `today`" — true of every row that has a
+     date and of every row that has none. The whole register came back and looked like an answer.
+     The kernel's structured form resolved it all along, so the two renderings of one grammar gave
+     different answers over the same rows. */
+  /**
+   * A RELATIVE WORD, AND A DAY THE SEED ACTUALLY HAS A ROW ON.
+   *
+   * Both halves matter. `today` is a day this record may hold nothing on, and "nothing is excluded"
+   * is exactly the answer the defect gives, so a literal `today` cannot tell the two apart. And an
+   * ISO literal cannot either: the string branch compares it against the stored date and happens to
+   * be right, so only a word that has to be RESOLVED reaches the defect. `-38d` is a word.
+   */
+  const dated = (ROWS.obligations ?? []).filter((e) => typeof e.fields.due === 'string' && e.fields.due);
+  const day = String(dated[0]?.fields.due ?? '').slice(0, 10);
+  assert.ok(day, 'the seed has no dated obligation, so this asserts nothing');
+  const off_days = Math.round((Date.parse(`${day}T12:00:00Z`) - Date.parse(`${new Date(NOW).toISOString().slice(0, 10)}T12:00:00Z`)) / 86_400_000);
+  const said = `${off_days >= 0 ? '+' : '-'}${Math.abs(off_days)}d`;
+  assert.equal(resolveDay(said, NOW), day, 'the relative word does not name the day it was built from');
+
+  const on = keep('obligations', `due is ${said}`);
+  const off = keep('obligations', `due is not ${said}`);
+
+  assert.ok(on.length > 0, 'the day chosen matches no row, so the negation cannot be checked');
+  assert.ok(off.length < all('obligations'), 'every row matched the negation, which is the defect');
+  for (const e of off) assert.notEqual(String(e.fields.due).slice(0, 10), day);
+  /* AND THE TWO HALVES ADD UP OVER EVERY ROW, undated ones included. `34 §6`: every positive
+     operator is false on a missing value, and `not` is how a person says "and the empty ones". A
+     negation that quietly drops the undated rows is a different bug wearing the same shape as the
+     fix. */
+  assert.equal(on.length + off.length, all('obligations'));
+});
+
 test('a row with no value for a dated field is not silently included', () => {
   // A missing date is not "before" anything. Counting it would put rows with no due date into an
   // overdue list, which is the sort of thing somebody acts on.

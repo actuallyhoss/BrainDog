@@ -336,7 +336,11 @@
       {#each entries as entry}<a href={entry.href} onclick={() => (moreOpen = false)}>{entry.title}</a>{/each}
     {/each}
 
-    <h2 class="more-section">{copy.lists}</h2>
+    <!-- AND THE HEADING GOES WITH THEM. `index.registers` holds only the lists that have something
+         in them, so on a young record this section is a title over nothing. -->
+    {#if data.index.registers.length > 0}
+      <h2 class="more-section">{copy.lists}</h2>
+    {/if}
     {#each data.index.registers as r}
       <a href="/r/{r.id}" onclick={() => (moreOpen = false)}>
         {r.name}<span class="more-tally num">{r.count}</span>

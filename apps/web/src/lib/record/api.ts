@@ -1148,26 +1148,48 @@ export function boot() {
       slug: 'the-studio',
       name: 'The Studio',
       locale: 'en',
-      registers: Object.values(REGISTERS).map((r) => ({
-        id: r.id,
-        name: r.name,
-        count: (ROWS[r.id] ?? []).length,
-        icon: iconFor(r.icon, 'rows'),
-        /**
-         * THE SAVED VIEWS OF THIS LIST, which appeared in no navigation at all.
-         *
-         * Two views existed in the record and the rail held zero `/v/` links, while the keyboard
-         * sheet documented `⌥V` as "Save the filter as a view" — so the product taught somebody to
-         * make a thing and then never showed it to them again. The palette found them, and the
-         * palette is labelled "Search, or run a command".
-         *
-         * UNDER THE LIST THEY FILTER, because that is what one IS: the same rows with a predicate.
-         * A section of its own would be a second place to look for a list.
-         */
-        views: Object.entries(VIEWS)
-          .filter(([, v]) => v.register === r.id)
-          .map(([key, v]) => ({ key, name: v.name })),
-      })),
+      /**
+       * THE LISTS THAT HOLD SOMETHING, AND IT USED TO BE EVERY LIST DECLARED.
+       *
+       * `USABILITY.md`'s second question is whether the product grows as the record grows, and the
+       * rail was the clearest no in it: eight list links, each with its own tally, drawn identically
+       * over a record of eight rows and a record of four hundred. Seven of the eight read `0`, and a
+       * link to a list with nothing in it is a thing a person has to read, decide is irrelevant, and
+       * put down, every time they look at the rail. The precedent is `Second.svelte`, which filters
+       * the same way under a comment saying that counting every declared register "is the count that
+       * made this unreachable".
+       *
+       * HERE AND NOT IN THE RAIL, because the rail is not the only reader. The phone's More sheet
+       * draws this same list, and the last time a rail rule lived in one of the two surfaces rather
+       * than in the list they share, the phone and the desktop showed different navigation and the
+       * bundle baseline had to be re-recorded to put it right. One list, one rule.
+       *
+       * A LIST IS NOT HIDDEN BY THIS. It is one keystroke away in the palette, which reaches objects
+       * rather than screens, and it arrives in the rail the moment it holds a row. What goes is the
+       * standing offer to look at nothing.
+       */
+      registers: Object.values(REGISTERS)
+        .filter((r) => (ROWS[r.id] ?? []).length > 0)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          count: (ROWS[r.id] ?? []).length,
+          icon: iconFor(r.icon, 'rows'),
+          /**
+           * THE SAVED VIEWS OF THIS LIST, which appeared in no navigation at all.
+           *
+           * Two views existed in the record and the rail held zero `/v/` links, while the keyboard
+           * sheet documented `⌥V` as "Save the filter as a view" — so the product taught somebody to
+           * make a thing and then never showed it to them again. The palette found them, and the
+           * palette is labelled "Search, or run a command".
+           *
+           * UNDER THE LIST THEY FILTER, because that is what one IS: the same rows with a predicate.
+           * A section of its own would be a second place to look for a list.
+           */
+          views: Object.entries(VIEWS)
+            .filter(([, v]) => v.register === r.id)
+            .map(([key, v]) => ({ key, name: v.name })),
+        })),
     },
     nav,
     /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */
