@@ -15,16 +15,18 @@
 </script>
 
 <svelte:head>
-  <title>Pricing · BrainDog</title>
-  <meta name="description" content={p.body} />
+  <!-- ITS OWN SENTENCE, in `copy.ts`. The description was the page's lede, which says how the two
+       plans differ and never what is being sold or for how much. -->
+  <title>{site.meta.pricing.title}</title>
+  <meta name="description" content={site.meta.pricing.description} />
   <!-- THE CANONICAL AND THE PREVIEW, from the same two sentences the page already has, so there is
        one description per page rather than two that can disagree. The canonical matters because
        `www` 301s here and a preview fetcher that followed the redirect would otherwise cite the
        hostname it started from. -->
   <link rel="canonical" href="https://brain.dog/pricing" />
   <meta property="og:url" content="https://brain.dog/pricing" />
-  <meta property="og:title" content="Pricing · BrainDog" />
-  <meta property="og:description" content={p.body} />
+  <meta property="og:title" content={site.meta.pricing.title} />
+  <meta property="og:description" content={site.meta.pricing.description} />
 </svelte:head>
 
 <section class="head">

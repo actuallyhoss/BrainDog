@@ -357,6 +357,18 @@ test('AND A LEG THAT IS NOT POINTED AT MONEY, WALKING ALONE, IS THE SAME FAILURE
   assert.equal(walk.days, null, 'a runway in days was reported out of a walk over durations');
 });
 
+test('and a leg pointed at TEXT is the same failure, which the zero check hid', () => {
+  /* `amountOf('Halden')` is `null`, `?? 0` makes it zero, and the `continue` for a zero amount fired
+     BEFORE anything asked what the value was. So a duration leg was caught and a text leg was
+     skipped in silence: no steps and no sentence, which is the one answer a cash walk must never
+     give. The kernel counts that row as not money and says so; this one now does too. */
+  const words: Leg = { register: 'obligations', on: 'due', amount: 'what' };
+  const walk = runway(500_000, [words], 180);
+  assert.ok(walk.mixed.length > 0, 'a text field was walked in silence');
+  assert.deepEqual(walk.steps, [], `${walk.steps.length} steps were walked over a text field`);
+  assert.equal(walk.crossed, null, 'a crossing day was computed out of words');
+});
+
 /* ── numbers somebody typed into a declaration ───────────────────────────── */
 
 test('A HORIZON IS A WHOLE NUMBER OF DAYS, and one that is not is refused rather than walked', () => {

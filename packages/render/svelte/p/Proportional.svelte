@@ -11,14 +11,16 @@
   one-pixel stub: the chart unreadable because of the thing it reports (05 §7.5).
 -->
 <script lang="ts">
-  import { inline, magnitudeOf, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { inline, magnitudeOfCell, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import Text from '../Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
-  /* ONE parser, shared with `toHTML`. Two copies of it meant two answers for the same cell, and
-     both of them lost the minus sign a formatted amount is written with. */
-  const numeric = (r: Row) => magnitudeOf(String(r.cells[1] ?? ''));
+  /* ONE parser, shared with `toHTML`, and it reads the cell as DRAWN rather than as written. Two
+     copies of it meant two answers for the same cell, and both of them lost the minus sign a
+     formatted amount is written with; then both read the author's source instead of the rendered
+     value, so a bar bound to `{{cash.now}}` measured nothing and disappeared. */
+  const numeric = (r: Row) => magnitudeOfCell(String(r.cells[1] ?? ''), opts);
   const fixed = (v: number) => Math.max(0, Math.min(1, v)).toFixed(2);
 
   /** Ask the host to close the hole. Only ever called from the branch that proved it can. */
@@ -31,7 +33,7 @@
     const r = block.rows[0];
     if (!r) return 0;
     const v = numeric(r);
-    const t = magnitudeOf(String(r.cells[2] ?? ''));
+    const t = magnitudeOfCell(String(r.cells[2] ?? ''), opts);
     return Number.isFinite(v) && Number.isFinite(t) && t !== 0 ? v / t : 0;
   });
 </script>
@@ -42,8 +44,13 @@
     <div class="prop-row" data-intent={row.tone}>
       <span class="prop-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
       <span class="prop-track" style="--magnitude:{fixed(gauge)}"></span>
-      <span class="prop-value num">{row.cells[1] ?? MISSING}</span>
-      <span class="prop-note num">of {row.cells[2] ?? MISSING}</span>
+      <!-- THE VALUE AND THE TARGET GO THROUGH THE INLINE RENDERER, like the label beside them and
+           like every other cell in the dialect. They did not, so a gauge written the way a live
+           page writes one, `{{cash.now}} | {{cash.target}}`, printed the author's braces and drew
+           a bar of length zero. It is the same finding as `timeline`'s date cell one primitive
+           over, on the two cells in this block that ARE the numbers. -->
+      <span class="prop-value num"><Text nodes={inline(row.cells[1] ?? MISSING, opts)} {opts} /></span>
+      <span class="prop-note num">of <Text nodes={inline(row.cells[2] ?? MISSING, opts)} {opts} /></span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
       {/if}
@@ -53,7 +60,7 @@
     {#snippet cells(row: Row, v: number, drawable: boolean)}
       <span class="prop-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
       {#if drawable}<span class="prop-track" style="--magnitude:{fixed(v / scale)}"></span>{/if}
-      <span class="prop-value num">{row.cells[1] ?? MISSING}</span>
+      <span class="prop-value num"><Text nodes={inline(row.cells[1] ?? MISSING, opts)} {opts} /></span>
       <span class="prop-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>

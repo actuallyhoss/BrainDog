@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { compile, evaluate, parseWhere, resolveDay, type Schema } from '../src/index.ts';
+import { compile, evaluate, fieldSql, parseWhere, resolveDay, type Schema } from '../src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
 
@@ -41,8 +41,16 @@ const good = (text: string) => {
 const bad = (text: string) => {
   const out = parse(text);
   assert.ok(out.bad.length > 0, `${text} was accepted`);
-  assert.equal(out.predicate, undefined, 'a refused sentence produced a predicate anyway');
-  return out.bad[0]!;
+  /* THE SECOND ASSERTION USED TO BE `predicate === undefined`, WHICH THE FIRST ONE GUARANTEES.
+     `parseWhere` returns `{ predicate: undefined, bad }` on every path where `bad` is non-empty, so
+     once the line above holds the line below cannot fail, and every refusal case in this file goes
+     through this helper. What is worth asserting about a refusal is that it CARRIES something a
+     caller can act on: `10 §7`'s fourth rule is that the refusal is the teacher, and a code with an
+     empty sentence teaches nothing. */
+  const said = out.bad[0]!;
+  assert.match(said.code, /^[A-Z][A-Z0-9_]+$/u, `${text} was refused with ${JSON.stringify(said.code)}`);
+  assert.ok(said.fix.trim().length > 0, `${text} was refused with no sentence`);
+  return said;
 };
 
 /* ── the grammar ─────────────────────────────────────────────────────────── */
@@ -323,4 +331,36 @@ test('and `or` separates alternatives however it is capitalised', () => {
   const upper = parse('state is open OR part');
   assert.deepEqual(upper.bad, [], upper.bad[0]?.fix);
   assert.deepEqual(upper.predicate, lower.predicate);
+});
+
+/* ── the one string the index, the filter and the sort all have to be ────── */
+
+test('`fieldSql` IS ONE STRING FOR THREE PLACES, and nothing was asking it anything', () => {
+  /**
+   * It is exported for one reason, and `31 §2` states it in these terms: this package owns
+   * `jsonPath`, so `CREATE INDEX ... json_extract(fields,'$.due')` and
+   * `WHERE json_extract(fields,'$.due') < ?` are the same string, which is the difference between
+   * the planner using the partial expression index and scanning it. An `ORDER BY` is the third
+   * place, and the kernel calls this for it.
+   *
+   * NO TEST ANYWHERE EXERCISED IT. The whole value of the export is that three call sites cannot
+   * drift apart, and the only thing holding them together was that one function is one function.
+   */
+  assert.equal(fieldSql('due', 'day'), "json_extract(fields, '$.due')");
+
+  /* A MONEY SORTS BY ITS NUMBER, which is the reason this is a function rather than a caller
+     building a path: sorting the object sorts the JSON text, so `GBP 9.00` lands above
+     `GBP 10.00`. */
+  assert.equal(fieldSql('amount', 'money'), "json_extract(fields, '$.amount.amount')");
+  assert.equal(fieldSql('effort', 'quantity'), "json_extract(fields, '$.effort.value')");
+
+  /* AND THE FILTER AND THE SORT ARE THE SAME STRING, which is the claim rather than either half of
+     it. `compile` builds the filter through this function, so the sort the kernel writes has to
+     appear in the SQL the filter produces, character for character. */
+  const c = compile({ field: 'amount', gt: { amount: 1, currency: 'GBP' } }, OBLIGATIONS);
+  assert.deepEqual(c.bad, [], c.bad[0]?.fix);
+  assert.ok(c.sql.includes(fieldSql('amount', 'money')), `the filter reads ${c.sql}`);
+
+  /* AN EXPLICIT PART WINS OVER THE TYPE'S OWN, which is how the qualifier half is reached. */
+  assert.equal(fieldSql('amount', 'money', '.currency'), "json_extract(fields, '$.amount.currency')");
 });

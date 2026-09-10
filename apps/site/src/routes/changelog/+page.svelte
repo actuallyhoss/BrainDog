@@ -35,6 +35,88 @@
 
   const ENTRIES: Entry[] = [
     {
+      date: '2026-09-10',
+      kind: 'changed',
+      title: 'Seventeen renames, and not one of them an id',
+      body:
+        'The product says the word a reader would say and the API keeps its own, which is the rule ' +
+        'Slack follows: a channel is a channel for life while the API says conversations. Track ' +
+        'became Thread, Estate became Services, Thing became Project, State became Status on five ' +
+        'lists and on the board, and the word register itself came out of four places a reader ' +
+        'meets it, three of them messages typed into routes rather than into the copy file, which ' +
+        'is why a sweep of visible text could not see them. Nothing renamed is an id, a document ' +
+        'or a format. The plan was wrong about seven of the seventeen, every time in the same ' +
+        'direction: an occurrence it had missed rather than one it invented.',
+    },
+    {
+      date: '2026-09-10',
+      kind: 'fixed',
+      title: 'A page made of figures named no register, and was handed to everybody',
+      body:
+        'A table block names the list it draws; a block of figures does not, because each of its ' +
+        'cells names a measurement whose own declaration carries the list. Both the listing filter ' +
+        'and the per-block blanking read the block alone, so a page of figures was treated as ' +
+        'prose, offered to every caller and handed its readings over, including to a read token ' +
+        'whose reach is one list. The money page the synthetic record ships is exactly that shape. ' +
+        'Fifty-two requests on six routes answered 500 rather than a refusal, because every query ' +
+        'value is JSON-decoded and the caller therefore chooses its shape as well as its contents.',
+    },
+    {
+      date: '2026-09-10',
+      kind: 'fixed',
+      title: 'A sheet destroyed while open took the keyboard with it',
+      body:
+        'Overlays are a depth, and the shell only answers an unmodified key while that depth is ' +
+        'zero. The count went up when a sheet opened and came back down in the same effect, which ' +
+        'needs the component to still be alive, so a sheet that was destroyed while open never ' +
+        'gave the lock back and every bare key in the product died for the rest of the session. ' +
+        'Two clicks from the front page reach it. The audit log answers the question it is sent ' +
+        'for now as well: the restore setting links to it with the words find the moment, and what ' +
+        'arrived was a list filtered by person and by kind with no way to narrow by when at all.',
+    },
+    {
+      date: '2026-09-10',
+      kind: 'fixed',
+      title: 'The two engines were asked the same questions and disagreed sixteen times',
+      body:
+        'A differential pass drove the typed kernel and the browser copy of it over the same ' +
+        'shipped record: 336 measurements, 3,563 filter sentences, 38 searches, 16 cash walks and ' +
+        '8 block declarations, comparing answers rather than reading source. Sixteen live ' +
+        'disagreements, twelve of which the browser had right. A sum of sterling invoices declared ' +
+        'in dollars was printed rather than refused. A stored moment compared against a date ' +
+        'matched nothing while its negation matched everything. Seven of the eleven filters the ' +
+        'shipped pages print were refused by the record that printed them, because a page prints ' +
+        'its filter back using each column heading rather than each field id.',
+    },
+    {
+      date: '2026-09-10',
+      kind: 'fixed',
+      title: 'A money average was stored ten thousand times too large',
+      body:
+        'One function took a value and nothing else, so any fractional figure became hundredths of ' +
+        'a percent, while each of its three callers wrote the currency from a separate expression ' +
+        'that correctly kept a real one. Two rows at 101 and 102 pounds read 101.5 and were ' +
+        'written as 1,015,000, which every surface in this product renders as ten thousand pounds. ' +
+        'The value and the currency are decided together now. Twenty-two findings in the same ' +
+        'pass: a record twelve hours ahead of UTC stamped today on yesterday, a cash walk added a ' +
+        'string as though it were money, and a caller allowed only to append to one list could ' +
+        'read its rows through search.',
+    },
+    {
+      date: '2026-09-10',
+      kind: 'fixed',
+      title: 'Eight controls that drew, announced themselves and did nothing',
+      body:
+        'Every segmented control dropped the value somebody chose: the form held it in one place ' +
+        'and read it from another, so on nearly every form in the product a press was a drawing of ' +
+        'a press, and a row added from the money list arrived with two required fields empty under ' +
+        'a live submit button. The drawer added the row twice on one press. Opening a row you had ' +
+        'just typed said it did not exist. The cell editor read the record rather than the screen, ' +
+        'so a second edit of one cell opened on the original value and Enter reverted your own ' +
+        'change. And the rail folded nothing, because hidden is a browser default and every ' +
+        'section in it sets a display of its own.',
+    },
+    {
       date: '2026-09-09',
       kind: 'shipped',
       title: 'The app is deployed, from two hostnames and one build',
@@ -181,8 +263,8 @@
       title: 'The new-row form is generated from the declaration',
       body:
         'A register declares its fields and their types, so the field type picks the control. One table, ' +
-        'no hand-written form for any register. A pack that adds a field gets a form field. `secret` is ' +
-        'absent rather than disabled: a credential never goes in a row.',
+        'no hand-written form for any register. A pack that adds a field gets a form field. A secret ' +
+        'field is absent rather than disabled: a credential never goes in a row.',
     },
     {
       date: '2026-09-03',
@@ -201,16 +283,17 @@
         'The first house red was the most saturated red sRGB has at that lightness. Across a rail, a primary ' +
         'button, every link and every selected row it did not read as a brand; it read as an alarm going off ' +
         'on a screen where nothing was wrong. Same hue, a third less chroma. The old value did not go away. ' +
-        'it is the band the overdue chip is struck from, so the alarm is always a step louder than the brand.',
+        'It is the band the overdue chip is struck from, so the alarm is always a step louder than the brand.',
     },
     {
       date: '2026-09-03',
       kind: 'fixed',
       title: 'A link and an overdue figure were the same colour',
       body:
-        'The accent and `danger` share a hue by construction and were being solved against the same ground, ' +
-        'so in the light scheme they landed one value apart. The generator now solves the link last and walks ' +
-        'until it is eight L* clear of body ink AND of `danger`; the validator measures both pairs.',
+        'The accent and the overdue red share a hue by construction and were being solved against the same ' +
+        'ground, so in the light scheme they landed one value apart. The generator now solves the link last ' +
+        'and walks until it is eight L* clear of body ink AND of the overdue red; the validator measures ' +
+        'both pairs.',
     },
     {
       date: '2026-09-03',
@@ -239,16 +322,18 @@
 </script>
 
 <svelte:head>
-  <title>Changelog · BrainDog</title>
-  <meta name="description" content={STATUS.body} />
+  <!-- ITS OWN SENTENCE, in `copy.ts`. The description was `STATUS.body` at 522 characters, which
+       a search result and a shared card both cut mid-paragraph. -->
+  <title>{site.meta.changelog.title}</title>
+  <meta name="description" content={site.meta.changelog.description} />
   <!-- THE CANONICAL AND THE PREVIEW, from the same two sentences the page already has, so there is
        one description per page rather than two that can disagree. The canonical matters because
        `www` 301s here and a preview fetcher that followed the redirect would otherwise cite the
        hostname it started from. -->
   <link rel="canonical" href="https://brain.dog/changelog" />
   <meta property="og:url" content="https://brain.dog/changelog" />
-  <meta property="og:title" content="Changelog · BrainDog" />
-  <meta property="og:description" content={STATUS.body} />
+  <meta property="og:title" content={site.meta.changelog.title} />
+  <meta property="og:description" content={site.meta.changelog.description} />
 </svelte:head>
 
 <section class="head">

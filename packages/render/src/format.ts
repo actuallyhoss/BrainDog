@@ -146,7 +146,12 @@ export function stamp(iso: string): string {
   if (!Number.isFinite(t)) return iso;
   const d = new Date(t);
   const two = (n: number) => String(n).padStart(2, '0');
-  return `${day(iso)}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
+  /* THE DAY PART, BECAUSE `day()` TAKES A DAY. Its `noon()` matches `^YYYY-MM-DD$` anchored and
+     hands back its argument unchanged when it does not, so passing the whole instant printed
+     `2026-09-03T09:00:00.000Z, 09:00` on the ledger: the raw stored value, on the screen this
+     function was written for, two functions under the paragraph that says a machine timestamp is
+     what `since()` exists to stop showing anybody. */
+  return `${day(iso.slice(0, 10))}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
 }
 
 /**

@@ -27,7 +27,7 @@
   import { rowsAsCards } from '../cards.svelte.ts';
   import type { Snippet } from 'svelte';
   import { TONES } from '../../src/index.ts';
-  import { chunkRows, type Column, type TableRow } from '../types.ts';
+  import { chunkRows, moveCell, type Cell, type Column, type TableRow } from '../types.ts';
 
   let {
     columns,
@@ -101,13 +101,78 @@
    */
   const lead = $derived(Math.max(0, columns.findIndex((c) => !c.hideLabel)));
 
-  /** Roving tabindex: exactly one cell is reachable by Tab, every other is -1. */
-  const isFocused = (r: number, c: number) => focus?.row === r && focus?.col === c;
-  const tabIndex = (r: number, c: number) =>
-    focus ? (isFocused(r, c) ? 0 : -1) : r === 0 && c === 0 ? 0 : -1;
+  /**
+   * Roving tabindex: exactly one cell is reachable by Tab, every other is -1.
+   *
+   * AND THE COMPONENT MOVES IT NOW. It never did: `focus` was declared `$bindable()` and never
+   * written here, so the caret could only move for a caller that drove it from outside, and four
+   * of the six do not. The caret is kept locally as well as offered through the binding, so the
+   * rover works for a caller that passes nothing, which is every `comparison` block this package
+   * draws through `Block.svelte`, and a caller that binds still owns the value.
+   */
+  let caret = $state<Cell>({ row: 0, col: 0 });
+  const at = $derived(focus ?? caret);
+  const isFocused = (r: number, c: number) => at.row === r && at.col === c;
+  const tabIndex = (r: number, c: number) => (isFocused(r, c) ? 0 : -1);
 
   const ariaSort = (field: string) =>
     sort?.field === field ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+
+  let grid = $state<HTMLElement | undefined>(undefined);
+
+  /* BY `aria-rowindex`, which every row already carries and which is the data row plus two, the
+     header is row 1. A `data-*` attribute per cell would be the obvious handle and costs one
+     attribute on every one of them, which on a 2,614-row register is the measurement this file
+     exists to respect. The column is the cell's place among its siblings. */
+  const cellAt = (c: Cell): HTMLElement | null =>
+    (grid?.querySelector(`.tr[aria-rowindex="${c.row + 2}"]`)?.children[c.col] as HTMLElement | undefined) ?? null;
+
+  /**
+   * The arrows, `Home` and `End`, and nothing else. The move itself is `moveCell` in `../types.ts`.
+   *
+   * SWALLOWED WHEN IT IS OURS AND UNTOUCHED WHEN IT IS NOT. `stopPropagation` because a page above
+   * this one walks its blocks, and on the register its rows, with the same keys: an arrow that
+   * is the grid's when it works and the page's when it hits the last column is a key whose meaning
+   * depends on where you already are. A modifier is never ours: `⌘Home` and `⌘End` are the whole
+   * list's ends and belong to whoever owns the list.
+   */
+  function onkeydown(e: KeyboardEvent) {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    const to = moveCell(at, e.key, rows.length, columns.length);
+    if (!to) return;
+    e.preventDefault();
+    e.stopPropagation();
+    caret = to;
+    if (focus) focus = to;
+    cellAt(to)?.focus();
+  }
+
+  /**
+   * The caret follows whatever was clicked or tabbed to.
+   *
+   * `focusin` and not `focus` because it is the one that bubbles. Without it the tab stop and the
+   * cell the reader is actually in come apart the moment they click one: the next arrow press
+   * moves from where the caret was left, and the caret jumps somewhere they were not looking.
+   */
+  function onfocusin(e: FocusEvent) {
+    /* AND ENTERING THE GRID ITSELF HANDS FOCUS TO A CELL. The root is `tabindex="-1"`, which the
+       `grid` role requires of an element that listens for keys and which keeps it out of the tab
+       order; without the forward, a host that enters a block by focusing its `[role="grid"]`,
+       which is what `/p/[slug]` does, would land on the container and the arrows would have
+       nothing to move. `Grid` forwards the same way for the same reason. */
+    if (e.target === grid) {
+      cellAt(at)?.focus();
+      return;
+    }
+    const cell = e.target instanceof Element ? e.target.closest('.td') : null;
+    const tr = cell?.parentElement;
+    const row = Number(tr?.getAttribute('aria-rowindex') ?? Number.NaN) - 2;
+    if (!cell || !tr || !Number.isInteger(row) || row < 0) return;
+    const col = [...tr.children].indexOf(cell);
+    if (col < 0 || (at.row === row && at.col === col)) return;
+    caret = { row, col };
+    if (focus) focus = caret;
+  }
 </script>
 
 <!-- A labelled, focusable scroll container. `tabindex="0"` is the part that matters and the linter
@@ -212,10 +277,14 @@
   <div
     class="table"
     role="grid"
+    bind:this={grid}
     data-toned={toned ? '' : undefined}
     aria-rowcount={total === undefined || total < 0 ? -1 : total + 1}
     aria-colcount={columns.length}
     style="--cols:{tracks}"
+    tabindex="-1"
+    {onkeydown}
+    {onfocusin}
   >
     <div class="tr th-row" role="row" aria-rowindex="1">
       {#each columns as column}
@@ -244,6 +313,11 @@
       >
         {#each group as row, i}
           {@const index = g * grouped.step + i}
+          <!-- `data-focused` IS THE HOST'S CARET, and deliberately not the internal one. A caller
+               that binds `focus` is drawing a caret line down its list and this marks it; a caller
+               that binds nothing never drew one, and marking row 0 of every `comparison` block on
+               every page would be a highlight nobody asked for on a row nobody chose. The roving
+               tab stop moves either way; only the paint belongs to the host. -->
           <div
             class="tr"
             role="row"
@@ -268,6 +342,14 @@
                 inside it, and a caret a screen reader can follow along a row. A table you cannot put
                 the caret in is a table a keyboard cannot read, which is a bigger loss than a cell
                 that is focusable and has nothing to do.
+
+                THAT PARAGRAPH WAS TRUE OF ONE CALLER OUT OF SIX. The arrow keys it names were never
+                written: the only handler in this file was `Enter`, `focus` was `$bindable()` and
+                never assigned, and a keyboard user on the four callers that bring no arrows of
+                their own tabbed to cell (0,0) and tabbed out again with every other cell in the
+                table unreachable. The rover is `onkeydown` on the grid root above, and its
+                arithmetic is `moveCell` in `../types.ts`, where a caret walking off the end of a
+                row can be asserted without a DOM.
 
                 `data-acts` IS FOR THE POINTER. Without it the cursor is the only thing left saying a
                 cell can be pressed, and it was saying it everywhere.

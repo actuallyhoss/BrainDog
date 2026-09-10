@@ -154,8 +154,20 @@ function linesOf(src: string): { text: string; start: number; end: number }[] {
 }
 
 /**
- * Segment a document. Total: it never throws, and every byte of the input lands in exactly one
- * segment, so an editor can splice `[start, end)` back over the source.
+ * Segment a document. Total: it never throws, and no byte the author typed is ever dropped.
+ *
+ * IT USED TO CLAIM THAT EVERY BYTE LANDS IN EXACTLY ONE SEGMENT, and that is false by two bytes on
+ * the four-line document the suite tests it with. It cannot be made true without giving up the
+ * half of the sentence that is worth having. A segment's `[start, end)` is the bytes the author
+ * typed and NOT the terminator after them, which is what `linesOf` above is doing when it takes
+ * the terminator off the text and keeps its length in the offsets. So the newline between one
+ * segment and the next belongs to neither, on purpose: it is what an editor splicing a replacement
+ * over `[start, end)` must not have to put back. A blank run between two fences is dropped for the
+ * same reason a blank paragraph is not a paragraph.
+ *
+ * What holds, and what the suite measures: the segments come in source order and never overlap,
+ * `src.slice(start, end)` is exactly the fence a block or a degradation was built from, and every
+ * byte left over is whitespace. Nothing an author wrote goes missing; the gaps are the separators.
  */
 export function parse(src: string): Segment[] {
   const out: Segment[] = [];
@@ -215,6 +227,33 @@ export function parse(src: string): Segment[] {
         fix: kind
           ? `"${kind}" is not one of the sixteen kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
+        raw,
+        info,
+        start,
+        end,
+      });
+      i = close;
+      continue;
+    }
+
+    /**
+     * A PAGE-ONLY KIND IS NOT A FENCE, and it degrades like an unknown one.
+     *
+     * `05 §2`'s kind table says it in words, *"a `table` fence in a write-up has no rows to draw
+     * and degrades to its fence like an unknown kind"*; `36 §7` says it as a parser step, and
+     * `KindSpec.pageOnly` is the flag that says which kinds those are. Nothing read the flag. So a
+     * bare `table` fence drew an empty grid, which reads as a bug in the record rather than as an
+     * answer; and a `table` fence WITH rows was refused by arity instead, *"a table row has 2
+     * columns where table takes 0"*, which points the author at a column count when the fact is
+     * that the kind is bound to a register and cannot carry authored rows at all. When the author
+     * is an agent the visible fence is the only feedback channel there is, so the sentence on it
+     * has to name the real reason. `36 §13`'s codes are a closed pair and this is the unknown one.
+     */
+    if (KINDS[kind].pageOnly) {
+      out.push({
+        type: 'degraded',
+        code: 'DIALECT_KIND_UNKNOWN',
+        fix: `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
         raw,
         info,
         start,

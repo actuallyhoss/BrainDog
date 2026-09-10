@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { KINDS, PRIMITIVES, PRIMITIVES_VERSION, isKind } from './kinds.ts';
 import { parse, splitRow } from './parse.ts';
-import { toHTML } from './html.ts';
-import { chunkRows } from '../svelte/types.ts';
-import { inline, safeHref, text } from './inline.ts';
-import { bytes, integer, money, pct, quantity, relative, since, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
+import { toHTML, verbatimText } from './html.ts';
+import { chunkRows, moveCell } from '../svelte/types.ts';
+import { lanes } from './board.ts';
+import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
+import { bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
@@ -62,11 +64,62 @@ test('a random byte string parses without throwing', () => {
   }
 });
 
-test('every byte of the source lands in exactly one segment', () => {
-  const src = 'intro\n\n```stat | Head\na | 1 | note\n```\n\ntail\n';
-  const segs = parse(src);
-  for (const s of segs) assert.ok(s.end >= s.start && s.end <= src.length);
-  for (let i = 1; i < segs.length; i++) assert.ok(segs[i]!.start >= segs[i - 1]!.end);
+/**
+ * The documents the segmenting property is measured over: the shape the suite has always used, a
+ * pair of fences with nothing but blanks between them, a run of whitespace with no document in it
+ * at all, and the same thing written on Windows.
+ */
+const SEGMENTED = [
+  'intro\n\n```stat | Head\na | 1 | note\n```\n\ntail\n',
+  '```stat | A\nx | 1 | \n```\n   \n```stat | B\ny | 2 | \n```',
+  '\t \n\n',
+  'a\r\nb\r\n\r\n```spec | T\r\nRate | 1\r\n```\r\n',
+  '```nope | x\nbody\n```\n\ntrailing with no newline',
+];
+
+/**
+ * THIS TEST USED TO CHECK NOTHING, over a property that is false.
+ *
+ * It was called *"every byte of the source lands in exactly one segment"* and asserted that each
+ * segment's end is at or after its start, which is true by construction, and that the next
+ * segment starts at or after the last one ended, written `>=`, which permits a gap of any size.
+ * on its own four-line fixture, two bytes landed in no segment at all and the test was green.
+ *
+ * The two bytes are line terminators, and the parser is right to leave them out: `[start, end)` is
+ * the bytes the author typed and not the newline after them, which is what makes a spliced
+ * replacement not have to put one back. So the guarantee in `parse`'s header was overstated rather
+ * than the parser being wrong, and this asserts the three things that do hold, which are order,
+ * no overlap, and no byte of substance dropped, over five documents instead of one.
+ */
+test('the segments are in order, never overlap, and drop nothing but whitespace', () => {
+  for (const src of SEGMENTED) {
+    const segs = parse(src);
+    const covered = new Uint8Array(src.length);
+    let previous = 0;
+    for (const s of segs) {
+      assert.ok(s.start >= 0 && s.end >= s.start && s.end <= src.length, `${s.type} is out of the source`);
+      assert.ok(s.start >= previous, `${s.type} at ${s.start} starts before the segment above it ended`);
+      previous = s.end;
+      for (let i = s.start; i < s.end; i++) {
+        assert.equal(covered[i], 0, `byte ${i} of ${JSON.stringify(src)} is in two segments`);
+        covered[i] = 1;
+      }
+    }
+    let dropped = '';
+    for (let i = 0; i < src.length; i++) if (!covered[i]) dropped += src[i];
+    // The whole of what is allowed to fall between two segments: the terminator that ended one,
+    // and a blank run that is not a paragraph. Anything else is an author's text going missing.
+    assert.match(dropped, /^\s*$/u, `${JSON.stringify(dropped)} was dropped from ${JSON.stringify(src)}`);
+  }
+});
+
+test('and a fence spliced out of the source is exactly what the fence said it was', () => {
+  // The half of the old sentence that is worth having: `[start, end)` addresses the bytes the
+  // author typed, so an editor can put a replacement over them. `raw` is what a degraded sibling
+  // shows, so the two disagreeing would put one fence on screen above another fence's words.
+  for (const src of SEGMENTED)
+    for (const s of parse(src))
+      if (s.type !== 'markdown') assert.equal(src.slice(s.start, s.end), s.raw, `${s.type} does not splice back`);
 });
 
 /* ── line endings ───────────────────────────────────────────────────── */
@@ -104,6 +157,39 @@ test('nor does a verbatim kind, which is the one that does not trim', () => {
   const [seg] = parse(['```code | Shell', 'ls -l', 'echo hi', '```'].join(CR + '\n'));
   assert.ok(seg && seg.type === 'block');
   assert.deepEqual(seg.rows.map((r) => r.cells[0]), ['ls -l', 'echo hi']);
+});
+
+/* ── a tree is its indentation ────────────────────────────────────────────── */
+
+/** Four lines and three levels, which is the smallest tree that can come out flat. */
+const TREE = ['```tree | src', 'src', '  index.ts', '  lib', '    a.ts', '```'];
+
+test('A TREE KEEPS ITS INDENTATION IN THE MIRROR, WHICH IS WHERE THE EXPORTS READ IT', () => {
+  /* `parse` moves a `tree` line's indent off the cell and into `Row.depth`, on purpose.
+     `Media.svelte` put it back and `toHTML` never read `depth` at all, so the same four lines drew
+     nested in the app and flat in the exports, in the digest email and in every test that reads
+     the mirror, which are the four consumers `html.ts`'s own header names. Media's header says what it
+     costs: a code sample that loses its indentation is a code sample that is wrong. */
+  const [seg] = parse(TREE.join(NEWLINE));
+  assert.ok(seg && seg.type === 'block');
+  assert.deepEqual(seg.rows.map((r) => r.depth), [0, 1, 1, 2], 'the parser did not record the levels');
+  assert.equal(verbatimText(seg), 'src\n  index.ts\n  lib\n    a.ts');
+  assert.match(toHTML([seg]), /<code>src\n {2}index\.ts\n {2}lib\n {4}a\.ts<\/code>/u);
+});
+
+test('and a kind that is verbatim but not indented is left exactly as it was', () => {
+  // `code` carries no `indented`, so nothing is added to a line that already holds its own spaces.
+  const [seg] = parse(['```code | py', 'def f():', '    return 1', '```'].join(NEWLINE));
+  assert.ok(seg && seg.type === 'block');
+  assert.equal(verbatimText(seg), 'def f():\n    return 1');
+});
+
+test('and a depth no parser would produce does not take the page down with it', () => {
+  // `Row` is a public type and a renderer that throws takes the whole page: `String.repeat`
+  // answers a negative or a non-finite count with a RangeError.
+  const seg = { ...parse(TREE.join(NEWLINE))[0] } as Extract<ReturnType<typeof parse>[number], { type: 'block' }>;
+  seg.rows = [{ cells: ['a'], depth: -3 }, { cells: ['b'], depth: Number.POSITIVE_INFINITY }, { cells: ['c'], depth: 1.9 }];
+  assert.equal(verbatimText(seg), 'a\nb\n  c');
 });
 
 test('the offsets still address the source, terminators included', () => {
@@ -414,6 +500,31 @@ test('AN INSTANT IS SAID IN THE UNIT IT MATTERS IN, WHICH NOTHING HERE COULD DO'
   assert.equal(since('', NOW), '');
 });
 
+test('A STAMP IS THE DAY AND THE MINUTE, and it printed the raw instant back', () => {
+  /**
+   * `since()` answers "how long ago" and its bands are deliberately coarse past a day, so two
+   * changes made the same afternoon both read `3d ago`. That is right on a row about an invoice and
+   * wrong on the ledger, which the restore setting sends somebody to with the words "find the
+   * moment". `stamp` is the answer to the second question.
+   *
+   * AND IT HANDED THE WHOLE INSTANT TO `day()`, WHICH TAKES A DAY. `noon()` matches
+   * `^YYYY-MM-DD$` anchored and returns its argument unchanged when it does not, so the ledger
+   * printed `2026-09-03T09:00:00.000Z, 09:00`: the raw stored value, on the one screen this
+   * function exists for, two functions under the paragraph saying a machine timestamp is exactly
+   * what these formatters are here to stop showing anybody.
+   */
+  assert.equal(stamp('2026-09-03T09:00:00.000Z'), '3 Sep 2026, 09:00');
+  assert.doesNotMatch(stamp('2026-09-03T09:00:00.000Z'), /T|Z/u, 'the stored form reached the screen');
+
+  /* A BARE DAY IS STILL A DAY, at midnight, because an `instant` column may hold one after an
+     import from a record that stored less. */
+  assert.equal(stamp('2026-09-03'), '3 Sep 2026, 00:00');
+
+  /* AND SOMETHING THAT IS NOT A MOMENT COMES BACK AS ITSELF, rather than as `Invalid Date`. */
+  assert.equal(stamp('not a date'), 'not a date');
+});
+
+
 test('AND PAST A DAY IT SAYS WHAT THE DAY COLUMN SAYS, AT EVERY HOUR OF THE CLOCK', () => {
   /**
    * The claim that used to be a sentence. `relative()` rounded a NOON-OFFSET and `since()` rounded
@@ -686,6 +797,52 @@ test('a negative row draws no bar, and still shows its number', () => {
   assert.ok(html.includes('−'), 'the minus sign did not reach the screen');
 });
 
+/* ── and the bar reads what it DREW, not what the author typed ───────────── */
+
+test('A BAR VALUE CELL IS A CELL, AND THE BAR IS MEASURED OFF WHAT IT DREW', () => {
+  /* `prop-label` and `prop-note` went through the inline renderer, and `prop-value`, the one cell
+     in the block that IS the number, was escaped raw, with the magnitude scraped off the same raw
+     string. So this block printed `{{money:500000 GBP}}` in the value column and compared 500000
+     minor units against the 1200 major ones it read out of the literal beside it: the first bar a
+     hundred times too long, in the same chart, with every selector correct. The only test that
+     exercised a magnitude seeded both rows with `money()` literals, which is precisely the case
+     where reading the source and reading the render coincide, so it passed either way. */
+  const src = ['```bar | Owed', 'Ada | {{money:500000 GBP}} | ', `Bo | ${money(120_000, 'GBP')} | `, '```'];
+  const html = toHTML(parse(src.join(NEWLINE)));
+  assert.doesNotMatch(html, /\{\{/u, 'the value cell printed its own source');
+  assert.match(html, /GBP 5,000\.00/u, 'the interpolated amount never reached the screen');
+  const tracks = [...html.matchAll(/--magnitude:([\d.]+)/gu)].map((m) => m[1]);
+  assert.deepEqual(tracks, ['1.00', '0.24'], 'the two bars are not in proportion to the two amounts');
+});
+
+test('and a gauge bound to two live values draws the proportion between them', () => {
+  // How a declared page writes a gauge. `magnitudeOf('{{cash.now}}')` is NaN, so the scale was 0
+  // and the bar disappeared entirely while the value column showed the author's braces.
+  const resolve = (path: string) =>
+    ({ 'cash.now': money(1_250_000, 'GBP'), 'cash.target': money(2_000_000, 'GBP') })[path] ?? null;
+  const html = toHTML(parse('```gauge | Cash\nRunway | {{cash.now}} | {{cash.target}}\n```'), { resolve });
+  assert.match(html, /--magnitude:0\.63/u, 'the gauge drew nothing');
+  assert.match(html, /GBP 12,500\.00/u);
+  assert.match(html, /of <span class="figure num">GBP 20,000\.00<\/span>/u, 'the target printed its own source');
+});
+
+test('the cell magnitude is the number in the render, and an unresolved one is not a number', () => {
+  // `magnitudeOf` is documented as reading "a string it just wrote". This is the wrapper that
+  // makes that true of a cell: render first, read second, one function for both renderers.
+  assert.equal(magnitudeOfCell('{{money:129900 GBP}}'), 1299);
+  assert.equal(magnitudeOfCell('{{money:-129900 GBP}}'), -1299, 'the real minus was lost on the way back in');
+  assert.equal(magnitudeOfCell('{{cash.now}}', { resolve: () => money(50_000, 'GBP') }), 500);
+  assert.ok(Number.isNaN(magnitudeOfCell('{{cash.now}}')), 'a hole is not a magnitude of zero');
+  assert.equal(magnitudeOfCell('GBP 1,200.00'), 1200, 'a literal still reads as itself');
+});
+
+test('a bar whose every value is a hole draws no bars at all, rather than four full ones', () => {
+  // The scale is the largest finite reading. With nothing resolvable there is no scale, and a bar
+  // at zero claims the value IS zero, so the rows keep their words and lose their tracks.
+  const html = toHTML(parse('```bar | Owed\nAda | {{a.b}} | \nBo | {{c.d}} | \n```'));
+  assert.equal((html.match(/--magnitude:/gu) ?? []).length, 0);
+});
+
 /* ── the two that were reachable from a record an agent writes ───────────── */
 
 test('A PROTOCOL-RELATIVE URL IS NOT A SAME-ORIGIN PATH', () => {
@@ -726,14 +883,48 @@ test('the groups and the step agree, or the row index counts a different table',
 
 /* ── the guard rails ──────────────────────────────────────────────────────── */
 
-test('the page-only kind is marked, so it cannot be drawn from a write-up fence', () => {
-  assert.ok(KINDS.table.pageOnly);
-  assert.ok(isKind('table'));
-  // A `table` fence has no rows to draw, so it degrades like an unknown kind rather than rendering
-  // an empty grid that looks like a bug in the record.
+/**
+ * THIS TEST USED TO ASSERT TWO LITERALS AND CONTRADICT ITSELF.
+ *
+ * `assert.ok(KINDS.table.pageOnly)` and `assert.ok(isKind('table'))` restate `kinds.ts:172`, where
+ * both are written down; a table cannot disagree with itself. Then its comment said a `table`
+ * fence *"degrades like an unknown kind rather than rendering an empty grid"* and the two lines
+ * under it asserted that it renders as a block, which it did, as `<div class="table"></div>`,
+ * exactly the empty grid the comment denied. Nothing anywhere read the flag.
+ *
+ * The behaviour the comment describes is the specified one (`05 §2`'s kind table, `36 §7`'s step
+ * 7), so the parser reads the flag now and these assert the degrade instead of the literals.
+ */
+test('A PAGE-ONLY KIND DEGRADES TO ITS FENCE RATHER THAN DRAWING AN EMPTY GRID', () => {
   const [seg] = parse('```table | Open\n```');
-  assert.equal(seg?.type, 'block');
-  assert.equal(seg?.type === 'block' && seg.rows.length, 0);
+  assert.equal(seg?.type, 'degraded');
+  assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_KIND_UNKNOWN');
+  const html = toHTML(parse('```table | Open\n```'));
+  assert.match(html, /block-degraded/, 'the fence was not shown back to the author');
+  assert.doesNotMatch(html, /<div class="table">/, 'the empty grid is still drawn');
+});
+
+test('and a page-only fence with rows names the register, not a column count', () => {
+  // `table` is `cells: 0`, so arity caught it first and said "a table row has 2 columns where
+  // table takes 0". That points an author, usually an agent, which cannot see the screen, at the
+  // shape of the row, when the fact is that the kind is bound to a register and takes no authored
+  // rows at all. The fence is the only feedback channel there is, so it has to say the real thing.
+  const [seg] = parse('```table | Open\na | b\n```');
+  assert.equal(seg?.type, 'degraded');
+  const fix = seg?.type === 'degraded' ? seg.fix : '';
+  assert.doesNotMatch(fix, /takes 0/, 'the author was pointed at the column count');
+  assert.match(fix, /register/);
+});
+
+test('and the flag is what decides it, for every kind in the table', () => {
+  // The invariant the old test only named. `pageOnly` is read by the parser now, so this walks the
+  // whole table rather than the one kind that carries the flag today: a seventeenth kind marked
+  // page-only degrades without an edit here, and one that is not marked still draws.
+  for (const [kind, spec] of Object.entries(KINDS)) {
+    assert.ok(isKind(kind));
+    const [seg] = parse('```' + kind + ' | H\n```');
+    assert.equal(seg?.type, spec.pageOnly ? 'degraded' : 'block', `${kind} drew the wrong way`);
+  }
 });
 
 test('prose in a drawn block is not a style problem, it is a row', () => {
@@ -741,4 +932,114 @@ test('prose in a drawn block is not a style problem, it is a row', () => {
   // render, because the write is accepted and the fence is the feedback channel.
   const html = toHTML(parse('```stat | H\nA long sentence that is not a figure at all | 1 | n\n```'));
   assert.match(html, /A long sentence/);
+});
+
+/* ── a ledger held by position belongs to one fence ──────────────────────── */
+
+/**
+ * A primitive's own source, read as text.
+ *
+ * A `.svelte` file cannot be mounted under `node --test`: there is no compiler in this package's
+ * test path and no DOM behind it, and an effect that fires on a prop change is not visible in a
+ * rendered tree at all. So the rules that live in a component are asserted the way `apps/web`
+ * already asserts this component's sentinel: over the file. Everything with an answer worth
+ * asserting is pulled out into `src/board.ts`, `src/ticks.ts` and `svelte/types.ts` instead, which
+ * is what `board.ts`'s header says it is for.
+ */
+const componentSource = (name: string): string =>
+  readFileSync(new URL(`../svelte/p/${name}.svelte`, import.meta.url), 'utf8');
+
+/** The one `$effect` each of the two ledger-holding primitives has, as source. */
+const fenceEffect = (name: string): string =>
+  /\$effect\(\(\) => \{([\s\S]*?)\n {2}\}\);/u.exec(componentSource(name))?.[1] ?? '';
+
+test('A BOARD DROPS ITS MOVE LEDGER WHEN THE FENCE CHANGES, AS THE CHECKLIST ALREADY DID', () => {
+  /* `moved` is keyed by row INDEX, because the dialect is text and a row has no id, so it is a
+     fact about one document. `List` drops its ticks when `block.raw` changes and says why;
+     `Grid` dropped nothing, and the page iterates its segments unkeyed, so Svelte reuses the
+     component when the document changes under it. The cost is below, in the arithmetic. */
+  for (const name of ['Grid', 'List'])
+    assert.match(fenceEffect(name), /block\.raw/u, `${name} does not watch the fence its ledger belongs to`);
+  const grid = fenceEffect('Grid');
+  for (const held of ['moved', 'focus', 'carrying', 'over'])
+    assert.match(grid, new RegExp(`\\b${held}\\s*=`, 'u'), `Grid carries ${held} across a fence change`);
+});
+
+test('and this is what a kept one does to the board it is kept over', () => {
+  // The same `{ 2: 'Doing' }` over two different documents. `lanes` clears a mark only when the
+  // new row's cell 0 already equals the stored target, which is the "the host wrote it" case, so over a
+  // document the reader never touched it draws a card in a column it was not declared in.
+  const rows = (titles: [string, string][]) => titles.map(([state, title]) => ({ cells: [state, title, ''] }));
+  const before = rows([['Todo', 'Kilnfonts'], ['Doing', 'Legal review'], ['Todo', 'Fenwick invoice']]);
+  const after = rows([['Todo', 'Kilnfonts'], ['Doing', 'Legal review'], ['Blocked', 'Registrar']]);
+  const moved = { 2: 'Doing' };
+  assert.deepEqual(
+    lanes(after, moved).find((l) => l.name === 'Doing')?.cards.map((c) => [c.row.cells[1], c.moved]),
+    [['Legal review', false], ['Registrar', true]],
+    'a card nobody dragged is drawn where nobody put it, wearing "Not saved"',
+  );
+  assert.deepEqual(
+    lanes(after, {}).find((l) => l.name === 'Doing')?.cards.map((c) => c.row.cells[1]),
+    ['Legal review'],
+    'and with the ledger dropped, the document is the truth again',
+  );
+  assert.equal(lanes(before, moved).find((l) => l.name === 'Doing')?.cards.length, 2, 'the move itself still works');
+});
+
+/* ── the grid's caret ─────────────────────────────────────────────────────── */
+
+test('THE ARROWS MOVE THE GRID’S ONE TAB STOP, AND NOTHING MOVED IT', () => {
+  /* `Table` ships `role="grid"`, `role="gridcell"` on every cell and `tabindex="0"` on exactly one
+     of them, and had no arrow handler at all: `grep -n Arrow Table.svelte` returned nothing and
+     `focus` was `$bindable()` that the component never wrote. Two of its six callers bring their
+     own arrows and four do not, so on those four a keyboard user tabbed to cell (0,0) and tabbed
+     out again with every other cell unreachable, under a comment claiming the opposite. */
+  assert.deepEqual(moveCell({ row: 2, col: 3 }, 'ArrowDown', 5, 8), { row: 3, col: 3 });
+  assert.deepEqual(moveCell({ row: 2, col: 3 }, 'ArrowUp', 5, 8), { row: 1, col: 3 });
+  assert.deepEqual(moveCell({ row: 2, col: 3 }, 'ArrowRight', 5, 8), { row: 2, col: 4 });
+  assert.deepEqual(moveCell({ row: 2, col: 3 }, 'ArrowLeft', 5, 8), { row: 2, col: 2 });
+});
+
+test('Home and End are the ROW’s ends here, because a row in a grid has columns', () => {
+  // Which is what the register grid has always bound them to; the whole list's ends are the same
+  // keys with a modifier, and a modifier is never this component's.
+  assert.deepEqual(moveCell({ row: 2, col: 3 }, 'Home', 5, 8), { row: 2, col: 0 });
+  assert.deepEqual(moveCell({ row: 2, col: 3 }, 'End', 5, 8), { row: 2, col: 7 });
+});
+
+test('it clamps rather than wrapping, and the press at the edge is still swallowed', () => {
+  // Under wrapping the cheapest slip, one press too many, is the largest possible move. The
+  // clamp is not a `null`, so the last press before the end does not scroll the page instead.
+  assert.deepEqual(moveCell({ row: 0, col: 0 }, 'ArrowUp', 5, 8), { row: 0, col: 0 });
+  assert.deepEqual(moveCell({ row: 0, col: 0 }, 'ArrowLeft', 5, 8), { row: 0, col: 0 });
+  assert.deepEqual(moveCell({ row: 4, col: 7 }, 'ArrowDown', 5, 8), { row: 4, col: 7 });
+  assert.deepEqual(moveCell({ row: 4, col: 7 }, 'ArrowRight', 5, 8), { row: 4, col: 7 });
+});
+
+test('a caret left outside a table that has since shrunk comes back in on the first press', () => {
+  // `/v/[view]` starts its caret at `{ row: 0, col: 1 }` against a table whose column count is the
+  // saved view's, and a filter can take the rows away underneath it.
+  assert.deepEqual(moveCell({ row: 900, col: 900 }, 'ArrowDown', 3, 2), { row: 2, col: 1 });
+  assert.deepEqual(moveCell({ row: -4, col: -4 }, 'ArrowRight', 3, 2), { row: 0, col: 1 });
+  assert.deepEqual(moveCell({ row: Number.NaN, col: 1.7 }, 'Home', 3, 2), { row: 0, col: 0 });
+});
+
+test('a key that is not the grid’s is left alone, so nothing bare is bound', () => {
+  // A block drawn inside somebody else's page cannot collide with a keymap it knows nothing about.
+  for (const key of ['j', 'k', 'Enter', ' ', 'PageDown', 'a', 'Tab', 'Escape'])
+    assert.equal(moveCell({ row: 1, col: 1 }, key, 5, 8), null, `${key} was taken`);
+});
+
+test('an empty grid is not somewhere a caret can go', () => {
+  assert.equal(moveCell({ row: 0, col: 0 }, 'ArrowDown', 0, 8), null);
+  assert.equal(moveCell({ row: 0, col: 0 }, 'ArrowRight', 5, 0), null);
+});
+
+test('and the primitive that declares the grid is the one that carries the rover', () => {
+  // The mover is only worth having where the grid is: a roving tabindex with nothing to rove it
+  // is the defect this replaced.
+  const src = componentSource('Table');
+  assert.match(src, /role="grid"/u);
+  assert.match(src, /moveCell\(at, e\.key, rows\.length, columns\.length\)/u, 'the arrows reach no mover');
+  assert.match(src, /\{onkeydown\}/u, 'the grid root binds no key handler');
 });

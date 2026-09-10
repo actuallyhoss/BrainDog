@@ -219,17 +219,29 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
          saying `state is open or part` means what the same words mean on a page. */
       if (leg.where && !matches(row, compile(leg.register, leg.where), NOW)) continue;
 
-      const amount = amountOf(row.fields[leg.amount]) ?? 0;
-      if (amount === 0) continue;
       /* A BARE NUMBER IS NOT MONEY, AND ADDING ONE IS MIXING. `amountOf` coerces any scalar, and
          `currencyOf` answers `null` for it — so a leg pointing at a `duration` or an `int` field
          poured seconds into a sterling walk and `mixed` stayed empty, because nothing counted the
          currency that was never there. Seventeen thousand seconds arrived on the screen as
          GBP −172.80 and the crossing day moved. `money.ts` has guarded this since it was written;
-         this walk did not. */
-      const currency = currencyOf(row.fields[leg.amount]);
+         this walk did not.
+
+         AND THE GUARD RAN AFTER THE ZERO CHECK, so a leg pointed at a `text` field slipped past it
+         in silence: `amountOf('Halden')` is `null`, `?? 0` makes it zero, and the `continue` above
+         fired before anything asked what the value was. No steps and no sentence, which is the one
+         answer a cash walk must never give. The kernel counts that row as not money and says so.
+
+         ABSENT IS STILL NOT WRONG. A row nobody has priced yet moves no balance, and saying so on
+         every one of them would bury the leg that is actually misdeclared. What is faulted is a
+         value that is THERE and is not money. */
+      const held = row.fields[leg.amount];
+      const present = held !== undefined && held !== null && held !== '';
+      const currency = currencyOf(held);
+      if (present && !currency) bare = true;
+
+      const amount = amountOf(held) ?? 0;
+      if (amount === 0) continue;
       if (currency) seen.add(currency);
-      else bare = true;
 
       const on = String(row.fields[leg.on] ?? '').slice(0, 10);
       if (!on) continue;

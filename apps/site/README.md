@@ -46,7 +46,7 @@ marketing page that cannot build without a running app is a marketing page that 
 
 `src/lib/copy.ts`. Same discipline as the app's, for a sharper reason: **marketing copy is where a
 product lies to itself.** One file is one pass to check that every claim on this site is a thing the
-software does. The voice, in four rules:
+software does. The voice, in five rules:
 
 - Say what it does. Never sell it, never adjective it.
 - A CTA is Verb + Noun. Never "Get Started", never "Learn More".

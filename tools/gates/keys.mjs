@@ -137,7 +137,20 @@ const RECIPES = {
   'row-up': { route: GRID, setup: focusFirstCell, press: ['j', 'j', 'k'] },
   peek: { route: GRID, setup: focusFirstCell, press: ['p'] },
   select: { route: GRID, setup: focusFirstCell, press: ['x'] },
-  edit: { route: GRID, setup: focusFirstCell, press: ['e'] },
+  /**
+   * ON A CELL THAT HOLDS A VALUE, WHICH THE FIRST ONE DOES NOT.
+   *
+   * `focusFirstCell` clicks the first `.td` of the first row and that is the selection picker: a
+   * control rather than a value, so `e` there is correctly not an editor, and this recipe was
+   * asserting the wrong claim about the right key. It is the same mistake the `related` note below
+   * records, one column along.
+   *
+   * IT WALKS RATHER THAN CLICKING THE CELL IT WANTS, because a click on a value cell OPENS THE
+   * ROW: the recipe would leave the register entirely and then press `e` on a screen that has no
+   * grid. `Home` puts the caret at the start of the row whatever the click left it on, and two
+   * columns along is the first cell that says what the row IS, which is the cell this key is about.
+   */
+  edit: { route: GRID, setup: focusFirstCell, press: ['Home', 'ArrowRight', 'ArrowRight', 'e'] },
   new: { route: GRID, setup: focusFirstCell, press: ['n'] },
   display: { route: GRID, setup: focusFirstCell, press: ['v'] },
   'copy-id': { route: GRID, setup: focusFirstCell, press: ['y'] },

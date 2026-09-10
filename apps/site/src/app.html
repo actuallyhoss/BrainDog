@@ -23,8 +23,9 @@
 
       IN THE SHELL AND NOT PER PAGE, for the parts that do not vary: the site name, the type, the
       card format and the image. The three pages set their own `og:title` and `og:description` from
-      their own `<title>` and description in `+layout.svelte`, so there is one sentence per page and
-      not two that can disagree.
+      their own `<title>` and description in each route's own `+page.svelte`, so there is one
+      sentence per page and not two that can disagree. This comment said `+layout.svelte`, which has
+      no `svelte:head` in it at all.
 
       `og:image` IS THE PRODUCT AND NOT A LOGO. The screenshot on the home page is what the product
       looks like, it is already in `static/`, and a preview card is one of the two places a stranger

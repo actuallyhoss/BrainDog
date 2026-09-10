@@ -131,6 +131,20 @@
           segments = [];
         }
       }
+      /**
+       * A PREVIEW THAT IS A REFUSAL IS NOT A PREVIEW.
+       *
+       * `table` is page-only, which `05 §2` and `36 §7` both specify as degrading to its fence like
+       * an unknown kind, and until today nothing implemented that: the tile drew an empty grid, and
+       * now the dialect answers honestly and the tile would draw the refusal sentence. Neither is a
+       * picture of the kind. The tile already has the right fallback one branch down, which is the
+       * kind's own DESCRIPTION in the same slot, "never a wireframe and never an icon", so a
+       * preview made entirely of degradations falls through to it.
+       *
+       * IT IS NOT A TEST FOR `table`. Any kind whose seed the dialect cannot draw wants the same
+       * answer, and naming the one that does it today is how this comes back.
+       */
+      if (segments.length > 0 && segments.every((s2) => s2.type === 'degraded')) segments = [];
       return { kind, seed, segments, spec: isKind(kind) ? KINDS[kind] : undefined };
     });
   });

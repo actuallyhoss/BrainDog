@@ -10,7 +10,7 @@
  * read it NOW. A figure you interpolate needs no tag — the path is its provenance (05 §7.3).
  */
 
-import { MISSING, TYPED, formatTyped, type TypedForm } from './format.ts';
+import { MISSING, TYPED, formatTyped, magnitudeOf, type TypedForm } from './format.ts';
 
 export type Inline =
   | { type: 'text'; text: string }
@@ -177,6 +177,25 @@ export function inline(text: string, opts: InlineOptions = {}): Inline[] {
   }
   return out;
 }
+
+/**
+ * The magnitude of a CELL: the number in what the cell draws, never the number in what the author
+ * typed.
+ *
+ * `magnitudeOf` says of itself that it is "for the one thing that has to read a string it just
+ * wrote", and neither of the two things reading it was handing it one. `bar` and `gauge` took the
+ * magnitude straight off `row.cells[1]`, which is source. So a gauge bound to `{{cash.now}}`, which
+ * is how a page that stays true is written, measured as `NaN`, its bar collapsed to zero, and the
+ * value column printed the author's braces; and a bar mixing `{{money:500000 GBP}}` with a literal
+ * `GBP 1,200.00` compared 500000 minor units against 1200 major ones, drawing the first bar a
+ * hundred times too long, in the same block, with every selector correct.
+ *
+ * Rendered first and read second is the only order in which the number on the screen and the
+ * length of the bar beside it are the same number. Both renderers call this, for the reason the
+ * bar's own comment already gives: two copies of the reading gave two answers for one cell.
+ */
+export const magnitudeOfCell = (cell: string, opts: InlineOptions = {}): number =>
+  magnitudeOf(text(inline(cell, opts)));
 
 /** The plain-text projection, for an accessible name, a title, or an export. */
 export function text(nodes: Inline[]): string {

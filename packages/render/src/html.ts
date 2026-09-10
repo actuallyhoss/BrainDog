@@ -15,8 +15,8 @@
  */
 
 import { KINDS, TONES, type Kind } from './kinds.ts';
-import { inline, text as plain, type Inline, type InlineOptions } from './inline.ts';
-import { MISSING, magnitudeOf } from './format.ts';
+import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
+import { MISSING } from './format.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
 export type RenderOptions = InlineOptions & {
@@ -189,18 +189,28 @@ function rows(b: Block, o: RenderOptions): string {
 }
 
 function proportional(b: Block, o: RenderOptions): string {
-  if (b.kind === 'gauge') {
-    const r = b.rows[0] ?? { cells: [] };
-    const value = magnitudeOf(String(r.cells[1] ?? ''));
-    const target = magnitudeOf(String(r.cells[2] ?? ''));
-    const m = Number.isFinite(value) && Number.isFinite(target) && target !== 0 ? value / target : 0;
-    return `<div class="prop"><div class="prop-row"${toneAttrs(r.tone)}>${cell('prop-label', r.cells[0], o)}<span class="prop-track" style="--magnitude:${magnitude(m)}"></span><span class="prop-value num">${escape(r.cells[1] ?? MISSING)}</span><span class="prop-note num">of ${escape(r.cells[2] ?? MISSING)}</span>${toneGlyph(r.tone)}</div></div>`;
-  }
+  /* THE VALUE CELL IS A CELL, and it was the one cell in the block that was not treated as one.
+     `prop-label` and `prop-note` went through the inline renderer. `prop-value`, the only cell here
+     that IS the number, was escaped raw, and the magnitude was then scraped off the same raw
+     string. So a gauge bound to `{{cash.now}}` printed the braces at a length of zero, and a bar
+     mixing an interpolated amount with a literal one measured minor units against major: a
+     hundredfold error in the length of the bar. The identical defect was found and fixed one
+     primitive over, on `timeline`'s date cell, for the identical reason. `MISSING` goes through
+     `inline` too, which draws it unchanged and keeps the empty cell reading exactly as it did. */
+  const drawn = (v: string | undefined): string => renderInline(inline(v ?? MISSING, o), o);
   /* A bar scales to its largest NON-HOLE row. A row whose value is not a number keeps its words and
      loses its bar, and an empty cell is not a number: a bar at zero claims the value IS zero
-     (05 §7.4). Both readings come out of `magnitudeOf`, which is also what the Svelte primitive
-     uses — two copies of it gave two answers for the same cell. */
-  const numeric = (r: Row) => magnitudeOf(String(r.cells[1] ?? ''));
+     (05 §7.4). Both readings come out of `magnitudeOfCell`, which is also what the Svelte primitive
+     uses; two copies of it gave two answers for the same cell. */
+  const numeric = (r: Row) => magnitudeOfCell(String(r.cells[1] ?? ''), o);
+
+  if (b.kind === 'gauge') {
+    const r = b.rows[0] ?? { cells: [] };
+    const value = numeric(r);
+    const target = magnitudeOfCell(String(r.cells[2] ?? ''), o);
+    const m = Number.isFinite(value) && Number.isFinite(target) && target !== 0 ? value / target : 0;
+    return `<div class="prop"><div class="prop-row"${toneAttrs(r.tone)}>${cell('prop-label', r.cells[0], o)}<span class="prop-track" style="--magnitude:${magnitude(m)}"></span><span class="prop-value num">${drawn(r.cells[1])}</span><span class="prop-note num">of ${drawn(r.cells[2])}</span>${toneGlyph(r.tone)}</div></div>`;
+  }
   const scale = Math.max(0, ...b.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite));
   const body = b.rows
     .map((r) => {
@@ -210,7 +220,7 @@ function proportional(b: Block, o: RenderOptions): string {
          claims the value IS zero. The number is still printed, with its sign. */
       const drawable = Number.isFinite(v) && v >= 0 && !r.hole && scale > 0;
       const track = drawable ? `<span class="prop-track" style="--magnitude:${magnitude(v / scale)}"></span>` : '';
-      const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${escape(r.cells[1] ?? MISSING)}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
+      const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${drawn(r.cells[1])}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
       return r.hole
         /* A HOLE ROW IS A CONTROL ONLY WHERE THE HOST CAN ACT ON IT — the same rule as an inline
            hole, for the same reason. This was a `<button>` with no handler on either side of the
@@ -269,8 +279,32 @@ function table(b: Block, o: RenderOptions): string {
   return `<div class="table" role="grid" aria-rowcount="${body.length + 1}" aria-colcount="${cols}" style="--cols:repeat(${cols},minmax(0,1fr))"><div class="tr" role="row" aria-rowindex="1">${th}</div>${tr}</div>`;
 }
 
+/**
+ * The text of a verbatim block, with an indented kind's levels put back on.
+ *
+ * `parse` TAKES THE INDENT OFF THE CELL AND PUTS IT IN `Row.depth`, deliberately, so a `tree` row's
+ * text is what the line says and its level is a number beside it. `Media.svelte` puts the two back
+ * together and this file never did: it read cell 0 alone, so a four-line tree came out flat in the
+ * exports, in the digest email and in every test that reads the mirror, which is the whole of what
+ * `toHTML` serves. The primitive's own header says what that costs: a code sample that loses its
+ * indentation is a code sample that is wrong. It was a straight parity break besides, the two
+ * renderers differing in text content on every `tree` block in the record.
+ *
+ * ONE function, read by both renderers, and it asks the KIND rather than naming `tree`, so a pack
+ * that declares a second indented kind is drawn by both of them the same way.
+ */
+export function verbatimText(b: Block): string {
+  /* CLAMPED, because a renderer that throws takes the whole page with it. `depth` is the parser's
+     own arithmetic and cannot be negative today, and `Row` is a public type a host can build by
+     hand: `String.repeat` answers a negative or a non-finite count with a `RangeError`. */
+  const level = (d: number | undefined): string =>
+    '  '.repeat(Number.isFinite(d) ? Math.max(0, Math.floor(d as number)) : 0);
+  const indented = KINDS[b.kind].indented;
+  return b.rows.map((r) => (indented ? level(r.depth) : '') + (r.cells[0] ?? '')).join('\n');
+}
+
 function media(b: Block): string {
-  const body = b.rows.map((r) => escape(r.cells[0] ?? '')).join('\n');
+  const body = escape(verbatimText(b));
   const lang = b.kind === 'code' && b.heading ? ` data-lang="${escape(b.heading)}"` : '';
   /* FOCUSABLE, because a `pre` does not wrap: on a phone it is always the widest thing on the
      page and always scrolls sideways, and a scrolling box a keyboard cannot focus is a box a

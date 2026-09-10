@@ -268,9 +268,12 @@
   }
 
   @media (width < 760px) {
-    /* The two outbound links go first: on a phone the bar has room for the two destinations
-       somebody arrived intending to reach, and `Design` and `Source` are one tap away in the
-       footer of every page. */
+    /* THE BAR IS ONE LINE ON A PHONE, and the two links this rule drops are the two that are not
+       drawn at all today: `Design` and `Source` are absent while the repository is private, and
+       the footer column that used to hold them is the Licence column now, so `.links` holds
+       exactly two anchors and this rule matches nothing. It said they were one tap away in the
+       footer, which was a present-tense claim about a column that no longer exists. It is here for
+       the day the repository opens and the two come back. */
     .links a:nth-child(n + 3) {
       display: none;
     }

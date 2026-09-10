@@ -757,7 +757,11 @@
          sound and it was never said out loud: the press did nothing, drew nothing and reported
          nothing, on the two types where a person is most likely to try. */
       const f = fieldOf(field);
-      if (f) toasts.push(copy.cellOpensRow(labelOf(f), notEditableBecause(field)), { intent: 'warn' });
+      /* AND A COLUMN THAT IS NOT A FIELD STILL ANSWERS. The picker and the row's verbs carry no
+         declaration, so `fieldOf` is undefined for them and this returned in silence: a printed key
+         doing nothing, which is the drift `19 §4` exists to prevent. It became reachable the day
+         clicking a cell started moving the caret to that cell. */
+      toasts.push(f ? copy.cellOpensRow(labelOf(f), notEditableBecause(field)) : copy.cellNoValue, { intent: 'warn' });
       return;
     }
     editing = { seq, field };

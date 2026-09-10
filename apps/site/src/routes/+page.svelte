@@ -18,16 +18,21 @@
 </script>
 
 <svelte:head>
-  <title>BrainDog</title>
-  <meta name="description" content={site.hero.body} />
+  <!-- THE TITLE AND THE DESCRIPTION ARE THEIR OWN SENTENCES, in `copy.ts`, and they were the
+       page's own. `<title>` was the bare brand under an `og:site_name` that is also the bare
+       brand, and the description was 304 characters of hero body whose first four clauses are
+       rhetorical questions, so the snippet a stranger reads never reached the sentence that says
+       what this is. -->
+  <title>{site.meta.home.title}</title>
+  <meta name="description" content={site.meta.home.description} />
   <!-- THE CANONICAL AND THE PREVIEW, from the same two sentences the page already has, so there is
        one description per page rather than two that can disagree. The canonical matters because
        `www` 301s here and a preview fetcher that followed the redirect would otherwise cite the
        hostname it started from. -->
   <link rel="canonical" href="https://brain.dog/" />
   <meta property="og:url" content="https://brain.dog/" />
-  <meta property="og:title" content="BrainDog" />
-  <meta property="og:description" content={site.hero.body} />
+  <meta property="og:title" content={site.meta.home.title} />
+  <meta property="og:description" content={site.meta.home.description} />
 </svelte:head>
 
 <section class="hero">
@@ -41,8 +46,12 @@
            not ready to open the app was a 404. The changelog is the honest substitute: it is the
            account of what is built and what is not, it is on this site, and it is what the design
            link was being read for. -->
-      <a class="btn" href={DOCS ?? '/changelog'}>{DOCS ? site.hero.secondary : site.nav.changelog}</a>
+      <a class="btn" href={DOCS ?? '/changelog'}>{DOCS ? site.hero.secondary : site.hero.changelog}</a>
     </div>
+    <!-- WHAT THE BUTTON ABOVE ACTUALLY DOES. The pricing page says "hosting has no billing and no
+         sign-up" and the changelog says the app draws a synthetic record; the page carrying the
+         button said neither, and the button said `Start a record`. -->
+    <p class="hero-note">{site.hero.note}</p>
   </div>
 
   <!-- `eager`, and only here. The hero screenshot is the largest contentful paint on this page, and
@@ -66,7 +75,10 @@
       <p class="row-body">{s.typed.body}</p>
       <p class="row-note">{s.typed.note}</p>
     </div>
-    <Shot name="grid" alt="A register of obligations as a dense grid: number, what, party, direction, amount, due, state and thing." />
+    <!-- THE COLUMN NAMES ARE THE SCREEN'S, and they were the field ids and the labels those
+         columns used to carry. This is what a screen reader user is told the picture shows, so it
+         is the one alt string on the page that has to match the product's own words. -->
+    <Shot name="grid" alt="The money register as a dense grid: number, description, who, which way, amount, due, status and project." />
   </div>
 </section>
 
@@ -95,7 +107,7 @@
     </div>
     <!-- `declared page` was the word here, and `19 §9` bans it: say the thing's own name. It also
          described three figures and a bar chart, on a page that has four figures and no chart. -->
-    <Shot name="money" alt="The money page: four figures against their targets, how many obligations sit in each state, and a table walking the balance forward to the day it goes under." />
+    <Shot name="money" alt="The money page: four figures against their targets, how many items sit in each status, and a table walking the balance forward to the day it goes under." />
   </div>
 </section>
 
@@ -151,6 +163,10 @@
       <p class="kicker">{s.vault.kicker}</p>
       <h2 class="card-title">{s.vault.title}</h2>
       <p class="row-body">{s.vault.body}</p>
+      <!-- THE CAVEAT THIS SECTION WAS THE ONLY ONE WITHOUT. Every other section describing an
+           unbuilt half carries it in the same place, and this one was making the strongest
+           promise on the page. -->
+      <p class="row-note">{s.vault.note}</p>
     </article>
     <article class="card">
       <p class="kicker">{s.own.kicker}</p>
@@ -243,6 +259,16 @@
     flex-wrap: wrap;
     gap: var(--sp-3);
     margin-block-start: var(--sp-5);
+  }
+
+  /* Under the buttons and not beside them: it is about what pressing one does, and a caveat set
+     beside a control reads as a caption for the page rather than for the press. */
+  .hero-note {
+    max-inline-size: 56ch;
+    margin-block-start: var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 1.6;
   }
 
   .btn {

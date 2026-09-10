@@ -279,6 +279,11 @@ export const copy = {
     secret: 'held by the vault and never drawn in full',
   } as Record<string, string | undefined>,
   cellWhyElse: 'more than one value',
+  /* AND A COLUMN THAT IS NOT A FIELD AT ALL. The picker and the row's verbs are controls rather
+     than values, and `e` on one of them did nothing and said nothing: `19 §4` is that the sheet
+     documents the bindings by reading them, so a key it prints for the grid has to answer wherever
+     the caret is. It became reachable the day clicking a cell started moving the caret to it. */
+  cellNoValue: 'That column is a control rather than a value, so there is nothing in it to change.',
   setTo: (state: string) => `Set to ${state}`,
   markArchived: 'Archived',
   markNotWritten: 'Not saved',

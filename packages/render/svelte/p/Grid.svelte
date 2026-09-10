@@ -61,6 +61,33 @@
   let over = $state<string | null>(null);
 
   /**
+   * THE LEDGER BELONGS TO ONE FENCE, and is dropped when that fence changes.
+   *
+   * Nothing dropped it. `moved` is keyed by ROW INDEX. `board.ts` says why, and `ticks.ts` states
+   * the same rule for the package: the dialect is text, a row has no id, so a position is a fact
+   * about one document and means nothing over another. `Document.svelte` and `/p/[slug]` both
+   * iterate their segments unkeyed, so Svelte reuses this component when the document changes
+   * under it, and `{ 2: 'Doing' }` was then applied to whatever row now sits at index 2: a card the
+   * reader never touched, drawn in a column it was not declared in, wearing "Not saved". `lanes()`
+   * clears a mark only when the new row's cell 0 already equals the stored target, which is the
+   * "the host wrote it" case and not this one.
+   *
+   * The caret and the drag in flight go with it, because both are held by index too: a `carrying`
+   * that outlives its rows is a drop onto a card nobody picked up.
+   *
+   * Same shape, and the same reason, as `List` dropping its ticks when its fence changes.
+   */
+  let drawn = $state('');
+  $effect(() => {
+    if (block.raw === drawn) return;
+    drawn = block.raw;
+    moved = {};
+    focus = 0;
+    carrying = null;
+    over = null;
+  });
+
+  /**
    * The column that would take the card if it were released now, or null.
    *
    * A LANE ONLY LIGHTS WHEN THE DROP WOULD DO SOMETHING. The card's own column is a valid place to

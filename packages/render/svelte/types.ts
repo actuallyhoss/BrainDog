@@ -61,3 +61,62 @@ export function chunkRows<T>(rows: readonly T[], size: number): { step: number; 
   for (let i = 0; i < rows.length; i += step) groups.push(rows.slice(i, i + step));
   return { step, groups };
 }
+
+/** Where the caret is, in data rows and columns. The header is not a row it can be on. */
+export type Cell = { row: number; col: number };
+
+/**
+ * Where the grid's one tab stop goes next, or `null` when the key is not the grid's.
+ *
+ * THE GRID SHIPPED A ROVING TABINDEX AND NO ROVER. `role="grid"`, `role="gridcell"` on every cell,
+ * exactly one of them `tabindex="0"` and no arrow handler anywhere in the component. The only
+ * `onkeydown` it had was `Enter` on a cell that could be activated. Two of its six callers bring
+ * their own arrows; the other four do not, and on those four a keyboard user tabbed to cell (0,0)
+ * and tabbed straight back out, every other cell in the table unreachable. The component's own
+ * comment claimed the opposite in the present tense: *"a composite widget with one tab stop, arrow
+ * keys inside it, and a caret a screen reader can follow along a row."* One tab stop is the whole
+ * argument for `role="grid"` over `role="table"`, and at 500 rows by 8 columns it is the difference
+ * between one tab stop and four thousand. It is a bargain the reader only wins if the arrows
+ * are there to spend it on.
+ *
+ * Here rather than inside the component for the reason `chunkRows` is here: none of it is markup,
+ * and a caret that walks off the end of a row is not visible in a rendered tree.
+ *
+ * IT CLAMPS AND DOES NOT WRAP, which is `moveTick`'s rule and `board.ts`'s: under wrapping the
+ * cheapest possible slip, one press too many, becomes the largest possible move. The clamp is not
+ * a `null` either: the arrow is swallowed at the edges too, so the last press before the end of a
+ * row does not suddenly scroll the page instead of moving the caret.
+ *
+ * `Home` AND `End` ARE THE ROW'S ENDS, not the grid's, because a row here has columns to be at the
+ * end of. That is what the register grid has always bound them to, and what the APG grid pattern
+ * asks for; the whole-grid ends are the same keys with a modifier, which belong to whoever owns
+ * the page rather than to one block on it.
+ *
+ * `from` is clamped before it is moved, so a caller whose caret is parked outside a table that has
+ * since got smaller is brought back inside by the first press rather than left with nowhere to go.
+ */
+export function moveCell(from: Cell, key: string, rows: number, cols: number): Cell | null {
+  if (rows <= 0 || cols <= 0) return null;
+  const lastRow = rows - 1;
+  const lastCol = cols - 1;
+  const at = {
+    row: Math.max(0, Math.min(Number.isFinite(from.row) ? Math.floor(from.row) : 0, lastRow)),
+    col: Math.max(0, Math.min(Number.isFinite(from.col) ? Math.floor(from.col) : 0, lastCol)),
+  };
+  switch (key) {
+    case 'ArrowDown':
+      return { ...at, row: Math.min(at.row + 1, lastRow) };
+    case 'ArrowUp':
+      return { ...at, row: Math.max(at.row - 1, 0) };
+    case 'ArrowRight':
+      return { ...at, col: Math.min(at.col + 1, lastCol) };
+    case 'ArrowLeft':
+      return { ...at, col: Math.max(at.col - 1, 0) };
+    case 'Home':
+      return { ...at, col: 0 };
+    case 'End':
+      return { ...at, col: lastCol };
+    default:
+      return null;
+  }
+}

@@ -6,17 +6,17 @@
   is a code sample that is wrong.
 -->
 <script lang="ts">
-  import type { Block, RenderOptions } from '../../src/index.ts';
+  import { verbatimText, type Block, type RenderOptions } from '../../src/index.ts';
 
   // `opts` is part of every primitive's signature and is not read here: `code` and `tree` rows are
   // verbatim, so nothing in them is interpolated or linked.
   let { block }: { block: Block; opts?: RenderOptions | undefined } = $props();
 
-  const body = $derived(
-    block.rows
-      .map((r) => (block.kind === 'tree' ? '  '.repeat(r.depth ?? 0) + (r.cells[0] ?? '') : (r.cells[0] ?? '')))
-      .join('\n'),
-  );
+  /* THE INDENT COMES BACK ON IN ONE PLACE NOW. This component rebuilt it from `Row.depth` and
+     `toHTML` did not read `depth` at all, so a tree drew nested here and flat in the mirror, in
+     the exports and in the digest: two renderers held to one accessibility tree, differing in
+     text content on every `tree` block there is. */
+  const body = $derived(verbatimText(block));
 </script>
 
 <!-- FOCUSABLE, and the same in `html.ts`: the two renderers are held to one accessibility tree.

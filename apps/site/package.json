@@ -10,6 +10,7 @@
     "deploy:production": "wrangler deploy --env production",
     "dev": "vite dev",
     "preview": "vite preview",
+    "test": "node --test test/*.test.ts",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
