@@ -221,25 +221,28 @@ export class Record$ extends DurableObject<Env> {
     await api.kernel.tail(this.#alarm);
   }
 
+  /**
+   * THESE TWO GO THROUGH `json()` LIKE EVERY OTHER ANSWER THIS FILE WRITES.
+   *
+   * They were built by hand with a content-type and nothing else, and `route()` returns what this
+   * object hands back unchanged, so they were the only two answers on the whole surface without
+   * `no-store` on them: every other one either comes out of `serveApi`, which sets it, or out of
+   * the helper below, which was written for exactly this rule and which these two predate. The
+   * blast radius is smaller than for the router's 401, because neither 401 nor 503 is
+   * heuristically cacheable and it takes an intermediary configured to store them. It is still the
+   * rule stated 130 lines down, broken in the two places the sentence did not reach.
+   */
   override async fetch(request: Request): Promise<Response> {
     const api = await this.#record();
 
     const refused = api.kernel.refused();
-    if (refused)
-      return new Response(JSON.stringify({ ok: false, refusal: refused }), {
-        status: 503,
-        headers: { 'content-type': 'application/json; charset=utf-8' },
-      });
+    if (refused) return json({ ok: false, refusal: refused }, 503);
 
     /* The context arrives from the Worker, which did the authentication. The record does the
        AUTHORISATION — every permission check is inside `createRecordApi`, one place, so the CLI and
        the MCP server answer to the same ladder as the browser. */
     const ctx = JSON.parse(request.headers.get('x-braindog-ctx') ?? 'null') as CallContext | null;
-    if (!ctx)
-      return new Response(JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This record needs a caller.' } }), {
-        status: 401,
-        headers: { 'content-type': 'application/json; charset=utf-8' },
-      });
+    if (!ctx) return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This record needs a caller.' } }, 401);
 
     return serveApi(request, handlersFor(api), ctx);
   }
@@ -366,6 +369,14 @@ const surfaceOf = (url: URL): string => (/^\/+mcp(?:\/|$)/.test(url.pathname) ? 
  * 33 §4 asks for it on all of `/api/*`, and `serveApi` sets it — but the 401, 403, 404 and 500 this
  * file writes never reach `serveApi`. A cached 401 is a person who signs in and still cannot get in;
  * a cached 403 is a person invited to a record who is told for an hour that they are not on it.
+ *
+ * AND ON THE OBJECT'S OWN TWO, WHICH THAT SENTENCE DID NOT REACH. `Record$.fetch` refuses before
+ * `serveApi` in two places, a 503 for a kernel that is refused and a 401 for a request carrying no
+ * context, and both were written by hand with a content-type and nothing else. `route()` ends with
+ * `return record.fetch(inner)`, so what the object writes is what the client gets: those two were
+ * the only answers on the whole surface without `no-store`. They call this from above it, which is
+ * where the class is; a `const` at module scope is in scope for a method body that runs long after
+ * this line is evaluated.
  */
 const json = (body: unknown, status: number): Response =>
   new Response(JSON.stringify(body), {

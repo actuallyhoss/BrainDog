@@ -31,7 +31,7 @@ import { randomBytes } from 'node:crypto';
    `crypto.subtle` is there as a value on `globalThis` while `CryptoKey` and `CryptoKeyPair` are types
    only `node:crypto` declares, and this is a type-only import that erases to nothing. */
 import type { webcrypto } from 'node:crypto';
-import { chmodSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, linkSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 
 /** What a record stores about one wrapped key. The kernel writes it and never reads inside it. */
 export type WrappedKey = {
@@ -59,10 +59,16 @@ const SEP = 0x1f;
 /**
  * The bytes on disk, made on first run.
  *
- * `wx` IS THE WHOLE OF THE RACE PROTECTION. Two processes starting together both find no file; the
- * loser's write fails rather than overwriting the winner's key with a second one — which would leave
- * every row wrapped under a key nothing can find, indistinguishable from corruption on the one
- * screen where "the data is gone" and "the key changed" need different answers (`12 §6.1`).
+ * THE EXCLUSIVE CREATE OF THE DESTINATION NAME IS THE WHOLE OF THE RACE PROTECTION, and `mint` is
+ * where it lives. Two processes starting together both find no file here; only one of them can
+ * create the name, and the loser reads what the winner put under it rather than overwriting the
+ * winner's key with a second one. A second key would leave every row wrapped under one nothing can
+ * find, indistinguishable from corruption on the one screen where "the data is gone" and "the key
+ * changed" need different answers (`12 §6.1`).
+ *
+ * THIS `existsSync` IS NOT THAT PROTECTION AND NEVER WAS. It is a check-then-act with the whole of
+ * `randomBytes` and a file write in the gap, and it is here to keep the common case off the error
+ * path. Everything that makes the race safe is one function down, on the create itself.
  */
 function keyBytes(file: string, say: (line: string) => void): Uint8Array {
   if (!existsSync(file)) mint(file);
@@ -106,14 +112,34 @@ function keyBytes(file: string, say: (line: string) => void): Uint8Array {
 /**
  * Thirty-two bytes on disk, by a name nothing else can be holding.
  *
- * `wx` WAS NOT THE WHOLE OF THE RACE PROTECTION, because `O_CREAT|O_EXCL` makes the file EXIST
- * before the bytes are in it. The loser of the race re-read an empty file and refused "is 0 bytes";
- * worse, a process killed between the create and the write left that empty file behind for ever —
- * `wx` never rewrites it, so every later boot refused identically on a host where nothing had been
- * created yet.
+ * `wx` ON THE DESTINATION WAS NOT THE WHOLE OF THE RACE PROTECTION, because `O_CREAT|O_EXCL` makes
+ * the file EXIST before the bytes are in it. The loser of the race re-read an empty file and refused
+ * "is 0 bytes"; worse, a process killed between the create and the write left that empty file behind
+ * for ever, because `wx` never rewrites it, so every later boot refused identically on a host where
+ * nothing had been created yet.
  *
- * WRITE THEN RENAME. The temp file carries the bytes before it carries the name, and `rename` is
- * atomic: the loser still loses, and what it then reads is a whole key.
+ * AND WRITE-THEN-RENAME TOOK THE GUARD AWAY WITH IT. `wx` moved onto `${file}.${pid}.tmp`, a name no
+ * two processes can collide on, so `EEXIST` stopped being reachable and the only code the catch
+ * swallowed stopped meaning anything. What landed the key was `rename`, and `rename` honours
+ * nothing: on POSIX it replaces the destination, so the loser's key overwrote the winner's, every
+ * row the winner had already wrapped stopped opening, `signerFor` returned `null` and exports went
+ * out silently unsigned. On Windows it threw `EPERM`, which is not `EEXIST`, so the loser died
+ * inside `openKeyStore` instead, on the first command a new self-hoster runs, with a sentence about
+ * a temp file. Eight processes released together on one deadline produced both outcomes in every
+ * round measured: three to six of them dying, and up to three DIFFERENT keys among the survivors,
+ * because a rename that lands after somebody has read theirs replaces what they read.
+ *
+ * WRITE, THEN LINK. The temp file carries the whole key before anything carries the destination
+ * name, which is the crash window the rename was introduced for and this keeps. `link` then
+ * publishes that finished file under the real name and REFUSES when the name is taken, `EEXIST` on
+ * POSIX and `EEXIST` on Windows, which is the guard the header one function up describes. So the
+ * loser replaces nothing, and what it reads a moment later is the winner's whole key.
+ *
+ * AND THE REASON TO SWALLOW IS THAT THE KEY IS THERE, not that the errno was the one we expected.
+ * Testing the code is how `EPERM` off a Windows rename came to be rethrown at somebody who had lost
+ * a race and was otherwise fine. This asks the question the code was standing in for. Anything else
+ * is a directory this process cannot make a key in, a filesystem with no hard links included, and
+ * that is a refusal on first run rather than two keys nobody can tell apart afterwards.
  */
 function mint(file: string): void {
   const tmp = `${file}.${process.pid}.tmp`;
@@ -123,16 +149,22 @@ function mint(file: string): void {
     /* AND THE BYTES GO FROM HERE TOO. They were handed to `writeFileSync` and dropped, which leaves
        a freshly minted root key in the same shared pool as the read above. */
     fresh.fill(0);
-    renameSync(tmp, file);
+    linkSync(tmp, file);
   } catch (e) {
     fresh.fill(0);
+    /* Somebody else won, or made it first. Theirs is the key. */
+    if (!existsSync(file)) throw e;
+  } finally {
+    /* THE TEMP GOES ON EVERY PATH NOW, INCLUDING THE ONE THAT WINS. `rename` moved the temp, so a
+       successful mint had nothing left to tidy and the removal belonged in the catch; `link` makes
+       a SECOND NAME FOR THE SAME KEK, and leaving it would put the root key in the data directory
+       twice, under a name no later boot reads, checks the mode of, or mentions. A temp file we
+       cannot remove is still litter rather than a reason to refuse. */
     try {
       rmSync(tmp, { force: true });
     } catch {
-      /* A temp file we could not remove is litter, not a reason to refuse. */
+      /* Litter, not a refusal. */
     }
-    /* Somebody else won, or made it first. Theirs is the key. */
-    if ((e as { code?: string }).code !== 'EEXIST') throw e;
   }
 }
 

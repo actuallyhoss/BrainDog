@@ -109,8 +109,23 @@ export function createClient(options: ClientOptions) {
     const url = new URL(`${base}/api/${name}`);
     if (!writes)
       for (const [key, value] of Object.entries(args)) {
-        if (value === undefined) continue;
-        /* JSON per value, so a predicate survives the query string and a plain string stays one. */
+        /* AND `null` IS ABSENT TOO, BECAUSE A QUERY STRING HAS NO `null` TO SEND. `cursor: null` is
+           how a caller says "from the beginning", and it went out as the four letters `null` and
+           came back as the value only because the host was guessing JSON out of every value it
+           read. The host now reads a cursor as the text the record minted, so a word that means
+           nothing there must not be written at all: `?cursor=null` would be a position, and it
+           sorts above every timestamp, so the first page would be handed back forever. */
+        if (value === undefined || value === null) continue;
+        /* JSON per value, so a predicate survives the query string and a plain string stays one.
+           THE SECOND HALF OF THAT SENTENCE WAS NOT TRUE, AND THIS LINE WAS NOT WHERE IT WAS WRONG.
+           The host `JSON.parse`d every value and kept the raw text only when the parse threw, so a
+           string whose text happens to be valid JSON changed type in flight: `"2026"` arrived as
+           the number 2026, `"true"` as the boolean. A page really declared at the slug `2026` was
+           advertised by `pages` and then answered `REQUIRED_MISSING`, "A page is asked for by its
+           slug", to a caller that had sent one, and `get('true', 1)` was a 500 out of SQLite.
+           `ROUTES` now says which arguments are structured and the host decodes only those, which
+           fixes it for a browser following a link as well as for this client, so the line means
+           what it says. */
         url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
       }
 

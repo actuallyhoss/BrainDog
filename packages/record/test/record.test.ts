@@ -240,6 +240,77 @@ test('and boot shows only the registers the caller may touch, because a list of 
   sql.close();
 });
 
+/* ── a page made of figures ─────────────────────────────────── */
+
+test('A PAGE MADE OF FIGURES NAMES THE REGISTERS BEHIND THEM, and it used to name none', async () => {
+  /**
+   * `05 §1` makes `table` the page-only kind that takes `source:`. A `stat` block has
+   * `cells:` instead, and each cell names a metric whose own declaration carries the register. Both
+   * the listing filter and the per-block blanking looked at `block.source` alone, so a page made
+   * entirely of figures named no register, was treated as prose, was listed to everybody, and
+   * handed its readings back.
+   *
+   * THE OTHER FOUR DOORS TO THE SAME NUMBER WERE ALREADY SHUT, which is what makes this the leak
+   * rather than the design: with a ceiling of `notes`, `list` refuses, `metric` answers
+   * `METRIC_UNKNOWN` on purpose so the name itself does not leak, and `boot` shows one register.
+   * The fifth door handed over the figure and the page's title with it.
+   */
+  const { api, sql } = await record();
+  const out = await api.kernel.install([
+    {
+      id: 'metric.owed',
+      kind: 'metric' as const,
+      body: {
+        metric: 'owed',
+        name: 'Owed',
+        source: 'register.obligations',
+        value: { count: 'what' },
+        format: 'int',
+        target: { lte: 99 },
+        window: '30d',
+      } as never,
+    },
+    {
+      id: 'page.figures',
+      kind: 'page' as const,
+      body: {
+        page: 'figures',
+        title: 'Obligations, monthly',
+        blocks: [{ kind: 'stat', cells: [{ metric: 'owed', label: 'Owed' }] }],
+      } as never,
+    },
+  ]);
+  assert.ok(out.ok);
+
+  const narrow = { ...owner, registers: ['notes'] } as CallContext;
+
+  /* The four doors that were already shut, asserted so the fifth is a leak rather than the rule. */
+  assert.equal(refusal(await api.list({ register: 'obligations' }, narrow)).code, 'FORBIDDEN');
+  assert.equal(refusal(await api.metric({ metric: 'owed' }, narrow)).code, 'METRIC_UNKNOWN');
+  assert.deepEqual(value<{ registers: { id: string }[] }>(await api.boot(narrow)).registers.map((r) => r.id), ['notes']);
+
+  /* THE PAGE IS NOT LISTED. Its title is a sentence about what the record holds. */
+  const listed = value<{ slug: string }[]>(await api.pages(narrow));
+  assert.deepEqual(listed.filter((p2) => p2.slug === 'figures'), []);
+
+  /* AND ITS FIGURES ARE NOT HANDED OVER even to a caller who asks for the slug directly. */
+  const asked = await api.page({ slug: 'figures' }, narrow);
+  if (asked.ok) {
+    const blocks = (asked.value as { blocks: { readings?: { reading: unknown }[]; refusals?: unknown[] }[] }).blocks;
+    for (const b of blocks) {
+      assert.deepEqual(b.readings ?? [], [], 'a reading over a register the caller cannot read was drawn');
+      assert.ok((b.refusals ?? []).length > 0, 'the block was blanked and said nothing about why');
+    }
+  }
+
+  /* AND THE OWNER STILL SEES IT, so the filter is about the caller rather than about the page. */
+  const mine = value<{ slug: string }[]>(await api.pages(owner));
+  assert.ok(mine.some((p2) => p2.slug === 'figures'), 'the owner lost a page of their own record');
+  const read = value<{ blocks: { readings?: { reading: unknown }[] }[] }>(await api.page({ slug: 'figures' }, owner));
+  assert.ok((read.blocks[0]?.readings ?? []).length > 0, 'the owner got no figures either');
+  sql.close();
+});
+
 /* ── who the record says did it ──────────────────────────────────────────── */
 
 test('A TOKEN WRITES AS THE PERSON WHO HOLDS IT, never as itself', async () => {

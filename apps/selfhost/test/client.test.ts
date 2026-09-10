@@ -280,11 +280,31 @@ test('THE VERB FOLLOWS THE ROUTE TABLE, not the caller’s guess', async () => {
   await client.update({ register: 'obligations', seq: 1, patch: {} });
 
   assert.deepEqual(seen.map((s) => s.method), ['GET', 'GET', 'POST', 'POST']);
-  for (const route of ROUTES.filter((r) => r.writes))
-    assert.ok(
-      seen.every((s) => !s.url.includes(`/api/${route.name}`) || s.method === 'POST'),
-      `${route.name} writes and was sent as a GET`,
-    );
+
+  /* AND THEN EVERY ROUTE IN THE TABLE, BECAUSE THE LOOP THAT WAS HERE COULD NOT FAIL.
+     It walked the seventeen write routes and asserted `seen.every(s => !s.url.includes(name) ||
+     s.method === 'POST')` against a `seen` holding four calls: `boot`, `list`, `create` and
+     `update`. For the fifteen write routes nothing had called, no URL mentioned them, so the
+     `every` was vacuously true and the assertion said nothing. What it actually checked was
+     `create` and `update`, which the `deepEqual` one line up had just checked exactly.
+
+     `includes` WAS WRONG TWICE OVER, TOO. `/api/listTokens` contains `/api/list`, so a read route's
+     name matched a write route's URL and the two were being asked about each other. The path is
+     compared whole here.
+
+     A ROUTE THE LOOP DID NOT REACH IS NOW A FAILURE rather than a pass, which is the only shape of
+     this test that has anything to say about the thirty-one methods nobody wrote a line for. */
+  for (const route of ROUTES) await client.call(route.name);
+
+  const wrong = ROUTES.filter((route) => {
+    const sent = seen.filter((s) => new URL(s.url).pathname === `/api/${route.name}`);
+    return sent.length === 0 || sent.some((s) => s.method !== (route.writes ? 'POST' : 'GET'));
+  });
+  assert.deepEqual(
+    wrong.map((r) => `${r.name} ${r.writes ? 'writes' : 'reads'}`),
+    [],
+    'a route was sent with the wrong verb, or was not sent at all',
+  );
 });
 
 test('a token is sent when there is one, and not when there is not', async () => {
@@ -319,6 +339,14 @@ test('and the whole route table is reachable from the client', async () => {
       const answer = out as { ok: boolean; refusal?: { code: string } };
       assert.notEqual(answer.refusal?.code, 'ROUTE_UNKNOWN', `${route.name} is in the table and the client cannot call it`);
       assert.notEqual(answer.refusal?.code, 'UNREACHABLE', `${route.name} did not reach the server`);
+      /* AND THE VERB SURVIVED THE TRIP. The test above proves the client picks it from the table;
+         this proves the server agreed, which is the half a mock cannot check. `serveApi` answers a
+         write sent as a GET with 405 and that one sentence, and nothing here was looking at it. */
+      assert.doesNotMatch(
+        (answer as { refusal?: { fix?: string } }).refusal?.fix ?? '',
+        /so it is a POST/,
+        `${route.name} writes and the client sent it as a GET`,
+      );
     }
   } finally {
     await c.close();

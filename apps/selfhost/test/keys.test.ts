@@ -11,6 +11,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,9 +28,13 @@ test('THE KEY FILE IS MADE ONCE and read back the same', async () => {
     const bytes = readFileSync(file);
     assert.equal(bytes.length, 32, '49 §4.4: 32 random bytes');
 
-    /* THE SECOND OPEN DOES NOT REPLACE IT. `wx` is the whole of the race protection, and a second
-       key would leave every existing row wrapped under one nothing can find — which reads on screen
-       exactly like corruption, and needs a different answer. */
+    /* THE SECOND OPEN DOES NOT REPLACE IT, AND THIS IS THE FAST PATH RATHER THAN THE RACE. It said
+       "`wx` is the whole of the race protection" and asserted a property about two processes with
+       one process, sequentially: the second `openKeyStore` finds `existsSync` true and never enters
+       `mint` at all, so it passed while `mint` was overwriting the winner's key in the case it
+       claimed to cover. What it does check is worth keeping and is a smaller thing: an open of a
+       key file that is already there reads it rather than minting over it. The property in the
+       sentence above needs more than one process, and has its own test at the foot of this file. */
     const second = await openKeyStore(file);
     assert.deepEqual(readFileSync(file), bytes, 'the key file was rewritten');
     assert.equal((await first.current()).kekId, (await second.current()).kekId);
@@ -252,6 +257,133 @@ test('A HALF-WRITTEN KEY FILE IS NEVER LEFT BEHIND', async () => {
     const empty = join(dir, 'empty');
     writeKey(empty, '');
     await assert.rejects(() => openKeyStore(empty), /is 0 bytes and a key is 32/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/* ── the race, with real processes ───────────────────────────────────────── */
+
+/**
+ * HOW MANY PROCESSES, AND WHY IT IS NOT TWO. Two `node` startups on a busy machine can miss each
+ * other entirely, and a race test that misses is a test that passes for the wrong reason. Eight on
+ * one deadline overlapped in every round measured, and every round found the defect.
+ */
+const RACERS = 8;
+
+/**
+ * A PROCESS THAT OPENS THE KEY STORE AND SAYS WHICH KEY IT GOT.
+ *
+ * IT SPINS ON THE DEADLINE RATHER THAN SLEEPING TO IT. A `setTimeout` wakes each process on its own
+ * timer tick, and eight ticks arrive spread over milliseconds, which is the one thing this test
+ * must not do. The busy loop costs a few hundred milliseconds of one core each and buys arrival
+ * inside the same microsecond.
+ *
+ * IT PRINTS THE FINGERPRINT AND NEVER THE KEY. `kekId` is the first 18 hex of SHA-256 over the root
+ * bytes, which is what the record already stores in `vault_key.kek_id`; the bytes themselves do not
+ * leave the process that made them.
+ *
+ * AND IT REPORTS WHEN IT WAS READY, so the test can tell a race it ran from a race it missed. Eight
+ * processes that arrive one after another all agree about the key no matter what `mint` does, and
+ * that agreement would be this test passing while proving nothing.
+ */
+const OPENER = `
+const [mod, file, at] = process.argv.slice(2);
+const { openKeyStore } = await import(mod);
+const ready = Date.now();
+while (Date.now() < Number(at)) {}
+try {
+  const { kekId } = await (await openKeyStore(file)).current();
+  process.stdout.write(JSON.stringify({ ready, kekId }));
+} catch (e) {
+  process.stdout.write(JSON.stringify({ ready, error: String((e && e.message) || e) }));
+}
+`;
+
+type Ran = { code: number | null; said: { ready: number; kekId?: string; error?: string } };
+
+const race = (runner: string, mod: string, file: string, at: number): Promise<Ran> =>
+  new Promise((done) => {
+    const kid = spawn(process.execPath, [runner, mod, file, String(at)], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    kid.stdout.on('data', (d) => (out += String(d)));
+    kid.stderr.on('data', (d) => (err += String(d)));
+    kid.on('close', (code) => {
+      let said: Ran['said'];
+      try {
+        said = JSON.parse(out) as Ran['said'];
+      } catch {
+        /* A process that died before it could answer answers here instead, so one assertion below
+           covers "it refused" and "it crashed" rather than the second reaching a `JSON.parse`. */
+        said = { ready: 0, error: err.split('\n').slice(0, 3).join(' ').trim() || `exit ${code} with no answer` };
+      }
+      done({ code, said });
+    });
+  });
+
+/**
+ * THE TEST THE COMMENT AT THE HEAD OF THIS FILE WAS ALWAYS ABOUT.
+ *
+ * `12 §6.1` NEEDS "THE DATA IS GONE" AND "THE KEY CHANGED" TO BE DIFFERENT ANSWERS, and the second
+ * one is what a first-run race produces if `mint` lets the loser land its key: every row the winner
+ * wrapped stops opening, `signerFor` returns `null`, and exports go out unsigned with nothing said.
+ * So the property is about concurrency and cannot be asserted with one process. This spawns eight
+ * against one empty directory on a shared deadline and asks the only three questions that matter:
+ * did they all get in, did they all get the SAME key, and is that key the one on disk.
+ *
+ * WHAT IT FOUND. Against the write-then-rename `mint` this replaced, twelve rounds out of twelve
+ * failed on this machine: one to six processes per round died with `EPERM` out of `renameSync`, and
+ * up to three DIFFERENT keys came back from the ones that lived, because a rename that lands after
+ * somebody has read theirs replaces what they read. On POSIX the `EPERM` half becomes a silent
+ * replacement instead, which is the worse of the two.
+ *
+ * WHAT IT DOES NOT COVER. It cannot prove the absence of a window, only that eight processes
+ * hitting one did not find it; and the interleaving is the operating system's to choose, so a
+ * machine that serialises the eight would pass without racing. That is what the readiness check
+ * below is for: it fails loudly rather than passing quietly when the race did not happen.
+ */
+test('EIGHT PROCESSES MINTING AT ONCE ALL END UP WITH THE SAME KEY', async () => {
+  const dir = scratch();
+  try {
+    /* THE KEY GOES IN ITS OWN DIRECTORY so the litter check below is about `mint` and not about the
+       runner this test had to write somewhere. */
+    const data = join(dir, 'data');
+    mkdirSync(data);
+    const file = join(data, 'kek');
+    const runner = join(dir, 'open.mjs');
+    writeFileSync(runner, OPENER);
+    const mod = new URL('../src/keys.ts', import.meta.url).href;
+
+    const at = Date.now() + 1500;
+    const ran = await Promise.all(Array.from({ length: RACERS }, () => race(runner, mod, file, at)));
+
+    /* THE RACE HAPPENED. Every process reached the spin loop before the deadline, so all eight were
+       inside `openKeyStore` together. If this is what fails, the machine is slower than the 1500 ms
+       allowed and the test proved nothing yet; raise the deadline rather than deleting the check. */
+    const late = ran.filter((r) => r.said.ready === 0 || r.said.ready > at);
+    assert.equal(late.length, 0, `${late.length} of ${RACERS} processes started after the deadline, so nothing raced`);
+
+    const broke = ran.filter((r) => r.said.error !== undefined || r.code !== 0);
+    assert.equal(
+      broke.length,
+      0,
+      `${broke.length} of ${RACERS} died inside openKeyStore: ${broke.map((r) => r.said.error ?? `exit ${r.code}`).join(' | ')}`,
+    );
+
+    /* AND THEY AGREE. One key, held by all eight, or every row one of them wrapped is a row nothing
+       can open and the operator is told the data is gone. */
+    const agreed = new Set(ran.map((r) => r.said.kekId));
+    assert.equal(agreed.size, 1, `${RACERS} processes minted ${agreed.size} different keys: ${[...agreed].join(', ')}`);
+
+    /* THE KEY THEY AGREED ON IS THE ONE ON DISK. Eight processes could agree on a key that a ninth
+       does not find, which is the same outage arriving on the next boot instead of this one. */
+    const onDisk = (await (await openKeyStore(file)).current()).kekId;
+    assert.equal(onDisk, ran[0]?.said.kekId, 'they agreed on a key that is not the one in the file');
+
+    /* AND NOBODY LEFT A SECOND COPY OF THE ROOT KEY BEHIND. `link` publishes the temp file under the
+       real name rather than moving it, so the winner has one to remove too. */
+    assert.deepEqual(readdirSync(data), ['kek'], 'a temp file was left in the data directory');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

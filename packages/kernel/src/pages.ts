@@ -445,12 +445,51 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
  * as its own, which says more.
  *
  * A PAGE THAT NAMES NONE IS PROSE, and prose is for anybody who may read.
+ *
+ * AND A `stat` BLOCK NAMES ITS REGISTERS THROUGH ITS FIGURES, WHICH THIS DID NOT LOOK AT.
+ *
+ * `05 §1` makes `table` the page-only kind that takes `source:`; a `stat` has `cells:` instead, and
+ * each cell names a metric whose own declaration carries the `source`. So a page made entirely of
+ * figures named no register here, was treated as prose, and was listed to everybody. Driven over
+ * HTTP with a read token whose ceiling is one register: `list` refuses, `metric` refuses, `boot`
+ * shows one register, and then `pages` names the payroll page and `page` hands back its readings.
+ * The shipped seed's own Money page is exactly that shape.
+ *
+ * IT NEEDS A RESOLVER, because a metric id is a name and the declaration behind it lives in the
+ * record. The caller passes one; a page whose metric cannot be resolved contributes nothing, which
+ * is the same answer `metric` gives for a name it cannot reach and is the safe direction: the
+ * listing is filtered by what a page IS known to touch, so an unknown is not a licence.
  */
-export function registersOf(decl: PageDecl): string[] {
+export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl | null): string[] {
   const named = new Set<string>();
+  const add = (source: unknown) => {
+    if (typeof source === 'string' && source.startsWith('register.')) named.add(source.slice('register.'.length));
+  };
   if (decl.for?.register) named.add(decl.for.register);
-  for (const block of decl.blocks ?? [])
-    if (typeof block.source === 'string' && block.source.startsWith('register.'))
-      named.add(block.source.slice('register.'.length));
+  for (const block of decl.blocks ?? []) {
+    add(block.source);
+    for (const cell of block.cells ?? []) {
+      /* THE FIRST COLON SEPARATES, as everywhere else: `project-owed:C:\Repos` is one project. */
+      const at = cell.metric.indexOf(':');
+      add(metric?.(at < 0 ? cell.metric : cell.metric.slice(0, at))?.source);
+    }
+    /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a
+       statement about that number whether or not the block is on the page. */
+    if (block.when?.metric) {
+      const at = block.when.metric.indexOf(':');
+      add(metric?.(at < 0 ? block.when.metric : block.when.metric.slice(0, at))?.source);
+    }
+  }
   return [...named];
+}
+
+/**
+ * The registers ONE block draws from, for a caller deciding whether to blank it.
+ *
+ * The same walk as `registersOf` over a single block, and it exists because the record checked
+ * `block.source` alone: a `stat` block has none, so its readings were never blanked for a caller
+ * who cannot read the register behind them.
+ */
+export function registersOfBlock(block: PageBlock, metric?: (id: string) => MetricDecl | null): string[] {
+  return registersOf({ page: '', title: '', blocks: [block] }, metric);
 }

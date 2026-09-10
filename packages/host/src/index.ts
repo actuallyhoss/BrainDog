@@ -19,6 +19,19 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { conflicted, refused } from '@braindog/ports';
 
 /**
+ * What one argument IS, so the text a stranger typed becomes the value the handler was written for.
+ *
+ * THREE, AND NOT A SCHEMA. `text` is taken verbatim, `integer` is a whole number or a refusal, and
+ * `json` is a structure that had to be encoded to survive a query string at all. Everything a read
+ * route takes today is one of the three, and the one thing this vocabulary must not become is a
+ * validator: what a register is called, what a slug may contain and what a predicate may ask are
+ * the record's own questions, answered by the record with its own sentences. This says only what
+ * shape the value arrives in, which is the one question the record cannot answer, because by the
+ * time it is asked the text has already been guessed at.
+ */
+export type ArgType = 'text' | 'integer' | 'json';
+
+/**
  * The six groups `30 §5` splits the surface into, and it splits it by WHO MAY REACH IT rather than
  * by convenience — which is what makes ADR-018's "the web app is a client of the agent API"
  * enforceable rather than aspirational.
@@ -49,28 +62,71 @@ export type Route = {
   writes: boolean;
   /** One line, for the CLI's help and the MCP tool description. */
   what: string;
+  /**
+   * The arguments this route takes, and what each one is. Reads only: a write is a POST and a JSON
+   * body already carries its own shapes.
+   *
+   * EVERY QUERY VALUE WAS JSON-DECODED AND HANDED ON UNCOERCED. `serveApi` tried `JSON.parse` on
+   * each one and fell back to the raw text when the parse failed, so the caller chose the SHAPE of
+   * every argument and not only its contents, and nothing between here and the SQL driver looked at
+   * it again. Fuzzing the read routes with fourteen hostile shapes per argument produced fifty-two
+   * GET requests answering 500 `INTERNAL`: `?seq={"a":1}` was "Provided value cannot be bound to
+   * SQLite parameter 2", `?register={"length":1}` was "Unknown named parameter 'length'", and
+   * `GET /api/search?q=x&limit=1.5`, which is a typo rather than an attack, was "datatype
+   * mismatch". A refusal is a value, and a 500 answering a read is the failure this layer exists to
+   * prevent.
+   *
+   * THE RULE WAS ALREADY WRITTEN DOWN AND LANDED ON TWO ROUTES OUT OF SIX.
+   * `packages/record/src/index.ts` around line 744 says it in as many words, over `page`'s slug:
+   * *"COERCED AT THE EDGE. These arrive from a query string a stranger wrote, and `.split` on an
+   * absent one threw a TypeError out of the route."* `metric` had it too. `get`, `history`,
+   * `search`, `governance`, `schema` and `list` did not, and a per-route coercion inside the record
+   * is four more places to forget. So it is here, as data, in the same line that declares the
+   * group: a route added tomorrow says what it takes where a reviewer is already looking.
+   *
+   * AND IT IS WHAT STOPS A STRING CHANGING TYPE ON THE WIRE. Guessing meant a string whose text is
+   * valid JSON stopped being a string: a page really declared at the slug `2026` was listed by
+   * `pages` and then answered `REQUIRED_MISSING`, "A page is asked for by its slug", to a caller
+   * that had sent one. `text` is the answer to that, and it is the same answer for a browser
+   * following the link as for the client.
+   */
+  takes?: Readonly<Record<string, ArgType>>;
 };
 
 export const ROUTES: readonly Route[] = [
   { name: 'boot', group: 'READ+', writes: false, what: 'What this record holds, and how many rows are in each register.' },
-  { name: 'schema', group: 'READ+', writes: false, what: 'What one register holds: its fields, their types, and what each may take.' },
-  { name: 'get', group: 'DATA', writes: false, what: 'One row, by the number a person says out loud.' },
-  { name: 'list', group: 'DATA', writes: false, what: 'Rows of one register, narrowed by a predicate, newest first.' },
-  { name: 'history', group: 'READ+', writes: false, what: 'The writes that made one row, in order, each with who and when.' },
-  { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.' },
+  { name: 'schema', group: 'READ+', writes: false, what: 'What one register holds: its fields, their types, and what each may take.',
+    takes: { register: 'text' } },
+  { name: 'get', group: 'DATA', writes: false, what: 'One row, by the number a person says out loud.',
+    takes: { register: 'text', seq: 'integer' } },
+  { name: 'list', group: 'DATA', writes: false, what: 'Rows of one register, narrowed by a predicate, newest first.',
+    /* `cursor` IS `text` AND NOT `json`, and it is the one argument where that matters. A keyset
+       cursor is `<when>|<id>`, which is not valid JSON, so it survived the guessing by accident;
+       reading it as the text the record minted is the same answer on purpose. */
+    takes: { register: 'text', where: 'json', limit: 'integer', cursor: 'text', order: 'json' } },
+  { name: 'history', group: 'READ+', writes: false, what: 'The writes that made one row, in order, each with who and when.',
+    takes: { register: 'text', seq: 'integer' } },
+  { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.',
+    takes: { q: 'text', limit: 'integer' } },
   { name: 'version', group: 'READ+', writes: false, what: "The record's version, so a client can ask what changed since." },
   { name: 'whoami', group: 'READ+', writes: false, what: 'Who you are to this record, and which verbs you reach.' },
-  { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.' },
+  { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.',
+    takes: { digest: 'text' } },
   { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
-  { name: 'page', group: 'READ+', writes: false, what: 'One page, with every block run: rows and figures, never markup.' },
-  { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.' },
+  { name: 'page', group: 'READ+', writes: false, what: 'One page, with every block run: rows and figures, never markup.',
+    takes: { slug: 'text' } },
+  { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.',
+    takes: { metric: 'text' } },
   { name: 'listGrants', group: 'VAULT', writes: false, what: 'What each credential opens. Never the credential.' },
-  { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.' },
-  { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.' },
+  { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.',
+    takes: { rule: 'json', limit: 'integer' } },
+  { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.',
+    takes: { register: 'text', id: 'text', status: 'text', limit: 'integer' } },
   { name: 'propose', group: 'DATA', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
   { name: 'decide', group: 'DATA', writes: true, what: 'Answer one, with the reason. No token reaches this.' },
   { name: 'packs', group: 'READ+', writes: false, what: 'Which packs this record has, and at what version.' },
-  { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.' },
+  { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
+    takes: { doc: 'json', source: 'json' } },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved. A browser session only.' },
   { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'setDeclaration', group: 'ADMIN', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
@@ -173,8 +229,24 @@ const NOT_422: Readonly<Record<string, number>> = {
   INTERNAL: 500,
 };
 
+/**
+ * One code's exception, or 422 because there is not one.
+ *
+ * `Object.hasOwn`, BECAUSE `Refusal.code` IS A `string`. This read `NOT_422[code]` off a bare
+ * object literal, so a refusal whose code was an inherited name returned a FUNCTION where a number
+ * is declared, and `?? 422` never fired because a function is not nullish: `constructor` gave
+ * `Object`, `toString` gave `Object.prototype.toString`. `serveApi` then handed that to `new
+ * Response` and got a `RangeError`, thrown from the line after the try whose own comment promises
+ * nothing throws across this boundary. Nothing lets a caller choose a code today, so it was latent
+ * rather than live, and `packages/record/src/index.ts:358` had already made exactly this repair one
+ * layer in for exactly this reason: *"`Object.hasOwn`, BECAUSE THE KEY COMES FROM THE CALLER."*
+ * The field is typed `string` until `packages/ports`'s refusal-code budget reaches zero, so this
+ * stays true for as long as that does.
+ */
+const exception = (code: string): number => (Object.hasOwn(NOT_422, code) ? (NOT_422[code] ?? 422) : 422);
+
 export const httpStatus = (r: Result<unknown>): number =>
-  r.ok ? 200 : conflicted(r) ? 409 : refused(r) ? (NOT_422[r.refusal.code] ?? 422) : 500;
+  r.ok ? 200 : conflicted(r) ? 409 : refused(r) ? exception(r.refusal.code) : 500;
 
 export type Handler = (args: Record<string, unknown>, ctx: unknown) => Promise<Result<unknown>>;
 
@@ -311,7 +383,13 @@ export async function serveApi(
       refusal: { code: 'FORBIDDEN', fix: `${name} changes the record, so it is a POST.` },
     });
 
-  let args: Record<string, unknown> = {};
+  /* `Object.create(null)`, FOR THE REASON `packages/record/src/index.ts:358` REACHES FOR
+     `Object.hasOwn`: every key here is a word the caller chose. `?__proto__={"limit":1}` set the
+     prototype of this object rather than an own key, so `args.limit` was 1 and `Object.keys(args)`
+     did not say so. Nothing escaped that far, because `Object.prototype` was untouched and the
+     caller could have sent `limit` directly, but an argument bag with no inherited names is one
+     fewer thing every reader of it has to know. */
+  let args: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   if (request.method === 'POST') {
     try {
       const body: unknown = await request.json();
@@ -323,15 +401,57 @@ export async function serveApi(
         refusal: { code: 'BODY_MALFORMED', fix: `${name} takes a JSON object as its body.` },
       });
     }
+    /* A READ MAY ALSO ARRIVE AS A POST, and a JSON body carries its own types rather than earning
+       them. So there is nothing to decode and the type is simply the one the table declares: a
+       `POST /api/get` with `{"seq":{"a":1}}` was the same 500 as the GET, on the same line of the
+       same driver, and reads are the half of the surface either verb may carry. */
+    for (const [key, kind] of Object.entries(route.takes ?? {})) {
+      if (!Object.hasOwn(args, key)) continue;
+      const value = args[key];
+      /* AN ABSENT ARGUMENT AND A NULL ONE ARE THE SAME ARGUMENT. `cursor: null` is how a caller
+         says "from the beginning", and every optional read argument reads a missing one the same
+         way, so refusing `null` here would refuse a sentence the record already understands. */
+      if (value === null || value === undefined) continue;
+      if (kind === 'text' && typeof value !== 'string') return json(422, { ok: false, refusal: notText(key, value) });
+      if (kind === 'integer' && !Number.isSafeInteger(value)) return json(422, { ok: false, refusal: notWhole(key, value) });
+    }
   } else {
-    /* A READ MAY BE A GET, and its arguments come from the query string, JSON-decoded per value so
-       a predicate survives the trip. A value that is not JSON is taken as the string it is, because
-       `?register=obligations` is what somebody types. */
+    /* A READ MAY BE A GET, and its arguments come from the query string, which carries text and
+       nothing else. THIS GUESSED. It tried `JSON.parse` on every value and kept the raw text only
+       when the parse threw, so `?seq={"a":1}` reached the SQL driver as an object and `?slug=2026`
+       stopped being a slug. The table says which arguments are structured, so only those are
+       decoded and the rest are the text they were sent as. */
     for (const [key, raw] of url.searchParams) {
+      /* `Object.hasOwn`, BECAUSE THE KEY IS A WORD THE CALLER CHOSE. It is the same lesson
+         `httpStatus` learned above and `packages/record/src/index.ts:358` learned before either:
+         `?constructor=x` would otherwise read a kind of `Object` off the prototype and coerce
+         against it. */
+      const kind = route.takes !== undefined && Object.hasOwn(route.takes, key) ? route.takes[key] : undefined;
+      /* AN ARGUMENT THE TABLE DOES NOT DECLARE REACHES NO HANDLER, so there is nothing to guess at
+         and guessing could only be wrong. It is kept, as text, because dropping it would make a
+         mistyped argument name look like an argument that was never sent. */
+      if (kind === undefined || kind === 'text') {
+        args[key] = raw;
+        continue;
+      }
+      if (kind === 'integer') {
+        const text = raw.trim();
+        const whole = WHOLE.test(text) ? Number(text) : Number.NaN;
+        if (!Number.isSafeInteger(whole)) return json(422, { ok: false, refusal: notWhole(key, raw) });
+        args[key] = whole;
+        continue;
+      }
       try {
         args[key] = JSON.parse(raw);
       } catch {
-        args[key] = raw;
+        return json(422, {
+          ok: false,
+          refusal: {
+            code: 'VALUE_MALFORMED',
+            fix: `${name} reads ${key} as JSON, and this one does not parse.`,
+            at: key,
+          },
+        });
       }
     }
   }
@@ -365,6 +485,30 @@ export async function serveApi(
   }
   return json(httpStatus(out), out);
 }
+
+/**
+ * A whole number and nothing else: no exponent, no decimal point, no leading `+`.
+ *
+ * `Number('1.5')` IS A NUMBER AND `Number('')` IS ZERO, which is why the test is the text rather
+ * than the parse. `GET /api/search?q=x&limit=1.5` was a 500 saying "datatype mismatch" from inside
+ * SQLite, and an empty `?limit=` would have been a silent nothing.
+ */
+const WHOLE = /^-?\d+$/;
+
+/* The two sentences the table's three kinds can refuse with. `VALUE_MALFORMED` is `30 §6`'s own row
+   for a value the caller can see and fix, and it is already in the registry, so nothing here grows
+   the vocabulary: a code invented at a boundary is a code no client can look up. */
+const notWhole = (key: string, seen: unknown): Refusal => ({
+  code: 'VALUE_MALFORMED',
+  fix: `${key} is a whole number, and this one is ${JSON.stringify(seen) ?? String(seen)}.`,
+  at: key,
+});
+
+const notText = (key: string, seen: unknown): Refusal => ({
+  code: 'VALUE_MALFORMED',
+  fix: `${key} is a piece of text, and this one is ${JSON.stringify(seen) ?? String(seen)}.`,
+  at: key,
+});
 
 const json = (status: number, body: { ok: boolean; value?: unknown; refusal?: Refusal; conflict?: Conflict }): Response =>
   new Response(JSON.stringify(body), {

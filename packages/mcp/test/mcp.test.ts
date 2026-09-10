@@ -36,6 +36,25 @@ const OBLIGATIONS = {
   } as never,
 };
 
+/**
+ * A SECOND REGISTER, BECAUSE A RECORD WITH ONE CANNOT ANSWER "WHICH OF THEM".
+ *
+ * Every scoping question below is which of two registers a caller is shown, and with one register
+ * installed "every register" and "the one inside the ceiling" are the same list: the assertion holds
+ * against a surface that applies no scope at all. It is installed per test rather than in `agent()`
+ * so that the tests about what the record HOLDS keep counting what they were written to count.
+ */
+const NOTES = {
+  id: 'register.notes',
+  kind: 'register' as const,
+  body: {
+    id: 'notes',
+    name: 'Notes',
+    title: 'what',
+    fields: [{ id: 'what', type: 'text', required: true }],
+  } as never,
+};
+
 async function agent() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
@@ -378,9 +397,16 @@ test('and a uri is parsed rather than resolved, because a stranger writes one', 
 
 test('and a caller sees the registers they may touch and not the ones they may not', async () => {
   // A list of names is itself information, so the resource list is scoped like `boot` is.
-  const { mcp, sql } = await agent();
+  /* AND THERE ARE TWO REGISTERS NOW, BECAUSE WITH ONE THIS TEST COULD NOT FAIL. `agent()` installs
+     exactly one, so "every register" and "the one inside the ceiling" were the same list and the
+     second assertion was true by construction: it passed against a surface that ignored `ctx`
+     entirely. The claim in the title is only asked of a record that holds a register the caller may
+     NOT touch, and it matters here because the same function is where the page filter lives. */
+  const { mcp, api, sql } = await agent();
+  assert.ok((await api.kernel.install([NOTES])).ok);
   const scoped = value<{ uri: string }[]>(await mcp.resources({ ...owner, registers: ['obligations'] }));
   assert.ok(scoped.some((r) => r.uri === 'braindog:schema/obligations'));
+  assert.equal(scoped.some((r) => r.uri === 'braindog:schema/notes'), false, 'a register outside the ceiling is named in the list');
   assert.equal(scoped.some((r) => r.uri.startsWith('braindog:schema/') && r.uri !== 'braindog:schema/obligations'), false);
   sql.close();
 });
@@ -420,5 +446,117 @@ test('AND A METRIC RESOURCE READS A METRIC, which the cast was hiding', async ()
   const uri = listed.find((r) => r.uri.startsWith('braindog:metric/'))?.uri;
   assert.ok(uri, 'no metric is listed, and a page names figures an agent cannot read');
   assert.ok(value<{ value: unknown }>(await mcp.read(uri!, owner)));
+  sql.close();
+});
+
+/* A page whose title is a sentence about a register, over a register the caller is not the reader
+   of. `for:` is what makes the record list it at all: a template names the register it walks, that
+   one is readable, and the only block on the page draws from another one that is not. */
+const NOTEBOOK = {
+  id: 'page.notebook',
+  kind: 'page' as const,
+  body: {
+    page: 'notebook',
+    title: 'Notes, monthly',
+    for: { register: 'obligations' },
+    blocks: [{ kind: 'table', source: 'register.notes', columns: [{ field: 'what' }] }],
+  } as never,
+};
+
+test('AND A PAGE IS WITHHELD FOR THE LEVEL HELD ON A REGISTER, not only for the ceiling', async () => {
+  /* The filter this exercises exists to stop a slug and a title travelling to somebody who cannot
+     read the register they are about, and it tested one refusal code where the check that produces
+     them writes two. A caller whose CEILING excludes the register is refused with `FORBIDDEN` and
+     was withheld the page. A caller invited to FILE into that same register and nothing else is
+     refused with a different code, about the same fact, by the same check, and was handed the
+     resource with "Notes, monthly" sitting in its description. Neither may read a row of it. */
+  const { mcp, api, sql } = await agent();
+  assert.ok((await api.kernel.install([NOTES, NOTEBOOK])).ok);
+  // A template is one page per row, so the page exists once there is something to draw it for.
+  assert.ok((await api.create({ register: 'obligations', fields: { what: 'Coffee' } }, owner)).ok);
+
+  const ceiling: CallContext = { ...owner, registers: ['obligations'] };
+  const level: CallContext = { ...owner, levels: { obligations: 'read', notes: 'append' } };
+  const codes = async (ctx: CallContext) =>
+    value<{ blocks: { refusals: { code: string }[] }[] }>(await api.page({ slug: 'coffee' }, ctx))
+      .blocks.flatMap((b) => b.refusals.map((r) => r.code));
+
+  /* THE FIXTURE'S OWN PREMISE, ASSERTED. Both callers are refused every block of this page, and the
+     two refusals do not say the same word. If either stops being true the test below is passing
+     about nothing, which is the state this file is trying not to be in. */
+  assert.deepEqual(await codes(ceiling), ['FORBIDDEN'], 'the ceiling caller is no longer refused the block');
+  const held = await codes(level);
+  assert.equal(held.length, 1, 'the append caller is no longer refused the block');
+  assert.notEqual(held[0], 'FORBIDDEN', 'the two callers are refused in the same word, so this proves nothing');
+
+  for (const [who, ctx] of [['ceiling', ceiling], ['append level', level]] as const) {
+    const listed = value<{ uri: string; description: string }[]>(await mcp.resources(ctx));
+    assert.equal(listed.some((r) => r.uri === 'braindog:page/coffee'), false, `the ${who} caller is offered a page they see nothing of`);
+    assert.equal(
+      listed.some((r) => r.description.includes('Notes, monthly')),
+      false,
+      `the ${who} caller is told what a register they cannot read is called`,
+    );
+  }
+  sql.close();
+});
+
+/* A page an agent may read, carrying a figure the record will not admit exists. Nothing declares
+   `owed`, so the block draws and the cell comes back refused with the id still on it. */
+const GHOSTLY = {
+  id: 'page.ghostly',
+  kind: 'page' as const,
+  body: {
+    page: 'ghostly',
+    title: 'Obligations, and a figure nobody declared',
+    blocks: [
+      { kind: 'table', source: 'register.obligations', columns: [{ field: 'what' }] },
+      { kind: 'stat', cells: [{ metric: 'owed', label: 'Owed' }] },
+    ],
+  } as never,
+};
+
+test('AND NO ADDRESS IS ADVERTISED THAT THIS SURFACE THEN REFUSES', async () => {
+  /* The ids came off the readings a page carried, and a reading survives its own refusal: the id of
+     a figure the record says does not exist arrived with the rest and was published. The list said
+     `braindog:metric/owed` and reading it said `METRIC_UNKNOWN`, so an agent enumerating resources
+     called one that was certain to refuse, and the record's answer, which is the shape chosen so
+     that a name leaks nothing, was handed back a name at a time by the layer above it. */
+  const { mcp, api, sql } = await agent();
+  assert.ok((await api.kernel.install([GHOSTLY])).ok);
+
+  assert.equal(refusal(await mcp.read('braindog:metric/owed', owner)).code, 'METRIC_UNKNOWN');
+
+  const listed = value<{ uri: string }[]>(await mcp.resources(owner));
+  assert.ok(listed.some((r) => r.uri === 'braindog:page/ghostly'), 'the page itself is readable and belongs in the list');
+  assert.equal(listed.some((r) => r.uri === 'braindog:metric/owed'), false, 'a figure the record denies is advertised');
+
+  /* AND THE WHOLE LIST, because the rule is about the list and not about one entry. */
+  for (const r of listed) {
+    const out = (await mcp.read(r.uri, owner)) as { ok: boolean; refusal?: { code: string } };
+    assert.ok(out.ok, `${r.uri} is advertised and answers ${out.refusal?.code}`);
+  }
+  sql.close();
+});
+
+test('AND A NAME OFF `Object.prototype` IS NOT A TOOL, it is a refusal', async () => {
+  /* `run` is a plain object literal, so `run['constructor']` was `Object` and got CALLED: the answer
+     to `call('constructor', args, ctx)` was the caller's own arguments, `call('toString', …)` was
+     the string `[object Undefined]`, and the rest threw a `TypeError` out of a function whose type
+     says it returns a `Result`. A refusal is a value here and an exception is not. The host looks
+     its routes up in a `Map` and the client in a `Set`; this was the one lookup that did neither. */
+  const { mcp, sql } = await agent();
+  for (const name of [
+    'constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty', 'isPrototypeOf',
+    'propertyIsEnumerable', 'toLocaleString', '__defineGetter__', '__lookupGetter__',
+  ]) {
+    const out = await mcp.call(name, { register: 'obligations' }, owner);
+    const said = refusal(out);
+    assert.equal(said.code, 'ROUTE_UNKNOWN', `${name} was answered rather than refused`);
+    assert.ok(said.fix.includes(name), `the refusal for ${name} does not say what was asked for`);
+    assert.ok(said.allowed?.includes('list'), `the refusal for ${name} does not say what there is instead`);
+  }
+  // And the tools that ARE there still are, which is what makes the guard a lookup and not a list.
+  assert.ok((await mcp.call('record_index', {}, owner)).ok);
   sql.close();
 });

@@ -60,6 +60,21 @@ const HOUR = 3_600_000;
 /** A minute. Long enough to stop a burst, short enough that a figure is not yesterday's. */
 const MINUTE = 60_000;
 
+/**
+ * The codes a scope check writes, which is what "this caller was not shown it" looks like on a block.
+ *
+ * THREE, BECAUSE ONE FACT HAS THREE SENTENCES. `readable` is `guard(ctx, 'read', register)`, and the
+ * two halves of that guard answer differently about the same register: outside the ceiling is
+ * `FORBIDDEN`, inside the ceiling with a level that does not reach `read` is `LEVEL_REQUIRED`, and a
+ * token whose scope is short of it is `SCOPE_INSUFFICIENT`. A filter that names one of the three is
+ * a filter on the ceiling where the question is the level.
+ *
+ * AND IT IS A LIST OF CODES RATHER THAN "ANY REFUSAL AT ALL". A block refused for a misspelt key is
+ * a block somebody has to be able to see in order to fix, and withholding the page it is on would
+ * hide the only sentence that says what is wrong with it.
+ */
+const WITHHELD = new Set(['FORBIDDEN', 'LEVEL_REQUIRED', 'SCOPE_INSUFFICIENT']);
+
 export type Tool = {
   name: string;
   /** What it does, in the words an agent reads before choosing it. Kept short: it is in every turn. */
@@ -385,7 +400,23 @@ export function tools(api: RecordApi) {
         if (!drawn.ok) continue;
         const blocks =
           (drawn.value as { blocks?: { refusals?: { code: string }[]; readings?: { metric: string }[] }[] }).blocks ?? [];
-        if (blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => r.code === 'FORBIDDEN'))) continue;
+        /**
+         * AND THE TEST WAS `FORBIDDEN` ALONE, WHICH IS HALF OF WHAT A SCOPE CHECK SAYS.
+         *
+         * The comment above is the right rule and this line applied it to one of the two callers it
+         * covers. A bookkeeper whose ceiling excludes the payroll register got `FORBIDDEN` on the
+         * block and no resource, which is correct. A contractor invited to FILE into that register
+         * and nothing else got `LEVEL_REQUIRED` on the same block, from the same check, about the
+         * same fact, and was handed `braindog:page/coffee` with the words "Payroll, monthly" sitting
+         * in its description. Neither of them may read a row of it. One of them was told what it is
+         * called.
+         *
+         * THE RECORD IS THE AUTHORITY AND THIS READS ITS ANSWER. Which registers a block draws from,
+         * and whether a `stat` block's figures count as drawing from one, are the record's question
+         * and are being answered in the record; this layer only asks whether every block on the page
+         * came back withheld, so it keeps saying the right thing as that answer improves underneath.
+         */
+        if (blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => WITHHELD.has(r.code)))) continue;
         /* THE FIGURES A PAGE NAMES, taken from what it actually drew rather than from a second read
            of the declaration — so a metric an agent is offered is one this page really carries. */
         for (const block of blocks) for (const reading of block.readings ?? []) seen.push(reading.metric);
@@ -400,13 +431,37 @@ export function tools(api: RecordApi) {
     /* AND THE FIGURES A PAGE DRAWS. The file's own header says `page` and `metric` are the two
        resources that close ADR-018's hole, and only one of them was listed — so an agent could read
        what a page says and not the figure it names. */
-    for (const id of [...new Set(seen)])
+    /**
+     * AND EVERY ADDRESS IS ASKED BEFORE IT IS ADVERTISED, WHICH IT WAS NOT.
+     *
+     * The ids come off the readings a page carried, and a reading survives its own refusal: the
+     * kernel spreads the cell it could not fill, so the id of a figure the record will not admit
+     * exists arrived here with the rest and went straight into the list. The listing then said
+     * `braindog:metric/owed` and reading that address said `METRIC_UNKNOWN`. That second answer is
+     * the one the record goes to real trouble to give, and its reason is written out where it is
+     * given: a figure over a register you cannot reach is a figure that does not exist, said in
+     * those words, because answering `FORBIDDEN` for the names that are real and `METRIC_UNKNOWN`
+     * for the names that are not is one probe per guess at what this business measures. Handing the
+     * same names back in a listing is that oracle rebuilt one line further out, and the two answers
+     * also simply disagreed, so an agent walking the list called something certain to refuse.
+     *
+     * IT ASKS `read` AND NOT THE METHOD UNDER IT, because what is being published is an ADDRESS. A
+     * parameterised id carries a colon, the uri grammar below does not admit one, and those were
+     * advertised too: an address in this list that this surface will not answer is the same broken
+     * promise whether the reason is authorisation or punctuation. The figure is computed a second
+     * time for a page that already drew it, and that is the price of the list never being ahead of
+     * the record.
+     */
+    for (const id of [...new Set(seen)]) {
+      const uri = `braindog:metric/${id}`;
+      if (!(await read(uri, ctx)).ok) continue;
       out.push({
-        uri: `braindog:metric/${id}`,
+        uri,
         name: `metric/${id}`,
         description: `The figure ${id}, with its target and how it compares.`,
         ttlMs: MINUTE,
       });
+    }
 
     return { ok: true, value: out };
   };
@@ -453,7 +508,29 @@ export function tools(api: RecordApi) {
     resources,
     read,
     async call(name: string, args: Record<string, unknown>, ctx: CallContext): Promise<Result<unknown>> {
-      const tool = run[name];
+      /**
+       * `Object.hasOwn`, BECAUSE THE NAME COMES FROM THE CALLER.
+       *
+       * `run` is a plain object literal, so `run['constructor']` is `Object`, `run['toString']` is
+       * `Object.prototype.toString`, and every name on `Object.prototype` was truthy and got CALLED
+       * rather than refused. `call('constructor', args, ctx)` handed the caller their arguments back
+       * as the answer. `call('toString', …)` answered the string `[object Undefined]`. Six more,
+       * `valueOf` and `hasOwnProperty` and `isPrototypeOf` and `propertyIsEnumerable` and
+       * `toLocaleString` and `__proto__`, threw a `TypeError` out of a function whose type says it
+       * returns a `Result` and whose file header says every tool answers in the record's own shape.
+       * A refusal is a value here and an exception is not, and a caller reading `.ok` off the first
+       * two got `undefined` and then read `.refusal.fix` off nothing.
+       *
+       * THE SIBLING SURFACES WERE ALREADY SAFE AND THIS WAS THE ONE LOOKUP THAT WAS NOT. The host
+       * finds a route in a `Map`, the client checks a `Set`, and `read` above is a chain of `if`s.
+       * The record made this same repair one layer in, in the same word and for the same sentence:
+       * `ctx.levels['constructor']` is `Object`, not `undefined`.
+       *
+       * AND IT IS NOT REACHABLE OVER THE WIRE TODAY, because `/mcp` is not mounted. The input is a
+       * tool name a client chooses, so it becomes live the day somebody wires the route, which is
+       * the wrong day to find out.
+       */
+      const tool = Object.hasOwn(run, name) ? run[name] : undefined;
       if (!tool)
         return {
           ok: false,

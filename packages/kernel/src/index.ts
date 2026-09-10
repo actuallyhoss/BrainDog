@@ -66,7 +66,7 @@ import {
 } from './govern.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { readBlock, readPage, registersOf, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
+import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import {
   carryingOf,
   headline,
@@ -1884,7 +1884,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Every page a person could open, templates expanded into one page per row. */
     /* AND WHICH REGISTERS EACH DRAWS FROM, so the record can scope the list the way `boot` scopes
        its own. It is stripped before it leaves — the caller gets a slug and a title. */
-    pages: () => resolvePages(pageDeps()).map((p) => ({ slug: p.slug, title: p.decl.title, registers: registersOf(p.decl) })),
+    /* AND THE RESOLVER GOES WITH IT, because a `stat` block names its registers through the metric
+       declarations in its `cells` rather than through a `source` of its own. Without it a page made
+       of figures named no register, was treated as prose, and was listed to everybody. */
+    pages: () =>
+      resolvePages(pageDeps()).map((p) => ({
+        slug: p.slug,
+        title: p.decl.title,
+        registers: registersOf(p.decl, pageDeps().metric),
+      })),
 
     /**
      * One page, with every block run.
@@ -1897,6 +1905,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** One metric document by its id, so a caller can fill a parameter and read it. */
     metricDecl: (id: string): MetricDecl | null => pageDeps().metric(id),
+
+    /**
+     * Which registers ONE block draws from, so the record can blank it for a caller who may not
+     * read them.
+     *
+     * IT WAS `block.source` AT THE CALL SITE, AND A `stat` BLOCK HAS NONE. Its registers are named
+     * through the metric declarations in its `cells`, which live in the record and which the
+     * caller has no way to resolve, so the check simply did not apply to a page made of figures and
+     * its readings were handed to anybody who could open the page.
+     */
+    blockRegisters: (block: PageBlock): string[] => registersOfBlock(block, pageDeps().metric),
 
     /**
      * What a rule WOULD do, without doing any of it.

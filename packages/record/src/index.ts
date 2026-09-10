@@ -758,11 +758,30 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       return ok({
         ...out.value,
         blocks: out.value.blocks.map((b) => {
-          const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : null;
-          /* THE LEVEL AND NOT ONLY THE CEILING, for the reason `readable` gives: a block over a
-             register somebody may only append to used to draw its rows. */
-          const beyond = register ? readable(ctx, register) : null;
-          return beyond ? { ...b, rows: [], matched: 0, refusals: [beyond] } : b;
+          /**
+           * EVERY REGISTER THE BLOCK DRAWS FROM, AND IT USED TO BE `b.source` ALONE.
+           *
+           * `05 §1` makes `table` the page-only kind that takes `source:`. A `stat` block has
+           * `cells:` instead, and each cell names a metric whose own declaration carries the
+           * register, so a block made of figures had no `source`, matched no register, and was
+           * handed back to anybody who could open the page. Driven over HTTP with a read token
+           * whose ceiling is one register: `list` refuses, `metric` refuses, `boot` shows one
+           * register, and then `page` returned `{"value":4200000,"unit":"GBP"}` from another.
+           * The shipped seed's Money page is exactly that shape.
+           *
+           * THE KERNEL RESOLVES THEM, because a metric id is a name and the declaration behind it
+           * lives in the record. `readings` is emptied with `rows`, because a `stat` block's
+           * content is its readings and blanking the rows of a block that has none is blanking
+           * nothing.
+           *
+           * THE LEVEL AND NOT ONLY THE CEILING, for the reason `readable` gives: a block over a
+           * register somebody may only append to used to draw its rows.
+           */
+          const beyond = kernel
+            .blockRegisters(b)
+            .map((register) => readable(ctx, register))
+            .find((said) => said !== null);
+          return beyond ? { ...b, rows: [], matched: 0, ...(b.readings ? { readings: [] } : {}), refusals: [beyond] } : b;
         }),
       });
     },
