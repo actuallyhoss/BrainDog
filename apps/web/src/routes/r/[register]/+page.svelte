@@ -181,6 +181,21 @@
        not live in styling alone, and `Chip` enforces it: there is no way to draw a tone in this
        app without its glyph, so the word and the glyph carry the meaning and the hue agrees. */
     intent?: Tone | undefined;
+    /**
+     * THE SAME FACT IN THE WIDTH THE GRID HAS, and it is absent for most receipts because most of
+     * them already fit.
+     *
+     * The `act` column is `11ch` and `truncate: 'never'`, sized for two icon verbs or for
+     * `Put back` beside a two-word mark. `markNeeds` is a sentence: on obligations it reads
+     * "Needs which way, amount, due, status" and came out of the cell as "Needs whic", clipped,
+     * immediately after the most common write in the product.
+     *
+     * IT IS NOT A TRUNCATION, IT IS A DIFFERENT SENTENCE FOR A SURFACE THAT ALREADY SAYS THE REST.
+     * The grid draws every declared field as a column and an unfilled one as an em dash, so which
+     * fields a row still wants is on the row four times over. The card draws three `mobile:`
+     * fields and cannot say it, which is why the card gets the long form and this one does not.
+     */
+    short?: string | undefined;
     /** The inverse. Absent when there is nothing to put back, which a receipt still records. */
     undo?: () => void;
   };
@@ -617,7 +632,10 @@
     const seq = pending.add(id, taken);
     receipt(seq, { mark: copy.markNotWritten, intent: 'warn', undo: () => pending.drop(id, seq) });
     closeCreate();
-    toasts.push(copy.notWritten(`${decl.one} ${named}`.trim()), { intent: 'warn' });
+    /* THE NAME, NOT THE NOUN AND THE NAME. `${decl.one} ${named}` read "item Deposit for the print
+       run, but nothing was saved yet": the register's singular in front of a title that is already
+       a noun phrase. The noun is only worth saying when the row has no name to say instead. */
+    toasts.push(copy.notWritten(named || decl.one), { intent: 'warn' });
   }
 
   function captureRow() {
@@ -649,12 +667,29 @@
      */
     receipt(seq, {
       mark: unanswered.length > 0 ? copy.markNeeds(unanswered.map((f) => f.label.toLowerCase()).join(', ')) : copy.markNotWritten,
+      short: copy.markNotWritten,
       intent: 'warn',
       undo: () => {
         pending.drop(id, seq);
         clearReceipt(seq);
       },
     });
+    /**
+     * AND IT SAYS THE ROW IS NOT SAVED, WHICH THE CHIP ABOVE CANNOT ALWAYS SAY.
+     *
+     * The mark is `markNeeds` OR `markNotWritten`, one or the other, and the argument for that is
+     * good: what a row still needs is the actionable half and a chip has room for one sentence.
+     * The cost is that the register a person opens most often wants four fields beyond the title,
+     * so on that register the fast path ALWAYS takes the `markNeeds` branch and the words "not
+     * saved" are never printed anywhere at all. `pending.svelte.ts`'s own header calls that the
+     * failure it exists to prevent: "a row that comes back tomorrow looking saved is worse than
+     * one that is honestly gone."
+     *
+     * `addTypedRow` twenty lines above, which is the same act through the full form, has always
+     * pushed this toast. The capture line pushed nothing, so the cheapest write in the product
+     * was also the only one that answered a person with silence.
+     */
+    toasts.push(copy.notWritten(said), { intent: 'warn' });
     capture = '';
   }
 
@@ -1596,6 +1631,23 @@
       {#if rowsAsCards()}
       <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} picked={selected}>
         {#snippet action(e)}
+          <!--
+            THE RECEIPT, ON THE ARM THAT IS THE ONLY ONE A PHONE EVER SEES.
+
+            `receiptFor` has been drawn by the grid since it was written, under a paragraph
+            arguing that a pending row "is unwritten on every screen, for as long as the tab is
+            open, and the one place it is drawn is the one place that has to say so". Below 640px
+            the grid is `display: none` and the cards are the one place, and they drew none of it.
+
+            Measured: type a row into the capture line on a phone and press Enter. The row appears
+            at the top of the list wearing `#-1` and nothing else. No chip, no `Put back`, and no
+            sentence anywhere saying the thing you just typed has not been kept. The module that
+            mints it says in its own header that a row which "comes back tomorrow looking saved is
+            worse than one that is honestly gone", and on a phone it looked saved immediately.
+
+            The same `Chip` and the same `undo` the grid renders, so there is one receipt and not
+            a touch copy of one.
+          -->
           <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
                key: peek `p`, copy `y`, copy link `⇧Y`, archive `⌫`, select `x`. On the device
                with no keyboard that made a register a list you could read and open and nothing
@@ -1610,6 +1662,23 @@
           >
             <Icon name="more" size="s" />
           </button>
+        {/snippet}
+        {#snippet note(e)}
+          {@const said = receiptFor(e.seq)}
+          {#if said}
+            {@const name = display(id, decl.title, e.fields[decl.title]) ?? copy.thisRow}
+            <Chip label={said.mark} tone={said.intent} />
+            {#if said.undo}
+              <button
+                type="button"
+                class="card-undo tap"
+                aria-label={copy.undoRowOf(name)}
+                onclick={(ev) => {
+                  ev.stopPropagation();
+                  said.undo?.();
+                }}>{copy.undoRow}</button>
+            {/if}
+          {/if}
         {/snippet}
       </RowCards>
 
@@ -1734,7 +1803,7 @@
               {@const name = display(id, decl.title, entry(id, seq)?.fields[decl.title]) ?? `#${seq}`}
               {#if said}
                 <span class="said">
-                  <Chip label={said.mark} tone={said.intent} />
+                  <Chip label={said.short ?? said.mark} tone={said.intent} />
                   {#if said.undo}
                     <button
                       type="button"
@@ -1791,7 +1860,17 @@
                   style={own.retired ? undefined : `--hue:${own.hue}`}
                   data-retired={own.retired ? '' : undefined}
                   role="img"
-                  aria-label={own.name}>{own.mark}</span>{/if}{value}
+                  aria-label={own.name}>{own.mark}</span>{/if}<!--
+                A ROW THAT HAS NO ID PRINTS NO ID, and it used to print `#-1`.
+
+                `pending` mints a NEGATIVE sequence so a row somebody typed can never collide with
+                one the record has, which is right and is argued for in that module's header. What
+                was never decided is what the column shows: `toRows` writes `#${seq}` for every
+                row, so the sentinel went straight to the screen. `#-1` is not a spoken id, it is
+                an implementation detail with a minus sign in front of it, and the column it
+                appears in is the one whose whole job is to give a person something they can say
+                out loud. The receipt beside it already says what the row is.
+              -->{#if seq >= 0}{value}{/if}
             {:else if value === null}
               <span class="missing">—</span>
             {:else if editableHere(column.field)}
@@ -2327,7 +2406,24 @@
    * no control.
    */
   @media (width < 640px) {
-    .card-more {
+    /* THE `Put back` BESIDE A RECEIPT ON A CARD. `.verb` is the grid's, sized for a row 34px tall
+     and a fine pointer; this one is under a thumb, so it takes `--tap` from `.tap` and reads as a
+     word rather than as an icon. */
+  .card-undo {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--sp-2);
+    background: none;
+    border: 0;
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .card-more {
       display: flex;
       align-items: center;
       justify-content: center;

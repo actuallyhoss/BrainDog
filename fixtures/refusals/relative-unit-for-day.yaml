@@ -1,0 +1,5 @@
+code:   RELATIVE_UNIT_FOR_DAY
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     due.remind
+fix:    Remind in days, because a day carries no time of day.

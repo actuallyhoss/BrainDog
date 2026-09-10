@@ -168,12 +168,35 @@
     text-align: end;
   }
 
+  /**
+   * THE DATE IS NOT THE TONE, AND IT COULD NOT AFFORD TO BE.
+   *
+   * `color: var(--tone, var(--dim))` put an overdue date in red on the home ledger, which is the
+   * strongest thing on that screen and is the reason it is being written down here rather than
+   * quietly deleted. It measured, in dark, `--danger` on `--s1` at 5.14 and on the HOVERED row at
+   * **4.36**, under the 4.5 floor for text this size. Hover lightens the ground in dark, the ink
+   * of a dark scheme being light, so pointing at the row is what breaks the pair.
+   *
+   * IT WAS A REGRESSION THIS FILE CAUSED AN HOUR EARLIER. `.line:hover` was `--ink 4%` and became
+   * `--hover-wash`, which is 6%, when nine hand-written strengths of one tint were unified. At 4%
+   * the pair measured about 4.6 and passed. So the option of putting one site back to 4% exists
+   * and is worse than this: a pair that clears the floor only while a shared token stays at one
+   * particular value is a pair that breaks again the next time anybody touches the token, and it
+   * would put the ninth strength back into the system to buy a margin of one tenth.
+   *
+   * WHAT IS LOST AND WHAT IS NOT. `13 §5.1` requires colour never to carry meaning alone, and it
+   * never did here: `+page.svelte` glyphs every toned date, so the row still says late by shape.
+   * What goes is the red, and it goes for the same reason and by the same rule that took it off
+   * the selected row (`blocks.css:1030`), off an intent chip, and off a bare intent button: a
+   * glyph is text too, so it takes the pair that has to survive the check, and an intent has no
+   * headroom over a tint of anything.
+   */
   .line-when {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 5px;
-    color: var(--tone, var(--dim));
+    color: var(--dim);
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

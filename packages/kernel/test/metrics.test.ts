@@ -331,6 +331,37 @@ test('a shape this build does not read is named rather than answered as the ungr
   sql.close();
 });
 
+test('AND THE GUARD FIRED WHERE NOBODY WRITES THE KEY, so the documented spelling got the ungrouped figure', async () => {
+  /**
+   * The loop above walks `keysOf(decl.value)`, and `group_by` is not inside `value`: `42 §4.9` and
+   * `declare.ts`'s `metricBody` both put it at the TOP LEVEL of a metric body, and `MetricDecl` has
+   * no field for either it or `bucket`. So a stored body carrying one arrived here as an extra key
+   * nothing looked at. Driven over the same rows, with a control:
+   *
+   *     plain sum, no group_by                       {"value":700,"rows":3,"unit":"GBP","refusals":0}
+   *     GROUP_BY_CARDINALITY: group_by: 'party'      {"value":700,"rows":3,"unit":"GBP","refusals":0}
+   *     group_by inside value (the checked place)    REFUSED NOT_IN_THIS_BUILD
+   *
+   * Identical figures, zero refusals, and the harm is the one the guard's own sentence names word
+   * for word: *"its figure would be the ungrouped one"*. A tile declaring `group_by: 'party'` draws
+   * one number over every party.
+   */
+  const { k, sql } = await record();
+  const ungrouped = value<Reading>(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 } }));
+
+  for (const key of ['group_by', 'bucket']) {
+    const said = refusal(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 }, [key]: 'party' } as never));
+    assert.equal(said.code, 'NOT_IN_THIS_BUILD');
+    assert.equal(said.at, key);
+    assert.match(said.fix, /the ungrouped one/);
+  }
+
+  /* AND THE CONTROL, so this is about the key and not about the metric: the same declaration
+     without it still answers, and the figure it answered with is the one the grouped tile drew. */
+  assert.equal(ungrouped.value, 2_945_000);
+  sql.close();
+});
+
 test('A PREDICATE THE REGISTER CANNOT ANSWER IS REFUSED, not run as if it matched nothing', async () => {
   const { k, sql } = await record();
   const out = refusal(k.metric({ ...OVERDUE, where: { field: 'colour', is: 'red' } as never }));

@@ -307,6 +307,128 @@ test('AND ROWS ARE NEVER THE PRICE OF AN UPGRADE', async () => {
   assert.match(out.fix, /412 rows in it/);
 });
 
+/**
+ * The installed register the upgrades below are against: `amount` as `text`, no `vat`, 412 rows.
+ *
+ * `already.body` IS CANONICAL JSON THE RECORD WROTE, which is what `plan` compares the arriving
+ * declaration to, so the fixture is written the same way rather than as a shape of its own.
+ */
+const populated = (fields: unknown[]): Installed => ({
+  ...EMPTY,
+  packs: [{ id: 'studio-books', version: '1.0.0' }],
+  declarations: [
+    {
+      id: 'register.obligations',
+      version: 1,
+      kind: 'register',
+      pack_id: 'studio-books',
+      body: JSON.stringify({ id: 'obligations', name: 'Obligations', title: 'what', fields }),
+      checksum: 'a',
+    },
+  ],
+  rows: { obligations: 412 },
+});
+
+const upgrade = async (fields: unknown[], state: Installed) => {
+  const pack = await packOf({ declarations: [{ register: 'obligations', name: 'Obligations', title: 'what', fields }], seeds: [] });
+  const diff = await plan(pack, state);
+  return { diff, out: await install(pack, diff, fakeHost(), diff.planHash) };
+};
+
+const WAS = [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'text' }];
+
+test('AND A TYPE CHANGE UNDER ROWS THAT KEEP THE OLD SHAPE WAS ACCEPTED IN SILENCE', async () => {
+  /**
+   * The `changes` branch compared the two bodies for INEQUALITY and wrote down a summary. It never
+   * looked inside them, so a reinstall that moved a field's type was reported as "1 change" and
+   * installed. Driven against a real record holding one row:
+   *
+   *     before ->                       [{"what":"Invoice 41","amount":"four hundred and eighty"}]
+   *     reinstall amount text -> money  ACCEPTED
+   *     after ->                        [{"what":"Invoice 41","amount":"four hundred and eighty"}]
+   *     money predicate over it ->      rows=0
+   *
+   * The register now declares `amount` a `money` and holds a string. `{ gt: { amount: 1, currency:
+   * 'GBP' } }` returns nothing over a register that has a row: nothing refused, nothing migrated,
+   * nothing logged. `02 §7` refuses the change outright — *"does not exist in v1: retire the field
+   * and add a new one"* — and `42 §5.3·31` gives the rule its inputs.
+   */
+  const state = populated(WAS);
+  const { diff, out } = await upgrade([{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money' }], state);
+  assert.deepEqual(diff.retypes, [{ id: 'register.obligations', field: 'amount', from: 'text', to: 'money', rows: 412 }]);
+
+  const said = refusal(out);
+  assert.equal(said.code, 'FIELD_TYPE_CHANGED');
+  assert.equal(said.at, 'register.obligations.fields.amount.type');
+  assert.match(said.fix, /text → money changes a type/);
+  assert.match(said.fix, /Retire the field and add a new one\./);
+
+  /* THE ELEMENT TYPE IS THE TYPE TOO (`42 §5.3·31`: *"a different `type` (or `of.type`)"*): a
+     `list<text>` that becomes a `list<int>` reads every row it holds as the wrong thing. */
+  const listed = await upgrade(
+    [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'list', of: 'int' }],
+    populated([{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'list', of: 'text' }]),
+  );
+  assert.equal(refusal(listed.out).code, 'FIELD_TYPE_CHANGED');
+
+  /* AND THE THINGS THAT ARE NOT A TYPE CHANGE STILL INSTALL, or this refuses every upgrade: a new
+     field, a field that goes away, and the same field labelled differently. */
+  for (const fields of [
+    [...WAS, { id: 'note', type: 'text' }],
+    [{ id: 'what', type: 'text', required: true }],
+    [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'text', label: 'Amount' }],
+  ]) {
+    const fine = await upgrade(fields, state);
+    assert.deepEqual(fine.diff.retypes, [], `${JSON.stringify(fields)} is not a type change`);
+    value(fine.out);
+  }
+
+  /* AND AN EMPTY REGISTER IS THE AUTHOR'S TO RESHAPE. There is nothing to leave behind, which is
+     the whole condition `42 §5.3·31` puts on this: `installed.rows[register] > 0`. */
+  const empty = await upgrade([{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money' }], {
+    ...populated(WAS),
+    rows: { obligations: 0 },
+  });
+  value(empty.out);
+});
+
+test('AND A REQUIRED FIELD LANDING ON ROWS THAT LACK IT LEFT THE REGISTER IN PERMANENT VIOLATION', async () => {
+  /**
+   * Driven on a register holding one row that has no `vat`:
+   *
+   *     add required vat ->          ACCEPTED
+   *     later create without vat ->  {"code":"REQUIRED_MISSING","fix":"obligations needs vat.","at":"vat"}
+   *     rows now ->                  [{"what":"A"}]
+   *
+   * The rule is enforced forwards and violated backwards, for ever, with no report of how many
+   * rows are in the wrong. `42 §5.3·9` asks for the row count in the sentence and `04 §5` gives
+   * the repair: *"Ship a default or a fill rule."*
+   */
+  const state = populated(WAS);
+  const { diff, out } = await upgrade([...WAS, { id: 'vat', type: 'money', required: true }], state);
+  assert.deepEqual(diff.newly_required, [{ id: 'register.obligations', field: 'vat', rows: 412 }]);
+
+  const said = refusal(out);
+  assert.equal(said.code, 'REQUIRED_ON_POPULATED');
+  assert.equal(said.at, 'register.obligations.fields.vat.required');
+  assert.match(said.fix, /is required and 412 rows were written before it/);
+  assert.match(said.fix, /Ship a default or a fill rule\./);
+
+  // A field the rows already had made required is the same fact about the same rows.
+  assert.equal(refusal((await upgrade([{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'text', required: true }], state)).out).code, 'REQUIRED_ON_POPULATED');
+
+  /* A `default` IS THE ANSWER FOR THE ROWS THAT HAVE NONE, which is why `04 §5` names it as the
+     repair — so shipping one installs, and so does a field that was required before. */
+  value((await upgrade([...WAS, { id: 'vat', type: 'text', required: true, default: 'none' }], state)).out);
+  value((await upgrade([...WAS, { id: 'vat', type: 'money' }], state)).out);
+  value(
+    (
+      await upgrade([{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'text', label: 'Amount' }], state)
+    ).out,
+  );
+  value((await upgrade([...WAS, { id: 'vat', type: 'money', required: true }], { ...state, rows: { obligations: 0 } })).out);
+});
+
 test('and two packs cannot own one declaration', async () => {
   const state: Installed = {
     ...EMPTY,

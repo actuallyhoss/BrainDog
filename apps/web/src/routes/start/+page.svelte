@@ -632,11 +632,24 @@
   /* A CARD, not a rule with text under it. Below a divider reads as a footnote — the thing you put
      after the real content — and this is the path somebody with an agent already open should take
      first. Tinted with the accent rather than the surface ladder, because it is an alternative to
-     the list above it and not the next step down from it. */
+     the list above it and not the next step down from it.
+
+     AND THE TINT IS THE WASH NOW, at the one strength the product draws an accent tint at. This
+     read `color-mix(in srgb, var(--accent) 7%, var(--s1))`: seven, beside `--accent-wash`'s twelve
+     and the board column's ten, three strengths of one tint that nobody chose against each other.
+     Measured against the `--s1` it sits on, seven per cent came out at 1.10:1 in light and 1.06 in
+     dark, which is a card the eye has to be told is there; the wash is 1.18 and 1.11.
+
+     `--accent-ground` IS THE OTHER TOKEN FOR THIS AND IT IS NOT THIS ONE. It mixes into `--bg`,
+     which is the page, and this is a card standing off the page on `--s1`. Using it would have
+     dropped the card back onto the ground it is meant to sit above. The base stays `--s1` and the
+     wash is painted over it, so the surface behind the tint is a declared one rather than half of
+     a value written here. */
   .agent {
     margin-block-start: var(--sp-6);
     padding: var(--sp-4) var(--sp-4) var(--sp-5);
-    background: color-mix(in srgb, var(--accent) 7%, var(--s1));
+    background-color: var(--s1);
+    background-image: linear-gradient(var(--accent-wash), var(--accent-wash));
     border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
     border-radius: var(--r-md);
   }

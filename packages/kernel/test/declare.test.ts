@@ -540,6 +540,115 @@ test('AND `search:` TAKES WHAT THE INDEX CAN TAKE', () => {
   assert.equal(refusedWith(withFields([{ id: 'what', type: 'text' }], { ...NO_STATE, search: 'what' })), 'DECLARATION_INVALID');
 });
 
+test('A `remind:` THE RECORD CANNOT READ INSTALLED AND ARMED NOTHING, IN SILENCE', () => {
+  /**
+   * `remind` is on `FIELD_KEYS` — the keys this build READS — so a field carrying it passed
+   * `keyFault` and went through; its value was validated nowhere, and the word appeared exactly
+   * once in `declare.ts`. `remindersFor` calls `shiftFrom` per offset and `continue`s on a `null`,
+   * so an unreadable offset derives no row and reports nothing. Driven:
+   *
+   *     offsetMs("-2h") = null            shiftFrom(now,"-2h") = null
+   *     remindersFor remind:["-2h"] -> []
+   *     declare: remind ["-2h","banana"] on a day -> ACCEPTED (null)
+   *     declare: remind ["-1d"] on a text field   -> ACCEPTED (null)
+   *
+   * A field declaring *"remind me two hours before"* was decoration, `banana` beside it was
+   * accepted, and a `remind:` on a field holding no date armed nothing either — `reschedule` skips
+   * any field that is not a `day` or an `instant`.
+   *
+   * `02 §4` NAMES THE CODE AND ITS PRODUCER: *"an hour offset against a `day` field is
+   * `RELATIVE_UNIT_FOR_DAY` — raised by `declare` at install, on the `remind:` key, not by the
+   * compiler"*, which is `30 §6`'s row for it and `38 §5`'s note that the row moved here.
+   */
+  const dated = (remind: unknown, type = 'day'): Declaration =>
+    withFields([{ id: 'what', type: 'text' }, { id: 'due', type, remind }], NO_STATE);
+
+  const hour = validateDeclaration(dated(['-2h', 'banana']));
+  assert.equal(hour?.code, 'RELATIVE_UNIT_FOR_DAY');
+  assert.equal(hour?.at, 'due.remind');
+  assert.match(hour?.fix ?? '', /no time of day to count back from/);
+
+  /* AN HOUR ON AN INSTANT IS LEGAL AND UNBUILT, which is a different fact and a different code.
+     `42 §4.2`'s `Offset` admits `h` in `remind:`, and `schedule.ts`'s grammar reads `d w m`. */
+  const instant = validateDeclaration(dated(['-2h'], 'instant'));
+  assert.equal(instant?.code, 'NOT_IN_THIS_BUILD');
+  assert.match(instant?.fix ?? '', /The repair is a deploy, not an edit\./);
+
+  /* AND ONE THAT IS NEITHER A UNIT NOR AN OFFSET is the code `metrics.ts` already uses for a
+     temporal literal the record cannot read. */
+  const said = validateDeclaration(dated(['banana']));
+  assert.equal(said?.code, 'RELATIVE_LITERAL_UNKNOWN');
+  assert.equal(said?.at, 'due.remind');
+  assert.match(said?.fix ?? '', /-7d is a week before/);
+  for (const offset of [7, '', 'tomorrow', '-1y', '-99999d', '- 7d'])
+    assert.equal(refusedWith(dated([offset])), 'RELATIVE_LITERAL_UNKNOWN', `${JSON.stringify(offset)} is not an offset`);
+
+  /* A REMINDER IS DERIVED FROM A DATE, and `reschedule` skips every other type — so a `remind:`
+     anywhere else is a key that installs and arms nothing for ever. */
+  const wrong = validateDeclaration(dated(['-1d'], 'text'));
+  assert.equal(wrong?.code, 'DECLARATION_INVALID');
+  assert.match(wrong?.fix ?? '', /nothing would ever be armed/);
+  assert.equal(refusedWith(dated('-7d')), 'DECLARATION_INVALID', 'a remind is a list');
+  assert.equal(refusedWith(dated([])), 'DECLARATION_INVALID', 'an empty list reminds nobody');
+
+  /* AND WHAT THE RECORD DOES READ STILL INSTALLS, including the `0d` its own default uses and the
+     `m` that is a calendar month in every temporal grammar this record has. */
+  for (const offset of ['-7d', '0d', '+2w', '-1m', '-30m'])
+    assert.equal(refusedWith(dated([offset])), null, `${offset} is an offset remindersFor derives`);
+  assert.equal(refusedWith(dated(['-1h'], 'instant')), 'NOT_IN_THIS_BUILD');
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'text' }, { id: 'due', type: 'day' }], NO_STATE)), null);
+});
+
+test('AND A `repeat:` SPELLED THE WAY THE DOCUMENTS SPELL IT ARMED ONE REMINDER A YEAR', () => {
+  /**
+   * `repeat` is on `FIELD_KEYS`, so a field carrying one passed `keyFault` and was let through
+   * unread: `validate` checked the key not at all. Its consumer is `schedule.ts`'s `expandRepeat`,
+   * whose arms were spelled `day week month year` and whose chain ended in an `else` meaning
+   * yearly, while `42 §4.4` closes the list at `daily weekly monthly yearly` and `02 §4`'s own
+   * worked example is `repeat: { freq: weekly, byday: [TU, TH], count: 12 }`. Driven from an
+   * anchor of 2026-09-08:
+   *
+   *     freq: week    ->  2026-09-08, 09-15, 09-22, 09-29
+   *     freq: weekly  ->  2026-09-08, 2027-09-08
+   *     freq: banana  ->  2026-09-08, 2027-09-08
+   *
+   * So a weekly standup written the way the specification writes it reminded nobody for
+   * fifty-one weeks, silently. `schedule.test.ts` holds the arithmetic; this holds the half that
+   * stops an unreadable frequency being installable at all.
+   *
+   * THE REFUSAL LANDS ONLY ON THE UNKNOWN WORD. Refusing `weekly`, which is what a declare-side
+   * check alone would have done before `schedule.ts` learned the long spellings, is worse for the
+   * author than the silence was for the reader.
+   */
+  const every = (repeat: unknown, type = 'day'): Declaration =>
+    withFields([{ id: 'what', type: 'text' }, { id: 'due', type, repeat }], NO_STATE);
+
+  const said = validateDeclaration(every({ freq: 'banana' }));
+  assert.equal(said?.code, 'DECLARATION_INVALID');
+  assert.equal(said?.at, 'due.repeat');
+  assert.match(said?.fix ?? '', /a frequency is daily, weekly, monthly or yearly/);
+
+  for (const bad of [{ freq: 7 }, { freq: '' }, {}, { interval: 2 }, { freq: 'WEEKLY' }])
+    assert.equal(refusedWith(every(bad)), 'DECLARATION_INVALID', `${JSON.stringify(bad)} is not a frequency`);
+
+  /* A REPEAT IS A FREQUENCY AND HOW OFTEN, and `every week` is neither. */
+  for (const shape of ['every week', 7, [], null])
+    assert.equal(refusedWith(every(shape)), 'DECLARATION_INVALID', `${JSON.stringify(shape)} is not a repeat`);
+
+  /* AND IT STEPS A DATE, so anywhere else it derives nothing for ever. */
+  const wrong = validateDeclaration(every({ freq: 'weekly' }, 'text'));
+  assert.equal(wrong?.code, 'DECLARATION_INVALID');
+  assert.match(wrong?.fix ?? '', /nothing would ever be derived/);
+
+  /* BOTH SPELLINGS INSTALL. The long four are the documents'; the short four stay because a
+     record may already hold one and turning a working reminder into a refused declaration on
+     somebody's next install is not a fix. */
+  for (const freq of ['daily', 'weekly', 'monthly', 'yearly', 'day', 'week', 'month', 'year'])
+    assert.equal(refusedWith(every({ freq })), null, `${freq} is a frequency the record reads`);
+  assert.equal(refusedWith(every({ freq: 'monthly', interval: 2, count: 12 })), null);
+  assert.equal(refusedWith(every({ freq: 'weekly' }, 'instant')), null);
+});
+
 /* ── a metric, which nothing checked at all ───────────────────────────────────── */
 
 /** A metric that satisfies `08 §2`, with one key overridden per case. */
@@ -600,23 +709,85 @@ test('and money carries its currency, because 02 §3 says a bare number is not m
 test('and one dimension, because two is a report generator', () => {
   /* `04 §5`, verbatim: *"group_by takes one field. Two dimensions is a report generator."*
      `08 §2.1` is explicit that the second dimension is the line this product does not cross. */
-  assert.equal(refusedWith(metric({ group_by: 'channel' })), null);
-  assert.equal(refusedWith(metric({ group_by: ['channel'] })), null);
   const two = validateDeclaration(metric({ group_by: ['channel', 'client'] }));
   assert.equal(two?.code, 'GROUP_BY_TWICE');
   assert.match(two?.fix ?? '', /report generator/);
   assert.equal(refusedWith(metric({ group_by: 7 })), 'DECLARATION_INVALID');
 });
 
+test('AND A GROUPING THIS BUILD CANNOT DRAW SAYS SO, RATHER THAN DRAWING THE UNGROUPED FIGURE', () => {
+  /**
+   * `metrics.ts`'s guard against an unread shape walks `keysOf(decl.value)`, and `group_by` is not
+   * in `value`: `42 §4.9` and `metricBody` both put it at the top level of a metric body. So the
+   * guard fired where nobody writes the key and the documented spelling went through. Driven over
+   * three rows summing GBP 700:
+   *
+   *     plain sum, no group_by                       {"value":700,"rows":3,"refusals":0}
+   *     group_by: 'party' (the documented spelling)  {"value":700,"rows":3,"refusals":0}
+   *     group_by inside value (the checked place)    REFUSED NOT_IN_THIS_BUILD
+   *
+   * The harm is the one the guard's own sentence names: *"its figure would be the ungrouped one"*.
+   */
+  const said = validateDeclaration(metric({ group_by: 'channel' }));
+  assert.equal(said?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(said?.at, 'group_by');
+  assert.match(said?.fix ?? '', /the ungrouped one/);
+  assert.equal(refusedWith(metric({ group_by: ['channel'] })), 'NOT_IN_THIS_BUILD', 'a list of one is one grouping');
+
+  /* AND THE SHAPE CHECKS STILL ANSWER FIRST, each about a mistake that survives the day grouping
+     is built: a second dimension is `GROUP_BY_TWICE` above, and a bucket is checked below. */
+  assert.equal(refusedWith(metric()), null, 'a metric with no grouping was caught by the guard');
+});
+
 test('and a bucket buckets a grouping, or it buckets nothing', () => {
   /* `08 §2.1`: *"only with a date `group_by`"*. Handed one alone, the evaluator returns the
      ungrouped figure with a bucket key nobody reads — a chart that draws one bar and looks like
      data. */
-  assert.equal(refusedWith(metric({ group_by: 'due', bucket: 'week' })), null);
   assert.equal(refusedWith(metric({ bucket: 'week' })), 'DECLARATION_INVALID');
   assert.equal(refusedWith(metric({ group_by: 'due', bucket: 'fortnight' })), 'DECLARATION_INVALID');
+  /* AND A WELL-FORMED ONE REACHES THE GROUPING GUARD ABOVE rather than installing: the bucket is
+     the shape of a chart whose bars this build does not compute. */
   for (const bucket of ['day', 'week', 'month', 'quarter', 'year'])
-    assert.equal(refusedWith(metric({ group_by: 'due', bucket })), null, `${bucket} is a bucket`);
+    assert.equal(refusedWith(metric({ group_by: 'due', bucket })), 'NOT_IN_THIS_BUILD', `${bucket} is a bucket`);
+});
+
+test('AN OPERAND CARRYING ITS OWN where: WAS ACCEPTED, AND THE FIGURE WAS THE OUTER ONE', () => {
+  /**
+   * `read` runs both halves of a ratio against ONE compiled predicate and one parameter list, and
+   * `aggregationsOf`'s `flat` reads `Object.entries(agg)[0]` — the first key only — so a second key
+   * on an operand is seen by nobody. Driven over three rows summing GBP 700 with `count: id` of 3,
+   * with a control to isolate the dropped key:
+   *
+   *     ratio, operand carries its own where:   {"value":233.33333333333334,"rows":3,"refusals":[]}
+   *     ratio, operand carries its own source:  {"value":233.33333333333334,"rows":3,"refusals":[]}
+   *     ratio with no operand keys (control)    {"value":233.33333333333334,"rows":3,"refusals":[]}
+   *
+   * All three the same number. `where: { field: party, is: Halden }` selected one row of the three
+   * and was discarded; `source: 'register.campaign_day'`, a different register, went the same way.
+   * The author reads a figure they believe is scoped, acts on it, and it is over every row.
+   *
+   * `42 §4.9`: *"Depth one in either direction; a `where` or `source` key inside an operand is
+   * `RATIO_MIXED_SOURCE`."* `04 §5` gives the sentence.
+   */
+  const scoped = validateDeclaration(
+    metric({ value: { ratio: { of: { sum: 'amount', where: { field: 'party', is: 'Halden' } }, per: { count: 'id' } } } }),
+  );
+  assert.equal(scoped?.code, 'RATIO_MIXED_SOURCE');
+  assert.equal(scoped?.at, 'value');
+  assert.match(scoped?.fix ?? '', /both operands must share one source and one predicate/);
+
+  // The other key, the other half, and a diff — `§4.9` defines one operand for all of them, and
+  // `read` drops the key for all of them.
+  for (const value of [
+    { ratio: { of: { sum: 'amount', source: 'register.campaign_day' }, per: { count: 'id' } } },
+    { ratio: { of: { sum: 'amount' }, per: { count: 'id', where: { field: 'party', is: 'Halden' } } } },
+    { diff: { of: { sum: 'amount', where: { field: 'party', is: 'Halden' } }, per: { sum: 'amount' } } },
+  ])
+    assert.equal(refusedWith(metric({ value })), 'RATIO_MIXED_SOURCE', `${JSON.stringify(value)} reads two sets of rows`);
+
+  // And the control installs, so this refuses a dropped key rather than the combinator.
+  assert.equal(refusedWith(metric({ value: { ratio: { of: { sum: 'amount' }, per: { count: 'id' } } } })), null);
+  assert.equal(refusedWith(metric({ value: { ratio: { of: { sum: { product: ['hours', { lookup: 'rates', by: 'party' }] } }, per: { count: 'id' } } } })), null);
 });
 
 test('and a comparison is one of the three the evaluator has an arm for', () => {
@@ -714,6 +885,39 @@ test('A BLOCK KIND IS ONE OF THE SIXTEEN, and the closure is what the security a
      exists (05 §2) — admitted by prefix, and checked as a document of its own. */
   assert.equal(refusedWith(block({ kind: 'block.invoice_card' })), null);
   assert.equal(refusedWith(block({ kind: 'block.Invoice Card' })), 'KIND_UNKNOWN');
+});
+
+test('AND THE DECLARATION THAT SEVENTEENTH ARRIVES AS WAS CHECKED BY NOTHING WHATEVER', () => {
+  /**
+   * `validate` branched on `digest`, `metric`, `page`, `theme`, `ingest` and `rule` and then read
+   * `if (decl.kind !== 'register') return null;` — and `block` is one of `KINDS` with no branch
+   * above that line. So a standalone `block.<id>` declaration fell straight out, whatever it said:
+   *
+   *     block.invoice_card, no primitive, no accepts, no body -> ACCEPTED (null)
+   *
+   * all three of which `42 §4.6` marks required. The test above accepts `kind: 'block.invoice_card'`
+   * on a page *on the strength of* the declaration being checked as a document of its own, and the
+   * document of its own was checked by nothing.
+   *
+   * AND CHECKING `42 §4.6`'s SHAPE WOULD BE A CHECK ABOUT NOTHING, which is why the answer is this
+   * code and not a body validator: nothing in this repository reads a declaration whose kind is
+   * `block`. `packages/render` owns the sixteen drawn kinds as a compiled table and there is no
+   * path from an installed declaration into it, so the page draws its fallback and says nothing.
+   * The declaration is well formed and the build is behind — the repair is a deploy, not an edit.
+   */
+  const said = validateDeclaration({
+    id: 'block.invoice_card',
+    kind: 'block',
+    body: { block: 'invoice_card', primitive: 'panel', accepts: { row: 'register' }, body: [{ primitive: 'rows' }] } as never,
+  });
+  assert.equal(said?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(said?.at, 'kind');
+  assert.match(said?.fix ?? '', /draws nowhere/);
+  assert.match(said?.fix ?? '', /The repair is a deploy, not an edit\./);
+
+  /* AND THE ID CHECK STILL RUNS FIRST, because a declaration whose id does not match its body is
+     wrong about itself before it is wrong about the build. */
+  assert.equal(refusedWith({ id: 'block.invoice_card', kind: 'block', body: { block: 'other' } as never }), 'DECLARATION_INVALID');
 });
 
 test('A BLOCK HAS AN ORDER AND A WIDTH IN TWELFTHS, and no x, y or height at all', () => {

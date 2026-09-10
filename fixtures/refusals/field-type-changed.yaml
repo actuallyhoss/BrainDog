@@ -1,0 +1,5 @@
+code:   FIELD_TYPE_CHANGED
+via:    install
+raises: packages/declare/src/index.ts
+at:     register.obligations.fields.amount.type
+fix:    Retire the field and add a new one.

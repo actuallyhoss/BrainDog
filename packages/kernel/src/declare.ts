@@ -28,6 +28,10 @@ import { checkInterval, type PullDecl } from './pull.ts';
    one list. See `MATCH_FIELDS`: they were two lists and they disagreed. A same-package edge, which
    `31 §2`'s order is not about. */
 import { ARRIVAL } from './ingest.ts';
+/* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
+   can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
+   is what two lists that disagree cost. */
+import { FREQ, shiftFrom } from './schedule.ts';
 import { spanMs } from './vault.ts';
 
 /**
@@ -310,6 +314,39 @@ function metricBody(decl: Declaration): Refusal | null {
   if (body.value === null || typeof body.value !== 'object')
     return bad('DECLARATION_INVALID', `${id} has no value, so there is nothing to compute.`, 'value');
 
+  /**
+   * AN OPERAND'S OWN `where:` OR `source:` WAS DROPPED, AND THE FIGURE CAME BACK AS THE OUTER ONE.
+   *
+   * `metrics.ts`'s `read` runs both halves of a ratio against ONE compiled predicate and one
+   * parameter list, and `aggregationsOf`'s inner `flat` reads `Object.entries(agg)[0]` — the first
+   * key only. So a second key on an operand is not seen by the evaluator and not seen here either.
+   * Driven over three rows summing GBP 700 with `count: id` of 3:
+   *
+   *     ratio, operand carries its own where:   {"value":233.33333333333334,"rows":3,"refusals":[]}
+   *     ratio, operand carries its own source:  {"value":233.33333333333334,"rows":3,"refusals":[]}
+   *     ratio with no operand keys (control)    {"value":233.33333333333334,"rows":3,"refusals":[]}
+   *
+   * All three the same number. `where: { field: party, is: Halden }` selected one row of the three
+   * and was discarded; `source: 'register.campaign_day'`, a different register entirely, was
+   * discarded the same way. The author reads a figure they believe is scoped and it is not — which
+   * is `metrics.ts`'s own worst case ("a figure of the right size in the wrong currency, with
+   * nothing on the screen disagreeing with anything else on it") arrived at over the wrong rows.
+   *
+   * `42 §4.9` IS EXACT ABOUT THE TRIGGER: *"Depth one in either direction; a `where` or `source`
+   * key inside an operand is `RATIO_MIXED_SOURCE`."* `42 §5.3·19` files it class B, so it needs no
+   * installed state and belongs here rather than beside the evaluator. A `diff` is checked with the
+   * ratio because `§4.9` defines one operand for both and `read` drops the key for both.
+   */
+  const combined = body.value as { ratio?: unknown; diff?: unknown };
+  const pair = combined.ratio ?? combined.diff;
+  if (pair !== null && typeof pair === 'object')
+    for (const half of ['of', 'per'] as const) {
+      const operand = (pair as Record<string, unknown>)[half];
+      if (operand === null || typeof operand !== 'object') continue;
+      if (Object.keys(operand).some((key) => key === 'where' || key === 'source'))
+        return bad('RATIO_MIXED_SOURCE', `${id}: both operands must share one source and one predicate.`, 'value');
+    }
+
   /* `money.<CUR>` CARRIES ITS CURRENCY. `02 §3` is why: a money figure without one is a bare
      number, and a bare number loses the one fact that makes a total mean anything. */
   const format = body.format;
@@ -349,6 +386,35 @@ function metricBody(decl: Declaration): Refusal | null {
     if (body.group_by === undefined)
       return bad('DECLARATION_INVALID', `${id} buckets by ${String(body.bucket)} and groups by nothing.`, 'bucket');
   }
+
+  /**
+   * AND THEN THE GROUPING ITSELF, BECAUSE THE GUARD AGAINST IT FIRES WHERE NOBODY WRITES THE KEY.
+   *
+   * `metrics.ts`'s `NOT_IN_THIS_BUILD` branch walks `keysOf(decl.value)`, and `group_by` is not
+   * inside `value`: `42 §4.9` and the two checks above both put it at the TOP LEVEL of a metric
+   * body. So the guard caught the spelling nobody uses and let the documented one through. Driven,
+   * over three rows summing GBP 700:
+   *
+   *     plain sum, no group_by                       {"value":700,"rows":3,"unit":"GBP"}
+   *     group_by: 'party' (the documented spelling)  {"value":700,"rows":3,"unit":"GBP"}
+   *     group_by inside value (the checked place)    REFUSED NOT_IN_THIS_BUILD
+   *
+   * The harm is the one the guard's own sentence names, word for word: *"its figure would be the
+   * ungrouped one"*. A tile declaring `group_by: 'party'` draws one number over every party and
+   * labels it with one of them.
+   *
+   * REFUSED AT THE DECLARATION AND NOT AT THE READING, so the metric does not install rather than
+   * installing and answering wrongly — and it is refused AFTER the two checks above so that
+   * `GROUP_BY_TWICE` and the bucket's shape still answer first, each about a mistake that survives
+   * the day grouping is built. `08 §2.2` publishes the shape and this build reads it nowhere: the
+   * repair is a deploy, not an edit.
+   */
+  if (body.group_by !== undefined)
+    return bad(
+      'NOT_IN_THIS_BUILD',
+      `${id}: group_by is a published shape this build does not read, so its figure would be the ungrouped one.`,
+      'group_by',
+    );
 
   return null;
 }
@@ -1352,6 +1418,16 @@ const TRANSITION_KEYS = ['to'] as const;
 const TRANSITION_UNBUILT = ['requires', 'by'] as const;
 
 /**
+ * An hour offset, which is the one unit `remind:` admits and `where:` does not.
+ *
+ * WRITTEN OUT AND NOT IMPORTED, because there is nothing to import: `schedule.ts`'s grammar reads
+ * `d w m` and has no arm for an hour at all. This names the unit in order to REFUSE it, so it is
+ * not a second copy of a list that has to stay in step with a first — the list it must not drift
+ * from is `offsetMs`, and that is called rather than copied.
+ */
+const HOUR_OFFSET = /^[+-]?\d{1,4}h$/u;
+
+/**
  * `34 §4`'s reserved field ids, and the register that declares one is dead on arrival.
  *
  * The write path has enforced this since it was written (`RESERVED` in `index.ts`) and `validate`
@@ -1452,6 +1528,35 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
   if (decl.kind === 'page') return pageBody(decl, installed);
   if (decl.kind === 'theme') return themeBody(decl);
   if (decl.kind === 'ingest') return ingestBody(decl);
+
+  /**
+   * A STANDALONE `block.<id>` DECLARATION WAS CHECKED BY NOTHING, AND IT IS DRAWN BY NOTHING.
+   *
+   * `block` is one of `KINDS` and had no branch above the register line below, so it fell straight
+   * to `return null`: `validate({ id: 'block.invoice_card', kind: 'block', body: { block:
+   * 'invoice_card' } })` was accepted with no `primitive`, no `accepts` and no `body`, all three of
+   * which `42 §4.6` marks required.
+   *
+   * AND CHECKING THOSE THREE WOULD BE A CHECK ABOUT NOTHING. `05 §2` says a new block kind arrives
+   * as a declaration of this kind, and `pageBody` already admits `kind: 'block.<id>'` on a page by
+   * prefix on the strength of it — but nothing in this repository reads a declaration whose kind is
+   * `block`: `grep` finds the eight kinds in `KINDS` and in the migration's CHECK constraint, and
+   * no consumer anywhere. `packages/render` owns the sixteen drawn kinds as a compiled table, and
+   * there is no path from an installed declaration into it. So the page draws the fallback and the
+   * author is told nothing, which is `BLOCK_KINDS`'s own sentence one file over: *"no rows, no
+   * refusal, no mark on the page."*
+   *
+   * SO THE HONEST ANSWER IS THE ONE `keyFault` GIVES A PUBLISHED KEY NOTHING KEEPS. The declaration
+   * is well formed and the build is behind, which is what `NOT_IN_THIS_BUILD` says and why `30 §6`
+   * files it beside `SCHEMA_NEWER`: the repair is a deploy, not an edit. Validating `42 §4.6`'s
+   * shape belongs in the change that makes something draw it.
+   */
+  if (decl.kind === 'block')
+    return bad(
+      'NOT_IN_THIS_BUILD',
+      `${decl.id} declares a block kind, which the documents publish and this build draws nowhere, so it would install and be read by nothing. The repair is a deploy, not an edit.`,
+      'kind',
+    );
 
   /* A `once_per` THAT IS NOT A LIST THROWS AT FIRE TIME, INSIDE A WRITE. `onceKey` calls `.map` on
      it, and nothing checked the shape — so `once_per: 'row'` installed cleanly and then made every
@@ -1611,6 +1716,122 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
           if (fault) return fault;
         }
       }
+    }
+
+    /**
+     * A `remind:` NOBODY COULD READ, AND THE FIELD IT SITS ON.
+     *
+     * `remind` is on `FIELD_KEYS`, so a field carrying it passed `keyFault` and was let through;
+     * its VALUE was validated nowhere, and the word appeared exactly once in this file. The
+     * consumer is `schedule.ts`'s `remindersFor`, which calls `shiftFrom` per offset and `continue`s
+     * on a `null` — so an offset the grammar cannot read derives no row and says nothing. Driven:
+     *
+     *     remindersFor remind:["-2h"] -> []
+     *     declare: remind ["-2h","banana"] on a day -> ACCEPTED (null)
+     *     declare: remind ["-1d"] on a text field   -> ACCEPTED (null)
+     *
+     * A field declaring *"remind me two hours before"* is decoration, and `banana` beside it is
+     * accepted too, so the declaration had no floor at all.
+     *
+     * THREE ANSWERS, BECAUSE THEY ARE THREE FACTS. `02 §4` and `34 §1.4` both say an hour is legal
+     * in `remind:` and nowhere else, and `02 §4` names the code for the half that is not: *"an hour
+     * offset against a `day` field is `RELATIVE_UNIT_FOR_DAY` — raised by `declare` at install, on
+     * the `remind:` key, not by the compiler"*, which is `30 §6:770`'s row naming its own producer.
+     * A day has no time of day to count back from. On an `instant` an hour IS legal (`42 §4.2`'s
+     * `Offset`, `42 §4.4`'s row) and `schedule.ts`'s grammar reads days, weeks and months only, so
+     * the honest answer there is the one `keyFault` gives a published key nothing keeps. Anything
+     * that is neither is `RELATIVE_LITERAL_UNKNOWN`, which is the code `metrics.ts` already uses
+     * for a temporal literal the record cannot read.
+     *
+     * THE READABILITY TEST IS `shiftFrom` ITSELF rather than a copy of its regular expression, for
+     * the reason the `ARRIVAL` import above gives: two lists that must agree and do not are how
+     * `MATCH_FIELDS` came to refuse names that fire. `-30m` is thirty MONTHS and reads clean here,
+     * because `m` is a calendar month in every temporal grammar this record has (`02 §4`,
+     * `34 §1.4`, `42 §4.2`) and there is no minute unit to confuse it with.
+     */
+    const remind = (raw as { remind?: unknown }).remind;
+    if (remind !== undefined) {
+      if (!Array.isArray(remind) || remind.length === 0)
+        return bad('DECLARATION_INVALID', `${id}.${f.id}'s remind is a list of offsets from the date, and this is not.`, `${f.id}.remind`);
+      if (f.type !== 'day' && f.type !== 'instant')
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${f.id} is a ${f.type} and a reminder is derived from a date, so nothing would ever be armed.`,
+          `${f.id}.remind`,
+        );
+      for (const said of remind) {
+        const offset = typeof said === 'string' ? said.trim() : '';
+        /* THE CONDITION IS HOISTED SO EACH CODE SITS AFTER ITS CONSTRUCTOR: `refusals.mjs` cannot
+           cross a ternary whose condition holds a quote, and `f.type === 'day'` holds one. */
+        const dated = f.type === 'day';
+        if (HOUR_OFFSET.test(offset) && dated)
+          return bad(
+            'RELATIVE_UNIT_FOR_DAY',
+            `${id}.${f.id} is a day and ${offset} counts in hours, and a day carries no time of day to count back from. Remind in days.`,
+            `${f.id}.remind`,
+          );
+        if (HOUR_OFFSET.test(offset))
+          return bad(
+            'NOT_IN_THIS_BUILD',
+            `${id}.${f.id} reminds at ${offset}, and an hour offset is published for an instant and read by this build nowhere, so it would install and arm nothing. The repair is a deploy, not an edit.`,
+            `${f.id}.remind`,
+          );
+        /* THE EPOCH IS AN ARBITRARY ANCHOR AND THAT IS THE POINT: `shiftFrom` reads the OFFSET's
+           grammar before it touches the date, so every anchor answers the same question, and this
+           is the exact call `remindersFor` makes and the exact `null` it skips a reminder on. */
+        if (shiftFrom(0, offset) === null)
+          return bad(
+            'RELATIVE_LITERAL_UNKNOWN',
+            `${id}.${f.id} reminds at ${JSON.stringify(said)}; an offset is a sign, a number and d, w or m, so -7d is a week before.`,
+            `${f.id}.remind`,
+          );
+      }
+    }
+
+    /**
+     * A `repeat:` NOBODY COULD READ, AND IT WAS EVERY SPELLING THE DOCUMENTS USE.
+     *
+     * `repeat` is on `FIELD_KEYS`, so a field carrying one passed `keyFault` and was let through
+     * unread: `validate` checked the key not at all. Its consumer is `schedule.ts`'s
+     * `expandRepeat`, whose arms were spelled `day week month year` and whose chain ended in an
+     * `else` meaning yearly, while `42 §4.4` closes the list at `daily weekly monthly yearly` and
+     * `02 §4`'s own worked example is `repeat: { freq: weekly, byday: [TU, TH], count: 12 }`.
+     * Driven from an anchor of 2026-09-08:
+     *
+     *     freq: week    ->  2026-09-08, 09-15, 09-22, 09-29
+     *     freq: weekly  ->  2026-09-08, 2027-09-08
+     *     freq: banana  ->  2026-09-08, 2027-09-08
+     *
+     * So a weekly standup written the way the specification writes it armed one reminder a year.
+     * `schedule.ts` takes both spellings now and derives nothing from a word it does not know,
+     * and this is what stops that word being installable in the first place. The refusal lands
+     * only on the unknown one: refusing `weekly` would have been worse for the author than the
+     * silence was for the reader.
+     *
+     * `FREQ` IS IMPORTED RATHER THAN COPIED, for the reason the `remind:` check above gives about
+     * `shiftFrom`. Two lists that must agree and do not are the shape of the defect itself.
+     */
+    const repeat = (raw as { repeat?: unknown }).repeat;
+    if (repeat !== undefined) {
+      if (repeat === null || typeof repeat !== 'object' || Array.isArray(repeat))
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${f.id}'s repeat is a frequency and how often, and this is not.`,
+          `${f.id}.repeat`,
+        );
+      if (f.type !== 'day' && f.type !== 'instant')
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${f.id} is a ${f.type} and a repeat steps a date, so nothing would ever be derived.`,
+          `${f.id}.repeat`,
+        );
+      const freq = (repeat as { freq?: unknown }).freq;
+      if (typeof freq !== 'string' || !Object.hasOwn(FREQ, freq))
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${f.id} repeats every ${typeof freq === 'string' ? freq : JSON.stringify(freq)}, and a frequency is daily, weekly, monthly or yearly.`,
+          `${f.id}.repeat`,
+        );
     }
   }
 

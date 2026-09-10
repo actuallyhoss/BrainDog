@@ -44,10 +44,37 @@
     white-space: nowrap;
   }
 
+  /**
+   * THE LABEL IS INK, AND IT USED TO BE THE TONE.
+   *
+   * `color: var(--tone)` sat on this rule, over this rule's own `--tone-wash`. The wash is that
+   * same hue at 12%, so the chip was asking a colour to be read against a dilution of itself.
+   * Measured on the shipped palette, `danger` on its own wash: 4.10:1 over `--bg` in light, 3.83
+   * over `--sunk`, 4.34 over `--s1` in dark, 3.82 over `--s3` in dark, 4.40 over `--bg` in
+   * high-contrast light. Body text needs 4.5. The FILLED chip below is worse, because its ground is
+   * 20% of the louder `-fill` band: `danger` measures 3.17 over `--sunk` in light and 3.44 in
+   * high-contrast light, which is under the 4.5 floor by a third.
+   *
+   * WEAKENING THE TINT DOES NOT RESCUE IT, and that is what makes this a colour decision rather
+   * than a number. The same pair is 4.34 at 8% and 4.84 with no tint at all. `28 §4.4` check G
+   * certifies an intent as text at 4.5 against the five DECLARED surfaces, and the house theme
+   * clears it by 0.01 in its worst cell (`danger` on `--s3` in dark, 4.51), so an intent has no
+   * headroom as text to spend and ANY tint under one of them fails by construction. There is no
+   * `--danger-text` to reach for either: `--accent-text` exists because the accent is used as text
+   * over its own wash in six places, and the generator emits no sibling for the four intents.
+   *
+   * SO THE LABEL MOVES AND THE WASH STAYS, and the base rule above already says where it moves to.
+   * `blocks.css:1030` made this exact call on the selected row, and its argument is the whole of
+   * `13 §2.3`: the glyph carries the meaning, the colour is the second channel. The glyph moves
+   * with the label, because a glyph is text and takes the same pair. What still says `bad` is the
+   * mark, the tint and the border, which is three channels where the rule asks for two.
+   *
+   * `--ink2` on these grounds measures 5.67 at its worst, over every surface, plain and filled, in
+   * all four palettes.
+   */
   .chip[data-intent] {
     background: var(--tone-wash);
     border-color: color-mix(in srgb, var(--tone) 28%, transparent);
-    color: var(--tone);
   }
 
   .chip[data-filled][data-intent] {

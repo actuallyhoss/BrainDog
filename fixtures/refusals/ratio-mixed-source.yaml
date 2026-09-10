@@ -1,0 +1,5 @@
+code:   RATIO_MIXED_SOURCE
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     value
+fix:    Give both operands one source and one predicate.

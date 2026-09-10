@@ -36,6 +36,7 @@
     href,
     picked,
     action,
+    note,
   }: {
     register: string;
     entries: readonly Entry[];
@@ -44,6 +45,15 @@
     picked?: ReadonlySet<number>;
     /** The trailing control on each card — the caller's, because the verbs are the caller's. */
     action?: Snippet<[Entry]>;
+    /**
+     * A LINE UNDER THE CARD, FULL WIDTH, for something about the row rather than a control on it.
+     *
+     * The receipt went in `action` first, which is a 44px trailing slot sized for one icon, and a
+     * chip plus a `Put back` button in it squeezed the title to one word a line. A receipt is not
+     * a verb: it is the row saying what has happened to it, it is as wide as the sentence it
+     * carries, and on a card the only place that shape fits is its own row.
+     */
+    note?: Snippet<[Entry]>;
   } = $props();
 
   const decl = $derived(REGISTERS[register]);
@@ -109,7 +119,10 @@
                 role="img"
                 aria-label={it.name}>{it.mark}</span>
             {/if}
-            #{e.seq}
+            <!-- A ROW THAT HAS NO ID PRINTS NO ID. `pending` mints a negative sequence so a row
+                 somebody typed can never collide with one the record has; `#-1` is that sentinel
+                 with a minus sign in front of it, and it was going straight to the screen. -->
+            {#if e.seq >= 0}#{e.seq}{/if}
           </span>
           <span class="card-title" dir={dirOf(register, decl.mobile[0])}>
             {display(register, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}
@@ -124,6 +137,7 @@
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
              tap target for opening the row and this sits beside it. -->
         {#if action}{@render action(e)}{/if}
+        {#if note}<div class="card-note">{@render note(e)}</div>{/if}
       </li>
     {/each}
   </ul>
@@ -174,6 +188,19 @@
     .card-line {
       display: flex;
       align-items: stretch;
+      /* `wrap`, so `note` takes a line of its own under the card and the trailing control keeps
+         the 44px it needs beside it. Without it a receipt shared the card's row and squeezed the
+         title to one word a line. */
+      flex-wrap: wrap;
+    }
+
+    .card-note {
+      flex-basis: 100%;
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-2) var(--sp-3);
+      border-block-start: 1px solid var(--line);
     }
 
     .card-line[data-picked] {

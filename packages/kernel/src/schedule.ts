@@ -29,13 +29,53 @@ export type Remindable = { id: string; type: string; remind?: readonly string[];
 
 /** `freq` and how often, with the ways a date lands on a day nobody works. */
 export type Repeat = {
-  freq: 'day' | 'week' | 'month' | 'year';
+  /**
+   * EVERY SPELLING THE DOCUMENTS USE COMPUTED AS YEARLY, IN SILENCE.
+   *
+   * `42 §4.4` closes this at `daily weekly monthly yearly` and `02 §4`'s own worked example is
+   * `repeat: { freq: weekly, byday: [TU, TH], count: 12 }`. This union spelled the four
+   * `day week month year`, and `expandRepeat`'s if-chain had no final guard, so **the documented
+   * spelling and every typo alike fell through to the yearly arm**. Driven from an anchor of
+   * 2026-09-08:
+   *
+   *     freq: week     ->  2026-09-08, 09-15, 09-22, 09-29
+   *     freq: weekly   ->  2026-09-08, 2027-09-08
+   *     freq: banana   ->  2026-09-08, 2027-09-08
+   *
+   * A weekly standup written exactly as the specification writes it reminded nobody for
+   * fifty-one weeks, and `validate` checked `repeat:` not at all, so nothing was refused and
+   * nothing was logged. It is a wrong answer on a date somebody acts on, produced by following
+   * the documentation.
+   *
+   * BOTH SPELLINGS ARE ACCEPTED AND ONE IS CANONICAL. The documents are the source and their
+   * words go first; the short forms stay because a record may already hold one and dropping them
+   * would turn a working reminder into a refused declaration on somebody's next install.
+   */
+  freq: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'day' | 'week' | 'month' | 'year';
   interval?: number;
   count?: number;
   until?: string;
   /** A Saturday or Sunday moved to the Friday before or the Monday after. */
   workday?: 'previous' | 'next';
 };
+
+/**
+ * One word, whatever spelling arrived, and `undefined` for anything that is not a frequency.
+ *
+ * IT IS A LOOKUP AND NOT A NORMALISING REGEX, so an unknown word has no answer rather than the
+ * nearest one. The chain this replaces ended in an `else` that meant yearly, which is how
+ * `freq: 'banana'` came to arm a reminder once a year.
+ */
+export const FREQ: Readonly<Record<string, 'day' | 'week' | 'month' | 'year'>> = Object.freeze({
+  day: 'day',
+  daily: 'day',
+  week: 'week',
+  weekly: 'week',
+  month: 'month',
+  monthly: 'month',
+  year: 'year',
+  yearly: 'year',
+});
 
 /**
  * `-7d` as milliseconds. `null` when it is not an offset, which is a declaration to refuse.
@@ -46,7 +86,12 @@ export type Repeat = {
  */
 export function offsetMs(text: string): number | null {
   const m = OFFSET.exec(text.trim());
-  if (!m) return null;
+  /* AND THE COMMENT ABOVE WAS THE ONLY PLACE THE RULE EXISTED. It says days and weeks only,
+     and the regex admitted `m` and answered `n * 30 * DAY_MS`, a thirty-day month, in the same
+     file whose `shiftFrom` clamps a month to the calendar. `shiftFrom` routes `m` past this,
+     so nothing in the tree got the wrong answer, but this is exported from the kernel's public
+     API and the next caller would have. */
+  if (!m || m[3] === 'm') return null;
   const n = Number(m[2]) * (m[1] === '-' ? -1 : 1);
   return n * (m[3] === 'd' ? DAY_MS : m[3] === 'w' ? 7 * DAY_MS : 30 * DAY_MS);
 }
@@ -103,6 +148,12 @@ export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizo
 
   const start = new Date(anchor);
 
+  /* NO ARM MEANS NO OCCURRENCES. The chain below ended in an `else`, so a word it did not know
+     was a year rather than a refusal. `declare` refuses an unknown frequency at install; this is
+     what the same fact looks like to a caller holding a record that was installed before it did. */
+  const freq = FREQ[repeat.freq];
+  if (!freq) return [];
+
   /* THE BUDGET IS SPENT FORWARD, NOT BACKWARD. The walk began at the anchor and stopped at `count`
      (or 500), so a daily repeat anchored more than about five hundred days ago produced five hundred
      occurrences that had all already happened — and `remindersFor`, which drops anything past,
@@ -112,12 +163,12 @@ export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizo
 
   for (let n = from; out.length < (repeat.count ?? 500) && n < from + 5000; n++) {
     let at: number;
-    if (repeat.freq === 'day') at = anchor + n * interval * DAY_MS;
-    else if (repeat.freq === 'week') at = anchor + n * interval * 7 * DAY_MS;
+    if (freq === 'day') at = anchor + n * interval * DAY_MS;
+    else if (freq === 'week') at = anchor + n * interval * 7 * DAY_MS;
     else {
       /* BY CALENDAR AND CLAMPED. Adding to the month number rolls 31 January into 3 March, which is
          not what anybody means by "monthly" — the last day of the month they named is. */
-      const months = repeat.freq === 'month' ? n * interval : n * interval * 12;
+      const months = freq === 'month' ? n * interval : n * interval * 12;
       const first = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, 1, 12));
       const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0, 12)).getUTCDate();
       at = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(start.getUTCDate(), last), 12);
@@ -144,12 +195,16 @@ function skipPast(anchor: number, repeat: Repeat, now: number): number {
   if (anchor >= now) return 0;
   const interval = Math.max(1, Math.floor(repeat.interval ?? 1));
   const behind = now - anchor;
-  if (repeat.freq === 'day') return Math.floor(behind / (interval * DAY_MS));
-  if (repeat.freq === 'week') return Math.floor(behind / (interval * 7 * DAY_MS));
+  /* THE SAME TABLE, because a skip that disagreed with the walk would put the first
+     occurrence in the wrong place rather than nowhere, which is harder to see. */
+  const freq = FREQ[repeat.freq];
+  if (!freq) return 0;
+  if (freq === 'day') return Math.floor(behind / (interval * DAY_MS));
+  if (freq === 'week') return Math.floor(behind / (interval * 7 * DAY_MS));
   const from = new Date(anchor);
   const to = new Date(now);
   const months = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
-  const step = repeat.freq === 'month' ? interval : interval * 12;
+  const step = freq === 'month' ? interval : interval * 12;
   return Math.max(0, Math.floor((months - 1) / step));
 }
 

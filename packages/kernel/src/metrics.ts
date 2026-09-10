@@ -310,6 +310,31 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     if ((UNREAD as readonly string[]).includes(word))
       at('NOT_IN_THIS_BUILD', `${word} is a published shape this build does not read, so its figure would be the ungrouped one`, 'value');
 
+  /**
+   * AND THE BODY'S OWN KEYS, BECAUSE THE WALK ABOVE FIRED WHERE NOBODY WRITES THEM.
+   *
+   * `keysOf(decl.value)` reads inside the value expression, and `group_by` and `bucket` are not
+   * there: `42 §4.9` and `declare.ts`'s `metricBody` both put them at the TOP LEVEL of a metric
+   * body, and `MetricDecl` above has no field for either — so a stored body carrying one arrives
+   * here as an extra key nothing looks at. Driven over three rows summing GBP 700:
+   *
+   *     plain sum, no group_by                       {"value":700,"rows":3,"refusals":0}
+   *     group_by: 'party' (the documented spelling)  {"value":700,"rows":3,"refusals":0}
+   *     group_by inside value (the checked place)    REFUSED NOT_IN_THIS_BUILD
+   *
+   * The comment above is precise about the harm — *"its figure would be the ungrouped one"* — and
+   * that is exactly what came back, with no refusal beside it.
+   *
+   * `declare.ts` NOW REFUSES THE DECLARATION, WHICH IS THE BETTER HALF AND IS NOT ALL OF IT: a
+   * metric installed before that check existed is still in somebody's record, and this is the side
+   * that reads it. Only the two shapes that can reach a body's top level are looked for, so a
+   * register field called `trend` is still summable — the reason the `keysOf` walk exists.
+   */
+  const body = decl as unknown as Record<string, unknown>;
+  for (const word of ['group_by', 'bucket'])
+    if (body[word] !== undefined)
+      at('NOT_IN_THIS_BUILD', `${word} is a published shape this build does not read, so its figure would be the ungrouped one`, word);
+
   const fields = aggregationsOf(decl.value);
   if (fields.length === 0) at('VALUE_MALFORMED', 'a value is an aggregation, a ratio or a diff', 'value');
   if (schema)

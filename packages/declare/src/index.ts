@@ -107,6 +107,16 @@ export type Diff = {
   touches: { rows_read: 0; rows_written: 0 };
   /** Rows that would be left under a retired register. Above zero is a refusal at install. */
   orphans: number;
+  /**
+   * Field changes this upgrade cannot make, because the register already holds rows.
+   *
+   * REPORTED HERE AND REFUSED BY `install`, which is `WOULD_ORPHAN`'s shape and the one `42 §5.3`
+   * gives every class-D rule: the plan names everything that is wrong in one screen and refuses
+   * nothing, and the install is where the answer is no. Both are empty on a first install, on a
+   * register with no rows, and on any change that leaves the rows readable.
+   */
+  retypes: { id: string; field: string; from: string; to: string; rows: number }[];
+  newly_required: { id: string; field: string; rows: number }[];
   warnings: { at: string; say: string }[];
   base: { format: number; primitives: number; packs: [string, string][]; declarations: [string, number, string][] };
   planHash: string;
@@ -556,6 +566,8 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
   const adds: Diff['adds'] = [];
   const changes: Diff['changes'] = [];
   const conflicts: Diff['conflicts'] = [];
+  const retypes: Diff['retypes'] = [];
+  const newlyRequired: Diff['newly_required'] = [];
   for (const decl of pack.declarations) {
     const already = live.get(decl.id);
     if (!already) {
@@ -577,7 +589,14 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
       conflicts.push({ id: decl.id, pack: already.pack_id ?? OWN });
       continue;
     }
-    if (already.body !== decl.canonical) changes.push({ id: decl.id, from_version: already.version, summary: summarise(decl) });
+    if (already.body !== decl.canonical) {
+      changes.push({ id: decl.id, from_version: already.version, summary: summarise(decl) });
+      /* AND WHAT THE CHANGE DOES TO THE ROWS UNDER IT. This compared the two bodies for INEQUALITY
+         and wrote down a summary; it never looked inside them, so an upgrade that moved a field's
+         type or made one required was reported as "1 change" and installed. */
+      const rows = decl.id.startsWith('register.') ? (installed.rows[decl.id.slice('register.'.length)] ?? 0) : 0;
+      if (rows > 0) unreadable(decl, already.body, rows, retypes, newlyRequired);
+    }
   }
 
   const keeping = new Set(pack.declarations.map((d) => d.id));
@@ -634,6 +653,8 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
     interrupts: interruptsOf(pack),
     touches: { rows_read: 0, rows_written: 0 },
     orphans,
+    retypes,
+    newly_required: newlyRequired,
     warnings: warningsOf(pack),
     base,
     /* THE INTEGER HALF CATCHES A RECORD THAT MOVED and the hash half catches a PACK that was edited
@@ -641,6 +662,76 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
        happens when the thing being approved is a file in somebody's editor. */
     planHash: `${installed.record_version}.${await digest(jcs({ pack: pack.checksum, base } as unknown as Json))}`,
   };
+}
+
+/**
+ * The two ways an upgrade leaves the rows already in a register in the wrong.
+ *
+ * A REINSTALL CORRUPTED A POPULATED REGISTER IN SILENCE, and both halves were driven against a
+ * record holding one row:
+ *
+ *     before ->                       [{"what":"Invoice 41","amount":"four hundred and eighty"}]
+ *     reinstall amount text -> money  ACCEPTED
+ *     after ->                        [{"what":"Invoice 41","amount":"four hundred and eighty"}]
+ *     money predicate over it ->      rows=0
+ *
+ *     add required vat ->             ACCEPTED
+ *     later create without vat ->     REQUIRED_MISSING: obligations needs vat.
+ *     rows now ->                     [{"what":"A"}]
+ *
+ * Nothing refused, nothing migrated, nothing logged. The register declares `amount` a `money` and
+ * holds a string; `{ gt: { amount: 1, currency: 'GBP' } }` returns nothing over a register that has
+ * a row. And `vat` is required forwards and violated backwards for ever, with no count of how many
+ * rows are in the wrong. `02 §7` and `04 §5` both refuse the first outright — *"does not exist in
+ * v1: retire the field and add a new one"* — and `42 §5.3·9` and `·31` give the two rules their
+ * inputs: a persisting field id whose `type` (or `of`) differs, and a `required: true` with no
+ * `default` where the installed body had neither, both with `installed.rows[register] > 0`.
+ *
+ * A BODY THAT WILL NOT PARSE IS NOT A FINDING. `already.body` is canonical JSON this record wrote,
+ * and a caller who hands `plan` something else must get the plan they always got rather than a
+ * throw out of a function whose whole contract is that it answers.
+ */
+function unreadable(
+  decl: PackDeclaration,
+  was: string,
+  rows: number,
+  retypes: Diff['retypes'],
+  newlyRequired: Diff['newly_required'],
+): void {
+  if (decl.kind !== 'register') return;
+  let old: unknown;
+  try {
+    old = JSON.parse(was);
+  } catch {
+    return;
+  }
+  const fieldsOf = (body: unknown): Map<string, Record<string, unknown>> => {
+    const list = (body as { fields?: unknown })?.fields;
+    const out = new Map<string, Record<string, unknown>>();
+    if (!Array.isArray(list)) return out;
+    for (const raw of list) {
+      const f = raw as { id?: unknown };
+      if (isObject(raw as Json) && typeof f.id === 'string') out.set(f.id, f as Record<string, unknown>);
+    }
+    return out;
+  };
+
+  const before = fieldsOf(old);
+  for (const [id, now] of fieldsOf(decl.body)) {
+    const then = before.get(id);
+
+    /* THE ELEMENT TYPE COUNTS AS THE TYPE. `42 §5.3·31` says *"a different `type` (or `of.type`)"*,
+       and a `list<text>` that becomes a `list<int>` reads every row it holds as the wrong thing
+       exactly as `text → money` does. */
+    const said = (f: Record<string, unknown> | undefined): string =>
+      f === undefined ? '' : `${String(f.type ?? '')}${f.of === undefined ? '' : `<${JSON.stringify(f.of)}>`}`;
+    if (then !== undefined && said(then) !== said(now)) retypes.push({ id: decl.id, field: id, from: said(then), to: said(now), rows });
+
+    /* A `default` IS THE ANSWER FOR THE ROWS THAT HAVE NONE, which is why `04 §5`'s sentence names
+       it as the repair: *"Ship a default or a fill rule."* */
+    const demanded = now.required === true && now.default === undefined;
+    if (demanded && then?.required !== true) newlyRequired.push({ id: decl.id, field: id, rows });
+  }
 }
 
 const summarise = (decl: PackDeclaration): string => {
@@ -796,6 +887,30 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       { at: at.id },
     );
   }
+
+  /* AND NEITHER IS A ROW LEFT UNREADABLE UNDER A REGISTER THAT KEEPS ITS NAME. `WOULD_ORPHAN`
+     above covers the register that goes away; these two cover the one that stays and stops
+     describing what is in it. `02 §7`: a type change *"does not exist in v1"*, and the repair is
+     the author's — retire the field, add another — not a migration this record can guess.
+
+     TWO CALLS AND NOT A LOOP, so each code sits as a literal after its own constructor: `42 §9`
+     greps for exactly that, and a code chosen into one call is a code the gate that counts what
+     this product emits cannot see. */
+  const retyped = diff.retypes[0];
+  if (retyped)
+    return no<Applied>(
+      'FIELD_TYPE_CHANGED',
+      `${retyped.id}.${retyped.field}: ${retyped.from} → ${retyped.to} changes a type, and ${retyped.rows} rows were written under the old one. Retire the field and add a new one.`,
+      { at: `${retyped.id}.fields.${retyped.field}.type` },
+    );
+
+  const demanded = diff.newly_required[0];
+  if (demanded)
+    return no<Applied>(
+      'REQUIRED_ON_POPULATED',
+      `${demanded.id}.${demanded.field} is required and ${demanded.rows} rows were written before it. Ship a default or a fill rule.`,
+      { at: `${demanded.id}.fields.${demanded.field}.required` },
+    );
 
   const staged = await host.stage(
     pack.declarations.map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),

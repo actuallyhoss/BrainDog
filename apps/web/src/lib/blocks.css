@@ -358,8 +358,28 @@
      column stays dark, which is how "this changes nothing" gets said without a message. An inset
      ring rather than a border, so no column changes width and the four stacks do not shift under
      the card being carried. */
+  /**
+   * THE TINT IS THE WASH PAINTED OVER THE COLUMN, and it used to be a third strength of accent
+   * mixed into the column's own surface.
+   *
+   * This read `color-mix(in srgb, var(--accent) 10%, var(--s1))`. Ten, beside `--accent-wash`'s
+   * twelve and `/start`'s `.agent` at seven: three strengths of one tint, none of them chosen
+   * against the others, which is the drift `tokens.css` names over `--hover-wash`. It could not be
+   * swapped for the wash directly because it OVERRIDES `.board-col`'s `background: var(--s1)`
+   * above, so a transparent value would have shown the board through the column.
+   *
+   * `--accent-ground` WAS THE WRONG TOKEN FOR IT, MEASURED. It is `7%` over `--bg`, and a column is
+   * `--s1`: the drop target would have come out at 1.00:1 against the `--s1` columns beside it in
+   * dark and 1.02 in high-contrast dark, which is the same luminance. The affordance that says
+   * "this one would take it" would have been invisible on half the schemes.
+   *
+   * So the base stays where it is and the wash goes ON it, as a background-image layer over the
+   * background-color the rule above already sets. Two longhands instead of one shorthand, and the
+   * product now has ONE accent tint. Against the plain column it measures 1.18:1 in light and 1.11
+   * in dark, where the ten per cent version measured 1.15 and 1.09.
+   */
   .board-col[data-drop] {
-    background: color-mix(in srgb, var(--accent) 10%, var(--s1));
+    background-image: linear-gradient(var(--accent-wash), var(--accent-wash));
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
   }
 
@@ -1115,12 +1135,32 @@
     border-start-end-radius: 0;
   }
 
+  /* THE BAR IS `--s1` WITH THE WARN WASH ON IT, and it used to be fourteen per cent of the FILL
+     role mixed into `--s1`.
+
+     Two things were wrong with that and `tokens.css` had already argued both. The hue was
+     `--warn-fill`, which is solved for an opaque chip or bar at 3:1 and in the dark scheme sits
+     BELOW `--warn` in lightness, so a tint of it does not gain in the dark the way a tint of the
+     text role does: measured against the `--s1` around it, the old bar was 1.19:1 in light and
+     1.19 in dark, where the wash is 1.21 and 1.28. And fourteen was a fifth strength of a tint the
+     product otherwise draws at twelve.
+
+     `--warn-wash` is the token for this and it already existed, declared for `.prop-row[data-hole]`
+     with a note saying the second warn-by-construction element gets a token beside it rather than
+     another percentage. This is that second element, and the token was already the right one. It
+     is painted over an explicit `--s1` rather than mixed into it, so what is behind the tint is a
+     declared surface rather than part of a call-site value.
+
+     The text on it is unmoved by the swap: `--ink2` measures 7.72 in light and 7.15 in dark where
+     it measured 7.82 and 7.65, and the glyph below measures 6.23 at its worst across the four
+     palettes. */
   .degraded-fix {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     padding: var(--sp-2) var(--sp-3);
-    background: color-mix(in srgb, var(--warn-fill) 14%, var(--s1));
+    background-color: var(--s1);
+    background-image: linear-gradient(var(--warn-wash), var(--warn-wash));
     border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line));
     border-block-end: 0;
     border-start-start-radius: var(--r-md);

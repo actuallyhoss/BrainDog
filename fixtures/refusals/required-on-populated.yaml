@@ -1,0 +1,5 @@
+code:   REQUIRED_ON_POPULATED
+via:    install
+raises: packages/declare/src/index.ts
+at:     register.obligations.fields.vat.required
+fix:    Ship a default or a fill rule.

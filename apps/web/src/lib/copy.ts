@@ -317,6 +317,10 @@ export const copy = {
   markNotWritten: 'Not saved',
   markNeeds: (fields: string) => `Needs ${fields}`,
   undoRow: 'Put back',
+  /* WHAT A ROW IS CALLED WHEN IT HAS NO NAME YET. `undoRowOf` puts the row's title in the control's
+     accessible name, and a row typed into the capture line has a title only if the capture WAS the
+     title; the grid falls back to `#<seq>`, which for a pending row is the negative sentinel. */
+  thisRow: 'this row',
   /* The confirmation AFTER `Put back`, and not a second copy of the button. A toast that
      repeats the verb reads like the command rather than like the outcome, which leaves
      somebody pressing it again to find out whether the first press worked. */

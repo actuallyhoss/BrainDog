@@ -391,3 +391,68 @@ test('and re-installing does not reset a schedule somebody is waiting on', async
   assert.equal(sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'digest'")?.due_at, first);
   sql.close();
 });
+
+test('EVERY SPELLING THE DOCUMENTS USE COMPUTED AS YEARLY, and one of them is the worked example in 02 §4', () => {
+  /**
+   * `42 §4.4` closes `repeat.freq` at `daily weekly monthly yearly` and `02 §4`'s worked example
+   * is `repeat: { freq: weekly, byday: [TU, TH], count: 12 }`. `Repeat` spelled the four
+   * `day week month year` and `expandRepeat`'s if-chain ended in an `else` meaning yearly, so
+   * every documented spelling and every typo alike fell into it. Measured from 2026-09-08:
+   *
+   *     freq: week    ->  2026-09-08, 09-15, 09-22, 09-29
+   *     freq: weekly  ->  2026-09-08, 2027-09-08
+   *     freq: banana  ->  2026-09-08, 2027-09-08
+   *
+   * A weekly standup written the way the specification writes it reminded nobody for fifty-one
+   * weeks, and nothing anywhere refused it or logged it.
+   */
+  const anchor = Date.parse('2026-09-08T12:00:00Z');
+  const days = (freq: string) =>
+    expandRepeat(anchor, { freq } as never, anchor, 400)
+      .slice(0, 4)
+      .map((t) => new Date(t).toISOString().slice(0, 10));
+
+  /* THE LONG SPELLING AND THE SHORT ONE ARE THE SAME ANSWER. Both are kept because a record may
+     already hold either, and turning a working reminder into a refused declaration on somebody's
+     next install is not a fix. */
+  const PAIRS: readonly (readonly [string, string])[] = [
+    ['daily', 'day'],
+    ['weekly', 'week'],
+    ['monthly', 'month'],
+    ['yearly', 'year'],
+  ];
+  for (const [long, short] of PAIRS)
+    assert.deepEqual(days(long), days(short), `${long} and ${short} are the same frequency and gave different dates`);
+
+  assert.deepEqual(days('weekly'), ['2026-09-08', '2026-09-15', '2026-09-22', '2026-09-29']);
+  assert.deepEqual(days('daily'), ['2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11']);
+  assert.deepEqual(days('monthly'), ['2026-09-08', '2026-10-08', '2026-11-08', '2026-12-08']);
+  assert.deepEqual(days('yearly'), ['2026-09-08', '2027-09-08']);
+
+  /* AND A WORD THAT IS NOT A FREQUENCY DERIVES NOTHING, rather than the nearest arm. `declare`
+     refuses it at install; this is what the same fact looks like to a caller holding a record
+     that was installed before it did. */
+  assert.deepEqual(days('banana'), [], 'an unknown frequency still armed something');
+  assert.deepEqual(days(''), []);
+
+  /* THE SKIP AGREES WITH THE WALK. `skipPast` had its own copy of the chain, so a disagreement
+     would have put the first occurrence in the wrong place rather than nowhere at all, which is
+     the harder failure to see. Anchored a year back, the first occurrence is not behind us. */
+  const old = Date.parse('2025-09-08T12:00:00Z');
+  const first = expandRepeat(old, { freq: 'weekly' } as never, anchor, 400)[0];
+  assert.ok(first !== undefined && first >= anchor - 7 * 86_400_000, 'the skip and the walk disagree');
+});
+
+test('and `offsetMs` stops answering for a month, which its own comment already forbade', () => {
+  /* It says DAYS AND WEEKS ONLY and admitted `m`, answering `n * 30 * DAY_MS`: a thirty-day month,
+     in the same file whose `shiftFrom` clamps a month to the calendar. `shiftFrom` routes `m` past
+     it so nothing in the tree got the wrong answer, but it is exported from the kernel's public
+     API and the next caller would have. */
+  assert.equal(offsetMs('-30m'), null);
+  assert.equal(offsetMs('+2m'), null);
+  assert.equal(offsetMs('-7d'), -7 * 86_400_000);
+  assert.equal(offsetMs('+2w'), 14 * 86_400_000);
+  /* AND `shiftFrom` STILL READS A MONTH, by the calendar, which is the whole reason for the split. */
+  assert.equal(shiftFrom(Date.parse('2026-03-31T12:00:00Z'), '-1m'), Date.parse('2026-02-28T12:00:00Z'));
+});
+

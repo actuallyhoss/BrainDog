@@ -145,10 +145,20 @@
     color: var(--ink2);
   }
 
+  /* AND IT ARRIVES AS THE WASH, NOT AS THE LABEL. This rule set `color: var(--tone)` on top of its
+     own `--tone-wash`, which is the same hue at 12%: a colour asked to be read against a dilution
+     of itself. Measured, `danger` on `--tone-wash`: 4.10:1 over `--bg` in light, 3.83 over
+     `--sunk`, 3.82 over `--s3` in dark, against a body floor of 4.5. A bare button lands on
+     whatever surface its screen uses, so all five of them count.
+
+     The tint is not a weaker version of the same message, it is the other channel. `Chip.svelte`
+     hit the identical pair an hour ago and `blocks.css:1030` before that, and both answered by
+     keeping the surface and dropping the ink. `--ink2` here measures 5.98 at its worst across the
+     four palettes; `--tone` with the wash removed would be 4.51, which is check G's floor plus
+     0.01 and not a margin worth shipping a red word for. */
   .btn[data-weight='bare'][data-intent]:hover:not(:disabled),
   .btn[data-weight='bare'][data-intent]:focus-visible {
     background: var(--tone-wash);
-    color: var(--tone);
   }
 
   /**
