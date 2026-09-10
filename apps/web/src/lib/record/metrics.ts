@@ -31,7 +31,8 @@ import { integer, money } from 'braindog-render';
 
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf, currencyOf, mixedFix } from './money.ts';
-import { compile, explain, matches, registerHref } from './where.ts';
+import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
+import type { Where } from './where.ts';
 import type { Entry } from './schema.ts';
 
 /* ── the document ────────────────────────────────────────────────────────── */
@@ -223,9 +224,31 @@ export function currenciesRead(rows: Entry[], value: Value): Set<string> {
 const pairCurrencies = (rows: Entry[], pair: { of: Aggregation; per: Aggregation }): Set<string> =>
   new Set([...currenciesOf(rows, pair.of), ...currenciesOf(rows, pair.per)]);
 
+/**
+ * Does this row CARRY that field? Which is not the same question as what number it holds.
+ *
+ * `''` IS ABSENT HERE, and it is the one line in this file where that has to be said out loud. The
+ * record's write path drops an empty string entirely, so the register the kernel reads has no `''`
+ * in it and answers `json_extract(fields, '$.note') IS NOT NULL` for thirty-eight obligations of
+ * which five carry a note. This build's copy of the same seed stores the `''` instead of dropping
+ * it, so a browser that counted it as a value was counting rows the record does not have.
+ */
+const carries = (e: Entry, field: string): boolean => {
+  const v = e.fields[field];
+  return v !== undefined && v !== null && v !== '';
+};
+
 function aggregate(rows: Entry[], agg: Aggregation): number | null {
-  if ('count' in agg)
-    return agg.count === 'id' ? rows.length : rows.filter((e) => operand(e, agg.count) !== null).length;
+  /* A COUNT COUNTS ROWS THAT HAVE A VALUE, WHATEVER TYPE THE VALUE IS. This went through `operand`,
+     which is `amountOf`, which is `null` for every string, so `count: 'note'` read 0 where the
+     record reads 5, and `count: 'due'` and `count: 'state'` read 0 over thirty-eight rows that all
+     carry both. None of them refused: the tile came back `rows: 38`, `shown: "0"`, and under a
+     `target: { lte: 5 }` it rendered as a figure meeting its target, in green. It bit `text`,
+     `enum`, `day`, `instant` and `document` and agreed on `int` only by accident.
+
+     `operand`'s use of `amountOf` is still right for `sum`, `avg`, `min` and `max`, and the comment
+     on it says why. A count is a presence test, and it never was one. */
+  if ('count' in agg) return agg.count === 'id' ? rows.length : rows.filter((e) => carries(e, agg.count)).length;
   if ('distinct' in agg) {
     /* `JSON.stringify` RATHER THAN `String`, and absent rows dropped. `String({ amount, currency })`
        is `'[object Object]'`, so every money value in a register collapsed to ONE distinct value —
@@ -234,12 +257,16 @@ function aggregate(rows: Entry[], agg: Aggregation): number | null {
        line up already follows. */
     const seen = new Set<string>();
     for (const e of rows) {
-      const v = e.fields[agg.distinct];
-      /* `''` IS A VALUE HERE, because it is one to SQLite: the kernel's `count(DISTINCT ...)` counts
-         an empty string as a distinct value, and two builds disagreeing about what a value is is the
-         defect this fix was for, arrived at from the other side. Absent is `undefined` or `null`. */
-      if (v === undefined || v === null) continue;
-      seen.add(JSON.stringify(v));
+      /* `''` WAS KEPT AS A VALUE HERE, on the argument that it is one to SQLite: the kernel's
+         `count(DISTINCT ...)` does count an empty string as a distinct value. That is true of
+         SQLite and it is not true of this record, because the write path drops `''` before anything
+         is stored. The kernel's rows never hold one, so the two builds came out off by exactly
+         the `''` bucket, every time. `distinct: 'note'` on obligations read 6 against the record's
+         5, and `distinct: 'points_at'` on services 11 against 10. The premise was right and the
+         register it was about was the wrong one. Absent is `undefined`, `null`, or the empty string
+         this build's copy of the seed writes where the record writes nothing. */
+      if (!carries(e, agg.distinct)) continue;
+      seen.add(JSON.stringify(e.fields[agg.distinct]));
     }
     return seen.size;
   }
@@ -311,9 +338,25 @@ export function hrefFor(decl: MetricDecl): string {
   return registerHref(register, decl.where);
 }
 
-/** Does this predicate mention time at all? Without one, the shifted window is the same rows. */
-const dated = (where: string | undefined, register: string): boolean =>
-  compile(register, where).clauses.some((c) => !('values' in c));
+/**
+ * The predicate as it RESOLVES at one clock: the same clauses, with every temporal word made a day.
+ *
+ * This is what the comparison actually depends on, and the check used to ask a different question.
+ * It asked whether any clause was a DATE clause, and an absolute date is a date clause that does
+ * not move. `due before 2026-10-01` over a thirty-day window compared 10,343,000 with itself and
+ * reported `delta: 0`, so the tile read GBP 103,430.00 · no change on the 30 days before: a set
+ * compared with itself, printed as a fact about the business. The relative form of the same
+ * sentence, `due before today`, was right all along, which is why the gate looked like it worked.
+ *
+ * So the question is the kernel's: does the resolved predicate MOVE when the clock does? A word
+ * like `today` or `+30d` resolves to a different day at a moved clock and a written-out date does
+ * not, and no list of which spellings are which has to be kept anywhere.
+ */
+const resolvedAt = (w: Where, now: number): string =>
+  JSON.stringify(w.clauses.map((c) => ('values' in c ? c : { ...c, day: resolveDay(c.day, now) })));
+
+/** Does this predicate say anything different a window ago? Without that, the two sets are one set. */
+const moves = (w: Where, now: number, shift: number): boolean => resolvedAt(w, now) !== resolvedAt(w, now - shift);
 
 /**
  * Read one metric, and the comparison with it.
@@ -484,9 +527,20 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   } else if (shift < 7 * DAY_MS) {
     why = 'a window under seven days is noise';
     unmeasured = 'too short a window to compare over';
-  } else if (!dated(decl.where, register)) {
-    why = 'the predicate does not mention time, so the window moves nothing';
-    unmeasured = 'nothing here is dated, so there is no before to compare with';
+  } else if (!moves(w, now, shift)) {
+    /* TWO WAYS FOR THE WINDOW TO MOVE NOTHING, and the check only ever knew about one of them. A
+       predicate with no dated clause is the case this was written for; a predicate naming a day in
+       full is the case it let through, and that IS a date clause, so asking "is any clause a date
+       clause" answered yes and the figure was compared with itself. Each gets the sentence that is
+       true of it, because "nothing here is dated" under a tile filtered to `due before 2026-10-01`
+       is a sentence a person can see is wrong. */
+    const timeless = w.clauses.every((c) => 'values' in c);
+    why = timeless
+      ? 'the predicate does not mention time, so the window moves nothing'
+      : 'the predicate names a fixed date, so the window moves nothing';
+    unmeasured = timeless
+      ? 'nothing here is dated, so there is no before to compare with'
+      : 'this asks about one fixed date, so the same rows are on both sides of the window';
   } else {
     const before = all.filter((e) => matches(e, w, now - shift));
     if (rows.length === 0 || before.length === 0) {

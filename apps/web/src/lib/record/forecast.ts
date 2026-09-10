@@ -23,6 +23,10 @@
  */
 
 import { NOW, REGISTERS, ROWS } from './data.ts';
+/* THE SAME MARKER `metrics.ts` PUTS IN ITS OWN CURRENCY SET, imported rather than retyped: two
+   copies of the word a screen prints are two words that drift, and this one is printed by
+   `mixedFix` on both sides of the product. */
+import { BARE } from './metrics.ts';
 import { amountOf, currencyOf } from './money.ts';
 import { compile, matches, resolveDay } from './where.ts';
 import type { Entry } from './schema.ts';
@@ -60,6 +64,15 @@ export type Runway = {
   days: number | null;
   /** The horizon actually walked, so a caller can say "nothing in the next 180 days". */
   horizon: number;
+  /**
+   * What this walk would not do, in words. Empty is the ordinary case.
+   *
+   * A REFUSAL IS A VALUE, which is the posture of every other module here and the one this walk did
+   * not have. The horizon and a leg's cycle are numbers somebody typed into a declaration, and both
+   * of them used to be walked as though they were the numbers they said they were. `mixed` stays
+   * the currency channel it has always been, because that is the one the screen already reads.
+   */
+  refusals: readonly string[];
 };
 
 const DAY_MS = 86_400_000;
@@ -81,7 +94,14 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number): { day:
   const start = noon(first);
   if (!Number.isFinite(start)) return [];
   const months = leg.every ? (leg.every.months[String(row.fields[leg.every.field] ?? '')] ?? 0) : 0;
-  if (!months || !Number.isInteger(months)) return start <= until ? [{ day: first, at: start }] : [];
+  /* A CYCLE THIS TABLE HAS NO FACTOR FOR IS A ONE-OFF, and a FRACTIONAL one is not. `!months` used
+     to carry `!Number.isInteger(months)` beside it, so `monthly: 0.5`, which is how somebody writes
+     a fortnightly charge, fell through to the one-off branch and charged each monthly
+     service once in six months instead of six times. On the shipped services leg that closed at
+     436,810 against a true 348,150: GBP 886.60 too high, over thirteen steps that look exactly like
+     forty-four correct ones. The fraction is refused on the leg in `runway` now, so one cannot
+     reach this line; what is left here is the honest case, a cycle the leg's table does not name. */
+  if (!months) return start <= until ? [{ day: first, at: start }] : [];
 
   const out: { day: string; at: number }[] = [];
   for (let n = 0; n < 64; n++) {
@@ -123,6 +143,22 @@ export type Leg = {
 };
 
 /**
+ * The furthest ahead a walk may be asked to look, in days.
+ *
+ * `horizon` ARRIVES ON A PAGE BLOCK AND WAS VALIDATED BY NOTHING. It multiplies into a timestamp
+ * and feeds the recurrence loop, so a number somebody typed into a declaration decided both how
+ * much work this function does and what window the answer is about. Every wrong one still came
+ * back as a table of movements with a running balance and a crossing day, with nothing on the
+ * screen to say the window was not a window. Driven against the money page's own legs: `0` closed
+ * at 164,600 over five steps, `12.5` at minus 1,654,700 over nine, and `100000` walked 924.
+ *
+ * Ten years is longer than any cash question a person actually asks, and short enough that the
+ * recurrence loop above stays a loop. It is the kernel's number and the kernel's argument rather
+ * than a second one, because the two engines answer the same question about the same record.
+ */
+const HORIZON_CAP = 3650;
+
+/**
  * The cash walk: what is liquid now, then every dated movement in order, until it goes under.
  *
  * WHAT IT READS IS DECLARED, NOT WIRED. This walked `ROWS.obligations` and `ROWS.services` by name,
@@ -134,13 +170,44 @@ export type Leg = {
  * go under: the part already paid is not in the opening figure either.
  */
 export function runway(opening: number, legs: readonly Leg[], horizon = 180): Runway {
+  /* THE HORIZON IS A NUMBER SOMEBODY TYPED IN A DECLARATION, and it was multiplied into a timestamp
+     with nothing checked at all. A refusal is a value here as everywhere else, so a horizon this
+     walk cannot carry is a sentence rather than a table drawn over a window that is not a window. */
+  if (!Number.isInteger(horizon) || horizon < 1 || horizon > HORIZON_CAP)
+    return {
+      from: opening,
+      currency: null,
+      mixed: [],
+      steps: [],
+      crossed: null,
+      days: null,
+      horizon,
+      refusals: [
+        `A horizon is a whole number of days between 1 and ${HORIZON_CAP.toLocaleString('en-GB')}, and this one is ${JSON.stringify(horizon)}.`,
+      ],
+    };
+
   const until = NOW + horizon * DAY_MS;
+  const refusals: string[] = [];
   const movements: { at: number; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
   /** Whether any leg contributed a number with no currency on it. See the note at the check below. */
   let bare = false;
 
   for (const leg of legs) {
+    /* A CYCLE IS A WHOLE NUMBER OF MONTHS, checked once for the leg rather than once per row. A
+       fraction has no honest reading: `+0.5m` is not a step this arithmetic can take, so the walk
+       either rounds it, collapsing two occurrences onto one day, or drops the recurrence
+       altogether, which is what it did. The leg is refused by name and skipped, because half of a
+       cash walk is not a smaller cash walk, it is a crossing day computed from part of the money. */
+    const fraction = leg.every ? Object.entries(leg.every.months).find(([, n]) => !Number.isInteger(n)) : undefined;
+    if (fraction) {
+      refusals.push(
+        `${leg.register} declares a cycle of ${fraction[1]} months for ${fraction[0]}, and a cycle is a whole number of months.`,
+      );
+      continue;
+    }
+
     const decl = REGISTERS[leg.register];
     for (const row of ROWS[leg.register] ?? []) {
       /* THE SAME PREDICATE EVERY OTHER READ USES, compiled from the leg's own sentence — so a leg
@@ -186,11 +253,22 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
     }
   }
 
-  /* ONE CURRENCY OR NO WALK. A crossing day computed from two currencies is a real-looking date on
-     which nothing happens, and there is no screen on which anybody would notice. */
-  const mixed = seen.size > 1 || (bare && seen.size > 0) ? [...seen].sort() : [];
+  /* ONE CURRENCY OR NO WALK, AND A NUMBER WITH NO CURRENCY IS NOT ONE. A crossing day computed from
+     two currencies is a real-looking date on which nothing happens, and there is no screen on which
+     anybody would notice.
+
+     THE GUARD FIRED ON `bare && seen.size > 0`, so it caught a bare leg only when ANOTHER leg had
+     supplied a currency. A bare leg walking ALONE, which is the case with nothing to compare
+     it against, walked. One leg over `tasks.effort` and an opening of GBP 5,000: fourteen task
+     efforts in integer seconds were poured into a sterling balance, the walk crossed on 2026-09-06
+     at minus 243,040, and the tile above it read RUNWAY · 3 days in the alarm colour. A walk adds
+     money; a leg that is not pointed at money is not a smaller walk, it is a different question.
+     `bare` alone is the condition, and the marker goes into the set so the sentence the screen
+     already draws names what was wrong with it. */
+  if (bare) seen.add(BARE);
+  const mixed = bare || seen.size > 1 ? [...seen].sort() : [];
   const currency = mixed.length ? null : ([...seen][0] ?? null);
-  if (mixed.length) return { from: opening, currency, mixed, steps: [], crossed: null, days: null, horizon };
+  if (mixed.length) return { from: opening, currency, mixed, steps: [], crossed: null, days: null, horizon, refusals };
 
   /* A zero never reaches the walk. A free certificate renews like everything else and moves the
      balance by nothing, so it is a row that costs a line and says nothing — and in a list whose
@@ -220,6 +298,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
     crossed,
     days: crossed ? Math.round((noon(crossed.day) - NOW) / DAY_MS) : null,
     horizon,
+    refusals,
   };
 }
 

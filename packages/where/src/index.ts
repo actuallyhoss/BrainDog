@@ -43,7 +43,20 @@ export type Predicate = Node;
 /** What the predicate is allowed to name, and what each field can hold. */
 export type Schema = {
   register: string;
-  fields: Record<string, { type: string; values?: readonly string[] }>;
+  /**
+   * `label` IS OPTIONAL AND IT IS NOT DECORATION.
+   *
+   * A page prints its own `where:` back to the reader using each field's LABEL, so
+   * `direction is owed_to_me` is shown as `which way is owed to me`. Fed back to the record, that
+   * was `FIELD_UNKNOWN: obligations has no field called which`: seven of the eleven filters the
+   * shipped pages print could not be read by the record that printed them. The browser's copy of
+   * this grammar accepts labels, which is why nobody noticed, and a differential pass over the
+   * shipped seed is what found the two disagreeing.
+   *
+   * THE SENTENCE FORM IS FOR PEOPLE AND THE STRUCTURED FORM IS FOR MACHINES, which is `38 §1`'s own
+   * division: a sentence somebody can be shown and cannot type back is not a sentence.
+   */
+  fields: Record<string, { type: string; values?: readonly string[]; label?: string }>;
 };
 
 export type Compiled = {
@@ -222,6 +235,26 @@ const refuse = (code: string, fix: string, at?: string, allowed?: readonly strin
 
 /** A day and an instant are written as a string; the three plain numbers are written as a number. */
 const TEMPORAL = new Set(['day', 'instant']);
+
+/**
+ * A BARE DAY, WHICH IS WHAT A PERSON MEANS BY `today`.
+ *
+ * An `instant` is stored to the second and a day is ten characters, so `last_seen is today`
+ * compiled to `last_seen = '2026-09-03'` against `'2026-09-03T11:57:00.000Z'` and matched NOTHING,
+ * on every record, whatever it held. Its negation therefore matched EVERYTHING: `last_seen is not
+ * today` returned the whole register. The sentence grammar resolves a relative word to a day, which
+ * is right; the comparison was never made day-granular to meet it.
+ *
+ * A PERSON ASKING FOR TODAY MEANS THE DAY AND NOT THE SECOND, which is the rule the browser's copy
+ * of this grammar has carried since it was written, and a differential pass over the shipped seed
+ * is what found the two disagreeing. It applies to `before` and `after` too: without it a same-day
+ * instant sorts AFTER the bare day it falls on, so `after today` included rows from this morning
+ * while `before today` correctly excluded them, which is not an exclusive pair.
+ */
+const DAY_ONLY = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u;
+const asDay = (type: string, value: unknown): boolean =>
+  type === 'instant' && typeof value === 'string' && DAY_ONLY.test(value);
+
 const NUMERIC = new Set(['int', 'decimal', 'duration']);
 
 /** The literal a comparison binds, or a refusal if the value is not one this type can hold. */
@@ -492,8 +525,12 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            bound it to the amount's `?`, which made every money comparison match nothing — a filter
            that silently returned an empty list rather than a wrong one, which is the failure this
            whole package is built to avoid. */
+        /* THE DATE PART WHEN THE BOUND IS A BARE DAY. See `asDay`: an instant is stored to the
+           second, so comparing it against ten characters matched nothing and its negation matched
+           everything. */
+        const lhs = asDay(decl.type, bound) ? `substr(${path}, 1, 10)` : path;
         if (op === 'is') {
-          const cmp = `${path} = ${put(bound)}`;
+          const cmp = `${lhs} = ${put(bound)}`;
           return `(${cmp}${qualifier(field, decl.type, value, put)})`;
         }
 
@@ -507,7 +544,7 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            the placeholders are read in string order, so computing the amount first here would bind
            the currency to the amount's `?` — the mistake the `is` branch above records. */
         const currency = qualifier(field, decl.type, value, put);
-        const negated = `${path} = ${put(bound)}`;
+        const negated = `${lhs} = ${put(bound)}`;
         return currency
           ? `(${path} IS NULL OR (${currency.slice(' AND '.length)} AND NOT (${negated})))`
           : `(${path} IS NULL OR NOT (${negated}))`;
@@ -534,8 +571,12 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         /* EVERY VALUE CARRIES ITS OWN QUALIFIER. `in` was compiled as a bare `IN (…)` over the
            amounts, so 24,000 EUR matched a list holding 24,000 GBP — the exact mistake the `is`
            branch was written to prevent, in the branch beside it. One clause per value, ORed. */
+        /* AND EACH VALUE DECIDES ITS OWN GRANULARITY. See `asDay`: a bare day named against an
+           instant is compared to the date part, and a full timestamp is compared as one, so a list
+           holding both is answered correctly value by value. */
+        const at = (i: number) => (asDay(decl.type, bounds[i]) ? `substr(${path}, 1, 10)` : path);
         if (op === 'in') {
-          const each = list.map((v, i) => `(${path} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
+          const each = list.map((v, i) => `(${at(i)} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
           return `(${each.join(' OR ')})`;
         }
 
@@ -568,7 +609,7 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
           }
           return clauses.length ? `(${clauses.join(' OR ')}) AND ` : '';
         })();
-        const each = list.map((v, i) => `(${path} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
+        const each = list.map((v, i) => `(${at(i)} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
         return `(${path} IS NULL OR (${same}NOT (${each.join(' OR ')})))`;
       }
 
@@ -585,7 +626,10 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         }
         const sign = op === 'gt' ? '>' : op === 'gte' ? '>=' : op === 'lt' || op === 'before' ? '<' : op === 'lte' ? '<=' : '>';
         // Bound first, qualifier second, in the order the placeholders appear. See `is` above.
-        const cmp = `${path} ${sign} ${put(bound)}`;
+        /* AND THE DATE PART WHEN THE BOUND IS A BARE DAY, for the reason `asDay` gives: without it a
+           same-day instant sorts after the ten characters of its own day, so `after today` kept the
+           rows `before today` had already excluded, and the pair was not exclusive. */
+        const cmp = `${asDay(decl.type, bound) ? `substr(${path}, 1, 10)` : path} ${sign} ${put(bound)}`;
         const money = qualifier(field, decl.type, value, put);
         /* A ROW WITH NO VALUE IS NOT BEFORE ANYTHING. `IS NOT NULL` is explicit rather than relying
            on SQLite's null comparison, because the same predicate is answered by `evaluate` in
@@ -772,8 +816,14 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
       if (typeof v === 'number') return v;
       return null;
     };
-    const comparable = (v: unknown): string | number | null =>
-      type === 'day' || type === 'instant' ? (typeof v === 'string' ? v : null) : numeric(v);
+    /* AND AN INSTANT COMPARED AGAINST A BARE DAY IS CUT TO ITS DAY, which is `asDay`'s argument and
+       the same cut the compiler makes. Without it this half of the grammar disagrees with the SQL
+       half about every relative word on an instant, and the two are meant to be one grammar. */
+    const comparable = (v: unknown, against?: unknown): string | number | null => {
+      if (type !== 'day' && type !== 'instant') return numeric(v);
+      if (typeof v !== 'string') return null;
+      return against !== undefined && asDay(type, against) ? v.slice(0, 10) : v;
+    };
 
     const op = OPERATORS.find((o) => o in leaf);
     if (!op || !operatorAllowed(op, type)) return false;
@@ -789,18 +839,18 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
       case 'present':
         return !absent;
       case 'is':
-        return !absent && same(raw, value, type);
+        return !absent && same(raw, value, type, asDay(type, value));
       /* AND A FOREIGN-CURRENCY ROW IS NOT A MATCH EVEN UNDER NEGATION: it is not the thing being
          talked about. `NOT(amount = 10000 AND currency = 'GBP')` was true of every euro row. */
       case 'not':
-        return absent || (sameQualifier(type, raw, value) && !same(raw, value, type));
+        return absent || (sameQualifier(type, raw, value) && !same(raw, value, type, asDay(type, value)));
       case 'in':
-        return !absent && Array.isArray(value) && value.some((v) => same(raw, v, type));
+        return !absent && Array.isArray(value) && value.some((v) => same(raw, v, type, asDay(type, v)));
       case 'not_in':
         return (
           absent ||
           !Array.isArray(value) ||
-          (value.some((v) => sameQualifier(type, raw, v)) && !value.some((v) => same(raw, v, type)))
+          (value.some((v) => sameQualifier(type, raw, v)) && !value.some((v) => same(raw, v, type, asDay(type, v))))
         );
       case 'gt':
       case 'gte':
@@ -809,8 +859,8 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
       case 'before':
       case 'after': {
         if (absent) return false;
-        const a = comparable(raw);
-        const b = comparable(value);
+        const a = comparable(raw, value);
+        const b = comparable(value, value);
         if (a === null || b === null) return false;
         if (!sameQualifier(type, raw, value)) return false;
         if (op === 'gt' || op === 'after') return a > b;
@@ -871,7 +921,10 @@ function sameQualifier(type: string, a: unknown, b: unknown): boolean {
 }
 
 /** Equality, by type: money is equal when both halves are, because a number is not an amount. */
-function same(a: unknown, b: unknown, type: string): boolean {
+function same(a: unknown, b: unknown, type: string, byDay = false): boolean {
+  /* AN INSTANT AGAINST A BARE DAY IS EQUAL WHEN THE DAY IS. See `asDay`: `last_seen is today`
+     compared twenty-four characters against ten and matched nothing, on every record. */
+  if (byDay) return typeof a === 'string' && typeof b === 'string' && a.slice(0, 10) === b;
   if (type === 'money')
     return (
       typeof a === 'object' &&

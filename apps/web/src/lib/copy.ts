@@ -490,7 +490,20 @@ export const copy = {
   noneMatching: (total: number, what: string) => `${total} ${what}, none matching:`,
   auditHolds: 'Every change to this record is appended here, with who made it and when.',
   vaultEmpty: 'No credentials indexed yet.',
-  vaultHolds: 'A credential here is a note about what a key opens and when it was last rotated. The value itself is never in the record.',
+  /**
+   * AND WHERE ONE COMES FROM, which is the half an empty state owes its reader and this did not have.
+   *
+   * It said what a credential row IS and stopped, on the one screen in the product with no control
+   * that puts anything into it, while the comment standing over the empty state claimed the
+   * sentence "says where one comes from". `12 §6` is where it actually comes from: `bindGrant`
+   * mints the id, "a `secret` field may hold only an id that exists", and `opens` is what makes the
+   * vault better than a password manager because "the credential is attached to the thing it
+   * operates". So a credential arrives by being saved on a row, and the row is what it opens.
+   *
+   * IT ALSO SAID `key`, WHICH `19 §9` BANS OUTRIGHT on this screen: the blurb three lines up
+   * carries the whole argument and the sentence beside it kept the word anyway.
+   */
+  vaultHolds: 'A credential is indexed when you save one on the row it belongs to, so the record can say what it opens and when it was last rotated. The value is encrypted by the host and never kept here.',
   select: 'Select',
   deselect: 'Deselect',
   /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
@@ -528,6 +541,25 @@ export const copy = {
      that came in through an ingest, and the inbox is the one screen where the reader is looking at
      an email. Naming it after the mechanism that carried it is naming it after the plumbing. */
   archiveArrival: 'Archive this',
+  /**
+   * THE INBOX AT ZERO IS TWO STATES, AND IT WAS DRAWN AS ONE, in a literal typed into the route.
+   *
+   * `kind="cleared"` is the check glyph, which means YOU FINISHED, and it was drawn on a record
+   * with no connector: nothing has ever come in there and nothing can until one exists, and the
+   * screen that makes one was not linked. The body asserted a history besides, "every arrival
+   * since you last looked became a row", on a record that has never had an arrival. `19 §6`
+   * separates *nothing yet* from *nothing matched* for exactly this reason.
+   *
+   * AND IT SAID `arrival`, which is the word the note above argues against and renamed out of the
+   * button below it. That literal lived in the route rather than in this file, which is why the
+   * rename could not reach it. Both sentences are here now.
+   */
+  inboxNothingYet: 'Nothing arrives here yet.',
+  inboxNothingYetWhy:
+    'The inbox holds email that came in and matched no rule, so you can file it yourself or make the rule that files the next one like it. A connector is what brings it in.',
+  inboxConnect: 'Set up a connector',
+  inboxClear: 'Nothing unmatched.',
+  inboxClearWhy: 'Anything that comes in without a rule to file it waits here.',
   /* WHAT THE VERSION IS FOR, rather than what it is. Every change moves it by one, so it names a
      moment — which is the only thing anybody does with it. */
   auditVersion: (n: string): string =>
@@ -615,6 +647,14 @@ export const copy = {
      and a bad heading for a list of things somebody has not met yet — `packBlurb` says what one is
      and sat unused two hundred lines from the screen that needed it. */
   browse: 'Packs you can install',
+  /* THE OTHER HALF OF THIS SCREEN HAD AN EMPTY STATE AND THIS ONE DID NOT. Eleven lines above it
+     the installed grid draws `noPacksYet`; here a record that has installed everything got the
+     heading, a `0` and blank space where a list had been. `19 §6` names that exact failure, and
+     the fix was one branch away in the same file. `cleared` rather than `no-data-yet`, because
+     having them all is finishing rather than starting, and it carries no action: there is nothing
+     for the reader to do about a list somebody else publishes to. */
+  allInstalled: 'Nothing new to install.',
+  allInstalledWhy: 'Packs this record does not already have appear here, each with what it would add before you install it.',
   install: 'Install',
   uninstall: 'Uninstall',
   installDiff: 'What this adds',
@@ -789,6 +829,12 @@ export const copy = {
    * a contradiction because on that screen it was one.
    */
   accessScope: 'A level here covers every list, including ones added later. Give somebody a different level on one list and it replaces it, for that list only.',
+  /* THE WHOLE OF THIS AREA AT ONE PERSON. A level, an exception, a removal and an erasure are all
+     one person measured against another, so on a record whose only person is you there is nothing
+     for any of them to say: five greyed segments, two hints about the greying, and a red erasure
+     aimed at the reader. This sentence and the invitation below it are what is left, and everything
+     else comes back the day there is somebody to compare with. */
+  onlyPerson: 'You are the only person on this record.',
   levelFor: (name: string) => `What ${name} can do`,
   /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
      the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */

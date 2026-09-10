@@ -18,7 +18,8 @@ const OBLIGATIONS: Schema = {
   register: 'obligations',
   fields: {
     what: { type: 'text' },
-    direction: { type: 'enum', values: ['owed_by_me', 'owed_to_me'] },
+    /* WITH THE LABEL THE SCREEN SHOWS, which is what a page prints its filter back with. */
+    direction: { type: 'enum', values: ['owed_by_me', 'owed_to_me'], label: 'Which way' },
     state: { type: 'enum', values: ['open', 'part', 'paid', 'written_off'] },
     amount: { type: 'money' },
     due: { type: 'day' },
@@ -288,4 +289,38 @@ test('A FILTER THAT IS NOT A SENTENCE IS A REFUSAL, and it used to be a TypeErro
   // `null` and `undefined` are still no filter at all, which is not the same as a broken one.
   assert.deepEqual(parseWhere(null as never, OBLIGATIONS, deps), { predicate: undefined, bad: [] });
   assert.deepEqual(parseWhere(undefined, OBLIGATIONS, deps), { predicate: undefined, bad: [] });
+});
+
+/* ── the sentence a page prints back ─────────────────────────────────────── */
+
+test('A FIELD IS FOUND BY ITS LABEL, and the sentence a page prints was FIELD_UNKNOWN', () => {
+  /**
+   * A page prints its own `where:` back to the reader using each field's LABEL, so
+   * `direction is owed_to_me` appears on screen as `which way is owed to me`. Typed back, or pasted
+   * back, that was `FIELD_UNKNOWN: obligations has no field called which` - and a label is more than
+   * one word, so the parser had also taken the wrong number of words for the field. Seven of the
+   * eleven filters the shipped pages print could not be read by the record that printed them. The
+   * browser's copy of this grammar has accepted labels all along, which is why nobody noticed.
+   */
+  const byId = parse('direction is owed_to_me');
+  const byLabel = parse('which way is owed to me');
+  assert.deepEqual(byLabel.bad, [], byLabel.bad[0]?.fix);
+  assert.deepEqual(byLabel.predicate, byId.predicate);
+
+  /* CASE FOLDED, because `Which way` is how it is printed and `which way` is how it is typed. */
+  assert.deepEqual(parse('Which Way is owed to me').predicate, byId.predicate);
+
+  /* AND THE ID STILL WINS, EXACTLY, so a label somebody chooses tomorrow cannot shadow a filter
+     that works today. */
+  assert.deepEqual(parse('state is open').predicate, { field: 'state', is: 'open' });
+});
+
+test('and `or` separates alternatives however it is capitalised', () => {
+  /* A page prints `state is open or part` and a person types `state is open OR part`. `Or` is not a
+     value any register declares, so reading it as one gave `ENUM_VALUE_UNKNOWN` over a sentence that
+     is ordinary English. */
+  const lower = parse('state is open or part');
+  const upper = parse('state is open OR part');
+  assert.deepEqual(upper.bad, [], upper.bad[0]?.fix);
+  assert.deepEqual(upper.predicate, lower.predicate);
 });

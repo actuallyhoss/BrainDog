@@ -145,48 +145,57 @@
     </div>
   </Section>
 
+  <!-- AND THIS HALF HAD NONE, eleven lines under the half that does it right. A record that has
+       installed everything got the heading, a `0` and a hole where the list had been, which is the
+       failure `19 §6` names and the fix was one branch away in the same file. It is `cleared` and
+       not `no-data-yet`: having them all is finishing rather than not having started, and there is
+       no action on it, because what fills this list is somebody else publishing to it. -->
   <Section title={copy.browse} count={available.length}>
-    <ul class="ledger">
-      {#each available as pack}
-        <li>
-          <div class="line">
-            <span class="seq">{pack.author}</span>
-            <span class="line-main">
-              <span class="line-title">{pack.name}</span>
-              <span class="line-detail">{pack.blurb}</span>
-            </span>
-            <span class="line-amount">
-              {#if pack.stars}<span class="stars"><Icon name="star" size="s" />{pack.stars}</span>{/if}
-            </span>
-            <span class="line-when">
-              <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>{copy.installDiff}</Button>
-              <!-- A PACK THAT COLLIDES CANNOT BE INSTALLED, and the button says so rather than
-                   promising a transaction that would be refused. `02 §5` warns that a disabled
-                   control "invites a question the UI cannot answer" — this one is answered directly
-                   below it, in the CONFLICTS section the button points at, which is the same shape
-                   the row form uses for its own disabled submit. -->
-              <Button
-                weight="quiet"
-                disabled={Boolean(pack.conflicts?.length)}
-                aria-describedby={pack.conflicts?.length ? `conflict-${pack.id}` : undefined}
-                onclick={() =>
-                  toasts.push(copy.notWritten(`${pack.name} would be installed in one transaction, after this plan`), { intent: 'warn' })}
-              >{copy.install}</Button>
-            </span>
-          </div>
-          <!-- THE REASON IS BESIDE THE BUTTON, NOT INSIDE THE DISCLOSURE. `02 §5`'s objection to a
-               disabled control is that it "invites a question the UI cannot answer" — which is
-               exactly what it would be if the answer lived behind a panel that is closed by
-               default. One sentence, always, next to the control it disables. -->
-          {#if pack.conflicts?.length}
-            <p class="pack-refused" id="conflict-{pack.id}">
-              {copy.diffRefused(pack.conflicts.map((id) => REGISTERS[id]?.name ?? id))}
-            </p>
-          {/if}
-          {#if diff === pack.id}{@render plan(pack)}{/if}
-        </li>
-      {/each}
-    </ul>
+    {#if available.length === 0}
+      <Empty kind="cleared" title={copy.allInstalled} body={copy.allInstalledWhy} />
+    {:else}
+      <ul class="ledger">
+        {#each available as pack}
+          <li>
+            <div class="line">
+              <span class="seq">{pack.author}</span>
+              <span class="line-main">
+                <span class="line-title">{pack.name}</span>
+                <span class="line-detail">{pack.blurb}</span>
+              </span>
+              <span class="line-amount">
+                {#if pack.stars}<span class="stars"><Icon name="star" size="s" />{pack.stars}</span>{/if}
+              </span>
+              <span class="line-when">
+                <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>{copy.installDiff}</Button>
+                <!-- A PACK THAT COLLIDES CANNOT BE INSTALLED, and the button says so rather than
+                     promising a transaction that would be refused. `02 §5` warns that a disabled
+                     control "invites a question the UI cannot answer" — this one is answered directly
+                     below it, in the CONFLICTS section the button points at, which is the same shape
+                     the row form uses for its own disabled submit. -->
+                <Button
+                  weight="quiet"
+                  disabled={Boolean(pack.conflicts?.length)}
+                  aria-describedby={pack.conflicts?.length ? `conflict-${pack.id}` : undefined}
+                  onclick={() =>
+                    toasts.push(copy.notWritten(`${pack.name} would be installed in one transaction, after this plan`), { intent: 'warn' })}
+                >{copy.install}</Button>
+              </span>
+            </div>
+            <!-- THE REASON IS BESIDE THE BUTTON, NOT INSIDE THE DISCLOSURE. `02 §5`'s objection to a
+                 disabled control is that it "invites a question the UI cannot answer" — which is
+                 exactly what it would be if the answer lived behind a panel that is closed by
+                 default. One sentence, always, next to the control it disables. -->
+            {#if pack.conflicts?.length}
+              <p class="pack-refused" id="conflict-{pack.id}">
+                {copy.diffRefused(pack.conflicts.map((id) => REGISTERS[id]?.name ?? id))}
+              </p>
+            {/if}
+            {#if diff === pack.id}{@render plan(pack)}{/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </Section>
 </div>
 
@@ -231,9 +240,27 @@
     max-inline-size: 1100px;
   }
 
+  /**
+   * IT WAS THREE TRACKS, WHATEVER THE RECORD HAD IN IT.
+   *
+   * It was `repeat(3, minmax(0, 1fr))`, so a record with one installed pack drew one card across a
+   * third of a 1100px page with two thirds of nothing beside it, and the same at two. The count is
+   * a fact about the record and the rule knew nothing about it.
+   *
+   * `auto-fit` AND NOT `auto-fill`, and the difference is the whole of the fix: both make as many
+   * 280px tracks as fit, and only `auto-fit` collapses the ones no card landed in. With `auto-fill`
+   * one card still sits in a third, because the two empty tracks keep their `1fr`. The floor is
+   * 280px rather than `0` for the reason `/decide`'s `.cards` carries a count: `minmax(0, 1fr)`
+   * under `auto-fit` has no width at which to stop, and that grid generated seven tracks for three
+   * items before it was told how many it held.
+   *
+   * AND THE TWO WIDTH OVERRIDES ARE GONE WITH IT. They forced two tracks under 1200px and one under
+   * 900, which is what this rule now works out on its own, and while they stood they put a single
+   * card back into half a page at every width below 1200.
+   */
   .grid-packs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: var(--sp-3);
   }
 
@@ -387,19 +414,9 @@
     font-size: var(--t-xs);
   }
 
-  @media (width < 1200px) {
-    .grid-packs {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
   @media (width < 900px) {
     .page {
       padding: var(--sp-4) var(--sp-4) var(--sp-8);
-    }
-
-    .grid-packs {
-      grid-template-columns: minmax(0, 1fr);
     }
   }
 </style>

@@ -19,7 +19,7 @@ import { openRecord, slugify, type Kernel, type PageResult } from '@braindog/ker
 import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
-import { LOOKUPS, NOW, PAGES, THINGS, installSeed } from '../src/index.ts';
+import { LOOKUPS, NOW, PAGES, REGISTERS, THINGS, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -226,5 +226,40 @@ test('a block that names a field the register does not declare says so, and draw
   assert.equal(result.refusals[0]?.code, 'FIELD_UNKNOWN');
   assert.match(result.refusals[0]?.fix ?? '', /colour/);
   assert.ok((result.refusals[0]?.allowed ?? []).includes('amount'));
+  sql.close();
+});
+
+/* ── the sentence a page prints, fed back to the record ──────────────────── */
+
+test('EVERY FIELD IS REACHABLE BY THE NAME THE SCREEN SHOWS FOR IT', async () => {
+  /**
+   * A page prints its own `where:` back to the reader using each field's LABEL, so
+   * `direction is owed_to_me` appears on screen as `which way is owed to me`. Fed back to the
+   * record, that was `FIELD_UNKNOWN: obligations has no field called which`, and seven of the
+   * eleven filters the shipped pages print could not be read by the record that printed them. The
+   * browser's copy of the grammar accepted labels all along, which is why nobody noticed: a
+   * differential pass over this seed is what found the two disagreeing.
+   *
+   * OVER EVERY LABELLED FIELD OF EVERY REGISTER, rather than over a list of the four sentences that
+   * were failing on the day. A list of sentences is a fixture that goes stale the first time
+   * somebody renames a field; this asks the property.
+   *
+   * A REFUSAL ABOUT THE VALUE IS FINE AND IS THE POINT OF THE PROBE. `x` is not a day, an amount or
+   * a member of any enum, so most of these refuse: what must never come back is a refusal about the
+   * FIELD, because that is the record saying it cannot read a name it puts on a screen.
+   */
+  const { k, sql } = await seeded();
+  const bad: string[] = [];
+  for (const [id, decl] of Object.entries(REGISTERS)) {
+    for (const f of decl.fields as readonly { id: string; label?: string }[]) {
+      if (!f.label) continue;
+      const out = k.list({ register: id, where: `${f.label.toLowerCase()} is x`, limit: 1 });
+      if (out.ok) continue;
+      const said = refused(out) ? out.refusal : null;
+      if (said?.code === 'FIELD_UNKNOWN') bad.push(`${id}.${f.id} (${f.label}): ${said.fix}`);
+    }
+  }
+  assert.deepEqual(bad, []);
+  assert.ok(Object.keys(REGISTERS).length > 1, 'no register was probed, so this asserts nothing');
   sql.close();
 });

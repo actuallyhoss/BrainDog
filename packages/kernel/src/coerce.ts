@@ -50,6 +50,15 @@ export type FieldDecl = {
   of?: Exclude<FieldType, 'list'>;
   values?: readonly string[];
   to?: string;
+  /**
+   * The name a person reads. Absent means the id with `_` as a space.
+   *
+   * IT IS NOT USED BY COERCION AND IT IS CARRIED ANYWAY, because the query grammar needs it: a page
+   * prints its own `where:` back to the reader using the label, so `direction is owed_to_me` is
+   * shown as `which way is owed to me`, and that sentence fed back to the record was
+   * `FIELD_UNKNOWN` until the schema handed the grammar the same word the screen shows.
+   */
+  label?: string;
 };
 
 export type Coerced = { ok: true; value: Json } | { ok: false; refusal: Refusal };

@@ -22,7 +22,7 @@
  * that quietly matches everything.
  */
 
-import { REGISTERS, ROWS } from './data.ts';
+import { NOW, REGISTERS, ROWS } from './data.ts';
 import { compile, matches } from './where.ts';
 import type { Entry, PageBlock, PageDecl } from './schema.ts';
 
@@ -43,15 +43,38 @@ export const slugify = (title: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'page';
 
+/**
+ * One stat cell, filled.
+ *
+ * A DECLARATION DOES NOT HAVE TO KEEP THE TYPE'S PROMISE, and this one assumed it did.
+ * `PageBlock['cells']` writes `label: string`, `label:` is optional wherever these documents are
+ * actually authored, and a page is JSON a pack or an agent wrote rather than an object this build
+ * constructed. `cells: [{ metric: 'project-open:{{name}}' }]` handed `fill` an `undefined` and got
+ * `TypeError: Cannot read properties of undefined (reading 'replace')`, thrown out of `resolvePages`,
+ * which the rail, the router and every page listing call, and above the per-block `try/catch` that
+ * would have contained it. One optional key missing from one cell of one declaration took every
+ * page in the record off the air, which is the same failure class the record's own `fill` records
+ * for itself: ONE row called `C:\Repos` made every page unlistable.
+ *
+ * A REFUSAL IS A VALUE. The page draws, and the cell falls back to the metric it reads, because a
+ * figure with a blank caption is a figure nobody can name and the metric id is the truest short
+ * sentence available about what is being counted.
+ *
+ * The parameter is annotated with the shape a document can actually have rather than the shape the
+ * type hopes for, so the fallback is a fact the compiler can see rather than one it argues with.
+ */
+const fillCell = (c: { metric: string; label?: string }, row: Entry): { metric: string; label: string } => ({
+  metric: fill(c.metric, row),
+  label: fill(c.label ?? c.metric, row),
+});
+
 const fillBlock = (b: PageBlock, row: Entry): PageBlock => ({
   ...b,
   ...(b.heading === undefined ? {} : { heading: fill(b.heading, row) }),
   ...(b.where === undefined ? {} : { where: fill(b.where, row) }),
   ...(b.empty === undefined ? {} : { empty: fill(b.empty, row) }),
   ...(b.body === undefined ? {} : { body: fill(b.body, row) }),
-  ...(b.cells === undefined
-    ? {}
-    : { cells: b.cells.map((c) => ({ metric: fill(c.metric, row), label: fill(c.label, row) })) }),
+  ...(b.cells === undefined ? {} : { cells: b.cells.map((c) => fillCell(c, row)) }),
   ...(b.authored === undefined
     ? {}
     : { authored: b.authored.map((r) => ({ ...r, cells: r.cells.map((c) => fill(c, row)) })) }),
@@ -67,11 +90,34 @@ export function resolvePages(declared: Record<string, PageDecl>): Record<string,
   const out: Record<string, PageDecl> = {};
   const taken = new Set<string>();
 
-  for (const decl of Object.values(declared)) {
-    if (!decl.for) {
-      out[decl.page] = decl;
-      taken.add(decl.page);
+  /**
+   * A slug nothing else has.
+   *
+   * THE NUMBERED FALLBACK WAS NEVER CHECKED AGAINST ANYTHING, so the collision it exists to break
+   * could happen to it, and `out[slug] = ...` overwrites. A hand-written page `kiln`, a hand-written
+   * page `kiln-1` and a template row titled "Kiln" at seq 1 gave nine pages in the record and eight
+   * here: the template's Kiln took `kiln-1` from "Kiln one, by hand", and that page was gone from
+   * the record's page list entirely. Not listed and unreachable would be bad enough. DELETED.
+   *
+   * Counting up terminates because `taken` is finite and every step adds to it. It is the record's
+   * own `claim`, and it is copied rather than reinvented so the two page lists cannot drift again.
+   */
+  const claim = (base: string, seq: number | null): string => {
+    if (!taken.has(base)) {
+      taken.add(base);
+      return base;
     }
+    let unique = `${base}-${seq ?? taken.size}`;
+    for (let n = 2; taken.has(unique); n += 1) unique = `${base}-${seq ?? taken.size}-${n}`;
+    taken.add(unique);
+    return unique;
+  };
+
+  for (const decl of Object.values(declared)) {
+    /* THROUGH `claim` TOO, because two declarations may write the same `page:` and one of them was
+       overwriting the other in exactly the way the template expansion below did. A pack installs
+       pages it did not author beside pages it did. */
+    if (!decl.for) out[claim(decl.page, null)] = decl;
   }
 
   for (const decl of Object.values(declared)) {
@@ -85,14 +131,27 @@ export function resolvePages(declared: Record<string, PageDecl>): Record<string,
        row of the register. The same rule as everywhere else: an unreadable filter matches nothing. */
     if (w.bad.length) continue;
 
-    const rows = (ROWS[register] ?? []).filter((e) => matches(e, w, Date.now()));
+    /**
+     * THE RECORD'S CLOCK, WHICH THIS ONE LINE ALONE DID NOT USE.
+     *
+     * It read `Date.now()`. Every other date in the browser resolves against `NOW`. `filterForBlock`
+     * passes it, `metrics.read` defaults to it, `forecast.runway` walks from it. Only this line
+     * did not, so a template whose `for:` said `state is open, due before today` expanded against
+     * the wall clock while its blocks then filtered against the record's. Four pages existed
+     * where the record has three: the extra one is an obligation falling between the two clocks,
+     * it drew a heading and no rows, and the set drifted by a day every day while nothing else
+     * on the record moved.
+     *
+     * The browser disagreed with ITSELF here before it disagreed with the record, which is what
+     * makes it a typo rather than a judgement. The shipped project template is undated, so this was
+     * latent, and latent is not fixed.
+     */
+    const rows = (ROWS[register] ?? []).filter((e) => matches(e, w, NOW));
     rows.forEach((row, n) => {
       const title = String(row.fields[reg.title] ?? `${register}#${row.seq}`);
       /* A collision keeps the row's number, so two projects called the same thing are still two
          pages and neither of them silently replaces the other. */
-      const base = slugify(title);
-      const slug = taken.has(base) ? `${base}-${row.seq}` : base;
-      taken.add(slug);
+      const slug = claim(slugify(title), row.seq);
 
       out[slug] = {
         ...decl,

@@ -36,10 +36,11 @@
   import { copy } from '$lib/copy.ts';
   import { silenced } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, NOW, QUESTIONS } from '$lib/record/api.ts';
-  import { answerFor, wouldRecord } from '$lib/record/answer.ts';
+  import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -85,7 +86,10 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
-    if (!question || question.decided) return;
+    /* AND A COMMITTED QUESTION IS AS INERT AS A DECIDED ONE. The guard tested the record and not
+       this session, so after a commit the number keys still moved a highlight behind the settled
+       block and the commit chord was one field away from firing twice. */
+    if (!question || question.decided || committed) return;
     const typing = e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
 
     /* ONLY FROM INSIDE THE REASON FIELD, and only with content — 19 §4's own row. This branch ran
@@ -147,12 +151,61 @@
    * into the middle of a receipt, which is what the old `?? committing` fallback did with a blank
    * question id beside it.
    */
-  let committed = $state(false);
+  /**
+   * AND COMMITTING CHANGED NOTHING BUT A BOOLEAN, on the central act of this product.
+   *
+   * `committed = true` pushed the toast and stopped there. The reason field stayed filled, the
+   * button stayed live behind `disabled={!reason.trim()}`, and one line appeared under it saying
+   * nothing is saved yet, so pressing again gave a second identical receipt for one immutable row
+   * with a person's name on it. Somebody who watched the toast fade had no way to tell whether the
+   * first press had landed, and the shape of a dead control is the shape a person retries.
+   *
+   * THE ANSWER IS KEPT NOW, NOT A FLAG SAYING ONE HAPPENED, because the settled block below needs
+   * the four facts a receipt is made of: who, when, which option, and the reason as it was written
+   * at the press. `/decide` already answers this same act correctly, with an answered state and a
+   * way back, and two screens must not answer one act two ways.
+   */
+  let committed = $state<Answer | null>(null);
   function commit() {
     const a = committing ? answerFor(question, committing, new Date(NOW).toISOString()) : null;
     if (!a) return;
-    committed = true;
-    toasts.push(copy.notWritten(wouldRecord({ ...a, reason })), { intent: 'warn' });
+    const said: Answer = { ...a, reason };
+    committed = said;
+    toasts.push(copy.notWritten(wouldRecord(said)), { intent: 'warn' });
+  }
+
+  /**
+   * The decision this screen is showing, whichever of the two ways it got here.
+   *
+   * A question the record already carries and one answered a moment ago are the same thing to a
+   * reader, so they are drawn by one block rather than by two that can drift. The option's title
+   * is resolved here for the stored case and travels with the answer for the fresh one, which is
+   * `answer.ts`'s own rule: a receipt that re-reads the question to find out what it was about is
+   * a receipt that changes its story if the question does.
+   */
+  const settled = $derived(
+    committed ??
+      (question?.decided
+        ? {
+            by: question.decided.by,
+            at: question.decided.at,
+            title:
+              question.options.find((o) => o.key === question.decided?.option)?.title ?? question.decided.option,
+            reason: question.decided.reason,
+          }
+        : null),
+  );
+
+  /**
+   * The inverse of the press, and it puts the reason back where it was typed.
+   *
+   * `loop/REWORK.md` §4 is why it exists at all: nothing was written, and a person who has just
+   * watched a receipt appear needs a way to check they pressed the right thing that is not
+   * pressing it again. Focus follows, because the field it goes back to is the one they were in.
+   */
+  function takeBack() {
+    committed = null;
+    queueMicrotask(() => field?.focus());
   }
 
   /**
@@ -190,16 +243,32 @@
   <PageHead icon="decide" kicker={copy.decide} title={question.title} id={question.id} />
 
   <div class="page">
-    {#if question.decided}
+    <!-- THE BLOCK EXISTED AND ONLY THE RECORD COULD REACH IT. It was gated on `question.decided`,
+         so a question decided a moment ago on this screen went on showing the options, the reason
+         field and a live commit button, which is the one state where the product has to say plainly
+         that it is finished. -->
+    {#if settled}
       <div class="settled">
         <p class="settled-head">
           <Icon name="check" size="m" />
           {copy.decidedBy}
-          {question.decided.by}, {since(question.decided.at, NOW)}
+          {settled.by}, {since(settled.at, NOW)}
         </p>
-        <p class="settled-choice">{question.options.find((o) => o.key === question.decided!.option)?.title}</p>
-        <p class="settled-reason">“{question.decided.reason}”</p>
+        <p class="settled-choice">{settled.title}</p>
+        <p class="settled-reason">“{settled.reason}”</p>
         <p class="settled-note">{copy.immutable}</p>
+        <!-- NOT SAVED, ON THE RECEIPT, and the way back beside it. `Chip` draws it because the tone
+             carries its own glyph and nothing in this app renders an intent without one (13 §5.1):
+             a receipt that only went amber says nothing to a screen reader. Only for a decision
+             made in this session, because one the record carries IS saved. -->
+        {#if committed}
+          <div class="settled-mock">
+            <Chip label={copy.markNotWritten} tone="warn" />
+            <Button weight="bare" aria-label={copy.takeItBackOf(question.title)} onclick={takeBack}>
+              {copy.takeItBack}
+            </Button>
+          </div>
+        {/if}
       </div>
     {:else}
       <section class="cost">
@@ -312,9 +381,9 @@
                  next press is the irreversible one. -->
             {#if reason.trim()}<span class="commit-note">{copy.immutable}</span>{/if}
           </div>
-          {#if committed}
-            <p class="commit-done">{copy.mockNotice}</p>
-          {/if}
+          <!-- THE LINE THAT SAID "Nothing you do here is saved yet." UNDER A STILL-LIVE BUTTON is
+               gone: this panel is replaced by the settled block the moment the press lands, and the
+               chip on that block carries the same fact where it is the whole of the news. -->
         </section>
       {:else}
         <div class="third">
@@ -555,12 +624,6 @@
     font-size: var(--t-xs);
   }
 
-  .commit-done {
-    margin-block-start: var(--sp-3);
-    color: var(--accent-text);
-    font-size: var(--t-ui);
-  }
-
   .third {
     display: flex;
     align-items: center;
@@ -600,6 +663,14 @@
     margin-block-start: var(--sp-3);
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  /* The chip and the way back, on one line, under the receipt they belong to. */
+  .settled-mock {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-3);
   }
 
   @media (width < 900px) {

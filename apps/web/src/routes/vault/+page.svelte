@@ -60,64 +60,77 @@
        this surface, and `vaultBlurb` had it, unrendered, in `copy.ts`. -->
   <p class="blurb">{copy.vaultBlurb}</p>
 
-  <ul class="ledger">
-    <!-- A NEW RECORD HAS NO CREDENTIALS IN IT, and this was a bare `{#each}` over the list: a
+  <!-- A NEW RECORD HAS NO CREDENTIALS IN IT, and this was a bare `{#each}` over the list: a
        heading, a `0`, one sentence of standing prose, and then nothing at all. `19 §6` names the
-       state and asks for a line saying what belongs here; the vault's own framing sentence already
-       says what that is, so the state says where one comes from. -->
+       state and asks for a line saying what belongs here.
+
+       IT SAT INSIDE THE `<ul>`, WHERE IT IS NOT A PERMITTED CHILD. A list holds list items and
+       nothing else, so the markup announced an empty list with a sentence orphaned inside it. The
+       two states are siblings now and the list is built only when it has rows.
+
+       AND THE SENTENCE SAID WHAT A CREDENTIAL ROW IS AND NEVER WHERE ONE COMES FROM, while the
+       comment standing in this spot claimed that it did. `vaultHolds` says both now. What it does
+       not say is "ask an agent": `12 §6` rule 7 makes the whole vault group a browser session
+       only, and every token is refused, so the copyable prompt the two settings screens carry
+       would be a door that answers with a refusal. -->
   {#if VAULT.length === 0}
     <Empty kind="no-data-yet" title={copy.vaultEmpty} body={copy.vaultHolds} />
+  {:else}
+    <ul class="ledger">
+      {#each VAULT as c}
+        <li>
+          <div class="line">
+            <!-- THE KIND AS A READER SAYS IT. `api_token` is what the column holds; `12 §6` closes
+                 the list at five and `19 §9` bans the word this screen used for three of them. -->
+            <span class="seq">{copy.credentialKinds[c.kind] ?? c.kind}</span>
+            <span class="line-main">
+              <span class="line-title">{c.label}</span>
+              <span class="line-detail">{copy.opens}: {c.opens}</span>
+            </span>
+            <span class="line-amount">
+              <!-- IT SAYS WHAT IT WOULD DO. A reveal is the one action in this product that is
+                   audited with your name on it, and a button that does nothing under a warning
+                   saying so teaches somebody the warning is decorative. -->
+              <Button
+                weight="bare"
+                onclick={() =>
+                  toasts.push(copy.notWritten(`${c.label} would be decrypted once and the read logged against you`), {
+                    intent: 'warn',
+                  })}
+              >
+                <Icon name="eye" size="s" />
+                {copy.reveal}
+              </Button>
+            </span>
+            <!-- A STALE CREDENTIAL WAS AMBER AND NOTHING ELSE. `13 §5.1`: colour never carries
+                 meaning alone. "14 months ago" in warn amber says "rotate this" to somebody who sees
+                 the amber and says nothing at all to anybody else — on the one screen in the product
+                 where not noticing has a cost measured in somebody else's access to your accounts. -->
+            <span class="line-when" data-intent={c.stale ? 'warn' : undefined}>
+              {#if c.stale}
+                <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
+              {/if}
+              <!-- THE COLUMN SAYS WHAT THE DATE IS. "14 months ago" beside a credential label is a
+                   date with no noun: rotated? created? last opened? All three are on this row's DDL
+                   (`12 §6`) and only one is on screen. `copy.rotated` existed for this and rendered
+                   nowhere. -->
+              <span class="rotated-key">{copy.rotated}</span>
+              {relative(c.rotated, NOW)}
+            </span>
+          </div>
+        </li>
+      {/each}
+    </ul>
+
+    <!-- THE WARNING BELONGS TO THE CONTROL, AND IT STOOD OUTSIDE EVERY GUARD. An empty vault drew
+         an alert glyph and a sentence about Reveal, which is not on the screen at n=0: a caution
+         about an action nobody can take is `06 §1`'s warning that does not apply, on the one screen
+         in this product where the warnings have to be read. -->
+    <p class="note">
+      <Icon name="alert" size="s" />
+      {copy.revealWarning}
+    </p>
   {/if}
-
-  {#each VAULT as c}
-      <li>
-        <div class="line">
-          <!-- THE KIND AS A READER SAYS IT. `api_token` is what the column holds; `12 §6` closes
-               the list at five and `19 §9` bans the word this screen used for three of them. -->
-          <span class="seq">{copy.credentialKinds[c.kind] ?? c.kind}</span>
-          <span class="line-main">
-            <span class="line-title">{c.label}</span>
-            <span class="line-detail">{copy.opens}: {c.opens}</span>
-          </span>
-          <span class="line-amount">
-            <!-- IT SAYS WHAT IT WOULD DO. A reveal is the one action in this product that is
-                 audited with your name on it, and a button that does nothing under a warning
-                 saying so teaches somebody the warning is decorative. -->
-            <Button
-              weight="bare"
-              onclick={() =>
-                toasts.push(copy.notWritten(`${c.label} would be decrypted once and the read logged against you`), {
-                  intent: 'warn',
-                })}
-            >
-              <Icon name="eye" size="s" />
-              {copy.reveal}
-            </Button>
-          </span>
-          <!-- A STALE CREDENTIAL WAS AMBER AND NOTHING ELSE. `13 §5.1`: colour never carries
-               meaning alone. "14 months ago" in warn amber says "rotate this" to somebody who sees
-               the amber and says nothing at all to anybody else — on the one screen in the product
-               where not noticing has a cost measured in somebody else's access to your accounts. -->
-          <span class="line-when" data-intent={c.stale ? 'warn' : undefined}>
-            {#if c.stale}
-              <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
-            {/if}
-            <!-- THE COLUMN SAYS WHAT THE DATE IS. "14 months ago" beside a credential label is a
-                 date with no noun: rotated? created? last opened? All three are on this row's DDL
-                 (`12 §6`) and only one is on screen. `copy.rotated` existed for this and rendered
-                 nowhere. -->
-            <span class="rotated-key">{copy.rotated}</span>
-            {relative(c.rotated, NOW)}
-          </span>
-        </div>
-      </li>
-    {/each}
-  </ul>
-
-  <p class="note">
-    <Icon name="alert" size="s" />
-    {copy.revealWarning}
-  </p>
 </div>
 
 <style>

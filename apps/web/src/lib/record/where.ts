@@ -80,7 +80,28 @@ const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
  * the third of March, because the second is not what anybody means.
  */
 export function resolveDay(word: string, now: number): string | null {
-  if (ISO.test(word)) return word;
+  /**
+   * THE SHAPE IS NOT THE CHECK, AND FOR EIGHT MONTHS IT WAS THE WHOLE OF IT.
+   *
+   * `ISO` is `^\d{4}-\d{2}-\d{2}$`, which says a string looks like a day and says nothing about
+   * whether that day exists. `due before 9999-99-99` returned all thirty-eight obligations and
+   * `due after 0000-00-00` returned all thirty-eight as well, because the word went back out
+   * unchanged and `matches` compared it as a string: every stored date sorts below `9999-99-99` and
+   * above `0000-00-00`. `renews before 9999-99-99` did the same to all sixteen services. That is the
+   * clause that quietly matches every row, reached through this file's own date test: the failure
+   * the header above lists four examples of, with a fifth one hiding inside the check written to
+   * prevent them.
+   *
+   * THE ROUND TRIP IS WHAT SAYS THE DAY IS REAL. `Date.UTC` and the lenient parsers normalise rather
+   * than refuse (`2026-02-30` comes back as 2 March), so parsing is not enough either; the day has
+   * to come back spelled the way it was written. `Date.parse` of an impossible day is `NaN` and
+   * `.toISOString()` on that THROWS, so the finiteness check comes first.
+   */
+  if (ISO.test(word)) {
+    const ms = Date.parse(`${word}T12:00:00Z`);
+    if (!Number.isFinite(ms)) return null;
+    return new Date(ms).toISOString().slice(0, 10) === word ? word : null;
+  }
 
   const d = new Date(now);
   switch (word) {
@@ -240,6 +261,26 @@ function allowed(register: string, field: string): string[] | null {
 }
 
 /**
+ * Whether a money value, as somebody wrote it, names a currency.
+ *
+ * A MONEY VALUE IS AN AMOUNT AND A CURRENCY, and this grammar has no money literal: it compares the
+ * value against `display()`, which writes `GBP 960.00`. So the currency is a word in the sentence
+ * or it is not there at all, and `amount is 480000` is a comparison that cannot say what it is a
+ * comparison OF. The record refuses it as `MONEY_LITERAL_NEEDS_CURRENCY` for the reason its own
+ * refusal gives: without one it matches every currency in the register, and adding two currencies
+ * is the mistake minor units exist to make impossible.
+ *
+ * The code sits at one end or the other, since `GBP 960.00` is what every surface here prints, rather
+ * than anywhere in the string, because "the big one" holds three three-letter words and none of
+ * them is money.
+ */
+const CURRENCY = /^[a-z]{3}$/i;
+const carriesCurrency = (value: string): boolean => {
+  const words = value.trim().split(/\s+/);
+  return CURRENCY.test(words[0] ?? '') || CURRENCY.test(words[words.length - 1] ?? '');
+};
+
+/**
  * Parse a predicate AND check it against the register it will run on.
  *
  * Splitting on the comma is safe for the values this grammar holds — enum words, a row's title, a
@@ -293,7 +334,36 @@ export function compile(register: string, where: string | undefined): Where {
       continue;
     }
 
+    /* The declaration behind the resolved name, read ONCE. Both branches below need the field's
+       type, and the `is` branch used to look it up on its own while the `before` branch never
+       looked it up at all, which is the next paragraph. */
+    const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
+    const dated = decl?.type === 'day' || decl?.type === 'instant';
+
     if (op === 'before' || op === 'after') {
+      /**
+       * AND THE FIELD HAS TO BE A DATE, WHICH NOTHING HERE EVER ASKED.
+       *
+       * This branch asked only whether the OPERAND resolved as a day. It never asked what the field
+       * was, and `matches` then ran `raw.slice(0, 10) < day` over whatever the column held, which
+       * for text and for an enum is a string comparison against a date. `state after today` was
+       * `'open' > '2026-09-03'`, true of all thirty-eight obligations, and `what after
+       * 2026-01-01` was true of all thirty-eight as well, because a letter sorts after a digit.
+       * `what before today` was 0 of 38 for the same reason in the other direction. That is 1,470
+       * of the 3,563 sentences a differential pass drove, which is every `before` or `after` over
+       * every field in the record that is not a date.
+       *
+       * Nothing on a screen distinguishes any of them from a filter that worked. It is the clause
+       * that quietly matches every row, which is the failure this file's header is written against,
+       * reached through the one operator pair the header does not list.
+       *
+       * The record's rule is the same rule, in `operatorAllowed`: `before` and `after` are for a
+       * `day` or an `instant`, and on any other type they are a refusal rather than a comparison.
+       */
+      if (!dated) {
+        bad.push(`${text}: ${field} is a ${decl?.type ?? 'field'}, and ${op} is about dates`);
+        continue;
+      }
       const word = rest.trim();
       if (resolveDay(word, Date.now()) === null) {
         bad.push(`${text}: ${word} is not a date`);
@@ -320,9 +390,21 @@ export function compile(register: string, where: string | undefined): Where {
      * The date path is taken only when the FIELD is a date and the value resolves as one, so an enum
      * whose value is literally the word `today` is untouched.
      */
-    const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
-    const dated = decl?.type === 'day' || decl?.type === 'instant';
     const one = rest.trim();
+
+    /**
+     * `is not` WITH NOTHING AFTER IT IS NOT A SEARCH FOR THE WORD `not`.
+     *
+     * `CLAUSE` prefers the longer operator, so `what is not` tried `is not` first, found no value
+     * behind it, backtracked to `is`, and compiled `what is "not"`: a filter for obligations whose
+     * description is the word "not". It matched nothing, said nothing, and drew the author's own
+     * "nothing matched" sentence, which is the state `blocks.ts` exists to keep apart from a filter
+     * that was never understood. The record asks the question back: `is not what?`
+     */
+    if (op === 'is' && one === 'not') {
+      bad.push(`${text}: is not what?`);
+      continue;
+    }
     /* `op === 'is'` AND NOT MERELY "not before or after". `before` and `after` are consumed above,
        and `is not` fell straight through here — so the negation was DROPPED and `due is not today`
        compiled to the same clause as `due is today`. Reachable from a URL, not only a typed
@@ -349,8 +431,42 @@ export function compile(register: string, where: string | undefined): Where {
     /* ` or ` and not `|`, because the person reading this is reading a sentence. */
     const values = rest.split(/\s+or\s+/i).map((v) => v.trim()).filter(Boolean);
 
+    /**
+     * A TYPE WITH NO DECLARED SET IS STILL NOT AN OPEN ONE, and it was being treated as one.
+     *
+     * `allowed` closes an `enum` by its values and a `ref` by the titles it points at, and returned
+     * `null` for everything else, so on a `day`, an `instant` or a `money` field ANY word compiled
+     * clean and went to `formsOf`, which compares it against the stored string and against
+     * `display()`. Four of the five refusals the record gives and this file did not came out of
+     * that hole, and the fifth is the ISO round trip above:
+     *
+     *     due is banana        →   0 of 38, no refusal    the record: banana is not a value due can hold
+     *     amount is 480000     →   0 of 38, no refusal    the record: amount is money, name a currency
+     *     amount is not today  →  38 of 38, no refusal    the record: the same
+     *
+     * The last one is the one that bites, and it is the shape the whole file exists to stop: on a
+     * field that cannot hold the value at all, `is not <anything>` excludes no row and hands back
+     * the entire register looking like an answer. An empty list is the milder half of the same
+     * mistake: it draws the author's own "nothing matched" sentence, which `blocks.ts` keeps
+     * apart from "the filter was not understood", and here the filter was not understood.
+     *
+     * A DAY IS CHECKED BY RESOLVING IT, which is the same test the operand of `before` gets and the
+     * same test `is` got two branches up before it fell through to here. The narrowing this costs
+     * is real and worth naming: `due is 27 Jul 2026`, the day as a table cell prints it, used to
+     * match one row through `display()` and is now a refusal. No surface in this app writes that
+     * spelling (`saidPlainly` and `registerHref` both emit the stored `2026-07-27`), and a filter
+     * whose meaning depends on how a cell is formatted is the thing the `is <a date>` paragraph
+     * above refuses to have.
+     */
     const set = allowed(register, field);
-    const unknown = set ? values.filter((v) => !set.includes(norm(v))) : [];
+    const closed = set !== null || dated || decl?.type === 'money';
+    const unknown = set
+      ? values.filter((v) => !set.includes(norm(v)))
+      : dated
+        ? values.filter((v) => resolveDay(v, Date.now()) === null)
+        : decl?.type === 'money'
+          ? values.filter((v) => !carriesCurrency(v))
+          : [];
 
     /* AN OPERATOR IN THE VALUE SLOT IS AN OPERATOR, NOT A VALUE, and it is checked only AFTER the
        declared values, so an enum that really holds the word `present` still resolves.
@@ -360,7 +476,7 @@ export function compile(register: string, where: string | undefined): Where {
        sentence — which is the one state `blocks.ts` exists to keep separate from a filter that was
        not understood. These are the operators `21-AUTHORING` §4.2 publishes and this build does not
        read, so an agent writing from the docs is told so instead of being handed an empty block. */
-    const reach = (set ? unknown : values).find((v) =>
+    const reach = (closed ? unknown : values).find((v) =>
       UNIMPLEMENTED.some((w) => v.toLowerCase().startsWith(`${w} `) || v.toLowerCase() === w),
     );
     if (reach) {
@@ -371,7 +487,17 @@ export function compile(register: string, where: string | undefined): Where {
     }
 
     if (unknown.length) {
-      bad.push(`${text}: ${field} has no value ${unknown.join(' or ')}`);
+      /* THE REFUSAL SAYS WHICH KIND OF WRONG IT IS. "state has no value done" is a fact about a
+         declared set and is the wrong sentence for `amount is 480000`, where the set is open and
+         the value is short of a currency; a person told the register has no such amount would go
+         looking for the row. Three types, three sentences, each naming the one thing to change. */
+      bad.push(
+        decl?.type === 'money'
+          ? `${text}: ${field} is money, so this comparison needs a currency, like GBP 960.00`
+          : dated
+            ? `${text}: ${unknown.join(' or ')} is not a value ${field} can hold`
+            : `${text}: ${field} has no value ${unknown.join(' or ')}`,
+      );
       continue;
     }
     clauses.push({ field, op: op === 'is not' ? 'is not' : 'is', values });

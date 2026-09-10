@@ -11,10 +11,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { applyFilters, page, pages, type Filter } from './api.ts';
-import { PAGES, REGISTERS, ROWS } from './data.ts';
+import { NOW, PAGES, REGISTERS, ROWS } from './data.ts';
 import { draw } from './blocks.ts';
 import { fill, resolvePages, slugify } from './pages.ts';
-import { registerHref } from './where.ts';
+import { compile, matches, registerHref } from './where.ts';
 import type { PageDecl } from './schema.ts';
 
 const projects = () => Object.values(pages()).filter((p) => p.param?.register === 'things');
@@ -295,5 +295,107 @@ test('EVERY BLOCK BOUND TO AN EMPTY LIST SAYS "nothing here yet", not "nothing m
     assert.ok(seen >= 3, `only ${seen} blocks read services, so this proves less than it should`);
   } finally {
     held.push(...was);
+  }
+});
+
+/* ── two pages on one slug ───────────────────────────────────────────────── */
+
+test('A SECOND COLLISION ON THE NUMBERED SLUG DELETED A PAGE', () => {
+  /**
+   * The fallback was `${base}-${row.seq}` and it was never checked against anything, while
+   * `out[slug] = …` overwrites. A hand-written `kiln`, a hand-written `kiln-1` and a template row
+   * titled "Kiln" at seq 1 all wanted `kiln-1`, and the template took it: "Kiln one, by hand" was
+   * gone from the record's page list entirely. The record's own audit filed this as a page listed
+   * and unreachable; here it is worse, because the page is not listed either.
+   *
+   * The fix counts up until the slug is free, which is the record's `claim`, copied.
+   */
+  const kiln = (ROWS.things ?? []).find((t) => t.fields.name === 'Kiln');
+  assert.ok(kiln, 'the seed has no project called Kiln, so this proves nothing');
+
+  const declared: Record<string, PageDecl> = {
+    ...PAGES,
+    kiln: { page: 'kiln', title: 'Kiln, by hand', blocks: [] } as unknown as PageDecl,
+    'kiln-1': { page: 'kiln-1', title: 'Kiln one, by hand', blocks: [] } as unknown as PageDecl,
+  };
+
+  const out = resolvePages(declared);
+  const titles = Object.values(out).map((p) => p.title);
+  assert.equal(Object.keys(out).length, Object.keys(resolvePages(PAGES)).length + 2, 'a page was destroyed by a slug collision');
+  for (const title of ['Kiln, by hand', 'Kiln one, by hand', 'Kiln'])
+    assert.ok(titles.includes(title), `"${title}" is not in the page list`);
+
+  /* AND EVERY ONE OF THEM IS REACHABLE UNDER THE SLUG IT IS FILED AT. A page in the list at an
+     address that serves a different document is the milder half of the same defect. */
+  assert.equal(new Set(Object.keys(out)).size, Object.keys(out).length);
+  for (const [slug, decl] of Object.entries(out)) assert.equal(out[slug]?.title, decl.title);
+});
+
+/* ── the record's clock, everywhere ──────────────────────────────────────── */
+
+test('a template expands on the RECORD’S clock, not the wall clock', () => {
+  /**
+   * `matches(e, w, Date.now())` was the one date in the browser that did not resolve against `NOW`.
+   * A template filtering `due before today` therefore expanded against whatever day it happened to
+   * be run on, while the blocks on the pages it produced filtered against the record's day: a page
+   * existed that the record does not have, drew a heading and no rows, and the set drifted by one
+   * every day while nothing else on the record moved.
+   *
+   * A RELATIVE WORD, NOT AN ISO LITERAL. An absolute date resolves the same on both clocks, so it
+   * cannot reach this at all.
+   */
+  const declared: Record<string, PageDecl> = {
+    ...PAGES,
+    overdue: {
+      page: 'overdue',
+      title: '{{what}}',
+      for: { register: 'obligations', where: 'state is open, due before today' },
+      blocks: [],
+    } as unknown as PageDecl,
+  };
+
+  const built = Object.values(resolvePages(declared)).filter((p) => p.param?.register === 'obligations');
+  const w = compile('obligations', 'state is open, due before today');
+  const wanted = (ROWS.obligations ?? []).filter((e) => matches(e, w, NOW));
+  const wall = (ROWS.obligations ?? []).filter((e) => matches(e, w, Date.now()));
+
+  assert.notEqual(wanted.length, wall.length, 'the two clocks agree today, so this proves nothing');
+  assert.equal(built.length, wanted.length, `${built.length} pages for ${wanted.length} rows the record admits`);
+  assert.deepEqual(built.map((p) => p.param?.seq).sort(), wanted.map((e) => e.seq).sort());
+});
+
+/* ── one missing optional key ────────────────────────────────────────────── */
+
+test('a `cells:` entry with no `label:` does not take EVERY page off the rail', () => {
+  /**
+   * `fill(c.label, row)` handed `String.prototype.replace` an `undefined` and threw out of
+   * `resolvePages`, which the rail, the router and every page listing call, above the per-block
+   * `try/catch` that would have contained it. One optional key missing from one cell of one
+   * declaration made every page in the record unlistable.
+   *
+   * A refusal is a value: the page draws, and the cell falls back to naming the metric it reads.
+   */
+  const declared: Record<string, PageDecl> = {
+    ...PAGES,
+    unlabelled: {
+      page: 'unlabelled',
+      title: '{{name}}',
+      for: { register: 'things', where: 'lane is building or earning' },
+      blocks: [{ kind: 'stat', heading: 'No label here', cells: [{ metric: 'project-open:{{name}}' }] }],
+    } as unknown as PageDecl,
+  };
+
+  const out = resolvePages(declared);
+  const shipped = resolvePages(PAGES);
+  for (const slug of Object.keys(shipped))
+    assert.ok(Object.values(out).some((p) => p.title === shipped[slug]?.title), `${slug} was lost`);
+
+  const built = Object.values(out).filter((p) => p.blocks?.[0]?.heading === 'No label here');
+  assert.ok(built.length > 1, 'the template produced no pages, so nothing was filled');
+  for (const p of built) {
+    const cell = p.blocks?.[0]?.cells?.[0];
+    assert.ok(cell, 'the cell is gone');
+    assert.ok(!cell.metric.includes('{{'), `${p.page}: the metric was not filled`);
+    assert.equal(cell.label, cell.metric, `${p.page}: an unlabelled cell has no name to draw`);
   }
 });

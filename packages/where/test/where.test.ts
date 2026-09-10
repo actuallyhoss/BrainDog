@@ -24,14 +24,16 @@ const SCHEMA: Schema = {
     open: { type: 'bool' },
     state: { type: 'enum', values: ['open', 'part', 'paid', 'written_off'] },
     tags: { type: 'list' },
+    /* Stored to the second, which is the whole subject of the instant test below. */
+    at: { type: 'instant' },
   },
 };
 
 type Row = { id: string; fields: Record<string, unknown> };
 
 const ROWS: Row[] = [
-  { id: 'a', fields: { what: 'Invoice 41 — brand', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', n: 3, state: 'open', tags: ['urgent', 'design'], effort: { value: 2, unit: 'days' } } },
-  { id: 'b', fields: { what: 'Retainer, August', amount: { amount: 24_000, currency: 'GBP' }, due: '2026-10-01', n: 9, state: 'paid', tags: ['retainer'] } },
+  { id: 'a', fields: { what: 'Invoice 41 — brand', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', n: 3, state: 'open', tags: ['urgent', 'design'], effort: { value: 2, unit: 'days' }, at: '2026-08-01T11:57:00.000Z' } },
+  { id: 'b', fields: { what: 'Retainer, August', amount: { amount: 24_000, currency: 'GBP' }, due: '2026-10-01', n: 9, state: 'paid', tags: ['retainer'], at: '2026-08-02T00:00:01.000Z' } },
   { id: 'c', fields: { what: 'Hosting', amount: { amount: 24_000, currency: 'EUR' }, due: '2026-09-05', n: 0, state: 'part', tags: [] } },
   { id: 'd', fields: { what: 'No amount at all', state: 'open' } },
   { id: 'e', fields: { what: '50% deposit', amount: { amount: 100_000, currency: 'GBP' }, due: '2026-12-31', n: 1, state: 'open', tags: ['deposit'] } },
@@ -718,4 +720,28 @@ test('A LOWER-CASE CURRENCY IS THE SAME CURRENCY, because the write path upper-c
      not, and answering a question about one with the other is the mistake a unit exists to stop. */
   assert.deepEqual(both({ field: 'effort', is: { value: 2, unit: 'days' } }), ['a']);
   assert.deepEqual(both({ field: 'effort', is: { value: 2, unit: 'DAYS' } }), []);
+});
+
+/* ── an instant, against the day a person named ──────────────────────────── */
+
+test('AN INSTANT IS COMPARED BY ITS DAY, and `is` matched nothing while `not` matched everything', () => {
+  /**
+   * An `instant` is stored to the second and a day is ten characters, so `at is 2026-08-01`
+   * compiled to `at = '2026-08-01'` against `'2026-08-01T11:57:00.000Z'` and matched NOTHING, on
+   * every record, whatever it held. Its negation therefore matched EVERYTHING. The sentence grammar
+   * resolves a relative word to a day, which is right; the comparison was never made day-granular
+   * to meet it, and a differential pass against the browser's copy of this grammar is what found it.
+   */
+  assert.deepEqual(both({ field: 'at', is: '2026-08-01' }), ['a']);
+  assert.deepEqual(both({ field: 'at', not: '2026-08-01' }), ['b', 'c', 'd', 'e']);
+  assert.deepEqual(both({ field: 'at', in: ['2026-08-01', '2026-08-02'] }), ['a', 'b']);
+
+  /* AND `before`/`after` ARE EXCLUSIVE OF THE DAY NAMED, which they were not: a same-day instant
+     sorts after the ten characters of its own day, so `after` kept the rows `before` excluded. */
+  assert.deepEqual(both({ field: 'at', before: '2026-08-02' }), ['a']);
+  assert.deepEqual(both({ field: 'at', after: '2026-08-01' }), ['b']);
+
+  /* A FULL TIMESTAMP IS STILL COMPARED AS ONE. The day rule is about the value somebody NAMED, and
+     naming a second is naming a second. */
+  assert.deepEqual(both({ field: 'at', is: '2026-08-01T11:57:00.000Z' }), ['a']);
 });

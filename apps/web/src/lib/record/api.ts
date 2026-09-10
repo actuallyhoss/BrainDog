@@ -1399,8 +1399,18 @@ function runwayBlock(b: PageBlock): BlockResult {
   ];
   const steps = walk.steps.slice(0, b.limit ?? 12);
   /* A WALK THE RECORD CANNOT MAKE IS A SENTENCE, not an empty table. A cash walk over two currencies
-     produces a crossing day that looks real and is invented. */
-  const refusals = walk.mixed.length ? [`The cash walk needs one currency: ${mixedFix(walk.mixed)}.`] : [];
+     produces a crossing day that looks real and is invented.
+
+     AND THE WALK'S OWN SENTENCES REACH THE BLOCK, WHICH THEY DID NOT. This read `walk.mixed` and
+     nothing else, so the refusals the walk itself produces — a horizon it cannot carry, a leg
+     pointed at something that is not money, a cycle that is not a whole number of months, a row
+     that recurs past the cap — came back to a block that drew an empty table under its own `empty:`
+     sentence instead. "Nothing is coming" and "this walk could not be made" are different facts and
+     one of them is the reason for the other. */
+  const refusals = [
+    ...walk.refusals,
+    ...(walk.mixed.length ? [`The cash walk needs one currency: ${mixedFix(walk.mixed)}.`] : []),
+  ];
   return {
     ...b,
     register: undefined,
@@ -1415,7 +1425,10 @@ function runwayBlock(b: PageBlock): BlockResult {
          only adds up if you already know the walk started at 5,000 — and the red "RUNWAY 0 days"
          headline above it is derived from the same invisible figure. A forecast whose arithmetic
          cannot be checked from the screen is a number somebody has to trust. */
-      ...(walk.mixed.length
+      /* AND NO OPENING ROW UNDER A REFUSAL OF ANY KIND, for the reason the mixed-currency case
+         already had: a block that refuses draws nothing, and half a table under a sentence saying
+         the walk could not be made is the half somebody reads. */
+      ...(refusals.length
         ? []
         : [
             {

@@ -415,7 +415,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     fields: Object.fromEntries(
       (registers.get(register)?.fields ?? [])
         .filter((f) => !f.retired)
-        .map((f) => [f.id, { type: f.type, ...(f.values ? { values: f.values } : {}), ...(f.to ? { to: f.to } : {}) }]),
+        /* THE LABEL TRAVELS WITH THE FIELD, because a page prints its own `where:` back to the
+           reader using it: `direction is owed_to_me` is shown as `which way is owed to me`. Without
+           it here, that sentence fed back to the record was `FIELD_UNKNOWN`, and seven of the eleven
+           filters the shipped pages print could not be read by the record printing them. */
+        .map((f) => [
+          f.id,
+          {
+            type: f.type,
+            ...(f.values ? { values: f.values } : {}),
+            ...(f.to ? { to: f.to } : {}),
+            ...(f.label ? { label: f.label } : {}),
+          },
+        ]),
     ),
   });
 
@@ -519,7 +531,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           fields: Object.fromEntries(
             fields
               .filter((f) => !f.retired)
-              .map((f) => [f.id, { type: f.type, ...(f.values ? { values: f.values } : {}), ...(f.to ? { to: f.to } : {}) }]),
+              /* The label too, for the reason `schemaOf` gives: a page prints its filter back with
+                 it, and a sentence somebody can be shown and cannot type back is not a sentence. */
+              .map((f) => [
+                f.id,
+                {
+                  type: f.type,
+                  ...(f.values ? { values: f.values } : {}),
+                  ...(f.to ? { to: f.to } : {}),
+                  ...(f.label ? { label: f.label } : {}),
+                },
+              ]),
           ),
         };
       }

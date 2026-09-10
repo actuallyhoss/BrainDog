@@ -274,6 +274,30 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const now = read(sql, said.predicate, schema, decl, ctx.lookups);
   if (!now.ok) return now;
 
+  /**
+   * AND THE FORMAT IS CHECKED AGAINST THE ROWS, WHICH IT WAS NOT.
+   *
+   * `format: money.USD` is a declaration about how to WRITE the figure and the rows are what it is a
+   * figure OF, so when they disagree the declaration is wrong. This side checked neither: a `sum` of
+   * sterling invoices declared `money.USD` came back as a plain number with `unit: 'GBP'` and no
+   * refusal, and every renderer in this product formats from `decl.format`, so it reached a screen
+   * as USD 168,794.00 over rows that are in pounds. That is the worst class of defect this file
+   * knows: a figure of the right size in the wrong currency, with nothing on the screen disagreeing
+   * with anything else on it.
+   *
+   * THE BROWSER'S COPY OF THIS EVALUATOR HAS HAD THE CHECK ALL ALONG, one sentence and eight lines,
+   * and a differential pass over the shipped seed is what found the two disagreeing. `50 §1` says
+   * there should not be two engines; while there are, a check that lands on one of them is half a
+   * check, and this is the half that was missing.
+   */
+  const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
+  if (declared && now.value.unit && declared !== now.value.unit)
+    return no<Reading>(
+      'MIXED_CURRENCY',
+      `${decl.metric}: the rows are in ${now.value.unit} and the format says ${declared}.`,
+      { at: 'format', allowed: [now.value.unit] },
+    );
+
   /* THE COMPARISON IS THE SAME PREDICATE AGAINST A MOVED CLOCK, which is why a predicate with no
      dated clause compares a set with itself: the delta is then structurally zero, and reporting that
      as "no change" would be a fact about the arithmetic dressed as a fact about the business. */

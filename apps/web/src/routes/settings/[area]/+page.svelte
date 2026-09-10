@@ -177,6 +177,25 @@
    */
   const KEEPS = new Set(['appearance', 'keyboard', 'navigation']);
 
+  /**
+   * THE AREAS WITH NOTHING TO CHANGE, and the notice at the foot of this page is not about them.
+   *
+   * "Nothing you do here is saved yet." rendered on all twelve, three of which offer nothing to do.
+   * `notifications` is four stated facts and two hints and `copy.muteAtSource` says out loud that
+   * there is no switch on it; `billing` is one sentence and a link to Export; `identity` reports
+   * who you are and which records you hold, and `33 §10` is why it cannot do more than report:
+   * login is account-level, so identity lives outside the record.
+   *
+   * A DISCLAIMER ON A SCREEN WITH NO CONTROL IS NOT CAUTIOUS, IT IS NOISE. It teaches a reader to
+   * skip the sentence on the nine screens where it is the difference between a mock and a promise,
+   * which is the same failure `06 §1` names about a warning that does not apply.
+   *
+   * A LIST AND NOT A PREDICATE, for the reason `KEEPS` above gives: there is nothing on an area
+   * object to ask, and the join between an area and what it draws lives in this file's markup and
+   * nowhere else. The day one of these three grows a control, this is the line that changes.
+   */
+  const REPORTS = new Set(['identity', 'notifications', 'billing']);
+
   let rail = $state<HTMLElement | undefined>(undefined);
 
   /**
@@ -306,6 +325,19 @@
    * over a call that also revokes eleven registers is the shape of thing somebody trusts once.
    */
   const levelChange = (who: Person, to: Level | null) => {
+    /**
+     * A SEGMENT THAT IS ALREADY PRESSED IS INERT, and this answered one with a warning toast.
+     *
+     * The branch read `${who.name} already reaches ${to}`, written for a third person, and the
+     * seed's name for the signed-in human is the literal `You` — so the sentence came out as **"You
+     * already reaches owner, but nothing was saved yet."** On your own row every other position is
+     * disabled and, with one owner, so is Remove, which made this the ONE pressable control in the
+     * whole People area: the single thing the screen let you do was report a change that was not
+     * one, ungrammatically, about yourself.
+     *
+     * Pressing the level somebody already holds changes nothing, so nothing is what it says.
+     */
+    if (to === who.level) return;
     /* `null` IS A DESTINATION AND A STARTING POINT, and the sentence has to survive both. Taking the
        record level away is `access.revoke` on `'*'` and leaves whatever exceptions they hold; going
        the other way from nothing is a grant. Comparing `LEVELS.indexOf(null)` would have made it
@@ -315,9 +347,7 @@
     const into = to === null ? -1 : LEVELS.indexOf(to);
     toasts.push(
       copy.notWritten(
-        to === who.level
-          ? `${who.name} already reaches ${to ?? 'nothing on this record'}`
-          : `${who.name} would move from ${who.level ?? 'nothing'} to ${to ?? 'nothing'} across this record, with one access.${into > from ? 'grant' : 'revoke'} per list and your reason on each`,
+        `${who.name} would move from ${who.level ?? 'nothing'} to ${to ?? 'nothing'} across this record, with one access.${into > from ? 'grant' : 'revoke'} per list and your reason on each`,
       ),
       { intent: 'warn' },
     );
@@ -327,6 +357,16 @@
      The check is here rather than in the control because it is a fact about the whole list. */
   const owners = $derived(PEOPLE_ACCESS.filter((p) => p.level === 'owner' && p.since).length);
   const lastOwner = (who: Person) => who.level === 'owner' && owners <= 1;
+
+  /**
+   * WHETHER THERE IS ANYBODY TO COMPARE YOURSELF WITH, which is what most of this area is about.
+   *
+   * A level, an exception, a removal and an erasure are all facts about one person MEASURED
+   * AGAINST another, and on a record whose only person is you there is no other. `USABILITY.md`'s
+   * second question asks that the product be smaller at one row than at four hundred and grow by
+   * itself; this is the line that lets the People area do it.
+   */
+  const alone = $derived(PEOPLE_ACCESS.length < 2);
 
   /**
    * AND YOU CANNOT TAKE YOUR OWN OWNERSHIP AWAY FROM THIS SCREEN.
@@ -596,167 +636,187 @@
         `invite({ person, levels, why })` deletes the person's `member` rows and re-inserts from
         `levels`, so a level change and a removal are the same call with a different argument.
       -->
-      <Section title={copy.whoCanSee} count={PEOPLE_ACCESS.length}>
-        <p class="hint">{copy.accessScope}</p>
-        <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
+      <!--
+        ONE PERSON IS NOT A COMPARISON, AND THIS AREA DREW THE WHOLE APPARATUS OF ONE.
 
-             The control is five buttons wide and the sentence beside it is a full clause, so in one
-             row of that grid the email clipped mid-address and the sentence saying what the person
-             can DO was squeezed out of existence — leaving five bare ladder words as the only
-             answer to the question this screen exists for. Who they are on the first line, what they
-             can do on the second, and the sentence directly under the control that sets it. -->
-        <ul class="whos">
-          {#each PEOPLE_ACCESS as p}
-            <li class="who">
-              <div class="who-head">
-                <!-- NO AVATAR. `13 §2.1b` gives a frozen accent to a REGISTER ROW's identity, and
-                     `20 §6` puts avatar stacks on a business record in the refused column. A glyph
-                     says "person" without inventing a face for one. -->
-                <Icon name="people" size="s" />
-                <span class="who-name">{p.name}</span>
-                <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
-                     tells two people with one name apart. And WHEN, because access with no date is
-                     a list you cannot audit. -->
-                <!-- AND WHETHER THEY HAVE LOOKED. `20 §6` — *"Read marks on decisions: who has
-                     seen the thing that binds them"* — is the one row of its table this screen
-                     could not draw: `member.seen_at` has been in the DDL since migration 0001 and
-                     `members()` returns it per person, and the browser's mirror stopped one column
-                     short. So the screen said what four people MAY do and nothing about whether any
-                     of them had been.
+        On a record whose only person is you: a six-position level segment with five positions
+        greyed, two standing hints explaining the greyness, an exceptions control for exceptions to
+        a level nobody else holds, a mock invitation, and a red erasure whose only candidate is the
+        reader. Every one of those is a fact about a comparison with nothing to compare, and the
+        heading counted the reader as a person on their own record.
 
-                     ONLY FOR SOMEBODY WHO HAS ACCEPTED. An invitation still out has also never been
-                     looked at, and saying so twice in one line is saying nothing. -->
-                <span class="who-detail">
-                  {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
-                </span>
-                <span class="who-do">
-                <Button
-                  weight="bare"
-                  tone="bad"
-                  disabled={lastOwner(p) || self(p)}
-                  aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
-                  onclick={() =>
-                    toasts.push(
-                      copy.notWritten(`Every one of ${p.name}'s access rows would be removed, with one access.revoke per list`),
-                      { intent: 'bad' },
-                    )}
-                >{copy.removeAccess}</Button>
-                </span>
-              </div>
-              <div class="who-level">
-                <!--
-                  SIX OPTIONS, AND THE SIXTH IS NOT A LEVEL.
+        `USABILITY.md`'s second question is that the product should be SMALLER at one row than at
+        four hundred and get bigger by itself. So at one person this area is one sentence and one
+        control, and the segments, the exceptions, the two hints and the erasure appear on the day
+        a second person exists, which is the day each of them means something.
+      -->
+      {#if alone}
+        <Section title={copy.whoCanSee}>
+          <p class="hint">{copy.onlyPerson}</p>
+        </Section>
+      {:else}
+        <Section title={copy.whoCanSee} count={PEOPLE_ACCESS.length}>
+          <p class="hint">{copy.accessScope}</p>
+          <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
 
-                  `member.level` is five words and `member` is a ROW that may not exist — and
-                  `members.ts` records what it cost to conflate the two. `access()` first promoted a
-                  scoped level to the record-wide one, so somebody invited to one list as its owner
-                  owned the record; the fix then gave a scoped-only member `read`, which hands an
-                  APPENDER a record-wide read, and `append`'s point is that it does not read. `null`
-                  is the answer both versions were reaching for, and a control offering five words
-                  could not say it.
+               The control is five buttons wide and the sentence beside it is a full clause, so in one
+               row of that grid the email clipped mid-address and the sentence saying what the person
+               can DO was squeezed out of existence — leaving five bare ladder words as the only
+               answer to the question this screen exists for. Who they are on the first line, what they
+               can do on the second, and the sentence directly under the control that sets it. -->
+          <ul class="whos">
+            {#each PEOPLE_ACCESS as p}
+              <li class="who">
+                <div class="who-head">
+                  <!-- NO AVATAR. `13 §2.1b` gives a frozen accent to a REGISTER ROW's identity, and
+                       `20 §6` puts avatar stacks on a business record in the refused column. A glyph
+                       says "person" without inventing a face for one. -->
+                  <Icon name="people" size="s" />
+                  <span class="who-name">{p.name}</span>
+                  <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
+                       tells two people with one name apart. And WHEN, because access with no date is
+                       a list you cannot audit. -->
+                  <!-- AND WHETHER THEY HAVE LOOKED. `20 §6` — *"Read marks on decisions: who has
+                       seen the thing that binds them"* — is the one row of its table this screen
+                       could not draw: `member.seen_at` has been in the DDL since migration 0001 and
+                       `members()` returns it per person, and the browser's mirror stopped one column
+                       short. So the screen said what four people MAY do and nothing about whether any
+                       of them had been.
 
-                  It is first, not last: it is the state somebody is in before you decide anything,
-                  and reading left to right the row now says *nothing on the record, then these
-                  lists* — which is the sentence "invite the bookkeeper" makes.
-                -->
-                <div class="segment segment-sm" role="group" aria-label={copy.levelFor(p.name)}>
-                  <!-- THE SIXTH OPTION IS NOT A LEVEL, AND ONLY THE COMMENT SAID SO. It rendered as
-                       the first of six identical chips with the same `aria-pressed`, inside a group
-                       labelled "What <name> can do" — so a screen reader heard six equivalent levels
-                       and the screen showed six equivalent chips. `13 §5.1`: the meaning cannot live
-                       in the styling alone. The accessible name says what it is, and the chip is set
-                       apart from the ladder beside it. -->
-                  {#each [null, ...LEVELS] as level}
-                    <button
-                      type="button"
-                      class="seg"
-                      class:seg-none={level === null}
-                      data-on={p.level === level ? '' : undefined}
-                      aria-pressed={p.level === level ? 'true' : 'false'}
-                      aria-label={level === null ? copy.noRecordLevelMeans : undefined}
-                      disabled={(lastOwner(p) && level !== 'owner') || (self(p) && level !== p.level)}
-                      aria-describedby={lastOwner(p) && level !== 'owner'
-                        ? 'last-owner'
-                        : self(p) && level !== p.level
-                          ? 'own-level'
-                          : undefined}
-                      onclick={() => levelChange(p, level)}
-                    >{level ?? copy.noRecordLevel}</button>
-                  {/each}
+                       ONLY FOR SOMEBODY WHO HAS ACCEPTED. An invitation still out has also never been
+                       looked at, and saying so twice in one line is saying nothing. -->
+                  <span class="who-detail">
+                    {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
+                  </span>
+                  <span class="who-do">
+                  <Button
+                    weight="bare"
+                    tone="bad"
+                    disabled={lastOwner(p) || self(p)}
+                    aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
+                    onclick={() =>
+                      toasts.push(
+                        copy.notWritten(`Every one of ${p.name}'s access rows would be removed, with one access.revoke per list`),
+                        { intent: 'bad' },
+                      )}
+                  >{copy.removeAccess}</Button>
+                  </span>
                 </div>
-                <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
-                     sets it. Five ladder words with nothing explaining them is the schema's
-                     vocabulary on the screen that decides who can change somebody's business. -->
-                <p class="means">{p.level === null ? copy.noRecordLevelMeans : (copy.levelMeans[p.level] ?? p.level)}</p>
+                <div class="who-level">
+                  <!--
+                    SIX OPTIONS, AND THE SIXTH IS NOT A LEVEL.
 
-                <!--
-                  THE EXCEPTIONS, WHICH ARE THE MATRIX.
+                    `member.level` is five words and `member` is a ROW that may not exist — and
+                    `members.ts` records what it cost to conflate the two. `access()` first promoted a
+                    scoped level to the record-wide one, so somebody invited to one list as its owner
+                    owned the record; the fix then gave a scoped-only member `read`, which hands an
+                    APPENDER a record-wide read, and `append`'s point is that it does not read. `null`
+                    is the answer both versions were reaching for, and a control offering five words
+                    could not say it.
 
-                  `20 §1` materialises person × register × level and `19 §2` names the absence of a
-                  screen for it as the reason this area was added back. Drawing the whole grid — five
-                  people down, fourteen lists across — is the shape that makes a person close the
-                  page: most cells are the same value, and the same value is the record level one
-                  line up.
-
-                  So the record level is the answer and these are the EXCEPTIONS to it. Somebody with
-                  none has one line and nothing else, which is almost everybody; somebody with two
-                  has two, named, with what they hold on each. It is the same information and it is
-                  the difference between a table nobody reads and a sentence anybody can.
-                -->
-                {#if p.scoped.length > 0}
-                  <ul class="exceptions">
-                    {#each p.scoped as ex}
-                      <li>
-                        <span class="ex-list">{REGISTERS[ex.register]?.name ?? ex.register}</span>
-                        <!-- THE LEVEL, AND THEN WHAT IT MEANS. The cell showed the sentence alone — the
-                             same sentence the record level one line up already shows — so you could
-                             not see at a glance whether an exception was above or below it, which is
-                             the one thing a matrix is for. The word is the comparison; the sentence
-                             is what the word means. -->
-                        <span class="ex-word">{ex.level}</span>
-                        <span class="ex-level">{copy.levelMeans[ex.level] ?? ex.level}</span>
-                        <Button
-                          weight="bare"
-                          tone="bad"
-                          onclick={() =>
-                            toasts.push(
-                              copy.notWritten(
-                                `${REGISTERS[ex.register]?.name ?? ex.register} would go back to ${p.level === null ? 'nothing' : p.level}, with one access.revoke naming that list`,
-                              ),
-                              { intent: 'bad' },
-                            )}
-                        >{copy.removeException}</Button>
-                      </li>
+                    It is first, not last: it is the state somebody is in before you decide anything,
+                    and reading left to right the row now says *nothing on the record, then these
+                    lists* — which is the sentence "invite the bookkeeper" makes.
+                  -->
+                  <div class="segment segment-sm" role="group" aria-label={copy.levelFor(p.name)}>
+                    <!-- THE SIXTH OPTION IS NOT A LEVEL, AND ONLY THE COMMENT SAID SO. It rendered as
+                         the first of six identical chips with the same `aria-pressed`, inside a group
+                         labelled "What <name> can do" — so a screen reader heard six equivalent levels
+                         and the screen showed six equivalent chips. `13 §5.1`: the meaning cannot live
+                         in the styling alone. The accessible name says what it is, and the chip is set
+                         apart from the ladder beside it. -->
+                    {#each [null, ...LEVELS] as level}
+                      <button
+                        type="button"
+                        class="seg"
+                        class:seg-none={level === null}
+                        data-on={p.level === level ? '' : undefined}
+                        aria-pressed={p.level === level ? 'true' : 'false'}
+                        aria-label={level === null ? copy.noRecordLevelMeans : undefined}
+                        disabled={(lastOwner(p) && level !== 'owner') || (self(p) && level !== p.level)}
+                        aria-describedby={lastOwner(p) && level !== 'owner'
+                          ? 'last-owner'
+                          : self(p) && level !== p.level
+                            ? 'own-level'
+                            : undefined}
+                        onclick={() => levelChange(p, level)}
+                      >{level ?? copy.noRecordLevel}</button>
                     {/each}
-                  </ul>
-                {/if}
-                <!-- `45 §5.6` HAS ONE METHOD FOR ALL OF IT: `invite` takes the record level and the
-                     register map together, so adding an exception is the same call as changing a
-                     level. One control, because one call.
+                  </div>
+                  <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
+                       sets it. Five ladder words with nothing explaining them is the schema's
+                       vocabulary on the screen that decides who can change somebody's business. -->
+                  <p class="means">{p.level === null ? copy.noRecordLevelMeans : (copy.levelMeans[p.level] ?? p.level)}</p>
 
-                     IN ITS OWN ROW, because as the next sibling after the `<ul>` it floated up beside
-                     the list on a wide screen and read as belonging to the first exception. -->
-                <div class="ex-add">
-                <Button
-                  weight="bare"
-                  onclick={() =>
-                    toasts.push(
-                      copy.notWritten(`One list would be picked, and ${p.name} given a different level on it, which takes one invite and one access.grant naming that list`),
-                      { intent: 'warn' },
-                    )}
-                ><Icon name="plus" size="s" />{copy.addException}</Button>
+                  <!--
+                    THE EXCEPTIONS, WHICH ARE THE MATRIX.
+
+                    `20 §1` materialises person × register × level and `19 §2` names the absence of a
+                    screen for it as the reason this area was added back. Drawing the whole grid — five
+                    people down, fourteen lists across — is the shape that makes a person close the
+                    page: most cells are the same value, and the same value is the record level one
+                    line up.
+
+                    So the record level is the answer and these are the EXCEPTIONS to it. Somebody with
+                    none has one line and nothing else, which is almost everybody; somebody with two
+                    has two, named, with what they hold on each. It is the same information and it is
+                    the difference between a table nobody reads and a sentence anybody can.
+                  -->
+                  {#if p.scoped.length > 0}
+                    <ul class="exceptions">
+                      {#each p.scoped as ex}
+                        <li>
+                          <span class="ex-list">{REGISTERS[ex.register]?.name ?? ex.register}</span>
+                          <!-- THE LEVEL, AND THEN WHAT IT MEANS. The cell showed the sentence alone — the
+                               same sentence the record level one line up already shows — so you could
+                               not see at a glance whether an exception was above or below it, which is
+                               the one thing a matrix is for. The word is the comparison; the sentence
+                               is what the word means. -->
+                          <span class="ex-word">{ex.level}</span>
+                          <span class="ex-level">{copy.levelMeans[ex.level] ?? ex.level}</span>
+                          <Button
+                            weight="bare"
+                            tone="bad"
+                            onclick={() =>
+                              toasts.push(
+                                copy.notWritten(
+                                  `${REGISTERS[ex.register]?.name ?? ex.register} would go back to ${p.level === null ? 'nothing' : p.level}, with one access.revoke naming that list`,
+                                ),
+                                { intent: 'bad' },
+                              )}
+                          >{copy.removeException}</Button>
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
+                  <!-- `45 §5.6` HAS ONE METHOD FOR ALL OF IT: `invite` takes the record level and the
+                       register map together, so adding an exception is the same call as changing a
+                       level. One control, because one call.
+
+                       IN ITS OWN ROW, because as the next sibling after the `<ul>` it floated up beside
+                       the list on a wide screen and read as belonging to the first exception. -->
+                  <div class="ex-add">
+                  <Button
+                    weight="bare"
+                    onclick={() =>
+                      toasts.push(
+                        copy.notWritten(`One list would be picked, and ${p.name} given a different level on it, which takes one invite and one access.grant naming that list`),
+                        { intent: 'warn' },
+                      )}
+                  ><Icon name="plus" size="s" />{copy.addException}</Button>
+                  </div>
                 </div>
-              </div>
-            </li>
-          {/each}
-        </ul>
-        <!-- `LEVEL_REQUIRED`'s own fix sentence, and it is always on screen rather than inside the
-             refusal — a disabled control whose reason arrives only after you press it is a control
-             that has already wasted the press. -->
-        <p class="hint" id="last-owner">{copy.lastOwner}</p>
-        <!-- BESIDE THE CONTROL, NOT AFTER THE PRESS, for the reason the line above it gives. -->
-        <p class="hint" id="own-level">{copy.ownLevel}</p>
-      </Section>
+              </li>
+            {/each}
+          </ul>
+          <!-- `LEVEL_REQUIRED`'s own fix sentence, and it is always on screen rather than inside the
+               refusal — a disabled control whose reason arrives only after you press it is a control
+               that has already wasted the press. -->
+          <p class="hint" id="last-owner">{copy.lastOwner}</p>
+          <!-- BESIDE THE CONTROL, NOT AFTER THE PRESS, for the reason the line above it gives. -->
+          <p class="hint" id="own-level">{copy.ownLevel}</p>
+        </Section>
+      {/if}
 
       <Section title={copy.inviteTitle}>
         <p class="hint">{copy.inviteHow}</p>
@@ -769,18 +829,22 @@
         </div>
       </Section>
 
-      <!-- `53 §5.8`: the owner erases a person from here, and it is the one control on this screen
-           that is not about access at all — it is `02 §10`'s cascade over sixteen stores, in one
-           transaction. It says which, because "erase" without a subject is a word nobody can act on. -->
-      <Section title={copy.erasePerson}>
-        <div class="danger">
-          <p class="danger-title">{copy.eraseWhat}</p>
-          <Button
-            tone="bad"
-            onclick={() => toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'bad' })}
-          >{copy.erasePerson}</Button>
-        </div>
-      </Section>
+      <!-- AND ERASE ARRIVES WITH THE SECOND PERSON. On a record whose only person is you, the one
+           candidate for a red, irreversible "Erase a person" is the person reading it. -->
+      {#if !alone}
+        <!-- `53 §5.8`: the owner erases a person from here, and it is the one control on this screen
+             that is not about access at all — it is `02 §10`'s cascade over sixteen stores, in one
+             transaction. It says which, because "erase" without a subject is a word nobody can act on. -->
+        <Section title={copy.erasePerson}>
+          <div class="danger">
+            <p class="danger-title">{copy.eraseWhat}</p>
+            <Button
+              tone="bad"
+              onclick={() => toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'bad' })}
+            >{copy.erasePerson}</Button>
+          </div>
+        </Section>
+      {/if}
     {:else if area === 'recovery'}
       <!--
         THE WAY BACK IN, and until now a dead end that said nothing about recovery.
@@ -1503,8 +1567,15 @@
          appearance writes four preferences, keyboard one, navigation one, and every one of them
          survives a reload — and this told their readers otherwise, four lines under a line saying
          the opposite. A disclaimer that is false where it matters most does not protect the mock;
-         it teaches people to discount the half that works. -->
-    <p class="mock">{KEEPS.has(area) ? copy.mockNoticeSome : copy.mockNotice}</p>
+         it teaches people to discount the half that works.
+
+         AND NOT ON AN AREA WITH NOTHING TO PRESS. Notifications, Billing and Identity report and
+         offer nothing, so a sentence telling their reader that their changes are not saved is
+         about changes they cannot make. It is the last thing on three screens where it means
+         nothing, which is how a reader learns to skip it on the nine where it means something. -->
+    {#if !REPORTS.has(area)}
+      <p class="mock">{KEEPS.has(area) ? copy.mockNoticeSome : copy.mockNotice}</p>
+    {/if}
   </div>
 </div>
 {/if}

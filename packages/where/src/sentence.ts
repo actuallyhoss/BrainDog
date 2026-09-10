@@ -183,8 +183,44 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     if (!sentence) continue;
 
     const words = sentence.split(/\s+/);
-    const field = words[0] ?? '';
-    const decl = Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+    /**
+     * THE FIELD IS FOUND BY ITS ID, ITS ID IN ANY CASE, OR ITS LABEL.
+     *
+     * A page prints its own `where:` back using each field's LABEL, so `direction is owed_to_me`
+     * appears on screen as `which way is owed to me`. Typed back, or pasted back, that was
+     * `FIELD_UNKNOWN: obligations has no field called which` - and a label is more than one word,
+     * so the parser had also taken the wrong number of words for the field. Seven of the eleven
+     * filters the shipped pages print could not be read by the record that printed them.
+     *
+     * THE ID IS TRIED FIRST AND EXACTLY, so nothing that works today can be shadowed by a label
+     * somebody chooses tomorrow. A label is matched with its spaces and its case folded, because
+     * `Which way` and `which way` are the same words on a screen.
+     */
+    const fold = (t: string) => t.replace(/[\s_]+/g, ' ').trim().toLowerCase();
+    let field = words[0] ?? '';
+    let decl = Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+    let after = 1;
+    if (!decl) {
+      const said = fold(sentence);
+      /* THE LONGEST NAME THE SENTENCE STARTS WITH, because one label may be a prefix of another and
+         the shorter one would take the words the longer one needs. */
+      let best = '';
+      let bestId = '';
+      for (const [id, f] of Object.entries(schema.fields))
+        for (const name of [f.label ?? '', id]) {
+          const key = fold(name);
+          if (!key || key.length <= best.length) continue;
+          if (said === key || said.startsWith(`${key} `)) {
+            best = key;
+            bestId = id;
+          }
+        }
+      if (bestId) {
+        field = bestId;
+        decl = schema.fields[bestId];
+        after = best.split(' ').length;
+      }
+    }
     if (!decl) {
       bad.push({
         code: 'FIELD_UNKNOWN',
@@ -195,8 +231,8 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       continue;
     }
 
-    const verb = words[1] ?? '';
-    const rest = words.slice(2).join(' ');
+    const verb = words[after] ?? '';
+    const rest = words.slice(after + 1).join(' ');
 
     /* ── before · after · on ─────────────────────────────────────────────── */
     /* `Object.hasOwn`, NOT `in`, AND FOR THE REASON THE FIELD LOOKUP ABOVE USES IT. `ORDERED` is
@@ -262,7 +298,10 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     /* `or` SEPARATES ALTERNATIVES, and an enum value may contain the word: `owed to me or paid` has
        to split on the separator rather than on every occurrence. Splitting on ` or ` does that,
        because a value is written in the words a screen shows and those are single-spaced. */
-    const said_values = said.split(' or ').map((v) => v.trim()).filter(Boolean);
+    /* CASE-INSENSITIVELY, because a page prints `state is open or part` and a person types
+       `state is open OR part`. `Or` is not a value any register declares, and reading it as one
+       gave `ENUM_VALUE_UNKNOWN` over a sentence that is ordinary English. */
+    const said_values = said.split(/ or /i).map((v) => v.trim()).filter(Boolean);
     const values: (string | number)[] = [];
     let failed = false;
 

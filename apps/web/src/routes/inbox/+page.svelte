@@ -11,7 +11,7 @@
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { DOM_CAP, INBOX, NOW } from '$lib/record/api.ts';
+  import { DOM_CAP, INBOX, NOW, SOURCES } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -46,7 +46,27 @@
 
 <div class="page">
   {#if INBOX.length === 0}
-    <Empty kind="cleared" title="Nothing unmatched." body="Every arrival since you last looked became a row." />
+    <!--
+      AN EMPTY INBOX IS TWO DIFFERENT FACTS AND THIS DREW ONE OF THEM, WRONGLY.
+
+      `<Empty kind="cleared" title="Nothing unmatched." body="Every arrival since you last looked
+      became a row." />`. The check glyph means *you finished*, and it was the day-one state of a
+      record with no connector: nothing had ever come in, nothing could until one existed, and the
+      screen that makes one is `/settings/ingest`, to which this page had no link. So a first-time
+      reader got a green tick and the impression the feature was working.
+
+      The body asserted a history that had not happened, and it said `arrival`, which is the word
+      `copy.ts` argues against directly above the button eight lines below. Both sentences were
+      typed here rather than in `copy.ts`, which is precisely why the rename that produced
+      `archiveArrival` never reached them.
+    -->
+    {#if SOURCES.length === 0}
+      <Empty kind="no-data-yet" title={copy.inboxNothingYet} body={copy.inboxNothingYetWhy}>
+        {#snippet actions()}<Button href="/settings/ingest">{copy.inboxConnect}</Button>{/snippet}
+      </Empty>
+    {:else}
+      <Empty kind="cleared" title={copy.inboxClear} body={copy.inboxClearWhy} />
+    {/if}
   {:else}
     <ul class="ledger">
       {#each INBOX.slice(0, DOM_CAP) as item}

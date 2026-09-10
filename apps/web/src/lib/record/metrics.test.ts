@@ -154,6 +154,35 @@ test('and one that does mention time reports a real movement', () => {
   assert.notEqual(r.delta, null, 'overdue moves with the clock and reported no delta');
 });
 
+test('A FIXED DATE IS A DATE CLAUSE THAT DOES NOT MOVE, so it is not "no change" either', () => {
+  /* The gate asked whether any clause was a DATE clause. `due before 2026-10-01` is one, and it
+     resolves to the same day however far the clock is wound back, so the shifted window matched
+     the same rows, the delta came out structurally zero, and the tile read GBP 103,430.00 · no
+     change on the 30 days before. A set compared with itself, printed as a fact about the
+     business. The question is whether the RESOLVED predicate moves, not whether it is dated. */
+  const fixed: MetricDecl = {
+    metric: 'due-by-october',
+    name: 'Due before October',
+    source: 'register.obligations',
+    where: 'due before 2026-10-01',
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { lte: 1 },
+    window: '30d',
+  };
+  const r = read(fixed);
+  assert.equal(r.value, 10_343_000, 'the figure itself is not what changed');
+  assert.equal(r.delta, null, `a fixed date reported a movement of ${r.delta}`);
+  assert.match(r.why, /moves nothing/);
+  assert.match(r.unmeasured ?? '', /fixed date/, 'the person under the figure is told nothing about why');
+
+  /* AND THE RELATIVE FORM OF THE SAME SENTENCE STILL COMPARES, which is what says the gate has not
+     simply been closed on every dated predicate. */
+  const relative = read({ ...fixed, metric: 'due-by-today', where: 'due before today' });
+  assert.notEqual(relative.delta, null, 'a predicate that does move with the clock lost its delta');
+  assert.match(relative.why, /before/);
+});
+
 /* ── arithmetic that must not lie ────────────────────────────────────────── */
 
 test('a zero denominator is an em dash, never zero and never infinity', () => {
@@ -324,6 +353,66 @@ test('DISTINCT COUNTS VALUES, not the string `[object Object]`', () => {
   );
   assert.equal(out.value, priced.size);
   assert.ok(priced.size > 1, 'the fixture must hold more than one amount for this to mean anything');
+});
+
+/** One aggregation over one register, as a document, so a test reads like a declaration. */
+const over = (source: string, value: MetricDecl['value']): MetricDecl => ({
+  metric: `${source}-${JSON.stringify(value)}`,
+  name: 'A figure',
+  source: `register.${source}`,
+  value,
+  target: { gte: 1 },
+  window: '30d',
+  compare: 'none',
+});
+
+/** Rows of a register that CARRY a field. `''` is what this build's copy writes where the record writes nothing. */
+const carrying = (source: string, field: string): number =>
+  (ROWS[source] ?? []).filter((e) => e.fields[field] !== undefined && e.fields[field] !== null && e.fields[field] !== '').length;
+
+test('A COUNT COUNTS ROWS THAT HAVE A VALUE, whatever type the value is', () => {
+  /* `count` was routed through `operand`, which is `amountOf`, which is `null` for every string.
+     So `count: 'note'` read 0 where the record reads 5, and `count: 'due'` and `count: 'state'`
+     read 0 over thirty-eight rows that carry both. Nothing refused: the reading came back
+     `rows: 38`, `shown: "0"`, and under a `target: { lte: 5 }` it rendered as a figure meeting its
+     target, in green. It bit `text`, `enum`, `day`, `instant` and `document`. */
+  for (const [source, field] of [
+    ['obligations', 'note'],
+    ['obligations', 'due'],
+    ['obligations', 'state'],
+    ['services', 'provider'],
+  ] as const) {
+    const r = read(over(source, { count: field }));
+    assert.deepEqual(r.refusals, [], `count: ${field} on ${source} refused`);
+    assert.equal(r.value, carrying(source, field), `count: ${field} on ${source} did not count the rows that carry it`);
+    assert.ok((r.value ?? 0) > 0, `count: ${field} on ${source} read nothing over ${r.rows} rows`);
+  }
+
+  // The record's own numbers, so a change in what a count means shows up as a number and not only
+  // as a property.
+  assert.equal(read(over('obligations', { count: 'note' })).value, 5, 'five obligations carry a note');
+  assert.equal(read(over('obligations', { count: 'due' })).value, 38, 'every obligation is dated');
+  assert.equal(read(over('services', { count: 'provider' })).value, 16, 'every service names a provider');
+
+  // And `id` is still the row count, which is the one spelling that always worked.
+  assert.equal(read(over('obligations', { count: 'id' })).value, (ROWS.obligations ?? []).length);
+});
+
+test('DISTINCT DOES NOT COUNT THE EMPTY STRING, because the record never stores one', () => {
+  /* The skip was `undefined` and `null` only, under a comment arguing that `''` is a value because
+     it is one to SQLite. True of SQLite, and not true of this record: the write path drops `''`
+     before anything is stored, so the register the kernel reads holds none and every distinct came
+     out off by exactly the `''` bucket: `note` on obligations 6 against 5, `points_at` on
+     services 11 against 10. */
+  for (const [source, field, want] of [
+    ['obligations', 'note', 5],
+    ['services', 'points_at', 10],
+    ['people', 'note', 4],
+  ] as const) {
+    const blanks = (ROWS[source] ?? []).filter((e) => e.fields[field] === '').length;
+    assert.ok(blanks > 0, `${source}.${field} has no blank rows, so this proves nothing`);
+    assert.equal(read(over(source, { distinct: field })).value, want, `distinct: ${field} on ${source} counted the blank`);
+  }
 });
 
 

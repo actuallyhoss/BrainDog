@@ -485,3 +485,132 @@ test('and nothing else in English is a day', () => {
   for (const word of ['soon', 'next week', 'in 90 days', '90 days', 'days from now', '90 years from now', '1 fortnight ago', '90 days from then'])
     assert.equal(resolveDay(word, NOW), null, `"${word}" resolved to a day`);
 });
+
+/* ── an operator belongs to a type ───────────────────────────────────────── */
+
+test('`before` and `after` are about dates, and were accepted on EVERY field type', () => {
+  /**
+   * THE CLAUSE THAT QUIETLY MATCHES EVERY ROW, REACHED THROUGH THE ONE OPERATOR PAIR THE HEADER
+   * DOES NOT LIST.
+   *
+   * `compile` asked only whether the OPERAND resolved as a day. It never asked what the FIELD was,
+   * and `matches` then ran `raw.slice(0, 10) < day` over whatever the column held: a string
+   * comparison against a date. `state after today` was `'open' > '2026-09-03'`, true of all
+   * thirty-eight obligations; `what after 2026-01-01` was true of all thirty-eight as well, because
+   * a letter sorts after a digit. The record refuses both: *"state is a enum, and after is about
+   * dates."*
+   */
+  assert.equal(keep('obligations', 'state after today').length, 0, 'an enum was compared as a date');
+  assert.equal(keep('obligations', 'what after 2026-01-01').length, 0, 'text was compared as a date');
+  assert.match(compile('obligations', 'state after today').bad[0] ?? '', /state is a enum, and after is about dates/);
+  assert.match(compile('obligations', 'what before today').bad[0] ?? '', /what is a text, and before is about dates/);
+
+  /* AND A DATED FIELD IS UNTOUCHED, which is the half that makes the refusal a rule rather than a
+     removal. */
+  assert.deepEqual(compile('obligations', 'due before today').bad, []);
+  assert.deepEqual(compile('services', 'renews after yesterday').bad, []);
+});
+
+test('and the rule holds over every field of every register, not just the two probed', () => {
+  /* THE SWEEP, because the defect was 1,470 of a differential pass's 3,563 sentences: every
+     `before` or `after` over every field in the record that is not a date. One register proves the
+     branch; the sweep proves nobody can add a field type back into it. */
+  let checked = 0;
+  for (const [id, decl] of Object.entries(REGISTERS)) {
+    for (const field of decl.fields) {
+      const dated = field.type === 'day' || field.type === 'instant';
+      for (const op of ['before', 'after'] as const) {
+        const w = compile(id, `${field.id} ${op} today`);
+        if (dated) {
+          assert.deepEqual(w.bad, [], `${id}.${field.id} is a ${field.type} and ${op} was refused`);
+          continue;
+        }
+        assert.ok(w.bad.length, `${id}.${field.id} is a ${field.type} and took ${op}`);
+        assert.equal(
+          (ROWS[id] ?? []).filter((e) => matches(e, w, NOW)).length,
+          0,
+          `${id}.${field.id} ${op} today matched rows`,
+        );
+        checked++;
+      }
+    }
+  }
+  assert.ok(checked > 40, `${checked} undated field/operator pairs, which is too few to be the sweep`);
+});
+
+/* ── a day that is not a day ─────────────────────────────────────────────── */
+
+test('an ISO SHAPE is not an ISO DAY, and the impossible ones matched every row', () => {
+  /* `ISO` is `^\d{4}-\d{2}-\d{2}$`, which says a string looks like a day and nothing about whether
+     that day exists. `resolveDay` returned the word unchanged and `matches` compared it as a
+     string: every stored date sorts below `9999-99-99`, so `due before 9999-99-99` was 38 of 38,
+     and above `0000-00-00`, so `due after 0000-00-00` was 38 of 38 as well. The record refuses all
+     of these as `VALUE_MALFORMED`. */
+  for (const word of ['9999-99-99', '0000-00-00', '2026-13-45', '2026-02-30', '2026-00-10', '2026-04-31'])
+    assert.equal(resolveDay(word, NOW), null, `"${word}" resolved to a day`);
+
+  for (const [register, sentence] of [
+    ['obligations', 'due before 9999-99-99'],
+    ['obligations', 'due after 0000-00-00'],
+    ['obligations', 'due before 2026-13-45'],
+    ['services', 'renews before 9999-99-99'],
+  ] as const) {
+    assert.ok(compile(register, sentence).bad.length, `${sentence} was accepted`);
+    assert.equal(keep(register, sentence).length, 0, `${sentence} matched rows`);
+  }
+
+  /* AND A REAL DAY STILL PASSES, INCLUDING THE LEAP ONE. A round trip that refuses 29 February in a
+     leap year would be a date test that is wrong about dates. */
+  assert.equal(resolveDay('2028-02-29', NOW), '2028-02-29');
+  assert.equal(resolveDay('2026-12-31', NOW), '2026-12-31');
+  assert.deepEqual(compile('obligations', 'due before 2026-10-01').bad, []);
+});
+
+/* ── a refusal the record gives is a refusal here ────────────────────────── */
+
+test('a value the field CANNOT HOLD is a refusal, not a silent empty list', () => {
+  /**
+   * FIVE SENTENCES THE RECORD REFUSES AND THIS FILE ANSWERED.
+   *
+   * `allowed` closes an `enum` by its values and a `ref` by the titles it points at, and returned
+   * `null` for everything else, so on a `day` or a `money` field any word compiled clean, went to
+   * `formsOf`, matched nothing, and drew the author's own "nothing matched" sentence, which is the
+   * state `blocks.ts` exists to keep apart from a filter that was never understood.
+   *
+   * `amount is not today` IS THE ONE THAT BITES, and it is the shape this whole file exists to
+   * stop: on a field that cannot hold the value at all, `is not <anything>` excludes no row and
+   * hands back the entire register looking like an answer. It was 38 of 38.
+   */
+  for (const [sentence, says] of [
+    ['due is banana', /banana is not a value due can hold/],
+    ['due before 2026-02-30', /2026-02-30 is not a date/],
+    ['amount is 480000', /amount is money, so this comparison needs a currency/],
+    ['what is not', /is not what\?/],
+    ['amount is not today', /amount is money, so this comparison needs a currency/],
+  ] as const) {
+    const w = compile('obligations', sentence);
+    assert.ok(w.bad.length, `${sentence} was accepted, and the record refuses it`);
+    assert.match(w.bad[0] ?? '', says);
+    assert.equal(keep('obligations', sentence).length, 0, `${sentence} matched rows`);
+  }
+});
+
+test('and the widenings that were built against a measured failure are still there', () => {
+  /* A REFUSAL THAT TAKES THE WORKING SENTENCES WITH IT IS NOT A FIX. Each of these compiles clean
+     and selects rows, and each was checked against the branch it goes through: a declared enum
+     value, a ref by the name a person reads, a ref by the number a URL carries, a money value the
+     way `display()` writes it, a relative day, and the prose day every declared page prints. */
+  for (const [register, sentence] of [
+    ['obligations', 'direction is owed to me'],
+    ['obligations', 'thing is Kiln'],
+    ['obligations', 'thing is 1'],
+    ['obligations', 'amount is GBP 960.00'],
+    ['obligations', 'due is not -38d'],
+    ['services', 'renews before 90 days from now'],
+  ] as const)
+    assert.deepEqual(compile(register, sentence).bad, [], `${sentence} was refused`);
+
+  /* An operator in the value slot is still named as an operator rather than reported as a value the
+     field cannot hold, on a money field as much as on a text one. */
+  assert.match(compile('obligations', 'amount is at least 10000').bad[0] ?? '', /"at least" is not an operator/);
+});

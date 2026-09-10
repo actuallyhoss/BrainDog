@@ -340,3 +340,71 @@ test('A BARE NUMBER IN A STERLING WALK IS MIXING, and the walk says so', () => {
   assert.equal(walk.currency, null, 'a mixed walk is in no currency');
   assert.deepEqual(walk.steps, [], 'a mixed walk draws no steps');
 });
+
+test('AND A LEG THAT IS NOT POINTED AT MONEY, WALKING ALONE, IS THE SAME FAILURE', () => {
+  /* The guard above fired on `bare && seen.size > 0`, which catches a bare leg only when ANOTHER
+     leg supplied a currency, so the one case with nothing to compare it against walked all the
+     way to a screen. This walk, on the shipped record: fourteen task efforts in integer seconds
+     poured into a GBP 5,000 opening, crossing on 2026-09-06 at minus 243,040, and `api.metric`
+     rendering it as RUNWAY · 3 days in the alarm colour. A walk adds money, and a leg pointed at a
+     duration is not a cheaper walk, it is a different question. */
+  const seconds: Leg = { register: 'tasks', on: 'by', amount: 'effort' };
+  const walk = runway(500_000, [seconds], 180);
+  assert.ok(walk.mixed.length > 0, 'seconds were walked as sterling and nothing said so');
+  assert.equal(walk.currency, null, 'a walk that saw no currency cannot name one');
+  assert.deepEqual(walk.steps, [], `${walk.steps.length} steps were walked over a duration field`);
+  assert.equal(walk.crossed, null, 'a crossing day was computed out of seconds');
+  assert.equal(walk.days, null, 'a runway in days was reported out of a walk over durations');
+});
+
+/* ── numbers somebody typed into a declaration ───────────────────────────── */
+
+test('A HORIZON IS A WHOLE NUMBER OF DAYS, and one that is not is refused rather than walked', () => {
+  /* `horizon` arrives on a page block, which is a document a pack or an agent writes, and it was
+     multiplied into a timestamp with nothing checked. Every one of these came back as a table of
+     movements with a running balance and a crossing day, with nothing on the screen to say the
+     window was not a window: `0` closed at 164,600 over five steps, `12.5` at minus 1,654,700 over
+     nine, and `100000` walked 924. */
+  for (const bad of [0, -5, 12.5, 4000, 100_000]) {
+    const walk = runway(500_000, LEGS, bad);
+    assert.deepEqual(walk.steps, [], `a horizon of ${bad} walked ${walk.steps.length} steps`);
+    assert.equal(walk.crossed, null, `a horizon of ${bad} produced a crossing day`);
+    assert.equal(walk.days, null, `a horizon of ${bad} produced a runway`);
+    assert.match(
+      walk.refusals[0] ?? '',
+      /whole number of days between 1 and 3,650/,
+      `a horizon of ${bad} was refused without saying what one is`,
+    );
+  }
+});
+
+test('and the ceiling is a boundary, not a suggestion', () => {
+  // The two horizons either side of it, and the smallest one there is. A cap nothing tests at its
+  // own edge is a cap somebody moves by one and never notices.
+  const far = runway(500_000, LEGS, 3650);
+  assert.deepEqual(far.refusals, [], 'ten years is inside the ceiling');
+  assert.ok(far.steps.length > 0, 'the longest walk allowed has to be a walk');
+  assert.ok(runway(500_000, LEGS, 3651).refusals.length, 'one day past the ceiling was walked');
+  assert.deepEqual(runway(500_000, LEGS, 1).refusals, [], 'a one-day walk is a walk');
+});
+
+test('A CYCLE IS A WHOLE NUMBER OF MONTHS, and a fortnight written as 0.5 is refused', () => {
+  /* `months: 0.5` is the obvious way to write a fortnightly charge, and `!Number.isInteger(months)`
+     fell through to the one-off branch: each monthly service was charged ONCE in six months
+     instead of six times. The shipped services leg closed at 436,810 over thirteen steps against
+     the honest 348,150 over forty-four, which is GBP 886.60 too high, and nothing on the screen
+     tells the thirteen steps from the forty-four. */
+  const services = LEGS.find((l) => l.register === 'services');
+  assert.ok(services?.every, 'the seed no longer declares a recurring services leg');
+  const fortnightly: Leg = { ...services, every: { ...services.every, months: { ...services.every.months, monthly: 0.5 } } };
+
+  const walk = runway(500_000, [fortnightly], 180);
+  assert.deepEqual(walk.steps, [], `a fractional cycle walked ${walk.steps.length} steps`);
+  assert.match(walk.refusals[0] ?? '', /services declares a cycle of 0\.5 months for monthly/);
+  assert.match(walk.refusals[0] ?? '', /whole number of months/);
+
+  // And the honest declaration is untouched, which is what says the refusal is about the fraction.
+  const honest = runway(500_000, [services], 180);
+  assert.deepEqual(honest.refusals, []);
+  assert.ok(honest.steps.length > walk.steps.length, 'the whole-month walk lost movements');
+});

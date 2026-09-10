@@ -206,6 +206,25 @@ test('A RATIO OF TWO DIFFERENT UNITS IS A RATE, and it was refused as a mixed cu
   sql.close();
 });
 
+test('A FORMAT THAT CONTRADICTS THE ROWS IS REFUSED, and it used to be printed', async () => {
+  /* `format: money.USD` is a declaration about how to WRITE the figure and the rows are what it is a
+     figure OF, so when they disagree the declaration is wrong. This side checked neither: a sum of
+     sterling invoices declared `money.USD` came back as a plain number with `unit: 'GBP'` and no
+     refusal, and every renderer formats from `decl.format`, so it reached a screen as USD 168,794.00
+     over rows that are in pounds. The browser's copy of this evaluator has had the check all along,
+     and a differential pass over the shipped seed is what found the two disagreeing. */
+  const { k, sql } = await record();
+  const out = k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never);
+  assert.equal(out.ok, false, 'a sterling sum was read under a dollar format');
+  assert.match(fixOf(out) ?? '', /the rows are in GBP and the format says USD/u);
+
+  /* AND THE FORMAT THAT AGREES IS UNTOUCHED, so the check is about a contradiction rather than
+     about declaring a currency at all. */
+  const fine = k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 99_999_999 } } as never);
+  assert.equal(fine.ok, true, fixOf(fine) ?? '');
+  sql.close();
+});
+
 test('A DIFF WHOSE OTHER HALF READ NOTHING IS THE FIRST HALF, and it refused MIXED_CURRENCY', async () => {
   /* A sum over no rows is zero, and its unit is `null` because there was nothing to take a unit
      from. `'GBP' !== null` is true, so `sum(received) - sum(paid)` refused on any record that had

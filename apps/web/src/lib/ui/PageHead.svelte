@@ -86,9 +86,21 @@
       </h1>
       {#if define}<p class="head-define"><Define noun={define} /></p>{/if}
     </div>
-    {#if count !== undefined}
+    <!--
+      A COUNT OF NOTHING OVER AN EMPTY STATE IS THE SAME FACT TWICE, and the zero is the half that
+      says nothing. This was `count !== undefined`, and `0 !== undefined`, so `/vault` printed
+      `Vault 0` over "No credential yet." and `/inbox` printed `Inbox 0` over its own sentence.
+      `Section` had the identical line and the identical defect.
+
+      AND `0 of 38` IS NOT THE SAME THING AT ALL. It is a filter that matched nothing over a list
+      that holds thirty-eight rows, which is a fact somebody needs: `19 §6` is that a surface showing
+      nothing must never be indistinguishable from a surface with nothing to show. So a bare zero
+      goes and a zero with a total beside it stays, which is why this is not the one-line fix
+      `Section` got.
+    -->
+    {#if count || total !== undefined}
       <p class="count num">
-        {count.toLocaleString('en')}{#if atLeast}<span class="more-sign">+</span>{/if}{#if total !== undefined && (atLeast || total !== count)}<span
+        {(count ?? 0).toLocaleString('en')}{#if atLeast}<span class="more-sign">+</span>{/if}{#if total !== undefined && (atLeast || total !== count)}<span
             class="of">&nbsp;of {total.toLocaleString('en')}</span
           >{/if}
       </p>
