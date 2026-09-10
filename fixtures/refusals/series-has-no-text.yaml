@@ -1,0 +1,5 @@
+code:   SERIES_HAS_NO_TEXT
+via:    where
+raises: packages/where/src/index.ts
+at:     campaign
+fix:    Filter the register on its key fields or its numbers.

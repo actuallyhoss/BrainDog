@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { REGISTER_BODY_KEYS } from '../src/declare.ts';
+import { day } from '../src/ingest.ts';
 import { indexesFor, indexName, jcs, openRecord, validateDeclaration, type Declaration, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -1229,6 +1230,214 @@ test("and a COMBINATOR'S OWN ARGUMENTS, which went through unread", () => {
   // And the plain ten still install: the first version of this check refused every one of them.
   assert.equal(refusedWith(ingest({ extract: { a: { money: { currency: 'EGP' } } } })), null);
   assert.equal(refusedWith(ingest({ extract: { a: { int: {} } } })), null);
+});
+
+test('A DATE FORMAT NOTHING COULD READ INSTALLED, AND THE FIELD STAYED EMPTY ON EVERY ARRIVAL FOR EVER', () => {
+  /**
+   * `extractorFault` checked a form's key against the thirteen and never looked at the format.
+   * `ingest.ts`'s `day` looks a format up in a table of four and returns `null` for one it does not
+   * hold, which is also its answer for a text with no date in it. Driven:
+   *
+   *     date { format: 'DD.MM.YYYY' }           ACCEPTED (null)
+   *     date { format: 'dd/mm/yyyy' }           ACCEPTED (null)
+   *     date {}                                 ACCEPTED (null)
+   *     date { format: 42 }                     ACCEPTED (null)
+   *     date { format: 'DD/MM' }                ACCEPTED (null)
+   *     day("due 03.04.2026", "DD.MM.YYYY")  =  null
+   *
+   * A rule that matched arrivals and wrote rows with the date empty on every one of them, for as
+   * long as the pack was installed. `43 §4.3` gives the grammar and `43 §13 D13` has `42` raise
+   * `DATE_FORMAT_INVALID` at install.
+   */
+  const dated = (format: unknown) => ingest({ extract: { due: { date: format === undefined ? {} : { format } } } });
+
+  const lower = validateDeclaration(dated('dd/mm/yyyy'));
+  assert.equal(lower?.code, 'DATE_FORMAT_INVALID');
+  assert.equal(lower?.at, 'ingest.hsbc_sms.extract.due.date.format');
+  assert.match(lower?.fix ?? '', /date's format dd\/mm\/yyyy holds no year\./);
+  assert.match(lower?.fix ?? '', /Write it with one year, one month and one day token: YYYY or YY, MM or M, DD or D\./);
+
+  assert.match(validateDeclaration(dated(undefined))?.fix ?? '', /date's format is missing\./);
+  assert.match(validateDeclaration(dated(42))?.fix ?? '', /date's format is not text\./);
+
+  /* `43 §9.3`'s three worked failures, one per rule: no year, two month tokens, and a one-or-two
+     digit token run straight into the next number. */
+  for (const [format, why] of [
+    ['DD/MM', /holds no year/],
+    ['MMM DD YYYY', /holds 2 month tokens/],
+    ['DMYYYY', /runs D, which is one or two digits, straight into another number/],
+  ] as const) {
+    const said = validateDeclaration(dated(format));
+    assert.equal(said?.code, 'DATE_FORMAT_INVALID', format);
+    assert.match(said?.fix ?? '', why, format);
+  }
+
+  // Inside a combinator too, because the walk already goes through them.
+  const nested = validateDeclaration(ingest({ extract: { due: { first: [{ date: { format: 'DD/MM' } }, { text: {} }] } } }));
+  assert.equal(nested?.code, 'DATE_FORMAT_INVALID');
+  assert.equal(nested?.at, 'ingest.hsbc_sms.extract.due.first[0].date.format');
+
+  /* A FORMAT THE GRAMMAR ADMITS AND THIS BUILD DOES NOT READ IS NOT THE AUTHOR'S MISTAKE. `43 §9.3`
+     reads `29.08.2026` with `DD.MM.YYYY`, so refusing it as invalid would be untrue, and installing
+     it is the silence above. The build is behind, and says so, and names what it does read. */
+  for (const format of ['DD.MM.YYYY', 'D/M/YY', 'DDMMYYYY']) {
+    const said = validateDeclaration(dated(format));
+    assert.equal(said?.code, 'NOT_IN_THIS_BUILD', format);
+    assert.equal(said?.at, 'ingest.hsbc_sms.extract.due.date.format', format);
+    assert.match(said?.fix ?? '', /reads only DD\/MM\/YY, DD\/MM\/YYYY, MM\/DD\/YYYY, YYYY-MM-DD, so the field would install/, format);
+    assert.ok(said?.allowed?.includes('DD/MM/YYYY'), format);
+  }
+
+  /* AND EVERY FORMAT THAT INSTALLS IS ONE `day` READS, which is the whole point: the four still
+     install, and each reads a real day out of a real sentence. */
+  for (const [format, text] of [
+    ['DD/MM/YY', 'due 03/04/26'],
+    ['DD/MM/YYYY', 'due 03/04/2026'],
+    ['MM/DD/YYYY', 'due 04/03/2026'],
+    ['YYYY-MM-DD', 'due 2026-04-03'],
+  ] as const) {
+    assert.equal(refusedWith(dated(format)), null, `${format} is read by this build and was refused`);
+    assert.equal(day(text, format), '2026-04-03', format);
+  }
+});
+
+test('A SERIES REGISTER WAS NEVER TOLD IT WAS ONE, so a text test over it installed and ran', async () => {
+  /**
+   * `schemaOf` built the `Schema` the compiler is handed from `register`, `state` and `fields`, and
+   * never `series`, although the flag was read three times elsewhere in the same file; the install
+   * check's `shape` built one for a register arriving in the same batch and did not send it either.
+   * So `02 §5`'s rule, *"refused at install: a series has no text"*, was kept by nothing. Driven
+   * against a `series: true` register holding two rows:
+   *
+   *     list, contains over a series register    ACCEPTED rows=1
+   *     list, starts over a series register      ACCEPTED rows=1
+   *     install, rule when contains over it      ACCEPTED
+   *     install, metric where contains over it   ACCEPTED
+   */
+  const { k, sql } = await record();
+  const DAY: Declaration = {
+    id: 'register.campaign_day',
+    kind: 'register',
+    body: {
+      id: 'campaign_day',
+      name: 'Campaign days',
+      title: 'campaign',
+      series: true,
+      fields: [
+        { id: 'campaign', type: 'text' },
+        { id: 'spend', type: 'int' },
+      ],
+    } as never,
+  };
+  const RULE: Declaration = {
+    id: 'rule.flag_autumn',
+    kind: 'rule',
+    body: {
+      rule: 'flag_autumn',
+      register: 'campaign_day',
+      when: { field: 'campaign', contains: 'Autumn' },
+      once_per: ['entry'],
+      then: [{ tag: 'autumn' }],
+    } as never,
+  };
+
+  /* THE REGISTER AND THE RULE IN ONE BATCH, which reads the arriving body and not the cache. */
+  const together = refusal(await k.install([DAY, RULE]));
+  assert.equal(together.code, 'SERIES_HAS_NO_TEXT');
+  assert.equal(together.at, 'campaign');
+  assert.equal(
+    together.fix,
+    'rule.flag_autumn cannot be read: campaign: contains over campaign_day, which is series: true. A series has no text; filter campaign_day on its key fields or its numbers.',
+  );
+
+  value(await k.install([DAY]));
+  value(k.create('campaign_day', { campaign: 'Autumn brand', spend: 40 }, { actor: 'p_1' }));
+
+  // And against the cache: a rule, a metric, and every text test a read can carry.
+  assert.equal(refusal(await k.install([RULE])).code, 'SERIES_HAS_NO_TEXT');
+  const metric = await k.install([
+    {
+      id: 'metric.spend',
+      kind: 'metric',
+      body: {
+        metric: 'spend',
+        source: 'register.campaign_day',
+        where: { field: 'campaign', starts: 'Autumn' },
+        value: { sum: 'spend' },
+        format: 'int',
+        target: 100,
+        window: '30d',
+      } as never,
+    },
+  ]);
+  assert.equal(refusal(metric).code, 'SERIES_HAS_NO_TEXT');
+  for (const op of ['contains', 'starts', 'ends'])
+    assert.equal(refusal(k.list({ register: 'campaign_day', where: { field: 'campaign', [op]: 'Autumn' } })).code, 'SERIES_HAS_NO_TEXT', op);
+  assert.equal(refusal(k.list({ register: 'campaign_day', where: { matches: 'autumn' } as never })).code, 'SERIES_HAS_NO_TEXT');
+
+  /* AND WHAT A SERIES IS FOR STILL READS, its key fields and its numbers, and a text test over a
+     register that is not a series is answered as it always was. */
+  assert.equal(value<{ rows: unknown[] }>(k.list({ register: 'campaign_day', where: { field: 'campaign', is: 'Autumn brand' } })).rows.length, 1);
+  assert.equal(value<{ rows: unknown[] }>(k.list({ register: 'campaign_day', where: { field: 'spend', gt: 10 } })).rows.length, 1);
+  value(await k.install([OBLIGATIONS]));
+  value(k.list({ register: 'obligations', where: { field: 'what', contains: 'Invoice' } }));
+  sql.close();
+});
+
+test('A TREE-FORM PREDICATE THE COMPILER REFUSES INSTALLED, AND ITS RULE THEN FIRED ON NOTHING FOR EVER', async () => {
+  /**
+   * The install check read a rule's `when:` and a metric's `where:` through `predicateOf`, which
+   * parses a sentence against the schema and, for the tree form, only resolves relative dates. So
+   * the sentence was refused and the same predicate written as JSON was not. Driven:
+   *
+   *     tree: gt on a text field                   INSTALLED -> row tags null
+   *     tree: an undeclared field                  INSTALLED -> row tags null
+   *     tree: contains on an int                   INSTALLED -> row tags null
+   *     sentence: an undeclared field (control)    REFUSED FIELD_UNKNOWN
+   *     tree: a readable predicate (control)       INSTALLED -> row tags ["flagged"]
+   *
+   * `evaluate` answers `false` for anything `compile` refuses, by construction, so each of those
+   * rules installed and then never fired, with no event and no refusal.
+   */
+  const JOBS: Declaration = {
+    id: 'register.jobs',
+    kind: 'register',
+    body: {
+      id: 'jobs',
+      name: 'Jobs',
+      title: 'what',
+      fields: [
+        { id: 'what', type: 'text' },
+        { id: 'n', type: 'int' },
+        { id: 'tags', type: 'list', of: 'text' },
+      ],
+    } as never,
+  };
+  const flag = (when: unknown): Declaration => ({
+    id: 'rule.flag',
+    kind: 'rule',
+    body: { rule: 'flag', register: 'jobs', when, once_per: ['entry'], then: [{ tag: 'flagged' }] } as never,
+  });
+
+  for (const [when, code, at] of [
+    [{ field: 'what', gt: 3 }, 'MATCH_OP_UNSUPPORTED', 'what'],
+    [{ field: 'nope', is: 'x' }, 'FIELD_UNKNOWN', 'nope'],
+    [{ field: 'n', contains: '4' }, 'MATCH_OP_UNSUPPORTED', 'n'],
+  ] as const) {
+    const { k, sql } = await record();
+    const said = refusal(await k.install([JOBS, flag(when)]));
+    assert.equal(said.code, code, JSON.stringify(when));
+    assert.equal(said.at, at, JSON.stringify(when));
+    assert.match(said.fix, /^rule\.flag cannot be read: /, JSON.stringify(when));
+    sql.close();
+  }
+
+  // The control: a readable tree still installs, and fires.
+  const { k, sql } = await record();
+  value(await k.install([JOBS, flag({ field: 'n', gt: 3 })]));
+  const made = value<{ id: string }>(k.create('jobs', { what: 'Kiln 4', n: 4 }, { actor: 'p_1' }));
+  assert.deepEqual(k.get(made.id)?.fields.tags, ['flagged']);
+  sql.close();
 });
 
 test('A MATCH IS ABOUT WHAT AN ARRIVAL HOLDS, and a field it does not hold matches nothing', () => {

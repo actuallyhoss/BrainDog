@@ -429,6 +429,129 @@ test('AND A REQUIRED FIELD LANDING ON ROWS THAT LACK IT LEFT THE REGISTER IN PER
   value((await upgrade([...WAS, { id: 'vat', type: 'money', required: true }], { ...state, rows: { obligations: 0 } })).out);
 });
 
+test('A COLOUR OUTSIDE A THEME WAS ACCEPTED, and nothing anywhere looked for one', async () => {
+  /**
+   * `credential` walks every declaration for a key that holds a secret, and no walk anywhere looked
+   * for one that holds a colour. Driven through `normalise`:
+   *
+   *     block.invoice-card, colour: '#E11D48'      ACCEPTED
+   *     page block, color: 'red'                   ACCEPTED
+   *     page block, tone: 'oklch(0.6 0.2 20)'      ACCEPTED
+   *
+   * `42 §5.3·11`: *"in every non-theme declaration: a key named colour/color, or a string value
+   * matching Colour"*, and `04 §5` gives the sentence this answers with.
+   */
+  const withDecl = (decl: Record<string, unknown>) => DOC({ declarations: [...(DOC().declarations as unknown[]), decl] });
+  const block = refusal(await normalise(withDecl({ block: 'invoice-card', colour: '#E11D48' })));
+  assert.equal(block.code, 'COLOUR_OUTSIDE_THEME');
+  assert.equal(block.at, 'block.invoice-card.colour');
+  assert.equal(
+    block.fix,
+    'block.invoice-card sets colour to #E11D48. A block names an intent (good, warn, bad or info), and the theme names the colour.',
+  );
+
+  /* A KEY NAMED FOR A COLOUR IS REFUSED WHATEVER IT HOLDS, and a colour-shaped value is refused
+     under whatever key it sits, at any depth. */
+  const page = (extra: Record<string, unknown>) =>
+    withDecl({ page: 'invoicing', title: 'Invoicing', blocks: [{ kind: 'table', source: 'register.obligations', ...extra }] });
+  for (const [extra, at] of [
+    [{ color: 'red' }, 'page.invoicing.blocks[0].color'],
+    [{ Colour: 'good' }, 'page.invoicing.blocks[0].Colour'],
+    [{ tone: 'oklch(0.6 0.2 20)' }, 'page.invoicing.blocks[0].tone'],
+    [{ tone: 'RGB(225, 29, 72)' }, 'page.invoicing.blocks[0].tone'],
+    [{ note: '  #fff  ' }, 'page.invoicing.blocks[0].note'],
+  ] as const) {
+    const said = refusal(await normalise(page(extra)));
+    assert.equal(said.code, 'COLOUR_OUTSIDE_THEME', JSON.stringify(extra));
+    assert.equal(said.at, at, JSON.stringify(extra));
+  }
+
+  /* AND WHAT IS NOT A COLOUR STILL INSTALLS: an intent, a sentence that happens to hold a hex run, a
+     theme, which is where colours live, and an example row, which is data. */
+  value(await normalise(page({ tone: 'good' })));
+  value(await normalise(page({ note: 'Invoice #125 is the one to chase' })));
+  value(await normalise(withDecl({ theme: 'brand', roles: { light: { ink: '#111111' } } })));
+  value(await normalise(DOC({ seeds: [{ register: 'obligations', fields: { what: '#E11D48' } }] })));
+});
+
+test('A RENAME WAS PLANNED AS AN ADD AND A RETIRE, and an empty register lost its id without a word', async () => {
+  /**
+   * `plan` built `adds` and `retires` in one function from one `Installed` and never compared them.
+   * Driven end to end through the record's `planPack` and `installPack`:
+   *
+   *     register.obligations -> register.bills, 0 rows   ACCEPTED; list obligations -> REGISTER_UNKNOWN
+   *     register.obligations -> register.bills, 2 rows   WOULD_ORPHAN "... there are 2 rows in it. Move them first."
+   *     page.money -> page.finance, same body            ACCEPTED
+   *
+   * `42 §5.3·10` gives the rule, exact on purpose, and `04 §5` the reason: ids are stable for ever
+   * and there is no alias key.
+   */
+  const FIELDS = [{ id: 'what', type: 'text', required: true }, { id: 'tags', type: 'list', of: 'text' }];
+  const from = (rows: number, extra: Installed['declarations'] = []): Installed => ({
+    ...EMPTY,
+    packs: [{ id: 'studio-books', version: '1.0.0' }],
+    declarations: [
+      {
+        id: 'register.obligations',
+        version: 1,
+        kind: 'register',
+        pack_id: 'studio-books',
+        body: JSON.stringify({ id: 'obligations', name: 'Obligations', title: 'what', fields: FIELDS }),
+        checksum: 'a',
+      },
+      ...extra,
+    ],
+    rows: { obligations: rows },
+  });
+  const to = async (declarations: unknown[], state: Installed) => {
+    const pack = await packOf({ declarations, seeds: [] });
+    const diff = await plan(pack, state);
+    const host = fakeHost();
+    return { diff, host, out: await install(pack, diff, host, diff.planHash) };
+  };
+  const BILLS = { register: 'bills', name: 'Obligations', title: 'what', fields: FIELDS };
+
+  const empty = await to([BILLS], from(0));
+  assert.deepEqual(empty.diff.renames, [{ from: 'register.obligations', to: 'register.bills', rows: 0 }]);
+  const said = refusal(empty.out);
+  assert.equal(said.code, 'ID_RENAMED');
+  assert.equal(said.at, 'register.bills');
+  assert.equal(
+    said.fix,
+    'register.obligations → register.bills renames an id, so anything written against register.obligations would stop resolving. Ids are stable for ever: keep register.obligations and change its name instead.',
+  );
+  assert.deepEqual(empty.host.log, [], 'a refused rename staged something');
+
+  /* WITH ROWS UNDER IT, THIS AND NOT `WOULD_ORPHAN`, whose remedy is to move the rows: the rows are
+     fine and the new id is the mistake. */
+  const full = await to([BILLS], from(412));
+  assert.equal(full.diff.orphans, 412);
+  const spoken = refusal(full.out);
+  assert.equal(spoken.code, 'ID_RENAMED');
+  assert.match(spoken.fix, /renames a spoken id, so obligations#<n> in a note would stop resolving\./);
+
+  // Any kind, and each kind's own key is the one taken out: a rule's is `rule`.
+  const CHASE = { register: 'obligations', when: 'state is open', once_per: ['entry'], then: [{ notify: { say: 'chase' } }] };
+  const rule = await to(
+    [{ register: 'obligations', name: 'Obligations', title: 'what', fields: FIELDS }, { rule: 'nudge', ...CHASE }],
+    from(0, [
+      { id: 'rule.chase', version: 1, kind: 'rule', pack_id: 'studio-books', body: JSON.stringify({ rule: 'chase', ...CHASE }), checksum: 'b' },
+    ]),
+  );
+  assert.deepEqual(rule.diff.renames, [{ from: 'rule.chase', to: 'rule.nudge', rows: 0 }]);
+  assert.equal(refusal(rule.out).code, 'ID_RENAMED');
+
+  /* AND WHAT IS NOT A RENAME STILL INSTALLS. Keeping the id and changing the name is the repair the
+     sentence names; a retire plus an add of a DIFFERENT body is two moves, which is `42 §10`'s
+     ledgered ceiling and not this rule. */
+  const relabelled = await to([{ ...BILLS, register: 'obligations', name: 'Bills' }], from(412));
+  assert.deepEqual(relabelled.diff.renames, []);
+  value(relabelled.out);
+  const different = await to([{ ...BILLS, name: 'Bills' }], from(0));
+  assert.deepEqual(different.diff.renames, []);
+  value(different.out);
+});
+
 test('and two packs cannot own one declaration', async () => {
   const state: Installed = {
     ...EMPTY,

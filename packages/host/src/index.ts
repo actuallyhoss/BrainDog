@@ -205,10 +205,10 @@ const NOT_422: Readonly<Record<string, number>> = {
      row, a runner posting out of `seq` order, the scope case — each told apart by its SENTENCE. A
      code is what a caller branches on; "ask a person to sign in" is what it acts on, and minting a
      code per remedy grows the vocabulary at the speed of the copywriting (`10 §7`).
-     `LEVEL_REQUIRED` is in the registry and stays. `SCOPE_INSUFFICIENT` is the last invention of the
-     three and follows `PERSON_REQUIRED` the day the one assertion in `packages/mcp`'s tests that
-     names it moves with it; the row is here until then. */
-  SCOPE_INSUFFICIENT: 403,
+     `LEVEL_REQUIRED` is in the registry and stays. `SCOPE_INSUFFICIENT` was the last invention of
+     the three and has followed `PERSON_REQUIRED`: `record`'s `allows` answers a token whose scope is
+     short with `FORBIDDEN` and the remedy in the sentence, so its row here went with it rather than
+     staying on as a status for a code nothing emits. */
   LEVEL_REQUIRED: 403,
   SCHEMA_MISMATCH: 503,
   SCHEMA_NEWER: 503,

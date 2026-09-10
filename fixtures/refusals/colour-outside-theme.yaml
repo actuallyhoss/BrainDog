@@ -1,0 +1,5 @@
+code:   COLOUR_OUTSIDE_THEME
+via:    lint
+raises: packages/declare/src/index.ts
+at:     block.invoice-card.colour
+fix:    Name an intent and let the theme name the colour.

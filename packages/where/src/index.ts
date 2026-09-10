@@ -74,6 +74,25 @@ export type Schema = {
    * register mirrors nothing, which is what a register with no lifecycle does.
    */
   state?: string;
+  /**
+   * WHETHER THE REGISTER IS A SERIES, WHICH HAS NO TEXT TO ASK ABOUT.
+   *
+   * `38 §2.2` writes this field into the schema by name, and `02 §5` turns off *"`matches`,
+   * `contains`, `near`, `starts`, `ends` in any `where:` over the register"*, *"refused at install:
+   * a series has no text"*. The schema had no such field and nothing sent one, so the rule was kept
+   * by nothing. Driven against a `series: true` register holding two rows:
+   *
+   *     list, contains over a series register    ACCEPTED rows=1
+   *     list, starts over a series register      ACCEPTED rows=1
+   *     install, rule when contains over it      ACCEPTED
+   *     install, metric where contains over it   ACCEPTED
+   *     list, matches over a series register     REFUSED MATCH_OP_UNSUPPORTED, "it needs the text index"
+   *
+   * The answers were right. What was wrong is that a document states a rule and nothing kept it,
+   * over the one register shape built to grow without bound, and that `matches` was refused for a
+   * reason true of every register rather than the one true of this one. Absent means not a series.
+   */
+  series?: boolean;
 };
 
 export type Compiled = {
@@ -568,6 +587,23 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
      * the leaf named no operator or it named a word that is not one of the nineteen; both read as
      * *this test cannot apply here*, and the `fix` names the nineteen either way.
      */
+    /* A SERIES HAS NO TEXT, AND THAT IS TRUE WHETHER OR NOT THIS BUILD READS THE TEXT INDEX.
+       `38 §5.3` puts L5 (`matches` on a series) before L6 (an empty index), so the fact no deploy
+       changes answers before the one a deploy would. `near` is L19's and is refused here with it,
+       because this build refuses `near` below before it resolves a field at all. */
+    if (schema.series === true)
+      for (const key of ['matches', 'near'])
+        if (key in leaf) {
+          bad.push(
+            refuse(
+              'SERIES_HAS_NO_TEXT',
+              `${key} over ${schema.register}, which is series: true. A series has no text; filter ${schema.register} on its key fields or its numbers.`,
+              key,
+            ),
+          );
+          return '';
+        }
+
     for (const key of ['matches', 'predicate', 'near'])
       if (key in leaf) {
         bad.push(
@@ -612,6 +648,19 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     if (!operatorAllowed(op, decl.type)) {
       bad.push(
         refuse('MATCH_OP_UNSUPPORTED', `${field} is a ${decl.type}, which cannot be asked "${op}".`, field),
+      );
+      return '';
+    }
+
+    /* L19: THE OTHER THREE TEXT TESTS OVER A SERIES, after L18, so `contains` on one of a series'
+       numbers is still the type's refusal and not this one. See `Schema.series`. */
+    if (schema.series === true && (op === 'contains' || op === 'starts' || op === 'ends')) {
+      bad.push(
+        refuse(
+          'SERIES_HAS_NO_TEXT',
+          `${field}: ${op} over ${schema.register}, which is series: true. A series has no text; filter ${schema.register} on its key fields or its numbers.`,
+          field,
+        ),
       );
       return '';
     }

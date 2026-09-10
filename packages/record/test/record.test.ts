@@ -10,6 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { REFUSAL_CODES } from '@braindog/ports';
+
 import { allows, createRecordApi, reaches, type CallContext, type Level, type Scope } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { testSigner } from '../../kernel/test/signer.ts';
@@ -85,7 +87,39 @@ test('THE EFFECTIVE PERMISSION IS THE INTERSECTION, never the maximum', () => {
   // ago — the exact failure a capability system is supposed to prevent.
   assert.equal(allows(token('write', 'owner'), 'write'), null);
   assert.equal(allows(token('write', 'read'), 'write')?.code, 'LEVEL_REQUIRED');
-  assert.equal(allows(token('read', 'owner'), 'write')?.code, 'SCOPE_INSUFFICIENT');
+  assert.equal(allows(token('read', 'owner'), 'write')?.code, 'FORBIDDEN');
+  assert.equal(allows(token('read', 'owner'), 'read'), null);
+});
+
+test('A SHORT SCOPE WAS `SCOPE_INSUFFICIENT`, A CODE IN NO REGISTRY, and it is `FORBIDDEN` with the remedy in the sentence', () => {
+  /**
+   * `allows` answered a token whose scope does not reach the need through a ternary,
+   *
+   *     code: short ? 'SCOPE_INSUFFICIENT' : 'LEVEL_REQUIRED'
+   *
+   * and driven, a read token on owner access asking to write was handed
+   *
+   *     {"code":"SCOPE_INSUFFICIENT","fix":"This needs write, and you have a read token on owner
+   *      access. Ask the owner for a token with a wider scope.","allowed":["read"]}
+   *
+   * `30 §6` has no such code. It writes `FORBIDDEN` as *"a credential outside its scope, level or
+   * ceiling"*, and settled the identical case for `PERSON_REQUIRED` by folding it into `FORBIDDEN`
+   * with the remedy in the sentence. The sentence already carried the remedy; only the code moves.
+   */
+  const said = allows(token('read', 'owner'), 'write');
+  assert.equal(said?.code, 'FORBIDDEN');
+  assert.equal(said?.fix, 'This needs write, and you have a read token on owner access. Ask the owner for a token with a wider scope.');
+  assert.deepEqual(said?.allowed, ['read']);
+  assert.ok((REFUSAL_CODES as readonly string[]).includes(said?.code ?? ''), `${said?.code} is outside 30 §6`);
+
+  // A propose token keeps its own way through, in its own sentence under the same code.
+  const propose = allows(token('propose', 'owner'), 'write');
+  assert.equal(propose?.code, 'FORBIDDEN');
+  assert.match(propose?.fix ?? '', /Send it as a proposal, or ask the owner for a write token\./);
+
+  /* AND A LEVEL THAT IS SHORT IS STILL TOLD APART BY ITS CODE, because it is a different act: the
+     owner raises a person's access, not a token's scope. */
+  assert.equal(allows(token('write', 'read'), 'write')?.code, 'LEVEL_REQUIRED');
   assert.equal(allows(token('read', 'owner'), 'read'), null);
 });
 
@@ -198,8 +232,8 @@ test('a read token reads and does not write', async () => {
 
   const reader = token('read');
   assert.ok(value<{ rows: unknown[] }>(await api.list({ register: 'obligations' }, reader)).rows.length === 1);
-  assert.equal(refusal(await api.create({ register: 'obligations', fields: { what: 'x' } }, reader)).code, 'SCOPE_INSUFFICIENT');
-  assert.equal(refusal(await api.update({ register: 'obligations', seq: 1, patch: { what: 'x' } }, reader)).code, 'SCOPE_INSUFFICIENT');
+  assert.equal(refusal(await api.create({ register: 'obligations', fields: { what: 'x' } }, reader)).code, 'FORBIDDEN');
+  assert.equal(refusal(await api.update({ register: 'obligations', seq: 1, patch: { what: 'x' } }, reader)).code, 'FORBIDDEN');
   sql.close();
 });
 

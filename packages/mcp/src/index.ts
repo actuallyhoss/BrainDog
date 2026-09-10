@@ -63,17 +63,18 @@ const MINUTE = 60_000;
 /**
  * The codes a scope check writes, which is what "this caller was not shown it" looks like on a block.
  *
- * THREE, BECAUSE ONE FACT HAS THREE SENTENCES. `readable` is `guard(ctx, 'read', register)`, and the
+ * TWO CODES, AND ONE FACT HAS THREE SENTENCES. `readable` is `guard(ctx, 'read', register)`, and the
  * two halves of that guard answer differently about the same register: outside the ceiling is
  * `FORBIDDEN`, inside the ceiling with a level that does not reach `read` is `LEVEL_REQUIRED`, and a
- * token whose scope is short of it is `SCOPE_INSUFFICIENT`. A filter that names one of the three is
- * a filter on the ceiling where the question is the level.
+ * token whose scope is short of it is `FORBIDDEN` again with its own sentence. That third was
+ * `SCOPE_INSUFFICIENT`, a code in no registry, until it went the way `PERSON_REQUIRED` had. A filter
+ * that names only one of them is a filter on the ceiling where the question is the level.
  *
  * AND IT IS A LIST OF CODES RATHER THAN "ANY REFUSAL AT ALL". A block refused for a misspelt key is
  * a block somebody has to be able to see in order to fix, and withholding the page it is on would
  * hide the only sentence that says what is wrong with it.
  */
-const WITHHELD = new Set(['FORBIDDEN', 'LEVEL_REQUIRED', 'SCOPE_INSUFFICIENT']);
+const WITHHELD = new Set(['FORBIDDEN', 'LEVEL_REQUIRED']);
 
 export type Tool = {
   name: string;

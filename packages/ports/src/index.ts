@@ -282,11 +282,11 @@ export type Refusal = {
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was
    * missing and they have been admitted by amendment; the synonyms have been renamed onto the
    * codes that already existed. What is left is `DECLARATION_INVALID` — the catch-all `declare.ts`
-   * leans on, 32 occurrences, a project of its own — and five codes whose last emitting site sits in
+   * leans on, 32 occurrences, a project of its own — and three codes whose last emitting site sits in
    * a file the same change could not reach: `INTERNAL` (a crash, not a refusal, and it must move in
-   * all three hosts at once or they answer differently),
-   * `SCOPE_INSUFFICIENT`, and two
-   * deliberate placeholders that live only in tests and should stay there.
+   * all three hosts at once or they answer differently), and two deliberate placeholders that live
+   * only in tests and should stay there. `SCOPE_INSUFFICIENT` was a fourth, and on 2026-09-10 it
+   * went the way `PERSON_REQUIRED` had, into `FORBIDDEN` with the remedy in the sentence.
    *
    * So `refusals.mjs` holds the number as a budget that may only go down. That is still the honest
    * intermediate: the list is real, the drift is measured, and a seventh invented code is red today.

@@ -256,8 +256,13 @@ test('a read token reads through every tool and writes through none', async () =
     ['create', { register: 'obligations', fields: { what: 'b' } }],
     ['update', { spoken: 'obligations#1', patch: { what: 'b' } }],
     ['log', { spoken: 'obligations#1', note: 'x' }],
-  ] as const)
-    assert.equal(refusal(await mcp.call(name, args, reader)).code, 'SCOPE_INSUFFICIENT', name);
+  ] as const) {
+    /* `FORBIDDEN`, and it was `SCOPE_INSUFFICIENT`, a code in no registry: `30 §6` writes the scope
+       case under `FORBIDDEN`, and the remedy was already in the sentence. */
+    const said = refusal(await mcp.call(name, args, reader));
+    assert.equal(said.code, 'FORBIDDEN', name);
+    assert.match(said.fix, /Ask the owner for a token with a wider scope\./, name);
+  }
   sql.close();
 });
 

@@ -26,8 +26,9 @@ import { instant } from './migrate.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
 /* THE SCHEMA THE MATCHER RUNS AGAINST, so the names this file refuses and the names that fire are
    one list. See `MATCH_FIELDS`: they were two lists and they disagreed. A same-package edge, which
-   `31 §2`'s order is not about. */
-import { ARRIVAL } from './ingest.ts';
+   `31 §2`'s order is not about. `DATE_FORMATS` comes over the same edge for the same reason: a
+   `date:` form this file accepts is one `day` can read, and there is one list of them. */
+import { ARRIVAL, DATE_FORMATS } from './ingest.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
    is what two lists that disagree cost. */
@@ -1043,6 +1044,45 @@ function matchFault(node: unknown, id: string, at: string): Refusal | null {
   return null;
 }
 
+/**
+ * `43 §4.3`'s date tokens, longest first.
+ *
+ * LONGEST FIRST, so `YYYY` is one year and not two `YY`s, and `MMM` is `MM` then `M`: two month
+ * tokens, which is `43 §9.3`'s own worked failure. Every other character is a literal, lower case
+ * included, so `dd/mm/yyyy` holds no token at all.
+ */
+const DATE_TOKENS = [
+  ['YYYY', 'year'],
+  ['YY', 'year'],
+  ['MM', 'month'],
+  ['DD', 'day'],
+  ['M', 'month'],
+  ['D', 'day'],
+] as const;
+
+/** What is wrong with a date format under `43 §4.3`, as the end of a sentence, or `null`. */
+function dateFormatFault(format: string): string | null {
+  const held = { year: 0, month: 0, day: 0 };
+  let i = 0;
+  while (i < format.length) {
+    const token = DATE_TOKENS.find(([t]) => format.startsWith(t, i));
+    if (token === undefined) {
+      i += 1;
+      continue;
+    }
+    const [t, part] = token;
+    held[part] += 1;
+    i += t.length;
+    /* A ONE-OR-TWO-DIGIT TOKEN RUN INTO ANOTHER NUMBER CANNOT BE SPLIT: `DMYYYY` over `1122026` is
+       the first of December or the eleventh of February, and nothing in the text says which. */
+    if (t.length === 1 && DATE_TOKENS.some(([next]) => format.startsWith(next, i)))
+      return `runs ${t}, which is one or two digits, straight into another number, so nothing says where it ends`;
+  }
+  for (const part of ['year', 'month', 'day'] as const)
+    if (held[part] !== 1) return held[part] === 0 ? `holds no ${part}` : `holds ${held[part]} ${part} tokens`;
+  return null;
+}
+
 /** A form's own key, against the thirteen — and through a combinator, which holds forms. */
 function extractorFault(form: unknown, at: string, depth: number): Refusal | null {
   if (form === null || typeof form !== 'object' || Array.isArray(form))
@@ -1064,6 +1104,49 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
         `${at}: ${JSON.stringify(key)} is not one of the thirteen forms — ten extractors and three combinators.`,
         at,
         EXTRACTORS as unknown as string[],
+      );
+  }
+
+  /**
+   * A `date:` FORMAT NOTHING COULD READ, AND IT READ AS "NO DATE HERE" ON EVERY ARRIVAL.
+   *
+   * The key was checked against the thirteen and the format was never looked at. `ingest.ts`'s
+   * `day` looks a format up in a table of four and returns `null` for one it does not hold, which
+   * is also what it returns for a text with no date in it. Driven against `validate` and `day`:
+   *
+   *     date { format: 'DD.MM.YYYY' }           ACCEPTED (null)
+   *     date { format: 'dd/mm/yyyy' }           ACCEPTED (null)
+   *     date {}                                 ACCEPTED (null)
+   *     date { format: 42 }                     ACCEPTED (null)
+   *     date { format: 'DD/MM' }                ACCEPTED (null)
+   *     day("due 03.04.2026", "DD.MM.YYYY")  =  null
+   *
+   * So an author writing a date the ordinary European way installed a rule that matched arrivals,
+   * wrote rows and left the date empty on every one of them for as long as the pack was installed,
+   * with nothing refused and nothing logged.
+   *
+   * TWO ANSWERS, BECAUSE THEY ARE TWO FACTS. `43 §4.3` is a token grammar, and a format outside it
+   * (no year, two months, a one-digit day run into the next number, no format at all) is
+   * `DATE_FORMAT_INVALID`, which `43 §13 D13` has `42` raise at install. A format inside the grammar
+   * that `day` does not tabulate is right and this build is behind: `DD.MM.YYYY` is one, and
+   * `43 §9.3` reads `29.08.2026` with it. That is the answer `keyFault` gives a published key nothing
+   * keeps, and it names the four this build does read.
+   */
+  if ('date' in form) {
+    const format = (form as { date?: { format?: unknown } | null }).date?.format;
+    const fault = typeof format === 'string' ? dateFormatFault(format) : format === undefined ? 'is missing' : 'is not text';
+    if (fault !== null)
+      return bad(
+        'DATE_FORMAT_INVALID',
+        `${at}.date's format ${typeof format === 'string' ? `${format} ` : ''}${fault}. Write it with one year, one month and one day token: YYYY or YY, MM or M, DD or D.`,
+        `${at}.date.format`,
+      );
+    if (typeof format === 'string' && !DATE_FORMATS.includes(format))
+      return bad(
+        'NOT_IN_THIS_BUILD',
+        `${at}.date's format ${format} is in the grammar and this build reads only ${DATE_FORMATS.join(', ')}, so the field would install and stay empty on every arrival. The repair is a deploy, not an edit.`,
+        `${at}.date.format`,
+        [...DATE_FORMATS],
       );
   }
 

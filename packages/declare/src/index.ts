@@ -117,6 +117,13 @@ export type Diff = {
    */
   retypes: { id: string; field: string; from: string; to: string; rows: number }[];
   newly_required: { id: string; field: string; rows: number }[];
+  /**
+   * A retire and an add that are one declaration under two ids. Reported here, refused by `install`.
+   *
+   * `42 §5.3·10`'s rule, which is exact on purpose: the same kind, and the two bodies equal once the
+   * key that carries the id is taken out. A fuzzier match is `42 §10`'s ledgered ceiling.
+   */
+  renames: { from: string; to: string; rows: number }[];
   warnings: { at: string; say: string }[];
   base: { format: number; primitives: number; packs: [string, string][]; declarations: [string, number, string][] };
   planHash: string;
@@ -177,6 +184,18 @@ const malformed = <T>(fix: string, at?: string): Result<T> =>
 
 /** Keys whose value is a credential by any reading. A pack is a file people share. */
 const SECRETS = new Set(['secret', 'token', 'password', 'api_key', 'apikey', 'ciphertext', 'private_key', 'bearer']);
+
+/** Keys that name an appearance, which only a theme may. `42 §5.3·11`. */
+const PAINTS = new Set(['colour', 'color']);
+
+/**
+ * `42 §4.2`'s `Colour`: the whole value, trimmed. Module constants, never built from pack text (`42 §8`).
+ *
+ * THE FUNCTION NAMES FOLD CASE, because CSS reads `RGB(` as `rgb(` and a check that did not would
+ * pass the one spelling a person copying from an old stylesheet writes.
+ */
+const HEX = /^#[0-9a-fA-F]{3,8}$/u;
+const CSS_COLOUR = /^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/iu;
 
 /**
  * A document becomes a pack, or does not.
@@ -272,6 +291,32 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
       return no<Pack>('SECRET_IN_PACK', `${kind}.${name} carries a ${wrong}, and a pack is a file people share.`, {
         at: wrong,
       });
+
+    /**
+     * AND A COLOUR IS NEVER IN ONE THAT IS NOT A THEME, AND NOTHING LOOKED.
+     *
+     * `credential` walks every body for a key that holds a secret, and no walk anywhere looked for
+     * one that holds a colour. Driven through this function:
+     *
+     *     block.invoice-card, colour: '#E11D48'      ACCEPTED
+     *     page block, color: 'red'                   ACCEPTED
+     *     page block, tone: 'oklch(0.6 0.2 20)'      ACCEPTED
+     *
+     * `42 §5.3·11` is the rule, class B and one body alone: *"in every non-theme declaration: a key
+     * named colour/color, or a string value matching Colour"*. `04 §5`'s sentence gives the reason:
+     * a block names an intent and the theme names appearance. A colour written anywhere else is one
+     * the theme a person chose cannot change, and `CONTRAST_FLOOR`, which is a theme's check, never
+     * measures it. Seeds are rows and are not looked at: a hex value in an example row is data.
+     */
+    if (kind !== 'theme') {
+      const painted = colour(body);
+      if (painted)
+        return no<Pack>(
+          'COLOUR_OUTSIDE_THEME',
+          `${kind}.${name} sets ${painted.at} to ${painted.value}. A ${kind} names an intent (good, warn, bad or info), and the theme names the colour.`,
+          { at: `${kind}.${name}.${painted.at}` },
+        );
+    }
 
     const declId = `${kind}.${name}`;
     if (seen.has(declId)) return malformed(`${id} declares ${declId} twice.`, declId);
@@ -414,6 +459,37 @@ function credential(body: Json, seen: WeakSet<object> = new WeakSet()): string |
   for (const [key, value] of Object.entries(body)) {
     if (SECRETS.has(key.toLowerCase()) && typeof value === 'string' && value.trim()) return key;
     const found = credential(value, seen);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * The first colour in a declaration body, by key or by value, with the path to it; or `null`.
+ *
+ * A SEEN-SET, for `credential`'s reason: a caller in this process can hand `normalise` a body that
+ * points at itself, and a stack overflow out of a function that returns a `Result` is the one thing
+ * this package promises does not happen.
+ */
+function colour(body: Json, path = '', seen: WeakSet<object> = new WeakSet()): { at: string; value: string } | null {
+  if (typeof body === 'string') {
+    const said = body.trim();
+    return HEX.test(said) || CSS_COLOUR.test(said) ? { at: path, value: said } : null;
+  }
+  if (typeof body !== 'object' || body === null) return null;
+  if (seen.has(body)) return null;
+  seen.add(body);
+  if (Array.isArray(body)) {
+    for (const [i, item] of body.entries()) {
+      const found = colour(item, `${path}[${i}]`, seen);
+      if (found) return found;
+    }
+    return null;
+  }
+  for (const [key, value] of Object.entries(body)) {
+    const at = path === '' ? key : `${path}.${key}`;
+    if (PAINTS.has(key.toLowerCase())) return { at, value: typeof value === 'string' ? value : JSON.stringify(value) };
+    const found = colour(value, at, seen);
     if (found) return found;
   }
   return null;
@@ -568,10 +644,12 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
   const conflicts: Diff['conflicts'] = [];
   const retypes: Diff['retypes'] = [];
   const newlyRequired: Diff['newly_required'] = [];
+  const added: PackDeclaration[] = [];
   for (const decl of pack.declarations) {
     const already = live.get(decl.id);
     if (!already) {
       adds.push({ id: decl.id, summary: summarise(decl) });
+      added.push(decl);
       continue;
     }
     /* ANOTHER PACK'S DECLARATION IS NOT YOURS TO CHANGE. Two packs owning one register is two
@@ -608,6 +686,29 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
     const rows = register ? (installed.rows[register] ?? 0) : 0;
     retires.push({ id: decl.id, rows });
     orphans += rows;
+  }
+
+  /* A RETIRE AND AN ADD OF ONE BODY ARE ONE DECLARATION UNDER TWO IDS. Both lists were built in this
+     function from one `Installed` and never compared, so a rename was planned as two unrelated moves;
+     `install` says what that cost. A body that will not parse is not a finding, for `unreadable`'s
+     reason. */
+  const renames: Diff['renames'] = [];
+  for (const decl of added) {
+    const now = unnamed(decl.kind, decl.body);
+    if (now === null) continue;
+    for (const gone of installed.declarations) {
+      if (gone.pack_id !== mine || keeping.has(gone.id) || gone.kind !== decl.kind) continue;
+      if (renames.some((r) => r.from === gone.id)) continue;
+      let was: unknown;
+      try {
+        was = JSON.parse(gone.body);
+      } catch {
+        continue;
+      }
+      if (unnamed(gone.kind, was) !== now) continue;
+      renames.push({ from: gone.id, to: decl.id, rows: retires.find((r) => r.id === gone.id)?.rows ?? 0 });
+      break;
+    }
   }
 
   const format = { wanted: pack.manifest.requires.format, has: installed.format, ok: installed.format >= pack.manifest.requires.format };
@@ -655,6 +756,7 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
     orphans,
     retypes,
     newly_required: newlyRequired,
+    renames,
     warnings: warningsOf(pack),
     base,
     /* THE INTEGER HALF CATCHES A RECORD THAT MOVED and the hash half catches a PACK that was edited
@@ -732,6 +834,19 @@ function unreadable(
     const demanded = now.required === true && now.default === undefined;
     if (demanded && then?.required !== true) newlyRequired.push({ id: decl.id, field: id, rows });
   }
+}
+
+/**
+ * A body with the key that carries its id taken out, as the text two bodies are compared by.
+ *
+ * `42 §5.3·10` says *"minus its kind key"*, and a register's is the one that moves: `normalise`
+ * stores `register: obligations` as `id: obligations`, so a register's id key is `id` and every
+ * other kind's is its own word.
+ */
+function unnamed(kind: DeclKind, body: unknown): string | null {
+  if (!isObject(body as Json)) return null;
+  const { [kind === 'register' ? 'id' : kind]: _named, ...rest } = body as Record<string, Json>;
+  return canonicalise(rest);
 }
 
 const summarise = (decl: PackDeclaration): string => {
@@ -874,6 +989,35 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       'OUT_OF_BOUNDS',
       `${diff.pack.id} needs ${missing.id} ${missing.range}, and this record has ${missing.installed ?? 'none'}.`,
       { at: `requires.packs.${missing.id}` },
+    );
+
+  /**
+   * A RENAME IS REFUSED BEFORE THE ORPHAN IT ALSO IS, because it is the truer sentence.
+   *
+   * `plan` built its adds and its retires in one function and never compared them, so a pack that
+   * renamed something was planned as one add and one retire. Driven end to end through the record's
+   * `planPack` and `installPack`:
+   *
+   *     register.obligations -> register.bills, 0 rows   ACCEPTED; list obligations -> REGISTER_UNKNOWN
+   *     register.obligations -> register.bills, 2 rows   WOULD_ORPHAN "... there are 2 rows in it. Move them first."
+   *     page.money -> page.finance, same body            ACCEPTED
+   *
+   * The first dropped the id every page, rule and note pointing at it was written against, and said
+   * nothing. The second told an author who had renamed a register to go and move its rows, when the
+   * rows were fine and the new id was the mistake. `04 §5` and `02 §2` both say it the other way
+   * round: ids are stable for ever and there is no alias key, so the repair is to keep the old id and
+   * change the name, which is a label and moves nothing.
+   */
+  const renamed = diff.renames[0];
+  if (renamed)
+    return no<Applied>(
+      'ID_RENAMED',
+      `${renamed.from} → ${renamed.to} renames ${
+        renamed.rows > 0
+          ? `a spoken id, so ${renamed.from.slice(renamed.from.indexOf('.') + 1)}#<n> in a note would stop resolving`
+          : `an id, so anything written against ${renamed.from} would stop resolving`
+      }. Ids are stable for ever: keep ${renamed.from} and change its name instead.`,
+      { at: renamed.to },
     );
 
   /* ROWS ARE NEVER THE PRICE OF AN UPGRADE. A pack that dropped a register somebody has been

@@ -445,6 +445,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        column is NULL on every row of it. The compiler needs the answer and only the declaration
        has it. */
     ...(registers.get(register)?.state === undefined ? {} : { state: registers.get(register)!.state! }),
+    /* AND WHETHER IT IS A SERIES, which `where` refuses every text test over (`02 §5`). The flag was
+       read in this file for the spoken number and the rules pass and never sent, so the compiler
+       that keeps the rule was never told which registers it was about. */
+    ...(registers.get(register)?.series === true ? { series: true } : {}),
     fields: Object.fromEntries(
       (registers.get(register)?.fields ?? [])
         .filter((f) => !f.retired)
@@ -561,6 +565,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const fields = ((arriving.body as { fields?: unknown }).fields ?? []) as (FieldDecl & { retired?: boolean })[];
         return {
           register,
+          /* A register arriving in this batch is a series by its own body, for `schemaOf`'s reason. */
+          ...((arriving.body as { series?: unknown }).series === true ? { series: true } : {}),
           fields: Object.fromEntries(
             fields
               .filter((f) => !f.retired)
@@ -645,6 +651,28 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const said = predicateOf(where as Predicate | string, schema, evalContext());
         const stop = said.bad.find((b) => b.code !== 'REF_UNKNOWN');
         if (stop) return { ...stop, fix: `${decl.id} cannot be read: ${stop.fix}` };
+
+        /**
+         * AND THEN COMPILED, BECAUSE THAT IS WHAT "CAN BE READ" MEANS.
+         *
+         * `predicateOf` parses a SENTENCE against the schema and, for the tree form, only resolves
+         * its relative dates, so the same mistake was refused written one way and installed written
+         * the other. `evaluate` answers `false` for anything `compile` refuses, by construction, so
+         * every one of these rules installed and then never fired. Driven:
+         *
+         *     tree: gt on a text field                   INSTALLED -> row tags null
+         *     tree: an undeclared field                  INSTALLED -> row tags null
+         *     tree: contains on an int                   INSTALLED -> row tags null
+         *     sentence: an undeclared field (control)    REFUSED FIELD_UNKNOWN
+         *     tree: a readable predicate (control)       INSTALLED -> row tags ["flagged"]
+         *
+         * Found by the series rule, `02 §5`'s *"refused at install: a series has no text"*: the
+         * compiler learned to refuse `contains` over a series and a rule saying it still installed,
+         * now to fire on nothing where it used to fire correctly. `compile` raises no `REF_UNKNOWN`,
+         * so nothing a row written tomorrow could satisfy is refused here.
+         */
+        const unread = compile(said.predicate, schema).bad[0];
+        if (unread) return { ...unread, fix: `${decl.id} cannot be read: ${unread.fix}` };
       }
 
       if (decl.kind === 'rule') {

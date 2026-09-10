@@ -187,8 +187,9 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
    *
    * THE COST OF THE OTHER CHOICE is `10 §7`'s: an agent teaches itself from codes that are stable
    * across versions, and a code minted per remedy makes the vocabulary grow at the speed of the
-   * copywriting. `SCOPE_INSUFFICIENT`, twelve lines down, is the same invention and is still here:
-   * it moves the same way, together with the assertion in `packages/mcp`'s tests that names it.
+   * copywriting. `SCOPE_INSUFFICIENT`, twelve lines down, was the same invention and has gone the
+   * same way: a read token asking to write was handed a code in no registry, and is handed
+   * `FORBIDDEN` now with the same sentence, which already told it to ask for a wider scope.
    */
   if (p.kind === 'token' && (need === 'decide' || need === 'owner'))
     return {
@@ -212,11 +213,11 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
           ? ' Ask the owner for a token with a wider scope.'
           : ' Ask the owner to raise the access this token was minted against.';
 
-  return {
-    code: short ? 'SCOPE_INSUFFICIENT' : 'LEVEL_REQUIRED',
-    fix: `This needs ${need}, and you have ${has}.${next}`,
-    allowed: reach,
-  };
+  /* TWO RETURNS AND NOT ONE, so each code sits as a literal where `refusals.mjs` reads it. This was
+     `code: short ? 'SCOPE_INSUFFICIENT' : 'LEVEL_REQUIRED'`, and the first arm was a code in no
+     registry, counted by that gate as one of the five outside it. */
+  if (short) return { code: 'FORBIDDEN', fix: `This needs ${need}, and you have ${has}.${next}`, allowed: reach };
+  return { code: 'LEVEL_REQUIRED', fix: `This needs ${need}, and you have ${has}.${next}`, allowed: reach };
 }
 
 /** And may they touch this register? A ceiling is a list, and `'*'` is no ceiling at all. */

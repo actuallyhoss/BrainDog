@@ -1,0 +1,5 @@
+code:   ID_RENAMED
+via:    install
+raises: packages/declare/src/index.ts
+at:     register.bills
+fix:    Keep the id and change the name instead.

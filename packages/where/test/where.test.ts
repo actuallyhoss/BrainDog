@@ -367,6 +367,57 @@ test('a leaf with no test, and a grammar shape this build does not read, are bot
     assert.match(compile(shape as never, SCHEMA).bad[0]?.code ?? '', /MATCH_OP_UNSUPPORTED/, JSON.stringify(shape));
 });
 
+test('A TEXT TEST OVER A SERIES WAS ANSWERED, and the documents say a series has no text', () => {
+  /**
+   * `38 §2.2` writes `series?: boolean` into the schema by name and `38 §5.3` refuses on it twice,
+   * L5 for `matches` and L19 for the other four. `Schema` had no such field, so a series register
+   * was asked `contains` like any other and answered. Driven against a `series: true` register:
+   *
+   *     list, contains over a series register    ACCEPTED rows=1
+   *     list, starts over a series register      ACCEPTED rows=1
+   *     list, matches over a series register     REFUSED MATCH_OP_UNSUPPORTED, "it needs the text index"
+   */
+  const SERIES: Schema = { register: 'campaign_day', series: true, fields: { campaign: { type: 'text' }, spend: { type: 'int' } } };
+  for (const op of ['contains', 'starts', 'ends'] as const) {
+    const said = compile({ field: 'campaign', [op]: 'Autumn' }, SERIES).bad[0];
+    assert.equal(said?.code, 'SERIES_HAS_NO_TEXT', op);
+    assert.equal(said?.at, 'campaign', op);
+    assert.equal(
+      said?.fix,
+      `campaign: ${op} over campaign_day, which is series: true. A series has no text; filter campaign_day on its key fields or its numbers.`,
+    );
+  }
+
+  /* `matches` AND `near` ARE REFUSED FOR BEING OVER A SERIES, not for this build lacking the index:
+     one of those is true of every register and a deploy changes it, and the other is not. */
+  for (const [leaf, at] of [
+    [{ matches: 'autumn' }, 'matches'],
+    [{ field: 'campaign', near: { text: 'autumn' } }, 'near'],
+  ] as const) {
+    const said = compile(leaf as never, SERIES).bad[0];
+    assert.equal(said?.code, 'SERIES_HAS_NO_TEXT', at);
+    assert.equal(said?.at, at);
+  }
+
+  // Inside a group as well, and the in-memory rendering answers false by construction.
+  assert.equal(
+    compile({ all: [{ field: 'spend', gt: 1 }, { field: 'campaign', contains: 'A' }] }, SERIES).bad[0]?.code,
+    'SERIES_HAS_NO_TEXT',
+  );
+  assert.equal(evaluate({ field: 'campaign', contains: 'Autumn' }, { campaign: 'Autumn brand' }, SERIES), false);
+
+  /* AND WHAT A SERIES IS FOR STILL COMPILES: its key fields and its numbers. `contains` on one of
+     its numbers is still the type's refusal, which `38 §5.3` puts first (L18 before L19), and a
+     register that is not a series is asked `contains` as before. */
+  assert.deepEqual(compile({ field: 'campaign', is: 'Autumn brand' }, SERIES).bad, []);
+  assert.deepEqual(compile({ field: 'spend', gt: 10 }, SERIES).bad, []);
+  assert.equal(compile({ field: 'spend', contains: '1' }, SERIES).bad[0]?.code, 'MATCH_OP_UNSUPPORTED');
+  const plain: Schema = { ...SERIES, series: false };
+  assert.deepEqual(compile({ field: 'campaign', contains: 'Autumn' }, plain).bad, []);
+  assert.equal(evaluate({ field: 'campaign', contains: 'Autumn' }, { campaign: 'Autumn brand' }, plain), true);
+  assert.equal(compile({ matches: 'x' } as never, plain).bad[0]?.code, 'MATCH_OP_UNSUPPORTED');
+});
+
 test('a refused predicate compiles to something that matches NOTHING, INSIDE A GROUP AS WELL AS AT THE ROOT', () => {
   /* Belt and braces: a caller that ignores `bad` must not get the whole register.
      THE FIXTURE USED TO BE A TOP-LEVEL LEAF, which is the single shape where the claim held. A leaf

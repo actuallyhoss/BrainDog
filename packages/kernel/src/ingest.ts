@@ -949,6 +949,15 @@ const FORMATS: Record<string, RegExp> = {
 };
 
 /**
+ * The formats `day` reads, which is what `declare` checks a `date:` form against at install.
+ *
+ * EXPORTED RATHER THAN COPIED. A format outside this table made `day` return `null`, which is also
+ * what it returns for a text holding no date, so the two were one answer and nothing upstream could
+ * tell them apart. A second list in `declare.ts` would be the drift `MATCH_FIELDS` records.
+ */
+export const DATE_FORMATS: readonly string[] = Object.freeze(Object.keys(FORMATS));
+
+/**
  * A day, in the format the pattern DECLARES.
  *
  * NEVER A GUESS. `03/04/26` is the third of April in Britain and the fourth of March in America, and

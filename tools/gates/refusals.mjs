@@ -286,8 +286,10 @@ for (const dir of ['packages', 'apps', 'tools']) {
  *                               operator at all, now `VALUE_MALFORMED` at `cursor`. The count in
  *                               this table is of CODES and the drift is in SITES, which is how the
  *                               second one stayed invisible to the gate that measures the first.
- *   `SCOPE_INSUFFICIENT` (1)    `FORBIDDEN` with the remedy in the sentence, exactly as
- *                               `PERSON_REQUIRED` now is. It waits on one assertion in `mcp`'s tests.
+ *   `SCOPE_INSUFFICIENT` GONE, 2026-09-10. `FORBIDDEN` with the remedy in the sentence, exactly as
+ *                               `PERSON_REQUIRED` now is. Its one site was a ternary in `record`'s
+ *                               `allows`, now two returns, and the assertions moved with it: one in
+ *                               `mcp`'s tests and three in `record`'s.
  *   `NOPE` (2) · `SOMETHING_NOBODY_MAPPED` (1)  test fixtures, and both are LEFT ON PURPOSE. The
  *                               first is a stub refusal in a transaction test where the code is not
  *                               what is asserted; the second is the subject of its own test —
@@ -296,7 +298,7 @@ for (const dir of ['packages', 'apps', 'tools']) {
  *                               floor: the budget cannot reach zero without making a test worse,
  *                               which is worth knowing before somebody tries.
  */
-const BUDGET = 5;
+const BUDGET = 4;
 const codes = [...invented.keys()].sort();
 /* THE BUDGET IS ABOUT A TREE WITH CODE IN IT. A fixture root holds a document and an array and no
    source at all, so counting emitted codes there measures nothing — and the slack rule below would
