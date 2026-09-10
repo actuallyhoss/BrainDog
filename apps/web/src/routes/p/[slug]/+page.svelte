@@ -981,7 +981,7 @@
 
   /* A stat's cells are declared, so the block cannot infer how many to draw (05 §4) — but the HOST
      may restack what it was given, and three figures across a 358px phone breaks `GBP 4,050.00`
-     into two lines. Home already does this for its own stat; a declared page needs it too. */
+     into two lines. A board on a phone stacks its lanes, which is what this still does for one. */
   @media (width < 640px) {
     .block-slot :global(.grid) {
       grid-template-columns: minmax(0, 1fr);
@@ -990,6 +990,51 @@
     .block-slot :global(.cell + .cell) {
       border-inline-start: 0;
       border-block-start: 1px solid var(--line);
+    }
+
+    /**
+     * AND A STAT GOES TWO-UP, BECAUSE THE REASON ABOVE STOPPED BEING TRUE OF THE PAGE IT CITED.
+     *
+     * The comment over this rule used to end "Home already does this for its own stat", and Home
+     * stacked its three figures one per row until today. It no longer does: its strip is two
+     * columns with the lead figure spanning both, because one-per-row put the question list off
+     * the first screen. `/p/money` kept stacking and paid for it the way Home had: four figures at
+     * about a hundred and ten pixels each, measured at 390 as cells 356 wide stacked from y 288 to
+     * y 716, so "Where it sits" started below the fold and the page read as four cards and nothing
+     * else.
+     *
+     * TWO COLUMNS, AND THE FIRST SPANS WHEN THE COUNT IS ODD, which is Home's shape generalised:
+     * four figures are a two-by-two, three are a lead with two beneath, one is one. The count is
+     * still the declaration's; `:first-child:nth-last-child(odd)` only reads it.
+     *
+     * `:has(> .cell)` SO A BOARD IS NOT CAUGHT. Board and stat both render `class="grid"`, and a
+     * board's lanes two-up on a phone are two columns of cards at 170px, which is a different
+     * decision from this one and nobody has taken it.
+     *
+     * HAIRLINES FROM THE GAP, NOT FROM BORDERS. With two columns and a possible span, "which cell
+     * gets a top rule and which a start rule" has four cases; a 1px gap over a `--line` ground
+     * draws every division once and correctly, and each cell paints its own surface over it.
+     */
+    .block-slot :global(.grid:has(> .cell)) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+    }
+
+    .block-slot :global(.grid:has(> .cell) > .cell) {
+      background: var(--s1);
+      border: 0;
+    }
+
+    .block-slot :global(.grid:has(> .cell) > .cell:first-child:nth-last-child(odd)) {
+      grid-column: 1 / -1;
+    }
+
+    /* A step down so `GBP 28,320.00` stays one line in half a phone, which is the rule Home's strip
+       already follows for the same width. */
+    .block-slot :global(.grid:has(> .cell) .cell-figure) {
+      font-size: var(--t-lg);
+      white-space: nowrap;
     }
   }
 

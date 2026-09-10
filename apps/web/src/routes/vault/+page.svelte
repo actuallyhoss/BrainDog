@@ -46,12 +46,24 @@
 
 <svelte:head><title>{titleOf(copy.vault)}</title></svelte:head>
 
-<PageHead icon="vault" title={copy.vault} count={VAULT.length}>
-  {#snippet actions()}
-    <!-- ONE SENTENCE, FROM ONE PLACE. This was typed here AND sat unrendered in `copy.ts` as
-         `staleKey` — the same fact written twice, with the reviewable copy the dead one. -->
-    {#if stale}<Chip label={copy.staleCount(stale)} tone="warn" />{/if}
-  {/snippet}
+<!--
+  THE SNIPPET IS PASSED ONLY WHEN THERE IS SOMETHING IN IT.
+
+  It was a child `{#snippet actions()}` whose whole body was `{#if stale}`, so the snippet was always
+  passed and `PageHead` always drew `.head-actions`, empty or not. That mattered the moment
+  `PageHead` started deciding the head's shape from whether it has actions
+  (`.head-main:has(.head-actions)`): on a record with no stale keys an EMPTY container would have
+  forced the title onto a line of its own, over nothing. Deciding at the call site is the honest
+  place, because only this screen knows whether the chip has anything to say; an `:empty` selector
+  in `PageHead` would be guessing through Svelte's comment and whitespace nodes.
+-->
+{#snippet staleActions()}
+  <!-- ONE SENTENCE, FROM ONE PLACE. This was typed here AND sat unrendered in `copy.ts` as
+       `staleKey` — the same fact written twice, with the reviewable copy the dead one. -->
+  <Chip label={copy.staleCount(stale)} tone="warn" />
+{/snippet}
+
+<PageHead {...stale ? { actions: staleActions } : {}} icon="vault" title={copy.vault} count={VAULT.length}>
 </PageHead>
 
 <div class="page">

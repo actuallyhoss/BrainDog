@@ -249,9 +249,26 @@
               the glyph and the sentence, which is what a reader was using anyway. The id has not
               gone anywhere: `y` copies it, the row's own screen prints it, and `/audit` still leads
               with it, because those are the three places somebody wants a number they can say.
+
+              AND A QUESTION ROW NOW LEADS WITH NOTHING, WHERE IT LED WITH THE DECIDE GLYPH. The
+              fork was the same grey `Y` on all four, in a shape this product teaches only as the
+              rail's icon for Decide. The questions are the block at the top of this list, three of
+              the four carry a "Recommends …" line no other row has, and none has an amount; the
+              glyph was the weakest of the ways to tell them apart. On a phone it cost more than it
+              said: below 640 it had a card line to itself, because a question has no amount to
+              share it with, and measured at 390 each title started 28px into its card, 12 of them
+              the glyph. An empty span has no height; the row gap stays.
+
+              THE PROJECT MARK WAS THE OTHER CANDIDATE, AND THE RECORD DOES NOT CARRY ONE. A
+              question's `entity` is a label, `Kiln` or `This record`, and the suggestion row it
+              stands in for (`45 §5`) has no reference to a thing. Drawing Kiln's `◆` would be this
+              screen matching a name to a project and asserting a link the record never made, and
+              the first question in the queue is about no project at all. The empty `.seq` holds the
+              track, as the empty `.line-amount` below already does, so the title lines up with the
+              rows under it.
             -->
             <a class="line line-tall" href="/decide/{q.id}">
-              <span class="seq"><Icon name="decide" size="s" /></span>
+              <span class="seq"></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{q.cost}</span>
@@ -267,8 +284,9 @@
                   IT IS NOT A SHORTCUT TO ANSWERING. The row is a link to the question's own screen,
                   where the reasoning and the other options are; there is no press here that
                   answers, so the recommendation costs a reader nothing and saves them an opening.
-                  On `/decide`, where one press now answers, the mark is deliberately absent: it
-                  would make rubber-stamping the machine the cheapest act on the screen.
+                  `/decide` hid it for a while, on the argument that one press answers there. It
+                  marks it now, as a word inside an option of the same weight as the others,
+                  because hiding it there only made a reader remember what this row had told them.
                 -->
                 {#if q.options?.find((o) => o.recommended)}
                   <span class="line-pick">{copy.recommends} {q.options.find((o) => o.recommended)?.title}</span>
@@ -408,7 +426,8 @@
      `obligations#12`, because this is the one list in the product that mixes registers and two rows
      from two lists both drew `#2`. Nothing carries the id here any more: the glyph tells the rows
      apart and the sentence beside it says which one this is, so sixteen characters of leading
-     column become one drawing and the words start where the eye does.
+     column become one drawing and the words start where the eye does. A question row leaves the
+     track empty; the row itself says why.
 
      Scoped, and above 640px for the reason `/audit` and `/decide` carry the same guard: below it the
      row is a card, and a component `<style>` is unlayered and beats `@layer components`. */

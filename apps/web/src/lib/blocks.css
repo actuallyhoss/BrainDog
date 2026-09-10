@@ -218,8 +218,16 @@
       'figure figure'
       'note note';
     /* `max-content` puts the glyph immediately after the label rather than at the far edge of the
-       cell: a tone belongs to the thing it qualifies, and half a column away it belongs to nothing. */
-    grid-template-columns: max-content minmax(0, 1fr);
+       cell: a tone belongs to the thing it qualifies, and half a column away it belongs to nothing.
+
+       AND `max-content` IS A TRACK THAT CAN NEVER WRAP, which is why it is `fit-content` now. A
+       `max-content` column is as wide as its content on one line, whatever the cell is. On a phone,
+       where `/p/money` lays four figures out two-up in 178px cells, `HOW LONG THE MONEY LASTS` in
+       uppercase tracking is wider than the cell: the label pushed the grid past its box and
+       `.grid { overflow: hidden }` clipped it to `HOW LONG THE MONEY LA`, and clipped the note
+       spanning under it with it. `fit-content(100%)` is identical when the label fits, so the glyph
+       still sits right after it, and wraps it when it does not. */
+    grid-template-columns: fit-content(100%) minmax(0, 1fr);
     align-items: center;
     row-gap: 3px;
     column-gap: var(--sp-2);

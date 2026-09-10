@@ -98,14 +98,22 @@
    * queue and it is asked for every time; it is not allowed to stop the queue moving.
    *
    * `/decide/<id>` STILL REQUIRES IT, and that is not an inconsistency. Going there is choosing the
-   * ceremony: the option bodies, the recommendation, a named decider and a row that cannot be edited
-   * afterwards. Two screens, two acts. This one is answering a question you have already thought
-   * about, and the receipt says exactly which of the two it was.
+   * ceremony: the option bodies, the reasoning behind the recommendation, a named decider and a row
+   * that cannot be edited afterwards. Two screens, two acts. This one is answering a question you
+   * have already thought about, and the receipt says exactly which of the two it was.
    *
-   * THE RECOMMENDATION IS NOT MARKED HERE, and that is the same argument `/decide/<id>` makes about
-   * never pre-selecting it: with the answer one press away, a "Recommended" badge beside a button
-   * turns rubber-stamping the machine into the cheapest thing on the screen. It is shown on the
-   * screen where the option bodies are, next to the reasoning it came from.
+   * THE RECOMMENDATION IS MARKED HERE NOW, AND IT WAS HIDDEN. The argument was that with the answer
+   * one press away, a badge beside a button makes rubber-stamping the machine the cheapest thing on
+   * the screen. It treated showing the recommendation as choosing it, and `19 §4` and `20 §3` keep
+   * those apart: displayed, never pre-selected, a label and not an order. Nor did hiding it hide
+   * anything. Home prints "Recommends …" under three of the four questions in this queue, one tap
+   * before this screen, so a reader arrived having been told and found it gone from the one screen
+   * whose job is choosing. What the hiding bought was having to remember it.
+   *
+   * WHAT KEEPS IT A SUGGESTION is everything the mark does not touch: every option is the same
+   * weight, in the record's order, one press each, and nothing is filled or focused on arrival. The
+   * word sits inside the control, so it is read with the option's name, and it is drawn the way the
+   * gate's `.card-rec` is, so one fact looks the same on both screens.
    */
   async function take(q: Question, key: string) {
     const a = answerFor(q, key, new Date(NOW).toISOString());
@@ -170,10 +178,10 @@
 
 <svelte:head><title>{titleOf(copy.decide)}</title></svelte:head>
 
-<PageHead icon="decide"
-  title={copy.decide}
-  count={open.length}
-/>
+<!-- NO COUNT IN THE HEAD, AND IT HAD ONE. It printed the same 4 that `Open questions` prints one line
+     lower, for the same list, and at 390 it wrapped onto a line of its own: the head measured 91px
+     there against 59 at 1440, so the first thing under the title on a phone was a lone number. -->
+<PageHead icon="decide" title={copy.decide} />
 
 <div class="page">
   {#if open.length === 0}
@@ -183,8 +191,12 @@
          written, so nothing left the queue: a heading that counted down would be this screen
          claiming a state the record has never heard of. -->
     <Section title={copy.openQuestions} count={open.length}>
+      <!-- THE AIM, AS A SENTENCE WITH ITS TONE, AND IT WAS A FRAGMENT. The metric's note sat alone at
+           the end of this row, `no more than 3`, grey, beside a count of 4 it was failing. The
+           metric already knew it was failing (`tone: 'warn'` above three) and nothing drew it.
+           `Chip` draws the tone with its glyph, so over the aim reads ⚠ and not only amber (13 §5.1). -->
       {#snippet aside()}
-        <span class="target">{target.note}</span>
+        <Chip label={copy.aimFor(target.note)} tone={target.tone} />
       {/snippet}
 
       <ol class="queue">
@@ -194,10 +206,14 @@
             <a class="q-open" href="/decide/{q.id}">
               <span class="q-rank num">{i + 1}</span>
               <span class="q-body">
+                <!-- WHAT IT IS ABOUT LEADS, AND THE ID ENDS THE LINE. It led with `SG34` in the id
+                     face, which Home took out of its leading column because `SG` is expanded
+                     nowhere. It stays, because the feed says "Opened SG31" and a reader looking for
+                     that question should find it here; it no longer comes first. -->
                 <span class="q-head">
-                  <span class="q-id">{q.id}</span>
                   {#if q.entity}<span class="q-entity">{q.entity}</span>{/if}
                   <span class="q-age">opened {since(q.opened, NOW)}</span>
+                  <span class="q-id">{q.id}</span>
                 </span>
                 <span class="q-title" id="q-{q.id}-title">{q.title}</span>
                 <span class="q-cost">{q.cost}</span>
@@ -262,8 +278,13 @@
                        invisible 44 x 44 hit box, the press state and a fill whose contrast against
                        its own label is already solved; an option button hand-rolled here would be a
                        second control with the same job and its own drift. -->
+                  <!-- THE RECOMMENDATION, AS A WORD INSIDE ITS OPTION. Not filled, not moved first,
+                       not focused: the same weight as its neighbours and in the record's order, so it
+                       is found rather than chosen. The argument is over `take`. -->
                   {#each optionsOf(q) as o (o.key)}
-                    <Button id="opt-{q.id}-{o.key}" onclick={() => take(q, o.key)}>{o.title}</Button>
+                    <Button id="opt-{q.id}-{o.key}" onclick={() => take(q, o.key)}>
+                      {o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}
+                    </Button>
                   {/each}
                 </div>
               {/if}
@@ -302,11 +323,6 @@
     gap: var(--sp-5);
     padding: var(--sp-5) var(--sp-6) var(--sp-9);
     max-inline-size: 980px;
-  }
-
-  .target {
-    color: var(--dim);
-    font-size: var(--t-xs);
   }
 
   .queue {
@@ -375,14 +391,21 @@
     font-size: var(--t-xs);
   }
 
-  .q-id {
+  /* The id is last now and takes the line's own dim ink; the thing the question is about is first
+     and takes the brighter one the id used to have. */
+  .q-entity {
     color: var(--ink2);
+  }
+
+  .q-id {
     font-family: var(--font-id);
     letter-spacing: -0.02em;
   }
 
-  .q-entity::before,
-  .q-age::before {
+  /* BETWEEN ITEMS, NOT BEFORE NAMED ONES. The dots were on `.q-entity` and `.q-age` because the id
+     was always first; with the entity optional and leading, a named rule would print a dot at the
+     start of the line for a question about nothing. */
+  .q-head > span + span::before {
     content: '·';
     margin-inline-end: var(--sp-2);
   }
@@ -421,6 +444,19 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
+  }
+
+  /* THE GATE'S `.card-rec`, INSIDE A BUTTON. `--earn` as text with no tint under it: the ground is
+     the button's own `--s3`, `--s2` on hover and `--s1` pressed, and those are three of the five
+     surfaces theme check G certifies every intent against as text. A tint would be the pair
+     `Chip.svelte` measured failing today, so the border carries the colour and the word the meaning. */
+  .rec {
+    padding: 1px var(--sp-2);
+    border: 1px solid color-mix(in srgb, var(--earn) 45%, transparent);
+    border-radius: var(--r-sm);
+    color: var(--earn);
+    font-size: var(--t-xs);
+    font-weight: 500;
   }
 
   .said {

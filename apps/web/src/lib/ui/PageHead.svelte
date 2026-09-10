@@ -240,7 +240,21 @@
       align-items: baseline;
     }
 
-    .head-titles {
+    /**
+     * THE TITLE TAKES THE WHOLE LINE ONLY WHEN SOMETHING HAS TO GO UNDER IT.
+     *
+     * This was `.head-titles { flex-basis: 100% }` for every head below 900px, so everything after
+     * the title wrapped. That is right when there are actions, which need a row of their own at
+     * phone width, and it was applied just as hard when the only thing after the title was a
+     * count. Measured at 390: Inbox, Vault, Audit and Search each drew a 91px head whose second
+     * line held one number, `6` or `14`, alone at the left edge, where the same head at 1440 is
+     * 59px with the count beside the title. A whole line of the smallest screen spent on a digit.
+     *
+     * `:has(.head-actions)` so a head that carries a control keeps its second row, which is the
+     * register's `New item` and Home's `to decide`, and a head that carries only a count keeps it
+     * on the title's line, right-aligned, the way every wider screen already draws it.
+     */
+    .head-main:has(.head-actions) .head-titles {
       flex-basis: 100%;
     }
 

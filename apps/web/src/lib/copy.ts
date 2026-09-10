@@ -1505,6 +1505,10 @@ export const copy = {
   /* The marketing site's own line, because the app must not imply an account to look around. */
   demoNeedsNothing: 'The demo record needs no sign-in. There is no sign-up and no billing.',
   openTheDemo: 'Open the demo record',
+  /* THE AIM FOR THE DECIDE QUEUE, AS A SENTENCE. `/decide` printed the metric's note by itself,
+     `no more than 3`, at the end of its heading row: a fragment with no subject, beside a count of
+     4 it was failing. The words are here; the tone and its glyph come from the metric. */
+  aimFor: (target: string) => `Aim for ${target}`,
 } as const;
 
 export type Copy = typeof copy;
