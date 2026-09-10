@@ -276,21 +276,20 @@
     }
 
     /**
-     * THE TITLE TAKES THE WHOLE LINE ONLY WHEN SOMETHING HAS TO GO UNDER IT.
+     * THE TITLE TAKES ITS OWN WIDTH, AND WHAT FOLLOWS IT WRAPS ONLY IF IT HAS TO.
      *
-     * This was `.head-titles { flex-basis: 100% }` for every head below 900px, so everything after
-     * the title wrapped. That is right when there are actions, which need a row of their own at
-     * phone width, and it was applied just as hard when the only thing after the title was a
-     * count. Measured at 390: Inbox, Vault, Audit and Search each drew a 91px head whose second
-     * line held one number, `6` or `14`, alone at the left edge, where the same head at 1440 is
-     * 59px with the count beside the title. A whole line of the smallest screen spent on a digit.
+     * Below 900px this forced the title onto a line of its own whenever the head carried an action,
+     * on the argument that a control needs a row of its own at phone width. Measured at 390 in the
+     * production build, that stranded the register's count alone at the left of a second row with
+     * `New item` in the middle of it, while `Money`, `38` and the button together are about 230px
+     * of a 322px line. Home's date is the case the rule was for, and it still gets its second row:
+     * `flex-basis: auto` is the title's own width, so an action that does not fit beside it wraps,
+     * and `margin-inline-start: auto` below puts it at the end of the line it lands on.
      *
-     * `:has(.head-actions)` so a head that carries a control keeps its second row, which is the
-     * register's `New item` and Home's `to decide`, and a head that carries only a count keeps it
-     * on the title's line, right-aligned, the way every wider screen already draws it.
+     * An earlier pass took the same rule off heads that carry only a count, for the same reason.
      */
-    .head-main:has(.head-actions) .head-titles {
-      flex-basis: 100%;
+    .head-titles {
+      flex: 1 1 auto;
     }
 
 

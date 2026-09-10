@@ -47,4 +47,5 @@ export {
   stamp,
   yesno,
   type TypedForm,
+  leadingCode,
 } from './format.ts';

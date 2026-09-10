@@ -8,7 +8,7 @@ import { toHTML, verbatimText } from './html.ts';
 import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type Column, type TableRow } from '../svelte/types.ts';
 import { lanes } from './board.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
-import { bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
+import { leadingCode, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
@@ -1269,4 +1269,13 @@ test('AN EMPTY CELL KEEPS ITS PLACE ON THE CARD AND STILL READS AS MISSING', () 
   assert.match(card, /@render cellBody\(row, title\.column, title\.value\)/u);
   assert.match(pair, /@render cellBody\(row, cell\.column, cell\.value\)/u);
   assert.doesNotMatch(card + pair, /\{#if [^}]*\.value\b/u, 'a slot is drawn only when its cell has a value');
+});
+
+
+test('A LEADING CURRENCY CODE is split from the amount money() wrote, and nothing else is', () => {
+  assert.deepEqual(leadingCode(money(2_832_000, 'GBP')), { currency: 'GBP', rest: '28,320.00' });
+  assert.deepEqual(leadingCode(money(-129_900, 'EGP')), { currency: 'EGP', rest: '\u22121,299.00' });
+  assert.deepEqual(leadingCode('USD -5.00'), { currency: 'USD', rest: '-5.00' });
+  for (const not of ['VAT quarter to 31 Aug', 'GBP', 'Over 30 days', 'gbp 5.00', 'GBPX 5.00', ''])
+    assert.equal(leadingCode(not), null, not);
 });

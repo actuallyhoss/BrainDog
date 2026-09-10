@@ -114,6 +114,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Face from '$lib/ui/Face.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
@@ -716,9 +717,7 @@
             {#each PEOPLE_ACCESS as p}
               <li class="who">
                 <div class="who-head">
-                  <!-- AN INITIAL, NOT A PHOTO. `20 §6` refuses avatar stacks on a business record,
-                       and a letter in a disc is a face without inventing one. -->
-                  <span class="face" data-you={self(p) ? '' : undefined} aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span>
+                  <Face name={p.name} you={self(p)} />
                   <span class="who-name">{p.name}</span>
                   <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
                        tells two people with one name apart. And WHEN, because access with no date is
@@ -1709,25 +1708,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-  }
-
-  /* Home's feed disc, so a person is drawn one way wherever they turn up, and you in the accent. */
-  .face {
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    background: var(--hold-wash);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    font-weight: 650;
-  }
-
-  .face[data-you] {
-    background: var(--accent-wash);
-    color: var(--accent-text);
   }
 
   .who-name {

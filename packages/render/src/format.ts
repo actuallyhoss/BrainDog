@@ -55,6 +55,20 @@ export function money(minor: number, currency: string): string {
 }
 
 /**
+ * The currency code at the front of a figure `money` wrote, split from the amount after it.
+ *
+ * A DRAWING DECISION, NOT A FORMAT. The text stays `GBP 28,320.00`, code first and always present,
+ * because money is never a bare number. What a screen may do is set the code quieter than the figure,
+ * the way `Money` in the app already does beside a row's amount, and it needs one rule for "this
+ * starts with a code" rather than a regex in every component. Three capitals, one space, then a
+ * digit or a minus: anything else is not a figure this module wrote, and comes back `null`.
+ */
+export function leadingCode(text: string): { currency: string; rest: string } | null {
+  const m = /^([A-Z]{3}) (?=[\u2212\-\d])/u.exec(text);
+  return m ? { currency: m[1]!, rest: text.slice(m[0].length) } : null;
+}
+
+/**
  * ONE MINUS SIGN, in all four of them.
  *
  * `money` and `pct` prepended `MINUS` over `Math.abs`; `integer` and `quantity` returned

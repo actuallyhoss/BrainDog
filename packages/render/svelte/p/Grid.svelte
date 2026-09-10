@@ -12,7 +12,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { inline, leadingCode, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
   import Text from '../Text.svelte';
 
@@ -361,6 +361,11 @@
   <div class="grid" style="--cells:{block.rows.length}">
     {#each block.rows as row, i}
       {@const href = opts.cellHref?.(i) ?? null}
+      <!-- THE CURRENCY CODE IS PRESENT AND QUIET. A figure the size of this one read "GBP" as loudly
+           as the number, three capitals in front of every headline on the screen. The code stays,
+           because money is never a bare number, and the text is unchanged; only the emphasis moves,
+           the way `Money` already sets a row's amount. -->
+      {@const coded = leadingCode(row.cells[1] ?? '')}
       <svelte:element
         this={href ? 'a' : 'div'}
         class="cell"
@@ -370,7 +375,11 @@
       >
         <span class="cell-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
         <span class="cell-figure num">
-          {#if row.cells[1]}<Text nodes={inline(row.cells[1], opts)} {opts} />{:else}{MISSING}{/if}
+          {#if !row.cells[1]}{MISSING}{:else if coded}<span class="amount-code">{coded.currency}</span>
+            <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text
+              nodes={inline(row.cells[1], opts)}
+              {opts}
+            />{/if}
         </span>
         <span class="cell-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
         {#if row.tone}

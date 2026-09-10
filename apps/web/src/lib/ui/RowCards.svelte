@@ -25,7 +25,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { TONES } from 'braindog-render';
+  import { leadingCode, TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { REGISTERS, dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
@@ -100,6 +100,12 @@
   const selectedLabel = copy.selected;
 </script>
 
+<!-- An amount sets its currency code quiet, the way every other figure in the product does. -->
+{#snippet amount(said: string)}
+  {@const coded = leadingCode(said)}
+  {#if coded}<span class="amount-code">{coded.currency}</span> {coded.rest}{:else}{said}{/if}
+{/snippet}
+
 {#if decl}
   <ul class="cards">
     {#each entries as e (e.seq)}
@@ -137,10 +143,10 @@
             {#if e.seq >= 0}#{e.seq}{/if}
           </span>
           <span class="card-b" dir={dirOf(register, decl.mobile[1])} data-enum={isEnum(decl.mobile[1]) ? '' : undefined}>
-            {display(register, decl.mobile[1], e.fields[decl.mobile[1]]) ?? ''}
+            {@render amount(display(register, decl.mobile[1], e.fields[decl.mobile[1]]) ?? '')}
           </span>
           <span class="card-c" dir={dirOf(register, decl.mobile[2])} data-enum={isEnum(decl.mobile[2]) ? '' : undefined}>
-            {display(register, decl.mobile[2], e.fields[decl.mobile[2]]) ?? ''}
+            {@render amount(display(register, decl.mobile[2], e.fields[decl.mobile[2]]) ?? '')}
           </span>
         </a>
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
@@ -207,6 +213,15 @@
       gap: var(--sp-2);
       padding: var(--sp-2) var(--sp-3);
       border-block-start: 1px solid var(--line);
+    }
+
+    /* A NOTE THAT SAYS NOTHING TAKES NO ROOM. `note` is a snippet, and the register passes one for
+       every card whether or not that row has a receipt, so the row drew under every card: a rule,
+       sixteen pixels of padding, and then the next card's own rule, which is two hairlines between
+       every pair of rows on a phone. The snippet draws elements only when there is something to
+       say, so a note with none is empty. */
+    .card-note:not(:has(*)) {
+      display: none;
     }
 
     .card-line[data-picked] {

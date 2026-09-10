@@ -38,6 +38,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -130,10 +131,10 @@
           {#each updates.slice(0, DOM_CAP) as u (u.seq)}
             {@const who = actorOf(String(u.fields.by))}
             <li class="update">
-              <!-- WHO SAID IT, AS A FACE. The disc Home's feed gives a writer, so an update reads as
-                   somebody speaking rather than a log line; the health stays on the chip. -->
+              <!-- WHO SAID IT, AS A FACE, so an update reads as somebody speaking rather than a log
+                   line; the health stays on the chip. -->
               <div class="u-head">
-                <span class="face" data-you={who === 'you' ? '' : undefined} aria-hidden="true">{who.charAt(0).toUpperCase()}</span>
+                <Face name={who} you={who === 'you'} />
                 <span class="u-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <Chip
                   label={String(u.fields.health).replace(/_/g, ' ')}
@@ -258,24 +259,6 @@
     margin-block-end: var(--sp-2);
   }
 
-  .face {
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    background: var(--hold-wash);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    font-weight: 650;
-  }
-
-  .face[data-you] {
-    background: var(--accent-wash);
-    color: var(--accent-text);
-  }
-
   .u-by {
     color: var(--ink2);
     font-size: var(--t-sm);
@@ -288,7 +271,8 @@
     font-size: var(--t-xs);
   }
 
-  /* Under the name rather than under the face, so the words line up with who said them. */
+  /* Under the name rather than under the face, so the words line up with who said them. `28px` is
+     the disc `Face` draws at its default size. */
   .u-body {
     padding-inline-start: calc(28px + var(--sp-3));
     color: var(--ink);

@@ -25,6 +25,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Face from '$lib/ui/Face.svelte';
   import { drew } from '../lib/ui/screen.svelte.ts';
 
   let { data } = $props();
@@ -364,10 +365,7 @@
               <!-- The agent that wrote it, named. Never a sparkle badge: across thirteen experiments
                    participants trusted people and organisations LESS when their use of AI was
                    disclosed, so the badge imposes the cost without buying anything (19 §6). -->
-              <!-- A face, not a name tag in the identifier font. Each writer gets a disc with its initial,
-                   and you get yours in the accent, so a feed of agents reads as people passing
-                   through rather than as a log file. -->
-              <span class="event-face" data-you={who === 'you' ? '' : undefined} aria-hidden="true">{who.charAt(0).toUpperCase()}</span>
+              <Face name={who} you={who === 'you'} />
               <span class="event-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
               <span class="event-text">{item.text}</span>
               <span class="event-when">{since(item.at, NOW)}</span>
@@ -532,22 +530,10 @@
     color: var(--ink);
   }
 
-  .event-face {
-    display: grid;
+  /* The disc is `Face`'s; the feed only says where it sits. */
+  .event > :global(.face) {
     grid-column: 1;
     grid-row: 1 / span 2;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    background: var(--hold-wash);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    font-weight: 650;
-  }
-  .event-face[data-you] {
-    background: var(--accent-wash);
-    color: var(--accent-text);
   }
   .event-by {
     grid-column: 2;

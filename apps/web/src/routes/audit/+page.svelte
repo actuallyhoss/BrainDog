@@ -20,6 +20,7 @@
   import { CapLine } from 'braindog-render/svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   /* THE URL IS NOT TYPED. `?kind=` carries whatever somebody pasted, and the words this screen
@@ -345,10 +346,10 @@
           <!-- ITS OWN COLUMN, NOT `.seq`. That one is 12ch of monospace for spoken ids, and
                `rows.css` says in as many words that anything longer needs a span of its own — so
                "renewal rule" arrived as `the renewal r…`. An actor is a name. -->
-          <!-- A face beside the name, the disc Home's feed draws, so the log reads as who passed
-               through rather than as a column of names. -->
+          <!-- A face beside the name, so the log reads as who passed through rather than as a
+               column of names. -->
           <span class="who">
-            <span class="face" data-you={who === 'you' ? '' : undefined} aria-hidden="true">{who.charAt(0).toUpperCase()}</span>
+            <Face name={who} you={who === 'you'} size="s" />
             <span class="who-name">{who}</span>
           </span>
           <span class="line-main">
@@ -414,25 +415,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  /* Home's feed face, a step smaller because an entry here is one line and not two. */
-  .face {
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 22px;
-    block-size: 22px;
-    background: var(--hold-wash);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    font-weight: 650;
-  }
-
-  .face[data-you] {
-    background: var(--accent-wash);
-    color: var(--accent-text);
   }
 
   /* The same shape the register's toolbar has, because it is the same act: narrowing a list. */

@@ -73,7 +73,7 @@
         {#each p.figures as fig}
           <li class="fig">
             <span class="fig-label">{fig.label}<span class="warn"><Icon name="alert" size="s" /></span></span>
-            <span class="fig-value num">{fig.value}</span>
+            <span class="fig-value num">{#if /^[A-Z]{3} /.test(fig.value)}<span class="fig-code">{fig.value.slice(0, 3)}</span> {fig.value.slice(4)}{:else}{fig.value}{/if}</span>
             <span class="fig-note">{fig.note}</span>
           </li>
         {/each}
@@ -313,6 +313,14 @@
     font-size: var(--t-lg);
     font-weight: 600;
     letter-spacing: -0.02em;
+  }
+
+  /* The code quiet in front of the figure, as the app draws it. */
+  .fig-code {
+    color: var(--dim);
+    font-size: 0.6em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   .fig-note {

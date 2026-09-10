@@ -23,6 +23,7 @@
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { actorOf, AUDIT, backlinks, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, values } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
+  import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -298,7 +299,7 @@
             {#each history as e}
               {@const who = actorOf(e.by)}
               <li>
-                <span class="face" data-you={who === 'you' ? '' : undefined} aria-hidden="true">{who.charAt(0).toUpperCase()}</span>
+                <Face name={who} you={who === 'you'} size="s" />
                 <span class="history-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <span class="history-note">{e.note}</span>
                 <span class="history-when">{since(e.at, NOW)}</span>
@@ -517,23 +518,9 @@
     border-block-end: 1px solid var(--line);
   }
 
-  .face {
-    display: grid;
+  .history li > :global(.face) {
     grid-column: 1;
     grid-row: 1 / span 2;
-    place-items: center;
-    inline-size: 22px;
-    block-size: 22px;
-    background: var(--hold-wash);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    font-weight: 650;
-  }
-
-  .face[data-you] {
-    background: var(--accent-wash);
-    color: var(--accent-text);
   }
 
   .history-by {
