@@ -17,7 +17,7 @@
   import { Block, Degraded } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import * as pref from '$lib/pref.ts';
-  import { NOW, ROWS, actorOf, metric } from '$lib/record/api.ts';
+  import { identityFor, NOW, ROWS, actorOf, metric } from '$lib/record/api.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -145,6 +145,34 @@
   {/snippet}
 </PageHead>
 
+<!--
+  THE THING A ROW BELONGS TO, DRAWN ONCE AND USED BY BOTH KINDS OF ROW.
+
+  `api.ts` says the rule in its own words: *"One mark and one accent per thing, and colour means
+  WHICH PROJECT, everywhere."* Everywhere was four places and none of them was a row, so this
+  ledger mixed a service from one project with three invoices from three others and drew all four
+  identically. The one question a person scanning it asks first, which of my projects is this, was
+  answerable only by opening the row.
+
+  AFTER THE TITLE AND NOT IN `.seq`, because `.seq` is a 2ch track holding the row's type icon and
+  the type is the other thing this mixed ledger must not stop saying. Two facts, two glyphs.
+
+  TWO CHANNELS. The mark is a shape before it is a colour, which is `13 §5.1` satisfied by the
+  mark rather than by something added beside it, and the label is the project's NAME because a
+  screen reader told "black up-pointing triangle" has been told the shape and not the thing.
+-->
+{#snippet mark(register: string, fields: Readonly<Record<string, unknown>>)}
+  {@const it = identityFor(register, fields)}
+  {#if it}
+    <span
+      class="line-mark"
+      style={it.retired ? undefined : `--hue:${it.hue}`}
+      data-retired={it.retired ? '' : undefined}
+      role="img"
+      aria-label={it.name}>{it.mark}</span>
+  {/if}
+{/snippet}
+
 <!-- Two columns, not three stacked lists. What needs you is the reason the screen exists and gets
      the width; the figures and the activity are context and sit beside it. A single column of
      full-bleed groups gives every group the same weight, which is the same as giving none. -->
@@ -257,7 +285,7 @@
             <a class="line" href="/r/services/{s.seq}">
               <span class="seq"><Icon name="service" size="s" /></span>
               <span class="line-main">
-                <span class="line-title">{s.fields.name} is lapsing</span>
+                <span class="line-title">{s.fields.name} is lapsing{@render mark('services', s.fields)}</span>
               </span>
               <span class="line-amount"><Money minor={amountOf(s.fields.cost) ?? 0} currency={currencyOf(s.fields.cost) ?? ''} /></span>
               <span class="line-when" data-intent="bad">
@@ -275,7 +303,7 @@
             <a class="line" href="/r/obligations/{e.seq}">
               <span class="seq"><Icon name="obligation" size="s" /></span>
               <span class="line-main">
-                <span class="line-title">{e.fields.what}</span>
+                <span class="line-title">{e.fields.what}{@render mark('obligations', e.fields)}</span>
               </span>
               <span class="line-amount">
                 <Money
@@ -508,6 +536,21 @@
     color: var(--accent-text);
     font-size: var(--t-sm);
     text-decoration: none;
+  }
+
+  /* THE THING'S HUE, AND IT IS NOT A LITERAL. `oklch(L C h)` where `h` is the row's frozen accent
+     and `L`/`C` are the theme's two mark constants, generated per scheme and chosen so every hue
+     clears 3:1 on every surface. A retired thing keeps its mark and loses its claim on a hue, so
+     `--hue` is withheld AND `--dim` is set: an unset `--hue` makes the `oklch()` invalid, and an
+     invalid declaration is a dropped one, which would leave the mark the same ink as the title. */
+  .line-mark {
+    margin-inline-start: var(--sp-2);
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    font-size: var(--t-xs);
+  }
+
+  .line-mark[data-retired] {
+    color: var(--dim);
   }
 
   .to-decide {

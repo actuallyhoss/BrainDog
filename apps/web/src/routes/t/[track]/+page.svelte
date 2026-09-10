@@ -307,7 +307,7 @@
   }
 
   .row:hover {
-    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    background: var(--hover-wash);
   }
 
   .row-main {

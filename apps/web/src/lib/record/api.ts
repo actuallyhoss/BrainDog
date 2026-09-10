@@ -370,6 +370,40 @@ export function identityOf(register: string, field: string, value: unknown): Ide
   };
 }
 
+/**
+ * THE THING A ROW BELONGS TO, WITHOUT BEING TOLD WHICH FIELD HOLDS IT.
+ *
+ * `identityOf` answers about a NAMED field, which is what a cell needs: the caller is drawing the
+ * `thing` column and wants the mark for the value in it. A row's leading glyph has no field to
+ * name. It wants the answer to a different question, "what is this row about", and until now
+ * nothing could ask it.
+ *
+ * The comment two hundred lines above this one says the rule out loud: *"One mark and one accent
+ * per thing, and colour means WHICH PROJECT, everywhere."* Everywhere was four places, none of
+ * them a row. Six of the eight registers the seed ships declare `thing -> things`, and `things` is
+ * the one register with an `identity:`, so six of the eight lists in this product can say which
+ * project a row belongs to in one glyph and have been saying it in a text column or not at all.
+ *
+ * FIRST MATCH IN DECLARED ORDER, and that is the register's choice rather than this function's.
+ * A register lists its fields in the order it wants them read, so the first `ref` that reaches a
+ * register with an identity is the one it considers the row's subject. `obligations` declares
+ * `party -> people` before `thing -> things` and `people` has no identity, so the walk passes over
+ * it and lands on the project, which is the right answer for the wrong-looking reason: it is right
+ * because `people` declares no mark, not because this function prefers projects.
+ *
+ * NULL IS THE COMMON ANSWER AND IS NOT A FAILURE. `things` itself has no ref at all, `people` has
+ * none, and a pack may ship a register that belongs to nothing. A row with no thing behind it gets
+ * no glyph, which is the honest drawing of "this row is not about a project".
+ */
+export function identityFor(register: string, fields: Readonly<Record<string, unknown>>): Identity | null {
+  for (const f of REGISTERS[register]?.fields ?? []) {
+    if (f.type !== 'ref' || !f.to) continue;
+    const found = identityOf(register, f.id, fields[f.id]);
+    if (found) return found;
+  }
+  return null;
+}
+
 /* ── columns ─────────────────────────────────────────────────────────────
    The default projection: seq, the title field, the `mobile:` fields, state, then indexed fields,
    capped at TEN. At 1440px the return sweep is ~1392px, and beyond ten columns of legible width the
@@ -379,7 +413,13 @@ const WIDTH: Record<string, string> = {
   // 6ch is the number's width and not the CELL's: the cell also carries its padding, so `#10`
   // truncated where `#9` did not. An identifier truncates in the middle by rule, which meant the
   // spoken id — the whole point of the column — came out as `#…`.
-  seq: '9ch',
+  //
+  // AND IT HAPPENED AGAIN, THE MOMENT THE COLUMN GAINED A SECOND THING. The `#` cell now leads
+  // with the mark of the thing the row belongs to, because it is the one column every projection
+  // has and `columnsFor` caps the default at ten, which leaves `thing` out of Money's. A mark and
+  // its gap are about a character and a half, so 9ch held `#13` yesterday and truncated it today,
+  // to `#…`, which is the same failure this comment was written for. 11ch fits a mark and `#999`.
+  seq: '11ch',
   money: '15ch',
   day: '15ch',
   /* A FOSSIL SIZED FOR A STRING IT NO LONGER PRINTS. `20ch` fits `2026-09-03T11:57:00.000Z`, which

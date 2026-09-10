@@ -369,7 +369,7 @@
     align-self: start;
     margin-block-start: var(--sp-1);
     padding: 1px 6px;
-    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    background: var(--hold-wash);
     border-radius: var(--r-sm);
     color: var(--ink2);
     font-size: var(--t-xs);
@@ -570,7 +570,7 @@
   }
 
   .prop-row[data-hole]:hover {
-    background: color-mix(in srgb, var(--warn-fill) 12%, transparent);
+    background: var(--warn-wash);
   }
 
   /* AND IT IS 44 UNDER A THUMB. `--row-h` is 34 comfortable and 30 compact, and this is the only
@@ -1015,7 +1015,7 @@
   /* Hover is a POINTER affordance and nothing more — it says "this row is a thing you can click".
      It is deliberately weaker than the focus band below, which is the one that carries state. */
   .rowgroup .tr:hover {
-    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    background: var(--hover-wash);
   }
 
   /* A persistent focus band, not hover: hover does not help a keyboard user and does not survive a
@@ -1049,7 +1049,7 @@
      the third, and the count said three while two were shaded. The band survives either way because
      it is a box-shadow. */
   .rowgroup .tr[aria-selected='true'] {
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    background: var(--accent-wash);
   }
 
   .tr[data-intent] .td {

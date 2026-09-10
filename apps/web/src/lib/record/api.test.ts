@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, isProse, labelOf, metric, packDiff, page, readableFields, search, toRows } from './api.ts';
+import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, packDiff, page, readableFields, search, toRows } from './api.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
@@ -849,4 +849,43 @@ test('AND THE TWO SECTIONS THAT WERE BEHIND A CONDITION THAT COULD NOT BE TRUE',
   /* AND IT NAMES WHO ALREADY OWNS IT. `02 §1`: a register another pack ships is a name this one
      cannot own, and "Services already exists" without the owner leaves the reader nowhere. */
   assert.match(found[0]!, /already exists, from /);
+});
+
+test('A ROW SAYS WHICH THING IT BELONGS TO, and every list was grey because nothing could ask', () => {
+  /**
+   * `identityOf` answers about a NAMED field, which is what a cell needs. A row's leading glyph
+   * has no field to name: it wants the answer to "what is this row about", and until this there
+   * was no way to ask it, which is why `api.ts`'s own rule that "colour means WHICH PROJECT,
+   * everywhere" had four call sites and not one of them was a row.
+   */
+  const first = (register: string) => ROWS[register]?.[0]?.fields ?? {};
+
+  /* Six of the eight registers the seed ships declare `thing -> things`, and `things` is the one
+     register with an `identity:`. So six of the eight lists in this product can say which project
+     a row belongs to in one glyph. */
+  for (const register of ['obligations', 'services', 'sessions', 'tracks', 'tasks']) {
+    const found = identityFor(register, first(register));
+    assert.ok(found, `${register} row 1 belongs to no thing, and it declares a ref that reaches one`);
+    assert.ok(found.mark.length > 0, `${register} gave a thing with no mark`);
+    assert.equal(typeof found.hue, 'number');
+    assert.ok(found.name.length > 0, 'the label a screen reader is given is the name, and it is empty');
+  }
+
+  /* AND NULL IS THE COMMON ANSWER AND NOT A FAILURE. `things` is the thing, so it belongs to
+     nothing; `people` declares no ref at all. A row with nothing behind it draws no glyph, which
+     is the honest picture of "this row is not about a project". */
+  assert.equal(identityFor('things', first('things')), null, 'a thing was said to belong to a thing');
+  assert.equal(identityFor('people', first('people')), null);
+  assert.equal(identityFor('nosuchregister', {}), null, 'a register that does not exist threw or answered');
+
+  /* FIRST MATCH IN DECLARED ORDER, and that is the register's choice and not this function's.
+     `obligations` declares `party -> people` BEFORE `thing -> things`, and the walk lands on the
+     project because `people` declares no identity, not because anything here prefers projects. */
+  const decl = REGISTERS.obligations!;
+  const refs = decl.fields.filter((f) => f.type === 'ref' && f.to).map((f) => f.to);
+  assert.deepEqual(refs, ['people', 'things'], 'the ordering this case rests on has changed');
+  assert.equal(identityFor('obligations', first('obligations'))?.name, 'Marlow & Co');
+
+  /* AND A REF THAT POINTS AT NO ROW IS NOT A GLYPH. A row can name a thing that was deleted. */
+  assert.equal(identityFor('obligations', { ...first('obligations'), thing: 9999 }), null);
 });

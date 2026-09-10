@@ -525,7 +525,7 @@
 
   :global(.menu-trigger:hover) .record,
   :global(.menu-trigger[aria-expanded='true']) .record {
-    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    background: var(--hover-wash);
     border-color: var(--line);
   }
 
@@ -554,7 +554,7 @@
 
   .mi:hover,
   .mi:focus-visible {
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 
@@ -573,7 +573,7 @@
     inline-size: 20px;
     block-size: 20px;
     flex: none;
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    background: var(--accent-wash);
     border-radius: var(--r-sm);
     color: var(--accent-text);
     font-family: var(--font-display);
@@ -591,7 +591,7 @@
 
   .mi-level {
     padding: 1px 6px;
-    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    background: var(--hold-wash);
     border-radius: var(--r-sm);
     color: var(--dim);
     font-size: var(--t-xs);
@@ -610,7 +610,7 @@
     inline-size: 28px;
     block-size: 28px;
     flex: none;
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    background: var(--accent-wash);
     border-radius: var(--r-md);
     color: var(--accent-text);
     font-family: var(--font-display);
@@ -766,7 +766,7 @@
   }
 
   .item:hover {
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 
@@ -777,7 +777,7 @@
   /* "Here" is the mark's colour. It is the one place in the rail that is allowed to be loud, and it
      is the cheapest way for a product to look like itself on every screen. */
   .item[aria-current='page'] {
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    background: var(--accent-wash);
     color: var(--accent-text);
     font-weight: 600;
   }
@@ -833,7 +833,7 @@
     gap: var(--sp-2);
     margin-block-start: var(--sp-5);
     padding: var(--sp-2) var(--sp-3);
-    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    background: var(--hold-wash);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
     color: var(--dim);

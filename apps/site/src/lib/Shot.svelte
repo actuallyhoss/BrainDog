@@ -35,10 +35,12 @@
     caption,
     eager = false,
     phone = true,
-  }: { name: string; alt: string; caption?: string; eager?: boolean; phone?: boolean } = $props();
+    lead = false,
+  }: { name: string; alt: string; caption?: string; eager?: boolean; phone?: boolean; lead?: boolean } =
+    $props();
 </script>
 
-<figure class="shot">
+<figure class="shot" class:lead>
   <div class="frame" class:tall={phone}>
     <picture>
       {#if phone}
@@ -73,6 +75,20 @@
     border-radius: var(--r-lg);
     overflow: hidden;
     background: var(--bg);
+    box-shadow: var(--raise);
+  }
+
+  /**
+   * ONE OF THE FIVE LEADS, AND IT WAS DRAWN LIKE THE OTHER FOUR.
+   *
+   * Five screenshots at the same width in the same 1px frame is five pictures of equal
+   * importance, and they are not: the first one is the product, above the fold, and the rest are
+   * evidence for a paragraph. The lead takes the top of the elevation ladder and a little more
+   * breathing room around it. Nothing else changes, because a device bezel or a tilt would be a
+   * picture of hardware nobody is buying.
+   */
+  .lead .frame {
+    box-shadow: var(--e2);
   }
 
   img {

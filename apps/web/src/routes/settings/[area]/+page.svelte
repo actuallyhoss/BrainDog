@@ -1863,12 +1863,12 @@
   }
 
   .area:hover {
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 
   .area[aria-current='page'] {
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    background: var(--accent-wash);
     color: var(--accent-text);
     font-weight: 600;
   }

@@ -34,7 +34,7 @@
     align-items: center;
     gap: 5px;
     padding: 2px 7px;
-    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    background: var(--hold-wash);
     border: 1px solid transparent;
     border-radius: var(--r-sm);
     color: var(--ink2);
@@ -45,7 +45,7 @@
   }
 
   .chip[data-intent] {
-    background: color-mix(in srgb, var(--tone) 12%, transparent);
+    background: var(--tone-wash);
     border-color: color-mix(in srgb, var(--tone) 28%, transparent);
     color: var(--tone);
   }

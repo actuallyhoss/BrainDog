@@ -142,7 +142,7 @@
   }
 
   .width:hover:not([data-on]) {
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    background: var(--hover-wash);
     color: var(--ink2);
   }
 
@@ -171,7 +171,7 @@
   }
 
   .icon-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 

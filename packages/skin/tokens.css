@@ -227,6 +227,68 @@
      */
     --scrim: color-mix(in srgb, var(--sunk) 52%, transparent);
 
+    /**
+     * THE WASHES, AND THERE WERE NINE STRENGTHS OF ONE OF THEM.
+     *
+     * A wash is a colour at low alpha under text: the tint on a hovered row, on the rail item you
+     * are standing in, on a chip. There was no token for any of them, so every component that
+     * wanted one wrote `color-mix(in srgb, var(--x) N%, transparent)` and chose N on the spot.
+     * Counted over `apps/web/src`: the neutral tint alone exists at 4%, 5%, 6%, 7% and 8%, in
+     * nineteen places across twelve files, and the accent tint at 12%, 13%, 14% and 16% in nine
+     * more. Two rail items on two different screens, doing one job, one of them at 14% and one at
+     * 12%. A chip at 7% and the hover under it at 6%.
+     *
+     * NOBODY READS "6% HERE AND 7% THERE", WHICH IS THE WHOLE REASON IT IS WORTH FIXING. What a
+     * reader gets is a product where nothing quite matches and no sentence available to them for
+     * saying so, and that is most of what "unfinished" means when somebody says it about a screen.
+     * `13 §6` already says a component may name only the semantic layer. A percentage picked at the
+     * call site is a colour picked at the call site with one extra step in front of it.
+     *
+     * TWO NEUTRAL STRENGTHS, AND THE HOVER IS HALF THE WASH. They say different things. A hover is
+     * a whisper that stops the moment the pointer leaves; a chip, a badge or a mark square is an
+     * object that stays there. At 6% and 7% the product was drawing both as the same grey, so a
+     * chip read as a row somebody happened to be pointing at. 6 and 12 are far enough apart to be
+     * two facts, and 12 is the strength every hue uses too: an intent is never transient, so there
+     * is no hover-weight version of one.
+     *
+     * THE HUE IS THE TEXT ROLE, NOT THE `-fill` ONE. `--warn-fill` is solved for an OPAQUE chip or
+     * bar at 3:1 (`13 §2.4` check D), which in the dark scheme puts it BELOW `--warn` in
+     * lightness, and 12% of it over a dark page is close to no tint at all. The plain role is the
+     * one solved to be seen against the surface in both schemes, which is the job a wash has.
+     *
+     * TWELVE AND NOT FOURTEEN, MEASURED. `Chip` paints `color: var(--tone)` on top of its own
+     * intent wash, and `--danger` over a 12% danger tint on `--bg` is 4.10:1 in the light scheme:
+     * already under the body floor before any of this, because the theme's proof certifies a role
+     * against the five DECLARED surfaces and a surface mixed at the call site is not one of them.
+     * `blocks.css:1030` hit the same wall on the selected row and answered it correctly, by
+     * dropping the colour and keeping the glyph. Fourteen would have taken that chip to 3.98, so
+     * the wash holds at the strength the product already shipped and the chip's own text colour is
+     * the thing that has to move.
+     *
+     * `--tone-wash` IS BELOW, ON `[data-intent]`, AND IT CANNOT LIVE UP HERE. A custom property's
+     * `var()`s are substituted where the property is DECLARED, so a `--tone-wash` written on
+     * `:root` would resolve `var(--tone)` against a `:root` that has no `--tone`, go
+     * invalid-at-computed-value-time, and inherit as nothing onto every element that wanted it.
+     *
+     * AND THERE IS NO `--earn-wash` OR `--danger-wash`, ON PURPOSE. Nothing paints one. An element
+     * that declares its intent gets all four through `--tone-wash`, and the only reason
+     * `--warn-wash` is named is `.prop-row[data-hole]`, which is warn by construction and has no
+     * attribute for an intent to hang on. This file already argues, over `--raise`, that a value
+     * nobody paints is the same defect as a flag nothing reads. The day a second construction-warn
+     * element appears it gets a token beside this one, not a tenth percentage.
+     */
+    --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
+    --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
+    --accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
+    --warn-wash: color-mix(in srgb, var(--warn) 12%, transparent);
+
+    /* A GROUND TINTED TOWARDS THE ACCENT, which is the accent as a SURFACE rather than as a
+       control. Two places write it: brain.dog's closing band and the recommended plan card. Two
+       copies of one value is exactly the drift the four washes above were just written to stop,
+       and this one is not a wash: it mixes into an opaque surface rather than into transparency,
+       so what is behind it is part of the value and cannot be left to the call site. */
+    --accent-ground: color-mix(in srgb, var(--accent) 7%, var(--bg));
+
     /* Open and close are not symmetric. Opening is something you watch; closing is something you
        have already decided about (13 §9). Ceiling 300ms — nothing is longer. */
     /**
@@ -300,6 +362,14 @@
        `toCSS`, which is what keeps it out of a record's reach: `toCSS` emits what a THEME may set,
        and the mark is not one of those things. */
   }
+
+  /* THE INTENT WASH, and it is one rule rather than four tokens because `blocks.css` has already
+     done the hard half: its intent map is the only place an author's word becomes a hue, and it
+     leaves the answer in `--tone`. This turns that hue into the same 12% every other wash is, so
+     an intent capsule reaches for a token like everything else and the map keeps its monopoly.
+     It sits on the attribute and not on `:root` for the reason argued over `--hover-wash`: a
+     custom property resolves its own `var()`s where it is declared, and `:root` has no `--tone`. */
+  [data-intent] { --tone-wash: color-mix(in srgb, var(--tone) 12%, transparent); }
 
   /* The reader's Text setting picks the body step. Three, not a slider. */
   html[data-text='sm'] { --text: var(--t-sm); }

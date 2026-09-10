@@ -72,6 +72,22 @@ for (const scheme of ['light', 'dark']) {
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1.5,
     colorScheme: scheme,
+    /**
+     * AND NO ENTRANCE ANIMATIONS, which is what `product.mjs` beside this file has always said and
+     * this one did not.
+     *
+     * The home page's sections arrive on a `view()` timeline now, and a FULL-PAGE capture does not
+     * resolve one: Playwright photographs the whole document against a 900px viewport, so every
+     * band below the fold is still at its first keyframe and the review shot comes out of the
+     * oven at forty per cent opacity. Nothing is wrong with the page: a reader scrolling sees
+     * every section at full strength, measured. But a screenshot tool that lies about the page is
+     * worse than no screenshot tool.
+     *
+     * `reducedMotion` and not a stylesheet injection, because the page already answers that
+     * question correctly: the arrival is inside `prefers-reduced-motion: no-preference` and is
+     * absent rather than damped under the other branch.
+     */
+    reducedMotion: 'reduce',
   });
   const page = await context.newPage();
   page.on('response', (r) => {

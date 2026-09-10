@@ -122,7 +122,7 @@
   }
 
   .btn[data-weight='bare']:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 
@@ -147,7 +147,7 @@
 
   .btn[data-weight='bare'][data-intent]:hover:not(:disabled),
   .btn[data-weight='bare'][data-intent]:focus-visible {
-    background: color-mix(in srgb, var(--tone) 12%, transparent);
+    background: var(--tone-wash);
     color: var(--tone);
   }
 

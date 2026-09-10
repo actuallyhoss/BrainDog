@@ -96,6 +96,50 @@ if (unsampled.length) {
   process.exit(1);
 }
 
+/**
+ * THE CONTROLS THAT DO NOT EXIST UNTIL SOMEBODY DOES SOMETHING, and this gate has never seen one.
+ *
+ * The sweep below measures a page AT REST: it opens a route, waits for it to settle, and reads
+ * the geometry. That is the right default and it is not the whole product. Two of the targets a
+ * phone actually presses are conditional markup, and both were under 44px for as long as they
+ * have existed:
+ *
+ *   * `.capture-go`, the submit control of the register's capture line, measured 48x24. It is
+ *     drawn inside `{#if capture.trim()}`, so at rest it is not in the document at all.
+ *   * `.filter-value`, in the Display sheet, measured 358x34. It is the only way to sort a list
+ *     or hide a column on a phone, and the sheet is closed at rest.
+ *
+ * Both were found by a person reading the CSS, not by this gate, on a run that reported zero
+ * findings over 572 page-runs. A rule that cannot see a control cannot enforce anything about it.
+ *
+ * ONLY AT THE FLOOR WIDTHS, AND ONLY WHERE THERE IS AN ACT. The target-size rule turns on the
+ * pointer and the pointer is emulated below 640, so a state opened at 1180px would be measured
+ * against a rule that does not apply there. Three widths and two acts is six extra page-runs on
+ * a sweep of five hundred and seventy-two.
+ *
+ * AN ACT THAT DOES NOT TAKE IS A FINDING AND NOT A SKIP. A `catch` here would give exactly the
+ * green this block exists to stop being: the gate would report the state measured and have
+ * measured the page behind it.
+ */
+const ACTS = {
+  '/r/obligations': [
+    {
+      name: 'capture typed',
+      run: async (page) => {
+        await page.fill('#capture', 'a');
+        await page.waitForSelector('.capture-go', { timeout: 4000 });
+      },
+    },
+    {
+      name: 'Display open',
+      run: async (page) => {
+        await page.getByRole('button', { name: 'Display' }).click({ timeout: 4000 });
+        await page.waitForSelector('.filter-value', { timeout: 4000 });
+      },
+    },
+  ],
+};
+
 /** The narrowest phone still in the wild, one bigger phone, one common tablet. */
 const FLOOR = L.floorWidths;
 
@@ -387,6 +431,29 @@ for (const width of widths) {
     checked++;
     process.stdout.write(out.length ? '!' : '.');
     for (const o of out) findings.push(`${route} @${width}  ${o}`);
+
+    /* AND THEN THE STATES, at the widths where the rule they break applies. `FLOOR` is the phone
+       set; above it the pointer is fine and a 34px control is the density this product means. */
+    if (FLOOR.includes(width))
+      for (const act of ACTS[route] ?? []) {
+        try {
+          await act.run(page);
+        } catch (e) {
+          findings.push(`${route} @${width}  could not reach "${act.name}": ${String(e).split('\n')[0]}`);
+          process.stdout.write('!');
+          continue;
+        }
+        await page.waitForTimeout(L.settleMs);
+        const after = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
+        checked++;
+        process.stdout.write(after.length ? '!' : ':');
+        for (const o of after) findings.push(`${route} @${width} (${act.name})  ${o}`);
+        /* BACK TO REST, because the acts share one page and the next one must not open its sheet
+           over the last one's. A reload is cheaper to reason about than an undo per act. */
+        await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
+        await ready.settled(page);
+        await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+      }
   }
   process.stdout.write('\n');
   await context.close();

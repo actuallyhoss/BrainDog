@@ -211,3 +211,52 @@ test('every register the copy names by example is one the seed declares', when(N
     );
   }
 });
+
+/**
+ * THE FIELDS THE FIGURE DRAWS ARE FIELDS THE SEED DECLARES.
+ *
+ * The home page draws one row of the money register beside the types its fields hold, and that
+ * figure is the only thing on this site that names a FIELD. It is the same class of defect as the
+ * sentence above and one step more likely: field labels get renamed more often than registers do.
+ * `Party` became `Who`, `Direction` became `Which way` and `State` became `Status` in a single
+ * pass this week, and the marketing copy is not next to the declaration that moved.
+ *
+ * A field's displayed name is its `label` where it has one and its id where it does not, so both
+ * are accepted. And the figure going missing is a FAILURE rather than a quiet pass, for the
+ * reason the register check gives about itself: a check that stops finding what it measures has
+ * stopped measuring.
+ */
+test('every field the home page draws is one the money register declares', when(NO_BUILD ?? NO_SEED), () => {
+  const source = readFileSync(SEED, 'utf8');
+  const opens = source.indexOf('  obligations: {');
+  assert.notEqual(opens, -1, 'packages/seed/src/index.ts no longer declares the obligations register');
+
+  /* The register's own block, ended at the next declaration at its indentation. `fields:` sits
+     inside it and nowhere else, which is what keeps a neighbouring register's labels out. */
+  const rest = source.slice(opens + 2);
+  const closes = rest.search(/\n {2}[a-z_]+: \{$/m);
+  const block = closes === -1 ? rest : rest.slice(0, closes);
+
+  const declared = new Set<string>();
+  for (const m of block.matchAll(/\bid: '([^']+)'/g)) declared.add((m[1] ?? '').toLowerCase());
+  for (const m of block.matchAll(/\blabel: '([^']+)'/g)) declared.add((m[1] ?? '').toLowerCase());
+  assert.equal(declared.size > 6, true, `only ${declared.size} field words parsed out of the seed; its shape has changed`);
+
+  const html = uncommented(read('index.html'));
+  const drawn = [...html.matchAll(/<dt class="label[^"]*">([^<]*)<\/dt>/g)].map((m) => decode(m[1] ?? '').trim());
+  if (drawn.length === 0) {
+    throw new Error(
+      'the figure that draws a typed row has gone from the home page. It is the one place the ' +
+        'copy names fields, and this check has nothing left to read.',
+    );
+  }
+
+  for (const label of drawn) {
+    assert.equal(
+      declared.has(label.toLowerCase()),
+      true,
+      `the home page draws a field called "${label}" and packages/seed declares no such field on ` +
+        `the money register. It declares: ${[...declared].sort().join(', ')}`,
+    );
+  }
+});

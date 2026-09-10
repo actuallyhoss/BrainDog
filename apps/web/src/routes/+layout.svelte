@@ -693,9 +693,23 @@
     }
   }
 
+  /**
+   * MOVEMENT ONLY, AND IT USED TO FADE.
+   *
+   * `from { opacity: 0 }` with `backwards` holds the screen at zero until the animation gets its
+   * first frame, and on a cold load that is not 0ms. Measured: `/r/obligations` fills `#main`
+   * 1,952ms after DOMContentLoaded on a cold cache, because that is what parsing and hydrating
+   * this app costs, and the fade does not begin until the work is done. So the arrival cue turned
+   * a screen that painted progressively into a screen that was blank for two seconds and then
+   * appeared. An animation that hides a slow page is worse than the hard cut it replaced.
+   *
+   * A held `translateY(4px)` is invisible for those two seconds and then reads as an arrival for
+   * the 240ms it is meant to. The cue is the movement, which is also the half `a11y.css` is right
+   * to delete: under `prefers-reduced-motion` there is simply no cue, and there is nothing here a
+   * reader needs that the screen does not already say.
+   */
   @keyframes arrive {
     from {
-      opacity: 0;
       transform: translateY(4px);
     }
   }

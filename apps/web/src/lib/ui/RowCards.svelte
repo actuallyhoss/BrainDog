@@ -27,7 +27,7 @@
   import type { Snippet } from 'svelte';
   import { TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { REGISTERS, dirOf, display, toneOf } from '$lib/record/api.ts';
+  import { REGISTERS, dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
 
   let {
@@ -64,6 +64,24 @@
    */
   const toneFor = (e: Entry) => toneOf(register, e);
 
+  /**
+   * AND THE THING THE ROW BELONGS TO, WHICH IS THE ONE COLOUR THIS PRODUCT HAS AND DOES NOT SPEND.
+   *
+   * `api.ts` states the rule in its own words: "One mark and one accent per thing, and colour
+   * means WHICH PROJECT, everywhere." Everywhere was four places, and a list was not one of them,
+   * so eight lists of rows that each belong to a project were eight blocks of grey with the
+   * project's name repeated down a text column, or not shown at all.
+   *
+   * TWO CHANNELS, NOT ONE. The mark is a shape before it is a colour (`▲` for one project, `◆`
+   * for another), which is `13 §5.1`'s requirement met by the mark itself rather than by adding
+   * something beside it. The hue is the row's frozen accent and the one non-token colour the
+   * rendered-DOM gate admits, at `L`/`C` chosen so every hue clears 3:1 on every surface.
+   *
+   * The label is the project's NAME and not its mark, because a screen reader reading "black
+   * up-pointing triangle" has been told the shape and not the thing.
+   */
+  const markFor = (e: Entry) => identityFor(register, e.fields);
+
   /* The tick's accessible name. `copy.ts` holds every sentence (`50 §3`) and this is one. */
   const selectedLabel = copy.selected;
 </script>
@@ -81,6 +99,15 @@
             {/if}
             {#if toneFor(e)}
               <span class="glyph" role="img" aria-label={TONES[toneFor(e)!].label}>{TONES[toneFor(e)!].glyph}</span>
+            {/if}
+            {#if markFor(e)}
+              {@const it = markFor(e)!}
+              <span
+                class="card-mark"
+                style={it.retired ? undefined : `--hue:${it.hue}`}
+                data-retired={it.retired ? '' : undefined}
+                role="img"
+                aria-label={it.name}>{it.mark}</span>
             {/if}
             #{e.seq}
           </span>
@@ -103,6 +130,23 @@
 {/if}
 
 <style>
+  /* THE THING'S HUE, WHICH IS THE ONLY COLOUR IN THIS FILE AND IS NOT A LITERAL. `oklch(L C h)`
+     where `h` is the row's frozen accent and `L`/`C` are the theme's two mark constants, generated
+     per scheme. A retired thing keeps its mark and loses its claim on a hue, so `--hue` is withheld
+     AND `--dim` is set by the rule below: an unset `--hue` makes the whole `oklch()` invalid, and
+     an invalid declaration is a dropped one, which would leave the mark inheriting the card's ink
+     rather than reading as retired. The attribute is what says so; the missing property alone
+     would not. */
+  .card-mark {
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    font-size: var(--t-xs);
+    line-height: 1;
+  }
+
+  .card-mark[data-retired] {
+    color: var(--dim);
+  }
+
   .cards {
     display: none;
   }

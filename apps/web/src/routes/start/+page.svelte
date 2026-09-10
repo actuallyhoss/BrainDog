@@ -534,11 +534,30 @@
   }
 
   .choice:hover {
-    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    background: var(--hover-wash);
   }
 
   /* The number is a KEY, so it is drawn as one. A bare circled digit reads as a step in a sequence
      you have to do in order; these are five alternatives and only one gets picked. */
+  /**
+   * AND ON A PHONE THE FIVE NUMBER KEYS GO, because there is no keyboard to press them with.
+   *
+   * This is the first screen anybody sees, and the owner's word for the product as it stood was
+   * "as if it's some nerdy tool". Five boxed digits down the right edge of the five choices are
+   * exactly that: an accelerator advertised to a reader who has no way to use it, on the screen
+   * whose whole job is to make a stranger feel this was built for them.
+   *
+   * `pointer: coarse` and not a width, which is `05 §6`'s rule and is also the right test here:
+   * a narrow laptop window still has the keyboard the digits are for.
+   *
+   * The binding itself is untouched. What goes is the advertisement.
+   */
+  @media (pointer: coarse) {
+    .choice-n {
+      display: none;
+    }
+  }
+
   .choice-n {
     min-inline-size: 20px;
     padding: 2px 6px;
@@ -559,7 +578,7 @@
     inline-size: 34px;
     block-size: 34px;
     border-radius: var(--r-sm);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    background: var(--accent-wash);
     color: var(--accent-text);
   }
 

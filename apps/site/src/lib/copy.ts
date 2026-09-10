@@ -116,12 +116,57 @@ export const site = {
          `kind` field on `services`. And `obligations` is an id, which the interface has drawn as
          Money since `packages/seed/src/index.ts` renamed it. The id is still in the code block
          further down, because an id is what an agent writes and it has not changed. */
-      body:
-        'A register is a typed collection: money, services, people. It declares its fields and ' +
-        'their types, and every row is checked against them on the way in. Money is an integer in ' +
-        'minor units with its own currency, so two currencies can never be added by accident. A date ' +
-        'is a date. A reference to another row is a reference, not a name someone retyped.',
+      /**
+       * TWO PARAGRAPHS AND NOT ONE, AND EVERY WORD IS THE WORD IT WAS.
+       *
+       * The same change the hero got, for the same measured reason and applied to the eight
+       * sections under it. At 390px a five-sentence body is nine or eleven unbroken lines between
+       * a heading and a picture, and a reader meets a wall in the place the page is making its
+       * argument. Each `body` is an array now, split only where the copy already had a full stop:
+       * the FIRST entry is the claim, set a step larger, and the rest is the detail under it.
+       *
+       * The teaching sentence is intact inside entry one, in one text node, because
+       * `test/content.test.ts` reads it back out of the served bytes and a tag inside it would
+       * split it.
+       */
+      body: [
+        'A register is a typed collection: money, services, people.',
+        'It declares its fields and their types, and every row is checked against them on the way in.',
+        'Money is an integer in minor units with its own currency, so two currencies can never be ' +
+          'added by accident. A date is a date. A reference to another row is a reference, not a ' +
+          'name someone retyped.',
+      ],
       note: 'The grid is a CSS grid with declared column tracks, not a <table>, because at eight columns and five thousand rows table layout stops being free.',
+      /**
+       * THE FIRST DRAWING ON THIS SITE, AND IT IS THE ONE THING NO SCREENSHOT HERE SHOWS.
+       *
+       * Every picture on this page is a photograph of a surface. A grid shows you the VALUES; the
+       * sentence above it is about the TYPES, and a type is not a thing a screenshot has ever
+       * contained. So the claim *"it declares its fields and their types, and every row is checked
+       * against them"* was the one argument on the page with no evidence beside it.
+       *
+       * NOTHING HERE IS INVENTED, and that is the whole reason it is safe to draw. The labels and
+       * the types are `packages/seed/src/index.ts`'s `obligations` declaration, and the values are
+       * item #4 of the same synthetic record the screenshot below is a photograph of, read off
+       * that screenshot. `test/content.test.ts` checks the first half against the seed, the same
+       * way it already checks the sentence that names three registers.
+       *
+       * The two reference fields are absent because their VALUES are not on the shipped shot and
+       * this figure does not get to guess at data. The sentence about references is in the prose
+       * above, where it always was.
+       */
+      figure: {
+        register: 'Money',
+        row: 'item #4',
+        fields: [
+          { label: 'Description', type: 'text', value: 'Corporation tax, payment on account' },
+          { label: 'Which way', type: 'one of two', value: 'owed by me' },
+          { label: 'Amount', type: 'money', value: 'GBP 19,100.00' },
+          { label: 'Due', type: 'a date', value: '7 Sep 2026' },
+          { label: 'Status', type: 'one of four', value: 'open' },
+        ],
+        caption: 'One row of the sample record, beside what the register says each of its fields may hold.',
+      },
     },
     agents: {
       kicker: 'For your agents',
@@ -130,12 +175,14 @@ export const site = {
          headed `# every session, over MCP`. The note below it withdrew the claim, and a reader who
          stops at the code block, which is what a code block is for, never reaches the note. The
          tense is in the body now, and the note says what the block is instead of repeating it. */
-      body:
-        'The record speaks MCP. Sixteen typed tools are written and tested against it, and the ' +
-        'transport that carries them is not connected yet, so no agent can reach a hosted record ' +
-        'today. When it is connected an agent gets the same typed tools you get, scoped to one ' +
-        'record, and every call it makes is in the audit log with the agent named. There is no ' +
-        'scraping, no browser automation and no second copy of your data for the model to read.',
+      body: [
+        'The record speaks MCP.',
+        'Sixteen typed tools are written and tested against it, and the transport that carries ' +
+          'them is not connected yet, so no agent can reach a hosted record today.',
+        'When it is connected an agent gets the same typed tools you get, scoped to one record, ' +
+          'and every call it makes is in the audit log with the agent named. There is no scraping, ' +
+          'no browser automation and no second copy of your data for the model to read.',
+      ],
       /* Real tool names and real argument shapes, checked against `packages/mcp/src/index.ts`. Wrapped
          to fit a narrow column rather than scrolled sideways: a code block the reader has to drag is
          a code block nobody finishes. */
@@ -169,24 +216,26 @@ export const site = {
     pages: {
       kicker: 'A page is a row',
       title: 'The screens are data too.',
-      body:
-        'A page is a screen made of blocks, and a block is one thing on it: a table, a figure, a ' +
-        'note. Which blocks, over which rows, in which order and how wide is all written down, and ' +
-        'editing it is editing a row. So it versions and diffs like everything else, and a pack, ' +
-        'which is a file that adds registers and pages, can ship a page the same way it ships a ' +
-        'register.',
+      body: [
+        'A page is a screen made of blocks, and a block is one thing on it: a table, a figure, a note.',
+        'Which blocks, over which rows, in which order and how wide is all written down, and ' +
+          'editing it is editing a row. So it versions and diffs like everything else, and a pack, ' +
+          'which is a file that adds registers and pages, can ship a page the same way it ships a ' +
+          'register.',
+      ],
       note: 'Sixteen block kinds over eight primitives. A pack may invent a kind; it may never write a colour, a font or a spacing value.',
     },
     project: {
       kicker: 'Per project',
       title: 'A page that is about one thing.',
-      body:
+      body: [
         'Point every block on a page at one project and it stops being a dashboard and starts being ' +
-        "that project's page: what is open on it, which of your agents are working on it right now, " +
+          "that project's page: what is open on it, which of your agents are working on it right " +
+          'now, what it is owed, what it costs to keep alive.',
         /* `Agent runs` AND NOT `Agent sessions`. The register was renamed in the app the same day
            the other three words on this page were, and this sentence was not in the list. */
-        'what it is owed, what it costs to keep alive. Agent runs are a list like any other, ' +
-        'so they draw like any other.',
+        'Agent runs are a list like any other, so they draw like any other.',
+      ],
       /* NOTHING ON THIS SITE RENDERS MARKDOWN, so a backtick in a string is a backtick on the page.
          This one also wrapped a filter written in a field label the screen has stopped using. */
       note: 'Nothing about it is a new kind of thing. It is the same blocks over the same registers, filtered to one project.',
@@ -200,10 +249,12 @@ export const site = {
          is where a stranger learns the word, was not. The id stays `tracks`, which is what the URL
          and a predicate say. */
       title: 'Pin an agent to a thread.',
-      body:
-        'A thread is the line of work you are in the middle of. Pin a session to one and the ' +
-        'context survives the session: close the window, come back on Tuesday, and what each agent ' +
-        'was doing is there in order, next to the updates that say how it was going.',
+      body: [
+        'A thread is the line of work you are in the middle of.',
+        'Pin a session to one and the context survives the session: close the window, come back on ' +
+          'Tuesday, and what each agent was doing is there in order, next to the updates that say ' +
+          'how it was going.',
+      ],
       note:
         'Health is never a stored field. It is derived from the newest update, so it can always tell ' +
         'you who said so and when. And a finished thread expects no update, which is a different ' +
@@ -212,10 +263,12 @@ export const site = {
     forecast: {
       kicker: 'What is coming',
       title: 'The day the money runs out, and what does it.',
-      body:
+      body: [
         'Start from what is liquid, apply every dated movement in order, and stop at the first day ' +
-        'the balance goes under. Invoices in both directions, and every renewal a subscription will ' +
-        'actually charge inside the window rather than the one date it stores.',
+          'the balance goes under.',
+        'Invoices in both directions, and every renewal a subscription will actually charge inside ' +
+          'the window rather than the one date it stores.',
+      ],
       note:
         'It names the row that crosses, not just the date. And the growth fit refuses to answer when ' +
         'the data cannot support one: six points of noise always produce a slope, and printing it is ' +
@@ -228,10 +281,12 @@ export const site = {
          ugly`. Rule one of this file is: say what it does, never sell it. Whether a page is ugly is
          not a thing the software decides and not a thing a reader can check, and what the software
          actually does was already in the same sentence. */
-      body:
+      body: [
         'Drag to reorder, or move with the keyboard. It is the same operation either way. Set a ' +
-        'width in twelfths. That is the whole vocabulary: spacing, type, colour, radius and ' +
-        'density all come from the theme, and a page cannot set one of them.',
+          'width in twelfths.',
+        'That is the whole vocabulary: spacing, type, colour, radius and density all come from the ' +
+          'theme, and a page cannot set one of them.',
+      ],
       note: 'Each kind knows the narrowest it survives, and the control refuses below it rather than clamping. A table at a third of a page is not a narrow table, it is an unreadable one.',
     },
     vault: {
@@ -244,10 +299,10 @@ export const site = {
          unchanged: the index excludes the ciphertext, and every token principal is refused. This
          was also the only capability section on the page carrying no note, and it was the section
          making the strongest promise. */
-      body:
-        'A row records that the Fenwick deploy key exists, what it unlocks and when it was last ' +
-        'rotated. The secret itself is encrypted under a separate envelope. Agents are refused the ' +
-        'vault outright.',
+      body: [
+        'A row records that the Fenwick deploy key exists, what it unlocks and when it was last rotated.',
+        'The secret itself is encrypted under a separate envelope. Agents are refused the vault outright.',
+      ],
       note:
         'Revealing a secret is written in the kernel and is routed by neither host yet, so nothing ' +
         'outside the record can decrypt one today. When it is routed, a secret is revealed once and ' +
@@ -262,11 +317,12 @@ export const site = {
          is theirs. And `one signed file` is not built yet: `BACKLOG.md` records that a `.dog`
          carries no signature. A promise about leaving is the one promise on a page like this that
          has to be exactly true, because it is the promise somebody checks on the way out. */
-      body:
-        'A record is one SQLite file, in the format every operating system has a free reader for. ' +
+      body: [
+        'A record is one SQLite file, in the format every operating system has a free reader for.',
         'Export is one file with every row, the fields each register declared, and every event in ' +
-        'it, not a CSV per table with the relationships thrown away. Self-hosting runs the same ' +
-        'packages from the same file, so leaving is a copy rather than a migration.',
+          'it, not a CSV per table with the relationships thrown away. Self-hosting runs the same ' +
+          'packages from the same file, so leaving is a copy rather than a migration.',
+      ],
     },
   },
 

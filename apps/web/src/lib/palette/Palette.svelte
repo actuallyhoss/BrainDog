@@ -1099,7 +1099,7 @@
      surface ladder away from the ground it sits on: a highlight you have to hunt for in the one
      control that exists to be driven from the keyboard. */
   .p-row[data-cursor] {
-    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    background: var(--accent-wash);
     color: var(--ink);
   }
 

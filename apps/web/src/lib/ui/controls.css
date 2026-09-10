@@ -179,7 +179,7 @@
   }
 
   .segment:hover:not([data-on]) {
-    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    background: var(--hover-wash);
     color: var(--ink2);
   }
 

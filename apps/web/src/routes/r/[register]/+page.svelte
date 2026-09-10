@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, inheritedFrom, labelOf, list, noticed, NOW, PAGE, PAGES, readableFields, REGISTERS, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
+  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityFor, identityOf, inheritedFrom, labelOf, list, noticed, NOW, PAGE, PAGES, readableFields, REGISTERS, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
@@ -1771,6 +1771,27 @@
               {/if}
             {:else if ident}
               <IdentityMark identity={ident} />
+            {:else if column.field === 'seq'}
+              <!--
+                THE THING THE ROW BELONGS TO, IN THE ONE COLUMN EVERY PROJECTION HAS.
+
+                `columnsFor` caps the default projection at ten and `thing` is not in Money's, so
+                the desktop grid of the first list in the rail was thirty-eight rows of grey with
+                no way at all to see which project any of them was about. The identity was
+                reachable only by adding a column, and only on the lists where it made the cut.
+
+                `#` is the one column that is always there, always narrow, and always first. The
+                mark is a shape before it is a colour, which is `13 §5.1` met by the mark itself,
+                and the label is the project's NAME because a screen reader told "black diamond"
+                has been told the shape and not the thing.
+              -->
+              {@const own = identityFor(id, entry(id, seq)?.fields ?? {})}
+              {#if own}<span
+                  class="row-mark"
+                  style={own.retired ? undefined : `--hue:${own.hue}`}
+                  data-retired={own.retired ? '' : undefined}
+                  role="img"
+                  aria-label={own.name}>{own.mark}</span>{/if}{value}
             {:else if value === null}
               <span class="missing">—</span>
             {:else if editableHere(column.field)}
@@ -2280,7 +2301,7 @@
 
   .mi:hover,
   .mi:focus-visible {
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 
@@ -2339,7 +2360,7 @@
     gap: var(--sp-2);
     margin-block-end: var(--sp-3);
     padding: var(--sp-2) var(--sp-3);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    background: var(--accent-wash);
     border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
     border-radius: var(--r-md);
     color: var(--accent-text);
@@ -2397,6 +2418,21 @@
    * under the cursor, which none of these does: the column is a grid track and its width is set by
    * the header.
    */
+  /* THE THING'S HUE, AND IT IS NOT A LITERAL. `oklch(L C h)` where `h` is the row's frozen accent
+     and `L`/`C` are the theme's two mark constants, generated per scheme and solved so every hue
+     clears 3:1 on every surface. A retired thing keeps its mark and loses its claim on a hue, so
+     `--hue` is withheld AND `--dim` is set: an unset `--hue` makes the `oklch()` invalid, and an
+     invalid declaration is a dropped one, which would leave the mark the same ink as the id. */
+  .row-mark {
+    margin-inline-end: var(--sp-1);
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    font-size: var(--t-xs);
+  }
+
+  .row-mark[data-retired] {
+    color: var(--dim);
+  }
+
   .cell-said {
     position: relative;
     display: block;
@@ -2663,7 +2699,7 @@
   }
 
   .filter-value:hover {
-    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 

@@ -44,7 +44,7 @@
      row wherever it is drawn. */
   a.line:hover,
   button.line:hover {
-    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    background: var(--hover-wash);
   }
 
   .line-tall {

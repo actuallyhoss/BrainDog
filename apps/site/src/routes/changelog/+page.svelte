@@ -319,6 +319,25 @@
   ];
 
   const LABEL = { shipped: 'shipped', changed: 'changed', fixed: 'fixed' } as const;
+
+  /**
+   * GROUPED BY DAY, because twenty-two identical rows are not a list a person reads.
+   *
+   * Every entry carried its own date in its own 14ch gutter, and six of them say 2026-09-10. So
+   * the column that exists to tell you WHEN was printing the same string six times in a row down
+   * the left edge, and the page had no unit larger than one paragraph: no way to see that a day
+   * happened, no way to skim to a day, nothing between the heading and five thousand words.
+   *
+   * The entries are already in date order in the array above and this preserves that order
+   * exactly rather than sorting: the order is editorial, most-important-first inside a day, and a
+   * sort by date would silently reshuffle it.
+   */
+  const DAYS: { date: string; entries: Entry[] }[] = [];
+  for (const entry of ENTRIES) {
+    const last = DAYS.at(-1);
+    if (last?.date === entry.date) last.entries.push(entry);
+    else DAYS.push({ date: entry.date, entries: [entry] });
+  }
 </script>
 
 <svelte:head>
@@ -351,22 +370,27 @@
   </div>
 </section>
 
-<ol class="log">
-  {#each ENTRIES as entry}
-    <li class="entry">
-      <div class="meta">
-        <!-- A machine-readable date beside a human one. The `datetime` is what a feed reader and a
-             search engine read; the text is what a person reads, and they are the same day. -->
-        <time class="date num" datetime={entry.date}>{entry.date}</time>
-        <span class="kind" data-kind={entry.kind}>{LABEL[entry.kind]}</span>
-      </div>
-      <div class="body">
-        <h3 class="entry-title">{entry.title}</h3>
-        <p class="entry-body">{entry.body}</p>
-      </div>
-    </li>
+<div class="log">
+  {#each DAYS as day}
+    <section class="day">
+      <!-- A machine-readable date beside a human one. The `datetime` is what a feed reader and a
+           search engine read; the text is what a person reads, and they are the same day. It is
+           a heading now rather than a caption, because it is what the entries under it belong
+           to, and it holds its place at the top of the window while they scroll past. -->
+      <h2 class="day-date"><time class="num" datetime={day.date}>{day.date}</time></h2>
+      <ol class="entries">
+        {#each day.entries as entry}
+          <li class="entry">
+            <h3 class="entry-title">
+              <span class="kind" data-kind={entry.kind}>{LABEL[entry.kind]}</span>{entry.title}
+            </h3>
+            <p class="entry-body">{entry.body}</p>
+          </li>
+        {/each}
+      </ol>
+    </section>
   {/each}
-</ol>
+</div>
 
 <style>
   .head,
@@ -439,43 +463,64 @@
    * column. The list has been off-axis since the page was written.
    */
   .log {
-    display: flex;
-    flex-direction: column;
-    margin-block: 0;
-    padding-block-end: var(--sp-6);
-    list-style: none;
+    /* The page's own bottom, now the shell no longer puts 96 pixels over the footer on every page
+       regardless of what is above it. */
+    padding-block-end: var(--sp-8);
   }
 
-  .entry {
+  .day {
     display: grid;
     grid-template-columns: 14ch minmax(0, 1fr);
     gap: var(--sp-5);
-    padding-block: var(--sp-5);
+    padding-block: var(--sp-6);
     border-block-start: 1px solid var(--line);
   }
 
-  .meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-2);
-  }
-
-  .date {
+  /**
+   * THE DATE HOLDS ITS PLACE WHILE ITS OWN ENTRIES GO PAST.
+   *
+   * Six entries share 2026-09-10, so the gutter printed one string six times and then stopped
+   * saying anything at all. One heading per day, stuck under the bar, and by the time you are
+   * four paragraphs into a day you can still see which day it is. `--sticky` is the token the
+   * base stylesheet already reserves for exactly this height, and `scroll-padding` upstream
+   * means a keyboard user landing on an entry does not land under the bar either.
+   */
+  .day-date {
+    position: sticky;
+    inset-block-start: calc(var(--sticky) + var(--sp-3));
+    align-self: start;
     color: var(--dim);
     font-family: var(--font-id);
     font-size: var(--t-sm);
+    font-weight: 400;
+    letter-spacing: 0;
   }
 
-  /* A tag, not a pill, and the same four-pixel corner every control in the product has. */
+  .entries {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-6);
+    margin: 0;
+    padding-inline: 0;
+    list-style: none;
+  }
+
+  /* A tag, not a pill, and the same four-pixel corner every control in the product has. It sits
+     on the title's own line now: it is what KIND of change the title describes, and a badge in a
+     column two inches away from the sentence it qualifies is a badge nobody reads. */
   .kind {
+    display: inline-block;
+    margin-inline-end: var(--sp-3);
     padding: 2px 7px;
     background: color-mix(in srgb, var(--ink) 7%, transparent);
     border: 1px solid transparent;
     border-radius: var(--r-sm);
     color: var(--ink2);
+    font-family: var(--font-ui);
     font-size: var(--t-xs);
     font-weight: 600;
+    letter-spacing: 0;
+    vertical-align: 0.14em;
   }
 
   .kind[data-kind='shipped'] {
@@ -490,30 +535,42 @@
     color: var(--info);
   }
 
+  /* THE THIRD KIND HAD NO COLOUR AND THE OTHER TWO DID. `shipped` was green and `fixed` was blue,
+     so a reader scanning the page learned that colour means something and then met a grey badge
+     that means the third thing. `--warn` is the watch role and a change that is neither new work
+     nor a repair is exactly that: something to notice. */
+  .kind[data-kind='changed'] {
+    background: color-mix(in srgb, var(--warn) 14%, transparent);
+    border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+    color: var(--warn);
+  }
+
   .entry-title {
-    font-size: var(--t-md);
-    letter-spacing: -0.014em;
-    text-wrap: balance;
+    font-size: var(--t-lg);
+    letter-spacing: -0.018em;
+    text-wrap: pretty;
   }
 
   .entry-body {
-    margin-block-start: var(--sp-2);
+    margin-block-start: var(--sp-3);
+    max-inline-size: 74ch;
     color: var(--ink2);
-    font-size: var(--t-ui);
-    line-height: 1.6;
+    font-size: var(--t-base);
+    line-height: 1.7;
     text-wrap: pretty;
   }
 
   @media (width < 760px) {
-    .entry {
+    .day {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-2);
+      gap: var(--sp-4);
+      padding-block: var(--sp-5);
     }
 
-    .meta {
-      flex-direction: row;
-      align-items: center;
-      gap: var(--sp-3);
+    /* Not sticky on a phone: a date pinned under the bar on a 390px screen is a line of the
+       reading area spent on a string the reader can scroll back four inches to find. */
+    .day-date {
+      position: static;
     }
 
     .head,

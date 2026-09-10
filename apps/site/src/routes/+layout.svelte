@@ -171,7 +171,9 @@
     font-size: var(--t-ui);
     font-weight: 500;
     text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
+    transition:
+      background var(--d-state) var(--ease-out),
+      opacity var(--d-release) var(--ease-out);
   }
 
   .links a:hover {
@@ -179,18 +181,28 @@
     color: var(--ink);
   }
 
+  .links a:active {
+    opacity: var(--press-dim);
+    transition-duration: var(--d-press);
+    transition-timing-function: var(--ease-push);
+  }
+
   .links a[aria-current] {
     color: var(--ink);
     font-weight: 600;
   }
 
+  /* The one control the site exists to be pressed, and it answered a finger with nothing. The
+     press is a scale AND an opacity for the reason `tokens.css` gives beside those two values:
+     under `prefers-reduced-motion` a11y collapses every duration to 1ms, so a press written as a
+     transform alone is not damped for those readers, it is absent. */
   .cta {
     display: inline-flex;
     align-items: center;
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-4);
     background: var(--accent);
-    border: 1px solid color-mix(in srgb, var(--accent) 72%, var(--sunk));
+    border: 1px solid var(--accent-edge);
     border-radius: var(--r-md);
     box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 60%, var(--sunk));
     color: var(--accent-ink);
@@ -198,14 +210,34 @@
     font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
+    transition:
+      transform var(--d-release) var(--ease-out),
+      opacity var(--d-release) var(--ease-out),
+      background var(--d-state) var(--ease-out);
   }
 
   .cta:hover {
-    background: color-mix(in srgb, var(--accent) 90%, var(--sunk));
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
   }
 
+  .cta:active {
+    background: var(--accent-press);
+    transform: scale(var(--press-scale));
+    opacity: var(--press-dim);
+    transition-duration: var(--d-press);
+    transition-timing-function: var(--ease-push);
+  }
+
+  /**
+   * NO MARGIN OVER THE FOOTER ANY MORE, and each page pays for its own bottom instead.
+   *
+   * `--sp-9` here put 96 pixels of `--bg` between the last section and the footer, so on the home
+   * page the closing band, an empty stripe and then the footer read as the page ending three
+   * times. A margin on a shared shell cannot know whether the thing above it is a tinted call to
+   * action or a paragraph, and only the page knows that.
+   */
   .foot {
-    margin-block-start: var(--sp-9);
     background: var(--sunk);
     border-block-start: 1px solid var(--line);
   }
@@ -235,17 +267,20 @@
     font-size: var(--t-xs);
   }
 
+  /* NO GAP BETWEEN THE LINKS, and it is not a density change: each one is already a 44px box, so
+     an 8px gap on top of that made a 52px rhythm for 20px of text and a column of three links
+     read as three unrelated things. The targets are untouched. */
   .foot-col {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
     min-inline-size: 12ch;
   }
 
   .foot-title {
+    margin-block-end: var(--sp-2);
     color: var(--dim);
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: var(--t-xs);
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
@@ -265,6 +300,10 @@
   .foot-col a:hover {
     color: var(--ink);
     text-decoration: underline;
+  }
+
+  .foot-col a:active {
+    opacity: var(--press-dim);
   }
 
   @media (width < 760px) {
@@ -299,7 +338,17 @@
      * and a keyboard still meet the brand, then the navigation, then the action, which is the
      * order the source has and the order `bar-in` gives every wider screen.
      */
-    .brand {
+    /**
+     * SCOPED TO THE BAR, AND IT WAS NOT.
+     *
+     * `.brand` matches the header's brand link and the FOOTER'S, and `.foot-brand` is a flex
+     * column, so `order: 1` moved the logo below the tagline and the licence line on every page
+     * of the site under 760px. Measured on the built page at 390: the tagline sat at 10310, the
+     * licence at 10338 and the wordmark at 10364, which is the footer introducing the company
+     * after quoting its slogan. The header's own fix is right and stays; it just has to say
+     * which brand it means.
+     */
+    .bar-in > .brand {
       order: 1;
     }
 

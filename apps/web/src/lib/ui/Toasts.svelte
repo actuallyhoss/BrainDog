@@ -133,7 +133,7 @@
   }
 
   .undo:hover {
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    background: var(--accent-wash);
     border-color: var(--accent);
   }
 
@@ -154,7 +154,7 @@
   }
 
   .close:hover {
-    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 
