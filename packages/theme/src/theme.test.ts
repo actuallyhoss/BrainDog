@@ -410,3 +410,26 @@ test('no suggested accent is the house colour, and none is a duplicate of anothe
   assert.equal(seen.size, ACCENTS.length, 'two suggested accents are the same colour');
   assert.ok(ACCENTS.length >= 4, 'too few suggestions to be a row of choices');
 });
+
+/* ── the grammar's own rule ──────────────────────────────────────────────── */
+
+test('THE COLOUR GRAMMAR REFUSES WHAT ITS OWN SENTENCE SAYS IT REFUSES', () => {
+  /**
+   * `parseColour`'s doc says `#RRGGBB`, `#RGB` or `oklch(L C H)`, and "No alpha (28 §1)". The `#`
+   * branch tested the first character and handed the rest to a reader that slices at fixed
+   * offsets, so `#ff0000ff` came back with the alpha silently dropped and `#12345` came back read
+   * off the wrong boundaries. The sentence was the only place the rule existed.
+   *
+   * IT IS REACHABLE. The accent preference is re-applied from storage on every load, so a value
+   * stored once by a looser build is a colour nobody chose, on every screen, for ever. And the
+   * theme's own output check cannot see it: it reads the RE-SERIALISED colour, which is six clean
+   * digits whatever went in.
+   */
+  for (const bad of ['#ff0000ff', '#12345', '#', '#zzzzzz', '#1234', '#f'])
+    assert.throws(() => parseColour(bad), /THEME_VALUE_INVALID/u, `${bad} was accepted`);
+
+  /* AND THE THREE SHAPES THE SENTENCE PUBLISHES STILL PARSE, so the check is about the rule rather
+     than about being strict. */
+  assert.deepEqual(parseColour('#ff0000'), parseColour('#f00'));
+  assert.equal(typeof parseColour('oklch(0.5 0.1 200)').r, 'number');
+});

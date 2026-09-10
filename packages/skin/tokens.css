@@ -182,8 +182,20 @@
      * A SCRIM IS THE PAGE'S OWN DARKEST INK AT LOW ALPHA, NOT BLACK. `--sunk` is the theme's
      * deepest surface and it moves with the scheme, so the layer separates on both halves rather
      * than putting black over a near-black page in the dark.
+     *
+     * AND IT SAID `--ink`, WHICH IS THE OPPOSITE OF WHAT THE PARAGRAPH ABOVE ARGUES FOR. `--ink` is
+     * the TEXT role and in the dark scheme it is near-white, so the layer behind the command
+     * palette and behind the phone's sheet went nineteen times BRIGHTER than the page rather than
+     * dimmer: measured on the shipped palette, a background of relative luminance 0.014 came out at
+     * 0.267, with the panel sitting on it as a dark box on a pale field. In the light scheme it
+     * dimmed, and landed on a mid grey over cream, which is the "black over the page" this comment
+     * says it avoids. `--sunk` is 0.011 in the dark and moves with the scheme, which is the whole
+     * sentence above. One identifier.
+     *
+     * NOTHING COULD SEE IT. The theme validator is handed the generated document and `tokens.css`
+     * is not in it, and there is no `scrim` role for a contrast pair to be checked against.
      */
-    --scrim: color-mix(in srgb, var(--ink) 52%, transparent);
+    --scrim: color-mix(in srgb, var(--sunk) 52%, transparent);
 
     /* Open and close are not symmetric. Opening is something you watch; closing is something you
        have already decided about (13 §9). Ceiling 300ms — nothing is longer. */

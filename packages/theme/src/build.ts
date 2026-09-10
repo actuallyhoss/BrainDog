@@ -267,10 +267,27 @@ const hex = (c: Lch) => {
   return out;
 };
 
-/** The dialect's whole colour grammar: `#RRGGBB`, `#RGB`, or `oklch(L C H)`. No alpha (28 §1). */
+/**
+ * The dialect's whole colour grammar: `#RRGGBB`, `#RGB`, or `oklch(L C H)`. No alpha (28 §1).
+ *
+ * AND THE `#` BRANCH CHECKED NOTHING, SO THE SENTENCE ABOVE WAS THE ONLY PLACE THE RULE EXISTED.
+ * It tested the first character and handed the rest to `fromHex`, which slices at fixed offsets:
+ * `#ff0000ff` came back `ok` with the alpha silently dropped, and `#12345` came back `ok` read as
+ * three bytes off the wrong boundaries. The document says "No alpha" and the code accepted it. It
+ * is reachable through the accent preference, which is re-applied from storage on every load, so a
+ * value stored once by a build that was looser is a colour nobody chose.
+ *
+ * THE OUTPUT CHECK COULD NOT SEE IT: the theme's check O reads the RE-SERIALISED colour, which is
+ * always six clean digits whatever went in.
+ */
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
 export function parseColour(s: string): Rgb {
   const t = s.trim();
-  if (t.startsWith('#')) return fromHex(t);
+  if (t.startsWith('#')) {
+    if (!HEX.test(t)) throw new Error(`THEME_VALUE_INVALID — "${s}" is not a colour this dialect accepts.`);
+    return fromHex(t);
+  }
   const m = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)$/i.exec(t);
   if (!m) throw new Error(`THEME_VALUE_INVALID — "${s}" is not a colour this dialect accepts.`);
   return quantise(gamutMap({ L: Number(m[1]), C: Number(m[2]), H: Number(m[3]) }));

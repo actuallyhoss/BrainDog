@@ -167,8 +167,18 @@ const TEXTUAL = new Set(['text', 'document', 'url', 'email', 'enum', 'ref', 'sec
 const canonicalHalf = (type: string, half: unknown): unknown =>
   type === 'money' && typeof half === 'string' ? half.toUpperCase() : half;
 
-/** Which operators a type can take at all. An operator its type cannot take is a refusal. */
-function operatorAllowed(op: Operator, type: string): boolean {
+/**
+ * Which operators a type can take at all. An operator its type cannot take is a refusal.
+ *
+ * EXPORTED, BECAUSE THE SENTENCE FORM HAS TO ASK THE SAME QUESTION. `sentence.ts` learned to say
+ * `is empty` and `is set`, and the only two ways to know which fields may be asked that are to call
+ * this or to write the table out a second time. A second copy is the drift this package is built
+ * against: `38 §4.3` is one relation, and a relation held in two places is two relations the day
+ * one of them is edited. The row it reads today says `empty` and `present` apply to every type
+ * (`34 §1.2`, *"every type"*), so nothing is refused by this on those two yet, and that is the
+ * point: the day the table narrows, both renderings narrow together.
+ */
+export function operatorAllowed(op: Operator, type: string): boolean {
   if (op === 'empty' || op === 'present') return true;
   if (op === 'is' || op === 'not' || op === 'in' || op === 'not_in') return type !== 'list';
   if (op === 'gt' || op === 'gte' || op === 'lt' || op === 'lte' || op === 'between') return ORDERED.has(type);

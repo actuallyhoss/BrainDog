@@ -32,6 +32,9 @@
  *     due after today                   a temporal literal
  *     due before +30d                   a relative day: ± a number, then d, w or m
  *     renews before eom                 end of month. Also bom, boy, eoy, tomorrow, yesterday
+ *     points at is empty                the field holds nothing: no value, '' or []
+ *     points at is set                  and it holds something. `is not empty` is the second of
+ *                                       those two and `is not set` is the first
  *     state is live, cycle is monthly   clauses are ANDed on the comma
  *
  * VALUES ARE MATCHED AGAINST WHAT THE UI SHOWS, not against what the column stores. `display()`
@@ -52,7 +55,28 @@ export type Clause =
   /* `not on` IS THE NEGATION OF `on` AND IT DID NOT EXIST. Without it, `is not` over a dated field
      had nowhere to go and fell through to the string branch below, where "today" is compared as
      the word `today` against a stored date. See the parse. */
-  | { field: string; op: 'before' | 'after' | 'on' | 'not on'; day: string };
+  | { field: string; op: 'before' | 'after' | 'on' | 'not on'; day: string }
+  /**
+   * AND A CLAUSE ABOUT WHETHER THE FIELD HOLDS ANYTHING AT ALL, which had no member here.
+   *
+   * The kernel's grammar has published `empty` and `present` among its operators since the first
+   * draft, `compile` there carries a `case` for each and `evaluate` answers both. This engine is
+   * the same grammar for the browser, and it listed both words under `UNIMPLEMENTED`: a filter a
+   * person could write in JSON could not be written in the sentence every block, chip and page
+   * prints. Two languages, which is the whole thing these two files are held against.
+   *
+   * IT CARRIES NO OPERAND, and the empty list is how that is spelled rather than a missing key.
+   * Two readers outside this file test the SHAPE rather than the operator, and `metrics.ts`'s
+   * `resolvedAt` is the one that matters: `'values' in c ? c : { ...c, day: resolveDay(c.day) }`
+   * reads a clause with no `values` as a dated one and would go looking for a day this clause does
+   * not have. A question about absence has nothing to compare against, so `[]` is the true answer
+   * and it keeps that reader correct: an absence clause does not move when the clock does.
+   *
+   * NOTHING MAY READ IT AS "IS ONE OF NOTHING". The value branch of `matches` answers false to
+   * that on every row and its negation true on every row, which is the clause that quietly matches
+   * everything, so both readers here test the OPERATOR first and the shape second.
+   */
+  | { field: string; op: 'empty' | 'present'; values: [] };
 
 export type Where = {
   /** The register it was compiled against. A value means nothing without one. */
@@ -180,9 +204,27 @@ const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after)\s+(.+?)\s*$/i
  * matched" sentence — the state `blocks.ts` exists to keep separate from a filter that was not
  * understood.
  */
-const UNIMPLEMENTED = ['at least', 'at most', 'more than', 'less than', 'contains', 'starts', 'starts with', 'ends', 'ends with', 'empty', 'present', 'between', 'in', 'not in'];
+/* `empty` AND `present` CAME OFF THIS LIST, because they are read now. They were the two published
+   operators that needed no operand and no new comparison: the record's own compiler answers both
+   with the three ways a value is absent, and this file was refusing the sentence for a predicate
+   the kernel beside it has always compiled. */
+const UNIMPLEMENTED = ['at least', 'at most', 'more than', 'less than', 'contains', 'starts', 'starts with', 'ends', 'ends with', 'between', 'in', 'not in'];
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
+
+/**
+ * The words for "the field holds nothing" and "the field holds something", and the operator each is.
+ *
+ * `set` IS THE READER'S WORD AND `present` IS THE FORMAT'S. `19 §9` takes the reader's, so `set` is
+ * what the sentences here say and what a refusal names; `present` is accepted beside it because it
+ * is the word `38 §2.1` publishes, and an agent writing from the documentation writes the word it
+ * read there. The record's sentence parser accepts exactly these three, so a filter written for one
+ * engine is a filter for the other.
+ */
+const ABSENCE: Record<string, 'empty' | 'present'> = { empty: 'empty', set: 'present', present: 'present' };
+
+/** And the negation inverts: `is not empty` is `present`, `is not set` is `empty`. */
+const INVERSE = { empty: 'present', present: 'empty' } as const;
 
 /**
  * A value as the field DECLARES it, from a value as somebody said it.
@@ -326,7 +368,13 @@ export function compile(register: string, where: string | undefined): Where {
       bad.push(cannotSay(text));
       continue;
     }
-    const [, name, op, rest] = m as unknown as [string, string, string, string];
+    const [, name, said, rest] = m as unknown as [string, string, string, string];
+    /* THE OPERATOR FOLDED ONCE, because `CLAUSE` matches case-insensitively and every test of it
+       below is against a lower-case literal. `STATE IS Live` has worked since the regex took its
+       `i`, and `STATE IS NOT Live` did not: `'IS NOT' === 'is not'` is false, so the negation fell
+       to the `is` branch and the clause meant the opposite of the sentence. A negation that does
+       not invert is the one defect this grammar keeps being bitten by. */
+    const op = said.toLowerCase();
 
     const field = fieldOf(register, name);
     if (!field) {
@@ -468,6 +516,29 @@ export function compile(register: string, where: string | undefined): Where {
           ? values.filter((v) => !carriesCurrency(v))
           : [];
 
+    /**
+     * `is empty` AND `is set`, IN THE SAME ORDER: THE DECLARED VALUES FIRST.
+     *
+     * The paragraph below is the rule and this is the first operator to be read rather than named,
+     * so it keeps the rule exactly. `set` is consulted first, which is the enum's values or the
+     * titles a ref points at, and only a word the register does not declare is read as the
+     * operator. A register free to declare a state called `empty` must not be made unfilterable on
+     * that field by this grammar learning a word.
+     *
+     * ONE WORD ONLY. `points at is empty or set` is two values, and two values are a list of things
+     * to compare against rather than a question about absence; it stays on the value branch, where
+     * the record's own sentence parser leaves it too.
+     */
+    const only = values.length === 1 ? norm(values[0] ?? '') : '';
+    const absence = ABSENCE[only];
+    if (absence && !(set ?? []).includes(only)) {
+      /* THE NEGATION INVERTS. `is not empty` is `present` and `is not set` is `empty`, which is the
+         one thing that must not be got wrong here: a negation compiled as its own positive is a
+         filter that confidently answers the opposite question. */
+      clauses.push({ field, op: op === 'is not' ? INVERSE[absence] : absence, values: [] });
+      continue;
+    }
+
     /* AN OPERATOR IN THE VALUE SLOT IS AN OPERATOR, NOT A VALUE, and it is checked only AFTER the
        declared values, so an enum that really holds the word `present` still resolves.
 
@@ -514,6 +585,23 @@ export function matches(entry: Entry, w: Where, now: number): boolean {
 
   return w.clauses.every((c) => {
     const raw = entry.fields[c.field];
+
+    /**
+     * THE THREE WAYS A VALUE IS ABSENT, and they are the kernel's three rather than a rule invented
+     * here: `null`, the empty string and the empty list, which its compiler spells out as
+     * `(expr IS NULL OR expr = '' OR expr = '[]')` and its evaluator answers with the same three.
+     * A write stores none of them, but an import carries whatever the other record held, and the
+     * shipped record's services hold `points_at: ''` rather than nothing at all. Reading only
+     * `null` would have missed exactly the rows somebody asking this question is looking for.
+     *
+     * `34 §6` is the other half: every positive operator is false on a missing value. `present` is
+     * a positive operator, so it is false on all three; `empty` is the question about absence
+     * itself, so it is the only clause here a row with nothing in the field can satisfy.
+     */
+    if (c.op === 'empty' || c.op === 'present') {
+      const absent = raw === undefined || raw === null || raw === '' || (Array.isArray(raw) && raw.length === 0);
+      return c.op === 'empty' ? absent : !absent;
+    }
 
     /* `'values' in c` rather than a check on `op`: the discriminant is spread across two literals
        per member, and the `in` operator narrows a union on the property that actually differs. */
@@ -572,12 +660,29 @@ export function registerHref(register: string, where: string | undefined): strin
   /* A NEGATION BECOMES `not-in` RATHER THAN THE ENUM'S COMPLEMENT: the complement is only writable
      when the field declares its values, and a URL that silently lists them is a URL that breaks the
      day a pack adds one. */
+  /**
+   * AN ABSENCE TRAVELS AS THE SENTENCE THAT SAYS IT: `<field>:is:empty` and `<field>:is:set`.
+   *
+   * THE OPERATOR IS TESTED FIRST AND THE SHAPE SECOND, because an absence clause carries
+   * `values: []` for the reader in `metrics.ts`, and `'values' in c` would send it down the value
+   * branch to print as `points_at:in:` with nothing after the colon: a chip naming no value.
+   *
+   * The chip parser splits on colons with no operator check and `whereOf` turns every chip back
+   * into a sentence, so `f=points_at:is:empty` arrives at this compiler as `points_at is empty`
+   * and means what it said. Minting a chip operator instead, say `points_at:empty:true`, would
+   * have come back through `whereOf`'s fallback as `points_at is true`: a link that reads as the
+   * filter it came from and opens a different list, which is the failure `registerHref` exists to
+   * prevent. A URL a page can write and the register cannot read is the two languages again, one
+   * address along.
+   */
   const chips = w.clauses.map((c) =>
-    'values' in c
-      ? `${c.field}:${c.op === 'is not' ? 'not-in' : 'in'}:${c.values
-          .map((v) => encodeURIComponent(declaredValue(register, c.field, v)))
-          .join(',')}`
-      : `${c.field}:${c.op}:${encodeURIComponent(c.day)}`,
+    c.op === 'empty' || c.op === 'present'
+      ? `${c.field}:is:${c.op === 'empty' ? 'empty' : 'set'}`
+      : 'values' in c
+        ? `${c.field}:${c.op === 'is not' ? 'not-in' : 'in'}:${c.values
+            .map((v) => encodeURIComponent(declaredValue(register, c.field, v)))
+            .join(',')}`
+        : `${c.field}:${c.op}:${encodeURIComponent(c.day)}`,
   );
   return chips.length ? `/r/${register}?${chips.map((f) => `f=${f}`).join('&')}` : `/r/${register}`;
 }

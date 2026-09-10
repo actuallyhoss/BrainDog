@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { display, labelOf } from './api.ts';
+import { applyFilters, display, labelOf } from './api.ts';
 import { saidPlainly } from './blocks.ts';
 import { NOW, PAGES, REGISTERS, ROWS, VIEWS } from './data.ts';
 import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
@@ -174,9 +174,14 @@ test('an operator the build does not read is named as an operator, not matched a
   // `21-AUTHORING` §4.2 publishes eleven and four are implemented. `amount is at least 10000` parsed
   // as `is` against the literal string "at least 10000", matched nothing, and drew the author's own
   // "nothing matched" sentence — the one state that must be kept apart from a filter that failed.
+  /* `note is empty` WAS THE SECOND ROW HERE AND IS NOW A CLAUSE. `empty` and `present` came off
+     `UNIMPLEMENTED` because this engine reads them: they are the two published operators that take
+     no operand, the kernel beside it has compiled both since its first draft, and refusing the
+     sentence for a predicate the JSON form accepts is the two-languages failure both files are
+     held against. The rest of the list is still published and still unread. */
   for (const [text, word] of [
     ['amount is at least 10000', 'at least'],
-    ['note is empty', 'empty'],
+    ['note is more than 10', 'more than'],
     ['amount is between 1 and 2', 'between'],
   ] as const) {
     const w = compile('obligations', text);
@@ -484,6 +489,90 @@ test('and nothing else in English is a day', () => {
      which is the bug this whole module was rewritten to kill. */
   for (const word of ['soon', 'next week', 'in 90 days', '90 days', 'days from now', '90 years from now', '1 fortnight ago', '90 days from then'])
     assert.equal(resolveDay(word, NOW), null, `"${word}" resolved to a day`);
+});
+
+/* ── the field holds nothing, or it holds something ──────────────────────── */
+
+test('`is empty` AND `is set` ARE SENTENCES, and the record has rows only one of them can find', () => {
+  /**
+   * THE OPERATOR PAIR THAT WAS PUBLISHED, COMPILED BY THE KERNEL, AND UNSAYABLE HERE.
+   *
+   * `38 §2.1` lists `empty` and `present` among the nineteen operators and `packages/where`
+   * compiles both, in SQL and in memory. This engine had them on `UNIMPLEMENTED`, so
+   * `points_at is empty` was refused as *"an operator this build does not read"* while the same
+   * question written as JSON was answered. A filter one of the two engines can express and the
+   * other cannot is the two-languages failure both files are held against, and it was blocking a
+   * real declaration: the estate page carries a warn note headed "Points at nothing" whose gate
+   * counts the LAPSING services instead, because the set it means could not be said.
+   *
+   * THE EMPTY STRING IS THE CASE THAT MATTERS. `34 §6` counts `null`, `''` and `[]` as missing,
+   * and the shipped record's services hold `points_at: ''` rather than nothing at all. Reading
+   * only `null` would have found none of the rows the question is asked about.
+   */
+  const nothing = keep('services', 'points at is empty');
+  const something = keep('services', 'points at is set');
+  const blank = (ROWS.services ?? []).filter((e) => e.fields.points_at === '');
+
+  assert.ok(blank.length > 0, 'the shipped record no longer has a service pointing at nothing');
+  assert.deepEqual(nothing.map((e) => e.seq), blank.map((e) => e.seq), 'the empty string was read as a value');
+  assert.equal(nothing.length + something.length, all('services'), 'a row was in neither half');
+  for (const e of something) assert.ok(String(e.fields.points_at).length > 0);
+
+  /* AND THE NEGATION INVERTS. `is not empty` is `set` and `is not set` is `empty`, which is the one
+     thing that must not be got wrong: a negation compiled as its own positive answers the opposite
+     of the question and looks like an answer. */
+  assert.deepEqual(keep('services', 'points at is not empty').map((e) => e.seq), something.map((e) => e.seq));
+  assert.deepEqual(keep('services', 'points at is not set').map((e) => e.seq), nothing.map((e) => e.seq));
+
+  /* `present` IS THE FORMAT'S WORD FOR `set`, and an agent writing from `38 §2.1` writes it. */
+  assert.deepEqual(keep('services', 'points at is present').map((e) => e.seq), something.map((e) => e.seq));
+
+  /* AND A MISSING VALUE IS MISSING TOO, which is the `null` of the three: a service on no project. */
+  const unattached = keep('services', 'thing is empty');
+  assert.ok(unattached.length > 0, 'the shipped record no longer has a service on no project');
+  for (const e of unattached) assert.ok(e.fields.thing === null || e.fields.thing === undefined);
+
+  /* AND IT IS AN ORDINARY CLAUSE, so it ANDs on the comma and narrows what is beside it. */
+  const live = keep('services', 'state is live, points at is empty');
+  assert.ok(live.length > 0 && live.length < nothing.length + 1);
+  for (const e of live) assert.equal(e.fields.state, 'live');
+});
+
+test('and a text field full of empty strings is the case the sentence could not reach', () => {
+  /* `obligations.note` is `''` on most rows and a paragraph on a few, which is exactly the shape a
+     person asks about: "which of these has a note". It was `"empty" is not an operator this build
+     reads`, while `{field: 'note', empty: true}` was answered by the record. */
+  const blank = keep('obligations', 'note is empty');
+  const written = keep('obligations', 'note is set');
+  assert.ok(blank.length > 0 && written.length > 0, 'the seed no longer has both kinds of note');
+  assert.equal(blank.length + written.length, all('obligations'));
+  for (const e of written) assert.ok(String(e.fields.note).length > 0);
+  for (const e of blank) assert.equal(e.fields.note ?? '', '');
+});
+
+test('and the link the surface hands over asks the register the same question', () => {
+  /**
+   * ONE PREDICATE, TWO PRODUCTS: the rows a surface draws and the address of the rest of them. An
+   * absence has no value to put in a chip, so it travels as the sentence that says it,
+   * `points_at:is:empty`, which is what the chip parser and `whereOf` already know how to carry.
+   * A minted chip operator would have come back through `whereOf`'s fallback as
+   * `points_at is true` and opened a list that contradicts the filter it came from.
+   */
+  const href = registerHref('services', 'points at is empty');
+  assert.match(href, /f=points_at:is:empty/);
+  assert.match(registerHref('services', 'points at is set'), /f=points_at:is:set/);
+
+  /* THE REGISTER ROUTE'S OWN READING OF THE CHIPS, verbatim, so this is the round trip rather than
+     an assertion about a string. */
+  const filters = new URL(href, 'https://x').searchParams.getAll('f').map((raw) => {
+    const [field = '', op = 'is', values = ''] = raw.split(':');
+    return { field, op, values: values.split(',') };
+  });
+  assert.deepEqual(
+    applyFilters('services', ROWS.services ?? [], filters).map((e) => e.seq),
+    keep('services', 'points at is empty').map((e) => e.seq),
+    'the link opened a different set of rows from the one the surface drew',
+  );
 });
 
 /* ── an operator belongs to a type ───────────────────────────────────────── */

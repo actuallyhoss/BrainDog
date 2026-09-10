@@ -84,8 +84,22 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
   });
   assert.deepEqual(said.bad, [], `${decl.metric}: ${said.bad[0]?.fix ?? ''}`);
 
-  const rows = (k.list({ register, ...(said.predicate ? { where: said.predicate } : {}), limit: 1000 }) as { ok: true; value: { rows: Entry[] } })
-    .value.rows.filter((e) => evaluate(said.predicate, e.fields, schema));
+  /**
+   * EVERY ROW, FILTERED IN MEMORY, AND IT USED TO ASK THE COMPILER FOR THE SET FIRST.
+   *
+   * This file's header says the reference "walks the seed's rows" and "shares no code with the
+   * evaluator beyond `parseWhere` and `evaluate`". It did not: it asked `k.list({ where })`, which
+   * compiles the predicate with the same `compile` the metric evaluator uses, and then filtered
+   * what came back. `.filter(evaluate)` can only REMOVE rows the SQL admitted, so a compiled
+   * predicate that wrongly drops a row produces the identical wrong figure on both sides and the
+   * differential sees nothing. Measured over all eighteen readings, `evaluate` removed zero rows,
+   * so only the arithmetic was ever being compared.
+   *
+   * SO THE SET COMES FROM THE ROWS. `limit` is the register's whole size because the point is that
+   * nothing between the seed and this line decides which rows count except `evaluate`.
+   */
+  const held = (k.list({ register, limit: 1000 }) as { ok: true; value: { rows: Entry[] } }).value.rows;
+  const rows = held.filter((e) => evaluate(said.predicate, e.fields, schema));
 
   const v = decl.value as Record<string, unknown>;
   if ('count' in v) {
@@ -150,16 +164,25 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
 });
 
 test('and the figures are the ones the record actually holds', async () => {
-  // Spot-checked against the rows rather than against the other implementation, so a shared mistake
-  // in both would still be caught here.
+  /**
+   * SPOT-CHECKED AGAINST THE ROWS, and it used to say that while asking the same engine.
+   *
+   * The comment claimed the figure was checked against the rows rather than against the other
+   * implementation, "so a shared mistake in both would still be caught here". It then asked
+   * `k.list({ where: 'state is open or part, direction is owed to me' })`, which parses that
+   * sentence and compiles it with exactly the code the metric evaluator uses: a shared mistake
+   * would have been shared by the check.
+   *
+   * THE ROWS AND A PREDICATE WRITTEN OUT BY HAND, which is what the sentence above always meant.
+   */
   const { k, sql } = await seeded();
 
   const owed = k.metric(METRICS['owed-to-you'] as MetricDecl);
   assert.ok(owed.ok);
-  const truth = (k.list({ register: 'obligations', where: 'state is open or part, direction is owed to me', limit: 1000 }) as {
-    ok: true;
-    value: { rows: Entry[] };
-  }).value.rows.reduce((a, e) => a + (e.fields.amount as { amount: number }).amount, 0);
+  const all = (k.list({ register: 'obligations', limit: 1000 }) as { ok: true; value: { rows: Entry[] } }).value.rows;
+  const truth = all
+    .filter((e) => (e.fields.state === 'open' || e.fields.state === 'part') && e.fields.direction === 'owed_to_me')
+    .reduce((a, e) => a + (e.fields.amount as { amount: number }).amount, 0);
   assert.equal(owed.value.value, truth);
   assert.equal(owed.value.unit, 'GBP');
   assert.ok(truth > 0, 'a seed with nothing owed cannot show what the product is for');
@@ -175,9 +198,13 @@ test('A COST PER CYCLE IS ANNUALISED, and the naive sum is 9.25 times too low', 
   const read = k.metric(filled(METRICS['project-cost']!, 'Kiln'));
   assert.ok(read.ok, fixOf(read));
 
-  const listed = k.list({ register: 'services', where: 'thing is Kiln, state is not cancelled', limit: 1000 });
+  /* THE ROWS AND A PREDICATE WRITTEN OUT BY HAND, for the reason the test above it gives: asking
+     `k.list` with a sentence compiles it with the code this figure is being checked against. */
+  const listed = k.list({ register: 'services', limit: 1000 });
   assert.ok(listed.ok, sayOf(listed));
-  const rows = listed.value.rows;
+  const kiln = k.get('things#1')?.id;
+  const rows = listed.value.rows.filter((e) => e.fields.thing === kiln && e.fields.state !== 'cancelled');
+  assert.ok(rows.length > 0, 'no service is on Kiln, so the comparison below is against nothing');
   const naive = rows.reduce((a, e) => a + (e.fields.cost as { amount: number }).amount, 0);
 
   assert.ok(read.value.value !== null && read.value.value > naive * 2, `${read.value.value} is not an annualised figure`);

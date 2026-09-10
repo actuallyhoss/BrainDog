@@ -640,7 +640,13 @@ export const SERVICES: Fields[] = [
 export const TASKS: Fields[] = [
   { what: 'Chase Halden on 2026-041', state: 'open', thing: 2, by: day(1), effort: days(0.2), note: '' },
   { what: 'Decide the licensing tier split', state: 'blocked', thing: 1, by: day(6), effort: days(1), note: 'Waiting on SG31.' },
-  { what: 'Move kilnfonts.example off auto-renew', state: 'open', thing: 1, by: day(-4), effort: days(0.2), note: '' },
+  /* THE REMEDY, AND IT USED TO BE THE CAUSE. This said "Move kilnfonts.example off auto-renew",
+     and the service row two hundred lines down is `lapsing` BECAUSE auto-renew is off: the audit
+     note says so in as many words, and the Kiln project's own document says letting it lapse
+     breaks links in files that have already been delivered. Three places named the fault and the
+     one task tracking it proposed doing the fault again. This record is the product's only worked
+     example, and a stranger reads it as what a real record looks like. */
+  { what: 'Turn auto-renew back on for kilnfonts.example', state: 'open', thing: 1, by: day(-4), effort: days(0.2), note: '' },
   { what: 'Draft the September issue', state: 'doing', thing: 3, by: day(4), effort: days(2), note: '' },
   /* SEVEN OF THE FOURTEEN NAME A TRACK, and none of them did. `tasks` declares a `track:` ref and
      every row left it null, so the Track column on `/r/tasks` was fourteen dashes and every track
@@ -680,7 +686,12 @@ export const TRACKS: Fields[] = [
   { name: 'Variable axis QA', state: 'open', thing: 1, opened: day(-38), note: 'Nine instances, three signed off. The rest need the mastering pass first.' },
   { name: 'Get off the Fenwick contract', state: 'open', thing: 3, opened: day(-61), note: 'Notice period is 60 days from the anniversary.' },
   { name: 'Specimen page rebuild', state: 'open', thing: 1, opened: day(-12) },
-  { name: 'Move the newsletter off portagemail', state: 'holding', thing: 2, opened: day(-90), note: 'Waiting on the deliverability question, SG29.' },
+  /* `thing: 3` AND IT SAID `2`. Everything else about this thread is Portage: the service it names,
+     the domain it names, and both tasks hanging off it all carry `thing: 3`, and `things#2` is
+     Marlow & Co. The Project column on the list and on the phone card printed the wrong project for
+     it, which is the one kind of mistake a worked example must not make: a stranger reads this
+     record as what a real one looks like. */
+  { name: 'Move the newsletter off portagemail', state: 'holding', thing: 3, opened: day(-90), note: 'Waiting on the deliverability question, SG29.' },
   { name: 'Year-end filing', state: 'done', opened: day(-210) },
 ];
 
@@ -810,6 +821,31 @@ export const METRICS: Record<string, SeedMetric> = {
     name: 'Lapsing',
     source: 'register.services',
     where: 'state is lapsing',
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * THE SET THE ESTATE'S ALARM IS ACTUALLY ABOUT, which until now could not be written down.
+   *
+   * The note headed "Points at nothing" was gated on `lapsing`, which counts services in the
+   * lapsing state: one row, and that row points somewhere. The four that point nowhere are all
+   * live. `08 §3`'s rule, and the four paragraphs the Money page's own `Late to pay` block carries
+   * about it, is that the gate and the figure have to describe one set, and this was the same
+   * defect one page along.
+   *
+   * IT NEEDED A WORD THE GRAMMAR DID NOT HAVE. The structured form has published `empty` and
+   * `present` since it was written and the sentence form had no way to say either, so the set was
+   * not expressible in the language every `where:` on every page is written in. It is now.
+   */
+  'points-nowhere': {
+    metric: 'points-nowhere',
+    name: 'Points at nothing',
+    source: 'register.services',
+    where: 'state is live, points_at is empty',
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },
@@ -980,8 +1016,13 @@ export const PAGES: Record<string, SeedPage> = {
            row's own screen prints and what `/audit` leads with, which are the three places somebody
            wants a number they can say out loud. A block on a page is not one of them. */
         columns: [
-          { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
-          { field: 'party', label: 'Party', width: 'minmax(12ch,20ch)' },
+        /* THE LABEL THE REGISTER DECLARES. A page column heads itself with `label ?? field`
+           and `/r/<id>` heads the same field with the register's own `label`, so a page that
+           types its own word makes one field two words. The worst of them was `tasks.by`,
+           which the register calls Due and this called By, over a right-aligned column of
+           dates on a page whose block two above it already said Due. */
+          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'party', label: 'Who', width: 'minmax(12ch,20ch)' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
         ],
@@ -1047,7 +1088,7 @@ export const PAGES: Record<string, SeedPage> = {
         source: 'register.obligations',
         where: 'direction is owed by me, state is open or part',
         columns: [
-          { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)', link: true },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
         ],
@@ -1154,7 +1195,7 @@ export const PAGES: Record<string, SeedPage> = {
         columns: [
           { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)', link: true },
           { field: 'provider', label: 'Provider', width: 'minmax(12ch,18ch)' },
-          { field: 'kind', label: 'Kind', width: '13ch' },
+          { field: 'kind', label: 'Type', width: '13ch' },
           { field: 'cost', label: 'Cost', width: '13ch', align: 'end' },
           { field: 'renews', label: 'Renews', width: '15ch', align: 'end' },
         ],
@@ -1170,7 +1211,10 @@ export const PAGES: Record<string, SeedPage> = {
         heading: 'Points at nothing',
         span: 12,
         body: 'Something here renews and points at nothing. A domain that resolves nowhere still costs what it costs.',
-        when: { metric: 'lapsing', gt: 0 },
+        /* AND THE GATE COUNTS THE SET THE SENTENCE IS ABOUT. It counted `lapsing`, which is one row
+           and that row points somewhere, while the services that point nowhere are all live: the
+           note drew, truthfully-looking, about rows it was not describing. */
+        when: { metric: 'points-nowhere', gt: 0 },
       },
     ],
   },
@@ -1259,7 +1303,7 @@ export const PAGES: Record<string, SeedPage> = {
            `what` already links to the row, and a direction the reader cannot see is worse than a
            number they cannot say out loud. */
         columns: [
-          { field: 'what', label: 'What', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)', link: true },
           { field: 'direction', label: 'Which way', width: '13ch' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
@@ -1348,7 +1392,7 @@ export const PAGES: Record<string, SeedPage> = {
            register-and-kind inside the reader, and a heading is not evaluated. */
         where: 'state is not done or dropped',
         columns: [
-          { field: 'what', label: 'What', width: 'minmax(20ch,1fr)', link: true },
+          { field: 'what', label: 'Description', width: 'minmax(20ch,1fr)', link: true },
           /* `Project` AND `Status`, AND THEY WERE `Thing` AND `State`. Every one of the five
              registers that carries a `thing` ref labels it Project and `things` labels its own
              lane Status, and this table — authored by hand rather than derived, so no rename
@@ -1357,7 +1401,7 @@ export const PAGES: Record<string, SeedPage> = {
              defect as two names for one screen, one row further down. */
           { field: 'thing', label: 'Project', width: 'minmax(10ch,16ch)' },
           { field: 'state', label: 'Status', width: '12ch' },
-          { field: 'by', label: 'By', width: '15ch', align: 'end' },
+          { field: 'by', label: 'Due', width: '15ch', align: 'end' },
         ],
         order: [{ field: 'by', dir: 'asc' }],
         empty: 'Nothing open.',
@@ -1382,7 +1426,7 @@ export const PAGES: Record<string, SeedPage> = {
         columns: [
           { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)', link: true },
           { field: 'role', label: 'Role', width: '14ch' },
-          { field: 'rate', label: 'Day rate', width: '14ch', align: 'end' },
+          { field: 'rate', label: 'Rate', width: '14ch', align: 'end' },
           { field: 'email', label: 'Email', width: 'minmax(16ch,1fr)' },
         ],
         empty: 'Nobody yet.',
@@ -1522,7 +1566,13 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
       return {
         ok: false,
         refusal: {
-          code: 'RECORD_NOT_EMPTY',
+          /* `IMPORT_NOT_EMPTY`, WHICH IS IN THE REGISTRY, AND `RECORD_NOT_EMPTY` IS NOT. This was
+             one of six codes `refusals.mjs` counts as drift and holds as a budget that may only go
+             down, and it was recorded as blocked on nothing in particular. It is not: the kernel's
+             own importer already emits `IMPORT_NOT_EMPTY` for the identical fact at
+             `dogl.ts:613`, both map to 422, and nothing in this repository asserts on the old
+             spelling. Two codes for one sentence, one of them unpublished. */
+          code: 'IMPORT_NOT_EMPTY',
           fix: `This record already holds ${kernel.count(register)} rows in ${register}. The seed opens an empty record.`,
           at: register,
         },

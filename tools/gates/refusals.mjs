@@ -254,7 +254,7 @@ for (const dir of ['packages', 'apps', 'tools']) {
 }
 
 /**
- * The budget: six, and it may only go down.
+ * The budget: five, and it may only go down.
  *
  * Each of these is one of three things and the gate cannot tell which: a concept `30 §6` is missing
  * and should gain by amendment; a code that already exists under another name; or a placeholder
@@ -276,8 +276,9 @@ for (const dir of ['packages', 'apps', 'tools']) {
  *                               hosts and the Worker, and moving fewer than three of them would buy
  *                               a lower number here and a product that answers differently
  *                               depending on where a customer runs it.
- *   `RECORD_NOT_EMPTY` (1)      `seed`'s, and the kernel's import has already moved to
- *                               `IMPORT_NOT_EMPTY`. One line.
+ *   `RECORD_NOT_EMPTY` GONE, 2026-09-10, in the one line this row said it would take. `seed`'s
+ *                               was the last site, the kernel's import had already moved, both map
+ *                               to 422, and nothing in this tree asserted on the old spelling.
  *   `WHERE_OPERATOR_UNSUPPORTED` GONE, 2026-09-10, and it had TWO sites rather than the one
  *                               recorded here: the rule linter's `each:` over a field that is
  *                               neither list nor enum, now `MATCH_OP_UNSUPPORTED`; and a
@@ -295,7 +296,7 @@ for (const dir of ['packages', 'apps', 'tools']) {
  *                               floor: the budget cannot reach zero without making a test worse,
  *                               which is worth knowing before somebody tries.
  */
-const BUDGET = 6;
+const BUDGET = 5;
 const codes = [...invented.keys()].sort();
 /* THE BUDGET IS ABOUT A TREE WITH CODE IN IT. A fixture root holds a document and an array and no
    source at all, so counting emitted codes there measures nothing — and the slack rule below would

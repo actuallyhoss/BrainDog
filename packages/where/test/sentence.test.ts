@@ -299,6 +299,75 @@ test('A FILTER THAT IS NOT A SENTENCE IS A REFUSAL, and it used to be a TypeErro
   assert.deepEqual(parseWhere(undefined, OBLIGATIONS, deps), { predicate: undefined, bad: [] });
 });
 
+/* ── the field holds nothing, or it holds something ──────────────────────── */
+
+test('`is empty` AND `is set` ARE SENTENCES, and the predicate they compile to is the published one', () => {
+  /**
+   * `38 §2.1` publishes `empty` and `present` among the nineteen operators, `compile` carries a
+   * `case` for each and `evaluate` answers both. There was no way to SAY either, so a filter a
+   * person could write in JSON could not be written in the words the pages, the register's own
+   * filter chips and every `where:` in the seed are written in: two languages, which is the failure
+   * this module's header is about, met from the other side.
+   */
+  assert.deepEqual(good('amount is empty'), { field: 'amount', empty: true });
+  assert.deepEqual(good('amount is set'), { field: 'amount', present: true });
+
+  /* `set` IS THE READER'S WORD AND `present` IS THE FORMAT'S. `19 §9` takes the reader's, and both
+     are accepted, because an agent writing from `38 §2.1` writes the word it read there. */
+  assert.deepEqual(good('amount is present'), { field: 'amount', present: true });
+
+  /* AND THE NEGATION INVERTS, which is the defect this file has been bitten by twice: `is not`
+     falling through to the branch beside it compiled `due is not today` as `due is today`. */
+  assert.deepEqual(good('amount is not empty'), { field: 'amount', present: true });
+  assert.deepEqual(good('amount is not set'), { field: 'amount', empty: true });
+  assert.deepEqual(good('amount is not present'), { field: 'amount', empty: true });
+
+  /* BY THE LABEL TOO, because a page prints its own filter with the label and a person types back
+     what is on the screen. */
+  assert.deepEqual(good('which way is empty'), { field: 'direction', empty: true });
+
+  // An ordinary clause, so it ANDs on the comma like any other.
+  assert.deepEqual(good('state is open, what is empty'), {
+    all: [
+      { field: 'state', is: 'open' },
+      { field: 'what', empty: true },
+    ],
+  });
+});
+
+test('AND A VALUE THE REGISTER DECLARES COMES FIRST, or that register is unfilterable', () => {
+  /**
+   * A register is free to declare a state called `empty` or to hold a project titled `Set`, and
+   * reading an operator out of the value slot would take that field's own values away from it. The
+   * browser's copy of this grammar settled the same ordering with the same argument beside it:
+   * *"an operator in the value slot is an operator, not a value, and it is checked only AFTER the
+   * declared values"*. Two engines reading one grammar in two orders is the disagreement a
+   * differential pass over the shipped record spent sixteen findings on.
+   */
+  const BOXES: Schema = {
+    register: 'boxes',
+    fields: {
+      state: { type: 'enum', values: ['empty', 'full'] },
+      thing: { type: 'ref', to: 'things' } as never,
+      note: { type: 'text' },
+    },
+  };
+  const boxes = { nowMs: NOW, refByTitle: (r: string, t: string) => (r === 'things' && t === 'Set' ? 'row-set' : null) };
+
+  assert.deepEqual(parseWhere('state is empty', BOXES, boxes).predicate, { field: 'state', is: 'empty' });
+  assert.deepEqual(parseWhere('state is not empty', BOXES, boxes).predicate, { field: 'state', not: 'empty' });
+  assert.deepEqual(parseWhere('thing is Set', BOXES, boxes).predicate, { field: 'thing', is: 'row-set' });
+
+  /* AND ON A FIELD THAT DECLARES NOTHING THE WORD IS THE OPERATOR, which is the type that needs it
+     most: a `text` hands every word straight back, so asking the value slot first would have made
+     `is empty` unreachable on every text field in the record. */
+  assert.deepEqual(parseWhere('note is empty', BOXES, boxes).predicate, { field: 'note', empty: true });
+  assert.deepEqual(parseWhere('note is set', BOXES, boxes).predicate, { field: 'note', present: true });
+
+  /* AND TWO VALUES ARE A LIST TO COMPARE AGAINST, not a question about absence. */
+  assert.deepEqual(parseWhere('note is empty or set', BOXES, boxes).predicate, { field: 'note', in: ['empty', 'set'] });
+});
+
 /* ── the sentence a page prints back ─────────────────────────────────────── */
 
 test('A FIELD IS FOUND BY ITS LABEL, and the sentence a page prints was FIELD_UNKNOWN', () => {

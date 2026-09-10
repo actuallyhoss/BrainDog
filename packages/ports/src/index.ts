@@ -278,20 +278,25 @@ export type Refusal = {
   /**
    * One of the hundred and twelve. `30-BLUEPRINT` §6, and the list is above.
    *
-   * STILL `string`, AND THE GATE IS WHY — but the reason is now five codes rather than twenty-four.
+   * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was
    * missing and they have been admitted by amendment; the synonyms have been renamed onto the
    * codes that already existed. What is left is `DECLARATION_INVALID` — the catch-all `declare.ts`
    * leans on, 32 occurrences, a project of its own — and five codes whose last emitting site sits in
    * a file the same change could not reach: `INTERNAL` (a crash, not a refusal, and it must move in
-   * all three hosts at once or they answer differently), `RECORD_NOT_EMPTY` in `seed`,
+   * all three hosts at once or they answer differently),
    * `SCOPE_INSUFFICIENT`, and two
    * deliberate placeholders that live only in tests and should stay there.
    *
    * So `refusals.mjs` holds the number as a budget that may only go down. That is still the honest
    * intermediate: the list is real, the drift is measured, and a seventh invented code is red today.
-   * The field narrows the day the budget reaches zero, and it is now five away rather than
+   * The field narrows the day the budget reaches zero, and it is now four away rather than
    * twenty-four.
+   *
+   * `RECORD_NOT_EMPTY` WAS THE FIFTH AND IT IS GONE. `seed` was its last site, the kernel's
+   * importer had already moved to `IMPORT_NOT_EMPTY` for the identical sentence, both map to 422,
+   * and nothing in this repository asserted on the old spelling: two codes for one fact, one of
+   * them unpublished.
    *
    * `WHERE_OPERATOR_UNSUPPORTED` WAS THE SIXTH AND IT IS GONE, in the one line the gate's own notes
    * said it would take. It had TWO sites rather than the one recorded: the kernel's rule linter,

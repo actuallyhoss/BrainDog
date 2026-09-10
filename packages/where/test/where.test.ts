@@ -11,7 +11,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { compile, evaluate, jsonPath, type Predicate, type Schema } from '../src/index.ts';
+import { compile, evaluate, jsonPath, parseWhere, type Predicate, type Schema } from '../src/index.ts';
+
+/** The record's clock, fixed, so a sentence carrying a relative word is a sentence about one day. */
+const NOW = Date.UTC(2026, 8, 5, 12);
 
 const SCHEMA: Schema = {
   register: 'obligations',
@@ -110,6 +113,86 @@ test('empty and present are about the FIELD, not about its value', () => {
   assert.deepEqual(both({ field: 'amount', present: true }), ['a', 'b', 'c', 'e']);
   // Zero is a number somebody measured, and it is present.
   assert.deepEqual(both({ field: 'n', present: true }), ['a', 'b', 'c', 'e']);
+});
+
+test('AND A PERSON CAN SAY BOTH OF THEM, which is the half of the grammar that was missing', () => {
+  /**
+   * `empty` and `present` were operators the STRUCTURED form had and the SENTENCE form could not
+   * say. `38 §2.1` publishes both among the nineteen, the two branches above compile them and
+   * `evaluate` answers them, so `{field: 'amount', empty: true}` was a filter a person could write
+   * in JSON and could not write in the words the pages, the filter chips and every `where:` in the
+   * seed are written in. `sentence.ts`'s own header calls that two languages, and the one that
+   * drifts is the one nobody is testing.
+   *
+   * THE CLAIM IS NOT THAT IT PARSES. It is that the sentence compiles to the same predicate the
+   * JSON form writes and that both renderings then answer the same rows, which is what `both` is
+   * for and why this test is in this file rather than beside the rest of the grammar.
+   */
+  const said = (text: string): Predicate | undefined => {
+    const out = parseWhere(text, SCHEMA, { nowMs: NOW });
+    assert.deepEqual(out.bad, [], out.bad[0]?.fix);
+    return out.predicate;
+  };
+
+  assert.deepEqual(said('amount is empty'), { field: 'amount', empty: true });
+  assert.deepEqual(said('amount is set'), { field: 'amount', present: true });
+  /* `present` IS THE FORMAT'S OWN WORD, and an agent writing from `38 §2.1` writes what it read. */
+  assert.deepEqual(said('amount is present'), { field: 'amount', present: true });
+
+  /* AND THE NEGATION INVERTS. A negation compiled as its own positive is the defect the sentence
+     grammar has been bitten by twice, and it answers the opposite of the question asked. */
+  assert.deepEqual(said('amount is not empty'), { field: 'amount', present: true });
+  assert.deepEqual(said('amount is not set'), { field: 'amount', empty: true });
+
+  // `d` is the row with no amount at all.
+  assert.deepEqual(both(said('amount is empty')), ['d']);
+  assert.deepEqual(both(said('amount is set')), ['a', 'b', 'c', 'e']);
+  assert.deepEqual(both(said('amount is not empty')), ['a', 'b', 'c', 'e']);
+  assert.deepEqual(both(said('amount is not set')), ['d']);
+
+  /* AND THE EMPTY LIST IS ONE OF THE THREE WAYS A VALUE IS ABSENT, which is `c`: it holds `tags:
+     []`, and the compiler's own `= '[]'` is why the sentence finds it. */
+  assert.deepEqual(both(said('tags is empty')), ['c', 'd']);
+  assert.deepEqual(both(said('tags is set')), ['a', 'b', 'e']);
+
+  // And it is an ordinary clause, so it ANDs on the comma like any other.
+  assert.deepEqual(both(said('state is open, amount is empty')), ['d']);
+});
+
+test('and the sentence takes the operator on exactly the types the structured form takes it on', () => {
+  /**
+   * ONE RELATION, ASKED ONCE. `operatorAllowed` decides which operators a type admits and is now
+   * exported for this: the sentence form asks it rather than carrying a second copy of `38 §4.3`,
+   * because a relation held in two places is two relations the day one of them is edited.
+   *
+   * `34 §1.2` gives `empty` and `present` to *"every type"*, so nothing below is refused today and
+   * the assertion is an EQUALITY rather than a list of refusals. It fails in either direction: a
+   * sentence accepted where the compiler refuses is a clause that installs clean and then matches
+   * nothing for ever, and a sentence refused where the compiler accepts is the gap this whole
+   * change is about. Before the sentence form learned the operator this failed on nine of the
+   * sixteen, because `empty` went to the value slot and came back as ENUM_VALUE_UNKNOWN, as a day
+   * that will not resolve, or as a number that is not one.
+   */
+  for (const type of [
+    // The sixteen of `38 §2.2`, in its order.
+    'text', 'document', 'int', 'decimal', 'money', 'quantity', 'day', 'instant', 'duration',
+    'bool', 'enum', 'ref', 'file', 'url', 'email', 'secret', 'list', 'json',
+  ]) {
+    const schema: Schema = { register: 'r', fields: { f: { type, ...(type === 'enum' ? { values: ['open'] } : {}) } } };
+    for (const [sentence, leaf] of [
+      ['f is empty', { field: 'f', empty: true }],
+      ['f is set', { field: 'f', present: true }],
+    ] as const) {
+      const spoken = parseWhere(sentence, schema, { nowMs: NOW });
+      const structured = compile(leaf, schema);
+      assert.equal(
+        spoken.bad.length === 0,
+        structured.bad.length === 0,
+        `${type}: the sentence said ${spoken.bad[0]?.code ?? 'yes'} and the predicate said ${structured.bad[0]?.code ?? 'yes'}`,
+      );
+      if (spoken.bad.length === 0) assert.deepEqual(spoken.predicate, leaf, `${type}: ${sentence}`);
+    }
+  }
 });
 
 test('has and lacks look inside a list', () => {

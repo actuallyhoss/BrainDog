@@ -10,6 +10,9 @@
  *     due after today
  *     due before +30d                   ± a number, then d, w or m
  *     renews before eom                 also bom, boy, eoy, tomorrow, yesterday
+ *     points at is empty                the field holds nothing: no value, '' or []
+ *     points at is set                  and it holds something. `is not empty` is the second of
+ *                                       those two and `is not set` is the first
  *     state is live, cycle is monthly   clauses are ANDed on the comma
  *
  * IT COMPILES TO THE SAME PREDICATE THE STRUCTURED FORM PRODUCES, and that is the whole reason it
@@ -38,7 +41,7 @@
 
 import type { Refusal } from '@braindog/ports';
 
-import type { Predicate, Schema } from './index.ts';
+import { operatorAllowed, type Predicate, type Schema } from './index.ts';
 
 const DAY_MS = 86_400_000;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -146,6 +149,34 @@ export type Parsed = { predicate: Predicate | undefined; bad: Refusal[] };
 
 /** Ordered comparisons, in the words the grammar uses. */
 const ORDERED: Record<string, string> = { before: 'before', after: 'after', on: 'is' };
+
+/**
+ * `is empty` AND `is set`: the two operators the structured form has always had and this could not say.
+ *
+ * `38 §2.1` publishes `empty` and `present` among the nineteen, `compile` carries a `case` for each
+ * and `evaluate` answers both, so `{field: 'points_at', empty: true}` was a filter a person could
+ * write in JSON and could not write in the words the pages, the register's own filter chips and
+ * every `where:` in the seed are written in. That is this file's own header read from the other
+ * side: not a sentence that drifts from the predicate, but a predicate no sentence reaches. The
+ * estate page carries a warn note headed "Points at nothing" whose gate counts the lapsing services
+ * instead, because the set it means, a service whose `points_at` holds nothing, could not be said.
+ *
+ * `set` IS THE READER'S WORD AND `present` IS THE FORMAT'S, and `19 §9` takes the reader's: a
+ * person asks whether a field is set, and `present` is the JSON talking about itself. Both are
+ * accepted here, because an agent reading `38 §2.1` writes the word it read there, and a sentence
+ * the documentation teaches and the parser refuses is the same two languages one layer up. `set` is
+ * the word the refusals name and the word a page prints back.
+ */
+const ABSENCE: Record<string, 'empty' | 'present'> = { empty: 'empty', set: 'present', present: 'present' };
+
+/**
+ * And the negation INVERTS, because a negation that does not is the defect this file has been
+ * bitten by twice: `due is not today` compiled to the clause `due is today` when `is not` fell
+ * through to the branch beside it, and a bare trailing `not` became a search for the word. `is not
+ * empty` is `present` and `is not set` is `empty`, and a clause that answers the opposite of the
+ * question is worse than one that refuses.
+ */
+const INVERSE = { empty: 'present', present: 'empty' } as const;
 
 /**
  * One sentence into one predicate.
@@ -292,6 +323,52 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     const said = (negated ? rest.slice(3) : rest).trim();
     if (!said) {
       bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence} — is${negated ? ' not' : ''} what?`, at: field });
+      continue;
+    }
+
+    /* ── is empty · is set ───────────────────────────────────────────────── */
+    /**
+     * THE DECLARED VALUES COME FIRST, AND THE OPERATOR ONLY AFTER THEM.
+     *
+     * A register is free to declare a state called `empty` or to hold a project titled `Set`, and
+     * reading an operator out of the value slot would make that register unfilterable on the one
+     * field whose values collide. The browser's copy of this grammar settled the same ordering with
+     * the same argument beside it: *"an operator in the value slot is an operator, not a value, and
+     * it is checked only AFTER the declared values, so an enum that really holds the word `present`
+     * still resolves"*. Two engines reading one grammar in two orders is the disagreement the
+     * differential pass over the shipped record spent sixteen findings on.
+     *
+     * ONLY AN ENUM AND A REF DECLARE ANYTHING, which is the same pair the browser closes. Every
+     * other type either checks a SHAPE that `empty`, `set` and `present` all fail, a day, a number,
+     * a boolean, or has no declared set at all and hands the word straight back, in which case
+     * there is nothing for the operator to shadow. Asking `resolve` on a `text` would answer with
+     * the word itself and the operator would never be reachable on the one type that needs it most.
+     */
+    const absence = ABSENCE[said.toLowerCase()];
+    const declared = decl.type === 'enum' || decl.type === 'ref' ? resolve(schema, field, decl, said, deps) : null;
+    if (absence && declared === null) {
+      const op = negated ? INVERSE[absence] : absence;
+      /**
+       * AND ONLY WHERE THE TYPE TAKES IT, asked of the structured compiler's own table rather than
+       * of a second one written here. `38 §4.3` is one relation over operators and types, and a
+       * relation kept in two places is two relations the day one is edited: `operatorAllowed` is
+       * exported for this. It admits `empty` and `present` on every type today, which `34 §1.2`
+       * writes as *"every type"*, so this refuses nothing yet and narrows the day the table does.
+       *
+       * `MATCH_OP_UNSUPPORTED` IS THE CODE THE COMPILER ALREADY GIVES FOR THIS LEAF, in the
+       * sentence it already gives, and `30 §6` reads it as *"an operator outside its type's set"*.
+       * The `before` branch above says why it may not be a code minted here: two renderings of one
+       * grammar answering one fact with two codes is the second language this file exists not to be.
+       */
+      if (!operatorAllowed(op, decl.type)) {
+        bad.push({
+          code: 'MATCH_OP_UNSUPPORTED',
+          fix: `${sentence} — ${field} is a ${decl.type}, which cannot be asked "${op}".`,
+          at: field,
+        });
+        continue;
+      }
+      clauses.push({ field, [op]: true } as Predicate);
       continue;
     }
 
