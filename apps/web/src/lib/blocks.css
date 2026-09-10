@@ -573,6 +573,63 @@
     background: color-mix(in srgb, var(--warn-fill) 12%, transparent);
   }
 
+  /* AND IT IS 44 UNDER A THUMB. `--row-h` is 34 comfortable and 30 compact, and this is the only
+     row of a chart that is a control. Below 640 the two-line rule further down already carries it
+     past the floor; above it, a coarse pointer is a tablet and nothing has ever measured one,
+     because `layout.mjs` runs its target rule below 640 only. `05 §6`: density follows the
+     pointer, never the width. `button.` because the same class is a plain `div` wherever the host
+     cannot act on the hole. */
+  @media (pointer: coarse) {
+    button.prop-row {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /**
+   * FIVE TRACKS DO NOT FIT ON A PHONE, AND THE ONE THAT GAVE WAY WAS THE CHART.
+   *
+   * `minmax(9ch, 20ch) minmax(0, 1fr) auto auto auto` is a desktop track list, and it had no rule
+   * under it at any width. The label, the value, the note and the tone glyph all size to their
+   * content; `minmax(0, 1fr)` is the only track that can yield, and `minmax(0, 1fr)` is
+   * `.prop-track`, which is the bar.
+   *
+   * Measured against the shipped build at 390, in a 342px row: the tracks compute to
+   * `107.6px 0px 98.2px 88.2px 0px`. **The bar is exactly zero pixels wide in every row of every
+   * `bar` and `gauge` block on `/`, `/p/*` and `/s/*`** — the chart is gone and a row of numbers
+   * is left, which is the one thing a chart is not. The same at 360, 320 and 430, so it is not a
+   * narrow-phone edge case, it is every phone. A row with no drawable value is worse again: with
+   * four children instead of five the value lands in the collapsed track and `GBP 900.00` renders
+   * in 9.4px.
+   *
+   * It never overflowed, which is why nothing caught it: a grid that answers a narrow container by
+   * squeezing a track to zero stays inside the viewport, and `layout.mjs` counts a right edge.
+   *
+   * SO THE ROW BECOMES TWO LINES, which is exactly what `.row` one hundred lines up does with the
+   * same shape and for the same reason: the label leads, and the bar, the value, the note and the
+   * glyph share the line under it. At 390 that gives the bar 108px of a 342px row, and the note
+   * stops being clipped as well (88.2px of a string that needs 104.6). No new breakpoint: 640 is
+   * already in the sweep, and each new one costs `layout.mjs` two more passes over every route.
+   *
+   * FOUR TRACKS AND NOT THREE, because the glyph is the fifth child when a row carries a tone and
+   * absent when it does not. Given three tracks it wrapped to a line of its own, 229px wide,
+   * under the value. The empty fourth track costs one 8px gap on rows without a glyph, which is
+   * the cheaper of the two mistakes.
+   */
+  @media (width < 640px) {
+    .prop-row {
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      gap: var(--sp-1) var(--sp-2);
+    }
+
+    .prop-label {
+      grid-column: 1 / -1;
+    }
+
+    .prop-track {
+      grid-column: 1;
+    }
+  }
+
   /* ── inline: chips ──────────────────────────────────────────────────────── */
 
   .inline {

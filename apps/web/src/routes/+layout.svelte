@@ -36,6 +36,7 @@
   import { copy } from '$lib/copy.ts';
   import { leaving, settled } from '$lib/ui/screen.svelte.ts';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import { watchKeyboard } from '$lib/a11y/keyboard.ts';
   import Sidebar from '$lib/ui/Sidebar.svelte';
   import { assets } from '$app/paths';
 
@@ -55,10 +56,14 @@
 
   let { data, children } = $props();
 
-  /* Two surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
-     and `/s/<token>` because a shared page is a capability URL: it renders one page, read-only,
-     with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6). */
-  const bare = $derived(page.url.pathname === '/start' || page.url.pathname.startsWith('/s/'));
+  /* Three surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
+     `/s/<token>` because a shared page is a capability URL: it renders one page, read-only,
+     with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6),
+     and `/signin` because a rail listing somebody else's registers behind a sign-in form is the
+     screen claiming you are already in. */
+  const bare = $derived(
+    page.url.pathname === '/start' || page.url.pathname === '/signin' || page.url.pathname.startsWith('/s/'),
+  );
 
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
      `/[id]`'s `Search` button navigated Home instead of searching. */
@@ -80,6 +85,20 @@
   $effect(() => {
     restoreAccent();
   });
+
+  /**
+   * THE SOFT KEYBOARD'S HEIGHT, WRITTEN AT LAST.
+   *
+   * `--kb` was declared in `tokens.css` and subtracted by `Sheet.svelte`, and nothing in either
+   * app ever wrote it, so the term subtracted zero and the submit button of every sheet in the
+   * product sat underneath the keyboard somebody had just used to fill the form. Measured on a
+   * phone with the keyboard up: the visible viewport is about 508px and the sheet is 743.
+   *
+   * `visualViewport` is the only source of that number on iOS. The module is a plain `.ts` with
+   * no runes so a test runner can load it, it takes the window as an argument so a test can hand
+   * it one it owns, and its return value is the teardown, which is its whole public surface.
+   */
+  $effect(() => watchKeyboard(window));
 
   let railOff = $state(pref.read().sidebar === false);
 
@@ -248,6 +267,24 @@
       </button>
     </div>
 
+    <!--
+      `{#key}`, SO ARRIVING SOMEWHERE IS AN EVENT AND NOT A REPAINT.
+
+      Every navigation in this product was a hard cut: the old screen was replaced by the new one
+      between two frames, with nothing at all to say a thing had happened. On a laptop that reads
+      as fast. On a phone, where the tap that caused it gave no feedback either, it reads as the
+      product having ignored you and then something changing on its own.
+
+      Four pixels and 240ms, which is `--d-move`, already in the token file for exactly this kind
+      of distance. `backwards` so the first frame is the start of the animation rather than the
+      end of it, which is the difference between a screen sliding in and a screen flickering.
+
+      IT SURVIVES BEING TURNED OFF. `a11y.css` collapses every animation to 1ms under
+      `prefers-reduced-motion`, and that is the right outcome here: the movement says nothing the
+      screen does not already say, so a reader who does not want it loses nothing at all. Anything
+      that carried meaning by moving would have to say it another way as well.
+    -->
+    {#key page.url.pathname}
     <main id="main" class="body" data-screen={settled()}>
       <!-- ABOVE THE SCREEN AND INSIDE THE SCROLLER, so it is the first thing read and the first
            thing to leave when the reader scrolls. A fixed strip across the top of every screen is a
@@ -256,7 +293,7 @@
         <aside class="sample" role="note">
           <p class="sample-said">
             <strong>{copy.sampleWhat}</strong>
-            {copy.sampleWhy}
+            <span class="sample-why">{copy.sampleWhy}</span>
           </p>
           <span class="sample-acts">
             <a class="sample-go" href="/start">{copy.sampleStart}</a>
@@ -266,6 +303,7 @@
       {/if}
       {@render children()}
     </main>
+    {/key}
   </div>
 
   <div class="tab-slot">
@@ -381,8 +419,11 @@
        the reader it was written for. The layout gate runs the target rule only below 640px, so it
        could not see the half that mattered. */
     min-block-size: var(--tap);
-    inset-block-start: var(--sp-2);
-    inset-inline-start: var(--sp-2);
+    /* AND THE FIRST CONTROL ON THE PAGE WAS UNDER THE NOTCH TOO. `max()` of the two horizontal
+       insets rather than one per side, because `env()` has no logical spelling: a `padding-inline`
+       that maps `left` to the start puts the notch padding on the wrong side under `dir="rtl"`. */
+    inset-block-start: calc(env(safe-area-inset-top) + var(--sp-2));
+    inset-inline-start: calc(max(env(safe-area-inset-left), env(safe-area-inset-right)) + var(--sp-2));
     z-index: var(--z-hint);
     padding: var(--sp-2) var(--sp-3);
     background: var(--s3);
@@ -398,7 +439,11 @@
 
   .live {
     position: fixed;
-    inset-block-start: 0;
+    /* UNDER THE NOTCH, AND THEREFORE NEVER SEEN. `app.html` sets `viewport-fit=cover`, so a 2px
+       hairline at y=0 is fifty-seven pixels above the first pixel of an iPhone 14 anybody can look
+       at: the one element in the product whose whole job is to be visible at all times was the one
+       element that never was. `env()` is 0 everywhere else, so this costs nothing on a laptop. */
+    inset-block-start: env(safe-area-inset-top);
     inset-inline: 0;
     z-index: var(--z-hint);
     block-size: 2px;
@@ -589,7 +634,74 @@
     color: var(--ink);
   }
 
+  /**
+   * ON A PHONE IT IS ONE LINE, because at 390 by 844 it was a hundred and ninety pixels.
+   *
+   * Measured: the sentence wrapped to five lines, the two controls dropped to a sixth, and the
+   * card took the top quarter of the first screen of the product. On `/r/obligations` that pushed
+   * the heading, the count, the filter bar and the capture field down with it, and the first row
+   * of the register began at 700px. The first thing a person saw on their phone was a paragraph
+   * explaining that what they could not yet see was made up.
+   *
+   * THE FIRST SENTENCE IS THE ONE THAT DOES THE WORK. "This is a sample record" is the whole fact;
+   * the rest is the reassurance, and reassurance is what a small screen can afford to lose. It is
+   * still on the page for a screen reader rather than removed from the markup, because the reader
+   * who cannot see the layout is not the one short of room.
+   *
+   * The comment above this bar says it is "a sentence somebody reads once". A sentence read once
+   * that costs a quarter of every screen until it is dismissed is being charged for by the day.
+   */
+  @media (width < 640px) {
+    .sample {
+      gap: var(--sp-2) var(--sp-3);
+      align-items: center;
+      margin: var(--sp-3) var(--sp-4) 0;
+      padding: var(--sp-2) var(--sp-3);
+      /* It still WRAPS, because "Start your own" and "Put this away" beside a bold sentence do not
+         fit 390px and shrinking either below the 44px floor is the one thing a small screen may
+         not trade. Two rows instead of six is the whole of the fix. */
+      justify-content: flex-start;
+    }
+
+    .sample-said {
+      flex: 1 1 auto;
+      min-inline-size: 0;
+    }
+
+    .sample-why {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .sample-acts {
+      flex: 0 0 auto;
+      gap: 0;
+    }
+
+    .sample-go {
+      padding: var(--sp-2) var(--sp-3);
+    }
+
+    .sample-away {
+      padding: var(--sp-2);
+    }
+  }
+
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+
   .body {
+    animation: arrive var(--d-move) var(--ease-out) backwards;
     min-inline-size: 0;
     background: var(--bg);
     border-inline-start: 1px solid var(--line);
@@ -624,7 +736,7 @@
      already the most obviously clickable thing on it. */
   .launcher {
     position: fixed;
-    inset-block-end: var(--sp-5);
+    inset-block-end: calc(env(safe-area-inset-bottom) + var(--sp-5));
     inset-inline-end: var(--sp-5);
     z-index: var(--z-hint);
     display: grid;
@@ -652,7 +764,12 @@
 
     .body {
       border: 0;
-      padding-block-end: calc(56px + var(--sp-6));
+      /* IT RESERVED 88px FOR A BAR THAT IS 90 ON AN IPHONE AND 56 ON A PHONE WITH NO HOME
+         INDICATOR: two pixels of the last row under the bar on one, and thirty-two pixels of
+         nothing on the other. Three files were each doing this sum and two of them got a
+         different answer, so the sum is `--tabbar` now and this adds only the breathing room it
+         always meant to add. */
+      padding-block-end: calc(var(--tabbar) + var(--sp-6));
     }
 
     .tab-slot {
@@ -670,9 +787,11 @@
        Home and a row's own id on a register. The tab bar owns the bottom of a phone; the header owns
        the top, and the space was already made. */
     .launcher {
-      inset-block-start: var(--sp-2);
+      /* AND ON A PHONE IT MOVED TO THE TOP, WHICH IS WHERE THE NOTCH IS. It sat at y 8 to 48 on a
+         device whose first visible pixel is 59. */
+      inset-block-start: calc(env(safe-area-inset-top) + var(--sp-2));
       inset-block-end: auto;
-      inset-inline-end: var(--sp-3);
+      inset-inline-end: calc(max(env(safe-area-inset-left), env(safe-area-inset-right)) + var(--sp-3));
       inline-size: 40px;
       block-size: 40px;
     }

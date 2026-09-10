@@ -153,15 +153,43 @@
     max-inline-size: 980px;
   }
 
+  /* The row is a `<button>`, at every width: it opens and closes. Only the TRACKS belong to the
+     desktop, and they are below. */
   .line {
-    /* WIDER THAN A SPOKEN ID, because what is in it is a domain. Sixteen characters is most of them
-       and the rest ellipsise, which is a truncation somebody can see. */
-    grid-template-columns: 16ch minmax(0, 1fr) auto 9ch;
     inline-size: 100%;
     border: 0;
     background: none;
     font: inherit;
     cursor: pointer;
+  }
+
+  /**
+   * THE ONE LEDGER SCREEN THAT WAS MISSING ITS WIDTH GUARD.
+   *
+   * `rows.css` turns a row into a two-line card below 640px. This override said nothing about
+   * width, and a component `<style>` is unlayered, so it beat `@layer components` at every size:
+   * the children took their card placements and the parent kept four desktop tracks underneath
+   * them. Every sibling ledger carries this guard with its own measurement beside it, and each
+   * comment says the same thing — `+page.svelte:369`, `audit:474`, `decide:486`, `packs:220`,
+   * `vault:151`. This screen had none.
+   *
+   * Measured against the shipped build at 390, in a 324px row: the tracks computed to
+   * `144px 63px 0px 81px`. The card places `.line-main` across all four and `.line-when` in
+   * column 2, so **the third and fourth tracks hold nothing at all: 81px of a 324px row, plus the
+   * 12px gap that goes with them, is dead** — and the sender's domain, which is what this screen's
+   * first column exists for, is held to 144px while it sits there. With the guard the card's own
+   * `minmax(0, 1fr) auto` applies and the domain gets 275.8px, which is 92% more of the row for
+   * the only thing on it a person is scanning.
+   *
+   * It never overflowed either. A collapsed track and an unoccupied one both stay inside the
+   * viewport, and `layout.mjs` counts a right edge.
+   */
+  @media (width >= 640px) {
+    /* WIDER THAN A SPOKEN ID, because what is in it is a domain. Sixteen characters is most of them
+       and the rest ellipsise, which is a truncation somebody can see. */
+    .line {
+      grid-template-columns: 16ch minmax(0, 1fr) auto 9ch;
+    }
   }
 
   .body {

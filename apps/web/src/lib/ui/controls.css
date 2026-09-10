@@ -15,6 +15,43 @@
  */
 
 @layer components {
+  /**
+   * THE PRESS, ONCE, FOR EVERY CONTROL IN THE PRODUCT.
+   *
+   * A count of `:active` rules across `apps/web/src` returned FOUR. Four, over a hundred and sixty
+   * pressable things: every button, every row of every list, every tab of the bar a phone
+   * navigates by, every segment of every filter, every menu row. Hover answers a mouse and focus
+   * answers a keyboard, and the finger got nothing back at all. On a phone, where there is no
+   * hover, that is the whole of the product's feedback: you touch a row, nothing happens, and the
+   * next screen arrives a moment later as if you had not done it.
+   *
+   * IT IS HERE AND NOT IN EACH COMPONENT for the reason the field shape is: it is ONE contract.
+   * Four scattered `:active` rules is how it got to four.
+   *
+   * TWO PROPERTIES, AND THE SECOND IS NOT DECORATION. `a11y.css` does not soften motion under
+   * `prefers-reduced-motion`, it deletes it: `transition-duration` is forced to 1ms, so a press
+   * written as a scale is not damped for those readers, it is absent. Opacity is a state and not a
+   * duration, so it lands either way. A control that answers some fingers and not others is worse
+   * than one that answers none, because the reader it ignores cannot tell that from a tap the
+   * product missed.
+   *
+   * `.cell` IS DELIBERATELY NOT IN THE LIST. A figure cell sits inside a bordered grid, and
+   * scaling one of three cells pulls its edge off the shared rule between them.
+   */
+  .btn:active:not(:disabled),
+  .line:active,
+  .tab:active,
+  .seg:active,
+  .segment:active,
+  .tile:active,
+  .choice:active,
+  .mi:active {
+    transform: scale(var(--press-scale));
+    opacity: var(--press-dim);
+    transition-duration: var(--d-press);
+    transition-timing-function: var(--ease-push);
+  }
+
   .field {
     display: flex;
     align-items: center;

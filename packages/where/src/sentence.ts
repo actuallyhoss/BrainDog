@@ -41,7 +41,7 @@
 
 import type { Refusal } from '@braindog/ports';
 
-import { operatorAllowed, type Predicate, type Schema } from './index.ts';
+import { addressable, KERNEL_FIELDS, operatorAllowed, type Predicate, type Schema } from './index.ts';
 
 const DAY_MS = 86_400_000;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -229,7 +229,24 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
      */
     const fold = (t: string) => t.replace(/[\s_]+/g, ' ').trim().toLowerCase();
     let field = words[0] ?? '';
-    let decl = Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+    /**
+     * AND THE RECORD'S OWN FIVE ARE FIELDS A SENTENCE MAY NAME.
+     *
+     * `created_at after -7d` is the whole reason `02 §6` makes them addressable without a
+     * declaration, and it is a SENTENCE before it is a tree: it is what a person types into a
+     * filter and what an agent writes into a `where:` string. The structured form learned them in
+     * `index.ts` and this one did not, which would have left `list({ where: {field: 'created_at',
+     * after: '-7d'} })` answering and `list({ where: 'created_at after -7d' })` refusing, from one
+     * grammar with one register behind it. That is the second language this file's header is about.
+     */
+    let decl: { type: string; values?: readonly string[]; label?: string } | undefined = Object.hasOwn(
+      schema.fields,
+      field,
+    )
+      ? schema.fields[field]
+      : Object.hasOwn(KERNEL_FIELDS, field)
+        ? { type: KERNEL_FIELDS[field]! }
+        : undefined;
     let after = 1;
     if (!decl) {
       const said = fold(sentence);
@@ -257,7 +274,10 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
         code: 'FIELD_UNKNOWN',
         fix: `${sentence} — ${schema.register} has no field called ${field || '(nothing)'}.`,
         at: field,
-        allowed: Object.keys(schema.fields),
+        /* THE RECORD'S OWN FIVE ARE IN THE LIST TOO, which is `38 §6`'s sentence for this refusal
+           and the reason `addressable` is exported: a suggestion list that omits them teaches an
+           agent that they do not exist. */
+        allowed: addressable(schema),
       });
       continue;
     }

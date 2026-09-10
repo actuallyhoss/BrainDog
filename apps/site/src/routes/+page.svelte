@@ -38,6 +38,12 @@
 <section class="hero">
   <div class="hero-copy">
     <h1 class="hero-title">{site.hero.title}</h1>
+    <p class="hero-lead">{site.hero.lead}</p>
+    <!-- A LIST, BECAUSE IT IS A LIST. Four things a business knows, marked rather than run
+         together, so the eye can take one and stop. -->
+    <ul class="hero-knows">
+      {#each site.hero.knows as one}<li>{one}</li>{/each}
+    </ul>
     <p class="hero-body">{site.hero.body}</p>
     <div class="hero-actions">
       <a class="btn btn-primary" href="{APP}/start">{site.hero.primary}</a>
@@ -153,7 +159,10 @@
       <p class="row-body">{s.arrange.body}</p>
       <p class="row-note">{s.arrange.note}</p>
     </div>
-    <Shot name="arrange" alt="The same page being arranged: a handle, a width control reading Full, Half and Third, and move and remove buttons on every block." />
+    <!-- `phone={false}`: arranging is a STATE and its setup presses a control a narrow window
+         puts somewhere else, so `product.mjs` takes no narrow capture of it and this falls back
+         to the wide one. -->
+    <Shot name="arrange" phone={false} alt="The same page being arranged: a handle, a width control reading Full, Half and Third, and move and remove buttons on every block." />
   </div>
 </section>
 
@@ -243,6 +252,35 @@
     line-height: 1.03;
     letter-spacing: -0.033em;
     text-wrap: balance;
+  }
+
+  .hero-lead {
+    /* The headline is set at `line-height: 1.03` and `text-wrap: balance`, so its last line has
+       almost no descender room under it. A lead sentence at the container's own gap sits on top
+       of the headline rather than under it. */
+    margin: var(--sp-4) 0 0;
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  /* The marker is a rule rather than a bullet: four one-line facts under a lead sentence read as
+     evidence, and a bulleted list of four reads as a feature table. */
+  .hero-knows {
+    display: grid;
+    gap: var(--sp-2);
+    margin: var(--sp-2) 0 var(--sp-1);
+    padding: 0;
+    list-style: none;
+  }
+
+  .hero-knows li {
+    padding-inline-start: var(--sp-3);
+    border-inline-start: 2px solid var(--line);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 1.45;
   }
 
   .hero-body {

@@ -57,6 +57,23 @@ export type Schema = {
    * division: a sentence somebody can be shown and cannot type back is not a sentence.
    */
   fields: Record<string, { type: string; values?: readonly string[]; label?: string }>;
+  /**
+   * WHICH FIELD THE RECORD MIRRORS ONTO THE `state` COLUMN, AND WHY IT IS NOT JUST THE WORD.
+   *
+   * `02 §1` settles in bold that a predicate over the state compiles against the mirrored COLUMN
+   * rather than the JSON, and `34 §1.2` and `38 §5.1` both write the exception as the NAME
+   * `state`. The name is not enough, and the seed proves it twice over. A register declares which
+   * of its fields is its lifecycle with a `state:` key, and one of the shipped registers points
+   * that key at a field called `lane`; going by the name would have read a column for a register
+   * that has no field called `state` and missed the one it does mirror. In the other direction, a
+   * register may declare an ENUM field called `state` and no `state:` key at all, which installs
+   * today: the write path mirrors nothing, the column stays NULL on every row of it, and a
+   * predicate reading the column would have matched nothing while the JSON holds the answer.
+   *
+   * So the schema says which field is mirrored and this package believes it. Absent means the
+   * register mirrors nothing, which is what a register with no lifecycle does.
+   */
+  state?: string;
 };
 
 export type Compiled = {
@@ -117,6 +134,97 @@ const IDENT = /^[a-z][a-z0-9_]{0,31}$/;
 const NUMERIC_SUBPATH: Record<string, string> = { money: '.amount', quantity: '.value' };
 
 /**
+ * THE FIVE THE RECORD KEEPS FOR ITSELF, AND THEY WERE ADDRESSABLE NOWHERE.
+ *
+ * `02 §6` publishes six field names that any `where:` may use without a register declaring them,
+ * `id seq state created_at updated_at version`, and `38 §4.3` item 13 gives the type of the five
+ * that are not `state`. The schema the kernel hands this compiler is the DECLARED fields and
+ * nothing else, so `{ field: created_at, after: '-7d' }`, which is *rows added this week* and about
+ * as ordinary a question as a register gets asked, came back `FIELD_UNKNOWN: obligations has no
+ * field called created_at`. So did `id`, `seq`, `updated_at` and `version`. The refusal was honest,
+ * which is why nothing was silently wrong: it was a capability three documents publish and this
+ * package did not have.
+ *
+ * THE FALLBACK LIVES HERE AND NOT IN THE KERNEL'S `schemaOf`, and that is the whole reason
+ * `38 §4.3` puts the list in this package. There are seven consumers of this grammar and two
+ * renderings of it; adding five keys to one register-to-schema function would have taught the SQL
+ * compiler a name the in-memory evaluator still could not read, which is the two-languages failure
+ * this file's header opens by saying the package exists to prevent.
+ *
+ * `state` IS NOT ONE OF THEM, and leaving it out is deliberate. It is the sixth of `02 §6`'s six
+ * and it resolves only when the register declares it, as that register's own enum (`38 §4.3`
+ * item 13). A register with no lifecycle has no states to name, and `state is open` against one
+ * should stay a refusal rather than quietly become a comparison against a column that is NULL on
+ * every row of it, which is the clause that matches nothing this file was written against.
+ */
+export const KERNEL_FIELDS: Readonly<Record<string, string>> = {
+  id: 'ref',
+  seq: 'int',
+  created_at: 'instant',
+  updated_at: 'instant',
+  version: 'int',
+};
+
+/**
+ * WHICH NAMES READ A COLUMN INSTEAD OF A KEY OF THE `fields` JSON.
+ *
+ * `02 §1` raises the question of what `{ field: state, is: open }` compiles against, calls it *not
+ * a detail, the whole thing* for a state machine, and settles it in bold: `state` is mirrored, and
+ * the predicate compiles against the COLUMN. `34 §1.2` and `38 §5.1` both restate it. This function
+ * had no exception in it, so every leaf went through `json_extract(fields, '$.state')`.
+ *
+ * THE ANSWERS WERE RIGHT AND THAT IS WHY IT SURVIVED. The write path stores `state` inside `fields`
+ * and mirrors it onto the column on the same statement, so reading the JSON gave the same value.
+ * What was lost is the one thing the exception was granted for: `migrations/0001_kernel.ts` creates
+ * `CREATE INDEX entry_state ON entry(register, state) WHERE deleted_at IS NULL`, and no predicate
+ * this package emitted could use it. An index scan and a whole-register scan return the same rows,
+ * so the only symptom is that the query got slow, which is the symptom nobody attributes.
+ *
+ * THE SET IS CLOSED AND EVERY MEMBER IS A LITERAL WRITTEN HERE, which is what makes handing the
+ * name straight back safe where `jsonPath` has to check the grammar first. A field that satisfies
+ * this test IS one of these five strings, and none of the five can carry a quote. The record
+ * reserves all five (`34 §4`), so no register can declare one and there is nothing to disambiguate
+ * against, which is exactly what is NOT true of `state`: see `Schema.state` and `mirrorsState`.
+ */
+export const isColumn = (field: string): boolean => Object.hasOwn(KERNEL_FIELDS, field);
+
+/** The column `entry` mirrors a register's state onto, spelled once. `02 §1`, `30 §1`. */
+const STATE_COLUMN = 'state';
+
+/**
+ * Does this register mirror THIS field onto the `state` column?
+ *
+ * The argument for asking the schema rather than the name is on `Schema.state`. This is the whole
+ * of the exception `02 §1` grants, and it is one comparison.
+ */
+export const mirrorsState = (schema: Schema, field: string): boolean =>
+  schema.state !== undefined && schema.state === field;
+
+/**
+ * What a field is allowed to hold, from the register or from the record's own five.
+ *
+ * ONE LOOKUP FOR BOTH RENDERINGS, for the reason `KERNEL_FIELDS` gives above: `compile` and
+ * `evaluate` resolving a name by two different routes is how they come to disagree about which
+ * names exist, and the disagreement is invisible until a rule fires on a row the list then does
+ * not show.
+ */
+const specOf = (schema: Schema, field: string): { type: string; values?: readonly string[]; label?: string } | undefined =>
+  Object.hasOwn(schema.fields, field)
+    ? schema.fields[field]
+    : Object.hasOwn(KERNEL_FIELDS, field)
+      ? { type: KERNEL_FIELDS[field]! }
+      : undefined;
+
+/**
+ * Every name a predicate over this register may use, for the `allowed` list on a refusal.
+ *
+ * `38 §6` writes the sentence out: *"Use one of the register's fields: <ids…>, or id, seq,
+ * created_at, updated_at, version."* A refusal that lists only the declared fields teaches an agent
+ * that the other five do not exist, and `10 §7`'s whole contract is that the refusal teaches.
+ */
+export const addressable = (schema: Schema): string[] => [...Object.keys(schema.fields), ...Object.keys(KERNEL_FIELDS)];
+
+/**
  * The SQL that reads one field, and it is EXPORTED so the sort and the filter cannot disagree.
  *
  * `31 §2` states the reason for `kernel -> where` in exactly these terms: this package owns
@@ -130,9 +238,35 @@ const NUMERIC_SUBPATH: Record<string, string> = { money: '.amount', quantity: '.
  * A MONEY OR QUANTITY SORTS BY ITS NUMBER, which is what `NUMERIC_SUBPATH` is for and why this is
  * one function rather than a caller building a path. Sorting `money` as an object sorts by the JSON
  * text, so `GBP 9.00` lands above `GBP 10.00`.
+ *
+ * AND A COLUMN IS A COLUMN, which is the exception `isColumn` above carries the argument for. It
+ * is one line here and it reaches three places at once, because this is the one function that
+ * spells a field expression: the filter, the sort and the kernel's `ORDER BY` all get the column
+ * on the same commit. `part` is only ever passed for the two halves of a money or a quantity, and
+ * none of the five is one, so the guard on it is belt and braces rather than a real case.
+ *
+ * IT DOES NOT KNOW ABOUT `state`, and that is why `fieldSqlIn` exists below. Whether a field is
+ * the mirrored one is a fact about a REGISTER and this function is handed a field and a type, so
+ * answering it here would mean guessing from the name, which `Schema.state`'s paragraph shows is
+ * wrong in both directions.
  */
 export const fieldSql = (field: string, type: string, part = ''): string =>
-  `json_extract(fields, '${jsonPath(field)}${part || NUMERIC_SUBPATH[type] || ''}')`;
+  part === '' && isColumn(field)
+    ? field
+    : `json_extract(fields, '${jsonPath(field)}${part || NUMERIC_SUBPATH[type] || ''}')`;
+
+/**
+ * The expression that reads one field OF A GIVEN REGISTER, and the one everything should call.
+ *
+ * `fieldSql` plus the one thing `fieldSql` cannot know on its own. It is exported for the same
+ * reason `fieldSql` is and stated in the same terms by `31 §2`: the index, the filter and the
+ * `ORDER BY` are the same string or the planner does not use the index, and "the query got slow"
+ * is the only symptom a year later.
+ */
+export const fieldSqlIn = (schema: Schema, field: string, type?: string): string =>
+  mirrorsState(schema, field)
+    ? STATE_COLUMN
+    : fieldSql(field, type ?? schema.fields[field]?.type ?? KERNEL_FIELDS[field] ?? 'text');
 
 const extract = fieldSql;
 
@@ -234,6 +368,40 @@ const CONTAINS_MAX = 40;
  * since the first draft with nothing anywhere emitting it.
  */
 const MAX_DEPTH = 3;
+
+/**
+ * SIXTY-FOUR VALUES A CHUNK, AND IT BOUNDS THE STATEMENT'S SHAPE RATHER THAN ITS PARAMETER COUNT.
+ *
+ * Three documents publish the number and none of them was implemented. `34 §1.10`'s limits table:
+ * *"`IN` chunk | 64 values a chunk, bounds the statement's shape; the 100-parameter ceiling is the
+ * adapter's (33 §1), not the grammar's"*. `02 §6` says *"chunked at 64 values"* in the operator
+ * table, and `38 §5` step 3 writes the algorithm out: slice at 64, one group per slice, `in` slices
+ * joined with OR and `not_in` slices with AND, one parenthesis around them when there is more than
+ * one. A list of 250 came out of here as a single OR chain of 250 terms.
+ *
+ * IT DOES NOT LOWER THE PARAMETER COUNT AND IT IS NOT MEANT TO. `38 §5` step 3 and `38 §7` both say
+ * so in as many words, and this build's emitted form makes it plainer still: each value carries its
+ * own currency qualifier, so a chunk of 64 holds the same 64 or 128 placeholders whether it is one
+ * group or four. The ceiling that a 250-value list actually meets is the ADAPTER's hundred, which
+ * `33 §1` counts before `prepare` and refuses `TOO_MANY_PARAMS` at 101, and `38 §4.4` is explicit
+ * that this function is not the layer that owes it: *"`compile` neither counts nor refuses;
+ * `params.length` is on the result."* So the count is published on the result and the chunk is what
+ * is enforced here.
+ *
+ * WHAT THE CHUNK BUYS IS THE ONE THING A GRAMMAR CAN PROMISE ABOUT ITS OUTPUT: a bounded shape. An
+ * unbounded OR chain is an unbounded expression tree, and the expression depth a Durable Object
+ * allows is 100 and is the one ceiling `30 §13` says nothing guards, on the argument that the
+ * compiler's output is bounded by construction. It was not.
+ */
+const IN_CHUNK = 64;
+
+/** The clauses in slices of `IN_CHUNK`, in order. `38 §5` step 3: 130 values become 64, 64 and 2. */
+const chunk = (clauses: string[]): string[][] => {
+  const out: string[][] = [];
+  for (let i = 0; i < clauses.length; i += IN_CHUNK) out.push(clauses.slice(i, i + IN_CHUNK));
+  return out;
+};
+
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
 
 const refuse = (code: string, fix: string, at?: string, allowed?: readonly string[]): Refusal => ({
@@ -423,10 +591,13 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
        resolves against `Object.prototype`, so `{field: 'constructor', is: 'x'}` compiled to a clause
        that matched nothing — a filter that quietly returned an empty list, which is the failure this
        whole module exists to prevent. */
-    const decl = Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+    /* AND THE RECORD'S OWN FIVE RESOLVE HERE TOO, which is `specOf`'s paragraph and `02 §6`'s
+       list. This read `schema.fields` alone, so a register's declaration was the whole vocabulary
+       and `created_at` was as unknown as a typo. */
+    const decl = specOf(schema, field);
     if (!decl) {
       bad.push(
-        refuse('FIELD_UNKNOWN', `${schema.register} has no field called ${field}.`, field, Object.keys(schema.fields)),
+        refuse('FIELD_UNKNOWN', `${schema.register} has no field called ${field}.`, field, addressable(schema)),
       );
       return '';
     }
@@ -446,7 +617,10 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     }
 
     const value = leaf[op];
-    const path = extract(field, decl.type);
+    /* AND THE MIRRORED STATE READS ITS COLUMN, which is `02 §1`'s decision and was in no line of
+       this file: every leaf went through `json_extract(fields, '$.state')`, so `entry_state` was
+       an index the compiler could not reach. See `fieldSqlIn`. */
+    const path = fieldSqlIn(schema, field, decl.type);
     const put = (v: string | number): string => {
       params.push(v);
       return '?';
@@ -607,9 +781,13 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         /* AND `IS NOT NULL` HERE TOO, for the reason the `is` branch above gives at length: a
            positive operator is false on a missing value, and a bare `=` inside a `none:` group is
            NULL rather than false and takes the row with it. */
+        /* AND THE CLAUSES GO OUT IN SLICES OF SIXTY-FOUR, which is `IN_CHUNK`'s paragraph above and
+           `38 §5` step 3's algorithm. One slice compiles to exactly the string this branch used to
+           produce, so the shape only changes for the lists that were unbounded. */
         if (op === 'in') {
           const each = list.map((v, i) => `(${at(i)} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
-          return `(${path} IS NOT NULL AND (${each.join(' OR ')}))`;
+          const slices = chunk(each).map((s) => `(${s.join(' OR ')})`);
+          return `(${path} IS NOT NULL AND ${slices.length === 1 ? slices[0]! : `(${slices.join(' OR ')})`})`;
         }
 
         /* `not_in` KEEPS THE CURRENCY AND NEGATES THE AMOUNTS, for the reason `not` does — and the
@@ -641,8 +819,13 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
           }
           return clauses.length ? `(${clauses.join(' OR ')}) AND ` : '';
         })();
+        /* AND `not_in` CHUNKS TOO, negated slice by slice and joined with AND, which is `38 §5`
+           step 3's other half and De Morgan's: NOT (a OR b) AND NOT (c OR d) is NOT (a OR b OR c OR
+           d), so the rows do not move and only the shape does. One slice is the string this branch
+           used to produce, unchanged. */
         const each = list.map((v, i) => `(${at(i)} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
-        return `(${path} IS NULL OR (${same}NOT (${each.join(' OR ')})))`;
+        const slices = chunk(each).map((s) => `NOT (${s.join(' OR ')})`);
+        return `(${path} IS NULL OR (${same}${slices.length === 1 ? slices[0]! : `(${slices.join(' AND ')})`}))`;
       }
 
       case 'gt':
@@ -797,14 +980,65 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
 }
 
 /**
+ * Does this predicate name one of the record's own five? Asked once, before anything is walked.
+ *
+ * IT IS ASKED UP FRONT BECAUSE THE WALK SHORT-CIRCUITS. `any:` stops at its first true child and
+ * `all:` at its first false one, so a check made where the leaf is read would fire on some rows and
+ * not others, and an exception that depends on the data is worse than either answering or refusing.
+ * The predicate is a handful of leaves and this walk allocates nothing.
+ */
+const namesColumn = (node: unknown, level = 1): boolean => {
+  /* AND IT COUNTS ITS DEPTH, because the first version of this walk did not and a four-thousand
+     deep `all:` was a `RangeError: Maximum call stack size exceeded` again, out of a guard added to
+     prevent a silent wrong answer. `MAX_DEPTH`'s paragraph is that failure, and the test that
+     catches it was already in the file. It is belt and braces below `evaluate`'s compile check,
+     which refuses a fourth level before this is reached, and belt and braces is what a backstop
+     is. */
+  if (level > MAX_DEPTH || !isNode(node as Node)) return false;
+  const n = node as Record<string, unknown>;
+  for (const q of QUANTIFIERS) {
+    const kids = n[q];
+    if (Array.isArray(kids)) return kids.some((k) => namesColumn(k, level + 1));
+  }
+  return typeof n.field === 'string' && Object.hasOwn(KERNEL_FIELDS, n.field);
+};
+
+/**
  * The same question, about one row already in memory.
  *
  * A rule mid-write has the row and no transaction to query from, and a test wants an answer without
  * a database. What matters is that this and `compile` say the same thing — there is a test that runs
  * both over the same rows and compares, because two renderings that disagree are worse than one
  * that is slow.
+ *
+ * `row` IS THE FOURTH ARGUMENT AND IT IS THE HARD PART OF ADDRESSING A KERNEL FIELD.
+ *
+ * `compile` reads `created_at` off a COLUMN of `entry`. This rendering is handed a row's `fields`,
+ * which is the JSON blob beside those columns, and a column is not in it: `id`, `seq`,
+ * `created_at`, `updated_at` and `version` are stored precisely where this argument cannot see
+ * them. Making the name compile and leaving this side blind would have answered `false` about every
+ * row for a question the SQL side answers correctly, which is not a smaller bug than the refusal it
+ * replaced. It is a bigger one, because a refusal is visible and `false` is not.
+ *
+ * SO THE ROW TRAVELS BESIDE ITS FIELDS RATHER THAN INSTEAD OF THEM. A fourth optional argument
+ * keeps the three-argument call every existing caller makes, and `38 §5.5` step 3 describes exactly
+ * this lookup: `state` reads the row, a kernel field reads the row, everything else reads `fields`.
+ * The alternative was to widen the second argument to accept either a bare `fields` map or a whole
+ * row and tell them apart by looking for a `fields` key, and a register may legitimately declare a
+ * field called `fields`, so the two shapes are not reliably distinguishable.
+ *
+ * AND ASKING WITHOUT THE ROW THROWS, for the reason `jsonPath` throws near the top of this file:
+ * a caller holding a row that hands over only half of it is a bug in the caller, not a value a
+ * person typed, and a backstop that returns a value can be ignored. There is exactly one honest
+ * answer to "is this row's `created_at` after Monday" when the row was not supplied, and it is not
+ * `false`.
  */
-export function evaluate(where: Predicate | undefined, fields: Record<string, unknown>, schema: Schema): boolean {
+export function evaluate(
+  where: Predicate | undefined,
+  fields: Record<string, unknown>,
+  schema: Schema,
+  row?: Readonly<Record<string, unknown>>,
+): boolean {
   if (where === undefined) return true;
 
   /**
@@ -824,6 +1058,15 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
    */
   if (compile(where, schema).bad.length) return false;
 
+  /* AND A QUESTION ABOUT A COLUMN NEEDS THE ROW, which is the fourth argument's paragraph above.
+     It is asked AFTER the compile check so that a predicate the compiler already refuses answers
+     `false` rather than throwing: an unreadable predicate is a refusal at this boundary, and only
+     a readable one the caller under-supplied is a bug in the caller. */
+  if (row === undefined && namesColumn(where))
+    throw new TypeError(
+      `A predicate over ${schema.register} names one of ${Object.keys(KERNEL_FIELDS).join(', ')}, which the record keeps in a column of the row and not in its fields. Pass the row as evaluate()'s fourth argument.`,
+    );
+
   const one = (node: Node): boolean => {
     if (isGroup(node)) {
       const q = quantifierOf(node);
@@ -837,10 +1080,29 @@ export function evaluate(where: Predicate | undefined, fields: Record<string, un
 
     const leaf = node as Record<string, unknown>;
     const field = typeof leaf.field === 'string' ? leaf.field : '';
-    const decl = Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+    /* THE SAME LOOKUP THE COMPILER MAKES, and it has to be, or one rendering knows a name the other
+       does not. See `specOf`. */
+    const decl = specOf(schema, field);
     if (!decl) return false;
 
-    const raw = fields[field];
+    /**
+     * WHERE A LEAF'S VALUE COMES FROM, AND IT IS NOT ALWAYS `fields`.
+     *
+     * `38 §5.5` step 3 gives the three cases and this is them: one of the record's own five reads
+     * the row, `state` reads the row when the caller handed one over, and everything else reads the
+     * declared field out of `fields`.
+     *
+     * THE MIRRORED FIELD FALLS BACK TO THE JSON RATHER THAN INSISTING ON THE COLUMN, because the
+     * write path stores it in both places on the same statement and the two hold the same string.
+     * Insisting would have broken every caller that passes a row's `fields` and nothing else, to
+     * buy an answer that is already correct. The five have no such fallback: `fields` never holds
+     * them, so there is nothing to fall back to and the guard above refuses to guess.
+     */
+    const raw = Object.hasOwn(KERNEL_FIELDS, field)
+      ? row?.[field]
+      : mirrorsState(schema, field) && row !== undefined && Object.hasOwn(row, STATE_COLUMN)
+        ? row[STATE_COLUMN]
+        : fields[field];
     const type = decl.type;
     const numeric = (v: unknown): number | null => {
       if (type === 'money') return typeof v === 'object' && v !== null ? (v as Money).amount : null;

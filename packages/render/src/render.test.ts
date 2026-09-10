@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { KINDS, PRIMITIVES, PRIMITIVES_VERSION, isKind } from './kinds.ts';
 import { parse, splitRow } from './parse.ts';
 import { toHTML, verbatimText } from './html.ts';
-import { chunkRows, moveCell } from '../svelte/types.ts';
+import { ariaSort, cardCells, chunkRows, moveCell, type Column, type TableRow } from '../svelte/types.ts';
 import { lanes } from './board.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
 import { bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
@@ -267,6 +267,39 @@ test('too many cells degrades to a visible fence, and the write is still accepte
 test('a kind outside the sixteen degrades rather than disappearing', () => {
   const [seg] = parse('```reactor_core | H\nA\n```');
   assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_KIND_UNKNOWN');
+});
+
+test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', () => {
+  /* `INFO` matched `[a-z]+`, so an info string with a capital in it missed the pattern entirely
+     and the kind came out as the empty string. The author got "A fence with no kind is shown as
+     you wrote it" for a fence whose first word was a kind. The fence is the only feedback channel
+     an agent author has, so a sentence that names the wrong fault costs the whole degradation. */
+  const fixFor = (src: string): string => {
+    const [seg] = parse(src);
+    assert.equal(seg?.type, 'degraded');
+    return seg?.type === 'degraded' ? seg.fix : '';
+  };
+  const stat = fixFor('```Stat | Head\na | 1 | n\n```');
+  assert.match(stat, /lower case/u, 'the capital is the fault and nothing said so');
+  assert.match(stat, /"stat"/u, 'a degradation that does not say what to write is a stop, not a step');
+  assert.doesNotMatch(stat, /no kind/u, 'the author wrote a kind');
+  assert.match(fixFor('```STAT | Head\n```'), /Write "stat"/u, 'shouting is the same fault');
+
+  // And the three sentences that were already right stay right: a word that is not a kind in any
+  // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the sixteen kinds/u);
+  assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
+  assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
+});
+
+test('and a capitalised kind is still a refusal, because the dialect has one spelling for a kind', () => {
+  // Accepting it would put `Stat` in `raw` and `stat` in the record for one figure, which is the
+  // thing `format.ts` opens by saying makes two figures. The write is accepted; the block degrades.
+  const [seg] = parse('```Stat | Head\na | 1 | n\n```');
+  assert.equal(seg?.type, 'degraded');
+  assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_KIND_UNKNOWN');
+  assert.equal(seg?.type === 'degraded' && seg.raw, '```Stat | Head\na | 1 | n\n```');
+  assert.match(toHTML(parse('```Stat | Head\na | 1 | n\n```')), /block-degraded/u);
 });
 
 test('a stat over six rows degrades under DIALECT_ARITY — there is no DIALECT_ROWS', () => {
@@ -788,6 +821,34 @@ test('A NEGATIVE AMOUNT KEEPS ITS SIGN ON THE WAY BACK IN', () => {
   assert.ok(Number.isNaN(magnitudeOf(MISSING)), 'a missing value is not zero');
 });
 
+test('AND A RUN OF DIGITS INSIDE A WORD IS NOT THE NUMBER THE CELL STATES', () => {
+  /* The pattern had no left edge, so it took the first digits anywhere in the cell:
+     `magnitudeOf('Q3 −1,299.00')` was 3, which is the quarter, and the amount and its sign were never
+     reached. Wrong figure, wrong side of zero, from the one function whose whole job is to read
+     back what the formatter just wrote. */
+  assert.equal(magnitudeOf('Q3 −1,299.00'), -1299, 'the quarter was measured instead of the amount');
+  assert.equal(magnitudeOf('Q3 1,299.00'), 1299);
+  assert.equal(magnitudeOf(`FY26 ${money(50_000, 'GBP')}`), 500);
+  assert.ok(Number.isNaN(magnitudeOf('Q3')), 'a label is not a magnitude of 3');
+  assert.ok(Number.isNaN(magnitudeOf('v1.2.3')), 'nor is a version a magnitude of 1');
+  // And the four shapes this function exists to read still read as themselves.
+  assert.equal(magnitudeOf(money(-129_900, 'GBP')), -1299);
+  assert.equal(magnitudeOf(pct(-12.5)), -12.5);
+  assert.equal(magnitudeOf(bytes(1_200_000)), 1.2);
+  assert.equal(magnitudeOf('12.5 days'), 12.5);
+});
+
+test('and the bar drawn off it put a credit at the top of the chart, full length', () => {
+  /* Reachable from a fence an author writes: `inline()` renders a literal cell to itself, so the
+     label reaches the measurement. Measured: the −1,299 row set the scale at 3 and drew at 1.00,
+     and the only row that was actually owed anything was shrunk to two thirds of a credit. A
+     negative value draws no bar at all, because the scale has one side. */
+  const html = toHTML(parse(['```bar | Owed', 'Ada | Q3 −1,299.00 | ', 'Bo | GBP 2.00 | ', '```'].join(NEWLINE)));
+  const tracks = html.match(/--magnitude:[\d.]+/g) ?? [];
+  assert.deepEqual(tracks, ['--magnitude:1.00'], 'the credit was given a bar and the debt was scaled against it');
+  assert.ok(html.indexOf('--magnitude') > html.indexOf('Q3'), 'the one bar drawn belongs to the row that is owed');
+});
+
 test('a negative row draws no bar, and still shows its number', () => {
   // A proportional chart has one side. Drawing |v| would put money owed to you and money owed by
   // you at the same length, on the same side, which is the reading the sign exists to prevent.
@@ -1042,4 +1103,71 @@ test('and the primitive that declares the grid is the one that carries the rover
   assert.match(src, /role="grid"/u);
   assert.match(src, /moveCell\(at, e\.key, rows\.length, columns\.length\)/u, 'the arrows reach no mover');
   assert.match(src, /\{onkeydown\}/u, 'the grid root binds no key handler');
+});
+
+/* ── the grid's headers, and the body the phone gets ──────────────────────── */
+
+const COLUMN = (over: Partial<Column> = {}): Column => ({ field: 'owed', label: 'Owed', width: '1fr', ...over });
+
+test('A HEADER CLAIMS SORTABILITY ONLY WHERE THERE IS SOMETHING TO PRESS', () => {
+  /* `aria-sort="none"` does not mean "not involved in sorting". It means "sortable, and not the
+     column currently sorted", so it is the attribute that tells a screen-reader user there is a
+     control in this header. It was written on every visible header of every table, and five of
+     the six callers pass no `onsort` at all: a `comparison` block, a shared page, a related list
+     and a saved view each advertised a control that is not there, once per column. */
+  const plain = COLUMN();
+  assert.equal(ariaSort(plain, undefined, false), undefined, 'a table that cannot sort announced a sort control');
+  assert.equal(ariaSort(plain, undefined, true), 'none', 'and a table that can must still say which columns');
+  // A column whose cells are a control has nothing to sort by, which is what `hideLabel` declares.
+  assert.equal(ariaSort(COLUMN({ field: 'select', hideLabel: true }), undefined, true), undefined);
+  // And the header is wired to it, `onsort` included: the rule is only worth having where it runs.
+  assert.match(componentSource('Table'), /aria-sort=\{headerSort\(column\)\}/u, 'the header decides for itself');
+  assert.match(
+    componentSource('Table'),
+    /ariaSort\(column, sort, onsort !== undefined\)/u,
+    'the header is not told whether the table can be sorted at all',
+  );
+});
+
+test('and a column that IS sorted says so, whoever set it', () => {
+  /* The direction is a fact about the list on the screen, not about this header: the register
+     sorts from the URL and withholds `onsort` while it has one row, and that list is still
+     sorted. Silence there would be a second wrong answer in the other direction. */
+  const plain = COLUMN();
+  assert.equal(ariaSort(plain, { field: 'owed', dir: 'asc' }, false), 'ascending');
+  assert.equal(ariaSort(plain, { field: 'owed', dir: 'desc' }, false), 'descending');
+  assert.equal(ariaSort(plain, { field: 'due', dir: 'asc' }, false), undefined, 'another column’s sort is not this one’s');
+  assert.equal(ariaSort(plain, { field: 'due', dir: 'asc' }, true), 'none');
+});
+
+test('A PHONE CARD DRAWS EVERY COLUMN, INCLUDING THE ONES WHOSE CELLS ARE EMPTY', () => {
+  /* The card arm guarded each label-and-value pair on `{#if row.cells[i + 1]}`, so a blank cell
+     took its label with it and the column left the card. A reader cannot tell a column that is
+     empty from a column the table does not have, which is the whole of what the grid arm's
+     missing mark is for and the opposite of the card's own rule: nothing hidden, nothing cut. */
+  const columns = [COLUMN({ field: 'who', label: 'Who' }), COLUMN({ field: 'owed', label: 'Owed' }), COLUMN({ field: 'note', label: 'Note' })];
+  const row: TableRow = { key: 'r1', cells: ['Ada', ''] };
+  assert.deepEqual(cardCells(row, columns).map((c) => [c.column.label, c.value]), [
+    ['Who', 'Ada'],
+    ['Owed', ''],
+    ['Note', null],
+  ]);
+  assert.equal(cardCells(row, columns).length, columns.length, 'a card drew fewer boxes than the table has columns');
+  // `null` and `''` stay apart: a cell the row does not have is missing, a cell left blank is blank.
+  assert.equal(cardCells({ key: 'r2', cells: [] }, columns).every((c) => c.value === null), true);
+});
+
+test('and it draws them the way the caller said to, which is the way the grid does', () => {
+  /* `cellSnippet` is how a caller draws a cell itself: the register's row picker, its identity
+     links, its in-place editor. The card arm never called it, so below 640px every one of those
+     came out as the string behind it. Both arms render one snippet now, and the assertion is that
+     there is exactly one of it: two arms two hundred lines apart is how they came apart before. */
+  const src = componentSource('Table');
+  const cardArm = /\{#snippet card\(row: TableRow\)\}([\s\S]*?)\n\{\/snippet\}/u.exec(src)?.[1] ?? '';
+  assert.notEqual(cardArm, '', 'the card arm is not where this test thinks it is');
+  assert.match(cardArm, /@render cellBody\(/u, 'the card arm draws cells its own way');
+  assert.doesNotMatch(cardArm, /row\.cells\[/u, 'the card arm reads cells past the rule that pairs them with columns');
+  assert.ok((src.match(/@render cellBody\(/gu)?.length ?? 0) >= 2, 'only one arm draws through the shared cell');
+  assert.equal(src.match(/@render cellSnippet\(/gu)?.length, 1, 'a caller’s cell snippet is drawn in one place or in none');
+  assert.equal(src.match(/class="missing"/gu)?.length, 1, 'the missing mark is drawn in one place');
 });

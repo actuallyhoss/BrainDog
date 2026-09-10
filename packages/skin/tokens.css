@@ -135,22 +135,52 @@
     --r-lg: 8px;
 
     /**
-     * NO ELEVATION. Not a soft shadow, not an inset highlight, nothing.
+     * THE RESTING LEVEL OF THE ELEVATION LADDER, and it was `none`.
      *
-     * A card sits flat on the ground and a one-pixel border is its whole boundary. Shadows are how a
-     * flat medium fakes depth it does not have, and once every card has one the screen is a pile of
-     * slightly-floating rectangles. A border is honest and it is also cheaper to read.
+     * IT USED TO SAY "NO ELEVATION. Not a soft shadow, not an inset highlight, nothing", and argued
+     * that a border is honest and shadows are how a flat medium fakes depth. It closed by inviting
+     * "a component that wants elevation" to come and change the line. Sixteen of them had already
+     * asked: `blocks.css` five times, `rows.css`, `RowCards`, `Second`, `/decide` twice,
+     * `/decide/<id>` twice, `/packs`, `/r/<register>/<seq>`, `/settings/<area>` and `/start` all
+     * write `box-shadow: var(--raise)`, and every one of them resolved to nothing.
      *
-     * The token stays, valued `none`, so the rule is stated rather than merely absent — and so a
-     * component that wants elevation has to come and change this line.
+     * AND IT WAS NOT THE PRODUCT'S DECISION TO MAKE. `05 §6` lists the elevation ladder among the
+     * rules a theme is checked against: *"three levels, fixed geometry, alphas per scheme; a theme
+     * has no `shadow` or `elevation` key"*. `28 §1` gives the generator the job. `39 §13 D9` names
+     * it. `28 §4.4` check I refuses a theme whose ladder is not monotonic in both schemes, and
+     * `packages/theme/src/checks.ts:287` implements that refusal. `css.ts:26-28` emits `--e1`,
+     * `--e2` and `--e3` into all twelve scheme blocks of `house.css` and `alpha.css`.
+     *
+     * So the ladder is generated per scheme, validated, shipped, and painted at two of its three
+     * levels: `--e2` on menus, row menus and toasts, `--e3` on sheets and the palette. Level one,
+     * the level a resting card is meant to sit at, was declared, checked, and then overwritten
+     * here with `none`. A generator that computes a value nobody paints is the same defect as a
+     * flag nothing reads, and this one had a paragraph over it explaining that it was on purpose.
+     *
+     * It is `var(--e1)` and not a literal so the value stays the theme's: a record that declares
+     * its own theme gets its own alphas, in both schemes, and forced-colors still deletes all
+     * three, which is why `28 §2` requires the border underneath and every one of those sixteen
+     * rules already has one.
      */
-    --raise: none;
+    --raise: var(--e1);
 
     /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
        never the pixels (13 §4.2). */
     --row-h: 34px;
     --ctl-h: 36px;
     --tap: 44px;
+    /**
+     * THE TAB BAR'S HEIGHT, IN ONE PLACE, because three files were each doing the arithmetic and
+     * two of them got a different answer.
+     *
+     * `TabBar` makes the bar 56 plus the home indicator. `+layout.svelte` reserved
+     * `56px + var(--sp-6)` for it, which is two pixels short on an iPhone 14 and thirty-two too
+     * many on a phone with no indicator. `Toasts` did the sum correctly, and its own comment
+     * records the identical bug being fixed there once already. A number written three times is a
+     * number that drifts.
+     */
+    --tab-h: 56px;
+    --tabbar: calc(var(--tab-h) + env(safe-area-inset-bottom));
     --measure: 72ch;
     --sticky: 52px;
     --rail: 244px;
@@ -199,6 +229,43 @@
 
     /* Open and close are not symmetric. Opening is something you watch; closing is something you
        have already decided about (13 §9). Ceiling 300ms — nothing is longer. */
+    /**
+     * THE TOP OF THE TYPE SCALE HAD NO LINE HEIGHT AND NO TRACKING, WHICH IS WHY NOTHING USED IT.
+     *
+     * `--t-3xl` is 34px and appears in the whole app zero times. `--t-2xl` appears three times,
+     * two of them on `/start`, a screen a person sees once. So the largest type on every screen
+     * somebody actually works in is 24px, four occurrences, and the product reads like a settings
+     * pane: a wall of one size with a little bold in it.
+     *
+     * The reason is mechanical rather than editorial. The ladder stopped at `--lh-tight`, which is
+     * sized for a heading around 20px; a 34px line at that leading with `-0.014em` of tracking
+     * looks loose and slightly wrong, and the fix for one heading is a pair of hand-tuned numbers
+     * nobody wants to write. A step with no leading and no tracking is a step nobody takes.
+     *
+     * These are the two numbers that make the top of the scale usable. They are set the way a
+     * display size wants them: leading just over one, and enough negative tracking that the
+     * letters close up as they get bigger.
+     */
+    --lh-3xl: 1.05;
+    --tr-tight: -0.028em;
+
+    /**
+     * THE PRESS, WHICH FOUR CONTROLS IN THE WHOLE APP HAD.
+     *
+     * A count of `:active` rules across `apps/web/src` returns four. The product it is measured
+     * against has twenty-eight, and every one of them changes two things rather than one.
+     *
+     * TWO PROPERTIES, AND NOT FOR EMPHASIS. `a11y.css` does not soften motion under
+     * `prefers-reduced-motion`, it DELETES it: `transition-duration` is forced to 1ms, so a press
+     * expressed as a scale is not damped for those readers, it is gone. Opacity is a state rather
+     * than a duration and still lands. A control that answers a finger for some readers and not
+     * others is worse than one that never answers, because the ones it ignores cannot tell that
+     * from a tap the product missed.
+     */
+    --press-scale: 0.97;
+    --press-dim: 0.62;
+    --ease-push: cubic-bezier(0.4, 0, 1, 1);
+
     --d-press: 90ms;
     --d-release: 180ms;
     --d-state: 180ms;

@@ -60,8 +60,29 @@ test('AND THE SHAPE OF THE WORD DOES NOT MATTER, but the word does', () => {
 });
 
 test('`the` IS ONLY DROPPED FROM THE FRONT, and only when it is the word', () => {
+  /**
+   * THE SECOND HALF OF THE TITLE HAD NO ASSERTION UNDER IT.
+   *
+   * This test guarded the "only when it is the word" clause with `plain('things')`, and `things`
+   * begins `th` rather than `the`, so the assertion was true by construction and could not have
+   * gone red for the risk it names. Measured against the implementation it was written over, which
+   * stripped the separators before it looked for the article: `theatre` came back `atre`, `themes`
+   * `mes`, `theft` `ft`, `them` `m` and `the` the empty string. No register id and no word on a
+   * tile begins with those three letters today, which is the only reason nothing was broken.
+   */
+  for (const v of ['theatre', 'themes', 'theft', 'them'])
+    assert.equal(plain(v), v, `${v} lost the three letters it starts with`);
+
+  /* AND `the` ALONE IS A WORD RATHER THAN AN ARTICLE IN FRONT OF NOTHING. Folding it to the empty
+     string makes `?add=the` the same input as `?add=`. Both reach the choice list today, and only
+     one of them is still addressable on the day a word on a tile is just *The*. */
+  assert.equal(plain('the'), 'the', 'the bare article came back as the empty string');
+
+  /* THE ARTICLE STILL GOES WHEN THERE IS A WORD BEHIND IT, however the gap is written. */
+  for (const v of ['The estate', 'the-estate', 'the_estate', 'THE ESTATE'])
+    assert.equal(plain(v), 'estate', `?add=${v}`);
+
   assert.equal(plain('things'), 'things', 'a key beginning "th" lost three letters');
-  assert.equal(plain('The estate'), 'estate');
   assert.equal(plain('tasks'), 'tasks');
   assert.equal(plain('people'), 'people');
 });

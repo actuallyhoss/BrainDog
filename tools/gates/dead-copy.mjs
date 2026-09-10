@@ -27,6 +27,17 @@
  *
  * ADDING A KEY TO THIS LIST IS A DECISION, and the diff shows it. Adding a dead key without one is
  * what this gate exists to stop.
+ *
+ * IT READS TWO MODULES NOW, AND THE SECOND ONE IS THE EXAMPLE THREE PARAGRAPHS UP. `first-run.ts`
+ * was split out of `copy.ts` for the bundle's sake: over a kilobyte of prose read by two surfaces,
+ * landing in the entry chunk every screen waits for. The split also put its keys outside this gate,
+ * because the gate read one path, and a sixth dead sentence was sitting in it when that was
+ * noticed. `seeTheListWhy` was replaced by `rowIsThere`, the comment ten lines below it says so,
+ * and the key stayed: named by nothing in the repository, shipped to the browser, rendered nowhere.
+ *
+ * SO THE LIST OF MODULES IS THE THING TO EXTEND, not the one constant. Each entry names the object
+ * it exports, because that is how a use of its keys is written, and the allow-list is qualified the
+ * same way so two modules cannot excuse each other's sentences by accident.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
@@ -36,7 +47,21 @@ import { skipDir } from './lib.mjs';
 
 const ROOT = process.env.BRAINDOG_GATE_ROOT ?? process.cwd();
 const SRC = join(ROOT, 'apps', 'web', 'src');
-const COPY = join(SRC, 'lib', 'copy.ts');
+
+/**
+ * Every module that holds this product's sentences, and the object each one exports.
+ *
+ * `required` IS THE DIFFERENCE BETWEEN THE RULE AND THE TREES THAT TEST IT. A repository with no
+ * `copy.ts` is a repository this gate cannot say anything about, and it exits 3 rather than
+ * reporting a green nothing. `first-run.ts` is a split of that file rather than a second policy, so
+ * its absence is printed and the run goes on: the negative fixtures under `negative/` are two-file
+ * trees that have never had one, and a gate that could only run against the whole app is a gate
+ * whose own test cannot exist.
+ */
+const MODULES = [
+  { object: 'copy', file: 'copy.ts', required: true },
+  { object: 'firstRun', file: 'first-run.ts', required: false },
+].map((m) => ({ ...m, at: join(SRC, 'lib', m.file) }));
 
 /**
  * Keys that are deliberately not rendered, and why.
@@ -45,30 +70,29 @@ const COPY = join(SRC, 'lib', 'copy.ts');
  * thing that lets the next reader tell them apart without re-deriving the whole surface.
  */
 const ALLOWED = new Map([
-  ['askBrainDog', 'CORRECT — 23 §3.1: with no model the assistant is absent, not disabled. The sentence waits.'],
-  ['tagline', 'UNBUILT — the slogan. `apps/site` renders it; the app has no surface that says its own name.'],
-  ['promoted', 'UNBUILT — a suggested page moving into the rail writes nothing yet (29 §2 needs a nav write).'],
-  ['restored', 'UNBUILT — Settings → backups (53 §5.4). No restore control exists.'],
+  ['copy.askBrainDog', 'CORRECT — 23 §3.1: with no model the assistant is absent, not disabled. The sentence waits.'],
+  ['copy.promoted', 'UNBUILT — a suggested page moving into the rail writes nothing yet (29 §2 needs a nav write).'],
+  ['copy.restored', 'UNBUILT — Settings → backups (53 §5.4). No restore control exists.'],
   /* `markAllRead` LEFT THIS LIST WHEN IT GOT A SURFACE, and the gate is what noticed: an excuse that
      outlives its reason is the same defect as a sentence with no renderer, one direction along.
      `marked` is the per-item form and stays — the browser's mark is one instant, not a flag a row. */
-  ['marked', 'UNBUILT — the PER-ROW read mark. Home marks the whole feed with one instant instead.'],
-  ['rankedBy', 'UNBUILT — 19 §6\'s "For You" ordering.'],
-  ['noFilters', 'UNBUILT — the filter bar\'s own empty state; the bar is hidden under 8 rows instead.'],
-  ['displayOptions', 'UNBUILT — the display menu names its sections directly.'],
-  ['saveAsView', 'UNBUILT — a saved view is seeded, never created from the grid.'],
-  ['includesExample', 'UNBUILT — 19 §6 mechanism 2: the example row, marked and deletable in one click.'],
-  ['example', 'UNBUILT — the chip that mark would render.'],
-  ['offline', 'UNBUILT — 19 §6\'s "Offline and stale" surface.'],
-  ['live', 'UNBUILT — same surface.'],
-  ['polling', 'UNBUILT — same surface.'],
-  ['stale', 'UNBUILT — same surface.'],
-  ['saved', 'UNBUILT — same surface.'],
-  ['reloaded', 'UNBUILT — same surface.'],
-  ['stopped', 'UNBUILT — same surface.'],
-  ['screenshotOn', 'UNBUILT — 19 §6\'s screenshot mode.'],
-  ['screenshotOff', 'UNBUILT — same.'],
-  ['appearance', 'UNBUILT — `/settings/[area]` title-cases the area id rather than naming it.'],
+  ['copy.marked', 'UNBUILT — the PER-ROW read mark. Home marks the whole feed with one instant instead.'],
+  ['copy.rankedBy', 'UNBUILT — 19 §6\'s "For You" ordering.'],
+  ['copy.noFilters', 'UNBUILT — the filter bar\'s own empty state; the bar is hidden under 8 rows instead.'],
+  ['copy.displayOptions', 'UNBUILT — the display menu names its sections directly.'],
+  ['copy.saveAsView', 'UNBUILT — a saved view is seeded, never created from the grid.'],
+  ['copy.includesExample', 'UNBUILT — 19 §6 mechanism 2: the example row, marked and deletable in one click.'],
+  ['copy.example', 'UNBUILT — the chip that mark would render.'],
+  ['copy.offline', 'UNBUILT — 19 §6\'s "Offline and stale" surface.'],
+  ['copy.live', 'UNBUILT — same surface.'],
+  ['copy.polling', 'UNBUILT — same surface.'],
+  ['copy.stale', 'UNBUILT — same surface.'],
+  ['copy.saved', 'UNBUILT — same surface.'],
+  ['copy.reloaded', 'UNBUILT — same surface.'],
+  ['copy.stopped', 'UNBUILT — same surface.'],
+  ['copy.screenshotOn', 'UNBUILT — 19 §6\'s screenshot mode.'],
+  ['copy.screenshotOff', 'UNBUILT — same.'],
+  ['copy.appearance', 'UNBUILT — `/settings/[area]` title-cases the area id rather than naming it.'],
 ]);
 
 const files = [];
@@ -115,10 +139,17 @@ const readable = (text) =>
 const sources = new Map();
 for (const f of files) sources.set(f, readable(await readFile(f, 'utf8')));
 
-const copySrc = sources.get(COPY);
-if (!copySrc) {
-  console.log('  dead-copy: no apps/web/src/lib/copy.ts to read');
-  process.exit(3);
+const defined = MODULES.filter((m) => sources.has(m.at));
+for (const m of MODULES) {
+  if (sources.has(m.at)) continue;
+  /* PRINTED RATHER THAN SILENT, both ways. A module this gate cannot find is a set of sentences it
+     is not checking, and the whole subject here is something complete-looking that reports success
+     and does nothing. */
+  if (m.required) {
+    console.log(`  dead-copy: no apps/web/src/lib/${m.file} to read`);
+    process.exit(3);
+  }
+  console.log(`  dead-copy: no apps/web/src/lib/${m.file}, so its sentences are not read`);
 }
 
 /**
@@ -165,20 +196,31 @@ for (const queue = [...routes]; queue.length > 0; ) {
  * widened pattern finds the same 399, which is the point: it costs nothing now, and it is not
  * sitting there waiting to be wrong on the day somebody writes one.
  */
-const keys = [...copySrc.matchAll(/^ {2}(?:['"]([^'"]+)['"]|([A-Za-z_$]\w*))\s*:/gmu)].map((m) => m[1] ?? m[2]);
+const entries = [];
+for (const m of defined)
+  for (const k of sources.get(m.at).matchAll(/^ {2}(?:['"]([^'"]+)['"]|([A-Za-z_$]\w*))\s*:/gmu))
+    entries.push({ ...m, key: k[1] ?? k[2], name: `${m.object}.${k[1] ?? k[2]}` });
+
+/* THE NAME AS A USE OF IT IS WRITTEN, which is what the allow-list and both reports are keyed on.
+   This held a bare key while there was one module to hold, and a bare key across two is a name
+   that means either file: an excuse written for one module's `example` would have covered the
+   other module's dead `example` without anybody deciding it should. */
+const names = entries.map((e) => e.name);
 
 const dead = [];
-for (const key of keys) {
-  const used = new RegExp(String.raw`\bcopy\.${key}\b|\bcopy\[['"]${key}['"]\]`);
+for (const { object, key, at, name } of entries) {
+  const used = new RegExp(String.raw`\b${object}\.${key}\b|\b${object}\[['"]${key}['"]\]`);
   let found = false;
   for (const [f, s] of sources) {
-    if (f === COPY || !reachable.has(f)) continue;
+    /* ITS OWN FILE IS NOT A RENDERER, AND ONLY ITS OWN. The other module is an ordinary file a
+       route reaches, so a key of this one named there is a use like any other. */
+    if (f === at || !reachable.has(f)) continue;
     if (used.test(s)) {
       found = true;
       break;
     }
   }
-  if (!found) dead.push(key);
+  if (!found) dead.push(name);
 }
 
 const unexpected = dead.filter((k) => !ALLOWED.has(k));
@@ -186,35 +228,36 @@ const unexpected = dead.filter((k) => !ALLOWED.has(k));
    too, but it is a different fact and not a failure — and reporting it unscoped would make the
    gate's own negative fixture, whose `copy.ts` has none of these, red for twenty-six reasons that
    are not the seeded one. */
-const revived = [...ALLOWED.keys()].filter((k) => keys.includes(k) && !dead.includes(k));
-const gone = [...ALLOWED.keys()].filter((k) => !keys.includes(k));
+const revived = [...ALLOWED.keys()].filter((k) => names.includes(k) && !dead.includes(k));
+const gone = [...ALLOWED.keys()].filter((k) => !names.includes(k));
 
 /* BOTH SIDES OF THE WALK, PRINTED — because a number a gate does not print is a number nobody
    checks, and the first version of this line counted `copy.ts` on one side and not the other, so a
    two-file fixture reported "3 of 2". If the two ever read the same the reachability walk has
    stopped narrowing anything, which is either good news or a resolver quietly matching nothing, and
    from outside those look identical. */
-const renderers = [...reachable].filter((f) => f !== COPY).length;
+const defs = new Set(defined.map((m) => m.at));
+const renderers = [...reachable].filter((f) => !defs.has(f)).length;
 console.log(
-  `  dead-copy: ${keys.length} sentences, ${dead.length} unrendered (${ALLOWED.size} known), over ${renderers} of ${files.length - 1} files a route reaches`,
+  `  dead-copy: ${names.length} sentences, ${dead.length} unrendered (${ALLOWED.size} known), over ${renderers} of ${files.length - defs.size} files a route reaches`,
 );
 
 if (unexpected.length) {
   console.error('\n  a sentence this product types and nobody reads:');
   for (const k of unexpected)
-    console.error(`      copy.${k} — render it, delete it, or name it in tools/gates/dead-copy.mjs with what it waits for`);
+    console.error(`      ${k} — render it, delete it, or name it in tools/gates/dead-copy.mjs with what it waits for`);
 }
 
 /* AND A KEY THAT CAME BACK TO LIFE LEAVES THE LIST. Otherwise the list grows monotonically and
    stops being a description of the debt — which is the same failure as the strings themselves. */
 if (revived.length) {
   console.error('\n  a known-dead sentence is now rendered, and its excuse is stale:');
-  for (const k of revived) console.error(`      copy.${k} — remove it from ALLOWED in ${relative(ROOT, import.meta.filename)}`);
+  for (const k of revived) console.error(`      ${k} — remove it from ALLOWED in ${relative(ROOT, import.meta.filename)}`);
 }
 
 /* Not a failure: the key is gone, so the debt is paid. Printed so the list shortens rather than
    accumulating excuses for sentences that no longer exist. */
-if (gone.length && keys.length > ALLOWED.size)
-  console.log(`      (${gone.length} allow-listed key(s) no longer in copy.ts: ${gone.join(', ')})`);
+if (gone.length && names.length > ALLOWED.size)
+  console.log(`      (${gone.length} allow-listed key(s) no longer defined: ${gone.join(', ')})`);
 
 if (unexpected.length || revived.length) process.exitCode = 1;

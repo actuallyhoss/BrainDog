@@ -54,13 +54,22 @@
     padding-block-end: env(safe-area-inset-bottom);
   }
 
+  /* THE KEYBOARD TAKES THE BOTTOM OF THE SCREEN AND THIS WAS DRAWN ON TOP OF IT: four dead targets
+     over the keys somebody is using, and `--z-sheet` puts them above the sheet being typed into.
+     There is no length that means "not on screen", which is why this reads the attribute rather
+     than `--kb`: `a11y/keyboard.ts` sets `data-kb` for exactly the readers that have to disappear
+     rather than move. */
+  :global(html[data-kb]) .tabs {
+    display: none;
+  }
+
   .tab {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
-    min-block-size: 56px;
+    min-block-size: var(--tab-h);
     padding: var(--sp-1);
     border: 0;
     background: none;

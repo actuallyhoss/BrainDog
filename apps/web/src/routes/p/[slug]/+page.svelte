@@ -17,7 +17,7 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { silenced } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
   import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
   import { draw, saidPlainly } from '$lib/record/blocks.ts';
   import { registerHref } from '$lib/record/where.ts';
@@ -230,6 +230,10 @@
     const el = document.activeElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
     if (e.metaKey || e.ctrlKey) return;
+
+    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this is the handler the defect
+       was found on, and it was one of six with the same hole. */
+    if (covered()) return;
 
     /* ⇧E toggles the declaration. Shift, not a bare `e`, because bare `e` means edit-in-place
        inside a grid and a key's meaning must be a function of the object in focus rather than of

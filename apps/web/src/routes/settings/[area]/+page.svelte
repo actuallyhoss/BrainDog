@@ -115,6 +115,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Keymap from '$lib/ui/Keymap.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
 
   /* Twelve rows with a glyph each, because this rail's own CSS says it "IS the same thing" as the
@@ -575,6 +576,26 @@
           <button type="button" class="seg" aria-pressed={!chars} data-on={!chars ? '' : undefined} onclick={() => (chars = false)}>{copy.off}</button>
         </div>
       </Section>
+      <!--
+        THE SHEET, ON THE ONE SCREEN THAT CAN STILL REACH IT.
+
+        `keymapOpen` is set in exactly one place, `+layout.svelte`'s `?` branch, and `?` is a single
+        character, so the moment the switch above is pressed Off the app's entire keyboard
+        documentation becomes unreachable. Permanently, and for the reader who used the
+        accessibility control. The palette's nearest row, `c-keys`, lands here on the switch, and
+        there was no menu item and no button anywhere else.
+
+        Silencing `?` is correct under 2.1.4. Having only one opener was not. So the document lives
+        here as well, under the control that governs it, where the marks it now draws on the
+        silenced rows answer the reader's actual question: what did I just turn off.
+
+        `silenced={!chars}` and not the cookie, because `chars` is this page's own state and the
+        cookie is written by the effect below: reading the cookie would show the previous answer
+        until the page reloaded.
+      -->
+      <Section title={copy.keymap}>
+        <Keymap silenced={!chars} />
+      </Section>
     {:else if area === 'navigation'}
       <!--
         THE SWITCH THIS AREA WAS ADDED TO HOLD, and the area shipped without it.
@@ -945,6 +966,10 @@
           <li><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{copy.levelMeans[me.level] ?? me.level}</span></li>
         </ul>
         <p class="hint">{copy.identityOutside}</p>
+        <!-- AND THE WAY TO REACH ANOTHER RECORD, from the area that is about who this one
+             thinks you are. The palette carries the same row; this is the one a person finds
+             without knowing the palette exists. -->
+        <div class="row-actions"><Button href="/signin">{copy.signIn}</Button></div>
       </Section>
 
       <!-- "RECORDS YOU CAN OPEN" OVER TWO ROWS YOU COULD NOT OPEN. A heading that names an action

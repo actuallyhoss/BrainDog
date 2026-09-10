@@ -166,8 +166,14 @@
          indicator the bar is 91px tall and this sat 68px up — 23px of toast over the tab labels,
          and `--z-toast` beats `--z-sheet`, so it painted on top of them. The inset is the same
          number in both places or the two disagree by exactly the height of the indicator. */
-      inset-block-end: calc(56px + var(--sp-3) + env(safe-area-inset-bottom));
+      inset-block-end: calc(var(--tabbar) + var(--sp-3));
       max-inline-size: none;
+    }
+
+    /* AND WITH THE KEYBOARD UP IT SITS WHERE THE BAR WAS. `html[data-kb]` has just removed the
+       bar, so the height this clears is not there any more and the keyboard is. */
+    :global(html[data-kb]) .stack {
+      inset-block-end: calc(var(--kb) + var(--sp-3));
     }
   }
 </style>

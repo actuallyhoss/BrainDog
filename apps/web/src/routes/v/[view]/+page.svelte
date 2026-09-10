@@ -12,7 +12,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { goto } from '$app/navigation';
-  import { silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { page } from '$app/state';
   import { CapLine, Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
@@ -83,6 +83,10 @@
 
   /* `⌥B`, which 50 §5.2 step 9 has specified all along and nothing bound. */
   function onkeydown(e: KeyboardEvent) {
+    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
+       the routes under the shell, and none of them read the overlay depth, so a sheet made of
+       buttons left the page behind it holding its own keyboard. */
+    if (covered()) return;
     if (typing()) return;
     if (e.altKey && e.key.toLowerCase() === 'b' && view) {
       e.preventDefault();

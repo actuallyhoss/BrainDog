@@ -34,7 +34,7 @@
   import { titleOf } from '$lib/title.ts';
   import { day, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { silenced } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, NOW, QUESTIONS } from '$lib/record/api.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { page } from '$app/state';
@@ -86,6 +86,10 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
+       the routes under the shell, and none of them read the overlay depth, so a sheet made of
+       buttons left the page behind it holding its own keyboard. */
+    if (covered()) return;
     /* AND A COMMITTED QUESTION IS AS INERT AS A DECIDED ONE. The guard tested the record and not
        this session, so after a commit the number keys still moved a highlight behind the settled
        block and the commit chord was one field away from firing twice. */

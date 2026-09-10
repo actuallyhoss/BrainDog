@@ -154,6 +154,9 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault' },
   { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs' },
   { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, icon: 'settings' },
+  /* THE FRONT DOOR, WHICH NOTHING LINKED TO. A screen with no way in is the same as no screen,
+     and the palette is `19 §4`'s primary way to reach one. */
+  { id: 'c-signin', title: copy.signIn, href: '/signin', group: copy.destinations, icon: 'lock' },
   /* THE ROUTE THE SHORTCUT TEACHER DID NOT TEACH. `g s` was bound, the `?` sheet advertised it, and
      `/search` appeared in no nav, no tab bar, no More sheet and not here, so typing `sear` found
      nothing, and on a phone the route was reachable only from the palette's overflow row, which is

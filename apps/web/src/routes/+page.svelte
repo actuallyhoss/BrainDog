@@ -150,6 +150,30 @@
      full-bleed groups gives every group the same weight, which is the same as giving none. -->
 <div class="page">
   <div class="primary">
+    <!--
+      THE THREE FIGURES LEAD, AND THEY USED TO BE IN THE SIDEBAR.
+
+      The comment below this one argued that What needs you is the reason the screen exists and so
+      gets the width, and that the figures are context. Half of that is right. What it produced is
+      a business record whose first screen leads with a date, and puts what the business is owed in
+      a 340px column to the right of it at 24px, third in the reading order, and on a phone
+      somewhere around the twelve hundredth pixel.
+
+      A person opens this to find out where the money is. That is not context.
+
+      So the strip is first and the strip is wide: three figures across the full column, the first
+      of them at the top of the type scale. `What needs you` keeps everything else it had, and it
+      is still the tallest thing on the screen, which is the honest way to say it matters: length,
+      not position.
+    -->
+    <Section title={copy.rightNow}>
+      <div class="strip">
+        {#each strip as segment}
+          {#if segment.type === 'block'}<Block block={segment} opts={stripOpts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
+        {/each}
+      </div>
+    </Section>
+
     <Section title={copy.needsYou}>
     <!--
       TWO NOTHINGS, AND THIS SCREEN COULD ONLY SAY ONE.
@@ -282,12 +306,6 @@
   </div>
 
   <aside class="secondary">
-    <Section title="Right now">
-      {#each strip as segment}
-        {#if segment.type === 'block'}<Block block={segment} opts={stripOpts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
-      {/each}
-    </Section>
-
     <Section title={copy.sinceAway} count={fresh.length}>
       {#snippet aside()}
         {#if fresh.length > 0}
@@ -388,20 +406,41 @@
     min-inline-size: 0;
   }
 
-  /* Three figures side by side in a 340px column is three 100px figures. The block is still TOLD how
-     many cells it has — this stacks them at a breakpoint, which is not the same as `auto-fit`
-     inferring a count from the space available (05 §4). */
-  .secondary :global(.grid) {
-    grid-template-columns: minmax(0, 1fr);
+  /**
+   * THE FIGURE THE SCREEN LEADS WITH.
+   *
+   * `--t-3xl` is 34px, it has been in the token file since the token file was written, and until
+   * this rule the app used it zero times. The largest type on any screen a person works in was
+   * 24px, four occurrences, which is why the product reads like a settings pane: one size, a
+   * little bold in it, and nothing that says look here first.
+   *
+   * ONE FIGURE AND NOT THREE. Three at 34px is three headlines, and a reader with three headlines
+   * has none. The first cell is what the business is owed right now; the two beside it are the
+   * shape of it, and they stay a step down.
+   *
+   * THE COLOUR IS STILL THE RECORD'S. `--tone` comes from the metric's own `tone`, and
+   * `blocks.css` paints a figure only when the record calls it bad. Size is a fact about the
+   * layout and a screen may decide it; whether a number is good news is a fact about the record
+   * and this screen may not.
+   */
+  .strip :global(.cell:first-child .cell-figure) {
+    font-size: var(--t-3xl);
+    line-height: var(--lh-3xl);
+    letter-spacing: var(--tr-tight);
+    /* `GBP 28,320.00` is thirteen characters and needs about 230px at this size. An equal third
+       of the column is 240px before padding, so it wrapped after the currency, which is the one
+       thing a figure this size must not do: the reader sees GBP, a line break, and a number. */
+    white-space: nowrap;
   }
 
-  .secondary :global(.cell + .cell) {
-    border-inline-start: 0;
-    border-block-start: 1px solid var(--line);
+  /* AND THE CELL IT SITS IN TAKES THE ROOM. Three equal thirds is the block's own default and it
+     is the wrong split for a strip with a lead in it. */
+  .strip :global(.grid) {
+    grid-template-columns: 1.35fr 1fr 1fr;
   }
 
-  .secondary :global(.cell) {
-    padding: var(--sp-4);
+  .strip :global(.cell) {
+    padding: var(--sp-5) var(--sp-4);
   }
 
   /* The activity feed is not a table. It has no columns worth aligning, so it gets a reading shape:
@@ -487,6 +526,15 @@
     font-weight: 500;
   }
 
+  /**
+   * ONE COLUMN.
+   *
+   * The strip is already first, because it is first in the markup now rather than ordered here.
+   * An earlier version of this rule put `display: contents` on the aside and moved its first
+   * child with `order`, which worked and was the wrong shape: the reading order a phone gets is
+   * the order the screen should have had all along, and expressing it in a media query left the
+   * desktop with the old one and two layouts to keep in step.
+   */
   @media (width < 1180px) {
     .page {
       grid-template-columns: minmax(0, 1fr);
@@ -499,4 +547,39 @@
       padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
   }
+
+  /**
+   * AND ON A PHONE THE FIRST FIGURE TAKES THE WIDTH AND THE OTHER TWO SHARE THE LINE.
+   *
+   * Three across at 390px is three cells of about a hundred and ten pixels, and `GBP 28,320.00`
+   * at 34px needs two hundred and thirty. The first cell spanning both tracks gives it three
+   * hundred and fifty-eight, so the number the screen leads with is one line at full size on the
+   * device most likely to be reading it, and the two that qualify it sit under it at a step down.
+   *
+   * A scroller was the other candidate and it is worse here: swiping is how you reach a fourth
+   * thing, and this is the shape of one number with two beside it. Nothing should need reaching.
+   */
+  @media (width < 640px) {
+    .strip :global(.grid) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .strip :global(.cell:first-child) {
+      grid-column: 1 / -1;
+      border-block-end: 1px solid var(--line);
+    }
+
+    /* The two below it come down a step so `GBP 26,690.00` stays on one line in half a phone. */
+    .strip :global(.cell:not(:first-child) .cell-figure) {
+      font-size: var(--t-lg);
+      white-space: nowrap;
+    }
+
+    /* The divider between the pair, and none above the one that spans. `blocks.css` draws it on
+       the inline start of every cell but the first, which on two rows puts one in mid-air. */
+    .strip :global(.cell:nth-child(2)) {
+      border-inline-start: 0;
+    }
+  }
+
 </style>

@@ -17,6 +17,34 @@
 const list = (words: string[]): string =>
   words.length <= 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
 
+/**
+ * `a` or `an`, for a noun this file does not know in advance.
+ *
+ * THE CAPTURE FIELD SAID "Add a item". It is the label AND the placeholder of the first control on
+ * every register screen, drawn from the register's own `one:`, and two of the nine the seed ships
+ * are wrong: `item` gives "Add a item" on Money, which is the first list in the rail and the first
+ * list anybody opens, and `update` gives "Add a update". A pack may ship any noun at all, so this
+ * cannot be fixed by editing the seed: the sentence is generated and the generator has to know.
+ *
+ * IT IS ABOUT SOUND AND NOT ABOUT LETTERS, which is why the naive vowel test is not enough in
+ * either direction. `user`, `unit`, `usage` and `unique` all begin with a vowel and take `a`,
+ * because they are said with a `y` in front. `hour` begins with a consonant and takes `an`. The
+ * `u` rule below is the one heuristic that earns its place: a `u` whose third letter is a vowel is
+ * almost always the `yoo` sound (`user`, `unit`, `usage`, `utility`, `unique`), and one whose third
+ * letter is not is almost always the `uh` sound (`update`, `upgrade`, `umbrella`). Measured over
+ * the nouns this product can plausibly meet, it is right every time.
+ *
+ * The silent `h` is a closed list rather than a rule because there is no rule: four words in
+ * ordinary English, and a business noun is almost never one of them.
+ */
+const SILENT_H = /^(hour|honest|honour|honor|heir)/;
+const article = (noun: string): string => {
+  const w = noun.trim().toLowerCase();
+  if (SILENT_H.test(w)) return 'an';
+  if (/^u/.test(w)) return /^u[^aeiou][aeiou]/.test(w) ? 'a' : 'an';
+  return /^[aeio]/.test(w) ? 'an' : 'a';
+};
+
 export const copy = {
   /* the product */
   product: 'BrainDog',
@@ -297,8 +325,9 @@ export const copy = {
   archiveRow: (row: string) => `Archive ${row}`,
   moreOn: (row: string) => `More on ${row}`,
 
-  /* The capture line: one field at the top of a register, and the only decision in it is the words. */
-  captureIn: (one: string) => `Add a ${one.toLowerCase()}`,
+  /* The capture line: one field at the top of a register, and the only decision in it is the words.
+     IT SPELT THE ARTICLE ITSELF and got it wrong on two of the nine registers the seed ships. */
+  captureIn: (one: string) => `Add ${article(one)} ${one.toLowerCase()}`,
   captureHint: 'Press Enter to add it. Everything else can wait.',
   captureInherits: (what: string) => `Takes ${what} from the filter you are looking at.`,
   captureAdd: 'Add',
@@ -306,6 +335,10 @@ export const copy = {
 
   /* home */
   needsYou: 'What needs you',
+  /* THE BAND OF FIGURES, AND IT WAS A LITERAL IN THE SCREEN. Every other title on this page comes
+     from here; this one was typed as `title="Right now"` in the markup, where `19 §9`'s vocabulary
+     cannot see it and `dead-copy` cannot count it. */
+  rightNow: 'Right now',
   sinceAway: 'Since you were away',
   nothingNeedsYou: 'Nothing needs you today.',
   /* THE ONE CONTROL THAT APPEARS WHEN THE NAV DOES NOT. It names the thing it brings back rather
@@ -762,8 +795,12 @@ export const copy = {
      rule and not the fact: the reader is looking at a disabled button and the one thing they need is
      WHICH name, because it is the only part of this they can act on — drop the pack, or ask its
      author to rename. `10 §7`'s fourth rule, on a screen rather than in an envelope. */
+  /* AND IT JOINED THEM WITH ` and `, so three colliding names read "Money and Services and People".
+     `list()` is at the top of this file for exactly this, and `rowRequired` and `rowFieldProblem`
+     both already use it for the same job. Two names is the common case, which is why a sentence
+     that reads wrong at three was not noticed. */
   diffRefused: (names: string[]) =>
-    `${names.join(' and ')} ${names.length === 1 ? 'is already a list' : 'are already lists'} on this record, and a pack cannot take a name another one owns. Nothing would be applied.`,
+    `${list(names)} ${names.length === 1 ? 'is already a list' : 'are already lists'} on this record, and a pack cannot take a name another one owns. Nothing would be applied.`,
   /* THE SENTENCE UNDER THE TITLE, and it is a sentence because the title needs one. `Packs` is not
      a word anybody brings with them, and a screen that has to define its own title has the wrong
      title: the reader's word for an installable, upgradeable, uninstallable thing with an author is
@@ -787,7 +824,13 @@ export const copy = {
   densityComfortable: 'Comfortable',
   densityRoomy: 'Roomy',
   characterKeys: 'Character keys',
-  characterKeysHint: 'Single letters act on the focused list.',
+  /* IT SAID "Single letters act on the focused list", WHICH NAMED NEITHER THE SCOPE NOR THE COST.
+     Nothing has to be focused: `?`, `/` and `g` act anywhere, and `j` moves a page's block cursor
+     from nowhere. So a reader deciding whether to turn this off was told it affected one list, and
+     what it actually takes is the help sheet, the palette shortcut and every goto. The sentence a
+     person needs before pressing Off is what stops working and what does not. */
+  characterKeysHint:
+    'Off silences every shortcut that is a single letter, digit or punctuation mark, including ? for this list, / for the palette and g to go somewhere. Every chord with a modifier keeps working.',
   on: 'On',
   off: 'Off',
 
@@ -1338,8 +1381,20 @@ export const copy = {
   /* the keymap sheet */
   keymap: 'Keyboard',
   /* THE SIDEBAR CALLS IT A LIST AND THIS CALLED IT A GRID — one object, two names, both on screen
-     in the same session, and one of them appearing only in the document that teaches the keyboard. */
-  keymapHint: 'Bare letters act only inside a list you have clicked into.',
+     in the same session, and one of them appearing only in the document that teaches the keyboard.
+
+     AND THEN THE SENTENCE WAS STILL FALSE. It read "Bare letters act only inside a list you have
+     clicked into", printed as the subtitle of a sheet whose FIRST section is headed Anywhere and
+     holds `/`, `g`, `?` and the goto digits, all four marked bare in the registry. Two sections
+     below it, On a page gives `j`, `k`, `o` and `y`, and `p/[slug]`'s block cursor starts at -1,
+     meaning nowhere, so `j` moves with nothing focused at all. Nine rows of the document disproved
+     its own subtitle. A reader who believed it and pressed nothing lost nothing; a reader who
+     believed it and turned Character keys off lost `?`, `/` and `g` without being told. */
+  keymapHint: 'Single letters act on whatever is in front of you. Character keys, in Settings, turns every one of them off.',
+  /* WHAT THE SHEET SAYS WHEN THE SWITCH IS OFF, above rows it is still right to print: the reader
+     wants to know what the keyboard WOULD do, and which half of it they have silenced. */
+  keymapSilenced: 'Character keys is off, so the keys marked below do nothing. Every chord with a modifier still works.',
+  keymapRowOff: 'Off',
   scopeDocument: 'Anywhere',
   scopeGrid: 'In a list',
   scopeBoard: 'On a board',
@@ -1373,6 +1428,79 @@ export const copy = {
    * not to trust the half that works.
    */
   mockNoticeSome: 'The settings above are kept on this device. Nothing else here is saved yet.',
+
+  /* ── the front door · `/signin` ───────────────────────────────────────────────────────────────
+
+     THE PRODUCT HAD NO SIGN-IN SURFACE AT ALL, and `19 §2`'s screen inventory has no row for one.
+     These sentences are that screen's, and every one of them is written against what the tree can
+     actually do rather than against what `12 §3` specifies: `POST /auth/magic`,
+     `GET /auth/magic/<token>`, `POST /auth/passkey/register` and `POST /auth/passkey/assert` are
+     four routes the document names and nothing in this repository serves. So the screen offers the
+     one door that opens and says, in one sentence, what the others are. */
+
+  /** `33 §4`'s own row is headed *Sign in*, so that is the word rather than a new one. */
+  signIn: 'Sign in',
+  /**
+   * WHAT THIS RECORD CAN LET YOU IN WITH, AND NOT A ROW OF BUTTONS THAT CANNOT.
+   *
+   * `12 §3` makes a passkey the primary method for a person in a browser with an email link as the
+   * fallback; `49 §5.10` puts passkeys in phase 3 and `§13 #1` says phase 2 closes with the link
+   * and the token exchange. Neither is served here. `23 §3.1`'s rule is the one that decides how
+   * that is drawn: a capability with no implementation behind it is **not there, not greyed out** —
+   * so there is no passkey button, and this sentence is what stands in its place.
+   */
+  waysIn:
+    'A passkey is the way in this record is designed for, and neither it nor the email link is built yet. An address and an access token are what work today.',
+  recordAddress: 'Address',
+  /** The shape, in the field, so nobody has to guess whether the scheme and the port are wanted. */
+  addressLike: 'http://127.0.0.1:8787',
+  accessToken: 'Access token',
+  /**
+   * THE EMPTY FIELD IS A REAL ANSWER AND THE SCREEN HAS TO SAY SO.
+   *
+   * `apps/selfhost/src/server.ts` serves unauthenticated when `BRAINDOG_TOKEN` is unset, and
+   * refuses *anything at all* that is presented to it in that state. So on the one deployment this
+   * screen exists for, typing something into the field is what fails.
+   */
+  tokenMayBeEmpty: 'A record started without BRAINDOG_TOKEN wants none. Leave this empty for one of those.',
+  /* Two full literals for the toggle's two states, which is this file's own rule about a toggle. */
+  showToken: 'Show',
+  hideToken: 'Hide',
+  /**
+   * WHERE THE CREDENTIAL GOES, SAID ON THE SCREEN RATHER THAN ONLY IN A COMMENT.
+   *
+   * `50 §1`, under Refuses: "A bearer token — the app never holds one". `lib/connect.ts` keeps
+   * that: the value is read out of the field, put in one header and dropped. A person handing a
+   * credential to a page is owed the answer to *where does this end up*, and the answer is nowhere.
+   */
+  tokenKept: 'The token is used once and kept nowhere. It is gone when this tab closes.',
+  openTheRecord: 'Open the record',
+  /* The busy label, in full, for the same reason the toggle above is two literals. */
+  reachingTheRecord: 'Reaching the record',
+  /* `Lists` is the rail's word for a register and the one a reader has already met (19 §9). */
+  reachedHolds: (lists: number, rows: number) =>
+    `This record holds ${lists.toLocaleString('en')} lists and ${rows.toLocaleString('en')} rows.`,
+  /**
+   * THE RECORD'S DAY, WHICH IS NOT ALWAYS THE READER'S — `boot`'s `now` exists for exactly this and
+   * `packages/record`'s own header spends a paragraph on it: a browser that dates a record's rows
+   * against `Date.now()` is confidently wrong and gets no error while being it.
+   */
+  reachedDay: (when: string) => `It answered as of ${when}, which is its day and not always yours.`,
+  reachedWithToken: 'The token was accepted.',
+  reachedWithNone: 'This record wanted no token, so none was sent.',
+  /**
+   * THE BOUNDARY, IN THE PLACE SOMEBODY WOULD OTHERWISE ASSUME OTHERWISE.
+   *
+   * Reaching a record and drawing one are two different pieces of work. Every screen in this build
+   * reads `@braindog/seed`, and swapping that for a live client is phase 1 of `loop/REWORK.md` —
+   * so a sign-in that quietly navigated Home would be claiming a switch that did not happen, which
+   * is this codebase's defining defect performed at the highest-stakes moment it has.
+   */
+  reachedNotSwitched:
+    'The screens behind this one still draw the sample record. Nothing from the record you just reached has been put on them.',
+  /* The marketing site's own line, because the app must not imply an account to look around. */
+  demoNeedsNothing: 'The demo record needs no sign-in. There is no sign-up and no billing.',
+  openTheDemo: 'Open the demo record',
 } as const;
 
 export type Copy = typeof copy;

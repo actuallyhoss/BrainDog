@@ -26,8 +26,15 @@ export async function load({ url }) {
      the rail. So there is one destination, and this is what sends people to it.
 
      `/s/<token>` IS EXEMPT because it is a capability URL: it renders one projected page, read-only,
-     and must not imply there is a record behind it at all. */
-  if (index.index.registers.length === 0 && url.pathname !== '/start' && !url.pathname.startsWith('/s/'))
+     and must not imply there is a record behind it at all.
+
+     `/signin` IS EXEMPT FOR THE OPPOSITE REASON. It is the screen a person opens when the record
+     in front of them is not the one they want, and an empty record is the likeliest moment to
+     want another: sending it to onboarding answers a question nobody asked and takes away the one
+     control that could have fixed it. The seed always ships registers, so this cannot bite today
+     and would bite the first hour a real empty record existed. */
+  const spared = url.pathname === '/start' || url.pathname === '/signin' || url.pathname.startsWith('/s/');
+  if (index.index.registers.length === 0 && !spared)
     redirect(307, '/start');
 
   return { ...index, inbox: INBOX.length };

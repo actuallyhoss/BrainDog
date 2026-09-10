@@ -70,6 +70,32 @@
     min-block-size: 34px;
   }
 
+  /**
+   * AND UNDER A THUMB THE ROW IS 44, WHICH IS THE ONE `13 §7` NUMBER THIS FILE NEVER PAID.
+   *
+   * `.line` is 38 and `.line-short` is 34, and `.line` is the tap target on Home, `/decide`,
+   * `/audit`, `/inbox`, `/vault`, `/packs` and `/jobs/<id>` — seven screens. `/decide` already
+   * writes `min-block-size: 44px` by hand inside its own `@media (width >= 640px)` guard, which is
+   * one screen fixing a rule that belongs to the row.
+   *
+   * THE POINTER AND NOT THE WIDTH, which is why it was invisible. Below 640 a row is a two-line
+   * card and measures 83 to 166px, so `layout.mjs` finds nothing and is right not to; the gate
+   * runs its target rule below 640 only. The 38px row is what a coarse pointer gets ABOVE that
+   * breakpoint, which is a tablet, and nothing has ever measured one. `05 §6`: density follows the
+   * pointer, and `--ctl-h` in `tokens.css` already goes to 44 in this exact condition.
+   *
+   * THE INTERACTIVE ONES ONLY. A `.line` is a link, a button or neither, and growing a row nobody
+   * can press is a density change rather than a target fix.
+   */
+  @media (pointer: coarse) {
+    a.line,
+    button.line,
+    a.line-short,
+    button.line-short {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* The id is a COLUMN, not a badge. These are strings a person says out loud, so they line up the
      way line numbers line up in a ledger — one fixed width, one face, one quiet ink. */
   /* A ROW, because the id may be preceded by a type glyph. `Icon` renders a block-level `svg`, so
@@ -175,21 +201,35 @@
       white-space: normal;
     }
 
-    /* AND THE ID COLUMN SIZES TO WHAT IS IN IT. `.seq` is a fixed monospace track that a card gives
-       whatever is left over — 20px at 320, which is two characters of `braindog`. On a card it is a
-       line of its own rather than a column competing with one. */
-    .seq {
-      grid-column: 1 / -1;
-      min-inline-size: max-content;
-    }
-
     .line {
       grid-template-columns: minmax(0, 1fr) auto;
       gap: var(--sp-1) var(--sp-3);
     }
 
+    /**
+     * THE ID COLUMN SIZES TO WHAT IS IN IT, AND IT SHARES THE TOP LINE WITH THE AMOUNT.
+     *
+     * `.seq` was declared TWICE in this block, eight lines apart. The first asked for
+     * `grid-column: 1 / -1` under a comment claiming the id becomes "a line of its own rather than
+     * a column competing with one"; the second asked for `grid-column: 1`, and the second won, so
+     * the paragraph described a layout that has never shipped.
+     *
+     * THE SECOND ONE IS RIGHT AND THE PARAGRAPH WAS WRONG. Measured on Home at 390 with the first
+     * declaration forced to win: `.seq` does not become the top line, it lands at y+123, BELOW the
+     * date, and the card grows from 142.5px to 146.5px. The reason is placement rather than taste
+     * — `.line-amount` already holds row 1 column 2 and `.line-main` holds row 2 across both
+     * columns, so a full-width `.seq` with no row of its own is auto-placed past all of them. A
+     * card whose id is printed under its date is not a line of its own, it is a stray.
+     *
+     * So the card is: id and amount on the first line, the title and its detail across the second,
+     * the date on the third. `min-inline-size: max-content` is what keeps the id off the flexible
+     * track's floor — that half of the old comment was true and is kept. Anything longer than a
+     * spoken id goes in a span that ellipsises, which is the contract stated on `.seq` itself
+     * above and which `/inbox` keeps with `.host`.
+     */
     .seq {
       grid-column: 1;
+      min-inline-size: max-content;
     }
 
     .line-main {

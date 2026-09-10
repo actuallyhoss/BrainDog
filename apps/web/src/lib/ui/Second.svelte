@@ -122,7 +122,11 @@
     padding: var(--sp-4);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
-    background: var(--raise);
+    /* `background: var(--raise)` — a SHADOW token in a background property, which computed to
+       `none` while `--raise` was `none` and so looked deliberate. It wants the raised surface, and
+       that is `--s1`, which is what every other card in the product sits on. */
+    background: var(--s1);
+    box-shadow: var(--raise);
     color: inherit;
     font: inherit;
     text-align: start;

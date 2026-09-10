@@ -62,6 +62,60 @@ export function chunkRows<T>(rows: readonly T[], size: number): { step: number; 
   return { step, groups };
 }
 
+/**
+ * What a column header announces about sorting, which for most of them is NOTHING.
+ *
+ * `aria-sort="none"` WAS ON EVERY VISIBLE HEADER OF EVERY TABLE. It does not mean "this column is
+ * not involved in sorting"; it means "this column is sortable and is not the one currently
+ * sorted", so it is the attribute that tells a screen-reader user there is a control here to
+ * press. Five of the six callers of `Table` pass no `onsort` at all and the sixth passes one only
+ * once it has two rows to put in an order, so on a `comparison` block, a shared page, a related
+ * list and a saved view, every heading advertised a control that does not exist and the reader
+ * spent the keystrokes finding out. The register's own call site had already written the sentence
+ * down, *"eight header buttons over a single row, each announcing `aria-sort="none"`"*, as the
+ * reason it withholds `onsort`, and withholding it did not withhold the claim.
+ *
+ * A COLUMN THAT IS SORTED STILL SAYS SO. The direction is a fact about the list the reader is
+ * looking at and is true whether or not the control that set it is this header: a host can sort
+ * from a URL, which is exactly what the register does with one row. So `undefined` is only for the
+ * case where there is no sort on this column AND no way to ask for one.
+ *
+ * Here rather than in the component for the reason `moveCell` is here: it is a decision with an
+ * answer, and an attribute that is absent is not visible in a rendered tree.
+ */
+export function ariaSort(
+  column: Column,
+  sort: { field: string; dir: 'asc' | 'desc' } | undefined,
+  sortable: boolean,
+): 'ascending' | 'descending' | 'none' | undefined {
+  /* A column whose cells are a control is never sortable, and `hideLabel` is already the declaration
+     for that, and it is the same one the header reads to decide it has no visible name. */
+  if (column.hideLabel) return undefined;
+  if (sort?.field === column.field) return sort.dir === 'asc' ? 'ascending' : 'descending';
+  return sortable ? 'none' : undefined;
+}
+
+/**
+ * Every column of a row, paired with the value the phone card draws for it.
+ *
+ * THE CARD DROPPED A CELL WHOSE VALUE WAS EMPTY. `{#if row.cells[i + 1]}` guarded each label-and-
+ * value pair, so a blank cell took its label with it and the column vanished from the card
+ * entirely, and a reader cannot tell a column that is empty from a column that is not there.
+ * The grid arm of the same component draws the record's own missing mark in that box and the
+ * card's own header says why it must: *"EVERY COLUMN, LABELLED … nothing hidden, nothing cut."*
+ * `13 §10` is that a declaration decides what a card shows; dropping a pair for the value that
+ * happens to be in it is the renderer deciding, once per row, differently each time.
+ *
+ * `?? null` AND NOT `?? ''`, because those are two different facts and the cell body draws them
+ * differently: a cell the row does not have is missing and gets the mark, a cell the author left
+ * blank is blank. It is the same reading the grid arm takes, so the two arms cannot disagree.
+ */
+export const cardCells = (
+  row: TableRow,
+  columns: readonly Column[],
+): { column: Column; value: string | null }[] =>
+  columns.map((column, i) => ({ column, value: row.cells[i] ?? null }));
+
 /** Where the caret is, in data rows and columns. The header is not a row it can be on. */
 export type Cell = { row: number; col: number };
 

@@ -26,12 +26,30 @@
  * `suggestPages`, while four real fields went unmentioned. The file written to catch an excuse that
  * outlives its reason had grown one of its own.
  *
- * `Pref` holds eleven: `scheme`, `text`, `density`, `theme`, `sidebar`, `chars`, `suggestPages`,
- * `seen`, `columns`, `nav`, `defined`. This covers six — `text`, `density`, `scheme`, `sidebar`,
- * `nav` and `suggestPages` — which is everything a page LOAD can settle. `suggestPages` joined the
- * type after this file had spent a paragraph excusing itself from covering a field the type did not
- * have; it is covered now, on the load, because turning it off empties a list. The other five each
- * need something a fixture cannot do by loading a URL:
+ * AND THEN IT DRIFTED AGAIN, WHICH IS THE PART WORTH READING. This paragraph said `Pref` holds
+ * ELEVEN and then named them, leaving out `contrast`, `sampleSaid` and `railShut`; it said "this
+ * covers six" while `CASES` below held seven, because `contrast` was given a case and the sentence
+ * a screen above it was not touched. Twice is not bad luck. A hand-written enumeration of a type,
+ * sitting a screen away from the list it describes, drifts every time somebody edits one of the two
+ * and not the other, and left as prose it would do it a third time.
+ *
+ * SO THE PARAGRAPH IS NO LONGER THE AUTHORITY AND THE TYPE IS. The check below `CASES` reads
+ * `pref.ts` as text, the way every gate in this directory reads TypeScript, and is red when a
+ * `Pref` field is in neither `CASES` nor `EXCUSED`, and red again when either of those names a
+ * field the type no longer has. `sampleSaid` was the first kind and `previewDismissed` was the
+ * second; one check catches both, and what follows is a description of its answer rather than the
+ * record it is kept in.
+ *
+ * `Pref` holds fourteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `chars`,
+ * `suggestPages`, `seen`, `columns`, `nav`, `defined`, `sampleSaid`, `railShut`. Nine are covered
+ * here: `text`, `density`, `scheme`, `contrast`, `sidebar`, `suggestPages`, `nav`, `sampleSaid` and
+ * `railShut`, which is everything a page LOAD can settle. `suggestPages` joined the type after this
+ * file had spent a paragraph excusing itself from covering a field the type did not have; it is
+ * covered now, on the load, because turning it off empties a list. `sampleSaid` and `railShut`
+ * arrived later still and were measured by nothing and excused by nothing, which is the hole the
+ * derived check exists to close: both are settled by a load exactly the way `sidebar` is, one
+ * taking an `<aside>` out of `#main` and the other folding a section of the rail. The other five
+ * each need something a fixture cannot do by loading a URL:
  *
  *   - `theme`   an accent is chosen by pressing a swatch, and the difference is a palette rather
  *               than one token. **A duplicate swatch that repainted nothing lived here for months**
@@ -46,7 +64,7 @@
  */
 
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 
@@ -61,7 +79,7 @@ const PORT = budget('prefs').port;
 /**
  * WHEN A PROBE IS ALLOWED TO BE BELIEVED, and for this gate that is a question about false REDS.
  *
- * Four of the seven cases read the record: `text` measures a grid cell, `suggestPages` counts
+ * Six of the nine cases read the record: `text` measures a grid cell, `suggestPages` counts
  * `#main .ledger li`, `nav` joins the rail's hrefs. Over a screen that has not drawn, all three
  * settings come back `no element`, `0` and `''`, the values are identical, and this gate prints
  * exactly the sentence it is named for: a preference that reached the cookie and not the page. The
@@ -80,11 +98,6 @@ const TYPES = {
   '.woff2': 'font/woff2',
   '.json': 'application/json',
 };
-
-if (!(await stat(ROOT).catch(() => null))) {
-  console.log('  prefs: no build to check. `pnpm build` first, and CI does.');
-  process.exit(3);
-}
 
 /**
  * What to set, where to look, and what has to differ.
@@ -180,7 +193,126 @@ const CASES = [
     values: [{}, { nav: ['/p/portage', '/p/kiln', '/p/marlow-co'] }],
     probe: () => [...document.querySelectorAll('nav.rail a[data-nav]')].map((a) => a.getAttribute('href')).join(' '),
   },
+  {
+    /**
+     * `sampleSaid`: the bar saying this is somebody else's company, and the way out of it.
+     *
+     * MEASURED BY NOTHING AND EXCUSED BY NOTHING, which is the state `contrast` was in three cases
+     * above and for the same reason: this list is hand-written, so a preference nobody adds a case
+     * for is a preference nobody measures. It is not even one of the hard ones. The dismissal is a
+     * boolean the shell reads before the screen draws and the bar is an `<aside>` inside `#main`,
+     * so a cookie and a URL settle it exactly the way they settle `sidebar`.
+     *
+     * THE ELEMENT AND NOT THE SENTENCE. Probing for the copy would compare two strings `dead-copy`
+     * already guards, and would come back the same on a bar that is present and empty; what the
+     * preference does is take the node out of the document, so the node is what is counted.
+     */
+    name: 'sampleSaid',
+    what: 'whether the sample bar is in the page',
+    route: '/',
+    /* `undefined` is "not yet put away", which is what a first visit is, so the two values are
+       "unset" and `true` rather than `true` and `false`. */
+    values: [{}, { sampleSaid: true }],
+    probe: () => String(document.querySelectorAll('#main aside.sample').length),
+  },
+  {
+    /**
+     * `railShut`: thirty-four items of navigation, and the heading somebody folded away.
+     *
+     * THE OTHER ONE NOTHING MEASURED, and the one of the two where a lazy probe would lie. Folding
+     * writes `data-shut` and `inert` on the group and leaves every anchor in the DOM, so a probe
+     * that counted rail links would report "no change" about a control that works. `sidebar` names
+     * the same trap two cases up and answers it with the rendered width.
+     *
+     * SO THE HEADINGS AND NOT THE LINKS. The fold is a button carrying the section's own name, and
+     * `aria-expanded` is what it writes, so this comes back as the name of every section that is
+     * folded and as the empty string when none is.
+     */
+    name: 'railShut',
+    what: 'which rail sections are folded (19 §3)',
+    route: '/',
+    /* `Money` BECAUSE `/` IS NOT IN IT. A section holding the screen you are looking at is never
+       shut, deliberately, so a case that folded the section containing its own route would measure
+       that exception rather than the preference. */
+    values: [{}, { railShut: ['Money'] }],
+    probe: () =>
+      [...document.querySelectorAll('nav.rail .fold[aria-expanded="false"]')]
+        .map((b) => (b.textContent ?? '').replace(/\s+/g, ' ').trim())
+        .join(' '),
+  },
 ];
+
+/**
+ * WHO IS MEASURING EACH PREFERENCE, READ OFF THE TYPE RATHER THAN OFF THE PARAGRAPH AT THE TOP.
+ *
+ * That paragraph enumerated `Pref` by hand and was wrong twice, the second time about the length of
+ * the list directly beneath it. So it is not what this gate trusts any more. `pref.ts` is read as
+ * text, which is how every gate in this directory reads TypeScript: `closed-lists` walks SQL out of
+ * a migration, `event-kinds` walks an array out of `events.ts`, `dead-copy` takes `copy.ts`'s keys
+ * off a two-space indent. A parser would be a second thing that can be wrong.
+ *
+ * BOTH DIRECTIONS, BECAUSE THE DRIFT HAS GONE BOTH WAYS. A field the type gained and this file
+ * never noticed is `sampleSaid`; a name this file kept after the type dropped it is
+ * `previewDismissed`. Neither is findable by reading one of the two lists on its own.
+ *
+ * AND AN EMPTY PARSE IS RED, NOT SILENT. `flags.mjs` next door pays for the same lesson: "a parse
+ * that returns an empty list is a gate that goes green having read no declarations at all, which is
+ * the one failure mode this directory exists to stop."
+ */
+const EXCUSED = new Set(['theme', 'chars', 'seen', 'columns', 'defined']);
+
+const prefSrc = (await readFile(join(REPO, 'apps', 'web', 'src', 'lib', 'pref.ts'), 'utf8')).replace(/\r\n/g, '\n');
+const prefOpens = prefSrc.indexOf('export type Pref = {');
+const prefCloses = prefOpens < 0 ? -1 : prefSrc.indexOf('\n};', prefOpens);
+const FIELDS =
+  prefOpens < 0 || prefCloses < 0
+    ? []
+    : [...prefSrc.slice(prefOpens, prefCloses).matchAll(/^ {2}([A-Za-z]\w*)\??:/gm)].map((m) => m[1]);
+
+const drift = [];
+if (!FIELDS.length)
+  drift.push(
+    'Pref could not be read out of apps/web/src/lib/pref.ts, so no preference here was checked against the type.\n' +
+      '        The parse wants `export type Pref = {`, one field per line at two spaces, and `};` on its own.',
+  );
+else {
+  const measured = new Set(CASES.map((c) => c.name));
+  for (const field of FIELDS)
+    if (!measured.has(field) && !EXCUSED.has(field))
+      drift.push(
+        `${field} is a Pref field with no case and no excuse, so nothing asks whether it changes anything.\n` +
+          '        Add a case above, or name it in EXCUSED with what a fixture cannot do by loading a URL.',
+      );
+  for (const name of [...measured, ...EXCUSED])
+    if (!FIELDS.includes(name))
+      drift.push(
+        `${name} is named here and Pref no longer has it, which is how previewDismissed outlived the type.\n` +
+          '        Take it out of CASES or out of EXCUSED, whichever is holding it.',
+      );
+}
+
+/* NOT UNDER EITHER OF THE HEADINGS AT THE BOTTOM, for the reason written beside them: "a preference
+   that reaches the cookie and not the page" is a claim about the app and this is a claim about this
+   file, and a reader who cannot tell them apart fixes the wrong one. */
+const sayDrift = () => {
+  console.error('\n  a preference this file has stopped accounting for:');
+  for (const line of drift) console.error(`      ${line}`);
+};
+
+/**
+ * AND THE BUILD IS CHECKED FOR AFTER THE TYPE IS, WHICH IS THE ONE ORDERING THAT LOSES NOTHING.
+ *
+ * This block used to sit above `CASES`, so a tree with no `build/` exited 3 before anything had
+ * read `pref.ts`, and the drift this file exists to stop was invisible on exactly the runs a person
+ * does at their desk. `flags.mjs` states the rule: "a finding found by reading source is a real
+ * answer, and reporting it as a skip would lose it." Whether the list matches the type has nothing
+ * to do with whether anybody has run a build.
+ */
+if (!(await stat(ROOT).catch(() => null))) {
+  if (drift.length) sayDrift();
+  console.log('  prefs: no build to check. `pnpm build` first, and CI does.');
+  process.exit(drift.length ? 1 : 3);
+}
 
 const server = createServer(async (req, res) => {
   const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
@@ -262,9 +394,12 @@ await browser.close();
 server.close();
 
 console.log(
-  `  prefs: ${checked} page-runs over ${CASES.length} preferences, ${findings.length} finding(s)` +
+  `  prefs: ${checked} page-runs over ${CASES.length} of Pref's ${FIELDS.length} preferences, ` +
+    `${findings.length + drift.length} finding(s)` +
     (unsettled.length ? `, ${unsettled.length} load(s) on a page that never drew` : ''),
 );
+
+if (drift.length) sayDrift();
 
 if (findings.length) {
   console.error('\n  a preference that reaches the cookie and not the page:');
@@ -282,7 +417,7 @@ if (unsettled.length) {
 /**
  * AND A RUN WHERE NO SCREEN DREW IS RED even when every case came back distinct.
  *
- * Three of the seven cases read tokens off `documentElement` and `body`, which `app.html` sets from
+ * Three of the nine cases read tokens off `documentElement` and `body`, which `app.html` sets from
  * the cookie before first paint and which are true of an empty document as well as a full one. Those
  * three would pass over a product that drew nothing at all, so the aggregate is what keeps a clean
  * `prefs` run from meaning less than it says.
@@ -290,4 +425,4 @@ if (unsettled.length) {
 const blind = ready.nothingDrawn();
 if (blind) console.error(`\n  ${blind}`);
 
-if (findings.length || unsettled.length || blind) process.exitCode = 1;
+if (findings.length || unsettled.length || blind || drift.length) process.exitCode = 1;

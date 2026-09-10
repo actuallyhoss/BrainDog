@@ -48,7 +48,18 @@ export type Degraded = {
 export type Segment = Markdown | Block | Degraded;
 
 const FENCE = /^(`{3,}|~{3,})(.*)$/;
-const INFO = /^(?<kind>[a-z]+)(?:\s*\|\s*(?<heading>.*))?$/;
+/**
+ * The info string: a kind word, then optionally `|` and a heading.
+ *
+ * THE KIND WORD IS READ IN ANY CASE AND ACCEPTED IN ONE. `[a-z]+` was the class here, so an info
+ * string with a capital in it did not match this pattern AT ALL, neither the kind half nor the
+ * heading half, and ` ```Stat ` fell through to the branch for a fence with no kind and was told
+ * *"A fence with no kind is shown as you wrote it."* The author had written a kind. They had
+ * written the shift key as well, and nothing on the screen said so, so the sentence sent them
+ * looking for the thing they had already done. When the author is an agent the visible fence is
+ * the only feedback channel there is, which makes the sentence the whole value of a degradation.
+ */
+const INFO = /^(?<kind>[A-Za-z]+)(?:\s*\|\s*(?<heading>.*))?$/;
 
 /** Split on `|` AFTER unescaping, so `\|` is a literal pipe and `\\` a literal backslash. */
 export function splitRow(line: string): string[] {
@@ -218,15 +229,40 @@ export function parse(src: string): Segment[] {
     const end = endOf(close);
     const raw = src.slice(start, end);
     const parsed = INFO.exec(info);
-    const kind = parsed?.groups?.kind ?? '';
+    /* WHAT THEY WROTE AND WHAT IT WOULD BE, kept apart, because the two of them are two different
+       sentences. The kind is matched case-insensitively so the word can be recognised, and it is
+       still only ACCEPTED in lower case: the dialect has one spelling per kind, `raw` is the bytes
+       the author typed, and a fence that says `Stat` while the record says `stat` is the same
+       figure written two ways, which `format.ts` opens by saying is two figures. */
+    const written = parsed?.groups?.kind ?? '';
+    const kind = written.toLowerCase();
 
     if (!isKind(kind)) {
       out.push({
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
-        fix: kind
-          ? `"${kind}" is not one of the sixteen kinds. The block is shown as you wrote it.`
+        fix: written
+          ? `"${written}" is not one of the sixteen kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
+        raw,
+        info,
+        start,
+        end,
+      });
+      i = close;
+      continue;
+    }
+
+    /* A CAPITAL IS A FAULT WITH A NAME, and it was reported as the absence of a kind. It degrades
+       rather than being quietly accepted for the reason above, and it names the spelling to write,
+       because a degradation that does not say what to do next is a stop rather than a step. It is
+       checked before `pageOnly` so that each sentence is about one thing: fix the case, and the
+       next render says whether the kind belongs in a fence at all. */
+    if (written !== kind) {
+      out.push({
+        type: 'degraded',
+        code: 'DIALECT_KIND_UNKNOWN',
+        fix: `"${written}" is a kind, but kinds are lower case. Write "${kind}". The block is shown as you wrote it.`,
         raw,
         info,
         start,

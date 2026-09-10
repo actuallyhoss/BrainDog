@@ -273,3 +273,88 @@ test('AND A CURSOR AND AN ORDER ARE ONE QUERY OR THE OTHER', async () => {
   assert.equal((sorted as { value: { cursor: string | null } }).value.cursor, null);
   sql.close();
 });
+
+/* ── the six the record keeps for itself, through a real register ────────── */
+
+test('A `where:` AND AN `order:` MAY NAME THE RECORD’S OWN FIELDS, and every one was FIELD_UNKNOWN', async () => {
+  /**
+   * `02 §6` makes `id seq state created_at updated_at version` addressable in any `where:` without
+   * a register declaring them. `schemaOf` hands the grammar the declared fields and nothing else,
+   * so `created_at after -7d`, which is *rows added this week*, was a refusal from a register that
+   * keeps a `created_at` column on every row of itself. `order:` had the same hole with one
+   * exception cut into it by hand: `o.field !== 'seq'`, one name of the six, spelt twice.
+   *
+   * IT IS DRIVEN THROUGH A REAL RECORD because the sort and the filter both have to reach a real
+   * column. A `created_at` compiled as `json_extract(fields, '$.created_at')` is NULL on every row,
+   * which sorts as the default order with extra steps and filters as a clause matching nothing:
+   * both look like a working query.
+   */
+  const { k, sql } = await record();
+
+  const recent = k.list({ register: 'obligations', where: { field: 'created_at', after: '2020-01-01T00:00:00.000Z' } });
+  assert.equal(recent.ok, true, (recent as { refusal?: { fix: string } }).refusal?.fix);
+  assert.equal((recent as { value: { matched: number } }).value.matched, 3);
+
+  /* AND THE OTHER DIRECTION ANSWERS NOTHING, so the clause is being read rather than ignored. */
+  const old = k.list({ register: 'obligations', where: { field: 'created_at', before: '2020-01-01T00:00:00.000Z' } });
+  assert.equal((old as { value: { matched: number } }).value.matched, 0);
+
+  /* AND AS A SENTENCE, which is the form a person and an agent write and the form a page prints. */
+  const said = k.list({ register: 'obligations', where: 'created_at after 2020-01-01' });
+  assert.equal(said.ok, true, (said as { refusal?: { fix: string } }).refusal?.fix);
+  assert.equal((said as { value: { matched: number } }).value.matched, 3);
+
+  const bySeq = k.list({ register: 'obligations', where: { field: 'seq', gt: 1 } });
+  assert.equal((bySeq as { value: { matched: number } }).value.matched, 2);
+
+  /* THE SORT TAKES THEM TOO, and `seq` was the only one it took. */
+  const sorted = k.list({ register: 'obligations', order: [{ field: 'created_at', dir: 'asc' }, { field: 'seq', dir: 'asc' }] });
+  assert.equal(sorted.ok, true, (sorted as { refusal?: { fix: string } }).refusal?.fix);
+  assert.deepEqual(
+    (sorted as { value: { rows: { fields: Record<string, unknown> }[] } }).value.rows.map((r) => r.fields.what),
+    ['Small', 'Large', 'Middle'],
+  );
+
+  /* AND A NAME THAT IS STILL UNKNOWN TEACHES THE WHOLE VOCABULARY, `38 §6`'s sentence for it. */
+  const nope = k.list({ register: 'obligations', order: [{ field: 'nonesuch' }] });
+  assert.equal((nope as { refusal: { code: string } }).refusal.code, 'FIELD_UNKNOWN');
+  for (const name of ['created_at', 'seq', 'id', 'updated_at', 'version'])
+    assert.ok(
+      ((nope as { refusal: { allowed?: readonly string[] } }).refusal.allowed ?? []).includes(name),
+      `${name} is missing from the refusal`,
+    );
+  sql.close();
+});
+
+test('AND A PREDICATE OVER THE STATE READS THE MIRRORED COLUMN, which `02 §1` settles in bold', async () => {
+  /**
+   * `02 §1` asks what `{ field: state, is: open }` compiles against, says that for a state machine
+   * this is not a detail but the whole thing, and answers: the COLUMN. It compiled against the
+   * JSON, and the answers were right anyway, because the write path stores the state in both
+   * places. What was lost is the reason the exception was granted, `entry_state`, which no
+   * predicate this record emitted could use.
+   *
+   * THE TWO HALVES ARE DESYNCHRONISED HERE ON PURPOSE, because that is the only way to see WHICH
+   * one is read while both agree. It is not a contrived state either: `02 §1`'s second reason for
+   * the mirror is that a person can open the file with `sqlite3` and ask it questions, and the
+   * column is what such a person writes to.
+   *
+   * WHICH FIELD IS MIRRORED COMES FROM THE DECLARATION AND NOT FROM THE WORD. This register names
+   * `state`, one of the shipped registers names `lane`, and a register may declare an enum called
+   * `state` and name no state at all, in which case the column is NULL on every row of it and
+   * reading it would match nothing.
+   */
+  const { k, sql } = await record();
+  const before = k.list({ register: 'obligations', where: { field: 'state', is: 'paid' } });
+  assert.equal((before as { value: { matched: number } }).value.matched, 0);
+
+  sql.exec("UPDATE entry SET state = 'paid' WHERE register = 'obligations' AND seq = 1");
+
+  const after = k.list({ register: 'obligations', where: { field: 'state', is: 'paid' } });
+  assert.equal(
+    (after as { value: { matched: number } }).value.matched,
+    1,
+    'the predicate read the JSON, so the column the record mirrors for exactly this is decoration',
+  );
+  sql.close();
+});

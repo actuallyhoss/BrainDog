@@ -284,6 +284,39 @@
       gap: var(--sp-3);
     }
 
+    /**
+     * AND THE ROW IT WRAPS TO WAS THE WRONG ONE.
+     *
+     * Wrapping fixed the 472px overflow and left the order alone, so a phone got the brand and two
+     * text links on the first line and *Open the app* alone on the second, hard against the left
+     * edge. The one control this site exists to be pressed was the widest thing on the header, in
+     * the corner a thumb reaches last, under two links to pages nobody came for.
+     *
+     * Brand left, the call to action right, the links on their own line beneath. Same two rows,
+     * same height, and the primary action is where every phone in the world puts one.
+     *
+     * `order` and not a second markup, because the reading order is right already: a screen reader
+     * and a keyboard still meet the brand, then the navigation, then the action, which is the
+     * order the source has and the order `bar-in` gives every wider screen.
+     */
+    .brand {
+      order: 1;
+    }
+
+    .cta {
+      order: 2;
+      margin-inline-start: auto;
+    }
+
+    .links {
+      order: 3;
+      flex-basis: 100%;
+      /* The first link's own padding, pulled back so its text starts on the brand's left edge
+         rather than one step in from it. It also cancels the `auto` that pushes the links right
+         on every wider screen. */
+      margin-inline-start: calc(var(--sp-3) * -1);
+    }
+
     .foot-in {
       flex-wrap: wrap;
       gap: var(--sp-6);

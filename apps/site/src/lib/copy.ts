@@ -66,11 +66,29 @@ export const site = {
 
   hero: {
     title: 'Give your business a memory',
+    /**
+     * THE FOUR THINGS WERE ALWAYS A LIST AND WERE SET AS A PARAGRAPH.
+     *
+     * Every word here is the word it was. What changed is the shape: on a phone at 390px the one
+     * paragraph ran to eight lines between the headline and the button, and a reader met the
+     * promise, then a wall, then the action. Four short sentences that are plainly four items of
+     * one list were the middle six of those lines, and prose is the one setting in which a list
+     * cannot be scanned.
+     *
+     * `lead` states the problem, `knows` is the evidence, `body` is what the product does about
+     * it. Three beats, and only the middle one is long, which is the beat a reader is allowed to
+     * skim.
+     */
+    lead: 'A company knows a great deal that never reaches its codebase.',
+    knows: [
+      'What it is owed and by whom.',
+      'What renews on Tuesday.',
+      'Which key opens which account.',
+      'Who decided the thing nobody can remember deciding.',
+    ],
     body:
-      'A company knows a great deal that never reaches its codebase. What it is owed and by whom. ' +
-      'What renews on Tuesday. Which key opens which account. Who decided the thing nobody can ' +
-      'remember deciding. BrainDog keeps all of it in one database instead: typed, append-only, ' +
-      'and readable by every agent you use.',
+      'BrainDog keeps all of it in one database instead: typed, append-only, and readable by ' +
+      'every agent you use.',
     /* `Open the demo record` AND IT WAS `Start a record`, which started no record. This is the
        largest control on the site and it is drawn twice; the route it opens is the first-run
        screen, and the row somebody types there is marked `Not saved` and dropped with the tab,
@@ -335,6 +353,14 @@ export const site = {
         links: [
           { label: 'Pricing', href: '/pricing' },
           { label: 'Changelog', href: '/changelog' },
+          /* THE FOOTER AND NOT THE HEADER. The page above it says there is no sign-up and no
+             billing, and the two buttons in the hero open the demo: a sign-in control beside them
+             would contradict the sentence a reader has just been given. Somebody who already has
+             a record knows they have one and looks at the bottom of the page for the way in.
+
+             A literal and not `${APP}/signin`, because `APP` is declared below `site` in this
+             module and a template here reads it before it exists. */
+          { label: 'Sign in', href: 'https://app.brain.dog/signin' },
         ],
       },
       {

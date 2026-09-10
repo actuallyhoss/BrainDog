@@ -80,29 +80,62 @@ await new Promise((r) => server.listen(PORT, r));
 await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
 
-for (const scheme of ['light', 'dark']) {
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    deviceScaleFactor: 2,
-    colorScheme: scheme,
-    // No entrance animations racing the shutter, and no motion in a still image anyway.
-    reducedMotion: 'reduce',
-  });
-  const page = await context.newPage();
+/**
+ * AND A PHONE, WHICH IS THE HALF THAT WAS MISSING.
+ *
+ * These went out at 2880 by 1800 into a box that is 358px wide on a phone. That is a twelve per
+ * cent scale, so the app's 15px body text renders at 1.9 pixels and every screenshot on the site
+ * is a grey texture. Six of the nine sections of the home page argue "look at this screen", and on
+ * the device most people arrive on there was nothing to look at.
+ *
+ * The fix is not a bigger box, because there is no bigger box on a phone. It is a photograph of
+ * the product AS A PHONE DRAWS IT: 390 by 844 into 358px is a ninety-two per cent scale, the type
+ * is the size the type is, and the picture is also the truthful one, because a person reading the
+ * marketing site on a phone is deciding whether to open the app on a phone.
+ *
+ * `deviceScaleFactor: 3` on the narrow one and 2 on the wide, which is what those two classes of
+ * device actually have, so neither is soft.
+ *
+ * `isMobile` IS DELIBERATELY NOT SET. It would give the page a coarse pointer, and this product
+ * changes control SIZE on the pointer rather than on the width (`05 §6`), so the screenshots would
+ * show 44px controls to a laptop reader looking at the wide capture next to them. Width decides
+ * layout here; the narrow capture is a narrow window, which is exactly what the app treats a phone
+ * as.
+ */
+const SIZES = [
+  { suffix: '', width: 1440, height: 900, scale: 2 },
+  { suffix: '-phone', width: 390, height: 844, scale: 3 },
+];
 
-  for (const shot of SHOTS) {
-    await page.goto(`http://localhost:${PORT}${shot.route}`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
-    // The same reason both other scripts do it: an off-screen rowgroup photographs empty.
-    await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-    if (shot.act) await shot.act(page);
-    await page.waitForTimeout(300);
-    const file = join(OUT, `${shot.name}-${scheme}.png`);
-    await page.screenshot({ path: file });
-    console.log(`  static/shots/${shot.name}-${scheme}.png`);
+for (const size of SIZES)
+  for (const scheme of ['light', 'dark']) {
+    const context = await browser.newContext({
+      viewport: { width: size.width, height: size.height },
+      deviceScaleFactor: size.scale,
+      colorScheme: scheme,
+      // No entrance animations racing the shutter, and no motion in a still image anyway.
+      reducedMotion: 'reduce',
+    });
+    const page = await context.newPage();
+
+    for (const shot of SHOTS) {
+      await page.goto(`http://localhost:${PORT}${shot.route}`, { waitUntil: 'networkidle' });
+      await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+      // The same reason both other scripts do it: an off-screen rowgroup photographs empty.
+      await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+      /* AND THE ACT IS THE LAPTOP'S. `arrange` presses a control that a phone lays out somewhere
+         else or not at all, and a shot whose setup silently failed is a picture of the screen
+         before the thing it is meant to be showing. It is skipped rather than guessed at, and the
+         phone falls back to the wide capture for that one. */
+      if (shot.act && size.suffix === '') await shot.act(page);
+      if (shot.act && size.suffix !== '') continue;
+      await page.waitForTimeout(300);
+      const file = join(OUT, `${shot.name}${size.suffix}-${scheme}.png`);
+      await page.screenshot({ path: file });
+      console.log(`  static/shots/${shot.name}${size.suffix}-${scheme}.png`);
+    }
+    await context.close();
   }
-  await context.close();
-}
 
 await browser.close();
 server.close();

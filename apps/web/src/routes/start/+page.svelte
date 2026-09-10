@@ -21,7 +21,7 @@
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { addKey } from '$lib/start.ts';
-  import { silenced } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
   import Define from '$lib/ui/Define.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -71,6 +71,10 @@
 
   function key(e: KeyboardEvent) {
     if (picked !== null || e.metaKey || e.ctrlKey || e.altKey) return;
+    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. This screen draws no sheet of its own, and
+       the shell's palette opens over every route: `1` to `5` moved the highlight behind it. See
+       `covered`, which six route handlers needed and none of them had. */
+    if (covered()) return;
     /* AND THE SWITCH, WHICH THIS SCREEN ALONE DID NOT HONOUR. `Character keys: off` is the app's
        stated WCAG 2.1.4 mechanism (`19 §4`) and `1`–`5` here are bare letters by any reading. Every
        other bare-key handler in the product asks; the first screen anybody sees did not. */

@@ -18,8 +18,25 @@
  * stays because a tile beginning with *the* is a tile somebody will write again.
  */
 
-/** Letters and digits only, with a leading `the` dropped — so `the-services`, `The Services` and `services` are one word. */
-export const plain = (v: string): string => v.toLowerCase().replace(/[^a-z0-9]+/g, '').replace(/^the/, '');
+/**
+ * Letters and digits only, with a leading `the` dropped when it is a word of its own, so
+ * `the-services`, `The Services` and `services` are one word.
+ *
+ * IT USED TO STRIP THE SEPARATORS FIRST AND `^the` SECOND, and by the time the article was looked
+ * for the gap that made it an article was gone. Measured: `theatre` came back `atre`, `themes`
+ * `mes`, `theft` `ft`, `them` `m`. Nothing was broken while no register id and no word on a tile
+ * began with those three letters, and the test guarding it asked about `things`, which begins `th`
+ * and could not have failed. The two steps are the other way round now and the article has to be
+ * followed by a gap, so a pack shipping *Theatre* or *Themes* is addressable and `?add=the-estate`
+ * still reaches the same word as `?add=estate`.
+ *
+ * AND `the` ON ITS OWN SURVIVES AS `the`. There is no noun after it to qualify, and folding it to
+ * the empty string would make `?add=the` the same input as `?add=`, which is a different thing
+ * somebody typed. Both get the choice list today; only one of them stays addressable on the day a
+ * tile says *The*.
+ */
+export const plain = (v: string): string =>
+  v.toLowerCase().replace(/^[^a-z0-9]*the(?=[^a-z0-9])/, '').replace(/[^a-z0-9]+/g, '');
 
 /**
  * The register a parameter names, or `undefined` when it names nothing.

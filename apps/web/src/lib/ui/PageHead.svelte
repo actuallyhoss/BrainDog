@@ -226,8 +226,12 @@
 
   @media (width < 900px) {
     .head {
-      /* The palette launcher is a fixed header button at this width, so the title clears it. */
-      padding: var(--sp-3) var(--sp-3) var(--sp-2);
+      /* The palette launcher is a fixed header button at this width, so the title clears it.
+         AND THE NOTCH. `app.html` sets `viewport-fit=cover`, so at scroll top the `h1` of every
+         screen in the product was behind the status bar. Padding rather than an inset, so the
+         head's own translucent blurred background fills the notch strip the way a native screen
+         does, and so it costs nothing on a device where the inset is zero. */
+      padding: calc(var(--sp-3) + env(safe-area-inset-top)) var(--sp-3) var(--sp-2);
       padding-inline-end: 56px;
     }
 

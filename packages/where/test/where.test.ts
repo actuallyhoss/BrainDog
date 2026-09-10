@@ -11,13 +11,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { compile, evaluate, jsonPath, parseWhere, type Predicate, type Schema } from '../src/index.ts';
+import { compile, evaluate, fieldSql, fieldSqlIn, jsonPath, parseWhere, type Predicate, type Schema } from '../src/index.ts';
 
 /** The record's clock, fixed, so a sentence carrying a relative word is a sentence about one day. */
 const NOW = Date.UTC(2026, 8, 5, 12);
 
 const SCHEMA: Schema = {
   register: 'obligations',
+  /* THE REGISTER SAYS WHICH FIELD IS ITS LIFECYCLE, which is what makes the mirrored column
+     readable. Going by the name would be wrong in both directions, and `Schema.state`'s paragraph
+     in the source has the two cases from the shipped seed. */
+  state: 'state',
   fields: {
     what: { type: 'text' },
     amount: { type: 'money' },
@@ -32,26 +36,49 @@ const SCHEMA: Schema = {
   },
 };
 
-type Row = { id: string; fields: Record<string, unknown> };
+/**
+ * A ROW IS ITS COLUMNS AND ITS `fields`, AND THIS FIXTURE USED TO BE ONLY THE SECOND HALF.
+ *
+ * `02 §6` makes six names addressable in any `where:` without a register declaring them, five of
+ * which live in COLUMNS of `entry` rather than in the JSON blob beside them, and `state` lives in
+ * both. A fixture with no columns can assert nothing about any of the six, which is how
+ * `created_at after -7d` came to be a `FIELD_UNKNOWN` that no test here noticed: the differential
+ * below could only ever compare the questions the fixture was able to hold.
+ */
+type Fielded = { id: string; fields: Record<string, unknown> };
+type Row = Fielded & {
+  seq: number;
+  state: string | null;
+  created_at: string;
+  updated_at: string;
+  version: number;
+};
 
 const ROWS: Row[] = [
-  { id: 'a', fields: { what: 'Invoice 41 — brand', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', n: 3, state: 'open', tags: ['urgent', 'design'], effort: { value: 2, unit: 'days' }, at: '2026-08-01T11:57:00.000Z' } },
-  { id: 'b', fields: { what: 'Retainer, August', amount: { amount: 24_000, currency: 'GBP' }, due: '2026-10-01', n: 9, state: 'paid', tags: ['retainer'], at: '2026-08-02T00:00:01.000Z' } },
-  { id: 'c', fields: { what: 'Hosting', amount: { amount: 24_000, currency: 'EUR' }, due: '2026-09-05', n: 0, state: 'part', tags: [] } },
-  { id: 'd', fields: { what: 'No amount at all', state: 'open' } },
-  { id: 'e', fields: { what: '50% deposit', amount: { amount: 100_000, currency: 'GBP' }, due: '2026-12-31', n: 1, state: 'open', tags: ['deposit'] } },
+  { id: 'a', seq: 1, state: 'open', created_at: '2026-08-01T09:00:00.000Z', updated_at: '2026-08-03T09:00:00.000Z', version: 2, fields: { what: 'Invoice 41 — brand', amount: { amount: 48_000, currency: 'GBP' }, due: '2026-08-01', n: 3, state: 'open', tags: ['urgent', 'design'], effort: { value: 2, unit: 'days' }, at: '2026-08-01T11:57:00.000Z' } },
+  { id: 'b', seq: 2, state: 'paid', created_at: '2026-08-02T09:00:00.000Z', updated_at: '2026-08-04T09:00:00.000Z', version: 5, fields: { what: 'Retainer, August', amount: { amount: 24_000, currency: 'GBP' }, due: '2026-10-01', n: 9, state: 'paid', tags: ['retainer'], at: '2026-08-02T00:00:01.000Z' } },
+  { id: 'c', seq: 3, state: 'part', created_at: '2026-09-01T09:00:00.000Z', updated_at: '2026-09-02T09:00:00.000Z', version: 1, fields: { what: 'Hosting', amount: { amount: 24_000, currency: 'EUR' }, due: '2026-09-05', n: 0, state: 'part', tags: [] } },
+  { id: 'd', seq: 4, state: 'open', created_at: '2026-09-04T09:00:00.000Z', updated_at: '2026-09-04T09:00:00.000Z', version: 1, fields: { what: 'No amount at all', state: 'open' } },
+  { id: 'e', seq: 5, state: 'open', created_at: '2026-09-05T09:00:00.000Z', updated_at: '2026-09-05T09:00:00.000Z', version: 3, fields: { what: '50% deposit', amount: { amount: 100_000, currency: 'GBP' }, due: '2026-12-31', n: 1, state: 'open', tags: ['deposit'] } },
 ];
 
-/** The same rows, in SQLite, so `compile` can be run against them for real. */
+/**
+ * The same rows, in SQLite, so `compile` can be run against them for real.
+ *
+ * THE COLUMNS AND THE INDEX ARE `migrations/0001_kernel.ts`'s, copied rather than invented: a test
+ * that asserts a predicate reads the mirrored `state` column against a table with no such column
+ * is asserting about a table nobody has.
+ */
 function db() {
   const d = new DatabaseSync(':memory:');
-  d.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, fields TEXT, deleted_at TEXT)');
+  d.exec(
+    'CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, seq INTEGER, fields TEXT, state TEXT, version INTEGER, created_at TEXT, updated_at TEXT, deleted_at TEXT)',
+  );
+  d.exec('CREATE INDEX entry_state ON entry(register, state) WHERE deleted_at IS NULL');
   for (const row of ROWS)
-    d.prepare('INSERT INTO entry (id, register, fields, deleted_at) VALUES (?, ?, ?, NULL)').run(
-      row.id,
-      'obligations',
-      JSON.stringify(row.fields),
-    );
+    d.prepare(
+      'INSERT INTO entry (id, register, seq, fields, state, version, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)',
+    ).run(row.id, 'obligations', row.seq, JSON.stringify(row.fields), row.state, row.version, row.created_at, row.updated_at);
   return d;
 }
 
@@ -64,8 +91,11 @@ const bySql = (where: Predicate | undefined): string[] => {
   return out.map((r) => r.id);
 };
 
+/* THE WHOLE ROW, NOT JUST ITS `fields`. A kernel field is a column, so an evaluator handed only the
+   JSON cannot answer a question about one, and answering `false` would make this differential pass
+   while the two renderings disagreed about every row. See `evaluate`'s fourth argument. */
 const byJs = (where: Predicate | undefined): string[] =>
-  ROWS.filter((r) => evaluate(where, r.fields, SCHEMA)).map((r) => r.id);
+  ROWS.filter((r) => evaluate(where, r.fields, SCHEMA, r)).map((r) => r.id);
 
 /** Both renderings, and they must agree — which is the whole point of there being one grammar. */
 const both = (where: Predicate | undefined): string[] => {
@@ -512,7 +542,9 @@ test('AND `empty` IS THE THREE WAYS A VALUE IS ABSENT, because an import carries
  * test above it, which is how a fixture stops being a fixture and becomes a thing you edit to make
  * tests pass.
  */
-const ODD: Row[] = [
+/* AND IT CARRIES NO COLUMNS, because none of the questions asked of it is about one: this set is
+   about a scalar arriving where a list belongs, which is entirely a fact about `fields`. */
+const ODD: Fielded[] = [
   /* A SCALAR WHERE A LIST BELONGS. This is what an import leaves behind: the `.dog` reader writes
      `fields` without coercing them, so a record that held `tags` as a string arrives holding one. */
   { id: 'imported', fields: { what: 'Imported', tags: 'urgent', open: true } },
@@ -861,4 +893,159 @@ test("A `none:` KEEPS THE ROWS WITH NOTHING IN THE FIELD, and SQL dropped every 
      something: a row with nothing in the field is not a match for a value. */
   assert.ok(!both({ field: 'due', is: '2026-08-01' }).includes('d'));
   assert.ok(!both({ field: 'due', in: ['2026-08-01', '2026-10-01'] }).includes('d'));
+});
+
+/* ── the `in` chunk ──────────────────────────────────────────────────────── */
+
+test('AN `in:` GOES OUT IN CHUNKS OF SIXTY-FOUR, and it used to be one unbounded OR chain', () => {
+  /**
+   * `34 §1.10`'s limits table, `02 §6`'s operator table and `38 §5` step 3 all publish the same
+   * number and nothing implemented it: a 250-value `in:` compiled to a single OR chain of 250
+   * terms. Three documents describing a shape the compiler does not emit is the drift this suite
+   * exists to catch, and the shape is the part a grammar can promise. An unbounded OR chain is an
+   * unbounded expression tree, and expression depth is the one Durable Object ceiling `30 §13`
+   * leaves unguarded, on the argument that the compiler's output is bounded by construction.
+   *
+   * IT IS NOT ABOUT THE PARAMETER COUNT, and the assertion below says so out loud. `38 §5` step 3
+   * and `38 §7` are both explicit that chunking does not lower the total, and `38 §4.4` is explicit
+   * that this function is not the layer that owes the ceiling: *"`compile` neither counts nor
+   * refuses; `params.length` is on the result."* The hundred is the adapter's (`33 §1`), and the
+   * count being on the result is what lets a caller see it.
+   */
+  const values = Array.from({ length: 130 }, (_, i) => `t${i}`);
+  const c = compile({ field: 'what', in: values }, SCHEMA);
+  assert.deepEqual(c.bad, [], c.bad[0]?.fix);
+
+  /* 130 becomes 64, 64 and 2, which is `38 §5` step 3's own worked example. */
+  const groups = c.sql.match(/\(\(json_extract\(fields, '\$\.what'\) = \?\)(?: OR \(json_extract\(fields, '\$\.what'\) = \?\))*\)/g) ?? [];
+  assert.deepEqual(
+    groups.map((g) => (g.match(/= \?/g) ?? []).length),
+    [64, 64, 2],
+    `the emitted shape is ${c.sql.slice(0, 140)}`,
+  );
+
+  /* AND THE COUNT IS UNCHANGED AND STILL ON THE RESULT, which is the half a caller reads. */
+  assert.equal(c.params.length, 130);
+
+  /* `not_in` CHUNKS THE OTHER WAY: each slice negated, the slices ANDed. De Morgan, so the rows do
+     not move and only the shape does. */
+  const n = compile({ field: 'what', not_in: values }, SCHEMA);
+  assert.deepEqual(n.bad, []);
+  assert.equal((n.sql.match(/NOT \(/g) ?? []).length, 3, `the emitted shape is ${n.sql.slice(0, 140)}`);
+  assert.equal(n.params.length, 130);
+
+  /* ONE SLICE IS THE STRING THIS BRANCH ALWAYS PRODUCED, so nothing short changed shape. */
+  assert.equal(
+    compile({ field: 'state', in: ['open', 'part'] }, SCHEMA).sql,
+    '(state IS NOT NULL AND ((state = ?) OR (state = ?)))',
+  );
+});
+
+test('AND CHUNKING MOVES NO ROWS, which is the only thing a shape change may not do', () => {
+  /* A list that crosses a chunk boundary and holds one value the fixture actually has: if the
+     slices were joined with the wrong word, or a slice were dropped, this is where it shows. */
+  const filler = Array.from({ length: 70 }, (_, i) => `nothing-${i}`);
+  assert.deepEqual(both({ field: 'what', in: [...filler, 'Hosting', ...filler] }), ['c']);
+  assert.deepEqual(both({ field: 'what', not_in: [...filler, 'Hosting', ...filler] }), ['a', 'b', 'd', 'e']);
+});
+
+/* ── the six the record keeps for itself ─────────────────────────────────── */
+
+test('`state` READS THE MIRRORED COLUMN, and the index it was mirrored for was used by nothing', () => {
+  /**
+   * `02 §1` raises the question, says that for a state machine it is not a detail but the whole
+   * thing, and settles it in bold: `state` is mirrored, and the predicate compiles against the
+   * COLUMN. `34 §1.2` and `38 §5.1` restate it. `fieldSql` had no exception in it, so every leaf
+   * read `json_extract(fields, '$.state')`.
+   *
+   * THE ANSWERS WERE ALREADY RIGHT, which is why this asserts about the SQL and not about the
+   * rows: the write path stores `state` in both places, so the JSON read returned the same value.
+   * What it could not do is use `entry_state`, and `EXPLAIN QUERY PLAN` is the only witness to
+   * that. `migrations/0001_kernel.ts` has created that index since the first migration.
+   */
+  assert.equal(fieldSqlIn(SCHEMA, 'state'), 'state');
+  /* AND ONLY FOR THE REGISTER THAT MIRRORS IT. A register that declares an enum called `state` and
+     names no state at all leaves the column NULL on every row, and reading it would match nothing
+     where the JSON holds the answer. `fieldSql` alone, which is handed a name and no register,
+     cannot tell the two apart and does not try. */
+  assert.equal(fieldSqlIn({ register: SCHEMA.register, fields: SCHEMA.fields }, 'state'), "json_extract(fields, '$.state')");
+  assert.equal(fieldSql('state', 'enum'), "json_extract(fields, '$.state')");
+  const c = compile({ field: 'state', is: 'open' }, SCHEMA);
+  assert.equal(c.sql, '(state IS NOT NULL AND state = ?)');
+
+  const d = db();
+  const plan = d
+    .prepare(`EXPLAIN QUERY PLAN SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND ${c.sql}`)
+    .all('obligations', ...(c.params as never[])) as { detail: string }[];
+  d.close();
+  assert.ok(
+    plan.some((p) => p.detail.includes('entry_state')),
+    `the planner did not reach entry_state: ${plan.map((p) => p.detail).join(' | ')}`,
+  );
+});
+
+test('THE RECORD OWNS FIVE FIELDS A `where:` MAY NAME, and every one of them was FIELD_UNKNOWN', () => {
+  /**
+   * `02 §6`: *"Six kernel fields are addressable in any `where:` and any aggregation without being
+   * declared: `id seq state created_at updated_at version`."* `34 §1.2` and `38 §4.3` item 13 say
+   * it again, with the types. The schema the kernel builds is the declared fields and nothing
+   * else, so `created_at after -7d`, which is *rows added this week*, was `FIELD_UNKNOWN` on every
+   * register in the product.
+   *
+   * `both()` IS THE ASSERTION AND NOT `bySql`, and that is the whole difficulty of this one. The
+   * in-memory rendering is handed a row's `fields`, and these five live in COLUMNS beside it. A
+   * name the compiler can read and the evaluator cannot is the two-languages failure this package
+   * exists to prevent, so an implementation that taught only the SQL side would pass a test
+   * written with `bySql` and fail this one.
+   */
+  assert.deepEqual(both({ field: 'created_at', after: '2026-08-15T00:00:00.000Z' }), ['c', 'd', 'e']);
+  assert.deepEqual(both({ field: 'created_at', before: '2026-08-15T00:00:00.000Z' }), ['a', 'b']);
+  assert.deepEqual(both({ field: 'seq', gt: 3 }), ['d', 'e']);
+  assert.deepEqual(both({ field: 'seq', in: [1, 5] }), ['a', 'e']);
+  assert.deepEqual(both({ field: 'version', gte: 3 }), ['b', 'e']);
+  assert.deepEqual(both({ field: 'updated_at', is: '2026-09-05' }), ['e']);
+  assert.deepEqual(both({ field: 'id', in: ['a', 'c'] }), ['a', 'c']);
+  assert.deepEqual(both({ field: 'id', present: true }), ['a', 'b', 'c', 'd', 'e']);
+
+  /* THEY READ COLUMNS, and not a path into the JSON, which is where a row does not keep them. */
+  assert.equal(
+    compile({ field: 'created_at', after: '2026-01-01T00:00:00.000Z' }, SCHEMA).sql,
+    '(created_at IS NOT NULL AND created_at > ?)',
+  );
+
+  /* AND THE REFUSAL FOR A NAME THAT IS STILL UNKNOWN TEACHES THE WHOLE VOCABULARY, which is
+     `38 §6`'s sentence for it: a suggestion list without them says they do not exist. */
+  const nope = compile({ field: 'nope', is: 'x' }, SCHEMA);
+  assert.equal(nope.bad[0]?.code, 'FIELD_UNKNOWN');
+  for (const name of ['id', 'seq', 'created_at', 'updated_at', 'version'])
+    assert.ok((nope.bad[0]?.allowed ?? []).includes(name), `${name} is missing from the refusal`);
+});
+
+test('AND ASKING THE IN-MEMORY RENDERING ABOUT A COLUMN WITHOUT THE ROW IS A BUG IN THE CALLER', () => {
+  /**
+   * The alternative was to answer `false`, and it is worse than the `FIELD_UNKNOWN` it replaced.
+   * A refusal is visible and a `false` about every row is not, and this rendering is what a rule
+   * runs mid-write while `compile` is what the list behind it runs: the two answering differently
+   * about one row is the disagreement nobody can reproduce. `jsonPath` near the top of the
+   * source makes the same call for the same reason and states it: a backstop that returns a value
+   * can be ignored.
+   */
+  assert.throws(
+    () => evaluate({ field: 'created_at', after: '2026-01-01T00:00:00.000Z' }, ROWS[0]!.fields, SCHEMA),
+    /column of the row/,
+  );
+  /* NESTED TOO, because `any:` stops at its first true child: a check made where the leaf is read
+     would fire on some rows and not on others, and an exception that depends on the data is worse
+     than either answering or refusing. */
+  assert.throws(
+    () => evaluate({ any: [{ field: 'state', is: 'open' }, { field: 'seq', gt: 1 }] }, ROWS[0]!.fields, SCHEMA),
+    /column of the row/,
+  );
+  /* AND A PREDICATE THE COMPILER ALREADY REFUSES IS STILL A `false` rather than a throw: an
+     unreadable predicate is a refusal at this boundary, and only a readable one the caller
+     under-supplied is a bug in the caller. */
+  assert.equal(evaluate({ field: 'seq', contains: 'x' }, ROWS[0]!.fields, SCHEMA), false);
+  /* AND THE THREE-ARGUMENT CALL STILL ANSWERS EVERYTHING IT USED TO. `state` is written to the
+     column and into `fields` on the same statement, so the half a caller hands over is enough. */
+  assert.equal(evaluate({ field: 'state', is: 'open' }, ROWS[0]!.fields, SCHEMA), true);
 });

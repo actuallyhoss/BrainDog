@@ -145,6 +145,45 @@ const NAME = 'bd_pref';
 /** A year. Long enough that it is never the reason something was forgotten. */
 const YEAR = 60 * 60 * 24 * 365;
 
+/**
+ * THE SHAPE OF EACH SETTING, so a value of the wrong TYPE is dropped and not cast over.
+ *
+ * The guard below checked that the cookie parsed and that it was an object, and then cast. Every
+ * reader after that believed the type: `{"defined":"row"}` threw at MODULE LOAD out of
+ * `define.svelte.ts`, and `{"nav":"/x"}` threw inside the shell's own `$derived`. With `ssr = false`
+ * a throw in either is a blank screen, on every route, until somebody clears a cookie they cannot
+ * see, which is the one failure a preference must never be able to cause.
+ *
+ * A STORED VALUE IS UNTRUSTED INPUT FROM THE PAST. It was written by a build that no longer exists,
+ * by a person with developer tools open, or by a version of this file with a different idea of what
+ * `nav` holds. The comment two paragraphs down has said "a cookie this build cannot read is not a
+ * crash" since it was written, and it was true only of the ones that fail to parse.
+ *
+ * ONE BAD KEY DOES NOT LOSE THE OTHERS. Somebody who has chosen a dark scheme and a compact density
+ * keeps both when an older build's `nav` is dropped: this reads key by key, because the alternative
+ * throws away eleven correct settings to punish one.
+ */
+const SHAPE: Record<string, (v: unknown) => boolean> = {
+  scheme: (v) => v === 'light' || v === 'dark',
+  text: (v) => v === 'sm' || v === 'base' || v === 'md',
+  density: (v) => v === 'compact' || v === 'comfortable' || v === 'roomy',
+  theme: (v) => typeof v === 'string',
+  contrast: (v) => typeof v === 'boolean',
+  sidebar: (v) => typeof v === 'boolean',
+  chars: (v) => typeof v === 'boolean',
+  suggestPages: (v) => typeof v === 'boolean',
+  sampleSaid: (v) => typeof v === 'boolean',
+  seen: (v) => typeof v === 'string',
+  nav: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+  defined: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+  railShut: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+  columns: (v) =>
+    typeof v === 'object' &&
+    v !== null &&
+    !Array.isArray(v) &&
+    Object.values(v as Record<string, unknown>).every((c) => Array.isArray(c) && c.every((x) => typeof x === 'string')),
+};
+
 /** What the cookie holds now, or `{}` — including when there is no document at all. */
 export function read(): Pref {
   if (typeof document === 'undefined') return {};
@@ -152,7 +191,14 @@ export function read(): Pref {
   if (!raw) return {};
   try {
     const out: unknown = JSON.parse(decodeURIComponent(raw));
-    return out && typeof out === 'object' && !Array.isArray(out) ? (out as Pref) : {};
+    if (!out || typeof out !== 'object' || Array.isArray(out)) return {};
+    const kept: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(out as Record<string, unknown>))
+      /* A KEY THIS BUILD DOES NOT KNOW IS KEPT, and a key it knows with the wrong type is not.
+         An unknown key is a setting from a newer build sharing a browser with this one, and
+         dropping it would make the two fight over the cookie every time either is opened. */
+      if (!Object.hasOwn(SHAPE, key) || SHAPE[key]!(value)) kept[key] = value;
+    return kept as Pref;
   } catch {
     /* A COOKIE THIS BUILD CANNOT READ IS NOT A CRASH. It is a preference from an older version, or
        one somebody edited; the default is the right answer and the next write replaces it. */

@@ -23,7 +23,7 @@
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import * as pref from '$lib/pref.ts';
-  import { silenced } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityOf, inheritedFrom, labelOf, list, noticed, NOW, PAGE, PAGES, readableFields, REGISTERS, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
   import { searchable } from '$lib/record/find.ts';
@@ -1001,6 +1001,10 @@
     });
 
   function onkeydown(e: KeyboardEvent) {
+    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
+       the routes under the shell, and none of them read the overlay depth, so a sheet made of
+       buttons left the page behind it holding its own keyboard. */
+    if (covered()) return;
     const el = document.activeElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
 
@@ -2506,6 +2510,15 @@
     cursor: pointer;
   }
 
+  /* 48x24 MEASURED AT 390, on the primary write action of the register. It is drawn only once
+     there is something to add, which is why no gate has ever measured it: the scan runs over a
+     page at rest and this button does not exist then. */
+  @media (pointer: coarse) {
+    .capture-go {
+      min-block-size: var(--tap);
+    }
+  }
+
   .capture-why {
     margin: var(--sp-2) 0 0;
     color: var(--ink2);
@@ -2638,6 +2651,17 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
+  /* 44 UNDER A THUMB, AND BOTH OF THESE WERE MEASURED AT 390 AND FOUND SHORT. `.filter-value` is
+     358x34 and is the only way to sort a list or hide a column on a phone; `.mi` is 34. Neither
+     has ever been measured by `layout.mjs`, because both live inside a sheet the gate does not
+     open, and the gate is right that a page at rest is what it measures. `13 §7` is the rule. */
+  @media (pointer: coarse) {
+    .filter-value,
+    .mi {
+      min-block-size: var(--tap);
+    }
+  }
+
   .filter-value:hover {
     background: color-mix(in srgb, var(--ink) 5%, transparent);
     color: var(--ink);
@@ -2716,5 +2740,57 @@
       display: none;
     }
 
+    /**
+     * THE BAR STOPS WRAPPING AND STARTS SCROLLING, because wrapping put the first row of the list
+     * below the fold on every phone in the product.
+     *
+     * Measured at 390 by 844, `/r/obligations` drew, in order: a note card, the heading, the
+     * subtitle, the count, New item, the search box, two chip groups, Display, one sentence about
+     * what the search box searches, the capture field, and one sentence about what a row may be
+     * missing. Eleven things. The first invoice began at 700px and the reader had to scroll to
+     * learn the screen had any rows on it at all.
+     *
+     * `flex-wrap: wrap` is right on a laptop, where the bar is one line and the wrap is the
+     * safety net. On a phone every child is close to the full width, so wrap is not a safety net,
+     * it is the layout: five rows of controls standing over the thing they control. A row of chips
+     * that scrolls sideways is what a phone does with a filter bar, it costs one row instead of
+     * five, and nothing is hidden, which is the difference between this and a drawer.
+     *
+     * The panel itself must not scroll sideways: `min-inline-size: 0` on the flex child is what
+     * keeps the overflow inside the bar. Without it the bar sizes to its content and takes the app
+     * with it, which is the 30px sideways scroll the comment above `.bar` records fixing once.
+     */
+    .bar {
+      flex-wrap: nowrap;
+      min-inline-size: 0;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      /* Room for the shadow of the last chip, and a scroll that ends flush rather than clipped. */
+      padding-block-end: var(--sp-1);
+    }
+
+    .bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .bar > * {
+      flex: 0 0 auto;
+    }
+
+    /* The search box is the one child allowed to give ground, down to something a word still fits
+       in. It is first in the bar, so it is the one thing that never scrolls out of reach. */
+    .bar > .field {
+      flex: 1 1 14ch;
+      min-inline-size: 12ch;
+    }
+
+    /* WHAT THE BOX SEARCHES, ON THE ONE SCREEN WHERE IT IS ALREADY IN THE PLACEHOLDER. The bar's
+       own `Search money` says it, the sentence repeats it in a second line of prose, and the house
+       rule at the top of `copy.ts` is that a screen never explains its own interface. It stays on
+       a laptop, where the line costs nothing and names the FIELD rather than the register. */
+    .bar-note {
+      display: none;
+    }
   }
 </style>

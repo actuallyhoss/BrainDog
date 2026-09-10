@@ -544,6 +544,14 @@
     cursor: pointer;
   }
 
+  /* 34 MEASURED, AND `13 §7` ASKS FOR 44 UNDER A THUMB. The register's copy of this control
+     carries the same rule; the two have been a pair since the second one was written. */
+  @media (pointer: coarse) {
+    .mi {
+      min-block-size: var(--tap);
+    }
+  }
+
   .mi:hover,
   .mi:focus-visible {
     background: color-mix(in srgb, var(--ink) 6%, transparent);

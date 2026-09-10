@@ -11,6 +11,7 @@
   `cleared` has no action, because nobody manufactures work.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import * as clipboard from '../clipboard.ts';
   import type { Snippet } from 'svelte';
 
@@ -90,11 +91,24 @@
    */
   $effect(() => {
     const said = kind === 'error' ? 'refused' : 'empty';
-    drew(said);
+    /**
+     * `untrack`, AND WITHOUT IT EVERY DESIGNED EMPTY STATE IN THE PRODUCT THREW.
+     *
+     * `drew` reaches `screen.svelte.ts`, whose `s.empties++` and `s.refusals++` both READ and
+     * write the same `$state`. An effect that reads what it writes depends on itself, so Svelte
+     * reran this one until it gave up: `effect_update_depth_exceeded`, on `/p/nowhere`, `/v/nope`,
+     * `/nowhere` and `/decide/ZZ99`, which is four of the five states this component exists to
+     * draw. The markup was correct throughout, which is why it survived: the only symptom is a
+     * console nobody reads on a screen nobody expects to be interesting.
+     *
+     * The dependency this effect is meant to have is `kind`, and `said` above already reads it.
+     * Everything after that is the notification, and a notification is not a dependency.
+     */
+    untrack(() => drew(said));
     /* AND IT IS TAKEN BACK WHEN THIS GOES. An `Empty` mounts for a frame on a list whose first page
        is still being assembled, and without the teardown that frame set the answer for the life of
        the screen: thirty-nine rows drawn and `data-screen="empty"` over them. */
-    return () => undrew(said);
+    return () => untrack(() => undrew(said));
   });
 </script>
 

@@ -62,6 +62,44 @@
     color: inherit;
   }
 
+  /**
+   * AND A 16px FLOOR UNDER A THUMB, WHICH IS THE OTHER HALF OF THE LINE ABOVE.
+   *
+   * `font: inherit` hands every control the body step, and the body step is 15px. Safari zooms the
+   * whole page on focus for any text control under 16px and then does not zoom back out, so the
+   * page a person is reading is left magnified and scrolled sideways. It happens on every field in
+   * the product: the shared `.field-input`, the register's capture line, `/search`, every
+   * generated `RowForm`, both decision textareas, the block bind selects, and `/audit`'s day
+   * `<select>` and `/signin`'s token box at 13px. Ten controls at 15 and two at 13, and the only
+   * two that clear the threshold are the palette and the settings code field at 17.
+   *
+   * `max(16px, var(--text))` AND NOT `16px`, BECAUSE `--text` IS THE READER'S OWN SETTING. Text:
+   * Large is 17px and a flat floor would take a whole step away from the reader who asked for a
+   * bigger one. This is a floor and not a size: Small and Normal come up to 16, Large stays at 17.
+   *
+   * A COARSE POINTER ONLY, because the zoom is a touch behaviour and `05 §6` is explicit that
+   * density follows the pointer and never the width. `tokens.css` raises `--ctl-h` to 44 in the
+   * same media condition and for the same reason.
+   *
+   * `!important` IS LOAD-BEARING AND IT IS NOT A SHORTCUT. Every one of the twelve sets its own
+   * `font-size` through a class, and `/signin`'s sets it through an id, so no selector this file
+   * could write reaches them: an element selector loses to a class in the same layer, and Svelte
+   * scopes every component rule to at least two. It is the same argument `a11y.css` makes for the
+   * two `!important`s it carries, and this is the same kind of floor.
+   *
+   * WHAT IT COSTS: the palette input and the settings code field are 17px by choice and land on 16
+   * at Text: Normal, because no selector can tell "deliberately above the floor" from "accidentally
+   * below it". Both stay above the threshold either way, and at Text: Large both are 17 again.
+   *
+   * NOT `button`. A button takes no text, so it triggers no zoom, and putting a floor under every
+   * button on a phone would resize the chips, the verbs and the row menus for nothing.
+   */
+  @media (pointer: coarse) {
+    input, select, textarea {
+      font-size: max(16px, var(--text)) !important;
+    }
+  }
+
   /* Quantities get tabular figures on a PROPORTIONAL face. A monospace face gives the thousands
      separator a full cell, so EGP 2,869 renders as EGP 2 , 869 at display size — the comma floats
      and the figure reads wider and smaller than the sans figure beside it. Mono is for IDENTITY;

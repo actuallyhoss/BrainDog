@@ -62,6 +62,26 @@ class Overlays {
 
 export const overlays = new Overlays();
 
+/**
+ * Whether a PAGE's own key handler should stand down, because something is open over the page.
+ *
+ * `Sheet`'s header states the contract as though it were kept: the shell gates every unmodified
+ * key on `overlays.depth`. That is true of the shell, and there are six more `<svelte:window>`
+ * handlers on the routes underneath it, and not one of them read the depth. Each guarded only the
+ * tag of whatever had focus, which is a check written for text boxes: `AddBlock` is a sheet made
+ * entirely of buttons, so the sheet's own focus step finds no field, focus stays on a `BUTTON`,
+ * and the page behind the modal keeps its keyboard.
+ *
+ * WHAT THAT COST: open a page, press Add a block, press `j` and then `o`, and the page underneath
+ * moves its cursor and then navigates the whole app out from under the open sheet. A key that
+ * reaches past a modal is the one thing a modal is.
+ *
+ * A FUNCTION AND NOT SIX COPIES OF `overlays.depth > 0`, for the reason this whole file exists:
+ * the seventh handler somebody writes reads one name and gets the rule, and the rule can be
+ * changed in one place when the next kind of layer arrives.
+ */
+export const covered = (): boolean => overlays.depth > 0;
+
 /** The `g` prefix is armed for one second, then expires. `g w` is a chord, not a mode. */
 export class GoPrefix {
   armed = $state(false);

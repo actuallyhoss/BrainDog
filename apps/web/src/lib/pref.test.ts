@@ -93,6 +93,44 @@ test('a cookie this build cannot read is not a crash', () => {
   assert.deepEqual(pref.read(), {});
 });
 
+test('AND NEITHER IS ONE THAT PARSES AND HOLDS THE WRONG TYPE, which used to be a blank screen', () => {
+  /**
+   * The guard checked that the cookie parsed and that it was an object, and then cast, so every
+   * reader after it believed the type. `{"defined":"row"}` threw at MODULE LOAD out of
+   * `define.svelte.ts`, and `{"nav":"/x"}` threw inside the shell's own `$derived`. With
+   * `ssr = false` a throw in either is a blank screen, on every route, until somebody clears a
+   * cookie they cannot see.
+   *
+   * A STORED VALUE IS UNTRUSTED INPUT FROM THE PAST: written by a build that no longer exists, by
+   * somebody with developer tools open, or by a version of this file with a different idea of what
+   * `nav` holds. The test above covers only the ones that fail to parse, which is why this one
+   * exists.
+   */
+  for (const [key, bad] of [
+    ['nav', '"/x"'],
+    ['defined', '"row"'],
+    ['railShut', '3'],
+    ['columns', '["what"]'],
+    ['scheme', '"chartreuse"'],
+    ['chars', '"yes"'],
+    ['seen', '17'],
+  ] as const) {
+    jar(`bd_pref=${encodeURIComponent(`{"${key}":${bad}}`)}`);
+    assert.deepEqual(pref.read(), {}, `${key} of the wrong type reached a reader`);
+  }
+
+  /* ONE BAD KEY DOES NOT LOSE THE OTHERS. Somebody who has chosen a dark scheme keeps it when an
+     older build's `nav` is dropped: throwing away every correct setting to punish one is the same
+     forgetting-at-random the merge above this file exists to prevent. */
+  jar(`bd_pref=${encodeURIComponent('{"scheme":"dark","nav":"/x"}')}`);
+  assert.deepEqual(pref.read(), { scheme: 'dark' });
+
+  /* AND A KEY THIS BUILD DOES NOT KNOW IS KEPT, because it is a setting from a newer build sharing
+     a browser with this one, and dropping it would make the two fight over the cookie. */
+  jar(`bd_pref=${encodeURIComponent('{"scheme":"dark","fromTheFuture":42}')}`);
+  assert.deepEqual(pref.read() as Record<string, unknown>, { scheme: 'dark', fromTheFuture: 42 });
+});
+
 test('and an absent document reads empty rather than throwing', () => {
   delete (globalThis as { document?: unknown }).document;
   assert.deepEqual(pref.read(), {});

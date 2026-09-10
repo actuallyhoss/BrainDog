@@ -1,9 +1,11 @@
 <!--
   A `<dialog>`: a 480px drawer above 900px, a sheet on a phone.
 
-  Its body is `88dvh − var(--kb)`, where `--kb` is the virtual keyboard's height read from
-  `visualViewport`, so the active field is not underneath the keyboard. `lockScroll` is a counter,
-  and Esc closes ONE layer per press and stops rather than falling through (19 §4).
+  Its body is `88dvh − var(--kb)` and its bottom edge sits `var(--kb)` up, so the active field is
+  not underneath the keyboard. `--kb` is written by `$lib/a11y/keyboard.ts`, which the shell starts;
+  this sentence used to be here with nothing behind it, and the term subtracted zero for the life of
+  the build. `lockScroll` is a counter, and Esc closes ONE layer per press and stops rather than
+  falling through (19 §4).
 
   Open is longer than close, always: a panel opens in 280ms and closes in 160ms. Opening is
   something you watch; closing is something you have already decided about (13 §9).
@@ -188,7 +190,12 @@
        BOTH properties, and the second one is not redundant. The UA also sets
        `max-height: calc(100% - 6px - 2em)`, which clamps a 900px viewport to 864 and leaves a
        36-pixel strip of the page showing under the drawer — measured, not guessed. */
-    block-size: 100dvh;
+    /* AND `--kb` IS SUBTRACTED HERE TOO, NOT ONLY ON THE PHONE SHEET BELOW. The drawer is what an
+       iPad in portrait gets (744px is above the 640 breakpoint), and its footer carries the submit
+       button on every create and every edit. `inset-block: 0` and a definite `block-size`
+       over-constrain the box, so the browser drops `inset-block-end`: the top stays pinned at zero
+       and the bottom edge lifts by exactly the keyboard, which is the behaviour wanted. */
+    block-size: calc(100dvh - var(--kb));
     max-block-size: 100dvh;
     margin: 0;
     padding: 0;
@@ -303,19 +310,8 @@
    * 284px at 320, 354 at 390 and 394 at 430: a dead strip of dimmed page down the right edge, with
    * the sheet's rounded corner floating mid-screen, in every sheet in the product.
    */
-  .sheet {
-    max-inline-size: 100%;
-  }
-
-  /**
-   * AND THE UA'S `max-width`, WHICH IS THE OTHER HALF OF THE SAME BUG.
-   *
-   * This file already overrides `max-block-size` for the UA's `max-height: calc(100% - 6px - 2em)`,
-   * with a comment saying "measured, not guessed" — and the horizontal twin was never taken. At the
-   * sheet's 15px font that computes to `calc(100% - 36px)`, so a sheet declaring `100vw` rendered
-   * 284px at 320, 354 at 390 and 394 at 430: a dead strip of dimmed page down the right edge, with
-   * the sheet's rounded corner floating mid-screen, in every sheet in the product.
-   */
+  /* IT WAS WRITTEN TWICE, rule and paragraph both, one immediately after the other. A duplicate
+     that says the same thing is harmless until the day somebody edits one of them. */
   .sheet {
     max-inline-size: 100%;
   }
@@ -326,11 +322,42 @@
       inset-inline: 0;
       inline-size: 100vw;
       block-size: calc(88dvh - var(--kb));
+      /**
+       * AND THE BOTTOM EDGE MOVES, WHICH SHRINKING THE HEIGHT ON ITS OWN DOES NOT DO.
+       *
+       * `block-size: calc(88dvh - var(--kb))` was here alone and reads like the whole fix. It is
+       * half of one. A `position: fixed` box is laid out against the LAYOUT viewport, which iOS
+       * does not shrink for the keyboard, so `inset-block-end: 0` kept the bottom of the sheet
+       * pinned under the keyboard and the height it lost came off the TOP.
+       *
+       * Measured at 390x844 with a 336px keyboard: with the height alone the sheet runs from y=437
+       * to y=844 and only 71px of it is inside the 508px a person can see. With this line it runs
+       * from y=101 to y=508 and the footer sits on the keyboard's top edge, which is where a
+       * submit button belongs.
+       */
+      inset-block-end: var(--kb);
       border-inline-start: 0;
       border-block-start: 1px solid var(--edge);
       border-start-start-radius: var(--r-lg);
       border-start-end-radius: var(--r-lg);
-      padding-block-end: env(safe-area-inset-bottom);
+      /* THE HOME INDICATOR IS NOT UNDER THE KEYBOARD, so the inset is not paid twice. With the
+         sheet already lifted by `--kb` the strip at the bottom of the screen is the keyboard's,
+         and paying `env(safe-area-inset-bottom)` on top of it left 34px of dead panel between the
+         footer and the keys, which reads as the sheet having failed to move. */
+      padding-block-end: max(0px, calc(env(safe-area-inset-bottom) - var(--kb)));
+      /**
+       * AND THE INLINE EDGES, WHICH NOTHING IN EITHER APP HAS EVER PAID.
+       *
+       * `app.html` sets `viewport-fit=cover`, so a phone in landscape puts 44 to 59px of notch
+       * over one side of a box that declares `inset-inline: 0`. This sheet is the widest such box
+       * in the product, and its close button sits at the trailing edge.
+       *
+       * `max()` OF THE TWO RATHER THAN ONE EACH SIDE, because `env()` has no logical spelling: the
+       * insets are named `left` and `right`, and a `padding-inline` that maps `left` to the start
+       * would put the notch padding on the wrong side under `dir="rtl"`. The symmetric form is
+       * right in both directions and costs a few pixels on the side away from the notch.
+       */
+      padding-inline: max(env(safe-area-inset-left), env(safe-area-inset-right));
     }
 
     .sheet[open] {

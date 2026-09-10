@@ -113,8 +113,18 @@ function noon(iso: string): number | null {
  * the other way. A magnitude that reads its own output has to read the WHOLE of it.
  *
  * NaN for a cell with no number in it, never 0: a bar at zero claims the value is zero.
+ *
+ * AND A NUMBER IS A NUMBER, NOT A RUN OF DIGITS INSIDE A WORD. The pattern had no left edge, so it
+ * took the first digits anywhere in the cell and `Q3 −1,299.00` measured as 3: the `3` of the
+ * quarter, with the amount and its sign never reached. That is not a rounding error, it is the
+ * wrong figure and the wrong side of zero. Rendered through `bar` it put a credit of 1,299 at the
+ * top of the chart at full length and shrank the one row that was actually owed to two thirds of
+ * it, every selector correct and every bar a lie. The lookbehind is the whole fix: a digit glued to
+ * a letter, to another digit, to a decimal point or to a hyphen is part of that word and is not the
+ * number this cell states. A cell whose only digits are inside a word therefore has no magnitude,
+ * which is `NaN`, which is a row that keeps its words and loses its bar.
  */
-const NUMBER = /-?\d[\d,]*(?:\.\d+)?/;
+const NUMBER = /(?<![\p{L}\p{N}.,-])-?\d[\d,]*(?:\.\d+)?/u;
 
 export function magnitudeOf(cell: string): number {
   const m = NUMBER.exec(cell.replaceAll(MINUS, '-'));

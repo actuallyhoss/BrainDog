@@ -27,7 +27,7 @@
   import { rowsAsCards } from '../cards.svelte.ts';
   import type { Snippet } from 'svelte';
   import { TONES } from '../../src/index.ts';
-  import { chunkRows, moveCell, type Cell, type Column, type TableRow } from '../types.ts';
+  import { ariaSort, cardCells, chunkRows, moveCell, type Cell, type Column, type TableRow } from '../types.ts';
 
   let {
     columns,
@@ -115,8 +115,11 @@
   const isFocused = (r: number, c: number) => at.row === r && at.col === c;
   const tabIndex = (r: number, c: number) => (isFocused(r, c) ? 0 : -1);
 
-  const ariaSort = (field: string) =>
-    sort?.field === field ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+  /* WHAT EACH HEADER SAYS ABOUT SORTING, and it used to say the same thing on every table: this
+     returned `'none'` for any column that was not the sorted one, and `'none'` is the value that
+     announces a column as sortable. The rule is in `../types.ts`, next to the roving caret's, and
+     for the same reason: an attribute that is absent cannot be seen in a rendered tree. */
+  const headerSort = (column: Column) => ariaSort(column, sort, onsort !== undefined);
 
   let grid = $state<HTMLElement | undefined>(undefined);
 
@@ -198,20 +201,41 @@
   guessing. The first column leads the card and the rest are label and value — nothing hidden,
   nothing cut, and no horizontal scroll on the surface `13 §10` says is for reading.
 -->
+<!--
+  ONE CELL BODY, DRAWN BY BOTH ARMS.
+
+  THE CARD ARM DREW CELLS ITS OWN WAY AND THAT IS THE WHOLE DEFECT. It never called `cellSnippet`,
+  which the grid arm has always called, so a caller that hands this component a snippet to draw a
+  cell with got it on a desktop and got raw text on a phone: the register supplies one, and its row
+  picker, its identity links and its in-place editor all came out as the string behind them below
+  640px. And it dropped a pair whose value was empty rather than drawing the record's own missing
+  mark, so a column disappeared from the card and a reader could not tell an empty cell from a
+  column that is not in the table. Two renderings of one cell is the same class of fault as two
+  renderings of one figure, and `13 §10` puts the decision in the declaration rather than in the
+  width: a card shows what the declaration says, and this is the same declaration at both widths.
+
+  Rendering it once is also the only form of the fix that stays fixed. The two arms are two hundred
+  lines apart and the next change to a cell will be made in whichever one the author is reading.
+-->
+{#snippet cellBody(row: TableRow, column: Column, value: string | null)}
+  {#if cellSnippet}{@render cellSnippet(row, column, value)}
+  {:else if value === null}<span class="missing">—</span>
+  {:else}{value}{/if}
+{/snippet}
+
 {#snippet card(row: TableRow)}
+  {@const cells = cardCells(row, columns)}
   <span class="table-card-lead">
     {#if row.tone}
       <span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
     {/if}
-    {row.cells[0]}
+    {#if cells[0]}{@render cellBody(row, cells[0].column, cells[0].value)}{/if}
   </span>
-  {#each columns.slice(1) as column, i}
-    {#if row.cells[i + 1]}
-      <span class="table-card-pair">
-        <span class="table-card-label">{column.label}</span>
-        <span class="table-card-value">{row.cells[i + 1]}</span>
-      </span>
-    {/if}
+  {#each cells.slice(1) as { column, value }}
+    <span class="table-card-pair">
+      <span class="table-card-label">{column.label}</span>
+      <span class="table-card-value">{@render cellBody(row, column, value)}</span>
+    </span>
   {/each}
 {/snippet}
 
@@ -291,7 +315,7 @@
         <span
           class="th"
           role="columnheader"
-          aria-sort={column.hideLabel ? undefined : ariaSort(column.field)}
+          aria-sort={headerSort(column)}
           data-align={column.align ?? 'start'}
         >
           {#if column.hideLabel}
@@ -384,9 +408,7 @@
                 {#if c === lead && row.tone}
                   <span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
                 {/if}
-                {#if cellSnippet}{@render cellSnippet(row, column, value)}
-                {:else if value === null}<span class="missing">—</span>
-                {:else}{value}{/if}
+                {@render cellBody(row, column, value)}
               </span>
             {/each}
           </div>

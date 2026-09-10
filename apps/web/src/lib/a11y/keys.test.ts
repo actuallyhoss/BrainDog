@@ -14,6 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { BINDINGS, NEVER_BIND, SCOPE_ORDER, SCROLL_KEYS, type Binding } from './bindings.ts';
 
@@ -72,13 +73,46 @@ test('`bare` means the row holds a single CHARACTER key, which is what the switc
      AND IT IS A PROPERTY OF THE ROW, NOT OF EACH CHORD. `select` prints `x  ⇧x  ⌘a` and `copy-id`
      prints `y  ⇧Y`, so a row is bare when ANY of its chords is a character, and the switch silences
      that half of the row. What would be a lie is a row marked bare with no character key in it, or a
-     row holding one and saying otherwise, because the switch reads this flag and nothing else. */
+     row holding one and saying otherwise.
+
+     THE REASON THIS ASSERTION GAVE FOR ITSELF WAS FALSE, and it was written here, today: "because
+     the switch reads this flag and nothing else". The switch is `chars.ts:33`, and it reads
+     `e.key.length === 1` and the cookie. It has never touched the registry and cannot: it is handed
+     a `KeyboardEvent`, not a `Binding`. At the moment that sentence was written the flag was
+     written on all forty-five rows and read by nothing but the test below it, so the justification
+     offered for the duplicate was the one thing that was not true of it.
+
+     What reads it now is `ui/Keymap.svelte`, which dims and marks the rows the switch has silenced,
+     and the test after this one holds it to that. Two readers that must agree is a reason for a
+     stored flag; one reader that recomputes it is not. */
   const character = (token: string) => /^[\p{L}\p{N},./?]$/u.test(token) || /^[0-9]–[0-9]$/u.test(token);
   for (const b of BINDINGS) {
     const tokens = b.key.split(/\s+/u).filter((t) => t !== '');
     const holds = tokens.some((t) => character(t));
     assert.equal(holds, b.bare, `${b.id} prints ${b.key} and says bare: ${b.bare}`);
   }
+});
+
+test('and something OUTSIDE this file reads `bare`, which for a long time nothing did', () => {
+  /**
+   * A STORED FLAG WITH ONE READER, AND THE READER IS THE TEST THAT DERIVES IT, IS NOT A FIELD.
+   *
+   * A repository-wide grep for the identifier used to return the type declaration, the forty-five
+   * rows, and the assertion above, which recomputes the value from `binding.key` with its own
+   * predicate. Delete `bare` from the type and from every row and nothing in the running product
+   * changes: only this file goes red, about the field it was the sole reader of.
+   *
+   * The registry is data and this is the column that says which half of it the accessibility
+   * switch takes away, so the answer was a reader rather than a deletion. `Keymap.svelte` is a
+   * `.svelte` file and `node --test` cannot import it, so this reads it as TEXT, which is the
+   * technique `palette.test.ts` already uses on this same registry and for the same reason.
+   */
+  const sheet = readFileSync(new URL('../ui/Keymap.svelte', import.meta.url), 'utf8');
+  const code = sheet.replace(/<!--[\s\S]*?-->/gu, '');
+  assert.match(code, /binding\.bare/u, 'the sheet does not read `bare`, so nothing outside this file does');
+  /* AND IT MUST BE ABLE TO KNOW THE SWITCH IS OFF, or the mark is drawn never and the read is
+     decorative. */
+  assert.match(code, /silenced/u, 'the sheet reads `bare` but cannot tell whether the switch is off');
 });
 
 test('every binding is in a scope the sheet draws, or it is printed nowhere', () => {

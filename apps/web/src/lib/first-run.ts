@@ -106,8 +106,6 @@ export const firstRun = {
      taken without asking: a list of somebody else's invoices, arrived at with no explanation, reads
      as the row having been written and gone somewhere strange. Named, it reads as what it is. */
   seeTheList: (label: string) => `See ${label} as it comes`,
-  seeTheListWhy:
-    'The lists arrive with a worked example in them, so there is something to read before you have written anything.',
   /**
    * AND THE ROW THEY TYPED IS IN IT.
    *

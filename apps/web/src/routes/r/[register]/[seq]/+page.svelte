@@ -20,7 +20,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
-  import { silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { actorOf, AUDIT, backlinks, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, values } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -98,6 +98,10 @@
    * `silenced` first: `y` is a bare letter, and `Character keys: off` silences the namespace.
    */
   function onkeydown(e: KeyboardEvent) {
+    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
+       the routes under the shell, and none of them read the overlay depth, so a sheet made of
+       buttons left the page behind it holding its own keyboard. */
+    if (covered()) return;
     if (typing() || silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (!row) return;
     /* NOT ON A ROW THE RECORD HAS NOT GOT. `obligations#-1` is not a number anybody can say, and a

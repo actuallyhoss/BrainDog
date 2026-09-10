@@ -23,7 +23,7 @@ import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } fro
 import { attempt } from './tx.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
-import { jsonPath, compile, fieldSql, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
 import { installDeclarations, jcs, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 import { checkDogl, exportDogl, importDogl, signDogl, type Section, type Signer } from './dogl.ts';
@@ -426,9 +426,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * `to` TRAVELS WITH A REF, because a sentence names one BY NAME — `thing is Kiln` — and the parser
    * needs to know which register to look the name up in. Leaving it out made every ref in a sentence
    * a refusal saying "there is no row called Kiln", which is true of nothing and helpful to nobody.
+   *
+   * AND IT STILL HANDS OVER THE DECLARED FIELDS ONLY, which is a decision rather than the hole it
+   * used to be. `02 §6` makes `id seq state created_at updated_at version` addressable in any
+   * `where:` without a register declaring them, and none of them was: this map was the whole
+   * vocabulary and `created_at after -7d` was a `FIELD_UNKNOWN`. Adding five keys here would have
+   * taught the SQL compiler a name the in-memory evaluator still could not read, and there are
+   * seven consumers of that grammar and two renderings of it, so the fallback belongs to `where`
+   * and `38 §4.3` item 13 puts it there. What this function knows is what the REGISTER declares;
+   * what the RECORD keeps for itself is not a register's business to say.
    */
   const schemaOf = (register: string): Schema => ({
     register,
+    /* WHICH FIELD IS MIRRORED TRAVELS WITH THE SCHEMA, and it is the one thing `where` cannot work
+       out from a field id. `02 §1` compiles a predicate over the state against the COLUMN, and the
+       column holds whatever this key names: one shipped register points it at `lane`, and a
+       register may declare an enum called `state` and name no state at all, in which case the
+       column is NULL on every row of it. The compiler needs the answer and only the declaration
+       has it. */
+    ...(registers.get(register)?.state === undefined ? {} : { state: registers.get(register)!.state! }),
     fields: Object.fromEntries(
       (registers.get(register)?.fields ?? [])
         .filter((f) => !f.retired)
@@ -819,8 +835,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      *
      * AND A FIELD THE REGISTER DOES NOT DECLARE IS NOT A SORT. `json_extract` on an absent key is
      * `NULL` for every row, so an unknown field sorts by nothing at all and looks like the default
-     * order with extra steps. `seq` is admitted because it is a column rather than a field, the
-     * same exception the column check makes.
+     * order with extra steps.
+     *
+     * `seq` WAS ADMITTED BY NAME HERE, AND IT WAS ONE OF SIX. This branch carried its own
+     * exception, spelt twice, for the one kernel-owned name somebody had needed: `o.field !==
+     * 'seq'` in the check and `o.field === 'seq' ? 'seq' : fieldSql(…)` in the clause. `02 §6`
+     * makes six of them addressable without a declaration, so `order: created_at` was a
+     * `FIELD_UNKNOWN` from a register that keeps a `created_at` column on every row. The exception
+     * is `where`'s now, in `fieldSqlIn`, which is where `31 §2` says a field expression is spelt
+     * so that the sort and the filter cannot disagree, and it returns for `seq` the same string
+     * this branch used to write by hand. It also gets the register's mirrored state right, which
+     * a name spelt here could not: one shipped register calls that field `lane`.
      */
     let sort = 'ORDER BY updated_at DESC, id DESC';
     /**
@@ -863,13 +888,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         );
       const parts: string[] = [];
       for (const o of q.order) {
-        if (o.field !== 'seq' && !Object.hasOwn(schema.fields, o.field))
+        if (!Object.hasOwn(schema.fields, o.field) && !isColumn(o.field))
           return no('FIELD_UNKNOWN', `${q.register} has no field called ${o.field}.`, {
             at: 'order',
-            allowed: Object.keys(schema.fields),
+            allowed: addressable(schema),
           });
         const dir = o.dir === 'asc' ? 'ASC' : 'DESC';
-        parts.push(o.field === 'seq' ? `seq ${dir}` : `${fieldSql(o.field, schema.fields[o.field]?.type ?? 'text')} ${dir}`);
+        parts.push(`${fieldSqlIn(schema, o.field)} ${dir}`);
       }
       /* `id` LAST, ALWAYS. Two rows with the same value have no order otherwise, so the same query
          can return them in two orders on two runs and a reader watching a list re-render sees rows
