@@ -133,6 +133,13 @@
     { id: 'backups', label: 'Backups', icon: 'archive' },
     { id: 'billing', label: 'Billing', icon: 'money' },
     { id: 'export', label: 'Export', icon: 'download' },
+    /* ITS OWN ROW, AND IT WAS THE LAST SECTION OF `Export`. A person who wants a copy of their data
+       clicks the row labelled Export with a download icon beside it, scrolls past the file, the
+       signing key and the public key, and arrives at the one irreversible act in the product.
+       `53 §5.9` says there is no rollback after step 2 of it. A destructive act reached by somebody
+       looking for a backup is reached by the person least expecting it, which is the opposite of
+       what the typed slug is there for. */
+    { id: 'delete', label: 'Delete this record', icon: 'trash' },
   ] as const;
 
   const area = $derived(page.params.area ?? 'appearance');
@@ -1430,6 +1437,57 @@
           <Button weight="quiet" href="/settings/export"><Icon name="download" size="s" />{copy.export}</Button>
         </div>
       </Section>
+    {:else if area === 'delete'}
+      <!-- ITS OWN AREA, AND IT WAS THE LAST SECTION OF `Export`. See `AREAS`: a person looking for
+           a copy of their data found the one act with no rollback. -->
+      <!-- `Danger` IS A ONE-WORD HEADING THAT STATES NO FACT, over a line saying `Delete this
+           record` over a button saying `Delete the studio` — three lines, two of them the same
+           sentence, and the two disagreeing about what the record is called. One sentence saying
+           what happens, and the button that does it. -->
+      <!--
+        AND THE CONFIRMATION IS THE CONTROL, not a sentence about one.
+
+        Four documents give the same flow — `02 §9` (*"an ADMIN method, browser session,
+        re-authenticated, **the slug typed**"*), `33 §4`, `33 §10`, `19 §2` — and the screen was one
+        button whose toast said *"Deleting a record asks you to type its name first"*. A control that
+        DESCRIBES its own safeguard has not got one: the description is exactly as far as the product
+        went, on the one action `53 §5.9` says has no rollback after step 2.
+
+        The field is the gate. The button is disabled until the slug is typed, so the safeguard is a
+        thing you do rather than a thing you are told about. Re-authentication is the half nothing
+        specifies HOW to do — `49 §4.2`'s `authed_at` is the only lever the documents give — so the
+        screen says it will be asked for rather than inventing a mechanism.
+      -->
+      <Section title={copy.deleteRecord(RECORD)}>
+        <div class="danger">
+          <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
+          <!-- WHAT IT COSTS, BEFORE THE FIELD. `53 §5.9`: *"Rollback: none after step 2 … by day +30
+               nothing of the record remains anywhere"*, and a final snapshot exists only so that a
+               same-day "wait" is answerable. -->
+          <p class="danger-why">{copy.deleteCosts}</p>
+          <label class="code-label" for="delete-slug">{copy.typeSlug(boot().index.slug)}</label>
+          <div class="code-row">
+            <div class="field field-lg">
+              <input
+                class="field-input"
+                id="delete-slug"
+                type="text"
+                autocapitalize="off"
+                spellcheck="false"
+                autocomplete="off"
+                bind:value={typedSlug}
+              />
+            </div>
+          <Button
+            tone="bad"
+            disabled={typedSlug.trim() !== boot().index.slug}
+            onclick={() => toasts.push(copy.notWritten(`You would be asked to sign in again, and then ${RECORD} and every copy of it would be gone`), { intent: 'bad' })}
+            >{copy.deleteRecord(RECORD)}</Button
+          >
+          </div>
+        </div>
+      </Section>
+
     {:else if area === 'export'}
       <Section title={copy.yourData}>
         <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
@@ -1511,53 +1569,6 @@
         <p class="hint">{copy.verifyHow}</p>
       </Section>
 
-      <!-- `Danger` IS A ONE-WORD HEADING THAT STATES NO FACT, over a line saying `Delete this
-           record` over a button saying `Delete the studio` — three lines, two of them the same
-           sentence, and the two disagreeing about what the record is called. One sentence saying
-           what happens, and the button that does it. -->
-      <!--
-        AND THE CONFIRMATION IS THE CONTROL, not a sentence about one.
-
-        Four documents give the same flow — `02 §9` (*"an ADMIN method, browser session,
-        re-authenticated, **the slug typed**"*), `33 §4`, `33 §10`, `19 §2` — and the screen was one
-        button whose toast said *"Deleting a record asks you to type its name first"*. A control that
-        DESCRIBES its own safeguard has not got one: the description is exactly as far as the product
-        went, on the one action `53 §5.9` says has no rollback after step 2.
-
-        The field is the gate. The button is disabled until the slug is typed, so the safeguard is a
-        thing you do rather than a thing you are told about. Re-authentication is the half nothing
-        specifies HOW to do — `49 §4.2`'s `authed_at` is the only lever the documents give — so the
-        screen says it will be asked for rather than inventing a mechanism.
-      -->
-      <Section title={copy.deleteRecord(RECORD)}>
-        <div class="danger">
-          <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
-          <!-- WHAT IT COSTS, BEFORE THE FIELD. `53 §5.9`: *"Rollback: none after step 2 … by day +30
-               nothing of the record remains anywhere"*, and a final snapshot exists only so that a
-               same-day "wait" is answerable. -->
-          <p class="danger-why">{copy.deleteCosts}</p>
-          <label class="code-label" for="delete-slug">{copy.typeSlug(boot().index.slug)}</label>
-          <div class="code-row">
-            <div class="field field-lg">
-              <input
-                class="field-input"
-                id="delete-slug"
-                type="text"
-                autocapitalize="off"
-                spellcheck="false"
-                autocomplete="off"
-                bind:value={typedSlug}
-              />
-            </div>
-          <Button
-            tone="bad"
-            disabled={typedSlug.trim() !== boot().index.slug}
-            onclick={() => toasts.push(copy.notWritten(`You would be asked to sign in again, and then ${RECORD} and every copy of it would be gone`), { intent: 'bad' })}
-            >{copy.deleteRecord(RECORD)}</Button
-          >
-          </div>
-        </div>
-      </Section>
     {/if}
 
     <!-- AND WITHOUT THE TALLY. "8 packs, 8 lists" welded a count nobody can act on to a sentence

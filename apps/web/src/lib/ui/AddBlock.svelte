@@ -19,7 +19,13 @@
   do not know that `todo`, `steps` and `timeline` share the `list` primitive while `chips` does not,
   and they should never have to.
 
-  The previews are inert: `tabindex="-1"` inside the tile and `pointer-events: none` on the drawing,
+  The previews are inert, and that word is now the mechanism rather than a description of one: the
+  comment here said `tabindex="-1"` inside the tile and there was no `tabindex` in the file at all,
+  only the `pointer-events` half. CSS cannot take a thing out of the tab order, and three of the
+  authored seeds draw primitives that put themselves INTO it: a `comparison` renders
+  `<div class="table-region" tabindex="0">` and a `code` block renders `<pre tabindex="0">`. So
+  tabbing through this sheet landed three times on an invisible strip that announces nothing, inside
+  an element marked `aria-hidden`, inside a `<button>`. `inert` on the drawing
   so the tile is one target rather than a live block you can accidentally operate.
 -->
 <script lang="ts">
@@ -162,7 +168,12 @@
                   <span class="tile-kind">{copy.kindNames[tile.kind] ?? tile.kind}</span>
                   <span class="tile-what">{copy.kinds[tile.kind] ?? ''}</span>
                 </span>
-                <span class="tile-draw" aria-hidden="true">
+                <!-- `inert` AND NOT `aria-hidden`. It takes the subtree out of the tab order, out
+                     of the accessibility tree and out of hit-testing in one attribute, which is
+                     what "a picture of itself" means; `aria-hidden` alone did the third of those
+                     and left focusable content behind it, which is the one arrangement axe calls a
+                     serious violation in its own right. -->
+                <span class="tile-draw" inert>
                   {#if tile.segments.length}
                     {#each tile.segments as segment}
                       {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
@@ -259,7 +270,7 @@
   }
 
   /* The drawing is a picture of itself and nothing more: no pointer, no focus, no scroll. The tile
-     is the one target. */
+     is the one target, and `inert` on the element is what makes the second of those true. */
   .tile-draw {
     display: block;
     max-block-size: 132px;

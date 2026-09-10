@@ -44,6 +44,7 @@ export {
   ref,
   relative,
   since,
+  stamp,
   yesno,
   type TypedForm,
 } from './format.ts';

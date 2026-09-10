@@ -35,11 +35,30 @@
 
   let el = $state<HTMLDialogElement>();
 
+  /**
+   * WHETHER THIS SHEET IS HOLDING THE LOCK, so that being destroyed can give it back.
+   *
+   * `overlays` is a DEPTH and the shell reads it to decide whether a bare letter belongs to the
+   * page: `+layout.svelte` gates every unmodified key on `overlays.depth > 0`. The effect below
+   * incremented it on open and decremented it in its own `else` arm, which needs the component to
+   * still be alive; a sheet that is UNMOUNTED while open never reaches that arm and the depth stays
+   * up for the life of the tab.
+   *
+   * TWO CLICKS FROM THE FRONT PAGE. Peek a row on a register, then press the drawer's own primary
+   * control, which is a link to that row: the route changes, the sheet is destroyed mid-open, and
+   * from then on `?`, `/`, `g h`, `j`, `k` and `n` do nothing on every screen in the product, while
+   * the modified chords keep working because they are tested before the guard. It reads as "some
+   * of the keyboard broke". The layout's own More sheet works around it by hand, closing itself on
+   * every link, which is the workaround that says the mechanism is wrong.
+   */
+  let held = false;
+
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
       el.showModal();
       overlays.open();
+      held = true;
       /**
        * AND THE CARET GOES WHERE THE WORK IS.
        *
@@ -59,10 +78,44 @@
     } else if (!open && el.open) {
       el.close();
       overlays.close();
+      held = false;
     }
   });
 
+  /* THE LOCK IS GIVEN BACK WHEN THIS COMPONENT GOES, whatever took it away. Its own effect cannot:
+     a teardown on the effect above would run on every re-run of it, and the open branch is one of
+     those. This one runs once, at destroy. */
+  $effect(() => () => {
+    if (held) {
+      overlays.close();
+      held = false;
+    }
+  });
+
+  /** Ask to be closed. It reports nothing: the element's own `close` event is the one notifier. */
   function close() {
+    open = false;
+  }
+
+  /**
+   * `onclose` FIRES FROM THE ELEMENT'S OWN EVENT AND FROM NOWHERE ELSE, which is what makes it fire
+   * once.
+   *
+   * `close()` used to set `open = false` AND call `onclose`; the effect then called `el.close()`,
+   * whose `close` event is handled here, which called `close()` again. Every caller's `onclose` ran
+   * twice per dismissal. A re-entrancy flag does not fix it, because the second call arrives in a
+   * later task: `dialog.close()` queues the event rather than dispatching it.
+   *
+   * SO THERE IS ONE NOTIFIER. Escape, the backdrop and a caller setting `open` to false all end in
+   * `el.close()`, and `el.close()` ends here. `open = false` is repeated because the browser can
+   * close a dialog without going through `close()` at all.
+   *
+   * All three callers happen to be idempotent today, so nothing was visibly wrong; the register's
+   * new-row drawer was the closest to biting, because its handler writes the URL. It is the same
+   * double-fire shape as a button carrying both `type="submit"` and an `onclick` that submits,
+   * which this repository has already paid for once.
+   */
+  function closed() {
     open = false;
     onclose?.();
   }
@@ -90,7 +143,7 @@
 
 </script>
 
-<dialog bind:this={el} class="sheet" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), close())} onclose={close}>
+<dialog bind:this={el} class="sheet" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), close())} onclose={closed}>
   <header class="sheet-head">
     <div>
       <h2 class="sheet-title">

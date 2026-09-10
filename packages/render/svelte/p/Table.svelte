@@ -46,7 +46,17 @@
   }: {
     columns: readonly Column[];
     rows: readonly TableRow[];
-    /** `aria-rowcount`. -1 while a filtered total is unknown, which is the honest answer. */
+    /**
+     * HOW MANY DATA ROWS THERE ARE. `-1` while a filtered total is unknown, which is the honest
+     * answer.
+     *
+     * IT IS THE DATA ROWS, AND `aria-rowcount` IS THE GRID'S ROWS. The header is inside the grid at
+     * `aria-rowindex="1"` and every data row is `index + 2`, so the count a screen reader is given
+     * has to be one more than this. It was passed straight through, and one caller of six had
+     * compensated by adding the one itself; the other five had not, so the last row of a
+     * thirty-eight-row register announced as "row 39 of 38". The component knows about its own
+     * header and the callers should not have to, so the arithmetic is here.
+     */
     total?: number | undefined;
     cap?: number | undefined;
     label?: string | undefined;
@@ -203,7 +213,7 @@
     class="table"
     role="grid"
     data-toned={toned ? '' : undefined}
-    aria-rowcount={total}
+    aria-rowcount={total === undefined || total < 0 ? -1 : total + 1}
     aria-colcount={columns.length}
     style="--cols:{tracks}"
   >

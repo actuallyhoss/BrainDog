@@ -129,6 +129,27 @@ export function day(iso: string): string {
 }
 
 /**
+ * The moment, to the minute, for the one screen where a band is not enough.
+ *
+ * `since()` ANSWERS "HOW LONG AGO" AND THE LEDGER IS ASKED "WHEN". Its bands are what a person
+ * actually holds - nobody plans around "in 47 days" - and past a day they are deliberately coarse,
+ * so two events the same afternoon both read `3d ago`. That is right on a row about an invoice and
+ * wrong on the audit log, which the restore screen sends somebody to with the words "find the
+ * moment", and which a person reads to say which change they mean out loud.
+ *
+ * UTC, LIKE `day()` ABOVE IT, and for the same reason: the ledger stores an instant and this
+ * product does not yet know the reader's zone. It is the one number on that screen that has to be
+ * the same for two people looking at it from different places.
+ */
+export function stamp(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return iso;
+  const d = new Date(t);
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${day(iso)}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
+}
+
+/**
  * How a number of whole days is said: days to about two weeks, weeks to about two months, months to
  * a year, then years. A band is what a person actually holds — nobody plans around "in 47 days".
  *

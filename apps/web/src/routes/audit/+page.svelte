@@ -14,7 +14,7 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import Button from '$lib/ui/Button.svelte';
-  import { since } from 'braindog-render';
+  import { day as fmtDay, since, stamp } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { AUDIT, DOM_CAP, NOW, PAGES, actorOf } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
@@ -165,7 +165,28 @@
   const who = $derived(route.url.searchParams.get('by') ?? '');
   const what = $derived(route.url.searchParams.get('kind') ?? '');
 
-  const matched = $derived(AUDIT.filter((e) => (!who || e.by === who) && (!what || e.kind === what)));
+  /**
+   * THE DAY, WHICH IS THE ONE FILTER THIS SCREEN IS SENT FOR AND DID NOT HAVE.
+   *
+   * The point-in-time restore setting says *"find the moment"* and links here. What arrived was a
+   * list filtered by actor and by kind, with no way to narrow by WHEN at all, on the surface whose
+   * whole subject is when things happened. Somebody who knows it was the Tuesday before last had to
+   * scroll.
+   *
+   * ONE DAY AND NOT A RANGE. `19 §5`'s rule is that a filter is what defines which rows you are
+   * looking at and has to be shareable, and a day is the unit a person actually says: the ledger's
+   * own rows are stamped to the minute now, so a day narrows to something readable and the stamp
+   * finishes the job. A range is two controls and a validity rule for a question nobody asked.
+   *
+   * AND IT APPEARS WHEN THERE IS SOMETHING TO CHOOSE BETWEEN, like the two beside it: a log whose
+   * every entry is on one day has nothing to narrow.
+   */
+  const days = $derived([...new Set(AUDIT.map((e) => e.at.slice(0, 10)))].sort().reverse());
+  const when = $derived(route.url.searchParams.get('on') ?? '');
+
+  const matched = $derived(
+    AUDIT.filter((e) => (!who || e.by === who) && (!what || e.kind === what) && (!when || e.at.slice(0, 10) === when)),
+  );
   /* THE LOG GROWS WITH WRITES, NOT WITH ROWS, so on a record of any size this is the longest list in
      the product — and it was the one rendering every entry it held. `13 §4.3`'s cap, and the line
      that admits it. */
@@ -201,7 +222,7 @@
 <div class="page">
   <!-- A CHOICE APPEARS WHEN THERE IS ONE TO MAKE. Two actors and two kinds is a filter; one of
        either is a fact about the record, and a segmented control over it changes nothing. -->
-  {#if actors.length > 1 || kinds.length > 1}
+  {#if actors.length > 1 || kinds.length > 1 || days.length > 1}
     <div class="bar">
       {#if actors.length > 1}
         <div class="segmented" role="group" aria-label={copy.auditWho}>
@@ -235,7 +256,21 @@
         </div>
       {/if}
 
-      {#if who || what}
+      <!-- A `<select>` AND NOT A SEGMENTED CONTROL, because the number of days a log covers is
+           unbounded and grows with use, which is the same argument `RowForm` makes for an enum of
+           more than four values. The label is visible: a placeholder disappears exactly when
+           somebody needs it (06 §8). -->
+      {#if days.length > 1}
+        <label class="on">
+          <span class="on-label">{copy.auditWhen}</span>
+          <select class="on-select" value={when} onchange={(e) => setParam('on', e.currentTarget.value)}>
+            <option value="">{copy.auditAnyDay}</option>
+            {#each days as d}<option value={d}>{fmtDay(d)}</option>{/each}
+          </select>
+        </label>
+      {/if}
+
+      {#if who || what || when}
         <Button weight="bare" href="/audit"><Icon name="close" size="s" />{copy.clearFilters}</Button>
       {/if}
     </div>
@@ -291,7 +326,24 @@
               {#if e.target}<a class="target tap" href={href(e.target)}>{targetOf(e.target)}</a>{/if}</span>
           </span>
           <span class="line-amount note">{e.note}</span>
-          <span class="line-when">{since(e.at, NOW)}</span>
+          <!--
+            THE MOMENT, AND NOT ONLY HOW LONG AGO IT WAS.
+
+            `since()` answers "how long ago", and past a day its bands are deliberately coarse: two
+            changes made the same afternoon both read `3d ago`. That is right on a row about an
+            invoice and wrong here, on the screen the restore setting sends somebody to with the
+            words "find the moment". The band stays because it is what makes a log scannable; the
+            stamp is beside it because it is what a person says out loud.
+
+            AND THE VERSION, WHICH THIS PAGE'S OWN FOOTER SAYS IS HOW YOU NAME A MOMENT while no row
+            printed one. Every event carries it and it was read in exactly one place, to say what
+            the record is at now.
+          -->
+          <span class="line-when">
+            <time datetime={e.at}>{since(e.at, NOW)}</time>
+            <span class="stamp">{stamp(e.at)}</span>
+            <span class="ver num">v{e.version.toLocaleString('en')}</span>
+          </span>
         </div>
       </li>
     {/each}
@@ -307,6 +359,31 @@
 </div>
 
 <style>
+  /**
+   * THE WHEN CELL CARRIES THREE THINGS ON THE LEDGER, and one everywhere else.
+   *
+   * `rows.css` gives `.line-when` a single nowrap band, which is right on a register row. Here it
+   * holds the band, the moment to the minute, and the version, because this is the screen the
+   * restore setting sends somebody to with the words "find the moment". They stack rather than sit
+   * in a line: three nowrap spans side by side on a 320px card push the note out of the row.
+   *
+   * THE BAND IS FIRST BECAUSE IT IS WHAT A PERSON SCANS, and the two exact numbers sit under it in
+   * the dim ink, where somebody looks when they have found the line they want.
+   */
+  .line-when {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+  }
+
+  /* THE SAME 12px AS THE BAND ABOVE THEM, and dimmer. `--t-xs` is the bottom of the scale and there
+     is nothing under it on purpose: `13 §8` puts the floor there, so these two are separated by ink
+     rather than by size. */
+  .stamp,
+  .ver {
+    color: var(--dim);
+  }
+
   /* WIDE ENOUGH FOR A NAME, in the reading face rather than the id face. It sits in the grid slot
      `.seq` would have taken, so the ledger's columns still line up down the page. */
   /* A NAME WRAPS ON A CARD TOO. `reply rule` and `renewal rule` are two words and the card's first
@@ -328,6 +405,27 @@
     align-items: center;
     gap: var(--sp-2);
     margin-block-end: var(--sp-4);
+  }
+
+  /* THE LABEL IS VISIBLE AND IT IS BESIDE THE CONTROL, not inside it: a placeholder disappears
+     exactly when a person needs it and fails contrast in most themes (06 §8). */
+  .on {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+  }
+
+  .on-select {
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-2);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    background: var(--s3);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-sm);
   }
 
   /* THE TRACK WRAPS HERE AND NOWHERE ELSE. A register's segmented groups hold two to four short

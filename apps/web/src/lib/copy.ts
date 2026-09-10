@@ -562,6 +562,10 @@ export const copy = {
   inboxClearWhy: 'Anything that comes in without a rule to file it waits here.',
   /* WHAT THE VERSION IS FOR, rather than what it is. Every change moves it by one, so it names a
      moment — which is the only thing anybody does with it. */
+  /* THE DAY FILTER, on the screen the restore setting sends somebody to with the words "find the
+     moment". It had no way to narrow by when at all. */
+  auditWhen: 'Day',
+  auditAnyDay: 'Any day',
   auditVersion: (n: string): string =>
     `This record is at version ${n}. Every change moves it by one, so a version is a way of naming a moment.`,
   goBack: 'Choose something else',
@@ -664,8 +668,15 @@ export const copy = {
   diffAdds: 'Adds',
   diffChanges: 'Changes',
   diffConflicts: 'Conflicts',
-  diffSeeds: 'Seeds',
-  diffTouches: 'Touches',
+  /* IN THE READER'S WORDS, AND THEY WERE IN THE SCHEMA'S. `Seeds` and `Touches` are `04 §3`'s
+     section names, and they were printed as headings over values that are already plain English:
+     "1 example row, marked example, clearable in one action" and "nothing you have written: 0 rows
+     read". This is the trust screen, where somebody decides whether to let a stranger's file into
+     their business, and the two labels on it were the two words nobody outside this repository
+     uses. `19 §9`: the product speaks the reader's words. The API keeps `seeds` and `touches`, the
+     way Slack's says `conversations` and its screens say channel. */
+  diffSeeds: 'Example rows',
+  diffTouches: 'Your rows',
   /* `04 §4`: a pack may place a page it owns and may never move yours. The move is SHOWN, so that
      the refusal is visible rather than silent, and then it does not happen. */
   diffNavKept: 'shown, not applied. Your sidebar is yours',
@@ -679,6 +690,12 @@ export const copy = {
      author to rename. `10 §7`'s fourth rule, on a screen rather than in an envelope. */
   diffRefused: (names: string[]) =>
     `${names.join(' and ')} ${names.length === 1 ? 'is already a list' : 'are already lists'} on this record, and a pack cannot take a name another one owns. Nothing would be applied.`,
+  /* THE SENTENCE UNDER THE TITLE, and it is a sentence because the title needs one. `Packs` is not
+     a word anybody brings with them, and a screen that has to define its own title has the wrong
+     title: the reader's word for an installable, upgradeable, uninstallable thing with an author is
+     an add-on. Renaming the screen is a decision with a cost across the API, the docs and the
+     `mcp` surface, so it is not taken here; what IS taken is that the definition stays, because
+     until the word changes the definition is what makes the word usable. */
   packBlurb: 'A pack adds ready-made lists and pages. Readable text; nothing runs.',
 
   /* settings */

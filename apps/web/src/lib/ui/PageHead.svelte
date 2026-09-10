@@ -97,8 +97,14 @@
       nothing must never be indistinguishable from a surface with nothing to show. So a bare zero
       goes and a zero with a total beside it stays, which is why this is not the one-line fix
       `Section` got.
+
+      AND THE TEST IS ON THE TOTAL'S VALUE, NOT ON WHETHER IT WAS PASSED. The first attempt at this
+      read `total !== undefined`, which let the bare zero straight back through: the register sets
+      its denominator to the MATCHED count while a filter is on, so searching for something with no
+      matches gives `count: 0, total: 0` and the head printed `Obligations 0` over "38 rows, none
+      matching". Both halves zero is the state with nothing to say.
     -->
-    {#if count || total !== undefined}
+    {#if count || total}
       <p class="count num">
         {(count ?? 0).toLocaleString('en')}{#if atLeast}<span class="more-sign">+</span>{/if}{#if total !== undefined && (atLeast || total !== count)}<span
             class="of">&nbsp;of {total.toLocaleString('en')}</span

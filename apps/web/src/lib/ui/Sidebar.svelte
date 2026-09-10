@@ -239,15 +239,26 @@
            the name unchanged and no toast. The record this app draws is a fixture, so the other row
            says so instead of pretending — a control that silently does nothing is the failure this
            app's own rule is written about. -->
+      <!--
+        AND THE RECORD YOU ARE ALREADY IN TOOK YOU SOMEWHERE ELSE.
+
+        Every row was an `<a href="/">`, and the handler called `preventDefault` for the rows that
+        are NOT current and returned early for the one that is. So the only row that ever reached
+        the anchor's default action was the one wearing the tick, and pressing "you are here" from a
+        register put you on the dashboard.
+
+        IT IS A `<button>` NOW, because none of these rows navigates: the other records cannot be
+        opened yet and say so, and the current one has nowhere to go. A menu item that is a link to
+        a place it does not take you is the shape a reader learns not to trust.
+      -->
       {#each records as r}
-        <a
+        <button
+          type="button"
           class="mi"
           role="menuitem"
-          href="/"
           aria-current={r.name === record ? 'true' : undefined}
-          onclick={(e) => {
+          onclick={() => {
             if (r.name === record) return;
-            e.preventDefault();
             toasts.push(copy.notWritten(`${r.name} would open, with its own registers and pages`));
           }}
         >
@@ -258,7 +269,7 @@
                the wrong record's rows. -->
           {#if r.level !== 'owner'}<span class="mi-level">{r.level}</span>{/if}
           {#if r.name === record}<Icon name="check" size="s" />{/if}
-        </a>
+        </button>
       {/each}
       <hr class="mi-rule" />
       <a class="mi" role="menuitem" href="/settings/identity"><Icon name="settings" size="s" />{copy.recordSettings}</a>

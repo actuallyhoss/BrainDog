@@ -76,7 +76,11 @@
 
   {#if spec.primitive === 'table'}
     {#if comparison}
-      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length + 1} label={block.heading} />
+      <!-- `rows.length` AND NOT `rows.length + 1`. `Table` counts its own header row into
+           `aria-rowcount` now; this was the one caller of six that added the header itself, and
+           the other five did not, so five surfaces announced one row too few and this one was
+           right by hand. -->
+      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} />
     {/if}
   {:else if spec.primitive === 'grid'}
     <!-- BY NAME rather than through `Draw`, because the callback belongs to one primitive: handed
