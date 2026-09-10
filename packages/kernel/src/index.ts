@@ -299,6 +299,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     );
     for (const row of rows) {
       const decl = JSON.parse(row.body) as RegisterDecl;
+      /**
+       * TWO SPELLINGS OF ONE FLAG, MADE ONE HERE, and until now only one of them did anything.
+       *
+       * `02 §1` publishes a register-level `search: [field, field]`, and `declare` validates it
+       * carefully: the names must exist and each type must be one the index can take, with its own
+       * refusal for a `money` field named there. Then nothing read it. The projection asks each
+       * field for its own `search: true` flag, so a register declared the documented way was
+       * indexed on nothing and its rows were findable by no text at all, with every check green.
+       *
+       * NORMALISED WHERE THE DECLARATION BECOMES THE REGISTER, rather than at the two places that
+       * project, because a rule applied at some of its readers is the shape this defect already
+       * has. Downstream still reads `f.search` and needs to know nothing about the other spelling.
+       */
+      const said = (decl as unknown as { search?: unknown }).search;
+      const named = Array.isArray(said) ? (said as string[]) : null;
+      if (named)
+        decl.fields = decl.fields.map((f) => (named.includes(f.id) ? { ...f, search: true } : f)) as typeof decl.fields;
       registers.set(decl.id, decl);
     }
   }

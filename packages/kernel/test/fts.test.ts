@@ -214,3 +214,48 @@ test('A NAME PASTED OUT OF FINDER FINDS THE ROW IT NAMES', async () => {
     }
   sql.close();
 });
+
+/* ── the other spelling of the same flag ─────────────────────────────────── */
+
+test('A REGISTER-LEVEL `search:` INDEXES THE FIELDS IT NAMES, and it used to index nothing', async () => {
+  /**
+   * `02 §1` publishes a register-level `search: [field, field]` and `declare` validates it
+   * carefully: the names must exist, and each type must be one the index can take, with its own
+   * refusal for a `money` field named there. Then nothing read it. The projection asks each FIELD
+   * for its own `search: true` flag, so a register declared the documented way was indexed on
+   * nothing and its rows were findable by no text at all, with every check green.
+   *
+   * BOTH SPELLINGS, IN ONE TEST, because the claim is that they are one flag rather than that
+   * either works.
+   */
+  const { k, sql } = await record();
+  const out = await k.install([
+    {
+      id: 'register.memos',
+      kind: 'register' as const,
+      body: {
+        id: 'memos',
+        name: 'Memos',
+        title: 'headline',
+        /* Named here and NOT flagged on the field, which is the half that did nothing. */
+        search: ['headline', 'body'],
+        fields: [
+          { id: 'headline', type: 'text', required: true },
+          { id: 'body', type: 'text' },
+          { id: 'secretish', type: 'text' },
+        ],
+      } as never,
+    },
+  ]);
+  assert.ok(out.ok, (out as { refusal?: { fix: string } }).refusal?.fix ?? '');
+
+  value(k.create('memos', { headline: 'Kerning pass', body: 'lowercase done', secretish: 'zarquon' }, { actor: 'p_1' }));
+
+  assert.equal(k.search('Kerning', { limit: 5 }).length, 1, 'the title named in `search:` was indexed on nothing');
+  assert.equal(k.search('lowercase', { limit: 5 }).length, 1, 'the second field named in `search:` was indexed on nothing');
+
+  /* AND A FIELD IT DOES NOT NAME IS STILL NOT INDEXED, so the list is a list rather than a switch
+     that turns the whole row on. */
+  assert.equal(k.search('zarquon', { limit: 5 }).length, 0, 'a field the register did not name was indexed anyway');
+  sql.close();
+});
