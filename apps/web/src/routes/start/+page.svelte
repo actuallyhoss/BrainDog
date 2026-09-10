@@ -121,15 +121,16 @@
   /**
    * AND IT TAKES THE WORD ON THE TILE, not only the register id behind it.
    *
-   * THE FIVE TILES SAY *Money*, *The estate*, *People*, *Projects*, *Work* and the five keys are
+   * THE FIVE TILES SAY *Money*, *Services*, *People*, *Projects*, *Work* and the five keys are
    * `obligations`, `services`, `people`, `things`, `tasks` — so three of the five words a person can
    * read on this screen fell through to the choice list. Nothing on the page writes the parameter,
    * so nothing was broken; it is a link somebody types or shares from what is in front of them, and
    * it worked two times in five.
    *
-   * NORMALISED TO LETTERS AND DIGITS, and `the` dropped from the front, so `the-estate`, `The
-   * Estate` and `estate` are one thing. Not a fuzzy match: an exact comparison against two names the
-   * screen already publishes.
+   * NORMALISED TO LETTERS AND DIGITS, and `the` dropped from the front, so `the-services`, `The
+   * Services` and `services` are one thing. Not a fuzzy match: an exact comparison against two
+   * names the screen already publishes. The second tile said *The estate* when that rule was
+   * written, which is what the dropped `the` was for; `start.ts` records what the rename cost it.
    */
   /**
    * AND IT IS HONOURED ONCE PER VALUE, WHICH IS WHAT MAKES *Back* WORK.

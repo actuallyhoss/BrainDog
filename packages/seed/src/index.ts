@@ -165,7 +165,16 @@ export const REGISTERS: Record<string, SeedRegister> = {
       { id: 'direction', label: 'Which way', type: 'enum', values: ['owed_by_me', 'owed_to_me'], index: true, required: true },
       { id: 'amount', type: 'money', required: true },
       { id: 'due', type: 'day', index: true, deadline: true, required: true, remind: ['-7d', '0d'] },
-      { id: 'state', type: 'enum', values: ['open', 'part', 'paid', 'written_off'], index: true, required: true },
+      /* `Status`, AND IT WAS `State` — here and on services, sessions, threads and tasks.
+         `columnsFor` draws every indexed field and `labelOf` falls back to the id, so five of the
+         six lists that carry this concept headed the column `State` while `things` labelled its
+         own `Status` at the declaration two hundred lines down. One concept, two headers, and the
+         reader meets both inside a minute: `copy.ts` had already caught the same split from the
+         other side, where a hardcoded "Set state" put a field's three names on one screen.
+         `Status` is the word every product the reader has already used says, and it is the one the
+         record was half saying. The field id stays `state`, which is what a predicate says, what
+         `done:` lists and what `05 §254` makes a path a page can hold. */
+      { id: 'state', label: 'Status', type: 'enum', values: ['open', 'part', 'paid', 'written_off'], index: true, required: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
       { id: 'note', type: 'text' },
     ],
@@ -195,8 +204,13 @@ export const REGISTERS: Record<string, SeedRegister> = {
          the other monthly. `columnsFor` draws every indexed field, so the period travels with the
          amount and neither is a guess. */
       { id: 'cycle', qualifies: 'cost', type: 'enum', values: ['monthly', 'yearly', 'two_yearly'], index: true, required: true },
-      { id: 'state', type: 'enum', values: ['live', 'lapsing', 'cancelled'], index: true, required: true },
-      { id: 'points_at', label: 'Target', type: 'text' },
+      { id: 'state', label: 'Status', type: 'enum', values: ['live', 'lapsing', 'cancelled'], index: true, required: true },
+      /* `Points at`, AND IT WAS `Target`. `19 §9` reserves *target* for what good looks like for a
+         number, which is what the metric declarations mean by it; here it meant where a domain
+         sends its traffic. One word for two unrelated things is the `grant` problem in miniature,
+         and `19 §9` closes on exactly that. The id already reads as English with its underscore
+         taken out, which is what `labelOf` would have produced with no label here at all. */
+      { id: 'points_at', label: 'Points at', type: 'text' },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
     ],
   },
@@ -267,22 +281,38 @@ export const REGISTERS: Record<string, SeedRegister> = {
     fields: [
       { id: 'doing', label: 'Task', type: 'text', required: true, search: true },
       { id: 'agent', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], index: true, required: true },
-      { id: 'state', type: 'enum', values: ['live', 'idle', 'ended'], index: true, required: true },
+      { id: 'state', label: 'Status', type: 'enum', values: ['live', 'idle', 'ended'], index: true, required: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
-      /* THE PIN. A session pinned to a track is how context survives the session that made it:
-         close the window, come back on Tuesday, open the track, and the thread is all there — what
-         each agent was doing, in order, next to the updates that say how it was going. Without it
-         an agent session is a thing that happened once and then could not be found again. */
-      { id: 'track', type: 'ref', to: 'tracks', index: true },
+      /* THE PIN. A session pinned to a thread is how context survives the session that made it:
+         close the window, come back on Tuesday, open the thread, and it is all there — what each
+         agent was doing, in order, next to the updates that say how it was going. Without it an
+         agent session is a thing that happened once and then could not be found again.
+
+         `Thread`, AND IT HAD NO LABEL AT ALL, so `labelOf` headed the column `Track` on three of
+         the busiest lists in the product. The list itself was renamed to Threads for the reason
+         written at its own declaration below — a reader meets `track` cold and it reads as music
+         or as shipping — and the three columns pointing at it went on saying the abandoned name,
+         which a reader meets two clicks after learning the new one. The id stays `track`, which is
+         what the URL, the predicate and every seeded row say. */
+      { id: 'track', label: 'Thread', type: 'ref', to: 'tracks', index: true },
       { id: 'last_seen', label: 'Last seen', type: 'instant', index: true },
-      { id: 'wrote', label: 'Writes', type: 'int' },
+      /* `Saves`, AND IT WAS `Writes`. The banner over this same list already made this exact
+         argument and this exact change — *"a write is a save"* — and renamed its own verbs to
+         *saves* and *rejected*; the column header beside it kept the schema's word. */
+      { id: 'wrote', label: 'Saves', type: 'int' },
       { id: 'host', type: 'text' },
       /* THE RUN, WHICH IS WHAT A SESSION IS DOING RIGHT NOW. A session row says what an agent is up
          to in a sentence; the job is the tool calls behind that sentence, in order, with what each
          one answered. Without this the two exist and cannot be got from one to the other — the job
          screen was reachable from nowhere in the product at all. Absent on a session that has
-         ended, which is the honest state: the transcript is kept, the run is over. */
-      { id: 'job', label: 'Run', type: 'text' },
+         ended, which is the honest state: the transcript is kept, the run is over.
+
+         `Steps`, AND IT WAS `Run`. This register is called Agent runs and its `one` is `run`, so a
+         run had a field called Run: the column and the thing the column is on were one word. What
+         the screen behind the link actually draws is the tool calls in order, which is what the
+         header now says. The id stays `job`, which is the address `/jobs/<id>` and the key every
+         seeded row carries. */
+      { id: 'job', label: 'Steps', type: 'text' },
     ],
   },
   /**
@@ -322,7 +352,7 @@ export const REGISTERS: Record<string, SeedRegister> = {
     pack: 'work',
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
-      { id: 'state', type: 'enum', values: ['open', 'holding', 'done', 'dropped'], index: true, required: true },
+      { id: 'state', label: 'Status', type: 'enum', values: ['open', 'holding', 'done', 'dropped'], index: true, required: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
       { id: 'opened', type: 'day', index: true },
       { id: 'note', type: 'document' },
@@ -348,14 +378,17 @@ export const REGISTERS: Record<string, SeedRegister> = {
     icon: 'doc',
     name: 'Updates',
     one: 'update',
-    holds: 'what was true about a track on a date, who said so, and how it was going',
+    /* `a thread` AND IT WAS `a track`. `holds` is drawn under the heading of an empty list —
+       "Updates holds …" — so this sentence is on a screen, and it was the last one in the
+       declarations still saying the word the register above it stopped using. */
+    holds: 'what was true about a thread on a date, who said so, and how it was going',
     title: 'body',
     mobile: ['body', 'health', 'at'],
     pack: 'work',
     fields: [
       { id: 'body', label: 'Update', type: 'document', required: true, search: true },
       { id: 'health', type: 'enum', values: ['on_track', 'at_risk', 'off_track'], index: true, required: true },
-      { id: 'track', type: 'ref', to: 'tracks', index: true, required: true },
+      { id: 'track', label: 'Thread', type: 'ref', to: 'tracks', index: true, required: true },
       { id: 'by', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], index: true, required: true },
       { id: 'at', label: 'When', type: 'instant', index: true, required: true },
       { id: 'supersedes', label: 'Replaces', type: 'ref', to: 'updates' },
@@ -375,12 +408,12 @@ export const REGISTERS: Record<string, SeedRegister> = {
     pack: 'work',
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
-      { id: 'state', type: 'enum', values: ['open', 'doing', 'blocked', 'done', 'dropped'], index: true, required: true },
+      { id: 'state', label: 'Status', type: 'enum', values: ['open', 'doing', 'blocked', 'done', 'dropped'], index: true, required: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
       { id: 'by', label: 'Due', type: 'day', index: true, deadline: true, remind: ['0d'] },
       /* Usually unset, and the schema has to be the thing that says so — the prose two documents
-         away saying "most tasks carry no track" is what lost last time (10 §7). */
-      { id: 'track', type: 'ref', to: 'tracks', index: true },
+         away saying "most tasks carry no thread" is what lost last time (10 §7). */
+      { id: 'track', label: 'Thread', type: 'ref', to: 'tracks', index: true },
       { id: 'effort', type: 'duration', unit: 'd' },
       { id: 'note', type: 'document' },
     ],
@@ -1027,7 +1060,16 @@ export const PAGES: Record<string, SeedPage> = {
   estate: {
     page: 'estate',
     title: 'Renewals',
-    nav: { section: 'Estate', order: 10 },
+    /* `Services`, AND THE SECTION WAS `Estate`. One area of this record had four names: the first
+       run's second card said *The estate*, this heading said *Estate*, the pack said *Estate*, the
+       register said *Services* and the page said *Renewals*. `Services` is the one the register
+       already carried, and the rail is where the reader meets the disagreement, because the
+       section heading sits directly above a list called Services.
+
+       A SECTION IS KEYED ON ITS HEADING and there is no other handle on one, so a reader who had
+       folded this section away gets it back open once, per device. `pref.ts` argues that is the
+       right answer anyway: the fold was about a heading that no longer exists. */
+    nav: { section: 'Services', order: 10 },
     icon: 'calendar',
     requires: ['register.services'],
     pack: 'estate',
@@ -1117,7 +1159,9 @@ export const PAGES: Record<string, SeedPage> = {
           { field: 'renews', label: 'Renews', width: '15ch', align: 'end' },
         ],
         order: [{ field: 'renews', dir: 'asc' }],
-        empty: 'No services on the estate yet.',
+        /* AND IT SAID `the estate`. This is the empty state of the Services list on the page in
+           the Services section, and it was the fifth surface still using the fourth name. */
+        empty: 'No services yet.',
         limit: 50,
       },
       {
@@ -1274,7 +1318,9 @@ export const PAGES: Record<string, SeedPage> = {
     blocks: [
       {
         kind: 'board',
-        heading: 'By state',
+        /* `By status`, for the same reason as the column two blocks down: the field this groups on
+           is headed Status everywhere it is drawn. */
+        heading: 'By status',
         span: 12,
         columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
         source: 'register.tasks',
@@ -1303,8 +1349,14 @@ export const PAGES: Record<string, SeedPage> = {
         where: 'state is not done or dropped',
         columns: [
           { field: 'what', label: 'What', width: 'minmax(20ch,1fr)', link: true },
-          { field: 'thing', label: 'Thing', width: 'minmax(10ch,16ch)' },
-          { field: 'state', label: 'State', width: '12ch' },
+          /* `Project` AND `Status`, AND THEY WERE `Thing` AND `State`. Every one of the five
+             registers that carries a `thing` ref labels it Project and `things` labels its own
+             lane Status, and this table — authored by hand rather than derived, so no rename
+             reaches it — was the last place in the record saying either of the old words. A
+             column header a person reads beside four others that say something else is the same
+             defect as two names for one screen, one row further down. */
+          { field: 'thing', label: 'Project', width: 'minmax(10ch,16ch)' },
+          { field: 'state', label: 'Status', width: '12ch' },
           { field: 'by', label: 'By', width: '15ch', align: 'end' },
         ],
         order: [{ field: 'by', dir: 'asc' }],

@@ -52,7 +52,12 @@
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(JOB?.kind ?? 'Job', 'Job')}</title></svelte:head>
+<!-- THE SCREEN'S OWN NOUN, AND IT HAD TWO. The kicker and this title were the literal `Job` while
+     the refusal below said "There is no run called …", the only action said "Stop the run", and the
+     register this screen is reached from is called Agent runs. `job` stays in the address, in the
+     field on a session row and in the type; the words a reader sees are one word now, and they are
+     in `copy.ts` so the next rename reaches them. -->
+<svelte:head><title>{titleOf(JOB?.kind ?? copy.run, copy.run)}</title></svelte:head>
 
 {#if !JOB}
   <div class="page">
@@ -67,10 +72,10 @@
   </div>
 {:else}
 
-<PageHead icon="session" kicker="Job" title={JOB.kind} id={JOB.id}>
+<PageHead icon="session" kicker={copy.run} title={JOB.kind} id={JOB.id}>
   {#snippet actions()}
     <Chip label={JOB.status} tone={JOB.status === 'failed' ? 'bad' : JOB.status === 'running' ? 'info' : 'good'} />
-    <Button weight="quiet" tone="bad" onclick={() => toasts.push(copy.notWritten('The job would stop at its next step'), { intent: 'warn' })}><Icon name="stop" size="s" />{copy.stopRun}</Button>
+    <Button weight="quiet" tone="bad" onclick={() => toasts.push(copy.notWritten(copy.runWouldStop), { intent: 'warn' })}><Icon name="stop" size="s" />{copy.stopRun}</Button>
   {/snippet}
 </PageHead>
 

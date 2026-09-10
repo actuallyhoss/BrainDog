@@ -32,8 +32,26 @@ test('EVERY WORD ON A TILE RESOLVES, and so does every register id', () => {
 
 test('AND THE SHAPE OF THE WORD DOES NOT MATTER, but the word does', () => {
   /* A link is typed, pasted and lower-cased by whatever passed it along. */
-  for (const v of ['The estate', 'the-estate', 'THE ESTATE', 'estate', 'the_estate'])
+  for (const v of ['Services', 'services', 'SERVICES', 'the-services', 'the_services'])
     assert.equal(addKey(v, CHOICES), 'services', `?add=${v}`);
+
+  /**
+   * AND THE WORD THAT USED TO BE ON THAT TILE IS NOT A WORD ANY MORE, WHICH IS A COST AND NOT AN
+   * OVERSIGHT.
+   *
+   * These five vectors were `The estate`, `the-estate`, `THE ESTATE`, `estate` and `the_estate`,
+   * because that is what the second tile said. One area of the record answered to four names —
+   * the tile, the rail's section heading, the pack and the register — and the register's word won,
+   * so the tile says *Services* and `?add=estate` reaches nothing.
+   *
+   * `addKey` compares against exactly two published names, the register id and the word on the
+   * tile, and neither is `estate` now. That is a link somebody could have shared, and it is the
+   * one thing this rename actually broke; nothing in the product writes the parameter, so there
+   * is no link of ours to update. The choice list is the honest answer to a word this record's
+   * tiles do not use, and it is the same answer `nonsense` gets.
+   */
+  for (const v of ['The estate', 'the-estate', 'estate'])
+    assert.equal(addKey(v, CHOICES), undefined, `?add=${v} still resolves, so the tile still says it`);
 
   /* AND A REGISTER THIS RECORD DOES NOT HAVE STILL GETS THE CHOICE LIST. `24` has no `decisions`
      register — a decision is what the gate writes — so this is the exact wrong answer to guess at. */

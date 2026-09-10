@@ -426,7 +426,11 @@ export function draw(
       segments: [],
       refusal: {
         kind: 'error',
-        title: 'This block declares both a source and rows of its own.',
+        /* `has` AND IT WAS `declares`. The same rule as the cycle refusal in `forecast.ts`: a
+           refusal is the teacher (`10 §7`), and the schema's verb in the first three words teaches
+           the schema rather than the fix. The body below already names both halves in the
+           dialect's own words, which is where an author needs them. */
+        title: 'This block has both a source and rows of its own.',
         body: 'Keep one. `source:` reads a register; `authored:` is written out by hand.',
       },
     };

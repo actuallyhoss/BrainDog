@@ -1025,7 +1025,7 @@
     }
     if (e.altKey && e.key.toLowerCase() === 'v') {
       e.preventDefault();
-      toasts.push(copy.notWritten('The filter would be saved as a named view on this register'), { intent: 'warn' });
+      toasts.push(copy.notWritten(copy.viewWouldBeSaved), { intent: 'warn' });
       return;
     }
     if (e.altKey && e.key.toLowerCase() === 'b') {
@@ -1474,7 +1474,7 @@
           <!-- A NAME AND NOT A LINK. The writes were REFUSED, so there are no rows to filter to and
                nowhere in this build that shows a field's own declaration; a link that went to a
                filter matching nothing would be worse than the plain word. -->
-          {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}this register{/if}
+          {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}{copy.thisList}{/if}
           were rejected over {seen.days} days: {seen.fix}.
           <!-- NO `title`. It carried `seen.why` — the same fact as the sentence beside it, in the
                schema's spelling, in an attribute no touch device shows and no keyboard reaches. Two
@@ -1483,7 +1483,17 @@
         </p>
         <Button
           weight="quiet"
-          onclick={() => toasts.push(copy.notWritten(`${seen?.field?.label ?? id} would be raised as a question on /decide, with the ${seen?.n} refused writes attached`), { intent: 'warn' })}
+          onclick={() =>
+            /* `rejected saves` AND NOT `refused writes`. The banner three lines up deliberately says
+               the first pair, because a friction pass counted the second as two tax words on the
+               front of the busiest list in the product, and this toast kept saying the old ones: one
+               screen, one gesture apart, two vocabularies for the same fact. */
+            toasts.push(
+              copy.notWritten(
+                `${seen?.field?.label ?? id} would be raised as a question on /decide, with the ${seen?.n} rejected saves attached`,
+              ),
+              { intent: 'warn' },
+            )}
         >{copy.raiseIt}</Button>
       </aside>
     {/if}
@@ -1579,7 +1589,7 @@
             <Button href="/r/{id}">{copy.clearFilters}</Button>
           {:else if emptyKind === 'no-data-yet'}
             <Button weight="primary" onclick={() => (createOpen = true)}>{copy.addOne}</Button>
-            <Button onclick={() => toasts.push(copy.notWritten('One example row would be added, marked `example`'), { intent: 'warn' })}>{copy.showExample}</Button>
+            <Button onclick={() => toasts.push(copy.notWritten(copy.exampleWouldBeAdded), { intent: 'warn' })}>{copy.showExample}</Button>
           {/if}
         {/snippet}
       </Empty>
@@ -2346,17 +2356,46 @@
     font-size: var(--t-ui);
   }
 
+  /**
+   * THE CELL IS THE BOX, AND THE PENCIL FLOATS OVER IT.
+   *
+   * This was an `inline-flex` holding the value and the pencil side by side, and the pencil is
+   * invisible at rest rather than absent, so it took width the whole time. `.td` truncates with an
+   * ellipsis, the flex row was wider than the column, and every editable cell on the busiest list
+   * in the product painted a stray `..` after a value that fitted perfectly well: thirty-eight rows
+   * times four editable columns, all day, on the screen a person spends the most time on. Nobody
+   * saw it because two dim dots at 55% ink read as part of the typeface.
+   *
+   * OUT OF FLOW, AND THE ROOM FOR IT IS MADE ONLY WHILE IT IS THERE. Three arrangements and each
+   * costs something: in flow costs every cell a pencil's width of its own text, for ever; out of
+   * flow with the room always reserved costs the same width the same way, and turned `owed to me`
+   * into `owed to ...` on every row; out of flow with the room made on hover costs an ellipsis on
+   * ONE cell while a pointer is on it. The paragraph below argues against reflowing the COLUMN
+   * under the cursor, which none of these does: the column is a grid track and its width is set by
+   * the header.
+   */
   .cell-said {
-    display: inline-flex;
-    gap: var(--sp-2);
-    align-items: center;
+    position: relative;
+    display: block;
     min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The room, made when the pencil appears and not before. */
+  :global(.td):hover .cell-said,
+  :global(.td):focus-within .cell-said {
+    padding-inline-end: var(--sp-4);
   }
 
   /* PRESENT IN THE TREE AND INVISIBLE UNTIL IT IS WANTED. `opacity` and not `display: none`, because
      a control removed from the box changes the cell's width the moment a pointer enters it, and a
      column that reflows under the cursor is a column you cannot click accurately. */
   .cell-pen {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
     display: grid;
     flex: none;
     place-items: center;

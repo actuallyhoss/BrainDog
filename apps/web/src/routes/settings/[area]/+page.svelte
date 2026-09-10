@@ -345,19 +345,21 @@
      * Pressing the level somebody already holds changes nothing, so nothing is what it says.
      */
     if (to === who.level) return;
-    /* `null` IS A DESTINATION AND A STARTING POINT, and the sentence has to survive both. Taking the
-       record level away is `access.revoke` on `'*'` and leaves whatever exceptions they hold; going
-       the other way from nothing is a grant. Comparing `LEVELS.indexOf(null)` would have made it
-       `-1`, which is below `read` and therefore always a grant — the wrong verb in the event, in
-       exactly the case this control was added for. */
-    const from = who.level === null ? -1 : LEVELS.indexOf(who.level);
-    const into = to === null ? -1 : LEVELS.indexOf(to);
-    toasts.push(
-      copy.notWritten(
-        `${who.name} would move from ${who.level ?? 'nothing'} to ${to ?? 'nothing'} across this record, with one access.${into > from ? 'grant' : 'revoke'} per list and your reason on each`,
-      ),
-      { intent: 'warn' },
-    );
+    /**
+     * THE DIRECTION IS THE EVENT'S, AND IT IS NO LONGER THE SENTENCE'S.
+     *
+     * This line ended `with one access.grant per list` or `with one access.revoke per list`,
+     * chosen by comparing the two levels' places in `LEVELS`, with `null` held at `-1` so that
+     * taking the record level away read as a revoke rather than as a grant — which it does: it is
+     * `access.revoke` on `'*'`, and it leaves whatever exceptions they hold.
+     *
+     * All of that is still true of what the record would write, and none of it belonged in the
+     * toast. Those are two of `30 §2`'s closed forty kinds, read out to somebody deciding what a
+     * colleague may see, and the half of the sentence naming where the level moves FROM and TO has
+     * already said which way it goes. What the second half is for is how much would happen, and
+     * that is one per list in either direction. The kinds are untouched in the log and the API.
+     */
+    toasts.push(copy.notWritten(copy.levelWouldMove(who.name, who.level ?? 'nothing', to ?? 'nothing')), { intent: 'warn' });
   };
 
   /* A RECORD KEEPS AT LEAST ONE OWNER — `LEVEL_REQUIRED`, and its fix sentence verbatim (45 §5.6).
@@ -703,7 +705,7 @@
                     aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
                     onclick={() =>
                       toasts.push(
-                        copy.notWritten(`Every one of ${p.name}'s access rows would be removed, with one access.revoke per list`),
+                        copy.notWritten(copy.accessWouldGo(p.name)),
                         { intent: 'bad' },
                       )}
                   >{copy.removeAccess}</Button>
@@ -787,7 +789,10 @@
                             onclick={() =>
                               toasts.push(
                                 copy.notWritten(
-                                  `${REGISTERS[ex.register]?.name ?? ex.register} would go back to ${p.level === null ? 'nothing' : p.level}, with one access.revoke naming that list`,
+                                  copy.exceptionWouldGo(
+                                    REGISTERS[ex.register]?.name ?? ex.register,
+                                    p.level === null ? 'nothing' : p.level,
+                                  ),
                                 ),
                                 { intent: 'bad' },
                               )}
@@ -807,7 +812,7 @@
                     weight="bare"
                     onclick={() =>
                       toasts.push(
-                        copy.notWritten(`One list would be picked, and ${p.name} given a different level on it, which takes one invite and one access.grant naming that list`),
+                        copy.notWritten(copy.exceptionWouldBeAdded(p.name)),
                         { intent: 'warn' },
                       )}
                   ><Icon name="plus" size="s" />{copy.addException}</Button>
@@ -966,7 +971,7 @@
                   ? undefined
                   : (e: MouseEvent) => {
                       e.preventDefault();
-                      toasts.push(copy.notWritten(`${r.name} would open, with its own registers and pages`));
+                      toasts.push(copy.notWritten(copy.otherRecord(r.name)));
                     }}
               >
                 <span class="seq"><Icon name="rows" size="s" /></span>

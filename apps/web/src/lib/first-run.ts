@@ -34,8 +34,12 @@ export const firstRun = {
      itself. "Not just code" says the same thing without telling a developer their work is out of
      scope. */
   firstLede: 'Everything about your business that is not just code.',
+  /* `the services it runs on` AND IT WAS `the estate`. One area of this record answered to four
+     names — this lede, the card below it, the pack, the rail's section heading — while the list
+     underneath all of them was called Services. This is the first paragraph of the first screen,
+     so it is where a reader learns the word, and it was teaching them the one nothing else says. */
   firstBody:
-    'Money, the estate it runs on, the people, the projects, and the decisions behind ' +
+    'Money, the services it runs on, the people, the projects, and the decisions behind ' +
     'them. Typed, versioned, and readable by every agent you use.',
   firstQuestion: 'Where do you want to start?',
   /* SPLIT IN TWO, so the clause defining *row* can sit against the word rather than behind the
@@ -45,7 +49,14 @@ export const firstRun = {
   firstHint: 'You can delete it later.',
   firstChoices: [
     { key: 'obligations', icon: 'money', label: 'Money', body: 'What you owe, and what you are owed.', field: 'What is it, and how much?' },
-    { key: 'services', icon: 'calendar', label: 'The estate', body: 'Domains, hosting, subscriptions, licences.', field: 'What renews, and when?' },
+    /* `Services`, AND IT WAS `The estate`. The tile is the second of five on the first screen
+       anybody sees, and it was the only one of the five whose word appeared nowhere else in the
+       product: the register it makes is Services, the rail heading over it is Services now, and
+       the page it opens is Renewals. `start.ts` resolves `?add=` against the word on the tile, so
+       `?add=services` and `?add=Services` both land where they did; `?add=estate` and
+       `?add=the-estate` now get the choice list, which is the honest answer to a word this
+       record's tiles no longer use. Nothing in the product writes that parameter. */
+    { key: 'services', icon: 'calendar', label: 'Services', body: 'Domains, hosting, subscriptions, licences.', field: 'What renews, and when?' },
     { key: 'people', icon: 'people', label: 'People', body: 'Clients, contractors, and who does what.', field: 'Who is it, and what are they for?' },
     { key: 'things', icon: 'thing', label: 'Projects', body: 'The things you run, and the plan for each.', field: 'What is it, and what is it for?' },
     /* `tasks` AND NOT `decisions`. A decision is not a register — it is what the gate writes when

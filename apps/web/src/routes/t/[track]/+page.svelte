@@ -92,9 +92,15 @@
          no filter ran, so "nothing matched" is about something that did not happen. It names the
          thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
          teacher. -->
-    <Empty kind="error" heading title={copy.noSuch('track', String(route.params.track))}>
+    <!-- AND SO DID THE REFUSAL AND THE WAY OUT OF IT. Four literals below the comment above said
+         `track` while the head and the kicker beside them read the declaration and said Thread.
+         Both of these are read from the declaration now: `one` is the word for a single row and
+         `name` is the word for the list, so neither can drift from the register again. The word
+         behind the `??` is only ever reached by a record with no such list, where every noun for
+         it is a guess and the row it names cannot exist either. -->
+    <Empty kind="error" heading title={copy.noSuch(REGISTERS.tracks?.one ?? 'thread', String(route.params.track))}>
       {#snippet actions()}
-        <Button weight="primary" href="/r/tracks">Open Tracks</Button>
+        <Button weight="primary" href="/r/tracks">{copy.openUnfiltered(REGISTERS.tracks?.name ?? '')}</Button>
       {/snippet}
     </Empty>
   </div>
@@ -115,13 +121,9 @@
     <section class="lane">
       <Section title="What has been said" count={updates.length}>
       {#if updates.length === 0}
-        <!-- Not an error, and not styled as one. Nobody has written about this track yet, which is
-             the ordinary state of a track somebody started this morning. -->
-        <Empty
-          kind="no-data-yet"
-          title="No update yet."
-          body="An update is a sentence, a health and a date. It is the only thing on a track that says how it is actually going."
-        />
+        <!-- Not an error, and not styled as one. Nobody has written about this thread yet, which is
+             the ordinary state of one somebody started this morning. -->
+        <Empty kind="no-data-yet" title="No update yet." body={copy.threadNoUpdate} />
       {:else}
         <ol class="thread">
           {#each updates.slice(0, DOM_CAP) as u (u.seq)}
@@ -183,7 +185,7 @@
       {#if tasks.length === 0}
         <!-- `points at` is the schema's word for a `ref`, and the second half reassured the reader
              that nothing was wrong — the product explaining itself rather than saying the fact. -->
-        <p class="quiet">No open tasks on this track.</p>
+        <p class="quiet">{copy.threadNoTasks}</p>
       {:else}
         <ul class="rows">
           {#each tasks as t (t.seq)}

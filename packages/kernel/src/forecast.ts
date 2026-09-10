@@ -159,7 +159,12 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
     if (fraction) {
       refusals.push({
         code: 'VALUE_MALFORMED',
-        fix: `${leg.register} declares a cycle of ${fraction[1]} months for ${fraction[0]}, and a cycle is a whole number of months.`,
+        /* `is set to` AND NOT `declares`, WHICH IS THE BROWSER'S WORDING FOR THE SAME REFUSAL.
+           `19 §9` is that the product speaks the reader's words, and `declares` is the format's word
+           for itself. The browser's copy of this walk was reworded and this one was not, which put
+           two sentences on one refusal one commit after the pass whose whole subject was the two
+           engines agreeing. Nothing compares the strings, so it was silent. */
+        fix: `${leg.register} is set to a cycle of ${fraction[1]} months for ${fraction[0]}, and a cycle is a whole number of months.`,
         at: 'every',
       });
       continue;

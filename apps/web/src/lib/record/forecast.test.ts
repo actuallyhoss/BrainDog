@@ -400,7 +400,11 @@ test('A CYCLE IS A WHOLE NUMBER OF MONTHS, and a fortnight written as 0.5 is ref
 
   const walk = runway(500_000, [fortnightly], 180);
   assert.deepEqual(walk.steps, [], `a fractional cycle walked ${walk.steps.length} steps`);
-  assert.match(walk.refusals[0] ?? '', /services declares a cycle of 0\.5 months for monthly/);
+  /* `is set to` AND IT WAS `declares`. `10 §7` makes the refusal the teacher, so it may not open
+     in the schema's own verb: the person reading it is looking at a cash walk with a leg missing
+     and wants to know which list to go and fix. The two facts this line is about — that the
+     refusal names the leg and quotes the fraction back — are unchanged. */
+  assert.match(walk.refusals[0] ?? '', /services is set to a cycle of 0\.5 months for monthly/);
   assert.match(walk.refusals[0] ?? '', /whole number of months/);
 
   // And the honest declaration is untouched, which is what says the refusal is about the fraction.

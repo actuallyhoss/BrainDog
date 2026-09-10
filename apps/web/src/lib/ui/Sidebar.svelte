@@ -259,7 +259,7 @@
           aria-current={r.name === record ? 'true' : undefined}
           onclick={() => {
             if (r.name === record) return;
-            toasts.push(copy.notWritten(`${r.name} would open, with its own registers and pages`));
+            toasts.push(copy.notWritten(copy.otherRecord(r.name)));
           }}
         >
           <span class="mi-avatar" aria-hidden="true">{r.name.slice(0, 1)}</span>

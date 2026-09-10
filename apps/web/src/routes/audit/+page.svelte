@@ -81,11 +81,18 @@
     'grant.read': { word: 'Read a credential', icon: 'vault' },
     'grant.rotate': { word: 'Rotated a credential', icon: 'vault' },
     'grant.revoke': { word: 'Revoked a credential', icon: 'vault' },
-    'grant.bind': { word: 'Bound a credential', icon: 'vault' },
+    /* `Attached` AND IT WAS `Bound`. `bind` came off the button that does this — `copy.ts` says
+       "Put this on a page" now, and gives the reason: nothing in the product ever says what
+       binding is. The kind stays `grant.bind`, which is a kind the record writes; the log's verb
+       is read by a person going back over what happened to their credentials. */
+    'grant.bind': { word: 'Attached a credential', icon: 'vault' },
     /* Ingest */
     arrive: { word: 'Arrived', icon: 'inbox' },
     match: { word: 'Matched', icon: 'inbox' },
-    extract: { word: 'Read an arrival', icon: 'inbox' },
+    /* `an email` AND IT WAS `an arrival`. An arrival is what the record calls a thing that came in
+       through an ingest, and the reader going down this log is looking for the day something read
+       their mail. `copy.ts` renamed the word off the inbox's own button for the same reason. */
+    extract: { word: 'Read an email', icon: 'inbox' },
     propose: { word: 'Proposed', icon: 'decide' },
     pull: { word: 'Fetched', icon: 'refresh' },
     /* Access */

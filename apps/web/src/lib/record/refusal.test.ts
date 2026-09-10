@@ -322,7 +322,16 @@ test('THE QUOTED QUERY IS THE READER’S WORDS, not the column’s', () => {
      sentence follows the label rather than the field id: that is the whole mechanism, and it means
      a pack that renames a field renames every filter sentence about it. */
   assert.equal(saidPlainly('obligations', 'direction is owed_to_me'), 'which way is owed to me');
-  assert.equal(saidPlainly('obligations', 'state is paid'), 'state is paid');
+  /* `status is paid` AND IT WAS `state is paid`, WHICH IS THE MECHANISM WORKING RATHER THAN
+     BREAKING. This field carried no label, so it stood here as the case where the sentence and
+     the field id are the same string. Five registers headed the column `State` while `things`
+     headed its own `Status`, so all six carry `label: 'Status'` now and every filter sentence
+     about the field followed without a line of printer code changing — which is exactly what
+     "a pack that renames a field renames every filter sentence about it" means. */
+  assert.equal(saidPlainly('obligations', 'state is paid'), 'status is paid');
+  /* AND A FIELD THAT STILL CARRIES NO LABEL IS STILL ITS OWN ID, which is the half the line above
+     used to hold on its own: `labelOf` falls back to the id with its underscores taken out. */
+  assert.equal(saidPlainly('obligations', 'note is x'), 'note is x');
   /* A relative day becomes the phrase, for the same reason: `+30d` is not something anybody typed. */
   assert.equal(saidPlainly('services', 'renews before +30d'), 'renews before 30 days from now');
   /* And a field the register does not declare passes through rather than being invented. */

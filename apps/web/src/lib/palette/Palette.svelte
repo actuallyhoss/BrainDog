@@ -270,9 +270,12 @@
     const out: Row[] = [];
 
     // Exact spoken id first, always. It is the string a person heard out loud.
+    // AND THE LINE UNDER IT SAID SO. `spoken id` is what this repository calls the convention among
+    // itself; the reader has just typed one, which is the whole proof they did not need the term.
+    // The literal lived here rather than in `copy.ts`, which is why no rename had ever reached it.
     const spoken = SPOKEN.exec(text.toUpperCase());
     const qualified = QUALIFIED.exec(text);
-    if (spoken) out.push({ id: 'spoken', title: text.toUpperCase(), detail: 'Open by spoken id', href: `/${text.toUpperCase()}`, group: copy.records, icon: 'arrow' });
+    if (spoken) out.push({ id: 'spoken', title: text.toUpperCase(), detail: copy.openById, href: `/${text.toUpperCase()}`, group: copy.records, icon: 'arrow' });
     if (qualified) out.push({ id: 'qualified', title: text, detail: `${REGISTERS[qualified[1]!]?.name ?? qualified[1]} row`, href: `/r/${qualified[1]}/${qualified[2]}`, group: copy.records, icon: 'arrow' });
 
     // Strict-prefix aliases outrank fuzzy matching. It is the only verified mechanism found that

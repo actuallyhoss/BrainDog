@@ -177,6 +177,18 @@ export const copy = {
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
   newRecord: 'New record',
+  /**
+   * WHAT THE OTHER RECORD WOULD OPEN WITH, AND IT SAID `registers`.
+   *
+   * The rail's switcher and the Settings list of records are two surfaces offering one act, so
+   * they were already typed as one sentence — twice, once in each file, neither of them here.
+   * `lists` is the word the rail's own heading uses and the word this file has settled on; the
+   * sentence behind the press kept the schema's word because a rename can only reach text that
+   * exists before somebody presses something, and this text does not.
+   *
+   * It is one key now, so the next rename reaches both call sites or neither.
+   */
+  otherRecord: (name: string) => `${name} would open, with its own lists and pages`,
 
   /* Toasts. Past tense, the row named, and the undo is the sentence's point — never "Row archived
      successfully", which reports on the software rather than on the record. */
@@ -490,6 +502,12 @@ export const copy = {
   noneMatching: (total: number, what: string) => `${total} ${what}, none matching:`,
   auditHolds: 'Every change to this record is appended here, with who made it and when.',
   vaultEmpty: 'No credentials indexed yet.',
+  /* A THREAD'S TWO EMPTY STATES, AND BOTH SAID `track`. The register was renamed to Threads and the
+     rename reached the head and the kicker of this screen, which read it from the declaration; the
+     three sentences below them were typed into the route, so they went on saying the word the rest
+     of the product had stopped using. They are here so the next rename reaches them. */
+  threadNoUpdate: 'An update is a sentence, a health and a date. It is the only thing on a thread that says how it is actually going.',
+  threadNoTasks: 'No open tasks on this thread.',
   /**
    * AND WHERE ONE COMES FROM, which is the half an empty state owes its reader and this did not have.
    *
@@ -519,6 +537,18 @@ export const copy = {
   archiveSelected: 'Archive them',
   clearFilters: 'Clear filters',
   saveAsView: 'Save as a view',
+  /* WHAT `Alt+V` WOULD DO, AND IT SAID `register`. `19 §9` bans that word from a screen by name,
+     and two other files in this repository had swept the markup and concluded it never reaches
+     one. Both sweeps were right about the markup: the sentence is a toast typed into the route, so
+     it does not exist until somebody presses the chord, and no sweep of visible text can see it. */
+  viewWouldBeSaved: 'The filter would be saved as a named view on this list',
+  /* AND THE OTHER ONE, WHICH IS NOT A TOAST AND WAS MISSED FOR A DIFFERENT REASON. The banner over
+     the busiest list names the field the rejected saves were aimed at, and falls back to naming
+     the list when the refusal carries no field. That fallback is static markup, so a sweep could
+     have seen it — but only on a record whose newest refusal has no field on it, and this one's
+     has. A word that only appears in a state the seeded record is not in is a word nobody reads
+     until somebody's own record reaches that state. */
+  thisList: 'this list',
   export: 'Export the record',
   requestAccess: 'Request access',
   tryAgain: 'Load it again',
@@ -541,6 +571,18 @@ export const copy = {
      that came in through an ingest, and the inbox is the one screen where the reader is looking at
      an email. Naming it after the mechanism that carried it is naming it after the plumbing. */
   archiveArrival: 'Archive this',
+  /**
+   * AND THE THREE SENTENCES BEHIND THE THREE BUTTONS, WHICH DID NOT GET THE MEMO.
+   *
+   * The note above renamed `arrival` off the button and gave the reason: the inbox is the one
+   * screen where the reader is looking at an email, and naming it after the mechanism that carried
+   * it is naming it after the plumbing. All three toasts under those buttons still said it, and
+   * one of them said `pattern` as well, three words away from a button reading "Leave it for
+   * another rule". They were literals in the route, which is why the rename could not reach them.
+   */
+  inboxLeaveIt: 'This email would be left for a different rule',
+  inboxFileIt: 'A row would be created from this email',
+  inboxArchiveIt: 'This email would be archived, and its bytes kept',
   /**
    * THE INBOX AT ZERO IS TWO STATES, AND IT WAS DRAWN AS ONE, in a literal typed into the route.
    *
@@ -571,6 +613,17 @@ export const copy = {
   goBack: 'Choose something else',
   editRow: 'Edit the row',
   stopRun: 'Stop the run',
+  /**
+   * ONE SCREEN, ONE NOUN FOR ITS OWN SUBJECT, AND IT USED TO HAVE TWO.
+   *
+   * `/jobs/<id>` drew the kicker `Job` and the tab title `Job` over a refusal reading "There is no
+   * run called j_9K4A" and a button reading "Stop the run", and the register it is reached from is
+   * called Agent runs with `one: 'run'`. A reader who followed "Watch the run" arrived somewhere
+   * headed Job. `job` stays in the address, in the field on a session row and in the type, because
+   * those are handles; the two words on the screen are not.
+   */
+  run: 'Run',
+  runWouldStop: 'The run would stop at its next step',
   verifyFile: 'Check an exported file',
   /* WHAT DELETING DOES, said instead of a one-word heading that states no fact. `Danger` was over
      `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
@@ -579,6 +632,11 @@ export const copy = {
     `Deleting ${record} removes every list, page and row in it. It cannot be undone.`,
   deleteRecord: (record: string): string => `Delete ${record}`,
   showExample: 'Show an example row',
+  /* AND WHAT PRESSING IT WOULD DO. The toast printed the schema's own value back inside a
+     backtick — "marked `example`" — on the empty state of a list somebody has just made. The mark
+     is real and it is a value in a `tags` field; its spelling is not what somebody deciding
+     whether they want a sample row is asking about. */
+  exampleWouldBeAdded: 'One example row would be added, marked as an example',
   /* `Preview` AND IT WAS `Peek`. It is printed as a keyboard hint on every list, `p peek`, which is
      a word the product invented for a thing every other product calls a preview. */
   peek: 'Preview the row',
@@ -610,6 +668,11 @@ export const copy = {
   destinations: 'Go to',
   records: 'Rows',
   pages: 'Pages and lists',
+  /* THE LINE UNDER AN ID SOMEBODY TYPED, AND IT SAID `spoken id`. That is this product's internal
+     name for the convention, written down in `19 §2` and in this file's own notes, and the palette
+     is the one surface where the reader has just proved they know the convention by using it. The
+     detail is there to say what pressing Enter does, so it says that and nothing else. */
+  openById: 'Open by id',
   askBrainDog: 'Ask BrainDog',
 
   /**
@@ -661,6 +724,12 @@ export const copy = {
   allInstalledWhy: 'Packs this record does not already have appear here, each with what it would add before you install it.',
   install: 'Install',
   uninstall: 'Uninstall',
+  /* AND WHAT UNINSTALLING WOULD DO, WHICH SAID `declares`. That is the schema's verb, and it sat
+     on the one control of the trust screen a person presses when they have decided against a file
+     they let in. What they want to know is what leaves and what stays, and the pack ADDED those
+     things; declaring them is what the file did before any of this concerned them. */
+  uninstallWould: (pack: string) =>
+    `${pack} and everything it added would be removed, with the diff shown first, and the rows it created would stay`,
   installDiff: 'What this adds',
   /* `04 §3`'s seven sections, in a person's words. Only the ones that say something render: a
      `CHANGES` heading over nothing is a warning that does not apply, and `06 §1` is that those
@@ -882,6 +951,26 @@ export const copy = {
      signal, and labelling the normal case trains people to stop reading the label. */
   alpha: 'Alpha',
   removeAccess: 'Remove',
+  /**
+   * THE FOUR SENTENCES THIS SCREEN SAYS WHEN YOU PRESS SOMETHING, AND ALL FOUR PRINTED AN EVENT
+   * KIND.
+   *
+   * `access.grant` and `access.revoke` are two of `30 §2`'s forty kinds, closed by a `CHECK` the
+   * database enforces, and they belong in the log and in the API. They were being read out to a
+   * person on the screen that decides who can see their business, in a sentence whose whole job is
+   * to say how much would happen. How much is one per list; which direction it is has already been
+   * said by the half of the sentence naming where the level moves from and to.
+   *
+   * THE KINDS ARE UNTOUCHED, which is the trade `19 §9` already ran once for the vault: the word on
+   * the screen changes and the schema keeps its own, because a kind is spoken by the record.
+   * They were four literals in the route, which is why one rename never reached all four.
+   */
+  levelWouldMove: (name: string, from: string, to: string) =>
+    `${name} would move from ${from} to ${to} across this record, with one change per list and your reason on each`,
+  accessWouldGo: (name: string) => `Every one of ${name}'s access rows would be removed, with one change per list`,
+  exceptionWouldGo: (list: string, to: string) => `${list} would go back to ${to}, with one change naming that list`,
+  exceptionWouldBeAdded: (name: string) =>
+    `One list would be picked, and ${name} given a different level on it, which takes one invitation and one change naming that list`,
   /* `LEVEL_REQUIRED`'s own fix sentence, verbatim (45 §5.6). */
   lastOwner: 'A record keeps at least one owner.',
   /* THE ONE ACTION THAT REMOVES YOUR OWN WAY BACK. `45 §5.6` gives every level change one method,

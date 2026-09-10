@@ -202,8 +202,13 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
        cash walk is not a smaller cash walk, it is a crossing day computed from part of the money. */
     const fraction = leg.every ? Object.entries(leg.every.months).find(([, n]) => !Number.isInteger(n)) : undefined;
     if (fraction) {
+      /* `is set to` AND IT WAS `declares`. `10 §7` makes the refusal the teacher, and a refusal
+         that opens in the schema's own verb teaches the schema: the person reading this is looking
+         at a cash walk with a leg missing from it and wants to know which list to go and fix.
+         `packages/kernel/src/forecast.ts` still says `declares` in the same sentence, and cannot
+         be reached from here. */
       refusals.push(
-        `${leg.register} declares a cycle of ${fraction[1]} months for ${fraction[0]}, and a cycle is a whole number of months.`,
+        `${leg.register} is set to a cycle of ${fraction[1]} months for ${fraction[0]}, and a cycle is a whole number of months.`,
       );
       continue;
     }

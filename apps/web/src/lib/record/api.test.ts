@@ -760,7 +760,16 @@ test('A PACK DIFF COUNTS WHAT IT SAYS IT COUNTS', () => {
 
   const page_ = d.adds.find((a) => a.kind === 'page')!;
   assert.equal(page_.name, PAGES.money!.title);
-  assert.match(page_.detail ?? '', new RegExp(`^${PAGES.money!.blocks.length} blocks`));
+  /* THE COUNT IS THE DECLARATION'S, AND THE WORD IS NO LONGER `blocks`. It asserted the whole
+     phrase, so it was holding two facts in one regex: that the number comes from the page rather
+     than from anywhere else, which is what this test is about and has not moved, and that the
+     noun beside it is `block`, which was never this test's subject. `block` is defined once, on a
+     sheet a person reaches from a different screen, once per device, behind a cookie — and this
+     is the screen where a stranger decides whether to let a file into their business and the one
+     screen in the product that can define nothing. So the number is asserted, and the word this
+     surface may not use is asserted absent. */
+  assert.match(page_.detail ?? '', new RegExp(`^${PAGES.money!.blocks.length} `));
+  assert.doesNotMatch(page_.detail ?? '', /\bblocks?\b/u, 'the trust screen is printing a word it has no room to define');
 });
 
 test('and it never names a page that does not exist', () => {

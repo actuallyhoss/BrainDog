@@ -113,8 +113,14 @@ test('and a good night records what makes “it is backed up” checkable', () =
     if (snap.failed !== null) continue;
     const row = AUDIT.find((e) => e.kind === 'export' && e.at.startsWith(snap.at));
     assert.ok(row, `${snap.at}`);
-    assert.equal(row.note, `${snap.rows} rows, sealed`);
-    assert.ok(snap.rows > 0, 'a sealed copy of nothing is not a sealed copy');
+    /* THE NOTE IS THE COUNT, AND IT USED TO END `, sealed`. `12 §8` asks the walk to record row
+       counts so that *it is backed up* is checkable, and the count is what does that. The word
+       beside it was a second name for the thing the row's own verb already says — this line
+       renders as *Backed up · This record · 91 rows* — and `copy.ts` had already settled `backup`
+       over `sealed copy` for the reason that having two words means a reader who learns one still
+       meets the other. What the test is about is the number, and the number is still asserted. */
+    assert.equal(row.note, `${snap.rows} rows`);
+    assert.ok(snap.rows > 0, 'a backup of nothing is not a backup');
   }
 });
 

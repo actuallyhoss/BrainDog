@@ -5,13 +5,20 @@
  * markup and a focus call; this is a mapping from what somebody typed to a register id, it has an
  * answer for every input, and it was wrong for three of the five words the screen puts on tiles.
  *
- * THE TILES SAY *Money*, *The estate*, *People*, *Projects*, *Work*. The keys behind them are
- * `obligations`, `services`, `people`, `things`, `tasks`. Only `people` is both. Nothing on the page
- * writes the parameter, so nothing was broken — it is a link somebody types or shares from what is
- * in front of them, and it worked two times in five.
+ * THE TILES SAY *Money*, *Services*, *People*, *Projects*, *Work*. The keys behind them are
+ * `obligations`, `services`, `people`, `things`, `tasks`. Two of the five are both. Nothing on the
+ * page writes the parameter, so nothing was broken — it is a link somebody types or shares from
+ * what is in front of them, and it worked two times in five.
+ *
+ * THE SECOND TILE SAID *The estate* WHEN THIS WAS WRITTEN, which is why `plain` drops a leading
+ * `the` at all: `?add=the-estate` had to reach the same register as `?add=estate`. The tile says
+ * *Services* now, because one area of the record answering to four names is what a vocabulary pass
+ * took off the first screen. So `?add=estate` and `?add=the-estate` get the choice list from here
+ * on, which is the honest answer to a word this record's tiles no longer use, and the rule below
+ * stays because a tile beginning with *the* is a tile somebody will write again.
  */
 
-/** Letters and digits only, with a leading `the` dropped — so `the-estate`, `The Estate` and `estate` are one word. */
+/** Letters and digits only, with a leading `the` dropped — so `the-services`, `The Services` and `services` are one word. */
 export const plain = (v: string): string => v.toLowerCase().replace(/[^a-z0-9]+/g, '').replace(/^the/, '');
 
 /**

@@ -196,16 +196,23 @@ const NIGHTLY = DEPLOYMENT.kind === 'cloud' ? 'T03:17:00.000Z' : 'T02:41:00.000Z
 const FAILED_NIGHTS = SNAPSHOTS.filter((s) => s.failed !== null);
 
 /**
- * How far back the newest sealed copy now is, said the way this product says durations.
+ * How far back the newest backup now is, said the way this product says durations.
  *
  * NOT "one night". The gap is to the newest night that WORKED, which is not the night before the
  * one that failed whenever two fail in a row — and a queue that ranks by the cost of being wrong
  * cannot state that cost from a constant.
+ *
+ * AND IT SAID `sealed copy`. Settings settled this word over `snapshot` and `sealed copy` and
+ * `copy.ts` records the reason: two words for one idea means a reader who learns one still meets
+ * the other. These two sentences are on `/decide` and on Home, which is two of the three spine
+ * screens, so they were where the reader met the other one. The copies are still sealed and
+ * `copy.ts` still says so on the screen that explains the signing key; that is a fact about how a
+ * backup is made rather than a second name for it.
  */
 const nightsSince = (snap: Snapshot): string => {
   const kept = SNAPSHOTS.filter((s) => s.failed === null && s.at < snap.at).map((s) => s.at).sort();
   const newest = kept[kept.length - 1];
-  return newest === undefined ? 'No sealed copy has ever been taken' : `The newest sealed copy is from ${newest}`;
+  return newest === undefined ? 'No backup has ever been taken' : `The newest backup is from ${newest}`;
 };
 
 /* ── declared pages ───────────────────────────────────────────────────────── */
@@ -271,7 +278,10 @@ export const QUESTIONS: Question[] = [
    */
   ...FAILED_NIGHTS.map((snap, i) => ({
     id: `SG${34 + i}`,
-    title: `The snapshot on ${snap.at} did not run`,
+    /* `backup` AND NOT `snapshot`, WHICH IS THE WORD SETTINGS SETTLED. The argument for it beside
+       `nightsSince` names `snapshot` as well as `sealed copy`, and this question is on `/decide`
+       and on Home: the two screens somebody sees first, carrying the third name for one thing. */
+    title: `The backup on ${snap.at} did not run`,
     /* WHAT IT COSTS, in the terms this queue ranks by — and the cost of a missed night is the
        distance back to the last night that worked. */
     cost: `${nightsSince(snap)}, and the reason has not gone away: ${snap.failed ?? ''}. Tonight will fail the same way.`,
@@ -281,7 +291,10 @@ export const QUESTIONS: Question[] = [
     opened: `${snap.at}${NIGHTLY}`,
     entity: 'This record',
     options: [
-      { key: 'run', title: 'Run it now', body: 'Take a sealed copy immediately. It counts against the thirty like any other night.', recommended: true },
+      /* `a backup` AND IT WAS `a sealed copy`. Settings calls this a backup, and an option on the
+         one question about whether the record still exists tomorrow is not the place to introduce
+         a second name for the thing being offered. */
+      { key: 'run', title: 'Run it now', body: 'Take a backup immediately. It counts against the thirty like any other night.', recommended: true },
       { key: 'ignore', title: 'Ignore it', body: 'Tonight’s run will try again. If the reason has not gone away it will fail again, and ask again.' },
     ],
   })),
@@ -393,7 +406,7 @@ export const DECIDED: Question[] = [
 export const INBOX: InboxItem[] = [
   { id: 'in_8f21', arrived: stamp(-3), from: 'billing@fenwick.example', subject: 'Your September invoice is ready', body: 'Account 44192. Total GBP 58.00, charged 24 September to the card ending 4417.', suggestion: 'When something arrives from Fenwick Cloud, set the renewal date on the matching service.' },
   { id: 'in_8f19', arrived: stamp(-9), from: 'ap@halden.example', subject: 'RE: Invoice 2026-041', body: 'Apologies for the delay. This is with our finance team and should clear in the next payment run on the 12th.' },
-  { id: 'in_8f14', arrived: stamp(-26), from: 'noreply@nordhaven.example', subject: 'Renewal reminder: kilnfonts.example', body: 'kilnfonts.example expires on 30 August 2026. Auto-renew is OFF for this name.', suggestion: 'Take the renewal date from the subject line of arrivals like this one.' },
+  { id: 'in_8f14', arrived: stamp(-26), from: 'noreply@nordhaven.example', subject: 'Renewal reminder: kilnfonts.example', body: 'kilnfonts.example expires on 30 August 2026. Auto-renew is OFF for this name.', suggestion: 'Take the renewal date from the subject line of emails like this one.' },
   { id: 'in_8f11', arrived: stamp(-31), from: 'sm@marchetti.example', subject: 'September availability', body: 'I can do Tuesdays and Thursdays through September, and the first week of October is free if you want the migration done in one block.' },
   { id: 'in_8f07', arrived: stamp(-48), from: 'hello@pellvine.example', subject: 'Year end: what we need from you', body: 'Bank statements to 31 March, the fixed asset list, and any invoices raised after the year end that relate to work done before it.' },
   { id: 'in_8f02', arrived: stamp(-73), from: 'support@ledgerpost.example', subject: 'Sending domain not verified', body: 'portagemail.example has no DKIM record. Messages are being sent, but a growing share will land in spam until this is fixed.' },
@@ -416,7 +429,12 @@ export const VAULT: Credential[] = [
 
 export const PACKS: PackInfo[] = [
   { id: 'money-core', name: 'Money', blurb: 'What you owe, what you are owed, and installments.', version: '1.4.0', installed: true, registers: ['obligations'], pages: ['money'], author: 'braindog' },
-  { id: 'estate', name: 'Estate', blurb: 'Domains, hosting, subscriptions, renewals.', version: '1.2.1', installed: true, registers: ['services'], pages: ['estate'], author: 'braindog' },
+  /* `Services`, AND THE PACK'S DISPLAY NAME WAS `Estate`. It was the fourth name for one area of
+     the record, beside the first run's card, the rail's section heading and the register itself,
+     and this is the copy of it a stranger reads on the trust screen before letting the file in.
+     The pack id stays `estate`, which is the `pack:` key on the register and the page, and what
+     `04 §3`'s format writes. */
+  { id: 'estate', name: 'Services', blurb: 'Domains, hosting, subscriptions, renewals.', version: '1.2.1', installed: true, registers: ['services'], pages: ['estate'], author: 'braindog' },
   { id: 'people', name: 'People', blurb: 'Collaborators, contractors, accountants.', version: '1.0.3', installed: true, registers: ['people'], pages: [], author: 'braindog' },
   { id: 'work', name: 'Work', blurb: 'Tasks, tracks, dates.', version: '1.1.0', installed: true, registers: ['tasks'], pages: ['work'], author: 'braindog' },
   { id: 'portfolio', name: 'Portfolio', blurb: 'The things you run, and the plan for each.', version: '1.0.0', installed: true, registers: ['things'], pages: [], author: 'braindog' },
@@ -426,7 +444,7 @@ export const PACKS: PackInfo[] = [
      condition that could never be true and the three sentences about it rendered nowhere. A trust
      screen that structurally cannot show the refusal it makes is a trust screen with a hole. */
   { id: 'freelancer-uk', name: 'Freelancer UK', blurb: 'Invoices with VAT, statutory interest, and the payment terms clause.', version: '2.0.1', installed: false, registers: ['invoices', 'clients'], pages: ['invoicing'], author: 'k.marsh', titles: { invoices: 'Invoices', clients: 'Clients', invoicing: 'Invoicing' }, stars: 214, moves: [{ page: 'money', from: 10, to: 12 }] },
-  /* AND THIS ONE COLLIDES. `services` is the Estate pack's, and two packs owning one name is the
+  /* AND THIS ONE COLLIDES. `services` is the `estate` pack's, and two packs owning one name is the
      failure `02 §1` builds the whole additive story on — so it is a CONFLICT rather than a change,
      and the install is refused rather than merged. */
   { id: 'type-foundry', name: 'Type foundry', blurb: 'Licences, cuts, and who is allowed to use what.', version: '0.4.0', installed: false, registers: ['licences', 'cuts', 'services'], pages: ['licensing'], author: 'a.brandt', titles: { licences: 'Licences', cuts: 'Cuts', licensing: 'Licensing' }, stars: 37, conflicts: ['services'] },
@@ -584,9 +602,13 @@ const NIGHTLY_EVENTS: AuditEvent[] = SNAPSHOTS.flatMap((snap) => {
      night apart are already ordered by the night. */
   const by = 'system';
   if (snap.failed === null)
-    return [{ seq: 0, at, by, kind: 'export' as const, note: `${snap.rows} rows, sealed`, version: 0 }];
+    /* THE COUNT, AND IT USED TO END `, sealed`. The row this note sits on already carries the
+       verb — `export` renders as *Backed up* — so the second half was a word `copy.ts` had
+       renamed out of the product saying a thing the line beside it had already said. What `12 §8`
+       asks the note to carry is the row count, and that is what is left. */
+    return [{ seq: 0, at, by, kind: 'export' as const, note: `${snap.rows} rows`, version: 0 }];
   return [
-    { seq: 1, at, by, kind: 'suggest' as const, target: `suggestion:SG${34 + FAILED_NIGHTS.indexOf(snap)}`, note: 'Re-run the snapshot', version: 1 },
+    { seq: 1, at, by, kind: 'suggest' as const, target: `suggestion:SG${34 + FAILED_NIGHTS.indexOf(snap)}`, note: 'Run the backup again', version: 1 },
     /* `12 §8`'S EXACT STRING. `note: 'failed: <reason>'` — and `30 §2` is explicit that this is
        how a blocked night is recorded: *"`blocker` is not an event kind."* */
     { seq: 0, at, by, kind: 'export' as const, note: `failed: ${snap.failed}`, version: 0 },

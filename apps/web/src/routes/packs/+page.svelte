@@ -134,7 +134,7 @@
               tone="bad"
               onclick={() =>
                 toasts.push(
-                  copy.notWritten(`${pack.name} and everything it declares would be removed, with the diff shown first, and the rows it created would stay`),
+                  copy.notWritten(copy.uninstallWould(pack.name)),
                   { intent: 'warn' },
                 )}
             >{copy.uninstall}</Button>

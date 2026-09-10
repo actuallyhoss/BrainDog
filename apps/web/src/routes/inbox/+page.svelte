@@ -117,7 +117,7 @@
                     <Button weight="primary" onclick={() => toasts.push(copy.notWritten('The rule would be written and tested against the last 30 days'), { intent: 'warn' })}>{copy.makeRule}</Button>
                     <Button
                       weight="bare"
-                      onclick={() => toasts.push(copy.notWritten('This arrival would be left for a different pattern'))}
+                      onclick={() => toasts.push(copy.notWritten(copy.inboxLeaveIt))}
                     >{copy.notThisOne}</Button>
                   </div>
                 </div>
@@ -127,12 +127,12 @@
                    which has a consequence. The buttons are the instruction. -->
 
               <div class="actions">
-                <Button onclick={() => toasts.push(copy.notWritten('A row would be created from this arrival'), { intent: 'warn' })}
+                <Button onclick={() => toasts.push(copy.notWritten(copy.inboxFileIt), { intent: 'warn' })}
                   >{copy.fileIt}</Button
                 >
                 <Button
                   weight="bare"
-                  onclick={() => toasts.push(copy.notWritten('This arrival would be archived, and its bytes kept'))}
+                  onclick={() => toasts.push(copy.notWritten(copy.inboxArchiveIt))}
                 >{copy.archiveArrival}</Button>
               </div>
             </div>

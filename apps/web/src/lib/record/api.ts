@@ -1289,7 +1289,13 @@ export function packDiff(pack: PackInfo): PackDiff {
             kind: 'page',
             name: decl.title,
             detail: [
-              `${decl.blocks.length} ${decl.blocks.length === 1 ? 'block' : 'blocks'}`,
+              /* AND IT COUNTED `blocks`. `block` is defined once, on the AddBlock sheet, once per
+                 device, behind a cookie — and this line is on the trust screen, which is where a
+                 stranger decides whether to let a file into their business and the one screen in
+                 the product with no way to define anything. What the count is FOR is how much
+                 page arrives with the pack, and a table and a figure are what a page is made of.
+                 The word is untouched everywhere it is taught. */
+              `${decl.blocks.length} ${decl.blocks.length === 1 ? 'table or figure' : 'tables and figures'}`,
               /* WHERE IT LANDS IN THE RAIL, which is the half somebody actually checks. A pack may
                  place a page it owns; `04 §4` is that it may never move yours. */
               decl.nav ? `${decl.nav.section} section` : 'not in your sidebar',
