@@ -26,7 +26,7 @@
   import { KINDS, isKind } from 'braindog-render';
 
   import { copy } from '../copy.ts';
-  import { pages } from '../record/api.ts';
+  import { REGISTERS, pages } from '../record/api.ts';
   import { BINDABLE, seedBlock } from '../record/seed.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -66,20 +66,22 @@
 
   const kinds = $derived(BINDABLE.filter((k) => isKind(k)));
 
+  /* The list by the name a person gave it, never its id. */
+  const listName = $derived(REGISTERS[register]?.name ?? register);
+
   $effect(() => {
     if (open && !toPage) toPage = destinations[0]?.page ?? '';
   });
 </script>
 
-<Sheet bind:open title={copy.bindBlock} id="{register}.{predicate}">
+<Sheet bind:open title={copy.bindBlock}>
   <div class="form">
     <!-- The sentence, with the two halves the view already answered stated rather than asked. 21
-         §3.4: the middle control never contains an expression, it contains NAMES. -->
+         §3.4: the middle control never contains an expression, it contains NAMES, so the list is
+         named as the rail names it and no id appears, in the sentence or in the sheet's title. -->
     <p class="sentence">
-      <span class="said">{copy.showMe}</span>
-      <code class="fixed">{register}</code>
-      <span class="said">{copy.thatIs}</span>
-      <code class="fixed">{predicate}</code>
+      <span class="said">{copy.showMe}</span> <span class="fixed" dir="auto">{listName}</span><span class="said">:</span>
+      <span class="fixed" dir="auto">{predicate}</span>
     </p>
     <p class="says">{says}</p>
 
@@ -100,7 +102,7 @@
     </label>
 
     {#if destinations.length === 0}
-      <p class="none">{copy.noDestination(register)}</p>
+      <p class="none">{copy.noDestination(listName)}</p>
     {:else}
       <!-- What will exist afterwards, spelled out. A2: nothing applies without a diff, and the
            smallest honest diff for one added block is the sentence describing it. -->
@@ -133,12 +135,11 @@
     gap: var(--sp-4);
   }
 
+  /* Plain text in the body face: the product's own words dim, the names the view brought ink. No
+     chips, because a name somebody gave a list is not code. */
   .sentence {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-2);
     font-size: var(--t-md);
+    overflow-wrap: anywhere;
   }
 
   .said {
@@ -146,20 +147,14 @@
   }
 
   .fixed {
-    padding: 2px 7px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-weight: 600;
   }
 
   .says {
     margin-block-start: calc(var(--sp-3) * -1);
     color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .row {

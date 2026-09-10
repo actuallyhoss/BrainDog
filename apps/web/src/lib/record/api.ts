@@ -1221,7 +1221,7 @@ export function boot() {
            * Two views existed in the record and the rail held zero `/v/` links, while the keyboard
            * sheet documented `⌥V` as "Save the filter as a view" — so the product taught somebody to
            * make a thing and then never showed it to them again. The palette found them, and the
-           * palette is labelled "Search, or run a command".
+           * palette is labelled "Search".
            *
            * UNDER THE LIST THEY FILTER, because that is what one IS: the same rows with a predicate.
            * A section of its own would be a second place to look for a list.

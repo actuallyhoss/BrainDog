@@ -59,9 +59,9 @@
     /**
      * Inside a frame that already has one.
      *
-     * A block draws its own border and heading, so the full card here would be a box in a box and a
-     * second title under the first. Compact keeps the glyph and the words and drops the frame —
-     * the same five designed states rather than a sixth shape that drifts from them.
+     * A block draws its own border and heading, so the full column here would be a second title
+     * under the first. Compact keeps the glyph and the words on one row: the same five designed
+     * states rather than a sixth shape that drifts from them.
      */
     compact?: boolean;
   } = $props();
@@ -144,7 +144,7 @@
     </p>
   {/if}
   {#if agentPrompt}
-    <p class="empty-agent">Or from any session:</p>
+    <p class="empty-agent">Or ask your assistant:</p>
     <pre class="empty-prompt"><code>{agentPrompt}</code></pre>
   {/if}
   {#if actions}<div class="empty-actions">{@render actions()}</div>{/if}
@@ -164,40 +164,31 @@
     cursor: pointer;
   }
 
+  /* No box: the state sits on the page's own ground, the way the rows it stands in for do. */
   .empty {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
     max-inline-size: 56ch;
-    padding: var(--sp-5);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    padding-block: var(--sp-4);
   }
 
   /* Nothing is centred: centring one line in a row of left-aligned ones is worse than not marking
      it at all, and a tight empty state inside a block's own frame keeps the page's shape (19 §6). */
-  /* It takes the kind's tone where there is one, and the plain edge where there is not. Absence is
-     not an alarm: `no-data-yet` and `no-results` are ordinary and must not arrive in the danger
-     colour just because they are empty. */
+  /* The bare glyph, no tile. It takes the kind's tone where there is one and the dim ink where
+     there is not. Absence is not an alarm: `no-data-yet` and `no-results` are ordinary and must not
+     arrive in the danger colour just because they are empty. */
   .empty-glyph {
-    display: grid;
-    place-items: center;
-    inline-size: 40px;
-    block-size: 40px;
-    margin-block-end: var(--sp-3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    display: flex;
+    margin-block-end: var(--sp-1);
     color: var(--dim);
   }
 
   .empty[data-kind='error'] .empty-glyph {
-    border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
     color: var(--danger);
   }
 
   .empty[data-kind='cleared'] .empty-glyph {
-    border-color: color-mix(in srgb, var(--earn) 40%, var(--line));
     color: var(--earn);
   }
 
@@ -210,7 +201,7 @@
   }
 
   /* The refusals, as a list, because they are several separate facts and a joined sentence reads as
-     one. Monospaced: every one of them quotes a clause somebody wrote. */
+     one. */
   .empty-lines {
     display: flex;
     flex-direction: column;
@@ -218,7 +209,6 @@
     margin: 0;
     padding: 0;
     color: var(--ink2);
-    font-family: var(--font-id);
     font-size: var(--t-sm);
     list-style: none;
   }
@@ -306,16 +296,15 @@
     font-size: var(--t-sm);
   }
 
+  /* THE COMMAND KEEPS THE IDENTIFIER FACE, because it is a literal somebody pastes, and loses the
+     box: a sunk, bordered panel read as a terminal on a screen meant for anybody. */
   .empty-prompt {
     margin: 0;
-    padding: var(--sp-3);
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
     color: var(--ink2);
     font-family: var(--font-id);
     font-size: var(--t-sm);
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   .empty-actions {

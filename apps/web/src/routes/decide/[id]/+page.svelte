@@ -477,21 +477,16 @@
     gap: var(--sp-2);
   }
 
+  /* The option's number, in the body face with nothing round it. A boxed digit in the id face
+     read as a key to press, and the card is already the box. */
   .card-n {
-    inline-size: 20px;
-    block-size: 20px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
     color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    line-height: 18px;
-    text-align: center;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
   .card[data-on] .card-n {
-    border-color: var(--accent);
     color: var(--accent-text);
   }
 

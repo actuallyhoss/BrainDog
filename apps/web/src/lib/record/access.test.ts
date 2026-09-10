@@ -358,7 +358,7 @@ test('and the two areas that report rather than offer say which deployment this 
   const key = `${copy.theKeyIs} ${copy.theKeyWhere}`;
   assert.match(key, /copy that file somewhere else/i);
   assert.match(key, /cannot be opened/i);
-  assert.match(copy.theKeyWhere, /age identity file/i, 'the screen no longer says where the key is');
+  assert.match(copy.theKeyWhere, /the key file you made/i, 'the screen no longer says where the key is');
   /**
    * `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some".
    *

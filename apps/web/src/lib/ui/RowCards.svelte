@@ -103,6 +103,7 @@
 {#if decl}
   <ul class="cards">
     {#each entries as e (e.seq)}
+      {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]])}
       <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
         <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
@@ -120,7 +121,9 @@
                 role="img"
                 aria-label={it.name}>{it.mark}</span>
             {/if}
-            {display(register, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}
+            <!-- A TITLE NOBODY SET SAYS SO, in the dim ink the grid gives a missing value. An empty
+                 first line would read as a card that failed to draw. -->
+            {#if title === null}<span class="card-missing">Not set</span>{:else}{title}{/if}
           </span>
           <span class="card-seq">
             {#if picked?.has(e.seq)}
@@ -265,6 +268,11 @@
     .card-title .glyph,
     .card-title .card-mark {
       margin-inline-end: var(--sp-1);
+    }
+
+    .card-missing {
+      color: var(--dim);
+      font-weight: 400;
     }
 
     @media (width < 400px) {

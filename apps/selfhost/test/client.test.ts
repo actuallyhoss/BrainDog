@@ -352,3 +352,46 @@ test('and the whole route table is reachable from the client', async () => {
     await c.close();
   }
 });
+
+/* ── the typed methods, each under its own name ─────────────────────────── */
+
+test('EVERY TYPED READ REACHES A REAL RECORD under its own name, and a missing one is a refusal', async () => {
+  /* The client grew a named method for each READ+ route a screen needs, and nothing drove them: a
+     method that sent the wrong argument name would have typed cleanly and answered nothing. Each is
+     asked once against a real server, which is the only place the name on the wire is checked. */
+  const c = await connected();
+  try {
+    value(await c.client.pages());
+    value(await c.client.packs());
+    value(await c.client.members());
+    value(await c.client.listTokens());
+    value(await c.client.listGrants());
+    value(await c.client.whoami());
+    value(await c.client.governance());
+    value(await c.client.governance({ register: 'suggestion', limit: 5 }));
+    assert.ok(refusal(await c.client.page('no-such-page')).fix.length > 0, 'a missing page said nothing');
+    assert.ok(refusal(await c.client.metric('no-such-metric')).fix.length > 0, 'a missing metric said nothing');
+  } finally {
+    await c.close();
+  }
+});
+
+test('a read mark and a note are writes that change no row', async () => {
+  const c = await connected();
+  try {
+    const mark = value<{ upTo: number; seen_at: unknown }>(await c.client.markRead());
+    assert.equal(typeof mark.upTo, 'number');
+    assert.ok('seen_at' in mark, 'the mark came back without saying where it now stands');
+
+    const made = value<{ version: number }>(
+      await c.client.create({ register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }),
+    );
+    value(await c.client.log({ register: 'obligations', seq: 1, note: 'Chased twice.' }));
+    /* THE VERSION DOES NOT MOVE. Somebody holding the version they read must still be able to save
+       over a note somebody else left, because a note changed nothing they could have read. */
+    assert.equal(value<{ version: number }>(await c.client.get('obligations', 1)).version, made.version);
+    assert.equal(refusal(await c.client.log({ register: 'obligations', seq: 1, note: '  ' })).code, 'REQUIRED_MISSING');
+  } finally {
+    await c.close();
+  }
+});

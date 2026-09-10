@@ -300,13 +300,16 @@
       <ul class="ledger">
         {#each DECIDED.slice(0, DOM_CAP) as q}
           <li>
+            <!-- A TICK LEADS AND THE ID ENDS THE LINE, the order the queue above keeps. `SG31` in the
+                 leading column was a code expanded nowhere; the question is what tells these rows
+                 apart, and the id stays, dim, for whoever meets "Decided SG31" in the log. -->
             <a class="line" href="/decide/{q.id}">
-              <span class="seq">{q.id}</span>
+              <span class="seq"><Icon name="check" size="s" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{q.decided?.reason}</span>
               </span>
-              <span class="line-when">{since(q.decided?.at ?? '', NOW)}</span>
+              <span class="line-when">{since(q.decided?.at ?? '', NOW)}<span class="decided-id">{q.id}</span></span>
             </a>
           </li>
         {/each}
@@ -521,9 +524,42 @@
    */
   @media (width >= 640px) {
     .ledger :global(.line) {
-      grid-template-columns: 8ch minmax(0, 1fr) auto;
+      grid-template-columns: 2ch minmax(0, 1fr) auto;
       min-block-size: 44px;
     }
+  }
+
+  /* ON A PHONE THE TICK IS A COLUMN, as on Home. `rows.css` gives the leading span a line of its
+     own on a card, and a lone tick over every decided question is a line that says nothing. */
+  @media (width < 640px) {
+    .ledger :global(.line) {
+      grid-template-columns: 20px minmax(0, 1fr);
+      gap: var(--sp-1) var(--sp-3);
+    }
+
+    .ledger :global(.seq) {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: start;
+      min-inline-size: 0;
+      padding-block-start: 2px;
+    }
+
+    .ledger :global(.line-main) {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .ledger :global(.line-when) {
+      grid-column: 2;
+      grid-row: 2;
+      justify-content: flex-start;
+    }
+  }
+
+  .decided-id::before {
+    content: '·';
+    margin-inline-end: 5px;
   }
 
   @media (width < 900px) {

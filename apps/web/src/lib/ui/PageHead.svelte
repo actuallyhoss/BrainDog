@@ -29,7 +29,7 @@
     define,
   }: {
     title: string;
-    /** The glyph the register or page already declares. The rail draws it; the page dropped it. */
+    /** The glyph the register or page declares, drawn beside the title only when `hue` is given. */
     icon?: IconName | undefined;
     /** The frozen hue of the row this page is about, when it is about one. */
     hue?: number | undefined;
@@ -56,9 +56,26 @@
     define?: Noun | undefined;
     actions?: Snippet | undefined;
   } = $props();
+
+  /* THE HAIRLINE SHOWS ONLY ONCE SOMETHING HAS SCROLLED UNDER THE HEAD. At rest a rule under the
+     title only boxed it. A zero-height mark where the head starts leaves the scroller the moment
+     the head sticks, which is the moment an edge starts meaning something. */
+  let mark = $state<HTMLElement>();
+  let under = $state(false);
+
+  $effect(() => {
+    if (!mark) return;
+    const io = new IntersectionObserver((seen) => {
+      const last = seen.at(-1);
+      if (last) under = !last.isIntersecting;
+    });
+    io.observe(mark);
+    return () => io.disconnect();
+  });
 </script>
 
-<header class="head">
+<div bind:this={mark} aria-hidden="true"></div>
+<header class="head" data-under={under ? '' : undefined}>
   <div class="head-main">
     <div class="head-titles">
       {#if kicker}<p class="kicker">{kicker}</p>{/if}
@@ -69,15 +86,10 @@
            FLEX direction too and swung our own id chip to the other side of the heading. Chrome
            keeps the UI's direction; data follows its own. See the note in `blocks.css`. -->
       <h1 class="title">
-        <!-- Every register and page declares an icon, the rail has always drawn it, and the page's
-             own header threw it away — so the one heading that names the thing you are looking at
-             was the only place it did not appear. -->
-        {#if icon}
-          <span
-            class="title-icon"
-            data-hued={hue === undefined ? undefined : ''}
-            style={hue === undefined ? undefined : `--hue:${hue}`}
-          >
+        <!-- ONLY WITH A HUE. A page about one thing wears that thing's coloured mark; a grey glyph
+             before every other heading only repeated the rail and read as admin navigation. -->
+        {#if icon && hue !== undefined}
+          <span class="title-icon" style="--hue:{hue}">
             <Icon name={icon} size="l" />
           </span>
         {/if}
@@ -159,7 +171,13 @@
     padding: var(--sp-4) var(--sp-5) var(--sp-3);
     background: color-mix(in srgb, var(--bg) 82%, transparent);
     backdrop-filter: blur(12px);
-    border-block-end: 1px solid var(--line);
+    /* Transparent rather than absent, so the head does not grow a pixel when the rule appears. */
+    border-block-end: 1px solid transparent;
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .head[data-under] {
+    border-block-end-color: var(--line);
   }
 
   .head-main {
@@ -191,16 +209,12 @@
     letter-spacing: -0.026em;
   }
 
+  /* The thing's own frozen hue, same lightness and chroma as its mark in the grid. A page about
+     Kiln is headed in Kiln's colour, which is the one colour here that names something. */
   .title-icon {
     display: grid;
     place-items: center;
     align-self: center;
-    color: var(--dim);
-  }
-
-  /* The thing's own frozen hue, same lightness and chroma as its mark in the grid. A page about
-     Kiln is headed in Kiln's colour, which is the one colour here that names something. */
-  .title-icon[data-hued] {
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
 

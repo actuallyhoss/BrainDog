@@ -320,6 +320,24 @@
    * in the past tense about a thing that did not happen is the worst kind of mock, because it is the
    * kind somebody believes.
    */
+  /* THE LADDER IN THE WORDS YOU WOULD USE ABOUT A COLLEAGUE. `member.level` keeps the schema's five
+     and every value written is still one of them; only what the screen prints changes. */
+  const LEVEL_SAID: Record<string, string> = {
+    owner: 'Owner',
+    decide: 'Decides',
+    write: 'Edits',
+    append: 'Adds only',
+    read: 'Reads',
+  };
+  const levelSaid = (level: string | null) => (level === null ? copy.noRecordLevel : (LEVEL_SAID[level] ?? level));
+
+  /* WHERE A MACHINE REACHES YOU FROM, said as what it is. `mcp` and `cli` are protocol names. */
+  const SURFACE_SAID: Record<string, string> = {
+    mcp: 'through an AI assistant',
+    cli: 'from the command line',
+  };
+  const surfaceSaid = (surface: string) => SURFACE_SAID[surface] ?? copy.overSurface(surface);
+
   /**
    * WHAT `invite({ person, levels, why })` WOULD WRITE, said in the words it would write it in.
    *
@@ -360,7 +378,7 @@
      * already said which way it goes. What the second half is for is how much would happen, and
      * that is one per list in either direction. The kinds are untouched in the log and the API.
      */
-    toasts.push(copy.notWritten(copy.levelWouldMove(who.name, who.level ?? 'nothing', to ?? 'nothing')), { intent: 'warn' });
+    toasts.push(copy.notWritten(copy.levelWouldMove(who.name, levelSaid(who.level), levelSaid(to))), { intent: 'warn' });
   };
 
   /* A RECORD KEEPS AT LEAST ONE OWNER — `LEVEL_REQUIRED`, and its fix sentence verbatim (45 §5.6).
@@ -490,9 +508,9 @@
       </Section>
 
       <Section title={copy.scheme}>
-        <div class="segment" role="group" aria-label={copy.scheme}>
+        <div class="segmented" role="group" aria-label={copy.scheme}>
           {#each [['light', copy.schemeLight, 'sun'], ['system', copy.schemeSystem, 'monitor'], ['dark', copy.schemeDark, 'moon']] as const as [v, label, icon]}
-            <button type="button" class="seg" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}>
+            <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}>
               <Icon name={icon} size="s" />
               {label}
             </button>
@@ -518,17 +536,17 @@
       -->
       <Section title={copy.contrast}>
         <p class="hint">{copy.contrastHint}</p>
-        <div class="segment" role="group" aria-label={copy.contrast}>
+        <div class="segmented" role="group" aria-label={copy.contrast}>
           <button
             type="button"
-            class="seg"
+            class="segment"
             aria-pressed={moreContrast}
             data-on={moreContrast ? '' : undefined}
             onclick={() => pickContrast(true)}>{copy.on}</button
           >
           <button
             type="button"
-            class="seg"
+            class="segment"
             aria-pressed={!moreContrast}
             data-on={!moreContrast ? '' : undefined}
             onclick={() => pickContrast(false)}>{copy.off}</button
@@ -537,11 +555,11 @@
       </Section>
 
       <Section title={copy.textSize}>
-        <div class="segment" role="group" aria-label={copy.textSize}>
+        <div class="segmented" role="group" aria-label={copy.textSize}>
           {#each [['sm', copy.textSmall], ['base', copy.textNormal], ['md', copy.textLarge]] as const as [v, label]}
             <button
               type="button"
-              class="seg"
+              class="segment"
               aria-pressed={text === v}
               data-on={text === v ? '' : undefined}
               onclick={() => ((text = v), set('text', v))}>{label}</button
@@ -551,11 +569,11 @@
       </Section>
 
       <Section title={copy.density}>
-        <div class="segment" role="group" aria-label={copy.density}>
+        <div class="segmented" role="group" aria-label={copy.density}>
           {#each [['compact', copy.densityCompact], ['comfortable', copy.densityComfortable], ['roomy', copy.densityRoomy]] as const as [v, label]}
             <button
               type="button"
-              class="seg"
+              class="segment"
               aria-pressed={density === v}
               data-on={density === v ? '' : undefined}
               onclick={() => ((density = v), set('density', v))}>{label}</button
@@ -571,9 +589,9 @@
              all a reader got. `19 §4` calls this the app's WCAG 2.1.4 conformance; a switch whose
              effect nobody states is a switch nobody turns on deliberately. -->
         <p class="hint">{copy.characterKeysHint}</p>
-        <div class="segment" role="group" aria-label={copy.characterKeys}>
-          <button type="button" class="seg" aria-pressed={chars} data-on={chars ? '' : undefined} onclick={() => (chars = true)}>{copy.on}</button>
-          <button type="button" class="seg" aria-pressed={!chars} data-on={!chars ? '' : undefined} onclick={() => (chars = false)}>{copy.off}</button>
+        <div class="segmented" role="group" aria-label={copy.characterKeys}>
+          <button type="button" class="segment" aria-pressed={chars} data-on={chars ? '' : undefined} onclick={() => (chars = true)}>{copy.on}</button>
+          <button type="button" class="segment" aria-pressed={!chars} data-on={!chars ? '' : undefined} onclick={() => (chars = false)}>{copy.off}</button>
         </div>
       </Section>
       <!--
@@ -612,9 +630,9 @@
       -->
       <Section title={copy.suggestPages}>
         <p class="hint">{copy.suggestPagesHint}</p>
-        <div class="segment" role="group" aria-label={copy.suggestPages}>
-          <button type="button" class="seg" aria-pressed={suggestPages} data-on={suggestPages ? '' : undefined} onclick={() => (suggestPages = true)}>{copy.on}</button>
-          <button type="button" class="seg" aria-pressed={!suggestPages} data-on={!suggestPages ? '' : undefined} onclick={() => (suggestPages = false)}>{copy.off}</button>
+        <div class="segmented" role="group" aria-label={copy.suggestPages}>
+          <button type="button" class="segment" aria-pressed={suggestPages} data-on={suggestPages ? '' : undefined} onclick={() => (suggestPages = true)}>{copy.on}</button>
+          <button type="button" class="segment" aria-pressed={!suggestPages} data-on={!suggestPages ? '' : undefined} onclick={() => (suggestPages = false)}>{copy.off}</button>
         </div>
         <!-- `19 §3` and `29 §4` both say this belongs to the record and not to the device, and there
              is no table in `30 §1` that could hold it — `50 §10` owns the deviation. The screen says
@@ -698,10 +716,9 @@
             {#each PEOPLE_ACCESS as p}
               <li class="who">
                 <div class="who-head">
-                  <!-- NO AVATAR. `13 §2.1b` gives a frozen accent to a REGISTER ROW's identity, and
-                       `20 §6` puts avatar stacks on a business record in the refused column. A glyph
-                       says "person" without inventing a face for one. -->
-                  <Icon name="people" size="s" />
+                  <!-- AN INITIAL, NOT A PHOTO. `20 §6` refuses avatar stacks on a business record,
+                       and a letter in a disc is a face without inventing one. -->
+                  <span class="face" data-you={self(p) ? '' : undefined} aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span>
                   <span class="who-name">{p.name}</span>
                   <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
                        tells two people with one name apart. And WHEN, because access with no date is
@@ -727,7 +744,7 @@
                     onclick={() =>
                       toasts.push(
                         copy.notWritten(copy.accessWouldGo(p.name)),
-                        { intent: 'bad' },
+                        { intent: 'warn' },
                       )}
                   >{copy.removeAccess}</Button>
                   </span>
@@ -748,7 +765,7 @@
                     and reading left to right the row now says *nothing on the record, then these
                     lists* — which is the sentence "invite the bookkeeper" makes.
                   -->
-                  <div class="segment segment-sm" role="group" aria-label={copy.levelFor(p.name)}>
+                  <div class="segmented levels" role="group" aria-label={copy.levelFor(p.name)}>
                     <!-- THE SIXTH OPTION IS NOT A LEVEL, AND ONLY THE COMMENT SAID SO. It rendered as
                          the first of six identical chips with the same `aria-pressed`, inside a group
                          labelled "What <name> can do" — so a screen reader heard six equivalent levels
@@ -758,8 +775,8 @@
                     {#each [null, ...LEVELS] as level}
                       <button
                         type="button"
-                        class="seg"
-                        class:seg-none={level === null}
+                        class="segment"
+                        class:level-none={level === null}
                         data-on={p.level === level ? '' : undefined}
                         aria-pressed={p.level === level ? 'true' : 'false'}
                         aria-label={level === null ? copy.noRecordLevelMeans : undefined}
@@ -770,7 +787,7 @@
                             ? 'own-level'
                             : undefined}
                         onclick={() => levelChange(p, level)}
-                      >{level ?? copy.noRecordLevel}</button>
+                      >{levelSaid(level)}</button>
                     {/each}
                   </div>
                   <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
@@ -802,20 +819,21 @@
                                not see at a glance whether an exception was above or below it, which is
                                the one thing a matrix is for. The word is the comparison; the sentence
                                is what the word means. -->
-                          <span class="ex-word">{ex.level}</span>
+                          <span class="ex-word">{levelSaid(ex.level)}</span>
                           <span class="ex-level">{copy.levelMeans[ex.level] ?? ex.level}</span>
+                          <!-- NOT THE DANGER TONE. Going back to their level undoes an exception, which is
+                               the safe direction, and red on it said the opposite. -->
                           <Button
                             weight="bare"
-                            tone="bad"
                             onclick={() =>
                               toasts.push(
                                 copy.notWritten(
                                   copy.exceptionWouldGo(
                                     REGISTERS[ex.register]?.name ?? ex.register,
-                                    p.level === null ? 'nothing' : p.level,
+                                    levelSaid(p.level),
                                   ),
                                 ),
-                                { intent: 'bad' },
+                                { intent: 'warn' },
                               )}
                           >{copy.removeException}</Button>
                         </li>
@@ -873,7 +891,7 @@
             <p class="danger-title">{copy.eraseWhat}</p>
             <Button
               tone="bad"
-              onclick={() => toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'bad' })}
+              onclick={() => toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'warn' })}
             >{copy.erasePerson}</Button>
           </div>
         </Section>
@@ -916,7 +934,7 @@
                       tone="bad"
                       disabled={PASSKEYS.length <= 1}
                       aria-describedby={PASSKEYS.length <= 1 ? 'last-key' : undefined}
-                      onclick={() => toasts.push(copy.notWritten(`${k.label} would stop being a way into this record`), { intent: 'bad' })}
+                      onclick={() => toasts.push(copy.notWritten(`${k.label} would stop being a way into this record`), { intent: 'warn' })}
                     >{copy.remove}</Button>
                   </span>
                 </div>
@@ -1101,6 +1119,7 @@
         {/if}
 <ul class="whos">
           {#each devices as d}
+            {@const claims = d.reach === 'login' || d.reach === 'runner'}
             <li class="who" data-intent={DEVICE_TONE[d.state]}>
               <div class="who-head">
                 <!-- ALL FOUR TONED STATES, and it marked two. `approved` and `expired` fell through
@@ -1121,7 +1140,7 @@
                      both as *today* — on the table whose whole decision is whether ten minutes have
                      passed. -->
                 <span class="who-detail">
-                  {copy.deviceState[d.state]} · {copy.overSurface(d.surface)} ·
+                  {copy.deviceState[d.state]} · {surfaceSaid(d.surface)} ·
                   {d.lastSeen ? copy.usedWhen(since(d.lastSeen, NOW)) : copy.askedWhen(since(d.at, NOW))}
                 </span>
                 <!--
@@ -1132,7 +1151,7 @@
                   it would let it do, so Approve and Deny sat under a sentence that could not tell a
                   ten-minute one-shot export from a ninety-day bearer that runs code as you.
 
-                  And `ua` beside it, `30 §1`'s "second free-text column the approver reads",
+                  And `ua` under it, `30 §1`'s "second free-text column the approver reads",
                   attributed rather than asserted because the column is trusted for nothing. Its
                   meaning turns on the reach: for the four operation grants it is the SUBJECT the
                   command sent — what would be exported, imported or installed.
@@ -1140,10 +1159,11 @@
                 <span class="who-detail who-reach">
                   <!-- The separator carries its own spaces. Svelte trims the leading whitespace of a
                        block, so `…{#if d.ua} ·` rendered `for ninety days· says it is …`. -->
-                  {copy.reachMeans[d.reach] ?? d.reach}{#if d.ua}{' · '}{d.reach === 'login' || d.reach === 'runner'
-                      ? copy.saysItIs(d.ua)
-                      : copy.aboutWhat(d.ua)}{/if}
+                  {copy.reachMeans[d.reach] ?? d.reach}{#if d.ua && !claims}{' · '}{copy.aboutWhat(d.ua)}{/if}
                 </span>
+                <!-- WHAT THE MACHINE SAYS IT IS, A STEP QUIETER. For a sign-in or a runner `ua` is a
+                     user agent, trusted for nothing, so it sits under the decision rather than in it. -->
+                {#if d.ua && claims}<span class="who-detail who-ua">{copy.saysItIs(d.ua)}</span>{/if}
                 <span class="who-do">
                   {#if d.state === 'pending'}
                     <!--
@@ -1158,16 +1178,16 @@
                       step.
                     -->
                     <Button weight="primary" onclick={focusCode}>{copy.approve}</Button>
+                    <!-- A PLAIN BUTTON. Saying no to a request is the safe answer, not a destructive one. -->
                     <Button
                       weight="bare"
-                      tone="bad"
-                      onclick={() => toasts.push(copy.notWritten('The request would be denied, and the denial kept'), { intent: 'bad' })}
+                      onclick={() => toasts.push(copy.notWritten('The request would be denied, and the denial kept'), { intent: 'warn' })}
                     >{copy.deny}</Button>
                   {:else if d.state === 'active'}
                     <Button
                       weight="bare"
                       tone="bad"
-                      onclick={() => toasts.push(copy.notWritten(`${d.name} would stop being able to act as you`), { intent: 'bad' })}
+                      onclick={() => toasts.push(copy.notWritten(`${d.name} would stop being able to act as you`), { intent: 'warn' })}
                     >{copy.revoke}</Button>
                   {/if}
                 </span>
@@ -1209,7 +1229,7 @@
                 {:else}<Icon name="session" size="s" />{/if}
                 <span class="who-name">{t.label}</span>
                 <span class="who-detail">
-                  {copy.keyCan[t.scope] ?? t.scope} · {copy.overSurface(t.surface)}
+                  {copy.keyCan[t.scope] ?? t.scope} · {surfaceSaid(t.surface)}
                 </span>
                 <!-- `since` FOR THE INSTANT AND `relative` FOR THE DAYS, and the mixture is the
                      point rather than an inconsistency: `created` and `expires` are days and
@@ -1226,7 +1246,7 @@
                   <Button
                     weight="bare"
                     tone="bad"
-                    onclick={() => toasts.push(copy.notWritten(`${t.label} would stop working immediately, and your own session would not`), { intent: 'bad' })}
+                    onclick={() => toasts.push(copy.notWritten(`${t.label} would stop working immediately, and your own session would not`), { intent: 'warn' })}
                   >{copy.revokeKey}</Button>
                 </span>
               </div>
@@ -1441,7 +1461,7 @@
           </ul>
           <div class="row-actions">
             <Button
-              onclick={() => toasts.push(copy.notWritten('A time would be picked, and the record put back to it, with every write after it gone and the audit ending there plus one restore.pitr row'), { intent: 'bad' })}
+              onclick={() => toasts.push(copy.notWritten('A time would be picked, and the record put back to it, with every write after it gone, and the history ends there, with one line saying you went back'), { intent: 'warn' })}
             >{copy.restoreTo}</Button>
             <!-- `53 §5.5`'s precondition: *"the owner knows the last good instant — `/audit` shows
                  every write with its time"*. The control that answers it is one link away. -->
@@ -1511,7 +1531,7 @@
           <Button
             tone="bad"
             disabled={typedSlug.trim() !== boot().index.slug}
-            onclick={() => toasts.push(copy.notWritten(`You would be asked to sign in again, and then ${RECORD} and every copy of it would be gone`), { intent: 'bad' })}
+            onclick={() => toasts.push(copy.notWritten(`You would be asked to sign in again, and then ${RECORD} and every copy of it would be gone`), { intent: 'warn' })}
             >{copy.deleteRecord(RECORD)}</Button
           >
           </div>
@@ -1663,10 +1683,11 @@
     }
   }
 
+  /* UNBOXED, AND EVERY ONE OF THESE WAS A CARD. A person, a machine, a key and a source are rows on
+     the page with a hairline between them, the way every other list in the product is drawn. */
   .whos {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1676,17 +1697,37 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    padding: var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    padding-block: var(--sp-3);
+  }
+
+  .who + .who {
+    border-block-start: 1px solid var(--line);
   }
 
   .who-head {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     gap: var(--sp-2);
+  }
+
+  /* Home's feed disc, so a person is drawn one way wherever they turn up, and you in the accent. */
+  .face {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 650;
+  }
+
+  .face[data-you] {
+    background: var(--accent-wash);
+    color: var(--accent-text);
   }
 
   .who-name {
@@ -1717,6 +1758,11 @@
     color: var(--ink2);
   }
 
+  .who-ua {
+    flex: 1 1 100%;
+    font-size: var(--t-xs);
+  }
+
   /* The controls sit at the end of the head line and never shrink: a button that wraps its own
      label is a button somebody reads twice. */
   .who-do {
@@ -1733,11 +1779,6 @@
     font-size: var(--t-sm);
   }
 
-  /* The same bar a toned row wears in a grid, on the block that replaced it. */
-  .who[data-intent] {
-    border-inline-start: 2px solid var(--tone);
-  }
-
   .who-level {
     display: flex;
     flex-wrap: wrap;
@@ -1751,12 +1792,11 @@
     font-size: var(--t-sm);
   }
 
-  /* The ladder is five words plus `nothing`, so its buttons are the narrowest segment in the
-     product — and the track wraps rather than scrolling, which `controls.css` already decided for
-     the same reason: five 44px segments measured 342px inside a 320px screen. */
-  .segment-sm .seg {
+  /* The ladder is five levels and a sixth answer, so its segments take the least padding in the
+     product, and the track wraps rather than scrolling, which `controls.css` decided for this reason:
+     five 44px segments measured 342px inside a 320px screen. */
+  .levels .segment {
     padding-inline: var(--sp-2);
-    font-size: var(--t-sm);
   }
 
   /* THE EXCEPTIONS. Indented under the level they are exceptions to, because that relationship is
@@ -1806,11 +1846,20 @@
 
   /* AND IT IS SET APART FROM THE LADDER. Five rungs and a sixth thing that is not one of them,
      rendered identically, is a control whose own comment insists on a distinction the screen does
-     not make. A separator rather than a colour: `13 §5.1` again. */
-  .seg-none {
-    margin-inline-end: var(--sp-2);
+     not make. A separator rather than a colour: `13 §5.1` again. It stands beside the pill rather
+     than being its border, because a pill's own edge is what marks the chosen one. */
+  .level-none {
+    position: relative;
+    margin-inline-end: var(--sp-3);
+  }
+
+  .level-none::after {
+    content: '';
+    position: absolute;
+    inset-block: var(--sp-2);
+    inset-inline-end: calc(-0.5 * var(--sp-3) - 1px);
     border-inline-end: 1px solid var(--line);
-    padding-inline-end: var(--sp-3);
+    pointer-events: none;
   }
 
   /* The ladder word, which is what one exception is compared against another by. */
@@ -1939,7 +1988,7 @@
 
   .hint {
     margin: 0 0 var(--sp-3);
-    max-width: var(--measure);
+    max-inline-size: var(--measure);
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
@@ -1956,8 +2005,8 @@
   .swatch {
     display: grid;
     place-items: center;
-    min-width: var(--tap);
-    height: var(--tap);
+    min-inline-size: var(--tap);
+    block-size: var(--tap);
     padding: 0 var(--sp-2);
     background: var(--swatch, var(--s1));
     /* THE LABEL ON A FILL, which is the token the theme solves for exactly this: a tick drawn in
@@ -1989,56 +2038,27 @@
     line-height: var(--lh-body);
   }
 
-  /* AND THE TRACK WRAPS, which `controls.css` already decided for the register's chips and this copy
-     of the pattern did not: *"the alternative hides a state with no way to know it is there"*. Six
-     44px-wide options is 374px, so at 320 and 360 the level control ran off the screen — and the one
-     that went first is `owner`. A second line costs nothing; a sixth option nobody can reach costs
-     the whole control. */
-  .segment {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    padding: 3px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+  /* THE SHARED PILLS FROM `controls.css`, with two things this screen needs on top.
+
+     The track hugs its options: a settings choice is two to six short words, and a sunk track run
+     to the far edge of the panel reads as a field with the words bunched at one end.
+
+     And a segment is 44 on BOTH axes under a thumb. `a11y.css` names the failure, *"a control grown
+     only in height measures 38x44 and fails"*, and `On` and `Off` are those labels: the shared
+     segment sets a height and its width is the word. The icon beside Light, System and Dark sits on
+     the label's line rather than above it. */
+  .segmented {
+    inline-size: fit-content;
+    max-inline-size: 100%;
   }
 
-  /* `--ctl-h`, LIKE EVERY OTHER CONTROL. Nine of these on `/settings/appearance` were 28px tall on
-     a phone — the screen whose own Text and Density controls are about making things easier to
-     use. `05 §6`: density follows the pointer, never the width. */
-  /* BOTH AXES, and this had one. `a11y.css` states the rule and the exact failure it is written
-     against — *"a control grown only in height measures 38x44 and fails"* — and a short label like
-     `On` or `read` measured **43 x 44**: the height was right and the width was the label. Found by
-     the layout gate the day it learned to measure targets, on three settings areas at four widths. */
-  .seg {
-    display: flex;
+  .segment {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-block-size: var(--ctl-h);
     min-inline-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: 4px;
-    color: var(--dim);
-    font-size: var(--t-ui);
-    cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
   }
-
-  .seg:hover {
-    color: var(--ink2);
-  }
-
-  .seg[data-on] {
-    background: var(--s2);
-    box-shadow: var(--raise);
-    color: var(--ink);
-  }
-
-
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
      are two buttons off the edge. At 320 "Export the rows only" ended at x=406 in a 320px screen. */

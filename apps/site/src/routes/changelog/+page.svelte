@@ -490,9 +490,10 @@
     inset-block-start: calc(var(--sticky) + var(--sp-4));
     align-self: start;
     color: var(--dim);
-    font-family: var(--font-id);
+    /* The body face with lining figures: a date is a word you read, not an identifier. */
     font-size: var(--t-sm);
-    font-weight: 400;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0;
   }
 

@@ -209,8 +209,8 @@
    *
    * ONE DAY AND NOT A RANGE. `19 §5`'s rule is that a filter is what defines which rows you are
    * looking at and has to be shareable, and a day is the unit a person actually says: the ledger's
-   * own rows are stamped to the minute now, so a day narrows to something readable and the stamp
-   * finishes the job. A range is two controls and a validity rule for a question nobody asked.
+   * own rows are stamped to the minute now, so a day narrows to something readable and the minute in
+   * each row's tooltip finishes the job. A range is two controls and a validity rule for a question nobody asked.
    *
    * AND IT APPEARS WHEN THERE IS SOMETHING TO CHOOSE BETWEEN, like the two beside it: a log whose
    * every entry is on one day has nothing to narrow.
@@ -339,12 +339,18 @@
 
   <ul class="ledger">
     {#each shown as e}
+      {@const who = actorOf(e.by)}
       <li>
         <div class="line line-short">
           <!-- ITS OWN COLUMN, NOT `.seq`. That one is 12ch of monospace for spoken ids, and
                `rows.css` says in as many words that anything longer needs a span of its own — so
                "renewal rule" arrived as `the renewal r…`. An actor is a name. -->
-          <span class="who">{actorOf(e.by)}</span>
+          <!-- A face beside the name, the disc Home's feed draws, so the log reads as who passed
+               through rather than as a column of names. -->
+          <span class="who">
+            <span class="face" data-you={who === 'you' ? '' : undefined} aria-hidden="true">{who.charAt(0).toUpperCase()}</span>
+            <span class="who-name">{who}</span>
+          </span>
           <span class="line-main">
             <!-- The target is a LINK, and that is not decoration. This page was a list of spans:
                  nothing in it could be reached by Tab, so the one scrolling container in the app
@@ -364,22 +370,14 @@
           </span>
           <span class="line-amount note">{e.note}</span>
           <!--
-            THE MOMENT, AND NOT ONLY HOW LONG AGO IT WAS.
+            HOW LONG AGO, WITH THE MOMENT BEHIND IT.
 
-            `since()` answers "how long ago", and past a day its bands are deliberately coarse: two
-            changes made the same afternoon both read `3d ago`. That is right on a row about an
-            invoice and wrong here, on the screen the restore setting sends somebody to with the
-            words "find the moment". The band stays because it is what makes a log scannable; the
-            stamp is beside it because it is what a person says out loud.
-
-            AND THE VERSION, WHICH THIS PAGE'S OWN FOOTER SAYS IS HOW YOU NAME A MOMENT while no row
-            printed one. Every event carries it and it was read in exactly one place, to say what
-            the record is at now.
+            The band is what makes a log scannable. The minute and the version, which the footer says
+            is how you name a moment, are its tooltip: stacked under it they made every entry three
+            lines tall for two numbers somebody wants once they have found the line.
           -->
           <span class="line-when">
-            <time datetime={e.at} title={stamp(e.at)}>{since(e.at, NOW)}</time>
-            <span class="stamp">{stamp(e.at)}</span>
-            <span class="ver num">v{e.version.toLocaleString('en')}</span>
+            <time datetime={e.at} title="{stamp(e.at)} · v{e.version.toLocaleString('en')}">{since(e.at, NOW)}</time>
           </span>
         </div>
       </li>
@@ -390,49 +388,51 @@
        version are the same fact, so a version number is a place in this list" is true, and it is a
        sentence about how the record is built. What a reader needs from the number is what it is
        FOR: it is how you name a moment when you talk to somebody about it. -->
-  <p class="foot">
-    {copy.auditVersion(AUDIT[0]?.version.toLocaleString('en') ?? '—')}
-  </p>
+  {#if AUDIT[0]}
+    <p class="foot">{copy.auditVersion(AUDIT[0].version.toLocaleString('en'))}</p>
+  {/if}
 </div>
 
 <style>
-  /**
-   * THE WHEN CELL CARRIES THREE THINGS ON THE LEDGER, and one everywhere else.
-   *
-   * `rows.css` gives `.line-when` a single nowrap band, which is right on a register row. Here it
-   * holds the band, the moment to the minute, and the version, because this is the screen the
-   * restore setting sends somebody to with the words "find the moment". They stack rather than sit
-   * in a line: three nowrap spans side by side on a 320px card push the note out of the row.
-   *
-   * THE BAND IS FIRST BECAUSE IT IS WHAT A PERSON SCANS, and the two exact numbers sit under it in
-   * the dim ink, where somebody looks when they have found the line they want.
-   */
-  .line-when {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 1px;
-  }
-
-  /* THE SAME 12px AS THE BAND ABOVE THEM, and dimmer. `--t-xs` is the bottom of the scale and there
-     is nothing under it on purpose: `13 §8` puts the floor there, so these two are separated by ink
-     rather than by size. */
-  .stamp,
-  .ver {
-    color: var(--dim);
-  }
-
   /* WIDE ENOUGH FOR A NAME, in the reading face rather than the id face. It sits in the grid slot
      `.seq` would have taken, so the ledger's columns still line up down the page. */
   /* A NAME WRAPS ON A CARD TOO. `reply rule` and `renewal rule` are two words and the card's first
      column is 94px; truncating a four-actor filter's own labels leaves `reply r…` as the only thing
      saying who did it. */
   .who {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     min-inline-size: 0;
-    overflow: hidden;
     color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  /* `text-overflow` does nothing on a flex container, so the ellipsis is the name's own. */
+  .who-name {
+    min-inline-size: 0;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Home's feed face, a step smaller because an entry here is one line and not two. */
+  .face {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 22px;
+    block-size: 22px;
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 650;
+  }
+
+  .face[data-you] {
+    background: var(--accent-wash);
+    color: var(--accent-text);
   }
 
   /* The same shape the register's toolbar has, because it is the same act: narrowing a list. */
@@ -481,7 +481,7 @@
     max-inline-size: 1100px;
   }
 
-  /* 16ch FOR THE ACTOR, because it is a name and not a spoken id. The ledger's default first column
+  /* 20ch FOR THE ACTOR AND ITS FACE, because it is a name and not a spoken id. The ledger's default first column
      is 10ch of monospace, which "renewal rule" does not fit in — and once `rule.renewal` became
      English, every rule in the log truncated. */
   /**
@@ -507,7 +507,7 @@
      name was being cut. */
   @media (width >= 640px) {
     .ledger :global(.line) {
-      grid-template-columns: 16ch minmax(0, 1fr) minmax(0, 1fr) 9ch;
+      grid-template-columns: 20ch minmax(0, 1fr) minmax(0, 1fr) 9ch;
     }
   }
 
@@ -534,7 +534,7 @@
      thing this screen must not do: the note IS what changed. */
   @media (width < 640px) {
     .note,
-    .who {
+    .who-name {
       overflow: visible;
       text-overflow: clip;
       white-space: normal;
@@ -550,12 +550,7 @@
        did the same.
 
        SO ROW 1 IS WHO AND WHEN, row 2 is what was done to what, and row 3 is the note, which gets
-       the whole width because it is the one thing on the line that must not be cut. The when cell
-       was three lines under everything else, `3h ago`, `3 Sep 2026, 09:00` and `v4,192` stacked
-       right-aligned, and an event was 122px for a sentence and a half. On a card it is the band and
-       the version on the actor's line; the stamp is the band's tooltip, and stays on the desktop
-       line where the restore setting's "find the moment" is done. The version is how this page
-       says to name a moment, and it stays visible. */
+       the whole width because it is the one thing on the line that must not be cut. */
     .who {
       grid-column: 1;
       grid-row: 1;
@@ -564,18 +559,11 @@
     .line-when {
       grid-column: 2;
       grid-row: 1;
-      flex-direction: row;
-      align-items: baseline;
-      gap: var(--sp-2);
     }
 
     .note {
       grid-column: 1 / -1;
       grid-row: 3;
-    }
-
-    .stamp {
-      display: none;
     }
   }
 

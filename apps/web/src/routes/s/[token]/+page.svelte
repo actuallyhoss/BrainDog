@@ -51,8 +51,6 @@
      a day further every day. */
   const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW };
 
-  const token = $derived(state.params.token ?? '');
-
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
    *
@@ -91,7 +89,7 @@
          surface a non-user ever sees, on the only route neither browser gate had ever visited. -->
     <div class="body">
       <h1 class="title">{result.page.title}</h1>
-      <p class="from">Shared from The Studio · <code>{token.slice(0, 8)}…</code></p>
+      <p class="from">Shared from The Studio</p>
 
       {#each result.blocks as block}
         {#if block.drawn}
@@ -191,12 +189,11 @@
     padding: var(--sp-5);
   }
 
+  /* No rule under the bar: the space before the title is what separates the two. */
   .bar {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding-block-end: var(--sp-4);
-    border-block-end: 1px solid var(--line);
   }
 
   /* 114x26 on a phone. It is a link out of a SHARED page — the one screen somebody arrives at from
@@ -225,8 +222,7 @@
     margin-inline-start: auto;
     padding: 2px var(--sp-3);
     background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--dim);
     font-size: var(--t-xs);
   }
@@ -247,10 +243,6 @@
     margin-block-start: calc(var(--sp-5) * -1 + var(--sp-1));
     color: var(--dim);
     font-size: var(--t-ui);
-  }
-
-  .from code {
-    font-family: var(--font-id);
   }
 
   .block-name {

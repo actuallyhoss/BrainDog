@@ -240,7 +240,6 @@
     align-items: flex-start;
     gap: var(--sp-3);
     padding: var(--sp-4) var(--sp-4) var(--sp-3);
-    border-block-end: 1px solid var(--line);
   }
 
   .sheet-title {

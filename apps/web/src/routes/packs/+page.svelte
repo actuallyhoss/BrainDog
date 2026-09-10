@@ -178,7 +178,7 @@
                   disabled={Boolean(pack.conflicts?.length)}
                   aria-describedby={pack.conflicts?.length ? `conflict-${pack.id}` : undefined}
                   onclick={() =>
-                    toasts.push(copy.notWritten(`${pack.name} would be installed in one transaction, after this plan`), { intent: 'warn' })}
+                    toasts.push(copy.notWritten(`${pack.name} would be installed all at once, after you have seen what it adds`), { intent: 'warn' })}
                 >{copy.install}</Button>
               </span>
             </div>
@@ -314,13 +314,14 @@
     list-style: none;
   }
 
+  /* THE BODY FACE. These are the names of lists and pages, which a person reads as words; the
+     identifier face made a pack's contents look like a manifest. */
   .pack-gives li {
     display: flex;
     align-items: center;
     gap: 5px;
     color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /* A hairline, and the card's own padding pulled back over it, so the actions read as the card's

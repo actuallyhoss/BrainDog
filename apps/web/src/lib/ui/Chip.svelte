@@ -25,18 +25,15 @@
 </span>
 
 <style>
-  /* A TAG, not a pill. The fully rounded capsule is the shape of a count or a notification —
-     something with a number in it — and a state word wearing that shape reads as a badge that has
-     been stuck onto the row rather than as a property of it. A 4px corner, the same corner every
-     control in the product has, reads as part of the row. */
+  /* A pill with no edge, the shape every button and choice in the product has. The wash alone sets
+     it off the row, and the padding keeps the pixel the border used to take. */
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 2px 7px;
+    padding: 3px 9px;
     background: var(--hold-wash);
-    border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--ink2);
     font-size: var(--t-xs);
     font-weight: 600;
@@ -67,18 +64,16 @@
    * `blocks.css:1030` made this exact call on the selected row, and its argument is the whole of
    * `13 §2.3`: the glyph carries the meaning, the colour is the second channel. The glyph moves
    * with the label, because a glyph is text and takes the same pair. What still says `bad` is the
-   * mark, the tint and the border, which is three channels where the rule asks for two.
+   * mark and the tint, which is the two channels the rule asks for.
    *
    * `--ink2` on these grounds measures 5.67 at its worst, over every surface, plain and filled, in
    * all four palettes.
    */
   .chip[data-intent] {
     background: var(--tone-wash);
-    border-color: color-mix(in srgb, var(--tone) 28%, transparent);
   }
 
   .chip[data-filled][data-intent] {
     background: color-mix(in srgb, var(--tone-fill) 20%, transparent);
-    border-color: color-mix(in srgb, var(--tone-fill) 40%, transparent);
   }
 </style>

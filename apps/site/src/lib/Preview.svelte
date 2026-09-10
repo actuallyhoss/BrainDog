@@ -85,7 +85,7 @@
           <ul class="needs">
             {#each p.needs as need}
               <li class="need">
-                <span class="glyph glyph-sm" data-hue="accent"><Icon name="decide" size="s" /></span>
+                <span class="ask"><Icon name="ask" size="s" /></span>
                 <span class="need-copy">
                   <span class="need-title">{need.title}</span>
                   <span class="need-rec">{p.recommends} <b>{need.recommends}</b></span>
@@ -101,7 +101,8 @@
           <ul class="feed">
             {#each p.away as item}
               <li class="event">
-                <span class="who">{item.who}</span>
+                <span class="face" aria-hidden="true">{item.who.charAt(0).toUpperCase()}</span>
+                <span class="who">{item.who.charAt(0).toUpperCase() + item.who.slice(1)}</span>
                 <span class="age">{item.age}</span>
                 <span class="what">{item.what}</span>
               </li>
@@ -377,7 +378,7 @@
 
   .event {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
     gap: 2px var(--sp-3);
     padding-block: 10px;
   }
@@ -386,14 +387,35 @@
     border-block-start: 1px solid var(--line);
   }
 
-  .who {
-    color: var(--dim);
-    font-family: var(--font-id);
+  /* A face and a name, the way the app's feed draws a writer now, rather than a name in the
+     identifier face. */
+  .face {
+    display: grid;
+    grid-row: 1 / span 2;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    background: var(--hover-wash);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
     font-size: var(--t-xs);
+    font-weight: 600;
+  }
+
+  .who {
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+  }
+
+  .ask {
+    display: grid;
+    place-items: center;
+    color: var(--accent-text);
   }
 
   .what {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
     color: var(--ink2);
   }
 

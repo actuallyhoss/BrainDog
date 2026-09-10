@@ -26,6 +26,7 @@
     NOW,
     REGISTERS,
     ROWS,
+    actorOf,
     display,
     healthLabel,
     healthTone,
@@ -127,13 +128,17 @@
       {:else}
         <ol class="thread">
           {#each updates.slice(0, DOM_CAP) as u (u.seq)}
-            <li class="update" data-intent={healthTone(String(u.fields.health) as never)}>
+            {@const who = actorOf(String(u.fields.by))}
+            <li class="update">
+              <!-- WHO SAID IT, AS A FACE. The disc Home's feed gives a writer, so an update reads as
+                   somebody speaking rather than a log line; the health stays on the chip. -->
               <div class="u-head">
+                <span class="face" data-you={who === 'you' ? '' : undefined} aria-hidden="true">{who.charAt(0).toUpperCase()}</span>
+                <span class="u-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <Chip
                   label={String(u.fields.health).replace(/_/g, ' ')}
                   tone={healthTone(String(u.fields.health) as never)}
                 />
-                <span class="u-by">{u.fields.by}</span>
                 <span class="u-at">{since(String(u.fields.at), NOW)}</span>
               </div>
               <p class="u-body" dir="auto">{u.fields.body}</p>
@@ -142,7 +147,7 @@
         </ol>
         <CapLine shown={Math.min(updates.length, DOM_CAP)} total={updates.length} />
         <p class="foot">
-          Appended, never edited. A correction is a new update that replaces the one before it, so the
+          Updates are never edited. A correction is a new update that replaces the one before it, so the
           thread stays the record of what was believed and when.
         </p>
       {/if}
@@ -150,10 +155,10 @@
     </section>
 
     <aside class="side">
-      <Section title="Agents on this" count={sessions.length}>
+      <Section title="Working on this" count={sessions.length}>
       {#if sessions.length === 0}
         <!-- `pinned` appeared nowhere else in the product and nothing pins anything. -->
-        <p class="quiet">No agent is working on this.</p>
+        <p class="quiet">Nobody is working on this.</p>
       {:else}
         <ul class="rows">
           {#each sessions.slice(0, DOM_CAP) as s (s.seq)}
@@ -229,33 +234,52 @@
   .thread {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* A card per update, with the intent on its leading edge rather than behind the text. The health
-     is the first thing read on a thread and the last thing that should be shouted. */
+  /* UNBOXED. Each update was a card with its health painted down the leading edge, so a thread read
+     as a stack of panels. Now they follow one another with a hairline between, and the health is
+     said once, on the chip, which is the last thing on a thread that should be shouted. */
   .update {
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-inline-start: 3px solid var(--tone, var(--edge));
-    border-radius: var(--r-md);
+    padding-block: var(--sp-4);
+  }
+
+  .update + .update {
+    border-block-start: 1px solid var(--line);
   }
 
   .u-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-2) var(--sp-3);
     margin-block-end: var(--sp-2);
+  }
+
+  .face {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 650;
+  }
+
+  .face[data-you] {
+    background: var(--accent-wash);
+    color: var(--accent-text);
   }
 
   .u-by {
     color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    font-weight: 600;
   }
 
   .u-at {
@@ -264,7 +288,9 @@
     font-size: var(--t-xs);
   }
 
+  /* Under the name rather than under the face, so the words line up with who said them. */
   .u-body {
+    padding-inline-start: calc(28px + var(--sp-3));
     color: var(--ink);
     font-size: var(--t-ui);
     line-height: var(--lh-body);
@@ -279,16 +305,18 @@
     line-height: var(--lh-body);
   }
 
+  /* UNBOXED, like every other list: rows on the page with a hairline between, reaching a step past
+     the text column so a row's words line up with the heading and its hover has room. */
   .rows {
     display: flex;
     flex-direction: column;
-    margin: 0 0 var(--sp-4);
+    margin: 0 calc(-1 * var(--sp-3)) var(--sp-4);
     padding: 0;
     list-style: none;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    overflow: hidden;
+  }
+
+  .rows li + li {
+    border-block-start: 1px solid var(--line);
   }
 
   .row {
@@ -296,14 +324,9 @@
     align-items: center;
     gap: var(--sp-3);
     padding: var(--sp-3);
-    border-block-end: 1px solid var(--line);
     color: var(--ink);
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
-  }
-
-  .rows li:last-child .row {
-    border-block-end: 0;
   }
 
   .row:hover {
@@ -326,7 +349,6 @@
 
   .row-sub {
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
   }
 

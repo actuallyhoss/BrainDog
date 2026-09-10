@@ -65,10 +65,10 @@ export const copy = {
   search: 'Search',
   /* The rail's heading for the registers, hard-coded there and needed by the phone nav too. */
   lists: 'Lists',
-  packs: 'Packs',
+  packs: 'Add-ons',
   vault: 'Vault',
   settings: 'Settings',
-  audit: 'Audit',
+  audit: 'History',
   more: 'More',
   close: 'Close',
 
@@ -120,7 +120,6 @@ export const copy = {
   notWritten: (what: string) => `${what}, but nothing was saved yet.`,
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
   showMe: 'Show me',
-  thatIs: 'that is',
   asA: 'Draw it as',
   onPage: 'On the page',
   noDestination: (register: string) => `No page shows ${register} yet.`,
@@ -290,7 +289,7 @@ export const copy = {
      for every cell, so pressing it on a money or a ref did nothing at all and said nothing: the
      silence a bound key is never allowed to answer with (19 §4). */
   cellOpensRow: (field: string, why: string) =>
-    `${field} is ${why}, so it is changed on the row rather than in the list. Press Enter to open the row.`,
+    `${field} is ${why}, so it is changed on the row rather than in the list. Open the row to change it.`,
   /* ONE REASON PER TYPE, AND THERE WERE TWO REASONS FOR SIX TYPES. The first version of this
      branched on `money` and gave everything else "a row in another list", so pressing `e` on an
      update's `When` answered *When is a row in another list*, which is not true of an instant and
@@ -388,7 +387,7 @@ export const copy = {
   reasonRequired: 'A decision is kept for ever and cannot be edited. Write why, and the button turns on.',
   reasonHint: 'Why this one, in a sentence somebody can read in six weeks.',
   reasonNudge: 'That will not mean anything in six weeks. Keep it anyway?',
-  commit: 'Commit the decision',
+  commit: 'Record the decision',
   defer: 'Defer the question',
   decidedBy: 'Decided by',
   immutable: 'A decision cannot be edited once it is made.',
@@ -416,7 +415,7 @@ export const copy = {
   addRow: 'Add',
   noneChosen: 'None',
   yes: 'Yes',
-  secretsLiveInTheVault: 'Keys and tokens go in the Vault. A row records what one opens.',
+  secretsLiveInTheVault: 'Passwords and keys go in the Vault. A row records what one opens.',
   /**
    * WHAT A LEVEL MEANS, IN ONE CELL. There were two: a chip printing the enum (`write`) and, three
    * inches away, a sentence collapsing three levels into two with a ternary — so S. Marchetti's row
@@ -524,8 +523,8 @@ export const copy = {
   recordEmpty: 'Nothing in the record yet.',
   recordEmptyBody: 'A record holds what a business is made of: what you owe and are owed, what it runs on, who is involved, and the decisions behind them.',
   startHere: 'Start here',
-  noPacksYet: 'No packs installed.',
-  noPacksBody: 'A pack adds ready-made lists and pages. The ones below are ready to install.',
+  noPacksYet: 'No add-ons installed.',
+  noPacksBody: 'An add-on brings ready-made lists and pages. The ones below are ready to install.',
   matching: 'matching',
   /**
    * A SAVED VIEW'S FILTER, AS THE SENTENCE A PERSON WOULD SAY.
@@ -555,8 +554,8 @@ export const copy = {
   openUnfiltered: (list: string) => `Open ${list}`,
   rowsWord: (n: number) => (n === 1 ? 'row' : 'rows'),
   noneMatching: (total: number, what: string) => `${total} ${what}, none matching:`,
-  auditHolds: 'Every change to this record is appended here, with who made it and when.',
-  vaultEmpty: 'No credentials indexed yet.',
+  auditHolds: 'Every change to this record shows up here, with who made it and when.',
+  vaultEmpty: 'No logins saved yet.',
   /* A THREAD'S TWO EMPTY STATES, AND BOTH SAID `track`. The register was renamed to Threads and the
      rename reached the head and the kicker of this screen, which read it from the declaration; the
      three sentences below them were typed into the route, so they went on saying the word the rest
@@ -576,13 +575,13 @@ export const copy = {
    * IT ALSO SAID `key`, WHICH `19 §9` BANS OUTRIGHT on this screen: the blurb three lines up
    * carries the whole argument and the sentence beside it kept the word anyway.
    */
-  vaultHolds: 'A credential is indexed when you save one on the row it belongs to, so the record can say what it opens and when it was last rotated. The value is encrypted by the host and never kept here.',
+  vaultHolds: 'Save a login on the thing it belongs to and it appears here. The password itself is locked away and never shown.',
   select: 'Select',
   deselect: 'Deselect',
   /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
      and not leave usefully, which is what this one was: implemented, drawn, and consumed by
      nothing. Verb + Noun, like every other action here. */
-  copyIds: 'Copy ids',
+  copyIds: 'Copy numbers',
   /* THE REGISTER'S OWN WORD FOR ITS OWN COLUMN. `things` labels its state field **Status**, so a
      hardcoded "Set state" put one field's three names on one screen — `lane` in the schema, Status
      in the header, state on the verb, two of them visible at once. The menu's VALUES already come
@@ -696,7 +695,7 @@ export const copy = {
      a word the product invented for a thing every other product calls a preview. */
   peek: 'Preview the row',
   openRow: 'Open the row',
-  copyId: 'Copy id',
+  copyId: 'Copy number',
   copyLink: 'Copy link',
   includesExample: 'includes 1 example',
   example: 'example',
@@ -716,18 +715,18 @@ export const copy = {
   review: 'Review',
 
   /* the palette */
-  paletteLabel: 'Search, or run a command',
-  palettePlaceholder: 'Type a name, an id, or a command',
+  paletteLabel: 'Search',
+  palettePlaceholder: 'Search or jump to anything',
   noMatches: 'Nothing matches',
-  commands: 'Commands',
+  commands: 'Actions',
   destinations: 'Go to',
   records: 'Rows',
   pages: 'Pages and lists',
   /* THE LINE UNDER AN ID SOMEBODY TYPED, AND IT SAID `spoken id`. That is this product's internal
      name for the convention, written down in `19 §2` and in this file's own notes, and the palette
      is the one surface where the reader has just proved they know the convention by using it. The
-     detail is there to say what pressing Enter does, so it says that and nothing else. */
-  openById: 'Open by id',
+     detail is there to say what pressing Enter does, in the reader's word for the thing: a number. */
+  openById: 'Open by number',
   askBrainDog: 'Ask BrainDog',
 
   /**
@@ -744,12 +743,15 @@ export const copy = {
    * IT IS A DISPLAY RENAME ONLY. `grant`, `grant.read` and `grant.kind` stay as they are in the
    * schema, the API and the `.dog` — `19 §9` again: "renaming a column to improve a label is how a
    * spoken id stops resolving."
+   *
+   * AND THEN `login` ON THE SCREEN, which is the word a stranger has for what they keep in a vault.
+   * These notes, and the schema, keep `credential` and `grant`.
    */
-  vaultBlurb: 'What each credential opens, and when each was last rotated. The value is never shown here.',
+  vaultBlurb: 'What each login opens, and when each was last rotated. The password itself is never shown here.',
   opens: 'Opens',
   rotated: 'Rotated',
   reveal: 'Reveal once',
-  revealWarning: 'Revealing is recorded in the audit log with your name on it.',
+  revealWarning: 'Revealing is recorded in History with your name on it.',
   /* `n` NOT ROTATED, said once. It was a hardcoded literal in the markup with this string sitting
      unrendered beside it — two sentences about one fact, and the one in `copy.ts` unreachable. */
   staleCount: (n: number) => `${n} not rotated in six months`,
@@ -768,7 +770,7 @@ export const copy = {
   /* `The Kennel` IS A COINED NOUN DEFINED NOWHERE IN THE PRODUCT. It is a good name for the place
      and a bad heading for a list of things somebody has not met yet — `packBlurb` says what one is
      and sat unused two hundred lines from the screen that needed it. */
-  browse: 'Packs you can install',
+  browse: 'Add-ons you can install',
   /* THE OTHER HALF OF THIS SCREEN HAD AN EMPTY STATE AND THIS ONE DID NOT. Eleven lines above it
      the installed grid draws `noPacksYet`; here a record that has installed everything got the
      heading, a `0` and blank space where a list had been. `19 §6` names that exact failure, and
@@ -776,7 +778,7 @@ export const copy = {
      having them all is finishing rather than starting, and it carries no action: there is nothing
      for the reader to do about a list somebody else publishes to. */
   allInstalled: 'Nothing new to install.',
-  allInstalledWhy: 'Packs this record does not already have appear here, each with what it would add before you install it.',
+  allInstalledWhy: 'Add-ons this record does not already have appear here, each with what it would add before you install it.',
   install: 'Install',
   uninstall: 'Uninstall',
   /* AND WHAT UNINSTALLING WOULD DO, WHICH SAID `declares`. That is the schema's verb, and it sat
@@ -784,7 +786,7 @@ export const copy = {
      they let in. What they want to know is what leaves and what stays, and the pack ADDED those
      things; declaring them is what the file did before any of this concerned them. */
   uninstallWould: (pack: string) =>
-    `${pack} and everything it added would be removed, with the diff shown first, and the rows it created would stay`,
+    `${pack} and everything it added would be removed, with what changes shown first, and the rows it created would stay`,
   installDiff: 'What this adds',
   /* `04 §3`'s seven sections, in a person's words. Only the ones that say something render: a
      `CHANGES` heading over nothing is a warning that does not apply, and `06 §1` is that those
@@ -804,7 +806,7 @@ export const copy = {
   /* `04 §4`: a pack may place a page it owns and may never move yours. The move is SHOWN, so that
      the refusal is visible rather than silent, and then it does not happen. */
   diffNavKept: 'shown, not applied. Your sidebar is yours',
-  diffUnread: 'This record has not read the pack yet, so the shape of each arrives with the file.',
+  diffUnread: 'This record has not read the add-on yet, so the details arrive when you install it.',
   /* `02 §1`: a name another pack ships is a name this one cannot own, and the whole install is one
      transaction — so it does not half-apply.
 
@@ -817,14 +819,11 @@ export const copy = {
      both already use it for the same job. Two names is the common case, which is why a sentence
      that reads wrong at three was not noticed. */
   diffRefused: (names: string[]) =>
-    `${list(names)} ${names.length === 1 ? 'is already a list' : 'are already lists'} on this record, and a pack cannot take a name another one owns. Nothing would be applied.`,
-  /* THE SENTENCE UNDER THE TITLE, and it is a sentence because the title needs one. `Packs` is not
-     a word anybody brings with them, and a screen that has to define its own title has the wrong
-     title: the reader's word for an installable, upgradeable, uninstallable thing with an author is
-     an add-on. Renaming the screen is a decision with a cost across the API, the docs and the
-     `mcp` surface, so it is not taken here; what IS taken is that the definition stays, because
-     until the word changes the definition is what makes the word usable. */
-  packBlurb: 'A pack adds ready-made lists and pages. Readable text; nothing runs.',
+    `${list(names)} ${names.length === 1 ? 'is already a list' : 'are already lists'} on this record, and an add-on cannot take a name another one owns. Nothing would be applied.`,
+  /* THE SENTENCE UNDER THE TITLE. The screen was `Packs`, a word nobody brings with them; it is
+     `Add-ons` now, the reader's word for an installable thing with an author. The API, the docs and
+     the `mcp` surface keep `pack`. The sentence stays for what an add-on here is: text, not code. */
+  packBlurb: 'An add-on brings ready-made lists and pages. It is readable text, and nothing in it runs.',
 
   /* settings */
   appearance: 'Appearance',
@@ -847,7 +846,7 @@ export const copy = {
      what it actually takes is the help sheet, the palette shortcut and every goto. The sentence a
      person needs before pressing Off is what stops working and what does not. */
   characterKeysHint:
-    'Off silences every shortcut that is a single letter, digit or punctuation mark, including ? for this list, / for the palette and g to go somewhere. Every chord with a modifier keeps working.',
+    'Off silences every shortcut that is a single letter, digit or punctuation mark, including ? for this list, / for the palette and g to go somewhere. Shortcuts that use Ctrl or Alt keep working.',
   on: 'On',
   off: 'Off',
 
@@ -897,7 +896,7 @@ export const copy = {
      and not read by this build", "{ lte: 400000 } for money in minor units" — under a headline
      figure, quoting a document number and a JSON literal at somebody with no control that edits a
      metric. The author's sentence still prints on the page block, beside the declaration. */
-  figureUnavailable: 'This figure cannot be worked out from what is declared. The pack that owns it says why.',
+  figureUnavailable: 'This figure cannot be worked out yet. The add-on that owns it says why.',
   /**
    * WHY A COLOUR CANNOT BE USED, SAID TO THE PERSON WHO PRESSED THE SWATCH.
    *
@@ -926,7 +925,7 @@ export const copy = {
    * THE LOAD-BEARING NOUNS, one clause each, `19 §6`.
    *
    * Four, and the number was measured rather than chosen. Of the eight the rule names, `pack` is
-   * already defined in place — "A pack adds ready-made lists and pages" is the first line of
+   * already defined in place — "An add-on brings ready-made lists and pages" is the first line of
    * `/packs` — and `tone`, `target` and `window` never appear on a screen in this build at all, so
    * a rule about the first time a word appears is satisfied by their not appearing. `register` is
    * not here because this product says LIST to a reader; `register` is the id an agent writes.
@@ -996,7 +995,7 @@ export const copy = {
   levelFor: (name: string) => `What ${name} can do`,
   /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
      the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */
-  noRecordLevel: 'nothing',
+  noRecordLevel: 'No access',
   noRecordLevelMeans: 'Nothing on this record itself. Only the lists named below, and nothing that is added later.',
   addException: 'Different on one list',
   removeException: 'Back to their level',
@@ -1126,11 +1125,10 @@ export const copy = {
 
   /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */
   yourData: 'The whole record',
-  /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`). Saying so is the difference between
-     a promise and a checkable fact: `sqlite3 portfolio.dog "select …"` works with no SDK, no import
-     step and no reader of ours. */
-  exportWhat:
-    'One .dog file: a SQLite database you can open with sqlite3, or anything that reads one. No import step, no reader of ours.',
+  /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`): `sqlite3 portfolio.dog "select …"`
+     works with no SDK and no reader of ours. The screen says it as "any database tool", because the
+     format's name means nothing to most of the people reading it. */
+  exportWhat: 'One file with everything in it, readable by any database tool.',
   /* `03 §1`: the three layers are addressable independently, and the governance layer alone IS a
      pack. A product whose only exit is all-or-nothing has three exits it is not offering. */
   takeAway: 'Part of it',
@@ -1212,10 +1210,10 @@ export const copy = {
      a screen — "say what they can see" — so none of these is a word from the schema. */
   reachMeans: {
     login: 'sign in as you, for ninety days',
-    runner: 'claim jobs and run code as you, for ninety days',
+    runner: 'do work for you on this machine, for ninety days',
     export: 'take one copy of this record, once, in the next ten minutes',
     import: 'load rows into this record, once, in the next ten minutes',
-    pack: 'install one pack, once, in the next ten minutes',
+    pack: 'install one add-on, once, in the next ten minutes',
     token: 'make one more key, once, in the next ten minutes',
   } as Record<string, string>,
   /* `30 §1` calls `ua` "client-supplied — shown to the approver, TRUSTED FOR NOTHING", so the
@@ -1263,7 +1261,7 @@ export const copy = {
 
   /* ingest — `25 §9` draws this screen */
   sources: 'Where rows come in from',
-  sourcesHow: 'Each of these fetches on its own schedule. Nothing here writes without a receipt.',
+  sourcesHow: 'Each of these fetches on its own schedule. Everything they add is logged.',
   sourceState: { ok: 'working', failing: 'failing', paused: 'paused' } as Record<string, string>,
   lastRan: (ago: string) => `last ran ${ago}`,
   nextRun: (ago: string) => `next ${ago}`,
@@ -1276,7 +1274,7 @@ export const copy = {
 
   /* notifications — `09` specifies the mechanism and no settings, so this reports */
   whenWeInterrupt: 'When this record interrupts you',
-  batchByDefault: 'Batch by default; interrupt by exception.',
+  batchByDefault: 'Most things wait for your summary. Only urgent ones interrupt.',
   quietHours: 'Quiet hours',
   quietHoursAre: '22:00 to 08:00 in this record’s timezone. Anything not urgent waits until they end.',
   urgentKinds: 'Urgent',
@@ -1356,7 +1354,7 @@ export const copy = {
   theKeyIs:
     'These copies are sealed with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
   theKeyWhere:
-    'On a self-host it is the age identity file you made when you set the record up. Copy that file somewhere else, or these backups cannot be opened.',
+    'On a self-host it is the key file you made when you set the record up. Copy that file somewhere else, or these backups cannot be opened.',
   restore: 'Going back',
   restoreSelfHost: 'This record is self-hosted, so going back means restoring one of the copies above by hand.',
   restoreCloud: 'Any point in the last thirty days, not only the nightly copies.',
@@ -1417,7 +1415,7 @@ export const copy = {
   keymapHint: 'Single letters act on whatever is in front of you. Character keys, in Settings, turns every one of them off.',
   /* WHAT THE SHEET SAYS WHEN THE SWITCH IS OFF, above rows it is still right to print: the reader
      wants to know what the keyboard WOULD do, and which half of it they have silenced. */
-  keymapSilenced: 'Character keys is off, so the keys marked below do nothing. Every chord with a modifier still works.',
+  keymapSilenced: 'Character keys is off, so the keys marked below do nothing. Shortcuts that use Ctrl or Alt keep working.',
   keymapRowOff: 'Off',
   scopeDocument: 'Anywhere',
   scopeGrid: 'In a list',
@@ -1471,10 +1469,10 @@ export const copy = {
    * fallback; `49 §5.10` puts passkeys in phase 3 and `§13 #1` says phase 2 closes with the link
    * and the token exchange. Neither is served here. `23 §3.1`'s rule is the one that decides how
    * that is drawn: a capability with no implementation behind it is **not there, not greyed out** —
-   * so there is no passkey button, and this sentence is what stands in its place.
+   * so there is no passkey button, and this sentence's "For now" is what stands in its place.
    */
   waysIn:
-    'A passkey is the way in this record is designed for, and neither it nor the email link is built yet. An address and an access token are what work today.',
+    "For now, sign in with your server's address and its key.",
   /**
    * THE QUESTION THE OPERATOR'S SENTENCES SIT BEHIND.
    *
@@ -1488,7 +1486,7 @@ export const copy = {
   recordAddress: 'Address',
   /** The shape, in the field, so nobody has to guess whether the scheme and the port are wanted. */
   addressLike: 'http://127.0.0.1:8787',
-  accessToken: 'Access token',
+  accessToken: 'Access key',
   /**
    * THE EMPTY FIELD IS A REAL ANSWER AND THE SCREEN HAS TO SAY SO.
    *
@@ -1496,7 +1494,7 @@ export const copy = {
    * refuses *anything at all* that is presented to it in that state. So on the one deployment this
    * screen exists for, typing something into the field is what fails.
    */
-  tokenMayBeEmpty: 'A record started without BRAINDOG_TOKEN wants none. Leave this empty for one of those.',
+  tokenMayBeEmpty: 'If your server was set up without a key, leave this empty.',
   /* Two full literals for the toggle's two states, which is this file's own rule about a toggle. */
   showToken: 'Show',
   hideToken: 'Hide',
@@ -1507,7 +1505,7 @@ export const copy = {
    * that: the value is read out of the field, put in one header and dropped. A person handing a
    * credential to a page is owed the answer to *where does this end up*, and the answer is nowhere.
    */
-  tokenKept: 'The token is used once and kept nowhere. It is gone when this tab closes.',
+  tokenKept: 'The key is used once and not stored. It is gone when you close this tab.',
   openTheRecord: 'Open the record',
   /* The busy label, in full, for the same reason the toggle above is two literals. */
   reachingTheRecord: 'Reaching the record',
@@ -1520,8 +1518,8 @@ export const copy = {
    * against `Date.now()` is confidently wrong and gets no error while being it.
    */
   reachedDay: (when: string) => `It answered as of ${when}, which is its day and not always yours.`,
-  reachedWithToken: 'The token was accepted.',
-  reachedWithNone: 'This record wanted no token, so none was sent.',
+  reachedWithToken: 'The key worked.',
+  reachedWithNone: 'This server needs no key, so none was sent.',
   /**
    * THE BOUNDARY, IN THE PLACE SOMEBODY WOULD OTHERWISE ASSUME OTHERWISE.
    *

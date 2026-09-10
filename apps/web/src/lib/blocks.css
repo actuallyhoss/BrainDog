@@ -125,23 +125,17 @@
     max-inline-size: var(--measure);
   }
 
-  /* A heading is a KICKER: two or three words, small caps. The sentence goes in the body. */
+  /* A HEADING IS A NAME, in ink at the step under a section and in sentence case. It was a dim
+     kicker, which put a caption over the block rather than a name on it. The sentence goes in the
+     body. */
   .block-head {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     margin-block-end: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink);
+    font-size: var(--t-md);
     font-weight: 600;
-
-
-  }
-
-  .block-head [data-intent],
-  .block-head .glyph {
-    text-transform: none;
-    letter-spacing: 0;
   }
 
   /* ── panel: note, quote ─────────────────────────────────────────────────── */
@@ -190,24 +184,16 @@
     color: var(--dim);
   }
 
-  .quote-by::before {
-    content: '— ';
-  }
-
   /* ── grid: stat, board ──────────────────────────────────────────────────
      `--cells` comes from the declaration. A layout primitive must be TOLD how many things it
      contains and must never infer the count from the space available (05 §4). */
 
-  /* ONE surface per block, and the cells inside it are divided by a rule rather than boxed by one.
-     Nested boxes are what makes a dense screen read as clutter; one soft container with hairline
-     divisions reads as a single object with parts. */
+  /* NO BOX, AND THE CELLS ARE DIVIDED BY A RULE. A surface, a border and a shadow round every
+     strip of figures made a page of blocks a stack of panels; hairlines between the cells on the
+     page's own ground read as one object with parts. */
   .grid {
     display: grid;
     grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
     overflow: hidden;
   }
 
@@ -231,7 +217,8 @@
     align-items: center;
     row-gap: 3px;
     column-gap: var(--sp-2);
-    padding: var(--sp-4);
+    /* The table's inset, so the figures start where a table's cells do on the same page. */
+    padding: var(--sp-4) var(--sp-3);
   }
 
   .cell + .cell {
@@ -248,7 +235,7 @@
   }
 
   a.cell:hover {
-    background: var(--s1);
+    background: var(--hover-wash);
   }
 
   a.cell:active {
@@ -299,7 +286,6 @@
     flex-direction: column;
     gap: var(--sp-2);
     padding: var(--sp-3);
-    background: var(--s1);
   }
 
   /* The same hairline the stat cells use. Four stacks of cards floating on one surface with nothing
@@ -324,7 +310,6 @@
 
   .board-count {
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
     font-weight: 400;
     letter-spacing: 0;
@@ -413,11 +398,9 @@
 
   /* ── rows: spec, params ─────────────────────────────────────────────────── */
 
+  /* UNBOXED, like the ledger and the table: rows on the page's own ground with a hairline between
+     each. The overflow stays clipped so a value that will not wrap cannot widen the page. */
   .rows {
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
     overflow: hidden;
   }
 
@@ -426,7 +409,7 @@
     grid-template-columns: minmax(9ch, 22ch) minmax(0, 1fr) minmax(0, auto);
     gap: var(--sp-3);
     align-items: baseline;
-    padding: var(--sp-2) var(--sp-4);
+    padding: var(--sp-2) var(--sp-3);
     min-block-size: var(--row-h);
     font-size: var(--t-ui);
     border-block-end: 1px solid var(--line);
@@ -726,10 +709,7 @@
     padding: 0;
     list-style: none;
     counter-reset: step;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
+    /* No box, the way `.rows` has none; the hairlines between items are the structure. */
     overflow: hidden;
   }
 
@@ -738,7 +718,7 @@
     grid-template-columns: auto minmax(0, 1fr) minmax(0, auto) auto;
     gap: var(--sp-3);
     align-items: baseline;
-    padding: var(--sp-2) var(--sp-4);
+    padding: var(--sp-2) var(--sp-3);
     min-block-size: var(--row-h);
     font-size: var(--t-ui);
     border-block-end: 1px solid var(--line);
@@ -790,6 +770,7 @@
     border-radius: var(--r-sm);
     color: var(--earn);
     font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
     align-self: center;
   }
 
@@ -820,9 +801,7 @@
     border: 0;
     border-radius: 0;
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
-    letter-spacing: -0.02em;
   }
 
   /* ── table: comparison, and the register grid's body ────────────────────── */
@@ -1352,7 +1331,7 @@
     background: var(--sunk);
     color: var(--dim);
     font-size: var(--t-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
   }
 
   .evidence[data-evidence='verified'] {

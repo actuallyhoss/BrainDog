@@ -154,10 +154,15 @@
     border-radius: var(--r-lg);
   }
 
-  /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM. */
+  /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM, and each is 44 wide as well as
+     44 tall: "On" and "Off" are narrower than a thumb, and a target is both axes. */
   @media (pointer: coarse) {
     .segmented {
       gap: var(--sp-1);
+    }
+
+    .segment {
+      min-inline-size: var(--tap);
     }
   }
 

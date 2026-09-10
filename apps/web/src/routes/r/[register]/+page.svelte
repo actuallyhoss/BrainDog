@@ -1318,7 +1318,7 @@
     const text = picked.map((e) => `${id}#${e.seq}`).join(' ');
     try {
       await navigator.clipboard.writeText(text);
-      toasts.push(copy.copied(`${picked.length} ${picked.length === 1 ? 'id' : 'ids'}`));
+      toasts.push(copy.copied(`${picked.length} ${picked.length === 1 ? 'number' : 'numbers'}`));
     } catch {
       toasts.push(copy.copyRefused, { intent: 'warn' });
     }
@@ -1582,9 +1582,6 @@
           : emptyKind === 'no-results' && q
             ? copy.searchesOnly(searched)
             : undefined}
-        agentPrompt={emptyKind === 'no-data-yet'
-          ? `read my record, then add every ${decl.one} you find`
-          : undefined}
       >
         {#snippet actions()}
           {#if emptyKind === 'no-results'}
@@ -1896,7 +1893,9 @@
                 out loud. The receipt beside it already says what the row is.
               -->{#if seq >= 0}<span class="row-seq">{value}</span>{/if}
             {:else if value === null}
-              {#if isTitle}{@render ownMark(seq)}{/if}<span class="missing">—</span>
+              <!-- AN EMPTY CELL DRAWS NOTHING. A dash in every gap was a column of marks that meant
+                   nothing; only a title says so, because a row with no name needs words to be found. -->
+              {#if isTitle}{@render ownMark(seq)}<span class="missing">Not set</span>{/if}
             {:else if editableHere(column.field)}
               <!--
                 THE POINTER PATH, AND IT WAS KEYBOARD ONLY. `e` has been on the `?` sheet since the
@@ -2014,20 +2013,14 @@
                words for the mechanism, and this banner sits on the front of the busiest list in the
                product: a friction pass counted it as three tax words in one sentence, met by
                somebody who came to look at their invoices. A write is a save and a refusal is a
-               rejection, in every product a person has used before this one. The CODE stays, in
-               the quiet strip below, because the sentence is for the person and the code is for
-               whoever they ask for help: showing only the friendly half leaves that person nothing
-               to search for. -->
+               rejection, in every product a person has used before this one. The error code that
+               followed the sentence is gone too: the sentence already says what was rejected. -->
           <strong>{seen.n} saves</strong> to
           <!-- A NAME AND NOT A LINK. The writes were REFUSED, so there are no rows to filter to and
                nowhere in this build that shows a field's own declaration; a link that went to a
                filter matching nothing would be worse than the plain word. -->
           {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}{copy.thisList}{/if}
           were rejected over {seen.days} days: {seen.fix}.
-          <!-- NO `title`. It carried `seen.why` — the same fact as the sentence beside it, in the
-               schema's spelling, in an attribute no touch device shows and no keyboard reaches. Two
-               tellings of one thing, one of them unreachable. -->
-          <span class="seen-code">{seen.code} · {seen.window}</span>
         </p>
         <Button
           weight="quiet"
@@ -2355,8 +2348,7 @@
   }
 
   /* A NOTE READS AS A NOTE. One hairline, the page's own paper, no intent colour and no fill: it
-     sits above the grid the way a margin annotation sits beside a paragraph. The code is set in the
-     id face at the smallest size so an operator can find it and a bookkeeper's eye skips it. */
+     sits above the grid the way a margin annotation sits beside a paragraph. */
   .seen {
     display: flex;
     /* IT WRAPS, because at 320px a sentence and a button do not fit on one line and the button was
@@ -2391,14 +2383,6 @@
 
   .seen-said strong { color: var(--ink); font-weight: 600; }
   .seen-field { color: var(--ink); font-style: normal; font-weight: 600; }
-
-  .seen-code {
-    margin-inline-start: var(--sp-2);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    color: var(--dim);
-    white-space: nowrap;
-  }
 
   /* THE SAME WRAP `/audit` TOOK, in a commit whose comment names the measurement — "Five of those
      in one unwrapping track reached 335px inside a 320px screen". The register's bar has the

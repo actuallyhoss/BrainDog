@@ -204,6 +204,14 @@ export function createClient(options: ClientOptions) {
     whoami: () => call<unknown>('whoami'),
     planPack: (args: { doc: unknown; source?: { kind: string; ref?: string } }) =>
       call<unknown>('planPack', args as Record<string, unknown>),
+
+    /* THE TWO DATA WRITES A SCREEN MAKES WITHOUT CHANGING A ROW. `markRead` moves the reader's own
+       mark and nothing else, and with no `upTo` the record uses its own newest event, so a caller
+       never has to know a number to say "I have seen this". `log` is a note against a row: it is a
+       write, and it leaves the row's version where it was. */
+    markRead: (upTo?: number) =>
+      call<{ upTo: number; seen_at: unknown }>('markRead', upTo === undefined ? {} : { upTo }),
+    log: (args: { register: string; seq: number; note?: string }) => call<unknown>('log', args as Record<string, unknown>),
   };
 }
 

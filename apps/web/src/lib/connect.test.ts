@@ -124,7 +124,7 @@ test('the contract also allows a 401 with no body, and that is still the credent
 test('and a credential offered to a host that wants none is told what that looks like', async () => {
   const { doFetch } = answering(() => json(401, NO));
   const out = await attempt('http://127.0.0.1:8791', 'anything', doFetch, 'http://127.0.0.1:8791');
-  assert.match(out.kind !== 'reached' ? (out.also ?? '') : '', /without BRAINDOG_TOKEN/);
+  assert.match(out.kind !== 'reached' ? (out.also ?? '') : '', /started without a key/);
 });
 
 test('no such clause when nothing was offered, because then it is not the explanation', async () => {

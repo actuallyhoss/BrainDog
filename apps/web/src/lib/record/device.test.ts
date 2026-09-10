@@ -473,9 +473,9 @@ test('EVERY SENTENCE THIS SCREEN SAYS IS A SENTENCE', () => {
   /* AND THE ONES BUILT FROM ARGUMENTS CARRY THEM. `approvedNow` is the whole of what a person is told
      after the one irreversible thing this screen does; a version that drops the label and the reach
      tells them a machine was approved without saying which, or to do what. */
-  const line = copy.approvedNow('Codex, unknown machine', 'claim jobs and run code as you, for ninety days');
+  const line = copy.approvedNow('Codex, unknown machine', 'do work for you on this machine, for ninety days');
   assert.ok(line.includes('Codex, unknown machine'), 'the approval does not say what was approved');
-  assert.ok(line.includes('claim jobs and run code as you'), 'the approval does not say what it granted');
+  assert.ok(line.includes('do work for you on this machine'), 'the approval does not say what it granted');
   assert.notEqual(line, copy.approvedNow('Something else', 'do something else'));
 
   for (const said2 of [copy.saysItIs('codex-cli 0.9'), copy.aboutWhat('the whole record'), copy.usedWhen('3 min ago'), copy.madeWhen('4w ago'), copy.endsWhen('in 8w')])

@@ -473,8 +473,8 @@
         <Button weight="primary" onclick={commitArrange}><Icon name="check" size="s" />{copy.arrangeDone}</Button>
       {:else}
         <!-- AUTHORING IS A DESKTOP SURFACE (13 §10), and this is the one that stayed. `Arrange` is
-             hidden below 900px and the kbd hints beside the source link are hidden with a comment
-             calling that "a desktop affordance for the same reason the source link beside it is" —
+             hidden below 900px and the filter beside the source link is hidden with a comment
+             calling it "a desktop affordance for the same reason the source link beside it is" —
              the source link itself never was. On four project pages it is the ONLY header control a
              phone gets, and what it opens is a 1,129px-wide YAML declaration in a 356px box that you
              drag sideways to read, line by line, with lines cut mid-token. -->
@@ -754,30 +754,27 @@
     position: relative;
   }
 
-  /* A hairline under every block header. It is the cheapest structure available: it says where a
-     block starts without drawing a box around it, so the page keeps its flatness and stops reading
-     as one long list. The source link sits on the same line, so the rule also ties the two halves
-     of the header together instead of leaving them floating at opposite ends of the block. */
+  /* NO RULE UNDER THE HEADER. The name at the section size is what says a block starts here, and
+     a hairline under it was a second device doing the same job. The source link shares the name's
+     baseline, which is what keeps the two halves of the header together. */
   .block-bar {
     display: flex;
     align-items: baseline;
     gap: var(--sp-3);
-    margin-block-end: var(--sp-4);
-    padding-block-end: var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    margin-block-end: var(--sp-3);
   }
 
   /* A BLOCK NAME IS A HEADING AND SHOULD LOOK LIKE ONE. At `--t-ui` and weight 500 in `--ink2` it
      was the same size, weight and colour as the body text underneath it, so a page of six blocks
      read as one undifferentiated column and the eye had nothing to jump between. It is the second
      level of the page's hierarchy — under the page title, over everything in the block — and now
-     it is sized and weighted like it. */
+     it takes the size `Section` gives every other heading at that level. */
   .block-name {
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-md);
+    font-size: var(--t-lg);
     font-weight: 600;
-    letter-spacing: -0.012em;
+    letter-spacing: -0.018em;
   }
 
   /* Every block header names its source, and `o` opens that register PRE-FILTERED to the block's
@@ -1005,19 +1002,34 @@
      * board's lanes two-up on a phone are two columns of cards at 170px, which is a different
      * decision from this one and nobody has taken it.
      *
-     * HAIRLINES FROM THE GAP, NOT FROM BORDERS. With two columns and a possible span, "which cell
-     * gets a top rule and which a start rule" has four cases; a 1px gap over a `--line` ground
-     * draws every division once and correctly, and each cell paints its own surface over it.
+     * HAIRLINES FROM BORDERS, AND THEY WERE A 1px GAP OVER A `--line` GROUND. That reads only
+     * while every cell paints a surface over the ground, which made each figure a box, and the grid
+     * has no box now. So a cell below the first row takes a rule above it and a cell in the second
+     * column a rule before it, and which cells those are turns on whether the first one spans.
      */
     .block-slot :global(.grid:has(> .cell)) {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1px;
-      background: var(--line);
     }
 
     .block-slot :global(.grid:has(> .cell) > .cell) {
-      background: var(--s1);
       border: 0;
+    }
+
+    .block-slot :global(.grid:has(> .cell) > .cell:nth-child(n + 3)),
+    .block-slot :global(.grid:has(> .cell:first-child:nth-last-child(odd)) > .cell:nth-child(2)) {
+      border-block-start: 1px solid var(--line);
+    }
+
+    .block-slot :global(.grid:has(> .cell) > .cell:nth-child(even)) {
+      border-inline-start: 1px solid var(--line);
+    }
+
+    .block-slot :global(.grid:has(> .cell:first-child:nth-last-child(odd)) > .cell:nth-child(even)) {
+      border-inline-start: 0;
+    }
+
+    .block-slot :global(.grid:has(> .cell:first-child:nth-last-child(odd)) > .cell:nth-child(odd):not(:first-child)) {
+      border-inline-start: 1px solid var(--line);
     }
 
     .block-slot :global(.grid:has(> .cell) > .cell:first-child:nth-last-child(odd)) {
@@ -1029,18 +1041,6 @@
     .block-slot :global(.grid:has(> .cell) .cell-figure) {
       font-size: var(--t-lg);
       white-space: nowrap;
-    }
-  }
-
-  /* No keyboard to press it with, so no chord to advertise.
-     
-     BOTH QUERIES, because they answer different questions and neither is sufficient. `pointer:
-     coarse` is the honest test — 05 §6, size follows the pointer and never the width — but a
-     touchscreen laptop reports coarse with a keyboard attached, and a phone in a headless browser
-     may not report it at all. The width query is the blunt one that catches the phone. */
-  @media (pointer: coarse), (width < 640px) {
-    .block-source :global(.kbd) {
-      display: none;
     }
   }
 </style>

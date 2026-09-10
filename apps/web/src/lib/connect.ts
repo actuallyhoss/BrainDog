@@ -245,7 +245,7 @@ export async function attempt(
                secret, which is a supported configuration and the likeliest reason a correct-looking
                credential is refused. `server.ts`: anything presented that is not the one string is
                401, and with no string set that is everything. */
-            also: 'A record started without BRAINDOG_TOKEN refuses every credential it is offered, so if this is one of those, leave the token empty.',
+            also: 'A server started without a key (no BRAINDOG_TOKEN) refuses every key it is offered, so if this is one of those, leave the key empty.',
           }
         : {}),
     };

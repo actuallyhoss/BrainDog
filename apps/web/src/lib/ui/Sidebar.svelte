@@ -420,8 +420,8 @@
            returns it to its stored order, never to the end of the list (19 §3). -->
       <!-- The one row in this rail that had no glyph, sitting between groups that all have one.
            This file's own header argues against exactly that. -->
-      <a class="pen" href="/settings/navigation">
-        <Icon name="alert" size="s" />
+      <a class="pen tap" href="/settings/navigation">
+        <Icon name="alert" size="m" />
         <span class="pen-text">{pen.length === 1 ? copy.suggestedPage : `${pen.length} suggested pages.`}</span>
         <span class="pen-action">{copy.review}</span>
       </a>
@@ -463,12 +463,12 @@
 
       The rail is where a desktop already goes to reach things, and it has room at its foot. The
       disc still exists below 900px, where there is no rail, and it lives in the header there.
-      `Ctrl K` opens the same palette from anywhere, and this row prints it, which is how the
-      palette teaches its own shortcut.
+      `Ctrl K` still opens the same palette from anywhere. The row no longer prints the chord: a
+      key cap in the rail read as a tool for people who already know the keys.
     -->
     <li>
       <button type="button" class="item tap" onclick={() => (palette.open = true)}>
-        <Icon name="search" size="m" /><span class="item-name">{copy.paletteLabel}</span><Kbd keys="⌘K" />
+        <Icon name="search" size="m" /><span class="item-name">{copy.paletteLabel}</span>
       </button>
     </li>
   </ul>
@@ -861,10 +861,10 @@
   }
 
   /* A count, not a badge: it says how many rows the register holds, which is a fact and not an
-     alert. Tabular so the column of them lines up down the rail. */
+     alert. The body face with tabular figures, so the column of them lines up down the rail
+     without reading as a readout. */
   .tally {
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
   }
@@ -873,23 +873,30 @@
     color: inherit;
   }
 
+  /* DRAWN AS A RAIL ROW, NOT A BOXED NOTICE. The glyph and the accent word already say something
+     is waiting; a wash and a border on top of them made it the loudest thing in the rail. */
   .pen {
-    gap: var(--sp-2);
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 10px;
+    min-block-size: 32px;
     margin-block-start: var(--sp-5);
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--hold-wash);
-    border: 1px solid var(--line);
+    padding: var(--sp-1) var(--sp-3);
     border-radius: var(--r-md);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink2);
+    font-size: var(--t-ui);
+    font-weight: 500;
     text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .pen :global(.icon) {
+    color: var(--dim);
   }
 
   .pen:hover {
-    border-color: var(--edge);
+    background: var(--hover-wash);
+    color: var(--ink);
   }
 
   .pen-text {

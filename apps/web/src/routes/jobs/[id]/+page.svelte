@@ -40,10 +40,10 @@
    * WHAT THE RUN IS DOING, WHICH IS WHAT EVERY OTHER SCREEN CALLS IT.
    *
    * The heading was the job's `kind`, `qa`, lower case, then `j_9K4A` in the id face: a stranger
-   * asked what qa is. `/t/1` lists the same run under "Agents on this" by the session's `doing`,
+   * asked what qa is. `/t/1` lists the same run under "Working on this" by the session's `doing`,
    * the sentence the agent keeps about itself, and so does the session's own row. That is the
-   * title now. The kind goes to the kicker, which upper-cases it, and the id stays the chip beside
-   * the title rather than joining the kicker, because an upper-cased `J_9K4A` is another id.
+   * title now. The kicker is the noun, Run, and the id stays the chip beside the title rather than
+   * joining the kicker, because an upper-cased `J_9K4A` is another id.
    *
    * A run no session names keeps the kind as its title, which is what the heading said before.
    */
@@ -88,20 +88,21 @@
   </div>
 {:else}
 
-<PageHead icon="session" kicker="{copy.run} · {JOB.kind}" title={named} id={JOB.id}>
+<PageHead icon="session" kicker={copy.run} title={named} id={JOB.id}>
   {#snippet actions()}
     <Chip label={JOB.status} tone={JOB.status === 'failed' ? 'bad' : JOB.status === 'running' ? 'info' : 'good'} />
-    <Button weight="quiet" tone="bad" onclick={() => toasts.push(copy.notWritten(copy.runWouldStop), { intent: 'warn' })}><Icon name="stop" size="s" />{copy.stopRun}</Button>
+    <Button weight="quiet" onclick={() => toasts.push(copy.notWritten(copy.runWouldStop), { intent: 'warn' })}><Icon name="stop" size="s" />{copy.stopRun}</Button>
   {/snippet}
 </PageHead>
 
 <div class="page">
   <!-- IT SAID "RUNNING" WHATEVER THE STATUS WAS. The chip above reads `failed` and this line read
        "Running search" underneath it — one screen, two answers, and the wrong one is the sentence.
-       The status is the subject of the line now, and the tool is the detail. -->
+       The status is the subject of the line now, and the tool is the detail. The model id is
+       gone: it is a string for whoever set up the runner, not for somebody reading what it did. -->
   <p class="status">
     {copy.jobStatus[JOB.status] ?? JOB.status}{#if last}
-      · last step <code>{last.tool}</code>{/if} · {JOB.model}
+      · last step <span class="tool">{last.tool}</span>{/if}
   </p>
 
   <!-- ONE ROW, DRAWN ONCE. A pressable step and a flat one differ in the element and in the chevron
@@ -146,7 +147,7 @@
              it read` is the whole content of that row; putting it behind a press would be hiding the
              one thing somebody opened this page to read. -->
         {#if !e.ok || open.has(e.seq)}
-          <p class="detail" data-ok={e.ok ? '' : undefined}>
+          <p class="detail">
             <!-- AND THE FOLD FOLDS. It printed `2000 of 41000 characters` under the whole 41,000 of
                  them — a label describing a truncation that had not happened. -->
             {open.has(e.seq) ? e.out : e.out.slice(0, FOLD)}
@@ -180,13 +181,11 @@
     font-size: var(--t-ui);
   }
 
-  /* Ink, not the accent. This is the name of the step the job is on — a fact, and one that is red
-     in a line that already carries a red `failed` further down the page. Monospace already sets it
-     apart from the sentence around it; colour on top of that is the same distinction made twice,
-     in the one hue this product reserves for something being wrong. */
-  .status code {
+  /* Ink and a little weight, not the accent and not monospace. It is the name of the step the run
+     is on, a fact, and the identifier face was what made this line read as a terminal. */
+  .status .tool {
     color: var(--ink);
-    font-family: var(--font-id);
+    font-weight: 500;
   }
 
   .line {
@@ -205,7 +204,6 @@
 
   .out {
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
     /* `text-overflow` does nothing on the flex parent, so the ellipsis lives on this span, which is
        the one holding the text. */
@@ -215,21 +213,24 @@
     white-space: nowrap;
   }
 
+  /* RED ON THE GLYPH AND NOWHERE ELSE. The word beside it says `failed`, so the colour marks the
+     row without setting a sentence in the alarm hue. */
   .out:not([data-ok]) {
+    color: var(--ink2);
+  }
+
+  .out:not([data-ok]) :global(svg) {
     color: var(--danger);
   }
 
+  /* THE REASON IN THE BODY FACE AND INK, failure or not. It is the sentence somebody opened this
+     page to read, and red text in the identifier face was the hardest way to read it. */
   .detail {
     padding: 0 var(--sp-4) var(--sp-3) calc(12ch + var(--sp-4) * 2);
     background: var(--s1);
     color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    line-height: 1.7;
-  }
-
-  .detail:not([data-ok]) {
-    color: var(--danger);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
   }
 
   .fold {

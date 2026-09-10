@@ -296,8 +296,10 @@
                 <span class="line-title">{s.fields.name} is lapsing{@render mark('services', s.fields)}</span>
               </span>
               <span class="line-amount"><Money minor={amountOf(s.fields.cost) ?? 0} currency={currencyOf(s.fields.cost) ?? ''} /></span>
-              <span class="line-when" data-intent="bad">
-                <span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>
+              <!-- A lapse is a warning and not a failure: the service still runs and there is time to
+                   renew it, so it wears `warn` and its glyph rather than the one for something wrong. -->
+              <span class="line-when" data-intent="warn">
+                <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
                 {relative(String(s.fields.renews), NOW)}
               </span>
             </a>
@@ -492,10 +494,13 @@
      is the wrong split for a strip with a lead in it. */
   .strip :global(.grid) {
     grid-template-columns: 1.35fr 1fr 1fr;
+    /* NO BOX ROUND IT, so it reaches a step past the column the way `.ledger` does, and the lead
+       figure starts where the heading above it and the rows below it start. */
+    margin-inline: calc(-1 * var(--sp-3));
   }
 
   .strip :global(.cell) {
-    padding: var(--sp-5) var(--sp-4);
+    padding-block: var(--sp-5);
   }
 
   /* The activity feed is not a table. It has no columns worth aligning, so it gets a reading shape:

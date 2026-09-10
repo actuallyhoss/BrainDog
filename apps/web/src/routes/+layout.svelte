@@ -233,7 +233,7 @@
 <a class="skip" href="#main">Skip to content</a>
 
 <!-- The record's own state, two pixels, always there. Solid while the socket is open, dashed while
-     polling, dim when a write has actually failed — never from `navigator.onLine`, which reports
+     polling, solid warn when a write has actually failed — never from `navigator.onLine`, which reports
      online on a LAN with no internet. And the chip must not cry wolf: one that appears and withdraws
      on every open is a chip nobody believes the day it is true (19 §6). -->
 <div class="live" data-state={live} aria-hidden="true"></div>
@@ -455,8 +455,10 @@
     background: repeating-linear-gradient(90deg, var(--warn) 0 8px, var(--line) 8px 16px);
   }
 
+  /* WARN, NOT DANGER: a dropped connection is a condition to wait out, not a loss. Solid where
+     polling is dashed, so the two states differ by shape as well as by colour. */
   .live[data-state='offline'] {
-    background: var(--danger);
+    background: var(--warn);
   }
 
   /* A SURFACE WITH NO SHELL SCROLLS ITSELF. Same architecture as `.body` below — one container, one

@@ -21,7 +21,6 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Kbd from '$lib/ui/Kbd.svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import RowCards from '$lib/ui/RowCards.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
@@ -109,13 +108,11 @@
       binding = true;
       return;
     }
-    /* AND `o`, WHICH THE BUTTON BESIDE IT HAS PRINTED SINCE IT WAS WRITTEN. `Open {register}` in
-       this page's own header carries a `<kbd>o</kbd>` and nothing listened for it — the same key,
-       for the same thing, is live one route over on `/p/<slug>`. A printed key that does nothing
-       teaches a reader that the printed keys do nothing.
+    /* AND `o`, which does what `Open {register}` in the header does, as the same key does one
+       route over on `/p/<slug>`. The button no longer prints the key; the `?` sheet lists it.
 
        `silenced` FIRST, because `o` is a bare letter and `Character keys: off` is what makes the
-       whole bare namespace legal (19 §4). This handler asked neither question before. */
+       whole bare namespace legal (19 §4). */
     if (silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === 'o' && view) {
       e.preventDefault();
@@ -162,11 +159,11 @@
 {:else}
   <PageHead icon={iconFor(decl.icon, 'rows')} kicker="{decl.name} · saved view" title={view.name} count={result.matched} total={result.total}>
     {#snippet actions()}
-      <Button weight="bare" href="/r/{view.register}"><Icon name="external" size="s" />Open {decl.name}<Kbd keys="o" /></Button>
+      <Button weight="bare" href="/r/{view.register}"><Icon name="external" size="s" />Open {decl.name}</Button>
       <!-- `BindBlock`'s own file header opens "THIS IS THE WHOLE WIZARD", which is what `13 §10`
            means by a page builder. It opened and worked on a phone. -->
       <span class="bind-slot">
-        <Button weight="quiet" onclick={() => (binding = true)}>{copy.bindBlock}<Kbd keys="⌥B" /></Button>
+        <Button weight="quiet" onclick={() => (binding = true)}>{copy.bindBlock}</Button>
       </span>
     {/snippet}
   </PageHead>

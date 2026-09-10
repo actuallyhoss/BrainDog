@@ -496,7 +496,6 @@
   .money-unit {
     flex: none;
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-sm);
   }
 

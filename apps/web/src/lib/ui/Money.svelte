@@ -36,7 +36,7 @@
   .code {
     color: var(--dim);
     font-size: 0.85em;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
   }
 
   .amount {

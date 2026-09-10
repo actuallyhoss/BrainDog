@@ -29,7 +29,6 @@
   import Money from '$lib/ui/Money.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
-  import Kbd from '$lib/ui/Kbd.svelte';
   import { Table } from 'braindog-render/svelte';
   import { drew } from '../../../../lib/ui/screen.svelte.ts';
 
@@ -87,7 +86,8 @@
   };
 
   /**
-   * `y` COPIES THE ID AND `⇧Y` THE LINK, which is what the grid does and what this page prints.
+   * `y` COPIES THE ID AND `⇧Y` THE LINK, which is what the grid does and what the button beside the
+   * number does.
    *
    * The route had no key listener at all while its own header carried `<kbd>y</kbd>` — so the one
    * screen where somebody most wants a row's spoken id to paste into a message advertised the key
@@ -205,7 +205,7 @@
               <dt class="field-label">{labelOf(f)}</dt>
               <dd class="field-value" data-type={f.type} dir={dirOf(id, f.id)}>
                 {#if value === null || value === undefined || value === ''}
-                  <span class="missing">—</span>
+                  <span class="missing">Not set</span>
                 {:else if f.type === 'money'}
                   <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />
                 {:else if f.id === decl.state}
@@ -247,7 +247,6 @@
                and its `supersedes` is what it replaces. -->
           <section class="incoming">
             <h2 class="incoming-title">
-              <Icon name={rel.icon} size="s" />
               {rel.name}
               <span class="incoming-label">{rel.label.toLowerCase()}</span>
               <span class="incoming-count num">{rel.total}</span>
@@ -268,19 +267,21 @@
              row is called, and the other is a compare-and-set counter that means nothing to a
              reader and changes on every write. The id stays, because it is the handle you paste
              into an agent. The counter goes; the History underneath is the version, in words. -->
-        <h2 class="side-title"><Icon name="info" size="s" />Details</h2>
+        <h2 class="side-title">Details</h2>
         <dl class="meta">
-          <dt>Id</dt>
-          <!-- IT SAID `y` AND NOTHING WAS BOUND, and the button itself had no handler either — two
-               lies in one control, on the screen where somebody most wants a row's id to paste into
-               a message. The button was fixed and the KEY was not, under a comment claiming both
-               were: this route registered no key listener at all while its own header printed one.
-               It came here from the header, beside the id it copies, and the key came with it. -->
+          <dt>Number</dt>
+          <!-- THE NUMBER YOU SAY, AND THE BUTTON THAT COPIES THE WHOLE ID. `#12` is what the header
+               prints and what a person reads out; `obligations#12` is what lands on the clipboard,
+               because pasted into a message it has to name the list too. `y` still copies it, and
+               the `?` sheet lists the key rather than a chip beside the button. An unsaved row has
+               no number, so it says so rather than printing the `#-1` that stands in for one. -->
           <dd class="id-line">
-            <span class="mono">{id}#{row.seq}</span>
-            {#if !unwritten}
+            {#if unwritten}
+              <span class="missing">{copy.markNotWritten}</span>
+            {:else}
+              <span class="number">#{row.seq}</span>
               <button type="button" class="copy-id tap" onclick={() => clipboard.putSpoken(id, row.seq)}>
-                <Icon name="copy" size="s" /><span>{copy.copyId}</span><Kbd keys="y" />
+                <Icon name="copy" size="s" /><span>{copy.copyId}</span>
               </button>
             {/if}
           </dd>
@@ -292,11 +293,13 @@
         </dl>
 
         {#if history.length}
-          <h2 class="side-title"><Icon name="history" size="s" />History</h2>
+          <h2 class="side-title">History</h2>
           <ol class="history">
             {#each history as e}
+              {@const who = actorOf(e.by)}
               <li>
-                <span class="history-by">{actorOf(e.by)}</span>
+                <span class="face" data-you={who === 'you' ? '' : undefined} aria-hidden="true">{who.charAt(0).toUpperCase()}</span>
+                <span class="history-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <span class="history-note">{e.note}</span>
                 <span class="history-when">{since(e.at, NOW)}</span>
               </li>
@@ -336,41 +339,44 @@
     background: var(--hover-wash);
   }
 
-  /* The key is advice for a keyboard, and a thumb has none. The binding stays. */
-  @media (pointer: coarse) {
-    .copy-id :global(kbd) {
-      display: none;
-    }
-  }
-
   .incoming {
     margin-block-start: var(--sp-6);
   }
 
-  .incoming-title {
+  /* THE FOUR HEADINGS ON THIS SCREEN ARE SECTION HEADINGS, and they were eyebrows: small, dim and
+     led by an icon, so Details, History and each list pointing here read as captions over the
+     facts. Twenty pixels at 600 in ink is what `Section` gives a heading everywhere else. */
+  .incoming-title,
+  .doc-label,
+  .side-title {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--sp-2);
     margin-block-end: var(--sp-3);
-    color: var(--dim);
+    color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--t-lg);
     font-weight: 600;
+    letter-spacing: -0.018em;
   }
 
-  /* The FIELD's label, quieter than the register's name: "Obligations · party" reads as one heading
-     with the relation in it, where two words of equal weight read as two headings.
-     Quieter by WEIGHT AND CASE, not by colour: `faint` clears the large-text floor only, and this
-     line is 11px — a rule the css-rules gate holds, and rightly, since the whole heading is small. */
+  /* The FIELD's label, quieter than the register's name: "Obligations party" reads as one heading
+     with the relation in it, where two words of equal weight read as two headings. A step down in
+     size and weight, and `--dim` rather than `--faint`, which clears only the large-text floor. */
   .incoming-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
     font-weight: 400;
-    letter-spacing: 0.04em;
-    text-transform: none;
+    letter-spacing: 0;
   }
 
+  /* The count the way `Section` draws one: beside the title, in the body face, dim. */
   .incoming-count {
-    margin-inline-start: auto;
-    color: var(--ink2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
   }
 
   .incoming-more {
@@ -394,13 +400,10 @@
     align-items: start;
   }
 
+  /* UNBOXED, like every list since `rows.css`: the fields sit on the page with a hairline between
+     each, and a label starts where the heading above it starts. */
   .field-list {
     margin: 0;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
-    overflow: hidden;
   }
 
   .field {
@@ -408,7 +411,7 @@
     grid-template-columns: minmax(0, 16ch) minmax(0, 1fr);
     gap: var(--sp-4);
     align-items: baseline;
-    padding: var(--sp-3) var(--sp-4);
+    padding: var(--sp-3) 0;
     border-block-end: 1px solid var(--line);
   }
 
@@ -452,14 +455,6 @@
     margin-block-start: var(--sp-6);
   }
 
-  .doc-label {
-    margin-block-end: var(--sp-3);
-    color: var(--dim);
-    font-family: var(--font-ui);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
   /* Prose gets a reading measure; a table, a grid and a ledger get the room. Width is a property of
      the block KIND, not of the page — the third time that family of bug was paid for (13 §4.1). */
   .document-slot :global(.document > h1) {
@@ -476,17 +471,6 @@
 
   .document-slot :global(.document > h1:first-child) {
     margin-block-start: 0;
-  }
-
-  .side-title {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-block-end: var(--sp-2);
-    color: var(--ink2);
-    font-family: var(--font-ui);
-    font-size: var(--t-ui);
-    font-weight: 500;
   }
 
   .side-title + * + .side-title {
@@ -510,8 +494,8 @@
     font-size: var(--t-xs);
   }
 
-  .mono {
-    font-family: var(--font-id);
+  .number {
+    font-variant-numeric: tabular-nums;
   }
 
   .history {
@@ -523,27 +507,53 @@
     list-style: none;
   }
 
+  /* WHO, AS A FACE AND A NAME, the shape of Home's feed: a disc with the initial beside the name
+     and the note, so a row's history reads as people passing through rather than as a log. */
   .history li {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
     gap: 2px var(--sp-2);
     padding-block-end: var(--sp-2);
     border-block-end: 1px solid var(--line);
   }
 
-  .history-by {
+  .face {
+    display: grid;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    place-items: center;
+    inline-size: 22px;
+    block-size: 22px;
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
     color: var(--ink2);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
+    font-weight: 650;
+  }
+
+  .face[data-you] {
+    background: var(--accent-wash);
+    color: var(--accent-text);
+  }
+
+  .history-by {
+    grid-column: 2;
+    grid-row: 1;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 600;
   }
 
   .history-note {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
+    grid-row: 2;
     color: var(--dim);
     font-size: var(--t-xs);
   }
 
   .history-when {
+    grid-column: 3;
+    grid-row: 1;
     color: var(--dim);
     font-size: var(--t-xs);
     text-align: end;

@@ -119,10 +119,10 @@
   .undo {
     flex: none;
     min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
+    padding: 0 var(--sp-4);
     background: none;
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--accent-text);
     font: inherit;
     font-weight: 600;
