@@ -254,7 +254,7 @@ for (const dir of ['packages', 'apps', 'tools']) {
 }
 
 /**
- * The budget: seven, and it may only go down.
+ * The budget: six, and it may only go down.
  *
  * Each of these is one of three things and the gate cannot tell which: a concept `30 §6` is missing
  * and should gain by amendment; a code that already exists under another name; or a placeholder
@@ -278,9 +278,13 @@ for (const dir of ['packages', 'apps', 'tools']) {
  *                               depending on where a customer runs it.
  *   `RECORD_NOT_EMPTY` (1)      `seed`'s, and the kernel's import has already moved to
  *                               `IMPORT_NOT_EMPTY`. One line.
- *   `WHERE_OPERATOR_UNSUPPORTED` (1)  the kernel's rule linter, on an `each:` crossing a field that
- *                               is neither list nor enum. `MATCH_OP_UNSUPPORTED`, like the five
- *                               spellings of it in `where` that moved. One line.
+ *   `WHERE_OPERATOR_UNSUPPORTED` GONE, 2026-09-10, and it had TWO sites rather than the one
+ *                               recorded here: the rule linter's `each:` over a field that is
+ *                               neither list nor enum, now `MATCH_OP_UNSUPPORTED`; and a
+ *                               cursor-plus-order conflict in `list` that was not about a `where`
+ *                               operator at all, now `VALUE_MALFORMED` at `cursor`. The count in
+ *                               this table is of CODES and the drift is in SITES, which is how the
+ *                               second one stayed invisible to the gate that measures the first.
  *   `SCOPE_INSUFFICIENT` (1)    `FORBIDDEN` with the remedy in the sentence, exactly as
  *                               `PERSON_REQUIRED` now is. It waits on one assertion in `mcp`'s tests.
  *   `NOPE` (2) · `SOMETHING_NOBODY_MAPPED` (1)  test fixtures, and both are LEFT ON PURPOSE. The
@@ -291,7 +295,7 @@ for (const dir of ['packages', 'apps', 'tools']) {
  *                               floor: the budget cannot reach zero without making a test worse,
  *                               which is worth knowing before somebody tries.
  */
-const BUDGET = 7;
+const BUDGET = 6;
 const codes = [...invented.keys()].sort();
 /* THE BUDGET IS ABOUT A TREE WITH CODE IN IT. A fixture root holds a document and an array and no
    source at all, so counting emitted codes there measures nothing — and the slack rule below would

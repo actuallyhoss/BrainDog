@@ -366,10 +366,24 @@ function read(
      * like a currency and means something else, so the test is on the value rather than on a type
      * that would have to be threaded down through two aggregations to get here.
      */
+    /**
+     * AND A HALF THAT READ NOTHING HAS NO UNIT, WHICH IS NOT A DIFFERENT UNIT.
+     *
+     * A sum over no rows is zero and its unit is `null`, because there was nothing to take a unit
+     * from. `'GBP' !== null` is true, so `sum(received) - sum(paid)` refused `MIXED_CURRENCY` on any
+     * record that had received money and not yet paid any: the tile read *"one half of this figure
+     * is in GBP and the other in no unit"* instead of the figure, and it repaired itself the day
+     * somebody entered a bill. A money tile that is broken only while a register is young is broken
+     * for exactly the people who have just arrived.
+     *
+     * SUBTRACTING NOTHING FROM POUNDS IS POUNDS. What the check is for is subtracting hours from
+     * pounds, and that needs two units to be wrong about.
+     */
     const currency = (u: string | null | undefined) => typeof u === 'string' && /^[A-Z]{3}$/u.test(u);
+    const said = (u: string | null | undefined) => typeof u === 'string' && u !== '';
     const clash = ratio
       ? currency(of.value.unit) && currency(per.value.unit) && of.value.unit !== per.value.unit
-      : of.value.unit !== per.value.unit;
+      : said(of.value.unit) && said(per.value.unit) && of.value.unit !== per.value.unit;
     if (clash)
       /* `RATIO_MIXED_CURRENCY` FOR A RATIO, AND `MIXED_CURRENCY` FOR A DIFF, because `04 §5` gives
          them separate rows with separate sentences: the ratio's is *"revenue is USD, spend is EGP.
@@ -632,8 +646,8 @@ export function scorePrediction(
     propose?: (p: { question: string; body_kind: string; body: Record<string, unknown> }, actor: string) => Result<{ id: string }>;
   },
 ): Result<Scored> {
-  const row = sql.one<{ id: string; claim: string; measure: string; target: string; window: string; on_miss: string }>(
-    'SELECT id, claim, measure, target, window, on_miss FROM prediction WHERE id = ? AND scored_at IS NULL',
+  const row = sql.one<{ id: string; claim: string; measure: string; target: string; window: string; on_miss: string; unit: string | null }>(
+    'SELECT id, claim, measure, target, window, on_miss, unit FROM prediction WHERE id = ? AND scored_at IS NULL',
     id,
   );
   /* NOT A REFUSAL. A prediction already scored is the ordinary case for a re-entered alarm, and the
@@ -674,10 +688,14 @@ export function scorePrediction(
   sql.exec(
     'UPDATE prediction SET scored_at = ?, observed = ?, met = ? WHERE id = ?',
     deps.nowAt,
-    /* THE SAME INTEGER RULE AS A SERIES POINT. `Math.round` alone stored a ratio of 0.375 as `0`
-       while `met` was computed from 0.375 and stored as `1` — a row reading "target ≥ 0.3 met,
-       observed 0", which is the record contradicting itself in its own governance table. */
-    observed === null ? null : stored(observed),
+    /* THE SAME INTEGER RULE AS A SERIES POINT, AND THE SAME UNIT THE BASELINE WENT IN UNDER.
+       `Math.round` alone stored a ratio of 0.375 as `0` while `met` was computed from 0.375 and
+       stored as `1` — a row reading "target ≥ 0.3 met, observed 0", which is the record
+       contradicting itself in its own governance table. The scale that replaced it was then applied
+       to money as well, so a prediction about a figure in pounds was settled against an observation
+       ten thousand times its own baseline. `row.unit` is the unit chosen when the prediction was
+       accepted, and it is the unit the observation has to be in for the two to be comparable. */
+    observed === null ? null : point(observed, row.unit).value,
     met === null ? null : met ? 1 : 0,
     id,
   );
@@ -768,8 +786,45 @@ export type Snapshot = { series: string; wrote: number; backfilled: number; miss
 const BASIS = 'pct.bp';
 const BASIS_SCALE = 10_000;
 
-/** What goes in the integer column: the value itself, or basis points when it is fractional. */
-export const stored = (value: number): number => (Number.isInteger(value) ? value : Math.round(value * BASIS_SCALE));
+/**
+ * A UNIT THIS RECORD MEANS SOMETHING BY: a currency, a quantity's unit, a duration's.
+ *
+ * `''` and `'count'` are the two spellings a bare number gets, and `pct.bp` is the one the scaling
+ * below invents. Everything else came off a declaration and is a real measurement.
+ */
+const realUnit = (unit: string | null | undefined): unit is string =>
+  typeof unit === 'string' && unit !== '' && unit !== 'count' && unit !== BASIS;
+
+/**
+ * What goes in the integer column, AND THE UNIT THAT GOES BESIDE IT, decided together.
+ *
+ * THE SCALE WAS APPLIED TO MONEY AND THE CURRENCY WAS KEPT, WHICH IS A FIGURE TEN THOUSAND TIMES
+ * TOO BIG WITH A POUND SIGN IN FRONT OF IT. `stored()` took a value and nothing else: any fractional
+ * number became basis points, while each of the three call sites wrote the unit from a separate
+ * expression that correctly kept a real unit when the reading had one. So the average of two rows at
+ * GBP 101 and GBP 102 read `{ value: 101.5, unit: 'GBP' }` and was written as
+ * `{ value: 1015000, unit: 'GBP' }`, which every surface in this product renders as £10,150.00. The
+ * same happened to `prediction.baseline`, and `listGovernance` hands those rows back as they are, so
+ * it reached a screen.
+ *
+ * A REAL UNIT IS THE ATOM AND IS NEVER SCALED. Money is already an integer in minor units, so an
+ * average landing between two pennies rounds to a penny: that is what money does, and half a penny
+ * is not a number this record can hold. The same is true of a duration in milliseconds and of a
+ * quantity in kilograms, and both were being multiplied by ten thousand for the same reason.
+ *
+ * BASIS POINTS ARE FOR THE FIGURE WITH NO UNIT AT ALL, which is what `08 §8` specifies them for: a
+ * ratio of 0.375 stored as `0` made a series whose whole point is a trend read as a flat line of
+ * zeroes. That case is unchanged.
+ *
+ * THE TWO ANSWERS COME BACK TOGETHER because they were computed apart, and computing them apart is
+ * the whole defect. A caller cannot write the scaled value under the reading's own unit any more,
+ * because it is not given one to write.
+ */
+export const point = (value: number, unit: string | null | undefined): { value: number; unit: string | null } => {
+  if (realUnit(unit)) return { value: Math.round(value), unit };
+  if (Number.isInteger(value)) return { value, unit: null };
+  return { value: Math.round(value * BASIS_SCALE), unit: BASIS };
+};
 
 export function snapshot(
   sql: Sql,
@@ -806,6 +861,21 @@ export function snapshot(
   const endOf = (ms: number): number => {
     const want = at(ms);
     let t = Date.parse(`${want}T12:00:00Z`);
+    /**
+     * AND NOON UTC IS ONLY INSIDE THE LOCAL DAY FOR OFFSETS BETWEEN MINUS TWELVE AND PLUS TWELVE.
+     *
+     * The paragraph above argues for noon because no clock change has ever crossed it, and that is
+     * true of noon LOCAL. This seeded noon UTC, which in `Pacific/Auckland` is one o'clock the NEXT
+     * morning: the walk then started in the wrong day and every instant it stepped to was in the
+     * wrong day too, so a record at UTC+12 or east stamped today's local date on a reading taken
+     * as of one in the morning and called it yesterday. The zone the comment above is written about
+     * is the zone it was wrong in, and `provision.test.ts` admits Auckland as a record's timezone.
+     *
+     * A YYYY-MM-DD STRING ORDERS LIKE THE DATE IT IS, so stepping in hours towards the day that is
+     * wanted needs no offset table and no arithmetic on a zone. It is at most fourteen steps.
+     */
+    while (at(t) > want) t -= 3_600_000;
+    while (at(t) < want) t += 3_600_000;
     /* Forward in hours while it is still this day, then back off by a millisecond. */
     while (at(t + 3_600_000) === want) t += 3_600_000;
     while (at(t + 60_000) === want) t += 60_000;
@@ -825,13 +895,17 @@ export function snapshot(
        cannot tell "nothing" from "no answer", and the difference is the whole of a trend. */
     if (!read.ok || read.value.value === null) return 'missing';
 
+    const wrote = point(read.value.value, read.value.unit);
+
     sql.exec(
       `INSERT INTO metric_point (series, grain, at, value, unit, n, source, wrote_at) VALUES (?, 'day', ?, ?, ?, ?, ?, ?)
        ON CONFLICT (series, grain, at) DO UPDATE SET value = excluded.value, unit = excluded.unit, n = excluded.n, wrote_at = excluded.wrote_at`,
       decl.metric,
       day,
-      stored(read.value.value),
-      read.value.unit ?? (Number.isInteger(read.value.value) ? '' : BASIS),
+      /* ONE DECISION, TWO COLUMNS. The value and its unit were computed by two expressions that
+         disagreed about money: the first scaled it and the second kept the currency. */
+      wrote.value,
+      wrote.unit ?? '',
       read.value.rows,
       decl.source,
       deps.nowAt,

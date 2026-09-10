@@ -54,11 +54,25 @@ export type Compiled = {
   bad: Refusal[];
 };
 
-const isGroup = (n: Node): n is Group =>
-  typeof n === 'object' && n !== null && ('all' in n || 'any' in n || 'none' in n);
+/**
+ * IS THIS A NODE AT ALL, which is a question this file did not used to ask.
+ *
+ * `packages/host` JSON-DECODES EVERY QUERY VALUE, so a caller chooses the SHAPE of `where` as well
+ * as its contents: `?where=null`, `?where=5` and `?where={"all":{"length":1}}` are all things a
+ * stranger can send. Each one reached `'matches' in leaf` or `childrenOf(…).map` and threw a
+ * TypeError straight out of `k.list`, which is a 500 on a read. The kernel coerces `limit`, `cursor` and
+ * `order` at the edge for exactly this reason and says so in as many words; `where` was left out of
+ * that fix. A refusal is a value here, and an exception is not one.
+ */
+const isNode = (n: unknown): n is Node => typeof n === 'object' && n !== null && !Array.isArray(n);
+
+const isGroup = (n: Node): n is Group => isNode(n) && ('all' in n || 'any' in n || 'none' in n);
 
 const quantifierOf = (g: Group): Quantifier => ('all' in g ? 'all' : 'any' in g ? 'any' : 'none');
-const childrenOf = (g: Group): Node[] => (('all' in g ? g.all : 'any' in g ? g.any : g.none) ?? []);
+/* THE CHILDREN AS THE CALLER SENT THEM, and `unknown` rather than `Node[]` because the caller sends
+   them. `?? []` read `{all: {length: 1}}` as a group with one child and then called `.map` on an
+   object; the two readers below ask whether it is a list before they walk it. */
+const childrenOf = (g: Group): unknown => ('all' in g ? g.all : 'any' in g ? g.any : g.none);
 
 /**
  * The JSON path a field is stored at, and the ONE place it is spelled.
@@ -118,6 +132,28 @@ const QUALIFIER: Record<string, { part: string; key: string }> = {
 const ORDERED = new Set(['int', 'decimal', 'duration', 'money', 'quantity', 'day', 'instant']);
 const TEXTUAL = new Set(['text', 'document', 'url', 'email', 'enum', 'ref', 'secret']);
 
+/**
+ * A CURRENCY IS UPPER CASE ON THE WAY IN, SO IT IS UPPER CASE IN THE QUESTION TOO.
+ *
+ * `{ amount: 100000, currency: 'gbp' }` RETURNED NOTHING while `'GBP'` returned three rows, with an
+ * empty `bad` list either way. The write path upper-cases: `coerce.ts:187` ends
+ * `currency: currency.toUpperCase()`, and `34 §3` gives the stored shape as `"currency": "EGP"`,
+ * so a lower-case literal is compared against a column that can never hold one. `evaluate` compares
+ * with `===` as well, so both renderings agreed by both being wrong, which is the one kind of
+ * disagreement the differential test at the bottom of `where.test.ts` cannot see.
+ *
+ * NORMALISED RATHER THAN REFUSED, and the reason is that `coerce` normalises. `CURRENCY` there is
+ * `/^[A-Za-z]{3}$/`: a person who writes `gbp` in a row gets a row, and a person who writes `gbp` in
+ * a filter would have got a refusal for the same three letters. One spelling accepted by the write
+ * and refused by the read is the second language this package exists not to be, and
+ * `MONEY_LITERAL_NEEDS_CURRENCY` would be the wrong sentence for it anyway, because the currency is there.
+ *
+ * A UNIT IS NOT FOLDED, because it is not a code. `coerce` only trims a quantity's unit, `m` is
+ * metres and `M` is not, and case-folding one would answer a question about millilitres with megalitres.
+ */
+const canonicalHalf = (type: string, half: unknown): unknown =>
+  type === 'money' && typeof half === 'string' ? half.toUpperCase() : half;
+
 /** Which operators a type can take at all. An operator its type cannot take is a refusal. */
 function operatorAllowed(op: Operator, type: string): boolean {
   if (op === 'empty' || op === 'present') return true;
@@ -140,7 +176,7 @@ function qualifier(field: string, type: string, value: unknown, put: (v: string 
   const q = QUALIFIER[type];
   if (!q || typeof value !== 'object' || value === null) return '';
   const half = (value as Record<string, unknown>)[q.key];
-  return half === undefined ? '' : ` AND ${extract(field, type, `.${q.part}`)} = ${put(String(half))}`;
+  return half === undefined ? '' : ` AND ${extract(field, type, `.${q.part}`)} = ${put(String(canonicalHalf(type, half)))}`;
 }
 
 /**
@@ -154,11 +190,27 @@ function currencyKey(field: string, type: string, value: unknown): string | null
   const q = QUALIFIER[type];
   if (!q || typeof value !== 'object' || value === null) return null;
   const half = (value as Record<string, unknown>)[q.key];
-  return half === undefined ? null : String(half);
+  return half === undefined ? null : String(canonicalHalf(type, half));
 }
 
 /** Forty bytes. Past it a `LIKE` pattern reaches a platform ceiling that differs between hosts. */
 const CONTAINS_MAX = 40;
+
+/**
+ * Three groups, counting the outermost as the first, and it is the documents' number rather than one
+ * chosen here.
+ *
+ * `02-DATA-MODEL` §6: *"Groups nest to depth 3, counting the root group as level 1; a fourth level
+ * is refused at install (`PREDICATE_TOO_DEEP`)."* `30 §6`'s table of ceilings says the same, and
+ * `38-SPEC-WHERE` §5.3 writes it as rule G1, *"a group at `level > 3` … refuse, do not descend"*,
+ * which is why the check below returns before it walks the children rather than after.
+ *
+ * THERE WAS NO COUNTER AT ALL. `walk` and `one` recursed as far as the JSON went, and `JSON.parse`
+ * accepts a four-thousand-deep `all:` happily, so a read a stranger can send was a `RangeError:
+ * Maximum call stack size exceeded` and a 500. `PREDICATE_TOO_DEEP` has been in `REFUSAL_CODES`
+ * since the first draft with nothing anywhere emitting it.
+ */
+const MAX_DEPTH = 3;
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
 
 const refuse = (code: string, fix: string, at?: string, allowed?: readonly string[]): Refusal => ({
@@ -168,22 +220,57 @@ const refuse = (code: string, fix: string, at?: string, allowed?: readonly strin
   ...(allowed === undefined ? {} : { allowed }),
 });
 
+/** A day and an instant are written as a string; the three plain numbers are written as a number. */
+const TEMPORAL = new Set(['day', 'instant']);
+const NUMERIC = new Set(['int', 'decimal', 'duration']);
+
 /** The literal a comparison binds, or a refusal if the value is not one this type can hold. */
 function bind(value: unknown, type: string): string | number | null {
-  if (type === 'money') return typeof value === 'object' && value !== null ? (value as Money).amount : null;
-  if (type === 'quantity') return typeof value === 'object' && value !== null ? (value as Quantity).value : null;
-  if (typeof value === 'boolean') return value ? 1 : 0;
-  /* AND THE STRINGS THE SENTENCE GRAMMAR PRODUCES FOR ONE. `resolve` answers the string `'true'`
+  /**
+   * A COMPOUND VALUE'S NUMBER, AND IT HAS TO BE A NUMBER.
+   *
+   * This read `.amount` off the object and returned whatever was there, which for
+   * `{ currency: 'GBP' }` is `undefined` and not `null`. Every guard downstream is `=== null` or
+   * `.filter((v) => v !== null)`, so the missing amount walked past all of them, `put(undefined)`
+   * pushed it into `params`, and `node:sqlite` answered `TypeError: Provided value cannot be bound
+   * to SQLite parameter 2`, which is a throw out of a read on a body a caller can send. `carriesUnit`
+   * checks the CURRENCY half, so the literal passed the money guard on its way here.
+   */
+  if (type === 'money' || type === 'quantity') {
+    const key = type === 'money' ? 'amount' : 'value';
+    const half = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+    return typeof half === 'number' && Number.isFinite(half) ? half : null;
+  }
+
+  /* A BOOLEAN IS A BOOL'S LITERAL AND NOBODY ELSE'S, and `typeof value === 'boolean'` used to sit
+     ABOVE this branch, so it answered for `int`, `decimal`, `duration`, `day` and `instant` as
+     well. `{field: 'n', gt: false}` compiled to `json_extract(…,'$.n') > 0` and returned three
+     rows while `evaluate` returned none, because `numeric()` and `comparable()` there answer `null`
+     for a boolean. That is a rule firing mid-write and the list drawn afterwards disagreeing
+     about the same row, which is the failure this package exists to make impossible.
+
+     AND THE STRINGS THE SENTENCE GRAMMAR PRODUCES FOR ONE. `resolve` answers the string `'true'`
      for `done is yes`, `json_extract` answers the integer `1`, and `1 = 'true'` is false in SQLite
      — so the sentence form matched NOTHING while the structured form matched correctly, and the
-     negation of the same sentence matched EVERYTHING. Two spellings of one grammar disagreeing is
-     the failure this package exists to make impossible, and the second half of it is the clause
-     that quietly matches every row, which its own header is written against. */
+     negation of the same sentence matched EVERYTHING. The second half of that is the clause that
+     quietly matches every row, which this file's own header is written against. */
   if (type === 'bool') {
-    if (value === 'true') return 1;
-    if (value === 'false') return 0;
+    if (value === true || value === 'true') return 1;
+    if (value === false || value === 'false') return 0;
     return null;
   }
+
+  /* A DAY IS A STRING AND A NUMBER IS NOT ONE, which is the same gap from the other side.
+     `{field: 'due', gt: 0}` fell through to the catch-all below and compiled to a real comparison
+     that SQLite answers TRUE of every dated row, because it orders INTEGER before TEXT: every
+     obligation in the register, from a filter that looked like it had asked about a date. `evaluate`
+     matched none of them. `VALUE_MALFORMED` is what the caller gets now, from the branches that
+     already say it: a `day` takes a day, and an `int` takes an integer. */
+  if (TEMPORAL.has(type)) return typeof value === 'string' ? value : null;
+  if (NUMERIC.has(type)) return typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+  /* THE TEXTUAL TYPES STILL TAKE EITHER, and that is not an oversight: `has` and `lacks` bind an
+     element of a list through here as `text`, and a list of `int` holds numbers. */
   if (typeof value === 'number' || typeof value === 'string') return value;
   return null;
 }
@@ -200,10 +287,38 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
   const bad: Refusal[] = [];
   const params: (string | number)[] = [];
 
-  const walk = (node: Node): string => {
+  const walk = (node: Node, level: number): string => {
+    /* A `where` THAT IS NOT A PREDICATE IS A REFUSAL AND NOT A THROW. `null`, `5` and `[1]` all
+       reached the `'matches' in leaf` test below and came out of `k.list` as a TypeError. */
+    if (!isNode(node)) {
+      bad.push(
+        refuse('VALUE_MALFORMED', `A predicate is a group or a leaf, and ${JSON.stringify(node) ?? 'undefined'} is neither.`, 'where'),
+      );
+      return '';
+    }
+
     if (isGroup(node)) {
       const q = quantifierOf(node);
-      const kids = childrenOf(node).map(walk).filter(Boolean);
+      /* REFUSED WITHOUT DESCENDING, which is `38-SPEC-WHERE` §5.3's rule G1 word for word and also
+         the only way the check is worth having: descending first is the `RangeError` it prevents. */
+      if (level > MAX_DEPTH) {
+        bad.push(
+          refuse(
+            'PREDICATE_TOO_DEEP',
+            `A predicate nests ${MAX_DEPTH} groups deep, counting the outermost as the first. Flatten it.`,
+            q,
+          ),
+        );
+        return '';
+      }
+      const said = childrenOf(node);
+      /* `all: {length: 1}` IS NOT A GROUP WITH ONE CHILD. `?? []` made a missing list an empty
+         group, which `all` reads as every row, and an object with a `length` reached `.map`. */
+      if (!Array.isArray(said)) {
+        bad.push(refuse('VALUE_MALFORMED', `${q} takes a list of predicates, and this one has ${JSON.stringify(said) ?? 'nothing'}.`, q));
+        return '';
+      }
+      const kids = (said as Node[]).map((k) => walk(k, level + 1)).filter(Boolean);
       /* An EMPTY GROUP is not an empty question. `all: []` is true of everything and `any: []` of
          nothing, which is what the two words mean, and guessing either way would be a filter that
          silently passed or silently blocked. */
@@ -581,8 +696,28 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     }
   };
 
-  const sql = where === undefined ? '1 = 1' : walk(where) || '0 = 1';
-  return { sql, params, bad };
+  const compiled = where === undefined ? '1 = 1' : walk(where, 1);
+
+  /**
+   * A REFUSAL ANYWHERE IN THE PREDICATE MATCHES NOTHING, AND NOT JUST A REFUSAL AT THE ROOT.
+   *
+   * The fallback used to be `walk(where) || '0 = 1'`, which is only reached when the whole walk
+   * returns the empty string, and only a top-level leaf does that. Inside a group the refused
+   * child was dropped by the `.filter(Boolean)` above and the group compiled to its SURVIVORS, so
+   * `{none: [{field: 'state', is: 'open'}, {field: 'nope', is: 'x'}]}` came out as
+   * `NOT (state = 'open')` and returned rows the question had asked to exclude. `none` is the
+   * direction that bites: dropping a child of a `NOT (… OR …)` makes the clause strictly WIDER than
+   * what was asked, which is this package's one unforgivable failure: a filter that looks like it
+   * worked and returned more than it should have. `all` widens the same way. The test that claimed
+   * this property held seeded a top-level leaf, the single shape where it did.
+   *
+   * THE PARAMETERS GO WITH IT. `0 = 1` has no placeholder, and handing back the values bound before
+   * the refusal would be a caller passing three parameters to a statement that wants none, which
+   * `node:sqlite` answers with an exception, turning a belt-and-braces guard into the crash it
+   * exists to prevent.
+   */
+  if (bad.length) return { sql: '0 = 1', params: [], bad };
+  return { sql: compiled || '0 = 1', params, bad };
 }
 
 /**
@@ -596,10 +731,28 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
 export function evaluate(where: Predicate | undefined, fields: Record<string, unknown>, schema: Schema): boolean {
   if (where === undefined) return true;
 
+  /**
+   * WHAT `compile` REFUSES, THIS ANSWERS `false` TO for every row, and by construction rather
+   * than by inspection.
+   *
+   * This walked the predicate on its own and had its own holes: `null` and `5` threw the same
+   * TypeError the compiler did, a four-thousand-deep `all:` was the same `RangeError`, and a refused
+   * child inside a `none:` was silently dropped here too, so a rule fired on rows the predicate had
+   * asked to exclude. Mirroring each of those checks by hand is how the two renderings drift, which
+   * is the one thing this file is not allowed to do: asking the compiler is the only way the answers
+   * cannot disagree about what is answerable.
+   *
+   * IT COSTS ONE COMPILE PER CALL, and that is the honest price. A predicate is a handful of leaves,
+   * the callers are a rule against one write and an ingest against one arrival, and the string this
+   * builds is thrown away. A wrong answer about one row, delivered quickly, is not cheaper.
+   */
+  if (compile(where, schema).bad.length) return false;
+
   const one = (node: Node): boolean => {
     if (isGroup(node)) {
       const q = quantifierOf(node);
-      const kids = childrenOf(node);
+      /* The compiler has already refused anything that is not a list of nodes, above. */
+      const kids = childrenOf(node) as Node[];
       if (kids.length === 0) return q !== 'any';
       if (q === 'all') return kids.every(one);
       if (q === 'any') return kids.some(one);
@@ -711,7 +864,10 @@ function sameQualifier(type: string, a: unknown, b: unknown): boolean {
   const q = QUALIFIER[type];
   if (!q) return true;
   if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
-  return (a as Record<string, unknown>)[q.key] === (b as Record<string, unknown>)[q.key];
+  /* THROUGH `canonicalHalf`, BECAUSE THE COMPILER BINDS THROUGH IT. A currency the caller wrote
+     lower-case is upper-cased on both sides or the two renderings disagree about `gbp`, and the
+     paragraph beside `canonicalHalf` is the argument for upper-casing it at all. */
+  return canonicalHalf(type, (a as Record<string, unknown>)[q.key]) === canonicalHalf(type, (b as Record<string, unknown>)[q.key]);
 }
 
 /** Equality, by type: money is equal when both halves are, because a number is not an amount. */
@@ -723,7 +879,8 @@ function same(a: unknown, b: unknown, type: string): boolean {
       typeof b === 'object' &&
       b !== null &&
       (a as Money).amount === (b as Money).amount &&
-      (a as Money).currency === (b as Money).currency
+      /* The same folding the compiler binds through, and `canonicalHalf` is the argument for it. */
+      canonicalHalf('money', (a as Money).currency) === canonicalHalf('money', (b as Money).currency)
     );
   if (type === 'quantity')
     return (

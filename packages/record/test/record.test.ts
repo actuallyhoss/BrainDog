@@ -449,6 +449,47 @@ test('and taking it out keeps the rows, which is the whole reason it is safe to 
   sql.close();
 });
 
+test('AND A PACK DOES NOT TAKE OVER A DECLARATION SOMEBODY WROTE IN THE APP', async () => {
+  /* `plan` tested `already.pack_id && already.pack_id !== mine`, and a declaration set from the app
+     has `pack_id: null`, so a hand-written page fell through into `changes`. The owner approved a
+     diff that said "1 change", the install rewrote their page, and the uninstall then DELETED it,
+     because by that point the row was claimed by the pack. The sentence above `setDeclaration`
+     promises the opposite in as many words: it belongs to no pack, so a later uninstall of anything
+     cannot take it, and a pack that claims the same id is a `PROVIDES_CONFLICT` rather than a silent
+     overwrite. Both halves were false. */
+  const { api, sql } = await record();
+  value(
+    await api.setDeclaration(
+      { body: { page: 'home', title: 'MY HAND-WRITTEN PAGE', blocks: [{ kind: 'note', text: 'Mine.' }] } },
+      owner,
+    ),
+  );
+  assert.equal(api.kernel.declarations().find((d) => d.id === 'page.home')?.pack_id, null);
+
+  const intruder = PACK({
+    declarations: [{ page: 'home', title: 'THE PACK OWNS IT NOW', blocks: [{ kind: 'note', text: 'Theirs.' }] }],
+    seeds: [],
+  });
+  const planned = value<{ diff: { planHash: string; conflicts: { id: string; pack: string }[]; changes: unknown[] } }>(
+    await api.planPack({ doc: intruder }, owner),
+  );
+  assert.deepEqual(
+    planned.diff.conflicts,
+    [{ id: 'page.home', pack: '(this record)' }],
+    'the plan offered somebody else’s page as one of the pack’s own changes',
+  );
+  assert.deepEqual(planned.diff.changes, []);
+
+  const tried = await api.installPack({ doc: intruder, planHash: planned.diff.planHash }, owner);
+  assert.equal((tried as { refusal?: { code: string } }).refusal?.code, 'PROVIDES_CONFLICT');
+
+  /* AND IT IS STILL THEIRS, with their words in it and no pack able to retire it. */
+  const still = api.kernel.declarations().find((d) => d.id === 'page.home');
+  assert.equal(still?.pack_id, null, 'the pack took the declaration');
+  assert.match(String(still?.body), /MY HAND-WRITTEN PAGE/);
+  sql.close();
+});
+
 test('AND NO TOKEN CHANGES WHAT A RECORD IS, whatever its scope', async () => {
   /* ADR-060: there is no `admin` scope to issue. The refusal names the thing that IS missing rather
      than a bigger token somebody would then go looking for. */
@@ -1052,6 +1093,157 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
   // And the register they WERE invited to is still theirs to write into.
   assert.equal(refusal(await api.list({ register: 'obligations' }, them)).code, 'LEVEL_REQUIRED', 'append does not read');
   assert.ok((await api.create({ register: 'obligations', fields: { what: 'Filed' } }, them)).ok, 'append could not append');
+  sql.close();
+});
+
+/**
+ * Two registers with a `search:` field on them, because `search` matches a row's PROJECTION and the
+ * fixtures at the top of this file declare no searchable field at all. A register nothing may read
+ * is invisible to the query without one, so the same test written over those fixtures would pass
+ * whether or not the reader filters by level, which is the shape of test that is worse than none.
+ */
+const SEARCHABLE = [
+  {
+    id: 'register.ledger',
+    kind: 'register' as const,
+    body: { id: 'ledger', name: 'Ledger', title: 'what', fields: [{ id: 'what', type: 'text', required: true, search: true }] } as never,
+  },
+  {
+    id: 'register.journal',
+    kind: 'register' as const,
+    body: { id: 'journal', name: 'Journal', title: 'body', fields: [{ id: 'body', type: 'text', required: true, search: true }] } as never,
+  },
+];
+
+test('AN `append` GRANT READS NOTHING, and every reader that named no register let it read', async () => {
+  /* `reaches` consults the CEILING and `ctx.levels` carries the LEVEL, and every register-less
+     reader filtered with the first one. So a register somebody may only file rows into came back in
+     `boot` with its name and its row count, in `search` with a row's title out of it, in `pages` as
+     a title that is a sentence about what the record holds, on the page itself as a drawn block,
+     and as a figure. `list` refused that same register in the same breath, and a pair of answers
+     that disagree is what says which of them is wrong. `append` is the one level whose entire point
+     is that it does not read. */
+  const { api, sql } = await studio();
+  assert.ok(
+    (
+      await api.kernel.install([
+        ...SEARCHABLE,
+        {
+          id: 'page.jotted',
+          kind: 'page',
+          body: { page: 'jotted', title: 'Jotted', blocks: [{ kind: 'table', source: 'register.journal' }] } as never,
+        },
+        {
+          id: 'metric.jotted',
+          kind: 'metric',
+          body: {
+            metric: 'jotted',
+            name: 'Jotted',
+            source: 'register.journal',
+            value: { count: 'body' },
+            format: 'int',
+            target: { lte: 99 },
+            window: '30d',
+          } as never,
+        },
+        {
+          id: 'digest.monday',
+          kind: 'digest',
+          body: {
+            digest: 'monday',
+            name: 'Monday',
+            schedule: { at: '08:00' },
+            channels: ['in-app'],
+            sections: [{ heading: 'Journal', source: 'register.journal' }],
+          } as never,
+        },
+      ])
+    ).ok,
+  );
+  value(await api.create({ register: 'ledger', fields: { what: 'payroll invoice' } }, owner));
+  value(await api.create({ register: 'journal', fields: { body: 'payroll salary secret' } }, owner));
+
+  value(await api.invite({ person: 'p_12', registers: { ledger: 'write', journal: 'append' } }, owner));
+  const held = api.kernel.access('p_12')!;
+  const them: CallContext = {
+    principal: { kind: 'person', id: 'p_12', level: held.level },
+    ...(held.registers === null ? {} : { registers: held.registers }),
+    levels: held.levels,
+  };
+
+  /* THE ANSWER `list` GIVES IS THE ONE EVERY READER BELOW HAS TO AGREE WITH, and the appending half
+     still appends, or this is a test of a grant that does nothing. */
+  assert.equal(refusal(await api.list({ register: 'journal' }, them)).code, 'LEVEL_REQUIRED');
+  assert.ok((await api.create({ register: 'journal', fields: { body: 'Filed' } }, them)).ok, 'append could not append');
+
+  const seen = value<{ registers: { id: string; count: number }[] }>(await api.boot(them));
+  assert.deepEqual(seen.registers.map((r) => r.id), ['ledger'], 'boot named a register the caller may only file into');
+
+  const hits = value<{ register: string; title: string }[]>(await api.search({ q: 'payroll' }, them));
+  assert.deepEqual(hits.map((h) => h.register), ['ledger'], 'search answered out of a register `list` refuses');
+  assert.equal(hits.some((h) => h.title.includes('secret')), false, 'the title of an unreadable row travelled');
+
+  const listed = value<{ slug: string }[]>(await api.pages(them));
+  assert.equal(listed.some((p) => p.slug === 'jotted'), false, 'a page title is a sentence about the register it draws from');
+
+  const drawn = value<{ blocks: { rows?: unknown[] }[] }>(await api.page({ slug: 'jotted' }, them));
+  assert.deepEqual(drawn.blocks[0]?.rows, [], 'a block over a register they may only file into drew its rows');
+
+  assert.equal(refusal(await api.metric({ metric: 'jotted' }, them)).code, 'METRIC_UNKNOWN');
+  assert.deepEqual(
+    value<{ sections: unknown[] }[]>(await api.digestToday({}, them))[0]?.sections,
+    [],
+    'a digest section handed the rows across',
+  );
+
+  /* AND THE OWNER STILL SEES ALL OF IT, or this is a filter that hides the record from everybody. */
+  assert.deepEqual(
+    value<{ register: string }[]>(await api.search({ q: 'payroll' }, owner)).map((h) => h.register).sort(),
+    ['journal', 'ledger'],
+  );
+  sql.close();
+});
+
+test('AND AN `append` GRANT ON A SECOND REGISTER DOES NOT TAKE AWAY THE READ ON THE FIRST', async () => {
+  /* `scoped` took the index-max level across the grants, `append` sorts above `read` in `LEVELS`,
+     and `LEVEL_REACH.append` deliberately excludes `read`. So the moment somebody holding `read` on
+     one register was also invited to file rows into a second, `boot`, `pages`, `page`, `metric`,
+     `search` and the digest all began refusing `LEVEL_REQUIRED` while `list` on the register they
+     still held `read` on went on working. The app could not start for a caller whose data it would
+     happily serve, and the refusal named the level they had just been given. The question is
+     register-blind, so the honest form of it is whether ANY grant reaches the need. */
+  const { api, sql } = await studio();
+  const ctxFor = (person: string): CallContext => {
+    const has = api.kernel.access(person)!;
+    return {
+      principal: { kind: 'person', id: person, level: has.level },
+      ...(has.registers === null ? {} : { registers: has.registers }),
+      levels: has.levels,
+    };
+  };
+
+  value(await api.invite({ person: 'p_13', registers: { obligations: 'read' } }, owner));
+  assert.deepEqual(
+    value<{ registers: { id: string }[] }>(await api.boot(ctxFor('p_13'))).registers.map((r) => r.id),
+    ['obligations'],
+    'a reader of one register could not open the record at all',
+  );
+
+  /* ONE GRANT ADDED AND NOTHING TAKEN AWAY, which is the whole of the claim. */
+  value(await api.invite({ person: 'p_13', registers: { obligations: 'read', notes: 'append' } }, owner));
+  const them = ctxFor('p_13');
+  assert.deepEqual(
+    value<{ registers: { id: string }[] }>(await api.boot(them)).registers.map((r) => r.id),
+    ['obligations'],
+    'being given the right to file expenses took away the reading they already held',
+  );
+  value(await api.search({ q: 'payroll' }, them));
+  value(await api.pages(them));
+  value(await api.digestToday({}, them));
+  value(await api.list({ register: 'obligations' }, them));
+
+  // And the second grant is still an append, which is the half that must not widen.
+  assert.equal(refusal(await api.list({ register: 'notes' }, them)).code, 'LEVEL_REQUIRED');
   sql.close();
 });
 

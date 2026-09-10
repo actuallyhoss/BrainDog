@@ -381,20 +381,53 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
    * their own registers' figures, and made every one of those filters dead code, which is how a
    * ceiling stops being enforced by being enforced twice.
    *
-   * SO A SCOPED MEMBER READS AT THE HIGHEST LEVEL THEY HOLD ANYWHERE, and the filter does the rest.
-   * That is not a widening: the ladder still refuses `write` to somebody who only holds `read`, and
-   * `reaches` still refuses every register they were not given. It is the difference between "may
-   * you ask this question at all" and "which rows are in the answer".
+   * SO A SCOPED MEMBER MAY ASK IF ANY ONE OF THEIR GRANTS REACHES THE QUESTION, and the filter does
+   * the rest. That is not a widening: the ladder still refuses `write` to somebody who only holds
+   * `read`, and every reader below still drops the registers they may not read. It is the difference
+   * between "may you ask this question at all" and "which rows are in the answer".
    */
   const scoped = (ctx: CallContext, need: Need): Refusal | null => {
     const p = ctx.principal;
     if (p.kind === 'system' || p.level !== null) return guard(ctx, need);
 
-    const held = Object.values(ctx.levels ?? {});
+    /* A LEVEL THIS RECORD DOES NOT PUBLISH IS NOT ONE. Only the index-max grant used to reach
+       `allows`, and an unrecognised value sorts below every real one, so it never got there. Every
+       grant is asked now, and `LEVEL_REACH[<anything else>]` is `undefined`, whose `.includes`
+       throws a TypeError out of the one check this package promises never to throw over. */
+    const held = Object.values(ctx.levels ?? {}).filter((level) => LEVELS.includes(level));
     if (held.length === 0) return guard(ctx, need);
+
+    /* DOES ANY GRANT REACH THIS, RATHER THAN DOES THE HIGHEST ONE. This took the index-max level
+       across the grants, and `append` sorts above `read` while `LEVEL_REACH.append` deliberately
+       excludes `read`, which is what the note nine lines under `LEVELS` says in as many words. So
+       adding an `append` grant on a second register TOOK AWAY the reading somebody already held on
+       the first: `boot`, `pages`, `page`, `metric`, `search` and `governance` all began refusing
+       `LEVEL_REQUIRED` while `list` on their own register still worked, and the sentence named the
+       level they had just been given. Giving a contractor the right to file expenses stopped the
+       app from starting for them. This question names no register, so the honest form of it is
+       whether any one grant reaches the need. */
+    if (held.some((level) => allows({ ...ctx, principal: { ...p, level } }, need) === null)) return null;
+
+    /* AND WHEN NONE OF THEM DOES, THE REFUSAL IS THE FURTHEST-REACHING GRANT'S, so the sentence
+       names the largest thing they hold rather than whichever register happened to be listed first. */
     const best = held.sort((a, b) => LEVELS.indexOf(b) - LEVELS.indexOf(a))[0]!;
     return allows({ ...ctx, principal: { ...p, level: best } }, need);
   };
+
+  /**
+   * Which registers are in a register-less answer, and it is the LEVEL and not only the ceiling.
+   *
+   * ONLY THE CEILING WAS ASKED. Every reader that names no register filtered with `reaches`, which
+   * consults `ctx.registers` and nothing else, so a register somebody may only APPEND to arrived in
+   * `boot` with its name and its row count on it, in `search` with a row's title out of it, in the
+   * list of pages, on a page block and in a digest section, while `list` on that same register
+   * refused them. `append` is the one level whose entire point is that it does not read, and it read
+   * everywhere the caller named nothing. `ctx.levels` is documented as the override and not the
+   * ceiling, and the readers were consulting the other one.
+   *
+   * SO THIS ASKS EXACTLY WHAT `list` ASKS, and the two answer the same way about the same register.
+   */
+  const readable = (ctx: CallContext, register: string): Refusal | null => guard(ctx, 'read', register);
 
   /**
    * The vault gate: a person at `owner`, and never a bearer of any kind.
@@ -529,7 +562,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
           : row.body_kind === 'change'
             ? String(body?.declaration_id ?? '').replace(/^register\./, '')
             : undefined;
-    return typeof named === 'string' && named !== '' && reaches(ctx, named) !== null;
+    /* AND IT IS THE LEVEL, NOT ONLY THE CEILING. This asked `reaches`, so a `rowset` over a register
+       somebody may only append to came back to them with every field value in it. */
+    return typeof named === 'string' && named !== '' && readable(ctx, named) !== null;
   };
 
   /** Who the write path records. A token writes as the PERSON who holds it, never as itself. */
@@ -540,15 +575,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
     /**
      * What this record is: its registers, and how many rows each holds.
      *
-     * The first call any client makes, and it is scoped — a caller sees the registers they may
-     * touch and not the ones they may not, because a list of names is itself information.
+     * The first call any client makes, and it is scoped: a caller sees the registers they may READ
+     * and not the ones they may not, because a list of names is itself information.
      */
     async boot(ctx: CallContext): Promise<Result<Boot>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const out: { id: string; name: string; count: number }[] = [];
       for (const [id, decl] of kernel.registers()) {
-        if (reaches(ctx, id)) continue;
+        /* THE FILTER WAS THE CEILING'S, WHICH IS THE WRONG ONE. A register somebody holds `append`
+           on is inside their ceiling by construction, so its name and its row count went out to the
+           one level whose whole point is that it does not read. */
+        if (readable(ctx, id)) continue;
         out.push({ id, name: decl.name, count: kernel.count(id) });
       }
       return ok({ registers: out, now: new Date(clock.now()).toISOString() });
@@ -681,7 +719,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
           /* A PAGE IS VISIBLE IF ANY REGISTER IT DRAWS FROM IS. `page()` already refuses the blocks a
              caller cannot reach and draws the rest, so a page they can see three fifths of is a page
              they can use. One that names none is prose, and prose is for anybody who may read. */
-          .filter((p) => p.registers.length === 0 || p.registers.some((id) => !reaches(ctx, id)))
+          /* AND VISIBLE MEANS READABLE. This asked the ceiling, so a page over the payroll register
+             was listed by its title to somebody invited to file rows into it and nothing else. */
+          .filter((p) => p.registers.length === 0 || p.registers.some((id) => !readable(ctx, id)))
           /* AND THE REGISTER LIST DOES NOT TRAVEL. It is what the filter is FOR, and shipping it
              would hand back the names the filter exists to withhold. */
           .map((p) => ({ slug: p.slug, title: p.title })),
@@ -719,7 +759,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
         ...out.value,
         blocks: out.value.blocks.map((b) => {
           const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : null;
-          const beyond = register ? reaches(ctx, register) : null;
+          /* THE LEVEL AND NOT ONLY THE CEILING, for the reason `readable` gives: a block over a
+             register somebody may only append to used to draw its rows. */
+          const beyond = register ? readable(ctx, register) : null;
           return beyond ? { ...b, rows: [], matched: 0, refusals: [beyond] } : b;
         }),
       });
@@ -749,7 +791,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       const decl = kernel.metricDecl(id ?? '');
       const filled = decl && param !== undefined ? (fill(decl, null, param) as typeof decl) : decl;
       const register = filled?.source.startsWith('register.') ? filled.source.slice('register.'.length) : null;
-      if (!filled || (register && reaches(ctx, register)))
+      /* AND THE CHECK IS `readable`, not the ceiling. A figure over a register somebody may only
+         append to answered with the figure, which is the same leak one number wide. */
+      if (!filled || (register && readable(ctx, register)))
         return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });
       return kernel.metric(filled);
     },
@@ -810,14 +854,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
 
-      /* AND IT IS HELD TO THE CALLER'S CEILING. `boot` hides a register this caller cannot reach and
-         `list` refuses it — and then a digest section over it handed the rows across. A section is a
-         read of a register like any other, and it answers to the same ceiling. */
+      /* AND IT IS HELD TO WHAT THE CALLER MAY READ. `boot` hides a register this caller cannot reach
+         and `list` refuses it, and then a digest section over it handed the rows across. A section
+         is a read of a register like any other, and it answers the same question `list` does. That
+         question was the CEILING alone, so a section over a register somebody may only append to
+         still went out to them. */
       return ok(
         kernel.digestToday(args?.digest).map((d) => {
           const sections = d.sections.filter((s) => {
             const register = s.source.startsWith('register.') ? s.source.slice('register.'.length) : null;
-            return register === null || !reaches(ctx, register);
+            return register === null || !readable(ctx, register);
           });
           return { ...d, sections, carrying: carryingOf(sections).length, headline: headline(d.name, carryingOf(sections)) };
         }),
@@ -1331,17 +1377,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
     /**
      * Rows whose text matches, across every register the caller may see.
      *
-     * The ceiling is passed DOWN rather than applied to the answer: a caller filtered afterwards
+     * The scope is passed DOWN rather than applied to the answer: a caller filtered afterwards
      * gets a short page whenever the matches were mostly in a register they cannot see, and cannot
      * tell that from there having been no matches.
      */
     async search(args: { q: string; limit?: number }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop } as Result<never>;
-      const ceiling = ctx.registers ?? '*';
-      const registers = ceiling === '*' ? undefined : [...ceiling];
+      /* WHAT THEY MAY READ, AND NOT WHAT THEIR CEILING REACHES. This handed `ctx.registers` down
+         whole, so a search matched inside a register somebody holds `append` on and came back with
+         the row's title: `list` refused that register in the same breath, and one of the two was
+         wrong. The list is built from the registers this record actually declares and filtered the
+         way `list` filters, so the two agree. */
+      const every = [...kernel.registers().keys()];
+      const registers = every.filter((id) => !readable(ctx, id));
+      /* AN EMPTY LIST IS NOT NO LIST. `fts.search` reads an empty `registers` as "do not scope
+         this", so handing one down would search EVERY register on behalf of somebody who may read
+         none of them. Nothing matches, so nothing is asked, and no `search.empty` observation is
+         written about a query that was never the record's to answer. */
+      if (registers.length === 0) return ok([]);
       const hits = kernel.search(String(args.q ?? ''), {
-        ...(registers ? { registers } : {}),
+        /* AND A CALLER WHO MAY READ EVERY ONE OF THEM IS NOT SCOPED AT ALL, which is the query this
+           always ran for an owner. */
+        ...(registers.length === every.length ? {} : { registers }),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
       });
       return ok(

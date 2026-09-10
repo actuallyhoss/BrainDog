@@ -1014,7 +1014,19 @@ export function metric(id: string): Metric {
     value: reading.shown,
     note: empty ? copy.nothingIn(REGISTERS[decl.source.replace(/^register\./, '')]?.name ?? decl.name) : `${targetLine(decl)}${move}`,
     tone: met === null ? undefined : met ? 'good' : 'warn',
-    href: reading.href,
+    /**
+     * AND A FIGURE OVER AN EMPTY REGISTER IS NOT A DOOR EITHER.
+     *
+     * The paragraph above takes the tick off a tile computed from no data, and left the tile a
+     * link: pressing `OWED TO YOU · GBP 0.00 · nothing in Obligations yet` opened a filtered list
+     * of a register with nothing in it, so somebody reading the sentence that says there is nothing
+     * there was invited to go and look at it.
+     *
+     * `held === 0` AND NOT `value === 0`, and the difference is the whole of it. `Overdue · GBP
+     * 0.00` over thirty-eight invoices is an answer, and its door opens the filter that produced it,
+     * which is worth having. A register with nothing in it has no such filter to show.
+     */
+    ...(empty ? {} : { href: reading.href }),
   };
 }
 

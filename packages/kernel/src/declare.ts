@@ -1112,7 +1112,23 @@ function createFault(
   ownPack?: string | null,
 ): Refusal | null {
   const spec = action.create as { register?: unknown; each?: unknown; bound?: unknown } | undefined;
-  if (spec === undefined || spec === null || typeof spec !== 'object') return null;
+  /* A RULE WITH NO `create` AT ALL IS NOT A CREATE, and there is nothing to fault. */
+  if (spec === undefined) return null;
+  /**
+   * AND A `create` THAT IS NOT AN OBJECT IS A FAULT RATHER THAN AN ABSENCE.
+   *
+   * `null`, a string and a number all fell through the same `return null` as "no create here", so a
+   * rule declaring `create: null` installed cleanly and then fired on nothing for ever: the record
+   * accepted a rule whose whole purpose was written down and could never happen, and said nothing on
+   * the day it was accepted or on any day after. That is the silence this file exists to break, one
+   * key along from the codes below it.
+   */
+  if (spec === null || typeof spec !== 'object')
+    return {
+      code: 'DECLARATION_INVALID',
+      fix: `${id} declares a create of ${JSON.stringify(spec)}, and a create names a register and what goes in it.`,
+      at: 'then.create',
+    };
 
   /**
    * `04 §5`'s THIRD CREATE CODE, WHICH HAD NO EMITTER ANYWHERE.

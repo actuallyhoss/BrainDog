@@ -31,6 +31,10 @@ const OBLIGATIONS: Declaration = {
       { id: 'state', type: 'enum', values: ['open', 'part', 'paid'], index: true },
       /* NOT MONEY, and a leg is allowed to point at it. That is the whole point of the test below. */
       { id: 'effort', type: 'duration' },
+      /* A FIELD THAT CAN HOLD ANYTHING, so a test can put the SHAPE of money in a row without the
+         substance of it. `isMoney` used to test that the two keys were present and never what was
+         under them. */
+      { id: 'blob', type: 'json' },
     ],
   } as never,
 };
@@ -311,6 +315,43 @@ test('A LEG POINTED AT SOMETHING THAT IS NOT MONEY SAYS SO, rather than vanishin
   assert.equal(walk.refusals.length, 1, 'three rows of the wrong type produced no steps and no sentence');
   assert.match(walk.refusals[0]?.fix ?? '', /is not money in 3 rows/);
   assert.equal(walk.refusals[0]?.at, 'amount');
+  sql.close();
+});
+
+test('A VALUE THAT ONLY LOOKS LIKE MONEY IS NOT MONEY, and it used to be added as text', async () => {
+  /* `isMoney` tested that `amount` and `currency` were PRESENT and never what was under them, so
+     `{ amount: '500', currency: 'GBP' }` walked through: `delta` came out as the string "500", the
+     running balance became "100000500" by concatenation rather than by addition, and every
+     `balance < 0` after it was a string comparison. It is the guard the `not money` sentence exists
+     to feed, so a value it waved through was money missing from the answer in silence. */
+  const { k, sql } = await record();
+  assert.ok(
+    k.create(
+      'obligations',
+      { what: 'Looks like money', direction: 'owed_by_me', due: day(5), state: 'open', blob: { amount: '500', currency: 'GBP' } },
+      { actor: 'p_1' },
+    ).ok,
+  );
+
+  const walk = value<Runway>(k.runway(100_000, [{ register: 'obligations', on: 'due', amount: 'blob' }], 180));
+  for (const step of walk.steps) assert.equal(typeof step.balance, 'number', `the balance is ${JSON.stringify(step.balance)}`);
+  assert.deepEqual(walk.steps, [], 'a string amount was walked as money');
+  assert.equal(walk.refusals.length, 1, 'the row that is not money produced no sentence');
+  assert.match(walk.refusals[0]?.fix ?? '', /is not money in 1 row/);
+  sql.close();
+});
+
+test('A HORIZON IS CHECKED BEFORE IT IS MULTIPLIED, and it used to be checked nowhere', async () => {
+  /* `horizon` arrives on a block, so it is a number somebody typed in a declaration deciding how
+     much work this function does. And a monthly charge over ten years hit a bare `64` in the middle
+     of the recurrence loop and stopped in 2031 with no sentence, which is the truncation the row cap
+     forty lines up refuses to do, in the one number that must never be approximately right. */
+  const { k, sql } = await record();
+  for (const bad of [0, -1, 1.5, 10_000, Number.NaN]) {
+    const out = k.runway(100_000, LEGS, bad);
+    assert.equal(out.ok, false, `a horizon of ${bad} was walked`);
+  }
+  assert.equal(k.runway(100_000, LEGS, 3650).ok, true, 'ten years is inside the ceiling and was refused');
   sql.close();
 });
 

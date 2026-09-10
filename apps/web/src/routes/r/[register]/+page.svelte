@@ -154,27 +154,6 @@
    * stop — at 500 rows a focusable control per row is 500 tab stops — so the keyboard path stays
    * `x`, which the `?` sheet already advertises, and the pointer path is this.
    */
-  const columns = $derived([
-    { field: 'select', label: copy.select, hideLabel: true, width: '3ch', align: 'start' as const, truncate: 'never' as const },
-    ...columnsFor(id).filter((c) => !hidden.has(c.field)),
-    /**
-     * THE VERBS, AND THE RECEIPT, IN THE ROW.
-     *
-     * EVERY FREQUENT VERB WAS BEHIND A MODAL. The editing path was `Sheet` wrapping `RowForm`,
-     * opened from the register page, and in the record this product is modelled on **61% of what a
-     * person does to a row could not be done where the row is drawn** before the equivalent change
-     * was made there. That one choice is most of what makes this screen read as enterprise
-     * software: the list is a place you look things up from and go somewhere else to act.
-     *
-     * ONE COLUMN, TWO STATES. A row that has just been acted on shows what happened and the way
-     * back; every other row shows the verbs. They cannot both be true of one row, so they share a
-     * cell rather than competing for the width of two.
-     *
-     * `hideLabel`, because the header of a column of controls is not a heading, and `truncate:
-     * 'never'`, because a truncated verb is a different verb.
-     */
-    { field: 'act', label: copy.rowActions, hideLabel: true, width: '11ch', align: 'end' as const, truncate: 'never' as const },
-  ]);
   /**
    * WHAT JUST HAPPENED TO A ROW, DRAWN WHERE THE ROW WAS.
    *
@@ -384,6 +363,69 @@
   const loaded = $derived(result.entries.length);
 
   /**
+   * HOW MANY ROWS MAKE SIFTING WORTH OFFERING.
+   *
+   * A CONTROL THAT ACTS ON A SET IS NOISE UNTIL THE SET IS BIGGER THAN THE SCREEN. Measured on this
+   * page at 390px with one row: the row's top was 445px into an 844px viewport — the row 5% of the
+   * screen, the chrome 53% — and 45 of the 71 focusable controls in `<main>` were there whether the
+   * list held one row or thirty-eight. Searching a list you can see all of is slower than reading
+   * it, and filtering it is slower still.
+   *
+   * EIGHT, BECAUSE THAT IS WHAT FITS. A phone shows about eight card rows at once, so below it
+   * everything the person owns is already in front of them and there is nothing to find. It is the
+   * one number here and it is tied to a screen rather than to a taste.
+   *
+   * IT IS DECLARED HERE, ABOVE THE COLUMNS, BECAUSE THE COLUMNS ASK IT. It used to sit four hundred
+   * lines further down beside the bar it gates, which was fine while the bar was the only thing that
+   * asked: the picker column and the select-all were unconditional, so half of the answer to "is
+   * this list big enough to act on in bulk" was drawn and half was not.
+   */
+  const ENOUGH_TO_SIFT = 8;
+
+  /** The moment `19 §6` describes: the register, with their one row in it. */
+  const arriving = $derived(page.url.searchParams.has('first'));
+
+  const siftable = $derived(!arriving && result.total >= ENOUGH_TO_SIFT);
+
+  /**
+   * AND THE PICKER IS NOT ON THE SCREEN UNTIL THERE IS A SET TO BUILD.
+   *
+   * `USABILITY.md`'s second question is whether the product grows as the record grows, and its
+   * example is exactly this: *"a control that is meaningless at n=1 should not be on the screen at
+   * n=1"*. Everything the bulk bar offers over one row — copy the id, set the state, archive it —
+   * is already on that row's own menu, so at one row the picker is a column of chrome whose only
+   * outcome is a toolbar that says `1 selected` above a list of one.
+   *
+   * THE SAME THRESHOLD THE BAR ABOVE IT USES, because they are one feature. `siftable` was already
+   * gating the search and filter bar, the keyboard hint and the search-fields sentence; the picker
+   * and the select-all were left unconditional, so half of the answer to "is this list big enough
+   * to act on in bulk" was drawn and half was not.
+   */
+  const columns = $derived([
+    ...(siftable
+      ? [{ field: 'select', label: copy.select, hideLabel: true, width: '3ch', align: 'start' as const, truncate: 'never' as const }]
+      : []),
+    ...columnsFor(id).filter((c) => !hidden.has(c.field)),
+    /**
+     * THE VERBS, AND THE RECEIPT, IN THE ROW.
+     *
+     * EVERY FREQUENT VERB WAS BEHIND A MODAL. The editing path was `Sheet` wrapping `RowForm`,
+     * opened from the register page, and in the record this product is modelled on **61% of what a
+     * person does to a row could not be done where the row is drawn** before the equivalent change
+     * was made there. That one choice is most of what makes this screen read as enterprise
+     * software: the list is a place you look things up from and go somewhere else to act.
+     *
+     * ONE COLUMN, TWO STATES. A row that has just been acted on shows what happened and the way
+     * back; every other row shows the verbs. They cannot both be true of one row, so they share a
+     * cell rather than competing for the width of two.
+     *
+     * `hideLabel`, because the header of a column of controls is not a heading, and `truncate:
+     * 'never'`, because a truncated verb is a different verb.
+     */
+    { field: 'act', label: copy.rowActions, hideLabel: true, width: '11ch', align: 'end' as const, truncate: 'never' as const },
+  ]);
+
+  /**
    * WHAT THE HEAD COUNTS AGAINST: the answer while filtering, the list otherwise.
    *
    * Unfiltered the two are the same number, so this changes nothing on the ordinary screen. Filtered
@@ -488,15 +530,19 @@
   /**
    * WHAT A READER CAN ORDER THE LIST BY, and what each direction is CALLED.
    *
-   * `columns[0]` is the selection box — not a field, ordering nothing — so the sort list is
-   * everything after it. It offered "Select" as a sort key for exactly as long as it took to look.
+   * THE SELECTION BOX IS NOT A FIELD and orders nothing, so it is not in the list. It offered
+   * "Select" as a sort key for exactly as long as it took to look.
+   *
+   * BY NAME AND NOT BY INDEX. This was `columns.slice(1)`, which is the picker's position rather
+   * than the picker, and the picker is drawn only once the list is long enough to act on in bulk:
+   * below that, `slice(1)` silently dropped the spoken id from the sort list instead.
    *
    * And the direction is named in the field's own terms. A column header can get away with an arrow
    * because the arrow sits on the thing it orders; a chip in a sheet is read on its own, and
    * "Due ↑ lowest first" is a sentence about a date that nobody says. `19 §9`'s rule is that the
    * product speaks the reader's words, and the reader's word for an ascending day is *oldest*.
    */
-  const sortable = $derived(columns.slice(1));
+  const sortable = $derived(columns.filter((c) => c.field !== 'select'));
 
   const wayOf = (field: string): readonly [string, string] => {
     if (field === 'seq') return [copy.firstAdded, copy.lastAdded];
@@ -780,8 +826,23 @@
   const copyLink = (seq: number) => clipboard.putLink(id, seq);
 
   /* Column 2, not 1: 0 is the picker and 1 is the spoken id, so the caret starts on the first cell
-     that says what the row IS. It was 1 when the id was the leading column. */
+     that says what the row IS. It was 1 when the id was the leading column.
+
+     AND THE PICKER IS NOT ALWAYS THERE. It is drawn only once the list is big enough to act on in
+     bulk, so on a short list the same cell is one column to the left. A caret that starts on the id
+     rather than on the title is a smaller mistake than one that starts past the end, which is why
+     this clamps rather than counting: `columns` is the list on screen and it is the only thing that
+     knows how long it is. */
   let focus = $state({ row: 0, col: 2 });
+
+  /* THE CARET IS KEPT INSIDE THE COLUMNS THERE ARE. Arrowing already clamps, and the starting
+     column did not: a register with two columns and no picker put the caret past the end of every
+     row, where `columns[focus.col]` is `undefined` and `e` and `Enter` both did nothing. It moves
+     only when it has to, so a reader who has arrowed somewhere keeps their place. */
+  $effect(() => {
+    const last = columns.length - 1;
+    if (focus.col > last) focus = { ...focus, col: Math.max(0, last) };
+  });
   /**
    * THE PEEKED ROW IS IN THE URL, and the comment above used to say it was not.
    *
@@ -822,25 +883,9 @@
 
   /** Only INDEXED fields are offered, in declaration order, at most eight. A filter on an unindexed
       field is a promise the storage cannot keep at 5,000 rows. */
-  /**
-   * HOW MANY ROWS MAKE SIFTING WORTH OFFERING.
-   *
-   * A CONTROL THAT ACTS ON A SET IS NOISE UNTIL THE SET IS BIGGER THAN THE SCREEN. Measured on this
-   * page at 390px with one row: the row's top was 445px into an 844px viewport — the row 5% of the
-   * screen, the chrome 53% — and 45 of the 71 focusable controls in `<main>` were there whether the
-   * list held one row or thirty-eight. Searching a list you can see all of is slower than reading
-   * it, and filtering it is slower still.
-   *
-   * EIGHT, BECAUSE THAT IS WHAT FITS. A phone shows about eight card rows at once, so below it
-   * everything the person owns is already in front of them and there is nothing to find. It is the
-   * one number here and it is tied to a screen rather than to a taste.
-   */
-  const ENOUGH_TO_SIFT = 8;
 
   const filterable = $derived((decl?.fields ?? []).filter((f) => f.index).slice(0, 8));
 
-  /** The moment `19 §6` describes: the register, with their one row in it. */
-  const arriving = $derived(page.url.searchParams.has('first'));
 
   /**
    * WHETHER THIS LIST IS BIG ENOUGH TO NEED SIFTING THROUGH.
@@ -849,7 +894,6 @@
    * what is on screen: filtering thirty-eight rows down to one must not remove the control that got
    * you there. The two differ exactly when somebody is already sifting.
    */
-  const siftable = $derived(!arriving && result.total >= ENOUGH_TO_SIFT);
 
   /**
    * THE FIELDS THE BOX ACTUALLY MATCHES, READ FROM THE DECLARATION.
@@ -971,7 +1015,7 @@
       focus = { row: rows.length - 1, col: focus.col };
       return;
     }
-    if (mod && e.key.toLowerCase() === 'a') {
+    if (mod && e.key.toLowerCase() === 'a' && siftable) {
       /* All LOADED, never all matching. A select-all reaching rows the DOM has never held is a
          count you cannot verify by looking — the same argument as 13 §4.3's 2,000-row cap, from the
          other side. */
@@ -1079,7 +1123,7 @@
         e.preventDefault();
         void goto(`/r/${to}`);
       }
-    } else if (e.key === 'x' || e.key === 'X') {
+    } else if ((e.key === 'x' || e.key === 'X') && siftable) {
       /* `X` and not `x` when shift is down — `e.key` carries the SHIFTED character, so a check for
          the lowercase letter alone silently drops every `⇧x`. */
       const row = result.entries[focus.row];

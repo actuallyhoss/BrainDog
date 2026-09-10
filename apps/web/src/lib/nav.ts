@@ -51,11 +51,42 @@ export function arrange<T extends { section: string; href: string; order: number
   const rank = new Map(arrangement.map((href, i) => [href, i]));
   return group(entries).map(([section, list]) => [
     section,
+    /**
+     * AN ENTRY THE ARRANGEMENT DOES NOT NAME SITS WHERE THE RECORD PUT IT, and it used to fall to
+     * the end. The comment here has always said the first thing and the code did the second:
+     * `rank.get(href) ?? Number.MAX_SAFE_INTEGER` ranks every unnamed entry after every named one,
+     * so the declaration's own order only ever broke ties among the leftovers.
+     *
+     * Nothing could reach it today, because the arrangement names every page the seed declares.
+     * The day a pack adds one, that page appears at the bottom of its section for everybody who has
+     * ever reordered their rail: a new thing, buried, for the readers most likely to be looking.
+     *
+     * SO AN UNNAMED ENTRY TAKES THE PLACE OF THE NEIGHBOUR IT WAS DECLARED AFTER. Walking the list
+     * in the record's own order and giving each unnamed entry a rank just past the last named one
+     * puts it back beside the page it was written to sit beside, wherever the reader has since moved
+     * that page to. An entry declared before any named one lands first, which is what its
+     * declaration asked for.
+     */
     list
-      .map((e, i) => ({ e, at: rank.get(e.href) ?? Number.MAX_SAFE_INTEGER, i }))
-      /* The reader's order first, then the declaration's, then arrival — so an entry the
-         arrangement does not name keeps the place the record gave it rather than falling to the
-         end, and a page a pack adds tomorrow appears where its declaration asked. */
+      .map((e, i) => ({ e, i }))
+      .sort((a, b) => a.e.order - b.e.order || a.i - b.i)
+      .map(({ e, i }, declared, all) => {
+        let at = rank.get(e.href);
+        if (at === undefined) {
+          /* The last named entry BEFORE this one in the record's order, plus a half, so it lands
+             immediately after that neighbour and before whatever the reader put next. */
+          let before = -1;
+          for (let back = declared - 1; back >= 0; back -= 1) {
+            const near = rank.get(all[back]!.e.href);
+            if (near !== undefined) {
+              before = near;
+              break;
+            }
+          }
+          at = before + 0.5;
+        }
+        return { e, at, i };
+      })
       .sort((a, b) => a.at - b.at || a.e.order - b.e.order || a.i - b.i)
       .map((x) => x.e),
   ]);

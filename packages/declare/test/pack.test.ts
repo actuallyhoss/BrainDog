@@ -321,6 +321,88 @@ test('and two packs cannot own one declaration', async () => {
   assert.match(out.fix, /belongs to somebody-else/);
 });
 
+test('AND A DECLARATION SOMEBODY WROTE IN THE APP IS NOT A PACK’S TO TAKE EITHER', async () => {
+  /* The test was `already.pack_id && already.pack_id !== mine`, and `pack_id` is `null` for every
+     declaration set from the app, so a hand-written page fell through to `changes`. The owner read
+     a diff that said "1 change", approved it, and the install rewrote their own page; and because
+     the row then belonged to the pack, `uninstall` DELETED it. `record/src/index.ts` states both
+     halves of the invariant that breaks: "IT BELONGS TO NO PACK. `pack_id` is null, so a later
+     `uninstall` of anything cannot take it, and a pack that claims the same id is a
+     `PROVIDES_CONFLICT` rather than a silent overwrite." */
+  const state: Installed = {
+    ...EMPTY,
+    declarations: [{ id: 'rule.chase', version: 1, kind: 'rule', pack_id: null, body: '{"rule":"chase"}', checksum: 'a' }],
+  };
+  const pack = await packOf();
+  const diff = await plan(pack, state);
+
+  assert.deepEqual(diff.conflicts, [{ id: 'rule.chase', pack: '(this record)' }], 'a hand-written declaration was planned as a change');
+  assert.deepEqual(diff.changes, [], 'the pack was going to rewrite something that is not its own');
+
+  const out = refusal(await install(pack, diff, fakeHost(), diff.planHash));
+  assert.equal(out.code, 'PROVIDES_CONFLICT');
+  /* AND THE REMEDY IS THE ONE THAT WORKS. There is no pack to uninstall here, so the sentence names
+     the thing that does free the id. */
+  assert.match(out.fix, /was written in this record/);
+  assert.match(out.fix, /Retire it first/);
+
+  // And the pack's own declaration at the same id is still its own to change.
+  const mine: Installed = {
+    ...EMPTY,
+    packs: [{ id: 'studio-books', version: '1.0.0' }],
+    declarations: [{ id: 'rule.chase', version: 1, kind: 'rule', pack_id: 'studio-books', body: '{}', checksum: 'a' }],
+  };
+  assert.deepEqual((await plan(pack, mine)).conflicts, [], 'a pack could not upgrade its own declaration');
+});
+
+test('AND SEVEN SHAPES OF PACK TEXT PASSED THE DOOR AND THEN CRASHED THE PREVIEW', async () => {
+  /* `plan` is the READ somebody runs to decide whether to trust a file a stranger sent them. It
+     writes nothing, it is specified to refuse nothing, and these seven documents made it answer 500:
+     `normalise` checked the kind, the name, the credential keys and whether the body serialises, and
+     never that `fields` and `then` are lists or that a dependency range is text, and then `spawnsOf`,
+     `interruptsOf`, `warningsOf` and `satisfies` walked them with `.map`, `.filter`, `.some` and
+     `.trim`. Two of the seven threw out of `normalise` itself, from the line that reads a seeded
+     register's field list. `PACK_MALFORMED` naming the key is the answer the format already has. */
+  const REG = (fields: unknown) => ({ register: 'obligations', name: 'Obligations', title: 'what', fields });
+  const RULE = (then: unknown) => ({ rule: 'chase', register: 'obligations', when: 'state is open', then });
+
+  const shapes: [string, Record<string, unknown>, string][] = [
+    ['fields as a string', { declarations: [REG('what')], seeds: [] }, 'register.obligations.fields'],
+    ['fields as a mapping', { declarations: [REG({ what: 'text' })], seeds: [] }, 'register.obligations.fields'],
+    ['fields holding a null', { declarations: [REG([null])], seeds: [] }, 'register.obligations.fields'],
+    ['then as a string', { declarations: [RULE('notify')], seeds: [] }, 'rule.chase.then'],
+    ['then as a mapping', { declarations: [RULE({ create: { register: 'obligations' } })], seeds: [] }, 'rule.chase.then'],
+    [
+      'a dependency range that is a number',
+      { requires: { format: 1, primitives: 1, packs: { 'studio-core': 3 } } },
+      'requires.packs',
+    ],
+    /* THE TWO THAT THREW OUT OF `normalise`: the seed check reads the register's field list to see
+       whether it declares `tags`, and it read it through a cast rather than a check. */
+    ['fields as a string, with a seed that reads it', { declarations: [REG('what')] }, 'register.obligations.fields'],
+    ['fields holding a null, with a seed that reads it', { declarations: [REG([null])] }, 'register.obligations.fields'],
+  ];
+
+  for (const [what, over, at] of shapes) {
+    const out = refusal(await normalise(DOC(over)));
+    assert.equal(out.code, 'PACK_MALFORMED', what);
+    assert.equal(out.at, at, `${what}: the refusal does not name the key`);
+  }
+
+  /* AND THE PREVIEW STILL FINISHES for an action with nothing legible under `create:`. `plan`
+     refuses nothing by design, so what it says about a rule that spawns nothing is that it spawns
+     nothing, and the install judges the declaration on the kernel's own terms. */
+  const nulled = await packOf({
+    declarations: [
+      { register: 'obligations', name: 'Obligations', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'tags', type: 'list', of: 'text' }] },
+      { rule: 'chase', register: 'obligations', when: 'state is open', then: [{ create: null }, { notify: null }] },
+    ],
+  });
+  const diff = await plan(nulled, EMPTY);
+  assert.deepEqual(diff.spawns, [], 'an action with no legible create was counted as a spawn');
+  assert.deepEqual(diff.interrupts, [], 'an action with no legible notify was counted as an interruption');
+});
+
 test('and a dependency it does not have is a refusal with the version in it', async () => {
   const pack = await packOf({ requires: { format: 9, primitives: 1, packs: {} } });
   const format = await plan(pack, EMPTY);

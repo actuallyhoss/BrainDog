@@ -115,7 +115,22 @@ export function search(
   if (!query) return [];
   const limit = Math.min(Math.max(1, opts.limit ?? 20), 100);
 
-  const scope = opts.registers?.length
+  /**
+   * AN EMPTY SCOPE IS AN EMPTY ANSWER, AND IT USED TO BE THE WHOLE RECORD.
+   *
+   * `opts.registers?.length` reads an empty array as though no scope had been passed, so a caller
+   * that COMPUTED a list of the registers somebody may read and got none handed that person every
+   * row in the record. It is the worst possible direction for a default to fail in, and it is one
+   * character away from the caller doing everything right: `registers: reachable.filter(...)` is the
+   * correct shape and an empty result is the correct answer to it.
+   *
+   * THE QUESTION IS WHETHER A SCOPE WAS GIVEN, not whether it has anything in it. `undefined` is a
+   * caller who never asked to be scoped, which is the owner's own search; `[]` is a caller who asked
+   * and holds nothing.
+   */
+  if (opts.registers !== undefined && opts.registers.length === 0) return [];
+
+  const scope = opts.registers
     ? ` AND entry_fts.register IN (${opts.registers.map(() => '?').join(', ')})`
     : '';
 

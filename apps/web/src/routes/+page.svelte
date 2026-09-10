@@ -130,10 +130,18 @@
 
 <PageHead icon="home" kicker={data.index.name} title={today}>
   {#snippet actions()}
-    <a class="to-decide tap" href="/decide">
-      <span class="to-decide-n num">{data.questions.length}</span>
-      <span>to decide</span>
-    </a>
+    <!-- AND NOTHING AT ALL WHEN THERE IS NOTHING TO DECIDE. This was unconditional, so a record
+         with no open question printed `0 to decide` at the top of the screen named for what needs
+         you, as a link to a page whose empty state is the same answer one navigation later.
+         `USABILITY.md`'s second question is whether the product grows as the record grows, and a
+         digest of nothing is its own example. `/decide` is still in the rail and still on `g d`, so
+         nothing becomes unreachable: what goes is the count of nothing. -->
+    {#if data.questions.length > 0}
+      <a class="to-decide tap" href="/decide">
+        <span class="to-decide-n num">{data.questions.length}</span>
+        <span>to decide</span>
+      </a>
+    {/if}
   {/snippet}
 </PageHead>
 

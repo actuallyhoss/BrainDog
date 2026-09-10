@@ -784,6 +784,18 @@ test('A GENERATOR WITH NO CEILING IS REFUSED AT INSTALL, and again at run time',
   assert.equal((none as { refusal: { code: string } }).refusal.code, 'CREATE_UNBOUNDED');
   assert.match((none as { refusal: { fix: string } }).refusal.fix, /no ceiling fills the record/u);
 
+  /* AND A `create` THAT IS NOT AN OBJECT AT ALL INSTALLED CLEANLY AND FIRED ON NOTHING FOR EVER.
+     `null`, a string and a number all fell through the same early return as "there is no create
+     here", so the record accepted a rule whose whole purpose was written down and could never
+     happen, and said nothing on the day it accepted it or on any day after. */
+  for (const said of [null, 'obligations', 7] as const) {
+    const wrong = EXPAND();
+    (wrong.body as { then: { create: unknown }[] }).then[0]!.create = said;
+    const out = await k.install([wrong]);
+    assert.equal(out.ok, false, `create: ${JSON.stringify(said)} installed and would fire on nothing`);
+    assert.equal((out as { refusal: { at?: string } }).refusal.at, 'then.create');
+  }
+
   const zero = EXPAND();
   Object.assign((zero.body as { then: { create: Record<string, unknown> }[] }).then[0]!.create, { bound: 0 });
   assert.equal(((await k.install([zero])) as { refusal: { code: string } }).refusal.code, 'OUT_OF_BOUNDS');

@@ -156,9 +156,29 @@ const ORDERED: Record<string, string> = { before: 'before', after: 'after', on: 
 export function parseWhere(text: string | undefined, schema: Schema, deps: SentenceDeps): Parsed {
   const bad: Refusal[] = [];
   const clauses: Predicate[] = [];
-  if (!text?.trim()) return { predicate: undefined, bad };
 
-  for (const raw of text.split(',')) {
+  /**
+   * A `where` THAT IS NOT A SENTENCE IS A REFUSAL, and it used to be a throw.
+   *
+   * `if (!text?.trim())` guards `null` and `undefined` and nothing else, and `packages/host`
+   * JSON-decodes every query value, so `?where={"length":1}` reached `.trim` and came back out of
+   * `k.list` as `TypeError: text?.trim is not a function`. A 500 for a read a stranger can send,
+   * where the kernel coerces `limit`, `cursor` and `order` at the edge for exactly this reason.
+   *
+   * `VALUE_MALFORMED`, WHICH IS THE CODE TWENTY LINES DOWN FOR THE NEIGHBOURING FACT: a `where:`
+   * written as a sentence IS a value, and `30 §6` reads the code as *"a value outside its type's
+   * shape that cannot be coerced"*. A filter that is not a string is one.
+   */
+  const filter = text as unknown;
+  if (filter === undefined || filter === null) return { predicate: undefined, bad };
+  if (typeof filter !== 'string')
+    return {
+      predicate: undefined,
+      bad: [{ code: 'VALUE_MALFORMED', fix: `A filter is written as a sentence, and ${JSON.stringify(filter)} is not one.`, at: 'where' }],
+    };
+  if (!filter.trim()) return { predicate: undefined, bad };
+
+  for (const raw of filter.split(',')) {
     const sentence = raw.trim();
     if (!sentence) continue;
 
@@ -179,7 +199,15 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     const rest = words.slice(2).join(' ');
 
     /* ── before · after · on ─────────────────────────────────────────────── */
-    if (verb in ORDERED) {
+    /* `Object.hasOwn`, NOT `in`, AND FOR THE REASON THE FIELD LOOKUP ABOVE USES IT. `ORDERED` is
+       an object literal, so `'constructor' in ORDERED` is true, and `'toString'` and `'valueOf'`
+       are true as well, which meant `due constructor 2026-10-01` parsed clean with an empty `bad`
+       list and became `{field: 'due', constructor: '2026-10-01'}`. `compile` refuses it later,
+       but `evaluate` simply answers false and the kernel's rule lint reads only `bad`, so a rule
+       carrying that `when:` installed clean and then fired on nothing, for ever, with nothing
+       anywhere saying so. The refusal it should have had is the one below on a verb that is not
+       `is`, and it now gets it. */
+    if (Object.hasOwn(ORDERED, verb)) {
       if (decl.type !== 'day' && decl.type !== 'instant') {
         /* `MATCH_OP_UNSUPPORTED` IS THE STRUCTURED COMPILER'S CODE FOR THIS EXACT LEAF, and the two
            renderings of one grammar have to answer with one code or the sentence form is a second
@@ -235,7 +263,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
        to split on the separator rather than on every occurrence. Splitting on ` or ` does that,
        because a value is written in the words a screen shows and those are single-spaced. */
     const said_values = said.split(' or ').map((v) => v.trim()).filter(Boolean);
-    const values: string[] = [];
+    const values: (string | number)[] = [];
     let failed = false;
 
     for (const one of said_values) {
@@ -267,7 +295,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
          shape a filter takes. `30 §6` reads the code as *"a value outside its type's shape that
          cannot be coerced, an unresolvable id or spoken reference"* — a spoken filter that resolves
          to no clause is the second half of that sentence as much as the first. */
-      bad: [{ code: 'VALUE_MALFORMED', fix: `${text} says nothing a register can answer.`, at: 'where' }],
+      bad: [{ code: 'VALUE_MALFORMED', fix: `${filter} says nothing a register can answer.`, at: 'where' }],
     };
   return { predicate: clauses.length === 1 ? clauses[0] : { all: clauses }, bad };
 }
@@ -279,7 +307,7 @@ function resolve(
   decl: { type: string; values?: readonly string[]; to?: string },
   said: string,
   deps: SentenceDeps,
-): string | null {
+): string | number | null {
   if (decl.type === 'enum') {
     /* IN THE WORDS A SCREEN SHOWS. `owed to me` is what a person reads and `owed_to_me` is what the
        column holds; both are accepted, and a word the enum does not declare is refused — which is
@@ -294,6 +322,41 @@ function resolve(
   }
 
   if (decl.type === 'bool') return said === 'true' || said === 'yes' ? 'true' : said === 'false' || said === 'no' ? 'false' : null;
+
+  /**
+   * A DAY, AND A NUMBER, RESOLVED HERE TOO, WHICH IS WHERE `is` AND `is not` NEVER GOT TO.
+   *
+   * This handled `enum`, `ref` and `bool` and handed back the raw word for everything else, and only
+   * the `before` / `after` / `on` branch called `resolveDay`. So `due is not today` compiled to
+   * `(due IS NULL OR NOT (due = 'today'))`, and `'2026-09-05' = 'today'` is false of every row, so the
+   * negation was true of every row, and the register came back whole from a filter that looked like
+   * it had worked. `due is today` was its mirror and matched nothing. The `n is 3` half is the same
+   * line stringing a number: SQLite compares `3 = '3'` across storage classes and answers false, so
+   * the row holding three was the one row the filter could not find.
+   *
+   * THE STRUCTURED FORM WAS ALREADY RESOLVED, and that is what makes this a disagreement rather than
+   * a gap. `resolveRelative` in the kernel's `metrics.ts` has `is` and `not` in its `DATED` list and
+   * refuses `RELATIVE_LITERAL_UNKNOWN` for a word it cannot read, so `{due, not: 'today'}` and
+   * `due is not today` gave different answers over the same rows: two renderings of one grammar,
+   * which is the failure this file's own header is written against.
+   *
+   * AN `instant` RESOLVES TO A PLAIN DAY, exactly as `before` and `after` already do on one and as
+   * `resolveRelative` does on the structured side. Resolving only `day` would put the two renderings
+   * back out of step on the other type in the same breath as fixing them on this one.
+   */
+  if (decl.type === 'day' || decl.type === 'instant') return resolveDay(said, deps.nowMs);
+
+  /* AN INTEGER IS AN INTEGER, and the round trip is what says so: `Number('3px')` is `NaN` and
+     `Number('')` is `0`, so the pattern comes first and the safe-integer check catches the rest.
+     `duration` is seconds and `34 §3` writes it as an integer, so it reads the same as `int`. */
+  if (decl.type === 'int' || decl.type === 'duration') {
+    const n = Number(said);
+    return /^[+-]?\d+$/.test(said) && Number.isSafeInteger(n) ? n : null;
+  }
+  if (decl.type === 'decimal') {
+    const n = Number(said);
+    return said.trim() !== '' && Number.isFinite(n) ? n : null;
+  }
 
   void schema;
   void field;

@@ -23,7 +23,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
-import { stored } from './metrics.ts';
+import { point } from './metrics.ts';
 import { sparkMayWrite } from './spark.ts';
 
 /** The three tables that are read like registers and are not registers. */
@@ -513,6 +513,8 @@ function writePrediction(deps: GovernDeps, sg: string, p: Prediction, forDecl: s
       { at: 'body.prediction.target' },
     );
 
+  const kept = point(baseline, p.unit);
+
   const id = `pr_${deps.mint()}`;
   const scoreAt = deps.nowMs + windowMs(p.window);
   deps.sql.exec(
@@ -522,11 +524,15 @@ function writePrediction(deps: GovernDeps, sg: string, p: Prediction, forDecl: s
     forDecl,
     p.claim,
     JSON.stringify(p.measure),
-    /* THE SAME INTEGER RULE THE OBSERVATION IS STORED UNDER. `Math.round` here and `stored()` at
-       scoring time put a ratio of 0.375 in as `baseline: 0` and back out as `observed: 3750` — a
-       ten-thousand-fold disagreement in the one row whose entire purpose is a before-and-after. */
-    stored(baseline),
-    p.unit ?? (Number.isInteger(baseline) ? 'count' : 'pct.bp'),
+    /* THE SAME INTEGER RULE THE OBSERVATION IS STORED UNDER, AND THE SAME UNIT. `Math.round` here
+       and `stored()` at scoring time put a ratio of 0.375 in as `baseline: 0` and back out as
+       `observed: 3750` — a ten-thousand-fold disagreement in the one row whose entire purpose is a
+       before-and-after. The scale that fixed that was then applied to money as well, so a prediction
+       about a figure in pounds went in ten thousand times too large with a currency on it, and
+       `listGovernance` hands these rows back as they are. `point()` decides the value and the unit
+       together, which is the only way the two cannot disagree. */
+    kept.value,
+    p.unit ?? kept.unit ?? 'count',
     /* THE SCORER'S GRAMMAR, NOT JSON. `targetOf` parses `<=0` and `>=3`; `Number('{"lte":0}')` is
        `NaN`, so a prediction written as JSON came back `VALUE_MALFORMED` at scoring time, never got
        a `scored_at`, and walked the retry ladder to dead. Twenty scored rows is what the brake

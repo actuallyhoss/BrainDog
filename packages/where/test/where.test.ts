@@ -252,14 +252,37 @@ test('a leaf with no test, and a grammar shape this build does not read, are bot
     assert.match(compile(shape as never, SCHEMA).bad[0]?.code ?? '', /MATCH_OP_UNSUPPORTED/, JSON.stringify(shape));
 });
 
-test('a refused predicate compiles to something that matches NOTHING', () => {
-  // Belt and braces: a caller that ignores `bad` must not get the whole register.
-  const c = compile({ field: 'nope', is: 'x' }, SCHEMA);
-  assert.ok(c.bad.length);
-  const d = db();
-  const rows = d.prepare(`SELECT id FROM entry WHERE ${c.sql}`).all(...(c.params as never[]));
-  d.close();
-  assert.equal(rows.length, 0, 'a refused predicate passed rows through');
+test('a refused predicate compiles to something that matches NOTHING, INSIDE A GROUP AS WELL AS AT THE ROOT', () => {
+  /* Belt and braces: a caller that ignores `bad` must not get the whole register.
+     THE FIXTURE USED TO BE A TOP-LEVEL LEAF, which is the single shape where the claim held. A leaf
+     at the root makes `walk` return the empty string and the whole compile falls back to `0 = 1`;
+     inside a group the refused child was dropped by a `.filter(Boolean)` and the group compiled to
+     its SURVIVORS. `none` is the direction that bites, because `NOT (a OR b)` losing `b` is strictly WIDER
+     than what was asked, so the clause returned rows the question had excluded, and `all` widens
+     the same way. A test that asserts a property at the one input where it holds is worse than no
+     test, because it reads as coverage. */
+  const shapes: Predicate[] = [
+    { field: 'nope', is: 'x' },
+    { all: [{ field: 'state', is: 'open' }, { field: 'nope', is: 'x' }] },
+    { any: [{ field: 'state', is: 'open' }, { field: 'nope', is: 'x' }] },
+    { none: [{ field: 'state', is: 'open' }, { field: 'nope', is: 'x' }] },
+    { all: [{ any: [{ field: 'state', is: 'open' }, { field: 'nope', is: 'x' }] }] },
+    { none: [{ field: 'amount', is: { amount: 1 } }] },
+  ];
+  for (const p of shapes) {
+    const c = compile(p, SCHEMA);
+    assert.ok(c.bad.length, `${JSON.stringify(p)} was not refused at all`);
+    /* AND IT BINDS NOTHING. A clause of `0 = 1` handed back with the parameters bound before the
+       refusal is a statement with three values and no placeholder, which `node:sqlite` answers with
+       an exception, the guard becoming the crash it exists to prevent. */
+    assert.deepEqual(c.params, [], `${JSON.stringify(p)} bound parameters a refused clause has no place for`);
+    const d = db();
+    const rows = d.prepare(`SELECT id FROM entry WHERE ${c.sql}`).all(...(c.params as never[]));
+    d.close();
+    assert.equal(rows.length, 0, `a refused predicate passed rows through: ${JSON.stringify(p)}`);
+    // And the other rendering says the same, because a refusal is not an answer in either of them.
+    assert.deepEqual(byJs(p), [], `evaluate answered a refused predicate: ${JSON.stringify(p)}`);
+  }
 });
 
 /* ── nothing is inlined ──────────────────────────────────────────────────── */
@@ -556,4 +579,143 @@ test('AND `not_in` PAIRS EACH AMOUNT WITH ITS OWN CURRENCY', () => {
   assert.ok(out.includes('b'), 'GBP 240.00 was excluded by a list that holds EUR 240.00');
   assert.ok(!out.includes('a'), 'GBP 480.00 is in the list and came back anyway');
   assert.ok(!out.includes('c'), 'EUR 240.00 is in the list and came back anyway');
+});
+
+/* -- a caller chooses the SHAPE as well as the contents ------------------- */
+
+test('A `where` THAT IS NOT A PREDICATE IS A REFUSAL, and it used to be a TypeError out of the read', () => {
+  /* `packages/host` JSON-decodes every query value and `list` passes `where` straight through, so
+     `?where=null` and `?where=5` are things somebody can send. Each of these threw: `Cannot use
+     'in' operator to search for 'matches' in null`, or `childrenOf(...).map is not a function`, and
+     the read came back a 500. The kernel coerces `limit`, `cursor` and `order` at the edge for
+     exactly this reason and says so in a comment; `where` was left out of that fix. */
+  for (const shape of [
+    null,
+    5,
+    true,
+    'state is open',
+    [{ field: 'state', is: 'open' }],
+    { all: { length: 1 } },
+    { all: [null] },
+    { any: 5 },
+    { none: 'state is open' },
+  ]) {
+    const c = compile(shape as never, SCHEMA);
+    assert.equal(c.bad[0]?.code, 'VALUE_MALFORMED', `${JSON.stringify(shape)} was not refused`);
+    assert.equal(c.sql, '0 = 1', `${JSON.stringify(shape)} compiled to something that can match`);
+    assert.deepEqual(c.params, []);
+    assert.equal(evaluate(shape as never, ROWS[0]!.fields, SCHEMA), false, `${JSON.stringify(shape)} evaluated`);
+  }
+  // An absent filter is still every row, which is the one shape that is not a refusal.
+  assert.equal(compile(undefined, SCHEMA).sql, '1 = 1');
+});
+
+test('A PREDICATE NESTS THREE GROUPS, and the fourth is a refusal rather than a RangeError', () => {
+  /* `02-DATA-MODEL` §6 and `38-SPEC-WHERE` §5.3's rule G1 both say three levels, counting the root
+     group as the first, and a fourth is `PREDICATE_TOO_DEEP`. There was no counter at all, and
+     `PREDICATE_TOO_DEEP` had sat in `REFUSAL_CODES` since the first draft with nothing emitting it. */
+  const three: Predicate = { all: [{ any: [{ none: [{ field: 'state', is: 'open' }] }] }] };
+  assert.deepEqual(compile(three, SCHEMA).bad, [], 'three levels is the ceiling, not two');
+  assert.deepEqual(both(three), ['b', 'c']);
+
+  const four: Predicate = { all: [{ any: [{ none: [{ all: [{ field: 'state', is: 'open' }] }] }] }] };
+  const c = compile(four, SCHEMA);
+  assert.equal(c.bad[0]?.code, 'PREDICATE_TOO_DEEP');
+  assert.equal(c.sql, '0 = 1');
+  assert.equal(evaluate(four, ROWS[0]!.fields, SCHEMA), false);
+
+  /* AND FOUR THOUSAND DEEP IS THE SAME REFUSAL, not a stack overflow, which is the shape a stranger
+     sends because `JSON.parse` accepts it happily. The rule refuses WITHOUT DESCENDING, so the
+     recursion never gets past the fourth frame. */
+  let deep: Predicate = { field: 'state', is: 'open' };
+  for (let i = 0; i < 4_000; i++) deep = { all: [deep] };
+  assert.equal(compile(deep, SCHEMA).bad[0]?.code, 'PREDICATE_TOO_DEEP');
+  assert.equal(evaluate(deep, ROWS[0]!.fields, SCHEMA), false);
+});
+
+/* -- a literal is the shape its type takes, and only that shape ----------- */
+
+test('A BOOLEAN IS A BOOL LITERAL AND NO OTHER TYPE MAY TAKE ONE, and a number is not a day', () => {
+  /* `typeof value === 'boolean'` sat ABOVE the `type === 'bool'` branch in `bind`, so it answered
+     for `int`, `decimal`, `duration`, `day` and `instant` too. `{field: 'n', gt: false}` compiled to
+     `json_extract(...,'$.n') > 0` and returned three rows while `evaluate` returned none, because
+     `numeric()` there answers `null` for a boolean. The same gap from the other side is a number on
+     a `day`: SQLite orders INTEGER before TEXT, so `{field: 'due', gt: 0}` was true of every dated
+     row in SQL and true of none in JavaScript. A rule and the list behind it disagreeing about the
+     same row is the failure this package exists to make impossible. */
+  for (const leaf of [
+    { field: 'n', is: true },
+    { field: 'n', gt: false },
+    { field: 'n', is: '3' },
+    { field: 'due', gt: 0 },
+    { field: 'due', is: 20_260_801 },
+    { field: 'due', before: true },
+    { field: 'n', lte: true },
+    { field: 'due', between: ['2026-01-01', 20_261_231] },
+  ]) {
+    const c = compile(leaf as never, SCHEMA);
+    assert.equal(c.bad[0]?.code, 'VALUE_MALFORMED', `${JSON.stringify(leaf)} compiled`);
+    assert.equal(c.sql, '0 = 1', `${JSON.stringify(leaf)} compiled to something that can match`);
+    assert.deepEqual(byJs(leaf as never), [], `${JSON.stringify(leaf)} evaluated`);
+  }
+
+  // And a `bool` still takes all four spellings, which is what the branch is for.
+  assert.deepEqual(oddBoth({ field: 'open', is: true }), ['imported']);
+  assert.deepEqual(oddBoth({ field: 'open', is: 'true' as never }), ['imported']);
+  assert.deepEqual(oddBoth({ field: 'open', is: false }), ['listed']);
+  assert.deepEqual(oddBoth({ field: 'open', is: 'false' as never }), ['listed']);
+});
+
+test('A MONEY LITERAL WITH A CURRENCY AND NO AMOUNT BOUND `undefined` INTO SQLITE', () => {
+  /* `bind` returned `undefined` rather than `null` for an object with no `amount` key, and every
+     guard downstream is `=== null` or `.filter((v) => v !== null)`, so it walked past all of them
+     and `put(undefined)` pushed it into `params`, which is typed `(string | number)[]`.
+     `carriesUnit` checks the CURRENCY half, so the literal passed the money guard on its way there,
+     and `node:sqlite` answered `TypeError: Provided value cannot be bound to SQLite parameter 2`: a
+     throw out of a read, on a body a caller can send. `MONEY_LITERAL_NEEDS_CURRENCY` is the wrong
+     code for it, because the currency is present. */
+  for (const leaf of [
+    { field: 'amount', is: { currency: 'GBP' } },
+    { field: 'amount', not: { currency: 'GBP' } },
+    { field: 'amount', gt: { currency: 'GBP' } },
+    { field: 'amount', lte: { currency: 'GBP' } },
+    { field: 'amount', in: [{ currency: 'GBP' }] },
+    { field: 'amount', not_in: [{ currency: 'GBP' }] },
+    { field: 'amount', between: [{ currency: 'GBP' }, { currency: 'GBP' }] },
+    { field: 'amount', is: { amount: '48000', currency: 'GBP' } },
+    { field: 'effort', is: { unit: 'days' } },
+  ]) {
+    const c = compile(leaf as never, SCHEMA);
+    assert.equal(c.bad[0]?.code, 'VALUE_MALFORMED', `${JSON.stringify(leaf)} was not refused`);
+    assert.ok(!c.params.some((p) => p === undefined), `${JSON.stringify(leaf)} bound undefined`);
+    // And it reaches SQLite without throwing, which is the whole of the complaint.
+    const d = db();
+    assert.equal(d.prepare(`SELECT id FROM entry WHERE ${c.sql}`).all(...(c.params as never[])).length, 0);
+    d.close();
+  }
+});
+
+test('A LOWER-CASE CURRENCY IS THE SAME CURRENCY, because the write path upper-cases it', () => {
+  /* `coerce.ts:187` ends `currency: currency.toUpperCase()` and its `CURRENCY` test is
+     `/^[A-Za-z]{3}$/`, so a row written with `gbp` is stored as `GBP` while a filter written with
+     `gbp` was compared against a column that can never hold one: three rows for `GBP`, none for
+     `gbp`, and an empty `bad` list both times. `evaluate` compared with `===` as well, so the two
+     renderings agreed by both being wrong, which is the one disagreement the sweep at the bottom of
+     this file cannot see. */
+  assert.deepEqual(both({ field: 'amount', is: { amount: 24_000, currency: 'gbp' } }), ['b']);
+  assert.deepEqual(both({ field: 'amount', is: { amount: 24_000, currency: 'Eur' } }), ['c']);
+  assert.deepEqual(both({ field: 'amount', gte: { amount: 24_000, currency: 'gbp' } }), ['a', 'b', 'e']);
+  assert.deepEqual(both({ field: 'amount', in: [{ amount: 24_000, currency: 'gbp' }] }), ['b']);
+  assert.deepEqual(both({ field: 'amount', not: { amount: 24_000, currency: 'gbp' } }), ['a', 'd', 'e']);
+  assert.deepEqual(both({ field: 'amount', not_in: [{ amount: 24_000, currency: 'gbp' }] }), ['a', 'd', 'e']);
+  // A range written in one currency spelled two ways is one range, not `MIXED_CURRENCY`.
+  assert.deepEqual(
+    both({ field: 'amount', between: [{ amount: 20_000, currency: 'gbp' }, { amount: 30_000, currency: 'GBP' }] }),
+    ['b'],
+  );
+
+  /* A UNIT IS NOT FOLDED, because it is not a code. `coerce` only trims it, `m` is metres and `M` is
+     not, and answering a question about one with the other is the mistake a unit exists to stop. */
+  assert.deepEqual(both({ field: 'effort', is: { value: 2, unit: 'days' } }), ['a']);
+  assert.deepEqual(both({ field: 'effort', is: { value: 2, unit: 'DAYS' } }), []);
 });

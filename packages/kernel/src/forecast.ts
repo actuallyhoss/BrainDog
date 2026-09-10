@@ -19,6 +19,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
+import { no } from '@braindog/ports';
 import { compile, resolveDay, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
@@ -93,7 +94,42 @@ const dayOf = (value: string): string => value.slice(0, 10);
 /** The most rows one leg may carry. Past it the walk refuses rather than answering from a subset. */
 const CAP = 2000;
 
+/**
+ * The most times one row may recur inside a walk. Past it the walk refuses rather than truncating.
+ *
+ * IT WAS A BARE `64` IN A `for` LOOP THAT `break`s, WHICH IS THE TRUNCATION THE ROW CAP ABOVE
+ * REFUSES TO DO. The argument beside that cap is that "a crossing day computed from most of the
+ * money is the one number in this module that must never be approximately right", and a monthly
+ * charge over a ten-year horizon stopped in 2031 and reported the runway as un-crossed, silently,
+ * by the same arithmetic the row cap exists to prevent.
+ *
+ * SIXTY-FOUR IS ENOUGH FOR EVERY HORIZON A PERSON ASKS FOR: five years of monthly, sixteen of
+ * quarterly, sixty-four of annual. What it is not enough for is a horizon nobody validated, and the
+ * answer to that is a sentence rather than a shorter walk.
+ */
+const EVERY_CAP = 64;
+
+/**
+ * The furthest ahead a walk may be asked to look, in days.
+ *
+ * `horizon` ARRIVES ON A BLOCK AND WAS VALIDATED BY NOTHING. It multiplies into a timestamp and
+ * feeds the recurrence loop, so a number somebody typed in a declaration decided how much work this
+ * function does. Ten years is longer than any cash question a person actually asks and short enough
+ * that the loop above stays a loop.
+ */
+const HORIZON_CAP = 3650;
+
 export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[], horizonDays = 180): Result<Runway> {
+  /* THE HORIZON IS A NUMBER SOMEBODY TYPED IN A DECLARATION, and it was multiplied into a timestamp
+     with nothing checked. A refusal is a value here as everywhere else, so a horizon this walk
+     cannot carry is a sentence rather than a walk that quietly stops early or a loop that does not
+     end. */
+  if (!Number.isInteger(horizonDays) || horizonDays < 1 || horizonDays > HORIZON_CAP)
+    return no<Runway>(
+      'OUT_OF_BOUNDS',
+      `A horizon is a whole number of days between 1 and ${HORIZON_CAP.toLocaleString('en-GB')}, and this one is ${JSON.stringify(horizonDays)}.`,
+      { at: 'horizon' },
+    );
   const until = deps.ctx.nowMs + horizonDays * DAY_MS;
   const refusals: Refusal[] = [];
   const movements: { at: number; step: Omit<Step, 'balance'> }[] = [];
@@ -153,6 +189,9 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
        field produced no steps and no refusals — and the page said nothing crosses zero, which is
        the one answer a cash walk must never give wrongly. */
     let notMoney = 0;
+    /* A ROW THAT RAN OUT OF OCCURRENCES BEFORE THE HORIZON DID. See `EVERY_CAP`: this used to be a
+       silent `break` in the middle of the money. */
+    let truncated = 0;
     for (const { id } of rows) {
       const entry = deps.hydrate(id);
       if (!entry) continue;
@@ -175,7 +214,9 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
       const label = String(entry.fields[title] ?? entry.id);
       const spoken = entry.seq === null ? entry.id : `${leg.register}#${entry.seq}`;
 
-      for (const { day, at } of occurrences(deps, entry, leg, dayOf(first), until)) {
+      const recurs = occurrences(deps, entry, leg, dayOf(first), until);
+      if (recurs.capped) truncated++;
+      for (const { day, at } of recurs.of) {
         /* CLAMPED TO TODAY, not dropped. The walk stays in order and a balance that is already gone
            is gone at the top of it; the label says which rows those are. */
         const late = at < deps.ctx.nowMs;
@@ -206,6 +247,14 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         code: 'VALUE_MALFORMED',
         fix: `${leg.register}.${leg.amount} is not money in ${notMoney} ${notMoney === 1 ? 'row' : 'rows'}, and a walk adds money. Point this leg at an amount.`,
         at: 'amount',
+      });
+    /* THE SAME SENTENCE THE ROW CAP GIVES, for the same reason: a crossing day computed from most of
+       the money is worse than no crossing day, because it is the answer wearing the shape of one. */
+    if (truncated)
+      refusals.push({
+        code: 'OUT_OF_BOUNDS',
+        fix: `${truncated} ${truncated === 1 ? 'row' : 'rows'} of ${leg.register} recur more than ${EVERY_CAP} times before this horizon ends, and the rest of their money is not in the walk. Shorten the horizon.`,
+        at: 'every',
       });
   }
 
@@ -275,22 +324,45 @@ function occurrences(
   leg: Leg,
   first: string,
   until: number,
-): { day: string; at: number }[] {
+): { of: { day: string; at: number }[]; capped: boolean } {
   const start = noon(first);
-  if (!Number.isFinite(start)) return [];
+  if (!Number.isFinite(start)) return { of: [], capped: false };
   const months = leg.every ? (leg.every.months[String(entry.fields[leg.every.field] ?? '')] ?? 0) : 0;
-  if (!months) return start <= until ? [{ day: first, at: start }] : [];
+  if (!months) return { of: start <= until ? [{ day: first, at: start }] : [], capped: false };
 
   const out: { day: string; at: number }[] = [];
-  for (let n = 0; n < 64; n++) {
+  for (let n = 0; n < EVERY_CAP; n++) {
     const day = n === 0 ? first : resolveDay(`+${Math.round(months * n)}m`, start);
     if (!day) break;
     const at = noon(day);
     if (at > until) break;
     out.push({ day, at });
   }
-  return out;
+  /* AND THE CAP IS REPORTED RATHER THAN TAKEN. Running out of occurrences while the horizon still
+     has room is money missing from the answer, and the caller has to be able to tell that from a
+     leg that simply ends. */
+  return { of: out, capped: out.length === EVERY_CAP };
 }
 
+/**
+ * MONEY, AND NOT MERELY THE SHAPE OF IT.
+ *
+ * This tested that the two keys were PRESENT and never what was under them, so a `json` field
+ * holding `{ amount: '500', currency: 'GBP' }` walked straight through: `delta` came out as the
+ * string `"500"`, the running balance became `"100000500"` by concatenation rather than
+ * £1,005.00 by addition, and every `balance < 0` after it was a string comparison. This is the guard
+ * the `notMoney` counter exists to feed, so a value it waved through was money missing from the
+ * answer with nothing said about it, which is the one thing a cash walk must never do.
+ *
+ * A FINITE NUMBER, because `NaN` and `Infinity` are both numbers and neither is an amount: `NaN`
+ * poisons the whole running balance and never compares true against zero, so a walk carrying one
+ * reports that nothing crosses.
+ */
 const isMoney = (v: unknown): v is { amount: number; currency: string } =>
-  typeof v === 'object' && v !== null && 'amount' in v && 'currency' in v;
+  typeof v === 'object' &&
+  v !== null &&
+  'amount' in v &&
+  'currency' in v &&
+  typeof (v as { amount: unknown }).amount === 'number' &&
+  Number.isFinite((v as { amount: number }).amount) &&
+  typeof (v as { currency: unknown }).currency === 'string';

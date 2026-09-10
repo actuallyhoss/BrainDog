@@ -206,6 +206,32 @@ test('A RATIO OF TWO DIFFERENT UNITS IS A RATE, and it was refused as a mixed cu
   sql.close();
 });
 
+test('A DIFF WHOSE OTHER HALF READ NOTHING IS THE FIRST HALF, and it refused MIXED_CURRENCY', async () => {
+  /* A sum over no rows is zero, and its unit is `null` because there was nothing to take a unit
+     from. `'GBP' !== null` is true, so `sum(received) - sum(paid)` refused on any record that had
+     received money and not yet paid any: the tile read "one half of this figure is in GBP and the
+     other in no unit" and repaired itself the day somebody entered a bill. A money tile that is
+     broken only while a register is young is broken for exactly the people who have just arrived. */
+  const { k, sql } = await record();
+  const net = value<Reading>(
+    k.metric({
+      ...OVERDUE,
+      where: undefined,
+      value: {
+        diff: {
+          of: { sum: 'amount', where: 'direction is owed_to_me' },
+          per: { sum: 'amount', where: 'party is Nobody At All' },
+        },
+      },
+      format: 'money',
+      target: { gte: 0 },
+    } as never),
+  );
+  assert.equal(typeof net.value, 'number', 'a diff against a half that read nothing was refused');
+  assert.equal(net.unit, 'GBP', 'the answer lost the currency the half that read something was in');
+  sql.close();
+});
+
 test('AND A RATIO OF TWO CURRENCIES STILL IS NOT, in its own code', async () => {
   /* `04 §5` names this one and names it narrowly: "a `ratio` of two different CURRENCIES", with the
      repair "revenue is USD, spend is EGP. Name an fx source, or scope the predicate to one
@@ -595,6 +621,68 @@ test('YESTERDAY IS OVERWRITTEN AND EVERY EARLIER DAY IS KEPT', async () => {
   assert.equal(again.backfilled, 0, 'the backfill rewrote days it had already written');
   assert.equal(sql.one<{ value: number }>('SELECT value FROM metric_point WHERE at = ?', before[0]!.at)?.value, 999);
   assert.equal(sql.all('SELECT 1 FROM metric_point').length, before.length, 'a second run doubled the series');
+  sql.close();
+});
+
+test("A RECORD AT UTC+12 GETS ITS OWN YESTERDAY, and it used to get today's date on it", async () => {
+  /**
+   * `endOf` SEEDED ITS SEARCH AT NOON UTC. The comment above it argues for noon because no clock
+   * change has ever crossed it, which is an argument about noon LOCAL: in `Pacific/Auckland` noon
+   * UTC is one o'clock the following morning, so the walk began in the wrong day and stayed there.
+   * The newest point came out stamped with TODAY's local date, holding a reading taken as of one in
+   * the morning, and the row that fires this is armed for five past midnight local.
+   *
+   * EVERY OTHER SNAPSHOT TEST IN THIS FILE PASSES `tz: 'UTC'`, the one zone where the defect is
+   * invisible, under code whose own comment is about Auckland.
+   */
+  const { k, sql } = await record();
+  const tz = 'Pacific/Auckland';
+  const local = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const today = local.format(new Date(NOW));
+
+  value<Snapshot>(snapshot(sql, OPEN, ctxOf(k, NOW), { nowAt: new Date(NOW).toISOString(), tz }, 3));
+  const newest = sql.one<{ at: string }>("SELECT at FROM metric_point WHERE series = 'still-open' ORDER BY at DESC")?.at;
+  assert.ok(newest, 'nothing was written at all');
+  assert.ok(newest < today, `the newest point is ${newest} and the local day is ${today}, so today was written as yesterday`);
+  sql.close();
+});
+
+test('A MONEY POINT IS MONEY, and it went in ten thousand times too large with a currency on it', async () => {
+  /**
+   * `stored()` TOOK A VALUE AND NOTHING ELSE. Any figure that was not a whole number became basis
+   * points, and each of the three call sites wrote the unit from a SEPARATE expression that kept a
+   * real unit when the reading had one. So an average of money landing between two pennies was
+   * multiplied by ten thousand and filed under `GBP`, which every surface in this product renders
+   * with a pound sign in front of it.
+   *
+   * THE SEED'S FIVE AMOUNTS AVERAGE TO A HALF-PENNY. 480,000 + 240,000 + 135,000 + 1,910,000 +
+   * 180,000 is 2,945,000 over five, which is 589,000 exactly, so the amounts are cut to four rows to
+   * reach a fraction: an average that lands on a whole penny cannot tell the two rules apart, which
+   * is why the one `avg` test in this file could not fail. It averages a `duration`, the single type
+   * where the old scaling happened to be harmless.
+   */
+  const { k, sql } = await record();
+  assert.ok(
+    k.create('obligations', { what: 'Odd one', direction: 'owed_to_me', amount: gbp(1), due: day(-1), state: 'open' }, { actor: 'p_1' }).ok,
+  );
+  const avg: MetricDecl = { ...OPEN, metric: 'avg-owed', value: { avg: 'amount' }, where: 'state is open', target: { lte: 9_999_999 }, format: 'money' };
+
+  const read = value<Reading>(evaluateMetric(sql, avg, ctxOf(k, NOW)));
+  assert.equal(read.unit, 'GBP', 'the reading is not in a currency, so this test is about the wrong thing');
+  assert.equal(Number.isInteger(read.value ?? 0), false, 'the average is a whole number of pennies, so the two rules agree here');
+
+  value<Snapshot>(snapshot(sql, avg, ctxOf(k, NOW), { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 1));
+  const kept = sql.one<{ value: number; unit: string }>("SELECT value, unit FROM metric_point WHERE series = 'avg-owed' ORDER BY at DESC");
+  assert.ok(kept, 'nothing was written');
+
+  assert.equal(kept.unit, 'GBP', 'a money point lost its currency');
+  /* WITHIN A PENNY OF THE READING, and not four orders of magnitude away from it. Money is an
+     integer in minor units, so an average between two pennies rounds to a penny: that is what money
+     does, and half a penny is not a number this record can hold. */
+  assert.ok(
+    Math.abs(kept.value - (read.value ?? 0)) <= 1,
+    `the point is ${kept.value} and the reading is ${read.value}`,
+  );
   sql.close();
 });
 

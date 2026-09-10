@@ -626,6 +626,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (!('create' in action)) continue;
       const spec = action.create;
 
+      /* AND A `create` THAT IS NOT AN OBJECT REACHED `.register` AND THREW. A declaration arrives as
+         JSON from a pack somebody else wrote, so the type is not there at the moment it is read:
+         `create: null` was a `TypeError` out of `install`, which is a 500 answering a preview, and
+         `create: "obligations"` walked on to look up a register called `undefined`. A refusal is a
+         value here as everywhere else, and `declare.ts` raises the same one a few lines later for
+         callers that reach it first. */
+      if (spec === null || typeof spec !== 'object')
+        return {
+          code: 'DECLARATION_INVALID',
+          fix: `${id} declares a create of ${JSON.stringify(spec)}, and a create names a register and what goes in it.`,
+          at: 'then.create',
+        };
+
       const target = shape(spec.register);
       if (!target)
         return { code: 'REGISTER_UNKNOWN', fix: `${id} creates rows in ${spec.register}, and there is no such register.`, at: 'register' };
@@ -672,8 +685,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (!kind)
           return { code: 'FIELD_UNKNOWN', fix: `${id} crosses ${field}, and ${rule.register} has no such field.`, at: 'each' };
         if (kind.type !== 'list' && kind.type !== 'enum')
+          /* `MATCH_OP_UNSUPPORTED`, WHICH IS A CODE `30 §6` PUBLISHES, and this said
+             `WHERE_OPERATOR_UNSUPPORTED`, which it does not. `refusals.mjs` counts a code the
+             registry has not got and holds the total as a budget that may only go down; its own
+             notes name this site and the replacement, and call it one line. An `each:` is an
+             operator applied to a field whose type does not admit it, which is what
+             `MATCH_OP_UNSUPPORTED` is for, and it was never about a `where` operator. */
           return {
-            code: 'WHERE_OPERATOR_UNSUPPORTED',
+            code: 'MATCH_OP_UNSUPPORTED',
             fix: `${id} crosses ${field}, which is a ${String(kind.type)} — only a list or an enum has values to cross.`,
             at: 'each',
           };
@@ -793,10 +812,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     }
     if (q.order?.length) {
       if (typeof q.cursor === 'string' && q.cursor !== '')
+        /* `VALUE_MALFORMED` AT `cursor`, AND IT SAID `WHERE_OPERATOR_UNSUPPORTED` AT `order`, which
+           is wrong twice. There is no `where` operator anywhere in this refusal, and the argument
+           that cannot be honoured is the CURSOR: an order is a legitimate thing to ask a list for
+           and a position in the record's order is not a value a sorted query can carry. The code was
+           also outside `30 §6`'s registry, which `refusals.mjs` counts as drift. */
         return no(
-          'WHERE_OPERATOR_UNSUPPORTED',
+          'VALUE_MALFORMED',
           'A cursor pages by when a row last changed, so it cannot also sort by a field. Ask for the whole answer, or page in the record order.',
-          { at: 'order' },
+          { at: 'cursor' },
         );
       const parts: string[] = [];
       for (const o of q.order) {
@@ -1128,8 +1152,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
           /* A LIST CHANGES BY ELEMENT. `tags` going from two to three is one `tag` row naming the
              one that arrived, not an `edit` naming both arrays — which is what makes "when was this
-             tagged late" a question with an answer. */
-          if (key === 'tags' || (known.get(key)?.type === 'list' && known.get(key)?.of === 'text')) {
+             tagged late" a question with an answer.
+
+             AND IT IS THE TYPE THAT DECIDES, NOT THE NAME. This read `key === 'tags' ||` first, so a
+             register declaring a `tags` field of any other type took this branch: both sets came out
+             empty, neither loop wrote a row, and the `continue` skipped the `edit`. Changing a text
+             `tags` from "draft" to "final" alongside another field left the history saying only the
+             other field had moved, which is the ledger quietly losing a write. Nothing enforces that
+             a field called `tags` is a list, so the name was never a safe stand-in for the type. */
+          const of = known.get(key);
+          if (of?.type === 'list' && of.of === 'text') {
             const before = new Set(Array.isArray(was) ? was.map(String) : []);
             const after = new Set(Array.isArray(is) ? is.map(String) : []);
             for (const value of after) if (!before.has(value)) write('tag', key, undefined, value);

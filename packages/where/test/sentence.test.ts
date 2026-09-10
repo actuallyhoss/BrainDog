@@ -22,6 +22,7 @@ const OBLIGATIONS: Schema = {
     state: { type: 'enum', values: ['open', 'part', 'paid', 'written_off'] },
     amount: { type: 'money' },
     due: { type: 'day' },
+    n: { type: 'int' },
     thing: { type: 'ref', to: 'things' } as never,
     urgent: { type: 'bool' },
   },
@@ -197,4 +198,94 @@ test('THE PARSED PREDICATE COMPILES AND EVALUATES, both, over the same rows', ()
   assert.equal(evaluate(p, late, OBLIGATIONS), true);
   assert.equal(evaluate(p, paid, OBLIGATIONS), false);
   assert.equal(evaluate(p, future, OBLIGATIONS), false);
+});
+
+/* -- the spoken form resolves what the structured form resolves ----------- */
+
+test('`due is today` AND `due is not today` RESOLVE THE DAY, which is what the JSON form already did', () => {
+  /* `resolve()` handled `enum`, `ref` and `bool` and handed back the raw word for everything else,
+     and only the `before` / `after` / `on` branch called `resolveDay`. So `due is not today`
+     compiled to `(due IS NULL OR NOT (due = 'today'))`, and since `'2026-09-05' = 'today'` is false
+     of every row the negation was true of every row: the whole register, out of a filter that
+     looked like it had worked. `due is today` was its mirror and matched nothing.
+
+     THE STRUCTURED FORM WAS ALREADY RESOLVED, which is what makes this a disagreement rather than a
+     gap: `resolveRelative` in the kernel's `metrics.ts` has `is` and `not` in its `DATED` list, so
+     `{due, not: 'today'}` answered correctly over the same rows while the sentence did not. */
+  assert.deepEqual(good('due is today'), { field: 'due', is: '2026-09-05' });
+  assert.deepEqual(good('due is not today'), { field: 'due', not: '2026-09-05' });
+  assert.deepEqual(good('due is +30d'), { field: 'due', is: '2026-10-05' });
+  assert.deepEqual(good('due is eom or boy'), { field: 'due', in: ['2026-09-30', '2026-01-01'] });
+  assert.deepEqual(good('due is 2026-10-01'), { field: 'due', is: '2026-10-01' });
+
+  // And a word no clock can read is a refusal rather than a clause that matches everything.
+  assert.equal(bad('due is soon').code, 'VALUE_MALFORMED');
+  assert.equal(bad('due is not soon').code, 'VALUE_MALFORMED');
+  assert.equal(bad('due is 2026-13-45').code, 'VALUE_MALFORMED');
+
+  /* AND THE CLAUSE ANSWERS THE ROWS IT SAYS IT DOES. The register coming back whole is the failure,
+     so the test that matters is over rows and not over the predicate shape. */
+  const rows = [
+    { id: 'today', fields: { due: '2026-09-05' } },
+    { id: 'later', fields: { due: '2026-12-01' } },
+    { id: 'never', fields: {} },
+  ];
+  const of = (text: string): string[] =>
+    rows.filter((r) => evaluate(good(text), r.fields, OBLIGATIONS)).map((r) => r.id);
+  assert.deepEqual(of('due is today'), ['today']);
+  assert.deepEqual(of('due is not today'), ['later', 'never']);
+});
+
+test('AND A NUMBER IS A NUMBER, because SQLite answers false to `3 = \'3\'`', () => {
+  /* The same line stringing an integer: `parseWhere('n is 3')` yielded `{field: 'n', is: '3'}`, and
+     SQLite compares across storage classes, so the one row holding three was the one row the filter
+     could not find. `n is not 3` was its mirror and returned the register. */
+  assert.deepEqual(good('n is 3'), { field: 'n', is: 3 });
+  assert.deepEqual(good('n is not 3'), { field: 'n', not: 3 });
+  assert.deepEqual(good('n is 3 or 9'), { field: 'n', in: [3, 9] });
+  assert.deepEqual(good('n is -2'), { field: 'n', is: -2 });
+  assert.equal(bad('n is three').code, 'VALUE_MALFORMED');
+  assert.equal(bad('n is 3.5').code, 'VALUE_MALFORMED');
+  assert.equal(bad('n is').code, 'REQUIRED_MISSING');
+
+  const rows = [{ id: 'three', fields: { n: 3 } }, { id: 'nine', fields: { n: 9 } }];
+  assert.deepEqual(
+    rows.filter((r) => evaluate(good('n is 3'), r.fields, OBLIGATIONS)).map((r) => r.id),
+    ['three'],
+  );
+  // And it compiles, rather than being refused by `bind` for the type it is.
+  assert.deepEqual(compile(good('n is 3'), OBLIGATIONS).bad, []);
+  assert.deepEqual(compile(good('n is 3'), OBLIGATIONS).params, [3]);
+});
+
+test('A VERB OFF `Object.prototype` IS NOT A VERB, and it used to parse clean', () => {
+  /* `ORDERED` is an object literal, so `'constructor' in ORDERED` is true, and `toString` and
+     `valueOf` are too. `due constructor 2026-10-01` therefore parsed with an EMPTY `bad` list and
+     became `{field: 'due', constructor: '2026-10-01'}`. `compile` refuses that later, but
+     `evaluate` merely answers false and the kernel's rule lint reads only `bad`, so a rule carrying
+     it installed clean and then fired on nothing, for ever, with nothing anywhere saying so.
+     `Object.hasOwn` is what the same file already uses for `schema.fields`, ten lines up. */
+  for (const verb of ['constructor', 'toString', 'valueOf', 'hasOwnProperty', 'isPrototypeOf']) {
+    const out = parse(`due ${verb} 2026-10-01`);
+    assert.equal(out.bad[0]?.code, 'MATCH_OP_UNSUPPORTED', `due ${verb} 2026-10-01 parsed clean`);
+    assert.equal(out.predicate, undefined);
+  }
+  // The three real ones still parse, which is what the table is for.
+  assert.deepEqual(good('due before 2026-10-01'), { field: 'due', before: '2026-10-01' });
+  assert.deepEqual(good('due after 2026-10-01'), { field: 'due', after: '2026-10-01' });
+  assert.deepEqual(good('due on 2026-10-01'), { field: 'due', is: '2026-10-01' });
+});
+
+test('A FILTER THAT IS NOT A SENTENCE IS A REFUSAL, and it used to be a TypeError out of the read', () => {
+  /* `if (!text?.trim())` guards `null` and `undefined` and nothing else, and `packages/host`
+     JSON-decodes every query value, so `?where={"length":1}` reached `.trim` and came back out of
+     `k.list` as `TypeError: text?.trim is not a function`. A 500 on a read a stranger can send. */
+  for (const shape of [{ length: 1 }, 5, true, ['state is open'], { all: [] }]) {
+    const out = parseWhere(shape as never, OBLIGATIONS, deps);
+    assert.equal(out.bad[0]?.code, 'VALUE_MALFORMED', `${JSON.stringify(shape)} was not refused`);
+    assert.equal(out.predicate, undefined);
+  }
+  // `null` and `undefined` are still no filter at all, which is not the same as a broken one.
+  assert.deepEqual(parseWhere(null as never, OBLIGATIONS, deps), { predicate: undefined, bad: [] });
+  assert.deepEqual(parseWhere(undefined, OBLIGATIONS, deps), { predicate: undefined, bad: [] });
 });

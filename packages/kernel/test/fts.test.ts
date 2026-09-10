@@ -160,6 +160,13 @@ test('THE CEILING IS APPLIED IN THE QUERY, not to its results', async () => {
   assert.equal(scoped.length, 1, 'the page was cut before the ceiling was applied');
   assert.equal(scoped[0]?.register, 'obligations');
   assert.equal(k.search('secret', { limit: 20 }).length, 11);
+
+  /* AND A SCOPE OF NOTHING IS AN ANSWER OF NOTHING, WHICH USED TO BE THE WHOLE RECORD. The test was
+     `opts.registers?.length`, so an empty array read as though no scope had been passed at all: a
+     caller that COMPUTED the list of registers somebody may read and got none handed that person
+     every row. It is one character away from the caller doing everything right, and it fails in the
+     worst possible direction. */
+  assert.deepEqual(k.search('secret', { registers: [], limit: 20 }), []);
   sql.close();
 });
 

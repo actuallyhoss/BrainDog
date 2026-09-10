@@ -1,0 +1,5 @@
+code:   PREDICATE_TOO_DEEP
+via:    where
+raises: packages/where/src/index.ts
+at:     all
+fix:    Flatten the predicate, which nests three groups deep counting the outermost as the first.

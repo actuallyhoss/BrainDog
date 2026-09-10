@@ -149,6 +149,19 @@ export type Host = {
 
 const isObject = (v: unknown): v is Record<string, Json> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/**
+ * A list-valued key off a declaration body, and never a throw.
+ *
+ * WHAT IS IN A PACK IS A STRANGER'S TEXT. Every reader of `fields` and `then` reached for `.map`,
+ * `.filter` or `.some` on whatever was under the key, and a document is free to put a string there.
+ * A key that is not a list is nothing to walk, which is the answer that lets `plan` finish and say
+ * what it does know rather than answering 500.
+ */
+const listOf = (body: unknown, key: string): readonly unknown[] => {
+  const value = isObject(body) ? body[key] : undefined;
+  return Array.isArray(value) ? value : [];
+};
+
 const malformed = <T>(fix: string, at?: string): Result<T> =>
   no<T>('PACK_MALFORMED', fix, at === undefined ? {} : { at });
 
@@ -183,6 +196,21 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
       return malformed(`A pack says its ${key}, because somebody has to decide whether to trust it.`, key);
 
   const requires = isObject(doc.requires) ? doc.requires : {};
+  /* A DEPENDENCY'S RANGE IS TEXT, AND THIS TOOK THE AUTHOR'S WORD FOR IT. The map was cast whole
+     (`requires.packs as Record<string, string>`) over values nobody had looked at, and `satisfies`
+     then called `.trim()` on whatever was there: a pack whose `requires.packs` held a number threw a
+     TypeError out of `plan`, which is the READ somebody runs to decide whether to trust a file from
+     a stranger. A refusal is a value here and 500 is not an answer. */
+  const needs: Record<string, string> = {};
+  if (isObject(requires.packs))
+    for (const [dependency, range] of Object.entries(requires.packs)) {
+      if (typeof range !== 'string')
+        return malformed(
+          `${id} requires ${dependency} at ${JSON.stringify(range)}, and a version range is text like >=1.0.0.`,
+          'requires.packs',
+        );
+      needs[dependency] = range;
+    }
   const manifest: Manifest = {
     pack: id,
     version,
@@ -192,7 +220,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     requires: {
       format: Number(requires.format ?? 0) || 0,
       primitives: Number(requires.primitives ?? 0) || 0,
-      packs: isObject(requires.packs) ? (requires.packs as Record<string, string>) : {},
+      packs: needs,
     },
     provides: [],
     ...(typeof doc.note === 'string' ? { note: doc.note } : {}),
@@ -239,6 +267,19 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     if (seen.has(declId)) return malformed(`${id} declares ${declId} twice.`, declId);
     seen.add(declId);
 
+    /* A REGISTER'S `fields` AND A RULE'S `then` ARE LISTS OF OBJECTS, and neither was ever checked.
+       `plan` walks both of them to say what a pack would DO before anybody installs it: how many
+       fields, which rules spawn rows, which ones interrupt somebody. It walked them with `.map`,
+       `.filter` and `.some`, so `fields` written as a string, as a mapping or as `[null]`, and `then`
+       written as a string, as a mapping or carrying a null action, each passed this function and
+       then threw a TypeError out of the preview. `plan` is the read somebody runs to decide whether
+       to trust a file from a stranger, which makes it the worst place in this module for a crash,
+       and `PACK_MALFORMED` naming the key is the answer the format already has. */
+    const list = kind === 'register' ? 'fields' : kind === 'rule' ? 'then' : null;
+    const items = list === null ? undefined : body[list];
+    if (list !== null && items !== undefined && (!Array.isArray(items) || items.some((item) => !isObject(item))))
+      return malformed(`${declId} writes its ${list} as something other than a list of objects.`, `${declId}.${list}`);
+
     /* A REGISTER SAYS `id` ONCE IT IS STORED, and every other kind keeps its own word. That is the
        kernel's convention and it is a good one — a page carrying its own name twice would have a
        copy that drifts — but a register is the one whose word is the same as the kind, so the
@@ -271,7 +312,11 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     /* A SEEDED REGISTER DECLARES `tags`, or its examples cannot be told from its real rows — and
        nobody deletes what they cannot identify. The `example` marker is a value in that field
        rather than a column, so the field has to exist before the marker can. */
-    const fields = ((registers.get(seed.register) as { fields?: { id?: string }[] } | undefined)?.fields ?? []).map((f) => f.id);
+    /* AND THE FIELD LIST IS READ THROUGH `listOf`, because this cast a stranger's `fields` to an
+       array of objects and then mapped over it: a register declaring `fields: "what"` alongside a
+       seed threw a TypeError out of `normalise` itself. The declaration loop above refuses that
+       document now; this reads it the safe way regardless, because a cast is not a check. */
+    const fields = listOf(registers.get(seed.register), 'fields').map((f) => (isObject(f) ? String(f.id ?? '') : ''));
     if (!fields.includes('tags'))
       return no<Pack>(
         'FIELD_UNKNOWN',
@@ -375,10 +420,22 @@ function canonicalise(value: unknown): string | null {
 
 /* ── the plan ────────────────────────────────────────────────────────────── */
 
+/**
+ * Who owns a declaration that no pack owns, said in a way a person reads.
+ *
+ * A CONFLICT NAMES THE OWNER, and the owner here is the record itself. `pack` is a string because
+ * every other conflict names a pack id, and a `null` in it would be a second shape every reader of a
+ * diff would have to know about to render one line.
+ */
+const OWN = '(this record)';
+
 /** `1.2.3` against `>=1.0.0`, `^1.2.0`, `1.x` or an exact version. Absent or `*` is anything. */
 export function satisfies(version: string | null, range: string): boolean {
   if (!version) return false;
-  const want = range.trim();
+  /* AND A RANGE THAT IS NOT TEXT IS NOT A RANGE. `range.trim()` threw for anything else, and this is
+     reached from `plan`, which answers about a document a stranger wrote. `normalise` refuses that
+     document at the door now; this is the second half of the same fact, for a `Pack` built by hand. */
+  const want = String(range ?? '').trim();
   if (!want || want === '*' || want === 'x') return true;
 
   /* A SPACE-SEPARATED RANGE IS EVERY COMPARATOR, AND ALL OF THEM MUST HOLD. `>=1.0.0 <2.0.0` fell
@@ -507,8 +564,17 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
     }
     /* ANOTHER PACK'S DECLARATION IS NOT YOURS TO CHANGE. Two packs owning one register is two
        upgrades that undo each other, quietly, on whichever installs second. */
-    if (already.pack_id && already.pack_id !== mine) {
-      conflicts.push({ id: decl.id, pack: already.pack_id });
+    /* AND NEITHER IS ONE SOMEBODY WROTE IN THE APP. The test was `already.pack_id && …`, which is
+       falsy when `pack_id` is `null`, and `null` is exactly what `setDeclaration` writes. So a
+       hand-written page fell through to `changes`: the plan said "1 change", the owner approved a
+       diff with that one line in it, the install rewrote their page, and `uninstall` later DELETED
+       it, because after the install the row is claimed by the pack. `record/src/index.ts` states
+       both halves of what that breaks in as many words: "IT BELONGS TO NO PACK. `pack_id` is null,
+       so a later `uninstall` of anything cannot take it, and a pack that claims the same id is a
+       `PROVIDES_CONFLICT` rather than a silent overwrite." The comparison is against `mine` now, so
+       the only declarations a pack may change are its own. */
+    if (already.pack_id !== mine) {
+      conflicts.push({ id: decl.id, pack: already.pack_id ?? OWN });
       continue;
     }
     if (already.body !== decl.canonical) changes.push({ id: decl.id, from_version: already.version, summary: summarise(decl) });
@@ -589,13 +655,18 @@ const spawnsOf = (pack: Pack): Diff['spawns'] =>
   pack.declarations
     .filter((d) => d.kind === 'rule')
     .flatMap((d) => {
-      const body = d.body as { rule?: string; when?: unknown; then?: { create?: { register: string; bound: number } }[] };
-      return (body.then ?? [])
-        .filter((a) => a && typeof a === 'object' && 'create' in a)
-        .map((a) => ({
+      const body = d.body as { rule?: string; when?: unknown };
+      /* `then` AND EVERY ACTION IN IT ARE A STRANGER'S TEXT. This read `(body.then ?? []).filter(…)`
+         and then `a.create!.register`: a `then` written as a string or a mapping threw out of
+         `.filter`, and `then: [{ create: null }]` threw on the `!`, both out of `plan`. An action
+         with no legible `create` spawns nothing, so it is listed as nothing, and the install refuses
+         the declaration on the kernel's own terms. */
+      return listOf(d.body, 'then')
+        .flatMap((a) => (isObject(a) && isObject(a.create) ? [a.create] : []))
+        .map((create) => ({
           rule: String(body.rule ?? d.id),
-          register: a.create!.register,
-          bound: Number(a.create!.bound) || 0,
+          register: String(create.register ?? ''),
+          bound: Number(create.bound) || 0,
           when: typeof body.when === 'string' ? body.when : jcs((body.when ?? null) as Json),
         }));
     });
@@ -610,10 +681,12 @@ const callsOf = (pack: Pack): Diff['calls_out'] =>
 
 const interruptsOf = (pack: Pack): string[] =>
   pack.declarations
+    /* THROUGH `listOf` FOR THE REASON `spawnsOf` GIVES: `.some` on a `then` that is a string threw
+       out of the preview, and the optional chaining only ever guarded the action, not the list. */
     .filter(
       (d) =>
         d.kind === 'rule' &&
-        ((d.body as { then?: { notify?: { urgent?: boolean } }[] }).then ?? []).some((a) => a?.notify?.urgent === true),
+        listOf(d.body, 'then').some((a) => isObject(a) && isObject(a.notify) && a.notify.urgent === true),
     )
     .map((d) => String((d.body as { rule?: string }).rule ?? d.id));
 
@@ -627,15 +700,16 @@ const interruptsOf = (pack: Pack): string[] =>
  */
 function warningsOf(pack: Pack): { at: string; say: string }[] {
   const out: { at: string; say: string }[] = [];
-  const registers = new Map(
-    pack.declarations.filter((d) => d.kind === 'register').map((d) => [d.body.id as string, d.body]),
-  );
+  /* THE FIELD IDS WERE READ INTO A VARIABLE NOTHING READS. `const fields = ((body as …).fields ?? [])
+     .map((f) => f.id)` stood in this loop assigned and never spent, so the only thing that line
+     could do was throw: a `fields` written as a string or holding a null crashed `plan()` from a
+     statement whose value was discarded on the next line. What the loop is about is which registers
+     arrive with nothing in them. */
+  const registers = pack.declarations.filter((d) => d.kind === 'register').map((d) => String(d.body.id ?? ''));
   const seeded = new Set(pack.seeds.map((s) => s.register));
 
-  for (const [id, body] of registers) {
-    const fields = ((body as { fields?: { id?: string; type?: string }[] }).fields ?? []).map((f) => f.id);
+  for (const id of registers)
     if (!seeded.has(id)) out.push({ at: `register.${id}`, say: `${id} arrives empty, so nothing on a page that reads it will draw.` });
-  }
   return out;
 }
 
@@ -658,9 +732,16 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
 
   if (diff.conflicts.length) {
     const first = diff.conflicts[0]!;
-    return no<Applied>('PROVIDES_CONFLICT', `${first.id} belongs to ${first.pack}, and two packs cannot own one declaration.`, {
-      at: first.id,
-    });
+    /* AND THE REMEDY IS NOT THE SAME FOR THE TWO OWNERS. A declaration another pack owns is freed by
+       uninstalling that pack; one somebody wrote in the app is freed by retiring it, and telling
+       them to uninstall a pack that does not exist would send them looking for it. */
+    return no<Applied>(
+      'PROVIDES_CONFLICT',
+      first.pack === OWN
+        ? `${first.id} was written in this record, and installing ${diff.pack.id} would take it over. Retire it first if you want the pack to own it.`
+        : `${first.id} belongs to ${first.pack}, and two packs cannot own one declaration.`,
+      { at: first.id },
+    );
   }
 
   /**

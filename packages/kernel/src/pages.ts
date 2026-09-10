@@ -148,7 +148,13 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
       taken.add(base);
       return base;
     }
-    const unique = `${base}-${seq ?? taken.size}`;
+    /* AND THE FALLBACK WAS NEVER CHECKED EITHER, so the collision it exists to break could happen
+       to it: a static page called `kiln`, a static page called `kiln-1`, and a template row titled
+       "Kiln" at seq 1 put two pages at `kiln-1`. `readPage` finds by slug, so the second was listed
+       and unreachable, which is the exact failure the paragraph above says was fixed. Counting up
+       ends because `taken` is finite and every step adds to it. */
+    let unique = `${base}-${seq ?? taken.size}`;
+    for (let n = 2; taken.has(unique); n += 1) unique = `${base}-${seq ?? taken.size}-${n}`;
     taken.add(unique);
     return unique;
   };
