@@ -539,9 +539,28 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            second, so comparing it against ten characters matched nothing and its negation matched
            everything. */
         const lhs = asDay(decl.type, bound) ? `substr(${path}, 1, 10)` : path;
+        /**
+         * `IS NOT NULL` FIRST, AND WITHOUT IT `none:` DROPPED EVERY ROW WITH NOTHING IN THE FIELD.
+         *
+         * `34 §1.3` and `02 §6` both say every positive operator is FALSE on a missing value, and
+         * `02 §6` names the decision it rests on: *"SQL's three-valued surprises stop at the
+         * compiler."* They did not stop here. `NULL = 'x'` is NULL, a `none:` group wraps its
+         * children in `NOT (...)`, and `NOT NULL` is NULL rather than true, so a row with no value
+         * in the field vanished from a query that should have kept it.
+         *
+         * IT IS THE TWO POSITIVE OPERATORS THAT WERE LEFT THREE-VALUED. `contains`, `gt`,
+         * `between`, `starts` and `ends` all already open with this guard; `is` and `in` did not,
+         * and they are the two a person writes most. The in-memory twin has always been two-valued,
+         * because `absent` is tested before the comparison, so the two renderings of one grammar
+         * disagreed about every `none:` over a sparse field.
+         *
+         * THE DIFFERENTIAL DID NOT SEE IT because all ten of its `none` cases name a field that
+         * every fixture row happens to carry, which is the failure this file's own comment about
+         * a shared mistake already names.
+         */
         if (op === 'is') {
           const cmp = `${lhs} = ${put(bound)}`;
-          return `(${cmp}${qualifier(field, decl.type, value, put)})`;
+          return `(${path} IS NOT NULL AND ${cmp}${qualifier(field, decl.type, value, put)})`;
         }
 
         /* AND A FOREIGN-CURRENCY ROW IS NOT A MATCH EVEN UNDER NEGATION. `NOT(amount = 10000 AND
@@ -585,9 +604,12 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            instant is compared to the date part, and a full timestamp is compared as one, so a list
            holding both is answered correctly value by value. */
         const at = (i: number) => (asDay(decl.type, bounds[i]) ? `substr(${path}, 1, 10)` : path);
+        /* AND `IS NOT NULL` HERE TOO, for the reason the `is` branch above gives at length: a
+           positive operator is false on a missing value, and a bare `=` inside a `none:` group is
+           NULL rather than false and takes the row with it. */
         if (op === 'in') {
           const each = list.map((v, i) => `(${at(i)} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
-          return `(${each.join(' OR ')})`;
+          return `(${path} IS NOT NULL AND (${each.join(' OR ')}))`;
         }
 
         /* `not_in` KEEPS THE CURRENCY AND NEGATES THE AMOUNTS, for the reason `not` does — and the

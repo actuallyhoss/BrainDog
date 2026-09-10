@@ -8,7 +8,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
+import { REGISTER_BODY_KEYS } from '../src/declare.ts';
 import { indexesFor, indexName, jcs, openRecord, validateDeclaration, type Declaration, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -1174,4 +1177,295 @@ test('A `starts` PATTERN IS MEASURED AS THE `LIKE` PATTERN IT BECOMES, not as th
   /* A `contains` KEEPS ITS OWN CODE AND ITS OWN CEILING: it compiles to `instr`, which has no
      pattern, so it has no platform limit and needs no escape. */
   assert.equal(refusedWith(rule({ when: { field: 'ref', contains: '%'.repeat(21) } })), null);
+});
+
+/* ── a key nothing reads ─────────────────────────────────────────────────── */
+
+/**
+ * `02 §6.1`'s OWN WORKED REGISTER, WHICH USED TO INSTALL AND LOCK NOTHING.
+ *
+ * The section is a whole page about the closed-period lock and does not hedge: *"A row matching the
+ * predicate refuses EVERY write: field edit, state move, rule `set`, agent `update`, and `create`
+ * into it … it is not a delete guard, `deleted_at` is a write, so a locked row cannot be deleted
+ * either, which is the point."* Run against this build before the check below existed, the
+ * declaration installed, and then a `posted` row was edited AND deleted, both accepted:
+ *
+ *     install ok?                    true
+ *     draft -> posted, `date` unset  ACCEPTED, state=posted
+ *     edit a POSTED row              ACCEPTED, narrative="Rewritten after posting"
+ *     delete a POSTED row            ACCEPTED, deleted_at=2026-09-05T12:00:00.000Z
+ *
+ * The severity was never the missing feature. `REPORT.md` puts the kernel at about a third. It is
+ * that a bookkeeping pack ships a lock in its register body, the install diff shows the register,
+ * and the lock is decoration until an auditor asks.
+ */
+const POSTINGS: Declaration = {
+  id: 'register.postings',
+  kind: 'register',
+  body: {
+    id: 'postings',
+    name: 'Postings',
+    title: 'narrative',
+    state: 'state',
+    immutable_when: { any: [{ field: 'state', is: 'posted' }] },
+    fields: [
+      { id: 'narrative', type: 'text', required: true },
+      { id: 'date', type: 'day' },
+      {
+        id: 'state',
+        type: 'enum',
+        values: ['draft', 'posted', 'void'],
+        transitions: { draft: { to: ['posted', 'void'], requires: ['date', 'narrative'] }, posted: { to: ['void'] }, void: { to: [] } },
+      },
+    ],
+  } as never,
+};
+
+test('`02 §6.1`’s OWN LEDGER IS REFUSED AT INSTALL, rather than installed with its lock as decoration', async () => {
+  const { k, sql } = await record();
+
+  const said = refusal(await k.install([POSTINGS]));
+  assert.equal(said.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(said.at, 'immutable_when');
+  assert.match(said.fix, /reads nowhere/);
+  assert.match(said.fix, /a deploy, not an edit/);
+
+  /* AND THE REGISTER IS NOT THERE. A refusal that still installed would be worse than silence: the
+     pack author would read the refusal, the record would hold the register, and the two would
+     disagree about whether the ledger exists. */
+  assert.equal(k.register('postings'), undefined, 'a refused declaration installed anyway');
+  assert.equal(refusal(k.create('postings', { narrative: 'Opening', state: 'draft' }, { actor: 'p_1' })).code, 'REGISTER_UNKNOWN');
+
+  /* THE SECOND HALF OF THE SAME DECLARATION, once the lock is off: `draft -> posted` carries
+     `requires: [date, narrative]`, and `index.ts` destructures `{ to: string[] }` and reads nothing
+     else. Reproduced before the check existed as `draft -> posted with date empty -> ACCEPTED`. */
+  const { immutable_when: _lock, ...rest } = POSTINGS.body as Record<string, unknown>;
+  const half = refusal(await k.install([{ ...POSTINGS, body: rest as never }]));
+  assert.equal(half.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(half.at, 'state.transitions.draft');
+  assert.match(half.fix, /requires/);
+
+  sql.close();
+});
+
+test('AND EVERY OTHER PUBLISHED REGISTER KEY THIS BUILD READS NOWHERE IS NAMED, one at a time', () => {
+  /* Each of these was reproduced as ACCEPTED against `validate` before the closed list existed, and
+     each is a rule rather than a decoration: an upsert key that duplicates yesterday, a delete
+     guard that deletes, a self-join nothing runs, a predicate name no `where:` can reach, and a
+     spoken prefix every id ignores. */
+  const cases: [string, Record<string, unknown>][] = [
+    ['seq_prefix', { seq_prefix: 'OB' }],
+    ['key', { series: true, key: ['what'] }],
+    ['delete', { delete: 'refuse_while_referenced' }],
+    ['pairs', { pairs: { on: ['what'], opposite: 'what', across: 'what', within: '4d', mark: 'moved' } }],
+    ['predicates', { predicates: { overdue: { field: 'what', is: 'x' } } }],
+    ['immutable_when', { immutable_when: { any: [] } }],
+  ];
+  for (const [key, extra] of cases) {
+    const said = validateDeclaration(withFields([{ id: 'what', type: 'text' }], { ...NO_STATE, ...extra }));
+    assert.equal(said?.code, 'NOT_IN_THIS_BUILD', `${key} installed in silence`);
+    assert.equal(said?.at, key);
+    assert.ok(said?.allowed?.includes('fields'), `${key}'s refusal does not say what a register body takes`);
+  }
+
+  /* AND THE FIELD'S OWN SIX. `derive:` is the one `02 §5` calls the important option of the four,
+     and with nothing reading it a field declaring a derivation is an ordinary writable field
+     holding whatever a caller sent, so `unique: true` + `derive: { normalise }`, which `32 §4.4`
+     uses as the duplicate-detection fixture, dedupes on the raw text or on nothing. */
+  const onAField: [string, Record<string, unknown>][] = [
+    ['derive', { derive: { normalise: 'what' } }],
+    ['required_when', { required_when: { field: 'what', present: true } }],
+    ['min', { min: 1 }],
+    ['max', { max: 4 }],
+    ['note', { note: 'a comment for the next reader' }],
+    ['register', { register: 'people' }],
+  ];
+  for (const [key, extra] of onAField) {
+    const said = validateDeclaration(withFields([{ id: 'what', type: 'text', ...extra }], NO_STATE));
+    assert.equal(said?.code, 'NOT_IN_THIS_BUILD', `${key} installed in silence on a field`);
+    assert.equal(said?.at, 'what');
+    assert.ok(said?.allowed?.includes('type'), `${key}'s refusal does not say what a field takes`);
+  }
+});
+
+test('AND `by:` IS THE ONE DOOR INTO THE LEVEL LADDER A DECLARATION CAN OPEN', () => {
+  /**
+   * `02 §5`'s last addition: `proposed: { to: [active], by: decide }`, and the comment on the line
+   * is *"a PERSON at the `decide` level. No token grants it."* Read by nothing. `record.update`
+   * gates on `guard(ctx, 'write', register)`, which a bearer token at scope `write` passes, so an agent
+   * performs the one move the declaration reserved for a person and no event tells them apart.
+   * `HUMAN_ONLY` is in the registry and produced by no product code.
+   *
+   * This is why it is refused rather than ignored: the other unread keys cost an invariant, and
+   * this one costs an authorisation.
+   */
+  const move = (body: Record<string, unknown>) =>
+    validateDeclaration(
+      withFields(
+        [{ id: 'what', type: 'text' }, { id: 'state', type: 'enum', values: ['proposed', 'active'], transitions: { proposed: body } }],
+        { state: 'state' },
+      ),
+    );
+
+  const said = move({ to: ['active'], by: 'decide' });
+  assert.equal(said?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(said?.at, 'state.transitions.proposed');
+  assert.match(said?.fix ?? '', /by/);
+
+  /* `to:` ON ITS OWN IS ENFORCED AND INSTALLS, which is what makes this one key of a two-key
+     structure rather than an unbuilt feature. */
+  assert.equal(move({ to: ['active'] }), null, 'the half that IS enforced was refused with the half that is not');
+});
+
+test('A KEY NO DOCUMENT PUBLISHES IS `DECLARATION_INVALID`, because there the repair IS an edit', () => {
+  /* The two codes answer two different questions. `NOT_IN_THIS_BUILD` says the declaration is right
+     and the build is behind. `30 §6` files it beside `SCHEMA_NEWER` for that reason, and telling
+     an author `immutable_when` is malformed sends them to check a spelling that is right. A key no
+     document publishes has no such defence. */
+  const invented = validateDeclaration(withFields([{ id: 'what', type: 'text' }], { ...NO_STATE, retry_after: '5m' }));
+  assert.equal(invented?.code, 'DECLARATION_INVALID');
+  assert.equal(invented?.at, 'retry_after');
+  assert.match(invented?.fix ?? '', /no such key/);
+
+  const onAField = validateDeclaration(withFields([{ id: 'what', type: 'text', nullable: true }], NO_STATE));
+  assert.equal(onAField?.code, 'DECLARATION_INVALID');
+  assert.match(onAField?.fix ?? '', /obligations\.what declares nullable/);
+
+  /* AND A MISSPELT `fields` SAYS SO. It used to answer *"declares no fields, so it can hold
+     nothing"*, which is true and is about the wrong thing. The list of what a register body takes
+     is now in `allowed`, where a person and an agent can both read it. */
+  const typo = validateDeclaration({
+    ...OBLIGATIONS,
+    body: { id: 'obligations', name: 'Obligations', title: 'what', feilds: [{ id: 'what', type: 'text' }] } as never,
+  });
+  assert.equal(typo?.code, 'DECLARATION_INVALID');
+  assert.equal(typo?.at, 'feilds');
+  assert.ok(typo?.allowed?.includes('fields'));
+});
+
+test('A RESERVED FIELD ID IS REFUSED AT INSTALL, and `title` is the one an author reaches for first', async () => {
+  /**
+   * `34 §4` reserves nine and `02 §2` repeats them; the write path has enforced the list since it
+   * was written and `validate` enforced none of it. So the two halves disagreed and the register
+   * between them installed and could then hold nothing. Reproduced end to end:
+   *
+   *     register notes { title (text, required), seq (int), body (text) }
+   *     install ok?                 true
+   *     create with title    -> FIELD_UNKNOWN: title is the record's, not a field you may write.
+   *     create without title -> REQUIRED_MISSING: notes needs title.
+   *
+   * `title` is not a contrived example. It is the likeliest name an author ever gives a field, and
+   * `02 §5`'s own worked register only avoids it by calling the field `what`.
+   */
+  const { k, sql } = await record();
+  const notes: Declaration = {
+    id: 'register.notes',
+    kind: 'register',
+    body: {
+      id: 'notes',
+      name: 'Notes',
+      title: 'title',
+      fields: [{ id: 'title', type: 'text', required: true }, { id: 'body', type: 'text' }],
+    } as never,
+  };
+
+  const said = refusal(await k.install([notes]));
+  assert.equal(said.code, 'FIELD_UNKNOWN');
+  assert.equal(said.at, 'title');
+  assert.match(said.fix, /the record's own/);
+  assert.equal(k.register('notes'), undefined, 'a register that can hold no row was installed anyway');
+
+  /* ALL NINE OF `34 §4`'s, and the same code at both moments. */
+  for (const id of ['id', 'seq', 'register', 'created_at', 'updated_at', 'deleted_at', 'version', 'spoken', 'title'])
+    assert.equal(
+      refusedWith(withFields([{ id: 'what', type: 'text' }, { id, type: 'text' }], NO_STATE)),
+      'FIELD_UNKNOWN',
+      `${id} is reserved and installed anyway`,
+    );
+
+  /* AND THE UNDERSCORE KEEPS ITS OWN SENTENCE, which is a different fact about a different list. */
+  const underscored = validateDeclaration(withFields([{ id: 'what', type: 'text' }, { id: '_rule', type: 'text' }], NO_STATE));
+  assert.equal(underscored?.code, 'DECLARATION_INVALID');
+  assert.match(underscored?.fix ?? '', /keeps for itself/);
+
+  sql.close();
+});
+
+test('AND `state` IS RESERVED WHETHER OR NOT THE BODY POINTS AT IT', () => {
+  /* `34 §4`: reserved *"unless it is an `enum`"*. The check used to sit behind `body.state` naming
+     the field, so `{ id: state, type: text }` with no `state:` key installed as an ordinary field
+     called `state`, and `entry.state`, the column it is named after and the one the index is on,
+     stayed NULL on every row of that register for ever. */
+  const said = validateDeclaration(withFields([{ id: 'what', type: 'text' }, { id: 'state', type: 'text' }], NO_STATE));
+  assert.equal(said?.code, 'STATE_NOT_ENUM');
+  assert.deepEqual(said?.allowed, ['enum']);
+  assert.equal(
+    refusedWith(withFields([{ id: 'what', type: 'text' }, { id: 'state', type: 'enum', values: ['open'] }], NO_STATE)),
+    null,
+    'the enum a register is allowed to call `state` was refused',
+  );
+});
+
+test('THE CLOSED LISTS ARE `42 §4.4`’s OWN, and this is the test that stops them going stale', () => {
+  /**
+   * A HAND-TYPED LIST OF KEYS GOES STALE THE DAY THE DOCUMENTS ADD ONE, which is the failure the
+   * closed list exists to fix, made again by the fix. So the document is the source and this is the
+   * tripwire: `42 §4.4` publishes two tables, one for a register body and one for a field, and
+   * every key in either of them must be in one of `declare.ts`'s two lists: read, or named as
+   * published-and-unread. A tenth key appearing in the corpus is red here on the day it lands
+   * rather than accepted in silence for a year.
+   *
+   * IT RUNS BOTH WAYS. A key on the unbuilt list that is in neither table would be a code inventing
+   * a refusal for something nobody published; and a key the code admits and the document does not
+   * publish has to be named below with a reason, so a new one cannot be slipped in beside them.
+   */
+  const doc = readFileSync(fileURLToPath(new URL('../../../docs/42-SPEC-DECLARE.md', import.meta.url)), 'utf8');
+  const section = doc.slice(doc.indexOf('### 4.4 ·'), doc.indexOf('### 4.5 ·'));
+  assert.ok(section.length > 1000, '42 §4.4 is not where this test looks for it');
+
+  const [onRegister, onField] = section.split('**On a field**');
+  assert.ok(onField, '42 §4.4 no longer has an `On a field` half, and this test reads its tables by that heading');
+
+  /** The Key column, and a row may name two (`min` / `max`). */
+  const published = (table: string): string[] =>
+    [...table.matchAll(/^\|\s*`([^|]*?)`\s*\|/gmu)].flatMap((m) => [...(m[1] ?? '').matchAll(/[a-z_]+/gu)].map((k) => k[0]));
+
+  const REG = published(onRegister ?? '');
+  const FLD = published(onField);
+  assert.ok(REG.includes('immutable_when') && REG.includes('fields'), `42 §4.4's register table did not parse: ${REG.join(' ')}`);
+  assert.ok(FLD.includes('derive') && FLD.includes('type'), `42 §4.4's field table did not parse: ${FLD.join(' ')}`);
+
+  const { register, registerUnbuilt, field, fieldUnbuilt, transition, transitionUnbuilt } = REGISTER_BODY_KEYS;
+  const homed = (keys: readonly string[], read: readonly string[], unbuilt: readonly string[], what: string) => {
+    for (const key of keys)
+      assert.ok(
+        read.includes(key) || unbuilt.includes(key),
+        `42 §4.4 publishes ${what} \`${key}\` and declare.ts neither reads it nor names it as unread`,
+      );
+    for (const key of unbuilt)
+      assert.ok(keys.includes(key), `declare.ts refuses ${what} \`${key}\` as published-and-unread, and 42 §4.4 does not publish it`);
+  };
+  homed(REG, register, registerUnbuilt, 'a register key');
+  homed(FLD, field, fieldUnbuilt, 'a field key');
+
+  /* The transition's three, which live inside the `transitions` row rather than in a table. */
+  const inside = /`\{ <value>: \{([^}]*)\}/u.exec(onField)?.[1] ?? '';
+  const inner = [...inside.matchAll(/([a-z_]+)\??:/gu)].map((m) => m[1] as string);
+  assert.deepEqual(inner, ['to', 'requires', 'by'], `42 §4.4's transitions row did not parse: ${inside}`);
+  homed(inner, transition, transitionUnbuilt, 'a transition key');
+
+  /**
+   * AND WHAT THE CODE ADMITS THAT THE DOCUMENT DOES NOT PUBLISH, written down rather than left to
+   * be found. Each is a real divergence between `42 §4.4` and this build, and every one of them is
+   * read by something, and refusing any would break the record the product ships with:
+   *
+   *   `id` · `to`        the code's spellings of `register:` on a body and on a `ref`.
+   *   `state` · `done`   which field is mirrored, and which of its values mean finished.
+   *   `icon` · `holds` · `label` · `deadline` · `qualifies` · `unit`  drawn by `apps/web`.
+   *   `search`           on a FIELD, which is what `fts.ts` actually reads.
+   *   `derived`          the kernel's own flag, which refuses a write and skips validation.
+   */
+  const undocumented = (mine: readonly string[], theirs: readonly string[]) => mine.filter((k) => !theirs.includes(k)).sort();
+  assert.deepEqual(undocumented(register, REG), ['done', 'holds', 'icon', 'id', 'state']);
+  assert.deepEqual(undocumented(field, FLD), ['deadline', 'derived', 'label', 'qualifies', 'search', 'to', 'unit']);
 });

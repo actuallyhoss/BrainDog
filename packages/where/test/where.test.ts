@@ -828,3 +828,37 @@ test('AN INSTANT IS COMPARED BY ITS DAY, and `is` matched nothing while `not` ma
      naming a second is naming a second. */
   assert.deepEqual(both({ field: 'at', is: '2026-08-01T11:57:00.000Z' }), ['a']);
 });
+
+/* ── `none:` over a field a row has nothing in ───────────────────────────── */
+
+test("A `none:` KEEPS THE ROWS WITH NOTHING IN THE FIELD, and SQL dropped every one of them", () => {
+  /**
+   * `34 §1.3` and `02 §6` both say every positive operator is FALSE on a missing value, and
+   * `02 §6` names the decision it rests on: *"SQL's three-valued surprises stop at the compiler."*
+   * They did not stop at `is` or at `in`. `NULL = 'x'` is NULL, a `none:` group wraps its children
+   * in `NOT (...)`, and `NOT NULL` is NULL rather than true, so the row vanished from a query that
+   * should have kept it. Row `d` carries no `due`, no `amount` and no `n`, and it is exactly the
+   * row a person asking "none of these" means to see.
+   *
+   * `both()` IS THE ASSERTION. The in-memory twin has always been two-valued, because it tests
+   * `absent` before it compares, so this is a disagreement between the two renderings of one
+   * grammar rather than a wrong answer in one of them. Every other positive operator in the file
+   * already opens with the same guard; these two are the ones a person writes most.
+   *
+   * AND THE TEN `none` CASES ALREADY HERE COULD NOT SEE IT, because each of them names a field
+   * every fixture row happens to carry. That is the shared-mistake failure this suite's own
+   * comments are about, and it is why the assertions below name `d` rather than counting rows.
+   */
+  assert.ok(both({ none: [{ field: 'due', is: '2026-08-01' }] }).includes('d'), 'the undated row was dropped');
+  assert.ok(both({ none: [{ field: 'n', is: 3 }] }).includes('d'), 'the row with no number was dropped');
+  assert.ok(
+    both({ none: [{ field: 'amount', is: { amount: 48_000, currency: 'GBP' } }] }).includes('d'),
+    'the row with no amount was dropped',
+  );
+  assert.ok(both({ none: [{ field: 'due', in: ['2026-08-01', '2026-10-01'] }] }).includes('d'), 'an `in` dropped it too');
+
+  /* AND THE POSITIVE FORM STILL EXCLUDES IT, which is the half that makes the negation mean
+     something: a row with nothing in the field is not a match for a value. */
+  assert.ok(!both({ field: 'due', is: '2026-08-01' }).includes('d'));
+  assert.ok(!both({ field: 'due', in: ['2026-08-01', '2026-10-01'] }).includes('d'));
+});

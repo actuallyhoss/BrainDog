@@ -183,6 +183,84 @@ test('A FIXED DATE IS A DATE CLAUSE THAT DOES NOT MOVE, so it is not "no change"
   assert.match(relative.why, /before/);
 });
 
+/* ── the comparison is against the window it names ───────────────────────── */
+
+/** A clock, at the noon every temporal literal in this record is measured from. */
+const at = (day: string): number => Date.parse(`${day}T12:00:00Z`);
+
+/** The predicate for the two tests below: a moving window, so all three clocks read a different set. */
+const WINDOWED: MetricDecl = {
+  metric: 'due-in-the-window',
+  name: 'Due in the window',
+  source: 'register.obligations',
+  where: 'due after -400d, due before today',
+  value: { sum: 'amount' },
+  format: 'money.GBP',
+  target: { lte: 1 },
+  window: '30d',
+};
+
+test('`year_ago` READS LAST YEAR, and it used to read last month', () => {
+  /* `08 §2` publishes three comparison words and the record's declaration validator admits all
+     three. This build's union carried two, and the branch sent everything that was not `none` down
+     the same `now minus window` arm, so a tile labelled *against the same period last year* was
+     reading the previous THIRTY DAYS. It said nothing about it either: the comparability gate is
+     correctly implemented and passes, so `why` named the comparison, `unmeasured` was `null` and
+     `delta` was a number, with nothing on the screen disagreeing with anything else on it. The
+     kernel's evaluator carried the same union, so the two engines agreed by both being wrong, which
+     is the one kind of disagreement a differential pass cannot see.
+
+     THREE CLOCKS, AND THREE DIFFERENT FIGURES, because two windows cannot tell the two words apart:
+     that is how the drift survived a file with a comparison gate in it. The clock is late 2027 so
+     that a year before it still lands inside the seed's own ten months of obligations. */
+  const now = at('2027-11-15');
+  const alone = (clock: number): number | null => read({ ...WINDOWED, compare: 'none' }, clock).value;
+
+  const current = alone(now);
+  const lastMonth = alone(now - 30 * 86_400_000);
+  const lastYear = alone(at('2026-11-15'));
+  assert.ok(current !== null && lastMonth !== null && lastYear !== null, 'a window this test needs read nothing');
+  assert.equal(new Set([current, lastMonth, lastYear]).size, 3, 'three windows that are not three figures prove nothing');
+
+  const previous = read({ ...WINDOWED, compare: 'previous' }, now);
+  const yearAgo = read({ ...WINDOWED, compare: 'year_ago' }, now);
+
+  assert.equal(previous.value, current, 'the two words read the same current window');
+  assert.equal(yearAgo.value, current);
+  assert.equal(previous.delta, (current - lastMonth) / Math.abs(lastMonth), '`previous` stopped reading the previous window');
+  assert.equal(yearAgo.delta, (current - lastYear) / Math.abs(lastYear), '`year_ago` was computed as `previous`, so it read last month');
+  assert.notEqual(yearAgo.delta, previous.delta, 'two comparison words that always agree are one word');
+
+  // And the sentence under the figure says which comparison it is, or the label is the old bug.
+  assert.equal(previous.why, 'on the 30 days before');
+  assert.equal(yearAgo.why, 'against the same period last year');
+  assert.equal(yearAgo.unmeasured, null);
+});
+
+test('and a year is calendar arithmetic, so the anniversary of 29 February is the 28th', () => {
+  /* A YEAR IS NOT A FIXED NUMBER OF MILLISECONDS. `resolveDay` resolves `+1m` by the calendar and
+     clamps the day of the month, because rolling 31 January into 3 March is not what anybody means
+     by a month; a year is twelve of those. Noon on 29 February 2028 minus `365 * DAY_MS` is 1 MARCH
+     2027, and letting `Date.UTC` roll the impossible 29 February 2027 forward lands there too. The
+     record's answer is 28 February 2027.
+
+     `eom` IS WHAT MAKES THE DIFFERENCE VISIBLE in a fixture with no 29 February in it: end of month
+     at 28 February 2027 is that day, and at 1 March 2027 it is the 31st, which is three more
+     obligations. So the clamped clock reports a movement and both of the wrong ones report none. */
+  const leap: MetricDecl = { ...WINDOWED, metric: 'due-by-month-end', where: 'due before eom' };
+  const now = at('2028-02-29');
+
+  const anniversary = read({ ...leap, compare: 'none' }, at('2027-02-28')).value;
+  const rolled = read({ ...leap, compare: 'none' }, at('2027-03-01')).value;
+  const current = read({ ...leap, compare: 'none' }, now).value;
+  assert.ok(anniversary !== null && rolled !== null && current !== null);
+  assert.notEqual(anniversary, rolled, 'this fixture cannot tell the two candidate days apart, so the test below proves nothing');
+
+  const yearAgo = read({ ...leap, compare: 'year_ago' }, now);
+  assert.equal(yearAgo.delta, (current - anniversary) / Math.abs(anniversary), 'the anniversary of 29 February is 28 February, not 1 March');
+  assert.notEqual(yearAgo.delta, 0, 'a rolled or 365-day clock reads the same rows twice and reports no change');
+});
+
 /* ── arithmetic that must not lie ────────────────────────────────────────── */
 
 test('a zero denominator is an em dash, never zero and never infinity', () => {

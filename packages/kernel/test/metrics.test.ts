@@ -368,6 +368,102 @@ test('AND A COMPARISON OF A SET WITH ITSELF SAYS SO rather than reporting no cha
   sql.close();
 });
 
+test('`year_ago` READS LAST YEAR, and it used to read last month', async () => {
+  /* `08 §2` publishes three comparison words and `declare` admits all three; this evaluator's union
+     carried two, so anything that was not `none` went down the `now minus window` arm. A metric
+     saying *against the same period last year* rendered a delta against the previous THIRTY DAYS,
+     and said nothing, because the comparability gate above it is correct and passes: `why` was
+     empty and `delta` was a number with every honesty check green.
+
+     THREE WINDOWS, SO READING THE WRONG ONE IS A DIFFERENT NUMBER rather than a missing one. A test
+     seeded with two could not tell the two words apart at all, which is how the drift survived. */
+  const { k, sql } = await record();
+
+  const seed = (offset: number, amount: number, tag: string): void => {
+    for (let n = 0; n < 3; n++)
+      assert.ok(
+        k.create(
+          'obligations',
+          { what: `${tag} ${n}`, party: 'Anniversary', direction: 'owed_to_me', amount: gbp(amount), due: day(offset), state: 'open' },
+          { actor: 'p_1' },
+        ).ok,
+      );
+  };
+  /* Equal counts in all three, so the "prior holds at least half the current's rows" clause of the
+     gate cannot be what a failure here is about. */
+  seed(-5, 10_000, 'this month');
+  seed(-40, 100_000, 'last month');
+  seed(-370, 1_000_000, 'last year');
+
+  const ANNIVERSARY: MetricDecl = {
+    metric: 'anniversary',
+    name: 'Owed, this window',
+    source: 'register.obligations',
+    where: { all: [{ field: 'party', is: 'Anniversary' }, { field: 'due', after: '-30d' }, { field: 'due', before: 'today' }] },
+    value: { sum: 'amount' },
+    target: { lte: 1 },
+    window: '30d',
+    format: 'money.GBP',
+  };
+
+  const previous = value<Reading>(k.metric({ ...ANNIVERSARY, compare: 'previous' }));
+  const yearAgo = value<Reading>(k.metric({ ...ANNIVERSARY, compare: 'year_ago' }));
+
+  assert.equal(previous.value, 30_000, 'both words read the same current window');
+  assert.equal(yearAgo.value, 30_000);
+  assert.equal(previous.why, '', 'the comparability gate refused the comparison this test is about');
+  assert.equal(yearAgo.why, '');
+
+  // 30,000 against 300,000 is the month before; 30,000 against 3,000,000 is the year before.
+  assert.equal(previous.delta, deltaFrom(300_000, 30_000));
+  assert.equal(previous.delta, -0.9);
+  assert.equal(yearAgo.delta, deltaFrom(3_000_000, 30_000));
+  assert.equal(yearAgo.delta, -0.99, '`year_ago` was computed as `previous`, so it read last month');
+  assert.notEqual(yearAgo.delta, previous.delta, 'two comparison words that always agree are one word');
+  sql.close();
+});
+
+test('and a year is calendar arithmetic, so the anniversary of 29 February is the 28th', async () => {
+  /* A YEAR IS NOT A FIXED NUMBER OF MILLISECONDS. `resolveDay` resolves `+1m` by the calendar and
+     clamps the day of the month, on the argument that rolling 31 January into 3 March is not what
+     anybody means by a month; a year is twelve of those. Subtracting `365 * DAY` from noon on
+     29 February 2028 lands on 1 MARCH 2027, and letting `Date.UTC` roll the impossible 29 February
+     2027 forward lands there too. The record's answer is 28 February 2027, and this seeds both
+     candidate days with different amounts so the three readings are three numbers. */
+  const LEAP = Date.UTC(2028, 1, 29, 12);
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(LEAP));
+  assert.ok((await k.install([OBLIGATIONS])).ok);
+
+  const on = (iso: string, amount: number): void => {
+    assert.ok(
+      k.create('obligations', { what: iso, direction: 'owed_to_me', amount: gbp(amount), due: iso, state: 'open' }, { actor: 'p_1' }).ok,
+    );
+  };
+  on('2028-02-29', 10_000);
+  on('2027-02-28', 40_000); // the anniversary
+  on('2027-03-01', 90_000); // where 365 days, and an unclamped roll, both land
+
+  const TODAY: MetricDecl = {
+    metric: 'leap',
+    name: 'Owed today',
+    source: 'register.obligations',
+    where: { field: 'due', is: 'today' },
+    value: { sum: 'amount' },
+    target: { lte: 1 },
+    window: '30d',
+    format: 'money.GBP',
+    compare: 'year_ago',
+  };
+
+  const read = value<Reading>(k.metric(TODAY));
+  assert.equal(read.value, 10_000);
+  assert.equal(read.why, '', 'the anniversary window came back empty, so the clock moved to a day with no rows');
+  assert.equal(read.delta, deltaFrom(40_000, 10_000), 'the anniversary of 29 February is 28 February, not 1 March');
+  assert.equal(read.delta, -0.75);
+  sql.close();
+});
+
 test('A SENTENCE IS A PREDICATE, in a metric and in a list, and both read the same rows', async () => {
   // A declaration is written as `direction is owed to me, state is open`. One form the record
   // accepts and the other it does not would make `where:` two languages.

@@ -359,6 +359,101 @@ test('THE FIRST MATCHING PATTERN WINS, and the second is not merged into it', as
   sql.close();
 });
 
+test('AND AN OPERATOR THIS BACKEND CANNOT SERVE IS REFUSED AT INSTALL, not left to fire on nothing', async () => {
+  /* The field axis was checked and the operator axis was not, so `matches`, `has` and `lacks`
+     installed and never fired, and `starts` and `ends` installed and DID fire where `34 §1.9`
+     refuses them: wider than published in one direction and silent in the other. An ingest that
+     never fires and an ingest that fires correctly look identical from the outside. */
+  const { k, sql } = await record();
+  for (const op of ['matches', 'has', 'lacks', 'starts', 'ends', 'near', 'via']) {
+    const out = await k.install([
+      {
+        id: 'ingest.probe',
+        kind: 'ingest' as const,
+        body: {
+          ingest: 'probe',
+          channel: 'email',
+          match: { field: 'subject', [op]: 'x' },
+          extract: { merchant: { text: {} } },
+          writes: { register: 'transactions' },
+        } as never,
+      },
+    ]);
+    assert.equal(out.ok, false, `${op} installed and would fire on nothing`);
+    assert.equal((out as { refusal: { code: string } }).refusal.code, 'MATCH_OP_UNSUPPORTED', op);
+  }
+
+
+  /* AND THE OPERATORS IT DOES SERVE STILL INSTALL, so the check is about the published set rather
+     than about being strict. */
+  const fine = await k.install([
+    {
+      id: 'ingest.probe',
+      kind: 'ingest' as const,
+      body: {
+        ingest: 'probe',
+        channel: 'email',
+        match: { field: 'subject', contains: 'x' },
+        extract: { merchant: { text: {} } },
+        writes: { register: 'transactions' },
+      } as never,
+    },
+  ]);
+  assert.equal(fine.ok, true, (fine as { refusal?: { fix: string } }).refusal?.fix ?? '');
+  sql.close();
+});
+
+test('A `match:` ON `ts` OR `state` FIRES, and it used to install cleanly and never match', async () => {
+  /* `34 §1.9` publishes seven field names and `declare.ts` enforces exactly those seven, reciting
+     them in its refusal. The matcher's `ARRIVAL` schema declared five, and `evaluate` answers
+     `false` to whatever `compile` would refuse, so a pattern naming `ts` or `state` was not an
+     error: it was a pattern that never matched, for ever. `ingestBody`'s own header is the finding,
+     in its own words: an ingest that never fires and an ingest that fires correctly look identical
+     from the outside until somebody notices a month of arrivals sitting untriaged. The fix that
+     sentence stands over landed on the UNKNOWN names and never on these two published ones.
+
+     Scoping an email rule with `match: { field: ts, after: … }` is an ordinary thing to write, and
+     the cost of it landing here rather than at install is days of somebody's inbox. */
+  const scoped = (match: unknown, id: string): Declaration => ({
+    id: `ingest.${id}`,
+    kind: 'ingest',
+    body: { ingest: id, channel: 'email', match, extract: { merchant: { text: { between: ['at ', ' on'] } } }, writes: { register: 'transactions' } } as never,
+  });
+
+  const fires = async (match: unknown, id: string): Promise<boolean> => {
+    const { k, sql } = await record(scoped(match, id));
+    const out = value<Arrived>(send(k, MAIL, `sha-${id}`));
+    sql.close();
+    return out.ingest === id;
+  };
+
+  // The two that installed and never fired.
+  assert.equal(await fires({ field: 'ts', after: '2020-01-01' }, 'by-ts'), true, 'a match on ts never fired');
+  assert.equal(await fires({ field: 'state', is: 'untriaged' }, 'by-state'), true, 'a match on state never fired');
+
+  /* AND THEY ANSWER, WHICH IS NOT THE SAME AS FIRING. A field carried as a constant would make every
+     pattern over it true, which is the same defect wearing the other face. */
+  assert.equal(await fires({ field: 'ts', before: '2020-01-01' }, 'ts-past'), false);
+  assert.equal(
+    await fires({ field: 'state', is: 'matched' }, 'state-matched'),
+    false,
+    'an arrival is untriaged when the match runs; matching is step 2 and every other state is decided after it',
+  );
+
+  // The five that always worked, so this did not narrow anything.
+  assert.equal(await fires({ all: [{ field: 'from', is: 'alerts@hsbc.example' }, { field: 'ts', after: '2020-01-01' }] }, 'both'), true);
+  assert.equal(await fires({ field: 'channel', is: 'email' }, 'by-channel'), true);
+  // And a name outside the seven is still refused at install, with the seven in the sentence.
+  const other = openSqlite();
+  const bad = await openRecord(other, fixedClock(NOW));
+  const said = await bad.install([ACCOUNTS, TRANSACTIONS, scoped({ field: 'cc', is: 'x' }, 'by-cc')]);
+  assert.equal(said.ok, false, 'a field outside the seven installed');
+  const why = (said as { refusal: { code: string; fix: string } }).refusal;
+  assert.equal(why.code, 'MATCH_FIELD_UNKNOWN');
+  assert.match(why.fix, /from, to, subject, body, channel, state, ts/);
+  other.close();
+});
+
 test('A REGISTER REFUSING WHAT A PATTERN READ DOWNGRADES IT, and never discards the bytes', async () => {
   /* The header of the module says the raw is stored first and always, twice. Returning the refusal
      rolled the raw back with it — the payload gone, and nobody able to fix the pattern from a row

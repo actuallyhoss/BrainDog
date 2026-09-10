@@ -81,7 +81,15 @@ export type MetricDecl = {
   target: { lte: number } | { gte: number };
   /** The comparison shift: `compare` re-evaluates the predicate with `asOf = now − W`. */
   window: string;
-  compare?: 'previous' | 'none';
+  /**
+   * `08 §2`'s three words, and this type knew two of them.
+   *
+   * The kernel's copy of this union had the same two, so both engines agreed by both being wrong,
+   * which `50 §1` is about and which a differential pass cannot see. `year_ago` installed and was
+   * computed as `previous`: see `yearBefore` for what the record means by a year and what the
+   * drift cost.
+   */
+  compare?: 'previous' | 'year_ago' | 'none';
 };
 
 /* ── evaluating one ──────────────────────────────────────────────────────── */
@@ -355,8 +363,52 @@ export function hrefFor(decl: MetricDecl): string {
 const resolvedAt = (w: Where, now: number): string =>
   JSON.stringify(w.clauses.map((c) => ('values' in c ? c : { ...c, day: resolveDay(c.day, now) })));
 
-/** Does this predicate say anything different a window ago? Without that, the two sets are one set. */
-const moves = (w: Where, now: number, shift: number): boolean => resolvedAt(w, now) !== resolvedAt(w, now - shift);
+/** Does this predicate say anything different at the moved clock? Without that, the two sets are one set. */
+const moves = (w: Where, now: number, then: number): boolean => resolvedAt(w, now) !== resolvedAt(w, then);
+
+/**
+ * The same clock, one year earlier.
+ *
+ * `compare: year_ago` WAS COMPUTED AS `previous` HERE TOO. The union above read
+ * `'previous' | 'none'` while the record's declaration validator admitted `08 §2`'s three words, so
+ * a metric declaring `year_ago` installed, fell into the arm below that moves the clock back one
+ * WINDOW, and rendered a delta against last month under a label that says last year. The
+ * comparability gate is correct and passes, so the tile carried a number with `unmeasured: null`
+ * and nothing on the screen disagreed with anything else on it.
+ *
+ * A YEAR IS NOT A FIXED NUMBER OF MILLISECONDS, AND THE RECORD HAS ALREADY SAID WHAT IT MEANS BY
+ * ONE. `resolveDay` resolves `+1m` by calendar arithmetic and clamps the day of the month, because
+ * rolling 31 January into 3 March is not what anybody means by a month. A year is twelve of those,
+ * so it is the same calendar date one year earlier at the same time of day: 365 days most years and
+ * 366 across a leap day. A constant `365 * DAY_MS` lands on the wrong day of the month for good
+ * after every 29 February, and `08 §2.4` asks for the opposite in so many words, cutting the prior
+ * window at the same day, "this month to the 14th against last month to the 14th".
+ *
+ * THE ONE DAY THAT CLAMPS IS 29 FEBRUARY, whose anniversary is 28 February: `Date.UTC` rolls it to
+ * 1 March on its own, which would set a February figure beside a March one under a label naming one
+ * month. It is UTC because `resolveDay` is, and an anniversary computed in another zone would name
+ * a day the predicate then resolves differently for part of every year.
+ *
+ * IT IS THE SAME ARITHMETIC AS THE KERNEL'S `yearBefore`, written out twice because there are two
+ * engines. `50 §1` says there should not be; while there are, the two have to agree to the
+ * millisecond or the browser and the record disagree about which rows last year holds.
+ */
+const yearBefore = (now: number): number => {
+  const d = new Date(now);
+  const year = d.getUTCFullYear() - 1;
+  const month = d.getUTCMonth();
+  /* Day 0 of the next month is the last day of this one, which is how `resolveDay` finds it too. */
+  const last = new Date(Date.UTC(year, month + 1, 0, 12)).getUTCDate();
+  return Date.UTC(
+    year,
+    month,
+    Math.min(d.getUTCDate(), last),
+    d.getUTCHours(),
+    d.getUTCMinutes(),
+    d.getUTCSeconds(),
+    d.getUTCMilliseconds(),
+  );
+};
 
 /**
  * Read one metric, and the comparison with it.
@@ -521,13 +573,18 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   let delta: number | null = null;
   let why = '';
   let unmeasured: string | null = null;
+  /* HOW FAR THE CLOCK MOVES IS THE WHOLE OF THE DIFFERENCE BETWEEN THE TWO COMPARISON WORDS.
+     `previous` moves it by the declared window and `year_ago` by a year, which is what each of them
+     says. Both branches below read `now - shift`, so the two words named one figure and only one of
+     the two labels above it was true. `yearBefore` carries the argument for what a year is. */
+  const then = shift === null ? now : decl.compare === 'year_ago' ? yearBefore(now) : now - shift;
   if (decl.compare === 'none' || shift === null) {
     why = 'no comparison asked for';
     unmeasured = null;
   } else if (shift < 7 * DAY_MS) {
     why = 'a window under seven days is noise';
     unmeasured = 'too short a window to compare over';
-  } else if (!moves(w, now, shift)) {
+  } else if (!moves(w, now, then)) {
     /* TWO WAYS FOR THE WINDOW TO MOVE NOTHING, and the check only ever knew about one of them. A
        predicate with no dated clause is the case this was written for; a predicate naming a day in
        full is the case it let through, and that IS a date clause, so asking "is any clause a date
@@ -542,7 +599,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
       ? 'nothing here is dated, so there is no before to compare with'
       : 'this asks about one fixed date, so the same rows are on both sides of the window';
   } else {
-    const before = all.filter((e) => matches(e, w, now - shift));
+    const before = all.filter((e) => matches(e, w, then));
     if (rows.length === 0 || before.length === 0) {
       why = 'one of the two windows is empty';
       unmeasured = 'nothing to compare with yet';
@@ -556,7 +613,10 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
         unmeasured = 'nothing to compare with yet';
       } else {
         delta = (value - prior) / Math.abs(prior);
-        why = `on the ${spokenWindow(decl.window)} before`;
+        /* AND THE SENTENCE SAYS WHICH COMPARISON IT IS. `on the 30 days before` under a figure
+           measured against the same period a year ago is the label that made the wrong figure look
+           right, and it would go on saying it after the arithmetic was fixed. */
+        why = decl.compare === 'year_ago' ? 'against the same period last year' : `on the ${spokenWindow(decl.window)} before`;
       }
     }
   }

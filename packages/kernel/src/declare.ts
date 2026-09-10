@@ -24,6 +24,10 @@ import { jsonPath } from '@braindog/where';
 import { FIELD_TYPES, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
+/* THE SCHEMA THE MATCHER RUNS AGAINST, so the names this file refuses and the names that fire are
+   one list. See `MATCH_FIELDS`: they were two lists and they disagreed. A same-package edge, which
+   `31 §2`'s order is not about. */
+import { ARRIVAL } from './ingest.ts';
 import { spanMs } from './vault.ts';
 
 /**
@@ -816,8 +820,28 @@ const EXTRACTORS = [
 const FIRST_ARMS = 8;
 const NTH_CEILING = 64;
 
-/** `42 §4.7`: what `inbox_raw` holds, and therefore everything a `match:` can be about. */
-const MATCH_FIELDS = ['from', 'to', 'subject', 'body', 'channel', 'state', 'ts'] as const;
+/**
+ * `42 §4.7`: what `inbox_raw` holds, and therefore everything a `match:` can be about.
+ *
+ * READ OFF THE SCHEMA THE MATCHER ACTUALLY RUNS AGAINST, and it used to be a second copy typed
+ * here. The two disagreed: this list published seven names and `ingest.ts`'s `ARRIVAL` declared
+ * five, so `match: { field: state }` and `match: { field: ts }` installed cleanly and then never
+ * fired, because `evaluate` answers false for what `compile` would refuse. An ingest that never
+ * fires and an ingest that fires correctly look identical from the outside, which is that file's
+ * own sentence about itself. A hand-kept list beside a schema is how they came to disagree, and
+ * one list is the only arrangement under which they cannot again.
+ */
+const MATCH_FIELDS = Object.keys(ARRIVAL.fields) as readonly string[];
+
+/**
+ * The operators `34 §1.9` refuses on this backend, whatever the field's type would otherwise take.
+ *
+ * THE FIELD AXIS WAS CHECKED AND THE OPERATOR AXIS WAS NOT, so `matches`, `has` and `lacks`
+ * installed and never fired, and `starts` and `ends` installed and DID fire where the document
+ * refuses them: wider than published in one direction and silent in the other. `38 §13` already
+ * publishes the sentence a person should get, so this says it in those words.
+ */
+const MATCH_OPS_ABSENT = ['via', 'has', 'lacks', 'near', 'matches', 'starts', 'ends'] as const;
 
 /** `43 §4.4`, closed: a key with an optional `[n]`, `[-1]` or `[]`, or a bare index. */
 const PATH_SEGMENT = /^(?:[^.[\]\s]+(?:\[(?:\d+|-1|)\])?|\[(?:\d+|-1|)\])$/u;
@@ -930,13 +954,25 @@ function matchFault(node: unknown, id: string, at: string): Refusal | null {
       return null;
     }
   }
+  /* THE OPERATOR BEFORE THE FIELD, because an operator this backend cannot serve is wrong whatever
+     field it is about, and naming the field first would send an author to check a name that is
+     right. `MATCH_OP_UNSUPPORTED` is in the registry and `30 §6` names it "the one code for THIS
+     TEST CANNOT APPLY HERE", listing the `inbox_raw` backend as its first case. */
+  const said = MATCH_OPS_ABSENT.find((o) => o in (node as Record<string, unknown>));
+  if (said)
+    return bad(
+      'MATCH_OP_UNSUPPORTED',
+      `${id}.${at} uses ${said}, and an arrival takes is, not, in, not_in, gt, gte, lt, lte, before, after, between, contains, empty, present.`,
+      at,
+    );
+
   const field = (node as { field?: unknown }).field;
   if (typeof field === 'string' && !(MATCH_FIELDS as readonly string[]).includes(field))
     return bad(
       'MATCH_FIELD_UNKNOWN',
       `${id}.${at} is about ${field}, and an arrival holds ${MATCH_FIELDS.join(', ')}. Match on those, and read the rest with extract.`,
       at,
-      MATCH_FIELDS as unknown as string[],
+      [...MATCH_FIELDS],
     );
   return null;
 }
@@ -1188,6 +1224,198 @@ function createFault(
 }
 
 /**
+ * A REGISTER BODY'S KEYS, CLOSED, because the answer to a key nothing reads was silence.
+ *
+ * `validate` deep-checked `fields`, `title`, `state` and `search` and returned `null` for
+ * everything else, so a register body was an open bag. Eleven keys the corpus publishes installed
+ * without a word and then did nothing. The cost is not the missing feature, because much of this
+ * product is honestly unbuilt; the cost is that the declaration was ACCEPTED. A bookkeeping pack
+ * ships with a closed-period lock in its register body, the install diff shows the register, and
+ * the lock is decoration. `02 §6.1`'s own sentence: *"it is not a missing feature, it is a missing
+ * control, and it is the one an auditor asks about first."* It was reproduced against that
+ * section's own worked `postings` register: a `posted` row was edited AND deleted, both accepted.
+ *
+ * SO THE KEYS ARE A LIST, THE LIST IS CLOSED, AND THERE ARE TWO ANSWERS RATHER THAN ONE.
+ *
+ *   published and read by nothing → `NOT_IN_THIS_BUILD`. The declaration is right and the build is
+ *     behind, which is exactly what `metrics.ts` already answers for `group_by`, `median` and
+ *     `trend`, and `30 §6` files that code beside `SCHEMA_NEWER` for the reason that fits here too:
+ *     **the repair is a deploy, not an edit.** Telling an author that `immutable_when` is malformed
+ *     sends them to check a spelling that is right.
+ *   published nowhere → `DECLARATION_INVALID`. `feilds:` is a typo and `retry_after:` is an
+ *     invention, and for both of those the repair IS an edit.
+ *
+ * THE LISTS BELOW ARE TESTED AGAINST `42 §4.4`, NOT REMEMBERED. A hand-typed list of keys goes
+ * stale the day the documents add one, which is the failure this whole check exists to fix, made
+ * again by the fix. So `declare.test.ts` parses that section's two tables and fails when a key in
+ * either of them is in neither list here, and when a key here is in neither table and is not one of
+ * the spellings named below.
+ */
+
+/**
+ * Read by this build, so there is nothing to say about it.
+ *
+ * The first line is `42 §4.4`'s, and the second is the divergence between the document and the
+ * code, written down rather than left to be rediscovered:
+ *
+ *   `id`      the code's spelling of `register:`. `ownId` has admitted both since it was written.
+ *   `state`   which field is mirrored onto `entry.state`. `02 §1` settles that `state` IS mirrored
+ *             and never says which key names it; this build reads one, and `applyDeclarations`
+ *             re-derives the column from it.
+ *   `done`    the states that mean finished, which is how a row is drawn ticked.
+ *   `icon` · `holds`  the rail's glyph and the register's one line, both drawn by `apps/web`.
+ *
+ * `pack:` IS ON THIS LIST AND IS NOT READ FROM THE BODY, and that is deliberate rather than an
+ * oversight: ownership is `declaration.pack_id`, written from the declaration's own `pack` and read
+ * back by `ownersTo` and `createFault`. The key is the same fact said twice, so a register carrying
+ * it promises nothing this record fails to keep, which is the test for this list rather than
+ * whether some line dereferences it.
+ */
+const REGISTER_KEYS = [
+  'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
+  'id', 'state', 'done', 'icon', 'holds',
+] as const;
+
+/**
+ * Published by `42 §4.4`, read by nothing, and each one a rule the record would not keep.
+ *
+ *   `immutable_when`  `02 §6.1`'s closed-period lock and `30 §4`'s step 2 of the write path. The
+ *                     string appears once in this tree, in a comment in `rules.ts` describing the
+ *                     step that does not exist. `ROW_LOCKED` is registered and emitted by nothing.
+ *   `key`             a series' idempotent upsert. `indexName` can spell `entry_k_<reg>` and no
+ *                     caller ever asks it to, so re-fetching yesterday duplicates yesterday, which
+ *                     is the single failure `02 §5` says `key:` exists to prevent.
+ *   `delete`          `refuse_while_referenced`. `DELETE_WHILE_REFERENCED` is registered and
+ *                     emitted by nothing, so an account with transactions deletes.
+ *   `pairs`           transfer detection, a bounded self-join nothing runs.
+ *   `predicates`      named predicates. `where` refuses the `{ predicate: … }` leaf outright, so
+ *                     declaring one here installs a name no predicate can reach.
+ *   `seq_prefix`      `SEQ_PREFIX_TAKEN` is registered and emitted by nothing, and every spoken id
+ *                     is `#` whatever the register says.
+ */
+const REGISTER_UNBUILT = ['seq_prefix', 'key', 'delete', 'pairs', 'predicates', 'immutable_when'] as const;
+
+/**
+ * A field's keys, same two lists and same two questions.
+ *
+ * The divergences again, because they are the reason this could not be copied out of the document:
+ *
+ *   `to`        the code's spelling of a `ref`'s target. `coerce` reads `field.to` and the document
+ *               writes `register:`, which is why `register:` is on the unbuilt list below: a `ref`
+ *               declared the documented way resolves a spoken id against the WRONG register, and
+ *               `coerce`'s own comment records that being found once already.
+ *   `label`     the word a person reads, which the query grammar prints a `where:` back with.
+ *   `search`    the FTS projection's flag. `fts.ts` reads `f.search`; the register-level `search:`
+ *               list is checked here and drives nothing, which is a separate finding and not this
+ *               one's to fix.
+ *   `deadline` · `qualifies` · `unit`  which day a row is about, which field makes an amount
+ *               readable, and how a `duration` is said. All three are drawn.
+ *   `derived`   the kernel's own flag, set by nothing today, which refuses a write and skips
+ *               validation when it is set.
+ */
+const FIELD_KEYS = [
+  'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
+  'redact', 'transitions', 'remind', 'repeat',
+  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived',
+] as const;
+
+/**
+ * Published on a field, read by nothing.
+ *
+ *   `derive`         `02 §5`'s seven shapes, and `34 §1.11` says `where` exports the machinery.
+ *                    `where` exports none of it and no file parses a shape, so a field declaring a
+ *                    derivation is an ordinary writable field holding whatever a caller sent, and
+ *                    the `unique: true` + `derive: { normalise }` fingerprint dedupes on the raw
+ *                    text or on nothing.
+ *   `required_when`  a conditional requirement evaluated against the row being written. Nothing
+ *                    evaluates it, so *"never set a tier without `tier_why`"* is prose again.
+ *   `min` · `max`    bounds `02 §5` says are refused `OUT_OF_BOUNDS`. No coercer reads either, so
+ *                    `max: 512000` on a `document` is a number in a file.
+ *   `register`       the documented spelling of `to:`, above.
+ *   `note`           a field's own comment, carried nowhere.
+ */
+const FIELD_UNBUILT = ['register', 'min', 'max', 'derive', 'required_when', 'note'] as const;
+
+/**
+ * And a transition's, which is where the two halves of one key part company.
+ *
+ * `to:` IS CORRECTLY ENFORCED, including that clearing a state is a move. So this is not an unbuilt
+ * feature, it is one key of a two-key structure with the invariant in the other key. `index.ts`
+ * destructures `{ to: string[] }` and reads nothing else. `requires:` is what stops an INCOMPLETE
+ * row reaching a legal state, and `by:` is an authorisation control: `02 §5`'s `by: decide` means
+ * *"a PERSON at the `decide` level. No token grants it"*, `record.update` gates on
+ * `guard(ctx, 'write', register)` which a bearer token passes, and `HUMAN_ONLY` is registered and
+ * emitted by nothing. It is the one door into `20 §1`'s level ladder that a declaration can open,
+ * and nothing closes it.
+ */
+const TRANSITION_KEYS = ['to'] as const;
+const TRANSITION_UNBUILT = ['requires', 'by'] as const;
+
+/**
+ * `34 §4`'s reserved field ids, and the register that declares one is dead on arrival.
+ *
+ * The write path has enforced this since it was written (`RESERVED` in `index.ts`) and `validate`
+ * enforced none of it, so the two halves disagreed and the register in between could be installed
+ * and could then hold nothing. Reproduced with the likeliest field name an author will ever pick:
+ * `register notes { title (text, required) }` installs clean, `create` WITH `title` is
+ * `FIELD_UNKNOWN: title is the record's, not a field you may write`, and `create` without it is
+ * `REQUIRED_MISSING`. There is a read-side cost too. `schemaOf` hands the compiler the declared
+ * fields, so `{ field: seq, gt: 10 }` compiles to a JSON path that is `NULL` on every row, a filter
+ * that matches nothing and whose negation matches everything.
+ *
+ * `FIELD_UNKNOWN` IS THE CODE AND IT IS NOT A NEW ONE. `34 §4` names it for exactly this fact, *"a
+ * reserved or `_`-prefixed key arriving from the boundary is `FIELD_UNKNOWN`"*, and `30 §6` says
+ * the write-path codes are raised at install too, *"for the same fact in a declaration's seed or
+ * default … one code, two moments"*, listing `FIELD_UNKNOWN` first among the seven. So the
+ * declaration answers what the write answers, in the same words, one moment earlier.
+ *
+ * `deleted_at` IS ON THIS LIST AND IS NOT IN THE WRITE PATH'S `RESERVED`, because the write path
+ * reads `patch.deleted_at` as the delete verb rather than as a field. That is the same fact
+ * arriving at a different door, and `34 §4` counts nine.
+ */
+const RESERVED_FIELD_IDS = [
+  'id', 'seq', 'register', 'created_at', 'updated_at', 'deleted_at', 'version', 'spoken', 'title',
+] as const;
+
+/** What the lists above are, for the test that keeps them honest against `42 §4.4`. */
+export const REGISTER_BODY_KEYS = {
+  register: REGISTER_KEYS,
+  registerUnbuilt: REGISTER_UNBUILT,
+  field: FIELD_KEYS,
+  fieldUnbuilt: FIELD_UNBUILT,
+  transition: TRANSITION_KEYS,
+  transitionUnbuilt: TRANSITION_UNBUILT,
+  reserved: RESERVED_FIELD_IDS,
+} as const;
+
+/**
+ * One key against the two lists. The refusal names the key, says it is not read, and says what is,
+ * the `allowed` list being the third of those.
+ *
+ * THE CODES ARE WRITTEN OUT AS LITERALS IN TWO CALLS rather than chosen into one, because
+ * `refusals.mjs` reads a literal handed to the constructor: behind a ternary the gate that counts
+ * what this product emits sees nothing, which is how two codes came to be published in `30 §6` and
+ * emitted by nothing.
+ */
+function keyFault(
+  said: string,
+  key: string,
+  read: readonly string[],
+  unbuilt: readonly string[],
+  at: string,
+): Refusal | null {
+  if (read.includes(key)) return null;
+  if (unbuilt.includes(key))
+    return bad(
+      'NOT_IN_THIS_BUILD',
+      `${said} declares ${key}, which the documents publish and this build reads nowhere, so it would install and be kept by nothing. The repair is a deploy, not an edit.`,
+      at,
+      read,
+    );
+  return bad('DECLARATION_INVALID', `${said} declares ${key}, and there is no such key.`, at, read);
+}
+
+/**
  * Check a declaration before it is installed, because an id becomes SQL.
  *
  * The register id and every field id are inlined into index names and `json_extract` paths — the one
@@ -1271,6 +1499,15 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
       'id',
     );
 
+  /* THE BODY'S KEYS BEFORE ITS FIELDS, and the order is worth a line: `feilds:` answered *"declares
+     no fields, so it can hold nothing"*, which is true and is about the wrong thing. A misspelt key
+     is a misspelt key, and the list of what a register takes is in `allowed` where a person and an
+     agent can both read it. */
+  for (const key of Object.keys(decl.body)) {
+    const fault = keyFault(id, key, REGISTER_KEYS, REGISTER_UNBUILT, key);
+    if (fault) return fault;
+  }
+
   const fields = decl.body.fields;
   if (!Array.isArray(fields) || fields.length === 0)
     return bad('DECLARATION_INVALID', `${id} declares no fields, so it can hold nothing.`, 'fields');
@@ -1300,6 +1537,17 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
         `A field id is lower-case letters, digits and single underscores, starting with a letter. ${String(f?.id)} is not.`,
         'fields',
       );
+    /* A RESERVED ID IS A REGISTER THAT INSTALLS AND THEN HOLDS NOTHING, and the write path has
+       always known it while this loop did not. Checked after the grammar so that `_rule` still gets
+       the sentence about the underscore, and before the type so that `title` is answered as the
+       record's own rather than sent off to check its type. */
+    if ((RESERVED_FIELD_IDS as readonly string[]).includes(f.id))
+      return bad(
+        'FIELD_UNKNOWN',
+        `${id}.${f.id}: ${f.id} is the record's own, not a field a register may declare. It would install and then refuse every write to that field.`,
+        f.id,
+      );
+
     if (seen.has(f.id)) return bad('DECLARATION_INVALID', `${id} declares ${f.id} twice.`, f.id);
     seen.add(f.id);
 
@@ -1334,6 +1582,36 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
        and the form drew a control with nothing in it. */
     if (f.type === 'enum' && (!Array.isArray(f.values) || f.values.length === 0))
       return bad('DECLARATION_INVALID', `${id}.${f.id} is an enum and lists no values, so nothing could ever be written to it.`, f.id);
+
+    /* `state` IS RESERVED WHETHER OR NOT THE BODY POINTS AT IT (`34 §4`, `02 §1`). This branch used
+       to live below, behind `body.state` naming the field, so `{ id: state, type: text }` with no
+       `state:` key installed as an ordinary field called `state`, and the column it is named after
+       stayed NULL on every row of that register for ever. */
+    if (f.id === 'state' && f.type !== 'enum')
+      return bad('STATE_NOT_ENUM', `${id}.state: state is a reserved id and is always an enum.`, 'state', ['enum']);
+
+    /* AND THE FIELD'S OWN KEYS, same two lists. A field is where `derive:` and `required_when:` sit,
+       which are the two that read most like a rule and are kept by nothing at all. */
+    for (const key of Object.keys(raw as object)) {
+      const fault = keyFault(`${id}.${f.id}`, key, FIELD_KEYS, FIELD_UNBUILT, f.id);
+      if (fault) return fault;
+    }
+
+    /* ONE KEY OF A TWO-KEY STRUCTURE. `to:` is enforced on every move and `requires:` and `by:` are
+       destructured away, so a transition that carries them says three things and keeps one. */
+    const moves = (raw as { transitions?: unknown }).transitions;
+    if (moves !== undefined) {
+      if (moves === null || typeof moves !== 'object' || Array.isArray(moves))
+        return bad('DECLARATION_INVALID', `${id}.${f.id}'s transitions are a state and the moves out of it, and this is not.`, f.id);
+      for (const [from, move] of Object.entries(moves as Record<string, unknown>)) {
+        if (move === null || typeof move !== 'object' || Array.isArray(move))
+          return bad('DECLARATION_INVALID', `${id}.${f.id}: the move out of ${from} is a body with a to: in it, and this is not.`, f.id);
+        for (const key of Object.keys(move)) {
+          const fault = keyFault(`${id}.${f.id}.transitions.${from}`, key, TRANSITION_KEYS, TRANSITION_UNBUILT, `${f.id}.transitions.${from}`);
+          if (fault) return fault;
+        }
+      }
+    }
   }
 
   /* `02 §5`: eight, *"each a partial expression index, which costs storage and write time"*. The

@@ -111,7 +111,7 @@ const NESTING = 3;
 export type IngestDecl = {
   ingest: string;
   channel: Channel;
-  /** Over the ARRIVAL — `from`, `to`, `subject`, `body` — never over a register. */
+  /** Over the ARRIVAL, `34 §1.9`'s seven: `from to subject body channel state ts`. Never a register. */
   match?: Predicate;
   extract: Record<string, Extractor>;
   writes: {
@@ -175,10 +175,44 @@ export type IngestDeps = {
   nowMs: number;
 };
 
-/** The arrival, as a set of fields a predicate can be about. */
-const ARRIVAL: Schema = {
+/**
+ * The arrival, as a set of fields a predicate can be about.
+ *
+ * SEVEN, WHICH IS WHAT `34 §1.9` PUBLISHES, AND THIS HELD FIVE. `declare.ts` enforces the seven
+ * exactly and its refusal recites them, so `match: { field: ts, after: -7d }` and
+ * `match: { field: state, is: untriaged }` installed cleanly and matched nothing, for ever:
+ * `evaluate` answers `false` to whatever `compile` would refuse, and `compile` refuses a field that
+ * is not in the schema it is handed. Which is the failure the header above `MATCH_FIELDS` in
+ * `declare.ts` already names in its own words: *"an ingest that never fires and an ingest that
+ * fires correctly look identical from the outside until somebody notices a month of arrivals
+ * sitting untriaged"*. The fix that sentence stands over landed on the UNKNOWN names and never on
+ * the two published ones. Scoping an email rule to the last week is an ordinary thing to write, and
+ * the cost of it landing here rather than at install is days of somebody's inbox.
+ *
+ * `state` IS AN `enum` OVER `inbox_raw`'s OWN SEVEN, not a `text`, because the type is what decides
+ * which operators the grammar allows on it: an `enum` takes `is`, `not`, `in` and `not_in`, and a
+ * `text` would also take `gt` and `before`, which are not questions about a state. `ts` is an
+ * `instant` for the same reason and the opposite effect: `before` and `after` are the operators a
+ * temporal scope is written with, and on a `text` the grammar refuses both.
+ *
+ * EXPORTED, BECAUSE THE INSTALL CHECK HAS TO ASK THE SAME QUESTION. `declare.ts` keeps its own list
+ * of the seven names and compares against it by hand, which is how the two came to disagree in the
+ * first place, and a hand-kept list cannot answer the operator half of `34 §1.9` at all. One schema
+ * read by both is the only arrangement under which what installs and what fires cannot drift.
+ */
+export const ARRIVAL: Schema = {
   register: 'arrival',
-  fields: { from: { type: 'text' }, to: { type: 'text' }, subject: { type: 'text' }, body: { type: 'text' }, channel: { type: 'text' } },
+  fields: {
+    from: { type: 'text' },
+    to: { type: 'text' },
+    subject: { type: 'text' },
+    body: { type: 'text' },
+    channel: { type: 'text' },
+    /* `0001_kernel.ts`'s own CHECK list, in its own order. One list in two places is two lists the
+       day somebody adds a state to the table, so this is the DDL's and not a second opinion. */
+    state: { type: 'enum', values: ['untriaged', 'matched', 'skipped', 'review', 'proposed', 'ignored', 'erased'] },
+    ts: { type: 'instant' },
+  },
 };
 
 /**
@@ -224,12 +258,32 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     }
 
     const raw = deps.mint();
+    /**
+     * The arrival a `match:` is a question about, and it holds all seven of `34 §1.9`'s names.
+     *
+     * IT HELD FIVE, AND THE TWO IT LEFT OUT WERE THE TWO A PATTERN COULD INSTALL AND NEVER USE. See
+     * `ARRIVAL` above for what that cost. Both halves have to be here: a field in the schema with no
+     * value on the row answers `empty` and nothing else, and a value with no field in the schema is
+     * a predicate `compile` refuses, which `evaluate` reads as `false` on every arrival.
+     *
+     * `ts` IS THE INSTANT THE PAYLOAD ARRIVED, which is the same `at` the raw row is stored under a
+     * few lines below, so a pattern scoped to the last week and the row a person later reads in the
+     * inbox agree about when the thing turned up.
+     *
+     * `state` IS `untriaged`, WHICH IS THE STATE AN ARRIVAL IS ACTUALLY IN AT THIS POINT. It is the
+     * column's own DEFAULT in `0001_kernel.ts` and it is the word the comment below `!matched` gives
+     * the reason for: the state a payload is in before anybody has said what it means. Matching is
+     * step 2 and every other state is decided by the steps after it, so any other answer here would
+     * be a claim about a decision that has not been taken yet.
+     */
     const fields: Record<string, unknown> = {
       channel: arrival.channel,
       from: headers.from ?? '',
       to: headers.to ?? '',
       subject: headers.subject ?? '',
       body,
+      state: 'untriaged',
+      ts: at,
     };
 
     /* THE FIRST MATCHING INGEST WINS, and the order is the declaration order. Two patterns that both

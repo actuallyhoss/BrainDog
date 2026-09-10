@@ -66,7 +66,16 @@ export type MetricDecl = {
   target?: { lte: number } | { gte: number } | undefined;
   /** Required. `30d`, `4w`, `3m` — the shift the comparison is measured over. */
   window?: string | undefined;
-  compare?: 'previous' | 'none' | undefined;
+  /**
+   * `08 §2`'s three words, and this type knew two of them.
+   *
+   * `declare.ts` has always admitted `previous`, `year_ago` and `none`, with the citation on the
+   * line, so a metric declaring `year_ago` installed. This union said `'previous' | 'none'`, and
+   * the branch below sent everything that was not `none` down the same `now minus window` path: a
+   * tile labelled *vs. last year* was reading last month, on the 30-day window `08 §2`'s own
+   * example uses. See `yearBefore` for what the record means by a year and for what the drift cost.
+   */
+  compare?: 'previous' | 'year_ago' | 'none' | undefined;
   /** `money.GBP`, `int`, `pct`, `days`. It says how to WRITE the figure, never what it is of. */
   format?: string | undefined;
 };
@@ -95,6 +104,54 @@ export function windowMs(text: string): number | null {
 
 /** The published shapes with no consumer here, each named rather than ignored. */
 const UNREAD = ['last', 'delta', 'median', 'group_by', 'bucket', 'running', 'trend'] as const;
+
+/**
+ * The same clock, one year earlier.
+ *
+ * `compare: year_ago` WAS COMPUTED AS `previous`, AND IT SHIPPED THE WRONG DELTA WITH EVERY HONESTY
+ * CHECK GREEN. The union above read `'previous' | 'none'` while `declare` admitted `08 §2`'s three
+ * words, so `year_ago` fell into the same arm as `previous` and the comparison moved the clock back
+ * one WINDOW. Ten rows in the last thirty days, a hundred in the thirty before and a thousand a year
+ * ago came back as minus 91 per cent under a label that says *vs. last year*, with the thousand
+ * never read: the comparability gate below is correctly implemented and passes, so `why` was empty
+ * and `delta` was a number, and nothing on the screen disagreed with anything else on it.
+ *
+ * A YEAR IS NOT A FIXED NUMBER OF MILLISECONDS, AND THIS RECORD HAS ALREADY WRITTEN DOWN WHAT IT
+ * MEANS BY ONE. `resolveDay` resolves `+1m` by calendar arithmetic and clamps the day of the month,
+ * on the argument that "adding to the month number rolls it into 3 March and nobody means that by a
+ * month". A year is twelve of those months, so it is the same calendar date one year earlier at the
+ * same time of day: 365 days in an ordinary year and 366 across a leap day. Subtracting a constant
+ * `365 * DAY` instead, which is what `vault.spanMs('1y')` does for a grant's lifetime, lands on the
+ * wrong day of the month for good after every 29 February, and `08 §2.4` asks for the opposite in
+ * so many words: the prior window is cut at the same day, "this month to the 14th against last
+ * month to the 14th". A grant expiring a day early costs nobody anything; a comparison cut a day
+ * short is a figure.
+ *
+ * THE ONE DAY THAT CLAMPS IS 29 FEBRUARY, WHOSE ANNIVERSARY IS 28 FEBRUARY. `Date.UTC` rolls it
+ * forward to 1 March on its own, which would put a February figure beside a March one under a label
+ * naming a single month, so the day is cut to the last the target month has, exactly as `resolveDay`
+ * cuts 31 January plus a month to 28 February.
+ *
+ * IT IS UTC BECAUSE `resolveDay` IS. Every temporal word in a predicate resolves against
+ * `new Date(nowMs).toISOString()`, so an anniversary computed in any other zone would name a day the
+ * predicate then resolves differently, and the two would be one day apart for part of every year.
+ */
+const yearBefore = (nowMs: number): number => {
+  const d = new Date(nowMs);
+  const year = d.getUTCFullYear() - 1;
+  const month = d.getUTCMonth();
+  /* Day 0 of the next month is the last day of this one, which is how `resolveDay` finds it too. */
+  const last = new Date(Date.UTC(year, month + 1, 0, 12)).getUTCDate();
+  return Date.UTC(
+    year,
+    month,
+    Math.min(d.getUTCDate(), last),
+    d.getUTCHours(),
+    d.getUTCMinutes(),
+    d.getUTCSeconds(),
+    d.getUTCMilliseconds(),
+  );
+};
 
 export type EvalContext = {
   nowMs: number;
@@ -310,7 +367,12 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
        different day when `now` moves back a month, which is what makes the two windows different
        sets — and a predicate with no dated clause resolves to the SAME tree, which is how the
        structural check below knows the window moves nothing. */
-    const shifted = predicateOf(decl.where, schema, { ...ctx, nowMs: ctx.nowMs - shift });
+    /* AND HOW FAR THE CLOCK MOVES IS THE WHOLE OF THE DIFFERENCE BETWEEN THE TWO WORDS. `previous`
+       moves it by the declared window and `year_ago` by a year, which is what each of them says.
+       This line was `ctx.nowMs - shift` for both, so the two words named one figure and only one of
+       the two labels above it was true. `yearBefore` carries the argument for what a year is. */
+    const moveTo = decl.compare === 'year_ago' ? yearBefore(ctx.nowMs) : ctx.nowMs - shift;
+    const shifted = predicateOf(decl.where, schema, { ...ctx, nowMs: moveTo });
     const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
     const before = read(sql, shifted.predicate, schema, decl, ctx.lookups);
 
