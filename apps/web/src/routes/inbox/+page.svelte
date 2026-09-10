@@ -100,6 +100,29 @@
               <!-- Plain text. Never the renderer, never {@html}, never a link the record made. -->
               <p class="raw">{item.body}</p>
 
+              <!-- THIS ONE FIRST, AND THEN THE NEXT ONE LIKE IT. The rule offer sat above these two, and
+                   its `Make it a rule` was the card's primary: measured at 390 on the first card,
+                   which opens expanded, a filled red button at y 479 and `File it as a row` in the
+                   outline weight at y 600. So the loudest thing on the inbox asked a stranger to
+                   automate a kind of email before they had dealt with one. The comments that put it
+                   there argued about the rule's SENTENCE, that it be read as a sentence and not as
+                   a language; none argued that a standing rule outranks filing the email in front
+                   of you. Filing is the primary now, and the offer follows it at the ordinary
+                   weight, where "would have filed this" reads as the follow-up it is. -->
+              <!-- THE PROSE THAT WAS HERE RESTATED THE TWO BUTTONS BELOW IT, and mismapped one:
+                   "or leave it" reads as doing nothing, and the control it pointed at was `Archive`,
+                   which has a consequence. The buttons are the instruction. -->
+
+              <div class="actions">
+                <Button weight="primary" onclick={() => toasts.push(copy.notWritten(copy.inboxFileIt), { intent: 'warn' })}
+                  >{copy.fileIt}</Button
+                >
+                <Button
+                  weight="bare"
+                  onclick={() => toasts.push(copy.notWritten(copy.inboxArchiveIt))}
+                >{copy.archiveArrival}</Button>
+              </div>
+
               {#if item.suggestion}
                 <div class="pattern">
                   <!-- IT WAS A DSL STRING UNDER THE HIGHEST-EMPHASIS CONTROL ON THE PAGE.
@@ -114,7 +137,7 @@
                   </p>
                   <p class="pattern-said">{item.suggestion}</p>
                   <div class="pattern-actions">
-                    <Button weight="primary" onclick={() => toasts.push(copy.notWritten('The rule would be written and tested against the last 30 days'), { intent: 'warn' })}>{copy.makeRule}</Button>
+                    <Button onclick={() => toasts.push(copy.notWritten('The rule would be written and tested against the last 30 days'), { intent: 'warn' })}>{copy.makeRule}</Button>
                     <Button
                       weight="bare"
                       onclick={() => toasts.push(copy.notWritten(copy.inboxLeaveIt))}
@@ -122,19 +145,6 @@
                   </div>
                 </div>
               {/if}
-              <!-- THE PROSE THAT WAS HERE RESTATED THE TWO BUTTONS BELOW IT, and mismapped one:
-                   "or leave it" reads as doing nothing, and the control it pointed at was `Archive`,
-                   which has a consequence. The buttons are the instruction. -->
-
-              <div class="actions">
-                <Button onclick={() => toasts.push(copy.notWritten(copy.inboxFileIt), { intent: 'warn' })}
-                  >{copy.fileIt}</Button
-                >
-                <Button
-                  weight="bare"
-                  onclick={() => toasts.push(copy.notWritten(copy.inboxArchiveIt))}
-                >{copy.archiveArrival}</Button>
-              </div>
             </div>
           {/if}
         </li>
@@ -231,8 +241,8 @@
   }
 
   /* Ink, not the accent. This is the rule the record is offering to write — a thing to READ and
-     agree with — and the accent is spent on the button beside it, which is the part that is
-     actually a decision.
+     agree with. The accent was spent on the button beside it, which was argued as the part that is
+     actually a decision; it is spent on `File it as a row` now, and the markup says why.
 
      AND NOT MONOSPACE EITHER. It was a `<code>` block carrying `services where provider is Fenwick
      Cloud → set renews`: a language, set in the face this product reserves for ids, under the
@@ -264,6 +274,29 @@
 
     .body {
       padding-inline-start: var(--sp-4);
+    }
+  }
+
+  /**
+   * ON A CARD THE TIME SITS BESIDE THE SENDER, WHERE IT HAD A LINE OF ITS OWN.
+   *
+   * `rows.css` puts `.line-when` in row 3 of a card, under the title and its detail, because on a
+   * register the first line is the id and the amount. Here row 1's second cell is the empty
+   * `.line-amount` this screen draws for the desktop track, so `3h ago` took a third line to say
+   * five characters: measured at 390, the domain at y 182, the subject and sender to y 247, and
+   * the time alone at y 251, in a 111px row. Beside the domain it costs nothing.
+   *
+   * AND THE DOMAIN SHRINKS NOW, because it has a neighbour. The card gives `.seq`
+   * `min-inline-size: max-content` so a spoken id is never cut; a domain is not a spoken id, and
+   * `.host` inside it carries its own ellipsis for exactly this.
+   */
+  @media (width < 640px) {
+    .line-when {
+      grid-row: 1;
+    }
+
+    .seq {
+      min-inline-size: 0;
     }
   }
 

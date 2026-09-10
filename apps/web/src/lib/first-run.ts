@@ -100,8 +100,13 @@ export const firstRun = {
    * product and one apology.
    */
   keptNothing: 'Nothing was saved yet.',
-  keptNothingWhy:
-    'This record cannot be written to from the browser yet, so what you typed is still on this screen and nowhere else. It is safe to leave it and come back.',
+  /* `the row lasts until this tab is closed or reloaded`, AND IT SAID "what you typed is still on
+     this screen and nowhere else. It is safe to leave it and come back." Measured on the build of
+     September 10th, neither half was true. The row was also on the list the button under it opens,
+     and leaving and coming back found this form empty with no outcome under it, while a reload
+     took the row off the list as well. How long `pending` holds a row is the true part, so it is
+     what this says. The second `yet` went too: the sentence before it already has one. */
+  keptNothingWhy: 'This record cannot be written to from the browser, so the row lasts until this tab is closed or reloaded.',
   /* AND THE WAY ONWARD IS AN OFFER, NAMED FOR WHAT IS THERE. It used to be the only path and it was
      taken without asking: a list of somebody else's invoices, arrived at with no explanation, reads
      as the row having been written and gone somewhere strange. Named, it reads as what it is. */
@@ -114,9 +119,28 @@ export const firstRun = {
    * about the one thing the person just did. A friction pass ranked that exact gap first of ten,
    * measured as four clicks, twenty-five keystrokes and zero rows. The row is now at the top of the
    * list, marked, and this sentence is what tells them to look for it.
+   *
+   * AND IT WAS THE LAST THING THE OUTCOME SAID, AFTER THREE WAYS OF SAYING NOTHING WAS SAVED. A
+   * fresh-eyes pass on the build of September 10th measured 61 words under the button, with a
+   * 13-word toast lying across them at y 713 to 776 on a 390px phone, and 43 of those 74 words said
+   * one fact. The thing that did happen came fourth. It leads now, the row is named as what the
+   * person typed rather than as "it", and the list is named, because "the list" on a screen that
+   * shows none is a list the reader has to guess at. The half about the other rows is
+   * `keptExamples`.
    */
-  rowIsThere:
-    'It is at the top of the list, marked as not saved, next to the worked examples the lists arrive with.',
+  rowIsThere: (thing: string, list: string, mark: string) => `${thing} is at the top of the ${list} list, marked ${mark}.`,
+  /* THE HALF OF THAT SENTENCE ABOUT EVERYBODY ELSE'S ROWS, kept on its own: it is what stops a list
+     of a fictional studio's rows reading as the record having taken the person's row somewhere. */
+  keptExamples: 'The other rows are the worked examples the lists arrive with.',
+  /**
+   * WHAT A SECOND PRESS SAYS, which is a correction rather than another row.
+   *
+   * IT WAS "the first row in Money would be changed, but nothing was saved yet.", starting in lower
+   * case, stacked under the first press's toast still saying the row "would be written". The row
+   * HAD been changed. This press is the one that keeps a toast, because nothing else on the screen
+   * moves when it lands: the outcome under the button is already there from the first press.
+   */
+  rowChanged: (thing: string, list: string) => `${thing} on the ${list} list was changed`,
 
   /** The label above the first field. Written per choice, because "Your first money" is not English. */
   firstField: {
@@ -126,6 +150,47 @@ export const firstRun = {
     things: 'Your first project',
     tasks: 'The first thing to do',
   } as Record<string, string>,
+
+  /* WHAT THE ROW IS CALLED ONCE IT EXISTS, for the sentence that says where it went. Per choice for
+     the reason `firstField` gives: Money's own noun is `item`, because half of Money is owed by you,
+     and this row was asked for as an invoice. */
+  firstThing: {
+    obligations: 'Your invoice',
+    services: 'Your renewal',
+    people: 'The person',
+    things: 'Your project',
+    tasks: 'The task',
+  } as Record<string, string>,
+
+  /**
+   * WHAT THE CHOICE HAS ALREADY ANSWERED, so the first-run form does not ask it.
+   *
+   * THE FORM ASKED FOR EVERY FIELD THE REGISTER REQUIRES, AND ON MONEY TWO OF THEM ANSWERED
+   * THEMSELVES. A fresh-eyes pass measured `/start?add=obligations` on the build of September 10th
+   * at five fields for one row, each wearing `required`. `Which way` opened on `owed by me` under a
+   * field labelled "Your first invoice", and an invoice somebody writes is owed TO them, so the
+   * default most people accept without reading recorded their first row backwards. `Status` offered
+   * `part` and `written off`, which is bookkeeping, on the screen `19 §6` budgets at one true fact
+   * in thirty seconds.
+   *
+   * THE DECLARATION STAYS REQUIRED. These are values, not exemptions: `RowForm` puts them in the
+   * same map a press writes, so the row, its card and its own page carry them exactly as if they had
+   * been chosen, and the row's menu changes them later like any other value.
+   *
+   * ONLY WHERE THE CHOICE DECIDES THE ANSWER. An invoice is owed to you. Something that renews is
+   * `live`, because a service that is lapsing or cancelled is one that does not. Something that
+   * needs doing is `open`. A new invoice is `open` because that is where the register starts every
+   * row, and `part`, `paid` and `written off` are what happens to it afterwards, one press away on
+   * the row. Everything else a register requires is still asked, because a value nobody saw is a
+   * fact nobody stated: a renewal's type, cost and cycle, a person's role and a project's status
+   * each have more than one right answer, and the tile says nothing about which.
+   * `first-run.test.ts` holds every tile to this against the seed the app ships.
+   */
+  firstGiven: {
+    obligations: { direction: 'owed_to_me', state: 'open' },
+    services: { state: 'live' },
+    tasks: { state: 'open' },
+  } as Record<string, Readonly<Record<string, string>>>,
 
   /* THE OTHER WAY IN, and it is offered rather than buried. PostHog's install flow leads with
      `npx @posthog/wizard` and treats the in-product path as the alternative, which is the right
@@ -175,3 +240,16 @@ export const firstRun = {
      to the whole product rather than to first run, because three of the four are met long after it.
      See `define.svelte.ts` for which four survived the measurement and why. */
 } as const;
+
+/**
+ * Which fields the first-run form asks for: the title, and every field the register requires that
+ * the choice has not already answered.
+ *
+ * IT WAS `f.required || f.id === decl.title`, INSIDE `RowForm`, where nothing but the screen could
+ * say what it produced, and on Money it produced five fields. It sits here beside `firstGiven`
+ * because it is that table's other half, and because a function a test can call is the only way
+ * `first-run.test.ts` can hold all five tiles to it against the seed the app ships.
+ */
+export function firstAsks<F extends { id: string; required?: boolean }>(fields: readonly F[], title: string | undefined, given: Readonly<Record<string, string>> = {}): F[] {
+  return fields.filter((f) => f.id === title || (f.required === true && given[f.id] === undefined));
+}

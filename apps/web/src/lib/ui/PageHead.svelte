@@ -84,7 +84,6 @@
         <span dir="auto">{title}</span>
         {#if id}<span class="title-id">{id}</span>{/if}
       </h1>
-      {#if define}<p class="head-define"><Define noun={define} /></p>{/if}
     </div>
     <!--
       A COUNT OF NOTHING OVER AN EMPTY STATE IS THE SAME FACT TWICE, and the zero is the half that
@@ -114,6 +113,18 @@
     {#if actions}<div class="head-actions">{@render actions()}</div>{/if}
   </div>
 </header>
+<!--
+  THE DEFINITION IS READ ONCE, SO IT DOES NOT RIDE IN THE STICKY HEAD.
+
+  It sat inside `.head-titles`, which is inside a `position: sticky` header, so the one sentence
+  this product shows a person the first time they meet a word stayed pinned to the top of the screen
+  for the whole scroll. Measured at 390: the head of `/r/obligations` was 150px, 19 per cent of the
+  788 above the tab bar, and 44px of it was "A list of one kind of thing, with the same fields on
+  every row." `19 §6` gives the definition its place, the first time the word appears; it does not
+  give it the top of the screen for as long as the page is open. Out here it is read where it is
+  met and scrolls away with the list, and it still shows once and never again.
+-->
+{#if define}<p class="head-define"><Define noun={define} /></p>{/if}
 
 <style>
   /* Same size as the figure, dimmed: it modifies the number rather than being part of it. */
@@ -127,6 +138,15 @@
      would leave a gap on every screen after the first. */
   .head-define {
     margin: 0;
+    /* The head's own inline padding, so the sentence starts under the title it defines now that it
+       is outside the box that used to pad it. */
+    padding: var(--sp-2) var(--sp-5) 0;
+  }
+
+  @media (width < 900px) {
+    .head-define {
+      padding-inline: var(--sp-3);
+    }
   }
 
   .head {

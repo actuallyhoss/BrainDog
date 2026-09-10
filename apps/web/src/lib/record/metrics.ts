@@ -605,7 +605,10 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
       unmeasured = 'nothing to compare with yet';
     } else if (before.length * 2 < rows.length) {
       why = 'the window before has under half the rows';
-      unmeasured = 'too few rows before to compare against';
+      /* IT SAID "too few rows before to compare against", under the second figure on Home. `why`
+         is the author's and may say rows; this is the person's, and "rows before" is the schema
+         describing its own window to somebody who asked how much they owe. */
+      unmeasured = 'not enough history to compare yet';
     } else {
       const prior = evaluateValue(before, decl.value);
       if (prior === null || prior === 0 || value === null) {

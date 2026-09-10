@@ -247,8 +247,8 @@
               registers, and a lapsing service and an overdue obligation both drew `#2`. That is a
               collision between two IDS, and it disappears with them. What tells the rows apart is
               the glyph and the sentence, which is what a reader was using anyway. The id has not
-              gone anywhere: `y` copies it, the row's own screen prints it, and `/audit` still leads
-              with it, because those are the three places somebody wants a number they can say.
+              gone anywhere: `y` copies it, the row's own screen prints it, and `/audit` still prints
+              it after the name, because those are the three places somebody wants a number they can say.
 
               AND A QUESTION ROW NOW LEADS WITH NOTHING, WHERE IT LED WITH THE DECIDE GLYPH. The
               fork was the same grey `Y` on all four, in a shape this product teaches only as the
@@ -451,6 +451,19 @@
     flex-direction: column;
     gap: var(--sp-8);
     min-inline-size: 0;
+  }
+
+  /* THE TWO SECTIONS OF THE MAIN COLUMN WERE 64px APART, the gap between the two columns, and the
+     strip's block added its own 24px under that. Measured, the figures' box ended at y 537 at 390
+     and What needs you began at y 625: 88px of nothing between the money and the list of what to
+     do about it, and about 98px at 1440, which reads as the end of the screen. One step down the
+     scale, and the block's trailing space goes, because here the section gap is what spaces it. */
+  .primary {
+    gap: var(--sp-6);
+  }
+
+  .strip > :global(:last-child) {
+    margin-block-end: 0;
   }
 
   /**

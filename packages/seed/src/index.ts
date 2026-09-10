@@ -670,7 +670,7 @@ export const TASKS: Fields[] = [
  * unit a person would say it in — "8m ago", not "0d ago".
  */
 export const SESSIONS: Fields[] = [
-  { doing: 'Variable axis QA — instances 3 of 9', agent: 'claude', state: 'live', thing: 1, track: 1, last_seen: hours(0), wrote: 14, host: 'kiln-mbp', job: 'j_9K4A' },
+  { doing: 'Variable axis QA, instances 3 of 9', agent: 'claude', state: 'live', thing: 1, track: 1, last_seen: hours(0), wrote: 14, host: 'kiln-mbp', job: 'j_9K4A' },
   { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'live', thing: 1, track: 3, last_seen: hours(0.1), wrote: 2, host: 'kiln-mbp' },
   { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', thing: 3, track: 2, last_seen: hours(3), wrote: 6, host: 'studio-desktop', job: 'j_7Q2F' },
   { doing: 'Chasing Halden on 2026-041', agent: 'you', state: 'ended', thing: 2, last_seen: hours(26), wrote: 1, host: 'studio-desktop' },

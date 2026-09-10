@@ -508,6 +508,16 @@
       grid-column: 1 / -1;
     }
 
+    /* AND A TITLE WITH A MARKER KEEPS THE MARKER'S LINE. This query was written for 320 and 390 is
+       under 400, so every iPhone below the Plus size got it: measured at 390 on `/p/kiln`, a task
+       was 100px, the checkbox alone at y 583, the title across the whole width at y 612 and the
+       date at y 647, so the boxes floated above the tasks they tick. Two tracks are enough: the
+       marker is 17px, or a date of about 54, and the title wraps in what is left, 225px of it at
+       320. Only the detail and the state go under it. A list with no marker keeps the whole line. */
+    .item-marker + .item-title {
+      grid-column: 2;
+    }
+
     .item-detail,
     .item-state {
       grid-column: 2;

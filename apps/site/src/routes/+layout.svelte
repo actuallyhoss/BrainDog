@@ -216,6 +216,15 @@
       background var(--d-state) var(--ease-out);
   }
 
+  /* 127x36 MEASURED ON A PHONE, on the one control this site exists to be pressed. `--ctl-h` is
+     36 here because the site does not carry the app's coarse-pointer density, and every other target
+     on the page keeps 44. `13 §7` is 44 on both axes under a thumb. */
+  @media (pointer: coarse) {
+    .cta {
+      min-block-size: var(--tap, 44px);
+    }
+  }
+
   .cta:hover {
     background: var(--accent-hover);
     border-color: var(--accent-hover);

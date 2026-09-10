@@ -448,7 +448,12 @@
    * of them is wrong wherever they are both visible — which is exactly at the cap, the one place the
    * cap line exists for.
    */
-  const denominator = $derived(filters.length || q ? result.matched : result.total);
+  /* AND THE PENDING ROWS ARE IN IT, because they are in the numerator. `drawn` counts what the list
+     draws, which includes a row somebody has just typed, while `result.total` is the record's count
+     and does not: so every successful add printed a numerator larger than its denominator, "39 of
+     38" on Money after a first row and "15 of 14" on Tasks after one capture. A person who has just
+     added something is the last reader who should be shown arithmetic that looks broken. */
+  const denominator = $derived(filters.length || q ? result.matched : result.total + pending.of(id).length);
 
   /**
    * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
@@ -557,7 +562,10 @@
    * "Due ↑ lowest first" is a sentence about a date that nobody says. `19 §9`'s rule is that the
    * product speaks the reader's words, and the reader's word for an ascending day is *oldest*.
    */
-  const sortable = $derived(columns.filter((c) => c.field !== 'select'));
+  /* `act` IS A COLUMN OF CONTROLS, NOT OF VALUES, and Display on a phone offered to sort by it:
+     "Sorted by" listed seven options and the last was `What you can do here`, which is the label of
+     the row-actions column. There is nothing in it to put in an order. */
+  const sortable = $derived(columns.filter((c) => c.field !== 'select' && c.field !== 'act'));
 
   const wayOf = (field: string): readonly [string, string] => {
     if (field === 'seq') return [copy.firstAdded, copy.lastAdded];
@@ -1393,17 +1401,6 @@
     <!-- THE BAR APPEARS WHEN THERE IS SOMETHING TO SIFT. Below eight rows it was a search box, six
          chips and a keyboard strip standing over a list you could already read — and on the first
          run it stood over the one row somebody had just typed. -->
-    <!-- AND ON THE RUN SCREEN TWO IS ABOUT, IT COMES FIRST. -->
-    {#if arriving}
-      <!-- ON THE ARRIVAL ITSELF, THE ONLY LIST WITH ANYTHING IN IT IS THIS ONE.
-
-           `?first=1` is a claim about the moment: somebody has just written their first row and been
-           sent here. `19 §6` calls this screen "the register, with their one row in it" — so on a
-           genuine first run `held` is one register, and it is this one. Passing the seeded record's
-           eight would describe a record that person does not have. -->
-      <Second held={[id]} register={id} first />
-    {/if}
-
     {#if siftable || q || filters.length}
     <div class="bar">
       <label class="field">
@@ -1422,6 +1419,10 @@
         />
       </label>
 
+      <!-- EVERYTHING AFTER THE SEARCH BOX, IN ONE BOX, so a phone can scroll the chips without
+           scrolling the search away. On a laptop this is `display: contents` and the bar is the
+           single row it always was. -->
+      <div class="bar-rest">
       {#each filterable.filter((f) => f.type === 'enum') as f}
         <div class="segmented" role="group" aria-label={labelOf(f)}>
           {#each f.values ?? [] as value}
@@ -1469,6 +1470,7 @@
           <Kbd keys="j  k" /> move <Kbd keys="p" /> peek <Kbd keys="↵" /> open <Kbd keys="⌫" /> archive
         </span>
       {/if}
+      </div>
     </div>
     {/if}
 
@@ -1660,7 +1662,10 @@
             aria-label="{copy.rowMenu} #{e.seq}"
             onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
           >
-            <Icon name="more" size="s" />
+            <!-- `m`, AND IT WAS `s`: a 12px box of a 24-unit path at `stroke-width: 1.6`, so each dot
+                 was 0.8 CSS pixels in `--dim`, on the only touch route to a row's eight verbs. In both
+                 schemes the column read as an empty cell beside the card. -->
+            <Icon name="more" size="m" />
           </button>
         {/snippet}
         {#snippet note(e)}
@@ -1930,6 +1935,26 @@
       </div>
     {/if}
 
+    <!--
+      THE ARRIVAL'S SECOND LIST, UNDER THE ROW IT FOLLOWS, AND IT USED TO COME FIRST.
+
+      The comment that stood over it read "AND ON THE RUN SCREEN TWO IS ABOUT, IT COMES FIRST", and
+      what that produced was measured: after a first row from `/start`, `?first=1` drew this panel,
+      its heading, a paragraph and four cards for other lists ABOVE the bar and the list, and the
+      person's own row landed at y 944 on an 844px screen whose usable area ends at 788 above the tab
+      bar. `19 §6` calls this screen "the register, with their one row in it", and the one row was
+      the one thing on it they could not see. The panel is the second step, so it sits after the
+      first; the note below moved under the rows for the same reason and says so.
+
+      ON THE ARRIVAL ITSELF, THE ONLY LIST WITH ANYTHING IN IT IS THIS ONE. `?first=1` is a claim
+      about the moment: somebody has just written their first row and been sent here, so on a
+      genuine first run `held` is one register, and it is this one. Passing the seeded record's
+      eight would describe a record that person does not have.
+    -->
+    {#if arriving}
+      <Second held={[id]} register={id} first />
+    {/if}
+
     <!-- AND UNDER THE ROWS, NOT OVER THEM.
 
          Measured on the built app at 390px: the sample bar, the header, the filter bar, its note,
@@ -2123,7 +2148,11 @@
         </fieldset>
       {/if}
 
-      <fieldset class="filter-group">
+      <!-- NOT ON A PHONE. Below 640px the register draws cards, and a card shows the declaration's
+           `mobile:` fields rather than the columns chosen here, so this section toggled six columns
+           that were not drawn: fifteen controls in a sheet whose one useful act on a phone is
+           choosing a sort. -->
+      <fieldset class="filter-group columns-group">
         <legend class="filter-legend">{copy.columns}</legend>
         <div class="filter-values">
           {#each columnsFor(id) as c}
@@ -2180,9 +2209,40 @@
         <Icon name="external" size="s" />
         <span class="mi-name">{copy.openRow}</span><Kbd keys="↵" />
       </a>
+      <!-- THE REGISTER'S OWN STATES, WHICH THIS MENU DID NOT CARRY.
+           Five verbs, and the one a person reaches for most on a list of obligations was not among
+           them: the only way to move a row's state was to select it and use the bulk bar, which is
+           three presses to change one row. The values come from the declaration rather than from a
+           list typed here, so a pack that adds a state gets a menu item.
+
+           NOT THE STATE IT IS ALREADY IN. An item that sets a row to where it already is does
+           nothing and looks like it did something, and `19 §6`'s rule for a control that cannot act
+           is that it is absent rather than greyed.
+
+           AND THEY COME SECOND, RIGHT AFTER OPEN. They were items six to eight, under Peek, Copy
+           id, Copy link and Select, so the verbs that change an invoice were below the tab bar on an
+           844px phone when the menu opened from the first card, while two developer verbs sat above
+           them. The copy verbs now come last, before Archive, which keeps its own rule. -->
+      {#if states.length > 0}
+        <hr class="mi-rule" />
+        {#each states.filter((v) => v !== entry(id, seq)?.fields[decl.state ?? '']) as state}
+          <button class="mi" role="menuitem" type="button" onclick={() => setRowState(seq, state)}>
+            <Icon name="check" size="s" />
+            <span class="mi-name">{copy.setTo(state.replace(/_/g, ' '))}</span>
+          </button>
+        {/each}
+        <hr class="mi-rule" />
+      {/if}
       <button class="mi" role="menuitem" type="button" onclick={() => peek(seq)}>
         <Icon name="eye" size="s" />
         <span class="mi-name">{copy.peek}</span><Kbd keys="p" />
+      </button>
+      <!-- AND THE ONE VERB THAT UNLOCKS THE OTHER FOUR. Selection was `x` alone, so the bulk bar —
+           copy ids, set state, archive them — could not be reached at all without a keyboard. One
+           row selected is enough to make it appear, and the bar takes it from there. -->
+      <button class="mi" role="menuitem" type="button" onclick={() => toggleSelect(seq, false)}>
+        <Icon name="check" size="s" />
+        <span class="mi-name">{selected.has(seq) ? copy.deselect : copy.select}</span><Kbd keys="x" />
       </button>
       <button class="mi" role="menuitem" type="button" onclick={() => void copyId(seq)}>
         <Icon name="copy" size="s" />
@@ -2192,31 +2252,6 @@
         <Icon name="link" size="s" />
         <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
       </button>
-      <!-- AND THE ONE VERB THAT UNLOCKS THE OTHER FOUR. Selection was `x` alone, so the bulk bar —
-           copy ids, set state, archive them — could not be reached at all without a keyboard. One
-           row selected is enough to make it appear, and the bar takes it from there. -->
-      <button class="mi" role="menuitem" type="button" onclick={() => toggleSelect(seq, false)}>
-        <Icon name="check" size="s" />
-        <span class="mi-name">{selected.has(seq) ? copy.deselect : copy.select}</span><Kbd keys="x" />
-      </button>
-      <!-- THE REGISTER'S OWN STATES, WHICH THIS MENU DID NOT CARRY.
-           Five verbs, and the one a person reaches for most on a list of obligations was not among
-           them: the only way to move a row's state was to select it and use the bulk bar, which is
-           three presses to change one row. The values come from the declaration rather than from a
-           list typed here, so a pack that adds a state gets a menu item.
-
-           NOT THE STATE IT IS ALREADY IN. An item that sets a row to where it already is does
-           nothing and looks like it did something, and `19 §6`'s rule for a control that cannot act
-           is that it is absent rather than greyed. -->
-      {#if states.length > 0}
-        <hr class="mi-rule" />
-        {#each states.filter((v) => v !== entry(id, seq)?.fields[decl.state ?? '']) as state}
-          <button class="mi" role="menuitem" type="button" onclick={() => setRowState(seq, state)}>
-            <Icon name="check" size="s" />
-            <span class="mi-name">{copy.setTo(state.replace(/_/g, ' '))}</span>
-          </button>
-        {/each}
-      {/if}
       <hr class="mi-rule" />
       <button class="mi" role="menuitem" type="button" onclick={() => archive(seq)}>
         <Icon name="archive" size="s" />
@@ -2358,6 +2393,12 @@
     gap: var(--sp-2);
   }
 
+  /* NOT A BOX ABOVE 640px. The chips, Clear and Display are children of the bar exactly as they
+     were before the phone needed them grouped; `contents` removes the wrapper from layout. */
+  .bar-rest {
+    display: contents;
+  }
+
   /* The menu rows: the same 34px, the same tint-on-hover, and each printing the key it stands in
      for — so using the menu teaches the key that replaces it. */
   .mi {
@@ -2376,6 +2417,17 @@
     text-align: start;
     text-decoration: none;
     cursor: pointer;
+  }
+
+  /* THE MENU IS A KEYBOARD CHEAT SHEET ON A DEVICE WITH NO KEYBOARD. Six of its nine items printed a
+     chip, `Enter`, `p`, `y`, `Shift+Y`, `x` and the delete glyph, to somebody holding a phone.
+     `/start` hid its digit badges under a coarse pointer for exactly this reason in the thirtieth
+     pass and the same rule was never applied here. The bindings are untouched; what goes is the
+     advertisement to a reader who cannot press them. */
+  @media (pointer: coarse) {
+    .mi :global(kbd) {
+      display: none;
+    }
   }
 
   .mi:hover,
@@ -2433,7 +2485,9 @@
       background: none;
       border: 0;
       border-inline-start: 1px solid var(--line);
-      color: var(--dim);
+      /* `--ink2`, and it was `--dim`: the one touch route to a row's eight verbs, drawn in the
+         quietest ink the palette has, read as an empty cell beside every card. */
+      color: var(--ink2);
       cursor: pointer;
     }
 
@@ -2868,6 +2922,10 @@
   }
 
   @media (width < 640px) {
+    .columns-group {
+      display: none;
+    }
+
     .table-slot {
       display: none;
     }
@@ -2892,8 +2950,35 @@
      * keeps the overflow inside the bar. Without it the bar sizes to its content and takes the app
      * with it, which is the 30px sideways scroll the comment above `.bar` records fixing once.
      */
+    /**
+     * AND THEN THE SEARCH BOX SCROLLED WITH THE CHIPS, WHICH IS WHY IT HAS A LINE OF ITS OWN NOW.
+     *
+     * The first version of this made the whole bar one sideways scroller and gave the search box a
+     * floor. The floor was on the wrapper, so the input measured 62px and read `Searcl`; moving it
+     * to the input gave 96px and `Search mor`. A floor cannot win, because the placeholder is
+     * "Search" plus the register's own name and `Search services` is longer than `Search money`.
+     * And the comment that gave the box its floor said it was "the one thing that never scrolls out
+     * of reach", which was true only while nobody scrolled.
+     *
+     * So the search box takes the bar's first line at full width and the chips, Clear and Display
+     * share a second line that is the only thing that scrolls. Two lines instead of the five that
+     * wrapping gave, and the search box is always the whole width of the phone.
+     */
     .bar {
+      flex-wrap: wrap;
+      min-inline-size: 0;
+    }
+
+    .bar > .field {
+      flex: 1 1 100%;
+    }
+
+    .bar-rest {
+      display: flex;
+      flex: 1 1 100%;
       flex-wrap: nowrap;
+      align-items: center;
+      gap: var(--sp-2);
       min-inline-size: 0;
       overflow-x: auto;
       overscroll-behavior-x: contain;
@@ -2902,19 +2987,12 @@
       padding-block-end: var(--sp-1);
     }
 
-    .bar::-webkit-scrollbar {
+    .bar-rest::-webkit-scrollbar {
       display: none;
     }
 
-    .bar > * {
+    .bar-rest > * {
       flex: 0 0 auto;
-    }
-
-    /* The search box is the one child allowed to give ground, down to something a word still fits
-       in. It is first in the bar, so it is the one thing that never scrolls out of reach. */
-    .bar > .field {
-      flex: 1 1 14ch;
-      min-inline-size: 12ch;
     }
 
     /* WHAT THE BOX SEARCHES, ON THE ONE SCREEN WHERE IT IS ALREADY IN THE PLACEHOLDER. The bar's

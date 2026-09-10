@@ -20,6 +20,7 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
+  import { REGISTERS } from '$lib/record/api.ts';
   import { addKey } from '$lib/start.ts';
   import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
   import Define from '$lib/ui/Define.svelte';
@@ -181,6 +182,16 @@
   const choice = $derived(CHOICES.find((c) => c.key === picked));
 
   /**
+   * What the row is called, and the list it went to, for the sentences that say where it is.
+   *
+   * THE LIST IS NAMED BY THE REGISTER AND NOT BY THE TILE. Four of the five are one word either way.
+   * The fifth tile says *Work* and opens a list whose head says *Tasks*, so "See Work as it comes"
+   * was a button naming a place it did not go. The outcome names what the reader will see.
+   */
+  const thing = $derived(choice ? (firstRun.firstThing[choice.key] ?? choice.label) : '');
+  const list = $derived(choice ? (REGISTERS[choice.key]?.name ?? choice.label) : '');
+
+  /**
    * The first row.
    *
    * IT SAYS WHAT IT WOULD HAVE WRITTEN AND GOES WHERE THE ROW WOULD BE. This app is a mock-up of
@@ -213,11 +224,17 @@
     /* PRESSING AGAIN CORRECTS THE ROW, it does not add another. `replace` answers `false` when the
        row is no longer waiting, which is what happens after `Put back` on the list, and then this
        adds one as it did the first time rather than quietly restoring a row somebody removed. */
+    /* THE FIRST PRESS DOES NOT TOAST ANY MORE, AND THE SECOND ONE DOES. Both used to, and the first
+       read "the first row in Money would be written, but nothing was saved yet.": lower case, and
+       drawn at y 713 to 776 on a 390px phone straight across the outcome below, whose first line
+       said the same thing. That outcome IS this screen's answer, for the reason written over it, so
+       a toast on top was one fact twice with one copy hiding the other. A second press moves
+       nothing on the screen, because the outcome is already there, so it keeps a toast, and the
+       toast says what happened: the row was changed. */
     if (made !== null && pending.replace(choice.key, made, taken)) {
-      toasts.push(copy.notWritten(`the first row in ${choice.label} would be changed`));
+      toasts.push(copy.notWritten(firstRun.rowChanged(thing, list)));
     } else {
       made = pending.add(choice.key, taken);
-      toasts.push(copy.notWritten(`the first row in ${choice.label} would be written`));
     }
     said = true;
   }
@@ -323,6 +340,11 @@
         about their own business" in under thirty seconds and a register has eight fields. Which
         three that is comes from the declaration, so a money register asks for an amount because it
         DECLARES one, and nobody writes a second copy of the schema in markup.
+
+        AND THEN TO THE REQUIRED ONES THE CHOICE HAS NOT ALREADY ANSWERED. `given` is
+        `firstRun.firstGiven`: an invoice is owed to you and a new one is open, so Money went from
+        five fields to three, and the two it dropped were the two a stranger had to read in order
+        to accept them.
       -->
       <form class="form" onsubmit={commit}>
         <!-- KEYED ON THE CHOICE. Going Back and picking another register reused the component, so
@@ -334,6 +356,7 @@
             first
             autofocus
             label={firstRun.firstField[choice.key]}
+            given={firstRun.firstGiven[choice.key]}
             bind:problems
             bind:taken
           />
@@ -371,11 +394,15 @@
         -->
         {#if said}
           <div class="kept" role="status">
-            <p class="kept-what">{firstRun.keptNothing}</p>
-            <p class="kept-why">{firstRun.keptNothingWhy}</p>
-            <p class="kept-why">{firstRun.rowIsThere}</p>
+            <!-- WHAT HAPPENED FIRST, THEN WHY. This opened on "Nothing was saved yet." and said it
+                 twice more before it said where the row was, so the one thing that had happened
+                 came last. That it is not saved is now said once as a sentence and once as the name
+                 of the mark the reader will find on the row. -->
+            <p class="kept-what">{firstRun.rowIsThere(thing, list, copy.markNotWritten)}</p>
+            <p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>
+            <p class="kept-why">{firstRun.keptExamples}</p>
             <div class="actions">
-              <Button href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(choice.label)}</Button>
+              <Button href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(list)}</Button>
             </div>
           </div>
         {/if}

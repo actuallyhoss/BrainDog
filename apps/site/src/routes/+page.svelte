@@ -73,7 +73,20 @@
     </ul>
     <p class="hero-body">{site.hero.body}</p>
     <div class="hero-actions">
-      <a class="btn btn-primary" href="{APP}/start">{site.hero.primary}</a>
+      <!--
+        THE BUTTON THAT SAYS DEMO OPENS THE DEMO, AND IT USED TO OPEN A FORM.
+
+        It read `Open the demo record` and pointed at `{APP}/start`, the first-run screen, which
+        asks a stranger what their business is before showing them anything. The header's small
+        `Open the app` pointed at `{APP}` and was the one that opened the demo. Measured: the demo
+        was one tap behind the small button and six behind the large one, with 22 keystrokes, four
+        screens and about 534 words in between, and the row a person typed landing below the fold.
+        The note under this button promises "a synthetic record rather than yours", which is what
+        `{APP}` is. `/start` is still one tap away, from the sample bar's `Start your own` inside
+        the demo, for the person who has seen enough to want one. The closing band repeats this
+        button and points at the same place.
+      -->
+      <a class="btn btn-primary" href={APP}>{site.hero.primary}</a>
       <!-- THE SECOND ACTION IS THE CHANGELOG WHILE THE DESIGN IS NOT READABLE. It pointed at the
            `docs/` tree in a private repository, so the one thing this page offers a reader who is
            not ready to open the app was a 404. The changelog is the honest substitute: it is the
@@ -266,7 +279,7 @@
   <div class="close">
     <h2 class="close-title">{site.hero.title}</h2>
     <div class="hero-actions">
-      <a class="btn btn-primary" href="{APP}/start">{site.hero.primary}</a>
+      <a class="btn btn-primary" href={APP}>{site.hero.primary}</a>
       <a class="btn" href="/pricing">{site.nav.pricing}</a>
     </div>
   </div>

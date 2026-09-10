@@ -167,15 +167,10 @@
       {#if unwritten}
         <Chip label={copy.markNotWritten} tone="warn" />
       {/if}
-      <!-- IT SAID `y` AND NOTHING WAS BOUND, and the button itself had no handler either — two
-           lies in one control, on the screen where somebody most wants a row's id to paste into a
-           message. The button was fixed and the KEY was not, under a comment claiming both were:
-           this route registered no key listener at all while its own header printed one. -->
-      {#if !unwritten}
-        <Button weight="bare" onclick={() => clipboard.putSpoken(id, row.seq)}>
-          <Icon name="copy" size="s" />{copy.copyId}<Kbd keys="y" />
-        </Button>
-      {/if}
+      <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER, AND IT LIVES BESIDE THE ID NOW. A row's page
+           led with a developer verb: the first control a person saw on an invoice was the one that
+           puts `obligations#1` on the clipboard, ahead of anything that does something to the
+           invoice. It is in Details, next to the id it copies, and it keeps its key. -->
       <!-- `Put back` AND NOT `Archive`, because there is nothing to archive: the row is in this tab
            and nowhere else. It is the same verb the list offers on the same row, which is the point
            — a row that can be taken back in one place and not the other is two products. -->
@@ -276,7 +271,19 @@
         <h2 class="side-title"><Icon name="info" size="s" />Details</h2>
         <dl class="meta">
           <dt>Id</dt>
-          <dd class="mono">{id}#{row.seq}</dd>
+          <!-- IT SAID `y` AND NOTHING WAS BOUND, and the button itself had no handler either — two
+               lies in one control, on the screen where somebody most wants a row's id to paste into
+               a message. The button was fixed and the KEY was not, under a comment claiming both
+               were: this route registered no key listener at all while its own header printed one.
+               It came here from the header, beside the id it copies, and the key came with it. -->
+          <dd class="id-line">
+            <span class="mono">{id}#{row.seq}</span>
+            {#if !unwritten}
+              <button type="button" class="copy-id tap" onclick={() => clipboard.putSpoken(id, row.seq)}>
+                <Icon name="copy" size="s" /><span>{copy.copyId}</span><Kbd keys="y" />
+              </button>
+            {/if}
+          </dd>
           <dt>Added</dt>
           <!-- IN WORDS, like the other two surfaces that answer "who changed my record". `actorOf`
                moved into `api.ts` when Home and `/audit` were found spelling the same two actors two
@@ -302,6 +309,40 @@
 {/if}
 
 <style>
+  /* THE ID AND THE ONE THING YOU DO WITH IT, ON ONE LINE. A bare button beside a value rather than
+     under it, so Details stays a list of facts with one control attached to the fact it acts on. */
+  .id-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .copy-id {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: 0 var(--sp-2);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+  }
+
+  .copy-id:hover {
+    background: var(--hover-wash);
+  }
+
+  /* The key is advice for a keyboard, and a thumb has none. The binding stays. */
+  @media (pointer: coarse) {
+    .copy-id :global(kbd) {
+      display: none;
+    }
+  }
+
   .incoming {
     margin-block-start: var(--sp-6);
   }

@@ -16,7 +16,7 @@
   import Button from '$lib/ui/Button.svelte';
   import { day as fmtDay, since, stamp } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { AUDIT, DOM_CAP, NOW, PAGES, actorOf } from '$lib/record/api.ts';
+  import { AUDIT, DECIDED, DOM_CAP, NOW, PAGES, QUESTIONS, REGISTERS, actorOf, entry } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -128,6 +128,33 @@
        prefix is there so the ledger's `target` column is unambiguous across tables, and printing it
        here would be printing the schema at somebody who asked what happened. */
     return spoken(target);
+  };
+
+  /**
+   * WHAT THE THING IS CALLED, WHICH THE LINE KNEW AND DID NOT SAY.
+   *
+   * Every line read "Created services#6" while the note beside it said "Object storage, from the
+   * Fenwick invoice": the record had the name and printed the key, so a stranger reading the log
+   * got a column of registers and numbers and had to open each one to learn what it was.
+   *
+   * THE NAME LEADS AND THE SPOKEN ID STAYS, after it and in the id face. This is one of the places
+   * somebody wants a number they can say (`19 §2`), so it is still on every line that has one; it
+   * has stopped being the only thing the line says. A page has no id to follow its title, because
+   * `page.money` is a declaration's key and `targetOf` already prints the title instead.
+   *
+   * `null` when nothing is known by that id any more, and the line prints the id alone, which is
+   * what it did before rather than an empty name.
+   */
+  const nameOf = (target: string): string | null => {
+    const row = /^([a-z0-9_-]+)#(\d+)$/.exec(target);
+    if (row) {
+      const reg = REGISTERS[row[1]!];
+      const found = reg ? entry(row[1]!, Number(row[2])) : undefined;
+      const title = reg && found ? String(found.fields[reg.title] ?? '') : '';
+      return title || null;
+    }
+    const id = spoken(target);
+    return [...QUESTIONS, ...DECIDED].find((q) => q.id === id)?.title ?? null;
   };
 
   /**
@@ -330,7 +357,10 @@
                  something to link to and the verb stands alone when there is not — rather than an
                  empty anchor, which is a keyboard stop that goes nowhere and reads as nothing. -->
             <span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
-              {#if e.target}<a class="target tap" href={href(e.target)}>{targetOf(e.target)}</a>{/if}</span>
+              {#if e.target}{@const name = nameOf(e.target)}<a class="target tap" href={href(e.target)}
+                  >{#if name}<bdi class="target-name">{name}</bdi> <span class="target-id">{targetOf(e.target)}</span
+                    >{:else}{targetOf(e.target)}{/if}</a
+                >{/if}</span>
           </span>
           <span class="line-amount note">{e.note}</span>
           <!--
@@ -347,7 +377,7 @@
             the record is at now.
           -->
           <span class="line-when">
-            <time datetime={e.at}>{since(e.at, NOW)}</time>
+            <time datetime={e.at} title={stamp(e.at)}>{since(e.at, NOW)}</time>
             <span class="stamp">{stamp(e.at)}</span>
             <span class="ver num">v{e.version.toLocaleString('en')}</span>
           </span>
@@ -471,9 +501,13 @@
    * The width query is what makes the two rules describe two different screens instead of arguing
    * about one.
    */
+  /* THE WHAT AND THE NOTE SHARE WHAT IS LEFT EVENLY, and the what had 22ch of it. That was room for
+     "Created services#6"; it is not room for "Created Object storage services#6", which is what the
+     line says now that it names the thing, and the note beside it had 531px at 1440 while the
+     name was being cut. */
   @media (width >= 640px) {
     .ledger :global(.line) {
-      grid-template-columns: 16ch minmax(0, 22ch) minmax(0, 1fr) 9ch;
+      grid-template-columns: 16ch minmax(0, 1fr) minmax(0, 1fr) 9ch;
     }
   }
 
@@ -509,9 +543,39 @@
     /* THE ACTOR GETS A LINE. On a card the row is two tracks, and `.who` is not one of the four
        cells the card layout places — so it fell into whatever was left, which was nothing: measured
        `clientWidth: 0` against 29px of text. Who did it is half of what this log says. */
+    /* AND THE LINE IT GOT WAS ALREADY TAKEN. `.who` went across both tracks of row 1, and the note
+       is `.line-amount`, which `rows.css` puts in row 1 column 2: measured at 390, `.who` at x 33
+       to 357 on y 462 and the note at x 139 to 357 on y 463. "the assistant" and "Two services on
+       the Fenwick invoice" were printed on top of each other, and any actor wider than about 106px
+       did the same.
+
+       SO ROW 1 IS WHO AND WHEN, row 2 is what was done to what, and row 3 is the note, which gets
+       the whole width because it is the one thing on the line that must not be cut. The when cell
+       was three lines under everything else, `3h ago`, `3 Sep 2026, 09:00` and `v4,192` stacked
+       right-aligned, and an event was 122px for a sentence and a half. On a card it is the band and
+       the version on the actor's line; the stamp is the band's tooltip, and stays on the desktop
+       line where the restore setting's "find the moment" is done. The version is how this page
+       says to name a moment, and it stays visible. */
     .who {
-      grid-column: 1 / -1;
+      grid-column: 1;
       grid-row: 1;
+    }
+
+    .line-when {
+      grid-column: 2;
+      grid-row: 1;
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--sp-2);
+    }
+
+    .note {
+      grid-column: 1 / -1;
+      grid-row: 3;
+    }
+
+    .stamp {
+      display: none;
     }
   }
 
@@ -526,6 +590,15 @@
   .target:hover,
   .target:focus-visible {
     border-block-end-color: currentColor;
+  }
+
+  /* The number you can say, after the name and quieter than it: the face the product keeps for
+     ids, in the dim ink, so the eye reads the name first and finds the id when it wants it. */
+  .target-id {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    letter-spacing: -0.02em;
   }
 
   .foot {

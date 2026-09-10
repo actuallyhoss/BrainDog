@@ -13,7 +13,7 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { job as jobById } from '$lib/record/api.ts';
+  import { ROWS, job as jobById } from '$lib/record/api.ts';
   import { page as route } from '$app/state';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -37,6 +37,22 @@
   const last = $derived(JOB?.events.at(-1));
 
   /**
+   * WHAT THE RUN IS DOING, WHICH IS WHAT EVERY OTHER SCREEN CALLS IT.
+   *
+   * The heading was the job's `kind`, `qa`, lower case, then `j_9K4A` in the id face: a stranger
+   * asked what qa is. `/t/1` lists the same run under "Agents on this" by the session's `doing`,
+   * the sentence the agent keeps about itself, and so does the session's own row. That is the
+   * title now. The kind goes to the kicker, which upper-cases it, and the id stays the chip beside
+   * the title rather than joining the kicker, because an upper-cased `J_9K4A` is another id.
+   *
+   * A run no session names keeps the kind as its title, which is what the heading said before.
+   */
+  const doing = $derived(
+    JOB ? String((ROWS.sessions ?? []).find((s) => s.fields.job === JOB.id)?.fields.doing ?? '') : '',
+  );
+  const named = $derived(doing || JOB?.kind || copy.run);
+
+  /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
@@ -57,7 +73,7 @@
      register this screen is reached from is called Agent runs. `job` stays in the address, in the
      field on a session row and in the type; the words a reader sees are one word now, and they are
      in `copy.ts` so the next rename reaches them. -->
-<svelte:head><title>{titleOf(JOB?.kind ?? copy.run, copy.run)}</title></svelte:head>
+<svelte:head><title>{titleOf(named, copy.run)}</title></svelte:head>
 
 {#if !JOB}
   <div class="page">
@@ -72,7 +88,7 @@
   </div>
 {:else}
 
-<PageHead icon="session" kicker={copy.run} title={JOB.kind} id={JOB.id}>
+<PageHead icon="session" kicker="{copy.run} · {JOB.kind}" title={named} id={JOB.id}>
   {#snippet actions()}
     <Chip label={JOB.status} tone={JOB.status === 'failed' ? 'bad' : JOB.status === 'running' ? 'info' : 'good'} />
     <Button weight="quiet" tone="bad" onclick={() => toasts.push(copy.notWritten(copy.runWouldStop), { intent: 'warn' })}><Icon name="stop" size="s" />{copy.stopRun}</Button>

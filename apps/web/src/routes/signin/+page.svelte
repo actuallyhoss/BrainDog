@@ -24,6 +24,13 @@
   server. `23 §3.1` is the rule for that state: not there, not greyed out. So there is no passkey
   button on this screen, and `copy.waysIn` is what stands where one would be.
 
+  AND IT STOOD FIRST, WHICH IS WHAT CHANGED. It was the sentence under the slogan, so a business
+  opening this screen was told its way in "is not built yet" before it saw a field, and the token's
+  hint beside the field named an environment variable, `BRAINDOG_TOKEN`: 92 words at 390, most of
+  them to whoever runs the server. Both sentences are still here, word for word, behind "Running your
+  own server?" at the foot of the screen, and it opens on the slogan, the two fields and the one
+  button. Nothing about the mechanism moved: the same connection, the same two fields, no passkey.
+
   AND IT DOES NOT SWITCH THE APP OVER. Signing in and reading live data are two pieces of work; this
   one ends at "the record answered, and here is what it said". `copy.reachedNotSwitched` says so on
   screen, because a screen that navigated Home after a successful connection would be claiming the
@@ -148,7 +155,6 @@
 
     <!-- The slogan, and it is the same five words the README and the marketing site lead with. -->
     <h1 class="lede">{copy.tagline}</h1>
-    <p class="body">{copy.waysIn}</p>
 
     <h2 class="question">{copy.signIn}</h2>
 
@@ -203,7 +209,6 @@
         </span>
       </div>
 
-      <p class="hint" id="in-token-why">{copy.tokenMayBeEmpty}</p>
       <p class="hint" id="in-token-kept">{copy.tokenKept}</p>
 
       <div class="actions">
@@ -250,6 +255,15 @@
         <a class="aside-go tap" href="/">{copy.openTheDemo}</a>
       </p>
     {/if}
+
+    <!-- THE OPERATOR'S HALF, and it is last because it is for the fewest readers. `in-token-why` is
+         still the token field's description: a `<details>` that is closed keeps its content in the
+         document, so a screen reader on the field hears it whether or not this is open. -->
+    <details class="own">
+      <summary class="own-q"><Icon name="chevronDown" size="s" />{copy.ownServer}</summary>
+      <p class="hint">{copy.waysIn}</p>
+      <p class="hint" id="in-token-why">{copy.tokenMayBeEmpty}</p>
+    </details>
   </div>
 </div>
 
@@ -299,14 +313,6 @@
     font-weight: 600;
     letter-spacing: -0.022em;
     line-height: var(--lh-tight);
-  }
-
-  .body {
-    margin-block-start: var(--sp-3);
-    max-inline-size: 54ch;
-    color: var(--dim);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
   }
 
   /* The eyebrow over the form, at the same rank `/start` gives its question. */
@@ -413,6 +419,45 @@
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
+  }
+
+  /* A question in the control's own weight rather than a link, because it opens something here
+     rather than going somewhere. `--ctl-h` is 44 under a coarse pointer, so the whole row is the
+     target, and the chevron turns the way the inbox's does. */
+  .own {
+    margin-block-start: var(--sp-5);
+  }
+
+  .own-q {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-block-size: var(--ctl-h);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .own-q::-webkit-details-marker {
+    display: none;
+  }
+
+  .own-q:hover {
+    color: var(--ink);
+  }
+
+  .own-q :global(svg) {
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .own[open] .own-q :global(svg) {
+    transform: rotate(180deg);
+  }
+
+  .own .hint + .hint {
+    margin-block-start: var(--sp-2);
   }
 
   /* The link moves to the next line whole. It broke across two — "Open the demo / record" — which

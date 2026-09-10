@@ -102,8 +102,22 @@
     min-inline-size: 0;
     border: 0;
     background: none;
+    /* `appearance: none`, BECAUSE THE RESET ABOVE WAS HALF OF ONE. Border and background were
+       cleared and `appearance` was left at `auto`, so on a phone the browser drew its own lighter
+       search field and a blue cancel glyph inside this one: a box inside a box, measured on
+       `/search` as a 280px input at x 65 inside a 326px wrapper. The register's search box has
+       the same class and had the same second box. */
+    appearance: none;
     color: var(--ink);
     font-size: var(--t-ui);
+  }
+
+  /* The field's own clear control, drawn by the browser in its own blue. Hidden rather than
+     restyled: clearing is one gesture on a phone keyboard, and a second one in a colour this
+     palette does not have is noise. */
+  .field-input::-webkit-search-cancel-button {
+    appearance: none;
+    display: none;
   }
 
   .field-lg .field-input {

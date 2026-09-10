@@ -16,7 +16,7 @@
   import { page } from '$app/state';
   import { CapLine, Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { DOM_CAP, VIEWS, iconFor, REGISTERS, columnsFor, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { DOM_CAP, VIEWS, iconFor, REGISTERS, columnsFor, display, labelOf, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -66,6 +66,22 @@
     }),
   );
   const narrowed = $derived(Boolean(q) || extra.length > 0);
+
+  /**
+   * THE FILTER IN THE LIST'S OWN WORDS. `copy.filterClause` says why the reading line stopped being
+   * the `where` sentence; this is the half that knows the register, so a field is called what its
+   * column is called and an enum value is written the way its cell writes it. A date clause keeps
+   * its value as typed, because `today` is already a word and `display` would read it as a day.
+   */
+  const readable = (filters: Filter[]): string =>
+    copy.filterReads(
+      filters.map((f) => {
+        const field = decl?.fields.find((d) => d.id === f.field);
+        const dated = f.op === 'before' || f.op === 'after';
+        const values = dated || !view ? f.values : f.values.map((v) => display(view.register, f.field, v) ?? v);
+        return copy.filterClause(field ? labelOf(field) : f.field, values, f.op);
+      }),
+    );
 
   const result = $derived(
     view
@@ -167,7 +183,7 @@
   <div class="page">
     <p class="predicate">
       <span class="predicate-label">Filter</span>
-      <code>{whereOf([...view.filters, ...extra])}</code>
+      <span class="predicate-said">{readable([...view.filters, ...extra])}</span>
       {#if q}<span class="predicate-q">{copy.matching} <code>{q}</code></span>{/if}
       {#if narrowed}
         <Button weight="bare" href="/v/{key}"><Icon name="close" size="s" />{copy.backToView}</Button>
@@ -279,12 +295,22 @@
     padding: var(--sp-5) var(--sp-6) var(--sp-9);
   }
 
+  /* IT WRAPS, because the filter is a sentence now and a sentence is longer than the chip was. */
   .predicate {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  /* THE BODY FACE AND NO CHIP. It was `<code>` on `--sunk` in `--font-id`: a query, set in the face
+     this product keeps for ids, over a list a person came to read. The chip below is still right
+     for `q`, which is text somebody typed and is quoted as typed. */
+  .predicate-said {
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .predicate-label {

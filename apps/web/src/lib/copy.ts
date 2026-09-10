@@ -538,6 +538,30 @@ export const copy = {
   noPacksYet: 'No packs installed.',
   noPacksBody: 'A pack adds ready-made lists and pages. The ones below are ready to install.',
   matching: 'matching',
+  /**
+   * A SAVED VIEW'S FILTER, AS THE SENTENCE A PERSON WOULD SAY.
+   *
+   * `/v/obligations.overdue` printed `state is open or part, due before today` in the id face on a
+   * grey chip: the `where` dialect, with the field ids `state` and `due`, over a list whose own
+   * columns call them Status and Due. The dialect is what an agent reads, and it stays on the
+   * control that hands one over; this is the reading line.
+   *
+   * TWO FUNCTIONS, ONE CLAUSE AND ONE SENTENCE, because `access.test.ts` renders every function in
+   * this file with a handful of argument shapes and counts one that renders under none of them as a
+   * sentence nobody checked. A single function over an array of clause objects was that sentence.
+   *
+   * `filterClause` takes the field's label, not its id: the caller knows the register.
+   */
+  filterClause: (label: string, values: readonly string[], op = 'in'): string =>
+    op === 'before' || op === 'after'
+      ? `${label} ${op} ${values.join(' or ')}`
+      : `${label} is ${op === 'not-in' ? 'not ' : ''}${values.join(' or ')}`,
+  /* Every clause after the first starts lower-case when it starts with an ordinary word, so "Due"
+     joins the sentence and "VAT number" keeps its capitals. */
+  filterReads: (clauses: readonly string[]): string => {
+    const said = clauses.map((c, i) => (i > 0 && /^[A-Z][a-z]/.test(c) ? c.charAt(0).toLowerCase() + c.slice(1) : c));
+    return said.length < 2 ? (said[0] ?? '') : `${said.slice(0, -1).join(', ')}, and ${said.at(-1) ?? ''}`;
+  },
   backToView: 'Back to the saved view',
   openUnfiltered: (list: string) => `Open ${list}`,
   rowsWord: (n: number) => (n === 1 ? 'row' : 'rows'),
@@ -850,7 +874,13 @@ export const copy = {
   /* the record's own colour */
 
   accentTitle: 'Accent',
-  accentHint: 'The colour this record is. Every surface, ink and boundary is solved from it against the same contrast floors, so a colour that would be unreadable is refused rather than approximated.',
+  /* IT DESCRIBED THE GENERATOR: "Every surface, ink and boundary is solved from it against the same
+     contrast floors, so a colour that would be unreadable is refused rather than approximated." True,
+     and a sentence about how the palette is computed, under a row of swatches somebody is choosing
+     between. What it does for them is the same fact from their side, including the refusal, which
+     is the one thing a swatch press can do that they would not expect. */
+  accentHint:
+    'The colour this record is. The other colours on screen are worked out from it, and one that would leave text hard to read is refused.',
   accentHouse: 'House',
   accentSet: (name: string) => `${name} is this record's colour.`,
   accentReset: 'Back to the house colour.',
@@ -870,8 +900,9 @@ export const copy = {
    * somebody else wrote; "more contrast" is a fact about the screen in front of you (`19 §9`).
    */
   contrast: 'More contrast',
-  contrastHint:
-    'A second palette, solved against a higher floor. Every surface, ink and boundary is further apart, and the accent you chose is kept.',
+  /* "A second palette, solved against a higher floor" was the comment above, said to the reader.
+     What they get is the second sentence it already had, in the words of what they see. */
+  contrastHint: 'Makes text and edges stand out more, and keeps the accent you chose.',
   /* A FIGURE THAT CANNOT BE WORKED OUT, said to the person reading the tile rather than to whoever
      wrote the declaration. What was here was the author's sentence — "group_by: is published in 08
      and not read by this build", "{ lte: 400000 } for money in minor units" — under a headline
@@ -1455,6 +1486,16 @@ export const copy = {
    */
   waysIn:
     'A passkey is the way in this record is designed for, and neither it nor the email link is built yet. An address and an access token are what work today.',
+  /**
+   * THE QUESTION THE OPERATOR'S SENTENCES SIT BEHIND.
+   *
+   * `waysIn` was the first thing under the slogan and `tokenMayBeEmpty` was the token field's
+   * hint, so somebody opening this screen for a business read that its way in "is not built yet"
+   * and then the name of an environment variable: 92 words around two fields and one button. Both
+   * are true and both are addressed to whoever runs the server, so they are behind the question
+   * that person would ask, and the screen opens on the fields.
+   */
+  ownServer: 'Running your own server?',
   recordAddress: 'Address',
   /** The shape, in the field, so nobody has to guess whether the scheme and the port are wanted. */
   addressLike: 'http://127.0.0.1:8787',

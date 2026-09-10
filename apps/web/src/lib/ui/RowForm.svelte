@@ -23,7 +23,7 @@
   import type { FieldDecl, Fields } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
   import { copy } from '../copy.ts';
-  import { firstRun } from '../first-run.ts';
+  import { firstAsks } from '../first-run.ts';
   import Icon from './Icon.svelte';
 
   /**
@@ -41,6 +41,7 @@
     autofocus = false,
     problems = $bindable<string[]>([]),
     taken = $bindable<Fields>({}),
+    given = {},
   }: {
     register: string;
     first?: boolean;
@@ -58,6 +59,12 @@
      * pass on.
      */
     taken?: Fields;
+    /**
+     * WHAT THE CHOICE HAS ALREADY ANSWERED, first run only: `firstRun.firstGiven`'s row for this
+     * register. Each value goes into `typed`, the map a press and a keystroke write, so the row
+     * carries it exactly as if it had been chosen and the form does not ask for it.
+     */
+    given?: Readonly<Record<string, string>> | undefined;
   } = $props();
 
   /**
@@ -99,10 +106,16 @@
    * THE ALTERNATIVE WAS ONE HARD-CODED FORM FOR FIVE QUESTIONS, and it was there: a text box and a
    * `Due` date, whatever was chosen. "What is it, and how much?" over a form with no amount, on the
    * first screen of a product about money; and a person, asked when they are due.
+   *
+   * AND NOT A REQUIRED FIELD THE CHOICE HAS ALREADY ANSWERED. Every required field made Money five
+   * fields for one row, measured on the build of September 10th: `Which way` opened on `owed by me`
+   * under "Your first invoice", so the default most people accept recorded the invoice backwards,
+   * and `Status` offered `part` and `written off` to somebody who had not made a row yet. Both are
+   * still required. `given` carries the answers the choice implies, `seed` below puts them where a
+   * press would, and `firstAsks` leaves them off the form, so Money asks for the title, the amount
+   * its question names, and the due date it pre-fills.
    */
-  const fields = $derived(
-    first ? readableFields(register).filter((f) => f.required || f.id === decl?.title) : readableFields(register),
-  );
+  const fields = $derived(first ? firstAsks(readableFields(register), decl?.title, given) : readableFields(register));
 
   /** The rows a `ref` can point at, titled the way a person says them. */
   function options(f: FieldDecl): { value: number; label: string }[] {
@@ -175,7 +188,12 @@
    */
   const seed = (): Record<string, string> => {
     const out: Record<string, string> = {};
-    for (const f of readableFields(register)) {
+    /* ONLY WHAT THE FORM DRAWS, AND IT WALKED EVERY READABLE FIELD. On the first run that filled
+       fields the form did not show: a task added from the Work tile arrived with "Due 1 Oct 2026, in
+       4w" on its own page, measured on the build of September 10th, a date nobody was shown, on a
+       field Tasks does not require. The row now carries what is on the screen and what the choice
+       answered, and nothing else. */
+    for (const f of fields) {
       if (first && f.deadline && f.type === 'day') out[f.id] = soon;
       /* AND AN ENUM OPENS ON ITS FIRST VALUE, whichever control it draws as. This seeded only the
          `<select>` arm, on the argument that a select bound to `undefined` shows nothing chosen;
@@ -184,7 +202,7 @@
          the row. */
       if (f.type === 'enum' && f.values?.[0]) out[f.id] = f.values[0];
     }
-    return out;
+    return first ? { ...out, ...given } : out;
   };
   let typed = $state<Record<string, string>>(seed());
 
@@ -302,7 +320,12 @@
              every field alike, and the only thing enforcing it was this component's own count. The
              submit is still what refuses, with a sentence naming the fields; this is the browser
              being told the same fact. -->
-        {#if f.required}<span class="row-required">{copy.required}</span>{/if}
+        <!-- AND ON THE FIRST RUN THE WORD GOES AND THE ATTRIBUTE STAYS. Everything that form draws
+             is a field the register requires (`firstAsks` is the title and the required fields the
+             choice has not answered), so the word marked every field and told a reader nothing
+             about any one of them: five on five fields when it was measured. The attribute still
+             tells the browser, and the sentence beside the dead button still names what is empty. -->
+        {#if f.required && !first}<span class="row-required">{copy.required}</span>{/if}
       </label>
 
       {#if f.type === 'enum' && (f.values?.length ?? 0) <= 4}
