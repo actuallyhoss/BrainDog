@@ -268,7 +268,11 @@ const moneyOr = (minor: number, currency: string | null): string => (currency ==
 /** What a `duration`'s declared unit is worth in the seconds the record stores. */
 const SECONDS: Record<string, number> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };
 
-export function display(register: string, field: string, value: unknown): string | null {
+/**
+ * `now` IS THE RECORD'S INSTANT, and it defaults to the seed's. A screen reading a real record passes
+ * the one `boot` answered with, so an `instant` is banded against the day the record thinks it is.
+ */
+export function display(register: string, field: string, value: unknown, now: number = NOW): string | null {
   if (value === null || value === undefined || value === '') return null;
   const f = decl(register, field);
   if (!f) return String(value);
@@ -294,7 +298,7 @@ export function display(register: string, field: string, value: unknown): string
        * and `updates.at` are instants, and a session seen two hours ago and one seen eleven hours
        * ago both read *today*. One formatter, on the one function every cell goes through.
        */
-      return since(String(value), NOW);
+      return since(String(value), now);
     case 'int':
       return integer(Number(value));
     case 'duration': {
@@ -338,7 +342,7 @@ export function display(register: string, field: string, value: unknown): string
 }
 
 /** The second line of a date cell: the band a person actually holds. */
-export const dueBand = (iso: unknown): string => (typeof iso === 'string' ? relative(iso, NOW) : '');
+export const dueBand = (iso: unknown, now: number = NOW): string => (typeof iso === 'string' ? relative(iso, now) : '');
 
 /**
  * The identity of the row a `ref` points at, when its register declares one.
@@ -522,7 +526,7 @@ export function columnsFor(register: string): Column[] {
  * and a paid one were the same card, on the surface where somebody is most likely to be looking for
  * exactly that difference.
  */
-export function toneOf(register: string, e: Entry): TableRow['tone'] {
+export function toneOf(register: string, e: Entry, now: number = NOW): TableRow['tone'] {
   const r = REGISTERS[register];
   if (!r) return undefined;
   const state = r.state ? String(e.fields[r.state] ?? '') : '';
@@ -533,18 +537,18 @@ export function toneOf(register: string, e: Entry): TableRow['tone'] {
   if (!dated) return undefined;
   const value = e.fields[dated.id];
   if (typeof value !== 'string') return undefined;
-  const days = (Date.parse(`${value}T12:00:00Z`) - NOW) / 86_400_000;
+  const days = (Date.parse(`${value}T12:00:00Z`) - now) / 86_400_000;
   if (days < 0) return 'bad';
   if (days < 14) return 'warn';
   return undefined;
 }
 
-export function toRows(register: string, entries: Entry[], columns: Column[]): TableRow[] {
+export function toRows(register: string, entries: Entry[], columns: Column[], now: number = NOW): TableRow[] {
   return entries.map((e) => ({
     key: `${register}#${e.seq}`,
     href: `/r/${register}/${e.seq}`,
-    tone: toneOf(register, e),
-    cells: columns.map((c) => (c.field === 'seq' ? `#${e.seq}` : display(register, c.field, e.fields[c.field]))),
+    tone: toneOf(register, e, now),
+    cells: columns.map((c) => (c.field === 'seq' ? `#${e.seq}` : display(register, c.field, e.fields[c.field], now))),
   }));
 }
 

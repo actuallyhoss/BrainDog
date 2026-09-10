@@ -144,4 +144,15 @@
     border-radius: var(--r-md);
     color: var(--hue, var(--ink2));
   }
+
+  /* The arrow in a primary pill leans towards where it goes, a little, under the pointer. */
+  @media (prefers-reduced-motion: no-preference) {
+    .btn-primary svg {
+      transition: transform var(--d-state) var(--ease-out);
+    }
+
+    .btn-primary:hover svg {
+      transform: translateX(2px);
+    }
+  }
 }

@@ -27,7 +27,7 @@
   import type { Snippet } from 'svelte';
   import { leadingCode, TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { REGISTERS, dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
+  import { NOW, REGISTERS, dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
 
   let {
@@ -37,6 +37,7 @@
     picked,
     action,
     note,
+    now = NOW,
   }: {
     register: string;
     entries: readonly Entry[];
@@ -54,6 +55,8 @@
      * carries, and on a card the only place that shape fits is its own row.
      */
     note?: Snippet<[Entry]>;
+    /** The record's instant, which dates each card's tone and bands. The seed's, where nobody says. */
+    now?: number;
   } = $props();
 
   const decl = $derived(REGISTERS[register]);
@@ -71,7 +74,7 @@
    * name for a screen reader and a shape for anybody who does not see red; the bar that used to run
    * down the card had neither, and on a list with no box round it read as an alert.
    */
-  const toneFor = (e: Entry) => toneOf(register, e);
+  const toneFor = (e: Entry) => toneOf(register, e, now);
 
   /**
    * AND THE THING THE ROW BELONGS TO, WHICH IS THE ONE COLOUR THIS PRODUCT HAS AND DOES NOT SPEND.
@@ -109,7 +112,7 @@
 {#if decl}
   <ul class="cards">
     {#each entries as e (e.seq)}
-      {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]])}
+      {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now)}
       <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
         <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
@@ -143,10 +146,10 @@
             {#if e.seq >= 0}#{e.seq}{/if}
           </span>
           <span class="card-b" dir={dirOf(register, decl.mobile[1])} data-enum={isEnum(decl.mobile[1]) ? '' : undefined}>
-            {@render amount(display(register, decl.mobile[1], e.fields[decl.mobile[1]]) ?? '')}
+            {@render amount(display(register, decl.mobile[1], e.fields[decl.mobile[1]], now) ?? '')}
           </span>
           <span class="card-c" dir={dirOf(register, decl.mobile[2])} data-enum={isEnum(decl.mobile[2]) ? '' : undefined}>
-            {@render amount(display(register, decl.mobile[2], e.fields[decl.mobile[2]]) ?? '')}
+            {@render amount(display(register, decl.mobile[2], e.fields[decl.mobile[2]], now) ?? '')}
           </span>
         </a>
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole

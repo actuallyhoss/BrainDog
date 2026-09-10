@@ -294,6 +294,16 @@ export async function start(options: {
    * this value has to be is the value this server was started with.
    */
   build?: string | undefined;
+  /**
+   * A PINNED INSTANT, FOR A RECORD THAT IS A FIXTURE.
+   *
+   * The seed's rows are dated relative to one day, so a record holding it draws the right tones and
+   * bands only on that day. The browser gates read the seed through this server, and a gate whose
+   * findings moved with the calendar would be two runs disagreeing about one tree. `boot` then says
+   * this instant too, which is how the app learns what day the record thinks it is. Absent means the
+   * real clock, which is what every deployment runs.
+   */
+  now?: number | undefined;
 } & (
     | {
         /**
@@ -415,7 +425,7 @@ export async function start(options: {
 
   api = await createRecordApi({
     sql,
-    clock: { now: () => Date.now() },
+    clock: { now: () => options.now ?? Date.now() },
     scheduler,
     delivers: options.delivers ?? [],
     sign,

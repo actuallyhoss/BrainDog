@@ -365,3 +365,9 @@ export const no = <T>(code: string, fix: string, extra: Omit<Refusal, 'code' | '
   ok: false,
   refusal: { code, fix, ...extra },
 });
+
+/* Sign-in's seam between a host and the Directory, type-only like everything above. */
+export type {
+  AssertionJSON, AssertionOptions, Auth, AuthBodies, AuthCall, AuthFlow, AuthResult, Mail, Methods, PasskeyInfo,
+  RegistrationJSON, RegistrationOptions, Who,
+} from './auth.ts';

@@ -1,0 +1,38 @@
+{
+  "note": "Throwaway test keys for the WebAuthn vectors. They open nothing.",
+  "es256": {
+    "alg": -7,
+    "id": "f3XWp4DMOWTWImUYxWQEVI-d-MTdqw6snTQ3v-KYrFE",
+    "jwk": {
+      "key_ops": [
+        "sign"
+      ],
+      "ext": true,
+      "kty": "EC",
+      "x": "PRlxIII6_5pZB_cz9fHfPydlEoakxw36GTkHUdiFDDc",
+      "y": "CDM-Reji-uaTOF9UGGiQ38k2xVTmD3iyoNnuPJ9YgSE",
+      "crv": "P-256",
+      "d": "IC28Ea1WRIHCPr5N6MlyBYhqa9D07CmVetS7vkjD3d0"
+    }
+  },
+  "rs256": {
+    "alg": -257,
+    "id": "BWiYVU8PV-Wh60VopLRqIkxjpiOC7Iv_Tc2MSrLSzWs",
+    "jwk": {
+      "key_ops": [
+        "sign"
+      ],
+      "ext": true,
+      "alg": "RS256",
+      "kty": "RSA",
+      "n": "qwGZtB-39ajwXgcZ6_pFkubSNGzJ8jHjaE7AZjTVT7NI9BLozrPMi5l6kInoMNlbAy8JftOryPnej9H4tZzE7Q-7oBbT75nqXHlUoew2u48gKuNNFLvlBKxPICTGJHAwK84AZDAyr3DgXxdDsbkI_rPe106i62NmkPUlwySKNlirk9GufLqfC8wgQDMS3MXoar8-9YJPwgDeI9xR0FeJ4wPgSU5N-Qfn7tWhjxnD4xn7nWB1E69ef5AfkVIuQA7qesl5JKl5BZXZ9pMn8mdx9UyTZQArS0jJVbH67tC7jcTJRC0h408gGoyN2hod6dfGfc2xb6y6ICpNu-mkF69b3Q",
+      "e": "AQAB",
+      "d": "B0M4Iz2S8yyg7hK1zR8smUKS_DBVRfihxH-juDOCOQek5N4bY7v1x0VWE-a8z7ugxo_W2BC7-PseXVP45hhUXLplqN-PUgZivQQCI3uuug8oDz-RZHyztfEYzdqsokY0JYgdiCPBOKY96-FHD2M2Y0AsX08y_XWT7jrFxyCO0M6oHvYVgmbE4rfB0TwrHFZL-TZ5fJKXBoJNWYrk16thXbFIP1d6CDExoMswyWtiPwMEKGDtqzYXa2o9JENykYwQk4BYuoUUVi7ZTSSVWVbUos-4DdTnhnVq6oGMPMrpDNSiMDifkTP_yKmsDyL39HHm2vxs8ISqN1ZU_HZRLtkkwQ",
+      "p": "3GbYg9U8pTd_QMNIupO1Lw-Tj0BVNcp4MN3yp95KqCPzpRduHiw_phKU8rtAYVG4JZ6xVUKPigSpE3isw9RpxT8yd9rGvnvxGxUqUBCsoKZ---8XklpbGKAAowE1PIKnKS2shTrripMIR24VOrOqVGZK2TIb7maDmrvDuV5fKcU",
+      "q": "xqBajn7f17kEKabrS00LTK-Ai-y5ANkurQrHyAAiAJzpTNuwWv9wtm0CTOiubqwfgW670Ae4BeLOOU1i3wQVSJdrctR7BgafNpKgmMsWTi7S-CNZPDn-TbBwJ_JYjVqsZq1z0OqHbOBasmOGKrNHM7Y0jJxWWqfhSfPDx8nWwzk",
+      "dp": "I4iZQ7fvTRvDcmeJpDsILQwv2BqhIkkAU7CU3KekFbOmJmm-oTK1GEtKpE-4M3h_XeFV6c8PYUsbDz6XbAMlAl4L_vLQtAk7eAhTiBEII-Zz9p43iKr0oOW69IzPTnAqDyOD-v7i1raZ0RpYZdxti6nqS1Ye1rLEaP_4sDwcz5k",
+      "dq": "emQOyOVXCvdfoEbRj-nef5dZL19jtCkfgNM2vX-PdC879vccGUZzboWHOFrcOSfolfnk0tAezcmu51JPDTrX3o4nUG-ritADxT3epafmi7CAoRQvBVR65eZFhefoNtnbh71zsxUA887fNDLtVlx4EF5CzS38bAosYURKrE4r_sk",
+      "qi": "iDcrno0Q6Sq8k4smhXL3TbSJqnkO1tV6OkloK26ctJW6KI58xkatDGwW3JWeru53u7mxinlj7ktKYoDAUfMdSO7zBFTZ1omJzgT_Vu8grdUA9wWD5U_tZKxKaAtVVnZsDp-XgFKLnUPTyS5iep1ibFkkJ-TATGECpC5jFX3Rtrw"
+    }
+  }
+}

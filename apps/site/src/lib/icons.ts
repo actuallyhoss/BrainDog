@@ -30,6 +30,11 @@ export const PATHS = {
   observe: 'M3 15h3.2l2.3-7.5L11.8 19l2.4-6.4 1.4 2.4H21',
   lock: 'M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3',
   key: 'M14.5 9.5a4 4 0 1 1-1.6 3.2L7 19H4v-3l6.3-6.3a4 4 0 0 1 4.2-.2zM16.5 7.5v.01',
+  vault: 'M12 3 5 6v6c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6zM12 13v3',
+  close: 'M6 6l12 12M18 6 6 18',
+  plus: 'M12 5v14M5 12h14',
+  people: 'M9.5 11.5a3.75 3.75 0 1 1 0-7.5 3.75 3.75 0 0 1 0 7.5zM2.5 20.5c0-3.6 3.1-6 7-6s7 2.4 7 6M16 4.6a3.6 3.6 0 0 1 0 6.9m1.4 3.3c2.4.6 4.1 2.4 4.1 5.7',
+  history: 'M4 12a8 8 0 1 0 2.3-5.6M4 4v5h5M12 8v4l3 2',
 } as const;
 
 export type IconName = keyof typeof PATHS;

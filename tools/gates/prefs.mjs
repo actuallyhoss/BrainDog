@@ -71,6 +71,7 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from './lib.mjs';
+import { answers, forward, startRecord } from './record.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
@@ -318,7 +319,11 @@ if (!(await stat(ROOT).catch(() => null))) {
   process.exit(drift.length ? 1 : 3);
 }
 
+/* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
+const record = await startRecord();
+
 const server = createServer(async (req, res) => {
+  if (new URL(req.url ?? '/', 'http://x').pathname.startsWith('/api/')) return forward(req, res, record.base);
   const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
@@ -335,6 +340,7 @@ const server = createServer(async (req, res) => {
   res.writeHead(404).end();
 });
 await new Promise((r) => server.listen(PORT, r));
+await answers(`http://localhost:${PORT}`);
 
 const browser = await chromium.launch();
 const findings = [];
@@ -396,6 +402,7 @@ for (const test of CASES) {
 process.stdout.write('\n');
 await browser.close();
 server.close();
+await record.close();
 
 console.log(
   `  prefs: ${checked} page-runs over ${CASES.length} of Pref's ${FIELDS.length} preferences, ` +

@@ -26,27 +26,27 @@ site's own, in `src/app.css`, so the three pages draw them one way. The one thin
 record app refuses is the translucent blurred bar: the app will not put translucency behind a
 column of small tabular digits, and a marketing page has no such column.
 
-## Every screenshot is the real app
+## The pictures are drawn, not photographed
 
-`static/shots/` holds captures of `apps/web` on the synthetic record, at 1440×900, in both schemes,
-served through `<picture>` with `prefers-color-scheme`. Two files and not one image with a CSS
-invert: the light and dark palettes are generated separately from one seed and are not each other
-inverted, so a single shot with `filter: invert()` would be a picture of a product that does not
-exist.
+The landing page shows the product as small drawn moments rather than screenshots. The hero
+(`src/lib/Moment.svelte`) is the demo's home screen filling up while you watch, the bento
+(`src/lib/bento/`, with `Fields.svelte`) is seven features in miniature, and
+`src/lib/Steps.svelte` is the one chain in the demo that runs from an email to rows. They are
+markup and tokens, so they paint with the first byte of HTML, read at phone size, wear whichever
+palette the tokens say and cost no image request.
 
-Regenerate them with `apps/web` running, from `apps/web`:
+**Nothing in them is invented.** Every label, figure, name and time is read off the demo record
+(`apps/web/src/lib/record/data.ts` and `packages/seed/src/index.ts`) and lives in `copy.ts` with
+the rest of the words. When the seed's sample business changes, the drawings change with it.
 
-```sh
-node scripts/shot.mjs   # the app's own routes, into apps/web/shots
-```
+**The motion is CSS, and it cannot fail open.** Every loop lives inside
+`prefers-reduced-motion: no-preference`, so the resting style is the finished state: a reader who
+asked for no motion, and the a11y gate, see the whole picture standing still. A loop pauses under
+the pointer. A list that gains rows moves inside a box of fixed height, so nothing on the page
+shifts once per loop.
 
-then copy the ones the site uses into `apps/site/static/shots/`. They are committed, because a
-marketing page that cannot build without a running app is a marketing page that cannot build.
-
-The one exception is the top of the home page, which is `src/lib/Preview.svelte`: the same home
-screen, laid out from words read off `home-light.png` rather than shown as the PNG, so it paints
-with the HTML, reads at phone size and wears the current palette. Nothing in it is invented, for
-the reason `Fields.svelte` gives, and its words are in `copy.ts` with the rest.
+`static/shots/` is no longer rendered by any page. `home-light.png` is still the `og:image` in
+`src/app.html`, and `scripts/product.mjs` still writes the set from the app's build.
 
 ## The copy is one file
 

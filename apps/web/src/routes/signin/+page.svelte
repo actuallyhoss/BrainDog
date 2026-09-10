@@ -113,7 +113,7 @@
     /* THE READINESS CONTRACT, AND THIS IS THE FIRST SCREEN IN THE APP THAT ACTUALLY FETCHES.
        `screen.svelte.ts`: a call still out takes `data-screen` away, so a browser gate never
        measures this page mid-flight. */
-    opened();
+    const at = opened();
     said = null;
     try {
       said = await attempt(held.base, held.token ?? '');
@@ -128,7 +128,7 @@
        * on destroy — "a count retracts itself", in that file's own words. And it is not a lie about
        * the call: `attempt` never throws, so every press comes back with a value.
        */
-      closed(true);
+      closed(true, at);
       reaching = false;
     }
     /* AND IT IS SHOWN THE ANSWER. At 390 the card lands below the fold, so the press produced a

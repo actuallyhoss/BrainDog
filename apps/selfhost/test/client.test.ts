@@ -121,6 +121,45 @@ test('a predicate survives the query string, which is the thing a GET client get
   }
 });
 
+test('A CONTAINS TREE SURVIVES THE QUERY STRING, which is what the register list’s search box sends', async () => {
+  /* The box is `{ any: [{ field, contains }] }` per word over the register's `search:` fields. It
+     travels as JSON in one query parameter, and a GET client that dropped the nesting would send a
+     list the record reads as no predicate at all: every row, looking like a search that matched. */
+  const c = await connected();
+  try {
+    for (const what of ['Invoice 41', 'Deposit', 'Invoice 7'])
+      value(await c.client.create({ register: 'obligations', fields: { what, state: 'open' } }));
+    const found = value<{ matched: number }>(
+      await c.client.list({ register: 'obligations', where: { all: [{ any: [{ field: 'what', contains: 'voice' }] }] } }),
+    );
+    assert.equal(found.matched, 2, 'the substring did not reach the record as a predicate');
+  } finally {
+    await c.close();
+  }
+});
+
+test('A SORTED LIST ANSWERS ONE PAGE AND NO CURSOR, and an unsorted one pages', async () => {
+  /* The register list draws a sorted answer as a list that stops, with its cap line, because the
+     record will not page an `order`. What makes that honest is the pair: `cursor: null` so nothing
+     asks for a page that cannot come, and `matched` still the whole answer so the line can say how
+     much is missing. */
+  const c = await connected();
+  try {
+    for (const what of ['c', 'a', 'b']) value(await c.client.create({ register: 'obligations', fields: { what } }));
+    const sorted = value<{ rows: { fields: { what: string } }[]; matched: number; cursor: string | null }>(
+      await c.client.list({ register: 'obligations', order: [{ field: 'what', dir: 'asc' }], limit: 2 }),
+    );
+    assert.deepEqual(sorted.rows.map((r) => r.fields.what), ['a', 'b']);
+    assert.equal(sorted.matched, 3);
+    assert.equal(sorted.cursor, null, 'a sorted answer offered a next page the record will refuse');
+
+    const paged = value<{ cursor: string | null }>(await c.client.list({ register: 'obligations', limit: 2 }));
+    assert.notEqual(paged.cursor, null, 'an unsorted answer with more rows offered no next page');
+  } finally {
+    await c.close();
+  }
+});
+
 test('search comes back with enough to draw a result without fetching it', async () => {
   const c = await connected();
   try {
@@ -153,6 +192,24 @@ test('THE RECORD SAYS WHAT INSTANT IT ANSWERED AS OF, and nothing asked it befor
     assert.ok(drift < 60_000, `the record's instant is ${drift}ms from this process's`);
   } finally {
     await c.close();
+  }
+});
+
+test('A RECORD STARTED ON A PINNED CLOCK SAYS THAT INSTANT, which is how the app learns the day', async () => {
+  /* The browser gates read the seed through this server, and the seed is dated relative to one day.
+     `start({ now })` pins the record's clock there, and `boot` is where the app reads it: a record
+     that pinned its clock and still answered the real one would put every band on the screen out by
+     however long it has been since the seed was written. */
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-client-'));
+  const pinned = Date.UTC(2026, 8, 3, 12);
+  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, now: pinned, pollMs: 0 });
+  try {
+    const at = (running.server.address() as { port: number }).port;
+    const client = createClient({ base: `http://127.0.0.1:${at}` });
+    assert.equal(value<{ now: string }>(await client.boot()).now, new Date(pinned).toISOString());
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

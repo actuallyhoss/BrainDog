@@ -19,6 +19,8 @@
   and the values are read off the screenshot underneath, which is a photograph of the same row.
 -->
 <script lang="ts">
+  import Icon from './Icon.svelte';
+
   let {
     register,
     row,
@@ -28,7 +30,7 @@
     register: string;
     row: string;
     fields: readonly { label: string; type: string; value: string }[];
-    caption: string;
+    caption?: string;
   } = $props();
 </script>
 
@@ -45,18 +47,18 @@
         <span>Type</span>
         <span>This row</span>
       </div>
-      {#each fields as field}
-        <div class="line">
+      {#each fields as field, i}
+        <div class="line" style="--i: {i}">
           <dt class="label">{field.label}</dt>
           <dd class="type">{field.type}</dd>
           <!-- Tabular figures only where there ARE figures. `.num` also turns on `ss02`, which is
                an alternate letterform set, so putting it on a sentence changes the sentence. -->
-          <dd class="value" class:num={/\d/.test(field.value)}>{field.value}</dd>
+          <dd class="value" class:num={/\d/.test(field.value)}>{field.value}<span class="ok" aria-hidden="true"><Icon name="check" size="s" /></span></dd>
         </div>
       {/each}
     </dl>
   </div>
-  <figcaption>{caption}</figcaption>
+  {#if caption}<figcaption>{caption}</figcaption>{/if}
 </figure>
 
 <style>
@@ -146,10 +148,45 @@
   }
 
   .value {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
     margin: 0;
     color: var(--ink);
     font-size: var(--t-base);
     overflow-wrap: anywhere;
+  }
+
+  /* CHECKED ON THE WAY IN, drawn: each value takes a tick in turn, which is the sentence beside it. */
+  .ok {
+    display: flex;
+    align-self: center;
+    color: var(--earn);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ok {
+      animation: checked 8s var(--ease-spring) calc(0.5s * var(--i) + 0.6s) infinite both;
+    }
+  }
+
+  @keyframes checked {
+    0% {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+
+    6%,
+    84% {
+      opacity: 1;
+      transform: none;
+    }
+
+    92%,
+    100% {
+      opacity: 0;
+    }
   }
 
   figcaption {

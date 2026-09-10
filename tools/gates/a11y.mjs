@@ -32,6 +32,7 @@ import { extname, join, normalize } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from './lib.mjs';
+import { answers, forward, startRecord } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -173,8 +174,12 @@ const axeSource = await readFile(AXE, 'utf8');
 /** The app the server is currently answering for. The outer loop sets it before each pass. */
 let current = APPS[0];
 
+/* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
+const record = await startRecord();
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
+  if (url.pathname.startsWith('/api/')) return forward(req, res, record.base);
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
@@ -205,6 +210,7 @@ const server = createServer(async (req, res) => {
   res.writeHead(404).end();
 });
 await new Promise((r) => server.listen(PORT, r));
+await answers(`http://localhost:${PORT}`);
 
 const browser = await chromium.launch();
 /** `id -> { help, nodes: Set<'route scheme@width  target'> }`, so one bug is one line however often it repeats. */
@@ -436,6 +442,7 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
 
 await browser.close();
 server.close();
+await record.close();
 
 const CONTRAST = 'color-contrast';
 const contrast = found.get(CONTRAST);

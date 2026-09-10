@@ -582,6 +582,16 @@
           {/each}
         </div>
       </Section>
+
+      <!-- DENSITY AND TEXT SHOW THEIR EFFECT WHERE THEY ARE SET. Their whole effect is `--row-h` and
+           `--text`, which only lists read, so pressing Roomy here changed nothing on this screen and a
+           person had to leave to find out what they had chosen. Three rows drawn the way a list draws
+           them answer it in place, with no toast. -->
+      <Section title={copy.densityPreview}>
+        <ul class="density-preview" aria-hidden="true">
+          {#each copy.densityPreviewRows as row}<li>{row}</li>{/each}
+        </ul>
+      </Section>
     {:else if area === 'keyboard'}
       <Section title={copy.characterKeys}>
         <!-- THE SENTENCE THAT SAYS WHAT THE SWITCH DOES. It was written, and allow-listed in
@@ -1050,6 +1060,12 @@
       -->
       <Section title={copy.enterCode}>
         <p class="hint">{copy.enterCodeHow}</p>
+        <!-- THE SAMPLE SAYS NOTHING HERE WILL MATCH, BEFORE ANYBODY TRIES. Its waiting request carries no
+             fingerprint on purpose (`data.ts` and `device.test.ts` say why: no code a person types may
+             approve a request in a record nobody owns), and a field that fails every entry without
+             saying so is the one control a machine sends people to. Every record this build can open
+             is the sample; when a real record can be opened, this line is drawn for the sample only. -->
+        <p class="hint">{copy.enterCodeSample}</p>
         <form class="code-form" onsubmit={tryCode}>
           <label class="code-label" for="user-code">{copy.codeLabel}</label>
           <div class="code-row">
@@ -1332,6 +1348,11 @@
              shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
              it were today's is the failure that actually costs somebody money." -->
         <p class="hint">{copy.staleShows}</p>
+      <!-- THERE WAS NO WAY TO ADD ONE, and inventing a button would be worse: `25 §9` draws this
+             screen without one, because a source is a declaration and arrives the way every
+             declaration does (`04 §1`: `ingest` is one of the kinds an add-on carries). So the screen
+             says where a new one comes from and links there. -->
+        <p class="hint sources-add">{copy.sourcesAdd} <a class="tap" href="/packs">{copy.sourcesAddGo}</a></p>
       </Section>
     {:else if area === 'notifications'}
       <!--
@@ -1777,6 +1798,23 @@
      five 44px segments measured 342px inside a 320px screen. */
   .levels .segment {
     padding-inline: var(--sp-2);
+  }
+
+  /* Rows the height a list's rows are, at the body size a list uses, with the list's hairline. */
+  .density-preview {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-inline-size: 36rem;
+  }
+
+  .density-preview li {
+    display: flex;
+    align-items: center;
+    min-block-size: calc(var(--row-h) + 10px);
+    border-block-end: 1px solid var(--line);
+    color: var(--ink2);
+    font-size: var(--text);
   }
 
   /* THE EXCEPTIONS. Indented under the level they are exceptions to, because that relationship is

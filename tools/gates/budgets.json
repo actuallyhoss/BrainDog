@@ -45,6 +45,10 @@
     ],
     "port": 5186
   },
+  "record": {
+    "//": "`record.mjs` on the command line: the port the seed is served on for `vite dev` and `vite preview` to proxy `/api` to. 8787 because `wrangler dev` listens there, so the app finds a record at the same address whichever host is running. The gates never use it: each starts its own record on port 0.",
+    "port": 8787
+  },
   "ready": {
     "//": "How long a screen has to say what it settled into, shared by the four gates that open a browser. Absence past it is a FINDING and never a skip: the wait this replaces ended in `.catch(() => {})`, so a page that had drawn nothing was measured anyway and the gate reported green over it.",
     "//settleTimeoutMs": "Ten seconds, which is twice the 5000 it replaces, and the extra five cost nothing on a healthy run: a settled screen ends the wait the moment `data-screen` appears, so the budget is only ever spent by a page that is already a finding. It has to cover a cold entry chunk plus a serial boot() then list() on a loaded CI runner, because a budget that fires on a slow runner is a red somebody widens rather than reads.",

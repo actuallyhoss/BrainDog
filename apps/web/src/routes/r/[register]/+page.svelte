@@ -25,9 +25,10 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { columnsFor, dirOf, display, DOM_CAP, entry, heldBy, iconFor, identityFor, identityOf, inheritedFrom, labelOf, list, noticed, NOW, PAGE, PAGES, readableFields, REGISTERS, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
+  import { columnsFor, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
+  import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
   import { searchable } from '$lib/record/find.ts';
-  import type { Entry, Fields } from '$lib/record/schema.ts';
+  import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -50,7 +51,30 @@
 
 
   const id = $derived(page.params.register ?? '');
-  const decl = $derived(REGISTERS[id]);
+
+  /**
+   * WHAT THE RECORD SAID: `boot` for the whole record, `schema` for this register, and a refusal
+   * when it said no.
+   *
+   * THE DECLARATION IS HELD WITH THE REGISTER IT IS FOR. The component is reused across the
+   * `[register]` parameter, so the address moves before the answer does; a declaration kept beside
+   * its own register id is how the screen tells "the new list has not arrived" from "this is the
+   * list", and draws the first as loading rather than as the old list under the new name.
+   */
+  let booted = $state<Boot | null>(null);
+  let declared = $state<{ register: string; decl: RegisterDecl } | null>(null);
+  let refusal = $state<Refusal | null>(null);
+  const decl = $derived(declared?.register === id ? declared.decl : undefined);
+
+  /**
+   * THE RECORD'S INSTANT, which every tone and date band on this screen is measured from. It is the
+   * record's and not the reader's: the seed is dated relative to one day, and a reader dating it
+   * against their own clock would put every band some number of days out with nothing saying so.
+   */
+  const now = $derived(booted ? Date.parse(booted.now) : Date.now());
+
+  /** Whether this list is the in-browser sample, because there is no record to read. See `open`. */
+  let sample = $state(false);
 
   /* WHAT THE RECORD HAS NOTICED ABOUT THIS REGISTER, if anything crossed a threshold. It is derived
      from the register alone — not from the filters — because a pattern in thirty days of refusals
@@ -258,18 +282,38 @@
    */
   let pages = $state<Entry[][]>([]);
   let cursor = $state<string | null>(null);
+  /** The whole answer's size, as the record counted it. The rows in hand are `pages`. */
+  let matched = $state(0);
   /* The answer this page set belongs to. A cursor from a different question is not a cursor. */
   let asked = $state('');
+  /** A question is out, the first page or the next one. `aria-busy` reads it. */
+  let busy = $state(false);
+  /** A next page is out. `more()` asks once however often the sentinel comes into view. */
+  let fetching = false;
+  /** How many rows hold each pill's value, as the record counted them. `facets` adds this tab's. */
+  let counted = $state(new Map<string, Map<string, number>>());
+
+  /** The rows the record returned, by number: what a cell, the editor and the menu look a row up in. */
+  const bySeq = $derived(new Map(pages.flat().map((e) => [e.seq, e] as const)));
+  const rowAt = (seq: number): Entry | undefined => bySeq.get(seq);
 
   const question = $derived(JSON.stringify([id, filters, q, sort ?? null]));
 
   $effect(() => {
-    const now = question;
-    if (now === asked) return;
-    asked = now;
-    const first = list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE });
-    pages = [first.entries];
-    cursor = first.cursor;
+    const said = question;
+    if (said === asked) return;
+    asked = said;
+    /* A DIFFERENT REGISTER IS A DIFFERENT SCREEN, so what the last one drew goes now rather than when
+       the answer lands, and the screen draws loading in between. The same register keeps its rows
+       until the new answer replaces them, so a pressed chip does not blank the list under it. */
+    if (declared?.register !== id) {
+      pages = [];
+      cursor = null;
+      matched = 0;
+      counted = new Map();
+    }
+    refusal = null;
+    void ask(said, id, filters, q, sort);
     /* AND THE RECEIPTS GO WITH THE ANSWER THEY WERE ABOUT. A chip saying `archived` beside a row
        the reader has just filtered TO is a chip about a different screen: the receipt exists to
        hold a row in place through one action, not to follow it around the product.
@@ -295,38 +339,120 @@
    * for the cap line, which is a count of the rows it was HANDED and therefore wrong the moment a
    * row is archived — the sentinel stayed, advertising more that this function then refused.
    *
-   * A STALE CURSOR STARTS OVER. `list` answers `stale` when the row a cursor names is no longer in
-   * the answer, which means the question moved under the reader — and the honest response is the
-   * first page of the new answer, not an empty page that reads as the end of the list.
+   * THE RECORD'S CURSOR IS A POSITION IN ITS OWN ORDER, `updated_at` and `id`, so a row changed after
+   * page one was fetched moves to the head of the list rather than breaking the walk: it is missed by
+   * the walk, not repeated in it, and there is no stale cursor to recover from. The mock's `stale`
+   * answer, and the branch here that started over on it, went with the mock.
+   *
+   * AN ANSWER FOR A QUESTION THAT HAS MOVED ON IS DROPPED. The reader filtered while this page was
+   * out, and appending it would put rows from one answer under the head of another.
    */
-  function more() {
-    if (cursor === null) return;
+  async function more() {
+    if (cursor === null || fetching) return;
     if (loaded >= DOM_CAP) return;
-    const next = list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE, cursor });
-    if (next.stale) {
-      /* AND IT KEEPS THE NEW CURSOR. Starting over used to set `cursor = null`, which says *this is
-         the whole answer* — so the head dropped its `+` and its "of N", the sentinel disappeared,
-         and the grid sat on two hundred rows claiming two thousand six hundred. The recovery
-         produced exactly the failure `stale` exists to prevent, one step later. */
-      const first = list(id, { filters, q, ...(sort ? { sort } : {}), limit: PAGE });
-      pages = [first.entries];
-      cursor = first.cursor;
-      return;
-    }
-    pages = [...pages, next.entries];
-    cursor = next.cursor;
+    const said = asked;
+    const from = cursor;
+    const register = id;
+    const chips = filters;
+    const text = q;
+    const order = sort;
+    fetching = true;
+    busy = true;
+    await read(async () => {
+      const next = await (await open()).page(register, { filters: chips, q: text, sort: order }, from);
+      if (asked !== said) return true;
+      if (!next.ok) return refuse(next.refusal);
+      pages = [...pages, next.value.entries];
+      cursor = next.value.cursor;
+      return true;
+    });
+    fetching = false;
+    if (asked === said) busy = false;
+  }
+
+  /**
+   * Ask the record this screen's question, and draw the answer whole.
+   *
+   * ONE BRACKET ROUND ALL OF IT: the declaration, the first page and the pills' counts land
+   * together or the screen has not settled. `data-screen` appears the moment nothing is out, and a
+   * screen that closed one call before it opened the next would say `ready` for a frame over a list
+   * with nothing in it, which is the frame a gate measures.
+   *
+   * THE PILLS ARE COUNTED ONLY WHILE THE BAR IS DRAWN, one `limit: 1` list per value of an indexed
+   * enum field, because a count nobody can see is a request nobody needed. The bar's own test is
+   * repeated here from the answer, because the screen has not got the answer yet.
+   *
+   * AND AN ANSWER FOR A QUESTION THAT HAS MOVED ON IS DROPPED, whole, which is why the state is
+   * written at the end rather than as each part arrives.
+   */
+  async function ask(said: string, register: string, chips: Filter[], text: string, order: typeof sort): Promise<void> {
+    busy = true;
+    await read(async () => {
+      const src = await open();
+      const [b, s] = await Promise.all([src.boot(), src.schema(register)]);
+      if (asked !== said) return true;
+      sample = src.sample;
+      if (!b.ok) return refuse(b.refusal);
+      booted = b.value;
+      if (!s.ok) return refuse(s.refusal);
+      const size = b.value.registers.find((r) => r.id === register)?.count ?? 0;
+      const bar = size >= ENOUGH_TO_SIFT || text !== '' || chips.length > 0;
+      const [answer, facets] = await Promise.all([
+        src.page(register, { filters: chips, q: text, sort: order }, null),
+        bar ? countAll(register, s.value, chips, text) : Promise.resolve(new Map<string, Map<string, number>>()),
+      ]);
+      if (asked !== said) return true;
+      if (!answer.ok) return refuse(answer.refusal);
+      declared = { register, decl: s.value };
+      pages = [answer.value.entries];
+      cursor = answer.value.cursor;
+      matched = answer.value.matched;
+      counted = facets;
+      return true;
+    });
+    if (asked === said) busy = false;
+  }
+
+  /** A refusal, drawn instead of the list. `false`, because that is what `read` records. */
+  const refuse = (said: Refusal): false => {
+    refusal = said;
+    return false;
+  };
+
+  /**
+   * How many rows hold each value of each pill, under every other chip and the search: the list's
+   * own question, with that one field's chip replaced by the value.
+   */
+  async function countAll(register: string, d: RegisterDecl, chips: Filter[], text: string): Promise<Map<string, Map<string, number>>> {
+    const src = await open();
+    const out = new Map<string, Map<string, number>>();
+    await Promise.all(
+      filterableOf(d.fields)
+        .filter((f) => f.type === 'enum')
+        .flatMap((f) =>
+          (f.values ?? []).map(async (value) => {
+            const n = await src.count(register, {
+              filters: [...chips.filter((x) => x.field !== f.id), { field: f.id, op: 'in', values: [value] }],
+              q: text,
+            });
+            const per = out.get(f.id) ?? new Map<string, number>();
+            per.set(value, n.ok ? n.value : 0);
+            out.set(f.id, per);
+          }),
+        ),
+    );
+    return out;
   }
 
 
   /**
    * The whole answer's SIZE, which is not the same as the rows in hand.
    *
-   * `list` with no `limit` walks the same filter, so this costs what the old code cost and buys the
-   * two counts every surface on this screen reads: how many rows matched, and how many the register
-   * holds. The real record answers both from `index` without walking anything, which is the point of
-   * separating them here rather than counting `pages`.
+   * THE RECORD ANSWERS BOTH COUNTS WITHOUT HANDING OVER THE ROWS: `matched` comes back with every
+   * page, and what the register holds comes from `boot`. The mock walked the whole filter a second
+   * time to learn them, which is what the two numbers every surface on this screen reads cost.
    */
-  const found = $derived(list(id, { filters, q, ...(sort ? { sort } : {}) }));
+  const total = $derived(booted?.registers.find((r) => r.id === id)?.count ?? 0);
   /**
    * `total` IS WHAT THE LIST HOLDS, AND ARCHIVING HERE HOLDS NOTHING.
    *
@@ -348,7 +474,7 @@
    * number was defensible alone and the pair was not.
    */
   const result = $derived({
-    ...found,
+    total,
     /* THE ROWS IN HAND, not the whole answer. `matched` is the answer's SIZE — what the head counts
        against, and what "38 rows, none matching" is about. What the head PRINTS while paging is
        `drawn`, the rows actually on screen; the two were conflated and the head over-reported. */
@@ -364,7 +490,7 @@
       const patch = edits.get(e.seq);
       return patch ? { ...e, fields: { ...e.fields, ...patch } } : e;
     }),
-    matched: found.entries.length + pending.of(id).length,
+    matched: matched + pending.of(id).length,
   });
   /**
    * THE ROWS IN HAND, WHICH IS NOT THE ROWS FETCHED.
@@ -477,8 +603,17 @@
    */
   const drawn = $derived(Math.min(loaded, DOM_CAP));
 
+  /**
+   * A SORTED LIST THE RECORD STOPPED, which is the one list with no next page that is not whole.
+   * The record will not page an `order`, so a sorted answer is its first page with `cursor: null`,
+   * and fewer rows in hand than it matched is how the screen knows the list stopped rather than
+   * ended. It is drawn like the cap: the count is exact and the cap line says what is missing.
+   */
+  const fetched = $derived(pages.reduce((n, p) => n + p.length, 0));
+  const truncated = $derived(cursor === null && fetched < matched);
+
   /** Whether the reader is looking at all of it. Everything honest on this screen turns on it. */
-  const whole = $derived(cursor === null);
+  const whole = $derived(cursor === null && !truncated);
 
   /**
    * `aria-rowcount`, which `50 §5.2` step 4 gives three states and this screen gave one.
@@ -501,7 +636,7 @@
    * record still holds every row, but `aria-rowcount` describes THIS GRID, which has stopped drawing
    * the archived ones. It read 2,614 over 2,611 rows.
    */
-  const settled = $derived(whole || drawn >= DOM_CAP);
+  const settled = $derived(whole || truncated || drawn >= DOM_CAP);
   const rowCount = $derived(settled ? result.matched : filters.length || q ? -1 : result.matched);
 
   /**
@@ -557,7 +692,7 @@
     io.observe(el);
     return () => io.disconnect();
   });
-  const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns));
+  const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns, now));
 
   /**
    * WHAT A READER CAN ORDER THE LIST BY, and what each direction is CALLED.
@@ -798,7 +933,7 @@
   const shownValue = (seq: number, field: string): unknown => {
     const patch = edits.get(seq);
     if (patch && Object.hasOwn(patch, field)) return patch[field];
-    const held = entry(id, seq) ?? pending.of(id).find((r) => r.seq === seq);
+    const held = rowAt(seq) ?? pending.of(id).find((r) => r.seq === seq);
     return held?.fields[field];
   };
 
@@ -836,7 +971,7 @@
        against what is on screen, so this one is against what the record holds: reaching the record's
        own value by hand drops the patch and takes the receipt with it, rather than recording a
        change from a value to itself. */
-    const held = entry(id, at.seq);
+    const held = rowAt(at.seq);
     const next = new Map(edits);
     const patch = { ...(next.get(at.seq) ?? {}) };
     if (held && said === asText(held.fields[at.field])) {
@@ -937,32 +1072,47 @@
     });
 
   const peekedEntry = $derived(
-    peeked === null ? undefined : (entry(id, peeked) ?? pending.of(id).find((r) => r.seq === peeked)),
+    peeked === null ? undefined : (rowAt(peeked) ?? pending.of(id).find((r) => r.seq === peeked)),
   );
 
   /** Only INDEXED fields are offered, in declaration order, at most eight. A filter on an unindexed
       field is a promise the storage cannot keep at 5,000 rows. */
 
-  const filterable = $derived((decl?.fields ?? []).filter((f) => f.index).slice(0, 8));
+  const filterable = $derived(filterableOf(decl?.fields ?? []));
+
+  /** The offer itself, read by the bar and by the pills' counts, so the two are one list. */
+  function filterableOf(fields: RegisterDecl['fields']): RegisterDecl['fields'] {
+    return fields.filter((f) => f.index).slice(0, 8);
+  }
 
   /**
    * HOW MANY ROWS HOLD EACH PILL'S VALUE, printed quietly beside its word.
    *
    * A facet count: the rows holding the value under every OTHER filter and the search, so a pill
-   * says what it holds whether or not its own field is filtered yet. Rows typed here and edits made
-   * here are counted, because the list below draws them. Read only while the bar is on screen.
+   * says what it holds whether or not its own field is filtered yet. The record counts them, one
+   * `limit: 1` list per value, while the bar is on screen (`ask`). Rows typed here and edits made
+   * here are added on top, because the list below draws them and the record has not been told.
+   *
+   * AN EDIT MOVES ITS ROW FROM ONE PILL TO ANOTHER, and only a row in hand can have been edited.
+   * Every row in hand answers the whole question, so it answers the pill's question too, and moving
+   * its count from the value the record holds to the one typed here is exact.
    */
   const facets = $derived.by(() => {
     const out = new Map<string, Map<string, number>>();
-    for (const f of filterable) {
-      if (f.type !== 'enum') continue;
-      const n = new Map<string, number>();
-      const answer = list(id, { filters: filters.filter((x) => x.field !== f.id), q }).entries;
-      for (const e of [...pending.of(id), ...answer]) {
-        const v = String({ ...e.fields, ...edits.get(e.seq) }[f.id] ?? '');
-        n.set(v, (n.get(v) ?? 0) + 1);
+    const bump = (n: Map<string, number>, v: unknown, by: number) => {
+      const key = String(v ?? '');
+      n.set(key, (n.get(key) ?? 0) + by);
+    };
+    for (const [field, held] of counted) {
+      const n = new Map(held);
+      for (const e of pending.of(id)) bump(n, e.fields[field], 1);
+      for (const e of pages.flat()) {
+        const patch = edits.get(e.seq);
+        if (!patch || !Object.hasOwn(patch, field)) continue;
+        bump(n, e.fields[field], -1);
+        bump(n, patch[field], 1);
       }
-      out.set(f.id, n);
+      out.set(field, n);
     }
     return out;
   });
@@ -1368,17 +1518,12 @@
   );
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   * THIS SCREEN FETCHES, AND SAYS WHAT IT DREW ONCE IT HAS.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * from a shell that has fetched nothing. `ask` and `more` bracket their reads with the screen's
+   * counters, so while a question is out there is no attribute whatever this line says. `Empty` says
+   * `empty` or `refused` for the states it draws, and this is the claim for the rest.
    */
   $effect(() => drew('ready'));
 </script>
@@ -1387,7 +1532,21 @@
 
 <svelte:window {onkeydown} />
 
-{#if !decl}
+{#if refusal && refusal.code !== 'REGISTER_UNKNOWN'}
+  <!-- THE RECORD SAID NO, AND ITS SENTENCE IS THE BODY, verbatim (`13 §6`). What the record wrote
+       is the most specific thing anybody can say about why this list is not here, and a sentence
+       rewritten here would be a guess about it. -->
+  <div class="page">
+    <Empty kind="error" heading title={copy.screenFailed} body={refusal.fix}>
+      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+    </Empty>
+  </div>
+{:else if !decl && !refusal}
+  <!-- LOADING, AND NOTHING IS DRAWN FOR IT. The answer is a round trip away, and a placeholder list
+       would be rows that are not there. `aria-busy` says the region is on its way, and
+       `data-screen` stays off until it has arrived. -->
+  <div class="page" aria-busy="true"></div>
+{:else if !decl}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
@@ -1398,7 +1557,7 @@
       kind="error"
       heading
       title={copy.noSuch('list', id)}
-      body={copy.theseExist('Lists', Object.values(REGISTERS).map((r) => r.name))}
+      body={copy.theseExist('Lists', (booted?.registers ?? []).map((r) => r.name))}
     >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
@@ -1411,7 +1570,7 @@
   <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
     count={whole ? result.matched : drawn}
-    atLeast={!whole && drawn < DOM_CAP}
+    atLeast={!whole && !truncated && drawn < DOM_CAP}
     total={denominator}
     define="list"
   >
@@ -1431,7 +1590,12 @@
     {/snippet}
   </PageHead>
 
-  <div class="page">
+  <div class="page" aria-busy={busy ? 'true' : undefined}>
+    <!-- THE SAMPLE SAYS SO, in the sample bar's own sentence and no louder. There is no record for
+         this tab to read, so these rows are the in-browser sample every other screen draws; that is
+         where they came from, not something that went wrong. See `open` in `lib/data/record.ts`,
+         which is also where this stops being reachable. -->
+    {#if sample}<p class="sample-note">{copy.sampleWhat}</p>{/if}
     <!--
       CAPTURE, FIRST ON THE PAGE.
 
@@ -1642,7 +1806,7 @@
 
       <div class="body-slot" bind:this={body}>
       {#if rowsAsCards()}
-      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} picked={selected}>
+      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} {now} picked={selected}>
         {#snippet action(e)}
           <!--
             THE RECEIPT, ON THE ARM THAT IS THE ONLY ONE A PHONE EVER SEES.
@@ -1712,7 +1876,7 @@
       <!-- A SENTINEL MEANS "THERE MAY BE MORE". A list whose answer arrived in one page has none,
            and neither does one at the cap — the line above says why it stopped. `Table` takes the
            same signal as the absence of `onmore`. -->
-      {#if !whole && loaded < DOM_CAP}
+      {#if cursor !== null && loaded < DOM_CAP}
         <div class="sentinel" aria-hidden="true"></div>
       {/if}
       {:else}
@@ -1731,7 +1895,7 @@
           the shape and not the thing.
         -->
         {#snippet ownMark(seq: number)}
-          {@const own = identityFor(id, entry(id, seq)?.fields ?? {})}
+          {@const own = identityFor(id, rowAt(seq)?.fields ?? {})}
           {#if own}<span
               class="row-mark"
               style={own.retired ? undefined : `--hue:${own.hue}`}
@@ -1747,7 +1911,7 @@
           {rows}
           total={rowCount}
           cap={DOM_CAP}
-          {...whole ? {} : { onmore: more }}
+          {...cursor === null ? {} : { onmore: more }}
           label={decl.name}
           {sort}
           selected={selectedKeys}
@@ -1762,7 +1926,7 @@
         >
           {#snippet cellSnippet(row, column, value)}
             {@const seq = Number(row.key.split('#')[1])}
-            {@const ident = identityOf(id, column.field, entry(id, seq)?.fields[column.field])}
+            {@const ident = identityOf(id, column.field, rowAt(seq)?.fields[column.field])}
             {@const isTitle = column.field === decl.title}
             {@const isEnum = fieldOf(column.field)?.type === 'enum'}
             {#if column.field === 'select'}
@@ -1771,7 +1935,7 @@
                 class="pick"
                 tabindex="-1"
                 data-on={selected.has(seq) ? '' : undefined}
-                aria-label="{selected.has(seq) ? copy.deselect : copy.select} {display(id, decl.title, entry(id, seq)?.fields[decl.title]) ?? `#${seq}`}"
+                aria-label="{selected.has(seq) ? copy.deselect : copy.select} {display(id, decl.title, rowAt(seq)?.fields[decl.title]) ?? `#${seq}`}"
                 onclick={(e) => {
                   /* The cell activates the row. Without this, picking one opened it. */
                   e.stopPropagation();
@@ -1840,7 +2004,7 @@
                 archiving a row opened it on the way out.
               -->
               {@const said = receiptFor(seq)}
-              {@const name = display(id, decl.title, entry(id, seq)?.fields[decl.title]) ?? `#${seq}`}
+              {@const name = display(id, decl.title, rowAt(seq)?.fields[decl.title]) ?? `#${seq}`}
               {#if said}
                 <span class="said">
                   <Chip label={said.short ?? said.mark} tone={said.intent} />
@@ -1947,7 +2111,9 @@
         always the answer's size. `Table` keeps `cap` for the sentinel, which is the other half of
         what that prop is for.
       -->
-      {#if loaded >= DOM_CAP}
+      <!-- AND A SORTED LIST THE RECORD STOPPED says so the same way: the rows it drew, of the rows
+           it matched, and what to do about the rest. -->
+      {#if loaded >= DOM_CAP || truncated}
         <CapLine shown={drawn} total={result.matched} />
       {/if}
       </div>
@@ -2052,7 +2218,7 @@
     <!-- AND OFF IT, THE CONDITION IS THE RECORD'S OWN SHAPE: registers that HOLD something. It was
          `Object.keys(REGISTERS)` — every register declared, whether or not a row had ever been
          written to it — which is the count that made this unreachable. -->
-    <Second held={Object.keys(REGISTERS).filter((r) => heldBy(r) > 0)} register={id} first={false} />
+    <Second held={(booted?.registers ?? []).filter((r) => r.count > 0).map((r) => r.id)} register={id} first={false} />
   {/if}
 
   <!-- Peek: a drawer, with the list still visible, for triage. It needs a VISIBLE affordance —
@@ -2237,7 +2403,7 @@
            them. The copy verbs now come last, before Archive, which keeps its own rule. -->
       {#if states.length > 0}
         <hr class="mi-rule" />
-        {#each states.filter((v) => v !== entry(id, seq)?.fields[decl.state ?? '']) as state}
+        {#each states.filter((v) => v !== rowAt(seq)?.fields[decl.state ?? '']) as state}
           <button class="mi" role="menuitem" type="button" onclick={() => setRowState(seq, state)}>
             <Icon name="check" size="s" />
             <span class="mi-name">{copy.setTo(state.replace(/_/g, ' '))}</span>
@@ -2345,6 +2511,13 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-4) var(--sp-6) var(--sp-9);
+  }
+
+  /* The sample bar's sentence, in the dim ink a note takes: it says where the rows came from. */
+  .sample-note {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-xs);
   }
 
   /* A NOTE READS AS A NOTE. One hairline, the page's own paper, no intent colour and no fill: it

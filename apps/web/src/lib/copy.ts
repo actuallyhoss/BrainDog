@@ -253,6 +253,11 @@ export const copy = {
   /* The bar over a sample record. It says what the record is, and where the way out is: a stranger
      landing on somebody else's company with no explanation is the first screen this product had. */
   sampleWhat: 'This is a sample record.',
+  enterCodeSample: 'In this sample no machine is waiting, so no code will match. On your own record, the six digits your terminal printed go here.',
+  densityPreview: 'How a list looks',
+  sourcesAdd: 'New sources arrive the way new lists do: with an add-on, or set up by your assistant.',
+  sourcesAddGo: 'Browse add-ons',
+  densityPreviewRows: ['Invoice 2026-041, brand system', 'Studio insurance, annual', 'VAT quarter to 31 Aug'],
   sampleWhy: 'A whole small business, made up, so you can see what a record holds before you have one. Nothing here is yours and nothing you do to it is saved.',
   sampleStart: 'Start your own',
   samplePutAway: 'Put this away',
@@ -1037,7 +1042,7 @@ export const copy = {
    * They were four literals in the route, which is why one rename never reached all four.
    */
   levelWouldMove: (name: string, from: string, to: string) =>
-    `${name} would move from ${from} to ${to} across this record, with one change per list and your reason on each`,
+    `${name} would move from ${from} to ${to} across this record, with one change per list`,
   accessWouldGo: (name: string) => `Every one of ${name}'s access rows would be removed, with one change per list`,
   exceptionWouldGo: (list: string, to: string) => `${list} would go back to ${to}, with one change naming that list`,
   exceptionWouldBeAdded: (name: string) =>

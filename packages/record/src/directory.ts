@@ -26,6 +26,10 @@ import type { Clock, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
+import { createAuth, type AuthConfig } from './identity.ts';
+
+export type { AuthConfig, Reason } from './identity.ts';
+
 /** The five a person can hold on a record. The record's own ladder, mirrored where membership lives. */
 export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
 export type Level = (typeof LEVELS)[number];
@@ -65,7 +69,8 @@ CREATE TABLE IF NOT EXISTS dir_person (
   id         TEXT PRIMARY KEY,              -- 'p_01J…'
   email      TEXT NOT NULL,                 -- as typed; matched lower-cased
   name       TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  suspended_at TEXT                         -- set: every session refused, every sign-in refused
 );
 CREATE UNIQUE INDEX IF NOT EXISTS dir_person_email ON dir_person(lower(email));
 
@@ -116,6 +121,67 @@ CREATE TABLE IF NOT EXISTS dir_meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- SIGN-IN. Five tables, and not one of them holds a value that opens anything: every id, link and
+-- challenge is stored as an HMAC under the host's key (identity.ts), so a copy of this file signs
+-- nobody in. Times are epoch milliseconds, because every question asked of them is arithmetic
+-- against the clock.
+
+-- A passkey: the public half, as the JWK WebCrypto imports. The private half never left the device.
+CREATE TABLE IF NOT EXISTS dir_passkey (
+  id         TEXT PRIMARY KEY,              -- the credential id, base64url, as the authenticator made it
+  person     TEXT NOT NULL,
+  jwk        TEXT NOT NULL,
+  alg        INTEGER NOT NULL CHECK (alg IN (-7, -257)),
+  sign_count INTEGER NOT NULL DEFAULT 0,
+  label      TEXT,
+  backed_up  INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  last_used  INTEGER
+);
+CREATE INDEX IF NOT EXISTS dir_passkey_person ON dir_passkey(person);
+
+-- A browser session. The record column is the record it was opened on, so the browser holds one
+-- opaque cookie rather than an id and a slug. prev_hash is the id a rotation replaced, good until
+-- prev_until so requests already in flight with it are not refused.
+CREATE TABLE IF NOT EXISTS dir_session (
+  id_hash    TEXT PRIMARY KEY,
+  person     TEXT NOT NULL,
+  record     TEXT,
+  expires    INTEGER NOT NULL,
+  rotated_at INTEGER NOT NULL,
+  authed_at  INTEGER NOT NULL,              -- the last proof: rotation never moves it
+  prev_hash  TEXT,
+  prev_until INTEGER
+);
+CREATE INDEX IF NOT EXISTS dir_session_prev ON dir_session(prev_hash);
+CREATE INDEX IF NOT EXISTS dir_session_expires ON dir_session(expires);
+
+-- A sign-in link (15 minutes) or a claim link (24 hours). Deleted by the statement that uses it.
+CREATE TABLE IF NOT EXISTS dir_link (
+  hash    TEXT PRIMARY KEY,
+  person  TEXT NOT NULL,
+  purpose TEXT NOT NULL CHECK (purpose IN ('magic', 'claim')),
+  expires INTEGER NOT NULL
+);
+
+-- A WebAuthn challenge, five minutes, for one ceremony and (on registration) one person. In a table
+-- rather than in memory, because a Durable Object evicted mid-ceremony forgets its memory.
+CREATE TABLE IF NOT EXISTS dir_challenge (
+  hash    TEXT PRIMARY KEY,
+  purpose TEXT NOT NULL CHECK (purpose IN ('register', 'assert')),
+  person  TEXT,
+  expires INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dir_challenge_expires ON dir_challenge(expires);
+
+-- The lockout: strikes per key (ip:, mint:, email:), capped at ten, locked for fifteen minutes.
+CREATE TABLE IF NOT EXISTS dir_fail (
+  key   TEXT PRIMARY KEY,
+  n     INTEGER NOT NULL,
+  first INTEGER NOT NULL,
+  until INTEGER
+);
 `;
 
 export type Person = { id: string; email: string; name: string | null; created_at: string };
@@ -128,13 +194,13 @@ export type Directory = ReturnType<typeof createDirectory>;
 /**
  * The Directory's own schema revision. `49 §5.1` step 4.
  *
- * ONE, and a second is a migration with a number. It is here rather than nowhere because a tenant
- * map has the same problem a record does: a build that opens one written by a NEWER build reads
- * tables whose columns it does not know about, and every answer it gives is confidently wrong about
- * which record a name means. `FORMAT_NEWER_THAN_READER` is what the format layer says (`03 §11`),
- * and this is the one place the Directory can say it.
+ * THREE, and every step past one is a migration with a number: `TO_2`, then `TO_3`. It is here
+ * rather than nowhere because a tenant map has the same problem a record does: a build that opens one
+ * written by a NEWER build reads tables whose columns it does not know about, and every answer it
+ * gives is confidently wrong about which record a name means. `FORMAT_NEWER_THAN_READER` is what the
+ * format layer says (`03 §11`), and this is the one place the Directory can say it.
  */
-export const DIRECTORY_VERSION = 2;
+export const DIRECTORY_VERSION = 3;
 
 /**
  * From one to two: the level leaves `dir_member` and the founding owner joins `dir_record`.
@@ -160,6 +226,16 @@ const TO_2 = [
 ];
 
 /**
+ * From two to three: sign-in.
+ *
+ * ONE COLUMN, BECAUSE THE FIVE NEW TABLES NEED NO MIGRATION. `SCHEMA` creates `dir_passkey`,
+ * `dir_session`, `dir_link`, `dir_challenge` and `dir_fail` with `IF NOT EXISTS` on every open, and on
+ * a version-2 file none of them exists yet. What `IF NOT EXISTS` cannot do is add a column to a table
+ * that is already there, and `dir_person` is.
+ */
+const TO_3 = ['ALTER TABLE dir_person ADD COLUMN suspended_at TEXT'];
+
+/**
  * Run it, and answer `null` when the driver will not.
  *
  * A NARROW HELPER AND NOT A GENERAL ONE. It wraps exactly the two statements whose availability
@@ -175,7 +251,14 @@ const attempt = <T>(fn: () => T): T | null => {
   }
 };
 
-export function createDirectory(sql: Sql, clock: Clock) {
+/**
+ * The Directory over one `Sql`.
+ *
+ * `auth` SWITCHES SIGN-IN ON, and without it `auth()` answers `methods` with "not configured" and
+ * every other flow with 404. The tenant map does not need it, and a host that has no key to take the
+ * MACs under must not be able to sign anybody in by accident.
+ */
+export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
   /* THE VERSION IS READ BEFORE THE DDL RUNS. `CREATE TABLE IF NOT EXISTS` over a newer schema is
      silent: every statement is a no-op, the object opens, and the first `resolve` answers from
      columns this build does not know the meaning of. A record refuses in that situation and the
@@ -207,19 +290,23 @@ export function createDirectory(sql: Sql, clock: Clock) {
 
   /* AND AN OLDER ONE IS BROUGHT FORWARD. `IF NOT EXISTS` leaves an existing table exactly as it was,
      so the DDL above is the shape of a NEW directory and this is the only thing that changes an old
-     one. Each statement is guarded by the version, runs once, and is a no-op if it has run: the
-     `UPDATE` is idempotent and the `DROP COLUMN` is the one that would throw, so it is last. */
-  if (version === 1)
-    sql.transactionSync(() => {
-      for (const statement of TO_2) sql.exec(statement);
-    });
-  /* THE ROW IS WRITTEN EVERY TIME AND THE PRAGMA IS BEST EFFORT. Unconditional, because a directory
+     one. Each step runs for the versions below it, `TO_2` before `TO_3`.
+
+     THE VERSION ROW IS WRITTEN IN THE SAME TRANSACTION AS THE STEPS. Both steps hold a statement that
+     throws when run twice (`DROP COLUMN`, `ADD COLUMN`), so a migration that committed while the row
+     still said the old number would make the next open throw out of `createDirectory`.
+
+     THE ROW IS WRITTEN EVERY TIME AND THE PRAGMA IS BEST EFFORT. Unconditional, because a directory
      that has been running on a version this build already reads may still have no `dir_meta` row —
      it was a pragma until today — and the row is what the next open reads first. */
-  sql.exec(
-    "INSERT INTO dir_meta (key, value) VALUES ('version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-    String(DIRECTORY_VERSION),
-  );
+  sql.transactionSync(() => {
+    if (version === 1) for (const statement of TO_2) sql.exec(statement);
+    if (version >= 1 && version < 3) for (const statement of TO_3) sql.exec(statement);
+    sql.exec(
+      "INSERT INTO dir_meta (key, value) VALUES ('version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      String(DIRECTORY_VERSION),
+    );
+  });
   if (version < DIRECTORY_VERSION) attempt(() => sql.exec(`PRAGMA user_version = ${DIRECTORY_VERSION}`));
 
   const mint = ulids(() => clock.now());
@@ -271,6 +358,12 @@ export function createDirectory(sql: Sql, clock: Clock) {
     resolve,
     slugOf,
     personByEmail,
+
+    /**
+     * Sign-in: sessions, passkeys, links, challenges and the lockout, over the five `dir_` tables
+     * above. `identity.ts` is the whole of it; this is where a host reaches it.
+     */
+    auth: createAuth(sql, clock, auth),
 
     /**
      * Whether a string is a name at all, and the sentence when it is not.

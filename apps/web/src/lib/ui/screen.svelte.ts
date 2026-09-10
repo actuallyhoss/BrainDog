@@ -47,14 +47,29 @@ export type Settled = 'ready' | 'empty' | 'refused';
  */
 const s = $state({ pending: 0, calls: 0, refused: false, ready: false, empties: 0, refusals: 0 });
 
-/** A call started. */
-export function opened(): void {
+/**
+ * Which screen a call belongs to: `leaving()` moves it on, and `opened()` hands it to the caller.
+ *
+ * A CALL CAN CROSS A NAVIGATION, AND THE COUNT MUST NOT. `leaving()` zeroes `pending` for the next
+ * screen, so an answer for the previous one landing afterwards would take the next screen's count
+ * below zero, and `pending > 0` would then be false while that screen's own call was still out: the
+ * attribute would appear over a page that had drawn nothing. A call closes against the screen it
+ * opened on, and an answer for a screen that has gone counts for nothing.
+ *
+ * NOT `$state`. Nothing draws from it; it is compared, and only here.
+ */
+let epoch = 0;
+
+/** A call started. What it returns is handed back to `closed`. */
+export function opened(): number {
   s.pending++;
   s.calls++;
+  return epoch;
 }
 
 /** A call answered. A refusal is a value in this codebase, so this is where one is recorded. */
-export function closed(ok: boolean): void {
+export function closed(ok: boolean, at: number): void {
+  if (at !== epoch) return;
   s.pending--;
   if (!ok) s.refused = true;
 }
@@ -94,6 +109,7 @@ export function undrew(what: Settled): void {
  * the window every one of these gates measures in.
  */
 export function leaving(): void {
+  epoch++;
   s.pending = 0;
   s.calls = 0;
   s.refused = false;

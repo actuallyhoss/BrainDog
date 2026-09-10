@@ -13,6 +13,11 @@
  * It serves `apps/web/build` for the same reason the other two scripts serve their own build, and
  * with the same SPA fallback: the record app ships one `index.html` and lets the router decide.
  *
+ * AND IT FORWARDS `/api/*` TO A RECORD, because the register list reads one now. It is the same
+ * in-memory seed the browser gates read (`tools/gates/record.mjs`), pinned at the seed's day, so the
+ * grid photographed here is a read of a real record and not the in-browser sample. Its unsorted
+ * order is the record's, newest first.
+ *
  * VIEWPORT, NOT FULL PAGE. `Shot.svelte` declares `width="2880" height="1800"` so the page reserves
  * the box before the image arrives and never reflows the sentence somebody is reading. A full-page
  * capture is whatever height the route happens to be, and every one of them would be a different
@@ -25,6 +30,8 @@ import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
+
+import { answers, forward, startRecord } from '../../../tools/gates/record.mjs';
 
 const ROOT = join(import.meta.dirname, '..', '..', 'web', 'build');
 const OUT = join(import.meta.dirname, '..', 'static', 'shots');
@@ -58,8 +65,11 @@ if (!(await stat(ROOT).catch(() => null))) {
   process.exit(1);
 }
 
+const record = await startRecord();
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
+  if (url.pathname.startsWith('/api/')) return forward(req, res, record.base);
   const rel = decodeURIComponent(url.pathname).slice(1);
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
@@ -76,6 +86,7 @@ const server = createServer(async (req, res) => {
   res.writeHead(404).end();
 });
 await new Promise((r) => server.listen(PORT, r));
+await answers(`http://localhost:${PORT}`);
 
 await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
@@ -120,7 +131,10 @@ for (const size of SIZES)
 
     for (const shot of SHOTS) {
       await page.goto(`http://localhost:${PORT}${shot.route}`, { waitUntil: 'networkidle' });
-      await page.waitForSelector('#main *', { timeout: 5000 }).catch(() => {});
+      /* THE SCREEN SAYS WHEN IT HAS DRAWN, and a list that reads the record has not drawn when its
+         heading has. `data-screen` is the app's own answer; a shot that timed out waiting for it is
+         still taken, because a picture of what went wrong is more use than no picture. */
+      await page.waitForSelector('main#main[data-screen]', { timeout: 10000 }).catch(() => {});
       // The same reason both other scripts do it: an off-screen rowgroup photographs empty.
       await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
       /* AND THE ACT IS THE LAPTOP'S. `arrange` presses a control that a phone lays out somewhere
@@ -139,3 +153,4 @@ for (const size of SIZES)
 
 await browser.close();
 server.close();
+await record.close();

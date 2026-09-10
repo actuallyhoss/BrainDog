@@ -10,21 +10,15 @@
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
-  import Note from '$lib/Note.svelte';
+  import Tag from '$lib/Tag.svelte';
   import { APP, BUILD, site } from '$lib/copy.ts';
 
   const p = site.pricing;
 </script>
 
 <svelte:head>
-  <!-- ITS OWN SENTENCE, in `copy.ts`. The description was the page's lede, which says how the two
-       plans differ and never what is being sold or for how much. -->
   <title>{site.meta.pricing.title}</title>
   <meta name="description" content={site.meta.pricing.description} />
-  <!-- THE CANONICAL AND THE PREVIEW, from the same two sentences the page already has, so there is
-       one description per page rather than two that can disagree. The canonical matters because
-       `www` 301s here and a preview fetcher that followed the redirect would otherwise cite the
-       hostname it started from. -->
   <link rel="canonical" href="https://brain.dog/pricing" />
   <meta property="og:url" content="https://brain.dog/pricing" />
   <meta property="og:title" content={site.meta.pricing.title} />
@@ -32,24 +26,30 @@
 </svelte:head>
 
 <section class="wrap head">
-  <div>
+  <div class="head-copy">
+    <Tag icon="money" hue="earn" label={p.kicker} />
     <h1 class="title">{p.title}</h1>
     <p class="lede">{p.body}</p>
   </div>
   <!-- ABOVE THE PRICES, NOT UNDER THEM. A price on a page is an offer, and neither of these can be
        accepted today. Saying so once, before the cards, is what lets the cards describe the plans in
-       the present tense without the page lying. BESIDE THE HEADING once there is room, so a wide
-       window does not draw a headline down the left third and leave the rest of the fold empty. -->
+       the present tense without the page lying. -->
   <div class="status">
     <span class="glyph" data-hue="warn"><Icon name="clock" /></span>
-    <p>{p.status}</p>
+    <div class="status-copy">
+      <h2 class="status-title">{p.statusTitle}</h2>
+      <p class="status-body">{p.status}</p>
+    </div>
   </div>
 </section>
 
 <section class="wrap plans">
   {#each [p.self, p.hosted] as plan, i}
     <article class="plan" data-featured={i === 1 ? '' : undefined}>
-      <h2 class="plan-name">{plan.name}</h2>
+      <div class="plan-top">
+        <span class="glyph" data-hue={i === 1 ? 'accent' : 'info'}><Icon name={i === 1 ? 'thing' : 'home'} /></span>
+        <h2 class="plan-name">{plan.name}</h2>
+      </div>
       <p class="plan-price">
         <span class="plan-figure num">{plan.price}</span>
         <span class="plan-unit">{plan.unit}</span>
@@ -61,17 +61,13 @@
         {/each}
       </ul>
       <!--
-        THE SELF-HOSTED CARD HAS NO ACTION WHILE THE REPOSITORY IS PRIVATE, and it had one that
-        answered 404. It sent you to `BUILD.md`, which is not readable, so the free plan this page
-        recommends had no route into it at all.
-
-        AN ABSENT CONTROL AND NOT A DISABLED ONE. `19 §6`'s rule, applied to a marketing page: a
-        control that cannot act is absent rather than greyed, and a greyed button under a price is a
-        product telling you it does not want your business. The sentence above the cards already
-        says neither plan is open yet, which is what a reader needs and is true of both.
+        THE SELF-HOSTED CARD HAS NO ACTION WHILE THE REPOSITORY IS PRIVATE: its action sent you to
+        build instructions nobody can read. An absent control and not a disabled one, because a
+        greyed button under a price is a product telling you it does not want your business. The
+        sentence above the cards already says neither plan is open yet.
       -->
       {#if i === 1}
-        <a class="btn btn-primary btn-lg" href={APP}>{plan.cta}</a>
+        <a class="btn btn-primary btn-lg" href={APP}>{plan.cta}<Icon name="arrow" /></a>
       {:else if BUILD}
         <a class="btn btn-lg" href={BUILD}>{plan.cta}</a>
       {/if}
@@ -80,7 +76,13 @@
 </section>
 
 <section class="wrap honest">
-  <Note text={p.honest} />
+  <div class="honest-card">
+    <span class="glyph" data-hue="accent"><Icon name="info" /></span>
+    <div>
+      <h2 class="honest-title">{p.honestTitle}</h2>
+      <p class="honest-body">{p.honest}</p>
+    </div>
+  </div>
 </section>
 
 <style>
@@ -91,31 +93,33 @@
   }
 
   .head {
+    position: relative;
+    isolation: isolate;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
     align-items: end;
     gap: var(--sp-6) var(--sp-7);
-    padding-block: clamp(48px, 7vw, 88px) var(--sp-7);
+    padding-block: clamp(48px, 7vw, 96px) var(--sp-7);
   }
 
   .title {
-    font-size: clamp(36px, 3vw + 20px, 56px);
-    line-height: 1.05;
-    letter-spacing: -0.032em;
+    margin-block-start: var(--sp-4);
+    font-size: clamp(40px, 3.4vw + 22px, 68px);
+    line-height: 1.02;
+    letter-spacing: -0.04em;
     text-wrap: balance;
   }
 
   .lede {
-    max-inline-size: 44ch;
-    margin-block-start: var(--sp-3);
+    max-inline-size: 40ch;
+    margin-block-start: var(--sp-4);
     color: var(--ink2);
     font-size: var(--t-lg);
     line-height: 1.5;
     text-wrap: pretty;
   }
 
-  /* A fact about the state of the product, not an alarm: a quiet card with a clock on it. It had a
-     3px warn-coloured bar down its edge, which is how the page drew a quotation elsewhere. */
+  /* A fact about the state of the product, not an alarm: a quiet card with a clock on it. */
   .status {
     display: flex;
     align-items: flex-start;
@@ -124,16 +128,30 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
+    box-shadow: var(--e1);
+  }
+
+  .status-copy {
+    min-inline-size: 0;
+  }
+
+  .status-title {
+    font-family: var(--font-ui);
+    font-size: var(--t-base);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .status-body {
+    margin-block-start: var(--sp-1);
     color: var(--ink2);
     font-size: var(--t-sm);
     line-height: 1.6;
     text-wrap: pretty;
   }
 
-  /* `align-items: start` and the cards stop being the same height. The free plan has no action
-     under it while the repository is private, so a stretched card put ninety pixels of nothing
-     inside a box with a border round it. Two cards that each end where their content does say
-     nothing at all, which is right. */
+  /* `align-items: start` and the cards stop being the same height, because the free plan has no
+     action under it while the repository is private. */
   .plans {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -142,28 +160,42 @@
   }
 
   .plan {
+    position: relative;
+    isolation: isolate;
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
+    overflow: hidden;
     padding: var(--sp-6);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: calc(var(--r-lg) + 4px);
     box-shadow: var(--e1);
   }
 
-  /* The recommended plan takes the ACCENT BORDER and a ground tinted towards the accent, and
-     nothing else: no ribbon, no "most popular", no scale transform. A card that is physically
-     larger than the one beside it is a card arguing with the reader about which one they came
-     for. `--accent-ground` is the same ground the home page's closing card uses. */
+  /* The hosted plan takes the ACCENT EDGE, a ground tinted towards it and a light from above, and
+     nothing else: no ribbon, no "most popular", no scale transform. */
   .plan[data-featured] {
     background: var(--accent-ground);
     border-color: var(--accent);
     box-shadow: var(--e2);
   }
 
-  /* The plan's name is a sentence-case heading at the size every card title on the site is. The
-     price under it is what the card is about, and it is more than twice the size. */
+  .plan[data-featured]::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset-block: -50% 50%;
+    inset-inline: 0;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
+  }
+
+  .plan-top {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
   .plan-name {
     font-size: var(--t-lg);
     letter-spacing: -0.018em;
@@ -174,14 +206,15 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
   }
 
   .plan-figure {
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: clamp(var(--t-3xl), 3vw + 20px, 52px);
+    font-size: clamp(44px, 3vw + 24px, 64px);
     font-weight: 600;
-    letter-spacing: var(--tr-tight);
+    letter-spacing: -0.035em;
     line-height: 1;
   }
 
@@ -197,8 +230,6 @@
     text-wrap: pretty;
   }
 
-  /* A rule over the points, because the two halves of a plan card are what it costs and what you
-     get, and a gap alone was not saying so. */
   .plan-points {
     display: flex;
     flex-direction: column;
@@ -234,7 +265,31 @@
 
   /* The page's own bottom: the shell puts no margin over the footer. */
   .honest {
-    padding-block: var(--sp-7) var(--sp-8);
+    padding-block: var(--sp-6) var(--sp-8);
+  }
+
+  .honest-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    padding: var(--sp-5);
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  .honest-title {
+    font-size: var(--t-md);
+    letter-spacing: -0.014em;
+  }
+
+  .honest-body {
+    max-inline-size: 70ch;
+    margin-block-start: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 1.6;
+    text-wrap: pretty;
   }
 
   @media (width < 900px) {
@@ -255,8 +310,22 @@
       padding-inline: var(--sp-4);
     }
 
+    .lede {
+      font-size: var(--t-md);
+    }
+
     .plan {
       padding: var(--sp-5);
+    }
+
+    .plan .btn {
+      align-self: stretch;
+    }
+
+    .honest-card {
+      flex-direction: column;
+      gap: var(--sp-3);
+      padding: var(--sp-4);
     }
   }
 </style>

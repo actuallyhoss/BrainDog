@@ -20,8 +20,13 @@ const root = join(here, '..', '..');
  * `pnpm` on Windows is a `.cmd` shim, and Node refuses to spawn one without a shell (EINVAL, the
  * fix for CVE-2024-27980). It is the only gate that is not a plain script, and its argv is a
  * constant, so it is the only one given a shell.
+ *
+ * ONE STRING, NOT A COMMAND AND AN ARGUMENT LIST. With `shell: true` Node concatenates the list
+ * unescaped and says so on every run (DEP0190), which printed a security warning at the foot of
+ * every `pnpm gates` a stranger ran. The line is a constant, so handing the shell the whole of it is
+ * exactly as safe and says nothing.
  */
-const PNPM = ['pnpm', ['-r', 'run', 'typecheck'], { shell: true }];
+const PNPM = ['pnpm -r run typecheck', [], { shell: true }];
 
 const GATES = [
   /* FIRST, because a type error invalidates every gate under it — and because two of them reached a

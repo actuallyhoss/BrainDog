@@ -43,6 +43,7 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from './lib.mjs';
+import { answers, forward, startRecord } from './record.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
@@ -81,6 +82,9 @@ if (!(await stat(ROOT).catch(() => null))) {
   console.log('  keys: no build to check. `pnpm build` first, and CI does.');
   process.exit(3);
 }
+
+/* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
+const record = await startRecord();
 
 /* Read as text, not imported: the registry uses runes, so anything reaching it cannot load outside
    a Svelte build — the same reason `silenced` lives next door in a plain `.ts`. */
@@ -210,6 +214,7 @@ const RECIPES = {
 };
 
 const server = createServer(async (req, res) => {
+  if (new URL(req.url ?? '/', 'http://x').pathname.startsWith('/api/')) return forward(req, res, record.base);
   const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
@@ -226,6 +231,7 @@ const server = createServer(async (req, res) => {
   res.writeHead(404).end();
 });
 await new Promise((r) => server.listen(PORT, r));
+await answers(`http://localhost:${PORT}`);
 
 /** Everything a press could plausibly move, as one string. */
 const SNAPSHOT = () => {
@@ -321,6 +327,7 @@ for (const row of rows) {
 process.stdout.write('\n');
 await browser.close();
 server.close();
+await record.close();
 
 console.log(
   `  keys: ${checked} bare binding(s) pressed in their own scope, ${skipped} skipped, ${dead.length} dead` +

@@ -30,7 +30,7 @@ import { createDirectory, type Directory as Dir } from '@braindog/record/directo
 import { alarmScheduler } from './alarm.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { recordOf, servesApi } from './route.ts';
+import { DEMO_CONTEXT, demoRecord, inward, recordOf, servesApi } from './route.ts';
 
 type EmailBinding = { send(message: { to: string; subject: string; text: string }): Promise<void> };
 
@@ -50,6 +50,12 @@ type Env = {
   BRAINDOG_BUILD?: string;
   /** Empty when no Spark is wired, so `/api/spark/*` is not routed at all (`33 §4`). */
   SPARK_ENDPOINT?: string;
+  /**
+   * The one record an anonymous GET reads, for the public demo, or empty for none. `demoRecord` in
+   * `route.ts` is the whole of what it opens. Declared empty in `wrangler.jsonc`, like
+   * `BRAINDOG_BUILD`, so the key exists and an unset deploy is `""` rather than a missing binding.
+   */
+  DEMO_RECORD?: string;
 };
 
 /** The `Sql` port over the Durable Object's own SQLite. Storage in the same thread as the code. */
@@ -461,6 +467,13 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (!servesApi(url.pathname))
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
 
+    /* THE PUBLIC DEMO, WHICH IS THE ONE EXCEPTION TO THE PARAGRAPH BELOW, and it is not "whichever
+       record was named": nothing the caller sent names it, and `demoRecord` says everything it opens.
+       It skips the Directory on purpose. The Directory answers which record a NAME means, and this
+       has no name, only the deployment's constant. */
+    const pinned = demoRecord(request, env.DEMO_RECORD);
+    if (pinned) return env.RECORD.get(env.RECORD.idFromName(pinned)).fetch(inward(request, DEMO_CONTEXT));
+
     /* NOTHING GETS IN WITHOUT SAYING WHO IT IS. This Worker serves MANY records; an unauthenticated
        request falling back to a constant person is that person's access on whichever record was
        named, which on a multi-tenant host is not a default, it is a hole. A self-host has one person
@@ -511,19 +524,15 @@ async function route(request: Request, env: Env): Promise<Response> {
 
     /* THE PATH TRAVELS UNCHANGED, because there is no prefix left to strip. `serveApi` reads the
        method out of `/api/<method>` on both hosts, from the same table. */
-    const inner = new Request(request);
     /* AND THE REGISTER CEILING TRAVELS WITH IT, or a person invited to one register reaches every
-       one of them — which is the whole of what "invite the bookkeeper" was supposed to mean. */
-    inner.headers.set(
-      'x-braindog-ctx',
-      JSON.stringify({
+       one of them — which is the whole of what "invite the bookkeeper" was supposed to mean.
+       `inward` writes the context over whatever the caller sent and drops the bearer, the same way
+       for both doors. */
+    return record.fetch(
+      inward(request, {
         principal,
         ...(held.registers === null ? {} : { registers: held.registers }),
         ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
-      } satisfies CallContext),
+      }),
     );
-    /* AND THE BEARER DOES NOT TRAVEL FURTHER. The record has no use for it and every hop a
-       credential takes is another place it can be logged. */
-    inner.headers.delete('authorization');
-    return record.fetch(inner);
 }

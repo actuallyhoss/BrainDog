@@ -65,11 +65,22 @@ if (ENV !== '' && !(ENVIRONMENTS as readonly string[]).includes(ENV))
  */
 const PALETTE = fileURLToPath(new URL(`../../packages/skin/${ENV === '' ? 'house' : ENV}.css`, import.meta.url));
 
+/**
+ * WHERE `/api` GOES WHEN VITE SERVES THIS APP: `BRAINDOG_API`, or a record on this machine.
+ *
+ * The register list reads the record from its own origin, as it does on both hosts, so under
+ * `vite dev` and `vite preview` something has to answer `/api/*` from this origin. `node
+ * tools/gates/record.mjs` serves the seed on 8787, which is also where `wrangler dev` listens, and
+ * `BRAINDOG_API` points it anywhere else. Nothing listening is not a failure: the proxy answers with
+ * an error page, the client reads that as `UNREACHABLE`, and the list draws the sample.
+ */
+const API = process.env.BRAINDOG_API ?? 'http://127.0.0.1:8787';
+
 export default defineConfig({
   plugins: [sveltekit()],
   define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT), __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
-  server: { port: 5183, strictPort: true },
-  preview: { port: 5183, strictPort: true },
+  server: { port: 5183, strictPort: true, proxy: { '/api': API } },
+  preview: { port: 5183, strictPort: true, proxy: { '/api': API } },
   build: { target: 'es2022', cssMinify: 'lightningcss' },
 });

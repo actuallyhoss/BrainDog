@@ -33,6 +33,7 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness, skipDir } from './lib.mjs';
+import { answers, forward, startRecord } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -183,6 +184,9 @@ if (!(await stat(ROOT).catch(() => null))) {
   process.exit(3);
 }
 
+/* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
+const record = await startRecord();
+
 /**
  * WHAT THIS GATE IS ALLOWED TO CALL A MEASUREMENT.
  *
@@ -205,6 +209,7 @@ let serving = ROOT;
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
+  if (url.pathname.startsWith('/api/')) return forward(req, res, record.base);
   const rel = decodeURIComponent(url.pathname).slice(1);
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
@@ -222,6 +227,7 @@ const server = createServer(async (req, res) => {
   res.writeHead(404).end();
 });
 await new Promise((r) => server.listen(PORT, r));
+await answers(`http://localhost:${PORT}`);
 
 const present = [];
 for (const v of VARIANTS) if (await stat(v.root).catch(() => null)) present.push(v);
@@ -520,6 +526,7 @@ serving = ROOT;
 
 await browser.close();
 server.close();
+await record.close();
 
 console.log(
   `  layout: ${checked} page-runs over ${widths.length} widths ` +

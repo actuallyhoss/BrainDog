@@ -12,7 +12,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
-  import { holeLabel, relative, since } from 'braindog-render';
+  import { holeLabel, relative, since, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -21,7 +21,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { actorOf, AUDIT, backlinks, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, values } from '$lib/record/api.ts';
+  import { actorOf, AUDIT, backlinks, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, toneOf, values } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -64,6 +64,7 @@
   const state = $derived(decl?.state ? String(row?.fields[decl.state] ?? '') : '');
   const tone = $derived(decl?.done?.includes(state) ? ('good' as const) : undefined);
 
+
   /* A `document` is an argument, not a figure, so it never sits in the field list beside a date and
      a currency — it gets the room prose needs (05 §7.1). */
   /* `readableFields` and not `decl.fields`: a register's identity mark and its frozen hue are
@@ -71,6 +72,29 @@
      about the project rather than the reason it has a triangle beside its name. */
   const documents = $derived(readableFields(id).filter((f) => f.type === 'document'));
   const shortFields = $derived(readableFields(id).filter((f) => f.type !== 'document'));
+
+  /**
+   * WHAT THE ROW IS, BEFORE WHAT IT HOLDS.
+   *
+   * The page opened on a list of labelled fields, one per line, which is how a database shows a
+   * record and not how anybody reads an invoice. A person opening one wants three things first: how
+   * much, where it stands, and when. So the first money field is the page's figure, the state is a
+   * word in its tone with its glyph, and the deadline sits beside it with how far off it is. The tone
+   * is the list's own (`toneOf`), so a row drawn late in the list is drawn late here.
+   *
+   * A FIELD SHOWN HERE IS NOT SHOWN TWICE. The list below keeps everything else, and keeps these too
+   * when they are empty, because "Not set" is a fact about the row that the lead has no room for.
+   */
+  const figureField = $derived(shortFields.find((f) => f.type === 'money'));
+  const dueField = $derived(shortFields.find((f) => (f as { deadline?: boolean }).deadline === true));
+  const figure = $derived(figureField && row ? amountOf(row.fields[figureField.id]) : null);
+  const leadTone = $derived(row ? (toneOf(id, row) ?? tone) : undefined);
+  const due = $derived(dueField && row ? row.fields[dueField.id] : undefined);
+  const hasLead = $derived(figure !== null || state !== '');
+  const leadIds = $derived(
+    new Set([figure !== null ? figureField?.id : undefined, due ? dueField?.id : undefined, state ? decl?.state : undefined].filter((x): x is string => Boolean(x))),
+  );
+  const listed = $derived(shortFields.filter((f) => !leadIds.has(f.id)));
 
   const resolved = values();
   const resolve = (path: string) => resolved[path] ?? null;
@@ -197,12 +221,32 @@
   </PageHead>
 
   <div class="page">
+    {#if hasLead && row && decl}
+      <section class="lead" aria-label={decl.one}>
+        {#if figure !== null && figureField}
+          <p class="lead-figure num">
+            <Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" />
+          </p>
+        {/if}
+        <p class="lead-line">
+          {#if state}
+            <span class="lead-state" data-intent={leadTone}>
+              {#if leadTone}<span class="glyph" role="img" aria-label={TONES[leadTone].label}>{TONES[leadTone].glyph}</span>{/if}
+              <span class="lead-word">{state.replace(/_/g, ' ')}</span>
+            </span>
+          {/if}
+          {#if due && dueField}
+            <span class="lead-due">{labelOf(dueField)} {display(id, dueField.id, due)} <span class="rel">{relative(String(due), NOW)}</span></span>
+          {/if}
+        </p>
+      </section>
+    {/if}
     <div class="split">
       <section class="fields">
         <dl class="field-list">
-          {#each shortFields as f}
+          {#each listed as f}
             {@const value = row.fields[f.id]}
-            <div class="field">
+            <div class="fact">
               <dt class="field-label">{labelOf(f)}</dt>
               <dd class="field-value" data-type={f.type} dir={dirOf(id, f.id)}>
                 {#if value === null || value === undefined || value === ''}
@@ -216,6 +260,8 @@
                 {:else if f.type === 'day'}
                   {display(id, f.id, value)}
                   <span class="rel">{relative(String(value), NOW)}</span>
+                {:else if f.type === 'enum'}
+                  <span class="enum-word">{display(id, f.id, value)}</span>
                 {:else}
                   {display(id, f.id, value)}
                 {/if}
@@ -407,7 +453,10 @@
     margin: 0;
   }
 
-  .field {
+  /* A FACT AND NOT A FIELD. The class was field, which controls.css gives to a text-input wrapper, so
+     every row of this list wore an input box: a surface, a border and a radius, eight boxes that read
+     as a form to fill in. The name is the fix; nothing here fights the input style. */
+  .fact {
     display: grid;
     grid-template-columns: minmax(0, 16ch) minmax(0, 1fr);
     gap: var(--sp-4);
@@ -416,7 +465,7 @@
     border-block-end: 1px solid var(--line);
   }
 
-  .field:last-child {
+  .fact:last-child {
     border-block-end: 0;
   }
 
@@ -556,5 +605,68 @@
     .page {
       padding: var(--sp-4) var(--sp-4) var(--sp-8);
     }
+  }
+
+  /* The row's figure, its state and its date, above the fields. See `figureField` for why. */
+  .lead {
+    display: grid;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-6);
+  }
+
+  .lead-figure {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-3xl);
+    font-weight: 600;
+    letter-spacing: var(--tr-tight);
+    line-height: var(--lh-3xl);
+  }
+
+  /* The code in front of the figure at half its size, the way every headline figure sets it. */
+  .lead-figure :global(.code) {
+    font-size: 0.5em;
+    font-weight: 600;
+  }
+
+  .lead-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-4);
+    margin: 0;
+    color: var(--ink2);
+  }
+
+  /* The state in its tone as TEXT on the page's own ground, never over a tint of itself. */
+  .lead-state {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--sp-1);
+    color: var(--tone, var(--ink));
+    font-weight: 600;
+  }
+
+  /* Sentence case in the stylesheet, so the text stays the record's own word. */
+  .lead-word {
+    display: inline-block;
+  }
+
+  .lead-word::first-letter {
+    text-transform: uppercase;
+  }
+
+  .lead-due .rel {
+    margin-inline-start: var(--sp-1);
+    color: var(--dim);
+  }
+
+  /* A declared value in sentence case, in the stylesheet, so the text stays the record's own word. */
+  .enum-word {
+    display: inline-block;
+  }
+
+  .enum-word::first-letter {
+    text-transform: uppercase;
   }
 </style>

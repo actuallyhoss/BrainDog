@@ -1,10 +1,10 @@
 <!--
   The site shell: a bar, the page, a footer.
 
-  NO JAVASCRIPT IS REQUIRED TO READ THIS SITE. The nav is links, the theme follows the operating
-  system, and there is nothing to hydrate: the only interactive thing on any page is the anchor you
-  click. That is not a performance stunt; it is what a prerendered document IS, and every script a
-  marketing page adds is a script between a stranger and the first sentence.
+  NOTHING HERE IS NEEDED TO READ THE SITE. The nav is links, the theme follows the operating system,
+  and every page is finished HTML. The one thing scripting adds is closing the phone menu after a
+  tap, on a press of Escape or on a tap outside it; without scripting it is a native disclosure
+  that opens and closes on its own button, and a link inside it loads the next page anyway.
 -->
 <script lang="ts">
   import '@braindog/skin/tokens.css';
@@ -16,14 +16,45 @@
   import '@braindog/skin/a11y.css';
   import '../app.css';
 
+  import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
+  import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
   import { APP, DOCS, SOURCE, site } from '$lib/copy.ts';
 
   let { children } = $props();
 
+  let menuOpen = $state(false);
+  let menu: HTMLDetailsElement | undefined = $state();
+
+  /* `Design` AND `Source` ARE ABSENT WHILE THE REPOSITORY IS PRIVATE. A link in a site's own
+     navigation that answers 404 is the loudest thing a site can say about how carefully it was
+     made. They come back with the repository, from one constant. */
+  const links: { href: string; label: string }[] = [
+    { href: '/pricing', label: site.nav.pricing },
+    { href: '/changelog', label: site.nav.changelog },
+    ...(DOCS ? [{ href: DOCS, label: site.nav.docs }] : []),
+    ...(SOURCE ? [{ href: SOURCE, label: site.nav.source }] : []),
+  ];
+
   const here = (href: string) => page.url.pathname === href;
+
+  afterNavigate(() => {
+    menuOpen = false;
+  });
+
+  const outside = (event: MouseEvent) => {
+    if (menuOpen && menu && event.target instanceof Node && !menu.contains(event.target)) menuOpen = false;
+  };
+
+  const escape = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || !menuOpen) return;
+    menuOpen = false;
+    menu?.querySelector('summary')?.focus();
+  };
 </script>
+
+<svelte:window onclick={outside} onkeydown={escape} />
 
 <a class="skip" href="#main">Skip to content</a>
 
@@ -35,20 +66,35 @@
     </a>
 
     <nav class="links" aria-label="Site">
-      <a href="/pricing" aria-current={here('/pricing') ? 'page' : undefined}>{site.nav.pricing}</a>
-      <a href="/changelog" aria-current={here('/changelog') ? 'page' : undefined}>{site.nav.changelog}</a>
-      <!-- `Design` AND `Source` ARE ABSENT WHILE THE REPOSITORY IS PRIVATE. A link in a site's own
-           navigation that answers 404 is the loudest thing a site can say about how carefully it
-           was made. They come back with the repository, from one constant. -->
-      {#if DOCS}<a href={DOCS}>{site.nav.docs}</a>{/if}
-      {#if SOURCE}<a href={SOURCE}>{site.nav.source}</a>{/if}
+      {#each links as link}
+        <a href={link.href} aria-current={here(link.href) ? 'page' : undefined}>{link.label}</a>
+      {/each}
     </nav>
 
-    <!-- AN OUTLINE PILL AND NOT A FILLED ONE. Every page has its own filled primary (the hero, the
-         hosted plan, the changelog's status) and a filled button up here made two answers to "what
-         do I do" in the first screen of each. This one is the way in from anywhere, and it stays
-         visible and one tap away without competing with the page it sits over. -->
+    <!-- A QUIET PILL AND NOT A FILLED ONE. Every page has its own filled primary (the hero, the
+         hosted plan, the changelog's status), and a filled button up here made two answers to
+         "what do I do" in the first screen of each. -->
     <a class="btn btn-sm cta" href={APP}>{site.nav.open}</a>
+
+    <!-- THE PHONE'S BAR IS ONE ROW. It was two: the brand and the action, then the links on a line
+         of their own, over a hundred pixels before the first word of the page. The links live in
+         this disclosure under a thumb-sized button instead, and the action stays in the bar. -->
+    <details class="menu" bind:open={menuOpen} bind:this={menu}>
+      <summary class="menu-btn" aria-label={site.nav.menu}>
+        <Icon name={menuOpen ? 'close' : 'rows'} />
+      </summary>
+      <nav class="menu-panel" aria-label="Site">
+        {#each links as link}
+          <a
+            class="menu-link"
+            href={link.href}
+            aria-current={here(link.href) ? 'page' : undefined}
+            onclick={() => (menuOpen = false)}>{link.label}<Icon name="arrow" size="s" /></a
+          >
+        {/each}
+        <a class="btn menu-app" href={APP}>{site.nav.open}</a>
+      </nav>
+    </details>
   </div>
 </header>
 
@@ -98,40 +144,36 @@
     transform: none;
   }
 
-  /* Translucent and blurred, and this is the ONE place in the product that gets to be. The app
-     refuses it because translucency behind a column of small tabular digits is a measurable
-     legibility cost; a marketing page has no such column, and a bar you can see the page moving
-     under is the cheapest way to say the page is long. */
+  /* Translucent and blurred, and this is the ONE place in the product that gets to be: a marketing
+     page has no column of small tabular digits for the blur to cost anything against. */
   .bar {
     position: sticky;
     inset-block-start: 0;
     z-index: var(--z-hint);
-    background: color-mix(in srgb, var(--bg) 80%, transparent);
-    backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
     border-block-end: 1px solid var(--line);
   }
 
-  /* `flex-wrap`, because a brand, links and an action in one non-wrapping row once ran 472px wide
-     inside a 320px screen and pushed the whole document sideways. */
   .bar-in,
   .foot-in {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
     max-inline-size: 1140px;
     margin-inline: auto;
     padding-inline: var(--sp-5);
   }
 
   .bar-in {
-    gap: var(--sp-2) var(--sp-4);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
     padding-block: 10px;
   }
 
-  /* `--ctl-h` is 36 on a fine pointer and 44 under a thumb, which is `13 §7`'s rule for every
-     target in the bar: as small as a mouse allows, as large as a finger needs. */
+  /* `--ctl-h` is 36 on a fine pointer and 44 under a thumb: as small as a mouse allows, as large as
+     a finger needs. */
   .brand {
     display: flex;
+    flex: none;
     align-items: center;
     min-block-size: var(--ctl-h);
     gap: 10px;
@@ -174,22 +216,96 @@
     color: var(--ink);
   }
 
-  .links a:active {
+  .links a:active,
+  .menu-link:active {
     opacity: var(--press-dim);
     transition-duration: var(--d-press);
     transition-timing-function: var(--ease-push);
   }
 
-  /**
-   * NO MARGIN OVER THE FOOTER, and each page pays for its own bottom instead. A margin on a shared
-   * shell cannot know whether the thing above it is a card or a paragraph, and only the page knows
-   * that. The same ground as the page, and one hairline.
-   */
+  .cta {
+    flex: none;
+  }
+
+  .menu {
+    display: none;
+  }
+
+  .menu-btn {
+    display: grid;
+    place-items: center;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .menu-btn::-webkit-details-marker {
+    display: none;
+  }
+
+  .menu[open] .menu-btn {
+    background: var(--s2);
+    border-color: var(--edge);
+  }
+
+  /* Under the bar, the width of the screen less its gutters, and the bar is what positions it. */
+  .menu-panel {
+    position: absolute;
+    inset-block-start: calc(100% + var(--sp-2));
+    inset-inline: var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-2);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e3);
+  }
+
+  /* CLOSED, THE PANEL IS NOT LAID OUT AT ALL. A closed disclosure only skips painting its content,
+     so a measurement still finds the links, squeezed into the button's own box and past the edge
+     of the screen. */
+  .menu:not([open]) .menu-panel {
+    display: none;
+  }
+
+  .menu-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-block-size: var(--tap);
+    padding-inline: var(--sp-3);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .menu-link:hover,
+  .menu-link[aria-current] {
+    background: var(--hover-wash);
+  }
+
+  .menu-app {
+    margin-block-start: var(--sp-2);
+  }
+
+  /* No margin over the footer: each page pays for its own bottom, because only the page knows
+     whether the thing above it is a card or a paragraph. */
   .foot {
     border-block-start: 1px solid var(--line);
   }
 
   .foot-in {
+    display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     gap: var(--sp-7);
     padding-block: var(--sp-7) var(--sp-8);
@@ -220,7 +336,6 @@
     min-inline-size: 12ch;
   }
 
-  /* A sentence-case heading in the ink, not a tracked uppercase label in the dim. */
   .foot-title {
     margin-block-end: var(--sp-1);
     color: var(--ink);
@@ -230,8 +345,7 @@
     letter-spacing: 0;
   }
 
-  /* Each row is its own target: 36 under a mouse and 44 under a thumb, and never narrower than it
-     is tall. Three links in a 60px band was the classic wrong-link tap. */
+  /* Each row is its own target: 36 under a mouse and 44 under a thumb, never narrower than tall. */
   .foot-col a {
     display: inline-flex;
     align-items: center;
@@ -251,54 +365,31 @@
     opacity: var(--press-dim);
   }
 
-  /* THE TWO LINKS THIS DROPS ARE NOT DRAWN TODAY. `Design` and `Source` are absent while the
-     repository is private, so `.links` holds exactly two anchors and this matches nothing. It is
-     here for the day the repository opens and the bar has four links to fit. */
-  @media (width < 760px) {
-    .links a:nth-child(n + 3) {
-      display: none;
-    }
-  }
-
   /**
-   * THE PHONE: TWO ROWS, AND THEY SCROLL AWAY.
-   *
-   * A brand, two links and an action need about 450px in one row and a phone has 320 to 430, so
-   * the bar is two rows here: the brand on the left and the action on the right, where every phone
-   * puts one, and the links on their own line beneath. `order` rather than a second markup, so a
-   * screen reader and a keyboard still meet brand, navigation, action in that order.
-   *
-   * NOT STICKY ON A PHONE. Two rows pinned is over a hundred pixels, an eighth of the screen spent
-   * for the whole scroll on a bar the reader needs once. On a phone the page's own actions are
-   * full-width pills a thumb reaches anyway.
+   * THE PHONE: ONE ROW. The brand, the app pill and the menu button, and nothing wraps. Under 370px
+   * the pill steps into the menu too, because a brand, a pill and a button need about 345px and the
+   * narrowest screens this is measured at are 320 and 360.
    */
   @media (width < 640px) {
-    .bar {
-      position: static;
-    }
-
     .bar-in,
     .foot-in {
       padding-inline: var(--sp-4);
     }
 
-    /* `> .brand`, because the footer's brand is a `.brand` too and moving it would introduce the
-       company after quoting its slogan. */
-    .bar-in > .brand {
-      order: 1;
-    }
-
-    .cta {
-      order: 2;
-      margin-inline-start: auto;
+    .bar-in {
+      gap: var(--sp-2);
     }
 
     .links {
-      order: 3;
-      flex-basis: 100%;
-      /* The first link's own padding, pulled back so its text starts on the brand's left edge. It
-         also cancels the `auto` that pushes the links right on every wider screen. */
-      margin-inline-start: calc(var(--sp-3) * -1);
+      display: none;
+    }
+
+    .cta {
+      margin-inline-start: auto;
+    }
+
+    .menu {
+      display: block;
     }
 
     .foot-in {
@@ -307,6 +398,16 @@
 
     .foot-brand {
       flex-basis: 100%;
+    }
+  }
+
+  @media (width < 370px) {
+    .cta {
+      display: none;
+    }
+
+    .menu {
+      margin-inline-start: auto;
     }
   }
 </style>

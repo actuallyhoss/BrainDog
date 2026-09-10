@@ -19,6 +19,7 @@
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
+  import Tag from '$lib/Tag.svelte';
   import type { Hue } from '$lib/icons.ts';
   import { APP, SOURCE, site } from '$lib/copy.ts';
 
@@ -345,17 +346,18 @@
     if (last?.date === entry.date) last.entries.push(entry);
     else DAYS.push({ date: entry.date, entries: [entry] });
   }
+
+  /** How many of each kind, counted from the list above so the numbers cannot drift from it. */
+  const KINDS = ['shipped', 'fixed', 'changed'] as const;
+  const COUNT: Record<Entry['kind'], number> = { shipped: 0, changed: 0, fixed: 0 };
+  for (const entry of ENTRIES) COUNT[entry.kind] += 1;
 </script>
 
 <svelte:head>
-  <!-- ITS OWN SENTENCE, in `copy.ts`. The description was `STATUS.body` at 522 characters, which
-       a search result and a shared card both cut mid-paragraph. -->
+  <!-- ITS OWN SENTENCE, in copy.ts. The description was STATUS.body at 522 characters, which a
+       search result and a shared card both cut mid-paragraph. -->
   <title>{site.meta.changelog.title}</title>
   <meta name="description" content={site.meta.changelog.description} />
-  <!-- THE CANONICAL AND THE PREVIEW, from the same two sentences the page already has, so there is
-       one description per page rather than two that can disagree. The canonical matters because
-       `www` 301s here and a preview fetcher that followed the redirect would otherwise cite the
-       hostname it started from. -->
   <link rel="canonical" href="https://brain.dog/changelog" />
   <meta property="og:url" content="https://brain.dog/changelog" />
   <meta property="og:title" content={site.meta.changelog.title} />
@@ -363,17 +365,26 @@
 </svelte:head>
 
 <section class="head">
+  <Tag icon="observe" hue="earn" label={site.changelog.kicker} />
   <h1 class="title">{site.nav.changelog}</h1>
+  <p class="lede">{site.changelog.lede}</p>
+  <!-- THE COUNTS ARE COUNTED, from the list below, so they cannot drift from it. -->
+  <p class="counts">
+    <span class="count-all">{site.changelog.count(ENTRIES.length, DAYS.length)}</span>
+    {#each KINDS as kind}
+      <span class="kind" data-hue={HUE[kind]}><span class="dot"></span>{COUNT[kind]} {LABEL[kind]}</span>
+    {/each}
+  </p>
+
   <div class="status">
-    <span class="glyph" data-hue="earn"><Icon name="observe" /></span>
+    <span class="live" aria-hidden="true"><span class="pulse"></span></span>
     <div class="status-copy">
       <h2 class="status-title">{STATUS.title}</h2>
       <p class="status-body">{STATUS.body}</p>
-      <!-- ONE ACTION WHILE THE REPOSITORY IS PRIVATE, and it was two. The second offered the source
-           as the check on the sentence above it, and answered 404. The one left is this page's
-           filled primary: the status says the app is live, and this is how you see that it is. -->
+      <!-- ONE ACTION WHILE THE REPOSITORY IS PRIVATE, and it is this page's filled primary: the
+           status says the app is live, and this is how you see that it is. -->
       <p class="status-links">
-        <a class="btn btn-primary" href={APP}>{site.nav.open}</a>
+        <a class="btn btn-primary" href={APP}>{site.nav.open}<Icon name="arrow" /></a>
         {#if SOURCE}<a class="btn" href={SOURCE}>{site.nav.source}</a>{/if}
       </p>
     </div>
@@ -383,14 +394,12 @@
 <div class="log">
   {#each DAYS as day}
     <section class="day">
-      <!-- A machine-readable date beside a human one. The `datetime` is what a feed reader and a
-           search engine read; the text is what a person reads, and they are the same day. It is
-           a heading now rather than a caption, because it is what the entries under it belong
-           to, and it holds its place at the top of the window while they scroll past. -->
+      <!-- A machine-readable date beside a human one, as a heading, because it is what the entries
+           under it belong to, and it holds its place while they scroll past. -->
       <h2 class="day-date"><time class="num" datetime={day.date}>{day.date}</time></h2>
       <ol class="entries">
         {#each day.entries as entry}
-          <li class="entry">
+          <li class="entry" data-hue={HUE[entry.kind]}>
             <h3 class="entry-title">
               <span class="kind" data-hue={HUE[entry.kind]}><span class="dot"></span>{LABEL[entry.kind]}</span>{entry.title}
             </h3>
@@ -411,28 +420,69 @@
   }
 
   .head {
-    padding-block: clamp(48px, 7vw, 88px) var(--sp-6);
+    padding-block: clamp(48px, 7vw, 96px) var(--sp-6);
   }
 
   .title {
-    font-size: clamp(36px, 3vw + 20px, 56px);
-    line-height: 1.05;
-    letter-spacing: -0.032em;
+    margin-block-start: var(--sp-4);
+    font-size: clamp(40px, 3.4vw + 22px, 68px);
+    line-height: 1.02;
+    letter-spacing: -0.04em;
   }
 
-  /* The state of the product, as a card with a pulse on it: it is the one thing on the page that
-     is about now rather than a day in the past. It had a 3px warn-coloured bar down its edge, which
-     read as an alarm about a product that is, in fact, working. */
+  .lede {
+    max-inline-size: 46ch;
+    margin-block-start: var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-lg);
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .counts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-5);
+  }
+
+  .count-all {
+    margin-inline-end: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* The state of the product, as the one card on the page with a pulse on it: it is the only thing
+     here that is about now rather than a day in the past. */
   .status {
     display: flex;
     align-items: flex-start;
     gap: var(--sp-4);
     margin-block-start: var(--sp-6);
     padding: var(--sp-5);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1);
+    background: var(--accent-ground);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+    border-radius: calc(var(--r-lg) + 4px);
+    box-shadow: var(--e2);
+  }
+
+  .live {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    background: color-mix(in srgb, var(--earn) 14%, transparent);
+    border-radius: var(--r-pill);
+  }
+
+  .pulse {
+    inline-size: 10px;
+    block-size: 10px;
+    background: var(--earn);
+    border-radius: var(--r-pill);
   }
 
   .status-copy {
@@ -463,11 +513,6 @@
     margin-block-start: var(--sp-1);
   }
 
-  /**
-   * `margin-block`, NOT `margin`. The rule above centres `.head, .log` with `margin-inline: auto`,
-   * and a `margin: 0` here once reset it, so the dates sat 245 pixels left of the title they
-   * belonged to. The page's own bottom is paid here too: the shell puts no margin over the footer.
-   */
   .log {
     padding-block-end: var(--sp-8);
   }
@@ -480,35 +525,48 @@
     border-block-start: 1px solid var(--line);
   }
 
-  /**
-   * THE DATE HOLDS ITS PLACE WHILE ITS OWN ENTRIES GO PAST. Six entries share 2026-09-10, so one
-   * heading per day is stuck under the bar, and four paragraphs into a day you can still see which
-   * day it is. `--sticky` is the token the base stylesheet reserves for exactly this height.
-   */
   .day-date {
     position: sticky;
     inset-block-start: calc(var(--sticky) + var(--sp-4));
     align-self: start;
     color: var(--dim);
-    /* The body face with lining figures: a date is a word you read, not an identifier. */
+    font-family: var(--font-ui);
     font-size: var(--t-sm);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
   }
 
+  /* A RAIL DOWN THE DAY, and a dot on it for each entry in the entry's own hue, so a day reads as
+     a short run of things that happened rather than a stack of paragraphs. */
   .entries {
     display: flex;
     flex-direction: column;
     gap: var(--sp-6);
     margin: 0;
-    padding-inline: 0;
+    padding-inline: var(--sp-5) 0;
+    border-inline-start: 1px solid var(--line);
     list-style: none;
   }
 
-  /* A pill on the title's own line: it is what KIND of change the title describes. The word is in
-     the ink and the hue is a dot and a wash, so the kind reads the same to somebody who does not
-     see green, and the contrast is the ink's rather than a tint's. */
+  .entry {
+    position: relative;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 0.55em;
+    inset-inline-start: calc(var(--sp-5) * -1 - 5px);
+    inline-size: 9px;
+    block-size: 9px;
+    background: var(--hue);
+    border-radius: var(--r-pill);
+    box-shadow: 0 0 0 3px var(--bg);
+  }
+
+  /* A pill on the title's own line: the word is in the ink and the hue is a dot and a wash, so the
+     kind reads the same to somebody who does not see green. */
   .kind {
     display: inline-flex;
     align-items: center;
@@ -548,6 +606,29 @@
     text-wrap: pretty;
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    .live::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 2px solid var(--earn);
+      border-radius: var(--r-pill);
+      animation: pulse 2.4s var(--ease-out) infinite;
+    }
+  }
+
+  @keyframes pulse {
+    from {
+      opacity: 0.7;
+      transform: scale(0.5);
+    }
+
+    to {
+      opacity: 0;
+      transform: scale(1.4);
+    }
+  }
+
   @media (width < 760px) {
     .day {
       grid-template-columns: minmax(0, 1fr);
@@ -555,19 +636,21 @@
       padding-block: var(--sp-5);
     }
 
-    /* Not sticky on a phone: a date pinned on a 390px screen is a line of the reading area spent on
-       a string the reader can scroll back four inches to find. */
+    /* Not sticky on a phone: a pinned date on a 390px screen is a line of reading area spent on a
+       string the reader can scroll back four inches to find. */
     .day-date {
       position: static;
     }
   }
 
-  /* On a phone the glyph sits over the status rather than beside it, so the paragraph gets the
-     whole width, and the action is a full-width pill. */
   @media (width < 640px) {
     .head,
     .log {
       padding-inline: var(--sp-4);
+    }
+
+    .lede {
+      font-size: var(--t-md);
     }
 
     .status {
@@ -579,6 +662,14 @@
     .status-links {
       align-self: stretch;
       flex-direction: column;
+    }
+
+    .entries {
+      padding-inline-start: var(--sp-4);
+    }
+
+    .entry::before {
+      inset-inline-start: calc(var(--sp-4) * -1 - 5px);
     }
   }
 </style>
