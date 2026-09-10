@@ -1444,63 +1444,6 @@
     -->
     {#if siftable && searched.length > 0}<p class="bar-note">{copy.filterBySearch(searched)}</p>{/if}
 
-    <!-- WHAT THE RECORD NOTICED, ON THE SCREEN IT IS ABOUT.
-
-         The observe loop is the most careful mechanism in this product — nine signals, four
-         detectors whose counts come from the rule of three, a dispersion requirement on every one
-         because a burst is not a pattern — and none of it had ever reached a person. It went here
-         and not on a findings page because `write.refused` carries `<register>.<field>:<code>`,
-         which IS this screen: the grid somebody keeps being refused at.
-
-         IT IS A NOTE, NOT AN ALARM. Nothing is broken and nothing is urgent; a thing has been
-         happening for weeks and the record is the only one that counted. `role="note"` and no
-         intent colour, because the day it looks like an error is the day it gets dismissed
-         unread. -->
-    <!-- AND NOT ON SOMEBODY'S FIRST MINUTE. This reports a pattern over thirty days on a register
-         that has been written to repeatedly — it is addressed to whoever maintains the declaration,
-         and it was the largest thing on the screen a person landed on after typing their first row,
-         reading "12 writes to Direction were refused … ENUM_VALUE_UNKNOWN · 30d". -->
-    <!-- AND NOT OVER AN EMPTY RESULT EITHER. It is a note about a register somebody writes to, and
-         a screen showing no rows is not the moment to read it. -->
-    {#if seen && !arriving && result.entries.length > 0}
-      <aside class="seen" role="note">
-        <Icon name="observe" size="s" />
-        <p class="seen-said">
-          <!-- `saves` AND `rejected`, WHICH WERE `writes` AND `refused`. Both are this product's own
-               words for the mechanism, and this banner sits on the front of the busiest list in the
-               product: a friction pass counted it as three tax words in one sentence, met by
-               somebody who came to look at their invoices. A write is a save and a refusal is a
-               rejection, in every product a person has used before this one. The CODE stays, in
-               the quiet strip below, because the sentence is for the person and the code is for
-               whoever they ask for help: showing only the friendly half leaves that person nothing
-               to search for. -->
-          <strong>{seen.n} saves</strong> to
-          <!-- A NAME AND NOT A LINK. The writes were REFUSED, so there are no rows to filter to and
-               nowhere in this build that shows a field's own declaration; a link that went to a
-               filter matching nothing would be worse than the plain word. -->
-          {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}{copy.thisList}{/if}
-          were rejected over {seen.days} days: {seen.fix}.
-          <!-- NO `title`. It carried `seen.why` — the same fact as the sentence beside it, in the
-               schema's spelling, in an attribute no touch device shows and no keyboard reaches. Two
-               tellings of one thing, one of them unreachable. -->
-          <span class="seen-code">{seen.code} · {seen.window}</span>
-        </p>
-        <Button
-          weight="quiet"
-          onclick={() =>
-            /* `rejected saves` AND NOT `refused writes`. The banner three lines up deliberately says
-               the first pair, because a friction pass counted the second as two tax words on the
-               front of the busiest list in the product, and this toast kept saying the old ones: one
-               screen, one gesture apart, two vocabularies for the same fact. */
-            toasts.push(
-              copy.notWritten(
-                `${seen?.field?.label ?? id} would be raised as a question on /decide, with the ${seen?.n} rejected saves attached`,
-              ),
-              { intent: 'warn' },
-            )}
-        >{copy.raiseIt}</Button>
-      </aside>
-    {/if}
 
     <!--
       CAPTURE, FIRST ON THE PAGE.
@@ -1881,6 +1824,78 @@
         <CapLine shown={drawn} total={result.matched} />
       {/if}
       </div>
+    {/if}
+
+    <!-- AND UNDER THE ROWS, NOT OVER THEM.
+
+         Measured on the built app at 390px: the sample bar, the header, the filter bar, its note,
+         this and the capture line put the first row at 865px of an 844px viewport, so somebody
+         opening their list of money saw no rows at all without scrolling. This note is 152px of
+         that, and it is the one piece of it that is not about the rows: its own paragraph below
+         says it is not an alarm, that nothing is broken and nothing is urgent, and that it is
+         addressed to whoever maintains the declaration rather than to whoever came to look at
+         their invoices. A thing that is not urgent does not go above the thing a person came for.
+
+         UNDER THE ROWS AND NOT BEHIND A WIDTH, because `13 §10` is that a phone shows a DECLARED
+         subset rather than a media-queried one, and because the argument holds at every width: it
+         was 152px over the rows on a desktop too.
+
+         WHAT THE RECORD NOTICED, ON THE SCREEN IT IS ABOUT.
+
+         The observe loop is the most careful mechanism in this product — nine signals, four
+         detectors whose counts come from the rule of three, a dispersion requirement on every one
+         because a burst is not a pattern — and none of it had ever reached a person. It went here
+         and not on a findings page because `write.refused` carries `<register>.<field>:<code>`,
+         which IS this screen: the grid somebody keeps being refused at.
+
+         IT IS A NOTE, NOT AN ALARM. Nothing is broken and nothing is urgent; a thing has been
+         happening for weeks and the record is the only one that counted. `role="note"` and no
+         intent colour, because the day it looks like an error is the day it gets dismissed
+         unread. -->
+    <!-- AND NOT ON SOMEBODY'S FIRST MINUTE. This reports a pattern over thirty days on a register
+         that has been written to repeatedly — it is addressed to whoever maintains the declaration,
+         and it was the largest thing on the screen a person landed on after typing their first row,
+         reading "12 writes to Direction were refused … ENUM_VALUE_UNKNOWN · 30d". -->
+    <!-- AND NOT OVER AN EMPTY RESULT EITHER. It is a note about a register somebody writes to, and
+         a screen showing no rows is not the moment to read it. -->
+    {#if seen && !arriving && result.entries.length > 0}
+      <aside class="seen" role="note">
+        <Icon name="observe" size="s" />
+        <p class="seen-said">
+          <!-- `saves` AND `rejected`, WHICH WERE `writes` AND `refused`. Both are this product's own
+               words for the mechanism, and this banner sits on the front of the busiest list in the
+               product: a friction pass counted it as three tax words in one sentence, met by
+               somebody who came to look at their invoices. A write is a save and a refusal is a
+               rejection, in every product a person has used before this one. The CODE stays, in
+               the quiet strip below, because the sentence is for the person and the code is for
+               whoever they ask for help: showing only the friendly half leaves that person nothing
+               to search for. -->
+          <strong>{seen.n} saves</strong> to
+          <!-- A NAME AND NOT A LINK. The writes were REFUSED, so there are no rows to filter to and
+               nowhere in this build that shows a field's own declaration; a link that went to a
+               filter matching nothing would be worse than the plain word. -->
+          {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}{copy.thisList}{/if}
+          were rejected over {seen.days} days: {seen.fix}.
+          <!-- NO `title`. It carried `seen.why` — the same fact as the sentence beside it, in the
+               schema's spelling, in an attribute no touch device shows and no keyboard reaches. Two
+               tellings of one thing, one of them unreachable. -->
+          <span class="seen-code">{seen.code} · {seen.window}</span>
+        </p>
+        <Button
+          weight="quiet"
+          onclick={() =>
+            /* `rejected saves` AND NOT `refused writes`. The banner three lines up deliberately says
+               the first pair, because a friction pass counted the second as two tax words on the
+               front of the busiest list in the product, and this toast kept saying the old ones: one
+               screen, one gesture apart, two vocabularies for the same fact. */
+            toasts.push(
+              copy.notWritten(
+                `${seen?.field?.label ?? id} would be raised as a question on /decide, with the ${seen?.n} rejected saves attached`,
+              ),
+              { intent: 'warn' },
+            )}
+        >{copy.raiseIt}</Button>
+      </aside>
     {/if}
   </div>
 
