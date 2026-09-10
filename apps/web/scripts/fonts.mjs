@@ -1,5 +1,5 @@
 /**
- * Fetch the two webfonts and write them into `static/fonts/`, self-hosted.
+ * Fetch the webfonts and write them into `static/fonts/`, self-hosted.
  *
  * Self-hosted and not linked, because 12 §8 forbids a third-party origin outright and because
  * `unicode-range` is evaluated per page and is all-or-nothing per file: an English-only session
@@ -19,7 +19,7 @@ const UA =
 
 const FACES = [
   { file: 'poppins-600.woff2', query: 'family=Poppins:wght@600', subset: 'latin' },
-  { file: 'plex-sans.woff2', query: 'family=IBM+Plex+Sans:wght@400;500;600', subset: 'latin' },
+  { file: 'geist.woff2', query: 'family=Geist:wght@300..800', subset: 'latin' },
   { file: 'plex-arabic.woff2', query: 'family=IBM+Plex+Sans+Arabic:wght@400;600', subset: 'arabic' },
 ];
 

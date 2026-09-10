@@ -147,10 +147,11 @@ const RECIPES = {
    *
    * IT WALKS RATHER THAN CLICKING THE CELL IT WANTS, because a click on a value cell OPENS THE
    * ROW: the recipe would leave the register entirely and then press `e` on a screen that has no
-   * grid. `Home` puts the caret at the start of the row whatever the click left it on, and two
-   * columns along is the first cell that says what the row IS, which is the cell this key is about.
+   * grid. `Home` puts the caret at the start of the row whatever the click left it on, and one
+   * column along is the first cell that says what the row IS, which is the cell this key is about.
+   * It was two while the id held the second column; the id ends the row now.
    */
-  edit: { route: GRID, setup: focusFirstCell, press: ['Home', 'ArrowRight', 'ArrowRight', 'e'] },
+  edit: { route: GRID, setup: focusFirstCell, press: ['Home', 'ArrowRight', 'e'] },
   new: { route: GRID, setup: focusFirstCell, press: ['n'] },
   display: { route: GRID, setup: focusFirstCell, press: ['v'] },
   'copy-id': { route: GRID, setup: focusFirstCell, press: ['y'] },

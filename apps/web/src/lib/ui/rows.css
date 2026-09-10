@@ -8,15 +8,19 @@
  */
 
 @layer components {
+  /* UNBOXED, AND IT WAS A CARD. A surface, a border, a radius and a shadow went round every list on
+     Home, Decide, Inbox, Audit and Vault, so each screen was a stack of framed panels, which is the
+     look of an admin console. The reference product draws a list as rows on the page with a hairline
+     between them and nothing around them, and space does the grouping the frame did. */
   .ledger {
-    margin: 0;
+    /* The rows reach a step past the text column on both sides, so a row's words line up with the
+       heading above them and its hover and hairline still have somewhere to be. */
+    margin: 0 calc(-1 * var(--sp-3));
     padding: 0;
     list-style: none;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
-    overflow: hidden;
+  }
+  .ledger .line {
+    padding-inline: var(--sp-3);
   }
 
   .ledger > li + li > .line,
@@ -97,7 +101,7 @@
   }
 
   /* The id is a COLUMN, not a badge. These are strings a person says out loud, so they line up the
-     way line numbers line up in a ledger — one fixed width, one face, one quiet ink. */
+     way line numbers line up in a ledger: one fixed width, one quiet ink. */
   /* A ROW, because the id may be preceded by a type glyph. `Icon` renders a block-level `svg`, so
      without this the mark stacks on top of the id and every line grows a second line.
 
@@ -110,9 +114,11 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    letter-spacing: -0.02em;
+    /* THE BODY FACE, AND IT WAS THE IDENTIFIER ONE. What lands in this column is mostly words, a
+       sender's domain on Inbox and "API token" on Vault, and a column of monospace down the left of
+       every list is what made them read as a terminal. Tabular figures keep an id lined up. */
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
     /* CLIPPED, AND THE ELLIPSIS IS THE CHILD'S. `text-overflow` does nothing on a flex container —
        it applies to a block container's own inline content — so this declared a behaviour it did not
        have, and a caller putting long text here got a hard cut with nothing to say it happened.

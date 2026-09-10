@@ -89,6 +89,8 @@ export type Profile = {
    * about surfaces as well as about ink.
    */
   ladder?: Record<Scheme, Record<(typeof SURFACES)[number], number>>;
+  /** The most chroma a surface may carry, per scheme. Omitted, it is 0.01 in dark and 0.014 in light. */
+  groundC?: Record<Scheme, number>;
   /** The chroma ladder the separability search walks, and the contrast grid it walks it against. */
   chromaLadder: number[];
   targetGrid: number[];
@@ -129,6 +131,19 @@ export const HOUSE_PROFILE: Profile = {
   // pair of numbers serves all four.
   fillChroma: 0.233,
   fillL: { dark: 0.623, light: 0.56 },
+  /**
+   * DARKER AND COOLER THAN THE DEFAULT LADDER. The default puts dark `bg` at L 0.241, a warm
+   * charcoal. The house sits where the product it is measured against sits, `bg` at L 0.168, and
+   * the note on `LADDER` calling 0.168 an OLED test pattern was written about a warm hue: at 165,
+   * with the chroma capped, it reads as near-black glass and the cards on it read as cards. Light
+   * keeps the default rungs. `groundC` holds the light tint to 0.006, because 0.014 at hue 165 is
+   * mint.
+   */
+  ladder: {
+    dark: { sunk: 0.15, bg: 0.168, s1: 0.2, s2: 0.23, s3: 0.262 },
+    light: { sunk: 0.938, bg: 0.962, s1: 0.988, s2: 0.994, s3: 0.999 },
+  },
+  groundC: { dark: 0.01, light: 0.006 },
   prefer: {
     dark: { earn: 7, warn: 8.5, danger: 5, info: 6 },
     light: { earn: 4.5, warn: 7, danger: 5.5, info: 5.5 },
@@ -333,6 +348,7 @@ function ground(
   hue: number,
   chroma: number,
   rungs?: Record<(typeof SURFACES)[number], number>,
+  cap?: number,
 ): Record<(typeof SURFACES)[number], string> {
   /**
    * A VISIBLE amount of hue, not a whisper.
@@ -341,7 +357,7 @@ function ground(
    * neutral grey is a page that could belong to anything. Cream is a colour, and it is the single
    * cheapest thing a product can do to stop looking like every other dark dashboard.
    */
-  const C = Math.min(chroma, scheme === 'light' ? 0.014 : 0.01);
+  const C = Math.min(chroma, cap ?? (scheme === 'light' ? 0.014 : 0.01));
   const rung = rungs ?? LADDER[scheme];
   return {
     sunk: hex({ L: rung.sunk, C, H: hue }),
@@ -408,7 +424,7 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   const nHue = seed.neutralHue === 'from-accent' ? acc.H : seed.neutralHue;
 
   /* 1 · ground */
-  const g = ground(scheme, nHue, acc.C, profile.ladder?.[scheme]);
+  const g = ground(scheme, nHue, acc.C, profile.ladder?.[scheme], profile.groundC?.[scheme]);
   const worst = worstOf(scheme, g);
   const dir = away(scheme);
 
@@ -648,7 +664,11 @@ export function build(seed: Seed, profile: Profile = HOUSE_PROFILE, id = 'house'
  * spread by degrees put two of the first four marks 3.6 apart to a deuteranope, which is two
  * projects wearing the same colour for one reader in twelve.
  */
-export function nextAccentHue(existing: number[], profile: Profile = HOUSE_PROFILE): number {
+export function nextAccentHue(
+  existing: number[],
+  profile: Profile = HOUSE_PROFILE,
+  allow: (h: number) => boolean = () => true,
+): number {
   const defs: Deficiency[] = ['protan', 'deutan', 'tritan'];
   const swatches = (h: number) =>
     (['dark', 'light'] as Scheme[]).map((s) => quantise({ L: profile.mark[s].L, C: profile.mark[s].C, H: h }));
@@ -657,6 +677,7 @@ export function nextAccentHue(existing: number[], profile: Profile = HOUSE_PROFI
   let bestScore = -1;
   for (let h = 0; h < 360; h += 1) {
     if (Object.values(INTENT_HUE).some((anchor) => hueGap(h, anchor) < HUE_FLOOR)) continue;
+    if (!allow(h)) continue;
     const mine = swatches(h);
     const score = existing.length
       ? Math.min(

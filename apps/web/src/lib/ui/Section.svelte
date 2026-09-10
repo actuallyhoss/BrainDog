@@ -44,22 +44,27 @@
     margin-block-end: var(--sp-3);
   }
 
+  /* A HEADING THAT READS AS ONE, and it was body text. At the body size in `--ink2` weight 500, "What
+     needs you" was the size of the rows under it, so a screen of three sections read as one list.
+     Twenty pixels at 600 in ink is what the reference product gives a section, and the count sits
+     beside it on the same baseline in the body face, not the identifier one. */
   .section-title {
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    color: var(--ink2);
+    color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
-    font-weight: 500;
-    letter-spacing: 0.005em;
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.018em;
   }
 
   .section-count {
     color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    font-weight: 400;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
   }
 
   .section-aside {

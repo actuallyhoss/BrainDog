@@ -231,10 +231,14 @@ const CASES = [
     name: 'railShut',
     what: 'which rail sections are folded (19 §3)',
     route: '/',
-    /* `Money` BECAUSE `/` IS NOT IN IT. A section holding the screen you are looking at is never
+    /* `Projects` BECAUSE `/` IS NOT IN IT. A section holding the screen you are looking at is never
        shut, deliberately, so a case that folded the section containing its own route would measure
-       that exception rather than the preference. */
-    values: [{}, { railShut: ['Money'] }],
+       that exception rather than the preference.
+
+       AND BECAUSE IT HOLDS MORE THAN ONE PAGE. This folded `Money`, which declares one page, and the
+       rail now draws a section of one as a plain row with no fold to press, so the cookie carried
+       the name and the page had nothing to shut. `Projects` is three things on the shipped seed. */
+    values: [{}, { railShut: ['Projects'] }],
     probe: () =>
       [...document.querySelectorAll('nav.rail .fold[aria-expanded="false"]')]
         .map((b) => (b.textContent ?? '').replace(/\s+/g, ' ').trim())

@@ -62,7 +62,9 @@
     padding: 0 var(--sp-4);
     background: var(--s3);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    /* A PILL. A 6px corner made every control a cell in a form; a capsule is the shape of one thing
+       you can press, and it is the shape the reference product gives every action it has. */
+    border-radius: var(--r-pill);
     /* One pixel of shade under the bottom edge — not a drop shadow, which would put the control on
        a different plane from the flat cards around it, but enough that a button reads as a thing
        you press rather than as a rectangle with a border. It inverts on :active, which is the whole
@@ -90,8 +92,9 @@
     box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--ink) 12%, transparent);
   }
 
-  /* The primary control is the MARK'S OWN COLOUR. There is no second brand red and no tint of it:
-     the one loud thing on a screen is the thing the product is called. */
+  /* The primary control is the ACCENT, and it used to be the mark's red. A red primary on every
+     screen read as an alarm; the logo keeps the red and the one filled control on a screen takes
+     the indigo, which says "this is the thing to press" without saying "something is wrong". */
   .btn[data-weight='primary'] {
     background: var(--accent);
     border-color: var(--accent-edge);
@@ -164,7 +167,7 @@
   /**
    * A DISABLED CONTROL LOSES THE FILL, not just the label.
    *
-   * IT ONLY DIMMED THE TEXT, so a disabled `primary` kept the mark's own red — the loudest thing on
+   * IT ONLY DIMMED THE TEXT, so a disabled `primary` kept the accent fill, the loudest thing on
    * any screen in this product — and wore grey letters on it. Two costs, and the second is the
    * serious one: `--dim` on `--accent` is about 2.2:1, under half of `23 §6`'s floor, so the label
    * of the one control somebody is looking for was the least readable text on the screen. It also

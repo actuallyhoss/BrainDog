@@ -26,7 +26,6 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Kbd from '$lib/ui/Kbd.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import BlockBar from '$lib/ui/BlockBar.svelte';
   import AddBlock from '$lib/ui/AddBlock.svelte';
@@ -487,7 +486,6 @@
                  not write code reads it as an origin or a supplier. Two literals in markup were
                  also the last two on this screen, so they move to `copy.ts` with everything else. -->
             {showSource ? copy.pageBack : copy.pageSource}
-            <Kbd keys="⇧E" />
           </Button>
         </span>
         <!-- ARRANGING IS A DESKTOP SURFACE. 13 §10: "Authoring: read and approve, do not author. The
@@ -617,7 +615,6 @@
                   {#if whereOf(block)}
                     <span class="block-where"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
                   {/if}
-                  <Kbd keys="o" />
                 </a>
               {/if}
             </header>
@@ -791,8 +788,7 @@
     gap: var(--sp-2);
     margin-inline-start: auto;
     color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     text-decoration: none;
   }
 
@@ -813,9 +809,7 @@
   /* The word, quieter than the clause it introduces: it is a label and the clause is the fact. */
   .block-where-lead {
     color: var(--dim);
-    font-size: var(--t-xs);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-size: var(--t-sm);
   }
 
   .source {

@@ -229,10 +229,8 @@
     margin-block-end: var(--sp-2);
     color: var(--dim);
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: var(--t-sm);
     font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
   }
 
   .tiles {

@@ -1069,10 +1069,8 @@
   .p-group {
     padding: var(--sp-3) var(--sp-2) var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
   }
 
   /* `--ctl-h`, BECAUSE THESE ARE THE PHONE'S ROUTE TO SEVERAL PLACES. 38px, adjacent, with no gap

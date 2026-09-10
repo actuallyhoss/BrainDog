@@ -128,7 +128,7 @@
 
 <svelte:head><title>{titleOf(copy.home)}</title></svelte:head>
 
-<PageHead icon="home" kicker={data.index.name} title={today}>
+<PageHead kicker={data.index.name} title={today}>
   {#snippet actions()}
     <!-- AND NOTHING AT ALL WHEN THERE IS NOTHING TO DECIDE. This was unconditional, so a record
          with no open question printed `0 to decide` at the top of the screen named for what needs
@@ -250,25 +250,15 @@
               gone anywhere: `y` copies it, the row's own screen prints it, and `/audit` still prints
               it after the name, because those are the three places somebody wants a number they can say.
 
-              AND A QUESTION ROW NOW LEADS WITH NOTHING, WHERE IT LED WITH THE DECIDE GLYPH. The
-              fork was the same grey `Y` on all four, in a shape this product teaches only as the
-              rail's icon for Decide. The questions are the block at the top of this list, three of
-              the four carry a "Recommends …" line no other row has, and none has an amount; the
-              glyph was the weakest of the ways to tell them apart. On a phone it cost more than it
-              said: below 640 it had a card line to itself, because a question has no amount to
-              share it with, and measured at 390 each title started 28px into its card, 12 of them
-              the glyph. An empty span has no height; the row gap stays.
-
-              THE PROJECT MARK WAS THE OTHER CANDIDATE, AND THE RECORD DOES NOT CARRY ONE. A
-              question's `entity` is a label, `Kiln` or `This record`, and the suggestion row it
-              stands in for (`45 §5`) has no reference to a thing. Drawing Kiln's `◆` would be this
-              screen matching a name to a project and asserting a link the record never made, and
-              the first question in the queue is about no project at all. The empty `.seq` holds the
-              track, as the empty `.line-amount` below already does, so the title lines up with the
-              rows under it.
+              A QUESTION ROW LEADS WITH A QUESTION MARK, IN THE ACCENT. It led with the Decide fork, a grey
+              `Y` in a shape this product teaches only as the rail's icon for a place, and then with
+              nothing. The reference product marks a question with a circled question mark in its
+              accent, and it is the one glyph here that says what the row wants: the other rows are
+              things that happened, this one is waiting for an answer from you. Not the project
+              mark, because a question's `entity` is a label and `45 §5` gives it no link to a thing.
             -->
             <a class="line line-tall" href="/decide/{q.id}">
-              <span class="seq"></span>
+              <span class="seq seq-ask"><Icon name="ask" size="m" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{q.cost}</span>
@@ -366,12 +356,17 @@
       {:else}
       <ul class="feed">
         {#each fresh.slice(0, NEWS_CAP) as item}
+          {@const who = actorOf(item.by)}
           <li>
             <a class="event" href={item.href}>
               <!-- The agent that wrote it, named. Never a sparkle badge: across thirteen experiments
                    participants trusted people and organisations LESS when their use of AI was
                    disclosed, so the badge imposes the cost without buying anything (19 §6). -->
-              <span class="event-by">{actorOf(item.by)}</span>
+              <!-- A face, not a name tag in the identifier font. Each writer gets a disc with its initial,
+                   and you get yours in the accent, so a feed of agents reads as people passing
+                   through rather than as a log file. -->
+              <span class="event-face" data-you={who === 'you' ? '' : undefined} aria-hidden="true">{who.charAt(0).toUpperCase()}</span>
+              <span class="event-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
               <span class="event-text">{item.text}</span>
               <span class="event-when">{since(item.at, NOW)}</span>
             </a>
@@ -515,7 +510,7 @@
 
   .event {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
     gap: 2px var(--sp-3);
     padding: var(--sp-3) 0;
     border-block-end: 1px solid var(--line);
@@ -532,15 +527,32 @@
     color: var(--ink);
   }
 
-  .event-by {
+  .event-face {
+    display: grid;
     grid-column: 1;
-    color: var(--dim);
-    font-family: var(--font-id);
+    grid-row: 1 / span 2;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
     font-size: var(--t-xs);
+    font-weight: 650;
+  }
+  .event-face[data-you] {
+    background: var(--accent-wash);
+    color: var(--accent-text);
+  }
+  .event-by {
+    grid-column: 2;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 600;
   }
 
   .event-when {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 1;
     color: var(--dim);
     font-size: var(--t-xs);
@@ -549,7 +561,7 @@
   }
 
   .event-text {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
     grid-row: 2;
   }
 
@@ -583,6 +595,41 @@
 
   .line-mark[data-retired] {
     color: var(--dim);
+  }
+  .seq-ask {
+    color: var(--accent-text);
+  }
+  /* ON A PHONE THE GLYPH IS A COLUMN, NOT A LINE. `rows.css` makes a card of three lines, the
+     glyph with the amount, the words, then the age, and a question has no amount, so its first line
+     was a lone question mark and its last a lone "9h ago". Here the glyph sits beside the words and
+     the amount and age stack at the end, the way a row is drawn in the reference product, and a
+     question card is as tall as what it says. Scoped to Home: elsewhere `.seq` holds an id or a
+     sender, which needs the width this takes away. */
+  @media (width < 640px) {
+    .ledger :global(.line) {
+      grid-template-columns: 20px minmax(0, 1fr) auto;
+      gap: 2px var(--sp-3);
+    }
+    .ledger :global(.seq) {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      align-self: start;
+      min-inline-size: 0;
+      padding-block-start: 2px;
+    }
+    .ledger :global(.line-main) {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+    }
+    .ledger :global(.line-amount) {
+      grid-column: 3;
+      grid-row: 1;
+    }
+    .ledger :global(.line-when) {
+      grid-column: 3;
+      grid-row: 2;
+      align-self: start;
+    }
   }
 
   .to-decide {

@@ -94,7 +94,7 @@
     min-inline-size: 16px;
     padding: 0 4px;
     background: var(--tone-fill, var(--edge));
-    border-radius: 999px;
+    border-radius: var(--r-pill);
     color: var(--accent-ink);
     font-size: 10px;
     font-variant-numeric: tabular-nums;

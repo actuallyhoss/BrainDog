@@ -173,13 +173,14 @@
     min-inline-size: 0;
   }
 
+  /* Sentence case, and it was letterspaced caps. An eyebrow in capitals over every title is the
+     house style of a report; the reference product has none, and the kicker reads as the words
+     it is rather than as a label stamped on the page. */
   .kicker {
     margin-block-end: 1px;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
-    letter-spacing: 0.055em;
-    text-transform: uppercase;
   }
 
   .title {

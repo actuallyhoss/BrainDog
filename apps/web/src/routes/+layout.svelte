@@ -41,7 +41,6 @@
   import { assets } from '$app/paths';
 
   import { named } from '$lib/env.ts';
-  import Mark from '$lib/ui/Mark.svelte';
   import TabBar from '$lib/ui/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -311,12 +310,14 @@
   </div>
 
   <!--
-    The mark, and the only place it appears in the app chrome.
+    The search button, below 900px only. At 900 and up the rail carries the same button as a row
+    at its foot.
 
-    It used to sit at the top of the rail, where a logo is decoration: it names the product you are
-    already inside, and spends the most valuable sixty pixels on the screen doing it. Here it has a
-    job. It opens the palette — the one surface that reaches anything in the record — from the
-    corner every product has trained people to look in.
+    IT WAS THE MARK, a red disc with the dog in it, on the argument that the product's own drawing
+    is the whole affordance. On a phone that was an unlabelled red circle in the top corner, over
+    the sample bar, and nobody guesses that a logo opens search. A magnifier in a quiet raised
+    circle says what it does. It opens the palette, the one surface that reaches anything in the
+    record.
 
     NOT AN ASSISTANT AND NOT A PANEL OF ITS OWN. There was a version of this with a prompt field and
     four suggested questions, and it was wrong twice over: a record you talk to instead of read is
@@ -324,7 +325,7 @@
     place to look for one thing. The button opens the palette that already exists.
   -->
   <button type="button" class="launcher tap" onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
-    <Mark height={26} tone="inherit" />
+    <Icon name="search" size="l" />
   </button>
 
   <Palette bind:open={palette.open} nav={data.nav} />
@@ -569,14 +570,13 @@
   .sample {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-3) var(--sp-5);
-    align-items: baseline;
+    gap: var(--sp-2) var(--sp-5);
+    align-items: center;
     justify-content: space-between;
-    margin: var(--sp-5) var(--sp-6) 0;
-    padding: var(--sp-4) var(--sp-5);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    margin: var(--sp-4) var(--sp-6) 0;
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+    background: var(--accent-wash);
+    border-radius: var(--r-lg);
   }
 
   .sample-said {
@@ -609,7 +609,7 @@
     padding: var(--sp-2) var(--sp-4);
     background: var(--accent);
     border: 1px solid var(--accent-edge);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--accent-ink);
     font-size: var(--t-sm);
     font-weight: 600;
@@ -721,9 +721,10 @@
     border-inline-start: 1px solid var(--line);
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* The launcher floats over the bottom-right corner of every surface, so every surface ends
-       above it. A floating button that covers the last row of a list hides exactly the thing a long
-       list is scrolled to the bottom to see. */
+    /* Below 900px the launcher floats over the bottom-right corner of every surface, so every
+       surface ends above it: a floating button over the last row of a list hides exactly the thing
+       a long list is scrolled to the bottom to see. Above 900 the launcher is a row in the rail, and
+       the same space is the page's foot. */
     padding-block-end: calc(var(--tap) + var(--sp-5));
   }
 
@@ -732,22 +733,10 @@
     display: none;
   }
 
-  /* A RED CIRCLE. The mark reversed out of its own colour, 52px, bottom-right, and nothing else in
-     it: no label, no count, no chevron. It is the product's own drawing, so the drawing is the
-     whole affordance, and a word beside it would be explaining a logo.
-
-     NO SHADOW. It had one, on the argument that a floating thing which casts nothing reads as
-     stuck to the glass. That argument is fine in the abstract and wrong in this app: nothing else
-     here casts a shadow, so the one that did read as a control borrowed from a different product
-     rather than as the one thing allowed to float. A solid disc of the only saturated colour on
-     the screen already sits above everything; it does not need help.
-
-     AND NO LIFT ON HOVER EITHER, WHICH IS THE SAME ARGUMENT ONE STEP FURTHER. It rose two pixels
-     under the cursor, on the reasoning that motion says "this is a control" without adding a
-     material the rest of the interface does not have. Nothing else in this app moves under a
-     cursor, so the movement said "this control is from somewhere else" — the same failure the
-     shadow had, in a different channel. A solid disc of the only saturated colour on the screen is
-     already the most obviously clickable thing on it. */
+  /* A QUIET RAISED CIRCLE WITH A MAGNIFIER, AND IT WAS A RED ONE WITH THE LOGO. The red disc was
+     argued as "the only saturated colour on the screen", which is exactly what made it read as an
+     alert rather than as search. It is a surface a step above the page now, with the soft shadow a
+     sheet has, because a thing that floats over the page should look like it does. */
   .launcher {
     position: fixed;
     inset-block-end: calc(env(safe-area-inset-bottom) + var(--sp-5));
@@ -758,12 +747,26 @@
     inline-size: 52px;
     block-size: 52px;
     padding: 0;
-    background: var(--brand);
-    border: 0;
-    border-radius: 999px;
-    color: var(--accent-ink);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    box-shadow: var(--e2);
+    color: var(--ink);
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
+  }
+
+  .launcher:hover {
+    background: var(--s2);
+  }
+
+  /* NOT WHERE THERE IS A RAIL. At 900px and up the rail carries the palette at its foot, and the
+     disc fixed to this corner sat on top of whatever row was beneath it: four controls on
+     `/r/obligations` at 1440 by 900. Below 900 there is no rail and the button stays, in the header. */
+  @media (width >= 900px) {
+    .launcher {
+      display: none;
+    }
   }
 
 
@@ -809,6 +812,12 @@
       inline-size: 40px;
       block-size: 40px;
     }
+
+    /* The sample bar is the first thing at the top of a phone, which is where that button floats,
+       so it ends before it, as the page head already does. */
+    .sample {
+      margin-inline-end: calc(var(--sp-3) + 40px + var(--sp-2));
+    }
   }
 
   .more-nav {
@@ -830,10 +839,8 @@
   .more-section {
     margin-block: var(--sp-4) var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
   }
 
   .more-section:first-child {

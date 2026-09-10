@@ -69,7 +69,7 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
-    box-shadow: var(--raise);
+    box-shadow: var(--e1);
     overflow: hidden;
   }
 
@@ -119,9 +119,7 @@
     border-block-end: 1px solid var(--line);
     color: var(--dim);
     font-size: var(--t-xs);
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+    font-weight: 600;
   }
 
   .line + .line {

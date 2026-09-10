@@ -30,6 +30,8 @@
     font-family: var(--font-ui);
     font-size: var(--text);
     line-height: var(--lh-body);
+    /* Geist is drawn a touch loose for text sizes; this is its own designers' body tracking. */
+    letter-spacing: -0.006em;
     font-synthesis-weight: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;

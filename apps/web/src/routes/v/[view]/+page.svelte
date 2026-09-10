@@ -313,10 +313,6 @@
     font-size: var(--t-sm);
   }
 
-  .predicate-label {
-    letter-spacing: 0.055em;
-    text-transform: uppercase;
-  }
 
   .predicate code {
     padding: 2px var(--sp-2);

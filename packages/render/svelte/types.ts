@@ -34,6 +34,12 @@ export type Column = {
    * a FIGURE NEVER TRUNCATES, because a truncated figure is not shortened, it is wrong.
    */
   truncate?: 'end' | 'middle' | 'never' | undefined;
+  /**
+   * This column carries the row's intent: the glyph sits at the head of its cells and its text takes
+   * the intent's colour, so a register's state reads `⊘ open` in one place. A table that names no
+   * such column puts the glyph at the head of its first value, as it always has.
+   */
+  tone?: boolean | undefined;
 };
 
 export type TableRow = {
@@ -110,11 +116,59 @@ export function ariaSort(
  * differently: a cell the row does not have is missing and gets the mark, a cell the author left
  * blank is blank. It is the same reading the grid arm takes, so the two arms cannot disagree.
  */
-export const cardCells = (
-  row: TableRow,
-  columns: readonly Column[],
-): { column: Column; value: string | null }[] =>
+export const cardCells = (row: TableRow, columns: readonly Column[]): CardCell[] =>
   columns.map((column, i) => ({ column, value: row.cells[i] ?? null }));
+
+/** One column of one row, as a phone card draws it. */
+export type CardCell = { column: Column; value: string | null };
+
+/**
+ * Which line of a phone card each column goes on, as indexes into `columns`. `-1` is none.
+ *
+ * THE CARD WAS ONE LINE PER COLUMN, AND ON A PHONE THAT WAS MOST OF THE PAGE. The first column led
+ * and every other column was a label-and-value line of its own under it, so a four-column table was
+ * a four-line card. Measured at 390 on the build of September 10th: `/p/money` was 6,267px against
+ * 2,800px at 1440, and its forecast, "What is coming", was 1,615px for thirteen payments at 116 to
+ * 144px each, `When`, `What`, `In and out` and `Balance` stacked in every one. The services table on
+ * `/p/estate` was 2,329px for sixteen rows at 145px each. A running balance is the thing a phone
+ * reader wants one payment at a time, and they were given a form per payment.
+ *
+ * SO A CARD IS TWO LINES, ARRANGED BY THE TWO RULES A TABLE ALREADY DECLARES (13 §4.2):
+ *
+ *   - the TITLE is the first column aligned to the start, because text and refs start and a
+ *     quantity, a date or a count ends. It skips the register's `#`, which is aligned to the end,
+ *     and a row picker, whose `hideLabel` already says it is a control and not a value;
+ *   - the first line ENDS on the first figure, a column that never truncates, because a figure
+ *     never truncates. Failing a figure, the first identifier, which truncates in the middle, and
+ *     which is where `RowCards` has always put `#seq`;
+ *   - EVERY OTHER COLUMN goes on the second line, labelled as it always was: text at its start,
+ *     quantities at its end, so a running balance still reads down one edge of the list.
+ *
+ * NOTHING IS DROPPED, AND THAT IS WHY THIS NEEDS NO NEW KEY. `13 §10` gives a register card three
+ * declared `mobile:` fields because that card SHOWS three and leaves the rest out, and choosing what
+ * to leave out is a decision only the author can make. This leaves nothing out. Every column is
+ * still on the card with its label; what changed is which line it sits on, and `05 §6` is that width
+ * may change layout. A block that wanted fewer columns on a phone would need `06 §1.1` to grow a key,
+ * and no block needs to.
+ *
+ * IT TAKES THE COLUMNS AND NOT A ROW, so the arrangement is decided once for the table and is the
+ * same on every card. A row whose title is missing keeps its title slot and draws the missing mark
+ * there; the next column is not promoted into it. Deciding per row from what happens to be in a cell
+ * is the fault `cardCells` records above, where a blank value took its column off the card.
+ */
+export function cardPlan(columns: readonly Column[]): { title: number; mark: number; start: number[]; end: number[] } {
+  const first = (test: (c: Column, i: number) => boolean) => columns.findIndex((c, i) => !c.hideLabel && test(c, i));
+  const byText = first((c) => c.align !== 'end');
+  const title = byText >= 0 ? byText : first(() => true);
+  const byFigure = first((c, i) => i !== title && c.truncate === 'never');
+  const mark = byFigure >= 0 ? byFigure : first((c, i) => i !== title && c.truncate === 'middle');
+  const start: number[] = [];
+  const end: number[] = [];
+  columns.forEach((c, i) => {
+    if (i !== title && i !== mark) (c.align === 'end' ? end : start).push(i);
+  });
+  return { title, mark, start, end };
+}
 
 /** Where the caret is, in data rows and columns. The header is not a row it can be on. */
 export type Cell = { row: number; col: number };

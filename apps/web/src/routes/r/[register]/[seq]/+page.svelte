@@ -354,10 +354,8 @@
     margin-block-end: var(--sp-3);
     color: var(--dim);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   /* The FIELD's label, quieter than the register's name: "Obligations · party" reads as one heading
@@ -458,10 +456,8 @@
     margin-block-end: var(--sp-3);
     color: var(--dim);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
-    letter-spacing: 0.055em;
-    text-transform: uppercase;
   }
 
   /* Prose gets a reading measure; a table, a grid and a ledger get the room. Width is a property of

@@ -306,7 +306,7 @@
   }
 
   .lede {
-    max-inline-size: 22ch;
+    text-wrap: balance;
     color: var(--ink);
     font-family: var(--font-display);
     font-size: var(--t-2xl);
@@ -315,14 +315,14 @@
     line-height: var(--lh-tight);
   }
 
-  /* The eyebrow over the form, at the same rank `/start` gives its question. */
+  /* The heading over the form, at the rank `/start` gives its question: a sentence at a section's
+     size, where it was a letterspaced eyebrow in capitals. */
   .question {
-    margin-block: var(--sp-7) var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    margin-block: var(--sp-7) var(--sp-4);
+    color: var(--ink);
+    font-size: var(--t-lg);
     font-weight: 600;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
+    letter-spacing: -0.018em;
   }
 
   .form {
@@ -387,6 +387,11 @@
     margin-block-start: var(--sp-2);
   }
 
+  /* The one thing to press on this screen, the width of the fields it sends. */
+  .actions :global(.btn[data-weight='primary']) {
+    flex: 1;
+  }
+
   .answer {
     margin-block-start: var(--sp-5);
   }
@@ -413,6 +418,10 @@
   }
 
   .aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-3);
     margin-block-start: var(--sp-6);
     padding-block-start: var(--sp-5);
     border-block-start: 1px solid var(--line);
@@ -460,12 +469,20 @@
     margin-block-start: var(--sp-2);
   }
 
-  /* The link moves to the next line whole. It broke across two — "Open the demo / record" — which
-     reads as two links and is the one thing on this line somebody has to be able to see at once. */
+  /* A BUTTON, AND IT WAS A LINK AT THE END OF A SENTENCE. The demo is the way in most people who
+     reach this screen want, so it is a pill under the sentence rather than underlined text after
+     it, and it cannot break across two lines. */
   .aside-go {
-    /* `.tap`'s invisible box needs a positioned element, and an inline one takes `relative` fine. */
-    display: inline-block;
-    color: var(--accent-text);
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-4);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: none;
     white-space: nowrap;
   }
 </style>

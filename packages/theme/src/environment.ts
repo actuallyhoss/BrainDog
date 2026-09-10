@@ -37,7 +37,9 @@
  *      have, because everything a contrast floor is measured against is the same object.
  */
 
+import { gamutMap } from './color.ts';
 import {
+  BRAND_RED,
   HOUSE_PROFILE,
   build,
   hueGap,
@@ -77,7 +79,14 @@ export type Environment = (typeof ENVIRONMENTS)[number];
  * existing marks under all three deficiencies. "The second mark, beside the brand" is what an
  * environment accent IS.
  */
-export const environmentHue = (house: Seed): number => nextAccentHue([normalise(house.accent).H], HOUSE_PROFILE);
+/* Away from the house accent AND from the mark, now that they are two colours, and only among the
+   hues that hold the accent's own lightness and chroma inside sRGB. The scorer measures marks,
+   which are low-chroma and fit anywhere; the fill is not, and the first answer without this filter
+   was a cyan that the gamut clipped to half its chroma, 3.9 apart from the indigo to a tritanope. */
+export const environmentHue = (house: Seed): number => {
+  const c = normalise(house.accent);
+  return nextAccentHue([c.H, normalise(BRAND_RED).H], HOUSE_PROFILE, (h) => Math.abs(gamutMap({ L: c.L, C: c.C, H: h }).C - c.C) <= 0.005);
+};
 
 /**
  * The house seed with one number changed.

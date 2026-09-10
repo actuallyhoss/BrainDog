@@ -18,6 +18,8 @@
   to one would be a 404 with a promise attached.
 -->
 <script lang="ts">
+  import Icon from '$lib/Icon.svelte';
+  import type { Hue } from '$lib/icons.ts';
   import { APP, SOURCE, site } from '$lib/copy.ts';
 
   type Entry = { date: string; title: string; body: string; kind: 'shipped' | 'changed' | 'fixed' };
@@ -320,6 +322,11 @@
 
   const LABEL = { shipped: 'shipped', changed: 'changed', fixed: 'fixed' } as const;
 
+  /* The word is the meaning and the hue agrees with it: green for new work, blue for a repair, amber
+     for a change of course. Three kinds and three hues, so the colour a reader learns from the first
+     two is never contradicted by a grey third. */
+  const HUE: Record<Entry['kind'], Hue> = { shipped: 'earn', fixed: 'info', changed: 'warn' };
+
   /**
    * GROUPED BY DAY, because twenty-two identical rows are not a list a person reads.
    *
@@ -358,15 +365,18 @@
 <section class="head">
   <h1 class="title">{site.nav.changelog}</h1>
   <div class="status">
-    <h2 class="status-title">{STATUS.title}</h2>
-    <p class="status-body">{STATUS.body}</p>
-    <!-- ONE LINK WHILE THE REPOSITORY IS PRIVATE, and it was two. The second offered the source as
-         the check on the sentence above it, and answered 404: the only outbound action in the block
-         whose entire subject is that its claims are checkable. -->
-    <p class="status-links">
-      <a class="status-link" href={APP}>{site.nav.open}</a>
-      {#if SOURCE}<a class="status-link" href={SOURCE}>{site.nav.source}</a>{/if}
-    </p>
+    <span class="glyph" data-hue="earn"><Icon name="observe" /></span>
+    <div class="status-copy">
+      <h2 class="status-title">{STATUS.title}</h2>
+      <p class="status-body">{STATUS.body}</p>
+      <!-- ONE ACTION WHILE THE REPOSITORY IS PRIVATE, and it was two. The second offered the source
+           as the check on the sentence above it, and answered 404. The one left is this page's
+           filled primary: the status says the app is live, and this is how you see that it is. -->
+      <p class="status-links">
+        <a class="btn btn-primary" href={APP}>{site.nav.open}</a>
+        {#if SOURCE}<a class="btn" href={SOURCE}>{site.nav.source}</a>{/if}
+      </p>
+    </div>
   </div>
 </section>
 
@@ -382,7 +392,7 @@
         {#each day.entries as entry}
           <li class="entry">
             <h3 class="entry-title">
-              <span class="kind" data-kind={entry.kind}>{LABEL[entry.kind]}</span>{entry.title}
+              <span class="kind" data-hue={HUE[entry.kind]}><span class="dot"></span>{LABEL[entry.kind]}</span>{entry.title}
             </h3>
             <p class="entry-body">{entry.body}</p>
           </li>
@@ -401,25 +411,36 @@
   }
 
   .head {
-    padding-block: var(--sp-8) var(--sp-6);
+    padding-block: clamp(48px, 7vw, 88px) var(--sp-6);
   }
 
   .title {
-    font-size: clamp(34px, 5vw, 52px);
-    letter-spacing: -0.03em;
+    font-size: clamp(36px, 3vw + 20px, 56px);
+    line-height: 1.05;
+    letter-spacing: -0.032em;
   }
 
+  /* The state of the product, as a card with a pulse on it: it is the one thing on the page that
+     is about now rather than a day in the past. It had a 3px warn-coloured bar down its edge, which
+     read as an alarm about a product that is, in fact, working. */
   .status {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    margin-block-start: var(--sp-6);
+    padding: var(--sp-5);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
+  }
+
+  .status-copy {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: var(--sp-3);
-    margin-block-start: var(--sp-5);
-    padding: var(--sp-5);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-inline-start: 3px solid var(--warn);
-    border-radius: var(--r-md);
+    min-inline-size: 0;
   }
 
   .status-title {
@@ -438,33 +459,16 @@
   .status-links {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-5);
-  }
-
-  /* 48x23 beside a status line. Small because it reads as an aside, and it is still a link
-     somebody presses with a thumb. */
-  .status-link {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--tap, 44px);
-    font-size: var(--t-ui);
-    font-weight: 600;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-1);
   }
 
   /**
-   * `margin-block`, NOT `margin`.
-   *
-   * The rule above gives `.head, .log` a 900px measure and `margin-inline: auto` to centre it, and
-   * this block then set `margin: 0` at the same specificity and later in the file, so the shorthand
-   * reset the inline margins the rule above had just set. The heading was centred in the viewport
-   * and the entries under it were flush against the left edge: on a 1440px window the dates sat 245
-   * pixels to the left of the title they belonged to, on a page whose entire content is that one
-   * column. The list has been off-axis since the page was written.
+   * `margin-block`, NOT `margin`. The rule above centres `.head, .log` with `margin-inline: auto`,
+   * and a `margin: 0` here once reset it, so the dates sat 245 pixels left of the title they
+   * belonged to. The page's own bottom is paid here too: the shell puts no margin over the footer.
    */
   .log {
-    /* The page's own bottom, now the shell no longer puts 96 pixels over the footer on every page
-       regardless of what is above it. */
     padding-block-end: var(--sp-8);
   }
 
@@ -477,17 +481,13 @@
   }
 
   /**
-   * THE DATE HOLDS ITS PLACE WHILE ITS OWN ENTRIES GO PAST.
-   *
-   * Six entries share 2026-09-10, so the gutter printed one string six times and then stopped
-   * saying anything at all. One heading per day, stuck under the bar, and by the time you are
-   * four paragraphs into a day you can still see which day it is. `--sticky` is the token the
-   * base stylesheet already reserves for exactly this height, and `scroll-padding` upstream
-   * means a keyboard user landing on an entry does not land under the bar either.
+   * THE DATE HOLDS ITS PLACE WHILE ITS OWN ENTRIES GO PAST. Six entries share 2026-09-10, so one
+   * heading per day is stuck under the bar, and four paragraphs into a day you can still see which
+   * day it is. `--sticky` is the token the base stylesheet reserves for exactly this height.
    */
   .day-date {
     position: sticky;
-    inset-block-start: calc(var(--sticky) + var(--sp-3));
+    inset-block-start: calc(var(--sticky) + var(--sp-4));
     align-self: start;
     color: var(--dim);
     font-family: var(--font-id);
@@ -505,44 +505,31 @@
     list-style: none;
   }
 
-  /* A tag, not a pill, and the same four-pixel corner every control in the product has. It sits
-     on the title's own line now: it is what KIND of change the title describes, and a badge in a
-     column two inches away from the sentence it qualifies is a badge nobody reads. */
+  /* A pill on the title's own line: it is what KIND of change the title describes. The word is in
+     the ink and the hue is a dot and a wash, so the kind reads the same to somebody who does not
+     see green, and the contrast is the ink's rather than a tint's. */
   .kind {
-    display: inline-block;
-    margin-inline-end: var(--sp-3);
-    padding: 2px 7px;
-    background: color-mix(in srgb, var(--ink) 7%, transparent);
-    border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-inline-end: var(--sp-2);
+    padding-block: 2px;
+    padding-inline: 8px 10px;
+    background: var(--hue-wash);
+    border-radius: var(--r-pill);
     color: var(--ink2);
     font-family: var(--font-ui);
     font-size: var(--t-xs);
     font-weight: 600;
     letter-spacing: 0;
-    vertical-align: 0.14em;
+    vertical-align: 0.15em;
   }
 
-  .kind[data-kind='shipped'] {
-    background: color-mix(in srgb, var(--earn) 12%, transparent);
-    border-color: color-mix(in srgb, var(--earn) 28%, transparent);
-    color: var(--earn);
-  }
-
-  .kind[data-kind='fixed'] {
-    background: color-mix(in srgb, var(--info) 12%, transparent);
-    border-color: color-mix(in srgb, var(--info) 28%, transparent);
-    color: var(--info);
-  }
-
-  /* THE THIRD KIND HAD NO COLOUR AND THE OTHER TWO DID. `shipped` was green and `fixed` was blue,
-     so a reader scanning the page learned that colour means something and then met a grey badge
-     that means the third thing. `--warn` is the watch role and a change that is neither new work
-     nor a repair is exactly that: something to notice. */
-  .kind[data-kind='changed'] {
-    background: color-mix(in srgb, var(--warn) 14%, transparent);
-    border-color: color-mix(in srgb, var(--warn) 30%, transparent);
-    color: var(--warn);
+  .dot {
+    inline-size: 6px;
+    block-size: 6px;
+    background: var(--hue);
+    border-radius: var(--r-pill);
   }
 
   .entry-title {
@@ -552,8 +539,8 @@
   }
 
   .entry-body {
-    margin-block-start: var(--sp-3);
     max-inline-size: 74ch;
+    margin-block-start: var(--sp-3);
     color: var(--ink2);
     font-size: var(--t-base);
     line-height: 1.7;
@@ -567,15 +554,30 @@
       padding-block: var(--sp-5);
     }
 
-    /* Not sticky on a phone: a date pinned under the bar on a 390px screen is a line of the
-       reading area spent on a string the reader can scroll back four inches to find. */
+    /* Not sticky on a phone: a date pinned on a 390px screen is a line of the reading area spent on
+       a string the reader can scroll back four inches to find. */
     .day-date {
       position: static;
     }
+  }
 
+  /* On a phone the glyph sits over the status rather than beside it, so the paragraph gets the
+     whole width, and the action is a full-width pill. */
+  @media (width < 640px) {
     .head,
     .log {
       padding-inline: var(--sp-4);
+    }
+
+    .status {
+      flex-direction: column;
+      gap: var(--sp-3);
+      padding: var(--sp-4);
+    }
+
+    .status-links {
+      align-self: stretch;
+      flex-direction: column;
     }
   }
 </style>

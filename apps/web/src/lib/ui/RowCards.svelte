@@ -63,14 +63,13 @@
    * THE ROW'S TONE, WHICH THE TABLE HAS ALWAYS DRAWN AND THE CARD NEVER DID.
    *
    * A register declares a `deadline:` field and `toRows` turns "past it" into `bad` and "done" into
-   * `good` — which the grid renders as a bar down the leading edge. On a phone that disappeared, so
-   * an overdue invoice and a paid one were the same card, on the surface where somebody is most
-   * likely to be looking for exactly that.
+   * `good`. On a phone that used to disappear, so an overdue invoice and a paid one were the same
+   * card, on the surface where somebody is most likely to be looking for exactly that.
    *
-   * AND THE BAR ALONE IS STILL COLOUR ALONE. `13 §5.1`: "Colour never carries meaning alone. The
-   * glyph is part of the intent token, not a choice at the call site." A card wearing `data-intent`
-   * and nothing else says nothing at all to a screen reader and nothing to anybody who does not see
-   * red — which on this surface is every overdue invoice in the register.
+   * A GLYPH AT THE HEAD OF THE TITLE, AND NO COLOURED EDGE. `13 §5.1`: "Colour never carries meaning
+   * alone. The glyph is part of the intent token, not a choice at the call site." The glyph has a
+   * name for a screen reader and a shape for anybody who does not see red; the bar that used to run
+   * down the card had neither, and on a list with no box round it read as an alert.
    */
   const toneFor = (e: Entry) => toneOf(register, e);
 
@@ -89,8 +88,13 @@
    *
    * The label is the project's NAME and not its mark, because a screen reader reading "black
    * up-pointing triangle" has been told the shape and not the thing.
+   *
+   * IT SITS IN FRONT OF THE TITLE, as it does in the grid, so the colour is where the eye starts.
    */
   const markFor = (e: Entry) => identityFor(register, e.fields);
+
+  /* A declared value is set in sentence case by the stylesheet, as the filter pills are. */
+  const isEnum = (field: string) => decl?.fields.find((f) => f.id === field)?.type === 'enum';
 
   /* The tick's accessible name. `copy.ts` holds every sentence (`50 §3`) and this is one. */
   const selectedLabel = copy.selected;
@@ -101,12 +105,9 @@
     {#each entries as e (e.seq)}
       <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
         <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
-          <span class="card-seq">
-            {#if picked?.has(e.seq)}
-              <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row
-                   is one of the four the bar above is about" is the meaning most worth not losing. -->
-              <span class="picked-tick" role="img" aria-label={selectedLabel}>✓</span>
-            {/if}
+          <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
+               what the row is before its number. The tone and the project lead it. -->
+          <span class="card-title" dir={dirOf(register, decl.mobile[0])}>
             {#if toneFor(e)}
               <span class="glyph" role="img" aria-label={TONES[toneFor(e)!].label}>{TONES[toneFor(e)!].glyph}</span>
             {/if}
@@ -119,18 +120,23 @@
                 role="img"
                 aria-label={it.name}>{it.mark}</span>
             {/if}
+            {display(register, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}
+          </span>
+          <span class="card-seq">
+            {#if picked?.has(e.seq)}
+              <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row
+                   is one of the four the bar above is about" is the meaning most worth not losing. -->
+              <span class="picked-tick" role="img" aria-label={selectedLabel}>✓</span>
+            {/if}
             <!-- A ROW THAT HAS NO ID PRINTS NO ID. `pending` mints a negative sequence so a row
                  somebody typed can never collide with one the record has; `#-1` is that sentinel
                  with a minus sign in front of it, and it was going straight to the screen. -->
             {#if e.seq >= 0}#{e.seq}{/if}
           </span>
-          <span class="card-title" dir={dirOf(register, decl.mobile[0])}>
-            {display(register, decl.mobile[0], e.fields[decl.mobile[0]]) ?? '—'}
-          </span>
-          <span class="card-b" dir={dirOf(register, decl.mobile[1])}>
+          <span class="card-b" dir={dirOf(register, decl.mobile[1])} data-enum={isEnum(decl.mobile[1]) ? '' : undefined}>
             {display(register, decl.mobile[1], e.fields[decl.mobile[1]]) ?? ''}
           </span>
-          <span class="card-c" dir={dirOf(register, decl.mobile[2])}>
+          <span class="card-c" dir={dirOf(register, decl.mobile[2])} data-enum={isEnum(decl.mobile[2]) ? '' : undefined}>
             {display(register, decl.mobile[2], e.fields[decl.mobile[2]]) ?? ''}
           </span>
         </a>
@@ -166,16 +172,13 @@
   }
 
   @media (width < 640px) {
+    /* NO BOX AND NO BAR. The cards are rows on the page's own ground with a hairline between them,
+       the way the grid draws its rows: a raised card holding cards read as a form to fill in. */
     .cards {
       display: block;
       margin: 0;
       padding: 0;
       list-style: none;
-      background: var(--s1);
-      border: 1px solid var(--line);
-      border-radius: var(--r-md);
-      box-shadow: var(--raise);
-      overflow: hidden;
     }
 
     .cards li + li {
@@ -211,7 +214,14 @@
       color: var(--ink);
     }
 
+    /* The board's `.card` in `blocks.css` is a raised tile, and this link shares the class name, so
+       it inherited a surface, a border and a radius and drew every row of a phone list as a box with
+       its menu hanging outside it. A row here is a line on the page. */
     .card {
+      background: none;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
       flex: 1;
       min-inline-size: 0;
       display: grid;
@@ -219,21 +229,13 @@
       gap: 2px var(--sp-3);
       /* 44px on both axes. A control grown only in height measures 38 x 44 and fails (13 §7). */
       min-block-size: 56px;
-      padding: var(--sp-2) var(--sp-4);
-      /* The same bar the grid draws down a row's leading edge, and for the same reason: it is the
-         only thing on a card that says a thing is late or settled. Transparent when there is no
-         intent, so every card keeps the same text position.
-
-         `data-intent` AND `var(--tone)`, which is `blocks.css`'s intent map — the one place an
-         intent becomes a colour. A component that names `--danger` itself is a second map. */
-      border-inline-start: 2px solid transparent;
+      /* Next to no inline padding: there is no box for the text to be inset from. */
+      padding: var(--sp-2) var(--sp-1);
+      /* `data-intent` stays on the card because it is what resolves `--tone` for the glyph, through
+         `blocks.css`'s intent map, the one place an intent becomes a colour. */
       color: var(--ink);
       font-size: var(--t-ui);
       text-decoration: none;
-    }
-
-    .card[data-intent] {
-      border-inline-start-color: var(--tone);
     }
 
     .card-seq {
@@ -257,6 +259,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .card-title .glyph,
+    .card-title .card-mark {
+      margin-inline-end: var(--sp-1);
     }
 
     @media (width < 400px) {
@@ -271,7 +279,7 @@
       grid-column: 1;
       grid-row: 2;
       color: var(--dim);
-      font-size: var(--t-xs);
+      font-size: var(--t-sm);
       font-variant-numeric: tabular-nums;
     }
 
@@ -279,9 +287,16 @@
       grid-column: 2;
       grid-row: 2;
       color: var(--dim);
-      font-size: var(--t-xs);
+      font-size: var(--t-sm);
       font-variant-numeric: tabular-nums;
       text-align: end;
+    }
+
+    /* Sentence case in the stylesheet, so the text stays the record's own word for search and for a
+       screen reader. */
+    .card-b[data-enum]::first-letter,
+    .card-c[data-enum]::first-letter {
+      text-transform: uppercase;
     }
   }
 </style>

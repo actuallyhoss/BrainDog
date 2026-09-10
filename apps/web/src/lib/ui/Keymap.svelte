@@ -81,10 +81,8 @@
     margin-block-end: var(--sp-2);
     color: var(--dim);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
   }
 
   .keys {
@@ -125,8 +123,6 @@
     border-radius: var(--r-sm);
     color: var(--dim);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    font-size: var(--t-sm);
   }
 </style>

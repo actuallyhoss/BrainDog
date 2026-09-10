@@ -3,7 +3,11 @@
  *
  * Two rules, and both are the site being a DOCUMENT where the app is an application: the page
  * scrolls (the app is one inner scroll container), and the ground is the work surface rather than
- * the desk the chrome sits on — there is no chrome here to sit on it.
+ * the desk the chrome sits on, because there is no chrome here to sit on it.
+ *
+ * And the three things every page here draws the same way: the pill, the tinted glyph, and the
+ * hues it may take. They are here rather than in each page because three copies of a button had
+ * already drifted into three buttons once.
  */
 
 @layer components {
@@ -22,5 +26,122 @@
 
   body {
     background: var(--bg);
+  }
+
+  /**
+   * THE PILL, and exactly one of them per view is filled.
+   *
+   * A filled button is the answer to "what do I do here", and a view with two of them has two
+   * answers. So the header's action is an outline pill on every page and the page's own primary is
+   * the filled one: the hero on the home page, the hosted plan on pricing, the status on the
+   * changelog.
+   *
+   * THE PRESS IS A SCALE AND AN OPACITY, for the reason `tokens.css` gives beside those two values:
+   * under `prefers-reduced-motion` a11y collapses every duration to 1ms, so a press written as a
+   * transform alone is not damped for those readers, it is absent. Opacity is a state and lands.
+   */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-block-size: 40px;
+    padding-inline: 18px;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    font-size: var(--t-ui);
+    font-weight: 500;
+    line-height: 1.2;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      transform var(--d-release) var(--ease-out),
+      opacity var(--d-release) var(--ease-out),
+      background var(--d-state) var(--ease-out),
+      border-color var(--d-state) var(--ease-out);
+  }
+
+  .btn:hover {
+    background: var(--s2);
+    border-color: var(--edge);
+  }
+
+  .btn:active {
+    transform: scale(var(--press-scale));
+    opacity: var(--press-dim);
+    transition-duration: var(--d-press);
+    transition-timing-function: var(--ease-push);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  .btn-lg {
+    min-block-size: 46px;
+    padding-inline: var(--sp-5);
+    font-size: var(--t-md);
+  }
+
+  /* `--ctl-h` is 36 on a fine pointer and 44 under a thumb, which is the whole of the header's
+     sizing rule: the same pill, as small as a mouse allows and as large as a finger needs. */
+  .btn-sm {
+    min-block-size: var(--ctl-h);
+    padding-inline: 14px;
+  }
+
+  /* `13 §7`: 44 on both axes under a thumb, and every pill on the site is wider than it is tall. */
+  @media (pointer: coarse) {
+    .btn {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /**
+   * A GLYPH ON A TINTED SQUARE, which is how this site marks a thing as a thing: a section, a fact,
+   * a project. The hue is decoration and never the meaning, because the words beside it always are.
+   *
+   * `--hue-wash` is declared on the same element as `--hue` for the reason `tokens.css` gives over
+   * `--tone-wash`: a custom property resolves its own `var()`s where it is declared.
+   */
+  [data-hue='accent'] {
+    --hue: var(--accent-text);
+  }
+
+  [data-hue='info'] {
+    --hue: var(--info);
+  }
+
+  [data-hue='earn'] {
+    --hue: var(--earn);
+  }
+
+  [data-hue='warn'] {
+    --hue: var(--warn);
+  }
+
+  [data-hue] {
+    --hue-wash: color-mix(in srgb, var(--hue) 14%, transparent);
+  }
+
+  .glyph {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    inline-size: 28px;
+    block-size: 28px;
+    background: var(--hue-wash, var(--hover-wash));
+    border-radius: var(--r-md);
+    color: var(--hue, var(--ink2));
   }
 }

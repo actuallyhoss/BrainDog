@@ -297,7 +297,6 @@
               <span class="choice-label">{c.label}</span>
               <span class="choice-body">{c.body}</span>
             </span>
-            <kbd class="choice-n">{i + 1}</kbd>
           </button>
         {/each}
       </div>
@@ -480,16 +479,16 @@
     letter-spacing: -0.026em;
   }
 
-  /* The question is now the SECOND thing on the screen, under the claim, so it steps down a level:
-     it is a label for the list rather than the headline of the page. On the step after a choice it
-     is the headline again, and `.step` puts the size back. */
+  /* The question is the SECOND thing on the screen, under the claim, so it is a heading for the
+     cards rather than the headline of the page. It was a letterspaced eyebrow in capitals, which is
+     how a form labels a section; it is a sentence at a section's size now, which is how a person
+     asks one. On the step after a choice it is the headline again, and `.step` puts the size back. */
   .question {
-    margin-block: var(--sp-7) var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    margin-block: var(--sp-7) var(--sp-4);
+    color: var(--ink);
+    font-size: var(--t-lg);
     font-weight: 600;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
+    letter-spacing: -0.018em;
   }
 
   .question.step {
@@ -502,21 +501,19 @@
     text-transform: none;
   }
 
+  /* CARDS, AND IT WAS ONE BOXED LIST. Five rows inside a frame read as a settings panel; five cards
+     you can pick up read as five ways in. Two across where there is room, one on a phone. */
   .choices {
-    display: flex;
-    flex-direction: column;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
-    overflow: hidden;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+    gap: var(--sp-3);
   }
 
   /* The claim, at the top, in the display face — the same sentence the marketing site leads with,
      because the first screen of the product and the first screen of the site should not describe
      two different things. */
   .lede {
-    max-inline-size: 22ch;
+    text-wrap: balance;
     color: var(--ink);
     font-family: var(--font-display);
     font-size: var(--t-2xl);
@@ -535,23 +532,22 @@
 
   .choice {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    gap: var(--sp-4);
-    min-block-size: 66px;
-    padding: var(--sp-3) var(--sp-4);
-    background: none;
-    border: 0;
-    border-block-end: 1px solid var(--line);
+    gap: var(--sp-3);
+    min-block-size: 76px;
+    padding: var(--sp-4);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
     color: var(--ink);
     font: inherit;
     text-align: start;
     cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .choice:last-child {
-    border-block-end: 0;
+    transition:
+      background var(--d-state) var(--ease-out),
+      border-color var(--d-state) var(--ease-out),
+      transform var(--d-press) var(--ease-out);
   }
 
   /* HIGHLIGHTED BY A NUMBER, and focus does the rest — so the ring somebody sees is the one the
@@ -560,51 +556,32 @@
     border-color: var(--accent);
   }
 
-  .choice:hover {
-    background: var(--hover-wash);
+  @media (hover: hover) and (pointer: fine) {
+    .choice:hover {
+      background: var(--s2);
+      border-color: var(--edge);
+    }
+  }
+
+  .choice:active {
+    transform: scale(var(--press-scale));
   }
 
   /* The number is a KEY, so it is drawn as one. A bare circled digit reads as a step in a sequence
      you have to do in order; these are five alternatives and only one gets picked. */
-  /**
-   * AND ON A PHONE THE FIVE NUMBER KEYS GO, because there is no keyboard to press them with.
-   *
-   * This is the first screen anybody sees, and the owner's word for the product as it stood was
-   * "as if it's some nerdy tool". Five boxed digits down the right edge of the five choices are
-   * exactly that: an accelerator advertised to a reader who has no way to use it, on the screen
-   * whose whole job is to make a stranger feel this was built for them.
-   *
-   * `pointer: coarse` and not a width, which is `05 §6`'s rule and is also the right test here:
-   * a narrow laptop window still has the keyboard the digits are for.
-   *
-   * The binding itself is untouched. What goes is the advertisement.
-   */
-  @media (pointer: coarse) {
-    .choice-n {
-      display: none;
-    }
-  }
-
-  .choice-n {
-    min-inline-size: 20px;
-    padding: 2px 6px;
-    background: var(--sunk);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    text-align: center;
-  }
+  /* THE FIVE NUMBER KEYS STILL WORK AND ARE NO LONGER ADVERTISED. Boxed digits beside the five
+     choices were an accelerator printed on the first screen a stranger sees, and the verdict on the
+     product as it stood was "as if it's some nerdy tool". They went on a phone first; they are gone
+     everywhere now. The binding is untouched. */
 
   /* The glyph, in the accent, because it was the only colour on the screen that was missing and
      five rows of grey text is most of what made this look like a form. */
   .choice-icon {
     display: grid;
     place-items: center;
-    inline-size: 34px;
-    block-size: 34px;
-    border-radius: var(--r-sm);
+    inline-size: 40px;
+    block-size: 40px;
+    border-radius: var(--r-pill);
     background: var(--accent-wash);
     color: var(--accent-text);
   }

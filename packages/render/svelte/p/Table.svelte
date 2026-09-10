@@ -27,7 +27,7 @@
   import { rowsAsCards } from '../cards.svelte.ts';
   import type { Snippet } from 'svelte';
   import { TONES } from '../../src/index.ts';
-  import { ariaSort, cardCells, chunkRows, moveCell, type Cell, type Column, type TableRow } from '../types.ts';
+  import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
 
   let {
     columns,
@@ -100,6 +100,18 @@
    * is a control, not a value", so it is the one this reads.
    */
   const lead = $derived(Math.max(0, columns.findIndex((c) => !c.hideLabel)));
+
+  /* WHERE THE TONE'S GLYPH GOES: the column that declares it carries the tone, which on a register
+     is its state, so the mark and the word it qualifies read as one thing (`⊘ open`). A table that
+     declares none keeps it at the head of its first value. */
+  const glyphAt = $derived.by(() => {
+    const declared = columns.findIndex((c) => c.tone);
+    return declared >= 0 ? declared : lead;
+  });
+
+  /* WHICH LINE OF A PHONE CARD EACH COLUMN SITS ON, decided once from the columns and never from a
+     row. The two rules and the measurement that bought them are with `cardPlan` in `../types.ts`. */
+  const plan = $derived(cardPlan(columns));
 
   /**
    * Roving tabindex: exactly one cell is reachable by Tab, every other is -1.
@@ -200,6 +212,14 @@
   them; a block table has columns and no such declaration, so guessing which three matter would be
   guessing. The first column leads the card and the rest are label and value — nothing hidden,
   nothing cut, and no horizontal scroll on the surface `13 §10` says is for reading.
+
+  AND NO LONGER ONE LINE EACH, which is what that paragraph used to build. Every column after the
+  first was a label-and-value line of its own, so a four-column table was a four-line card: at 390,
+  `/p/money` was 6,267px against 2,800px at 1440, and its forecast was 1,615px for thirteen payments
+  at 116 to 144px each. The promise is kept and the lines are not. Every column is still on the card
+  with its label; `cardPlan` decides only which line it sits on, from the alignment and truncation
+  the columns already declare. The title and the figure share the first line, and the rest is a
+  quiet second line, text at its start and quantities at its end.
 -->
 <!--
   ONE CELL BODY, DRAWN BY BOTH ARMS.
@@ -223,20 +243,44 @@
   {:else}{value}{/if}
 {/snippet}
 
+{#snippet pair(row: TableRow, cell: CardCell)}
+  <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'}>
+    {#if !cell.column.hideLabel}<span class="table-card-label">{cell.column.label}</span>{/if}
+    <span class="table-card-value">{@render cellBody(row, cell.column, cell.value)}</span>
+  </span>
+{/snippet}
+
 {#snippet card(row: TableRow)}
   {@const cells = cardCells(row, columns)}
-  <span class="table-card-lead">
-    {#if row.tone}
-      <span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
-    {/if}
-    {#if cells[0]}{@render cellBody(row, cells[0].column, cells[0].value)}{/if}
-  </span>
-  {#each cells.slice(1) as { column, value }}
-    <span class="table-card-pair">
-      <span class="table-card-label">{column.label}</span>
-      <span class="table-card-value">{@render cellBody(row, column, value)}</span>
+  {@const title = cells[plan.title]}
+  {@const mark = cells[plan.mark]}
+  <span class="table-card-head">
+    <span class="table-card-lead">
+      {#if row.tone}
+        <span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
+      {/if}
+      {#if title}{@render cellBody(row, title.column, title.value)}{/if}
     </span>
-  {/each}
+    <!-- THE FIGURE'S NAME IS HIDDEN, NOT GONE. Beside a title an amount reads as that thing's amount
+         to anybody who can see the line, which is what it is. A screen reader hears the card as one
+         link in one breath, and a bare `GBP −9,190.00` in the middle of it is a number without a
+         name, so the column's label is there for it and only for it. -->
+    {#if mark}
+      <span class="table-card-mark" data-truncate={mark.column.truncate}>
+        <span class="table-card-name">{mark.column.label}</span> {@render cellBody(row, mark.column, mark.value)}
+      </span>
+    {/if}
+  </span>
+  {#if plan.start.length + plan.end.length > 0}
+    <span class="table-card-rest">
+      {#if plan.start.length > 0}
+        <span class="table-card-start">{#each plan.start as i}{@render pair(row, cells[i]!)}{/each}</span>
+      {/if}
+      {#if plan.end.length > 0}
+        <span class="table-card-end">{#each plan.end as i}{@render pair(row, cells[i]!)}{/each}</span>
+      {/if}
+    </span>
+  {/if}
 {/snippet}
 
 <!--
@@ -333,7 +377,7 @@
       <div
         class="rowgroup"
         role="rowgroup"
-        style="contain-intrinsic-size: auto calc({group.length} * var(--row-h))"
+        style="contain-intrinsic-size: auto calc({group.length} * var(--tr-h, var(--row-h)))"
       >
         {#each group as row, i}
           {@const index = g * grouped.step + i}
@@ -384,28 +428,29 @@
                 tabindex={tabIndex(index, c)}
                 data-align={column.align ?? 'start'}
                 data-truncate={column.truncate ?? 'end'}
-                data-lead={c === lead ? '' : undefined}
+                data-glyph={c === glyphAt ? '' : undefined}
+                data-tone={column.tone ? '' : undefined}
                 data-acts={onactivate ? '' : undefined}
                 onclick={onactivate ? () => onactivate(row) : undefined}
                 onkeydown={onactivate ? (e) => e.key === 'Enter' && onactivate(row) : undefined}
               >
-                <!-- IN THE FIRST CELL, AND AT ITS HEAD.
+                <!-- IN THE CELL IT QUALIFIES, AND AT ITS HEAD.
 
                      Inside a cell because the only children `role="row"` admits are cells: a glyph
                      hung on the row itself is a stray node in the accessibility tree, which is the
                      same mistake the cap line was making one element up.
 
-                     In the FIRST cell because that is where `List` puts it and says why — "a tone
-                     belongs to the thing it qualifies, and five hundred pixels away it belongs to
-                     nothing" — and at its head because the rest of that cell truncates. A glyph
-                     after the text is a glyph the ellipsis eats on exactly the narrow rows that
-                     needed it. It also lands on the same edge as the colour bar, so the two channels
-                     say one thing in one place.
+                     In the cell it qualifies because that is `List`'s rule and it says why: "a
+                     tone belongs to the thing it qualifies, and five hundred pixels away it belongs
+                     to nothing". That is the column declaring `tone` where there is one, a
+                     register's state, and the first value where there is not. At its head because
+                     the rest of that cell truncates: a glyph after the text is a glyph the ellipsis
+                     eats on exactly the narrow rows that needed it.
 
                      THE GUTTER IS RESERVED FOR THE COLUMN, NOT FOR THE ROW. Otherwise the toned rows
                      indent and the column's left edge goes ragged, which reads as five different
                      columns rather than one column with five marks in it. -->
-                {#if c === lead && row.tone}
+                {#if c === glyphAt && row.tone}
                   <span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
                 {/if}
                 {@render cellBody(row, column, value)}

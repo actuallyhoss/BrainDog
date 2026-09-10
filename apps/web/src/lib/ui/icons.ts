@@ -81,6 +81,9 @@ export const PATHS = {
      never carries meaning on its own (13 §2.3). */
   ban: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM5.6 5.6l12.8 12.8',
   info: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 11v5M12 7.5v.01',
+  /* A question waiting for an answer, which is not the Decide screen's fork: that is a place, this is
+     a row asking something of the reader. */
+  ask: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.8M12 17v.01',
 
   /* Nouns that were being said with a borrowed word. `settings` was carrying Settings, More and
      Keymap at once; `clock` was carrying both "a time" and "the log"; `copy` was carrying both "to

@@ -356,10 +356,8 @@
 
   .diff dt {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
   }
 
   .diff dd {

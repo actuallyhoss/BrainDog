@@ -287,7 +287,7 @@ const ROWS = [
   },
   { name: 'entry CSS, brotli', size: css, budget: B.mainCssBrotli, note: 'tokens, a11y, blocks, rows and the shell' },
   { name: 'index.html, brotli', size: shell, budget: B.htmlBrotli, note: 'it carries no record state' },
-  { name: 'UI face (Plex)', size: await font('plex-sans.woff2'), budget: B.uiFaceBytes, note: "22 §9's budget, unchanged" },
+  { name: 'UI face (Geist)', size: await font('geist.woff2'), budget: B.uiFaceBytes, note: "22 §9's budget, unchanged" },
   { name: 'display face (Poppins)', size: await font('poppins-600.woff2'), budget: B.displayFaceBytes, note: 'nothing below 20px' },
 ];
 

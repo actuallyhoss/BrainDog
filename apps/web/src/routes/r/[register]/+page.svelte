@@ -412,15 +412,27 @@
    * outcome is a toolbar that says `1 selected` above a list of one.
    *
    * THE SAME THRESHOLD THE BAR ABOVE IT USES, because they are one feature. `siftable` was already
-   * gating the search and filter bar, the keyboard hint and the search-fields sentence; the picker
+   * gating the search and filter bar; the picker
    * and the select-all were left unconditional, so half of the answer to "is this list big enough
    * to act on in bulk" was drawn and half was not.
    */
+  /* The register's own projection, with its state marked as the column that carries the row's
+     tone, so `⊘ open` reads as one thing rather than a mark in one column and a word in another. */
+  const projected = $derived(
+    columnsFor(id)
+      .filter((c) => !hidden.has(c.field))
+      .map((c) => (c.field === decl?.state ? { ...c, tone: true } : c)),
+  );
+
   const columns = $derived([
     ...(siftable
       ? [{ field: 'select', label: copy.select, hideLabel: true, width: '3ch', align: 'start' as const, truncate: 'never' as const }]
       : []),
-    ...columnsFor(id).filter((c) => !hidden.has(c.field)),
+    ...projected.filter((c) => c.field !== 'seq'),
+    /* THE SPOKEN ID ENDS THE ROW, quiet, where a list keeps what you look up rather than read. It
+       led the row, so every line opened on a number; the project's mark that shared its cell now
+       sits in front of the title, where colour saying which project is read. */
+    ...projected.filter((c) => c.field === 'seq'),
     /**
      * THE VERBS, AND THE RECEIPT, IN THE ROW.
      *
@@ -933,6 +945,28 @@
 
   const filterable = $derived((decl?.fields ?? []).filter((f) => f.index).slice(0, 8));
 
+  /**
+   * HOW MANY ROWS HOLD EACH PILL'S VALUE, printed quietly beside its word.
+   *
+   * A facet count: the rows holding the value under every OTHER filter and the search, so a pill
+   * says what it holds whether or not its own field is filtered yet. Rows typed here and edits made
+   * here are counted, because the list below draws them. Read only while the bar is on screen.
+   */
+  const facets = $derived.by(() => {
+    const out = new Map<string, Map<string, number>>();
+    for (const f of filterable) {
+      if (f.type !== 'enum') continue;
+      const n = new Map<string, number>();
+      const answer = list(id, { filters: filters.filter((x) => x.field !== f.id), q }).entries;
+      for (const e of [...pending.of(id), ...answer]) {
+        const v = String({ ...e.fields, ...edits.get(e.seq) }[f.id] ?? '');
+        n.set(v, (n.get(v) ?? 0) + 1);
+      }
+      out.set(f.id, n);
+    }
+    return out;
+  });
+
 
   /**
    * WHETHER THIS LIST IS BIG ENOUGH TO NEED SIFTING THROUGH.
@@ -1398,6 +1432,51 @@
   </PageHead>
 
   <div class="page">
+    <!--
+      CAPTURE, FIRST ON THE PAGE.
+
+      IT WAS A MODAL BEHIND A BUTTON, asking for every declared field. The add is the most frequent
+      write a person makes to a list and it was the most expensive one on this screen: a press, a
+      dialog, a form, a submit, a dismissal. This is a press and a return key.
+
+      THE SUBMIT CONTROL IS INSIDE THE FIELD AND ONLY EXISTS ONCE THERE IS SOMETHING TO ADD, which
+      is the one place a button of this kind is not clutter: it appears exactly when it can do
+      something, so it is never a control a reader has to learn to ignore.
+
+      `form` AND `type="submit"` RATHER THAN A KEYDOWN HANDLER, because Enter in a single-field form
+      is the platform's own behaviour and a phone's keyboard prints "Go" for it without being asked.
+
+      ABOVE THE SEARCH AND THE FILTERS, because it is the one thing here that does not act on the
+      rows below it. AND NOTHING UNDER IT: a sentence sat there on every visit saying what a new row
+      would still be missing or take from the filter. The row says what it is missing once it
+      exists, in its cells and its receipt; said in advance, over the list, it was the screen
+      explaining itself.
+    -->
+    {#if !arriving}
+      <form
+        class="capture"
+        onsubmit={(e) => {
+          e.preventDefault();
+          captureRow();
+        }}
+      >
+        <label class="capture-label" for="capture">{copy.captureIn(decl.one)}</label>
+        <div class="capture-field">
+          <Icon name="plus" size="m" />
+          <input
+            id="capture"
+            class="capture-input"
+            type="text"
+            autocomplete="off"
+            bind:value={capture}
+            placeholder={copy.captureIn(decl.one)}
+          />
+          <!-- Present only once there is something to add. -->
+          {#if capture.trim()}<button type="submit" class="capture-go">{copy.captureAdd}</button>{/if}
+        </div>
+      </form>
+    {/if}
+
     <!-- THE BAR APPEARS WHEN THERE IS SOMETHING TO SIFT. Below eight rows it was a search box, six
          chips and a keyboard strip standing over a list you could already read — and on the first
          run it stood over the one row somebody had just typed. -->
@@ -1439,7 +1518,8 @@
               aria-pressed={on ? 'true' : 'false'}
               onclick={() => toggleFilter(f.id, value)}
             >
-              {value.replace(/_/g, ' ')}
+              <span class="segment-word">{value.replace(/_/g, ' ')}</span>
+              <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
             </button>
           {/each}
         </div>
@@ -1458,84 +1538,18 @@
            IT IS IN THE BAR, which appears at eight rows. Below that there is nothing to sort and
            nothing worth hiding, and the bar's own comment already argues why standing a strip of
            controls over a list you can read at a glance is worse than not having them. -->
-      <Button weight="bare" onclick={() => (displayOpen = true)}>
-        <Icon name="settings" size="s" />{copy.display}
-      </Button>
-
-      <!-- FOUR ROW VERBS OVER NOTHING TO ACT ON. Filtering to zero kept the strip, so a screen whose
-           whole message is "38 rows, none matching" also offered to move, peek, open and archive a
-           row that is not there. -->
-      {#if result.entries.length > 0}
-        <span class="bar-hint">
-          <Kbd keys="j  k" /> move <Kbd keys="p" /> peek <Kbd keys="↵" /> open <Kbd keys="⌫" /> archive
-        </span>
-      {/if}
+      <!-- AT THE END OF THE BAR, where a keyboard strip used to stand. It printed four bindings
+           to every visitor on every visit, `j k` move, `p` peek, Enter open and archive: a screen
+           explaining its own interface to people who had not asked. The bindings are untouched.
+           The `?` sheet lists them by reading the registry, and the row menu prints each verb's
+           key beside it, which is where somebody learning them is already looking. -->
+      <span class="bar-end">
+        <Button weight="bare" onclick={() => (displayOpen = true)}>
+          <Icon name="settings" size="s" />{copy.display}
+        </Button>
+      </span>
       </div>
     </div>
-    {/if}
-
-    <!--
-      WHERE THE FIELDS THAT ARE NOT CHIPS ARE FILTERED. It lived inside the drawer and came out with
-      it, which is where it always belonged: the search box it names is on the line above.
-
-      AND ONE OF THE TWO SENTENCES WAS FALSE. "Due sorts on the column" named one field, and every
-      column on this table sorts — clicking `Amount` gives `?sort=amount:asc` and
-      `aria-sort="ascending"`. So the product explained its own interface, in a drawer, incorrectly.
-      Sorting is a fact about the table and the table already says it: eight headers, each a button.
-    -->
-    {#if siftable && searched.length > 0}<p class="bar-note">{copy.filterBySearch(searched)}</p>{/if}
-
-
-    <!--
-      CAPTURE, FIRST ON THE PAGE.
-
-      IT WAS A MODAL BEHIND A BUTTON, asking for every declared field. The add is the most frequent
-      write a person makes to a list and it was the most expensive one on this screen: a press, a
-      dialog, a form, a submit, a dismissal. This is a press and a return key.
-
-      THE SUBMIT CONTROL IS INSIDE THE FIELD AND ONLY EXISTS ONCE THERE IS SOMETHING TO ADD, which
-      is the one place a button of this kind is not clutter: it appears exactly when it can do
-      something, so it is never a control a reader has to learn to ignore.
-
-      `form` AND `type="submit"` RATHER THAN A KEYDOWN HANDLER, because Enter in a single-field form
-      is the platform's own behaviour and a phone's keyboard prints "Go" for it without being asked.
-    -->
-    {#if !arriving}
-      <form
-        class="capture"
-        onsubmit={(e) => {
-          e.preventDefault();
-          captureRow();
-        }}
-      >
-        <label class="capture-label" for="capture">{copy.captureIn(decl.one)}</label>
-        <div class="capture-field">
-          <input
-            id="capture"
-            class="capture-input"
-            type="text"
-            autocomplete="off"
-            bind:value={capture}
-            placeholder={copy.captureIn(decl.one)}
-            aria-describedby="capture-why"
-          />
-          <!-- Present only once there is something to add. -->
-          {#if capture.trim()}<button type="submit" class="capture-go">{copy.captureAdd}</button>{/if}
-        </div>
-        <p class="capture-why" id="capture-why">
-          {#if unanswered.length > 0}
-            {copy.captureNeeds(unanswered.map((f) => f.label.toLowerCase()).join(', '))}
-          {:else if Object.keys(inherited).length > 0}
-            {copy.captureInherits(
-              Object.keys(inherited)
-                .map((f) => (decl.fields.find((x) => x.id === f)?.label ?? f).toLowerCase())
-                .join(' and '),
-            )}
-          {:else}
-            {copy.captureHint}
-          {/if}
-        </p>
-      </form>
     {/if}
 
     {#if rows.length === 0}
@@ -1705,7 +1719,29 @@
         <div class="sentinel" aria-hidden="true"></div>
       {/if}
       {:else}
-      <div class="table-slot">
+      <div class="table-slot" data-picking={selected.size > 0 ? '' : undefined}>
+        <!--
+          THE THING THE ROW BELONGS TO, IN FRONT OF WHAT THE ROW IS.
+
+          `columnsFor` caps the default projection at ten and `thing` is not in Money's, so the
+          desktop grid of the first list in the rail was thirty-eight rows of grey with no way at all
+          to see which project any of them was about. The mark went into `#`, the one column every
+          projection has; `#` ends the row now, and the mark came with the title instead, because
+          colour saying which project is read where the eye starts.
+
+          The mark is a shape before it is a colour, which is `13 §5.1` met by the mark itself, and
+          the label is the project's NAME because a screen reader told "black diamond" has been told
+          the shape and not the thing.
+        -->
+        {#snippet ownMark(seq: number)}
+          {@const own = identityFor(id, entry(id, seq)?.fields ?? {})}
+          {#if own}<span
+              class="row-mark"
+              style={own.retired ? undefined : `--hue:${own.hue}`}
+              data-retired={own.retired ? '' : undefined}
+              role="img"
+              aria-label={own.name}>{own.mark}</span>{/if}
+        {/snippet}
         <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
              without it, so eight header buttons over a single row — each announcing
              `aria-sort="none"` — become eight headings. -->
@@ -1730,6 +1766,8 @@
           {#snippet cellSnippet(row, column, value)}
             {@const seq = Number(row.key.split('#')[1])}
             {@const ident = identityOf(id, column.field, entry(id, seq)?.fields[column.field])}
+            {@const isTitle = column.field === decl.title}
+            {@const isEnum = fieldOf(column.field)?.type === 'enum'}
             {#if column.field === 'select'}
               <button
                 type="button"
@@ -1847,25 +1885,6 @@
               <IdentityMark identity={ident} />
             {:else if column.field === 'seq'}
               <!--
-                THE THING THE ROW BELONGS TO, IN THE ONE COLUMN EVERY PROJECTION HAS.
-
-                `columnsFor` caps the default projection at ten and `thing` is not in Money's, so
-                the desktop grid of the first list in the rail was thirty-eight rows of grey with
-                no way at all to see which project any of them was about. The identity was
-                reachable only by adding a column, and only on the lists where it made the cut.
-
-                `#` is the one column that is always there, always narrow, and always first. The
-                mark is a shape before it is a colour, which is `13 §5.1` met by the mark itself,
-                and the label is the project's NAME because a screen reader told "black diamond"
-                has been told the shape and not the thing.
-              -->
-              {@const own = identityFor(id, entry(id, seq)?.fields ?? {})}
-              {#if own}<span
-                  class="row-mark"
-                  style={own.retired ? undefined : `--hue:${own.hue}`}
-                  data-retired={own.retired ? '' : undefined}
-                  role="img"
-                  aria-label={own.name}>{own.mark}</span>{/if}<!--
                 A ROW THAT HAS NO ID PRINTS NO ID, and it used to print `#-1`.
 
                 `pending` mints a NEGATIVE sequence so a row somebody typed can never collide with
@@ -1875,9 +1894,9 @@
                 an implementation detail with a minus sign in front of it, and the column it
                 appears in is the one whose whole job is to give a person something they can say
                 out loud. The receipt beside it already says what the row is.
-              -->{#if seq >= 0}{value}{/if}
+              -->{#if seq >= 0}<span class="row-seq">{value}</span>{/if}
             {:else if value === null}
-              <span class="missing">—</span>
+              {#if isTitle}{@render ownMark(seq)}{/if}<span class="missing">—</span>
             {:else if editableHere(column.field)}
               <!--
                 THE POINTER PATH, AND IT WAS KEYBOARD ONLY. `e` has been on the `?` sheet since the
@@ -1899,7 +1918,7 @@
                 control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
                 sheet has advertised since the grid was written.
               -->
-              <span class="cell-said">{value}<button
+              <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{value}</span>{:else}{value}{/if}<button
                   type="button"
                   class="cell-pen"
                   tabindex="-1"
@@ -1909,7 +1928,7 @@
                     openEditor(seq, column.field);
                   }}
                 ><Icon name="edit" size="s" /></button></span>
-            {:else}{value}{/if}
+            {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{value}</span>{:else}{value}{/if}{/if}
           {/snippet}
         </Table>
       </div>
@@ -2399,6 +2418,73 @@
     display: contents;
   }
 
+  /**
+   * THE FILTERS ARE PILLS: one rounded track on a raised surface, and the chosen value a lighter pill
+   * in it with its word in ink. `controls.css` asks for the state to be a SHAPE and not a shade, and
+   * this keeps that, drawn round rather than as a box of boxes. Scoped to this screen, so every other
+   * segmented control keeps the shared rule.
+   *
+   * THE COUNT SITS BESIDE THE WORD AND QUIETER THAN IT, so a pill says what it holds before it is
+   * pressed. The weight does not change when a pill is chosen, so the bar does not shift under the
+   * pointer. Sentence case is the stylesheet's, on the first letter, so the word stays the one the
+   * record stores and the empty state quotes.
+   */
+  .segmented {
+    background: var(--s2);
+    border-radius: var(--r-pill);
+  }
+
+  .segment {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  /* 44 under a thumb is `--ctl-h`'s; under a mouse the pill sits inside a track the height of the
+     search box beside it. */
+  @media (pointer: fine) {
+    .segment {
+      min-block-size: calc(var(--ctl-h) - 6px);
+    }
+  }
+
+  .segment[data-on] {
+    background: var(--s3);
+    box-shadow: var(--raise);
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .segment-word,
+  .enum {
+    display: inline-block;
+  }
+
+  .segment-word::first-letter,
+  .enum::first-letter {
+    text-transform: uppercase;
+  }
+
+  .segment-n {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The search box is a pill too, so the bar is one family of shapes. */
+  .bar > .field {
+    background: var(--s2);
+    border-radius: var(--r-pill);
+  }
+
+  /* Display ends the bar: it changes how the list looks, not what it holds. */
+  .bar-end {
+    margin-inline-start: auto;
+  }
+
   /* The menu rows: the same 34px, the same tint-on-hover, and each printing the key it stands in
      for — so using the menu teaches the key that replaces it. */
   .mi {
@@ -2484,7 +2570,7 @@
       padding: 0;
       background: none;
       border: 0;
-      border-inline-start: 1px solid var(--line);
+      border-radius: var(--r-md);
       /* `--ink2`, and it was `--dim`: the one touch route to a row's eight verbs, drawn in the
          quietest ink the palette has, read as an empty cell beside every card. */
       color: var(--ink2);
@@ -2583,6 +2669,13 @@
     color: var(--dim);
   }
 
+  /* The spoken id at the end of the row, quiet, in the face that says it is an identifier. */
+  .row-seq {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
   .cell-said {
     position: relative;
     display: block;
@@ -2639,7 +2732,7 @@
      field's own placeholder says the same words, and a visible label above a single-field form
      turns one line into three. */
   .capture {
-    margin: 0 0 var(--sp-4);
+    margin: 0;
   }
 
   .capture-label {
@@ -2651,14 +2744,23 @@
     white-space: nowrap;
   }
 
+  /* ONE FRIENDLY FIELD: a rounded line on the first raised surface with a plus at its head, which
+     is the shape "add" has in every list a person has used. */
   .capture-field {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding-inline: var(--sp-4);
+    min-block-size: var(--tap);
+    padding-inline: var(--sp-4) var(--sp-2);
     background: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-md);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    color: var(--dim);
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .capture-field:hover {
+    border-color: var(--edge);
   }
 
   /* THE RING IS ON THE BOX AND NOT ON THE INPUT, because the submit control is inside the box: a
@@ -2689,7 +2791,7 @@
     padding: 2px var(--sp-3);
     background: var(--accent);
     border: 1px solid var(--accent-edge);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--accent-ink);
     font-size: var(--t-xs);
     font-weight: 600;
@@ -2703,13 +2805,6 @@
     .capture-go {
       min-block-size: var(--tap);
     }
-  }
-
-  .capture-why {
-    margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    line-height: 1.5;
   }
 
   /* THE VERBS ARE QUIET UNTIL THE ROW IS. A column of controls at full contrast on every row of a
@@ -2727,7 +2822,7 @@
   .verb {
     padding: 1px var(--sp-2);
     background: none;
-    border: 1px solid transparent;
+    border: 0;
     border-radius: var(--r-sm);
     color: var(--ink2);
     font-size: var(--t-xs);
@@ -2737,15 +2832,32 @@
   .verb.icon {
     display: grid;
     place-items: center;
-    padding: 2px;
-    opacity: 0.45;
+    padding: var(--sp-1);
+    color: var(--dim);
   }
 
   .verb:hover,
   .verb:focus-visible {
-    border-color: var(--edge);
+    background: var(--hover-wash);
     color: var(--ink);
-    opacity: 1;
+  }
+
+  /* UNDER A MOUSE THEY ARE NOT THERE UNTIL THE ROW IS, which the comment over `.verbs` has always
+     said and no rule ever did. They come up with the row's hover, the keyboard caret and focus
+     inside the row. Only where there is a hover: a finger has none, so a touch screen keeps them
+     drawn, and a phone has the card's menu. The keyboard's route never went through them; they are
+     `tabindex="-1"` and every verb is a key the `?` sheet lists. The picker goes the same way while
+     nothing is selected, and comes back on every row once something is. */
+  @media (hover: hover) and (pointer: fine) {
+    .verbs,
+    .table-slot:not([data-picking]) .pick:not([data-on]) {
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    :global(.tr:not(:hover, :focus-within, [data-focused])) .verbs,
+    .table-slot:not([data-picking]) :global(.tr:not(:hover, :focus-within, [data-focused]) .pick:not([data-on])) {
+      opacity: 0;
+    }
   }
 
   .pick {
@@ -2775,15 +2887,6 @@
     text-decoration: underline;
     text-underline-offset: 0.18em;
     cursor: pointer;
-  }
-
-  .bar-hint {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-xs);
   }
 
   .peek {
@@ -2888,12 +2991,6 @@
     font-size: var(--t-xs);
   }
 
-  .bar-note {
-    margin-block-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
   .peek dt {
     color: var(--dim);
     font-size: var(--t-sm);
@@ -2911,13 +3008,6 @@
   @media (width < 900px) {
     .page {
       padding: var(--sp-4) var(--sp-4) var(--sp-8);
-    }
-
-    /* Only ONE rule belongs in this block, and thirty lines of `.mi` and `.picked` were pasted in
-       beside it — identical to the top-level ones, at the wrong indentation, re-declaring what was
-       already true. Dead weight in the bundle, and a media query that lies about what it changes. */
-  .bar-hint {
-      display: none;
     }
   }
 
@@ -2993,14 +3083,6 @@
 
     .bar-rest > * {
       flex: 0 0 auto;
-    }
-
-    /* WHAT THE BOX SEARCHES, ON THE ONE SCREEN WHERE IT IS ALREADY IN THE PLACEHOLDER. The bar's
-       own `Search money` says it, the sentence repeats it in a second line of prose, and the house
-       rule at the top of `copy.ts` is that a screen never explains its own interface. It stays on
-       a laptop, where the line costs nothing and names the FIELD rather than the register. */
-    .bar-note {
-      display: none;
     }
   }
 </style>

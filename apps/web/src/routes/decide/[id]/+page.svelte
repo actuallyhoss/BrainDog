@@ -42,7 +42,6 @@
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Kbd from '$lib/ui/Kbd.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
@@ -284,9 +283,6 @@
       <section class="options">
         <div class="options-head">
           <h2 class="options-title">{copy.theOptions}</h2>
-          <span class="options-hint">
-            <Kbd keys="1–{question.options.length}" /> highlights <Kbd keys="↵" /> opens the reason
-          </span>
         </div>
 
         <div class="cards" data-cells={question.options.length}>
@@ -375,7 +371,6 @@
               onclick={commit}
             >
               {copy.commit}
-              <Kbd keys="⌘↵" />
             </Button>
             <Button weight="bare" onclick={() => (committing = null)}>Cancel</Button>
             <!-- ONE WARNING AT A TIME. `commit-why` above already says "kept for ever and cannot be
@@ -394,7 +389,7 @@
           <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped.
                It had no handler, so the one control that stops a gate being cleared by dismissing
                things did nothing — while `d` on the keyboard opened the same flow correctly. -->
-          <Button weight="bare" tone="info" onclick={defer}>{copy.defer}<Kbd keys="d" /></Button>
+          <Button weight="bare" tone="info" onclick={defer}>{copy.defer}</Button>
           <span class="third-note">{copy.deferHint}</span>
         </div>
       {/if}
@@ -418,10 +413,8 @@
   .cost-label {
     color: var(--warn);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
-    letter-spacing: 0.055em;
-    text-transform: uppercase;
   }
 
   .cost-body {
@@ -449,14 +442,6 @@
     font-weight: 500;
   }
 
-  .options-hint {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
 
   /* Told how many things it contains. `auto-fit` with three items in a 962px column generated SEVEN
      tracks, four of them empty — a 550px slab of border colour, with every selector correct (05 §4). */
@@ -686,10 +671,6 @@
        reason field above the fold. Decisions get made from a phone (19 §3). */
     .cards {
       grid-template-columns: minmax(0, 1fr);
-    }
-
-    .options-hint {
-      display: none;
     }
   }
 </style>

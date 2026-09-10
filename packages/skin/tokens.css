@@ -30,28 +30,26 @@
 
 @layer tokens {
   /* ── Faces ──────────────────────────────────────────────────────────────
-     Three roles, and the pairing is deliberate rather than convenient.
+     Three roles.
 
-     IBM Plex Sans carries the work: a humanist grotesque with a large x-height that holds up at
-     11px, and true tabular figures. It is also the engineered Latin sibling of IBM Plex Sans
-     Arabic, which 13 §3.1 already requires — so the Arabic requirement is met by a real companion
-     design instead of a fallback.
+     GEIST CARRIES THE WORK, AND IT REPLACED IBM PLEX SANS. Plex was chosen for its x-height and
+     its Arabic sibling, and both reasons still hold for Arabic, which keeps Plex through its own
+     `unicode-range` below. For Latin it read as what it is, the typeface of a large company's
+     internal tools, and the owner's verdict on the whole product was "a corporate tool". Geist is
+     the face of the product BrainDog is measured against, it holds up at 11px, it has true tabular
+     figures, and as one variable file from 300 to 800 it is 25.5 KB where Plex was 45.7 KB for
+     three weights.
 
-     Poppins carries the brand: it is the wordmark's own face, geometric where Plex is humanist, and
-     it appears only at display sizes. It never touches a table, because a geometric face with a
-     small x-height and lining figures is the wrong tool for a column of money.
+     Poppins carries the brand: it is the wordmark's own face, geometric where Geist is neutral, and
+     it appears only at display sizes. It never touches a table.
 
      The identifier face is the system monospace stack and costs zero bytes. It is the ROLE that
-     makes #125 and D41 read as identifiers, not a chosen face (13 §3.1).
-
-     ponytail: 52.4 KB of Latin against a 45 KB budget (22 §9), because these are Google's stock
-     subsets. Subset both with pyftsubset to the glyphs actually reachable and the measured headroom
-     is ~15 KB; do it when the `bundle` gate lands, not before. */
+     makes #125 and D41 read as identifiers, not a chosen face (13 §3.1). */
 
   @font-face {
-    font-family: 'Plex';
-    src: url('/fonts/plex-sans.woff2') format('woff2');
-    font-weight: 400 600;
+    font-family: 'Geist';
+    src: url('/fonts/geist.woff2') format('woff2');
+    font-weight: 300 800;
     font-display: swap;
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2074, U+20AC,
       U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
@@ -76,8 +74,8 @@
   }
 
   :root {
-    --font-ui: 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-display: 'Poppins', 'Plex', system-ui, sans-serif;
+    --font-ui: 'Geist', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Poppins', 'Geist', 'Plex', system-ui, sans-serif;
     --font-id: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
 
     /* Eight steps, fixed. A theme never sets type; the reader's Text setting picks the body step
@@ -130,9 +128,12 @@
     --sp-8: 64px;
     --sp-9: 96px;
 
-    --r-sm: 4px;
-    --r-md: 6px;
-    --r-lg: 8px;
+    /* Softer than they were (4 / 6 / 8), which read as a spreadsheet's cells. A control or a card
+       is a thing you can pick up, and a pill is the shape of a choice or a single action. */
+    --r-sm: 6px;
+    --r-md: 9px;
+    --r-lg: 14px;
+    --r-pill: 999px;
 
     /**
      * THE RESTING LEVEL OF THE ELEVATION LADDER, and it was `none`.

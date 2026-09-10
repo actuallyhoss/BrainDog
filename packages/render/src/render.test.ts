@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { KINDS, PRIMITIVES, PRIMITIVES_VERSION, isKind } from './kinds.ts';
 import { parse, splitRow } from './parse.ts';
 import { toHTML, verbatimText } from './html.ts';
-import { ariaSort, cardCells, chunkRows, moveCell, type Column, type TableRow } from '../svelte/types.ts';
+import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type Column, type TableRow } from '../svelte/types.ts';
 import { lanes } from './board.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
 import { bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
@@ -1170,4 +1170,103 @@ test('and it draws them the way the caller said to, which is the way the grid do
   assert.ok((src.match(/@render cellBody\(/gu)?.length ?? 0) >= 2, 'only one arm draws through the shared cell');
   assert.equal(src.match(/@render cellSnippet\(/gu)?.length, 1, 'a caller’s cell snippet is drawn in one place or in none');
   assert.equal(src.match(/class="missing"/gu)?.length, 1, 'the missing mark is drawn in one place');
+});
+
+/* ── the phone card's two lines ───────────────────────────────────────────── */
+
+/* The columns as their callers declare them today: the seed's "Who owes you" through `/p/[slug]`,
+   a related list through `columnsFor`, and a `comparison` through `Block.svelte`. */
+const WHO_OWES_YOU = [
+  COLUMN({ field: 'what', label: 'Description', align: 'start', truncate: 'end' }),
+  COLUMN({ field: 'party', label: 'Who', align: 'start', truncate: 'end' }),
+  COLUMN({ field: 'amount', label: 'Amount', align: 'end', truncate: 'never' }),
+  COLUMN({ field: 'due', label: 'Due', align: 'end', truncate: 'end' }),
+];
+const RELATED = [
+  COLUMN({ field: 'seq', label: '#', align: 'end', truncate: 'middle' }),
+  COLUMN({ field: 'what', label: 'Description' }),
+  COLUMN({ field: 'direction', label: 'Which way' }),
+];
+const PICKED = [COLUMN({ field: 'select', label: 'Select', hideLabel: true }), ...WHO_OWES_YOU];
+const COMPARISON = ['Option', 'Cost', 'What it gives up'].map((label, i) => COLUMN({ field: String(i), label }));
+/** `runwayBlock` with `When` aligned to the end, as `13 §4.2` has dates. */
+const FORECAST = [
+  COLUMN({ field: 'day', label: 'When', align: 'end', truncate: 'end' }),
+  COLUMN({ field: 'what', label: 'What', align: 'start', truncate: 'end' }),
+  COLUMN({ field: 'delta', label: 'In and out', align: 'end', truncate: 'never' }),
+  COLUMN({ field: 'balance', label: 'Balance', align: 'end', truncate: 'never' }),
+];
+
+/** One `{#snippet}` of `Table`, as source, the way the card arm above is read. */
+const snippetSource = (name: string, params: string): string =>
+  new RegExp(`\\{#snippet ${name}\\(${params}\\)\\}([\\s\\S]*?)\\n\\{\\/snippet\\}`, 'u').exec(componentSource('Table'))?.[1] ?? '';
+
+test('A PHONE CARD LEADS WITH THE TEXT AND ENDS ITS FIRST LINE ON THE FIGURE', () => {
+  /* One line per column made `/p/money` 6,267px at 390 against 2,800px at 1440, and its forecast
+     1,615px for thirteen payments. The card is two lines now: the title and the amount, then the
+     rest, and which is which comes from the alignment and truncation the columns already declare. */
+  assert.deepEqual(cardPlan(WHO_OWES_YOU), { title: 0, mark: 2, start: [1], end: [3] });
+  // A related list leads with the register's `#`, an identifier aligned to the end. It ends the
+  // first line, which is where `RowCards` has always put it, and the text after it is the title.
+  assert.deepEqual(cardPlan(RELATED), { title: 1, mark: 0, start: [2], end: [] });
+  // A row picker is a control: never the title, never the figure.
+  assert.deepEqual(cardPlan(PICKED), { title: 1, mark: 3, start: [0, 2], end: [4] });
+  // A `comparison` declares no alignment at all, so its first cell leads and the rest are labelled.
+  assert.deepEqual(cardPlan(COMPARISON), { title: 0, mark: -1, start: [1, 2], end: [] });
+  // And the card reads the declaration without second-guessing it: `runwayBlock` sets `When` at
+  // the start today, so today the date leads the forecast's card.
+  const asDeclared = FORECAST.map((c, i) => (i === 0 ? { ...c, align: 'start' as const } : c));
+  assert.equal(cardPlan(asDeclared).title, 0);
+  assert.equal(cardPlan([]).title, -1, 'a table with no columns has no title to draw');
+  // The component asks once, from the columns.
+  assert.match(componentSource('Table'), /const plan = \$derived\(cardPlan\(columns\)\)/u, 'the card arm does not use the plan');
+});
+
+test('A FIGURE IS DRAWN WHOLE ON EITHER LINE, AND THE BALANCE ENDS THE LINE UNDER THE PAYMENT', () => {
+  /* Two figures. The first ends the title's line, because an amount beside "Legal review" reads as
+     that payment's amount, which it is; the running balance ends the second line, so it still reads
+     down one edge of the list. Neither is shortened: a truncated figure is not shortened, it is
+     wrong (13 §4.2). */
+  const plan = cardPlan(FORECAST);
+  assert.deepEqual(plan, { title: 1, mark: 2, start: [], end: [0, 3] });
+  const cells = cardCells({ key: 'r', cells: ['3 Sep 2026', 'Legal review, February', 'GBP −19,100.00', 'GBP −4,190.00'] }, FORECAST);
+  assert.equal(cells[plan.mark]?.value, 'GBP −19,100.00');
+  assert.equal(cells[plan.end.at(-1) ?? -1]?.value, 'GBP −4,190.00');
+  // And the stylesheet is told which values are figures, on both lines, so it can keep them whole.
+  const card = snippetSource('card', 'row: TableRow');
+  assert.match(card, /class="table-card-mark" data-truncate=\{mark\.column\.truncate\}/u, 'the first line’s figure does not say it is one');
+  assert.match(card, /@render cellBody\(row, mark\.column, mark\.value\)/u, 'the figure is not drawn through the one cell body');
+  assert.match(
+    snippetSource('pair', 'row: TableRow, cell: CardCell'),
+    /class="table-card-pair" data-truncate=\{cell\.column\.truncate/u,
+    'a figure on the second line does not say it is one',
+  );
+});
+
+test('AN EMPTY CELL KEEPS ITS PLACE ON THE CARD AND STILL READS AS MISSING', () => {
+  /* The plan is given columns and no row, so no row can move a column by what it has in a cell:
+     a missing title keeps the title's place and draws the missing mark there. That is the fault
+     `cardCells` was written for, where a blank value took its column off the card. */
+  assert.equal(cardPlan.length, 1, 'the arrangement can see a row');
+  const plan = cardPlan(WHO_OWES_YOU);
+  const cells = cardCells({ key: 'r', cells: [null, 'Halden Type Co'] }, WHO_OWES_YOU);
+  assert.equal(cells[plan.title]?.column.label, 'Description', 'a missing title handed its place to the next column');
+  assert.equal(cells[plan.title]?.value, null);
+  assert.equal(cells[plan.mark]?.column.label, 'Amount');
+  assert.equal(cells[plan.mark]?.value, null, 'a missing figure is not on the card to read as missing');
+  // Every column is on the card exactly once: nothing hidden, nothing drawn twice.
+  for (const columns of [WHO_OWES_YOU, RELATED, PICKED, COMPARISON, FORECAST]) {
+    const p = cardPlan(columns);
+    const placed = [p.title, p.mark, ...p.start, ...p.end].filter((i) => i >= 0).sort((a, b) => a - b);
+    assert.deepEqual(placed, columns.map((_, i) => i), `a column of ${columns.map((c) => c.label).join(', ')} left the card`);
+  }
+  // And every slot draws through the one cell body, whose `null` is the missing mark, and none of
+  // them is skipped for the value that happens to be in it.
+  const card = snippetSource('card', 'row: TableRow');
+  const pair = snippetSource('pair', 'row: TableRow, cell: CardCell');
+  assert.notEqual(card, '', 'the card arm is not where this test thinks it is');
+  assert.notEqual(pair, '', 'the second line is not drawn by a `pair` snippet');
+  assert.match(card, /@render cellBody\(row, title\.column, title\.value\)/u);
+  assert.match(pair, /@render cellBody\(row, cell\.column, cell\.value\)/u);
+  assert.doesNotMatch(card + pair, /\{#if [^}]*\.value\b/u, 'a slot is drawn only when its cell has a value');
 });

@@ -20,10 +20,11 @@ node scripts/shot.mjs # screenshots of the BUILT site, both schemes
 
 ## It is the same design system, not a lookalike
 
-Same tokens, same generated palette, same mark, same 4px corner, same pressable button edge —
-because it imports `@braindog/skin` rather than copying it. The one thing it does that the record
-app refuses is the translucent blurred bar: the app will not put translucency behind a column of
-small tabular digits, and a marketing page has no such column.
+Same tokens, same generated palette, same mark, same corner radii, because it imports
+`@braindog/skin` rather than copying it. The pill, the tinted glyph and its four hues are the
+site's own, in `src/app.css`, so the three pages draw them one way. The one thing it does that the
+record app refuses is the translucent blurred bar: the app will not put translucency behind a
+column of small tabular digits, and a marketing page has no such column.
 
 ## Every screenshot is the real app
 
@@ -41,6 +42,11 @@ node scripts/shot.mjs   # the app's own routes, into apps/web/shots
 
 then copy the ones the site uses into `apps/site/static/shots/`. They are committed, because a
 marketing page that cannot build without a running app is a marketing page that cannot build.
+
+The one exception is the top of the home page, which is `src/lib/Preview.svelte`: the same home
+screen, laid out from words read off `home-light.png` rather than shown as the PNG, so it paints
+with the HTML, reads at phone size and wears the current palette. Nothing in it is invented, for
+the reason `Fields.svelte` gives, and its words are in `copy.ts` with the rest.
 
 ## The copy is one file
 

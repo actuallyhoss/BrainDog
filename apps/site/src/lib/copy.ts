@@ -79,7 +79,7 @@ export const site = {
      * it. Three beats, and only the middle one is long, which is the beat a reader is allowed to
      * skim.
      */
-    lead: 'A company knows a great deal that never reaches its codebase.',
+    lead: 'Your business knows a great deal that never reaches its codebase.',
     knows: [
       'What it is owed and by whom.',
       'What renews on Tuesday.',
@@ -87,12 +87,13 @@ export const site = {
       'Who decided the thing nobody can remember deciding.',
     ],
     body:
-      'BrainDog keeps all of it in one database instead: typed, append-only, and readable by ' +
-      'every agent you use.',
+      'BrainDog keeps all of it in one place: a typed, append-only database that every agent you ' +
+      'use can read.',
     /* `Open the demo record` AND IT WAS `Start a record`, which started no record. This is the
-       largest control on the site and it is drawn twice; the route it opens is the first-run
-       screen, and the row somebody types there is marked `Not saved` and dropped with the tab,
-       which `apps/web/src/lib/record/pending.svelte.ts` says in its own words. A verb the product
+       largest control on the site and it is drawn twice. It opens the demo record, where
+       nothing needs an account; the first-run screen is one tap inside it, and the row somebody
+       types there is marked `Not saved` and dropped with the tab, which
+       `apps/web/src/lib/record/pending.svelte.ts` says in its own words. A verb the product
        cannot perform is the one defect a marketing page cannot carry. The pricing page and the
        changelog both already said there is no sign-up; the hero did not, and `note` is that
        sentence, under the hero's own pair of buttons. */
@@ -100,10 +101,66 @@ export const site = {
     secondary: 'Read the design',
     /** The second action while the design is not readable. `Changelog` is a bare noun, and a CTA is a verb plus a noun. */
     changelog: 'Read the changelog',
+    /* "A made-up business" and it said "a synthetic record": the same fact in the words the demo's
+       own sample bar uses, so the promise under the button and the first thing inside agree. */
     note:
-      'The app draws a synthetic record rather than yours. There is no sign-up and no billing, and ' +
-      'nothing you type into it is kept.',
-    caption: 'The record app. Cream in light, warm charcoal in dark, and the same palette generated for both.',
+      'The demo is a made-up business, not yours. There is no sign-up and no billing, and nothing ' +
+      'you type into it is kept.',
+  },
+
+  /**
+   * THE HOME SCREEN AT THE TOP OF THE HOME PAGE, as words, because it is laid out rather than
+   * photographed: see `Preview.svelte`.
+   *
+   * NOTHING HERE IS INVENTED. Every label, figure and sentence is read off
+   * `static/shots/home-light.png`, the app's home screen on the synthetic record the demo opens.
+   * When the seed's sample business changes, this changes with that screenshot, not before it.
+   */
+  preview: {
+    label:
+      'The BrainDog home screen: the open questions waiting on a decision, the money that is late ' +
+      'in both directions, and what changed since you last looked.',
+    record: 'The Studio',
+    initial: 'T',
+    nav: [
+      { name: 'Home', count: '' },
+      { name: 'Decide', count: '4' },
+      { name: 'Inbox', count: '6' },
+    ],
+    projectsTitle: 'Projects',
+    projects: ['Kiln', 'Marlow & Co', 'Portage'],
+    threadsTitle: 'Threads',
+    threads: ['Variable axis QA'],
+    date: 'Thursday 3 September',
+    pending: { count: '4', label: 'to decide' },
+    nowTitle: 'Right now',
+    figures: [
+      { label: 'Owed to you', value: 'GBP 28,320.00', note: 'no more than GBP 20,000.00' },
+      { label: 'Due in 30 days', value: 'GBP 26,690.00', note: 'no more than GBP 25,000.00' },
+      { label: 'Overdue to pay', value: 'GBP 10,540.00', note: 'should be nothing' },
+    ],
+    needsTitle: 'What needs you',
+    recommends: 'Recommends',
+    needs: [
+      { title: 'The backup on 2026-09-03 did not run', recommends: 'Run it now', age: '9h ago' },
+      {
+        title: 'Does Kiln licence per-seat, per-product, or one flat studio price?',
+        recommends: 'Per product',
+        age: '4d ago',
+      },
+      {
+        title: 'Does Portage keep sending from portagemail.example, or move to the apex?',
+        recommends: 'Keep the subdomain',
+        age: '2d ago',
+      },
+    ],
+    awayTitle: 'Since you were away',
+    away: [
+      { who: 'claude', what: 'Added 2 services from the Fenwick invoice', age: '3h ago' },
+      { who: 'reply rule', what: 'Halden replied on 2026-041: payment run on the 12th', age: '9h ago' },
+      { who: 'you', what: 'Marked Kerning pass, lowercase done', age: '14h ago' },
+      { who: 'codex', what: 'Opened SG31, the Kiln licensing question', age: '1d ago' },
+    ],
   },
 
   sections: {

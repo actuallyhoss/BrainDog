@@ -21,6 +21,7 @@ import { HOUSE, HIGH_CONTRAST, HOUSE_SEED } from './index.ts';
 import { ACCENTS } from './record.ts';
 import {
   BRAND_RED,
+  hueGap,
   INKS,
   INTENTS,
   SURFACES,
@@ -172,11 +173,16 @@ test('an achromatic seed is refused, not silently substituted', () => {
   );
 });
 
-test('the accent is the mark, exactly', () => {
-  // Asserted rather than described, because this is the decision the palette is built around and
-  // the constraint that used to forbid it is still one line away in build.ts. `info` is a generated
-  // role precisely so this can hold; re-point it at `accent` and this test is what fails.
-  for (const scheme of ['dark', 'light'] as const) assert.equal(HOUSE.schemes[scheme].accent, BRAND_RED);
+test('the accent is not the mark, and the mark is still the brand red', () => {
+  // The reversal, held. The controls moved to an indigo because a red primary on every screen read
+  // as an alarm; the logo did not move, and `theme.mjs` still paints it from `BRAND_RED`. If the
+  // accent drifts back to the mark's hue this fails, and so does the danger-versus-brand test above
+  // in spirit: red is meant to mean one thing.
+  const mark = rgbToLch(parseColour(BRAND_RED));
+  for (const scheme of ['dark', 'light'] as const) {
+    const accent = rgbToLch(parseColour(HOUSE.schemes[scheme].accent));
+    assert.ok(hueGap(accent.H, mark.H) >= 90, `the ${scheme} accent is ${hueGap(accent.H, mark.H).toFixed(0)} degrees from the mark`);
+  }
 });
 
 test('the four intent words stay separable with a red accent beside them', () => {

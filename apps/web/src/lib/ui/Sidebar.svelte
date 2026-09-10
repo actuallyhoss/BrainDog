@@ -36,6 +36,7 @@
   import type { NavEntry } from '../record/api.ts';
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
   import Icon, { type IconName } from './Icon.svelte';
+  import { palette } from '../palette/open.svelte.ts';
   import Menu from './Menu.svelte';
   import RowMenu from './RowMenu.svelte';
   import Kbd from './Kbd.svelte';
@@ -301,7 +302,39 @@
 
   <div class="scroll">
     <!-- Declared. Sections and order come from `page` rows, and the user's arrangement wins. -->
+    {#snippet navItem(entry: NavEntry, label: string)}
+            <!-- A page about a THING wears that thing's colour. The hue is chosen once at create
+                 and frozen, and it is the only colour in the product that means something specific
+                 rather than something general: not "this is important", but "this is Kiln". Using
+                 it here is the difference between a rail of grey rows and a rail where the project
+                 you are looking for is the one you already recognise. -->
+            <a
+              class="item tap"
+              href={entry.href}
+              data-nav={entry.href}
+              aria-current={here(entry.href) ? 'page' : undefined}
+              style={entry.hue === undefined ? undefined : `--hue:${entry.hue}`}
+              data-hued={entry.hue === undefined ? undefined : ''}
+              onkeydown={(e) => onItemKey(e, entry)}
+              oncontextmenu={(e) => {
+                e.preventDefault();
+                openMenu(entry, e.currentTarget);
+              }}
+            >
+              <Icon name={entry.icon} size="m" />
+              <span class="item-name">{label}</span>
+            </a>
+    {/snippet}
     {#each sections as [section, entries]}
+      {#if entries.length === 1}
+        <!-- A SECTION OF ONE IS A ROW, NOT A FOLDER. Money, Services and Work each declare one page,
+             so the rail drew a folding heading over a single row three times, `Money` then
+             `Overview`, `Services` then `Renewals`, which is the look of a file tree. A section
+             holding one page is that page, named by its section, and there is nothing to fold. -->
+        <ul class="group solo">
+          <li>{@render navItem(entries[0]!, section)}</li>
+        </ul>
+      {:else}
       <!--
         THE HEADING IS THE CONTROL. A separate chevron beside it would be a second target the width
         of a glyph, on a row that is already exactly the right size to press, and `19 §3` gives the
@@ -336,30 +369,11 @@
       <ul class="group" data-shut={folded ? '' : undefined} inert={folded || undefined} aria-hidden={folded || undefined}>
         {#each entries as entry}
           <li>
-            <!-- A page about a THING wears that thing's colour. The hue is chosen once at create
-                 and frozen, and it is the only colour in the product that means something specific
-                 rather than something general: not "this is important", but "this is Kiln". Using
-                 it here is the difference between a rail of grey rows and a rail where the project
-                 you are looking for is the one you already recognise. -->
-            <a
-              class="item tap"
-              href={entry.href}
-              data-nav={entry.href}
-              aria-current={here(entry.href) ? 'page' : undefined}
-              style={entry.hue === undefined ? undefined : `--hue:${entry.hue}`}
-              data-hued={entry.hue === undefined ? undefined : ''}
-              onkeydown={(e) => onItemKey(e, entry)}
-              oncontextmenu={(e) => {
-                e.preventDefault();
-                openMenu(entry, e.currentTarget);
-              }}
-            >
-              <Icon name={entry.icon} size="m" />
-              <span class="item-name">{entry.title}</span>
-            </a>
+            {@render navItem(entry, entry.title)}
           </li>
         {/each}
       </ul>
+      {/if}
     {/each}
 
     <!-- The registers themselves. Native, never pack-positioned: a page can be uninstalled with the
@@ -438,6 +452,25 @@
         <Icon name="settings" size="m" /><span class="item-name">{copy.settings}</span>
       </a>
     </li>
+    <!--
+      THE PALETTE, FROM THE RAIL, AND IT USED TO FLOAT OVER THE LIST.
+
+      On a desktop the way into the palette was a 52px disc fixed to the bottom-right corner, and at
+      rest it sat on top of whatever row happened to be there. Measured at 1440 by 900 on
+      `/r/obligations` it covered four controls, Archive and More on two rows, and on Home the tail
+      of the questions as they scrolled under it. A control that hides the controls of the list it
+      floats over is paid for by every row that passes beneath it.
+
+      The rail is where a desktop already goes to reach things, and it has room at its foot. The
+      disc still exists below 900px, where there is no rail, and it lives in the header there.
+      `Ctrl K` opens the same palette from anywhere, and this row prints it, which is how the
+      palette teaches its own shortcut.
+    -->
+    <li>
+      <button type="button" class="item tap" onclick={() => (palette.open = true)}>
+        <Icon name="search" size="m" /><span class="item-name">{copy.paletteLabel}</span><Kbd keys="⌘K" />
+      </button>
+    </li>
   </ul>
 
   <!-- EVERY ITEM IS A KEY THAT ALREADY EXISTS, the same rule the row menu follows: the menu is not
@@ -483,6 +516,17 @@
 </nav>
 
 <style>
+  /* The one item in the rail that is a button rather than a link. Reset to the item's shape so it
+     reads as another row of the rail and not as a control dropped into it. */
+  button.item {
+    inline-size: 100%;
+    background: none;
+    border: 0;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
   /* The rail is the darker ground. Navigation is how you get to the work; the work is what should
      be bright. */
   .rail {
@@ -653,6 +697,10 @@
     list-style: none;
   }
 
+  /* A row that stands for a whole section follows a folder with the space a heading would take. */
+  .group:not(.solo) + .solo {
+    margin-block-start: var(--sp-4);
+  }
   .spine {
     margin-block-start: var(--sp-4);
   }
@@ -687,18 +735,16 @@
       linear-gradient(transparent, color-mix(in srgb, var(--ink) 10%, transparent)) bottom / 100% 8px no-repeat scroll;
   }
 
-  /* Small caps here and nowhere else in the product. A section header is not read — it is a RULER
-     the eye uses to find the group it wants, and at that job the boxy silhouette of caps at 11px
-     beats sentence case. Column headers and field labels are the opposite case and are set the
-     opposite way; see blocks.css. */
+  /* SENTENCE CASE, AND A STEP UP FROM WHERE IT WAS. It was letterspaced caps at 11px, on the
+     argument that a group header is a ruler the eye scans rather than words it reads. Five of them
+     down the rail read as a filing cabinet. The product this one is measured against names its
+     sections in plain words and lets weight and space do the separating, and so does this. */
   .section {
     margin: var(--sp-5) 0 var(--sp-1);
     color: var(--dim);
     font-family: var(--font-ui);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+    font-size: var(--t-sm);
+    font-weight: 600;
   }
 
   /* THE WHOLE HEADING IS THE TARGET, so the padding moves off the `h2` and onto the button: a
@@ -774,16 +820,17 @@
     color: var(--ink2);
   }
 
-  /* "Here" is the mark's colour. It is the one place in the rail that is allowed to be loud, and it
-     is the cheapest way for a product to look like itself on every screen. */
+  /* "HERE" IS A RAISED PILL IN INK, AND IT WAS THE MARK'S RED. A red word on a red wash was the
+     loudest thing in the rail on every screen, and the place you already are is the one row that
+     needs no shouting. A lifted surface says "you are here" the way a tab does. */
   .item[aria-current='page'] {
-    background: var(--accent-wash);
-    color: var(--accent-text);
+    background: var(--s2);
+    color: var(--ink);
     font-weight: 600;
+    box-shadow: var(--e1);
   }
-
   .item[aria-current='page'] :global(.icon) {
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   /* Only the glyph takes it. The label stays `ink` so the row still reads as a row, and a rail of
@@ -805,7 +852,7 @@
     min-inline-size: 18px;
     padding: 0 5px;
     border: 1px solid color-mix(in srgb, var(--tone, var(--line)) 55%, var(--line));
-    border-radius: 999px;
+    border-radius: var(--r-pill);
     color: var(--tone, var(--dim));
     font-size: 10px;
     font-variant-numeric: tabular-nums;

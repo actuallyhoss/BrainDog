@@ -332,10 +332,7 @@ export const copy = {
   /* The capture line: one field at the top of a register, and the only decision in it is the words.
      IT SPELT THE ARTICLE ITSELF and got it wrong on two of the nine registers the seed ships. */
   captureIn: (one: string) => `Add ${article(one)} ${one.toLowerCase()}`,
-  captureHint: 'Press Enter to add it. Everything else can wait.',
-  captureInherits: (what: string) => `Takes ${what} from the filter you are looking at.`,
   captureAdd: 'Add',
-  captureNeeds: (fields: string) => `Add it now and fill in ${fields} after. The row says what it is still missing.`,
 
   /* home */
   needsYou: 'What needs you',
@@ -470,18 +467,10 @@ export const copy = {
   rowFieldProblem: (names: string[]): string =>
     `${list(names)} cannot be stored as typed. The reason is under the field.`,
   noFilters: 'Nothing here can be filtered yet.',
-  /* WHERE A FIELD IS FILTERED INSTEAD, said once for all of them rather than as a headed section
-     each. Three fieldsets carrying a legend and one sentence read as three controls that failed to
-     render.
-
-     ITS SIBLING SAID SOMETHING FALSE and is gone: "Due sorts on the column" named one field, and
-     every column on the table sorts. A sentence explaining the interface is against the house rule
-     to begin with; one that explains it wrongly teaches somebody the product is smaller than it is.
-     Sorting is a fact about the table, and the table says it — every header is a button. */
-  filterBySearch: (fields: string[]): string =>
-    `The box searches ${list(fields)}.`,
   /**
-   * AND THE EMPTY STATE SAYS IT TOO, because that is where somebody is when it matters.
+   * WHAT THE SEARCH BOX READS, SAID WHERE A SEARCH HAS FOUND NOTHING, because that is where somebody
+   * is when it matters. It was also said under the bar on every visit, which is a screen explaining
+   * its own interface to somebody who had not asked; an empty answer is the moment they have.
    *
    * The box is `34 §6`'s `matches` operator over the register's `search:` fields, which is narrower
    * than the scan it replaced — rightly, per `fts.ts` (*"an index over everything answers every query

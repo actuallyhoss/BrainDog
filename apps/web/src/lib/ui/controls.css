@@ -151,7 +151,7 @@
     padding: 2px;
     background: var(--sunk);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-lg);
   }
 
   /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM. */
@@ -182,7 +182,7 @@
     padding: 0 var(--sp-3);
     background: none;
     border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -197,9 +197,11 @@
     color: var(--ink2);
   }
 
+  /* A pill lifted out of the track, the way the reference product draws its chosen option. */
   .segment[data-on] {
     background: var(--s3);
     border-color: var(--line);
+    box-shadow: var(--e1);
     color: var(--ink);
     font-weight: 600;
   }
