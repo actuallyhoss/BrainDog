@@ -46,7 +46,7 @@ rather than by an incident, which is the only good way to find it.
 
 | Principal | Mechanism |
 |---|---|
-| A person, browser | passkey (WebAuthn) primary; email magic link fallback. Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, 30 days, rotating |
+| A person, browser | passkey (WebAuthn) primary; email magic link fallback. One session cookie, `__Host-bd_s` (`bd_s` on http at a loopback name, and none on any other http origin): an opaque 32-byte id, `HttpOnly`, `Secure`, `SameSite=Lax`, 30 days, rotated after a day of use with the replaced id honoured for sixty seconds. The record it opens is on its session row, so there is no second cookie |
 | A person, second device | passkey on that device, or a magic link |
 | An agent | bearer token, scoped `read` · `propose` · `write` — **there is no `admin` scope, ever**, and no standing token reaches ADMIN. VAULT is a browser session only. ADMIN is a browser session — or a bearer carrying an **operation grant**: from a browser session the owner approves *one named operation* (a pack install by plan hash, an export scope, an import by file hash, a token's creation or revocation) after seeing its summary; the approval is single-use, dies in ten minutes, is recorded as `device_grant.reach` and an `access.grant` event, and reaches exactly that one method once ([ADR-060](16-DECISIONS.md), amended; [48-SPEC-CLI](48-SPEC-CLI.md) §5.2; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.6). Revocable, shown once, last-used recorded |
 | An MCP client | an agent token (Phase A ships tokens only); OAuth 2.1 (RFC 9728 metadata, RFC 9207 `iss`, CIMD) when BrainDog is its own authorization server — deferred, [33-CONTRACTS](33-CONTRACTS.md) §4 |
@@ -55,7 +55,7 @@ rather than by an incident, which is the only good way to find it.
 | **A machine the customer connected** — the tier-C runner | **the device grant of §6.1** with `reach = runner` (RFC 8628): six-digit code, owner approves in the browser, a 90-day bearer stored as `token_hash`, auto-deregistered after 14 silent days; the `runner` principal kind. It reaches the JOBS group's three runner methods — `claimJob` · `postJobEvent` · `readCancel` ([30-BLUEPRINT](30-BLUEPRINT.md) §5) — and, per job, a job bearer that `claimJob` mints as a `token` row: scope `propose` (which reads), labelled `job:<id>`, audience one job, expiring with the job ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.7). Never `write`. See [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 |
 | Inbound webhook | the URL is `/in/webhook/<rec_id>/<ingest-id>/<token>` — a random path token per ingest — and a declared `verify: { kind: hmac_sha256, header: X-Signature, grant: <label> }` ([25-CONNECTORS](25-CONNECTORS.md) §3.2) is checked in the host through the record's `ingestVerify`, since the record never decrypts ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.4); an unverified payload is stored `untriaged` and never matched |
 | Inbound email | the per-record address is the capability; a DKIM/SPF pass is required to match, else the payload is quarantined `untriaged` |
-| Self-host, single user | `BRAINDOG_TOKEN` for a private instance — owner level, everything; self-host single-user only — with magic links in phase 2 and passkeys in phase 3, when the web app lands: ES256 and RS256, no attestation, registration behind a session ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.10) |
+| Self-host, single user | `BRAINDOG_TOKEN` for a private instance — owner level, everything; self-host single-user only — exchanged at `POST /auth/token` for a session, behind which passkeys are registered (ES256 and RS256, no attestation); the magic link waits for a mail transport on this host ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.10) |
 
 > **One row above deserves a note, because an earlier draft made it different in kind.** That draft
 > gave the connected machine a keypair it generated locally, with BrainDog holding only the public
@@ -64,13 +64,14 @@ rather than by an incident, which is the only good way to find it.
 > an agent token, so a complete theft of BrainDog's own database still impersonates no customer's
 > machine. One flow to secure instead of two, and no keypair anywhere in this document.
 
-**The routes are one table.** Every authentication path is a `/auth/*` route in [33-CONTRACTS](33-CONTRACTS.md) §4
-— ten of them: `POST /auth/device` · `POST /auth/device/token` · `POST /auth/device/approve` ·
-`POST /auth/magic` · `GET /auth/magic/<token>` · `POST /auth/passkey/register` · `POST /auth/passkey/assert`
-(phase 3) · `POST /auth/logout` · `POST /auth/switch` · `GET /auth/invite/<token>` — and both hosts serve
-exactly these. A bearer on the wire is `<rec_id>.<secret>`; the record keeps only `sha256(secret)`, in
-`token.hash` or `device_grant.token_hash`.
-
+**The routes are one table.** Every authentication path is a `/auth/*` route in [33-CONTRACTS](33-CONTRACTS.md) §4,
+and the sign-in half is data: `AUTH_ROUTES` in `packages/host/src/auth.ts`, which both hosts answer through one
+`serveAuth` and the `router-groups` gate reads. A route's path is its flow with the dots as slashes
+(`POST /auth/passkey/assert`, `POST /auth/magic/redeem`), except the server key's exchange, which is
+`POST /auth/token`. The device grant, the invitation and the record switch (`/auth/device`, `/auth/device/token`,
+`/auth/device/approve`, `/auth/invite`, `/auth/switch`) are specified and not built, and keep those paths when
+they land. A bearer on the wire is `<rec_id>.<secret>`; the record keeps only `sha256(secret)`, in `token.hash`
+or `device_grant.token_hash`.
 **Passkeys first, and no passwords at all.** A record holding credentials should not be protected
 by a reusable secret that can be phished. WCAG 2.2's accessible-authentication criterion is
 satisfied for free: a passkey requires no cognitive test, and paste is never blocked on the
@@ -380,7 +381,7 @@ removes our access going forward, and removes it from the backups thirty days la
 | Content Security Policy | no `unsafe-inline` for scripts or stylesheets, no third-party origins. Packs cannot load a remote asset, so the policy has nothing to allow. One named exception: `style-src-attr 'unsafe-inline'` for the renderer's single `--magnitude` custom property on a bar — an attribute value nothing content-controlled can reach; `style-src-elem` is nonce-based ([22-FRONTEND](22-FRONTEND.md) §7) |
 | Output encoding | one renderer, one escape function, escaping applied before any markup exists so nothing downstream can un-escape |
 | Link safety | `https:`, `mailto:`, anchors, same-origin paths only, `rel="noreferrer"` on the first two. Everything else renders as its literal text |
-| CSRF | `SameSite=Lax` plus origin check on every mutation |
+| CSRF | `SameSite=Lax`, plus the `Origin` check (or, where a browser sends no `Origin`, `Sec-Fetch-Site: same-origin`) on every cookie-authenticated non-GET and every `/auth` POST, which must also be `application/json`. The app is served with `frame-ancestors 'none'`. A self-host with no server key answers only to its own names: any other `Host` is an empty 421, so a page that rebinds its name to 127.0.0.1 cannot reach it |
 | Rate limiting | per token and per IP at the Worker; per record at AI Gateway |
 | Dependency surface | **a stated goal of near-zero runtime dependencies**, and the few are enumerated in [ADR-046](16-DECISIONS.md): `valibot` in `declare`, and one YAML parser, `yaml`, on the CLI and self-host paths only ([ADR-063](16-DECISIONS.md)). The prior system's Worker had no `package.json` at all, which is why it ran unmodified on plain Node — a supply-chain posture and a portability win from one decision |
 | Secrets in CI | Cloudflare API tokens scoped to deploy only; no token in the repo, ever |
@@ -396,11 +397,11 @@ Carried from the predecessor, where each was earned:
 |---|---|
 | A `401` says only `UNAUTHORIZED`; a `500` is bare | recon gets nothing |
 | **No CORS, anywhere**; every JSON answer is `no-store` | — |
-| The login lockout **reserves the attempt before comparing**, is sticky at ten strikes for fifteen minutes on a capped counter, keyed four ways — `ip:` `email:` `mint:` `device:` — and **fails closed** — a reservation that returns no row is a `503`, not a pass. Device codes and share tokens are locked out on the record's own `auth_fail`, logins on the Directory's ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.5) | the magic-link fallback code is short-lived and guessable in principle; the lockout is what makes any code field acceptable |
+| The login lockout **reserves the attempt before comparing**, compares ten attempts and refuses the eleventh with a bare `429` and `Retry-After` for fifteen minutes, sticky, on a capped counter that forgets a first strike fifteen minutes old and that a success clears for its address; the address is the socket's, or behind a proxy named with `BRAINDOG_TRUST_PROXY=1` the last `X-Forwarded-For` entry; it is keyed four ways — `ip:` `email:` `mint:` `device:` — and **fails closed** — a reservation that returns no row is a `503`, not a pass. Device codes and share tokens are locked out on the record's own `auth_fail`, logins on the Directory's ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.5) | the magic-link fallback code is short-lived and guessable in principle; the lockout is what makes any code field acceptable |
 | **Agent tokens bypass the lockout, deliberately** | *"an agent tripping the ten-strike IP block would lock Sam out of his own brain"* |
-| Passkey verification returns **one word, `rejected`, for every failure** — and the reason is logged, not returned | the caller who deserves the reason is the owner, who reads the log |
+| Every sign-in failure is **one body**, `401 UNAUTHORIZED` "That did not sign you in.", whatever failed: a passkey, a link, the server key or a session. The reason is logged, not returned | the caller who deserves the reason is the owner, who reads the log |
 | Passkey registration requires an authenticated session **in place of attestation** | *"behind the gate… is the security model in one line"* |
-| **Two fleet-wide levers, both the host's**: the Directory's session and magic-link hashes are HMAC-SHA-256 under the host's `SESSION_SECRET`, and `TOKENS_VALID_FROM` refuses anything minted before it | rotate one secret and every session is gone; set one date and every token is gone — an incident response that walks no rows ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.11) |
+| **Two fleet-wide levers, both the host's**: the Directory's session, link and challenge hashes are HMAC-SHA-256 under the host's session key (`SESSION_SECRET` on the Worker; on a self-host, HKDF over the key file with the info `braindog/session`, or `BRAINDOG_SESSION_SECRET`), and `TOKENS_VALID_FROM` refuses anything minted before it | rotate one secret and every session is gone; set one date and every token is gone — an incident response that walks no rows ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.11) |
 | **Fixtures carry no real data**: generated names, `.example` hosts, dates in 2030–2031, amounts under 10^7 minor, no ULID or hash on disk | a test corpus is the one copy of a record that is committed in clear ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md)) |
 
 **An audit row is drawn on another screen.** The predecessor logged `Credential indexed: <name> — opens

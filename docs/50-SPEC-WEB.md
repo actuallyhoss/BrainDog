@@ -641,9 +641,9 @@ mechanism 2, amended in §13 D1). Per device — §10.
 
 1. `export const ssr = false`; the shell mounts its silhouette (`<main aria-busy="true">`) before any call returns.
 2. Fire `boot()`, `GET /api/version` and the route's own call **in parallel**; a page therefore costs one round trip
-   after the shell. `UNAUTHORIZED` from any of them → `location.assign('/auth/login?next=' + path)` (33 §10).
+   after the shell. `UNAUTHORIZED` from any of them → `location.assign('/signin?next=' + path)`. `/signin` goes on to `next` only when it is a path on this origin (`safeNext` in `packages/host/src/auth.ts`: no `//`, no backslash, no scheme, nothing that decodes to one), else to `/`.
 3. `live.spark = version.spark`; `version.record = max(boot.version, version.version)`; `aria-busy` is set back.
-4. `me.records` draws the record switcher as links to `GET /auth/switch/<slug>` — the `rec` cookie is the host's
+4. `me.records` draws the record switcher as links to `GET /auth/switch/<slug>` — the record is on the session row, and moving it is the host's
    (51 D4); the app never reads or sends it.
 5. Register `sw.js`; open the socket (§5.4); apply `boot.theme` (§5.7 step 3).
 6. `/s/<token>` skips steps 2–5: it calls `page(slug)` once with `Authorization: Share <token>` — the header 51 §5.6
@@ -660,7 +660,7 @@ The app raises no refusal code of its own; it renders the server's. The one thin
 | `ok` | the overlay entry is dropped; *saved* to the polite live region; an Undo toast |
 | `refusals` (422) | each `fix` verbatim, next to its field; also in the summary when >1 or unplaced. Never a toast — a blocking error must be read (13 §6) |
 | `conflict` (409) | after the rule of §5.3 step 5: either silent re-apply, or *{actor} changed this: {theirs}* with **Keep mine** / **Take theirs**; a toast *Reloaded — {actor} changed this row* |
-| `UNAUTHORIZED` (401) | redirect to `/auth/login?next=<path>`; nothing else is said |
+| `UNAUTHORIZED` (401) | redirect to `/signin?next=<path>`; nothing else is said |
 | `FORBIDDEN` (403) | the `no-permission` state |
 | `NEEDS_BROWSER_SESSION` (403) | cannot occur: the app never sends a bearer. If seen, it is rendered as `error` with its `fix`, and it is a bug in a host |
 | `SCHEMA_MISMATCH` · `SCHEMA_NEWER` (503) | a full-screen `error`: *The record is being updated. Try again in a minute.* |
@@ -719,7 +719,7 @@ A size budget that only warns is exceeded; every row fails CI.
 | Theme text | generated server-side, re-serialised from a typed parse (28 §4.4); applied by `replaceSync`, never parsed from markup, so no `unsafe-inline`; the client refuses `url(` `@import` `expression(` `\`; `@layer theme` precedes `@layer a11y`, so a theme cannot remove the focus ring |
 | Screenshot mode | the allow-list is compile-time provenance; the default is plate; the vault is absent. It is a **display** mode for a shoulder, not a redaction of the payload — the words stay in the DOM (32 §10) |
 | Links from content | `https:`, `mailto:`, `#anchor` and same-origin paths render as links; everything else is text — in `render` for documents and in `rows.ts` for palette results (12 §8, 04 §7) |
-| Auth | cookie only; the app never mints, stores or sends a bearer; the `rec` cookie that names the record is the host's (51 D4); `Authorization: Share <token>` on `/s/<token>` and `X-Request-Id` are the only headers the app ever sets; `/vault` strips any query string on load and never writes one (19 §5); `openGrant` is a POST whose plaintext is shown once and held in no store |
+| Auth | cookie only; the app never mints, stores or sends a bearer; the one session cookie, `__Host-bd_s`, is the host's and `HttpOnly`, and names the record through its session row (51 D4, amended); `Authorization: Share <token>` on `/s/<token>` and `X-Request-Id` are the only headers the app ever sets; `/vault` strips any query string on load and never writes one (19 §5); `openGrant` is a POST whose plaintext is shown once and held in no store |
 | CSP | the hosts' header (51); this app's only inline script is the one-statement prefs reader, whose SHA-256 the hosts allow; the theme is a linked file or a constructed sheet, never an inline `<style>`; no third-party origin |
 | Injection | one renderer, one escape function (spec 36); the quarantine frame of 23 §9 never calls the markdown renderer on `inbox_raw` |
 | Secrets | a `secret` field renders its grant's label; a `grant.*` event's note is drawn as id and kind; the app logs nothing to the console in production and shows only a code and a `rid` on failure (12 §8) |

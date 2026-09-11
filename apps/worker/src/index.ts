@@ -21,18 +21,25 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { handlersFor, serveApi } from '@braindog/host';
-import type { OutboxRow } from '@braindog/kernel';
+import { deriveSessionKey, relyingParty, serveAuth, type Provisioned } from '@braindog/host/auth';
+import { ulids, type CreateRecordArgs, type OutboxRow } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type RecordApi } from '@braindog/record';
-import type { Param, Row, Scheduler, Sql } from '@braindog/ports';
+import { fixOf, ok, refused } from '@braindog/ports';
+import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
 
 import { createDirectory, type Directory as Dir } from '@braindog/record/directory';
 
 import { alarmScheduler } from './alarm.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { DEMO_CONTEXT, demoRecord, inward, recordOf, servesApi } from './route.ts';
+import { inward, isRecordId, recordOf, servesApi, servesAuth } from './route.ts';
+import { doorOf, withCookie } from './session.ts';
 
-type EmailBinding = { send(message: { to: string; subject: string; text: string }): Promise<void> };
+/**
+ * Cloudflare's `send_email` binding. `from` is the sender Email Service needs; sign-in mail sets it from
+ * `AUTH_MAIL_FROM`, and the outbox's `notify.email` does not pass one yet.
+ */
+type EmailBinding = { send(message: { from?: string; to: string; subject: string; text: string }): Promise<void> };
 
 type Env = {
   RECORD: DurableObjectNamespace<Record$>;
@@ -56,7 +63,22 @@ type Env = {
    * `BRAINDOG_BUILD`, so the key exists and an unset deploy is `""` rather than a missing binding.
    */
   DEMO_RECORD?: string;
+  /**
+   * The Directory's MAC key: a secret, `wrangler secret put SESSION_SECRET --env <environment>`, 32 random
+   * bytes or more and a different value per environment. Unset or shorter, and sign-in is off:
+   * `/auth/methods` says `not-configured` and every other `/auth` route is 404. Changing it signs everybody out.
+   */
+  SESSION_SECRET?: string;
+  /** The operator's bearer for `/auth/provision` and `/auth/claim/mint`, a secret too. Unset: both are 404. */
+  PROVISION_KEY?: string;
+  /** The sender for sign-in links, on a domain Email Service sends for. Empty, or no `EMAIL`, and there are no links. */
+  AUTH_MAIL_FROM?: string;
+  /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
+  PUBLIC_HOST?: string;
 };
+
+/** A `Result`'s refusal, for an RPC that hands back only the part a caller acts on. */
+const refusalOf = (r: Result<unknown>): Refusal => (refused(r) ? r.refusal : { code: 'RECORD_UNAVAILABLE', fix: fixOf(r) });
 
 /** The `Sql` port over the Durable Object's own SQLite. Storage in the same thread as the code. */
 function storageSql(storage: DurableObjectStorage): Sql {
@@ -212,6 +234,18 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.access(person);
   }
 
+  /**
+   * Make this record: its identity, its owner and the owner's membership. The operator's provisioning only.
+   *
+   * AN RPC AND NEVER A ROUTE. `createRecord` is INTERNAL, because whoever calls it becomes the owner, and the
+   * only way here is `/auth/provision`, behind the operator key. `null` is made.
+   */
+  async create(args: CreateRecordArgs): Promise<Refusal | null> {
+    const api = await this.#record();
+    const made = await api.createRecord(args);
+    return made.ok ? null : refusalOf(made);
+  }
+
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
   /**
    * How it went, and which lease it is about.
@@ -267,10 +301,70 @@ export class Record$ extends DurableObject<Env> {
  */
 export class Directory$ extends DurableObject<Env> {
   #dir: Dir | null = null;
+  /** The MAC key, derived before any call is answered, or `null` when sign-in is off. */
+  #mac: Uint8Array | null = null;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    /* DERIVED UNDER THE BLOCK, so the first call already has the key it is checked with: HKDF is
+       asynchronous and `createDirectory` is not. Shorter than 32 characters is off, like unset, because
+       every session is an HMAC under it and a short secret is a guessable one. */
+    void ctx.blockConcurrencyWhile(async () => {
+      const secret = env.SESSION_SECRET ?? '';
+      this.#mac = secret.length >= 32 ? await deriveSessionKey(new TextEncoder().encode(secret)) : null;
+    });
+  }
 
   #directory(): Dir {
-    this.#dir ??= createDirectory(storageSql(this.ctx.storage), { now: () => Date.now() });
+    if (this.#dir) return this.#dir;
+    const mac = this.#mac;
+    const host = this.env.PUBLIC_HOST ?? '';
+    const rp = host ? relyingParty(`https://${host}`) : null;
+    this.#dir = createDirectory(
+      storageSql(this.ctx.storage),
+      { now: () => Date.now() },
+      mac
+        ? {
+            mac,
+            ...(rp ? { rp } : {}),
+            magic: Boolean(this.env.AUTH_MAIL_FROM && this.env.EMAIL),
+            /* The reason a sign-in failed, for the operator's tail. A flow and a word, never who or with what. */
+            log: (line) => console.error(`auth: ${line.flow} refused (${line.reason})`),
+          }
+        : undefined,
+    );
+    /* `createDirectory` imported its own copy, so this was the last one held as bytes. */
+    mac?.fill(0);
+    this.#mac = null;
     return this.#dir;
+  }
+
+  /** Sign-in, whole: `/auth/*` arrives as an `AuthCall` and leaves as an `AuthResult`. */
+  auth(call: AuthCall): Promise<AuthResult> {
+    return this.#directory().auth(call);
+  }
+
+  /**
+   * The operator's first half: the name and the person, checked and made, before any record exists. A
+   * refusal when the name cannot be had, and nothing has been written then.
+   */
+  prepare(slug: string, email: string, name: string | null): { person?: { id: string; email: string; name: string | null }; refusal?: Refusal } {
+    const d = this.#directory();
+    const wrong = d.bad(slug);
+    if (wrong) return { refusal: { code: 'VALUE_MALFORMED', fix: wrong, at: 'slug' } };
+    const held = d.claimed(slug);
+    if (held === 'taken') return { refusal: { code: 'ALREADY_KNOWN', fix: `${slug} is already a record here.`, at: 'slug' } };
+    if (held === 'released')
+      return { refusal: { code: 'ALREADY_KNOWN', fix: `${slug} was the name of another record and is never given out again.`, at: 'slug' } };
+    const person = d.person$(email, name ?? undefined);
+    if (!person.ok) return { refusal: refusalOf(person) };
+    return { person: { id: person.value.id, email: person.value.email, name: person.value.name } };
+  }
+
+  /** The operator's second half, once the record exists: the name now points at it. `null` is named. */
+  name(slug: string, email: string, record: string): Refusal | null {
+    const named = this.#directory().provision({ slug, email, record });
+    return named.ok ? null : refusalOf(named);
   }
 
   /**
@@ -384,10 +478,10 @@ const surfaceOf = (url: URL): string => (/^\/+mcp(?:\/|$)/.test(url.pathname) ? 
  * where the class is; a `const` at module scope is in scope for a method body that runs long after
  * this line is evaluated.
  */
-const json = (body: unknown, status: number): Response =>
+const json = (body: unknown, status: number, extra: [string, string][] = []): Response =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    headers: [['content-type', 'application/json; charset=utf-8'], ['cache-control', 'no-store'], ...extra],
   });
 
 /**
@@ -437,9 +531,9 @@ export default {
    * the self-host answered the same fact as `{ ok: false, refusal }`. A client cannot have one
    * branch for a refusal when one of its two hosts sometimes speaks a different language.
    */
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
-      return await route(request, env);
+      return await route(request, env, ctx);
     } catch (e) {
       /* THE SENTENCE AND NEVER THE STACK. A trace is a map of this deployment, and a request that
          reached here is one somebody may be probing with. */
@@ -462,26 +556,43 @@ export default {
   },
 };
 
-async function route(request: Request, env: Env): Promise<Response> {
+async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    /* SIGN-IN FIRST, AND IT IS THE DIRECTORY'S: nothing under `/auth/` reaches a record. */
+    if (servesAuth(url.pathname)) return signIn(request, env, ctx);
     if (!servesApi(url.pathname))
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
 
-    /* THE PUBLIC DEMO, WHICH IS THE ONE EXCEPTION TO THE PARAGRAPH BELOW, and it is not "whichever
-       record was named": nothing the caller sent names it, and `demoRecord` says everything it opens.
-       It skips the Directory on purpose. The Directory answers which record a NAME means, and this
-       has no name, only the deployment's constant. */
-    const pinned = demoRecord(request, env.DEMO_RECORD);
-    if (pinned) return env.RECORD.get(env.RECORD.idFromName(pinned)).fetch(inward(request, DEMO_CONTEXT));
+    const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
 
-    /* NOTHING GETS IN WITHOUT SAYING WHO IT IS. This Worker serves MANY records; an unauthenticated
-       request falling back to a constant person is that person's access on whichever record was
-       named, which on a multi-tenant host is not a default, it is a hole. A self-host has one person
-       on one machine and can have one; this cannot.
+    /* WHICH DOOR, in `session.ts`'s order and nowhere else: a bearer, the session cookie, the public demo,
+       or none. A cookie that names no session is a 401 that clears it, and never the demo. */
+    const door = await doorOf(request, {
+      origin: `https://${env.PUBLIC_HOST ?? ''}`,
+      demo: env.DEMO_RECORD,
+      session: (sid) => directory.auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
+      access: (record, person) => env.RECORD.get(env.RECORD.idFromName(record)).access(person),
+    });
 
-       BROWSER SESSIONS ARE THE OTHER HALF and they are not built — sessions, passkeys and magic
-       links live in the Directory (ADR-061). Until they are, a bearer is the only way in, and saying
-       so is better than letting everybody in while the sentence explains why. */
+    /* THE PUBLIC DEMO: nothing the caller sent names it, and `demoRecord` says everything it opens. It skips
+       the Directory on purpose. The Directory answers which record a NAME means, and this has no name,
+       only the deployment's constant. */
+    if (door.door === 'demo') return env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx));
+
+    /* A PERSON, on the record their session names, and a rotation rides back on the record's answer. The
+       record authorises exactly as it does for a bearer: every check is inside `createRecordApi`. */
+    if (door.door === 'session')
+      return withCookie(await env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx)), door.cookie);
+
+    if (door.door === 'refused') {
+      if (door.status === 401 && door.refusal === undefined) return unauthorized();
+      const extra: [string, string][] = door.retryAfter === undefined ? [] : [['retry-after', String(door.retryAfter)]];
+      const body = door.refusal !== undefined ? { ok: false, refusal: door.refusal } : door.retryAfter === undefined ? { ok: false } : { ok: false, retryAfter: door.retryAfter };
+      return withCookie(json(body, door.status, extra), door.cookie);
+    }
+
+    /* A BEARER. This Worker serves MANY records, and a request that says who it is by nothing but the
+       header it carries says so here, or not at all. */
     const named = recordOf(request.headers.get('authorization'));
     if (!named) return unauthorized();
 
@@ -490,7 +601,6 @@ async function route(request: Request, env: Env): Promise<Response> {
        runs the migrations, which writes storage. Routing on an unverified id would be an open
        invitation to mint empty billable records, one forged bearer at a time. The id is 26 random
        characters, so answering is not an oracle: nobody guesses their way to a `true`. */
-    const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
     if (!(await directory.knows(named))) return unauthorized();
 
     const record = env.RECORD.get(env.RECORD.idFromName(named));
@@ -535,4 +645,78 @@ async function route(request: Request, env: Env): Promise<Response> {
         ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
       }),
     );
+}
+
+/**
+ * `/auth/*`, through the same `serveAuth` the self-host runs, and shipped switched off.
+ *
+ * WITHOUT `SESSION_SECRET` THE DIRECTORY HOLDS NO KEY, so `/auth/methods` says `not-configured` and every
+ * other route is 404; without `PROVISION_KEY` the two operator routes are 404 as well. The address the
+ * lockout counts is `cf-connecting-ip`, which Cloudflare writes and a caller cannot.
+ */
+async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const from = env.AUTH_MAIL_FROM;
+  const email = env.EMAIL;
+  return serveAuth(request, {
+    on: 'worker',
+    origin: `https://${env.PUBLIC_HOST ?? ''}`,
+    auth: ((call: AuthCall) => directory.auth(call)) as unknown as Auth,
+    ip: request.headers.get('cf-connecting-ip') ?? '',
+    demo: isRecordId(env.DEMO_RECORD ?? ''),
+    /* MAIL ONLY WHEN BOTH ARE SET, AND NEVER AWAITED. `waitUntil` keeps the send alive after the answer has
+       gone, so a known address and an unknown one answer in the same time. A failure is logged as a fact
+       and never with the address or the link. */
+    ...(from && email
+      ? {
+          mail: (to: string, link: string) =>
+            ctx.waitUntil(
+              email.send({ from, to, subject: 'Sign in to BrainDog', text: letter(link) }).catch(() => {
+                console.error('auth: a sign-in link could not be sent');
+              }),
+            ),
+        }
+      : {}),
+    operator: { key: env.PROVISION_KEY, provision: (args) => provision(env, args) },
+  });
+}
+
+/** The one letter sign-in sends: plain text, the link on a line of its own, and what it is for. */
+const letter = (link: string): string =>
+  [
+    'Here is your link to sign in to BrainDog. It works once, for the next fifteen minutes.',
+    '',
+    link,
+    '',
+    'If you did not ask to sign in, you can ignore this message.',
+  ].join('\n');
+
+/**
+ * The operator's record: the name and the person, then the record, then the Directory row that names it.
+ *
+ * THE RECORD BEFORE THE NAME, `51 §13 D21`: a Directory row never points at a record that failed to be made.
+ *
+ * WITHOUT VAULT KEYS UNTIL THE KEK BINDING IS LIVE. `createRecord` takes the three keys wrapped, and absent
+ * until there is something to wrap them with, and this Worker has no KeyStore yet. Such a record reads,
+ * writes and signs people in; it cannot seal a grant or sign an export until keys are wrapped for it.
+ */
+async function provision(env: Env, args: { slug: string; email: string; name?: string }): Promise<Result<Provisioned>> {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const ready = await directory.prepare(args.slug, args.email, args.name ?? null);
+  if (ready.refusal) return { ok: false, refusal: ready.refusal };
+  const owner = ready.person;
+  if (!owner) return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'The Directory made no person for that address.' } };
+  const id = `rec_${ulids(() => Date.now())()}`;
+  const made = await env.RECORD.get(env.RECORD.idFromName(id)).create({
+    id,
+    slug: args.slug,
+    name: args.name ?? args.slug,
+    tz: 'UTC',
+    locale: 'en',
+    owner: { id: owner.id, email: owner.email, name: owner.name },
+  });
+  if (made) return { ok: false, refusal: made };
+  const unnamed = await directory.name(args.slug, args.email, id);
+  if (unnamed) return { ok: false, refusal: unnamed };
+  return ok({ record: id, slug: args.slug, person: owner.id });
 }

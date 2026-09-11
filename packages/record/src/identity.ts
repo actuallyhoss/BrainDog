@@ -345,7 +345,8 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Auth {
           configured: true,
           passkey: rp !== undefined,
           magic: config.magic,
-          key: config.key !== undefined && persons() <= 1,
+          /* EXACTLY ONE. With nobody in the Directory the exchange has nobody to sign in, so offering it would be a door that cannot open. */
+          key: config.key !== undefined && persons() === 1,
           firstRun: Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_passkey')?.n ?? 0) === 0,
           me: found ? whoOf(found.row) : null,
         };

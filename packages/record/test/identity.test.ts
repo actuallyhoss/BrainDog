@@ -651,6 +651,13 @@ test('THE SERVER KEY IS REFUSED WHERE THERE IS MORE THAN ONE PERSON', async () =
   assert.equal(ok(await d.auth({ flow: 'methods' })).body.key, false, 'methods still offers the key');
 });
 
+test('THE SERVER KEY IS NOT OFFERED WHERE NOBODY IS IN THE DIRECTORY, because the exchange has nobody to sign in', async () => {
+  const { config } = setup();
+  const d = createDirectory(openSqlite(), fixedClock(NOW), config);
+  assert.equal(ok(await d.auth({ flow: 'methods' })).body.key, false, 'methods offers a key nobody can sign in with');
+  notYou(await keyIn(d));
+});
+
 /* ── one failure, and what the log is told ────────────────────────────── */
 
 test('EVERY SIGN-IN FAILURE IS ONE BODY, and the log hears why without hearing who', async () => {

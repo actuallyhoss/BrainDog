@@ -63,15 +63,17 @@ test('A CONTEXT THE CALLER SENT IS OVERWRITTEN, NOT TRUSTED, and the bearer goes
   assert.equal(new URL(inner.url).pathname, '/api/listGrants', 'the path did not travel unchanged');
 });
 
-test('and the Worker sets the context in one place, for both doors', () => {
+test('and the Worker sets the context in one place, for every door', () => {
   /* `Record$.fetch` reads the header as the whole of who is asking. A second place that set it is a
      second chance to set it after something the caller controls, which is A9 in
      `loop/research-anon-read.md`. */
   const src = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
   assert.doesNotMatch(src, /headers\.set\(\s*'x-braindog-ctx'/u, 'index.ts sets the context itself again');
-  assert.equal((src.match(/inward\(request, /gu) ?? []).length, 2, 'both doors do not go through inward');
-  assert.ok(
-    src.indexOf('demoRecord(request, env.DEMO_RECORD)') < src.indexOf('recordOf(request.headers'),
-    'the demo door is not decided before the bearer is read',
-  );
+  /* THREE DOORS NOW: the demo, a session, and a bearer, and each one reaches the record through `inward`. */
+  assert.equal((src.match(/inward\(request, /gu) ?? []).length, 3, 'a door does not go through inward');
+  /* AND THE DOOR IS DECIDED BEFORE THE BEARER IS READ, in `session.ts`, where a cookie comes before the demo. */
+  assert.ok(src.includes('doorOf(request'), 'index.ts no longer asks session.ts which door');
+  assert.ok(src.indexOf('doorOf(request') < src.indexOf('recordOf(request.headers'), 'the door is not decided before the bearer is read');
+  const session = readFileSync(fileURLToPath(new URL('../src/session.ts', import.meta.url)), 'utf8');
+  assert.ok(session.indexOf("readSid(request, 'secure')") < session.indexOf('demoRecord(request, deps.demo)'), 'the demo is decided before the cookie');
 });

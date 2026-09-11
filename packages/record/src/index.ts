@@ -104,7 +104,19 @@ export type CallContext = {
    * A request carrying nothing is none of the three, and this is how a method says so.
    */
   credentialed?: boolean;
+
+  /**
+   * When this caller last proved who they are, in epoch milliseconds: a passkey, a link or the server key.
+   *
+   * SET ONLY BY A HOST, AND ONLY FROM A SESSION ROW'S `authed_at`, which rotation never moves. The vault
+   * asks for a proof in the last fifteen minutes (`12 §6`: reveal is deliberate). Absent is a caller with
+   * no session at all, a bearer or a self-host's open mode, which the vault answers exactly as before.
+   */
+  provedAt?: number;
 };
+
+/** How recent a session's last proof must be for the vault: `12 §6`, `33 §10`. */
+const FRESH = 15 * 60_000;
 
 /** What a method needs. The ladder is ordered, and the check is an index comparison. */
 export type Need = 'read' | 'propose' | 'append' | 'write' | 'decide' | 'owner';
@@ -446,7 +458,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
         fix: 'Open this from the app; a token cannot reach the vault.',
         at: 'principal',
       };
-    return allows(ctx, 'owner');
+    const stop = allows(ctx, 'owner');
+    if (stop) return stop;
+    /* AND A SESSION WHOSE LAST PROOF IS OLDER THAN FIFTEEN MINUTES IS SENT BACK TO PROVE IT AGAIN. A
+       cookie is thirty days of standing access; the vault is the one place a laptop left open on a desk
+       should not be enough. After the owner check, so somebody who is not an owner is told that instead. */
+    if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+      return { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the vault.', at: 'principal' };
+    return null;
   };
 
   /**

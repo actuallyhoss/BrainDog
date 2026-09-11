@@ -66,7 +66,10 @@ if (ENV !== '' && !(ENVIRONMENTS as readonly string[]).includes(ENV))
 const PALETTE = fileURLToPath(new URL(`../../packages/skin/${ENV === '' ? 'house' : ENV}.css`, import.meta.url));
 
 /**
- * WHERE `/api` GOES WHEN VITE SERVES THIS APP: `BRAINDOG_API`, or a record on this machine.
+ * WHERE `/api` AND `/auth` GO WHEN VITE SERVES THIS APP: `BRAINDOG_API`, or a record on this machine.
+ *
+ * BOTH, BECAUSE SIGN-IN IS SAME-ORIGIN TOO. `/auth/*` sets the session cookie and `/api/*` reads it, so
+ * a proxy that forwarded one and not the other would sign somebody in to a record the lists cannot read.
  *
  * The register list reads the record from its own origin, as it does on both hosts, so under
  * `vite dev` and `vite preview` something has to answer `/api/*` from this origin. `node
@@ -80,7 +83,7 @@ export default defineConfig({
   plugins: [sveltekit()],
   define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT), __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
-  server: { port: 5183, strictPort: true, proxy: { '/api': API } },
-  preview: { port: 5183, strictPort: true, proxy: { '/api': API } },
+  server: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API } },
+  preview: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API } },
   build: { target: 'es2022', cssMinify: 'lightningcss' },
 });

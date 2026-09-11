@@ -49,11 +49,18 @@ export function recordOf(authorization: string | null): string | null {
  * Whether this Worker answers for this path at all.
  *
  * 33 §4'S OWN LIST, AND ONLY THE PART THAT IS BUILT. Everything else that belongs to this Worker in
- * the document — `/mcp`, `/a/*`, `/s/*`, `/in/*`, `/auth/*`, `/ws` — does not exist yet, and a router
+ * the document — `/mcp`, `/a/*`, `/s/*`, `/in/*`, `/ws` — does not exist yet, and a router
  * claiming them now would answer 401 for routes whose whole point is being reachable without one.
- * Everything outside the list is the app's: that is what `run_worker_first` means.
+ * `/auth/*` is built, and is `servesAuth` below. Everything outside the two is the app's: that is what
+ * `run_worker_first` means.
  */
 export const servesApi = (pathname: string): boolean => /^\/+api\/+[^/]/.test(pathname);
+
+/** `/auth/*`: sign-in, which is the Directory's and never reaches a record (`51 §5.8`). */
+export const servesAuth = (pathname: string): boolean => /^\/+auth(?:\/|$)/.test(pathname);
+
+/** Whether a string has the shape of a record id. A shape and not a record: nothing is asked. */
+export const isRecordId = (x: string): boolean => REC_ID.test(x);
 
 /**
  * THE ONE DOOR WITHOUT A KEY: the public demo, read-only, from one record the deployment names.

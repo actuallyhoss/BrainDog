@@ -68,6 +68,17 @@ const STRONG = /\b(?:plaintext|plainText|decrypted|secretValue|plain|dek|kek|pkc
 const sourceIn = (args, whole) => STRONG.test(args) || (/\broot\b/i.test(args) && KEY_FILE.test(whole));
 
 /**
+ * AND THE FOUR RAW VALUES SIGN-IN CARRIES, by the one name each has (`packages/ports/src/auth.ts`): the
+ * session id, a sign-in link, a claim link and the self-host's server key. Every one of them opens an
+ * account, so a log, the record, an error message or a response body holding one is a leak.
+ *
+ * AN OUTBOUND REQUEST AND A SERIALISATION ARE NOT SINKS FOR THESE FOUR. A browser posts the key or the link
+ * to its own host exactly once, and that post is the one thing they exist for; a gate red on it would be red
+ * on the sign-in screen itself. A response is still a sink, because echoing one back is the leak.
+ */
+const WIRE = /\b(?:sid|linkToken|claimToken|serverKey)\b/;
+
+/**
  * What keeps or transmits. `52 §5.2`'s five, and every one of them outlives the process.
  *
  * `push(` IS WEB PUSH AND NOT `Array.prototype.push`, which is why the source has to appear in the
@@ -97,9 +108,9 @@ const SINKS = [
   { id: 'an error message', re: /new Error\s*\(/g },
   /* SERIALISATION IS THE STEP BEFORE EVERY OTHER SINK. A value inside `JSON.stringify` is a value
      on its way out of the process, whatever it is handed to next. */
-  { id: 'a serialisation', re: /JSON\.stringify\s*\(/g },
+  { id: 'a serialisation', re: /JSON\.stringify\s*\(/g, wire: false },
   { id: 'a response', re: /new Response\s*\(/g },
-  { id: 'an outbound request', re: /(?<![.\w])fetch\s*\(/g },
+  { id: 'an outbound request', re: /(?<![.\w])fetch\s*\(/g, wire: false },
 ];
 
 /**
@@ -212,10 +223,11 @@ for (const top of ['packages', 'apps'])
       for (const m of text.matchAll(sink.re)) {
         const raw = argsOf(text, m.index + m[0].length - 1);
         const args = sink.bound ? bound(raw) : raw;
-        if (sourceIn(args, text))
+        const plain = sourceIn(args, text);
+        if (plain || (sink.wire !== false && WIRE.test(args)))
           findings.push({
             where: `${rel}:${lineOf(text, m.index)}`,
-            why: `a plaintext reaches ${sink.id}`,
+            why: plain ? `a plaintext reaches ${sink.id}` : `a sign-in secret reaches ${sink.id}`,
             text: `${m[0]}${args.trim().slice(0, 60)}`,
           });
       }

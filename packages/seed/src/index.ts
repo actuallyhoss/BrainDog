@@ -478,7 +478,7 @@ Unattributed | 3400 | | hole
 \`\`\`
 
 Direct licensing carries it, and that is the thing to protect. The unattributed row is not a
-channel — it is three months of payouts that arrived before the reference field existed, and it
+channel: it is three months of payouts that arrived before the reference field existed, and it
 sits outside the scale because a hole that sets the bar makes every real category a stub.
 
 ## 2 · The licensing question
@@ -516,7 +516,7 @@ as {{ref:tasks#3}}.
 
 ## What is not verified
 
-- The 61% direct share {estimate} — it excludes the unattributed rows above.
+- The 61% direct share {estimate}; it excludes the unattributed rows above.
 - Whether studio deals renew at all {unknown}
 
 ## Log
@@ -527,7 +527,7 @@ as {{ref:tasks#3}}.
 {{ago:2026-05-19}} | Moved off the old CI | Hobnail cancelled
 \`\`\`
 
-Settled by research — do not run it again: the registrar comparison is D41.
+Settled by research. Do not run it again: the registrar comparison is D41.
 
 \`\`\`stat | This block is wrong on purpose
 Too | many | cells | for | a | stat | row
@@ -561,19 +561,19 @@ export const PEOPLE: Fields[] = [
 /* ── obligations ─────────────────────────────────────────────────────────── */
 
 const HAND_OBLIGATIONS: Fields[] = [
-  { what: 'Invoice 2026-041 — brand system', party: 1, direction: 'owed_to_me', amount: gbp(480_000), due: day(-38), state: 'open', thing: 2, note: 'Chased twice. 45-day terms expired 3 August.' },
-  { what: 'Invoice 2026-046 — retainer, August', party: 2, direction: 'owed_to_me', amount: gbp(240_000), due: day(-9), state: 'open', thing: 2, note: '' },
+  { what: 'Invoice 2026-041: brand system', party: 1, direction: 'owed_to_me', amount: gbp(480_000), due: day(-38), state: 'open', thing: 2, note: 'Chased twice. 45-day terms expired 3 August.' },
+  { what: 'Invoice 2026-046: retainer, August', party: 2, direction: 'owed_to_me', amount: gbp(240_000), due: day(-9), state: 'open', thing: 2, note: '' },
   { what: 'Illustration, July set', party: 3, direction: 'owed_by_me', amount: gbp(135_000), due: day(-2), state: 'open', thing: 1, note: '' },
   { what: 'Corporation tax, payment on account', party: null, direction: 'owed_by_me', amount: gbp(1_910_000), due: day(4), state: 'open', thing: null, note: 'HMRC reference on the letter, not here.' },
-  { what: 'Invoice 2026-049 — type licensing', party: 1, direction: 'owed_to_me', amount: gbp(96_000), due: day(11), state: 'open', thing: 1, note: '' },
+  { what: 'Invoice 2026-049: type licensing', party: 1, direction: 'owed_to_me', amount: gbp(96_000), due: day(11), state: 'open', thing: 1, note: '' },
   { what: 'Accountant, year-end fee', party: 4, direction: 'owed_by_me', amount: gbp(145_000), due: day(19), state: 'part', thing: null, note: 'Half paid in June.' },
   { what: 'Backend contract, September', party: 6, direction: 'owed_by_me', amount: gbp(496_000), due: day(27), state: 'open', thing: 3, note: '' },
-  { what: 'Invoice 2026-038 — discovery', party: 2, direction: 'owed_to_me', amount: gbp(180_000), due: day(-71), state: 'paid', thing: 2, note: 'Paid 24 July.' },
-  { what: 'Invoice 2026-035 — brand refresh', party: 1, direction: 'owed_to_me', amount: gbp(620_000), due: day(-96), state: 'paid', thing: 2, note: '' },
+  { what: 'Invoice 2026-038: discovery', party: 2, direction: 'owed_to_me', amount: gbp(180_000), due: day(-71), state: 'paid', thing: 2, note: 'Paid 24 July.' },
+  { what: 'Invoice 2026-035: brand refresh', party: 1, direction: 'owed_to_me', amount: gbp(620_000), due: day(-96), state: 'paid', thing: 2, note: '' },
   { what: 'Studio insurance, annual', party: null, direction: 'owed_by_me', amount: gbp(38_400), due: day(41), state: 'open', thing: null, note: '' },
   { what: 'VAT quarter to 31 Aug', party: null, direction: 'owed_by_me', amount: gbp(742_000), due: day(63), state: 'open', thing: null, note: '' },
   { what: 'Conference stand, deposit', party: null, direction: 'owed_by_me', amount: gbp(250_000), due: day(88), state: 'open', thing: 1, note: 'Refundable to 30 days out.' },
-  { what: 'Invoice 2026-051 — newsletter setup', party: 2, direction: 'owed_to_me', amount: gbp(75_000), due: day(33), state: 'open', thing: 3, note: '' },
+  { what: 'Invoice 2026-051: newsletter setup', party: 2, direction: 'owed_to_me', amount: gbp(75_000), due: day(33), state: 'open', thing: 3, note: '' },
   { what: 'Illustration, August set', party: 3, direction: 'owed_by_me', amount: gbp(118_000), due: day(15), state: 'open', thing: 1, note: '' },
 ];
 

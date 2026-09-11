@@ -28,6 +28,8 @@
   import { LEVELS, type Level, type Person, type Device } from '$lib/record/schema.ts';
   import { CODE_DIGITS, approve } from '$lib/record/device.ts';
   import { TONES, bytes, relative, since } from 'braindog-render';
+  import { untrack } from 'svelte';
+  import { methods, passkeyRegister, passkeys, removePasskey, signOut, support, type Methods, type PasskeyInfo } from '$lib/auth.ts';
 
   /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
      `the studio` — and one of the two was a literal. */
@@ -117,7 +119,7 @@
   import Face from '$lib/ui/Face.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
-  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
   /* Twelve rows with a glyph each, because this rail's own CSS says it "IS the same thing" as the
      app's rail, and the app's rail has never had a row without one. A list of twelve bare words is
@@ -413,6 +415,82 @@
   const self = (who: Person) => who.id === me.person;
   /** The signed-in person's own row, which is where their name and address live. */
   const mine = $derived(PEOPLE_ACCESS.find((p) => p.id === me.person));
+
+  /**
+   * WHAT THE HOST SAYS ABOUT SIGNING IN, read only on the two areas that draw it.
+   *
+   * `null` until it answers, and where there is no host at all, which is the public demo: those two
+   * areas then draw the sample, and no control that would need a session.
+   */
+  const webauthnHere = support();
+  let hostAuth = $state<Methods | null>(null);
+  let liveKeys = $state<PasskeyInfo[] | null>(null);
+  let addingKey = $state(false);
+  let addSaid = $state<string | null>(null);
+  let signingOutNow = $state(false);
+  let outSaid = $state<string | null>(null);
+  const signedInEmail = $derived(hostAuth?.me?.email ?? null);
+  /** Somebody is signed in to a host that offers passkeys, so the list and its button are real. */
+  const livePasskeys = $derived(hostAuth?.me && hostAuth.passkey ? hostAuth : null);
+  const canAddPasskey = $derived(livePasskeys !== null && webauthnHere.webauthn && webauthnHere.secure);
+
+  /* The area changes without the page remounting, so this reads `area` and runs again for each. */
+  $effect(() => {
+    if (area !== 'identity' && area !== 'recovery') return;
+    untrack(() => void readSignIn());
+  });
+
+  async function readSignIn() {
+    const at = opened();
+    const answer = await methods();
+    hostAuth = answer.ok ? answer.value : null;
+    if (hostAuth?.me && hostAuth.passkey) {
+      const listed = await passkeys();
+      liveKeys = listed.ok ? listed.value : null;
+    }
+    /* A host without sign-in means the sample, drawn, and not a refusal of this screen. */
+    closed(true, at);
+  }
+
+  async function addLivePasskey() {
+    if (addingKey) return;
+    addingKey = true;
+    addSaid = null;
+    const at = opened();
+    const out = await passkeyRegister();
+    closed(true, at);
+    addingKey = false;
+    if (out.ok) liveKeys = [...(liveKeys ?? []), out.value];
+    addSaid = out.ok
+      ? copy.passkeyAdded
+      : out.kind === 'cancelled'
+        ? copy.passkeyNotAdded
+        : out.kind === 'exists'
+          ? copy.passkeyExists
+          : copy.passkeyFailed;
+  }
+
+  async function dropPasskey(id: string) {
+    const at = opened();
+    const out = await removePasskey(id);
+    closed(true, at);
+    if (out.ok) liveKeys = liveKeys?.filter((k) => k.id !== id) ?? null;
+    else toasts.push(copy.passkeyNotRemoved, { intent: 'warn' });
+  }
+
+  async function signOutHere() {
+    if (signingOutNow) return;
+    signingOutNow = true;
+    const at = opened();
+    const out = await signOut();
+    closed(true, at);
+    signingOutNow = false;
+    if (out.ok && hostAuth) {
+      hostAuth = { ...hostAuth, me: null };
+      liveKeys = null;
+    }
+    outSaid = out.ok ? copy.signedOut : copy.signOutFailed;
+  }
 
   function promote(decl: PageDecl) {
     toasts.push(copy.notWritten(`${decl.title} would be placed at the end of its section in your nav`), { intent: 'warn' });
@@ -919,6 +997,54 @@
         the fallback is the email link. Anything else here would be a control with nothing behind it
         on the one screen where that costs somebody their record.
       -->
+      {#if livePasskeys}
+        <!-- THE HOST'S OWN PASSKEYS, for somebody signed in to a host that offers them. Adding one is
+             real only here, because only a live session can say whose passkey it is. -->
+        <Section title={copy.passkeys} count={liveKeys?.length ?? 0}>
+          <p class="hint">{copy.passkeyHow}</p>
+          {#if liveKeys === null}
+            <p class="hint">{copy.passkeysUnread}</p>
+          {:else if liveKeys.length === 0}
+            <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(livePasskeys.magic)} />
+          {:else}
+            <ul class="ledger">
+              {#each liveKeys as k (k.id)}
+                <li>
+                  <div class="line">
+                    <span class="seq"><Icon name="key" size="s" /></span>
+                    <span class="line-main">
+                      <span class="line-title">{k.label ?? copy.passkeyUnnamed}</span>
+                      <span class="line-detail">{copy.addedWhen(since(new Date(k.createdAt).toISOString()))}</span>
+                    </span>
+                    <span class="line-amount"></span>
+                    <span class="line-when">
+                      {k.lastUsed ? copy.usedWhen(since(new Date(k.lastUsed).toISOString())) : copy.neverUsed}
+                      <Button
+                        weight="bare"
+                        tone="bad"
+                        disabled={liveKeys.length <= 1}
+                        aria-describedby={liveKeys.length <= 1 ? 'last-key' : undefined}
+                        onclick={() => dropPasskey(k.id)}
+                      >{copy.remove}</Button>
+                    </span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+            {#if liveKeys.length <= 1}<p class="hint" id="last-key">{copy.lastPasskey}</p>{/if}
+          {/if}
+          {#if canAddPasskey}
+            <div class="row-actions">
+              <Button weight="primary" onclick={addLivePasskey} aria-busy={addingKey}
+                ><Icon name="plus" size="s" />{addingKey ? copy.addingPasskey : copy.addPasskey}</Button
+              >
+            </div>
+          {/if}
+          {#if addSaid}<p class="hint" role="status">{addSaid}</p>{/if}
+        </Section>
+      {:else}
+      <!-- THE SAMPLE'S PASSKEYS, where nobody is signed in or the host offers none. There is no
+           "Add a passkey" here: without a session there is nobody to add one for. -->
       <Section title={copy.passkeys} count={PASSKEYS.length}>
         <p class="hint">{copy.passkeyHow}</p>
         {#if PASSKEYS.length === 0}
@@ -952,18 +1078,13 @@
           </ul>
           {#if PASSKEYS.length <= 1}<p class="hint" id="last-key">{copy.lastPasskey}</p>{/if}
         {/if}
-        <div class="row-actions">
-          <Button
-            weight="primary"
-            onclick={() => toasts.push(copy.notWritten('Your browser would be asked for a new passkey, and this session is what proves it is you'), { intent: 'warn' })}
-          ><Icon name="plus" size="s" />{copy.addPasskey}</Button>
-        </div>
       </Section>
+      {/if}
 
       <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
            `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery
            screen offering a link that cannot be sent is worse than one offering nothing. -->
-      {#if AUTH_METHODS.magic}
+      {#if (hostAuth ?? AUTH_METHODS).magic}
         <Section title={copy.magicLink}>
           <p class="hint">{copy.magicHow}</p>
         </Section>
@@ -989,14 +1110,23 @@
                an address and a join date. `19 §9` bans a word the schema uses about itself, and an
                address is what an invitation binds to and what identifies you across the records
                listed below. -->
-          <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{mine?.email ?? mine?.name ?? me.person}</span></li>
+          <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{signedInEmail ?? mine?.email ?? mine?.name ?? me.person}</span></li>
           <li><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{copy.levelMeans[me.level] ?? me.level}</span></li>
         </ul>
         <p class="hint">{copy.identityOutside}</p>
         <!-- AND THE WAY TO REACH ANOTHER RECORD, from the area that is about who this one
              thinks you are. The palette carries the same row; this is the one a person finds
              without knowing the palette exists. -->
-        <div class="row-actions"><Button href="/signin">{copy.signIn}</Button></div>
+        <!-- SIGNING OUT LIVES HERE, beside who you are signed in as, and it takes the place of the way
+             in only while there is a session to end. -->
+        <div class="row-actions">
+          {#if signedInEmail}
+            <Button onclick={signOutHere} aria-busy={signingOutNow}>{signingOutNow ? copy.signingOut : copy.signOut}</Button>
+          {:else}
+            <Button href="/signin">{copy.signIn}</Button>
+          {/if}
+        </div>
+        {#if outSaid}<p class="hint" role="status">{outSaid}</p>{/if}
       </Section>
 
       <!-- "RECORDS YOU CAN OPEN" OVER TWO ROWS YOU COULD NOT OPEN. A heading that names an action
@@ -1654,7 +1784,8 @@
          offer nothing, so a sentence telling their reader that their changes are not saved is
          about changes they cannot make. It is the last thing on three screens where it means
          nothing, which is how a reader learns to skip it on the nine where it means something. -->
-    {#if !REPORTS.has(area)}
+    <!-- Not under the live passkeys: adding and removing one there is really kept, by the host. -->
+    {#if !REPORTS.has(area) && !(area === 'recovery' && livePasskeys)}
       <p class="mock">{KEEPS.has(area) ? copy.mockNoticeSome : copy.mockNotice}</p>
     {/if}
   </div>
@@ -1697,8 +1828,12 @@
       gap: 0 0;
     }
 
+    /* The label over its value. As a block the two spans ran together into one line, "Signed in
+       asada@studio.example". */
     .facts li {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-1);
       margin-block-end: var(--sp-2);
     }
   }

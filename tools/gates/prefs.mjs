@@ -71,7 +71,7 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from './lib.mjs';
-import { answers, forward, startRecord } from './record.mjs';
+import { answers, forward, forwards, startRecord } from './record.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
@@ -323,7 +323,7 @@ if (!(await stat(ROOT).catch(() => null))) {
 const record = await startRecord();
 
 const server = createServer(async (req, res) => {
-  if (new URL(req.url ?? '/', 'http://x').pathname.startsWith('/api/')) return forward(req, res, record.base);
+  if (forwards(new URL(req.url ?? '/', 'http://x').pathname)) return forward(req, res, record.base);
   const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {

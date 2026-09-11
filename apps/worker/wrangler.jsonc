@@ -243,7 +243,10 @@
            `src/route.ts` is the whole of what it opens. It is set to the demo record's `rec_...` id
            once that record exists and holds the seed (`scripts/provision-demo.mjs` says what that
            takes), here or with `--var DEMO_RECORD:<id>` on the deploy. */
-        "DEMO_RECORD": ""
+        "DEMO_RECORD": "",
+        /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
+           with the `EMAIL` binding below (51 §5.8). */
+        "AUTH_MAIL_FROM": ""
       },
 
       "durable_objects": {
@@ -330,7 +333,10 @@
         "AGE_RECIPIENT": "age1<production-recipient>",
         "SPARK_ENDPOINT": "",
         "BRAINDOG_BUILD": "",
-        "DEMO_RECORD": ""
+        "DEMO_RECORD": "",
+        /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
+           with the `EMAIL` binding below (51 §5.8). */
+        "AUTH_MAIL_FROM": ""
       },
 
       "durable_objects": {
@@ -373,5 +379,10 @@
      `wrangler secret put <NAME> --env <environment>`, value at the prompt and never as an
      argument (53 §2.2). They are PER SCRIPT, so alpha and production hold different values —
      which is the point: a shared `SESSION_SECRET` would make a session minted in alpha valid in
-     production, since the session hash is an HMAC under it. */
+     production, since the session hash is an HMAC under it.
+
+     SIGN-IN SHIPS SWITCHED OFF, AND THESE ARE ITS SWITCHES. Without `SESSION_SECRET` (32 characters or
+     more) `/auth/methods` says `not-configured` and every other `/auth` route is 404. `PROVISION_KEY`
+     is the third secret: the operator's bearer for `/auth/provision` and `/auth/claim/mint`, which make a
+     record and hand back its 24-hour claim link; without it both are 404. */
 }

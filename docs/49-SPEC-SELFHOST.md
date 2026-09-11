@@ -134,18 +134,31 @@ and `invitation.hash` are SHA-256 of what the browser holds; `person.email` is s
 a `magic_link` row is deleted by the statement that consumes it; `invitation.accepted_at` is set once and the
 row is never reused; `auth_fail.n` never exceeds 10.
 
+**Amended with sign-in, at Directory version 3.** The tables above are the first draft's. The built Directory is
+`@braindog/record/directory`, the same file the Worker runs, and its sign-in tables are `dir_session`,
+`dir_passkey`, `dir_link` (magic and claim links in one table, told apart by `purpose`), `dir_challenge` and
+`dir_fail` (33 §10). Every stored hash is HMAC-SHA-256 under the session key rather than a plain SHA-256. The key
+is derived from the KEK file by HKDF with the info `braindog/session`, or from `BRAINDOG_SESSION_SECRET` when that
+is set, so replacing either one signs everybody out without walking a row (12 §8). Times in these tables are epoch
+milliseconds.
+
 ### 4.2 · Cookies
 
 | Cookie | Value | Attributes | Life |
 |---|---|---|---|
-| `bd_s` | 32 random bytes, base64url (43 chars); the table holds its SHA-256 | `HttpOnly; Secure; SameSite=Lax; Path=/` | `Max-Age=2592000` (30 days) |
-| `bd_r` | the chosen record's slug — multi-record hosts only (§5.3) | `HttpOnly; Secure; SameSite=Lax; Path=/` | same as `bd_s` |
+| `__Host-bd_s`, on an https origin | 32 random bytes, base64url (43 chars); the table holds its HMAC | `Path=/; HttpOnly; Secure; SameSite=Lax` | `Max-Age=2592000` (30 days) |
+| `bd_s`, on http at a loopback name | the same | `Path=/; HttpOnly; SameSite=Lax` | the same |
 
-**Rotation rule.** On any authenticated request where `now − session.rotated_at > 24 h`: mint a new value,
-`UPDATE session SET id_hash = ?, rotated_at = ?, expires = now + 30 d WHERE id_hash = ?`, and `Set-Cookie` the
-new value. The old value is dead the moment the row changes; a concurrent request carrying it gets one 401.
-`authed_at` moves only on a fresh passkey assertion or magic link (§5.6, §5.10), never on rotation.
+One cookie. The record it opens is on the session row, so `bd_r` is gone. An origin that is neither https nor
+loopback gets no cookie at all, and `/auth/methods` says `why: 'insecure'`. `BRAINDOG_ORIGIN` names the origin,
+and without it the origin is `http://localhost:<PORT>`.
 
+**Rotation rule.** On any request carrying the cookie where `now − rotated_at > 24 h`, the row takes a new id and
+keeps the old one as `prev_hash` until `now + 60 s`, the expiry moves to `now + 30 d`, and the answer carries the
+new cookie. The rotation is a compare-and-set on `rotated_at`, so two requests carrying one day-old cookie rotate
+it once. The minute of grace is an amendment: the app sends `boot`, `version` and a route's calls in parallel with
+one cookie, and an old id that died on the spot answered every call but the first with a 401. `authed_at` moves
+only on a new sign-in (§5.6, §5.7, §5.10), never on rotation.
 ### 4.3 · The data directory
 
 ```
@@ -189,7 +202,7 @@ anywhere is `BootRefused`. The five enforced ceilings are the adapter's; the hos
 | bearer found in `token` | `{ kind: 'token', id, scope: ladder(scope), name: label }` — `read`→`[read]`, `propose`→`[read,propose]`, `write`→`[read,propose,write]` | `cli` on `/api/*`, `mcp` on `/mcp` |
 | bearer found in `device_grant` with `reach = 'runner'` (`active`, unexpired) | `{ kind: 'token', id, scope: ['read','propose'], name: label }` + host flag `runner` | `cli` |
 | bearer found in `device_grant` with `reach ∈ export import pack token` (`active`, within its ten minutes) | `{ kind: 'person', id: approved_by, level: member('*') }` with `op: reach` — the operation grant of 48 §13 D1 | `cli` |
-| `bd_s` cookie | `{ kind: 'person', id: person_id, level: member('*') }` | `web` |
+| the session cookie | `{ kind: 'person', id: person, level: member('*') }`, with `credentialed: true` and `provedAt` from the session's `authed_at` | `web` |
 | timer, poller, snapshot job | `{ kind: 'system' }` | `alarm` |
 | `/in/*` | `{ kind: 'system' }` | `webhook` · `email` |
 
@@ -218,12 +231,12 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 | `/in/webhook/<ingest-id>` · `/in/email/<token>` | POST | ingest | INGRESS | 4 |
 | `/s/<token>` | GET | share | READ+ | 7 |
 | `/<ID>` (34 §4's two spoken grammars) | GET | cookie | READ+ | 2 |
-| `/auth/methods` · `/auth/magic/start` · `/auth/magic` · `/auth/token` · `/auth/logout` · `/auth/record` | GET · POST · GET · POST · POST · POST | none · none · none · none · cookie · cookie | AUTH | 2 |
+| the sign-in routes of 33 §4 (`AUTH_ROUTES`), the operator's two excepted: `/auth/methods` · `/auth/session` · `/auth/token` · `/auth/magic/start` · `/auth/magic/redeem` · `/auth/passkeys` · `/auth/passkey/remove` · `/auth/logout` | GET · POST | none, or the session cookie | AUTH | 2 |
 | `/auth/invite` | GET | none | AUTH | 2 |
 | `/auth/device` · `/auth/device/token` · `/auth/device/approve` | POST | none · none · cookie | AUTH | 2 |
 | `/auth/passkey/register/options` · `/auth/passkey/register` · `/auth/passkey/assert/options` · `/auth/passkey/assert` | POST | cookie · cookie · none · none | AUTH | 3 |
 | `/ws` | GET | — | PUBLIC | 404 in phase 2 (§13 #4) |
-| everything else — `GET /auth/login`, a page of 50 §5.13, included | GET | — | SHELL | 3 |
+| everything else, `GET /signin` included: the built app, falling back to its `index.html`, contained by `realpath`, served with `frame-ancestors 'none'` | GET | none | SHELL | 3 |
 
 Forty-one `/api/<method>` routes are generated from `METHOD_GROUPS`; INTERNAL methods have none; `restore`
 answers 404 on this host (§13 #10). The `router-groups` gate (33 §8) asserts every entry has a `group`, that
@@ -289,51 +302,73 @@ for `id`, checked through `api.page` with a `{ kind: 'share', id, slug }` princi
 
 1. One `record_dir` row → it, always.
 2. Bearer: the hash is looked up in each open record's `token`, then `device_grant` (≤ 10 indexed lookups; `ponytail:` O(records)).
-3. Cookie: `bd_r` slug, validated against `person_record`; absent → the person's first `person_record` row, and `bd_r` is set.
+3. Cookie: the session row's record, which sign-in set to one the person owns, else the first they joined; the record's own `member` table then says what they may do.
 4. `/s/<token>` → `payload.rec`; `/in/email/<token>` → the record whose Directory-side token matches; `/in/webhook/<id>` → the first record whose `api.kernel.declarations()` holds an active `ingest.<id>` (41 §2); `/a/<sha256>` → content-addressed, every `blobs/` dir is tried.
 5. Nothing → 404 bare.
 
 ### 5.4 · Authenticate
 
-1. `Authorization: Bearer t` present: if `config.token` and `timingSafeEqual(t, config.token)` → owner principal (§4.6). Else `h = sha256hex(t)`; `SELECT id, scope, label, expires_at, revoked_at FROM token WHERE hash = ?` → a live row → principal; `UPDATE token SET last_used_at = ?, last_surface = ? WHERE id = ?`. Else `SELECT id, reach, label, approved_by, expires, last_used FROM device_grant WHERE token_hash = ? AND status = 'active'` with `expires > now`: `reach = 'runner'` and `last_used ≥ now − 14 d` → the runner principal, `UPDATE device_grant SET last_used = ?` (a row silent 14 days is set `expired` and the request gets 401); `reach ∈ export import pack token` → `{ kind: 'person', id: approved_by, level: member('*') }` with `ctx.op = reach` — the ten-minute operation grant of 48 §13 D1; a `login` row is never a bearer (its token is in `token`). Nothing → 401 `{ code: 'UNAUTHORIZED' }`. Bearers never touch `auth_fail` (12 §8: agents bypass the lockout).
-2. Cookie `bd_s=v`: `SELECT person_id, expires, rotated_at, authed_at FROM session WHERE id_hash = ?`; missing or `expires ≤ now` → delete, clear cookie, 401. `person.suspended_at` set → 401. Level: `SELECT level FROM member WHERE person_id = ? AND register = '*'` in the resolved record → none → 403 `FORBIDDEN`. Rotate per §4.2.
-3. `auth: 'none'` routes skip both; `auth: 'cookie'` routes refuse a bearer with 403 `NEEDS_BROWSER_SESSION` — except `config.token`, which is owner everywhere (30 §10).
+1. `Authorization: Bearer t` present: if `config.token` and `sameKey(t, config.token)` (SHA-256 of both, compared in constant time) → owner principal (§4.6). Else `h = sha256hex(t)`; `SELECT id, scope, label, expires_at, revoked_at FROM token WHERE hash = ?` → a live row → principal; `UPDATE token SET last_used_at = ?, last_surface = ? WHERE id = ?`. Else `SELECT id, reach, label, approved_by, expires, last_used FROM device_grant WHERE token_hash = ? AND status = 'active'` with `expires > now`: `reach = 'runner'` and `last_used ≥ now − 14 d` → the runner principal, `UPDATE device_grant SET last_used = ?` (a row silent 14 days is set `expired` and the request gets 401); `reach ∈ export import pack token` → `{ kind: 'person', id: approved_by, level: member('*') }` with `ctx.op = reach` — the ten-minute operation grant of 48 §13 D1; a `login` row is never a bearer (its token is in `token`). Nothing → 401 `{ code: 'UNAUTHORIZED' }`. Bearers never touch `auth_fail` (12 §8: agents bypass the lockout).
+2. The session cookie: the Directory's `auth({ flow: 'session', sid })`, which finds the row by the id's HMAC or, for sixty seconds after a rotation, by the previous one. Missing, expired, or a suspended person → 401 and the cookie cleared; a bad cookie never falls through to step 3. The level is the record's own `access(person)`; none → 403 `FORBIDDEN`. A cookie non-GET needs `sameOrigin`, else 403 `FORBIDDEN`. Rotate per §4.2.
+3. Nothing presented and no `config.token` (open mode): the `Host` must be `localhost`, `127.0.0.1` or `[::1]` at this port, or the origin's host, else an empty 421 (DNS rebinding); a non-GET whose `Origin` or `Sec-Fetch-Site` names another site is 403 `FORBIDDEN`, and a request carrying neither is the CLI or the client, not a page; then the owner, with `credentialed: false`.
+4. `auth: 'none'` routes skip both; `auth: 'cookie'` routes refuse a bearer with 403 `NEEDS_BROWSER_SESSION` — except `config.token`, which is owner everywhere (30 §10).
 
 ### 5.5 · The lockout — reserve before compare, fail closed
 
-Keys: `ip:<addr>` and `email:<addr>` on `/auth/magic`, `/auth/token`, `/auth/invite`, `/auth/passkey/assert`;
-`mint:<addr>` on `/auth/magic/start`; `device:<addr>` on `/auth/device`, `/auth/device/token` and
-`/auth/device/approve` — the last three in the **record's** `auth_fail` (33 §10), the rest in the Directory's. `<addr>` is the first
-`X-Forwarded-For` value when present, else `socket.remoteAddress`.
+Keys: `ip:<addr>` on `/auth/token`, `/auth/passkey/assert` and `/auth/magic/redeem`; `mint:<addr>` and
+`email:<addr>` on `/auth/magic/start`; `device:<addr>` on `/auth/device`, `/auth/device/token` and
+`/auth/device/approve`, the last three in the **record's** `auth_fail` (33 §10) and the rest in the Directory's
+`dir_fail`. `<addr>` is `socket.remoteAddress`. Behind a proxy the operator names with `BRAINDOG_TRUST_PROXY=1`, it
+is the last `X-Forwarded-For` entry, the one that proxy wrote; otherwise the header is ignored, because an address
+anybody can write is an address anybody can lock out.
 
 ```sql
--- one statement, inside transactionSync, BEFORE any comparison
-INSERT INTO auth_fail (key, n, until) VALUES (?, 1, NULL)
+-- one statement, BEFORE any comparison: ?1 the key, ?2 now, ?3 now minus 15 min, ?4 now plus 15 min
+INSERT INTO dir_fail (key, n, first, until) VALUES (?1, 1, ?2, NULL)
 ON CONFLICT (key) DO UPDATE SET
-  n     = CASE WHEN until IS NOT NULL AND until <= ?now THEN 1 ELSE MIN(n + 1, 10) END,
-  until = CASE WHEN until IS NOT NULL AND until <= ?now THEN NULL
-               WHEN n + 1 >= 10 THEN COALESCE(until, ?now_plus_15m) ELSE until END
+  n     = CASE WHEN (until IS NOT NULL AND until <= ?2) OR (until IS NULL AND first <= ?3) THEN 1 ELSE MIN(n + 1, 10) END,
+  first = CASE WHEN (until IS NOT NULL AND until <= ?2) OR (until IS NULL AND first <= ?3) THEN ?2 ELSE first END,
+  until = CASE WHEN until IS NOT NULL AND until <= ?2 THEN NULL
+               WHEN until IS NULL AND first <= ?3 THEN NULL
+               WHEN n >= 10 THEN COALESCE(until, ?4) ELSE until END
 RETURNING n, until;
 ```
 
-1. No row returned → 503 bare (a reservation that fails is never a pass).
-2. `until > now` → 401 `UNAUTHORIZED` — the compare never runs, and a correct secret during the window is still refused (sticky).
-3. Compare. Success → `DELETE FROM auth_fail WHERE key = ?` for the email key; the IP key is left to expire.
+1. No row returned, or the statement throws → 503 `{ ok: false }`: a reservation that fails is never a pass.
+2. `until > now` → 429 with `Retry-After` in seconds and `{ ok: false, retryAfter }`. The compare never runs, and
+   a correct secret during the window is refused like any other (sticky).
+3. Compare. A success deletes the `ip:` key in the transaction that writes the session. The `mint:` and `email:`
+   keys are never cleared, because sending a link is not a sign-in.
 
-Ten strikes, fifteen minutes (§13 #17). The counter is capped at 10 so hammering cannot extend the window.
-
+Ten attempts are compared and the eleventh is refused, for fifteen minutes (§13 #17). The counter is capped at 10,
+so hammering cannot extend the window. **Three amendments to the first draft, each argued above the statement in
+`packages/record/src/identity.ts`.** The lock falls on the eleventh reservation rather than the tenth, which
+refused the tenth attempt itself, so nine failures and then the right secret could never succeed. A success clears
+the address, because an office behind one address signs many people in on a Monday morning and every one of those
+sign-ins reserved a strike. And a count whose first strike is fifteen minutes old starts again, because otherwise a
+handful of typos from one address over a month added up to a lock.
 ### 5.6 · Magic link
 
-1. `POST /auth/magic/start { email }`: reserve `mint:<ip>`; `email = trim(lower(email))`; `SELECT id FROM person WHERE email = ? AND suspended_at IS NULL`; none → 200 `{}` and nothing else (no enumeration; sign-up is closed on a self-host, §13 #15). No SMTP configured → 503 bare, and `/auth/methods` says `magic: false` so the screen never offers it.
-2. `t = base64url(randomBytes(32))`; `INSERT INTO magic_link (hash, person_id, expires) VALUES (sha256hex(t), ?, now + 15 min)`; `dispatch.email({ to, subject: 'Sign in to BrainDog', text: `${origin}/auth/magic?t=${t}` })`; 200 `{}`.
-3. `GET /auth/magic?t=…`: reserve `ip:<ip>`; `DELETE FROM magic_link WHERE hash = ? AND expires > ? RETURNING person_id` — single use and expiry in one statement; no row → 401.
-4. Session: `v = base64url(randomBytes(32))`; `INSERT INTO session (id_hash, person_id, expires, rotated_at, authed_at) VALUES (sha256hex(v), ?, now + 30 d, now, now)`; if a `bd_s` cookie was already present (re-auth), delete its row first. `Set-Cookie bd_s`; `bd_r` if the person holds exactly one record; 302 `/`.
-
+1. `POST /auth/magic/start { email }`: reserve `mint:<ip>`, then `email:<addr>`. A live person with that address
+   gets a `magic` link; none → the same 200 `{}` and no mail (no enumeration; sign-up is closed on a self-host,
+   §13 #15). With no mail transport the route is 404 and `/auth/methods` says `magic: false`, so the screen never
+   offers it. This host has no SMTP yet, so today it is always off here, and a link is never printed instead.
+2. `t` = 32 random bytes, base64url; `INSERT INTO dir_link (hash, person, purpose, expires)` with the HMAC of `t`,
+   `'magic'` and `now + 15 min`. The host sends `<origin>/signin#magic=<t>` without waiting for the send, so a
+   known and an unknown address answer in the same time. A fragment never reaches a server, a log or a link
+   pre-fetcher.
+3. The app reads the fragment once, removes it from the address bar, and on a press sends
+   `POST /auth/magic/redeem { linkToken }`: reserve `ip:<ip>`; `DELETE FROM dir_link WHERE hash = ? AND purpose = 'magic' AND expires > ? RETURNING person`,
+   single use and expiry in one statement; no row → 401. A claim link is the same with `claimToken`, purpose
+   `claim` and 24 hours.
+4. Session: a new id; a presented session is deleted first (fixation); the row records the person, the record
+   they own (else the first they joined), `now + 30 d` and `authed_at = now`; `Set-Cookie` per §4.2; 200 with
+   `{ person, email, record, provedAt }`. The app goes on to `next` when it is a path on this origin, else `/`.
 ### 5.7 · Token exchange — `BRAINDOG_TOKEN` → a session
 
-1. `POST /auth/token { token }`: reserve `ip:<ip>`; `config.token` unset → 404 bare.
+1. `POST /auth/token { serverKey }`: `config.token` unset → 404 `ROUTE_UNKNOWN`; reserve `ip:<ip>`.
 2. `SELECT COUNT(*) FROM person` > 1 → 403 `FORBIDDEN` — the token is single-user by design (12 §3), and the process enforces the word.
-3. `timingSafeEqual` → mint a session for `record_dir.owner_person` as in §5.6 step 4; 200 `{}`.
+3. The two digests compared in constant time → a session for the one person, as in §5.6 step 4; 200 with `{ person, email, record, provedAt }` and the cookie.
 
 This is also the bootstrap when no SMTP is configured, and the authenticated session behind which the first
 passkey is registered (12 §8: registration needs a session in place of attestation).
@@ -344,7 +379,7 @@ passkey is registered (12 §8: registration needs a session in place of attestat
 2. `GET /auth/invite?t=…`: reserve `ip:<ip>`; `SELECT email, rec_id, levels FROM invitation WHERE hash = ? AND expires > ? AND accepted_at IS NULL`; none → 401.
 3. In one Directory transaction: `person` for `email` or `INSERT` one (`p_` + ULID); `UPDATE invitation SET accepted_at = now`; `INSERT OR IGNORE INTO person_record`.
 4. `api.invite({ person: { id, email, name }, levels }, ownerCtx)` where `ownerCtx.principal = { kind: 'person', id: record_dir.owner_person, level: 'owner' }` — the owner's act, completed at acceptance: the record writes its `person` mirror, the `member` rows and one `access.grant` event per register (33 §10). A refusal here rolls nothing back in the Directory; the invitee can retry with a new invitation.
-5. Session as §5.6 step 4; `bd_r = slug`; 302 `/settings/recovery` — the screen that registers a passkey (phase 3).
+5. Session as §5.6 step 4, on the invitation's record; 302 `/settings/recovery` — the screen that registers a passkey (phase 3).
 
 ### 5.9 · Device grant — RFC 8628, 12 §6.1
 
@@ -364,8 +399,9 @@ passkey is registered (12 §8: registration needs a session in place of attestat
 
 Registration (`/auth/passkey/register/options` then `/auth/passkey/register`; an authenticated session is
 required — 12 §8 — and the options carry `attestation: 'none'`, `pubKeyCredParams: [{ alg: -7 }, { alg: -257 }]`,
-`rp.id = new URL(origin).hostname`). Challenges live in a `Map<challenge, { person_id, exp: now + 5 min }>`
-in memory; `ponytail:` a restart forgets a ceremony in flight.
+`rp.id = new URL(origin).hostname`). Challenges live in `dir_challenge`, by their HMAC, for five minutes: single use, consumed by the one statement
+that deletes them, pruned on every insert, and refused past 10,000 live rows. A table and not a `Map`, because the
+Worker's Directory object is evicted between requests and a ceremony in flight would go with it.
 
 1. `c = JSON.parse(utf8(clientDataJSON))`: `c.type === 'webauthn.create'`, `c.challenge` is live for this person, `c.origin === origin`.
 2. `att = cbor(attestationObject)`; `attStmt` is ignored whatever `fmt` says — the session is the attestation.
@@ -381,10 +417,10 @@ Assertion (`/auth/passkey/assert/options` → `{ challenge, rpId, userVerificati
 3. `authData`: rpIdHash matches; UP set.
 4. Verify `signature` over `authData ‖ sha256(clientDataJSON)`: ES256 — DER `ECDSA-Sig-Value` → raw `r‖s` (64 bytes), `subtle.verify({ name: 'ECDSA', hash: 'SHA-256' })`; RS256 — `subtle.verify('RSASSA-PKCS1-v1_5')`.
 5. `n = u32be(33)`; if `n !== 0 || stored !== 0` then require `n > stored`, else `rejected` (a clone); `UPDATE passkey SET sign_count = ?, last_used = ?`.
-6. Session as §5.6 step 4 — or, when a valid `bd_s` is present, `UPDATE session SET authed_at = now` and rotate (re-auth for the vault).
+6. Session as §5.6 step 4, and always a new one: a presented cookie is deleted first rather than refreshed, so a cookie planted before a sign-in never becomes a signed-in one. A new assertion is also how the vault's fifteen minutes are renewed.
 
-Every failure is the one word `rejected` inside the module and a 401 `UNAUTHORIZED` on the wire; the reason
-(`challenge` · `origin` · `rpid` · `flags` · `alg` · `sig` · `count` · `dup`) is logged, never returned.
+Every failure is one body on the wire, 401 `UNAUTHORIZED` "That did not sign you in."; the reason
+(`challenge` · `origin` · `rpid` · `flags` · `alg` · `sig` · `count` · `dup`, and the Directory's own) goes to the log, never the answer.
 The CBOR decoder handles major types 0–5 and 7, definite lengths only, depth ≤ 4, integers ≤ 2^53; anything
 else → `rejected`.
 
@@ -504,7 +540,7 @@ at wait + 10 s on its side.
 
 ### 5.19 · The shell and its assets
 
-Every unmatched GET — `/auth/login?next=` included — goes to the `handler(req, res, next)` of `@braindog/web/node`,
+Every unmatched GET — `/signin?next=` included — goes to the `handler(req, res, next)` of `@braindog/web/node`,
 adapter-node's output in `build-node/` (50 §13 #1–#2; 22 §9 differences 1 and 2): it serves `/_app/immutable/*`
 with `immutable`, and renders the shell through the one `render()` call of `hooks.server.ts`. `/api/*` never
 reaches it because the router matched first. The image ships the built directory; the self-hoster runs no bundler.
@@ -604,12 +640,13 @@ boot or on the wire ever prints a token, a code, a cookie value or a payload.
 
 | Boundary | Rule |
 |---|---|
-| TLS | the reverse proxy's; the process speaks HTTP on `PORT`, binds `0.0.0.0` for Docker (`-p 127.0.0.1:8080:8080` is how a self-hoster keeps it local). `Secure` is always on the cookie; browsers accept it on `localhost` |
+| TLS | the reverse proxy's; the process speaks HTTP on `PORT`, binds `0.0.0.0` for Docker (`-p 127.0.0.1:8080:8080` is how a self-hoster keeps it local). The cookie is `__Host-bd_s` with `Secure` on https, and `bd_s` without it on http at a loopback name, which a browser treats as secure; any other http origin gets no cookie, so a self-host off localhost needs TLS and `BRAINDOG_ORIGIN` |
 | The KEK | one file, 32 bytes, 0600, created `wx`; refused when group/other-readable; read once, derived twice, zero-filled; never logged, never in a snapshot, never in an export. It is what a self-hoster must back up **separately** — Settings → backups says so in one line |
 | Decryption | in the host, never the record (ADR-062): `openGrant` returns sealed material; the host unwraps the DEK, derives the grant key by HKDF, decrypts under `aad = record_id ‖ grant_id ‖ version` and returns plaintext once |
-| Cookie | `HttpOnly Secure SameSite=Lax`, 30 days, rotated every 24 h of use; `authed_at` gates the vault at 15 minutes |
-| CSRF | `SameSite=Lax` plus the `Origin` / `Sec-Fetch-Site` check on every cookie-authenticated non-GET (12 §8) |
-| Lockout | reserve before compare, sticky at ten, fifteen minutes, fail closed (503 on no row); bearers bypass it; keys per IP and per email; device codes and share tokens on the record's own `auth_fail` |
+| Cookie | `HttpOnly SameSite=Lax`, `Secure` wherever the origin allows it, 30 days, rotated after 24 h of use with a 60-second grace; `authed_at` gates the vault at 15 minutes |
+| The app | served from the same origin as `/auth` and `/api`: the built `apps/web`, or `BRAINDOG_SHELL`, with `realpath` containment, `frame-ancestors 'none'` and `nosniff` |
+| CSRF | `SameSite=Lax` plus the `Origin` / `Sec-Fetch-Site` check on every cookie-authenticated non-GET (12 §8), and on every `/auth` POST, which must also be `application/json`. With no server key, a `Host` this process was not reached by is an empty 421 (DNS rebinding), and a write whose `Origin` names another site is 403 |
+| Lockout | reserve before compare; ten compared and the eleventh refused with 429 and `Retry-After` for fifteen minutes, sticky; a first strike forgotten after fifteen minutes; an address cleared by a success on it; fail closed (503 on no row); bearers bypass it; `X-Forwarded-For` only behind `BRAINDOG_TRUST_PROXY=1`; device codes and share tokens on the record's own `auth_fail` |
 | `/auth/*` rate | `mint:<ip>` and `device:<ip>` through the same table — ten starts per fifteen minutes; device codes additionally pay `tries` on every pending row |
 | `/api/*` rate | 600/min, burst 60 per token (10 §8), in memory |
 | Refusals | a 401 says `UNAUTHORIZED` and nothing else; a 500 is bare; passkeys say `rejected` internally; no CORS anywhere; `no-store` on every JSON answer |
@@ -664,16 +701,19 @@ and captures `DATA`).
 
 | Input | Expected |
 |---|---|
-| `POST /auth/magic/start` with a known email | mock SMTP receives one message whose text contains `/auth/magic?t=`; `GET` that URL → 302 `/`, `Set-Cookie bd_s` with `HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`; `magic_link` row gone |
+| `POST /auth/magic/start` with a known email | one message whose text contains `/signin#magic=`; `POST /auth/magic/redeem` with its token → 200 and the cookie exactly as §4.2 writes it; the `dir_link` row gone |
 | the same link twice | second → 401 |
 | the link at +16 min (injected clock) | 401 |
 | `/auth/magic/start` with an unknown email | 200 `{}`; SMTP receives nothing |
-| `/auth/magic/start` with no SMTP configured | 503; `GET /auth/methods` → `magic: false` |
-| ten wrong `GET /auth/magic?t=` from one IP, then the right one | eleventh → 401; at +15 min → 302 |
+| `/auth/magic/start` with no mail transport | 404; `GET /auth/methods` → `magic: false` |
+| ten wrong keys or links from one IP, then the right one | the eleventh → 429 with `Retry-After`; at +15 min → 200 |
 | `auth_fail` reservation forced to return no row (stub) | 503 |
 | `POST /auth/token` with the right token, one person | 302-equivalent 200 and a session; with two persons → 403 `FORBIDDEN` |
-| a session at +25 h of use | response carries a new `bd_s`; old value → 401 on its next use |
-| `openGrant` with a cookie whose `authed_at` is 16 min old | 403 `NEEDS_BROWSER_SESSION`; after `/auth/passkey/assert` (phase 3) or a fresh magic link → 200 |
+| a session at +25 h of use | the answer carries a new cookie; the old value still answers for 60 seconds, then 401 |
+| a VAULT read with a cookie whose `authed_at` is 16 min old | 403 `NEEDS_BROWSER_SESSION`, "Sign in again to open the vault."; after a new sign-in → 200 |
+| open mode: `GET /api/boot` with `Host: evil.example:<port>` | an empty 421 |
+| open mode: a `text/plain` POST whose `Origin` is another site | 403 `FORBIDDEN`, and nothing written |
+| open mode: a session cookie that names nothing | 401 and the cookie cleared; never the owner |
 | `GET /auth/invite?t=` for a fresh invitation | person created, `person_record` written, `accepted_at` set, `api.invite` called with the owner principal, 302 `/settings/recovery`; second use → 401 |
 
 **Device grant**
@@ -803,7 +843,7 @@ so its row is what this spec needs from it:
 | 44 | `createMcpHandler(api: DataApi, decls, { context(req), declarationsChangedAt, maxBodyBytes? }): (req: Request) => Promise<Response>` | 44 §2 |
 | 47 | `runPull(job: OutboxRow<'pull.fetch'>, deps: { http, keys, clock, record, ctx }): Promise<PullResult>` — acks itself | 47 §2 |
 | 48 | `apps/selfhost/src/main.ts` with `init <slug>` and `dev`; `POST /auth/device { slug?, reach, label, subject? }` → `DeviceCode`; `POST /auth/device/token { device_code }` → `DevicePoll`; `Reach`; operation grants and `device_grant.reach`; `createToken listTokens revokeToken`; `POST /api/export` as streamed `text/plain`; `#dog` / `#table` block order with `dog_sig` last | 48 §4.2, §5.2–§5.3, §5.12, §5.14, §13 D1–D3 |
-| 50 | `@braindog/web/node` → `handler(req, res, next)`; `/auth/login?next=`; `/decide/[id]`; `/settings/<area>` — `agents` for the code entry (`verification_uri`), `recovery` for the first passkey; `/r/<register>/<seq>` | 50 §2.2, §5.13, §13 #1–#2; 19 §2 |
+| 50 | `@braindog/web/node` → `handler(req, res, next)`; `/signin?next=`; `/decide/[id]`; `/settings/<area>` — `agents` for the code entry (`verification_uri`), `recovery` for the first passkey; `/r/<register>/<seq>` | 50 §2.2, §5.13, §13 #1–#2; 19 §2 |
 | 45 | `createRecordApi({ sql, scheduler, clock }): RecordApi & { kernel: Kernel }`; `drainSchedule`, `leaseOutbox({ kinds, n })`, `ackOutbox({ id, outcome, error })`, `applyPull`; `createRecord({ id, slug, name, tz, locale, owner, keys: { record, connector, signing } })` writing `record`, the `person` mirror, `member('*', 'owner')` and the three `vault_key` rows; `invite({ person, levels })` at acceptance; `arrive({ channel, headers, body, ingest_id?, verified })` — INTERNAL, the arrival write 33 §4 describes and 30 §5 does not list; the three token methods of 48 §5.12 | 30 §5, 33 §2, §9; this spec §5.8, §5.16, §5.22 |
 
 ---
@@ -819,7 +859,7 @@ so its row is what this spec needs from it:
 | 5 | **`wake()` kicks the in-process poller** (`setImmediate`) instead of being a no-op; the poller's tick is **15 s** and is the belt for abandoned leases | 33 §1 `wake()` comment; 30 §8 doorbell row; 09 §1 self-hosted paragraph |
 | 6 | **The SMTP client is ~90 lines over `node:tls`** — implicit TLS on 465 or STARTTLS on 587, AUTH PLAIN, text/plain base64; configured by `BRAINDOG_SMTP_URL` and `BRAINDOG_SMTP_FROM`; without it, `/auth/methods` says so and `notify.email` is not leased | 33 §6 (an SMTP row) |
 | 7 | `BRAINDOG_ORIGIN` — the public origin, for magic-link URLs, the WebAuthn `rpId` and the CSRF origin check; default `http://localhost:<PORT>` | 33 §6 |
-| 8 | **How a request names its record on a multi-record host** (§5.3): one record is implicit; a bearer is found by hash; a cookie carries `bd_r`; a share, email or webhook path carries its own; `/a/<sha256>` is content-addressed across records | 33 §4 (one sentence after the table); 33 §6 Data row |
+| 8 | **How a request names its record on a multi-record host** (§5.3): one record is implicit; a bearer is found by hash; a session row carries the record; a share, email or webhook path carries its own; `/a/<sha256>` is content-addressed across records | 33 §4 (one sentence after the table); 33 §6 Data row |
 | 9 | `notify.push` on the self-host through `@pushforge/builder@2.0.5`, VAPID keys at `<data>/vapid.json` | ADR-046: "the Worker and the self-host" |
 | 10 | **Snapshots are exports**: the `VACUUM INTO` copy has its six `local` tables emptied, is vacuumed again, manifested and signed, so `braindog verify` prints 25 tables; `Snapshots.restore` throws and `restore` has no route — restore is `braindog import` into a fresh directory | 33 §6 Snapshots row: "→ strip `local` → manifest → sign"; 33 §9 Restore row: "self-host: offline, no route" |
 | 11 | `POST /a` uploads (the table listed only the GET); `POST /api/snapshot`, `GET /api/snapshots[/:id]` are the two owner routes 12 §8 names | 33 §4 (three rows) |
@@ -828,7 +868,7 @@ so its row is what this spec needs from it:
 | 14 | **48 §13 D1's device wire is adopted whole** — `POST /auth/device` / `POST /auth/device/token`, `Reach`, `device_grant.reach`, operation grants of ten minutes resolved to the approver with `ctx.op`, ADMIN admitting them by reach; two things this host adds: 48's `subject` is stored in 30 §1's `ua` column (the second free-text column the approver reads), and `verification_uri` is `${origin}/settings/agents` | 30 §1 (`device_grant.ua` comment: "label · subject"); 33 §10 Device grant row; 50 (a code-entry control at `/settings/agents`) |
 | 15 | **Sign-up is closed on a self-host**: persons come from `braindog init` and invitations; an unknown email at `/auth/magic/start` gets 200 and no mail | 33 §10 Sign up row: "Cloud; self-host: `init` and invitations" |
 | 16 | `session.authed_at` (a ninth column, not a ninth table) records the last proof; rotation every 24 h of use with a sliding 30-day expiry never moves it; VAULT requires it within 15 minutes | 33 §10 `session` row |
-| 17 | Lockout constants: ten strikes, fifteen minutes, capped counter, keys `ip:` `email:` `mint:` `device:`; device codes and share tokens on the record's `auth_fail` | 12 §8 (the numbers) |
+| 17 | Lockout constants: ten compared and the eleventh refused, fifteen minutes, a capped counter, a count forgotten fifteen minutes after its first strike, an address cleared by a success; keys `ip:` `email:` `mint:` `device:`; device codes and share tokens on the record's `auth_fail` | 12 §8 (the numbers) |
 | 18 | `CallContext.session` comes from `X-BrainDog-Session`, `-Client-Id`, `-Host`, `-Repo` on `/api/*`; `/mcp` reads `_meta` | 33 §2; 48 sends them |
 | 19 | The host signs: the final page of a streamed `POST /api/export` and every snapshot use one `sign()` over the record's `vault_key(purpose = 'signing')`, unwrapped with the KEK | 33 §9 Export rows: "the Worker or the self-host signs" |
 | 20 | One sick record does not stop the host: `SCHEMA_MISMATCH` / `SCHEMA_NEWER` is per record, 503 on its routes only | 33 §9 Migrations row (self-host clause) |

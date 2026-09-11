@@ -152,6 +152,7 @@ interface Env {
   KEK: SecretsStoreSecret; KEK_PREV?: SecretsStoreSecret;      // one key, never one per customer — 12 §6
   EMAIL: SendEmail; TELEMETRY: AnalyticsEngineDataset; RL_READ: RateLimit; RL_WRITE: RateLimit;
   AI_GATEWAY: string; AGE_RECIPIENT: string; PUBLIC_HOST: string;
+  SESSION_SECRET?: string; PROVISION_KEY?: string; AUTH_MAIL_FROM?: string;   // two secrets and the sign-in sender (§5.8)
 }
 ```
 
@@ -180,8 +181,8 @@ request's record; a `bearer` auth carries a hash, never the secret; `system` is 
 | Shape | Form | Rule |
 |---|---|---|
 | Bearer | `Authorization: Bearer <rec_id>.<secret>` — `^rec_[0-9A-HJKMNP-TV-Z]{26}\.[A-Za-z0-9_-]{43}$` | the record id routes; `sha256(secret)` is what `token.hash` and `device_grant.token_hash` hold. 32 random bytes, shown once (§13 D3) |
-| Session cookie | `sid=<43 chars>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000` | `session.id_hash = sha256(sid)`; re-issued when `rotated_at` is over 24 h old (33 §10: 30 days, rotating) |
-| Record cookie | `rec=<rec_id>; HttpOnly; Secure; SameSite=Lax; Path=/` | which of the person's records a browser request means; set at sign-in and by `/auth/switch/<slug>` (§13 D4) |
+| Session cookie | `__Host-bd_s=<43 chars>; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax` | `dir_session.id_hash` is HMAC-SHA-256 of `s:` and the id, under the key HKDF derives from `SESSION_SECRET`; re-issued when `rotated_at` is over 24 h old, the old id honoured for 60 seconds (33 §10) |
+| The record | on the session row, not in a cookie | the record the session opened: one the person owns, else the first they joined; `/auth/switch` will move it (§13 D4, amended) |
 | Session hint | `BrainDog-Session: {"spoken":"S42","client_id":"…","host":"…","repo":"…"}` | ASCII JSON ≤ 512 bytes; malformed → ignored; MCP carries the same under `_meta` and 44 parses it |
 | Share token | `/s/<rec_id>.<b64url JCS{id,slug,exp,k}>.<b64url HMAC-SHA-256>` | key = `HKDF-SHA-256(KEK, info 'braindog/share')`; `k` = `kek_id`; `exp` RFC 3339; verified in the Worker, revocation checked by the record (§13 D5) |
 | WebSocket push | `{ "version": 1234, "registers": ["obligations", "decision"] }` | outgoing only; never a row — 22 §5 |
@@ -243,9 +244,11 @@ The skeleton in 33 §7 lacked `send_email`, `analytics_engine_datasets`, `rateli
 
 1. Read `Authorization`. If present and it matches the bearer grammar of §4.3: `rec = <rec_id>`,
    `auth = { kind: 'bearer', hash: hex(sha256(secret)) }`. A header present but malformed → **401** `UNAUTHORIZED`.
-2. Else read cookies `sid` and `rec`. Missing either → **401**. `row = await DIRECTORY.session(hex(sha256(sid)))`;
-   `null` → **401**. `rec ∉ row.records` → **403** `FORBIDDEN`. `auth = { kind: 'person', id: row.person }`.
-   If `row.rotate`, mint a new `sid` and add `Set-Cookie` to the eventual response.
+2. Else read `__Host-bd_s`: `DIRECTORY.auth({ flow: 'session', sid })`. Anything but a 200 → **401** with the cookie
+   cleared, and never the demo principal (a 429 or a 503 passes through as itself). The record is `who.record`,
+   the record's own `access(person)` gives the level (none → **403** `FORBIDDEN`), and `provedAt` is
+   `who.provedAt`. A rotation's `Set-Cookie` rides on the eventual response. The order is `src/session.ts`'s:
+   bearer, cookie, then the demo for a credential-free read, else **401**.
 3. Cookie auth on a mutating method (`POST`, `PUT`) requires `Origin` equal to `https://<PUBLIC_HOST>` or
    `Sec-Fetch-Site: same-origin` → else **403** `FORBIDDEN` (12 §8 CSRF). Bearer requests skip this.
 4. `session` from `BrainDog-Session` if valid; `now = Date.now()`; `surface` from the route: `/api/*` cookie → `web`,
@@ -305,7 +308,7 @@ Email:
 ### 5.5 · `GET /a/<sha256>` and `PUT /a`
 
 Read:
-1. Path must match `^/a/([0-9a-f]{64})$` → else **404**. The record is the `rec` cookie, else `?r=<rec_id>`
+1. Path must match `^/a/([0-9a-f]{64})$` → else **404**. The record is the session's, else `?r=<rec_id>`
    (a shared page's images); neither → **404**. No session check: the URL is the capability (12 §8).
 2. `obj = await BLOBS.get(blobKey(rec, sha))`; `null` → **404**.
 3. Headers: `Content-Type` from `obj.httpMetadata.contentType` (set from bytes at upload), `X-Content-Type-Options:
@@ -351,31 +354,34 @@ Write:
 
 ### 5.8 · `/auth/*` — the Directory (33 §10)
 
-| Route | `AuthCall.flow` | Notes |
+`/auth/*` is `serveAuth` from `packages/host/src/auth.ts` over the Directory's one RPC, `Directory.auth(call)`, with
+the origin from `PUBLIC_HOST` and the lockout's address from `cf-connecting-ip`, which Cloudflare writes and a
+caller cannot. The routes are 33 §4's table; this host serves all of them but `/auth/token`, the self-host's
+server key, and adds the operator's two.
+
+**Shipped switched off.** Without `SESSION_SECRET` (32 characters or more) the Directory holds no MAC key:
+`/auth/methods` answers `why: 'not-configured'` and every other `/auth` route is 404. Mail goes out only when
+`AUTH_MAIL_FROM` and the `EMAIL` binding (Cloudflare Email Service, which reaches any address) are both set, by
+`ctx.waitUntil` and never awaited.
+
+| Route | Flow | Notes |
 |---|---|---|
-| `POST /auth/signup` | `signup.start { email, slug }` | slug free → magic link mailed; taken → **422** `ALREADY_KNOWN` at `slug` |
-| `POST /auth/magic` | `magic.request { email }` | always **204**; the mail is sent only if the person exists |
-| `GET /auth/magic/<t>` | `magic.redeem { hash }` | single use, 15 min; success sets `sid` and `rec` |
-| `POST /auth/passkey/options` · `/verify` | `passkey.options` · `passkey.verify` | verify answers one word, `rejected`, on every failure (12 §8) |
-| `POST /auth/passkey/register` | `passkey.register` | requires a live session — in place of attestation |
-| `POST /auth/invite/<hash>` | `invite.accept` | passkey behind it; then `RECORD.call('join', …)` (§13 D11) |
-| `GET /auth/switch/<slug>` | `switch` | `rec` cookie to a record the person holds |
-| `POST /auth/logout` | `logout` | deletes the session row, clears both cookies |
-| `POST /auth/device/start` · `/poll` | — | record methods `deviceStart` · `devicePoll` (the table is the record's — 30 §1) |
-| `POST /auth/device/approve` | — | cookie only → `deviceApprove`; a bearer → **403** `NEEDS_BROWSER_SESSION` |
+| `POST /auth/passkey/register/options` · `/register` | `passkey.register.options` · `passkey.register` | a live session, in place of attestation |
+| `POST /auth/passkey/assert/options` · `/assert` | `passkey.assert.options` · `passkey.assert` | every failure is the one body, 401 "That did not sign you in." (12 §8) |
+| `POST /auth/magic/start` · `/redeem` | `magic.start` · `magic.redeem` | start is always 200 and mails only a live person; the link is `/signin#magic=`, redeemed by a POST |
+| `GET /auth/methods` · `/session` · `/passkeys`; `POST /auth/passkey/remove` · `/logout` | as named | a logout deletes the row and clears the cookie |
+| `POST /auth/provision` | (the operator's) | a `PROVISION_KEY` bearer; `{ slug, email, name? }` → the record first, then its Directory rows (D21), then a 24-hour claim link handed back to the operator and never mailed |
+| `POST /auth/claim/mint` | `claim.mint` | a `PROVISION_KEY` bearer; a new claim link for a person already provisioned |
+| `POST /auth/device/start` · `/poll` · `/approve`; `/auth/invite`; `/auth/switch` | none yet | specified, not built |
 
-Sign-up's second half, after the passkey: the Worker calls `RECORD.call('createRecord', { id, slug, name, owner },
-SYSTEM)` **first**, then `DIRECTORY.auth({ flow: 'signup.finish' })` writes `record_dir` and `person_record` — a
-Directory row never points at a record that failed to initialise. Every mail the Directory needs (magic link,
-invitation) is sent by the Worker through `EMAIL` directly: the secret is minted outside the record, so the outbox
-is not its path.
+Self-service sign-up is not built: a hosted record is made by the operator today. Until the KEK Secrets Store
+binding is live, a provisioned record has no vault keys; it reads, writes and signs people in, and cannot seal a
+grant or sign an export until keys are wrapped for it.
 
-The lockout (12 §8): every flow that compares a code or a link is preceded by `reserve(key)` —
-`INSERT INTO auth_fail(key, n) VALUES (?, 1) ON CONFLICT(key) DO UPDATE SET n = n + 1 RETURNING n, until` for
-`ip:<ip>` and `email:<email>`; `n > 10` → `AuthResult { status: 429, retryAfter }` and `until = now + 15 min`,
-sticky; the `RETURNING` yields no row → `503`, fail closed; success → `DELETE FROM auth_fail WHERE key = ?`. Agent
-tokens never touch `/auth/*`, so they bypass it (32 §2.3).
-
+The lockout (12 §8) is 49 §5.5's, over `dir_fail`: reserve before compare; ten compared and the eleventh a **429**
+with `Retry-After`, sticky for fifteen minutes; a first strike forgotten after fifteen minutes; an address cleared
+by a success on it; a reservation that returns no row is **503**, fail closed. Agent tokens never touch `/auth/*`,
+so they bypass it (32 §2.3).
 ### 5.9 · The DO `Sql` adapter (`sql-do.ts`)
 
 ```ts
@@ -612,7 +618,7 @@ Only codes from 30 §6 appear in a body; the Worker mints none. The adapter's th
 |---|---|---|
 | bearer at `VAULT`, `ADMIN`, session-half `JOBS` | 403 `NEEDS_BROWSER_SESSION` | *Open this in the browser; no token can do it.* |
 | cookie mutation without a same-origin `Origin` | 403 `FORBIDDEN` | *Reload the page and try again.* |
-| `rec` cookie names a record the session does not hold | 403 `FORBIDDEN` | *Switch to a record you belong to.* |
+| the session's record no longer holds the person | 403 `FORBIDDEN` | *You are not on this record.* |
 | `/mcp` with a cookie | 401 `UNAUTHORIZED` | *MCP takes an agent token.* |
 | module-level `SCHEMA_MISMATCH` / `SCHEMA_NEWER` | 503 | *A deploy is in progress; retry in five minutes.* |
 
@@ -779,9 +785,9 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 | D1 | Each DO class exposes **one RPC dispatcher** — `Record.call(method, args, pre)`, `Spark.dispatch`, `Directory.auth` — plus the platform methods of §2. Forty-five named RPC methods in a ≤ 100-line file is not possible, and the method name is data the gate walks | 33 §7: *"expose their methods as RPC"* → *"one `call` dispatcher over the groups"* |
 | D2 | The Worker builds a **`PreContext`** (verified person id, bearer hash, share, system, spark) and the **record builds `CallContext`** — scope, level, name and actor are the record's tables. A bearer cannot be resolved anywhere else | 33 §2 first paragraph after the code block |
 | D3 | **Bearer wire format** `<rec_id>.<secret>`; `token.hash` and `device_grant.token_hash` hold `sha256(secret)`. The record id must be in the bearer or the Worker cannot find the table that verifies it | 33 §10 *Agent token* row; 12 §3 |
-| D4 | Browser requests name their record with a **`rec` cookie**, set at sign-in and by `GET /auth/switch/<slug>`; the Directory's `session()` returns the person's records and the Worker checks membership. A person holds several records and the shell is static | 33 §4 (`/auth/switch`), 33 §10 |
+| D4 | Browser requests name their record **on the session row**, not in a second cookie: sign-in opens a record the person owns (else the first they joined), `/auth/switch` will move it, and the record's own `member` table says what the person may do. *Amended from a `rec` cookie: one opaque cookie is one thing to protect.* A person holds several records and the shell is static | 33 §4 (`/auth/switch`), 33 §10 |
 | D5 | **Share token** = `<rec_id>.<b64url payload>.<b64url HMAC-SHA-256>` under `HKDF(KEK, 'braindog/share')` with `kek_id` in the payload; the Worker verifies the MAC, the record checks `share.close`. An invalid token is 404 | 20 §2 tier 1; 33 §4 `/s/<token>` |
-| D6 | **`PUT /a`** uploads (cookie, or a bearer whose `whoami` is `write`); `/a/<sha256>` takes the record from the `rec` cookie or `?r=`. The corpus had a store and no way in | 33 §4; 12 §8 asset store; 03 §8 |
+| D6 | **`PUT /a`** uploads (cookie, or a bearer whose `whoami` is `write`); `/a/<sha256>` takes the record from the session or `?r=`. The corpus had a store and no way in | 33 §4; 12 §8 asset store; 03 §8 |
 | D7 | **Webhook URL** `/in/webhook/<rec_id>/<ingest-id>/<token>` — an ingest id is per record. The random segment is the default verification; `hmac_sha256` is verified in the Worker via `ingestVerify` | 33 §4; 12 §3 |
 | D8 | **Nightly snapshot** = `scheduled()` → `snapshot` (ADMIN, the tenth; also `POST /api/snapshot`) → an `export.r2` outbox row → the consumer's `Snapshots.take`; `GET /api/snapshots` lists R2. The outbox gives the ladder and the visible failure 12 §8 asks for | 30 §5 ADMIN; 33 §1 `Snapshots` (Cloud); 33 §4; 12 §8 |
 | D9 | The three **`infer.*` write-backs ride `ackOutbox.result`** and the record persists them in the ack's transaction — the consumer's write surface is `arrive · leaseOutbox · ackOutbox · observe` | 30 §8 *`infer.*`* row |

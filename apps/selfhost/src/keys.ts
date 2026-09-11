@@ -33,6 +33,8 @@ import { randomBytes } from 'node:crypto';
 import type { webcrypto } from 'node:crypto';
 import { chmodSync, existsSync, linkSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 
+import { deriveSessionKey } from '@braindog/host/auth';
+
 /** What a record stores about one wrapped key. The kernel writes it and never reads inside it. */
 export type WrappedKey = {
   wrapped: Uint8Array;
@@ -184,10 +186,14 @@ async function fingerprint(raw: Uint8Array): Promise<string> {
  * interface: `49 §10` says rotation is a second file and a `kek_id → file` map, and neither exists.
  * A `byId` that answered for any id would be a store claiming to hold keys it does not have.
  */
-export async function openKeyStore(file: string, say: (line: string) => void = () => {}): Promise<KeyStore> {
+export async function openKeyStore(file: string, say: (line: string) => void = () => {}): Promise<KeyStore & { sessionKey: Uint8Array }> {
   const root = keyBytes(file, say);
   const kekId = await fingerprint(root);
   const key = await crypto.subtle.importKey('raw', root, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  /* THE SESSION KEY IS DERIVED HERE, from the root before it goes: HKDF-SHA-256, info `braindog/session`.
+     It is what the Directory takes every session and link MAC under, so replacing the key file signs
+     everybody out, which is `12 §8`'s lever. `serve` hands it to the Directory once and zero-fills it. */
+  const sessionKey = await deriveSessionKey(root);
 
   /* AND THE ROOT BYTES GO. `49 §8`: read once, used once, zero-filled. The imported `CryptoKey` is
      not extractable, so what is left is a handle rather than a key.
@@ -197,12 +203,14 @@ export async function openKeyStore(file: string, say: (line: string) => void = (
    * `braindog/device-code` and `braindog/share`, and NOTHING IN THIS REPOSITORY SIGNS A DEVICE CODE
    * OR A SHARE TOKEN: `/auth/device/*` and `/s/<token>` are unbuilt. They were derived, held for the
    * life of the store, and read by nothing but their own test — which is the failure this codebase
-   * keeps finding, performed on key material. Two lines the day either route exists. */
+   * keeps finding, performed on key material. Two lines the day either route exists. The session key
+   * is derived above because sign-in reads it. */
   root.fill(0);
 
   return {
     current: () => Promise.resolve({ kekId, key }),
     byId: (id) => Promise.resolve(id === kekId ? key : null),
+    sessionKey,
   };
 }
 

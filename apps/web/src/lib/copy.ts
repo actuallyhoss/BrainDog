@@ -1091,6 +1091,10 @@ export const copy = {
   neverUsed: 'never used',
   remove: 'Remove',
   lastPasskey: 'This is your only passkey, so it cannot be removed. Add a second one first.',
+  /* A passkey the host holds with no name, which is every one this browser adds. */
+  passkeyUnnamed: 'Passkey',
+  passkeysUnread: 'Your passkeys could not be read just now.',
+  passkeyNotRemoved: 'That passkey was not removed. Try again.',
   magicLink: 'If you lose them all',
   /* `49 §5.6`. It is the ONLY other way in — there are no recovery codes anywhere in this product,
      and saying so is kinder than letting somebody look for them. */
@@ -1458,83 +1462,86 @@ export const copy = {
 
   /* ── the front door · `/signin` ───────────────────────────────────────────────────────────────
 
-     THE PRODUCT HAD NO SIGN-IN SURFACE AT ALL, and `19 §2`'s screen inventory has no row for one.
-     These sentences are that screen's, and every one of them is written against what the tree can
-     actually do rather than against what `12 §3` specifies: `POST /auth/magic`,
-     `GET /auth/magic/<token>`, `POST /auth/passkey/register` and `POST /auth/passkey/assert` are
-     four routes the document names and nothing in this repository serves. So the screen offers the
-     one door that opens and says, in one sentence, what the others are. */
+     One sentence per state of `lib/signin.ts`, and calm throughout: a closed passkey sheet or a
+     lockout is something that happened, not something that went wrong. Nothing here names a way in
+     the host has not offered, because the screen never draws one. */
 
   /** `33 §4`'s own row is headed *Sign in*, so that is the word rather than a new one. */
   signIn: 'Sign in',
-  /**
-   * WHAT THIS RECORD CAN LET YOU IN WITH, AND NOT A ROW OF BUTTONS THAT CANNOT.
-   *
-   * `12 §3` makes a passkey the primary method for a person in a browser with an email link as the
-   * fallback; `49 §5.10` puts passkeys in phase 3 and `§13 #1` says phase 2 closes with the link
-   * and the token exchange. Neither is served here. `23 §3.1`'s rule is the one that decides how
-   * that is drawn: a capability with no implementation behind it is **not there, not greyed out** —
-   * so there is no passkey button, and this sentence's "For now" is what stands in its place.
-   */
-  waysIn:
-    "For now, sign in with your server's address and its key.",
-  /**
-   * THE QUESTION THE OPERATOR'S SENTENCES SIT BEHIND.
-   *
-   * `waysIn` was the first thing under the slogan and `tokenMayBeEmpty` was the token field's
-   * hint, so somebody opening this screen for a business read that its way in "is not built yet"
-   * and then the name of an environment variable: 92 words around two fields and one button. Both
-   * are true and both are addressed to whoever runs the server, so they are behind the question
-   * that person would ask, and the screen opens on the fields.
-   */
-  ownServer: 'Running your own server?',
-  recordAddress: 'Address',
-  /** The shape, in the field, so nobody has to guess whether the scheme and the port are wanted. */
-  addressLike: 'http://127.0.0.1:8787',
-  accessToken: 'Access key',
-  /**
-   * THE EMPTY FIELD IS A REAL ANSWER AND THE SCREEN HAS TO SAY SO.
-   *
-   * `apps/selfhost/src/server.ts` serves unauthenticated when `BRAINDOG_TOKEN` is unset, and
-   * refuses *anything at all* that is presented to it in that state. So on the one deployment this
-   * screen exists for, typing something into the field is what fails.
-   */
-  tokenMayBeEmpty: 'If your server was set up without a key, leave this empty.',
+  signInLede: 'Sign in to open your record.',
+  checkingWays: 'Checking how this server signs you in',
+  withPasskey: 'Sign in with a passkey',
+  /* The mechanism and not the gesture: "Use Face ID" is wrong on a laptop, and the browser names the
+     gesture itself a moment later. */
+  waitingForPasskey: 'Waiting for your passkey',
+  passkeyCancelled: 'Sign-in was cancelled. Nothing changed.',
+  passkeyUnusable: 'This browser cannot use a passkey here. Try another browser, or another way in.',
+  emailLink: 'Email me a sign-in link',
+  emailLabel: 'Email',
+  emailLike: 'you@example.com',
+  sendLink: 'Send me a link',
+  sendingLink: 'Sending the link',
+  linkSentTitle: 'Check your email',
+  /* The host answers alike for an address it does not know, so this cannot say the link was sent. */
+  linkSentBody: (email: string) => `If ${email} can sign in here, a link is on its way. It works once, for fifteen minutes.`,
+  useAnotherEmail: 'Use a different email',
+  serverKeyWay: 'Sign in with the server key',
+  serverKeyLabel: 'Server key',
+  /* Where the credential goes, said to the person handing it over: one request, and nowhere after. */
+  serverKeyHint: 'The key you started your server with. It is sent once and never kept in this browser.',
   /* Two full literals for the toggle's two states, which is this file's own rule about a toggle. */
   showToken: 'Show',
   hideToken: 'Hide',
+  signingIn: 'Signing you in',
+  rejectedTitle: 'That did not sign you in.',
+  rejectedNext: 'Try again, or use another way in.',
+  closedTitle: 'The server could not check that just now.',
+  closedNext: 'Nobody was let in. Try again in a minute.',
+  lockedTitle: (minutes: number) => `Sign-in is paused for ${minutes === 1 ? 'a minute' : `${minutes} minutes`}.`,
+  lockedWhy: 'There were too many tries. Waiting is the only way through it.',
+  linkLandingTitle: 'Your sign-in link is here.',
+  claimLandingTitle: 'Your record is ready to claim.',
+  useLink: 'Sign in with this link',
+  claimRecord: 'Claim your record',
+  linkExpiredTitle: 'That link has expired or was already used.',
+  linkExpiredWhy: (kind: 'magic' | 'claim', canAsk: boolean) =>
+    kind === 'claim'
+      ? 'Ask whoever set up your record for a new one.'
+      : canAsk
+        ? 'A link works once, for fifteen minutes. Ask for a new one below.'
+        : 'A link works once, for fifteen minutes.',
+  unreachableTitle: 'The server did not answer.',
+  unreachableWhy: 'Check your connection, then try again.',
+  askAgain: 'Try again',
+  noHostTitle: 'There is nothing to sign in to here.',
+  noHostWhy: 'This copy of BrainDog runs without a server, so there is no record behind it.',
+  openTitle: 'This server lets you straight in.',
+  openWhy: 'It was started without a key, so anyone on this computer can open the record.',
+  openYourRecord: 'Open your record',
+  /* What the hosted app says until its sign-in is switched on, to whoever opens it: a fact and a
+     promise, and the demo underneath as the one thing to press. */
+  notConfiguredTitle: 'Sign-in is not open here yet.',
+  notConfiguredWhy: 'When it opens, this is where you will sign in to your record.',
+  insecureTitle: 'Sign-in needs a secure address.',
+  insecureWhy: "Open this page over https, or at localhost on the server's own computer.",
+  signedInTitle: 'You are signed in',
   /**
-   * WHERE THE CREDENTIAL GOES, SAID ON THE SCREEN RATHER THAN ONLY IN A COMMENT.
-   *
-   * `50 §1`, under Refuses: "A bearer token — the app never holds one". `lib/connect.ts` keeps
-   * that: the value is read out of the field, put in one header and dropped. A person handing a
-   * credential to a page is owed the answer to *where does this end up*, and the answer is nowhere.
+   * WHICH SCREENS MOVED AND WHICH DID NOT. Only the lists read a live record so far, so a sign-in that
+   * let the reader assume the whole app had switched would be claiming work that has not happened.
    */
-  tokenKept: 'The key is used once and not stored. It is gone when you close this tab.',
-  openTheRecord: 'Open the record',
-  /* The busy label, in full, for the same reason the toggle above is two literals. */
-  reachingTheRecord: 'Reaching the record',
-  /* `Lists` is the rail's word for a register and the one a reader has already met (19 §9). */
-  reachedHolds: (lists: number, rows: number) =>
-    `This record holds ${lists.toLocaleString('en')} lists and ${rows.toLocaleString('en')} rows.`,
-  /**
-   * THE RECORD'S DAY, WHICH IS NOT ALWAYS THE READER'S — `boot`'s `now` exists for exactly this and
-   * `packages/record`'s own header spends a paragraph on it: a browser that dates a record's rows
-   * against `Date.now()` is confidently wrong and gets no error while being it.
-   */
-  reachedDay: (when: string) => `It answered as of ${when}, which is its day and not always yours.`,
-  reachedWithToken: 'The key worked.',
-  reachedWithNone: 'This server needs no key, so none was sent.',
-  /**
-   * THE BOUNDARY, IN THE PLACE SOMEBODY WOULD OTHERWISE ASSUME OTHERWISE.
-   *
-   * Reaching a record and drawing one are two different pieces of work. Every screen in this build
-   * reads `@braindog/seed`, and swapping that for a live client is phase 1 of `loop/REWORK.md` —
-   * so a sign-in that quietly navigated Home would be claiming a switch that did not happen, which
-   * is this codebase's defining defect performed at the highest-stakes moment it has.
-   */
-  reachedNotSwitched:
-    'The screens behind this one still draw the sample record. Nothing from the record you just reached has been put on them.',
+  sampleStill: 'Your lists now read this record. Home, pages and every other screen still show the sample.',
+  addPasskeyHere: 'Add a passkey on this device',
+  addPasskeyWhy: 'Add one now, so next time you can sign in without the key.',
+  addingPasskey: 'Waiting for your device',
+  passkeyAdded: 'Passkey added. Next time, sign in with it.',
+  passkeyNotAdded: 'Nothing was added.',
+  passkeyExists: 'This device already has a passkey for this record.',
+  passkeyFailed: 'The passkey was not added. Try again.',
+  openBrainDog: 'Open BrainDog',
+  signOut: 'Sign out',
+  signingOut: 'Signing out',
+  signedOut: 'You are signed out.',
+  signOutFailed: 'You are still signed in. Try again.',
   /* The marketing site's own line, because the app must not imply an account to look around. */
   demoNeedsNothing: 'The demo record needs no sign-in. There is no sign-up and no billing.',
   openTheDemo: 'Open the demo record',

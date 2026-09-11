@@ -32,7 +32,7 @@ import { extname, join, normalize } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from './lib.mjs';
-import { answers, forward, startRecord } from './record.mjs';
+import { answers, forward, forwards, startRecord } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -179,7 +179,7 @@ const record = await startRecord();
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
-  if (url.pathname.startsWith('/api/')) return forward(req, res, record.base);
+  if (forwards(url.pathname)) return forward(req, res, record.base);
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
   if (rel.includes('..')) return res.writeHead(400).end();
   for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {

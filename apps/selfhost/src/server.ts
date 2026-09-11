@@ -12,15 +12,31 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
 import { handlersFor, httpStatus, serveApi, type Handler } from '@braindog/host';
+import {
+  clearCookie,
+  cookieMode,
+  readSid,
+  relyingParty,
+  sameKey,
+  sameOrigin,
+  serveAuth,
+  sessionContext,
+  sessionCookie,
+  type AuthDoor,
+  type CookieMode,
+} from '@braindog/host/auth';
 import type { OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
-import type { Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
+import { createDirectory, type Directory } from '@braindog/record/directory';
+import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
 import type { KeyStore } from './keys.ts';
+import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 
 /** The `Sql` port over `node:sqlite`. The one thing this file exists to supply. */
@@ -61,12 +77,11 @@ export function openSqlite(path: string): Sql & { close(): void } {
 }
 
 /**
- * Who is asking.
+ * Who is asking: a bearer, a session cookie, or, with no server key, nobody at all.
  *
- * ONE USER, and the token is the whole of the check — `30-BLUEPRINT` §10's `BRAINDOG_TOKEN` row: a
- * self-host is one person's record on one machine, so there is no directory, no invitation and no
- * second level. What there IS is the same `CallContext` the hosted product builds, so every
- * permission check below this line is the same code.
+ * A self-host is one person's record on one machine, and the Directory `init` wrote says who that person
+ * is. Whichever way they arrive, the answer is the same `CallContext` the hosted product builds, so every
+ * permission check below this line is the same code. `contextFor`, further down, is the order.
  */
 /** A credential this record does not know, or none where one is needed. 401 — `49 §5.4` step 1. */
 const UNKNOWN: Refusal = { code: 'UNAUTHORIZED', fix: 'This record does not know that credential.', at: 'authorization' };
@@ -102,11 +117,78 @@ const NOBODY: Refusal = {
   at: 'record',
 };
 
-async function contextFor(
-  request: Request,
-  token: string | undefined,
-  api: Awaited<ReturnType<typeof createRecordApi>>,
-): Promise<CallContext | Refusal> {
+/** Every sign-in that does not sign somebody in, including a cookie that names no session. */
+const NOT_YOU: Refusal = { code: 'UNAUTHORIZED', fix: 'That did not sign you in.' };
+
+/** A write that a page somewhere else sent, riding on this process's ambient authority. */
+const CROSS: Refusal = { code: 'FORBIDDEN', fix: 'A change here is accepted only from a page this BrainDog served.', at: 'origin' };
+
+const SAFE = new Set(['GET', 'HEAD']);
+
+type Api = Awaited<ReturnType<typeof createRecordApi>>;
+
+/** What this host knows about itself when it decides who is asking. */
+type Site = {
+  api: Api;
+  token: string | undefined;
+  origin: string;
+  mode: CookieMode | null;
+  /** The Directory's sign-in, or `null` where this host holds no sessions: open mode, or nothing to check them with. */
+  auth: Auth | null;
+  /** The names a browser may reach an open self-host by: loopback at its port, and the configured origin's host. */
+  hosts: ReadonlySet<string>;
+  origins: ReadonlySet<string>;
+  /** `/auth/*`, less the address, which is per request. */
+  door: Omit<AuthDoor, 'ip'>;
+};
+
+/** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
+type Seen =
+  | { ctx: CallContext; cookie?: string }
+  | { refused: Refusal; cookie?: string }
+  | { bare: 421 | 503 }
+  | { bare: 429; retryAfter: number };
+
+/**
+ * The owner, for the server key and for open mode.
+ *
+ * A RECORD WITH NO ELIGIBLE OWNER REFUSES, rather than inventing one. The fallback to a constant is right
+ * for a file nobody has created, which is what `braindog dev` and every test against an empty file open,
+ * and wrong the moment there IS a record: it would hand `owner` to a person id no `member` row names.
+ *
+ * AND WHETHER ANYTHING WAS PRESENTED TRAVELS WITH IT. Minting a bearer that outlives the machine needs a
+ * credential, and `createToken` can tell only if it is told.
+ */
+function owner(api: Api, credentialed: boolean): Seen {
+  const who = api.kernel.created() ? api.kernel.ownerId() : 'p_self';
+  if (!who) return { refused: NOBODY };
+  return { ctx: { principal: { kind: 'person', id: who, level: 'owner' }, credentialed } };
+}
+
+/**
+ * Whether a browser sent this write from a page somewhere else. Open mode only.
+ *
+ * AN `Origin` OR A `Sec-Fetch-Site` THAT NAMES ANOTHER SITE IS A FORGERY, AND A REQUEST CARRYING NEITHER IS
+ * NOT A PAGE AT ALL. Every browser sends `Origin` on a POST from another origin, which is exactly the
+ * `text/plain` `fetch` that could write rows as the owner here; what sends neither is the CLI, the client or
+ * a test on the owner's own machine. That is looser than `sameOrigin`, which refuses a request with neither,
+ * and it is looser only where no cookie is involved: a cookie is only ever sent by a browser.
+ */
+function forged(request: Request, origins: ReadonlySet<string>): boolean {
+  const said = request.headers.get('origin');
+  if (said !== null) return !origins.has(said);
+  const site = request.headers.get('sec-fetch-site');
+  return site !== null && site !== 'same-origin' && site !== 'none';
+}
+
+/**
+ * Who is asking, in the order `49 §5.4` gives, amended: a bearer, then the session cookie, then open mode.
+ *
+ * `host` IS THE `Host` HEADER AS THE SOCKET RECEIVED IT, because in open mode it is the check: a page that
+ * rebinds its own name to 127.0.0.1 reaches this port with its own name in `Host`, and gets a 421.
+ */
+async function contextFor(request: Request, host: string, site: Site): Promise<Seen> {
+  const { api, token } = site;
   /**
    * WHAT WAS ACTUALLY PRESENTED, and `undefined` when that is nothing.
    *
@@ -121,68 +203,69 @@ async function contextFor(
   const raw = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
   const sent = raw ? raw : undefined;
 
-  /* AN AGENT TOKEN IS TRIED FIRST, and it is the same table and the same check the Worker uses. A
-     self-host that recognised only one shared string would be a deployment where an agent cannot be
-     given less than everything — which is the difference between a scope and a password. */
-  /* AND IT IS NOT THE SHARED SECRET. `includes('.')` is how this tells an agent token from the one
-     shared secret, and a secret like `s3cr3t.v2` took this branch, failed `verifyToken`, and was
-     refused — locking the owner out of their own machine with a status that explains nothing. The
-     shared secret is one exact string; anything else with a dot in it is an agent token. */
-  if (sent?.includes('.') && sent !== token) {
-    const seen = await api.kernel.verifyToken(sent, 'api');
-    if (!seen.ok) return UNKNOWN;
+  /* ONE · A BEARER, which is an agent or the server key and never a browser, so the origin checks below do
+     not apply to it: nothing ambient sends an `Authorization` header. */
+  if (sent !== undefined) {
+    /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
+       differs, so how long a wrong guess took said how much of it was right. */
+    const isKey = token !== undefined && (await sameKey(sent, token));
+    if (isKey) return owner(api, true);
 
-    /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant. `owner` here meant a token
-       belonging to a colleague invited at `read` came back as an owner — and that a token outlived
-       the removal of the person who holds it, which is the one thing this whole path exists to
-       prevent. */
+    /* AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A self-host that recognised only
+       one shared string would be a deployment where an agent cannot be given less than everything.
+       `includes('.')` tells an agent token from the shared secret, and a shared secret with a dot in it
+       matched above and never reaches here. */
+    /* A CREDENTIAL THAT MATCHED NOTHING IS REFUSED, and never falls through to open mode: revoking a scoped
+       token used to promote it to the owner, and `Authorization: x` on an open self-host was the owner. */
+    if (!sent.includes('.')) return { refused: UNKNOWN };
+    const seen = await api.kernel.verifyToken(sent, 'api');
+    if (!seen.ok) return { refused: UNKNOWN };
+
+    /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant, so a token outlives nothing its
+       holder has lost. NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. */
     const held = api.kernel.access(seen.value.person_id);
-    /* NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. They were one
-       answer, so revoking somebody's membership and sending a bearer nobody minted looked the same
-       to a client — and only one of the two is worth retrying with a different credential. */
-    if (!held) return OFF;
+    if (!held) return { refused: OFF };
     return {
-      principal: {
-        kind: 'token',
-        id: seen.value.id,
-        scope: seen.value.scope,
-        person: seen.value.person_id,
-        level: held.level,
+      ctx: {
+        principal: { kind: 'token', id: seen.value.id, scope: seen.value.scope, person: seen.value.person_id, level: held.level },
+        ...(held.registers === null ? {} : { registers: held.registers }),
+        ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
       },
-      ...(held.registers === null ? {} : { registers: held.registers }),
-      ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
     };
   }
 
-  /* A BEARER THAT DID NOT VERIFY IS REFUSED, and does not fall through to the branch below. It
-     used to: revoking a scoped token PROMOTED it, because the same header that had been a `read`
-     agent became an unauthenticated request and an unauthenticated request was the owner. */
-  if (sent?.includes('.') && sent !== token) return UNKNOWN;
+  /* TWO · THE SESSION COOKIE. A BAD ONE IS A 401 AND IS CLEARED, AND NEVER FALLS THROUGH TO OPEN MODE: a
+     cookie that names no session is somebody who thinks they are signed in, and answering them as the
+     owner of an open host would be a different person's answer. */
+  const sid = site.mode === null ? undefined : readSid(request, site.mode);
+  if (sid !== undefined && site.mode !== null) {
+    const clear = clearCookie(site.mode);
+    if (!site.auth) return { refused: NOT_YOU, cookie: clear };
+    const out = await site.auth({ flow: 'session', sid });
+    if (out.status === 429) return { bare: 429, retryAfter: out.retryAfter };
+    if (out.status === 503) return { bare: 503 };
+    if (out.status !== 200) return { refused: out.refusal, cookie: clear };
+    /* A rotation reaches the cookie whatever the answer is. */
+    const carried = out.session === undefined ? {} : { cookie: out.session === 'clear' ? clear : sessionCookie(out.session.sid, site.mode) };
+    const held = api.kernel.access(out.body.person);
+    if (!held) return { refused: OFF, ...carried };
+    /* AND A COOKIE WRITE MUST COME FROM A PAGE ON THIS ORIGIN (`12 §8` CSRF). `SameSite=Lax` keeps the
+       cookie off a cross-site POST; this is the half that does not depend on the browser. */
+    if (!SAFE.has(request.method) && !sameOrigin(request, site.origin)) return { refused: CROSS, ...carried };
+    return { ctx: sessionContext(out.body, held), ...carried };
+  }
 
-  /* AND THEN THE ONE SHARED SECRET, which is what a single-person deployment on one machine has
-     instead of a sign-in. `undefined` and not falsy: an empty `BRAINDOG_TOKEN` in a compose file is
-     a value somebody set, and reading it as "no token wanted" opens the server rather than locking
-     it. */
-  if (token !== undefined && sent !== token) return UNKNOWN;
+  /* THREE · OPEN MODE: no server key, one person on one machine, and the machine is the boundary. The
+     `Host` check is what keeps a page that rebinds its name to 127.0.0.1 from being on the machine, and
+     the origin check is what keeps a page elsewhere from writing through a browser that is. */
+  if (token === undefined) {
+    if (!site.hosts.has(host)) return { bare: 421 };
+    if (!SAFE.has(request.method) && forged(request, site.origins)) return { refused: CROSS };
+    return owner(api, false);
+  }
 
-  /* AND SOMETHING THAT MATCHED NOTHING IS REFUSED, rather than treated as nothing. `49 §5.4` step 1:
-     a credential that is neither `config.token` nor a token row nor a device grant is 401. It used
-     to fall through to the branch below — so `Authorization: x` on a self-host with no shared secret
-     was the owner, which is the same hole as the empty header and reads even less like one. */
-  if (sent !== undefined && sent !== token) return UNKNOWN;
-
-  /* A RECORD WITH NO ELIGIBLE OWNER REFUSES, rather than inventing one. The fallback to a constant is
-     right for a file nobody has created — that is what `braindog dev` and every test against an
-     empty file open — and wrong the moment there IS a record: it would hand `owner` to a person id
-     no `member` row names, on a record whose own tables say every owner is suspended. */
-  const who = api.kernel.created() ? api.kernel.ownerId() : 'p_self';
-  if (!who) return NOBODY;
-
-  /* AND WHETHER ANYTHING WAS PRESENTED TRAVELS WITH IT. Reading and writing as the owner without a
-     credential is the documented shape of a single-person deployment; minting a bearer that outlives
-     the machine is not, and `createToken` is the one method that can tell the difference only if it
-     is told. */
-  return { principal: { kind: 'person', id: who, level: 'owner' }, credentialed: sent !== undefined };
+  /* AND NOTHING AT ALL, WHERE A CREDENTIAL IS NEEDED, IS 401. */
+  return { refused: UNKNOWN };
 }
 
 /**
@@ -303,7 +386,25 @@ export async function start(options: {
    * this instant too, which is how the app learns what day the record thinks it is. Absent means the
    * real clock, which is what every deployment runs.
    */
-  now?: number | undefined;
+  now?: number | (() => number) | undefined;
+  /**
+   * The Directory: `<data>/directory.sqlite`, or `:memory:`. Without it nobody signs in from the app, and
+   * `/auth/methods` says so. Opened here and closed with the server.
+   */
+  directory?: string | undefined;
+  /**
+   * The origin the app is served from, `BRAINDOG_ORIGIN`; `http://localhost:<port>` when it is not set.
+   *
+   * IT DECIDES THREE THINGS, which is why it is said once: the cookie's name, the passkeys' relying party
+   * (a passkey made at one origin answers nothing at another), and the `Origin` every write must carry.
+   */
+  origin?: string | undefined;
+  /** The built app to serve for every path that is not `/api` or `/auth`. Absent: those paths are 404. */
+  shell?: string | undefined;
+  /** 32 bytes for the Directory's MACs, derived from the KEK or `BRAINDOG_SESSION_SECRET`. Absent: no sessions. */
+  sessionKey?: Uint8Array | undefined;
+  /** `BRAINDOG_TRUST_PROXY=1`: count the lockout against the address the proxy saw, not the proxy's own. */
+  trustProxy?: boolean | undefined;
 } & (
     | {
         /**
@@ -331,7 +432,27 @@ export async function start(options: {
         deliver?: undefined;
       }
   )) {
+  /* ONE CLOCK FOR THE RECORD AND THE DIRECTORY. A test that moves it a day forward moves both, which is how
+     rotation and the vault's fifteen minutes are tested against a real socket. */
+  const pinned = options.now;
+  const clock = { now: typeof pinned === 'function' ? pinned : pinned === undefined ? () => Date.now() : () => pinned };
+
+  /* A WRONG ORIGIN OR A MISSING BUILD IS A REFUSAL BEFORE ANYTHING LISTENS, not a server that starts and
+     then answers every sign-in and every screen with the wrong thing. */
+  if (options.origin !== undefined) {
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(options.origin);
+    } catch {
+      parsed = null;
+    }
+    if (!parsed || parsed.origin === 'null')
+      throw new Error('BRAINDOG_ORIGIN is an origin, such as https://studio.example or http://localhost:8080, and this is not one.');
+  }
+  const shell = options.shell === undefined ? null : shellOf(options.shell);
+
   const sql = openSqlite(options.file);
+  const dirSql = openSqlite(options.directory ?? ':memory:');
 
   /* The alarm and the record refer to each other: the record arms the alarm after every write, and
      the alarm drains the record when it fires. The scheduler is built first and the record is what
@@ -425,7 +546,7 @@ export async function start(options: {
 
   api = await createRecordApi({
     sql,
-    clock: { now: () => options.now ?? Date.now() },
+    clock,
     scheduler,
     delivers: options.delivers ?? [],
     sign,
@@ -467,6 +588,9 @@ export async function start(options: {
      read from the other end. `BRAINDOG_HOST` is the explicit override for the case in between — a
      container that has a token and needs `0.0.0.0` to be reachable at all. */
   const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '0.0.0.0');
+  const trustProxy = options.trustProxy === true;
+  /* SET THE MOMENT THE PORT IS KNOWN, and nothing is answered before: see below. */
+  let site: Site | null = null;
   /* NOTHING A REQUEST CAN DO ENDS THE PROCESS. `void answer(…)` discarded the promise and `answer`
      had no `catch`, so one throw was an unhandled rejection and Node exited — and the first throw is
      before any authentication: `new Request(url, { body })` refuses a body on a GET, so a `GET
@@ -476,7 +600,7 @@ export async function start(options: {
      The 500 says what happened in one sentence and the socket is closed, which is the promise
      `serveApi` makes one layer down and the one this layer was breaking. */
   const server = createServer((req, res) => {
-    void answer(req, res, handlers, api, options.token).catch((e: unknown) => {
+    void answer(req, res, handlers, site, shell, trustProxy).catch((e: unknown) => {
       const why = e instanceof Error ? e.message : String(e);
       try {
         res.writeHead(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -488,6 +612,52 @@ export async function start(options: {
     });
   });
   await new Promise<void>((resolve) => server.listen(options.port, host, resolve));
+
+  /* THE ORIGIN IS KNOWN ONLY NOW, when the port is, and `port: 0` is how every test starts one. Nothing
+     between here and `site = …` awaits, so no request is answered before it is set. */
+  const port = (server.address() as AddressInfo).port;
+  const origin = new URL(options.origin ?? `http://localhost:${port}`).origin;
+  const mode = cookieMode(origin);
+  const rp = relyingParty(origin);
+
+  /* WHY NOBODY SIGNS IN FROM THE APP, when nobody does: open mode has nobody to sign in as, no directory has
+     nobody at all, an origin no cookie can be set on has nowhere to keep a session, and no session key has
+     nothing to check one with. `null` is sign-in on. */
+  const key = options.sessionKey;
+  const token = options.token;
+  const off: 'open' | 'directory' | 'insecure' | 'key' | null = token === undefined ? 'open' : options.directory === undefined ? 'directory' : mode === null ? 'insecure' : key === undefined ? 'key' : null;
+  const directory: Directory = createDirectory(
+    dirSql,
+    clock,
+    off === null && key !== undefined && token !== undefined
+      ? {
+          mac: key,
+          ...(rp ? { rp } : {}),
+          /* NO LINK UNTIL THERE IS SMTP. A link printed to a terminal is a link anybody reading the log can spend. */
+          magic: false,
+          key: { serverKey: token },
+          /* The reason a sign-in failed, for the operator. A flow and a word, never who or with what. */
+          log: (line) => console.error(`auth: ${line.flow} refused (${line.reason})`),
+        }
+      : undefined,
+  );
+  const loopback = [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`];
+  site = {
+    api,
+    token,
+    origin,
+    mode,
+    auth: off === null ? directory.auth : null,
+    hosts: new Set([...loopback, new URL(origin).host]),
+    origins: new Set([...loopback.map((h) => `http://${h}`), origin]),
+    door: { on: 'selfhost', origin, auth: directory.auth, open: token === undefined },
+  };
+
+  /* WHAT THE BOOT LINE NAMES: the ways in that are live, from the Directory's own answer. */
+  const said = off === null ? await directory.auth({ flow: 'methods' }) : null;
+  const live = said?.status === 200 ? said.body : null;
+  const ways = [...(live?.passkey ? ['a passkey'] : []), ...(live?.key ? ['the server key'] : [])];
+
   return {
     server,
     api,
@@ -495,21 +665,60 @@ export async function start(options: {
     scheduler,
     drain: run,
     poll,
+    directory,
+    signIn: { origin, ways, off },
     close: () =>
       new Promise<void>((r) => {
         scheduler.stop();
         if (ticker) clearInterval(ticker);
-        server.close(() => (sql.close(), r()));
+        server.close(() => (sql.close(), dirSql.close(), r()));
       }),
   };
+}
+
+const json = (status: number, body: object, extra: readonly (readonly [string, string])[] = []): Response => {
+  const headers = new Headers({ 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  for (const [k, v] of extra) headers.append(k, v);
+  return new Response(JSON.stringify(body), { status, headers });
+};
+
+/**
+ * The address the lockout counts against: the socket's, or, behind a proxy this host was told to trust
+ * (`BRAINDOG_TRUST_PROXY=1`), the last `X-Forwarded-For` entry, which is the one that proxy wrote.
+ *
+ * THE LAST AND NOT THE FIRST. The first entry is whatever the client sent, and a proxy appends to it rather
+ * than replacing it, so counting the first would let anybody lock anybody out by naming them. Without the
+ * setting the header is ignored, for the same reason.
+ */
+function ipOf(req: IncomingMessage, trustProxy: boolean): string {
+  const forwarded = trustProxy ? String(req.headers['x-forwarded-for'] ?? '').split(',').pop()?.trim() : '';
+  return forwarded || req.socket.remoteAddress || '';
+}
+
+/**
+ * A `Response` onto the socket, every `Set-Cookie` kept.
+ *
+ * `getSetCookie()`, BECAUSE `Object.fromEntries(out.headers)` KEPT ONE. `Headers` joins a repeated header
+ * into one comma-separated value, and a cookie is the one header that cannot be split back apart, so a
+ * rotation and a cleared cookie in one answer would have reached the browser as one broken cookie.
+ */
+async function write(res: ServerResponse, out: Response, cookie?: string): Promise<void> {
+  const cookies = [...out.headers.getSetCookie(), ...(cookie === undefined ? [] : [cookie])];
+  out.headers.forEach((value, name) => {
+    if (name !== 'set-cookie') res.setHeader(name, value);
+  });
+  if (cookies.length > 0) res.setHeader('set-cookie', cookies);
+  res.writeHead(out.status);
+  res.end(Buffer.from(await out.arrayBuffer()));
 }
 
 async function answer(
   req: IncomingMessage,
   res: ServerResponse,
   handlers: Record<string, Handler>,
-  api: Awaited<ReturnType<typeof createRecordApi>>,
-  token: string | undefined,
+  site: Site | null,
+  shell: ((request: Request) => Response) | null,
+  trustProxy: boolean,
 ): Promise<void> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
@@ -520,21 +729,29 @@ async function answer(
     headers: Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : (v ?? '')]),
     ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
   });
+  if (!site) return write(res, json(503, { ok: false }));
 
-  const ctx = await contextFor(request, token, api);
+  /* THREE DOORS, AND THEY ARE `33 §4`'S: sign-in, the record, and the app for everything else. The app is
+     what makes `/signin` the same origin as the cookie it asks for. */
+  const path = new URL(url).pathname;
+  if (/^\/+auth(?:\/|$)/.test(path)) return write(res, await serveAuth(request, { ...site.door, ip: ipOf(req, trustProxy) }));
+  if (!/^\/+api(?:\/|$)/.test(path))
+    return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
+
+  const seen = await contextFor(request, req.headers.host ?? '', site);
+  if ('ctx' in seen) return write(res, await serveApi(request, handlers, seen.ctx), seen.cookie);
   /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —
      a credential nobody minted, a credential belonging to somebody who is not on the record, and a
      record with no owner who may act — so a client could not tell which of the three to do something
      about. `httpStatus` is the same function the Worker uses, which is what keeps one record from
      behaving differently depending on where it runs. */
-  const out =
-    'principal' in ctx
-      ? await serveApi(request, handlers, ctx)
-      : new Response(JSON.stringify({ ok: false, refusal: ctx }), {
-          status: httpStatus({ ok: false, refusal: ctx }),
-          headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-        });
-
-  res.writeHead(out.status, Object.fromEntries(out.headers));
-  res.end(Buffer.from(await out.arrayBuffer()));
+  if ('refused' in seen) {
+    const out = { ok: false as const, refusal: seen.refused };
+    return write(res, json(httpStatus(out), out), seen.cookie);
+  }
+  /* A NAME THIS PROCESS WAS NOT REACHED BY: an empty 421, which says nothing to a page that rebound its
+     own name onto this port. */
+  if (seen.bare === 421) return write(res, new Response(null, { status: 421, headers: { 'cache-control': 'no-store' } }));
+  if (seen.bare === 429) return write(res, json(429, { ok: false, retryAfter: seen.retryAfter }, [['retry-after', String(seen.retryAfter)]]));
+  return write(res, json(503, { ok: false }));
 }

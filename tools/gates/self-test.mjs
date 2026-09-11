@@ -81,6 +81,9 @@ const CASES = [
      SQL merely contains the words `root`, `wrapped_by` and `kek`, because eight calls in the real
      tree are that shape and a gate red on all of them is a gate switched off. */
   { gate: 'secret-grep-record', run: 'secret-grep', expect: /reaches the record/, findings: 1 },
+  /* THE FOURTH: a session id in a log. The same fixture posts the server key to its own host, which is the
+     one transmission sign-in's four names exist for, so a count of one proves the gate tells them apart. */
+  { gate: 'secret-grep-wire', run: 'secret-grep', expect: /sign-in secret reaches a log/, findings: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },

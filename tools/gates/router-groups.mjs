@@ -28,7 +28,7 @@
  * amended the list shrinks.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -128,9 +128,58 @@ for (const name of unrouted) {
 for (const name of Object.keys(UNENUMERATED))
   if (!byName.has(name)) findings.push(`this gate records ${name} as an unenumerated route and nothing routes it`);
 
+/* ── the sign-in table, as data: `AUTH_ROUTES` in `packages/host/src/auth.ts` ─────────────────── */
+
+/**
+ * THE SAME RULE, FOR THE OTHER TABLE. Sign-in is none of `30 §5`'s six groups, because nothing in it reaches
+ * a record: it is the Directory, and who may call each route is the route's own `needs`. So what is checked
+ * is that the table and the `AuthCall` union say the same thing: one route per flow, named by the rule the
+ * web app is written against, the two operator routes on the Worker only, and a GET only where nothing
+ * changes who is signed in, since a browser may prefetch a GET.
+ *
+ * A TREE WITH NO SIGN-IN HAS NOTHING TO CHECK, and a tree whose host package exports one has to have it.
+ */
+const authFile = join(root, 'packages', 'host', 'src', 'auth.ts');
+const hostPackage = join(root, 'packages', 'host', 'package.json');
+if (existsSync(hostPackage) && /"\.\/auth"/.test(readFileSync(hostPackage, 'utf8')) && !existsSync(authFile))
+  findings.push('packages/host exports ./auth, and packages/host/src/auth.ts is not there');
+
+let authRoutes = [];
+if (existsSync(authFile)) {
+  authRoutes = [...readFileSync(authFile, 'utf8').matchAll(/\{ path: '([^']+)', method: '([A-Z]+)', flow: '([a-z.]+)', on: '([a-z]+)', needs: '([a-z]+)'/g)].map(
+    (m) => ({ path: m[1], method: m[2], flow: m[3], on: m[4], needs: m[5] }),
+  );
+  if (authRoutes.length === 0) findings.push('packages/host/src/auth.ts has no sign-in route table this gate can read');
+
+  const ports = read('packages', 'ports', 'src', 'auth.ts');
+  const union = ports.slice(ports.indexOf('export type AuthCall ='), ports.indexOf('export type AuthFlow'));
+  const flows = [...new Set([...union.matchAll(/flow: '([a-z.]+)'/g)].map((m) => m[1]))];
+  if (flows.length === 0) findings.push("the AuthCall union in packages/ports/src/auth.ts is not where this gate looks for it");
+
+  const READS = ['methods', 'session', 'passkeys'];
+  const paths = new Set();
+  for (const r of authRoutes) {
+    if (paths.has(r.path)) findings.push(`${r.path} is in the sign-in table twice`);
+    paths.add(r.path);
+    if (!['GET', 'POST'].includes(r.method)) findings.push(`${r.path} is a ${r.method}, and a sign-in route is a GET or a POST`);
+    if (!['both', 'selfhost', 'worker'].includes(r.on)) findings.push(`${r.path} is served on ${r.on}, which is not a host`);
+    if (!['nothing', 'session', 'operator'].includes(r.needs)) findings.push(`${r.path} needs ${r.needs}, which no host can check`);
+    if (r.flow !== 'provision' && !flows.includes(r.flow)) findings.push(`${r.path} names ${r.flow}, which is not in the AuthCall union`);
+    const named = r.flow === 'key.exchange' ? '/auth/token' : `/auth/${r.flow.replaceAll('.', '/')}`;
+    if (r.path !== named) findings.push(`${r.flow} is served at ${r.path}, and the rule names it ${named}`);
+    if (r.needs === 'operator' && (r.on !== 'worker' || r.method !== 'POST')) findings.push(`${r.path} is an operator route, and those are POSTs on the Worker only`);
+    if (r.method === 'GET' && !READS.includes(r.flow)) findings.push(`${r.path} changes who is signed in, and it is a GET`);
+  }
+  for (const flow of flows) {
+    const n = authRoutes.filter((r) => r.flow === flow).length;
+    if (n !== 1) findings.push(`${flow} is in the AuthCall union and has ${n} sign-in routes`);
+  }
+}
+
 if (findings.length === 0) {
   const shape = GROUPS.map((g) => `${routes.filter((r) => r.group === g).length} ${g}`).join(' · ');
   console.log(`  router-groups: ${routes.length} routes, every one with a group — ${shape}`);
+  if (authRoutes.length > 0) console.log(`  router-groups: ${authRoutes.length} sign-in routes, one per flow, named by the rule`);
 } else {
   console.error(`\n  router-groups: ${findings.length} finding(s) — 30 §5\n`);
   for (const f of [...new Set(findings)]) console.error(`    ${f}`);

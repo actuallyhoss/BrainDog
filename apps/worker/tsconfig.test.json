@@ -3,6 +3,7 @@
   "include": [
     "test/**/*.ts",
     "src/alarm.ts",
-    "src/route.ts"
+    "src/route.ts",
+    "src/session.ts"
   ]
 }

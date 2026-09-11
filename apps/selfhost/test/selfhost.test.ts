@@ -8,6 +8,7 @@
 
 import { test } from 'node:test';
 import { connect } from 'node:net';
+import { request as httpRequest } from 'node:http';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -464,6 +465,93 @@ test('and a shared secret with a dot in it is still a shared secret', async () =
   const s = await server('s3cr3t.v2');
   try {
     assert.equal((await s.call('boot')).status, 200, 'the owner was locked out by their own token');
+  } finally {
+    await s.close();
+    s.clean();
+  }
+});
+
+/* ── open mode: the machine is the boundary, so the boundary is checked ───── */
+
+/** The content type a cross-site `fetch` can send without a preflight, which is what makes the forgery possible. */
+const SIMPLE = 'text/plain';
+
+/**
+ * A request with a `Host` of our choosing, which `fetch` will not send: it writes the header from the URL.
+ */
+function raw(port: number, path: string, headers: Record<string, string>): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({ host: '127.0.0.1', port, path, headers }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk: string) => (body += chunk));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+test('OPEN MODE ANSWERS ONLY TO ITS OWN NAMES: a page that rebinds its name to 127.0.0.1 gets an empty 421', async () => {
+  /* DNS REBINDING. A page at `evil.example` points its own name at 127.0.0.1 and asks for `/api/boot`: the
+     browser thinks it is talking to evil.example, so the answer is readable by that page, and open mode
+     answered it as the owner. The `Host` header is the one thing that still says evil.example. */
+  const s = await server();
+  try {
+    const rebound = await raw(s.port, '/api/boot', { host: `evil.example:${s.port}` });
+    assert.equal(rebound.status, 421);
+    assert.equal(rebound.body, '', 'a 421 said something to the page that was refused');
+    assert.equal((await raw(s.port, '/api/boot', { host: `localhost:${s.port}` })).status, 200);
+    assert.equal((await raw(s.port, '/api/boot', { host: `127.0.0.1:${s.port}` })).status, 200);
+  } finally {
+    await s.close();
+    s.clean();
+  }
+});
+
+test('A PAGE ELSEWHERE CANNOT WRITE THROUGH OPEN MODE: a foreign text/plain POST is 403, and writes nothing', async () => {
+  /* `serveApi` reads any body as JSON, and a cross-site `fetch` with `text/plain` needs no preflight, so a
+     page anywhere could create rows as the owner of a self-host running on the machine that opened it. */
+  const s = await server();
+  try {
+    const res = await fetch(`http://127.0.0.1:${s.port}/api/create`, {
+      method: 'POST',
+      headers: { origin: 'https://evil.example', 'content-type': SIMPLE },
+      body: JSON.stringify({ register: 'obligations', fields: { what: 'Pay evil.example' } }),
+    });
+    assert.equal(res.status, 403);
+    assert.equal(((await res.json()) as Answer).refusal?.code, 'FORBIDDEN');
+
+    const crossSite = await fetch(`http://127.0.0.1:${s.port}/api/create`, {
+      method: 'POST',
+      headers: { 'sec-fetch-site': 'cross-site', 'content-type': SIMPLE },
+      body: JSON.stringify({ register: 'obligations', fields: { what: 'Pay evil.example' } }),
+    });
+    assert.equal(crossSite.status, 403);
+
+    const listed = await s.call('list?register=obligations');
+    assert.equal((listed.body.value as { matched: number }).matched, 0, 'the refused write wrote a row');
+  } finally {
+    await s.close();
+    s.clean();
+  }
+});
+
+test('and the same write from the page this host served is 200', async () => {
+  const s = await server();
+  try {
+    const res = await fetch(`http://127.0.0.1:${s.port}/api/create`, {
+      method: 'POST',
+      headers: { origin: `http://localhost:${s.port}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ register: 'obligations', fields: { what: 'Invoice 41' } }),
+    });
+    assert.equal(res.status, 200);
+    const fetched = await fetch(`http://127.0.0.1:${s.port}/api/create`, {
+      method: 'POST',
+      headers: { 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+      body: JSON.stringify({ register: 'obligations', fields: { what: 'Invoice 42' } }),
+    });
+    assert.equal(fetched.status, 200);
   } finally {
     await s.close();
     s.clean();

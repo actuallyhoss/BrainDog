@@ -114,7 +114,7 @@ test('the numbers a person says are the numbers the record issued', async () => 
   assert.equal(k.get('tracks#1')?.fields.name, 'Variable axis QA');
 
   const invoice = k.get('obligations#1')!;
-  assert.equal(invoice.fields.what, 'Invoice 2026-041 — brand system');
+  assert.equal(invoice.fields.what, 'Invoice 2026-041: brand system');
   assert.equal(invoice.fields.party, k.get('people#1')!.id, 'the invoice does not point at Halden');
   assert.equal(invoice.fields.thing, k.get('things#2')!.id);
   sql.close();

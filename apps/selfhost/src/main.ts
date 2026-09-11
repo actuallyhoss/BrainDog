@@ -34,6 +34,9 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { argv, env, exit, stderr } from 'node:process';
+import { fileURLToPath } from 'node:url';
+
+import { deriveSessionKey } from '@braindog/host/auth';
 
 import { createRecordApi } from '@braindog/record';
 import { createDirectory } from '@braindog/record/directory';
@@ -70,6 +73,29 @@ function refuse(said: string): never {
 }
 
 const dataDir = (): string => env.BRAINDOG_DATA ?? '/data';
+
+/** The app `apps/web` builds, served for every path that is not `/api` or `/auth` when it is there. */
+const BUILT = fileURLToPath(new URL('../../web/build', import.meta.url));
+
+type SignIn = { origin: string; ways: string[]; off: 'open' | 'directory' | 'insecure' | 'key' | null };
+
+/** The boot line about signing in: the ways in, or the one reason there are none. Never a key or a token. */
+function bootLine(s: SignIn): string {
+  switch (s.off) {
+    case 'open':
+      return '  loopback only, and nobody signs in: a request carrying nothing is the owner. Set BRAINDOG_TOKEN to require sign-in and to mint bearers.';
+    case 'directory':
+      return '  behind BRAINDOG_TOKEN; there is no directory here, so the app cannot sign anybody in, and the token works as a bearer';
+    case 'insecure':
+      return `  behind BRAINDOG_TOKEN; ${s.origin} cannot hold a session cookie, so the app cannot sign anybody in. Serve it over https, or at localhost.`;
+    case 'key':
+      return '  behind BRAINDOG_TOKEN; there is no session key, so the app cannot sign anybody in';
+    default:
+      return s.ways.length === 0
+        ? `  behind BRAINDOG_TOKEN; ${s.origin}/signin has no way in to offer yet`
+        : `  behind BRAINDOG_TOKEN; sign in at ${s.origin}/signin with ${s.ways.join(' or ')}`;
+  }
+}
 
 /** One clock for the whole command, so the record and the Directory agree about when it happened. */
 const clock = { now: () => Date.now() };
@@ -383,23 +409,40 @@ async function serve(): Promise<void> {
      open a grant, and says so nowhere. `49 §5.1` step 2 puts it before anything is served. */
   const store = await openKeyStore(env.BRAINDOG_KEK_FILE ?? join(data, 'kek'), say);
 
+  /* THE DIRECTORY'S MAC KEY, `12 §8`'s lever: derived from the key file unless `BRAINDOG_SESSION_SECRET`
+     names one, for a deployment that wants sessions to outlive a new key file, or to die without one.
+     Either way it is 32 bytes by HKDF, and it is zero-filled once the Directory holds its own copy. */
+  const secret = env.BRAINDOG_SESSION_SECRET;
+  if (secret !== undefined && secret.length < 32)
+    return refuse('BRAINDOG_SESSION_SECRET is shorter than 32 characters. Make it 32 random bytes in base64url, or unset it to derive one from the key file.');
+  const sessionKey = secret === undefined ? store.sessionKey : await deriveSessionKey(new TextEncoder().encode(secret));
+
+  /* THE DIRECTORY `init` WROTE, when there is one: it is who may sign in. An explicit record file with no
+     data directory behind it has none, and `/auth/methods` then says nobody signs in from the app. */
+  const dirFile = join(data, 'directory.sqlite');
+  const shell = env.BRAINDOG_SHELL ?? (existsSync(join(BUILT, 'index.html')) ? BUILT : undefined);
+
   const running = await start({
     file,
     port,
     token: env.BRAINDOG_TOKEN,
     keys: store,
     ...(env.BRAINDOG_HOST === undefined ? {} : { host: env.BRAINDOG_HOST }),
+    ...(existsSync(dirFile) ? { directory: dirFile } : {}),
+    ...(env.BRAINDOG_ORIGIN === undefined ? {} : { origin: env.BRAINDOG_ORIGIN }),
+    ...(shell === undefined ? {} : { shell }),
+    sessionKey,
+    trustProxy: env.BRAINDOG_TRUST_PROXY === '1',
   });
+  /* `importKey` copied it, so these are the last copies this process holds as bytes. */
+  sessionKey.fill(0);
+  store.sessionKey.fill(0);
 
-  say(`braindog · ${file} · http://localhost:${port}/api/boot`);
-  /* SAID OUT LOUD, because the safe default is also the surprising one. Somebody who expected the
-     server on their LAN needs to know why it is not, and somebody who set a token needs to know
-     that it now is. */
-  say(
-    env.BRAINDOG_TOKEN === undefined
-      ? '  loopback only, and no bearer can be minted — set BRAINDOG_TOKEN for either'
-      : '  listening on every interface, behind BRAINDOG_TOKEN',
-  );
+  say(`braindog · ${file} · ${running.signIn.origin}`);
+  /* ONE LINE FOR WHO MAY GET IN, SAID OUT LOUD, because the safe default is also the surprising one:
+     somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
+     token needs to know where to sign in. It names ways, never a key. */
+  say(bootLine(running.signIn));
 
   /* AND IT STOPS WHEN IT IS ASKED TO. A container that kills a process holding a WAL leaves it to
      the next boot's recovery; closing takes a second and makes the file whole. */

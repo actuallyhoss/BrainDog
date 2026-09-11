@@ -358,7 +358,7 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/in/webhook/<rec_id>/<ingest-id>/<token>` | POST | the ingest's `verify:` (HMAC header or the URL's random path segment) | above the auth gate; store raw, enqueue, return — an ingest id is per record, so the record is in the path |
 | `<slug>@in.brain.dog` | email | DKIM/SPF pass, else quarantined | Cloud: above the auth gate; store raw, enqueue |
 | `/in/email/<token>` | POST | the token minted at `init` (`<slug>/inbound.token`) | self-host: raw RFC 5322 in the body, from a forwarding webhook (§6) |
-| `/a/<sha256>` | GET | none | attachment bytes, type sniffed, SVG 415, `default-src 'none'; sandbox`; the record from the `rec` cookie or `?r=` |
+| `/a/<sha256>` | GET | none | attachment bytes, type sniffed, SVG 415, `default-src 'none'; sandbox`; the record from the session or `?r=` |
 | `/a/<sha256>` | PUT | cookie, or a `write` bearer | upload: the client computes the hash, the server verifies it — a mismatch is `CHECKSUM_MISMATCH` |
 | `/s/<token>` | GET | the share token → a `share` principal | one projected page, read-only; an invalid token is 404 |
 | `/<ID>` | GET | cookie | a spoken id, resolved by the shell — there is no server 302 |
@@ -366,23 +366,29 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/.well-known/oauth-protected-resource` | GET | none | **deferred** — Phase A ships agent tokens only; when built BrainDog is its own authorization server |
 | `/ws` | GET (upgrade) | cookie | Cloud: the hibernatable WebSocket, the frame `{ version, registers }` on change; self-host phase 2: 404, the client polls `/api/version` |
 | `/ws/runner` | GET (upgrade) | the runner's grant | Cloud only: the doorbell socket, `{ t: 'wake' }`; the self-host runner long-polls (§11) |
-| `/auth/*` | mixed | — | the ten routes below — the Directory (§10) |
+| `/auth/*` | GET · POST | per route | the sign-in routes below, which are the Directory's (§10) |
 | everything else | GET | — | the static shell: one `build/`, served as assets by both hosts; no server renders a request |
 
-**The `/auth/*` routes, once** — 49 and 51 serve exactly these ten:
+**The `/auth/*` routes, once.** `AUTH_ROUTES` in `packages/host/src/auth.ts` is this table as data, and both hosts
+answer it through one `serveAuth`. A POST needs `application/json` and a same-origin `Origin`. A 200 is the `/api`
+envelope; a sign-in that does not sign somebody in is `401 UNAUTHORIZED` "That did not sign you in."; the lockout
+is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout store that fails is `503`.
 
-| Route | Method | Does |
-|---|---|---|
-| `/auth/device` | POST | start: `{ slug?, reach, label, subject? }` → `{ device_code, user_code, verification_uri, interval }` (`deviceStart`) |
-| `/auth/device/token` | POST | poll: `{ device_code }` → pending, or the bearer once approved (`devicePoll`) |
-| `/auth/device/approve` | POST | browser: the owner approves the code — and, for an operation grant, the named operation after seeing its summary (`deviceApprove`) |
-| `/auth/magic` | POST | start a magic link; an unknown email gets 200 and no mail |
-| `/auth/magic/<token>` | GET | redeem it: a `session` row and the `rec` cookie |
-| `/auth/passkey/register` · `/auth/passkey/assert` | POST | the WebAuthn ceremony — Cloud; self-host phase 3 |
-| `/auth/logout` | POST | ends the session |
-| `/auth/switch` | POST | sets the `rec` cookie to another of the person's records; the host checks membership |
-| `/auth/invite/<token>` | GET | acceptance: the invitee's verified person → `acceptInvite` |
+| Route | Method | Host | Does |
+|---|---|---|---|
+| `/auth/methods` | GET | both | which ways in this host offers, and who the cookie belongs to: `{ passkey, magic, key, open, demo, why?, me, firstRun? }` |
+| `/auth/session` | GET | both | who the cookie belongs to, or 401 and the cookie cleared |
+| `/auth/token` | POST | self-host | `{ serverKey }`: `BRAINDOG_TOKEN` for a session, where the Directory holds one person |
+| `/auth/passkey/register/options` · `/auth/passkey/register` | POST | both | the registration ceremony, behind a session |
+| `/auth/passkey/assert/options` · `/auth/passkey/assert` | POST | both | signing in with a passkey |
+| `/auth/magic/start` | POST | both | `{ email }`: a link, mailed as `<origin>/signin#magic=<token>`; an unknown address gets the same 200 and no mail |
+| `/auth/magic/redeem` | POST | both | `{ linkToken }` or `{ claimToken }`: spent once, by a press, never by a GET |
+| `/auth/passkeys` · `/auth/passkey/remove` | GET · POST | both | a person's own passkeys, and removing one, the last included |
+| `/auth/logout` | POST | both | ends the session and clears the cookie |
+| `/auth/provision` · `/auth/claim/mint` | POST | Cloud | the operator's, behind `PROVISION_KEY`: a record, its Directory rows and a 24-hour claim link handed back, never mailed |
 
+Specified and not built: `/auth/device`, `/auth/device/token` and `/auth/device/approve` (the operation grant of
+§10), `/auth/invite` and `/auth/switch`. They keep these paths when they land.
 `Cache-Control: no-store` on `/api/*` and `/mcp`; no CORS; `run_worker_first: ['/api/*', '/mcp', '/a/*', '/in/*',
 '/s/*', '/ws/*', '/auth/*', '/.well-known/*']`. INTERNAL methods have no route. There is no admin scope: VAULT never
 sees a bearer, and ADMIN sees one only when it carries an operation grant for exactly that method.
@@ -390,8 +396,8 @@ sees a bearer, and ADMIN sees one only when it carries an operation grant for ex
 **Error bodies.** Both hosts return the `Result` envelope unchanged; the status is `host.httpStatus(result)`: `ok`
 200 · any refusal 422 (`PLAN_STALE` and `IMPORT_NOT_EMPTY` included — never 409) · `conflict` 409 · `UNAUTHORIZED` 401
 with an empty body · `FORBIDDEN` and `NEEDS_BROWSER_SESSION` 403 with the envelope · the migration refusal 503. Every
-response echoes the client's `X-Request-Id`, and both hosts log it. A request names its record by the `rec` cookie
-(browser), by the bearer's hash, or by its own path (a share, an email, a webhook).
+response echoes the client's `X-Request-Id`, and both hosts log it. A request names its record by its session
+(browser; the record is on the session row), by the bearer's hash, or by its own path (a share, an email, a webhook).
 
 ---
 
@@ -437,9 +443,9 @@ polling in place of `/ws`, and inbound email through a forwarding webhook; passk
 |---|---|
 | Runtime | Node **24.13.0**, pinned to the minor; `node:sqlite` is the only driver (FTS5 and JSON measured present) — no `better-sqlite3`, which is not built under the pin |
 | Entry | `BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` relative to a checkout — what `braindog init` and `dev` spawn (§5) |
-| Data | `BRAINDOG_DATA=/data` — `<slug>/record.dog` per record, plus `directory.sqlite` (§10); a request names its record by the `rec` cookie, the bearer's hash, or its own path (§4) |
+| Data | `BRAINDOG_DATA=/data` — `<slug>/record.dog` per record, plus `directory.sqlite` (§10); a request names its record by its session row, the bearer's hash, or its own path (§4) |
 | Root key | `BRAINDOG_KEK_FILE=/data/kek` — 32 random bytes, 0600, created on first run; `BRAINDOG_KEK_PREV_FILE` is the second slot of the rotation ladder (§1) |
-| Secrets | `BRAINDOG_SESSION_SECRET` — the HMAC key under which `session.id_hash` and `magic_link.hash` are stored (§10); `BRAINDOG_TOKENS_VALID_FROM` — the fleet lever that invalidates every bearer minted before an instant |
+| Secrets | `BRAINDOG_SESSION_SECRET`, optional: what the Directory's session key is derived from by HKDF instead of the key file (§10); `BRAINDOG_ORIGIN`: the origin the app is served from, which names the cookie and the passkeys' relying party; `BRAINDOG_TRUST_PROXY=1`: count the lockout against the last `X-Forwarded-For` entry; `BRAINDOG_TOKENS_VALID_FROM` — the fleet lever that invalidates every bearer minted before an instant |
 | Origin | `BRAINDOG_ORIGIN` — the public origin for magic-link URLs, the CSRF origin check and (phase 3) the WebAuthn `rpId`; default `http://localhost:<PORT>` |
 | Auth | the magic link, and `BRAINDOG_TOKEN` as an owner-level bearer for a private single-user instance; passkeys in phase 3; sign-up is closed — `init` and invitations create people |
 | Mail | outbound through `BRAINDOG_SMTP_URL` and `BRAINDOG_SMTP_FROM` — one small client over `node:tls` (implicit TLS on 465 or STARTTLS on 587, `AUTH PLAIN`), no dependency (49 §5); inbound through `POST /in/email/<token>` from a forwarding webhook, raw RFC 5322 in the body — the token lives at `<slug>/inbound.token` |
@@ -585,23 +591,25 @@ Durable Object class (Cloud) or `directory.sqlite` (self-host), same schema, sam
 | Directory table | Holds |
 |---|---|
 | `person` | `id` (`p_` + ULID), `email` UNIQUE, `name`, `created_at`, `suspended_at` |
-| `passkey` | `id`, `person_id`, `public_key`, `sign_count`, `created_at`, `last_used` — Cloud; self-host phase 3 |
-| `session` | `id_hash` (HMAC-SHA-256 under `SESSION_SECRET`), `person_id`, `expires`, `rotated_at`, `authed_at` — one more column, not one more table. The cookie: `HttpOnly Secure SameSite=Lax`, 30 days sliding, rotated every 24 h of use; `authed_at` records the last proof and rotation never moves it — VAULT requires it within 15 minutes |
-| `magic_link` | `hash` (HMAC-SHA-256 under `SESSION_SECRET`), `person_id`, `expires` (15 min), single use |
+| `passkey` | `id`, `person`, `jwk`, `alg` (ES256 or RS256), `sign_count`, `label`, `backed_up`, `created_at`, `last_used`; both hosts |
+| `session` | `id_hash` (HMAC-SHA-256 of `s:` and the id, under the host's session key), `person`, `record` (the record the session opened, so a browser holds one cookie), `expires`, `rotated_at`, `authed_at`, `prev_hash`, `prev_until`. The cookie: `__Host-bd_s`, `HttpOnly Secure SameSite=Lax`, 30 days sliding, rotated after 24 h of use; the replaced id answers for sixty seconds, because the app sends its first calls in parallel and the first to arrive rotates; `authed_at` records the last proof, rotation never moves it, and VAULT requires it within 15 minutes |
+| `link` | `hash` (HMAC-SHA-256 of `l:` and the token), `person`, `purpose` (`magic`, 15 min; `claim`, 24 h), `expires`; single use, spent by the statement that deletes it |
+| `challenge` | `hash` (HMAC-SHA-256 of `c:` and the challenge), `purpose`, `person`, `expires` (5 min): WebAuthn challenges in a table rather than in memory, so a ceremony survives the Directory object being evicted; single use, and minting refuses past 10,000 live rows |
 | `invitation` | `hash`, `email`, `rec_id`, `levels`, `expires` (24 h), `accepted_at` |
 | `record_dir` | `slug` UNIQUE, `rec_id`, `owner_person`, `billing ∈ active \| lapsed`, `lapsed_at` |
 | `person_record` | `person_id`, `rec_id` |
-| `auth_fail` | `key`, `n`, `until` — the login lockout, reserve-before-compare, fail closed |
+| `fail` | `key`, `n`, `first`, `until`: the login lockout, reserve-before-compare, sticky, fail closed, and forgetting a first strike fifteen minutes old |
 
 The record keeps `person` as a mirror (`id email name suspended_at`) so a `.dog` resolves its actors offline, plus
-`member`, `token`, `device_grant` (with its `reach`) and its own `auth_fail` for device codes and share tokens. Browser
-requests name their record with the `rec` cookie, set at sign-in and by `POST /auth/switch`; the Directory's
-`session()` returns the person's records and the host checks membership.
+`member`, `token`, `device_grant` (with its `reach`) and its own `auth_fail` for device codes and share tokens. A browser
+request's record is on its session row, set at sign-in to a record the person owns (else the first they joined),
+and the host asks that record's own `member` table what the person may do, as it does for a bearer. In code the
+tables are `dir_`-prefixed, at Directory version 3.
 
 | Flow | Steps |
 |---|---|
-| Sign up | Cloud: email → magic link → `createRecord` (INTERNAL) writes the record first — the record row, the owner's `person` mirror, `member('*', 'owner')` — then the Directory rows `record_dir` and `person_record`; sign-up generates the record DEK, the connector DEK and the signing key ([12-SECURITY](12-SECURITY.md) §6); a passkey is registered after, from phase 3. Self-host: closed — `init` and invitations; an unknown email at `/auth/magic` gets 200 and no mail |
-| Sign in | passkey first where one exists, the magic link as the fallback — the self-host's only path in phase 2; both produce a `session` row and set `rec`; **no passwords** |
+| Sign up | Cloud: email → magic link → `createRecord` (INTERNAL) writes the record first — the record row, the owner's `person` mirror, `member('*', 'owner')` — then the Directory rows `record_dir` and `person_record`; sign-up generates the record DEK, the connector DEK and the signing key ([12-SECURITY](12-SECURITY.md) §6); a passkey is registered after, from phase 3. Self-host: closed — `init` and invitations; an unknown email at `/auth/magic/start` gets 200 and no mail |
+| Sign in | passkey first where one exists, the magic link as the fallback — the self-host's only path in phase 2; both produce a `session` row, which carries the record; a self-host also takes its server key at `/auth/token`; **no passwords** |
 | Invite | `invite({ email, levels })` (ADMIN, the owner) mints an invitation — one email, 24 h; the invitee signs in behind `GET /auth/invite/<token>` and the host calls `acceptInvite` (INTERNAL) with the Directory's verified person, which writes `person_record`, the record's `person` mirror, the `member` rows and one `access.grant` event per register |
 | Agent token | minted from a browser session (`createToken`) or by `braindog login`'s device flow; scoped `read` / `propose` / `write` — one word stored, the ladder's top; the bearer is `<rec_id>.<secret>` and the record's `token` table stores `sha256(secret)` with `last_used_at` and `last_surface`; one record |
 | Device grant | six digits, ten minutes, five tries; `code_hash = sha256(id ‖ ':' ‖ user_code)` — `id` is the poll id, never the code; approved from a browser (`deviceApprove`); `verification_uri` is `${origin}/settings/agents`; `device_grant.reach` names what the grant reaches — `login` or `runner` mint a 90-day bearer in `token_hash`; the CLI, an agent and a runner all enrol this way |
