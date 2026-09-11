@@ -20,7 +20,7 @@ line in §10.
 |---|---|
 | **Does** | reads config from env; opens or creates the KEK; opens the Directory and every record directory under `BRAINDOG_DATA`; refuses to start without FTS5; applies kernel migrations; arms one timer and one outbox poller per record; serves 33 §4 over `node:http`; owns identity — sessions, magic links, invitations, device grants, passkeys; signs and keeps nightly snapshots |
 | **Refuses** | to write a row except through `RecordApi`; to decrypt anything the record could decrypt (it never can — ADR-062: AES-GCM runs here, the record stores sealed bytes); to terminate TLS; to receive SMTP; to hold a plaintext credential, session id, magic-link token or device code in any table |
-| **Imports** | `@braindog/ports` (`openNodeSqlite` from `./node-sqlite`, `bootProbe`, `blobKey`, `SqlError`, the port types — 37 §2), `@braindog/kernel` (`openRecord` for the snapshot copy; the `CallContext` and `Result` types, which live there — 41 §13 #1), `@braindog/record` (`createRecordApi`, `RecordApi` — 45), `@braindog/mcp` (`createMcpHandler` — 44 §2), `@braindog/connect` (`runPull`, phase 4 — 47 §2), and `@braindog/web/node` — the `handler` adapter-node emits into `build-node/` (50 §13 #1–#2; [31-STACK](31-STACK.md) §2 row 15 admits the edge). Never `apps/cli`, never `apps/worker` |
+| **Imports** | `@braindog/ports` (`openNodeSqlite` from `./node-sqlite`, `bootProbe`, `blobKey`, `SqlError`, the port types — 37 §2), `@braindog/kernel` (`openRecord` for the snapshot copy; the `CallContext` and `Result` types, which live there — 41 §13 #1), `@braindog/record` (`createRecordApi`, `RecordApi` — 45), `@braindog/mcp` (`serveMcp`, `gate` and `unauthorized` from `./http`), `@braindog/connect` (`runPull`, phase 4 — 47 §2), and `@braindog/web/node` — the `handler` adapter-node emits into `build-node/` (50 §13 #1–#2; [31-STACK](31-STACK.md) §2 row 15 admits the edge). Never `apps/cli`, never `apps/worker` |
 
 The host touches a record file outside `RecordApi` in exactly **five** places, each named where it happens
 (§5) and nowhere else: the bearer lookup and its `last_used` write on `token` and `device_grant` (§5.4); the
@@ -62,7 +62,6 @@ type HostDeps = { clock: Clock; keys: KeyStore; dispatch: Dispatch; http: Http; 
 type OpenRecord = {
   slug: string; recId: RecordId; sql: Sql; caps: Capabilities;
   api: RecordApi;                       // 45 — and api.kernel, the Kernel it wraps (41 §2), for the host's reads
-  mcp: McpHandler;                      // createMcpHandler(api, api.kernel.declarations(), { context, declarationsChangedAt }) — 44 §2
   scheduler: NodeScheduler; poller: Poller; snapshots: NodeSnapshots;
   sick: null | 'SCHEMA_MISMATCH' | 'SCHEMA_NEWER';             // every route → 503 while set
   close(): void;
@@ -199,16 +198,17 @@ anywhere is `BootRefused`. The five enforced ceilings are the adapter's; the hos
 | Credential | `principal` | `surface` |
 |---|---|---|
 | `Authorization: Bearer` = `config.token` | `{ kind: 'person', id: record_dir.owner_person, level: 'owner' }` | `cli` |
-| bearer found in `token` | `{ kind: 'token', id, scope: ladder(scope), name: label }` — `read`→`[read]`, `propose`→`[read,propose]`, `write`→`[read,propose,write]` | `cli` on `/api/*`, `mcp` on `/mcp` |
+| bearer found in `token` | `{ kind: 'token', id, scope: ladder(scope), name: label }` — `read`→`[read]`, `propose`→`[read,propose]`, `write`→`[read,propose,write]` | `api` on `/api/*`, `mcp` on `/mcp` |
 | bearer found in `device_grant` with `reach = 'runner'` (`active`, unexpired) | `{ kind: 'token', id, scope: ['read','propose'], name: label }` + host flag `runner` | `cli` |
 | bearer found in `device_grant` with `reach ∈ export import pack token` (`active`, within its ten minutes) | `{ kind: 'person', id: approved_by, level: member('*') }` with `op: reach` — the operation grant of 48 §13 D1 | `cli` |
 | the session cookie | `{ kind: 'person', id: person, level: member('*') }`, with `credentialed: true` and `provedAt` from the session's `authed_at` | `web` |
 | timer, poller, snapshot job | `{ kind: 'system' }` | `alarm` |
 | `/in/*` | `{ kind: 'system' }` | `webhook` · `email` |
 
-`session` is filled from four request headers when present — `X-BrainDog-Session`, `X-BrainDog-Client-Id`,
-`X-BrainDog-Host`, `X-BrainDog-Repo` → `{ spoken, client_id, host, repo }`; over `/mcp` the handler reads
-`_meta` itself. `now = clock.now()`.
+`session` is filled from seven request headers when present: `X-Braindog-Session`, `X-Braindog-Client`,
+`X-Braindog-Host`, `X-Braindog-Repo`, `X-Braindog-Remote`, `X-Braindog-Cwd` and `X-Braindog-Agent`, giving
+`{ spoken, client_id, host, repo, remote, cwd, agent }`. `sessionOf` in `packages/host/src/session.ts` holds each
+to its grammar and drops what fails. Over `/mcp` the same hints come from `params._meta.session`, checked the same way. `now = clock.now()`.
 
 ### 4.7 · Routes as data
 
@@ -226,7 +226,7 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 | `/api/claimJob[?wait=N]` · `/api/postJobEvent` · `/api/readCancel` | POST | runner | JOBS | 7 |
 | `/api/boot` · `/api/pages/:slug` · `/api/schema/:register` · `/api/version` | GET | bearer-or-cookie | READ+ | 2 |
 | `/api/snapshot` · `/api/snapshots` · `/api/snapshots/:id` | POST · GET · GET | cookie | ADMIN | 2 |
-| `/mcp` | POST | bearer | DATA | 6 |
+| `/mcp` | POST | bearer only; never the cookie, never open mode | DATA | 6 |
 | `/a` · `/a/<64 hex>` | POST · GET | bearer-or-cookie · none | DATA · PUBLIC | 2 |
 | `/in/webhook/<ingest-id>` · `/in/email/<token>` | POST | ingest | INGRESS | 4 |
 | `/s/<token>` | GET | share | READ+ | 7 |
@@ -274,7 +274,7 @@ for `id`, checked through `api.page` with a `{ kind: 'share', id, slug }` princi
 4. `openDirectory(`${data}/directory.sqlite`)`: `sql = openNodeSqlite(path)` — the adapter sets the four PRAGMAs of 33 §6, measures `caps` and runs `bootProbe` itself (37 §5.1), throwing `SqlError('NO_SUCH_MODULE')` with the probe text on a build without FTS5, which `startServer` rethrows as `BootRefused`; `user_version` 0 → run the DDL of §4.1 and set 1; > 1 → `SCHEMA_NEWER`.
 5. For each `record_dir` row whose `<slug>/record.dog` exists: `openRecordFile` —
    1. `sql = openNodeSqlite(`${dir}/record.dog`)` — the same probe, the same `BootRefused`. `config.sqlite === 'better-sqlite3'` asks `ports` for its alternative adapter behind the same `Sql` (33 §1); 37 §1 leaves that adapter to a later ADR, so the flag is refused with `ConfigError` until it exists.
-   2. `api = createRecordApi({ sql, scheduler, clock })` with `scheduler = new NodeScheduler(…)` whose `fire` is `api.drainSchedule({}, systemCtx)` and whose `kick` is `poller.kick`; `mcp = createMcpHandler(api, api.kernel.declarations(), { context: req => bearerContext(req, rec, 'mcp'), declarationsChangedAt: 0 })`, rebuilt with `declarationsChangedAt = now` after an `ok` from `installPack`, `uninstallPack` or `setDeclaration` (44 §2, §5.6).
+   2. `api = createRecordApi({ sql, scheduler, clock })` with `scheduler = new NodeScheduler(…)` whose `fire` is `api.drainSchedule({}, systemCtx)` and whose `kick` is `poller.kick`. There is no MCP handler per record: `/mcp` calls `serveMcp(request, api, ctx)` on each request (§5.2).
    3. `await api.kernel.applyMigrations()` (41 §2); `api.kernel.refused()` non-null → `rec.sick = its code`, log, continue — one bad record does not stop the host.
    4. `{ nextDueMs, outboxPending } = api.kernel.pendingWork()` (41 §2); `nextDueMs !== null && await scheduler.set(nextDueMs)`; `outboxPending && poller.kick()`.
    5. `poller.start()` (§5.12); `snapshots.armNightly()` (§5.13); read `<slug>/inbound.token` if present (§5.16, §5.22).
@@ -285,7 +285,7 @@ for `id`, checked through `api.page` with a `{ kind: 'share', id, slug }` princi
 ### 5.2 · A request
 
 1. Read method, `URL`, headers; `Content-Length` or body > 1 MB → 413 bare ([10-MCP](10-MCP.md) §8); `/a` has its own 2 MB rule (§5.17).
-2. Match `ROUTES` in order: `/api/*` and `/auth/*` first, then `/mcp`, `/a`, `/in`, `/s`, `/ws`, `/<ID>`, the shell last (the `run_worker_first` list of 33 §4 is exactly this prefix set).
+2. Match `ROUTES` in order: `/auth/*` first, then `/mcp`, then `/api/*`, `/a`, `/in`, `/s`, `/ws`, `/<ID>`, the shell last (the `run_worker_first` list of 33 §4 is exactly this prefix set). `/mcp` is taken before the body is read: `gate` answers 405, 403 for any `Origin` and 415 from the headers, the bearer is checked by the same function `/api` uses, with `verifyToken(bearer, 'mcp')`, and only then does `serveMcp` read the body, counting to 1 MB as it arrives. A missing or unknown bearer is 401 with `WWW-Authenticate: Bearer`; a known token for somebody no longer on the record is 403, as on `/api`.
 3. Set `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Content-Type: application/json; charset=utf-8` on every `/api/*`, `/auth/*`, `/mcp` answer. No `Access-Control-*` header is ever written; a test greps for it.
 4. Resolve the record (§5.3) when the route needs one; a `sick` record → 503 `{ code, fix }`.
 5. Authenticate per `route.auth` (§5.4); build `CallContext`.
@@ -840,7 +840,7 @@ so its row is what this spec needs from it:
 |---|---|---|
 | 37 | `openNodeSqlite(path): NodeSql` at `./node-sqlite` (`:memory:` is the memory adapter; runs `measureCaps` and `bootProbe`, throws `SqlError('NO_SUCH_MODULE')`) · `bootProbe(caps, driver)` · `blobKey(recId, sha256)` · `SqlError` | 37 §2.4–§2.5, §5.1 |
 | 41 | `openRecord(sql, clock): Kernel`; `Kernel.applyMigrations() · refused() · pendingWork() · version() · declarations() · exportDogl(cursor)`; the `CallContext` and `Result` types; `dog_manifest` excludes itself and `dog_sig` (K25) | 41 §2, §13 #1 |
-| 44 | `createMcpHandler(api: DataApi, decls, { context(req), declarationsChangedAt, maxBodyBytes? }): (req: Request) => Promise<Response>` | 44 §2 |
+| 44 | `serveMcp(request, surface, ctx \| null, { maxBodyBytes? }): Promise<Response>`, with `gate(request)` and `unauthorized()` beside it, from `@braindog/mcp/http`; `surface` is the `RecordApi` | `loop/research-agent-path.md` §1.7 |
 | 47 | `runPull(job: OutboxRow<'pull.fetch'>, deps: { http, keys, clock, record, ctx }): Promise<PullResult>` — acks itself | 47 §2 |
 | 48 | `apps/selfhost/src/main.ts` with `init <slug>` and `dev`; `POST /auth/device { slug?, reach, label, subject? }` → `DeviceCode`; `POST /auth/device/token { device_code }` → `DevicePoll`; `Reach`; operation grants and `device_grant.reach`; `createToken listTokens revokeToken`; `POST /api/export` as streamed `text/plain`; `#dog` / `#table` block order with `dog_sig` last | 48 §4.2, §5.2–§5.3, §5.12, §5.14, §13 D1–D3 |
 | 50 | `@braindog/web/node` → `handler(req, res, next)`; `/signin?next=`; `/decide/[id]`; `/settings/<area>` — `agents` for the code entry (`verification_uri`), `recovery` for the first passkey; `/r/<register>/<seq>` | 50 §2.2, §5.13, §13 #1–#2; 19 §2 |

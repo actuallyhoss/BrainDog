@@ -1,6 +1,6 @@
 # 05 · Blocks and themes
 
-What an agent reaches for when it has something to show, and the reason sixteen kinds — and every
+What an agent reaches for when it has something to show, and the reason eighteen kinds — and every
 kind a pack adds after them — can look like one product.
 
 > A block set is a **system**, not a catalogue. Every kind draws from the same eight primitives
@@ -14,8 +14,8 @@ Kinds are declarations over these. Primitives compose, so kinds do not have to.
 
 | Primitive | Is | Kinds built on it |
 |---|---|---|
-| `panel` | a bounded region with a tone, an optional glyph, and a nested document | `note`, `quote` |
-| `grid` | *n* cells of label and figure, row-aligned by subgrid | `stat`, `board` |
+| `panel` | a bounded region with a tone, an optional glyph, and a nested document | `note`, `quote`, `section` (page only) |
+| `grid` | *n* cells of label and figure, row-aligned by subgrid | `stat`, `board`, `cards` (page only) |
 | `rows` | label · value · note, one per line | `spec`, `params` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar`, `gauge` |
 | `inline` | a run of pills | `chips` |
@@ -37,7 +37,7 @@ inlines**. This is why a pack can add a kind without asking a designer.
 
 A kind is data, not code. A `block` declaration is a primitive, an `accepts:` list and a body of
 primitive nodes, each node one of `parts children rows columns empty value`; `$<name>` substitutes a
-whole node named in `accepts:` and is never spliced into a string. The sixteen ship as one TypeScript
+whole node named in `accepts:` and is never spliced into a string. The eighteen ship as one TypeScript
 table — `src/kinds.ts`, `as const`, with a derived `Kind` union — whose shape is the shape a pack's
 `block` declaration takes, so a first-party kind and a pack's kind take one code path
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D4; an earlier draft said sixteen JSON files).
@@ -67,7 +67,7 @@ an agent gets it right first time because there is nothing to nest. The row shap
 strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
-### v1 kinds — sixteen
+### Kinds — eighteen
 
 | Group | Kinds |
 |---|---|
@@ -76,10 +76,13 @@ strong, em, code spans and links; a blockquote, a table, an image or raw HTML is
 | Rows | `spec` · `params` |
 | Work | `todo` · `steps` · `timeline` · `board` |
 | Technical | `code` (annotated) · `tree` · `comparison` |
-| Register-bound | `table` — rows from a `source:` register with declared `columns:`; the one kind bound to a register rather than to authored rows, and **page-only** |
+| Register-bound | `table` — rows from a `source:` register with declared `columns:`; bound to a register rather than to authored rows, and **page-only** |
+| Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`. Both **page-only** |
 
-Sixteen, counted. *An earlier draft counted fifteen and left `table` out while every declared page in
-the corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
+Eighteen, counted: the sixteen of v1 and the two page kinds of the agent path
+(`loop/research-agent-path.md` step 20), which sit on existing primitives so `PRIMITIVES_VERSION` does
+not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
+corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
 arbitrary SVG — `sparkline`, `series` and `forecast` are **post-v1**, and everything after them
 arrives as a pack, which is the whole reason for the primitive layer.
 
@@ -91,7 +94,7 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 - A row is split on `|` **after** unescaping — `\|` is a literal pipe, `\\` a literal backslash.
 - A trailing cell that is a tone word — `good` `warn` `bad` `info`, an alias from §7.4, or `hole` on a `bar` — is the tone. Anything else in that position is a cell.
 - `{{path}}` is substituted **per cell, after splitting**, and a substituted value is never re-parsed, so a value containing `|` cannot add a column.
-- More cells than the kind takes degrades the block to its fence with one line above it naming the kind and the row — `DIALECT_ARITY`; a kind outside the sixteen is `DIALECT_KIND_UNKNOWN`. Fewer cells leaves the trailing ones absent. Both happen at render; nothing is refused at write (§3).
+- More cells than the kind takes degrades the block to its fence with one line above it naming the kind and the row — `DIALECT_ARITY`; a kind outside the eighteen is `DIALECT_KIND_UNKNOWN`. Fewer cells leaves the trailing ones absent. Both happen at render; nothing is refused at write (§3).
 
 | Kind | Cells, in order |
 |---|---|
@@ -111,6 +114,8 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 | `tree` | indentation-significant, two spaces per level; rows not split |
 | `comparison` | the header row fixes the column count |
 | `table` | **page-only**: `source:` and `columns:` on the block ([06-PAGES](06-PAGES.md) §1.1); a `table` fence in a write-up has no rows to draw and degrades to its fence like an unknown kind |
+| `cards` | **page-only**: the page's evaluator writes the rows. The first row names each column's role, `role` or `role: label`, from `title figure fact trend ring who when mark`; then one row per card, then a *tone*. One figure and at most three facts, or the block degrades under `DIALECT_ARITY`. A `trend` cell is a run of numbers, and a token that is not one is a gap; a `ring` cell is `3/5` or `60%` |
+| `section` | **page-only**: the heading is the section, drawn as a heading and never as a caption; one row, glyph \| count \| `fold`. A count of zero is not drawn. `fold` starts it shut, and the host hides the blocks after it up to the next section |
 
 ---
 
@@ -202,7 +207,7 @@ prove in the Kennel.
 ### Why this is strict rather than flexible
 
 The block set only looks like one product because no kind writes its own colour. A theme that can
-reach past tokens breaks all sixteen kinds at once — and the author will never find out which
+reach past tokens breaks every kind at once — and the author will never find out which
 one, because they will only hear that it looks broken.
 
 ---

@@ -19,7 +19,7 @@
  * minted for another record. Reading it here costs no hop and claims no URL.
  */
 
-import { ROUTES } from '@braindog/host';
+import { ROUTES, sessionOf, withSession } from '@braindog/host';
 import type { CallContext } from '@braindog/record';
 
 /** The address half of a bearer. Checked as a shape, never as a credential — that is the record's. */
@@ -48,16 +48,22 @@ export function recordOf(authorization: string | null): string | null {
 /**
  * Whether this Worker answers for this path at all.
  *
- * 33 §4'S OWN LIST, AND ONLY THE PART THAT IS BUILT. Everything else that belongs to this Worker in
- * the document — `/mcp`, `/a/*`, `/s/*`, `/in/*`, `/ws` — does not exist yet, and a router
- * claiming them now would answer 401 for routes whose whole point is being reachable without one.
- * `/auth/*` is built, and is `servesAuth` below. Everything outside the two is the app's: that is what
+ * 33 §4'S OWN LIST, AND ONLY THE PART THAT IS BUILT. `/a/*`, `/s/*`, `/in/*` and `/ws` belong to this
+ * Worker in the document and do not exist yet, and a router claiming them now would answer 401 for
+ * routes whose whole point is being reachable without one. `/auth/*` and `/mcp` are built, and are
+ * `servesAuth` and `servesMcp` below. Everything outside the three is the app's: that is what
  * `run_worker_first` means.
  */
 export const servesApi = (pathname: string): boolean => /^\/+api\/+[^/]/.test(pathname);
 
 /** `/auth/*`: sign-in, which is the Directory's and never reaches a record (`51 §5.8`). */
 export const servesAuth = (pathname: string): boolean => /^\/+auth(?:\/|$)/.test(pathname);
+
+/**
+ * `/mcp`: an agent's MCP client, with its bearer and nothing else (`loop/research-agent-path.md` §1.1).
+ * One path and no subpaths, because the transport is one endpoint and `run_worker_first` names it alone.
+ */
+export const servesMcp = (pathname: string): boolean => /^\/+mcp\/*$/.test(pathname);
 
 /** Whether a string has the shape of a record id. A shape and not a record: nothing is asked. */
 export const isRecordId = (x: string): boolean => REC_ID.test(x);
@@ -117,7 +123,9 @@ export const DEMO_CONTEXT: CallContext = {
  */
 export function inward(request: Request, ctx: CallContext): Request {
   const inner = new Request(request);
-  inner.headers.set('x-braindog-ctx', JSON.stringify(ctx));
+  /* AND WHAT AN AGENT SAYS ABOUT ITS RUN, checked here, on every door: the record reads the hints of a
+     token's call and ignores anybody else's, so a person is never a run whichever door they used. */
+  inner.headers.set('x-braindog-ctx', JSON.stringify(withSession(ctx, sessionOf(request.headers))));
   inner.headers.delete('authorization');
   return inner;
 }

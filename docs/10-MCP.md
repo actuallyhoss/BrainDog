@@ -68,47 +68,53 @@ without one gets `403 NEEDS_BROWSER_SESSION`; over MCP every token is refused (�
 
 ## 3 · The tool surface is DYNAMIC and per-customer
 
-A customer's tools are generated from *their* installed packs. A freelancer with `money-core` and
-`freelancer-uk` gets different tools from a studio with `products` and `people`.
+A customer's registers come from *their* installed packs. A freelancer with `money-core` and `freelancer-uk` has
+different registers from a studio with `products` and `people`, and the same fourteen tools reach all of them.
 
 ### The generation rule
 
-Tools are **not** one per register — that is the naive design and it produces 40 tools nobody can
-choose between. Instead:
+Tools are **not** one per register. That is the naive design, and it produces 40 tools nobody can choose between.
+Instead:
 
 | Tool | Shape | Count |
 |---|---|---|
-| `record_index` | the orientation call. Registers, counts, open questions, what changed | 1 |
-| `search` | FTS5 + vector over everything the token can read; `vec` is the caller's own query embedding — the record never embeds on a read | 1 |
-| `get` | fetch one row: `{ spoken }` \| `{ register, seq }` \| `{ id }`, plus an optional `path` into it | 1 |
-| `list` | a register plus a `where:` and a projection | 1 |
-| `create` / `update` | typed writes against a named register; `update` carries the row's `version` and a client `op_id` | 2 |
-| `propose` | open a suggestion with options. **The only way an agent affects a decision** | 1 |
-| `log` | append one audit event — kind `note`, one sentence, target optional | 1 |
-| **Per-register schemas** | delivered as **resources**, not tools | *n* |
+| `record_index` | the cheap orientation call: registers, counts and the version | 1 |
+| `context` | the briefing for where the session stands: its project, open work, questions waiting on the person, people, the keys and servers it may use by name, skills and learnings, and everything global | 1 |
+| `schema` / `history` | a register's fields, read before a write; the writes that made one row | 2 |
+| `get` | one row, by the id a person says: `obligations#41`, or a prefixed id such as `S42` or `LN7` | 1 |
+| `list` | a register plus a `where:` tree, a limit and a cursor | 1 |
+| `search` | FTS5 over everything the token can read | 1 |
+| `governance` | what was proposed, decided and predicted | 1 |
+| `propose` | open a suggestion with options. **The only way an agent affects a decision**, and the way it asks to change what it may not change itself | 1 |
+| `create` / `update` | typed writes against a named register; `update` carries the row's `version` | 2 |
+| `log` | one note on a row, changing nothing about it | 1 |
+| `handoff` | keep the session's next step and its dead ends true | 1 |
+| `meet` | a person met in the work, matched or added, with where they were met | 1 |
+| **Per-register schemas, pages, figures, skills** | delivered as **resources**, not tools | *n* |
 
-**Eight tools, fixed, regardless of how many registers a customer has.** (An earlier draft said nine and enumerated eight — the ninth row of the table is *resources*, which are deliberately not tools.) The variability lives in
-the *arguments* — `list(register: "obligations", where: {…})` — and the register schemas are
-fetched as resources when needed.
+**Fourteen tools, fixed, regardless of how many registers a customer has.** The variability lives in the
+*arguments*, as in `list(register: "obligations", where: {...})`, and in the resources, which are fetched when
+needed. Fourteen and not the eight an earlier revision named, because the agent path added three things every
+session does: `context`, `handoff` and `meet` (`loop/DIRECTION.md` §0). Five went to pay for them: `pages`, `page` and
+`metric` are resources, `credentials` could never answer a token, and `dry_run` previews a rule, which only a person
+installs ([44-SPEC-MCP](44-SPEC-MCP.md) §4.4).
 
-**One method, two names, said once:** the tool `record_index` calls the RPC method `index()` of the
-DATA group in [30-BLUEPRINT](30-BLUEPRINT.md) §5 — the tool name carries the noun because a bare
-`index` reads as a verb in a tool list. The other seven tools share their method's name. Every
-method takes `(args, ctx)` and returns the `Result<T>` envelope of [33-CONTRACTS](33-CONTRACTS.md)
-§2; over HTTP a refusal is `422 { refusals }` and a conflict is `409 { conflict }`; over MCP a refusal
-is an error result carrying the same `code` and `fix`, and a call outside its published schema is the
-protocol's `-32602` — a vocabulary, not a refusal code ([30-BLUEPRINT](30-BLUEPRINT.md) §6).
+**What each reaches, said once:** `record_index` reads `boot()` and `version()`, `log` is `update` with an empty
+patch, and every other tool shares its method's name ([30-BLUEPRINT](30-BLUEPRINT.md) §5). Every method takes
+`(args, ctx)` and returns the `Result<T>` envelope of [33-CONTRACTS](33-CONTRACTS.md) §2. Over HTTP a refusal is
+`422 { refusals }` and a conflict is `409 { conflict }`. Over MCP a refusal is an error result carrying the refusal
+whole, `code`, `fix` and `allowed`, and a conflict is `VERSION_STALE` with the current row and who changed it. A
+message the protocol cannot read gets one of JSON-RPC's numbers, which are a vocabulary and not refusal codes
+([30-BLUEPRINT](30-BLUEPRINT.md) §6).
 
 This is the central design decision of the MCP surface and it exists because of §4.
 
 ### `tools/list_changed`
 
-Not pushed — the server is stateless — but carried in the response that proves the cache stale: a
-`REGISTER_UNKNOWN` after an uninstall, or a register added within `ttlMs`. The eight tools do not
-change, but `list`'s description embeds the customer's register list — once, capped at 24 ids, never
-as a schema `enum` — and that list does. A client that cached the tool list gets told to refetch
-rather than calling `list(register: "invoices")` against a record that no longer has one
-([44-SPEC-MCP](44-SPEC-MCP.md) §5).
+Not pushed, and not needed for the tools: the server is stateless, the fourteen do not change on an install, and no
+description names a register. A register added or removed is seen through `record_index`, `context` and
+`resources/list`, and a client holding a stale register name is answered `REGISTER_UNKNOWN` with the registers there
+are in `allowed` ([44-SPEC-MCP](44-SPEC-MCP.md) §4.5).
 
 ---
 

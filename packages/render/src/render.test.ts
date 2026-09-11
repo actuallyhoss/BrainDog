@@ -7,6 +7,7 @@ import { parse, splitRow } from './parse.ts';
 import { toHTML, verbatimText } from './html.ts';
 import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type Column, type TableRow } from '../svelte/types.ts';
 import { lanes } from './board.ts';
+import { ringDash, ringOf, trendOf } from './cards.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
 import { leadingCode, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
 
@@ -14,8 +15,8 @@ const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
 /* ── the closed sets ──────────────────────────────────────────────────────── */
 
-test('sixteen kinds over eight primitives, and every kind names one that exists', () => {
-  assert.equal(Object.keys(KINDS).length, 16);
+test('eighteen kinds over eight primitives, and every kind names one that exists', () => {
+  assert.equal(Object.keys(KINDS).length, 18);
   assert.equal(PRIMITIVES.length, 8);
   assert.equal(PRIMITIVES_VERSION, 1);
   for (const [kind, spec] of Object.entries(KINDS))
@@ -264,7 +265,7 @@ test('too many cells degrades to a visible fence, and the write is still accepte
   assert.match(toHTML([seg]), /block-degraded/);
 });
 
-test('a kind outside the sixteen degrades rather than disappearing', () => {
+test('a kind outside the eighteen degrades rather than disappearing', () => {
   const [seg] = parse('```reactor_core | H\nA\n```');
   assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_KIND_UNKNOWN');
 });
@@ -287,7 +288,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
-  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the sixteen kinds/u);
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the eighteen kinds/u);
   assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });
@@ -986,6 +987,131 @@ test('and the flag is what decides it, for every kind in the table', () => {
     const [seg] = parse('```' + kind + ' | H\n```');
     assert.equal(seg?.type, spec.pageOnly ? 'degraded' : 'block', `${kind} drew the wrong way`);
   }
+});
+
+/* ── cards and section: the two page kinds ────────────────────────────────── */
+
+const onPage = (src: string) => parse(src, { page: true });
+const AGENTS =
+  '```cards\nmark: Project | title: Doing | who: Agent | fact: Next | when: Seen\nKiln | Fix the export | Claude |  | 3m ago | warn\nSite | Rewrite pricing | Codex | Ship it | 2h ago\n```';
+
+test('CARDS AND SECTION ARE PAGE-ONLY: a write-up gets its fence back, a page gets the block', () => {
+  for (const kind of ['cards', 'section']) assert.equal(parse('```' + kind + ' | H\n```')[0]?.type, 'degraded', kind);
+  assert.equal(onPage(AGENTS)[0]?.type, 'block');
+  assert.equal(onPage('```section | Working now\n | 3 | \n```')[0]?.type, 'block');
+});
+
+test('and a table is still not a fence on a page, because it has no rows anyone writes', () => {
+  assert.equal(onPage('```table | H\na | b\n```')[0]?.type, 'degraded');
+});
+
+test('a section in a write-up is told to write a heading, not sent looking for a register', () => {
+  const [seg] = parse('```section | Working now\n```');
+  const fix = seg?.type === 'degraded' ? seg.fix : '';
+  assert.match(fix, /heading/u);
+  assert.doesNotMatch(fix, /register/u);
+});
+
+test('A CARD TAKES ONE FIGURE AND AT MOST THREE FACTS, and says so rather than dropping one', () => {
+  for (const head of ['figure | figure', 'fact | fact | fact | fact', 'title | size', 'title | title', '']) {
+    const row = head.split('|').map(() => 'x').join(' | ');
+    const [seg] = onPage('```cards\n' + (head ? `${head}\n${row}\n` : '') + '```');
+    assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_ARITY', `"${head}" was drawn`);
+  }
+  const every = 'title | figure | fact | fact | fact | trend | ring | who | when | mark';
+  assert.equal(onPage('```cards\n' + every + '\n```')[0]?.type, 'block');
+});
+
+test('the header row carries no tone, and a card’s tone is read only past its last column', () => {
+  const [seg] = onPage('```cards\ntitle | fact: State\nKiln | good\nSite | good | warn\n```');
+  assert.equal(seg?.type, 'block');
+  if (seg?.type !== 'block') return;
+  assert.deepEqual(seg.rows[1], { cells: ['Kiln', 'good'] }, 'a value that is also a tone word is a value');
+  assert.equal(seg.rows[2]?.tone, 'warn');
+});
+
+test('a card leads with its mark, is named by a heading, and wears its tone beside the name', () => {
+  const html = toHTML(onPage(AGENTS));
+  assert.match(
+    html,
+    /<li class="cards-item" data-intent="warn"><div class="cards-head"><span class="cards-mark" aria-hidden="true">K<\/span><h3 class="cards-title">Fix the export<\/h3><span class="glyph" role="img" aria-label="watch this">/u,
+  );
+  assert.match(html, /<span class="cards-face" aria-hidden="true">C<\/span><span class="cards-name">Claude<\/span>/u, 'an agent is a face');
+  assert.match(html, /<dt>Next<\/dt><dd>—<\/dd>/u, 'a missing fact is the missing mark, not a blank');
+  assert.match(html, /<span class="cards-when">3m ago<\/span>/u);
+});
+
+test('a card with no title is the person, so the face takes the mark’s place and is not drawn twice', () => {
+  const html = toHTML(onPage('```cards\nwho: Name | fact: Role\nthe assistant | Agent\n```'));
+  assert.match(html, /<span class="cards-face" aria-hidden="true">A<\/span><h3 class="cards-title">the assistant<\/h3>/u);
+  assert.doesNotMatch(html, /cards-who/u);
+});
+
+test('A TREND THAT MISSES A VALUE HAS A GAP THERE, NEVER A DIP TO ZERO', () => {
+  const t = trendOf('18 20 - 24');
+  assert.ok(t);
+  assert.equal(t.d, 'M0 90 L333.33 63.33 M1000 10', 'the line lifts off at the gap and starts again after it');
+  assert.equal(t.end, 'M1000 10h0');
+  assert.deepEqual(t.said, ['18', '20', 'no value', '24']);
+  assert.equal(trendOf('7'), null, 'one point is not a line');
+  assert.equal(trendOf('- 5'), null);
+  assert.equal(trendOf('3 3 3')?.d, 'M0 50 L500 50 L1000 50', 'a flat run is drawn in the middle, not on the floor');
+});
+
+test('a ring is a proportion or nothing: 3/5 and 60% draw an arc, a word keeps its words', () => {
+  assert.equal(ringOf('3/5'), 0.6);
+  assert.equal(ringOf('60%'), 0.6);
+  assert.equal(ringOf('150%'), 1, 'clamped to the ring');
+  assert.equal(ringOf('nearly'), null);
+  assert.equal(ringOf('3/0'), null, 'a proportion of nothing is not a full ring');
+  assert.equal(ringDash(0.6), '60 100');
+});
+
+test('the figure keeps its currency code quiet, and a missing figure is the missing mark', () => {
+  const html = toHTML(
+    onPage('```cards\ntitle | figure: Owed | trend: Weekly | ring: Done\nKiln | GBP 4,800.00 | 18 20 - 24 | 3/5\nSite |  | 7 | nearly\n```'),
+  );
+  assert.match(html, /<span class="cards-value num"><span class="amount-code">GBP<\/span> 4,800.00<\/span><span class="cards-label">Owed<\/span>/u);
+  assert.match(html, /<span class="cards-value num">—<\/span>/u);
+  assert.match(html, /role="img" aria-label="Weekly: 18, 20, no value, 24"/u);
+  assert.match(html, /stroke-dasharray="60 100"/u);
+  assert.equal(html.match(/class="cards-trend"/gu)?.length, 1, 'one point drew a line');
+  assert.equal(html.match(/cards-ring-mark/gu)?.length, 1, 'a word drew a ring');
+  assert.match(html, /<span class="cards-ring"><span class="cards-value num">nearly<\/span>/u);
+});
+
+test('a title that is a link makes the card a door', () => {
+  const html = toHTML(onPage('```cards\ntitle | fact: Stage\n[Kiln](/r/things/1) | Building\n```'));
+  assert.match(html, /<h3 class="cards-title"><a href="\/r\/things\/1">Kiln<\/a><\/h3>/u);
+});
+
+test('a card grid with no cards says so in a sentence', () => {
+  assert.match(toHTML(onPage('```cards\ntitle | fact: Role\n```')), /<p class="cards-empty">Nothing to show\.<\/p>/u);
+});
+
+test('A SECTION IS A HEADING, NOT A CAPTION, and its count shows only when it counts something', () => {
+  const html = toHTML(onPage('```section | Working now\n | 3 | \n```'));
+  assert.doesNotMatch(html, /figcaption/u);
+  assert.match(html, /<h2 class="sec-title">Working now<span class="sec-count num">3<\/span><\/h2>/u);
+  assert.doesNotMatch(toHTML(onPage('```section | Working now\n | 0 | \n```')), /sec-count/u, 'a zero is not a count');
+  assert.doesNotMatch(toHTML(onPage('```section | Working now\n```')), /sec-count|sec-fold/u);
+});
+
+test('a folded section carries its control, shut, with the words for both states', () => {
+  const html = toHTML(onPage('```section | Parked and retired\nthing | 4 | fold\n```'));
+  assert.match(html, /<span class="sec-glyph" data-glyph="thing" aria-hidden="true"><\/span>Parked and retired/u);
+  assert.match(
+    html,
+    /<details class="sec-fold"><summary class="sec-toggle"><span class="sec-show">Show<\/span><span class="sec-hide">Hide<\/span><\/summary><\/details>/u,
+  );
+  assert.doesNotMatch(html, /<details[^>]*open/u, 'folded means it starts shut');
+});
+
+test('and the two page kinds add no inline style: every mark is placed by an attribute', () => {
+  const html = toHTML(
+    onPage(`${AGENTS}\n\`\`\`cards\ntitle | trend | ring\nA | 1 2 3 | 2/4\n\`\`\`\n\`\`\`section | S\n | 2 | fold\n\`\`\``),
+  );
+  assert.doesNotMatch(html, /style=/u);
 });
 
 test('prose in a drawn block is not a style problem, it is a row', () => {

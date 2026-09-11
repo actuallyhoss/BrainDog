@@ -1,5 +1,5 @@
 /**
- * The eight tools, from an agent's side of the wire.
+ * The fourteen tools and the resources, from an agent's side, over a real record.
  *
  * Two things are being asserted, and the second is the unusual one. The first is that each tool does
  * what it says. The second is that its REFUSALS TEACH: the caller is a model that will try again
@@ -10,11 +10,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { codeOf, conflicted, fixOf, refused } from '@braindog/ports';
+import { codeOf, conflicted } from '@braindog/ports';
 
 import { TOOLS, tools } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { stub, type Ctx } from './stub.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -39,10 +40,10 @@ const OBLIGATIONS = {
 /**
  * A SECOND REGISTER, BECAUSE A RECORD WITH ONE CANNOT ANSWER "WHICH OF THEM".
  *
- * Every scoping question below is which of two registers a caller is shown, and with one register
- * installed "every register" and "the one inside the ceiling" are the same list: the assertion holds
- * against a surface that applies no scope at all. It is installed per test rather than in `agent()`
- * so that the tests about what the record HOLDS keep counting what they were written to count.
+ * With one register installed, "every register" and "the one inside the ceiling" are the same list,
+ * and a scoping assertion holds against a surface that applies no scope at all. It is installed per
+ * test rather than in `agent()` so that the tests about what the record HOLDS keep counting what
+ * they were written to count.
  */
 const NOTES = {
   id: 'register.notes',
@@ -75,61 +76,38 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('THE COUNT IS THE DESIGN, and it is the document’s list minus what is not built', () => {
-  /* The tool list is in every turn of every session, so one more tool costs every conversation for
-     ever. `10-MCP` §5 names eight, and all eight are here now that the decision gate is built —
-     `propose` earns its place the moment there is something on the other end of it. `schema` and
-     `history` are present because that document serves them as resources and this build serves
-     none, and `decide` is ABSENT because no token reaches that rung: a tool that could only ever
-     refuse is a tool an agent spends its turns discovering.
-
-     The four added since are the record's own reading of itself — `pages`, `page`, `metric` and
-     `credentials` — and each earns its place by being a question an agent asks that `list` cannot
-     answer: what does this record draw, what does this figure say, what would break if this machine
-     were lost, and — the one an agent needs most — what would this rule do if I turned it on. */
-  const named = TOOLS.map((t) => t.name);
-  for (const wanted of ['record_index', 'search', 'get', 'list', 'create', 'update', 'log'])
-    assert.ok(named.includes(wanted), `${wanted} is in 10-MCP §5 and not here`);
-  assert.ok(named.includes('propose'), 'the one verb an agent has when it is not sure');
-  assert.ok(!named.includes('decide'), 'a tool that refuses everything is worse than an absent one');
-
-  /* AND NO TOOL READS A CREDENTIAL. The vault needs a person in a browser and an agent holding a
-     token is neither; `credentials` is the INDEX, which is what makes "check nothing expires next
-     week" a thing an agent can do without anything being readable that should not be. */
-  for (const forbidden of ['openGrant', 'open_grant', 'credential', 'secret'])
-    assert.ok(!named.includes(forbidden), `${forbidden} would read a credential`);
-
-  assert.equal(TOOLS.length, 16);
-  assert.equal(new Set(named).size, TOOLS.length, 'two tools share a name');
-  for (const t of TOOLS) {
-    assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
-    assert.ok(t.description.length < 200, `${t.name} is long, and it is in every turn`);
-  }
+test('THE COUNT IS THE DESIGN: fourteen, and each is named by the plan', () => {
+  /* `research-agent-path` §1.5: the eight of `10-MCP` §3 less what no token can use, plus `context`,
+     `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
+     token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
+     discovering. */
+  assert.deepEqual(
+    TOOLS.map((t) => t.name),
+    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet'],
+  );
+  for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });
 
-test('the whole tool list is small enough to sit in every turn', () => {
-  // `10-MCP` §6 budgets 1,800 tokens for the list plus instructions. Four characters to a token is
-  // the rough conversion, so the JSON is the thing to keep under about 7,000 characters.
-  const size = JSON.stringify(TOOLS).length;
-  assert.ok(size < 7000, `the tool list is ${size} characters, which is most of the budget`);
+test('AND NO TOOL READS A CREDENTIAL, because there is no vault tool', () => {
+  /* The vault needs a person in a browser, and an agent holding a token is neither. What a key opens
+     arrives through `context`, by name; the value never arrives at all. */
+  for (const t of TOOLS) assert.doesNotMatch(t.name, /grant|vault|credential|secret|key/i, `${t.name} would read a credential`);
 });
 
 test('a tool says whether it writes, so a client can tell its user before it runs', () => {
   assert.deepEqual(
     TOOLS.filter((t) => t.writes).map((t) => t.name),
-    ['propose', 'create', 'update', 'log'],
+    ['propose', 'create', 'update', 'log', 'handoff', 'meet'],
   );
 });
 
 /* ── they do what they say ───────────────────────────────────────────────── */
 
-test('record_index is the first call, and it says what to call next', async () => {
+test('record_index says what the record holds, with the version as a number', async () => {
   const { mcp, sql } = await agent();
-  const index = value<{ registers: { id: string; count: number }[]; version: number }>(
-    await mcp.call('record_index', {}, owner),
-  );
-  assert.deepEqual(index.registers.map((r) => r.id), ['obligations']);
-  assert.equal(index.registers[0]?.count, 0);
+  const index = value<{ registers: { id: string; count: number }[]; version: number }>(await mcp.call('record_index', {}, owner));
+  /* Found rather than pinned: the kernel declares registers of its own, such as `session`. */
+  assert.equal(index.registers.find((r) => r.id === 'obligations')?.count, 0);
   assert.equal(typeof index.version, 'number');
   sql.close();
 });
@@ -153,14 +131,12 @@ test('a row is addressed the way a person says it, and made and read and changed
   sql.close();
 });
 
-test('list takes a predicate, which is why there are not fourteen filter tools', async () => {
+test('list takes a predicate, which is why there is not a filter tool per register', async () => {
   const { mcp, sql } = await agent();
   for (const [what, state] of [['a', 'open'], ['b', 'paid'], ['c', 'open']] as const)
     value(await mcp.call('create', { register: 'obligations', fields: { what, state } }, owner));
 
-  const open = value<{ rows: unknown[]; matched: number }>(
-    await mcp.call('list', { register: 'obligations', where: { field: 'state', is: 'open' } }, owner),
-  );
+  const open = value<{ matched: number }>(await mcp.call('list', { register: 'obligations', where: { field: 'state', is: 'open' } }, owner));
   assert.equal(open.matched, 2);
 
   const both = value<{ matched: number }>(
@@ -173,7 +149,7 @@ test('list takes a predicate, which is why there are not fourteen filter tools',
 test('a note changes nothing and is still a write, so it lands in the history', async () => {
   const { mcp, sql } = await agent();
   value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
-  const before = value<{ fields: Record<string, unknown>; version: number }>(await mcp.call('get', { spoken: 'obligations#1' }, owner));
+  const before = value<{ fields: Record<string, unknown> }>(await mcp.call('get', { spoken: 'obligations#1' }, owner));
 
   value(await mcp.call('log', { spoken: 'obligations#1', note: 'Chased on the call.' }, owner));
   const after = value<{ fields: Record<string, unknown> }>(await mcp.call('get', { spoken: 'obligations#1' }, owner));
@@ -181,6 +157,31 @@ test('a note changes nothing and is still a write, so it lands in the history', 
 
   const events = value<{ note: string | null }[]>(await mcp.call('history', { spoken: 'obligations#1' }, owner));
   assert.equal(events.at(-1)?.note, 'Chased on the call.');
+  sql.close();
+});
+
+test('a prefixed id is found through the register that declares the prefix', async () => {
+  /* `S42` and `LN7` are how a person says a session or a learning. Which register owns a prefix is
+     its declaration's `seq_prefix`, so the tool layer asks the declarations and then reads the row
+     by register and number, the one form the record's `get` takes. */
+  const { surface, calls } = stub({
+    boot: async () => ({ ok: true, value: { registers: [{ id: 'obligations', name: 'Obligations' }, { id: 'session', name: 'Agent runs' }] } }),
+    schema: async (args) => ({ ok: true, value: args.register === 'session' ? { seq_prefix: 'S' } : {} }),
+  });
+  const ctx: Ctx = { who: 'agent' };
+  value(await tools(surface).call('get', { spoken: ' S42 ' }, ctx));
+  assert.deepEqual(calls.at(-1), { method: 'get', args: { register: 'session', seq: 42 }, ctx });
+});
+
+test('AND A PREFIX NO READABLE REGISTER HOLDS IS A REFUSAL, never a throw', async () => {
+  /* Against a real record, which has no learnings register here: the answer is the record's word for
+     a register it does not have, and it names the tool that reads suggestions and decisions. */
+  const { mcp, sql } = await agent();
+  for (const spoken of ['LN7', 'SG12', 'D3']) {
+    const said = refusal(await mcp.call('get', { spoken }, owner));
+    assert.equal(said.code, 'REGISTER_UNKNOWN', spoken);
+    assert.match(said.fix, /governance/, spoken);
+  }
   sql.close();
 });
 
@@ -213,15 +214,17 @@ test('A REFUSAL NAMES WHAT TO SEND INSTEAD, because the caller will try again im
 
 test('an address that is not one says what an address looks like', async () => {
   const { mcp, sql } = await agent();
-  for (const spoken of ['41', 'obligations', 'Obligations#41', undefined, 42])
-    assert.match(refusal(await mcp.call('get', { spoken }, owner)).fix, /register#number/, String(spoken));
+  for (const spoken of ['41', 'obligations', 'Obligations#41', 'obligations#0', 's42', 'S0', 'S42x', undefined, 42])
+    assert.match(refusal(await mcp.call('get', { spoken }, owner)).fix, /register#number.*S42/, String(spoken));
+  /* The tools that change a row, or read its history, take the qualified form only. */
+  for (const name of ['history', 'update', 'log'])
+    assert.match(refusal(await mcp.call(name, { spoken: 'S42', patch: {}, note: 'x' }, owner)).fix, /register#number/, name);
   sql.close();
 });
 
 test('a stale write comes back as a conflict, with the row and the actor an agent needs to retry', async () => {
   /* AN AGENT IS THE CALLER THAT MOST NEEDS THE BODY. It cannot look at the screen, so "this moved"
-     with no row attached leaves it either dropping the write or retrying blind; with `current` it
-     re-applies its own patch and sends once more. 44 §5.4 renders exactly these two fields. */
+     with no row attached leaves it dropping the write or retrying blind. */
   const { mcp, sql } = await agent();
   value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
   value(await mcp.call('update', { spoken: 'obligations#1', patch: { what: 'b' } }, owner));
@@ -237,6 +240,32 @@ test('an empty note is refused rather than written, because a note is for the ne
   const { mcp, sql } = await agent();
   value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
   assert.equal(refusal(await mcp.call('log', { spoken: 'obligations#1', note: '   ' }, owner)).code, 'REQUIRED_MISSING');
+  sql.close();
+});
+
+test('WHAT THE RECORD DOES NOT ANSWER YET IS A REFUSAL THAT SAYS WHAT TO DO, never a throw', async () => {
+  /* `context`, `handoff` and `meet` are in the list today and arrive in the record with the session
+     register. An agent that calls one now is told to carry on another way, in the record's own word
+     for it, so it does not spend turns retrying. */
+  const { mcp, sql } = await agent();
+  for (const [name, instead] of [
+    ['context', /record_index/],
+    ['meet', /create/],
+  ] as const) {
+    const said = refusal(await mcp.call(name, { where: 'commit 4464966', next: 'x' }, owner));
+    assert.equal(said.code, 'NOT_IN_THIS_BUILD', name);
+    assert.match(said.fix, instead, name);
+  }
+  sql.close();
+});
+
+test('and the five tools that left answer as any unknown name does', async () => {
+  const { mcp, sql } = await agent();
+  for (const name of ['pages', 'page', 'metric', 'credentials', 'dry_run', 'listGrants', 'openGrant']) {
+    const said = refusal(await mcp.call(name, { slug: 'money', metric: 'owed' }, owner));
+    assert.equal(said.code, 'ROUTE_UNKNOWN', name);
+    assert.ok(said.allowed?.includes('context'), `the refusal for ${name} does not say what there is instead`);
+  }
   sql.close();
 });
 
@@ -257,8 +286,6 @@ test('a read token reads through every tool and writes through none', async () =
     ['update', { spoken: 'obligations#1', patch: { what: 'b' } }],
     ['log', { spoken: 'obligations#1', note: 'x' }],
   ] as const) {
-    /* `FORBIDDEN`, and it was `SCOPE_INSUFFICIENT`, a code in no registry: `30 §6` writes the scope
-       case under `FORBIDDEN`, and the remedy was already in the sentence. */
     const said = refusal(await mcp.call(name, args, reader));
     assert.equal(said.code, 'FORBIDDEN', name);
     assert.match(said.fix, /Ask the owner for a token with a wider scope\./, name);
@@ -274,12 +301,7 @@ test('search finds a row by any of its searchable fields, and the words are pref
     {
       id: 'register.people',
       kind: 'register',
-      body: {
-        id: 'people',
-        name: 'People',
-        title: 'name',
-        fields: [{ id: 'name', type: 'text', required: true, search: true }],
-      } as never,
+      body: { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true, search: true }] } as never,
     },
   ]);
   value(await mcp.call('create', { register: 'people', fields: { name: 'Halden Studio' } }, owner));
@@ -292,127 +314,69 @@ test('search finds a row by any of its searchable fields, and the words are pref
 });
 
 test('and a query of punctuation finds nothing rather than erroring', async () => {
-  // The words a person types are not FTS5 syntax. Passed through raw, a typed quote is a syntax
-  // error and a typed minus is an exclusion nobody asked for.
   const { sql, mcp } = await agent();
-  for (const q of ['"', '-', '   ', 'NEAR(a b)'])
-    assert.ok(Array.isArray(value(await mcp.call('search', { q }, owner))), `${q} threw`);
-  sql.close();
-});
-
-/* ── the four the record added ───────────────────────────────────── */
-
-test('AN AGENT CAN ASK WHAT THE RECORD DRAWS, and read one page of it', async () => {
-  const { mcp, sql } = await agent();
-  const pages = await mcp.call('pages', {}, owner);
-  assert.ok(pages.ok, fixOf(pages));
-  assert.deepEqual(pages.value, [], 'this record declares no pages');
-
-  const missing = await mcp.call('page', { slug: 'nonsense' }, owner);
-  assert.ok(refused(missing));
-  assert.equal(missing.refusal.code, 'PAGE_UNKNOWN');
-
-  // And a slug that is not a string is a refusal rather than a crash, like every other argument.
-  const bad = await mcp.call('page', {}, owner);
-  assert.equal(bad.ok, false);
-  sql.close();
-});
-
-test('and what each credential OPENS, which is never the credential', async () => {
-  // There is no tool that reads one and there is not going to be. What an agent can have is the
-  // index, which is what makes "check nothing expires next week" possible without anything leaking.
-  const { mcp, sql } = await agent();
-  const out = await mcp.call('credentials', {}, owner);
-  assert.ok(out.ok, fixOf(out));
-  assert.deepEqual(out.value, []);
-  assert.ok(!JSON.stringify(out).includes('ciphertext'));
-  sql.close();
-});
-
-test('a figure comes back with its target, and one that is not declared is named', async () => {
-  const { mcp, sql } = await agent();
-  const out = await mcp.call('metric', { metric: 'nonesuch' }, owner);
-  assert.ok(refused(out));
-  assert.equal(out.refusal.code, 'METRIC_UNKNOWN');
-  sql.close();
-});
-
-test('PREVIEW BEFORE PROPOSE, which is the tool an agent needs most', async () => {
-  /* An agent writing a rule cannot look at the screen afterwards, and a rule that quietly tagged
-     four hundred rows is a rule nobody can undo by hand. */
-  const { mcp, sql } = await agent();
-  value(await mcp.call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }, owner));
-
-  const out = value<{ matches: number; won: number; sample: { would: string[] }[] }>(
-    await mcp.call(
-      'dry_run',
-      { rule: { rule: 'late', register: 'obligations', when: 'state is open', then: [{ tag: 'chased' }] } },
-      owner,
-    ),
-  );
-  assert.equal(out.matches, 1);
-  assert.equal(out.won, 1);
-  assert.deepEqual(out.sample[0]?.would, ['tag chased']);
-
-  // And it wrote nothing, which is the whole reason it can be handed to whoever is writing the rule.
-  assert.equal(sql.all("SELECT 1 FROM event WHERE actor LIKE 'rule:%'").length, 0);
-  assert.equal(value<{ fields: Record<string, unknown> }>(await mcp.call('get', { spoken: 'obligations#1' }, owner)).fields.tags, undefined);
-
-  // A rule about a register nobody has is a refusal, not a preview of nothing.
-  assert.ok(refusal(await mcp.call('dry_run', { rule: { rule: 'x', register: 'nothing', then: [] } }, owner)).code);
-  assert.ok(refusal(await mcp.call('dry_run', {}, owner)).code);
+  for (const q of ['"', '-', '   ', 'NEAR(a b)']) assert.ok(Array.isArray(value(await mcp.call('search', { q }, owner))), `${q} threw`);
   sql.close();
 });
 
 /* ── the resources, which are not tools and that is the point ─────── */
 
-test('A PAGE WAS INVISIBLE TO EVERY AGENT, and that is what ADR-018 calls a design error', async () => {
-  /* Its rule is that any screen needing an endpoint no agent can call is a design error — and the
-     web app's page read is `page({ slug })`, which no tool reaches. The fix is a resource rather
-     than a ninth tool, because a page is a read surface with a stable address and cacheable
-     content, and the tool list is in every turn of every session. */
+test('A PAGE IS A RESOURCE, and every resource listed reads', async () => {
+  /* ADR-018: a screen needing an endpoint no agent can call is a design error. A page is a read
+     surface with a stable address and cacheable content, which is what a resource is, and the tool
+     list is in every turn. */
   const { mcp, sql } = await agent();
 
-  const list = value<{ uri: string; ttlMs: number }[]>(await mcp.resources(owner));
+  const list = await mcp.resources(owner);
   const uris = list.map((r) => r.uri);
-  assert.ok(uris.includes('braindog:whoami'));
-  assert.ok(uris.includes('braindog:boot'));
-  assert.ok(uris.includes('braindog:schema/obligations'), 'a register has no schema resource');
+  for (const uri of ['braindog:whoami', 'braindog:boot', 'braindog:digest/today', 'braindog:decisions', 'braindog:schema/obligations'])
+    assert.ok(uris.includes(uri), `${uri} is not listed`);
 
-  // `whoami` is asked every time; a register's shape changes when a pack is installed and not
-  // between one.
   assert.equal(list.find((r) => r.uri === 'braindog:whoami')?.ttlMs, 0);
   assert.equal(list.find((r) => r.uri === 'braindog:schema/obligations')?.ttlMs, 3_600_000);
 
-  // And every one of them reads.
-  assert.ok(value<{ kind: string }>(await mcp.read('braindog:whoami', owner)).kind);
-  assert.ok(value<{ registers: unknown[] }>(await mcp.read('braindog:boot', owner)).registers);
-  assert.ok(value<{ fields: unknown[] }>(await mcp.read('braindog:schema/obligations', owner)).fields);
-  assert.ok(Array.isArray(value<unknown[]>(await mcp.read('braindog:decisions', owner))));
-  assert.ok(Array.isArray(value<unknown[]>(await mcp.read('braindog:digest/today', owner))));
+  for (const r of list) assert.ok((await mcp.read(r.uri, owner)).ok, `${r.uri} is listed and does not read`);
+
+  assert.equal(refusal(await mcp.read('braindog:page/nonsense', owner)).code, 'PAGE_UNKNOWN');
+  assert.equal(refusal(await mcp.read('braindog:metric/nonesuch', owner)).code, 'METRIC_UNKNOWN');
   sql.close();
+});
+
+test('AND WHAT THE RECORD CANNOT ANSWER YET IS NOT LISTED, and is listed once it can', async () => {
+  /* `context` and `sessions/live` have no method on today's record, so offering them would send an
+     agent to a certain refusal. A surface that has them lists them, and the sessions one carries the
+     sentence the start hook prints. */
+  const { mcp, sql } = await agent();
+  const today = (await mcp.resources(owner)).map((r) => r.uri);
+  assert.equal(today.includes('braindog:context'), false);
+  assert.equal(today.includes('braindog:sessions/live'), true, 'the record answers sessionsLive since step 6');
+  sql.close();
+
+  const later = await tools(stub().surface).resources({ who: 'agent' });
+  assert.ok(later.some((r) => r.uri === 'braindog:context'));
+  const live = later.find((r) => r.uri === 'braindog:sessions/live');
+  assert.match(live?.description ?? '', /Two sessions in one working tree overwrite each other\. Coordinate or stop\./);
+  assert.equal(live?.ttlMs, 0);
 });
 
 test('and a uri is parsed rather than resolved, because a stranger writes one', async () => {
   const { mcp, sql } = await agent();
-  for (const uri of ['braindog:schema/../../x', 'braindog:nothing', 'schema/obligations', 'braindog:', 'braindog:page'])
+  for (const uri of ['braindog:schema/../../x', 'braindog:nothing', 'schema/obligations', 'braindog:', 'braindog:page', 'braindog:skill/../x', 'braindog:sessions'])
     assert.equal(refusal(await mcp.read(uri, owner)).code, 'ROUTE_UNKNOWN', `${uri} resolved to something`);
   sql.close();
 });
 
 test('and a caller sees the registers they may touch and not the ones they may not', async () => {
-  // A list of names is itself information, so the resource list is scoped like `boot` is.
-  /* AND THERE ARE TWO REGISTERS NOW, BECAUSE WITH ONE THIS TEST COULD NOT FAIL. `agent()` installs
-     exactly one, so "every register" and "the one inside the ceiling" were the same list and the
-     second assertion was true by construction: it passed against a surface that ignored `ctx`
-     entirely. The claim in the title is only asked of a record that holds a register the caller may
-     NOT touch, and it matters here because the same function is where the page filter lives. */
+  /* THE SECOND REGISTER IS INSTALLED FIRST, BECAUSE WITH ONE THIS TEST COULD NOT FAIL. And its
+     premise is asserted: without the ceiling the second register IS listed, so the absence below is
+     the ceiling's doing and not the fixture's. */
   const { mcp, api, sql } = await agent();
   assert.ok((await api.kernel.install([NOTES])).ok);
-  const scoped = value<{ uri: string }[]>(await mcp.resources({ ...owner, registers: ['obligations'] }));
+  assert.ok((await mcp.resources(owner)).some((r) => r.uri === 'braindog:schema/notes'), 'the fixture has no second register to withhold');
+
+  const scoped = await mcp.resources({ ...owner, registers: ['obligations'] });
   assert.ok(scoped.some((r) => r.uri === 'braindog:schema/obligations'));
   assert.equal(scoped.some((r) => r.uri === 'braindog:schema/notes'), false, 'a register outside the ceiling is named in the list');
-  assert.equal(scoped.some((r) => r.uri.startsWith('braindog:schema/') && r.uri !== 'braindog:schema/obligations'), false);
   sql.close();
 });
 
@@ -435,28 +399,21 @@ const OVERDUE = {
 const MONEY = {
   id: 'page.money',
   kind: 'page' as const,
-  body: {
-    page: 'money',
-    title: 'Money',
-    blocks: [{ as: 'stat', cells: [{ metric: 'overdue', label: 'Overdue' }] }],
-  } as never,
+  body: { page: 'money', title: 'Money', blocks: [{ as: 'stat', cells: [{ metric: 'overdue', label: 'Overdue' }] }] } as never,
 };
 
-test('AND A METRIC RESOURCE READS A METRIC, which the cast was hiding', async () => {
-  /* The tool path sent `metric` and the resource sent `id`, and `as never` hid it — so every metric
-     resource answered `REQUIRED_MISSING` about an argument it had been sent. */
+test('AND A METRIC RESOURCE READS A METRIC', async () => {
   const { mcp, api, sql } = await agent();
   assert.ok((await api.kernel.install([OVERDUE, MONEY])).ok);
-  const listed = value<{ uri: string }[]>(await mcp.resources(owner));
-  const uri = listed.find((r) => r.uri.startsWith('braindog:metric/'))?.uri;
+  const uri = (await mcp.resources(owner)).find((r) => r.uri.startsWith('braindog:metric/'))?.uri;
   assert.ok(uri, 'no metric is listed, and a page names figures an agent cannot read');
-  assert.ok(value<{ value: unknown }>(await mcp.read(uri!, owner)));
+  assert.ok(value<{ value: unknown }>(await mcp.read(uri, owner)));
   sql.close();
 });
 
 /* A page whose title is a sentence about a register, over a register the caller is not the reader
-   of. `for:` is what makes the record list it at all: a template names the register it walks, that
-   one is readable, and the only block on the page draws from another one that is not. */
+   of. `for:` makes the record list it at all: a template names the register it walks, that one is
+   readable, and the only block on the page draws from another one that is not. */
 const NOTEBOOK = {
   id: 'page.notebook',
   kind: 'page' as const,
@@ -469,45 +426,34 @@ const NOTEBOOK = {
 };
 
 test('AND A PAGE IS WITHHELD FOR THE LEVEL HELD ON A REGISTER, not only for the ceiling', async () => {
-  /* The filter this exercises exists to stop a slug and a title travelling to somebody who cannot
-     read the register they are about, and it tested one refusal code where the check that produces
-     them writes two. A caller whose CEILING excludes the register is refused with `FORBIDDEN` and
-     was withheld the page. A caller invited to FILE into that same register and nothing else is
-     refused with a different code, about the same fact, by the same check, and was handed the
-     resource with "Notes, monthly" sitting in its description. Neither may read a row of it. */
+  /* A caller whose CEILING excludes the register is refused `FORBIDDEN`; a caller invited to FILE
+     into it is refused `LEVEL_REQUIRED` by the same check about the same fact. Neither may read a row
+     of it, so neither is told what it is called. */
   const { mcp, api, sql } = await agent();
   assert.ok((await api.kernel.install([NOTES, NOTEBOOK])).ok);
-  // A template is one page per row, so the page exists once there is something to draw it for.
   assert.ok((await api.create({ register: 'obligations', fields: { what: 'Coffee' } }, owner)).ok);
 
   const ceiling: CallContext = { ...owner, registers: ['obligations'] };
   const level: CallContext = { ...owner, levels: { obligations: 'read', notes: 'append' } };
   const codes = async (ctx: CallContext) =>
-    value<{ blocks: { refusals: { code: string }[] }[] }>(await api.page({ slug: 'coffee' }, ctx))
-      .blocks.flatMap((b) => b.refusals.map((r) => r.code));
+    value<{ blocks: { refusals: { code: string }[] }[] }>(await api.page({ slug: 'coffee' }, ctx)).blocks.flatMap((b) => b.refusals.map((r) => r.code));
 
-  /* THE FIXTURE'S OWN PREMISE, ASSERTED. Both callers are refused every block of this page, and the
-     two refusals do not say the same word. If either stops being true the test below is passing
-     about nothing, which is the state this file is trying not to be in. */
+  /* THE FIXTURE'S OWN PREMISE, ASSERTED: both callers are refused every block, in different words. */
   assert.deepEqual(await codes(ceiling), ['FORBIDDEN'], 'the ceiling caller is no longer refused the block');
   const held = await codes(level);
   assert.equal(held.length, 1, 'the append caller is no longer refused the block');
   assert.notEqual(held[0], 'FORBIDDEN', 'the two callers are refused in the same word, so this proves nothing');
 
   for (const [who, ctx] of [['ceiling', ceiling], ['append level', level]] as const) {
-    const listed = value<{ uri: string; description: string }[]>(await mcp.resources(ctx));
+    const listed = await mcp.resources(ctx);
     assert.equal(listed.some((r) => r.uri === 'braindog:page/coffee'), false, `the ${who} caller is offered a page they see nothing of`);
-    assert.equal(
-      listed.some((r) => r.description.includes('Notes, monthly')),
-      false,
-      `the ${who} caller is told what a register they cannot read is called`,
-    );
+    assert.equal(listed.some((r) => r.description.includes('Notes, monthly')), false, `the ${who} caller is told what a register they cannot read is called`);
+    for (const r of listed) assert.ok((await mcp.read(r.uri, ctx)).ok, `the ${who} caller is offered ${r.uri}, which refuses them`);
   }
   sql.close();
 });
 
-/* A page an agent may read, carrying a figure the record will not admit exists. Nothing declares
-   `owed`, so the block draws and the cell comes back refused with the id still on it. */
+/* A page an agent may read, carrying a figure the record will not admit exists. */
 const GHOSTLY = {
   id: 'page.ghostly',
   kind: 'page' as const,
@@ -521,47 +467,65 @@ const GHOSTLY = {
   } as never,
 };
 
-test('AND NO ADDRESS IS ADVERTISED THAT THIS SURFACE THEN REFUSES', async () => {
-  /* The ids came off the readings a page carried, and a reading survives its own refusal: the id of
-     a figure the record says does not exist arrived with the rest and was published. The list said
-     `braindog:metric/owed` and reading it said `METRIC_UNKNOWN`, so an agent enumerating resources
-     called one that was certain to refuse, and the record's answer, which is the shape chosen so
-     that a name leaks nothing, was handed back a name at a time by the layer above it. */
+test('AND NO METRIC IS ADVERTISED THAT THE RECORD SAYS DOES NOT EXIST', async () => {
   const { mcp, api, sql } = await agent();
   assert.ok((await api.kernel.install([GHOSTLY])).ok);
 
   assert.equal(refusal(await mcp.read('braindog:metric/owed', owner)).code, 'METRIC_UNKNOWN');
 
-  const listed = value<{ uri: string }[]>(await mcp.resources(owner));
+  const listed = await mcp.resources(owner);
   assert.ok(listed.some((r) => r.uri === 'braindog:page/ghostly'), 'the page itself is readable and belongs in the list');
   assert.equal(listed.some((r) => r.uri === 'braindog:metric/owed'), false, 'a figure the record denies is advertised');
+  for (const r of listed) assert.ok((await mcp.read(r.uri, owner)).ok, `${r.uri} is advertised and refuses`);
+  sql.close();
+});
 
-  /* AND THE WHOLE LIST, because the rule is about the list and not about one entry. */
-  for (const r of listed) {
-    const out = (await mcp.read(r.uri, owner)) as { ok: boolean; refusal?: { code: string } };
-    assert.ok(out.ok, `${r.uri} is advertised and answers ${out.refusal?.code}`);
-  }
+const SKILLS = {
+  id: 'register.skills',
+  kind: 'register' as const,
+  body: {
+    id: 'skills',
+    name: 'Skills',
+    title: 'name',
+    state: 'state',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'trigger', type: 'text' },
+      { id: 'body', type: 'text' },
+      { id: 'state', type: 'enum', values: ['active', 'retired'] },
+    ],
+  } as never,
+};
+
+test('A SKILL IS READ BY ITS NAME, and listed with when to use it', async () => {
+  const { mcp, api, sql } = await agent();
+  assert.equal(refusal(await mcp.read('braindog:skill/review-pr', owner)).code, 'REGISTER_UNKNOWN');
+
+  assert.ok((await api.kernel.install([SKILLS])).ok);
+  for (const [name, state] of [['review-pr', 'active'], ['old-deploy', 'retired']] as const)
+    value(await mcp.call('create', { register: 'skills', fields: { name, trigger: 'Before merging a branch.', body: 'Read the diff.', state } }, owner));
+
+  const listed = await mcp.resources(owner);
+  const skill = listed.find((r) => r.uri === 'braindog:skill/review-pr');
+  assert.equal(skill?.description, 'When to use it: Before merging a branch.');
+  assert.equal(listed.some((r) => r.uri === 'braindog:skill/old-deploy'), false, 'a retired skill is offered');
+
+  assert.equal(value<{ fields: { body: string } }>(await mcp.read('braindog:skill/review-pr', owner)).fields.body, 'Read the diff.');
+  assert.equal(refusal(await mcp.read('braindog:skill/nonesuch', owner)).code, 'ROUTE_UNKNOWN');
   sql.close();
 });
 
 test('AND A NAME OFF `Object.prototype` IS NOT A TOOL, it is a refusal', async () => {
-  /* `run` is a plain object literal, so `run['constructor']` was `Object` and got CALLED: the answer
-     to `call('constructor', args, ctx)` was the caller's own arguments, `call('toString', …)` was
-     the string `[object Undefined]`, and the rest threw a `TypeError` out of a function whose type
-     says it returns a `Result`. A refusal is a value here and an exception is not. The host looks
-     its routes up in a `Map` and the client in a `Set`; this was the one lookup that did neither. */
   const { mcp, sql } = await agent();
   for (const name of [
     'constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty', 'isPrototypeOf',
     'propertyIsEnumerable', 'toLocaleString', '__defineGetter__', '__lookupGetter__',
   ]) {
-    const out = await mcp.call(name, { register: 'obligations' }, owner);
-    const said = refusal(out);
+    const said = refusal(await mcp.call(name, { register: 'obligations' }, owner));
     assert.equal(said.code, 'ROUTE_UNKNOWN', `${name} was answered rather than refused`);
     assert.ok(said.fix.includes(name), `the refusal for ${name} does not say what was asked for`);
     assert.ok(said.allowed?.includes('list'), `the refusal for ${name} does not say what there is instead`);
   }
-  // And the tools that ARE there still are, which is what makes the guard a lookup and not a list.
   assert.ok((await mcp.call('record_index', {}, owner)).ok);
   sql.close();
 });

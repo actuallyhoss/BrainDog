@@ -1275,10 +1275,12 @@ export const PAGES: Record<string, SeedPage> = {
         empty: 'Nothing open on {{name}}.',
       },
       {
-        kind: 'timeline',
+        /* CARDS, because an agent working on the project is a face and a sentence, not a row in a log.
+           Same span as the timeline it replaces: the page pairs its blocks 8 with 4 and 7 with 5. */
+        kind: 'cards',
         heading: 'Agents',
         span: 7,
-        columns: [{ field: 'last_seen' }, { field: 'doing' }, { field: 'agent' }],
+        columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
         source: 'register.sessions',
         where: 'thing is {{name}}',
         order: [{ field: 'last_seen', dir: 'desc' }],
@@ -1420,14 +1422,16 @@ export const PAGES: Record<string, SeedPage> = {
     placed: false,
     blocks: [
       {
-        kind: 'table',
+        /* CARDS, with a face for each person, as the old tool draws people: a table of four columns read
+           as a directory. Each card still opens the person's row. */
+        kind: 'cards',
         heading: 'Everyone',
         source: 'register.people',
         columns: [
-          { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)', link: true },
-          { field: 'role', label: 'Role', width: '14ch' },
-          { field: 'rate', label: 'Rate', width: '14ch', align: 'end' },
-          { field: 'email', label: 'Email', width: 'minmax(16ch,1fr)' },
+          { field: 'name', label: 'Name', as: 'who' },
+          { field: 'role', label: 'Role', as: 'fact' },
+          { field: 'rate', label: 'Rate', as: 'fact' },
+          { field: 'email', label: 'Email', as: 'fact' },
         ],
         empty: 'Nobody yet.',
       },

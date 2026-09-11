@@ -20,8 +20,9 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { handlersFor, serveApi } from '@braindog/host';
+import { handlersFor, hintsOf, serveApi, withSession } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAuth, type Provisioned } from '@braindog/host/auth';
+import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { ulids, type CreateRecordArgs, type OutboxRow } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type RecordApi } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
@@ -32,8 +33,8 @@ import { createDirectory, type Directory as Dir } from '@braindog/record/directo
 import { alarmScheduler } from './alarm.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { inward, isRecordId, recordOf, servesApi, servesAuth } from './route.ts';
-import { doorOf, withCookie } from './session.ts';
+import { inward, isRecordId, servesApi, servesAuth, servesMcp } from './route.ts';
+import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 
 /**
  * Cloudflare's `send_email` binding. `from` is the sender Email Service needs; sign-in mail sets it from
@@ -105,6 +106,13 @@ function storageSql(storage: DurableObjectStorage): Sql {
     },
   };
 }
+
+/**
+ * The record's `/mcp`, with `_meta.session` checked as the session headers were and put on the context
+ * over them, key by key. The headers' hints are already on `ctx`: `inward` put them there.
+ */
+const serveMcp = (request: Request, api: RecordApi, ctx: CallContext): Promise<Response> =>
+  answerMcp(request, api, ctx, { session: (c, said) => withSession(c, hintsOf(said)) });
 
 /** One customer's record. The class name is `Record$` because `Record` is a TypeScript builtin. */
 export class Record$ extends DurableObject<Env> {
@@ -284,6 +292,10 @@ export class Record$ extends DurableObject<Env> {
     const ctx = JSON.parse(request.headers.get('x-braindog-ctx') ?? 'null') as CallContext | null;
     if (!ctx) return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This record needs a caller.' } }, 401);
 
+    /* `/mcp` READS ITS BODY HERE. The router checked the bearer from the headers alone, so nothing a stranger
+       sent is parsed, and the tools reach this record through the same methods `/api` calls. */
+    if (servesMcp(new URL(request.url).pathname)) return serveMcp(request, api, ctx);
+
     return serveApi(request, handlersFor(api), ctx);
   }
 }
@@ -453,15 +465,22 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
   if (pass.unacked > 0) await env.INGRESS.send({ record: id });
 }
 
-/** Where a call came from, for the "last used" line on a token listing. */
 /**
- * Where a call came from, for the "last used" line on a token listing.
+ * The bearer path's three calls, over this deployment's objects.
  *
- * THE PATH IS THE CALLER'S TO WRITE, so it is matched at the root rather than anywhere in the
- * string. `includes('/mcp')` made `POST /api/list/mcp` record `mcp` on somebody's token before the
- * method lookup 404'd it — a forgeable line in the one place a person decides what to revoke.
+ * WHERE A CALL CAME FROM IS THE BRANCH THE ROUTER TOOK, never the path read again. A path is the caller's
+ * to write, and `includes('/mcp')` once made `POST /api/list/mcp` record `mcp` on a token: a forgeable line
+ * in the one place a person decides what to revoke.
  */
-const surfaceOf = (url: URL): string => (/^\/+mcp(?:\/|$)/.test(url.pathname) ? 'mcp' : 'api');
+function bearerDeps(env: Env): BearerDeps {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const record = (id: string) => env.RECORD.get(env.RECORD.idFromName(id));
+  return {
+    knows: (id) => directory.knows(id),
+    verify: (id, bearer, surface) => record(id).verify(bearer, surface),
+    access: (id, person) => record(id).access(person),
+  };
+}
 
 /**
  * `no-store`, ON THE ROUTER'S OWN ANSWERS TOO.
@@ -560,6 +579,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const url = new URL(request.url);
     /* SIGN-IN FIRST, AND IT IS THE DIRECTORY'S: nothing under `/auth/` reaches a record. */
     if (servesAuth(url.pathname)) return signIn(request, env, ctx);
+    /* AN AGENT'S MCP CLIENT, BEFORE ANY DOOR IS ASKED, so neither the cookie nor the demo is ever read for it. */
+    if (servesMcp(url.pathname)) return agent(request, env);
     if (!servesApi(url.pathname))
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
 
@@ -592,59 +613,29 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     }
 
     /* A BEARER. This Worker serves MANY records, and a request that says who it is by nothing but the
-       header it carries says so here, or not at all. */
-    const named = recordOf(request.headers.get('authorization'));
-    if (!named) return unauthorized();
+       header it carries says so here, or not at all. `session.ts` holds the path, and `/mcp` takes the same one. */
+    const found = await bearerOf(request, 'api', bearerDeps(env));
+    if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unauthorized();
 
-    /* AND THE DIRECTORY IS ASKED WHETHER THAT ADDRESS IS ONE OF OURS, before it is used as one.
-       `idFromName` on a name nobody has does not fail — it CREATES the object, and `#record()` then
-       runs the migrations, which writes storage. Routing on an unverified id would be an open
-       invitation to mint empty billable records, one forged bearer at a time. The id is 26 random
-       characters, so answering is not an oracle: nobody guesses their way to a `true`. */
-    if (!(await directory.knows(named))) return unauthorized();
+    /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. Every check about
+       what a caller may do is inside `createRecordApi`, so the CLI and the MCP server answer to the same ladder
+       as the browser. `inward` writes the context over whatever the caller sent and drops the bearer. */
+    return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
+}
 
-    const record = env.RECORD.get(env.RECORD.idFromName(named));
-
-    /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. This
-       resolves WHO is asking and at what LEVEL; every check about what they may do with it is inside
-       `createRecordApi`, in one place, so the CLI and the MCP server answer to the same ladder as the
-       browser.
-
-       THE BEARER'S OWN RECORD IS CHECKED AGAIN, INSIDE. Reading the id out of it here is a claim;
-       `verifyToken` refuses a bearer whose record half is not the object's own, which is what makes
-       the claim safe to route on. */
-    const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1];
-    const seen = bearer ? await record.verify(bearer, surfaceOf(url)) : null;
-    if (!seen) return unauthorized();
-
-    /* THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT. The Directory said which record the NAME meant
-       and nothing more — a level read from there is a level `invite` and `remove` do not write, so
-       removing somebody would not have stopped them writing. */
-    const person = seen.person_id;
-    const held = await record.access(person);
-    if (!held) return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } }, 403);
-    const level = held.level as 'read' | 'append' | 'write' | 'decide' | 'owner';
-
-    /* THE INTERSECTION IS THE RECORD'S TO COMPUTE. What goes over is both halves — the token's
-       scope and the person's level — because a token says what its holder may do with their access
-       and never what access they have. */
-    const principal: CallContext['principal'] = seen
-      ? { kind: 'token', id: seen.id, scope: seen.scope as 'read' | 'propose' | 'write', person, level }
-      : { kind: 'person', id: person, level };
-
-    /* THE PATH TRAVELS UNCHANGED, because there is no prefix left to strip. `serveApi` reads the
-       method out of `/api/<method>` on both hosts, from the same table. */
-    /* AND THE REGISTER CEILING TRAVELS WITH IT, or a person invited to one register reaches every
-       one of them — which is the whole of what "invite the bookkeeper" was supposed to mean.
-       `inward` writes the context over whatever the caller sent and drops the bearer, the same way
-       for both doors. */
-    return record.fetch(
-      inward(request, {
-        principal,
-        ...(held.registers === null ? {} : { registers: held.registers }),
-        ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
-      }),
-    );
+/**
+ * `POST /mcp`: what the headers can refuse, then the bearer, then the record's object reads the body.
+ *
+ * A BEARER AND NOTHING ELSE. This is reached before `doorOf`, so a session cookie is never read and the demo
+ * never answers: an agent carries its own credential, and a person in a browser has the app. `gate` is the
+ * transport's own, so the order is the self-host's: 405, 403, 415, then 401.
+ */
+async function agent(request: Request, env: Env): Promise<Response> {
+  const early = gate(request);
+  if (early) return early;
+  const found = await bearerOf(request, 'mcp', bearerDeps(env));
+  if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent();
+  return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
 }
 
 /**

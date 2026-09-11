@@ -16,7 +16,8 @@
 
 import { KINDS, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
-import { MISSING } from './format.ts';
+import { MISSING, leadingCode } from './format.ts';
+import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
 export type RenderOptions = InlineOptions & {
@@ -128,6 +129,7 @@ const toneGlyph = (tone?: string): string => {
 /* ── the eight primitives ─────────────────────────────────────────────────── */
 
 function panel(b: Block, o: RenderOptions): string {
+  if (b.kind === 'section') return section(b, o);
   if (b.kind === 'quote') {
     const r = b.rows[0] ?? { cells: [] };
     return `<blockquote class="panel">${cell('quote-text', r.cells[0], o)}${r.cells[1] ? `<cite class="quote-by">${escape(r.cells[1])}</cite>` : ''}</blockquote>`;
@@ -149,6 +151,7 @@ function panel(b: Block, o: RenderOptions): string {
 }
 
 function grid(b: Block, o: RenderOptions): string {
+  if (b.kind === 'cards') return cards(b, o);
   if (b.kind === 'board') {
     const columns = [...new Set(b.rows.map((r) => r.cells[0] ?? ''))];
     const body = columns
@@ -316,18 +319,116 @@ function media(b: Block): string {
   return `<pre class="media"${lang} tabindex="0" role="group" aria-label="${label}"><code>${body}</code></pre>`;
 }
 
+/* ── two kinds with a drawer of their own ─────────────────────────────────── */
+
+/** An amount leads with its currency code, present and quiet, as `Grid.svelte` draws a stat's figure. */
+function amount(value: string, o: RenderOptions): string {
+  const coded = leadingCode(value);
+  return coded
+    ? `<span class="amount-code">${escape(coded.currency)}</span> ${renderInline(inline(coded.rest, o), o)}`
+    : renderInline(inline(value, o), o);
+}
+
+/**
+ * `cards`: one card per row after the first, which names what each column is (`src/cards.ts`).
+ *
+ * The grid's column count is the host's `auto-fill` over a minimum width, so a narrow container is
+ * one column with no breakpoint. `--cells` is not written: 05 §4 forbids inferring a count from the
+ * space, and a card grid infers nothing, it only lets empty tracks stay empty.
+ */
+function cards(b: Block, o: RenderOptions): string {
+  const [head, ...rows] = b.rows;
+  if (rows.length === 0) return `<p class="cards-empty">${escape(CARDS_NONE)}</p>`;
+  const L = cardLayout(head?.cells ?? []);
+  const label = (i: number): string => L.labels[i] ?? '';
+  const said = (r: Row, i: number): string => (i < 0 ? '' : plain(inline(r.cells[i] ?? '', o)));
+  const drawn = (r: Row, i: number): string => renderInline(inline(r.cells[i] ?? '', o), o);
+  const labelled = (i: number): string => (label(i) ? `<span class="cards-label">${escape(label(i))}</span>` : '');
+
+  const body = rows
+    .map((r) => {
+      const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null;
+      const face = L.nameIsWho ? initialOf(said(r, L.name)) : null;
+      const lead = mark
+        ? `<span class="cards-mark" aria-hidden="true">${escape(mark)}</span>`
+        : face
+          ? `<span class="cards-face" aria-hidden="true">${escape(face)}</span>`
+          : '';
+      const name = L.name >= 0 ? `<h3 class="cards-title">${r.cells[L.name] ? drawn(r, L.name) : MISSING}</h3>` : '';
+      const when = L.when >= 0 && r.cells[L.when] ? `<span class="cards-when">${drawn(r, L.when)}</span>` : '';
+
+      const figure =
+        L.figure >= 0
+          ? `<span class="cards-figure"><span class="cards-value num">${r.cells[L.figure] ? amount(r.cells[L.figure]!, o) : MISSING}</span>${labelled(L.figure)}</span>`
+          : '';
+      const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null;
+      const trend = t
+        ? `<svg class="cards-trend" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(`${label(L.trend) || TREND}: ${t.said.join(', ')}`)}"><path class="cards-trend-line" d="${t.d}" vector-effect="non-scaling-stroke"></path><path class="cards-trend-end" d="${t.end}" vector-effect="non-scaling-stroke"></path></svg>`
+        : '';
+      const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null;
+      /* The ring is decoration beside the value it draws, which is printed, so it is hidden and the
+         words are what a screen reader hears. A value that is not a proportion keeps its words. */
+      const ring =
+        L.ring >= 0 && r.cells[L.ring]
+          ? `<span class="cards-ring">${
+              m === null
+                ? ''
+                : `<svg class="cards-ring-mark" viewBox="0 0 36 36" aria-hidden="true"><circle class="cards-ring-track" cx="18" cy="18" r="16" pathLength="100"></circle><circle class="cards-ring-fill" cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="${ringDash(m)}" transform="rotate(-90 18 18)"></circle></svg>`
+            }<span class="cards-value num">${drawn(r, L.ring)}</span>${labelled(L.ring)}</span>`
+          : '';
+      const middle = figure || trend || ring ? `<div class="cards-body">${figure}${trend}${ring}</div>` : '';
+      const facts = L.facts.length
+        ? `<dl class="cards-facts">${L.facts
+            .map((i) => `<div class="cards-fact"><dt>${escape(label(i))}</dt><dd>${r.cells[i] ? drawn(r, i) : MISSING}</dd></div>`)
+            .join('')}</dl>`
+        : '';
+      const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null;
+      const who =
+        L.who >= 0 && r.cells[L.who]
+          ? `<div class="cards-who">${whoFace ? `<span class="cards-face" aria-hidden="true">${escape(whoFace)}</span>` : ''}<span class="cards-name">${drawn(r, L.who)}</span></div>`
+          : '';
+      return `<li class="cards-item"${toneAttrs(r.tone)}><div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${middle}${facts}${who}</li>`;
+    })
+    .join('');
+  return `<ul class="cards-grid">${body}</ul>`;
+}
+
+/**
+ * `section`: a heading on a page, with a count aside and, when folded, the control that folds what
+ * follows. The folding itself is the host's, because the blocks that follow are the page's and not
+ * this block's; `details` carries the state so the host can read it without script.
+ */
+function section(b: Block, o: RenderOptions): string {
+  const [glyph = '', count = '', fold = ''] = b.rows[0]?.cells ?? [];
+  const mark = glyph ? `<span class="sec-glyph" data-glyph="${escape(glyph)}" aria-hidden="true"></span>` : '';
+  const n = counted(plain(inline(count, o))) ? `<span class="sec-count num">${renderInline(inline(count, o), o)}</span>` : '';
+  const title = b.heading ? `<h2 class="sec-title">${mark}${renderInline(inline(b.heading, o), o)}${n}</h2>` : '';
+  const toggle =
+    fold === 'fold'
+      ? `<details class="sec-fold"><summary class="sec-toggle"><span class="sec-show">${FOLD_SHOW}</span><span class="sec-hide">${FOLD_HIDE}</span></summary></details>`
+      : '';
+  return `<div class="sec">${title}${toggle}</div>`;
+}
+
 const PRIMITIVE_RENDERERS = { panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;
 
 /* ── segments ─────────────────────────────────────────────────────────────── */
 
+/**
+ * Whether a block's heading becomes its figcaption.
+ *
+ * `code`'s heading is its language, and a `section`'s heading is the section, drawn by its drawer as
+ * a real heading. Neither is a caption. One function, read by both renderers, so the two trees
+ * cannot disagree about it.
+ */
+export const captioned = (b: Block): boolean => Boolean(b.heading) && b.kind !== 'code' && b.kind !== 'section';
+
 function block(b: Block, o: RenderOptions): string {
   const spec = KINDS[b.kind];
   const draw = PRIMITIVE_RENDERERS[spec.primitive];
-  // `code`'s heading is its language, not a caption, so it does not become a figcaption.
-  const cap =
-    b.heading && b.kind !== 'code'
-      ? `<figcaption class="block-head"${toneAttrs(b.tone)}>${toneGlyph(b.tone)}${renderInline(inline(b.heading, o), o)}</figcaption>`
-      : '';
+  const cap = captioned(b)
+    ? `<figcaption class="block-head"${toneAttrs(b.tone)}>${toneGlyph(b.tone)}${renderInline(inline(b.heading ?? '', o), o)}</figcaption>`
+    : '';
   return `<figure class="block block-${spec.primitive}" data-kind="${b.kind}" data-primitive="${spec.primitive}"${toneAttrs(b.tone)}>${cap}${draw(b as never, o)}</figure>`;
 }
 

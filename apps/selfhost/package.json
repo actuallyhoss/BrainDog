@@ -6,6 +6,7 @@
   "dependencies": {
     "@braindog/host": "workspace:*",
     "@braindog/kernel": "workspace:*",
+    "@braindog/mcp": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*"
   },

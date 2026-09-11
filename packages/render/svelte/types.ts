@@ -6,7 +6,7 @@
  * shared page all need to build these shapes.
  */
 
-import type { Tone } from '../src/index.ts';
+import type { CardRole, Tone } from '../src/index.ts';
 
 export type Column = {
   field: string;
@@ -40,6 +40,11 @@ export type Column = {
    * such column puts the glyph at the head of its first value, as it always has.
    */
   tone?: boolean | undefined;
+  /**
+   * What this column is on a card, for a `cards` block (`src/cards.ts`). A table ignores it. Absent,
+   * the page's evaluator places the column the way a phone card does: text first, a figure after.
+   */
+  as?: CardRole | undefined;
 };
 
 export type TableRow = {

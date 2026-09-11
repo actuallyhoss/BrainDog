@@ -1,0 +1,18 @@
+{
+  "name": "braindog-cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": { "braindog": "src/main.ts" },
+  "engines": { "node": ">=24.13" },
+  "devDependencies": {
+    "@braindog/client": "workspace:*",
+    "@braindog/mcp": "workspace:*",
+    "@braindog/ports": "workspace:*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

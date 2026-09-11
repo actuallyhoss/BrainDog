@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { KERNEL_MIGRATION, MIGRATIONS, applyMigrations, assertNumbering, canon, checksum, statements } from '../src/migrate.ts';
+import { openRecord, type Declaration } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -31,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 1, format: 1, applied: [1] });
+  assert.deepEqual(result.value, { kernel: 2, format: 1, applied: [1, 2] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -50,9 +51,119 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1]);
+  assert.deepEqual(first.result.value.applied, [1, 2]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 1);
+  assert.equal(sql.all('SELECT version FROM migration').length, 2);
+  sql.close();
+});
+
+/** Everything a migration could touch, so a run that changes nothing can be shown to. */
+const snapshot = (sql: ReturnType<typeof openSqlite>) => ({
+  schema: sql.all("SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY name"),
+  declaration: sql.all('SELECT * FROM declaration ORDER BY id, version'),
+  counter: sql.all('SELECT * FROM counter ORDER BY name'),
+  entry: sql.all('SELECT * FROM entry ORDER BY id'),
+  event: sql.all('SELECT * FROM event ORDER BY rowid'),
+  migration: sql.all('SELECT * FROM migration ORDER BY version'),
+});
+
+test('and a second run changes nothing at all, not a row and not an index', async () => {
+  const sql = openSqlite();
+  await applyMigrations(sql, fixedClock(NOW));
+  const before = snapshot(sql);
+  await applyMigrations(sql, fixedClock(NOW + 60_000));
+  assert.deepEqual(snapshot(sql), before);
+  sql.close();
+});
+
+/* ── a record that already exists ────────────────────────────────────────── */
+
+const NOTES: Declaration = {
+  id: 'register.notes',
+  kind: 'register',
+  body: { id: 'notes', name: 'Notes', title: 'body', fields: [{ id: 'body', type: 'text' }] },
+};
+
+/** The session register's index names, which is what migration 2 adds besides its one row. */
+const sessionIndexes = (sql: ReturnType<typeof openSqlite>): string[] =>
+  sql
+    .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'index'")
+    .map((r) => r.name)
+    .filter((name) => name.startsWith('entry_u_session__') || name.startsWith('entry_i_session__'));
+
+/**
+ * A record as this build first finds it on a host: migration 1 in its ledger, and registers, rows
+ * and history of its own. Made by opening a record and taking migration 2's work away again.
+ */
+async function beforeMigration2() {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([NOTES])).ok);
+  assert.ok(k.create('notes', { body: 'Call the bank' }, { actor: 'p_1' }).ok);
+  sql.exec("DELETE FROM declaration WHERE id = 'register.session'");
+  for (const name of sessionIndexes(sql)) sql.exec(`DROP INDEX ${name}`);
+  sql.exec('DELETE FROM migration WHERE version = 2');
+  return sql;
+}
+
+test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it held is untouched', async () => {
+  const sql = await beforeMigration2();
+  const before = snapshot(sql);
+
+  const { result } = await applyMigrations(sql, fixedClock(NOW));
+  assert.ok(result.ok, fixOf(result));
+  assert.deepEqual(result.value.applied, [2]);
+
+  const after = snapshot(sql);
+  assert.deepEqual(after.entry, before.entry, 'a row changed');
+  assert.deepEqual(after.event, before.event, 'the history changed');
+  assert.deepEqual(after.counter, before.counter, 'a counter changed');
+  assert.deepEqual(
+    after.declaration.filter((d) => (d as { id: string }).id !== 'register.session'),
+    before.declaration,
+    'a declaration other than the kernel one changed',
+  );
+  const seated = sql.one<{ version: number; pack_id: string }>("SELECT version, pack_id FROM declaration WHERE id = 'register.session'");
+  assert.deepEqual({ ...seated }, { version: 1, pack_id: 'kernel' });
+  assert.equal(sessionIndexes(sql).length, 8, 'the session indexes were not built');
+
+  /* AND THE RECORD OPENS ON IT: the register is live and its first row is spoken S1. */
+  const k = await openRecord(sql, fixedClock(NOW));
+  const run = k.create('session', { doing: 'First run' }, { actor: 'p_1' });
+  assert.ok(run.ok, fixOf(run));
+  assert.equal(k.get('S1')?.id, run.value.id);
+  assert.equal(k.get('notes#1')?.fields.body, 'Call the bank');
+  sql.close();
+});
+
+test('AND ONE THAT DECLARED A register.session OF ITS OWN KEEPS ITS ROWS, the kernel one arriving as its next version', async () => {
+  /* A collision on the declaration's primary key would throw inside the migration, and the record
+     would not open at all. */
+  const sql = await beforeMigration2();
+  sql.exec(
+    `INSERT INTO declaration (id, version, kind, pack_id, body, checksum, retired, superseded_at, created_at)
+     VALUES ('register.session', 1, 'register', NULL, ?, 'x', 0, NULL, '2026-09-01T00:00:00.000Z')`,
+    JSON.stringify({ fields: [{ id: 'what', type: 'text' }], id: 'session', name: 'Mine', title: 'what' }),
+  );
+  sql.exec(
+    `INSERT INTO entry (id, register, seq, fields, version, created_at, updated_at)
+     VALUES ('01J00000000000000000000000', 'session', 1, ?, 1, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`,
+    JSON.stringify({ what: 'mine' }),
+  );
+
+  const { result } = await applyMigrations(sql, fixedClock(NOW));
+  assert.ok(result.ok, fixOf(result));
+  const rows = sql.all<{ version: number; pack_id: string | null; superseded_at: string | null }>(
+    "SELECT version, pack_id, superseded_at FROM declaration WHERE id = 'register.session' ORDER BY version",
+  );
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]?.pack_id, null);
+  assert.ok(rows[0]?.superseded_at, 'the record’s own declaration is still active beside the kernel one');
+  assert.deepEqual(
+    { version: rows[1]?.version, pack_id: rows[1]?.pack_id, superseded_at: rows[1]?.superseded_at },
+    { version: 2, pack_id: 'kernel', superseded_at: null },
+  );
+  assert.equal(sql.all("SELECT 1 FROM entry WHERE register = 'session'").length, 1, 'the record’s own session row was lost');
   sql.close();
 });
 
@@ -116,6 +227,15 @@ test('a mis-numbered migration is a defect, not a refusal', () => {
   assert.throws(() => assertNumbering([{ version: 2, slug: 'wrong', sql: 'SELECT 1' }]), /numbered 2 and sits at 1/);
   assert.doesNotThrow(() => assertNumbering(MIGRATIONS));
   assert.equal(MIGRATIONS.length, KERNEL_MIGRATION);
+});
+
+test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', async () => {
+  /* An edit to either text fails here, before any record refuses to open over it. The repair is a
+     new migration, never a new constant. */
+  assert.deepEqual(await Promise.all(MIGRATIONS.map((m) => checksum(m.sql))), [
+    'fa653de2288f0aaeefa53cf1c0c19077f9842a76fb46f369d45707831290667d',
+    '16c5b5dc98bfba0191673904850dad59761cfba49680b037aef9333dfc7dc676',
+  ]);
 });
 
 /* ── the checksum ────────────────────────────────────────────────────────── */

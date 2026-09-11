@@ -16,7 +16,7 @@ import type { AddressInfo } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
-import { handlersFor, httpStatus, serveApi, type Handler } from '@braindog/host';
+import { handlersFor, hintsOf, httpStatus, serveApi, sessionOf, withSession, type Handler } from '@braindog/host';
 import {
   clearCookie,
   cookieMode,
@@ -30,6 +30,7 @@ import {
   type AuthDoor,
   type CookieMode,
 } from '@braindog/host/auth';
+import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
 import type { OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { createDirectory, type Directory } from '@braindog/record/directory';
@@ -149,6 +150,9 @@ type Seen =
   | { bare: 421 | 503 }
   | { bare: 429; retryAfter: number };
 
+/** What a bearer comes to: somebody, or a refusal. Never a bare status, because nothing ambient sends one. */
+type Known = { ctx: CallContext } | { refused: Refusal };
+
 /**
  * The owner, for the server key and for open mode.
  *
@@ -159,7 +163,7 @@ type Seen =
  * AND WHETHER ANYTHING WAS PRESENTED TRAVELS WITH IT. Minting a bearer that outlives the machine needs a
  * credential, and `createToken` can tell only if it is told.
  */
-function owner(api: Api, credentialed: boolean): Seen {
+function owner(api: Api, credentialed: boolean): Known {
   const who = api.kernel.created() ? api.kernel.ownerId() : 'p_self';
   if (!who) return { refused: NOBODY };
   return { ctx: { principal: { kind: 'person', id: who, level: 'owner' }, credentialed } };
@@ -182,6 +186,57 @@ function forged(request: Request, origins: ReadonlySet<string>): boolean {
 }
 
 /**
+ * WHAT WAS ACTUALLY PRESENTED, and `undefined` when that is nothing.
+ *
+ * `headers.get` RETURNS `''` FOR A HEADER WITH NO VALUE, and `'' !== undefined` — so a bare
+ * `Authorization:` line read as a credential. That is one byte, and it walked straight through the
+ * check that had just been added to stop exactly this: a request carrying nothing minted an owner
+ * bearer that works from anywhere for thirty days. `Authorization: Bearer` did it too, because the
+ * strip needs whitespace after `Bearer` to match, so the word itself became the credential.
+ *
+ * TRIMMED AND EMPTIED TO `undefined` HERE, ONCE, so nothing below has to remember.
+ */
+function presented(request: Request): string | undefined {
+  const raw = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
+  return raw ? raw : undefined;
+}
+
+/**
+ * A bearer: the server key, or an agent token. `/api` and `/mcp` both come through here, so a token reaches
+ * the same person at the same level through either, and `surface` is only what the token's listing shows as
+ * where it was last used.
+ */
+async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp'): Promise<Known> {
+  const { api, token } = site;
+  /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
+     differs, so how long a wrong guess took said how much of it was right. */
+  const isKey = token !== undefined && (await sameKey(sent, token));
+  if (isKey) return owner(api, true);
+
+  /* AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A self-host that recognised only
+     one shared string would be a deployment where an agent cannot be given less than everything.
+     `includes('.')` tells an agent token from the shared secret, and a shared secret with a dot in it
+     matched above and never reaches here. */
+  /* A CREDENTIAL THAT MATCHED NOTHING IS REFUSED, and never falls through to open mode: revoking a scoped
+     token used to promote it to the owner, and `Authorization: x` on an open self-host was the owner. */
+  if (!sent.includes('.')) return { refused: UNKNOWN };
+  const seen = await api.kernel.verifyToken(sent, surface);
+  if (!seen.ok) return { refused: UNKNOWN };
+
+  /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant, so a token outlives nothing its
+     holder has lost. NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. */
+  const held = api.kernel.access(seen.value.person_id);
+  if (!held) return { refused: OFF };
+  return {
+    ctx: {
+      principal: { kind: 'token', id: seen.value.id, scope: seen.value.scope, person: seen.value.person_id, level: held.level },
+      ...(held.registers === null ? {} : { registers: held.registers }),
+      ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
+    },
+  };
+}
+
+/**
  * Who is asking, in the order `49 §5.4` gives, amended: a bearer, then the session cookie, then open mode.
  *
  * `host` IS THE `Host` HEADER AS THE SOCKET RECEIVED IT, because in open mode it is the check: a page that
@@ -189,50 +244,11 @@ function forged(request: Request, origins: ReadonlySet<string>): boolean {
  */
 async function contextFor(request: Request, host: string, site: Site): Promise<Seen> {
   const { api, token } = site;
-  /**
-   * WHAT WAS ACTUALLY PRESENTED, and `undefined` when that is nothing.
-   *
-   * `headers.get` RETURNS `''` FOR A HEADER WITH NO VALUE, and `'' !== undefined` — so a bare
-   * `Authorization:` line read as a credential. That is one byte, and it walked straight through the
-   * check that had just been added to stop exactly this: a request carrying nothing minted an owner
-   * bearer that works from anywhere for thirty days. `Authorization: Bearer` did it too, because the
-   * strip needs whitespace after `Bearer` to match, so the word itself became the credential.
-   *
-   * TRIMMED AND EMPTIED TO `undefined` HERE, ONCE, so nothing below has to remember.
-   */
-  const raw = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
-  const sent = raw ? raw : undefined;
+  const sent = presented(request);
 
   /* ONE · A BEARER, which is an agent or the server key and never a browser, so the origin checks below do
      not apply to it: nothing ambient sends an `Authorization` header. */
-  if (sent !== undefined) {
-    /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
-       differs, so how long a wrong guess took said how much of it was right. */
-    const isKey = token !== undefined && (await sameKey(sent, token));
-    if (isKey) return owner(api, true);
-
-    /* AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A self-host that recognised only
-       one shared string would be a deployment where an agent cannot be given less than everything.
-       `includes('.')` tells an agent token from the shared secret, and a shared secret with a dot in it
-       matched above and never reaches here. */
-    /* A CREDENTIAL THAT MATCHED NOTHING IS REFUSED, and never falls through to open mode: revoking a scoped
-       token used to promote it to the owner, and `Authorization: x` on an open self-host was the owner. */
-    if (!sent.includes('.')) return { refused: UNKNOWN };
-    const seen = await api.kernel.verifyToken(sent, 'api');
-    if (!seen.ok) return { refused: UNKNOWN };
-
-    /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant, so a token outlives nothing its
-       holder has lost. NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. */
-    const held = api.kernel.access(seen.value.person_id);
-    if (!held) return { refused: OFF };
-    return {
-      ctx: {
-        principal: { kind: 'token', id: seen.value.id, scope: seen.value.scope, person: seen.value.person_id, level: held.level },
-        ...(held.registers === null ? {} : { registers: held.registers }),
-        ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
-      },
-    };
-  }
+  if (sent !== undefined) return bearerFor(sent, site, 'api');
 
   /* TWO · THE SESSION COOKIE. A BAD ONE IS A 401 AND IS CLEARED, AND NEVER FALLS THROUGH TO OPEN MODE: a
      cookie that names no session is somebody who thinks they are signed in, and answering them as the
@@ -399,7 +415,7 @@ export async function start(options: {
    * (a passkey made at one origin answers nothing at another), and the `Origin` every write must carry.
    */
   origin?: string | undefined;
-  /** The built app to serve for every path that is not `/api` or `/auth`. Absent: those paths are 404. */
+  /** The built app to serve for every path that is not `/api`, `/auth` or `/mcp`. Absent: those paths are 404. */
   shell?: string | undefined;
   /** 32 bytes for the Directory's MACs, derived from the KEK or `BRAINDOG_SESSION_SECRET`. Absent: no sessions. */
   sessionKey?: Uint8Array | undefined;
@@ -720,26 +736,27 @@ async function answer(
   shell: ((request: Request) => Response) | null,
   trustProxy: boolean,
 ): Promise<void> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
-
   const url = `http://localhost${req.url ?? '/'}`;
-  const request = new Request(url, {
-    method: req.method ?? 'GET',
-    headers: Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : (v ?? '')]),
-    ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
-  });
+  const method = req.method ?? 'GET';
+  const headers = Object.entries(req.headers).map(([k, v]): [string, string] => [k, Array.isArray(v) ? v.join(', ') : (v ?? '')]);
   if (!site) return write(res, json(503, { ok: false }));
 
-  /* THREE DOORS, AND THEY ARE `33 §4`'S: sign-in, the record, and the app for everything else. The app is
-     what makes `/signin` the same origin as the cookie it asks for. */
+  /* FOUR DOORS, AND THEY ARE `33 §4`'S: sign-in, an agent's MCP client, the record, and the app for everything
+     else. The app is what makes `/signin` the same origin as the cookie it asks for. `/mcp` is taken before a
+     byte of the body is read, because it reads the body only for a bearer it knows. */
   const path = new URL(url).pathname;
+  if (/^\/+mcp\/*$/.test(path)) return write(res, await agent(req, url, method, headers, site));
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  const request = new Request(url, { method, headers, ...(chunks.length ? { body: Buffer.concat(chunks) } : {}) });
   if (/^\/+auth(?:\/|$)/.test(path)) return write(res, await serveAuth(request, { ...site.door, ip: ipOf(req, trustProxy) }));
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
 
   const seen = await contextFor(request, req.headers.host ?? '', site);
-  if ('ctx' in seen) return write(res, await serveApi(request, handlers, seen.ctx), seen.cookie);
+  /* THE SESSION HEADERS ON EVERY DOOR, checked: the record reads a token's and ignores anybody else's. */
+  if ('ctx' in seen) return write(res, await serveApi(request, handlers, withSession(seen.ctx, sessionOf(request.headers))), seen.cookie);
   /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —
      a credential nobody minted, a credential belonging to somebody who is not on the record, and a
      record with no owner who may act — so a client could not tell which of the three to do something
@@ -754,4 +771,73 @@ async function answer(
   if (seen.bare === 421) return write(res, new Response(null, { status: 421, headers: { 'cache-control': 'no-store' } }));
   if (seen.bare === 429) return write(res, json(429, { ok: false, retryAfter: seen.retryAfter }, [['retry-after', String(seen.retryAfter)]]));
   return write(res, json(503, { ok: false }));
+}
+
+/**
+ * `POST /mcp`, for an agent's MCP client (`loop/research-agent-path.md` §1.3, §1.7).
+ *
+ * NOTHING OF THE BODY IS READ UNTIL THE BEARER IS KNOWN. What the headers can refuse, and the bearer, are
+ * decided on a request with no body at all; the socket's bytes become one only for a caller this record knows.
+ *
+ * A BEARER AND NOTHING ELSE: the path `/api` takes for one, and nothing that path falls back to. The cookie is
+ * never read and open mode never applies, because an agent carries its own credential and a browser has the app.
+ */
+async function agent(req: IncomingMessage, url: string, method: string, headers: [string, string][], site: Site): Promise<Response> {
+  const head = new Request(url, { method, headers });
+  const early = gate(head);
+  if (early) return early;
+  const sent = presented(head);
+  const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp');
+  if (seen === null) return unauthorized();
+  if ('refused' in seen) {
+    /* A credential this record does not know is the transport's 401. One it knows, for somebody no longer on
+       the record or a record nobody may act on, gets the status and the sentence `/api` gives. */
+    if (seen.refused.code === 'UNAUTHORIZED') return unauthorized();
+    const out = { ok: false as const, refusal: seen.refused };
+    return json(httpStatus(out), out);
+  }
+  /* The session headers, then `_meta.session` over them key by key, both checked the same way. */
+  return serveMcp(new Request(url, { method, headers, body: bodyOf(req), duplex: 'half' }), site.api, withSession(seen.ctx, sessionOf(head.headers)), {
+    session: (ctx, said) => withSession(ctx, hintsOf(said)),
+  });
+}
+
+/**
+ * The socket's bytes as a stream, read only as `serveMcp` asks for them.
+ *
+ * PAUSED BEFORE THE LISTENER IS ATTACHED, and `highWaterMark: 0`, so not a byte is read until a read asks
+ * for one. A listener attached while flowing reads a chunk at once, and Node then leaves draining to us.
+ *
+ * A CANCEL DRAINS RATHER THAN DESTROYS. `serveMcp` cancels a body it refuses at 413, and destroying the
+ * request would close the socket before the 413 is written. The rest is read and dropped, never held, so
+ * the connection is still good for the client's next request.
+ */
+function bodyOf(req: IncomingMessage): ReadableStream<Uint8Array> {
+  let open = true;
+  const stop = (): boolean => {
+    const was = open;
+    open = false;
+    return was;
+  };
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      req.pause();
+      req.on('data', (chunk: Buffer) => {
+        if (!open) return;
+        controller.enqueue(new Uint8Array(chunk));
+        if ((controller.desiredSize ?? 0) <= 0) req.pause();
+      });
+      req.once('end', () => {
+        if (stop()) controller.close();
+      });
+      req.once('error', (e) => {
+        if (stop()) controller.error(e);
+      });
+    },
+    pull: () => void req.resume(),
+    cancel: () => {
+      stop();
+      req.resume();
+    },
+  }, { highWaterMark: 0 });
 }

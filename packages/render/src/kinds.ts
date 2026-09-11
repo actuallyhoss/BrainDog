@@ -1,10 +1,10 @@
 /**
- * The eight primitives, the sixteen kinds, and the four intent words.
+ * The eight primitives, the eighteen kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
  *
- * The sixteen ship as ONE table rather than sixteen files, in the shape a pack's `block`
+ * The eighteen ship as ONE table rather than eighteen files, in the shape a pack's `block`
  * declaration takes, so a first-party kind and a kind a pack invented after the bundle shipped
  * travel one code path (22 §3, ADR-056).
  */
@@ -30,7 +30,7 @@ export type Primitive = (typeof PRIMITIVES)[number];
  * workspace dependencies, which is what makes it a seam rather than a layer. So the names are
  * EXPORTED here and handed in there, and the one gap that mattered is why: the forced-colours
  * boundary list was hand-written against a mental model of the app, so `.prop`, `.inline` and
- * `.list` were missing — six of sixteen kinds lost every boundary under Windows High Contrast —
+ * `.list` were missing — six of the sixteen kinds of the day lost every boundary under Windows High Contrast —
  * while `.card`, `.field` and `.sheet` were in it and are classes nothing emits.
  */
 export const PRIMITIVE_CLASSES: Record<Primitive, string> = {
@@ -133,13 +133,13 @@ export type KindSpec = {
 };
 
 /**
- * Sixteen, counted. `diagram`, `sparkline`, `series` and `forecast` are post-v1 and arrive as a
+ * Eighteen, counted. `diagram`, `sparkline`, `series` and `forecast` are post-v1 and arrive as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
  * shape-checked — and then re-exported as `Record<Kind, KindSpec>`, because `as const` alone narrows
- * each entry to its own literal type and `KINDS[kind].ordered` stops compiling for the fifteen kinds
- * that do not set it.
+ * each entry to its own literal type and `KINDS[kind].ordered` stops compiling for the kinds that do
+ * not set it.
  */
 const TABLE = {
   /* Prose and emphasis */
@@ -170,6 +170,12 @@ const TABLE = {
 
   /* Register-bound */
   table: { primitive: 'table', cells: 0, tone: false, pageOnly: true, minSpan: 6, purpose: 'list' },
+
+  /* Page-bound, on existing primitives so `PRIMITIVES_VERSION` does not move. A `cards` fence's
+     first row names what each column is on a card (`src/cards.ts`); a `section` has one row,
+     `glyph | count | fold`. Both reach a fence only from a page's own evaluator (`parse`'s `page`). */
+  cards: { primitive: 'grid', cells: 0, tone: true, header: true, pageOnly: true, minSpan: 4, purpose: 'list' },
+  section: { primitive: 'panel', cells: 3, tone: false, rows: 1, pageOnly: true, minSpan: 12, purpose: 'say' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

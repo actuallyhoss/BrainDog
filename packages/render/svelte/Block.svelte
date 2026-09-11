@@ -7,7 +7,7 @@
   police afterwards (50 §2.7).
 -->
 <script lang="ts">
-  import { KINDS, TONES, inline, type Block, type RenderOptions, type Row } from '../src/index.ts';
+  import { KINDS, TONES, captioned, inline, type Block, type RenderOptions, type Row } from '../src/index.ts';
   import Text from './Text.svelte';
   import Panel from './p/Panel.svelte';
   import Grid from './p/Grid.svelte';
@@ -65,12 +65,14 @@
   data-primitive={spec.primitive}
   data-intent={block.tone}
 >
-  {#if block.heading && block.kind !== 'code'}
+  <!-- `captioned` is the same rule `toHTML` reads: a `code` heading is its language and a `section`
+       heading is the section itself, so neither becomes a caption. -->
+  {#if captioned(block)}
     <figcaption class="block-head" data-intent={block.tone}>
       {#if block.tone}
         <span class="glyph" role="img" aria-label={TONES[block.tone].label}>{TONES[block.tone].glyph}</span>
       {/if}
-      <Text nodes={inline(block.heading, opts)} {opts} />
+      <Text nodes={inline(block.heading ?? '', opts)} {opts} />
     </figcaption>
   {/if}
 

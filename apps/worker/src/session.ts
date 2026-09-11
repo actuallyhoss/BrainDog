@@ -15,7 +15,7 @@ import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from 
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 
-import { DEMO_CONTEXT, demoRecord } from './route.ts';
+import { DEMO_CONTEXT, demoRecord, recordOf } from './route.ts';
 
 /** What the record says a person holds in it. The same shape `Record$.access` answers. */
 export type Held = { level: string | null; registers: string[] | null; levels: Record<string, string> };
@@ -83,4 +83,48 @@ export function withCookie(response: Response, cookie: string | undefined): Resp
   const next = new Response(response.body, response);
   next.headers.append('set-cookie', cookie);
   return next;
+}
+
+/** The three calls the bearer path makes: the Directory's `knows`, and the record's `verify` and `access`. */
+export type BearerDeps = {
+  knows: (record: string) => Promise<boolean>;
+  verify: (record: string, bearer: string, surface: 'api' | 'mcp') => Promise<{ id: string; person_id: string; scope: string } | null>;
+  access: (record: string, person: string) => Promise<Held | null>;
+};
+
+export type Bearer = { record: string; ctx: CallContext } | { status: 401 } | { status: 403; refusal: Refusal };
+
+type TokenPrincipal = Extract<CallContext['principal'], { kind: 'token' }>;
+
+/**
+ * An agent's bearer, for `/api` and `/mcp` alike, so a token reaches the same person at the same level
+ * through either. `surface` is all that differs, and it is only the token's `last_surface`: where a listing
+ * says it was last used, which is how somebody decides what to revoke.
+ *
+ * THE DIRECTORY IS ASKED WHETHER THE RECORD IS OURS BEFORE IT IS USED AS AN ADDRESS. `idFromName` on a name
+ * nobody has creates the object, and opening one writes storage, so an unchecked id would let a forged bearer
+ * mint an empty record. The id is 26 random characters, so a `true` cannot be guessed.
+ *
+ * THEN THE RECORD CHECKS THE SECRET AGAINST ITS OWN TABLE, and says what the person may do inside it. A level
+ * read from the Directory is one `invite` and `remove` never write, so removing somebody would not stop them.
+ */
+export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: BearerDeps): Promise<Bearer> {
+  const authorization = request.headers.get('authorization');
+  const record = recordOf(authorization);
+  if (!record || !(await deps.knows(record))) return { status: 401 };
+  const bearer = /^Bearer\s+(.+)$/i.exec(authorization ?? '')?.[1];
+  const seen = bearer ? await deps.verify(record, bearer, surface) : null;
+  if (!seen) return { status: 401 };
+  const held = await deps.access(record, seen.person_id);
+  if (!held) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } };
+  /* BOTH HALVES GO OVER, the token's scope and the person's level, and the record computes where they meet: a
+     token says what its holder may do with their access and never what access they have. */
+  return {
+    record,
+    ctx: {
+      principal: { kind: 'token', id: seen.id, scope: seen.scope as TokenPrincipal['scope'], person: seen.person_id, level: held.level as TokenPrincipal['level'] },
+      ...(held.registers === null ? {} : { registers: held.registers }),
+      ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
+    },
+  };
 }

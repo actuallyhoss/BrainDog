@@ -100,23 +100,30 @@ A7), and the install-time check refuses a key that is not in it, by name.
 
 | Key | Type | Default | Required |
 |---|---|---|---|
-| `kind` | one of the sixteen — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 — or a `block.<id>` this pack declares or the record has installed. A pack kind is **page-only** at stage 0: a write-up's fence takes the sixteen ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.5) | — | yes |
-| `heading` | text | — | no |
+| `kind` | one of the eighteen — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 — or a `block.<id>` this pack declares or the record has installed. A pack kind is **page-only** at stage 0: a write-up's fence takes the kinds that are not page-only ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.5) | — | yes |
+| `heading` | text. On a `section` it is the section, drawn as a heading | — | `section` |
 | `span` | int, 1–12 | 12 | no |
-| `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) | — | `table` |
+| `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page). On a `section` it is what the count counts | — | `table`, `cards` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6 | every row | no |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
-| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool, tone_when? }]` | — | `table` |
+| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool, tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts | — | `table`, `cards` |
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
 | `limit` | int | 50, at most 500 | no |
 | `empty` | text, interpolatable | — | **yes, on every block with a `source`** |
 | `cells` | `[{ metric, label }]` | — | `stat` |
 | `tone` | intent | — | no |
 | `body` | markdown in the dialect | — | `note` |
+| `icon` | a glyph name, drawn beside a `section`'s heading | — | no |
+| `fold` | bool. A `section` that starts shut, folding the blocks after it up to the next section; one press opens it | `false` | no |
 | *`accepts` names* | on a pack-declared `kind`, the keys its `accepts:` names are legal here, typed `register · metric · number · text` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.6) | per the block declaration | as the declaration says |
 
 `tone_when` on a column is a `where:` leaf without `field:` — the column supplies it — plus a `tone`,
-evaluated at render like `when`. *An earlier draft of this document defined none of these; thirty-seven
+evaluated at render like `when`.
+
+A `cards` block lays one card per row in a grid that fills its container at 17rem a card, one column
+on a narrow one; the title opens the row. A `section` is a full-width heading with a count aside, and
+the blocks after it sit under it. Neither is a box: a card is one surface, and a section is a heading
+and air. *An earlier draft of this document defined none of these; thirty-seven
 keys were in use across four documents with no type, default or required flag between them.*
 
 ---

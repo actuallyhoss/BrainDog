@@ -9,7 +9,7 @@ Derives from [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §1–§7, [34-GRAM
 ## 1 · Purpose and boundary
 
 **Does.** Takes a `document` string in the dialect of 34 §2 and returns segments (`parse`) or HTML (`toHTML`).
-Draws the sixteen kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
+Draws the eighteen kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
 Formats money, dates, quantities and references one way. Never renders nothing: a malformed block becomes a
 visible fence with one line above it (05 §3 invariant 1).
 
@@ -21,6 +21,7 @@ visible fence with one line above it (05 §3 invariant 1).
 | pass HTML through, load an asset, emit a colour, a font or a spacing value | 05 §3 invariant 3; 04 §7 |
 | refuse a document | the fence at render is the feedback channel, 05 §3 |
 | draw a `table` | page-only, 05 §2.1; a `table` fence degrades |
+| draw `cards` or `section` from a write-up | page-only; only a page's evaluator passes `parse(src, { page: true })`, because it writes their rows from a declaration |
 | render Svelte | `braindog-render/svelte` is stage 3 (31 §2) and outside this spec |
 | validate a pack's `block` declaration | `declare`, spec 42 |
 
@@ -34,13 +35,13 @@ visible fence with one line above it (05 §3 invariant 1).
 
 ```ts
 // packages/render/src/index.ts — the whole surface; the exports map names nothing else
-export function parse(markdown: string): Segment[];
+export function parse(markdown: string, opts?: ParseOptions): Segment[];   // ParseOptions = { page?: boolean }
 export function toHTML(segments: readonly Segment[], opts?: RenderOptions): string;
 export function render(markdown: string, opts?: RenderOptions): string;      // toHTML(parse(markdown), opts)
 
 export const PRIMITIVES_VERSION: 1;
 export const PRIMITIVES: readonly ['panel', 'grid', 'rows', 'proportional', 'inline', 'list', 'table', 'media'];
-export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // sixteen entries, §4
+export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // eighteen entries, §4
 
 export type { Segment, Markdown, Block, Degraded, Row, Inline, Kind, KindSpec, Primitive,
               Tone, TypedKind, EvidenceTag, RenderOptions, LinkRef, Refusal };
@@ -64,11 +65,14 @@ type LinkRef =
 | `parse` | fence scan, row split, tone, arity, inline tokens | never throws; every string yields a `Segment[]` (fuzz-tested, §9) |
 | `toHTML` | resolves, formats, escapes, emits | throws nothing of its own; an exception from `opts.resolve` or `opts.link` propagates — the host owns them |
 | `render` | `toHTML(parse(s), opts)` | as above |
-| `KINDS` | the sixteen kinds as data | — |
+| `KINDS` | the eighteen kinds as data | — |
 | `PRIMITIVES` | the eight primitive names, in 05 §1 order | — |
 | `PRIMITIVES_VERSION` | `1` at stage 0 (31 §6) | — |
 
-`braindog-render/svelte` is stage 3. It consumes the same `Segment[]` and is held to the parity test of §9. Nothing more is said here.
+`braindog-render/svelte` is stage 3. It consumes the same `Segment[]` and is held to the parity test of §9. Nothing more is said here,
+except that `cards` and `section` each have a drawer of their own on both sides (`svelte/Cards.svelte`, `svelte/Section.svelte`,
+and `cards` and `section` in `html.ts`), reached through their primitive as `board` and `quote` are, and that `src/cards.ts` holds
+what both drawers decide: the roles, the trend line, the ring and a face's initial.
 
 Versioning: the package semver moves on any change to this surface; `PRIMITIVES_VERSION` moves only when the eight
 change (31 §6). A host that stores a parsed tree stores the package version beside it (22 §8).
@@ -91,6 +95,7 @@ packages/render/
     parse.ts     ~140    fence scan → segments; row split; tone; arity; degradation
     inline.ts    ~130    the inline tokeniser: code span, {{…}}, typed forms, evidence, strong, em, link, text
     html.ts      ~340    escape; markdown blocks; resolve and format; eight primitive emitters; the degraded block
+    cards.ts     ~150    what `cards` and `section` decide: the roles, the trend line, the ring, a face's initial
   test/
     parse.test.ts  inline.test.ts  html.test.ts  fuzz.test.ts  budget.test.ts
     fixtures/      stat-05.md  dialect-arity.md  dialect-kind-unknown.md  writeup-100kb.md
@@ -107,7 +112,8 @@ Build is `tsc -p .`; no bundler. Tests run on the `.ts` sources with `node --tes
 ```ts
 type Primitive   = typeof PRIMITIVES[number];
 type Kind        = 'note' | 'quote' | 'stat' | 'bar' | 'gauge' | 'chips' | 'spec' | 'params'
-                 | 'todo' | 'steps' | 'timeline' | 'board' | 'code' | 'tree' | 'comparison' | 'table';
+                 | 'todo' | 'steps' | 'timeline' | 'board' | 'code' | 'tree' | 'comparison' | 'table'
+                 | 'cards' | 'section';
 type Tone        = 'good' | 'warn' | 'bad' | 'info' | 'hole';
 type TypedKind   = 'date' | 'day' | 'until' | 'ago' | 'money' | 'quantity' | 'pct' | 'ref';
 type EvidenceTag = 'verified' | 'inferred' | 'estimate' | 'unknown';
@@ -123,7 +129,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, sixteen, counted:
+`KINDS`, eighteen, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -143,6 +149,8 @@ interface KindSpec {
 | `tree` | media | — verbatim | 0 | no | — | |
 | `comparison` | table | the header row's count | n | no | — | |
 | `table` | table | — | 0 | no | — | pageOnly |
+| `cards` | grid | the first row names each column's role (`title figure fact trend ring who when mark`); one row per card | the header's count | yes | — | pageOnly · header |
+| `section` | panel | glyph · count · fold | 3 | no | 1 | pageOnly |
 
 ```ts
 type Segment = Markdown | Block | Degraded;
@@ -176,7 +184,7 @@ type Inline =
 Invariants, each a test in §9:
 
 1. Every non-blank input line belongs to exactly one segment. `Degraded.source` is the block's lines verbatim, both fences included.
-2. `Block.kind` is one of the sixteen and is never `table`.
+2. `Block.kind` is one of the eighteen and is never `table`; it is `cards` or `section` only when `parse` was called with `{ page: true }`.
 3. For a split kind, `Row.cells.length ≤ KINDS[kind].cells.length`; for `comparison`, ≤ the header row's count.
 4. `Row.tone === 'hole'` only when `Block.kind === 'bar'`.
 5. `Block.rows.length ≤ KINDS[kind].rows` where a cap is set.
@@ -198,9 +206,10 @@ Invariants, each a test in §9:
    - Empty info string → kind `code`, no heading (§13-8).
    - No match, non-empty → degrade `DIALECT_KIND_UNKNOWN`; `kind` = the info's first whitespace-delimited token.
    - Match, kind not in `KINDS`, or kind `table` → degrade `DIALECT_KIND_UNKNOWN` (§13-9).
+   - Match, kind `cards` or `section`, without `{ page: true }` → degrade `DIALECT_KIND_UNKNOWN` (§13-21).
 6. Heading: split as a row (§5.2). A trailing tone word is the **block's** tone; the remaining cells, re-joined with ` | `, are the heading, tokenised (§5.4). `note | Kicker | bad` is how a note takes a tone (§13-6).
 7. Body: `note`, `code`, `tree` → `body` = the lines joined with `\n`, `rows = []`. Every other kind: each non-blank line is a row (§5.2).
-8. Arity: a row with more cells than the kind takes → degrade the whole block, `DIALECT_ARITY`, `at: "rows[n]"` (n is 1-based among rows). `comparison`: the first row is the header; its count is the arity for the rest. Rows over the cap → degrade, `at: "rows"`.
+8. Arity: a row with more cells than the kind takes → degrade the whole block, `DIALECT_ARITY`, `at: "rows[n]"` (n is 1-based among rows). `comparison` and `cards`: the first row is the header; its count is the arity for the rest, the header carries no tone, and a later row's tone is read only from a cell beyond that count. Rows over the cap → degrade, `at: "rows"`. A `cards` header with a word that is not a role, two of one role, or more than three facts → degrade, `DIALECT_ARITY`.
 9. Emit the `Block` or `Degraded`. Continue at step 3.
 10. At EOF close an open markdown run.
 
@@ -365,6 +374,8 @@ in the kind's order; an absent cell renders as an empty span — columns never s
 | `code` | `<pre><code class="language-L">verbatim</code></pre>`; `L` = the heading when it matches `^[A-Za-z0-9_+#.-]+$`; no `<figcaption>` |
 | `tree` | `<pre class="tree"><code>verbatim</code></pre>` |
 | `comparison` | `<table><thead><tr><th scope="col">…</th></tr></thead><tbody><tr[ class="tone-x"]><td>…</td></tr></tbody></table>`; a short row is padded with empty `<td>` to the header count |
+| `cards` | `<ul class="cards-grid"><li class="cards-item"[ data-intent]><div class="cards-head">` mark or face · `<h3 class="cards-title">` · glyph · `<span class="cards-when">` `</div>` · `<div class="cards-body">` figure · trend `<svg role="img" viewBox="0 0 1000 100" preserveAspectRatio="none">` with `vector-effect="non-scaling-stroke"` paths · ring `<svg aria-hidden="true">` with `stroke-dasharray` against `pathLength="100"`, beside its printed value `</div>` · `<dl class="cards-facts">` · `<div class="cards-who">` face and name `</li>…</ul>`. No cards → `<p class="cards-empty">Nothing to show.</p>`. No `figcaption` is withheld; the page passes none. Every mark is placed by an attribute and no `style` is written |
+| `section` | no `figcaption`: `<div class="sec"><h2 class="sec-title">`glyph? heading `<span class="sec-count">`count, when not zero`</span></h2>` and, when folded, `<details class="sec-fold"><summary class="sec-toggle"><span class="sec-show">Show</span><span class="sec-hide">Hide</span></summary></details></div>`. The host hides the blocks after a shut `sec-fold` |
 | degraded | `<figure class="block block-degraded" data-kind="K"><figcaption>fix</figcaption><pre class="block-degraded" data-code="C"[ data-row="n"]><code>source</code></pre></figure>` |
 
 **Magnitude.** `numeric(cell)`: a cell that is exactly one `path` token uses the raw resolved value — a number is itself,
@@ -393,11 +404,13 @@ it saying what to do. The fence is the feedback channel.
 
 | Code | When | `at` | `found` · `wanted` | `fix` — the figcaption a person reads |
 |---|---|---|---|---|
-| `DIALECT_KIND_UNKNOWN` | the info string names no kind, or does not match the info regex | `info` | the token · `one of the sixteen kinds` | `` `widget` is not a block kind. Write `code \| widget` for verbatim text, or one of the sixteen kinds. `` |
-| `DIALECT_KIND_UNKNOWN` | the kind is `table` in a write-up (§13-9) | `info` | `table` · `a page block` | `` `table` draws a register on a page. In a write-up, use `comparison`. `` |
+| `DIALECT_KIND_UNKNOWN` | the info string names no kind, or does not match the info regex | `info` | the token · `one of the eighteen kinds` | `` `widget` is not a block kind. Write `code \| widget` for verbatim text, or one of the eighteen kinds. `` |
+| `DIALECT_KIND_UNKNOWN` | the kind is `table` in a write-up (§13-9), or `cards` outside `{ page: true }` | `info` | the kind · `a page block` | `` `table` draws a register on a page. In a write-up, use `comparison`. `` |
+| `DIALECT_KIND_UNKNOWN` | the kind is `section` outside `{ page: true }` | `info` | `section` · `a page block` | `` `section` is a heading on a page, so it has no place in a fence. Write a `##` heading. `` |
 | `DIALECT_ARITY` | row n has more cells than the kind takes | `rows[n]` | the count · the kind's cells joined with ` \| ` | `` `stat` row 2 has 5 cells. A `stat` row is label \| figure \| note, then a tone. `` |
 | `DIALECT_ARITY` | a `comparison` row is wider than its header | `rows[n]` | the count · the header count | `` `comparison` row 3 has 4 cells. The header has 3. `` |
-| `DIALECT_ARITY` | rows over the cap — `stat` 6, `quote` 1, `gauge` 1 (§13-9) | `rows` | the count · the cap | `` `stat` has 7 rows. Six at most — a seventh tile is a `spec`. `` |
+| `DIALECT_ARITY` | rows over the cap — `stat` 6, `quote` 1, `gauge` 1, `section` 1 (§13-9) | `rows` | the count · the cap | `` `stat` has 7 rows. Six at most — a seventh tile is a `spec`. `` |
+| `DIALECT_ARITY` | a `cards` header names a word that is not a role, two of one role, or more than three facts (§13-21) | `rows[1]` | the fault · one figure and at most three facts | `` A cards block has more than three facts. A card takes one figure and at most three facts. `` |
 
 The `fix` sentence follows 13 §6: what was wrong, where, what to do; no reasoning, no metric. The `Degraded` segment
 carries the whole `Refusal`, so a CLI or an MCP surface prints `code` and `fix` the way it prints a write refusal.
@@ -514,6 +527,7 @@ What never travels: nothing leaves the process. The package makes no call.
 | `licence-closure` | `npm pack --dry-run --json`: every entry under `dist/`, `src/`, `test/fixtures/` or is `LICENSE`, `README.md`, `package.json`; no `@braindog/`; no `../../`; `dependencies` empty; `LICENSE` starts `MIT License` (31 §4 rule 8) |
 | `refusal-fixtures` | `dialect-arity` and `dialect-kind-unknown` are produced by tests 5 and 6 from `test/fixtures/*.md`; spec 40 wraps the same two files as the `fixtures/refusals/*.yaml` the gate reads |
 | `a11y-tree` parity — **stage 3** | the corpus through `toHTML`, parsed by a browser, and through the Svelte interpreter yields the same accessibility tree and the same `--cells` values (31 §2, ADR-045). A row here; it runs when spec 50 exists |
+| `src/parity.test.ts` | the Svelte drawers compiled under `node --test` through Node's module hooks and rendered by `svelte/server`, held equal to `toHTML` once hydration markers and whitespace between tags are taken out. It covers every shape of `cards` and `section` today, and is the harness the corpus row above can grow into |
 
 ---
 
@@ -526,7 +540,7 @@ What never travels: nothing leaves the process. The package makes no call.
 - `ponytail:` instants render raw RFC 3339; add `opts.tz` and a time format when a page interpolates one.
 - `ponytail:` `format(v)` has no "billions with a suffix" and no "rate as a level" (05 §7.1 rule 3); add when a metric's `format:` reaches the renderer through `resolve`.
 - `ponytail:` bar magnitudes are linear from zero over absolute values; add a signed scale when a diff chart needs one.
-- `ponytail:` the sixteen kinds are one TypeScript table with no `body`/`accepts`; `expand` and `$name` (22 §3) arrive with `declare` (42), the first consumer that has a pack kind to render.
+- `ponytail:` the kinds are one TypeScript table with no `body`/`accepts`; `expand` and `$name` (22 §3) arrive with `declare` (42), the first consumer that has a pack kind to render.
 - `ponytail:` glyph cells are emitted as `data-glyph` and drawn by the host stylesheet; the 122-glyph library is not in this package; ship it when a second consumer renders chips without the app's CSS.
 - `ponytail:` `--cells` and `--magnitude` ride inline `style`; switch to an SVG `<rect width="N%">` if the host's CSP cannot allow `style-src-attr` (§13-10).
 - `ponytail:` no heading ids; add anchors when a page links into a write-up section.
@@ -572,7 +586,7 @@ Toolchain from the root: Node 24.13.0, pnpm 11.25.0, ESLint flat with `eslint-pl
 
 ## 13 · Decisions taken here
 
-Twenty, counted. Each names the document to amend in the same revision (35 §1).
+Twenty-one, counted. Each names the document to amend in the same revision (35 §1).
 
 | # | Title | Decision | Amend |
 |---|---|---|---|
@@ -596,6 +610,7 @@ Twenty, counted. Each names the document to amend in the same revision (35 §1).
 | 18 | **`todo` markers** | `[ ]`, `[x]`, `[X]` at the start of the first cell; absent → not done; rendered as `<input type="checkbox" disabled[ checked]>` | 34 §2.2 `todo` row |
 | 19 | **Where a bar's magnitude comes from** | a cell that is one interpolation uses the raw value — number, `money.amount`, `quantity.value`, a parsed string; a text cell parses after stripping `,` and `%`; `bar` scales to the max non-hole row, `gauge` to `value / target` clamped at 1 | 05 §7.4 `bar` rows |
 | 20 | **The budgets** | `parse` 100 KB ≤ 10 ms; `render` ≤ 25 ms; output ≤ 5× input; `dist` ≤ 12 KB brotli; 10 KB keystroke parse ≤ 1 ms | 15 §2 stage 0 ("a test suite"); 22 §8 |
+| 21 | **`cards` and `section` are page kinds on existing primitives** | two rows in `KINDS`, on `grid` and `panel`, so `PRIMITIVES_VERSION` stays 1. Both are page-only, and `parse(src, { page: true })` admits a page-only kind that has a row grammar: `cards` carries its roles in a header row, `section` its glyph, count and fold in one row. `table` has none and still degrades. A `section`'s heading is drawn as an `h2`, never a caption. No new code, no new primitive, no new inline style: marks are placed by SVG attributes and coloured by host CSS in role tokens | 05 §2 and §2.1; 06 §1.1; 42 §4.5 |
 
 ---
 
@@ -606,7 +621,7 @@ Twenty, counted. Each names the document to amend in the same revision (35 §1).
 - [ ] The exports map exposes `.` only; `import 'braindog-render/src/parse.ts'` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
 - [ ] `node --test` passes tests 1–36; the fixture files of §3 are committed; `test/seeds/` exists.
 - [ ] `budget.test.ts` passes every row of §7 on Node 24.13.0.
-- [ ] The `closed-lists` gate reads 16 · 8 · 4 + 4 + 1 · 8 · 4 from `dist/index.js` and matches 34 §6.
+- [ ] The `closed-lists` gate reads 18 · 8 · 4 + 4 + 1 · 8 · 4 from `dist/index.js` and matches 34 §6.
 - [ ] The `licence-closure` gate passes on `npm pack --dry-run --json`.
 - [ ] `dialect-arity` and `dialect-kind-unknown` fixtures produce their codes.
 - [ ] The eleven design documents named in §13 carry their amendments, and [BUILD.md](../BUILD.md) logs this iteration.

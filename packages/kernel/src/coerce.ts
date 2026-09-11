@@ -94,6 +94,94 @@ export function isJsonQuoted(s: string): boolean {
 /** The two characters backslash and `n`, with no real newline anywhere in the string. */
 export const hasEscapedNewline = (s: string): boolean => s.includes('\\n') && !s.includes('\n');
 
+/**
+ * The shapes a published key takes, by its issuer's own prefix: a private key's PEM header, Stripe,
+ * GitHub, GitLab, Slack, AWS, Google, Anthropic and OpenAI, npm, 25 §7's own `phx_` and `vcp_`, a
+ * JWT, the two webhook addresses that are their own secret, and a password written into a URL.
+ */
+const KEY_SHAPES: readonly RegExp[] = [
+  /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----/u,
+  /\b[rs]k_(?:live|test)_[A-Za-z0-9]{16,}/u,
+  /\bgh[opsur]_[A-Za-z0-9]{30,}/u,
+  /\bgithub_pat_[A-Za-z0-9_]{30,}/u,
+  /\bglpat-[A-Za-z0-9_-]{20,}/u,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/u,
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/u,
+  /\bAIza[0-9A-Za-z_-]{35}/u,
+  /\bsk-(?:ant|proj)-[A-Za-z0-9_-]{20,}/u,
+  /\bsk-[A-Za-z0-9]{32,}/u,
+  /\bnpm_[A-Za-z0-9]{36}/u,
+  /\b(?:phx|vcp)_[A-Za-z0-9]{20,}/u,
+  /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/u,
+  /hooks\.slack\.com\/services\/[A-Za-z0-9/]{20,}/u,
+  /discord(?:app)?\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]{20,}/u,
+  /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/iu,
+];
+
+/** A run a key could be written as: the base64 and base64url alphabets, thirty-two or longer. */
+const KEY_RUN = /[A-Za-z0-9+/=_-]{32,}/gu;
+
+/** A URL's path, where a document's own id lives. A link to a document is not a key to it. */
+const URL_PATH = /\b([a-z][a-z0-9+.-]*:\/\/[^\s/?#]+)\/[^\s?#]*/giu;
+
+const classOf = (c: string): number => (c >= 'a' && c <= 'z' ? 0 : c >= 'A' && c <= 'Z' ? 1 : c >= '0' && c <= '9' ? 2 : 3);
+
+/**
+ * Whether one run reads as random rather than as words.
+ *
+ * ENTROPY ALONE DOES NOT TELL THEM APART: a long camel-case name scores what a 32-character key
+ * scores. What does is how a key is made. It mixes lower case, capitals and digits, changes class at
+ * two characters in five or more, has few separators, and holds few runs of three lower-case letters,
+ * which is what a word is made of. Measured over random keys of 32 to 64 characters this misses
+ * between one in forty and one in a thousand, and passes the long names, slugs and paths tried.
+ */
+function random(run: string): boolean {
+  if (!/[a-z]/u.test(run) || !/[A-Z]/u.test(run) || !/[0-9]/u.test(run)) return false;
+  if (run.replace(/[A-Za-z0-9]/gu, '').length > run.length / 10) return false;
+  let turns = 0;
+  for (let i = 1; i < run.length; i++) if (classOf(run[i]!) !== classOf(run[i - 1]!)) turns++;
+  if (turns < 0.4 * (run.length - 1)) return false;
+  let words = 0;
+  for (const [w] of run.matchAll(/[a-z]{3,}/gu)) words += w.length;
+  if (words >= 0.45 * run.length) return false;
+  const counts = new Map<string, number>();
+  for (const c of run) counts.set(c, (counts.get(c) ?? 0) + 1);
+  let bits = 0;
+  for (const n of counts.values()) bits -= (n / run.length) * Math.log2(n / run.length);
+  return bits >= 3.5;
+}
+
+/**
+ * Whether a text holds what looks like a key: a known issuer's shape, or a long random token.
+ *
+ * LET THROUGH ON PURPOSE: a hex digest or a git hash of any length, a ULID, a UUID and the record's
+ * own ids, none of which mixes cases; a token inside a URL's path, which is a link; and anything
+ * under 32 characters. A long base64 value that is not secret, such as a public key or a wallet
+ * address, is refused with the keys, because it cannot be told apart from one.
+ */
+export function looksLikeCredential(text: string): boolean {
+  if (KEY_SHAPES.some((shape) => shape.test(text))) return true;
+  for (const [run] of text.replace(URL_PATH, '$1 ').matchAll(KEY_RUN)) if (random(run)) return true;
+  return false;
+}
+
+/**
+ * What `min:` and `max:` measure (`02 §5`): the UTF-8 bytes of a text or a document, the value of a
+ * number, a money's amount in minor units and a quantity's value. `null` for anything else.
+ */
+export function measure(type: string, value: Json): number | null {
+  if (type === 'text' || type === 'document') return typeof value === 'string' ? new TextEncoder().encode(value).length : null;
+  if ((type === 'money' || type === 'quantity') && value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const n = type === 'money' ? value.amount : value.value;
+    return typeof n === 'number' ? n : null;
+  }
+  return typeof value === 'number' ? value : null;
+}
+
+/** A field's bounds in words, as a refusal names them: `12 to 400`, `at least 12`, `at most 400`. */
+export const range = (lo: number | undefined, hi: number | undefined): string =>
+  lo !== undefined && hi !== undefined ? `${lo} to ${hi}` : lo !== undefined ? `at least ${lo}` : `at most ${String(hi)}`;
+
 /** A day that exists. `2026-02-30` matches the shape and is not a date. */
 export function isRealDay(s: string): boolean {
   const m = DAY.exec(s);
@@ -135,6 +223,22 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
     case 'text':
     case 'document': {
       if (typeof value !== 'string') return malformed(`${at} takes a string.`);
+      /* A CREDENTIAL NEVER GOES IN A ROW IN PLAIN TEXT, and this is the check that keeps it out of
+         every text a register holds, from every caller. First, so a key sent JSON-quoted is still
+         answered with where keys go.
+
+         `VALUE_MALFORMED`, AND THE `secret` ARM BELOW IS WHY. The record already answers a key sent
+         where no row keeps one with this code and no `found`: a secret field takes a grant id and
+         never the key. This is the same fact at a text field, and one fact keeps one code.
+         `SECRET_IN_PACK` says it about a pack, and its repair is an edit to a pack file that a caller
+         writing a learning has not got. `FORBIDDEN` is about who asks, and a person is refused this
+         as surely as an agent. No `found`, because the value may be the key. */
+      if (looksLikeCredential(value))
+        return bad(
+          'VALUE_MALFORMED',
+          `${at} holds what looks like a key, and a key never goes in a row. Deposit it in the vault, and write here what it opens.`,
+          at,
+        );
       /* In this order: a JSON-quoted string also contains no newline, and reporting the second would
          send the caller looking for a line break that was never the problem. */
       if (isJsonQuoted(value))

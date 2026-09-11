@@ -15,6 +15,7 @@
   import { inline, leadingCode, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
   import Text from '../Text.svelte';
+  import Cards from '../Cards.svelte';
 
   let {
     block,
@@ -255,7 +256,9 @@
   {#if unsaved}<span class="card-mark">{NOT_SAVED}</span>{/if}
 {/snippet}
 
-{#if block.kind === 'board'}
+{#if block.kind === 'cards'}
+  <Cards {block} {opts} />
+{:else if block.kind === 'board'}
   <!--
     HTML DRAG AND DROP, NOT POINTER EVENTS. The gesture is the platform's: it brings its own drag
     image, its own cursor, `Esc` to cancel and a drop that fires once. A pointer-events version has

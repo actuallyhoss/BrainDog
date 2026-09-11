@@ -33,13 +33,15 @@ else is `node:*`.
 
 ## 2 · Public API
 
-An app's public surface is its command tree, its config file and its environment. Every command takes the
-two globals `--json` and `--host <host>`; every command exits with one of four codes (§4.4).
+An app's public surface is its command tree, its config file and its environment. Every command but `mcp`
+takes the two globals `--json` and `--host <host>`; every command exits with one of four codes (§4.4).
 
 | Command | Arguments · flags | Calls | Prints | Exit |
 |---|---|---|---|---|
 | `login <host>` | `<host>` = `https://origin[/slug]` | `POST /auth/device` then `POST /auth/device/token` until approved | the six digits and the URL (stderr); `logged in to <host> as <label> · expires <date>` | 0 · 1 · 3 |
+| `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers of `loop/research-agent-path.md` §3.4, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
+| `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
 | `dev` | self-host only; `--port <n>` (default 8080) | spawns the self-host entry: `dev` | the child's output | the child's |
 | `export` | `--sections data,origin,governance` · `--redact-grants` · `--with-attachments` · `--mirror` · `-o <file.dog>` · `--key <pubkey \| url>` | `POST /api/export` — one streamed body, under an operation grant (§5.2) · `GET /a/<sha256>` for attachments | the verify block of §5.6, then the paths written | 0 · 1 · 3 |
 | `import <file.dog \| file.dogl>` | `--key <pubkey \| url>` | offline verify, then `POST /api/import` — one streamed body (operation grant) | `imported <tables> tables, <rows> rows · event <id>` | 0 · 1 · 3 |
@@ -57,8 +59,25 @@ two globals `--json` and `--host <host>`; every command exits with one of four c
 | `runner run` | `--once` | `POST /api/claimJob { wait: 20 }` · `postJobEvent` · `readCancel`; spawns `claude` | one line per job to stderr; never exits unless `--once` | 0 · 1 · 3 |
 | `--version` | — | nothing | `app <date>+<sha> · format 1 · kernel <n> · primitives 1` | 0 |
 
-Seventeen commands plus `--version`, counted. `--json` puts exactly one JSON document on stdout (§4.5) and
-moves every progress line to stderr. `--host` beats `BRAINDOG_HOST`, which beats `hosts.json`'s `default`.
+Nineteen commands plus `--version`, counted: the seventeen of the first design, then `mcp` and `serve`.
+`--json` puts exactly one JSON document on stdout (§4.5) and moves every progress line to stderr. `mcp` takes
+no `--json`, because its stdout is the protocol. `--host` beats `BRAINDOG_HOST`, which beats `hosts.json`'s
+`default`. A host is written `https://origin[/slug]`; a bare name means https, and plain http is refused
+except to this machine, because the bearer would cross the network in the clear.
+
+**Built today: `mcp`, `init` and `serve`.** The command runs from a checkout as
+`node apps/cli/src/main.ts`. Until §3's bundle exists, the manifest's `bin` points at that file and the manifest
+stays `private`, so `tools/release.mjs` does not offer a file npm could not run. `init` and `serve` are the
+self-host's, which has no `bin` of its own and tells people to type them, so this command claims the name and
+spawns the self-host for both. The agent path adds `hook start|end`, `logout`, `session`, `key add|exec` (alias
+`run`), `skills sync`, `tools scan|write`, `context` and `install` (`loop/research-agent-path.md` §4.2). Each
+gets its row here in the step that builds it; until then the command says it is not built yet.
+
+Claude Code registers `mcp` once per profile, and no token appears in the line or in the file it writes:
+
+```
+claude mcp add-json braindog '{"type":"stdio","command":"node","args":["<checkout>/apps/cli/src/main.ts","mcp","--agent","claude"]}' --scope user
+```
 
 ### The config file
 
@@ -68,7 +87,8 @@ $XDG_CONFIG_HOME/braindog/hosts.json          Linux, macOS; ~/.config when XDG_C
 mode 0600 · written atomically (write hosts.json.tmp, rename)
 ```
 
-Shape in §4.1. `BRAINDOG_TOKEN` wins over the file and is never written to it.
+Shape in §4.1. `BRAINDOG_TOKEN` wins over the file and is never written to it. A token is never an argument,
+because argv shows in process lists and in an agent's config.
 
 ### Environment
 
@@ -77,8 +97,9 @@ Shape in §4.1. `BRAINDOG_TOKEN` wins over the file and is never written to it.
 | `BRAINDOG_HOST` | every remote command | the host when `--host` is absent |
 | `BRAINDOG_TOKEN` | every remote command | the bearer, as-is: an agent token on Cloud, the owner bearer of 33 §6 on a self-host |
 | `XDG_CONFIG_HOME` | config | the directory above `braindog/hosts.json` |
-| `BRAINDOG_SELFHOST` | `init`, `dev` | the path of the self-host entry file (§5.14) |
-| `BRAINDOG_DATA`, `PORT` | `init`, `dev` | passed through to the spawned self-host, unread by the CLI |
+| `BRAINDOG_TIMEOUT_MS` | `mcp` | the budget of one tool call, in milliseconds; 20,000 when unset or not a whole number |
+| `BRAINDOG_SELFHOST` | `init`, `serve`, `dev` | the path of the self-host entry file (§5.14) |
+| `BRAINDOG_DATA`, `PORT` | `init`, `serve`, `dev` | passed through to the spawned self-host, unread by the CLI |
 
 ---
 

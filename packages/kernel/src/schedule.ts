@@ -20,6 +20,7 @@ import type { Sql } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
 import { backoffMs, openChangeSuggestion, summary, type AckDeps } from './outbox.ts';
+import { SESSION } from './session.ts';
 import { resolveDay } from '@braindog/where';
 
 const DAY_MS = 86_400_000;
@@ -475,6 +476,35 @@ function fail(sql: Sql, deps: AckDeps, row: Claimed, error: string, attempts: nu
     from: { kind: row.kind, key: row.key, error, attempts, payload: summary(row.payload) },
     question: `A ${row.kind} due ${row.due_at.slice(0, 10)} could not run after ${attempts} attempts: ${error}. Retry it, or change what produces it.`,
   });
+}
+
+/** A run not heard from in twelve hours is abandoned by the hourly sweep. */
+export const ABANDON_MS = 12 * 3_600_000;
+
+/**
+ * The session half of the hourly sweep: a run not heard from in twelve hours is abandoned.
+ *
+ * WRITTEN, NOT DERIVED, because a run that crashed never marks itself dead, and a register whose
+ * finished rows are finished only to a reader who remembers to compare clocks fills up with runs
+ * that look alive. `handoff` is skipped: it is a request waiting for the next run, and its age says
+ * nothing about whether anything died. `done` is never written, because the sweep knows that a run
+ * went quiet and not that its work finished.
+ *
+ * `move` is the write path's, so each change is a `state` event by `system` like any other, and a
+ * run that comes back later re-attaches through the declared `abandoned` to `active` move.
+ */
+export function sweepSessions(sql: Sql, nowMs: number, move: (id: string, to: string) => boolean, limit = 100): number {
+  const quiet = sql.all<{ id: string }>(
+    `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND state IN ('active', 'idle')
+     AND coalesce(json_extract(fields, '$.last_seen'), updated_at) < ?
+     ORDER BY coalesce(json_extract(fields, '$.last_seen'), updated_at) LIMIT ?`,
+    SESSION,
+    iso(nowMs - ABANDON_MS),
+    Math.max(0, Math.floor(limit)),
+  );
+  let n = 0;
+  for (const row of quiet) if (move(row.id, 'abandoned')) n++;
+  return n;
 }
 
 /**

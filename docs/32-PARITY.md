@@ -88,26 +88,50 @@ tool, `record_index` shows who is live, and the CI rule *"the kernel contains no
 declaration"* gains one named exception with its reason.
 
 ```yaml
-register: session            # declared by the KERNEL — the only one
-seq_prefix: "S"
+register: session                 # declared by the KERNEL, the only one, in migration 0002
+name: Agent runs                  # the word on screen; the id stays session
+one: run
+seq_prefix: S                     # S42. D and SG are governance's, and no other register may speak S
+title: doing
+state: state
+done: [done, abandoned]
+mobile: [doing, agent, state]
+icon: session
 fields:
-  - { id: client_id, type: text, unique: true }     # the agent runtime's own id, for re-attach
-  - { id: token_id,  type: text, index: true }      # the agent token that opened it — a token's writes are one query (53 §13 #12)
-  - { id: title,     type: text }
+  - { id: client_id, type: text, unique: true }                     # the agent runtime's own id, for re-attach
+  - { id: token_id,  type: text, index: true }                      # kernel-written: the token that opened it, so a token's writes are one query (53 §13 #12)
+  - { id: agent,     label: Agent, type: enum, values: [claude, codex, cursor, other], default: other, index: true }
+  - { id: doing,     label: Doing, type: text, search: true }       # not `title`, which is a reserved field id (02 §2)
+  - { id: project,   label: Project, type: text, index: true }      # kernel-written: the spoken id of a row in the scopes register; empty is global
   - { id: repo,      type: text, index: true }
-  - { id: host,      type: text }
-  - { id: state,     type: enum, values: [active, idle, handoff, done, abandoned], default: active,
-      transitions: { active: {to: [idle, handoff, done, abandoned]}, idle: {to: [active, done, abandoned]},
-                     handoff: {to: [active, done]} } }
-  - { id: next,      type: text }                    # THE one next step. "carry on" is not resumable
-  - { id: tried,     type: list, of: {type: text} }  # dead ends — the highest-value field
-  - { id: notes,     type: list, of: {type: text} }  # reasoning, not the diff
-  - { id: last_seen, type: instant }                 # written in place by the KERNEL at step 6 on every write from this session — no version bump, no updated_at, no event; not a derivation
+  - { id: remote,    type: text }                                   # the normalised origin URL
+  - { id: cwd,       type: text }
+  - { id: host,      type: text, index: true }
+  - { id: branch,    type: text }
+  - { id: head,      type: text }
+  - { id: state,     type: enum, values: [active, idle, handoff, done, abandoned], default: active, index: true,
+      transitions: { active:    { to: [idle, handoff, done, abandoned] },
+                     idle:      { to: [active, handoff, done, abandoned] },
+                     handoff:   { to: [active, done] },
+                     done:      { to: [active] },                   # re-attach after /clear
+                     abandoned: { to: [active] } } }                # re-attach the next morning
+  - { id: next,      label: Next step, type: text }                 # THE one next step. "carry on" is not resumable
+  - { id: tried,     label: Already tried, type: list, of: text }   # dead ends: the highest-value field
+  - { id: notes,     type: list, of: text }                         # reasoning, not the diff
+  - { id: last_seen, label: Last seen, type: instant, index: true } # written in place by the KERNEL on every write from this session: no version bump, no updated_at, no event; not a derivation
 ```
 
 *(An earlier draft wrote `last_seen` as `derive: { touched_by: self }` — a combinator the closed list
 of seven does not contain — and left `active → abandoned` out of the transitions, so the sweep's own
 write would have been refused at step 5.)*
+
+*(Amended September 11th 2026 for the agent path, `loop/research-agent-path.md` §3.2. New: the name
+and the word `run`; `agent`, which is the face on screen; `project`, `remote`, `cwd`, `branch` and
+`head`; an idle run may hand off; and a done or abandoned run is re-attached rather than replaced.
+What that plan called `title` is `doing`, because `title` is a reserved field id and a register
+declaring it cannot be installed. Migration 0002 writes this declaration as its canonical JSON, with
+`pack_id = 'kernel'` and its eight indexes, and a test holds that row to what `installDeclarations`
+writes for the same body ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.2).)*
 
 | Rule | Mechanism |
 |---|---|

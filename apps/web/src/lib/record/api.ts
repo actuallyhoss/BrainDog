@@ -1546,6 +1546,8 @@ function drawnWhen(b: PageBlock): boolean {
 const READS = new Set([
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
   'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon',
+  /* A section's two keys: `fold` starts it shut, `icon` names the glyph beside its heading. */
+  'fold', 'icon',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -1632,6 +1634,8 @@ function readBlock(b: PageBlock): BlockResult {
           width: c.width ?? 'minmax(12ch,1fr)',
           align: c.align ?? 'start',
           truncate: c.field === 'amount' || c.field === 'cost' ? ('never' as const) : ('end' as const),
+          /* A card's role for this column. Without it every cards block fell back to the guessed roles. */
+          ...(c.as === undefined ? {} : { as: c.as }),
         }))
       : [];
     return {

@@ -25,6 +25,18 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  apps/cli:
+    devDependencies:
+      '@braindog/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@braindog/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../../packages/ports
+
   apps/selfhost:
     dependencies:
       '@braindog/host':
@@ -33,6 +45,9 @@ importers:
       '@braindog/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
+      '@braindog/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@braindog/ports':
         specifier: workspace:*
         version: link:../../packages/ports
@@ -126,6 +141,9 @@ importers:
       '@braindog/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
+      '@braindog/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@braindog/ports':
         specifier: workspace:*
         version: link:../../packages/ports

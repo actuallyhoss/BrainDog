@@ -22,7 +22,8 @@
 
 import type { Sql } from '@braindog/ports';
 
-import { FORMAT_VERSION } from './migrate.ts';
+import { FORMAT_VERSION, execScript } from './migrate.ts';
+import { SEAT_SESSION } from './migrations/0002_session.ts';
 
 export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';
 
@@ -717,6 +718,16 @@ export function importDogl(
       touched.add(table.name);
       rows++;
     }
+    /* THE FILE'S DECLARATIONS REPLACED THE TABLE, and a file written before migration 2 carries no
+       kernel `register.session`. This record's ledger says migration 2 has run, so nothing else
+       would ever put the row back. */
+    if (
+      touched.has('declaration') &&
+      !sql.one(
+        "SELECT 1 AS x FROM declaration WHERE id = 'register.session' AND pack_id = 'kernel' AND superseded_at IS NULL AND retired = 0",
+      )
+    )
+      execScript(sql, SEAT_SESSION);
     return { tables: touched.size, rows };
   });
   }
@@ -746,8 +757,8 @@ function parseRow(line: string, table: string): unknown[] {
 /**
  * What this record already holds, in the words a person would use — or `null` when it holds nothing.
  *
- * The seed is not content: the migration writes `dog_section`, `dog_meta` and two counters at 1, and
- * a record that has only those has never been written to.
+ * The seed is not content: the migrations write `dog_section`, `dog_meta`, two counters at 1 and the
+ * kernel's `register.session` declaration, and a record that has only those has never been written to.
  */
 const SEEDED = new Set(['migration', 'record', 'entry_fts', 'entry_vec']);
 
@@ -767,13 +778,16 @@ function notEmpty(sql: Sql, shapes: Map<string, TableShape>): string | null {
     /* `record` is identity rather than content — one row saying what this record is called. Opening
        a file into an empty record adopts the file's identity, which is the point; the seeded
        counters are likewise not content. `migration` is a fact about this database and never
-       imported at all, and the two shadow tables are derived from `entry`. */
+       imported at all, and the two shadow tables are derived from `entry`. The kernel's own
+       declaration row is seed in the same way. */
     if (shape.section === 'header' || SEEDED.has(name)) continue;
     const n = Number(
       sql.one<{ n: number }>(
         name === 'counter'
           ? "SELECT count(*) AS n FROM counter WHERE next > 1 OR name NOT IN ('decision', 'suggestion')"
-          : `SELECT count(*) AS n FROM ${name}`,
+          : name === 'declaration'
+            ? "SELECT count(*) AS n FROM declaration WHERE pack_id IS NOT 'kernel'"
+            : `SELECT count(*) AS n FROM ${name}`,
       )?.n ?? 0,
     );
     if (n > 0) found.push(`${n} ${name}`);

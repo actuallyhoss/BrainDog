@@ -241,20 +241,23 @@ packages/kernel/
 ├── package.json            @braindog/kernel · private · "exports": { ".": "./src/index.ts" } · zero dependencies
 ├── src/
 │   ├── migrations/0001_kernel.ts   the DDL of 30 §1 plus the seed rows, as one exported string
+│   ├── migrations/0002_session.ts  register.session, the kernel's one register, as its canonical bytes
 │   ├── migrate.ts                  the runner, the checksum, the ledger, schemaState
 │   ├── coerce.ts                   the sixteen types → canonical JSON; TEXT_* detection; ULID; spoken ids; derive
 │   ├── write.ts                    steps 1–10 and 12a; the actor ladder; validate; transition; pairs; persist
 │   ├── events.ts                   appendEvent, the redaction list, JCS values, op_id replay, observe
 │   ├── fts.ts                      the projected-text rule; delete + insert by rowid; rebuild
-│   ├── schedule.ts                 remind: and repeat: → schedule rows; the range cancel; the queue inserts
+│   ├── schedule.ts                 remind: and repeat: → schedule rows; the range cancel; the queue inserts; the session sweep
+│   ├── session.ts                  the session register's envelope, the ladder's reading rungs, staleness
 │   ├── dogl.ts                     the canonical projection, manifest refresh, export pages, import
 │   ├── erase.ts                    purge and erase
 │   └── index.ts                    openRecord, the Kernel object, get/list/search, the declaration cache, the types
 └── test/                           §9
 ```
 
-Nine modules and one migration, counted. One over the template's "about eight": `schedule.ts` and `erase.ts` are
-each a page of logic with its own test file and share nothing with `write.ts` but a transaction.
+Ten modules and two migrations, counted. Two over the template's "about eight": `schedule.ts` and `erase.ts` are
+each a page of logic with its own test file and share nothing with `write.ts` but a transaction, and `session.ts`
+holds what the kernel knows about the one register it declares (§5.4 step 1.4).
 
 | File | Responsibility | Size |
 |---|---|---|
@@ -264,7 +267,8 @@ each a page of logic with its own test file and share nothing with `write.ts` bu
 | `write.ts` | `writeInTxn()` — the numbered steps of §5.4 with their SQL; `resolveActor()`; `validate()`; `transition()`; `pairs()`; `persist()` | ~420 |
 | `events.ts` | `appendEvent`, `REDACTED`, `redactedValue()`, `eventRows()` for a write, `replay`, `observe` | ~110 |
 | `fts.ts` | `projectedText(decl, fields)`, `project(rowid, entry)`, `rebuildFts()` | ~50 |
-| `schedule.ts` | `reminderRows(decl, entry, now)`, `expandRepeat()`, `cancelRange()`, `schedule()`, `outbox()` | ~170 |
+| `schedule.ts` | `reminderRows(decl, entry, now)`, `expandRepeat()`, `cancelRange()`, `schedule()`, `outbox()`, `sweepSessions()` (§5.8) | ~200 |
+| `session.ts` | `sessionDeclaration()`, read from migration 0002's bytes and never retyped; `findSession()`, rungs 1 to 4 of the ladder; `opening()`; `KERNEL_WRITTEN`; `isStale()` at 45 minutes; the `SessionHints` type | ~120 |
 | `dogl.ts` | `TABLES` (31 rows: name · section · columns · pk), `projection()`, `refreshManifest()`, `exportDogl()`, `importDogl()`, `verifySig()` | ~300 |
 | `erase.ts` | `purge()`, `erase()` — the store list of §5.9 as data | ~150 |
 | `index.ts` | `openRecord`, the `Kernel` object literal, `get`/`list`/`search`/`count`, the declaration cache and compiled-lock cache, `transaction()`, the types and closed lists | ~220 |
@@ -342,7 +346,7 @@ Conventions: `now` is `clock.now()` read once per call and formatted `instant(no
 
 ### 5.2 · `applyMigrations`
 
-The one migration at v1, `0001_kernel.ts`, exports the DDL of [30-BLUEPRINT](30-BLUEPRINT.md) §1 in the order printed there,
+Two migrations. `0001_kernel.ts` exports the DDL of [30-BLUEPRINT](30-BLUEPRINT.md) §1 in the order printed there,
 omitting `CREATE TABLE migration`, and ending with these seed statements:
 
 ```sql
@@ -356,17 +360,36 @@ INSERT INTO dog_section (table_name, section) VALUES
   ('prediction','governance'), ('grant','governance'), ('vault_key','governance'), ('member','governance'),
   ('token','local'), ('device_grant','local'), ('auth_fail','local'), ('observation','local'), ('job','local'), ('job_event','local'),
   ('dog_meta','header'), ('dog_section','header'), ('dog_manifest','header'), ('dog_sig','header');   -- 31 rows; 25 travel
-INSERT INTO counter (name, next) VALUES ('decision', 1), ('suggestion', 1), ('seq:session', 1);
-INSERT INTO declaration (id, version, kind, pack_id, body, checksum, retired, superseded_at, created_at)
-  VALUES ('register.session', 1, 'register', 'kernel', '<JCS of 32-PARITY §2.1>', '<sha256>', 0, NULL, '2026-09-02T00:00:00.000Z');
-CREATE UNIQUE INDEX entry_u_session__client_id ON entry (json_extract(fields, '$.client_id')) WHERE register = 'session' AND deleted_at IS NULL;
-CREATE INDEX entry_i_session__repo ON entry (json_extract(fields, '$.repo')) WHERE register = 'session' AND deleted_at IS NULL;
+INSERT INTO counter (name, next) VALUES ('decision', 1), ('suggestion', 1);
 ```
 
-The `register.session` body is the declaration of [32-PARITY](32-PARITY.md) §2.1, canonicalised with `jcs`; a test
-asserts `installDeclarations` on an empty record produces the identical row and index names, so the hand-written
-INSERT and the code path cannot drift. `dog_meta`'s other keys (`created_at`, `producer`, `record_slug`, `tz`,
-`locale`) are written by export's refresh from the `record` row, not by the migration.
+`0002_session.ts` declares the kernel's one register, [32-PARITY](32-PARITY.md) §2.1, and nothing else. It adds a
+row and its indexes and no table, so it carries no format bump:
+
+```sql
+UPDATE declaration SET superseded_at = '2026-09-11T00:00:00.000Z' WHERE id = 'register.session' AND superseded_at IS NULL;
+INSERT INTO declaration (id, version, kind, pack_id, body, checksum, retired, superseded_at, created_at)
+  SELECT 'register.session', coalesce(max(version), 0) + 1, 'register', 'kernel', '<JCS of 32-PARITY §2.1>', '<sha256>', 0, NULL, '2026-09-11T00:00:00.000Z'
+  FROM declaration WHERE id = 'register.session';
+CREATE UNIQUE INDEX IF NOT EXISTS entry_u_session__client_id ON entry (json_extract(fields, '$.client_id')) WHERE register = 'session' AND deleted_at IS NULL;
+-- and entry_i_session__<f> for token_id, agent, project, repo, host, state and last_seen, the same shape
+```
+
+The body is written into the migration as its canonical bytes, not built by `jcs` when the module loads: a
+migration's checksum is over its text, so SQL assembled by a function would change with the function, and every
+record would then refuse to open with `SCHEMA_MISMATCH`. `test/session-register.test.ts` asserts that
+`installDeclarations` on a record without the row produces an identical row and identical index names and
+statements, so the hand-written copy and the code path cannot drift. The body spells the register's id `id`, the
+code's spelling of `register:`, because the declaration cache keys registers on it.
+
+Three details are deliberate. The `UPDATE` and the `coalesce(max(version), 0) + 1` let a record that declared a
+`register.session` of its own before this build take the kernel's as that id's next version and keep its rows,
+where a plain insert would collide on the primary key and the record would not open. No `seq:session` counter is
+seeded: `allocate` creates a register's counter at its first row, and a seeded one would make every new record
+look non-empty to an import. And an import replaces the `declaration` table with the file's, so when the file
+carries no kernel row, because it was written before migration 2, `importDogl` runs the same two statements;
+`notEmpty` does not count the kernel's row as content. `dog_meta`'s other keys (`created_at`, `producer`,
+`record_slug`, `tz`, `locale`) are written by export's refresh from the `record` row, not by a migration.
 
 The runner:
 
@@ -412,13 +435,19 @@ nothing to roll back — and step R runs.
 
 1. `decl = register(register)`; none or retired → `REGISTER_UNKNOWN`.
 2. The current row. By id: `SELECT rowid, id, register, seq, fields, state, version, created_at, updated_at, deleted_at FROM entry WHERE id = ?`; none → `VALUE_MALFORMED` at `id`. On a `series: true` create, by key — `WHERE register = ? AND json_extract(fields, '$.a') = ? AND json_extract(fields, '$.b') = ?` over the coerced key values (the `entry_k_<reg>` index); a hit turns the create into an update of that row, `deleted_at` cleared (§13 #8).
-3. Every `patch` key: `deleted_at` is accepted as the delete/restore signal; another reserved id (`id seq register created_at updated_at version spoken title`) or a `_`-prefixed id → `FIELD_UNKNOWN` — except `_rule`, `_parent`, `_each` when `w.mechanism` starts `rule:` and `w.cascade === false`; an id the declaration lacks → `FIELD_UNKNOWN`; a derived, retired or kernel-written field → `IMMUTABLE_FIELD`.
+3. Every `patch` key: `deleted_at` is accepted as the delete/restore signal; another reserved id (`id seq register created_at updated_at version spoken title`) or a `_`-prefixed id → `FIELD_UNKNOWN`, except `_rule`, `_parent`, `_each` when `w.mechanism` starts `rule:` and `w.cascade === false`; an id the declaration lacks → `FIELD_UNKNOWN`; a derived, retired or kernel-written field → `IMMUTABLE_FIELD`. The kernel-written fields are the `session` register's `last_seen`, `project` and `token_id` (`KERNEL_WRITTEN` in `session.ts`), refused from every caller, a person included; the ladder below writes them through `w.stamp`, past this check. A `secret` field, or a `list` of them, is refused the same way and from every caller, because the vault door (after step 12a) is the one write that sets one.
 4. The actor, by principal:
    - `person` → `ctx.principal.id` (`p_…`, resolved to a name through the `person` mirror at read — §13 #4).
    - `system` → `w.mechanism ?? 'system'`.
    - `spark` → `FORBIDDEN` (30 §3: Spark never writes a row).
-   - `token` → the ladder of [32-PARITY](32-PARITY.md) §2.1, each rung one indexed read on `register = 'session' AND deleted_at IS NULL`:
-     `ctx.session.spoken` → `WHERE seq = ?` and state ∉ {done, abandoned}; else `client_id` → `json_extract(fields,'$.client_id') = ?`; else `host` + `repo` → `json_extract(fields,'$.repo') = ? AND json_extract(fields,'$.host') = ? AND state IN ('active','idle') AND json_extract(fields,'$.last_seen') > ?` (now − 45 min), newest first; else **open one**: a re-entrant `write('session', null, { client_id, host, repo, title, state: 'active', last_seen: now }, { ctx, cascade: false, batch, note: 'opened: auto' })`. The new session's `create` event is authored by its own `S<n>`. If that write is refused (it cannot be, short of a superseded `register.session`), the actor falls back to `agent:<ctx.principal.name>` and an observation `write.refused` on `session.-:<code>` records the defect.
+   - `token` → the ladder of [32-PARITY](32-PARITY.md) §2.1, in `session.ts`. `WriteContext` carries it as `principal: { kind: 'token', token }` and `session: SessionHints`; the hints are `spoken` and any of the register's `client_id agent doing repo remote cwd host branch head`. Each reading rung is one indexed read on `register = 'session' AND deleted_at IS NULL`, and the first that answers wins:
+     1. `spoken` names a row, `WHERE seq = ?`, whose state is not `done` or `abandoned`: that run gets the heartbeat.
+     2. A name that matches nothing, or names a finished run, is dropped and never recorded, and the next rung is tried.
+     3. `client_id` → `json_extract(fields,'$.client_id') = ?`, in any state: that run, **re-attached**.
+     4. Only when the hints carry no `client_id`: `json_extract(fields,'$.host') = ? AND json_extract(fields,'$.repo') = ? AND state IN ('active','idle') AND json_extract(fields,'$.last_seen') > ?` (now minus 45 minutes), newest `last_seen` first: **adopted**. A caller whose client id matched nothing is a different run, and adopting it would merge two agents working side by side in one checkout.
+     5. Otherwise **open one**: a re-entrant `write('session', null, <every hint but spoken>, { actor: 'S<n>', cascade: false, batch, note: 'opened: auto', stamp: { last_seen: now, token_id } })`, where `<n>` is read from `counter` before the row takes it, so the `create` event is authored by the new `S<n>` itself. What the run is doing goes in `doing`, from the hints, as `attach` and `handoff` write it: the plan's `title` is `doing` because `title` is a reserved field id ([32-PARITY](32-PARITY.md) §2.1). `state` takes its default, `active`.
+
+     The rungs read, and nothing is written until every check of the write they serve has passed: `attribute` runs at the head of step 6, so a refused write opens no run, re-attaches none and moves no heartbeat. A run found at rung 1, 3 or 4 in `idle`, `done` or `abandoned` is moved to `active` by a re-entrant `state` write that it signs itself; `handoff` is left as it is, because it is a request waiting for the next run. If opening is refused (a hint the host should have dropped, such as an `agent` outside its enum), the write it serves still goes in under the caller's `actor`, which for a token is `agent:<name>` ([30-BLUEPRINT](30-BLUEPRINT.md) §3), and an observation `write.refused` on `session.<field>:<code>` records the defect. A `session` hint on any principal but a token is ignored: a person in a browser is never a run.
    - A `w.mechanism` on a `token` or `person` principal → `TypeError`: only the record's system paths and the in-transaction hook name a mechanism.
 
 **2 · LOCK.** If `decl.immutable_when`: for an update, `SELECT 1 FROM entry WHERE id = ? AND (<lock.sql>)` with `lock.params`; a row → `ROW_LOCKED`, `found` = the printed predicate. For a create, the same compiled SQL over the candidate:
@@ -445,11 +474,11 @@ ORDER BY rowid DESC LIMIT 1
 An actor matching `^p_` → `HUMAN_ONLY`. A `create` row's `to_v` is the whole `fields` as JCS, so a field set at
 creation by a person pins too; a redacted value inside it is the string `--redacted--`, still non-null.
 
-**3 · COERCE.** `merged = { ...current.fields }`; for each patch key: `null` deletes the key; else `coerce(field, value)`. On a create, every declared field with `default:` and no value takes the default first. Per type ([34-GRAMMARS](34-GRAMMARS.md) §3), the accepted inputs and the canonical output:
+**3 · COERCE.** `merged = { ...current.fields }`; for each patch key: `null` deletes the key; else `coerce(field, value)`. On a create, every declared field with `default:` and no value takes the default first. On an existing row, a field declared `by: decide` that the patch clears, or whose coerced value differs from the stored one compared as JSON the way `immutable` is, → `FORBIDDEN` from every caller, unless the write carries out an accepted proposal (the `decided` door, after step 12a). Per type ([34-GRAMMARS](34-GRAMMARS.md) §3), the accepted inputs and the canonical output:
 
 | Type | Accepts | Refuses |
 |---|---|---|
-| `text` · `document` | a string; `document` gets CRLF → LF | `TEXT_JSON_QUOTED` when `s.length ≥ 2 && s[0] === '"' && s.at(-1) === '"'` and `JSON.parse(s)` yields a string; `TEXT_ESCAPED_NEWLINE` when `s.includes('\\n') && !s.includes('\n')` — the two characters backslash, `n`, with no real newline anywhere. Checked in that order; a non-string is `VALUE_MALFORMED` |
+| `text` · `document` | a string; `document` gets CRLF → LF | first, `VALUE_MALFORMED` with `found` omitted when the text looks like a key (`looksLikeCredential` in `coerce.ts`: an issuer's prefix such as a PEM private-key header, `sk_live_`, `ghp_`, `github_pat_`, `xoxb-` or `AKIA`, a JWT, a webhook address, a password in a URL, or, outside a URL's path, a run of 32 or more base64 characters that mixes cases and digits and reads as random); then `TEXT_JSON_QUOTED` when `s.length ≥ 2 && s[0] === '"' && s.at(-1) === '"'` and `JSON.parse(s)` yields a string; `TEXT_ESCAPED_NEWLINE` when `s.includes('\\n') && !s.includes('\n')` — the two characters backslash, `n`, with no real newline anywhere. Checked in that order; a non-string is `VALUE_MALFORMED` |
 | `int` · `duration` | an integer number, or a string matching `^-?\d+$` | non-integer → `VALUE_MALFORMED`; `\|n\| > 2^53 − 1` → `INT_OUT_OF_RANGE` |
 | `decimal` | a finite number, or a numeric string | > 15 significant digits in `String(n)` → `VALUE_MALFORMED` |
 | `money` | `{ amount, currency }` — `amount` an integer (or integer string), `currency` `^[A-Za-z]{3}$` upper-cased | a non-integer `amount` — a float is the exact bug minor units exist to stop — `minor` instead of `amount`, a missing currency → `VALUE_MALFORMED`; the range rule of `int` |
@@ -462,18 +491,20 @@ creation by a person pins too; a redacted value inside it is the string `--redac
 | `file` | `{ sha256: /^[0-9a-f]{64}$/, mime: string, bytes: int ≥ 0, name: string }` | `VALUE_MALFORMED` |
 | `url` | `new URL(s)` succeeds and `protocol ∈ { 'https:', 'mailto:' }`; stored as `url.href` | `VALUE_MALFORMED` |
 | `email` | one `local@domain`, no spaces, one `@`; domain lower-cased | `VALUE_MALFORMED` |
-| `secret` | `^g_[0-9A-HJKMNP-TV-Z]{26}$` and `SELECT 1 FROM grant WHERE id = ?` | anything else → `VALUE_MALFORMED` with `found` **omitted** — the value might be the credential itself (§8) |
+| `secret` | no patch: step 1.3 refuses one, and the vault door sets the grant id itself. `coerce` on its own checks `^g_[0-9A-HJKMNP-TV-Z]{26}$` and `SELECT 1 FROM grant WHERE id = ?` | anything else → `VALUE_MALFORMED` with `found` **omitted** — the value might be the credential itself (§8) |
 | `list<T>` | an array; each element coerced as `of:`; a refusal's `at` is `<f>[i]` | a non-array → `VALUE_MALFORMED`; element refusals as T |
 | `json` | any JSON | — |
 
 After coercion a value that is `null`, `""` or `[]` removes its key (K2).
 
+**3b · SCOPE.** On a token's write to a register with a `scope:` field (`scope.ts`), after coercion: the run is found by the ladder's reading rungs and nothing is written; a create that leaves a `ref` scope field out takes the run's project; then, on a create or when the patch touched the field, `scopeFault` refuses `FORBIDDEN` for a `widen: person` row created in another project or moved out of its own, and for a `links: true` list that loses a project. A person's and the system's writes skip this step: scope says where a row applies, and levels say who may write it.
+
 **4 · VALIDATE**, in this order, stopping at the first refusal:
 
 1. `required: true` on a non-retired, non-derived field with no value in `merged` → `REQUIRED_MISSING` (on an update, only when the patch touched it or it was already missing — a stale row is not refused for a rule it predates).
-2. `required_when:` — `evaluate(leaf, merged)` from `@braindog/where`, the reference evaluator over one row; true and the field missing → `REQUIRED_MISSING`.
+2. `required_when: { field, is }`: `is` coerced as `field` and compared with `merged[field]` as JSON; equal, this field missing, and the write a create or one that touched either field → `REQUIRED_MISSING` at this field.
 3. `enum` membership — a value, or a `list<enum>` element, outside `values:` → `ENUM_VALUE_UNKNOWN`, `wanted` = the list.
-4. `min:`/`max:` — UTF-8 bytes for `text`/`document`/`url`/`email`/`json`; the number for `int`/`decimal`/`duration`, `amount` for `money`, `value` for `quantity`; element count for `list<T>`. Defaults: `text` 16,384 bytes, `document` 524,288, `json` 65,536, `url`/`email` 2,048, `list` 1,000 elements; the whole `fields` JCS ≤ 1,048,576 bytes at `at: 'fields'` (§13 #14) → `OUT_OF_BOUNDS`, both bounds in `wanted`.
+4. `min:`/`max:`, measured by `measure` in `coerce.ts`: UTF-8 bytes for `text`/`document`, the number for `int`/`decimal`/`duration`, `amount` for `money`, `value` for `quantity`; on a create, or a field the patch touched, outside them → `OUT_OF_BOUNDS` at the field, the declared bounds in the sentence. `declare` refuses a bound on `url`/`email`/`json`/`list<T>` as `NOT_IN_THIS_BUILD`, and this build does not yet enforce the default caps (`text` 16,384 bytes, `document` 524,288, `json` 65,536, `url`/`email` 2,048, `list` 1,000 elements) or the whole-`fields` ceiling of 1,048,576 bytes (§13 #14).
 5. `immutable: true` — the field had a value on `current` and `merged` differs → `IMMUTABLE_FIELD`.
 6. `ref` targets — every changed `ref` and `list<ref>` value, chunked ≤ 64: `SELECT id, register FROM entry WHERE id IN (?, …)`; a row of another register → `REF_REGISTER_MISMATCH`. A missing target is allowed — a reference is soft ([02-DATA-MODEL](02-DATA-MODEL.md) §5).
 7. `unique: true` — for every changed unique field, including a derived one computed by `deriveValue` here:
@@ -484,7 +515,7 @@ After coercion a value that is `null`, `""` or `[]` removes its key (K2).
 8. `delete: refuse_while_referenced` — when the patch sets `deleted_at` from `NULL`: for every field in every active register declared `ref`/`list<ref>` to this register, `SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.f') = ?` (a `list<ref>`: `EXISTS (SELECT 1 FROM json_each(json_extract(fields, '$.f')) WHERE value = ?)`); any `n > 0` → `DELETE_WHILE_REFERENCED`, `found` = `{ register, n }` per referrer.
 9. The CAS — `w.version !== undefined && w.version !== current.version` → the `conflict` result with `current` and `actor = SELECT actor FROM event WHERE target = ? ORDER BY rowid DESC LIMIT 1`.
 
-**5 · TRANSITION.** Only when a `state` enum is declared and `merged.state !== current?.state` on an update (a create may set any declared value — transitions govern moves, §13 #19). `t = field.transitions?.[from]`; if `t` exists and `to ∉ t.to` → `TRANSITION_ILLEGAL`; `t.by` and the principal is not a person at a level ≥ `by` on the ladder `read < append < write < decide < owner` → `LEVEL_REQUIRED`; a field in `t.requires` missing on `merged` → `REQUIRED_MISSING`. A missing `transitions:` means every move is legal.
+**5 · TRANSITION.** Only when a `state` enum is declared and `merged.state !== current?.state` on an update (a create may set any declared value — transitions govern moves, §13 #19). `t = field.transitions?.[from]`; if `t` exists and `to ∉ t.to` → `TRANSITION_ILLEGAL`; `t.by === 'decide'` and the write does not carry out an accepted proposal → `FORBIDDEN` at the state field, whoever asks; a field in `t.requires` missing on `merged` → `REQUIRED_MISSING` at that field. A missing `transitions:` means every move is legal.
 
 **R · OBSERVE.** On any refusal or conflict above:
 
@@ -496,7 +527,7 @@ ON CONFLICT (kind, subject, day) DO UPDATE SET n = n + 1;                -- subj
 At depth 0 the statement runs after the (empty) transaction returns, in autocommit; inside a hook it runs where it
 is. The one write a refusal makes ([24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.2).
 
-**6 · PERSIST.**
+**6 · PERSIST.** At its head, after `attribute`: on the vault door's write only, `bindGrant` runs with the run as its actor, rotating the live grant the row's secret field already names or minting one (a revoked one is replaced), and `merged[field]` takes the grant id. A refusal there is returned like any other, and the savepoint the door opened rolls back the run with it.
 
 1. A rule-generated create (`_rule` present): `SELECT id FROM entry WHERE json_extract(fields,'$._rule') = ? AND json_extract(fields,'$._parent') = ? AND json_extract(fields,'$._each') = ?` (the `entry_created_by` index); a hit returns that row `ok` with no event — a re-run is a no-op ([07-INGEST](07-INGEST-AND-RULES.md) §6.1).
 2. `seq = decl.series ? null : allocate('seq:' + register)` on a create.
@@ -514,8 +545,7 @@ is. The one write a refusal makes ([24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md)
    WHERE id = ? AND version = ? RETURNING rowid, version;                 -- rowsWritten = 0 → VERSION_STALE, the belt
    ```
    `fields` is the JCS string of `merged`.
-7. Heartbeat: when the actor is `S<n>` and the target is not that session row,
-   `UPDATE entry SET fields = json_set(fields, '$.last_seen', ?) WHERE id = ?` — no version, no event (K1, §13 #6). When the target *is* the session row, `last_seen` is set in `merged` before step 6.
+7. Heartbeat, written by `attribute` at the head of this step once the ladder has found the run: when the target is not that session row, `UPDATE entry SET fields = json_set(fields, '$.last_seen', ?) WHERE id = ?`, with no version, no `updated_at` and no event (K1, §13 #6). When the target *is* the session row, `last_seen` is set in `merged` beside `w.stamp`, and because it is not in the patch it writes no `edit` row of its own.
 
 **6b · PAIRS.** When `decl.pairs` and `merged[opposite]` is present with `amount ≠ 0` and `_pair` is missing. The candidate predicate is built as a `where:` tree and compiled — the compiler already inlines derived fields:
 
@@ -571,11 +601,13 @@ layer owns quiet hours. At most 100 rows per field per write, nearest first (§1
 **12a · OUTBOX.** Rows a hook queued through `kernel.outbox(row)` are already inserted —
 `INSERT INTO outbox (id, created, kind, payload, state, attempts) VALUES (?, ?, ?, ?, 'pending', 0)` — inside this transaction. Nothing else is in the step; it is named so the boundary below has a last statement.
 
+**The two doors only the kernel opens.** `write` takes a fifth argument that the kernel's public `write`, `create` and `update` never pass, so nothing a caller fills in can set it. `decided` is set by governance's accept path on the rows an accepted proposal writes, and is the one way a field or a move declared `by: decide` changes. `seal` is set by `depositGrant({ register, ref?, field, fields?, grant }, w)`, the vault door's half in the record. It is INTERNAL and routed nowhere: a host's vault door calls it once it has sealed a key with the key store and dropped the value, handing over the sealed bytes and what they open. It runs this write path under a savepoint, creating the row or updating `ref`, binds the grant at the head of step 6, and returns the row and the grant. So `grant.add` and `create` are both signed by the run, a refusal anywhere rolls back the grant and the run together, and step 8 writes the field as `--redacted--`.
+
 **═ transaction ends ═** `transaction()` returns `{ ok: true, value: entry, version: version() }` — `MAX(event.rowid)` after this write's rows. Then the **caller** — `record` — does **11 · ARM** (`pendingWork().nextDueMs` → `await scheduler.set(min)` on a difference) and **12b · WAKE** (`outboxPending` → `await scheduler.wake()`). Both are async and outside the kernel by construction ([30-BLUEPRINT](30-BLUEPRINT.md) §4).
 
 ### 5.5 · Read helpers
 
-- `get`: by id `WHERE id = ?`; by `(register, seq)` `WHERE register = ? AND seq = ?`; by spoken: prefixed `^([A-Z][A-Z0-9]{0,3})([1-9][0-9]*)$` → the register whose `seq_prefix` is the prefix (`S` → `session`), qualified `^([a-z][a-z0-9_]*)#([1-9][0-9]*)$` → register + seq; `#7` → `REGISTER_UNKNOWN`. `deleted_at IS NULL` unless `includeDeleted`. Nine columns plus `rowid`; `spoken` and `fields` (parsed) are computed.
+- `get`: by id `WHERE id = ?`; by `(register, seq)` `WHERE register = ? AND seq = ?`; by spoken: a prefixed id is resolved against the installed prefixes held by the cache of §5.1: it must start with a register's `seq_prefix` and the rest must be `[1-9][0-9]*`, so `S42` is row 42 of `session`. No single pattern parses it, because `^([A-Z][A-Z0-9]{0,3})([1-9][0-9]*)$` is greedy and reads `S42` as `S4` and 2. One prefix may not overlap another in speech, and install refuses one that does `SEQ_PREFIX_TAKEN` ([34-GRAMMARS](34-GRAMMARS.md) §4), so at most one matches; qualified `^([a-z][a-z0-9_]*)#([1-9][0-9]*)$` → register + seq; `#7` → `REGISTER_UNKNOWN`. `deleted_at IS NULL` unless `includeDeleted`. Nine columns plus `rowid`; `spoken` and `fields` (parsed) are computed.
 - `list`: `k` = a kernel column or `json_extract(fields, '$.f')`:
   ```sql
   SELECT rowid, id, register, seq, fields, state, version, created_at, updated_at, deleted_at FROM entry
@@ -595,7 +627,7 @@ layer owns quiet hours. At most 100 rows per field per write, nearest first (§1
 
 ### 5.6 · `installDeclarations(batch, ctx)`
 
-1. Before the transaction: `checksum_i = hex(sha256(jcs(body_i)))` for every declaration ([34-GRAMMARS](34-GRAMMARS.md) §5).
+1. Before the transaction: `checksum_i = hex(sha256(jcs(body_i)))` for every declaration ([34-GRAMMARS](34-GRAMMARS.md) §5). Before that, `validate` refuses a `register.session` that is not migration 0002's bytes under `pack: 'kernel'`, with `PROVIDES_CONFLICT` at `register.session`: the migration is that declaration's one writer, and every agent write resolves to a row of it. The kernel's own bytes pass, and installing them changes nothing.
 2. In one `transaction()`:
    1. `batch.planVersion !== undefined && version() !== batch.planVersion` → `PLAN_STALE`.
    2. If `batch.pack`: `INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET version = excluded.version, source = excluded.source, source_ref = excluded.source_ref, manifest = excluded.manifest, installed_at = excluded.installed_at, checksum = excluded.checksum`.
@@ -638,6 +670,15 @@ INSERT INTO event (…) VALUES (…, 'system', 'purge', NULL, NULL, NULL, NULL, 
 
 `event` rows are kept; `counter` is untouched, so a purged number is never reissued (K9). Returns
 `{ purged: n, remaining: rows.length > limit }`; the caller re-arms to `now` while `remaining`.
+
+**The session sweep** runs in the same hourly `purge` row, after the rows above: `sweepSessions` in `schedule.ts`
+takes every `session` row in `active` or `idle` whose `coalesce(json_extract(fields,'$.last_seen'), updated_at)` is
+more than twelve hours old, at most 100, and moves it to `abandoned` through a re-entrant write as `system`, with
+`note: 'Nothing heard from this run in twelve hours.'`, so each is an ordinary `state` event. `handoff` is skipped,
+because it is a request waiting for the next run. `done` is never written, because a run that crashes never marks
+itself dead, and the sweep knows only that it went quiet, not that its work finished. Staleness at 45 minutes is
+never stored: `isStale` derives it at read. The `purge` method runs the same function and adds the count as
+`sessions`.
 
 ### 5.9 · `erase({ subjects, personId?, basis }, ctx)`
 
@@ -865,7 +906,7 @@ code in `KERNEL_REFUSAL_CODES` has a file and every file a code.
 | state is mirrored and checked | `transitions: { draft: { to: [posted], requires: [date] } }`; `draft → void` · `draft → posted` without `date` · with `date` | `TRANSITION_ILLEGAL` · `REQUIRED_MISSING` · `ok` and `entry.state = 'posted'` with one `state` event |
 | `by:` needs a person | `proposed → active, by: decide` from a `write` token · from a `decide` person | `LEVEL_REQUIRED` · `ok` |
 | CAS | two updates with the same `version` | second is `conflict` with `current.version = n + 1` and the first writer's actor; `observation` incremented |
-| unique names the row | `client_id` unique; a second session with the same id | `ALREADY_KNOWN`, `found = 'S1'` |
+| unique names the row | `client_id` unique; a second session with the same id | `ALREADY_KNOWN` at `client_id`, whose sentence names `S1`; `Refusal` has no `found` key, so the spoken id travels in `fix` |
 | unique on a series | `key: [campaign, channel, day]`; a second create with the same key | the first row updated in place, `version = 2`, one row total |
 | the only stored derivation | `fingerprint: derive normalise(lesson), unique` | `fields.fingerprint` is `lower(trim(lesson))`; a second row with the same normalised text is `ALREADY_KNOWN` |
 | text corruption refused | `'"hello"'` · `'a\\nb'` (no U+000A) · `'a\nb'` | `TEXT_JSON_QUOTED` · `TEXT_ESCAPED_NEWLINE` · `ok` |
@@ -895,16 +936,34 @@ whose note contains `sha256:` and not the name, `member` rows gone with one `acc
 byte-identical ignoring the `dog_sig` block (the `dog-roundtrip` gate); `sha256` of each table's row lines equals
 its manifest row; `--redact-grants` verifies; a flipped byte in a row → `CHECKSUM_MISMATCH` naming the table; a
 missing `dog_sig` → `SIGNATURE_INVALID`; `#dogl 2` → `FORMAT_NEWER_THAN_READER`; import into a record with one
-entry → `IMPORT_NOT_EMPTY`; a write between two pages → `CHECKSUM_MISMATCH` on the second; a `migration` row with
-version 2 in the file → `SCHEMA_NEWER`; an unknown column in `#table entry …` is reported and dropped.
+entry → `IMPORT_NOT_EMPTY`; a write between two pages → `CHECKSUM_MISMATCH` on the second; a `migration` row in
+the file numbered past this build's last → `SCHEMA_NEWER`; an unknown column in `#table entry …` is reported and dropped.
 
-**Migrations** — `test/migrate.test.ts`: a fresh database → `kernel = 1`, `format = 1`, `dog_meta.format = '1'`,
-31 `dog_section` rows of which 6 are `local`; `applyMigrations` twice is a no-op; the pinned checksum of
-`0001_kernel.ts` equals a constant in the test (an edit to an applied migration fails here first); a ledger row
-with a wrong checksum → `SCHEMA_MISMATCH` and `write` returns the same refusal (the record maps it to 503); a
-ledger row with version 2 → `SCHEMA_NEWER`; `installDeclarations(SESSION_BODY)` on a record without 0001's
-declaration row produces an identical row and identical index names (`no-declarations-in-kernel` gate: the only
-`INSERT INTO declaration` under `src/migrations` is `register.session`).
+**Migrations**: `test/migrate.test.ts`: a fresh database → `kernel = 2`, `format = 1`, `applied = [1, 2]`,
+`dog_meta.format = '1'`, 31 `dog_section` rows of which 6 are `local`; `applyMigrations` twice applies nothing and
+changes no row, index or ledger line; the checksums of `0001_kernel.ts` and `0002_session.ts` equal constants in
+the test (an edit to an applied migration fails here first); a record at migration 1 with registers, rows and
+events takes migration 2 on open, keeps every one of them and speaks `S1`; a record that declared its own
+`register.session` keeps its rows, and the kernel's arrives as version 2; a ledger row with a wrong checksum →
+`SCHEMA_MISMATCH` and `write` returns the same refusal (the record maps it to 503); a ledger row past the last
+migration → `SCHEMA_NEWER`. `test/session-register.test.ts`: `installDeclarations(SESSION_BODY)` on a record
+without the kernel's row produces an identical row and identical indexes; `S1` and `session#1` name the same row,
+and `S12` is row 12. The `no-declarations-in-kernel` gate: the only `INSERT INTO declaration` under
+`src/migrations` is `register.session`.
+
+**Sessions**: `test/session.test.ts`. A token write naming no run opens `S1`, whose `create` event is signed `S1`
+with `note = 'opened: auto'`, and the task's event is signed `S1`. A token write from `S3` moves its `last_seen`
+and leaves its `version`, `updated_at` and events alone, so the next edit of `S3` on the version read before is not
+a conflict. A name matching nothing, or a finished run, is dropped and never becomes a row. A client id re-attaches
+a `done` run to `active` and leaves a `handoff` waiting. A live run on one host and repo is adopted, but not by a
+caller with its own client id and not after 45 minutes. A person carrying session hints opens nothing. A refused
+write opens no run and spends no number. An open refused on a bad hint leaves the write in under the caller's
+actor, with a `write.refused` observation on `session.agent:ENUM_VALUE_UNKNOWN`. A run writing its own row carries
+`last_seen` in that write and gets no `edit` row for it. `last_seen`, `project` and `token_id` are
+`IMMUTABLE_FIELD` from a person and from a run. The twelve-hour sweep moves `active` and `idle` to `abandoned` as
+`system`, leaves `handoff`, writes no `done`, and the swept run re-attaches. `register.session` from a person, from
+a pack, or from a pack named `kernel` with other bytes is `PROVIDES_CONFLICT`, and the kernel's own bytes change
+nothing.
 
 **Coercion table** — `test/coerce.test.ts`: one row per line of the step-3 table, input → canonical or code;
 `deriveValue` for the seven shapes against `where`'s compiled SQL over the same fixture rows (the two must agree);

@@ -216,7 +216,7 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `name` | text ≤ 60 — "the id is never shown" | **yes** | — | — |
 | `one` | text ≤ 40, the singular | no; absent is a warning | — | — |
 | `pack` | `PackId`, equal to the manifest's | no | — | — |
-| `seq_prefix` | `SeqPrefix` | no | `#` | — |
+| `seq_prefix` | `SeqPrefix`; not `D` `SG` `S`, not another active register's, and not one that another prefix followed by a number spells, as `P` and `P2` both read `P21` (`SEQ_PREFIX_TAKEN`) | no | `#` | — |
 | `series` | bool | no | `false` | — |
 | `key` | 1–4 field ids | iff `series: true` | — | — |
 | `fields` | 1–64 field objects, ids unique (`FIELDS_OVER_CAP` above 64) | yes | — | — |
@@ -226,6 +226,7 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `delete` | — | no | — | `refuse_while_referenced` |
 | `pairs` | `{ on: 1–3 of Id \| abs(Id), opposite: Id, across: Id, within: Window, date?: Id, mark: text ≤ 20 }` | no | — | — |
 | `identity` | `{ mark: an enum field, accent: an int field }` | no | — | — |
+| `scopes` | `{ repos?: Id, folders?: Id }`, at least one, each a `list<text>` field of this register; not on a `series`; one active register declares it (`DECLARATION_INVALID`) | no | — | — |
 | `predicates` | `{ Id: predicate }`, ≤ 16, each through `where.validate` on this register | no | `{}` | — |
 | `immutable_when` | predicate | no | — | — |
 
@@ -245,18 +246,34 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `unique` | bool; never with `retired` | no | `false` | — |
 | `immutable` | bool | no | `false` | — |
 | `default` | a JSON value of the field's type; for `enum` one of `values` (`ENUM_VALUE_UNKNOWN`) | no | — | — |
-| `min` / `max` | number — bytes for text/document, value for numeric types, count for list | no | `0` / the type's cap | — |
+| `min` / `max` | number: UTF-8 bytes for `text` and `document`, a whole number with `max` at most 16,384 and 524,288; the value for `int` `decimal` `duration`, `amount` for `money`, `value` for `quantity`. `min` ≤ `max`, and a `default` inside them (`OUT_OF_BOUNDS`). `url` `email` `json` `list` are given a size by 02 §5 and bounded by nothing in this build (`NOT_IN_THIS_BUILD`); any other type is `DECLARATION_INVALID` | no | none | — |
 | `retired` | bool | no | `false` | — |
 | `redact` | bool — the per-field redaction of 20 §8; `from_v`/`to_v` write `--redacted--` (41 §2) | no | `false` | — |
 | `derive` | exactly one of `{ sum: [Id…] } { diff: [Id, Id] } { product: [Id, Id] } { ratio: { of: Id, per: Id } } { band: { of: Id, edges: [number…] } } { via: Id, field: Id } { normalise: Id }` | no | — | seven shapes, 02 §5 |
-| `required_when` | one `where:` leaf on this register; operator in `is not in not_in gt gte lt lte before after between empty present has lacks` (`REQUIRED_WHEN_OP_UNSUPPORTED`) | no | — | — |
-| `transitions` | `{ <value>: { to: [values], requires?: [Id…], by?: level } }`, keys and `to` ⊆ `values` | `enum` only | every move legal | `by ∈ read append write decide owner` (20 §1) |
+| `required_when` | `{ field: Id, is: value }`: required while `field`, a `text` `enum` `bool` or `int` of this register other than this one, holds `is`, which is coerced as that field and for an enum is one of its `values`. `is` is the operator this build reads; the rest of 02 §5's list (`not in not_in gt gte lt lte before after between empty present has lacks`) is `NOT_IN_THIS_BUILD`, and `contains matches near starts ends via` are `REQUIRED_WHEN_OP_UNSUPPORTED` | no | none | `is` |
+| `transitions` | `{ <value>: { to: [values], requires?: [Id…], by?: decide } }`, keys and `to` ⊆ `values`. `requires` names fields of this register a move out of `<value>` needs filled (`FIELD_UNKNOWN`); `by: decide` is a move only an accepted proposal makes | `enum` only | every move legal | `by ∈ decide` (`ENUM_VALUE_UNKNOWN`) |
+| `by` | `decide`: once the row is made, only an accepted proposal changes the field. A create sets it freely; a direct update that would change it is `FORBIDDEN` from every caller, the owner included | no | none | `decide` (`ENUM_VALUE_UNKNOWN`) |
 | `remind` | 1–6 `Offset`, `h` allowed | `day`/`instant` only | — | — |
 | `repeat` | `{ freq, interval?: 1–99, byday?: [MO TU WE TH FR SA SU], bymonthday?: [−31…31 ≠ 0], until?: day, count?: 1–999, workday? }` | `day`/`instant` only | — | `freq ∈ daily weekly monthly yearly` · `workday ∈ previous next none` |
 | `note` | text ≤ 280 | no | — | — |
+| `scope` | `{ widen?, same? }` on a `ref`, or `{ links? }` on a `list<ref>`, whose target is the register declaring `scopes`; one per register | no | global; `widen: any`, `same: both` | `widen ∈ any person` · `same ∈ both nearer` · `links ∈ true` |
 
 `band.edges.length + 1 === values.length`, else `BAND_EDGES_MISMATCH`. Every field id named by `search title mobile
-key pairs identity derive required_when transitions.requires` is declared on this register, else `FIELD_UNKNOWN`.
+key pairs identity scopes derive required_when transitions.requires` is declared on this register, else `FIELD_UNKNOWN`.
+
+A `secret` field is written by the vault door alone (41 §5.4), so nothing else may put a value in it: it is never
+`required`, never under `required_when`, never given a `default`, and a `list` of `secret` is refused
+(`DECLARATION_INVALID`). It holds where a key is sealed and says nothing about the row, so it is never searched
+(`SEARCH_FIELD_TYPE`) and never the `title` (`DECLARATION_INVALID`).
+
+`scopes` and `scope` say where a row applies (02 §5). The register declaring `scopes` holds the projects, and a run is
+placed in one by the repositories and folders its rows list. A field's `scope` names the project a row belongs to, and
+absent is global. `widen: person` holds a token to its run's project: its create lands there and names no other, and it
+may narrow a global row to a project but never move a row out of one (`FORBIDDEN`). `same: nearer` makes a project row
+hide a global row with the same title when a run reads by scope. `links: true` lets a token add a project to the list
+and never remove one. A `scope` on any other type, one pointing at a register that does not declare `scopes`, `widen`
+or `same` on a list, `links` on a `ref`, an unknown key and a second `scope` on one register are `DECLARATION_INVALID`;
+a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 
 ### 4.5 · `page` — 06 §1.1
 
@@ -280,19 +297,21 @@ key pairs identity derive required_when transitions.requires` is declared on thi
 
 | Key | Type | Required | Default | Closed list |
 |---|---|---|---|---|
-| `kind` | a key of render's `KINDS` (sixteen), or a `block.<Id>` declared by this pack or installed (`KIND_UNKNOWN`) | yes | — | `Object.keys(KINDS)` ∪ declared blocks |
-| `heading` | text ≤ 80 | no | — | — |
+| `kind` | a key of render's `KINDS` (eighteen), or a `block.<Id>` declared by this pack or installed (`KIND_UNKNOWN`) | yes | — | `Object.keys(KINDS)` ∪ declared blocks |
+| `heading` | text ≤ 80; on a `section` it is the section, drawn as a heading | `section` | — | — |
 | `span` | int 1–12 | no | `12` | — |
-| `source` | `register.<Id>` · `metric.<Id>` · `block.<n>` (an earlier block on this page) | `table` | — | — |
+| `source` | `register.<Id>` · `metric.<Id>` · `block.<n>` (an earlier block on this page); on a `section`, what its count counts | `table`, `cards` | — | — |
 | `where` | predicate, validated on the source register | no | every row | — |
 | `when` | `{ metric: Id, <op>: value }`, one leaf, ops `is not in not_in gt gte lt lte empty present` | no | always drawn | — |
-| `columns` | 1–16 of `{ field: Id, label?, width?: `^\d{1,3}(ch\|%)$` or `minmax(…)`, align?: start \| end, link?: bool, tone_when?: leaf + tone }` | `table` | — | — |
+| `columns` | 1–16 of `{ field: Id, label?, width?: `^\d{1,3}(ch\|%)$` or `minmax(…)`, align?: start \| end, link?: bool, tone_when?: leaf + tone, as? }`; `as` only on `cards`, where each role appears once and `fact` at most three times (`OUT_OF_BOUNDS`) | `table`, `cards` | on `cards`, the first text column is `title`, the first figure that never truncates is `figure`, the rest `fact` | `as ∈ title figure fact trend ring who when mark` (`ENUM_VALUE_UNKNOWN`) |
 | `order` | `[{ field: Id, dir: asc \| desc }]` ≤ 3 | no | 29 §5's rule | — |
 | `limit` | int 1–500 | no | `50` | — |
 | `empty` | text ≤ 200, interpolatable | **yes on every block with a `source`** | — | — |
 | `cells` | 1–6 of `{ metric: Id, label: text ≤ 40 }` | `stat` | — | — |
 | `tone` | intent | no | — | the four |
 | `body` | the dialect, ≤ 64 KB | `note` | — | — |
+| `icon` | `Glyph`, beside a `section`'s heading | no | — | — |
+| `fold` | bool; a `section` that starts shut, folding the blocks after it up to the next section | no | `false` | — |
 | *accepts names* | for a pack-declared `kind`, the keys its `accepts:` names, typed §4.6 | per the block declaration | — | — |
 
 ### 4.6 · `block` — 22 §3 · 05 §1 · 34 §2.4
@@ -421,7 +440,7 @@ colour *value* is parsed, re-serialised and contrast-checked by `theme` (28 §4.
 | `digest` | `Id` | yes | — | — |
 | `schedule` | `{ day?, at: Clock, tz? }` — weekly with `day`, daily without | yes | `tz: record` | `day ∈ mon tue wed thu fri sat sun` |
 | `channels` | 1–5, unique | yes | — | `in-app email push webhook mcp` (09 §3) |
-| `sections` | 1–12 of `{ heading: text ≤ 60, source: register.<Id> \| metric.<Id>, where?, as, columns?, limit?: 1–50, omit_when_empty?: bool }` | yes | `omit_when_empty: false` | `as ∈ KINDS`; `table` needs `columns` |
+| `sections` | 1–12 of `{ heading: text ≤ 60, source: register.<Id> \| metric.<Id>, where?, as, columns?, limit?: 1–50, omit_when_empty?: bool }` | yes | `omit_when_empty: false` | `as ∈ KINDS` except `section`; `table` and `cards` need `columns` |
 | `prose` | — | no | — | `spark` |
 
 ### 4.12 · `Diff` — 04 §3
@@ -556,7 +575,7 @@ The checks, in 04 §5's row order. B = one declaration alone · C = the Registry
 26. `SERIES_HAS_NO_TEXT` — via `where.validate` (38 §2.3), whose `RegisterSchema.series` this package sets.
 27. `REQUIRED_WHEN_OP_UNSUPPORTED` — B.
 28. `PREDICATE_CYCLE` — via `where.validate` over `RegisterSchema.predicates` (38 §2.3).
-29. `SEQ_PREFIX_TAKEN` — C/D. A non-`#` prefix equal to `D` `SG` `S`, to another register's in the pack, or to an installed register's.
+29. `SEQ_PREFIX_TAKEN` — C/D. A non-`#` prefix equal to `D` `SG` `S` (`S` only when the declaration is not `register.session`), to another register's in the pack, or to an installed register's, or one that such a prefix followed by a number spells.
 30. `SEARCH_FIELD_TYPE` — B.
 31. `FIELD_TYPE_CHANGED` — D. An upgrade where a field id persists with a different `type` (or `of.type`) and `installed.rows[register] > 0`.
 32. `PROVIDES_MISMATCH` — A (§5.2 step 4).
@@ -572,6 +591,14 @@ The checks, in 04 §5's row order. B = one declaration alone · C = the Registry
     `create.fields` or seed key whose field is `secret` or `file`.
 38. `WOULD_ORPHAN` (§13 D4) — D. A `retires` entry for a register with `installed.rows > 0` — every downgrade, and an upgrade
     that drops a register. Reported in `Diff.retires`/`orphans` and refused by `install` while v1 has no `--force` (48 §13 D12).
+39. The scope rules (§4.4), B and D, borrowing `DECLARATION_INVALID`, `FIELD_UNKNOWN` and `ENUM_VALUE_UNKNOWN`: `scopes` names
+    `list<text>` fields of its own register, never on a series, and one active register in the Registry declares it; a field's
+    `scope` sits on a `ref` or `list<ref>` to that register, `widen` and `same` on a ref and `links` on a list, one per register.
+40. The field rules (§4.4), B: `min`/`max` bound a type that has a size and hold their own `default` (`OUT_OF_BOUNDS`,
+    `VALUE_MALFORMED`; `NOT_IN_THIS_BUILD` on `url email json list`); `required_when` compares one `text enum bool int` field by
+    `is` (`FIELD_UNKNOWN`, `ENUM_VALUE_UNKNOWN`, 27's `REQUIRED_WHEN_OP_UNSUPPORTED`); a field's and a move's `by` is `decide`
+    (`ENUM_VALUE_UNKNOWN`), and a move's `requires` names fields of the register (`FIELD_UNKNOWN`); and a `secret` field takes no
+    value but the vault door's (`DECLARATION_INVALID`, `SEARCH_FIELD_TYPE`).
 
 Borrowed at install, "one code, two moments" (30 §6's `TRANSITION_ILLEGAL` precedent): `FIELD_UNKNOWN` (an unknown key,
 or a named field the register lacks), `REQUIRED_MISSING` (a required key absent), `ENUM_VALUE_UNKNOWN` (a closed-list

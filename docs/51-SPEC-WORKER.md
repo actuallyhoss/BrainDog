@@ -36,7 +36,7 @@ deletes a customer, restores a bookmark.
 
 **Imports.** `@braindog/ports` (types, `blobKey`, `preflight`, `mapSqlError` hooks), `@braindog/record`
 (`createRecord`, `Method`, `GROUPS`, `./directory`), `@braindog/spark` (`createSpark`), `@braindog/mcp`
-(`createMcpHandler`), `@braindog/connect` (`ingest`), `cloudflare:workers`, `age-encryption`, `@pushforge/builder`.
+(`serveMcp`, `gate` and `unauthorized` from `./http`), `@braindog/connect` (`ingest`), `cloudflare:workers`, `age-encryption`, `@pushforge/builder`.
 `apps/web/build` is an asset directory, never an import. Rows 1–4 and 7–11 of 31 §2 are reachable; nothing else.
 
 ---
@@ -278,13 +278,20 @@ The skeleton in 33 §7 lacked `send_email`, `analytics_engine_datasets`, `rateli
 
 ### 5.3 · `POST /mcp`
 
-1. `preContext` with `surface: 'mcp'`; only a bearer is accepted — a cookie → **401**.
-2. Rate-limit key is the token hash; `Mcp-Name` goes into the telemetry blob, never into a decision (10 §1: the
-   headers exist so the edge need not parse the body).
-3. `handler = createMcpHandler({ call: (m, args, session) => stub.call(m, args, { ...pre, session }) })`;
-   `return handler(req)`. The JSON-RPC parse, `_meta` → `session`, the eight tools, resources and `instructions` are
-   44's; the Worker never sees a tool name. 10 §1 spells the factory `createMcpHandler(api, decls)`; the declarations
-   are a read the handler makes through `api` (§13 I1).
+1. `servesMcp(pathname)` is decided before `doorOf`, so a cookie is never read and the demo never answers. `/mcp`
+   is one path with no subpaths.
+2. `gate(request)` from `@braindog/mcp/http`: **405** with `Allow: POST` for any other method, **403** for any
+   `Origin`, **415** for a body that is not `application/json`. Headers only; nothing of the body is read.
+3. `bearerOf(request, 'mcp', …)` in `src/session.ts`, the same path `/api` takes: the bearer's record id, the
+   Directory's `knows`, the record's `verify(bearer, 'mcp')`, which records `last_surface = 'mcp'`, then
+   `access(person)`. A missing, malformed or unknown bearer is **401** with `WWW-Authenticate: Bearer` and the
+   JSON-RPC body `{ id: null, error: -32001 'UNAUTHORIZED' }`; a person no longer on the record is **403**
+   `FORBIDDEN`, as on `/api`.
+4. `inward(request, ctx)` to the record's object, whose `fetch` answers `/mcp` with `serveMcp(request, api, ctx)`:
+   **413** above 1 MB, the body parsed, the mirrored headers held to it, then the core's `handle`. The JSON-RPC
+   parse, the fourteen tools, resources and `instructions` are 44's; the Worker never sees a tool name.
+5. Not built yet: the rate limit keyed on the token hash (§5.1 step 5), `Mcp-Name` in the telemetry blob, and
+   `_meta.session`.
 
 ### 5.4 · Arrivals — `/in/webhook/<rec_id>/<ingest-id>/<token>` and `email()`
 
@@ -619,7 +626,7 @@ Only codes from 30 §6 appear in a body; the Worker mints none. The adapter's th
 | bearer at `VAULT`, `ADMIN`, session-half `JOBS` | 403 `NEEDS_BROWSER_SESSION` | *Open this in the browser; no token can do it.* |
 | cookie mutation without a same-origin `Origin` | 403 `FORBIDDEN` | *Reload the page and try again.* |
 | the session's record no longer holds the person | 403 `FORBIDDEN` | *You are not on this record.* |
-| `/mcp` with a cookie | 401 `UNAUTHORIZED` | *MCP takes an agent token.* |
+| `/mcp` with a cookie, or with nothing | 401, `WWW-Authenticate: Bearer`, the JSON-RPC error `-32001`; the cookie is never read | *UNAUTHORIZED*, and nothing else |
 | module-level `SCHEMA_MISMATCH` / `SCHEMA_NEWER` | 503 | *A deploy is in progress; retry in five minutes.* |
 
 ---
@@ -809,7 +816,7 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 
 | # | Symbol assumed | Owner |
 |---|---|---|
-| I1 | `createMcpHandler(api: { call })` — 10 §1 spells `(api, decls)`; the declarations are a read through `api` | 44 |
+| I1 | `serveMcp(request, api, ctx)` from `@braindog/mcp/http`, over the record's own methods; the core beneath it is `handle(message, surface, ctx)` from `./rpc` | 44 |
 | I2 | `createRecord(ports): { call, alarm, applyMigrations, changed, version }`; `Method`, `Args<M>`, `Ret<M>`, `GROUPS` | 45 |
 | I3 | `export(cursor)` returns `{ chunk, cursor, manifest? }` in pages of ≤ 1,000 rows | 45 |
 | I4 | `preflight(query, params, caps)`, the case array, `Assert`, `SqlError` | 37 |

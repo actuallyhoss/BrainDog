@@ -19,7 +19,7 @@
 import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
-import { coerce, isAbsent, instant, parseSpoken, type FieldDecl, type Json } from './coerce.ts';
+import { coerce, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
 import { attempt } from './tx.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
@@ -33,6 +33,7 @@ import {
   pendingWork,
   reschedule,
   retryHandler,
+  sweepSessions,
   type Drained,
   type Handler,
   type Remindable,
@@ -99,11 +100,24 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { sparkMayWrite } from './spark.ts';
+import { KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, type Found, type SessionHints } from './session.ts';
+import {
+  resolveProject,
+  scopeFault,
+  scopeFieldOf,
+  type Resolved,
+  type ScopeDecl,
+  type ScopesDecl,
+  type Whereabouts,
+} from './scope.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkDogl, keyIdOf, b64url, manifestBytes, signDogl, type Signature, type Signer } from './dogl.ts';
 export { SPARK, SPARK_KINDS, sparkMayWrite } from './spark.ts';
-export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, parseSpoken, spoken } from './coerce.ts';
+export { KERNEL_WRITTEN, STALE_MS, isStale, sessionDeclaration } from './session.ts';
+export type { SessionHints } from './session.ts';
+export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
+export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
@@ -180,6 +194,17 @@ export type RegisterDecl = {
      * to the whole team by the feature that exists to make the record trustworthy.
      */
     redact?: boolean;
+    /** Where a row applies: a `ref` to a project, or a list of them. One field per register. */
+    scope?: ScopeDecl;
+    /** Bounds: UTF-8 bytes on text and documents, the value on numbers (`02 §5`). */
+    min?: number;
+    max?: number;
+    /** Required while another field of the row holds this value. */
+    required_when?: { field: string; is: Json };
+    /** `decide`: once the row is made, only an accepted proposal changes the field. */
+    by?: 'decide';
+    /** On an enum: the moves out of each value, what a move needs filled, and `by` for one only a proposal makes. */
+    transitions?: Readonly<Record<string, { to: readonly string[]; requires?: readonly string[]; by?: 'decide' }>>;
   })[];
   /** The enum field mirrored onto `entry.state`, when the register has one. */
   state?: string;
@@ -187,6 +212,10 @@ export type RegisterDecl = {
   done?: readonly string[];
   /** A series has no spoken number: its rows are points, and nobody says a point out loud. */
   series?: boolean;
+  /** What a row's spoken id starts with, `S` for `S42`. Absent or `#` is `register#42` only. */
+  seq_prefix?: string;
+  /** On the one register whose rows are projects: the fields listing each one's repositories and folders. */
+  scopes?: ScopesDecl;
 };
 
 export type Entry = {
@@ -204,7 +233,10 @@ export type Entry = {
 export type Patch = Record<string, unknown>;
 
 export type WriteContext = {
-  /** Who. `p_…` for a person, a mechanism name for the record's own paths. */
+  /**
+   * Who. `p_…` for a person, a mechanism name for the record's own paths. On a token's write it is
+   * what the events carry only when no run can be opened, which the ladder records as a defect.
+   */
   actor: string;
   /** One sentence a person reads in six weeks. Not a commit message. */
   note?: string;
@@ -236,9 +268,31 @@ export type WriteContext = {
    * while the record still can.
    */
   stamp?: Record<string, Json>;
+  /**
+   * Who is behind the write, when the caller knows. A token's write runs the session ladder and is
+   * signed by the run it resolves to, `S42` (`30 §3`). Every other principal keeps `actor` as given,
+   * which is how a person in a browser is never a run.
+   */
+  principal?: { kind: 'person' | 'token' | 'system'; token?: string | undefined } | undefined;
+  /** What an agent says about its run. Read for a token's write only. */
+  session?: SessionHints | undefined;
 };
 
 const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
+
+/**
+ * What only the kernel's own paths say about a write, and so is not on `WriteContext`, which a caller
+ * fills in.
+ *
+ *   `decided`  the write carries out an accepted proposal: the one way a field or a move declared
+ *              `by: 'decide'` changes. Governance's accept path sets it.
+ *   `seal`     the vault door. `depositGrant` binds the key's grant inside the write, once the run
+ *              signing it is known, and points `field` at it. No patch names a secret field.
+ */
+type Door = {
+  decided?: boolean;
+  seal?: { field: string; bind: (actor: string, held: string | null) => Result<GrantRow> };
+};
 
 /* ── the record ──────────────────────────────────────────────────────────── */
 
@@ -291,9 +345,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
   /** The active declarations, parsed once. Rebuilt when a declaration changes and never otherwise. */
   let registers = new Map<string, RegisterDecl>();
+  /** Each spoken prefix other than `#`, to the register that speaks it. */
+  let prefixes = new Map<string, string>();
 
   function reload(): void {
     registers = new Map();
+    prefixes = new Map();
     const rows = sql.all<{ id: string; body: string }>(
       "SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0",
     );
@@ -317,6 +374,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (named)
         decl.fields = decl.fields.map((f) => (named.includes(f.id) ? { ...f, search: true } : f)) as typeof decl.fields;
       registers.set(decl.id, decl);
+      if (decl.seq_prefix !== undefined && decl.seq_prefix !== '#') prefixes.set(decl.seq_prefix, decl.id);
     }
   }
   reload();
@@ -389,8 +447,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /** A row, addressed the way the caller happens to have it. */
   function get(ref: string | { register: string; seq: number }, opts: { includeDeleted?: boolean } = {}): Entry | null {
     if (typeof ref !== 'string') return bySeq(ref.register, ref.seq, opts.includeDeleted);
-    const said = parseSpoken(ref);
+    const said = parseSpoken(ref) ?? prefixed(ref);
     return said ? bySeq(said.register, said.seq, opts.includeDeleted) : byId(ref, opts.includeDeleted);
+  }
+
+  /** A row as a person says it, `S42` or `things#3`, or its id when the row is gone. */
+  function nameOf(id: string): string {
+    const row = byId(id, true);
+    if (!row || row.seq === null) return id;
+    const prefix = registers.get(row.register)?.seq_prefix;
+    return prefix && prefix !== '#' ? `${prefix}${row.seq}` : `${row.register}#${row.seq}`;
+  }
+
+  /**
+   * `S42` to the register whose prefix is `S`, and its row 42.
+   *
+   * MATCHED AGAINST THE INSTALLED PREFIXES, not split by `34 §4`'s pattern alone. That pattern is
+   * greedy, so on its own it reads `S42` as the prefix `S4` and row 2. `validate` refuses two
+   * prefixes one id could belong to, so at most one matches here.
+   */
+  function prefixed(ref: string): { register: string; seq: number } | null {
+    const said = ref.trim();
+    for (const [prefix, register] of prefixes) {
+      const n = said.startsWith(prefix) ? said.slice(prefix.length) : '';
+      if (/^[1-9][0-9]*$/.test(n)) return { register, seq: Number(n) };
+    }
+    return null;
   }
 
   /**
@@ -701,7 +783,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     if (risky && !rule.once_per?.length)
       return {
         code: 'REQUIRED_MISSING',
-        fix: `${id} notifies, creates or suggests, and declares no once_per — so it would fire on every write of the row.`,
+        fix: `${id} notifies, creates or suggests, and declares no once_per, so it would fire on every write of the row.`,
         at: 'once_per',
       };
 
@@ -776,7 +858,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
              `MATCH_OP_UNSUPPORTED` is for, and it was never about a `where` operator. */
           return {
             code: 'MATCH_OP_UNSUPPORTED',
-            fix: `${id} crosses ${field}, which is a ${String(kind.type)} — only a list or an enum has values to cross.`,
+            fix: `${id} crosses ${field}, which is a ${String(kind.type)}. Only a list or an enum has values to cross.`,
             at: 'each',
           };
         /* AGAINST THE DECLARED CARDINALITY WHERE IT IS KNOWABLE. An enum's values are in the
@@ -972,13 +1054,107 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   const version = (): number =>
     Number(sql.one<{ v: number | null }>('SELECT MAX(rowid) AS v FROM event')?.v ?? 0);
 
+  /**
+   * A register's rows as a run in one project sees them: the project's own, and the global rows it
+   * inherits. On a field declared `same: 'nearer'` a project row hides a global row with the same
+   * title, so a project's own skill replaces the one of that name that applies everywhere. A
+   * finished project row hides nothing, because it applies nowhere.
+   *
+   * THE ONE READ `context` AND A PAGE'S `inherit:` ARE TO BE BUILT ON, so nearer-wins is decided in
+   * one place. `project` is a spoken id or a row id; `null` is a global run, which inherits all.
+   */
+  function inScope(
+    register: string,
+    project: string | null,
+    opts: { limit?: number } = {},
+  ): Result<{ rows: Entry[]; inherited: Entry[] }> {
+    const barred = schemaRefusal(state);
+    if (barred) return barred;
+    const decl = registers.get(register);
+    if (!decl) return no('REGISTER_UNKNOWN', `There is no register called ${register}.`, { allowed: [...registers.keys()] });
+    const f = scopeFieldOf(decl.fields);
+    if (!f) return no('FIELD_UNKNOWN', `${register} has no field that says where its rows apply.`, { at: 'scope' });
+    const home = project === null ? null : get(project);
+    if (project !== null && (!home || home.register !== f.to))
+      return no('VALUE_MALFORMED', `${project} is not a row of ${String(f.to)}, so it is not a project.`, { at: 'project' });
+
+    const limit = Math.min(Math.max(1, Math.floor(Number(opts.limit)) || 50), 200);
+    const at = `'$.${f.id}'`;
+    const read = (where: string, ...params: string[]): Entry[] =>
+      sql
+        .all<Record<string, unknown>>(
+          `SELECT ${COLUMNS} FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND ${where}
+           ORDER BY e.updated_at DESC, e.id DESC LIMIT ?`,
+          register,
+          ...params,
+          limit,
+        )
+        .map(hydrate);
+
+    const rows = !home
+      ? []
+      : f.type === 'list'
+        ? read(`EXISTS (SELECT 1 FROM json_each(e.fields, ${at}) WHERE value = ?)`, home.id)
+        : read(`json_extract(e.fields, ${at}) = ?`, home.id);
+    const done = decl.done ?? [];
+    const hide = home && f.scope?.same === 'nearer' ? home.id : null;
+    const inherited = hide
+      ? read(
+          `json_extract(e.fields, ${at}) IS NULL AND NOT EXISTS (SELECT 1 FROM entry p WHERE p.register = e.register
+           AND p.deleted_at IS NULL AND json_extract(p.fields, ${at}) = ?
+           AND json_extract(p.fields, '$.${decl.title}') = json_extract(e.fields, '$.${decl.title}')
+           ${done.length ? `AND coalesce(p.state, '') NOT IN (${done.map(() => '?').join(', ')})` : ''})`,
+          hide,
+          ...done,
+        )
+      : read(`json_extract(e.fields, ${at}) IS NULL`);
+    return ok({ rows, inherited });
+  }
+
+  /**
+   * THE VAULT DOOR, the record's half, and INTERNAL: no route reaches it.
+   *
+   * A host's door seals a key with the record's key store and drops the value; this binds the sealed
+   * bytes into a grant and points one row's `secret` field at it, in one transaction, through the
+   * write path and every check it has. `ref` names the row to update, and without it one is created.
+   * A row whose field names a live grant rotates that grant, keeping one prior version, and a revoked
+   * one is replaced. It is the one write that sets a secret field.
+   */
+  function depositGrant(
+    args: { register: string; ref?: string | null; field: string; fields?: Patch; grant: Omit<BindGrantArgs, 'id'> },
+    w: WriteContext,
+  ): Result<{ entry: Entry; grant: GrantRow }> {
+    const decl = registers.get(args.register);
+    if (!decl) return no('REGISTER_UNKNOWN', `There is no register called ${args.register}.`, { allowed: [...registers.keys()] });
+    const sealable = decl.fields.filter((f) => f.type === 'secret' && !f.retired).map((f) => f.id);
+    if (!sealable.includes(args.field))
+      return no('FIELD_UNKNOWN', `${args.register} has no secret field called ${args.field}.`, { at: args.field, allowed: sealable });
+
+    let bound: GrantRow | undefined;
+    const bind = (actor: string, held: string | null): Result<GrantRow> => {
+      const live = held !== null && getGrant(sql, held)?.revoked_at === null;
+      const out = bindGrant(sql, vaultDeps(actor), { ...args.grant, ...(live && held !== null ? { id: held } : {}) }, transaction);
+      if (out.ok) bound = out.value;
+      return out;
+    };
+    const out = write(args.register, args.ref ?? null, args.fields ?? {}, w, { seal: { field: args.field, bind } });
+    if (!out.ok) return out;
+    /* A replayed deposit binds nothing again, and answers with the grant the row already names. */
+    const grant = bound ?? getGrant(sql, String(out.value.fields[args.field] ?? ''));
+    return grant ? ok({ entry: out.value, grant }) : no('OUT_OF_BOUNDS', `There is no grant behind ${args.field}.`, { at: args.field });
+  }
+
   /* ── the write path ──────────────────────────────────────────────────── */
 
-  function write(register: string, ref: string | null, patch: Patch, w: WriteContext): Result<Entry> {
+  function write(register: string, ref: string | null, patch: Patch, w: WriteContext, door: Door = {}): Result<Entry> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
 
-    const out = writing(register, ref, patch, w);
+    /* A SEALING WRITE BINDS A GRANT PART-WAY THROUGH ITS PERSIST STEP, so a refusal after that rolls
+       back to a savepoint rather than trusting that nothing was written before it. */
+    const out = door.seal
+      ? attempt(sql, transaction, () => writing(register, ref, patch, w, door))
+      : writing(register, ref, patch, w, door);
     /* THE ONE WRITE A REFUSAL MAKES. Ten of the same refusal in a month across three days means the
        DECLARATION is wrong rather than one caller having a bad afternoon — and a record that threw
        its refusals away could never notice the difference. It is outside the transaction the write
@@ -991,7 +1167,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return out;
   }
 
-  function writing(register: string, ref: string | null, patch: Patch, w: WriteContext): Result<Entry> {
+  function writing(register: string, ref: string | null, patch: Patch, w: WriteContext, door: Door = {}): Result<Entry> {
     return transaction(() => {
       /* STEP ZERO: A REPLAY RETURNS WHAT THE FIRST ATTEMPT RETURNED.
        *
@@ -1041,6 +1217,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const merged: Record<string, Json> = { ...(current?.fields ?? {}) };
       const touched: string[] = [];
 
+      /* `by: decide` ON A FIELD: once the row is made, only an accepted proposal changes it, from
+         every caller, the owner included. `FORBIDDEN` with the remedy in the sentence, as the scope
+         rules give it, because the repair is the same: propose it, and the owner's press applies it. */
+      const decidedOnly = (key: string): Result<Entry> =>
+        no<Entry>('FORBIDDEN', `${key} changes only by an accepted proposal. Propose the change, and it is applied when the owner accepts it.`, {
+          at: key,
+        });
+
       /* Defaults first, and on a create only: a default is what a row starts as, not what it
          returns to when somebody clears a field. */
       if (!current)
@@ -1059,10 +1243,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           });
         if (field.derived)
           return no<Entry>('IMMUTABLE_FIELD', `${key} is derived, so the record computes it.`, { at: key });
+        /* THE RECORD'S OWN, on the one register the kernel declares: when a run was last heard from,
+           the project it resolved to, and the token that opened it. */
+        if (register === SESSION && KERNEL_WRITTEN.includes(key))
+          return no<Entry>('IMMUTABLE_FIELD', `${key} is written by the record itself, and no caller sets it.`, { at: key });
+        /* A SECRET FIELD IS THE VAULT DOOR'S, from every caller. It names the grant a key was sealed
+           into, and `depositGrant` writes it in the transaction that seals the key, so a caller naming
+           a grant could only point a row at a key sealed for another. `IMMUTABLE_FIELD`, the answer a
+           kernel-written field gives, because the refusal is about the field and not about who asks. */
+        if (field.type === 'secret' || field.of === 'secret')
+          return no<Entry>(
+            'IMMUTABLE_FIELD',
+            `${key} says where a key is sealed, and only the vault writes it. Deposit the key, and the record points this field at it.`,
+            { at: key },
+          );
         touched.push(key);
         if (value === null) {
           if (field.immutable && current && current.fields[key] !== undefined)
             return no<Entry>('IMMUTABLE_FIELD', `${key} is set once, so it cannot be cleared either.`, { at: key });
+          if (field.by === 'decide' && current?.fields[key] !== undefined && !door.decided) return decidedOnly(key);
           delete merged[key];
           continue;
         }
@@ -1085,9 +1284,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           JSON.stringify(current.fields[key]) !== JSON.stringify(out.value)
         )
           return no<Entry>('IMMUTABLE_FIELD', `${key} is set once and cannot be changed.`, { at: key });
+        /* Compared the way `immutable` is, so re-sending the value a row already holds is no change. */
+        if (
+          field.by === 'decide' &&
+          current &&
+          !door.decided &&
+          JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(isAbsent(out.value) ? null : out.value)
+        )
+          return decidedOnly(key);
         // Absent is one thing, not three: null, "" and [] all remove the key (K2).
         if (isAbsent(out.value)) delete merged[key];
         else merged[key] = out.value;
+      }
+
+      /* ── where the row applies, on a token's write ──
+         The run is found here, before the checks, so its project can be the default and the limit;
+         it is opened or re-attached only at persist, so a refused write still opens no run. */
+      let located: Located | undefined;
+      const locate = (): Located => (located ??= locateRun(w));
+      const scoped = w.principal?.kind === 'token' ? scopeFieldOf(decl.fields) : undefined;
+      if (scoped) {
+        const home = locate().project?.id ?? null;
+        if (!current && scoped.type === 'ref' && patch[scoped.id] === undefined && home !== null) merged[scoped.id] = home;
+        if (!current || touched.includes(scoped.id)) {
+          const why = scopeFault(scoped, current?.fields[scoped.id], merged[scoped.id], !current, home, nameOf);
+          if (why) return no<Entry>('FORBIDDEN', why, { at: scoped.id });
+        }
       }
 
       /* ── validate ── */
@@ -1098,11 +1320,29 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (f.required && value === undefined && (!current || touched.includes(f.id)))
           return no<Entry>('REQUIRED_MISSING', `${register} needs ${f.id}.`, { at: f.id });
 
+        /* REQUIRED WHILE ANOTHER FIELD SAYS SO, checked when either of the two is written, for the
+           reason `required` is: a row is not refused for a rule it predates. */
+        const when = f.required_when;
+        if (when && value === undefined && (!current || touched.includes(f.id) || touched.includes(when.field))) {
+          const target = known.get(when.field);
+          const is = target ? coerce(target, when.is) : null;
+          if (is?.ok && JSON.stringify(merged[when.field] ?? null) === JSON.stringify(is.value))
+            return no<Entry>('REQUIRED_MISSING', `${register} needs ${f.id} when ${when.field} is ${String(when.is)}.`, { at: f.id });
+        }
+
         if (value !== undefined && f.type === 'enum' && !f.values?.includes(String(value)))
           return no<Entry>('ENUM_VALUE_UNKNOWN', `${f.id} has no value ${String(value)}.`, {
             at: f.id,
             allowed: f.values ?? [],
           });
+
+        /* THE BOUNDS, on what this write set: the bytes of a text, the value of a number. */
+        if (value !== undefined && (f.min !== undefined || f.max !== undefined) && (!current || touched.includes(f.id))) {
+          const size = measure(f.type, value);
+          const bytes = f.type === 'text' || f.type === 'document' ? ' bytes' : '';
+          if (size !== null && ((f.min !== undefined && size < f.min) || (f.max !== undefined && size > f.max)))
+            return no<Entry>('OUT_OF_BOUNDS', `${f.id} is ${size}${bytes}, and takes ${range(f.min, f.max)}${bytes}.`, { at: f.id });
+        }
 
         /* A RESTORE TOUCHES NOTHING AND CHANGES EVERYTHING. The row was invisible to the partial
            unique index while it was deleted, so another row may have taken its value — and bringing
@@ -1121,7 +1361,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
               clash.seq === null ? 'UNIQUE_VIOLATION' : 'ALREADY_KNOWN',
               clash.seq === null
                 ? `${f.id} is already held by another row.`
-                : `${register}#${clash.seq} already has that ${f.id}.`,
+                : /* Named as a person says it: `S1` on a register with a prefix, `tasks#1` otherwise. */
+                  `${decl.seq_prefix && decl.seq_prefix !== '#' ? decl.seq_prefix : `${register}#`}${clash.seq} already has that ${f.id}.`,
               { at: f.id },
             );
         }
@@ -1132,7 +1373,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (decl.state && current && nextState !== current.state) {
         const field = known.get(decl.state);
         const from = current.state ?? '';
-        const legal = (field as { transitions?: Record<string, { to: string[] }> } | undefined)?.transitions?.[from];
+        const legal = field?.transitions?.[from];
         /* CLEARING THE STATE IS A MOVE, and skipping the check for it was a two-step way around
            every transition the register declares: clear it, and the next write starts from `''`,
            for which no transition is declared, so anything is legal. A row cannot leave a state it
@@ -1145,11 +1386,47 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
               : `${register}#${current.seq} cannot go from ${from} to ${nextState}.`,
             { at: decl.state, allowed: legal.to },
           );
+        /* A MOVE ONLY A DECISION MAKES, as a superseded learning coming back is: it is proposed. */
+        if (legal?.by === 'decide' && !door.decided)
+          return no<Entry>(
+            'FORBIDDEN',
+            `${nameOf(current.id)} leaves ${from} only by an accepted proposal. Propose the move, and it is made when the owner accepts it.`,
+            { at: decl.state },
+          );
+        /* AND WHAT A MOVE OUT NEEDS FILLED, as the reason a learning was superseded. */
+        const missing = legal?.requires?.find((need) => merged[need] === undefined);
+        if (missing !== undefined)
+          return no<Entry>('REQUIRED_MISSING', `${nameOf(current.id)} leaves ${from} only with ${missing} filled.`, { at: missing });
       }
 
       /* ── persist ── */
       const now = instant(clock.now());
       const deletedAt = deleting ? (patch.deleted_at === null ? null : now) : (current?.deleted_at ?? null);
+
+      /* THE LADDER, for a token's write and nothing else: a person in a browser is never a run
+         (`32 §2.1`). It runs here, after every check, so a refused write opens no run and moves no
+         heartbeat. From here on `w.actor` is the run, which signs every event below and the rules
+         pass. */
+      if (w.principal?.kind === 'token') {
+        const run = attribute(w, locate(), current?.id ?? null, now);
+        if (run.own) {
+          merged.last_seen = now;
+          const { place, project } = locate();
+          if (place && project) merged.project = project.spoken;
+          else if (place) delete merged.project;
+        }
+        w = { ...w, actor: run.actor };
+      }
+
+      /* THE VAULT DOOR'S KEY, bound here and not earlier: after every check, so a refused write seals
+         nothing, and after the ladder, so `grant.add` is signed by the run that deposited it. */
+      if (door.seal) {
+        const held = current?.fields[door.seal.field];
+        const bound = door.seal.bind(w.actor, typeof held === 'string' ? held : null);
+        if (!bound.ok) return bound;
+        merged[door.seal.field] = bound.value.id;
+        if (!touched.includes(door.seal.field)) touched.push(door.seal.field);
+      }
 
       /* STAMPED AFTER VALIDATION, because these are the kernel's own fields and no declaration
          describes them — running them through the field loop would refuse every one. */
@@ -1283,6 +1560,85 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * The BATCH is the triggering write's event id, shared by everything it caused, so "undo this
    * expansion" is one query rather than an archaeology of timestamps.
    */
+  /**
+   * The run a token's write belongs to, found or opened, with its heartbeat moved.
+   *
+   * `findSession` holds the rungs and only reads; this is the half that writes, called from the
+   * persist step of the write it serves. `own` means that write is to the run's own row, which then
+   * carries `last_seen` itself: a heartbeat written beside it would be overwritten by it.
+   */
+  type Located = { found: Found | null; place: boolean; project: { id: string; spoken: string } | null };
+
+  /**
+   * The run a token's write belongs to, and the project it is in, found without writing anything.
+   *
+   * A run about to be opened, or re-attached by its client id from a place it names, is placed by
+   * `resolveProject` (`scope.ts`). Any other run keeps the project it was placed in, so an agent's
+   * later writes cannot move it by sending other hints.
+   */
+  function locateRun(w: WriteContext): Located {
+    const hints = w.session ?? {};
+    const found = findSession(sql, hints, clock.now());
+    if (!found || (found.by === 'client' && Boolean(hints.remote || hints.repo || hints.cwd)))
+      return { found, place: true, project: resolveProject(sql, registers, hints).project };
+    const row = found.project ? get(found.project) : null;
+    return { found, place: false, project: row && found.project ? { id: row.id, spoken: found.project } : null };
+  }
+
+  function attribute(w: WriteContext, at: Located, target: string | null, now: string): { actor: string; own: boolean } {
+    const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+    const batch = w.batch === undefined ? {} : { batch: w.batch };
+    const { found } = at;
+    const project = at.project?.spoken ?? null;
+
+    if (found) {
+      const actor = `${prefix}${found.seq}`;
+      if (found.id === target) return { actor, own: true };
+      const back =
+        REVIVED.includes(found.state ?? '') &&
+        writing(SESSION, found.id, { state: 'active' }, { actor, cascade: false, stamp: { last_seen: now }, ...batch }).ok;
+      /* THE HEARTBEAT IS NOT A WRITE: no version, no `updated_at`, no event (`41 §13` #6). As a
+         write, every agent write would turn the next edit of its run's row into a conflict. */
+      if (!back) sql.exec("UPDATE entry SET fields = json_set(fields, '$.last_seen', ?) WHERE id = ?", now, found.id);
+      /* A RE-ATTACHED RUN IS PLACED AGAIN, in place like the heartbeat and for the same reason: a
+         run that came back in another folder is in that folder's project, and the record noting
+         where it found the run is not an edit anybody made. */
+      if (at.place && project !== found.project) {
+        if (project === null) sql.exec("UPDATE entry SET fields = json_remove(fields, '$.project') WHERE id = ?", found.id);
+        else sql.exec("UPDATE entry SET fields = json_set(fields, '$.project', ?) WHERE id = ?", project, found.id);
+      }
+      return { actor, own: false };
+    }
+
+    /* OPENED UNDER ITS OWN NAME. The number is read before the row takes it, so the `create` event is
+       signed by the run it creates; nothing else allocates in this transaction in between. */
+    const seq = Number(sql.one<{ n: number }>('SELECT next AS n FROM counter WHERE name = ?', `seq:${SESSION}`)?.n ?? 1);
+    const actor = `${prefix}${seq}`;
+    const opened = writing(SESSION, null, opening(w.session ?? {}), {
+      actor,
+      note: 'opened: auto',
+      cascade: false,
+      stamp: {
+        last_seen: now,
+        ...(w.principal?.token === undefined ? {} : { token_id: w.principal.token }),
+        ...(project === null ? {} : { project }),
+      },
+      ...batch,
+    });
+    if (opened.ok) {
+      if (opened.value.seq !== seq) throw new TypeError(`${actor} was opened as ${prefix}${String(opened.value.seq)}`);
+      return { actor, own: false };
+    }
+    /* A RUN THAT CANNOT BE OPENED IS A DEFECT, NOT A REFUSAL. The write it serves has passed every
+       check and still goes in, under the caller's own name, and this observation is how anybody finds
+       out that an agent's write went unattributed. */
+    if (refused(opened))
+      observe(sql, clock.now(), [
+        { kind: 'write.refused', subject: `${SESSION}.${opened.refusal.at ?? '-'}:${opened.refusal.code}` },
+      ]);
+    return { actor: w.actor, own: false };
+  }
+
   function rules(entry: Entry, register: string, w: WriteContext, batch: string): Entry {
     if (w.cascade === false) return entry;
     if (!sql.one("SELECT 1 AS x FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")) return entry;
@@ -1596,7 +1952,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     mint,
     allocate,
     hasRegister: (register) => registers.has(register),
-    write: (register, patch, actor, batch) => write(register, null, patch, { actor, batch }),
+    /* `decided`, because a row an accepted proposal writes is a decision carried out: the one way a
+       field or a move declared `by: 'decide'` changes. */
+    write: (register, patch, actor, batch) => write(register, null, patch, { actor, batch }, { decided: true }),
     /* THE FROZEN BASELINE, read through the one evaluator every figure in this record goes through.
        A prediction's measure is a metric body without a target or a window (24 §4.6) — both are
        supplied here from the prediction's own, which is what makes it gradeable at all. */
@@ -1692,6 +2050,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * kind rather than walking eight hours of a ladder, which is the honest behaviour: it says the
    * record cannot do this, instead of looking like it is trying.
    */
+  /**
+   * The hourly sweep: soft-deleted rows past thirty days, and runs not heard from in twelve hours.
+   * The `purge` schedule row and the `purge` method both run this one function.
+   */
+  function sweepRecord(cutoffMs = clock.now() - 30 * 86_400_000, limit?: number) {
+    const out = purge(sql, cutoffMs, clock.now(), transaction, mint, limit);
+    const sessions = transaction(() =>
+      sweepSessions(
+        sql,
+        clock.now(),
+        (id, to) =>
+          writing(SESSION, id, { state: to }, { actor: 'system', cascade: false, note: 'Nothing heard from this run in twelve hours.' })
+            .ok,
+      ),
+    );
+    return { ...out, sessions };
+  }
+
   const HANDLERS: Partial<Record<ScheduleKind, Handler>> = {
     retry: retryHandler(sql),
 
@@ -1699,7 +2075,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        record that deleted ten thousand rows in one afternoon is swept without holding a write lock
        on the one thread it has. */
     purge: () => {
-      purge(sql, clock.now() - 30 * 86_400_000, clock.now(), transaction, mint);
+      sweepRecord();
       return clock.now() + 3_600_000;
     },
 
@@ -2118,6 +2494,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     bindGrant: (args: BindGrantArgs, actor: string): Result<GrantRow> =>
       bindGrant(sql, vaultDeps(actor), args, transaction),
 
+    /** Seal a key into a grant and point a row's secret field at it, in one write. INTERNAL: the vault door's. */
+    depositGrant,
+
     /**
      * Hand the sealed bytes out, and count the reading.
      *
@@ -2385,8 +2764,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * A soft delete is not a delete and is not forever either: thirty days is the window in which
      * "undo" is a real word, and after it a record that only grows makes every scan pay.
      */
-    purge: (opts: { cutoffMs?: number; limit?: number } = {}) =>
-      purge(sql, opts.cutoffMs ?? clock.now() - 30 * 86_400_000, clock.now(), transaction, mint, opts.limit),
+    purge: (opts: { cutoffMs?: number; limit?: number } = {}) => sweepRecord(opts.cutoffMs, opts.limit),
 
     /** Claim up to `n` jobs of these kinds. One statement, so a double drain finds nothing. */
     leaseOutbox: (kinds: readonly OutboxKind[], n = 10) => transaction(() => lease(sql, ackDeps(), kinds, n)),
@@ -2639,8 +3017,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     count,
     version,
     history,
+    /** Which project a run in this place belongs to, and how it was told (`scope.ts`). Reads only. */
+    resolveProject: (where: Whereabouts): Resolved => resolveProject(sql, registers, where),
+    inScope,
     create: (register: string, fields: Patch, w: WriteContext) => write(register, null, fields, w),
     update: (register: string, ref: string, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
-    write,
+    /* Four arguments and no fifth: a `Door` is the kernel's own to open. */
+    write: (register: string, ref: string | null, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
   };
 }

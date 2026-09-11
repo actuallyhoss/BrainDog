@@ -217,9 +217,20 @@ if (!installed.ok) {
 }
 rows = Number(installed.value.rows);
 
+/* THE FIRST REGISTER THAT HOLDS A ROW, not the first declared. Since migration 0002 the kernel's own
+   `session` register is declared before the seed's, and it starts empty, so `registers[0]` offered
+   nothing to write against and the guard below was never reached. */
 const registers = [...record.registers().keys()];
-const register = registers[0];
-const listed = register === undefined ? null : record.list({ register, limit: 1 });
+let register;
+let listed = null;
+for (const id of registers) {
+  const tried = record.list({ register: id, limit: 1 });
+  if (tried?.ok && tried.value.rows.length > 0) {
+    register = id;
+    listed = tried;
+    break;
+  }
+}
 const row = listed?.ok ? listed.value.rows[0] : undefined;
 
 /* ── 3 · the write a model is allowed to make ───────────────────────────────────────────────────── */

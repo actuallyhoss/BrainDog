@@ -14,7 +14,7 @@ npm i braindog-render
 
 ## The problem it solves
 
-An agent has something to show. Give it sixteen components and it will reach for the wrong one; give
+An agent has something to show. Give it eighteen components and it will reach for the wrong one; give
 it HTML and it will write a table inside a callout; give it a JSON schema and it will spend a
 third of its tokens on punctuation.
 
@@ -57,14 +57,15 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Sixteen kinds over eight primitives
+## Eighteen kinds over eight primitives
 
-Kinds are declarations over primitives, so primitives compose and kinds do not have to.
+Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards` and
+`section` are page-only: a page's evaluator writes their rows and passes `parse(src, { page: true })`.
 
 | Primitive | Is | Kinds |
 |---|---|---|
-| `panel` | a bounded region with a tone and a nested document | `note` `quote` |
-| `grid` | *n* cells of label and figure | `stat` `board` |
+| `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` |
+| `grid` | *n* cells of label and figure | `stat` `board` `cards` |
 | `rows` | label · value · note, one per line | `spec` `params` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` |
 | `inline` | a run of pills | `chips` |
@@ -77,7 +78,7 @@ inlines**. Which is why a third party can add a kind without asking a designer �
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; sixteen kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; eighteen kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 

@@ -49,6 +49,36 @@ export type Boot = {
   registers: { id: string; name: string; count: number }[];
   /** ISO 8601, UTC. What day the record thinks it is, which is not always what day the reader does. */
   now: string;
+  /* OPTIONAL, because a host older than the session register answers without them. */
+  /** The runs that are live now, as `sessionsLive` answers. */
+  sessions?: LiveRun[];
+  /** Open suggestions, newest first: what waits on a person. */
+  waiting?: { id: string; body_kind: string; opened_by: string; opened_at: string }[];
+};
+
+/** One live run: the row, its spoken id, and what is worked out when it is read. */
+export type LiveRun = {
+  id: string;
+  seq: number;
+  spoken: string;
+  state: string | null;
+  version: number;
+  fields: Record<string, unknown>;
+  /** Not heard from in 45 minutes. */
+  stale: boolean;
+  /** Seconds since it was last heard from. */
+  age_s: number;
+  /** Its repository is the one the caller said it is in. */
+  same_repo: boolean;
+};
+
+/** `attach`: the run this agent is, and whether it was already there. */
+export type Attached = {
+  session: { id: string; seq: number; state: string | null; version: number; fields: Record<string, unknown> };
+  spoken: string;
+  resumed: boolean;
+  /** The project the run is placed in, by spoken id, or `null` for none. */
+  project: string | null;
 };
 
 /** `33 §4` line 356, six keys. `app` is `null` on a host that was not told what it is running. */
@@ -212,6 +242,27 @@ export function createClient(options: ClientOptions) {
     markRead: (upTo?: number) =>
       call<{ upTo: number; seen_at: unknown }>('markRead', upTo === undefined ? {} : { upTo }),
     log: (args: { register: string; seq: number; note?: string }) => call<unknown>('log', args as Record<string, unknown>),
+
+    /* A RUN'S THREE. `attach` and `handoff` are an agent's, and the host reads which run from the session
+       headers the caller's own `fetch` sends; `sessionsLive` is anybody's who may read the register. */
+    attach: (args: {
+      source: 'startup' | 'resume' | 'clear' | 'compact' | 'cli';
+      client_id?: string;
+      doing?: string;
+      branch?: string;
+      head?: string;
+    }) => call<Attached>('attach', args as Record<string, unknown>),
+    handoff: (args: {
+      next?: string;
+      tried?: string;
+      note?: string;
+      doing?: string;
+      state?: string;
+      branch?: string;
+      head?: string;
+      session?: string;
+    }) => call<unknown>('handoff', args as Record<string, unknown>),
+    sessionsLive: () => call<LiveRun[]>('sessionsLive'),
   };
 }
 

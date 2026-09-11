@@ -81,7 +81,7 @@ test('THE CLIENT DRIVES A REAL RECORD, over a real socket', async () => {
   try {
     assert.deepEqual(
       value<{ registers: { id: string }[] }>(await c.client.boot()).registers.map((r) => r.id),
-      ['obligations'],
+      ['session', 'obligations'],
     );
 
     const made = value<{ seq: number; version: number }>(

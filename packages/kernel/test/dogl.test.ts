@@ -315,6 +315,28 @@ test('EXPORT · IMPORT · EXPORT PRODUCES THE SAME FILE, which is the only proof
   sql.close();
 });
 
+test('A FILE WRITTEN BEFORE MIGRATION 2 OPENS, and the record it lands in keeps its session register', async () => {
+  /* The file carries no kernel `register.session`, and the import replaces the declaration table
+     with the file's. The target's ledger already says migration 2 ran, so the import is the only
+     thing that can put the row back. */
+  const source = await filled();
+  source.sql.exec("DELETE FROM declaration WHERE id = 'register.session'");
+  const lines = value<string[]>(await source.k.export());
+  assert.ok(!lines.some((l) => l.startsWith('["register.session"')), 'the file still carries the kernel row');
+
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
+  value(await k.import(lines));
+  const seated = sql.all<{ pack_id: string }>(
+    "SELECT pack_id FROM declaration WHERE id = 'register.session' AND superseded_at IS NULL AND retired = 0",
+  );
+  assert.deepEqual(seated.map((r) => r.pack_id), ['kernel']);
+  assert.equal(k.register('session')?.seq_prefix, 'S', 'the imported record cannot speak S1');
+  assert.equal(k.count('obligations'), 2, 'the file’s own rows did not arrive');
+  source.sql.close();
+  sql.close();
+});
+
 test('and everything the record could answer before, it answers after', async () => {
   const source = await filled();
   const lines = value<string[]>(await source.k.export());
@@ -709,7 +731,7 @@ test('AND THE CHECK RUNS BEFORE ONE ROW IS WRITTEN', async () => {
   /* AND THE DECLARATIONS ARE UNTOUCHED, which is the half a per-table check could still have got
      wrong: `importDogl` clears a table on its first line, so a refusal that arrived one table in
      would leave the record emptier than it started. */
-  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM declaration')?.n ?? 0, 0);
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM declaration WHERE pack_id IS NOT 'kernel'")?.n ?? 0, 0);
   sql.close();
   source.sql.close();
 });

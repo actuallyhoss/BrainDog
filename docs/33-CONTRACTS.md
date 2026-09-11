@@ -185,44 +185,49 @@ type Refusal = { code: RefusalCode; at: string; found?: unknown; wanted?: string
 ```
 
 Six principal kinds, counted. **Who declares what:** `Refusal` and `RefusalCode` are `@braindog/ports`' (type-only);
-`CallContext` and `Result<T>` are `@braindog/kernel`'s; `RecordApi` — the object with the sixty-four methods below — is
+`CallContext` and `Result<T>` are `@braindog/kernel`'s; `RecordApi` — the object with the sixty-six methods below — is
 `@braindog/record`'s (`export type RecordApi`). Every consumer imports the type; nothing re-declares any of the four
 structurally.
 
 The host builds `CallContext` on every request — `@braindog/host`'s `resolveContext(req, lookups)` reads the `rec`
-cookie, the bearer (found by its hash) or the operation grant, and the session hints from the one `BrainDog-Session`
-header on `/api/*` or from `_meta.session` on `/mcp` (the one `_meta` key read; every other key is ignored — 44 §4.2);
+cookie, the bearer (found by its hash) or the operation grant, and the session hints from seven headers on `/api/*`
+and `/mcp` alike, `X-Braindog-Session`, `-Client`, `-Host`, `-Repo`, `-Remote`, `-Cwd` and `-Agent`, or from
+`_meta.session` on `/mcp`, which is read over them key by key (the one `_meta` key read; every other key is ignored,
+44 §4.2). `@braindog/host`'s `sessionOf` and `hintsOf` hold each hint to its grammar and drop what fails, and the call
+still goes through. Every principal carries them and the record reads a token's only, so a person is never a run;
 the alarm and the queue build a `system` context. The record derives `actor` and `ctx.scope` from it, runs the `op`
 reach check itself, and never trusts a caller-supplied actor. There is no 412: a stale `version` is a 409 whose body
 names who changed the row.
 
-**The sixty-four methods, one row each.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
+**The sixty-six methods, one row each.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
 any token in scope (`markRead` person principals only) · READ+ any token, and the MCP resources · VAULT a browser
 session only · JOBS the browser four by session and the runner three by the runner's grant, every MCP token refused ·
 ADMIN a browser session, or a bearer carrying an operation grant for that one operation · INTERNAL the host only, no
-route. The shapes are decided here. 9 · 12 · 4 · 7 · 16 · 16.
+route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 
 | Group | Method | Args | Returns / notes |
 |---|---|---|---|
 | DATA | `index` | `{ level?: 'index' \| 'digest', scope? }` | registers with counts, open questions, what changed — the three read levels of [10-MCP](10-MCP.md) §4 |
 | DATA | `search` | `{ q, registers?, limit? }` — `limit` ≤ 50 | rows, projected |
-| DATA | `get` | `{ spoken } \| { register, seq } \| { id }`, plus `{ path?, level? }` — `path` = `<field>(.<key>)*` | one row; `full` needs a `path`; a missing row is `ok` with `value: null` |
+| DATA | `get` | `{ spoken } \| { register, seq } \| { id }`, plus `{ path?, level? }` — `path` = `<field>(.<key>)*` | one row; `full` needs a `path`; a missing row is `ok` with `value: null`. `S1` is read against the installed prefixes, and a row the caller may not read answers as a missing one, so a spoken id is not a way to learn which registers exist |
 | DATA | `list` | `{ register, where?, order?, limit?, cursor?, fields? }` — default `order: [{ field: updated_at, dir: desc }]`, `limit` 25, max 200 | rows + `cursor` |
 | DATA | `create` | `{ register, fields, op_id }` | the row, `version` |
 | DATA | `update` | `{ register, seq \| id, patch, version, op_id }` — `version` is compare-and-set | the row, or `conflict` |
 | DATA | `propose` | `{ question, body_kind, body, op_id? }` — `body_kind ∈ options \| pattern \| rowset \| change` | `SG<n>`; Spark files a tier-A proposal here, once (46 §5) |
 | DATA | `log` | `{ note, target? }` — `note` ≤ 280 chars | the event |
 | DATA | `markRead` | `{ upTo }` — person principals only; `upTo` = an `event.rowid` | nothing; not an event |
+| DATA | `attach` | `{ source, client_id?, doing?, branch?, head? }`, `source` one of `startup` `resume` `clear` `compact` `cli`; a token only, needing `propose` | `{ session, spoken, resumed, project }`: the run the ladder found or opened, `project` its spoken id or `null`. Re-attaching refreshes where the run is and what it is doing, and never `next`, `tried` or `notes` |
+| DATA | `handoff` | `{ next?, tried?, note?, doing?, state?, branch?, head?, session? }`, needing `propose`; `session` names a run, and only a person may name one | the run. `tried` and `note` append inside one transaction, fifty kept of each and the oldest dropped; `state` moves along the declared transitions |
 | READ+ | `page` | `{ slug }` | the page's `blocks[]` with their rows, one projection |
 | READ+ | `metric` | `{ id }` | the value, its partials and `currency_excluded` |
 | READ+ | `schema` | `{ register }` | the register's declared fields and states |
 | READ+ | `dialect` | `{}` | the dialect of [34-GRAMMARS](34-GRAMMARS.md) §2, from the record's own constant — `record` never imports `render` |
 | READ+ | `digestToday` | `{}` | today's digest |
-| READ+ | `sessionsLive` | `{}` | the live sessions |
+| READ+ | `sessionsLive` | `{}` | the live runs, newest heard from first, each with `stale` (45 minutes), `age_s` and `same_repo` worked out as it is read; it opens no run |
 | READ+ | `learningsFor` | `{ repo }` | the learnings for one repo |
 | READ+ | `whatsNew` | `{ cursor? }` — cursor = `event.rowid`; default = the first rowid after the caller's `member.seen_at` | ≤ 60 events + `sinceCapped` |
 | READ+ | `project` | `{ query, budget }` — `secret` fields already replaced by their label | the `Projection` of 30 §9 |
-| READ+ | `boot` | `{}` | index + live sessions + open suggestions + `whatsNew` + `theme { id, version, css }` + `me { person, level, owner, records }`, one round trip |
+| READ+ | `boot` | `{}` | index + the live runs as `sessions` + open suggestions, without their bodies, as `waiting` + `whatsNew` + `theme { id, version, css }` + `me { person, level, owner, records }`, one round trip |
 | READ+ | `whoami` | `{}` | the principal as the record resolves it: its levels and the registers in scope |
 | READ+ | `ruleTest` | `{ id, against }` — raw ids, a register, or a file's rows | the dry run's `Report` (23 §4): `won / lost / takenBy`; writes nothing |
 | VAULT | `listGrants` | `{}` | grants with labels; never a value |
@@ -280,7 +285,7 @@ rowid as `version` — the kernel's replay, never the host's (41 §13 #9).
 
 **The factories.** `openRecord({ sql, clock, random, accent })` opens the kernel — randomness injected so a fixture is
 deterministic, `accent` the theme's hue chooser (`nextAccentHue`, [ADR-028](16-DECISIONS.md); 13 §2.1b) — and
-`applyMigrations` runs before any cache load. `createRecordApi(deps): RecordApi` returns the sixty-four as named
+`applyMigrations` runs before any cache load. `createRecordApi(deps): RecordApi` returns the sixty-six as named
 methods; a host routes `POST /api/<method>` by property lookup on that object — a two-line lookup in
 `@braindog/host`, never a `call` dispatcher in the record. `createSpark(deps): Spark` is the same shape for Spark's
 named methods (46 §2), served at `/api/spark/<method>`. `createMcpHandler(api: RecordApi, { context(req):
@@ -354,7 +359,7 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/api/spark/<method>` | POST | cookie only | Spark's named methods (46 §2), registered only when `SPARK_ENDPOINT` is set; otherwise no route |
 | `/api/boot` · `/api/pages/:slug` · `/api/schema/:register` | GET | bearer or cookie | aliases of `boot page schema` |
 | `/api/version` | GET | bearer or cookie | `{ version, format, kernel, primitives, app, spark: boolean }` — the polling fallback reads `version`; `deploy-parity` reads `app` (§8) |
-| `/mcp` | POST | bearer | streamable HTTP, the 2026-07-28 shape (`Mcp-Method`, `Mcp-Name`, `_meta`); eight tools, resources, `instructions` with every `tools/list`; `tools/list_changed` rides the response that proves the cache stale; POST only (405), 415 on a wrong type, 413 above 1 MB; wired by `createMcpHandler` (§2) |
+| `/mcp` | POST | **bearer only**: an agent token, or the self-host's server key, by the path `/api` takes; never a cookie, never the demo, never open mode | streamable HTTP, stateless, the 2026-07-28 shape: `serveMcp` in `@braindog/mcp/http` over the core's `handle`, called by both hosts; fourteen tools, resources, `instructions` with every `tools/list`. In order: 405 with `Allow: POST` for any other method, GET and DELETE included; 403 for any `Origin`; 415 for a body that is not `application/json`; 401 with `WWW-Authenticate: Bearer` before a byte of the body is read; 413 above 1 MB, on `Content-Length` and on the bytes; 400 `-32700` for a body that is not JSON. `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` are held to the body when sent, and required of a 2026-07-28 request: 400 with `-32022` for an unsupported version, `-32020` for a mismatch. A notification is 202 with no body; a method the server lacks is 404 `-32601`. No session id is minted or echoed. The token's `last_surface` is `mcp` |
 | `/in/webhook/<rec_id>/<ingest-id>/<token>` | POST | the ingest's `verify:` (HMAC header or the URL's random path segment) | above the auth gate; store raw, enqueue, return — an ingest id is per record, so the record is in the path |
 | `<slug>@in.brain.dog` | email | DKIM/SPF pass, else quarantined | Cloud: above the auth gate; store raw, enqueue |
 | `/in/email/<token>` | POST | the token minted at `init` (`<slug>/inbound.token`) | self-host: raw RFC 5322 in the body, from a forwarding webhook (§6) |

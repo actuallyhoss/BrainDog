@@ -411,6 +411,363 @@
     font-size: var(--t-xs);
   }
 
+  /* ── cards: one card per row ─────────────────────────────────────────────
+     `auto-fill` over 17rem, so a lane of one card keeps a card's width rather than stretching across
+     the page, and `min()` so a container narrower than one card is one column, not a sideways
+     scroll. No breakpoint: the grid answers its container, which is 05 §6's rule for width.
+     `cards-grid` and not `cards`, because the register's phone list and `/decide` already own that
+     name, and a rule here is global. */
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
+    align-items: start;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A CARD IS ONE SURFACE, and nothing inside it is boxed: the head, the figure and the facts sit on
+     the card's own ground with air between them. `start` above, so a short card is its own height
+     rather than the height of the tallest one beside it. */
+  .cards-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    padding: var(--sp-4);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  .cards-item:has(.cards-title a):hover {
+    background: var(--s2);
+  }
+
+  .cards-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .cards-mark,
+  .cards-face {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 650;
+    line-height: 1;
+  }
+
+  /* A MARK IS SQUARE AND A FACE IS ROUND, so a project and a person are told apart by shape, which
+     holds in every theme and for every reader where a hue would not. */
+  .cards-mark {
+    background: var(--s3);
+    border-radius: var(--r-sm);
+  }
+
+  .cards-face {
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+  }
+
+  .cards-who .cards-face {
+    inline-size: 22px;
+    block-size: 22px;
+  }
+
+  /* THE UI FACE, NAMED. An `h3` takes the display face from the skin, and that face is for 20px and
+     up; a card's name is body size, so it takes the face every other name in a list takes. */
+  .cards-title {
+    flex: 1;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-base);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+
+  .cards-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* The whole card is the target, drawn from the link rather than by wrapping the card in one,
+     because a link may not hold another and a fact can be a link. On `::before`, because a touch target
+     is measured as the element and its `::before`. */
+  .cards-title a::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-lg);
+  }
+
+  .cards-when {
+    flex: none;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  .cards-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-4);
+  }
+
+  .cards-figure {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .cards-figure .cards-value {
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 500;
+    letter-spacing: -0.028em;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cards-figure .amount-code {
+    font-size: 0.5em;
+    font-weight: 600;
+  }
+
+  .cards-label {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* The line takes what the figure leaves, down to a width at which it is still a shape. */
+  .cards-trend {
+    flex: 1 1 6rem;
+    min-inline-size: 5rem;
+    block-size: 28px;
+    overflow: visible;
+  }
+
+  .cards-trend-line {
+    fill: none;
+    stroke: var(--dim);
+    stroke-width: 1.5px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .cards-trend-end {
+    stroke: var(--ink2);
+    stroke-width: 5px;
+    stroke-linecap: round;
+  }
+
+  /* THE RING SITS BESIDE ITS NUMBER, which is printed, so the arc is a picture of a figure the
+     reader already has and never the only place it is said. */
+  .cards-ring {
+    display: grid;
+    grid-template-areas:
+      'mark value'
+      'mark label';
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--sp-2);
+  }
+
+  .cards-ring-mark {
+    grid-area: mark;
+    inline-size: 28px;
+    block-size: 28px;
+  }
+
+  .cards-ring .cards-value {
+    grid-area: value;
+    color: var(--ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cards-ring .cards-label {
+    grid-area: label;
+  }
+
+  .cards-ring-track {
+    fill: none;
+    stroke: var(--s3);
+    stroke-width: 4;
+  }
+
+  .cards-ring-fill {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  .cards-facts {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+  }
+
+  .cards-fact {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    font-size: var(--t-sm);
+  }
+
+  .cards-fact dt {
+    flex: none;
+    color: var(--dim);
+  }
+
+  .cards-fact dd {
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink2);
+    text-align: end;
+    overflow-wrap: anywhere;
+  }
+
+  .cards-who {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .cards-empty {
+    margin: 0;
+    color: var(--dim);
+  }
+
+  /* ── section: a heading for the blocks after it ──────────────────────────
+     A group on a page is a heading and air, never a box: one step above a block's name, the count on
+     its baseline, and the fold a pill at the end of the line. */
+
+  .sec {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-3);
+    padding-block-start: var(--sp-4);
+  }
+
+  .sec-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: var(--lh-tight);
+  }
+
+  .sec-count {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The renderer names a glyph and ships no art for it yet, so the slot takes no room rather than
+     holding an empty square until the glyph set lands. */
+  .sec-glyph {
+    display: none;
+  }
+
+  .sec-fold {
+    margin-inline-start: auto;
+  }
+
+  .sec-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    background: var(--s2);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .sec-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .sec-toggle:hover {
+    background: var(--s3);
+    color: var(--ink);
+  }
+
+  /* One word at a time: the control says what pressing it does, and the other word leaves the
+     accessibility tree along with the screen. */
+  .sec-fold[open] .sec-show,
+  .sec-fold:not([open]) .sec-hide {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .sec-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* A SECTION ON A DECLARED PAGE IS ITS OWN HEADING. The page draws a bar naming every block, and a
+     section's name is the section, which it already draws, so the bar goes and the words are said
+     once. The page's styles are not in a layer, so only an important declaration here outranks
+     them. The region keeps its name: a reference to a hidden heading still reads its text. */
+  .block-slot:has(> .block[data-kind='section']) > .block-bar {
+    display: none !important;
+  }
+
+  /* A FOLDED SECTION FOLDS THE BLOCKS AFTER IT, up to the next section. CSS cannot ask which section
+     is nearest, so this asks two questions it can: is there a folded section before this block with
+     no open section after it, or a folded, open, folded run with no open section after that. It is
+     exact until a page folds three sections with open ones between them. Nothing folds while the
+     page is being arranged, because a block nobody can see is a block nobody can move. */
+  .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:not([data-arranging], :has(> .block[data-kind='section'])):not(
+      .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ *
+    ),
+  .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+    ~ .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:not([data-arranging], :has(> .block[data-kind='section'])):not(
+      .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ *
+    ) {
+    display: none;
+  }
+
   /* ── rows: spec, params ─────────────────────────────────────────────────── */
 
   /* UNBOXED, like the ledger and the table: rows on the page's own ground with a hairline between

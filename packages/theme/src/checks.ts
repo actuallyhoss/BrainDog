@@ -54,7 +54,7 @@ function pairsAgainstSurfaces(
           level: 'refuse',
           code: 'CONTRAST_FLOOR',
           measured: r2(got),
-          fix: `theme — the pair (${role} on ${surface}) is ${r2(got)}:1 in ${scheme}. It needs ${floor}:1. Move ${role} further from the ground.`,
+          fix: `theme: the pair (${role} on ${surface}) is ${r2(got)}:1 in ${scheme}. It needs ${floor}:1. Move ${role} further from the ground.`,
         });
     }
   return out;
@@ -109,7 +109,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
       level: 'refuse',
       code: 'CONTRAST_FLOOR',
       measured: r2(ringTones),
-      fix: `theme — the two focus-ring tones are ${r2(ringTones)}:1 apart in ${scheme}. They need 9:1, or the ring vanishes on one surface.`,
+      fix: `theme: the two focus-ring tones are ${r2(ringTones)}:1 apart in ${scheme}. They need 9:1, or the ring vanishes on one surface.`,
     });
   out.push(...pairsAgainstSurfaces(p, ['focus-in'], 3, 'E', scheme));
 
@@ -140,7 +140,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
           level: 'refuse',
           code: 'INTENT_INSEPARABLE',
           measured: r2(gap),
-          fix: `theme — ${intents[i]![0]} and ${intents[j]![0]} are ${r2(gap)}° of hue apart, and four intents need at least ${HUE_FLOOR}°. Delta-E counts lightness, so a pale tint of a hue measures far from it and reads as the same colour.`,
+          fix: `theme: ${intents[i]![0]} and ${intents[j]![0]} are ${r2(gap)}° of hue apart, and four intents need at least ${HUE_FLOOR}°. Delta-E counts lightness, so a pale tint of a hue measures far from it and reads as the same colour.`,
         });
       for (const d of DEFS) {
         const de = separation(rgb(intents[i]![1]), rgb(intents[j]![1]), d);
@@ -152,7 +152,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
             level: 'refuse',
             code: 'INTENT_INSEPARABLE',
             measured: r2(de),
-            fix: `theme — ${intents[i]![0]} and ${intents[j]![0]} are delta-E ${r2(de)} apart to a ${d}ope. Four intents need at least 10. Move one hue, or lower the chroma of the other.`,
+            fix: `theme: ${intents[i]![0]} and ${intents[j]![0]} are delta-E ${r2(de)} apart to a ${d}ope. Four intents need at least 10. Move one hue, or lower the chroma of the other.`,
           });
       }
     }
@@ -173,7 +173,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         scheme,
         level: 'refuse',
         code: 'THEME_LADDER_ORDER',
-        fix: `theme — the surface ladder turns back on itself at ${SURFACES[i]} in ${scheme}. Surfaces must only go one way.`,
+        fix: `theme: the surface ladder turns back on itself at ${SURFACES[i]} in ${scheme}. Surfaces must only go one way.`,
       });
   }
 
@@ -185,7 +185,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         scheme,
         level: 'refuse',
         code: 'THEME_VALUE_INVALID',
-        fix: `theme — ${role} is "${value}", which is not a colour this dialect accepts.`,
+        fix: `theme: ${role} is "${value}", which is not a colour this dialect accepts.`,
       });
     /* J · HOW MUCH THE GAMUT MAPPER HAD TO TAKE OFF, which is the only form of this question that
        has an answer. Asking a hex whether it is in sRGB is asking whether a number between 0 and 1
@@ -204,7 +204,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         scheme,
         level: 'refuse',
         code: 'THEME_VALUE_INVALID',
-        fix: `theme — ${role} gave up ${(built.clipped?.[scheme]?.[role as Role] ?? 0).toFixed(3)} of chroma to the sRGB gamut, so ${value} is not the colour it was solved as.`,
+        fix: `theme: ${role} gave up ${(built.clipped?.[scheme]?.[role as Role] ?? 0).toFixed(3)} of chroma to the sRGB gamut, so ${value} is not the colour it was solved as.`,
       });
     for (const b of BANNED)
       if (value.includes(b))
@@ -213,7 +213,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
           scheme,
           level: 'refuse',
           code: 'THEME_VALUE_INVALID',
-          fix: `theme — ${role} contains "${b}", which a token value may never hold.`,
+          fix: `theme: ${role} contains "${b}", which a token value may never hold.`,
         });
   }
 
@@ -231,7 +231,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         level: 'refuse',
         code: 'CONTRAST_FLOOR',
         measured: r2(c),
-        fix: `theme — ${role} is ${r2(c)}:1 against its own label in ${scheme}. A control needs 4.5:1 in every state, not only at rest.`,
+        fix: `theme: ${role} is ${r2(c)}:1 against its own label in ${scheme}. A control needs 4.5:1 in every state, not only at rest.`,
       });
     else out.push({ check: 'Q', scheme, level: 'pass', measured: r2(c) });
   }
@@ -251,7 +251,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         level: 'refuse',
         code: 'CONTRAST_FLOOR',
         measured: r2(dL),
-        fix: `theme — a link and ${what} are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
+        fix: `theme: a link and ${what} are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
       });
   }
 
@@ -263,7 +263,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
       scheme,
       level: 'warn',
       measured: r2(dLine),
-      fix: `theme — line and edge are ${r2(dLine)} apart in ${scheme}. A decorative hairline and a load-bearing boundary should not look the same.`,
+      fix: `theme: line and edge are ${r2(dLine)} apart in ${scheme}. A decorative hairline and a load-bearing boundary should not look the same.`,
     });
 
   /* N · APCA advisory: where WCAG 2 is known to pass a dark-on-dark pair that reads as mud */
@@ -276,7 +276,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         scheme,
         level: 'warn',
         measured: lc,
-        fix: `theme — ${role} on bg passes WCAG at ${r2(w)}:1 but scores Lc ${lc} under APCA. Advisory only.`,
+        fix: `theme: ${role} on bg passes WCAG at ${r2(w)}:1 but scores Lc ${lc} under APCA. Advisory only.`,
       });
   }
 
@@ -307,7 +307,7 @@ export function checkElevation(built: Built): Finding[] {
           scheme,
           level: 'refuse',
           code: 'THEME_LADDER_ORDER',
-          fix: `theme — elevation level ${i + 1} in ${scheme} carries no readable opacity, so its depth cannot be compared.`,
+          fix: `theme: elevation level ${i + 1} in ${scheme} carries no readable opacity, so its depth cannot be compared.`,
         });
     for (let i = 1; i < alphas.length; i++)
       if (!(alphas[i]! > alphas[i - 1]!))
@@ -316,7 +316,7 @@ export function checkElevation(built: Built): Finding[] {
           scheme,
           level: 'refuse',
           code: 'THEME_LADDER_ORDER',
-          fix: `theme — elevation level ${i + 1} is not above level ${i} in ${scheme}.`,
+          fix: `theme: elevation level ${i + 1} is not above level ${i} in ${scheme}.`,
         });
   }
   return out;
@@ -333,7 +333,7 @@ export function checkForcedColors(css: string): Finding[] {
           scheme: 'dark',
           level: 'refuse',
           code: 'THEME_LADDER_ORDER',
-          fix: 'theme — the stylesheet has no forced-colors block. Under forced colours the five-surface ladder becomes one surface and every block boundary disappears.',
+          fix: 'theme: the stylesheet has no forced-colors block. Under forced colours the five-surface ladder becomes one surface and every block boundary disappears.',
         },
       ];
 }

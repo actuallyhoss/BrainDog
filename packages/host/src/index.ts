@@ -18,6 +18,8 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { conflicted, refused } from '@braindog/ports';
 
+export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
+
 /**
  * What one argument IS, so the text a stranger typed becomes the value the handler was written for.
  *
@@ -97,8 +99,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'boot', group: 'READ+', writes: false, what: 'What this record holds, and how many rows are in each register.' },
   { name: 'schema', group: 'READ+', writes: false, what: 'What one register holds: its fields, their types, and what each may take.',
     takes: { register: 'text' } },
-  { name: 'get', group: 'DATA', writes: false, what: 'One row, by the number a person says out loud.',
-    takes: { register: 'text', seq: 'integer' } },
+  { name: 'get', group: 'DATA', writes: false, what: 'One row, by the number a person says out loud: tasks#3, or S1.',
+    takes: { register: 'text', seq: 'integer', spoken: 'text' } },
   { name: 'list', group: 'DATA', writes: false, what: 'Rows of one register, narrowed by a predicate, newest first.',
     /* `cursor` IS `text` AND NOT `json`, and it is the one argument where that matters. A keyset
        cursor is `<when>|<id>`, which is not valid JSON, so it survived the guessing by accident;
@@ -110,6 +112,7 @@ export const ROUTES: readonly Route[] = [
     takes: { q: 'text', limit: 'integer' } },
   { name: 'version', group: 'READ+', writes: false, what: "The record's version, so a client can ask what changed since." },
   { name: 'whoami', group: 'READ+', writes: false, what: 'Who you are to this record, and which verbs you reach.' },
+  { name: 'sessionsLive', group: 'READ+', writes: false, what: 'The runs that are live now, with how long since each was heard from.' },
   { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.',
     takes: { digest: 'text' } },
   { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
@@ -147,6 +150,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'log', group: 'DATA', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
   { name: 'create', group: 'DATA', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
+  { name: 'attach', group: 'DATA', writes: true, what: 'Say which run this agent is and where it stands. A token only: a person is never a run.' },
+  { name: 'handoff', group: 'DATA', writes: true, what: "Keep a run's handoff true: the next step, what was tried, a note, its state." },
 ];
 
 /**
@@ -298,6 +303,9 @@ export type RecordSurface = {
   import(args: never, ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
+  attach(args: never, ctx: never): Promise<Result<unknown>>;
+  handoff(args: never, ctx: never): Promise<Result<unknown>>;
+  sessionsLive(args: never, ctx: never): Promise<Result<unknown>>;
 };
 
 export function handlersFor(api: RecordSurface): Record<string, Handler> {
@@ -338,6 +346,9 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     import: (a, ctx) => api.import(a as never, ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
+    attach: (a, ctx) => api.attach(a as never, ctx as never),
+    handoff: (a, ctx) => api.handoff(a as never, ctx as never),
+    sessionsLive: (a, ctx) => api.sessionsLive(a as never, ctx as never),
   };
   /* The table and the wiring, checked against each other where they are both in scope — so adding a
      route to one without the other throws at start rather than 404ing in production. */

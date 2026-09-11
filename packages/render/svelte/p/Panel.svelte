@@ -10,6 +10,7 @@
 <script lang="ts">
   import { TONES, inline, type Block, type RenderOptions } from '../../src/index.ts';
   import Text from '../Text.svelte';
+  import Section from '../Section.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -40,7 +41,9 @@
   });
 </script>
 
-{#if block.kind === 'quote'}
+{#if block.kind === 'section'}
+  <Section {block} {opts} />
+{:else if block.kind === 'quote'}
   {@const row = block.rows[0] ?? { cells: [] }}
   <blockquote class="panel">
     <span class="quote-text"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>

@@ -17,6 +17,14 @@
  */
 
 import { BAR_HOLE, KINDS, TONE_ALIAS, TONES, isKind, type DegradeCode, type Kind, type Tone } from './kinds.ts';
+import { cardFault } from './cards.ts';
+
+/**
+ * `page` is set by a page's own evaluator and never by a write-up. It admits the page-only kinds
+ * that have a row grammar (`cards`, `section`), because their rows come from a declaration rather
+ * than from an author. `table` has none and still degrades: the host draws it from the register.
+ */
+export type ParseOptions = { page?: boolean };
 
 export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean; depth?: number };
 
@@ -123,10 +131,16 @@ function readRows(kind: Kind, body: string[]): { rows: Row[]; over?: string } {
     }
 
     const all = splitRow(text);
-    const { cells, tone, hole } = takeTone(all, spec);
-
-    // A header row fixes the column count, so `comparison` takes as many cells as its first row.
-    const width = spec.header ? (rows.length === 0 ? cells.length : rows[0]!.cells.length) : spec.cells;
+    /* A HEADER ROW FIXES THE COLUMN COUNT, so `comparison` and `cards` take as many cells as their
+       first row. The header carries no tone, and a later row's tone is read only from a cell beyond
+       that count: read against `cells: 0`, every row's last value was a tone candidate, and a card
+       whose last column said "good" would have lost the word to the tone. */
+    const head = spec.header ? rows[0]?.cells.length : undefined;
+    const { cells, tone, hole } =
+      spec.header && head === undefined
+        ? { cells: all, tone: undefined, hole: false }
+        : takeTone(all, { ...spec, cells: head ?? spec.cells });
+    const width = head ?? (spec.header ? cells.length : spec.cells);
     if (cells.length > width)
       return { rows, over: `${cells.length} columns where ${kind} takes ${width}: "${line.trim()}"` };
 
@@ -180,7 +194,7 @@ function linesOf(src: string): { text: string; start: number; end: number }[] {
  * `src.slice(start, end)` is exactly the fence a block or a degradation was built from, and every
  * byte left over is whitespace. Nothing an author wrote goes missing; the gaps are the separators.
  */
-export function parse(src: string): Segment[] {
+export function parse(src: string, opts: ParseOptions = {}): Segment[] {
   const out: Segment[] = [];
   const source = linesOf(src);
   const lines = source.map((l) => l.text);
@@ -242,7 +256,7 @@ export function parse(src: string): Segment[] {
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
         fix: written
-          ? `"${written}" is not one of the sixteen kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the eighteen kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -285,11 +299,17 @@ export function parse(src: string): Segment[] {
      * is an agent the visible fence is the only feedback channel there is, so the sentence on it
      * has to name the real reason. `36 §13`'s codes are a closed pair and this is the unknown one.
      */
-    if (KINDS[kind].pageOnly) {
+    const drawable = opts.page === true && (KINDS[kind].cells > 0 || KINDS[kind].header === true);
+    if (KINDS[kind].pageOnly && !drawable) {
       out.push({
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
-        fix: `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
+        /* A section is not a register, so the register sentence would send its author looking for
+           rows it never had. A write-up's heading is the markdown one. */
+        fix:
+          kind === 'section'
+            ? `"section" is a heading on a page, so it has no place in a fence. Write a "##" heading. The block is shown as you wrote it.`
+            : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
         raw,
         info,
         start,
@@ -310,6 +330,23 @@ export function parse(src: string): Segment[] {
         type: 'degraded',
         code: 'DIALECT_ARITY',
         fix: `A ${kind} row has ${over}. The block is shown as you wrote it.`,
+        raw,
+        info,
+        start,
+        end,
+      });
+      i = close;
+      continue;
+    }
+
+    /* A CARD'S COLUMNS ARE ROLES, and one figure and at most three facts is the kind's arity, stated
+       per role rather than per row. Too many is DIALECT_ARITY like any row that is too wide. */
+    const fault = kind === 'cards' ? cardFault(rows[0]?.cells ?? []) : null;
+    if (fault) {
+      out.push({
+        type: 'degraded',
+        code: 'DIALECT_ARITY',
+        fix: `A cards block has ${fault}. A card takes one figure and at most three facts. The block is shown as you wrote it.`,
         raw,
         info,
         start,

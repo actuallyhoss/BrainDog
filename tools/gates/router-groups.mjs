@@ -77,7 +77,8 @@ for (const group of GROUPS) {
   if (spec[group] && listed.size !== counts[group])
     findings.push(`30 §5 says ${group} has ${counts[group]} methods and its own row lists ${listed.size}`);
 }
-const total = /\*\*Sixty-four methods: (\d+) · (\d+) · (\d+) · (\d+) · (\d+) · (\d+)\.\*\*/.exec(blueprint);
+/* The count word is prose, and it moves every time a method is added. The six numbers are what the gate checks. */
+const total = /\*\*(?:[A-Z][a-z]+(?:-[a-z]+)?) methods: (\d+) · (\d+) · (\d+) · (\d+) · (\d+) · (\d+)\.\*\*/.exec(blueprint);
 if (!total) findings.push("30 §5's counting sentence is not where this gate looks for it");
 else
   GROUPS.forEach((group, i) => {

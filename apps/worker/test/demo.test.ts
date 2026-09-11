@@ -69,11 +69,12 @@ test('and the Worker sets the context in one place, for every door', () => {
      `loop/research-anon-read.md`. */
   const src = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
   assert.doesNotMatch(src, /headers\.set\(\s*'x-braindog-ctx'/u, 'index.ts sets the context itself again');
-  /* THREE DOORS NOW: the demo, a session, and a bearer, and each one reaches the record through `inward`. */
-  assert.equal((src.match(/inward\(request, /gu) ?? []).length, 3, 'a door does not go through inward');
+  /* FOUR DOORS NOW: the demo, a session, a bearer on `/api` and a bearer on `/mcp`, and each one reaches the
+     record through `inward`. */
+  assert.equal((src.match(/inward\(request, /gu) ?? []).length, 4, 'a door does not go through inward');
   /* AND THE DOOR IS DECIDED BEFORE THE BEARER IS READ, in `session.ts`, where a cookie comes before the demo. */
   assert.ok(src.includes('doorOf(request'), 'index.ts no longer asks session.ts which door');
-  assert.ok(src.indexOf('doorOf(request') < src.indexOf('recordOf(request.headers'), 'the door is not decided before the bearer is read');
+  assert.ok(src.indexOf('doorOf(request') < src.indexOf("bearerOf(request, 'api'"), 'the door is not decided before the bearer is read');
   const session = readFileSync(fileURLToPath(new URL('../src/session.ts', import.meta.url)), 'utf8');
   assert.ok(session.indexOf("readSid(request, 'secure')") < session.indexOf('demoRecord(request, deps.demo)'), 'the demo is decided before the cookie');
 });

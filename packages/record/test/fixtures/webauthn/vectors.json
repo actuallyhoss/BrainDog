@@ -4,58 +4,58 @@
   "person": "p_fixture_person",
   "es256": {
     "registration": {
-      "challenge": "EklF5iCbimgKh9vM7PKTQCP9iHqwHJiu2iOuZryPo8U",
+      "challenge": "cDjcX2egj2IMcKeHw09FhLS57PzQHlcwWQyOOhWgD6w",
       "id": "f3XWp4DMOWTWImUYxWQEVI-d-MTdqw6snTQ3v-KYrFE",
       "response": {
-        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiRWtsRjVpQ2JpbWdLaDl2TTdQS1RRQ1A5aUhxd0hKaXUyaU91WnJ5UG84VSIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiY0RqY1gyZWdqMklNY0tlSHcwOUZoTFM1N1B6UUhsY3dXUXlPT2hXZ0Q2dyIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
         "attestationObject": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVik2tBqH9IFFTMILE_2IyFdBUy8ECzo_blb4fR3Ly4N9ypFAAAAAAAAAAAAAAAAAAAAAAAAAAAAIH911qeAzDlk1iJlGMVkBFSPnfjE3asOrJ00N7_imKxRpQECAyYgASFYID0ZcSCCOv-aWQf3M_Xx3z8nZRKGpMcN-hk5B1HYhQw3IlggCDM-Reji-uaTOF9UGGiQ38k2xVTmD3iyoNnuPJ9YgSE"
       }
     },
     "packed": {
-      "challenge": "EklF5iCbimgKh9vM7PKTQCP9iHqwHJiu2iOuZryPo8U",
+      "challenge": "cDjcX2egj2IMcKeHw09FhLS57PzQHlcwWQyOOhWgD6w",
       "id": "f3XWp4DMOWTWImUYxWQEVI-d-MTdqw6snTQ3v-KYrFE",
       "response": {
-        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiRWtsRjVpQ2JpbWdLaDl2TTdQS1RRQ1A5aUhxd0hKaXUyaU91WnJ5UG84VSIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiY0RqY1gyZWdqMklNY0tlSHcwOUZoTFM1N1B6UUhsY3dXUXlPT2hXZ0Q2dyIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
         "attestationObject": "o2NmbXRmcGFja2VkZ2F0dFN0bXSjY2FsZyZjc2lnQwECA2N4NWOBQwkJCWhhdXRoRGF0YVik2tBqH9IFFTMILE_2IyFdBUy8ECzo_blb4fR3Ly4N9ypFAAAAAAAAAAAAAAAAAAAAAAAAAAAAIH911qeAzDlk1iJlGMVkBFSPnfjE3asOrJ00N7_imKxRpQECAyYgASFYID0ZcSCCOv-aWQf3M_Xx3z8nZRKGpMcN-hk5B1HYhQw3IlggCDM-Reji-uaTOF9UGGiQ38k2xVTmD3iyoNnuPJ9YgSE"
       }
     },
     "assertion": {
-      "challenge": "oBpyiF3iw4TaUApSjdHrFG5Z3Nqx6icuMw3aOUvCJU4",
+      "challenge": "PftbRCx7T_wN6Qp3UFuI5-I6cJRJEveRZy3XqwxA7yA",
       "signCount": 7,
       "id": "f3XWp4DMOWTWImUYxWQEVI-d-MTdqw6snTQ3v-KYrFE",
       "response": {
-        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoib0JweWlGM2l3NFRhVUFwU2pkSHJGRzVaM05xeDZpY3VNdzNhT1V2Q0pVNCIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiUGZ0YlJDeDdUX3dONlFwM1VGdUk1LUk2Y0pSSkV2ZVJaeTNYcXd4QTd5QSIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
         "authenticatorData": "2tBqH9IFFTMILE_2IyFdBUy8ECzo_blb4fR3Ly4N9yoFAAAABw",
-        "signature": "MEUCIBGVicQo-Pgp4ybmCUx_xYLPRCVWQ7l0h4QK3NU9bPA0AiEA4ZLNd-coZZi9mpf3gI8c58fvQcYzAg0YiVwk0w-5WtY",
+        "signature": "MEQCIAIhETIubyIwZM5V2I2hPgnVtxmrs3t-a47lZ8v2x3fKAiBIPIko9fPj4Y21iMOw7nGFrPuFweoroRzfxoifYbS-gQ",
         "userHandle": "cF9maXh0dXJlX3BlcnNvbg"
       }
     }
   },
   "rs256": {
     "registration": {
-      "challenge": "GoctHs7DbTA99Iy-FzQparMcqxTkQV3duA6_rwQUWtA",
+      "challenge": "v0ZqwEqUhDqf5dVTaW6g84Sdh4h7PGjQsuO25hniaqc",
       "id": "BWiYVU8PV-Wh60VopLRqIkxjpiOC7Iv_Tc2MSrLSzWs",
       "response": {
-        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiR29jdEhzN0RiVEE5OUl5LUZ6UXBhck1jcXhUa1FWM2R1QTZfcndRVVd0QSIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoidjBacXdFcVVoRHFmNWRWVGFXNmc4NFNkaDRoN1BHalFzdU8yNWhuaWFxYyIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
         "attestationObject": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVkBZ9rQah_SBRUzCCxP9iMhXQVMvBAs6P25W-H0dy8uDfcqRQAAAAAAAAAAAAAAAAAAAAAAAAAAACAFaJhVTw9X5aHrRWiktGoiTGOmI4Lsi_9NzYxKstLNa6QBAwM5AQAgWQEAqwGZtB-39ajwXgcZ6_pFkubSNGzJ8jHjaE7AZjTVT7NI9BLozrPMi5l6kInoMNlbAy8JftOryPnej9H4tZzE7Q-7oBbT75nqXHlUoew2u48gKuNNFLvlBKxPICTGJHAwK84AZDAyr3DgXxdDsbkI_rPe106i62NmkPUlwySKNlirk9GufLqfC8wgQDMS3MXoar8-9YJPwgDeI9xR0FeJ4wPgSU5N-Qfn7tWhjxnD4xn7nWB1E69ef5AfkVIuQA7qesl5JKl5BZXZ9pMn8mdx9UyTZQArS0jJVbH67tC7jcTJRC0h408gGoyN2hod6dfGfc2xb6y6ICpNu-mkF69b3SFDAQAB"
       }
     },
     "packed": {
-      "challenge": "GoctHs7DbTA99Iy-FzQparMcqxTkQV3duA6_rwQUWtA",
+      "challenge": "v0ZqwEqUhDqf5dVTaW6g84Sdh4h7PGjQsuO25hniaqc",
       "id": "BWiYVU8PV-Wh60VopLRqIkxjpiOC7Iv_Tc2MSrLSzWs",
       "response": {
-        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiR29jdEhzN0RiVEE5OUl5LUZ6UXBhck1jcXhUa1FWM2R1QTZfcndRVVd0QSIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoidjBacXdFcVVoRHFmNWRWVGFXNmc4NFNkaDRoN1BHalFzdU8yNWhuaWFxYyIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
         "attestationObject": "o2NmbXRmcGFja2VkZ2F0dFN0bXSjY2FsZyZjc2lnQwECA2N4NWOBQwkJCWhhdXRoRGF0YVkBZ9rQah_SBRUzCCxP9iMhXQVMvBAs6P25W-H0dy8uDfcqRQAAAAAAAAAAAAAAAAAAAAAAAAAAACAFaJhVTw9X5aHrRWiktGoiTGOmI4Lsi_9NzYxKstLNa6QBAwM5AQAgWQEAqwGZtB-39ajwXgcZ6_pFkubSNGzJ8jHjaE7AZjTVT7NI9BLozrPMi5l6kInoMNlbAy8JftOryPnej9H4tZzE7Q-7oBbT75nqXHlUoew2u48gKuNNFLvlBKxPICTGJHAwK84AZDAyr3DgXxdDsbkI_rPe106i62NmkPUlwySKNlirk9GufLqfC8wgQDMS3MXoar8-9YJPwgDeI9xR0FeJ4wPgSU5N-Qfn7tWhjxnD4xn7nWB1E69ef5AfkVIuQA7qesl5JKl5BZXZ9pMn8mdx9UyTZQArS0jJVbH67tC7jcTJRC0h408gGoyN2hod6dfGfc2xb6y6ICpNu-mkF69b3SFDAQAB"
       }
     },
     "assertion": {
-      "challenge": "VTawGZjORqhpNx_BdWAcQT38--UpWNZa3xeUfGeoGAc",
+      "challenge": "NHu0PnGk-We1IFXEpwx_g1Ep9lHnMUqXzxigFdv5y9A",
       "signCount": 0,
       "id": "BWiYVU8PV-Wh60VopLRqIkxjpiOC7Iv_Tc2MSrLSzWs",
       "response": {
-        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiVlRhd0daak9ScWhwTnhfQmRXQWNRVDM4LS1VcFdOWmEzeGVVZkdlb0dBYyIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiTkh1MFBuR2stV2UxSUZYRXB3eF9nMUVwOWxIbk1VcVh6eGlnRmR2NXk5QSIsIm9yaWdpbiI6Imh0dHBzOi8vc3R1ZGlvLmV4YW1wbGUiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
         "authenticatorData": "2tBqH9IFFTMILE_2IyFdBUy8ECzo_blb4fR3Ly4N9yoFAAAAAA",
-        "signature": "dMsYS4QuwJqD9ovq8IcmxpcOpUZX7-1RmZ9OAXKrMoYoLjGfXCRfWBouj7r4WLIrFHbR_o-hOjYbZ1m8k7QMKJKIFX4nv2t0cRm9SddwMjfhVVKcDF5EbnRA5T4Punv-ucKc2iAKa4H27NC_y0mWvkNjjLq9A85hO1wXEHzjq00xgTPMHbiveSncZeW_9KkBGY3vqBjp2mQt8O7112SFqdR1WYfruY4PCpITtQoCbopLkc34Kg4pvbylNc5vmMXNERGqSGavmcuAI0rkRGNKwL_YhZ2cDJduRCsIoyo_CRjeeA3zt4XvWdsxJgbs4iZ_cd-yYQo3uxzSDGE26TiXpg",
+        "signature": "YgfQ-7NqufshSVIFCBbZOpdmZnquJMYyByt5eK2asY9ch8vX0xsQbrOhLgljpddw1n26oZ_Ew9r_ysVqYpZvC6lP1hVY5TR2np8UVsN3sJHUZZjcWayT3k-7nDMz--msTI5xgFhcQuSOokgOOCjQydzw0yQJn9WdfEWHw08_Mqp71onGsNUWUmo6hoYQy3FL-U40npp7uZ5V8G6CE2fnZPxJXytzQRXHOAv3OfeUIN4jx8jfb_tHRaUNuFzfvov4Z6Mu1fU33Y1BLNQCfcjRnzb4_Vup2sKHvIjftWwJIjXECiabDOusIJNNZUSxjEsO3nAC9LNaL65sox_agL8dWQ",
         "userHandle": "cF9maXh0dXJlX3BlcnNvbg"
       }
     }

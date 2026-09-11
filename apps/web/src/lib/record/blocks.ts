@@ -35,7 +35,8 @@
  */
 
 import { money, parse } from 'braindog-render';
-import { KINDS, isKind } from 'braindog-render';
+import { KINDS, isKind, type CardRole } from 'braindog-render';
+import type { Column } from 'braindog-render/svelte';
 import { NOW, REGISTERS, ROWS, display, type BlockResult } from './api.ts';
 import { declaredValue } from './where.ts';
 import { asMoney, currencyOf, merge, mixedFix, total, type Total } from './money.ts';
@@ -257,12 +258,88 @@ function projectRows(block: BlockResult, cells: number): string[] {
 }
 
 /**
+ * What each column is on a card: the declaration's `as:`, or where a phone card would put it.
+ *
+ * A column without `as:` is placed by `cardPlan`'s two rules: the first text column names the card
+ * and the first figure that never truncates is its figure. Everything else is a fact, and past three
+ * facts the renderer degrades the block and says why, which is better than this choosing what to
+ * leave out.
+ */
+function cardRoles(columns: readonly Column[]): CardRole[] {
+  const roles: (CardRole | undefined)[] = columns.map((c) => c.as);
+  const free = (test: (c: Column) => boolean) => columns.findIndex((c, i) => roles[i] === undefined && test(c));
+  if (!roles.includes('title') && !roles.includes('who')) {
+    const i = free((c) => c.align !== 'end');
+    if (i >= 0) roles[i] = 'title';
+  }
+  if (!roles.includes('figure')) {
+    const i = free((c) => c.truncate === 'never');
+    if (i >= 0) roles[i] = 'figure';
+  }
+  return roles.map((r) => r ?? 'fact');
+}
+
+/**
+ * A card grid over a register: a first row naming each column's role and label, then one row per
+ * entry, projected the way every other kind is.
+ *
+ * THE LABEL IS THE FIELD'S NAME, not its id. A column declared without `label:` arrives labelled with
+ * its field id, and `last_seen` beside a figure is the schema talking to a reader.
+ */
+function cardsRows(block: BlockResult): string[] {
+  /* The evaluator's columns, typed as the renderer's: the declaration's own column type is the other
+     half of this intersection and does not carry `as`. */
+  const columns: readonly Column[] = block.columns;
+  const roles = cardRoles(columns);
+  const fields = REGISTERS[block.register ?? '']?.fields ?? [];
+  const labelOf = (c: Column) => (c.label !== c.field ? c.label : (fields.find((f) => f.id === c.field)?.label ?? c.label));
+  const head = columns.map((c, i) => escapeCell(`${roles[i]}: ${labelOf(c)}`)).join(' | ');
+  /* The card's name: its title, or the person when it has none, which is what the renderer heads it with. */
+  const named = roles.includes('title') ? roles.indexOf('title') : roles.indexOf('who');
+  const rows = block.entries.map((entry, i) => {
+    /* AN ENUM VALUE IN SENTENCE CASE, as the lists set it: "client" on a card read as a stored value.
+       Enums only, because an email or a name must keep the case it was written in. */
+    const said = (c: Column): string => {
+      const v = display(block.register ?? '', c.field, entry.fields[c.field]) ?? '';
+      return fields.find((f) => f.id === c.field)?.type === 'enum' && v ? v.charAt(0).toUpperCase() + v.slice(1) : v;
+    };
+    const cells = columns.map((c) => escapeCell(said(c)));
+    /* THE NAME OPENS THE ROW, so a card is a door the way a register row is. It is written as the
+       dialect's own link, so no host callback is needed; a name holding a bracket stays text rather
+       than breaking the link written around it. */
+    const href = block.rows[i]?.href;
+    const name = named >= 0 ? cells[named] : undefined;
+    if (href && name && !/[[\]]/u.test(name)) cells[named] = `[${name}](${href})`;
+    const tone = block.rows[i]?.tone;
+    return `${cells.join(' | ')}${tone ? ` | ${tone}` : ''}`;
+  });
+  return [head, ...rows];
+}
+
+/**
+ * A section's one row: `glyph | count | fold`.
+ *
+ * Over a register it counts what its `where:` admits, so the heading says how many are under it.
+ * Without a source it counts nothing and draws no number, a gap rather than a zero. `icon:` and
+ * `fold:` are read through a local type because `PageBlock` does not carry them yet.
+ */
+function sectionRow(block: BlockResult): string {
+  const { icon, fold } = block as BlockResult & { icon?: string; fold?: boolean };
+  const count = block.register ? String(block.matched.length) : '';
+  return `${escapeCell(icon ?? '')} | ${count} | ${fold ? 'fold' : ''}`;
+}
+
+/**
  * The heading is DELIBERATELY not passed through. The block bar above already names the block and
  * says where its rows came from; a figcaption repeating it is the same sentence twice, in two
  * different typographic registers.
+ *
+ * A SECTION IS THE EXCEPTION, because its heading is the whole block: the renderer draws it as a
+ * heading rather than a caption, and `blocks.css` takes the bar away over it so it is said once.
  */
 export function toSegments(block: BlockResult) {
-  const head = `${block.kind}${block.tone ? ` |  | ${block.tone}` : ''}`;
+  const heading = block.kind === 'section' && block.heading ? ` | ${escapeCell(block.heading)}` : '';
+  const head = `${block.kind}${heading || (block.tone ? ` |  | ${block.tone}` : '')}`;
   const spec = isKind(block.kind) ? KINDS[block.kind] : undefined;
 
   /* AUTHORED ROWS COME FIRST, and a block that declares both a source and authored rows is refused
@@ -294,12 +371,18 @@ export function toSegments(block: BlockResult) {
         ? chipsRows(block)
       : block.kind === 'gauge'
         ? gaugeRows(block)
+      : block.kind === 'cards'
+        ? cardsRows(block)
+      : block.kind === 'section'
+        ? [sectionRow(block)]
       : block.register && block.columns.length > 0 && spec
         ? projectRows(block.kind === 'board' ? boardOrder(block) : block, spec.cells)
         : block.body
           ? [block.body]
           : [];
-  return parse(['```' + head, ...rows, '```'].join('\n'));
+  /* `page`, because this is a page's evaluator: it is the one caller that may draw the page-only
+     kinds whose rows it wrote itself. `table` has no rows to write and still degrades. */
+  return parse(['```' + head, ...rows, '```'].join('\n'), { page: true });
 }
 
 /**
@@ -453,7 +536,16 @@ export function draw(
     };
 
   const segments = toSegments(block);
-  const blank = segments.every((s) => s.type === 'block' && s.rows.length === 0);
+  /* A CARD GRID IS BLANK WHEN IT HAS NO ENTRIES, whatever its first row says: that row names the
+     columns and is not a card. A section over a register that admitted nothing has nothing under
+     it, and its `empty:` is the sentence for that; a section with no source is a heading, and a
+     heading is never blank. */
+  const blank =
+    block.kind === 'cards'
+      ? block.entries.length === 0
+      : block.kind === 'section'
+        ? Boolean(block.register) && block.matched.length === 0
+        : segments.every((s) => s.type === 'block' && s.rows.length === 0);
   return {
     segments,
     refusal: blank ? nothing() : null,

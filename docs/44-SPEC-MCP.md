@@ -1,200 +1,156 @@
 # 44 · packages/mcp — specification
 
-The agent surface of [10-MCP](10-MCP.md), typed to the file: eight fixed tools, ten resources, three prompts, the
-server `instructions`, and the streamable-HTTP JSON-RPC handler that carries them — hand-rolled, over the `DataApi`
-envelopes of [33-CONTRACTS](33-CONTRACTS.md) §2, with the token budgets of 10 §4 asserted by a gate. Ninth in the
+The agent surface of [10-MCP](10-MCP.md), typed to the file: fourteen fixed tools, ten kinds of resource, the server
+`instructions`, and the JSON-RPC 2.0 core that carries them, hand-rolled over the `Result` envelope of
+[33-CONTRACTS](33-CONTRACTS.md) §2, with the token budget of 10 §4 asserted by a test. Two transports wrap the core:
+stdio in `apps/cli` and streamable HTTP at `POST /mcp` on both hosts (`loop/research-agent-path.md` §1). Ninth in the
 build order of [35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §4. Mode: ponytail.
 
 ---
 
 ## 1 · Purpose and boundary
 
-**What it does.** `createMcpHandler(api, opts)` returns one function, `(req: Request) => Promise<Response>`, that a
-host mounts at `POST /mcp` (33 §4). The function parses a 2026-07-28 MCP request, checks the `Mcp-Method` and
-`Mcp-Name` headers against the body, validates tool arguments against a schema, calls one method of `api`, and
-renders the `Result<T>` as an MCP result — `ok` as content, a refusal as an error result carrying `code` and `fix`
-(30 §6), a conflict as `VERSION_STALE` with the current row and the other actor's name. It answers `tools/list` with
-the eight tools, the `instructions` and `ttlMs`; `resources/*` with the READ+ methods; `prompts/*` with three
-templates. It is stateless: no session store, no handshake (10 §1).
+**What it does.** One pure function carries everything. `handle(message, surface, ctx)` in `src/rpc.ts` takes one
+parsed JSON-RPC 2.0 message and returns one reply, or `null` for a notification, which is never answered and never
+runs anything. It answers `initialize` with the instructions and a negotiated protocol version; `ping`; `tools/list`
+with the fourteen tools and the instructions again; `tools/call`; `resources/list`, `resources/templates/list` and
+`resources/read`; and `prompts/list`, which is empty for now. The tools and resources are `tools(surface)` in
+`src/index.ts`, over `McpSurface<C>`, a structural type naming only the record methods the tools call. A `Result`
+becomes an MCP result: a value as its JSON, a refusal as an error result carrying the refusal, a conflict as
+`VERSION_STALE` with the current row and the other actor (§4.3). Nothing is remembered between messages (10 §1).
 
-**What it refuses to do.** Seven, counted:
+**Two transports wrap it.** Each does its own reading and writing around `handle`, so the two cannot drift in what
+they say (`loop/research-agent-path.md` §1.1):
+
+| Transport | Where | For |
+|---|---|---|
+| stdio | `braindog mcp` in `apps/cli`, over `@braindog/client` (build step 2) | Claude Code, Codex and Cursor, which launch a process; the bearer stays in the hosts file |
+| streamable HTTP | `POST /mcp` on both hosts, `serveMcp()` in `src/http.ts` (build step 3) | clients that cannot launch a process |
+
+**What it refuses to do.** Eight, counted:
 
 | Refused | Whose job |
 |---|---|
-| Authenticate a bearer or build a `CallContext` | the host — `opts.context(req)` (33 §2: "the Worker builds `CallContext` on every request") |
-| Rate-limit | the Worker, on `Mcp-Name` (10 §8) |
-| Authorise a call against scope, level or ceiling | the record, in one place (30 §10) |
-| Touch a database or a port | it has no `Sql`; it holds `api` and `opts`, nothing else — the register list it embeds is one `api.index` read (§5.2) |
-| Speak the legacy HTTP+SSE transport | not carried (ADR-054); the one-day shim of Q7, if ever, is the Worker's |
-| Reach VAULT, JOBS or ADMIN | refused by name, with a reason, before any call (10 §8) |
-| Decide | no token holds `decide` (30 §10); the MRTR retry is refused (§5.7) |
+| Authenticate a bearer or build the context | the transport: the command line reads its bearer from the hosts file, and a host verifies it before `/mcp` (33 §4) |
+| Rate-limit | the host (10 §8) |
+| Authorise a call against scope, level or ceiling | the record, in one place (30 §10). The tools hand `ctx` on and never read it |
+| Touch a database, a port, a `node:` module or `process` | it holds `surface` and `ctx` and nothing else; the `stack` and `graph` gates hold it to that |
+| Speak the legacy HTTP+SSE transport | not carried (ADR-054) |
+| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the fourteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
+| Decide | there is no `decide` tool, and no token holds `decide` (30 §10) |
+| Hand over a credential | there is no vault tool. `context` names a key by its label and what it opens, never its value (§8) |
 
-**What it may import.** `@braindog/declare` — the `Refusal` type ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §2 exports
-it) — and `valibot`, which `declare` already brings (ADR-040). Nothing else. The envelopes `CallContext` and `Result`
-are owned by `kernel` ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §13 D1), to which this package has no edge, so §2 re-declares
-them structurally (§13 D9). [31-STACK](31-STACK.md) §2 permits an edge to `ports`; nothing here uses one, and §13 D9
-removes the row. `mcp` never imports `record` (31 §2: "the MCP server reaching into internals, and being untestable
-without a Durable Object") — the record reaches this package only as the `api` argument, and the Worker's `tsc` at
-the call site is what binds the two.
+**What it may import.** `@braindog/ports`, for `Result` and `refused` (31 §2, row 12). `src/` imports nothing of
+`@braindog/record`: `McpSurface<C>` is structural, so the same tools run over the record in process and over
+`@braindog/client` from the command line. The tests import the record and the kernel's SQLite adapter to run the
+tools over a real one, which is why `@braindog/record` stays in `dependencies`. No `valibot` and no
+`@modelcontextprotocol/sdk`: the record checks arguments and names the field (§4.4), and the protocol without a
+session store is one file.
 
 ---
 
 ## 2 · Public API
 
-Everything below is exported from `src/index.ts`; the `exports` map has one entry.
+`src/index.ts` is the package's `.` export and `src/rpc.ts` its `./rpc` export. The second is its own entry because
+it imports the first, and a re-export the other way would be a cycle.
 
 ```ts
-import type { Refusal } from '@braindog/declare';
-import * as v from 'valibot';
+// src/index.ts
+type Answer<T = unknown> = Promise<Result<T>>;
+type Args = Record<string, unknown>;
+type Row = { state?: string | null; fields: Record<string, unknown> };
 
-// ─── envelopes — 33-CONTRACTS §2 verbatim, declared here structurally (§13 D9) ─────────────
-type Scope = 'read' | 'propose' | 'write';
-type Level = 'read' | 'append' | 'write' | 'decide' | 'owner';
-type Session = { spoken?: string; client_id?: string; host?: string; repo?: string };
-
-type CallContext = {
-  principal:
-    | { kind: 'person'; id: string; level: Level }
-    | { kind: 'token';  id: string; scope: Scope[]; name: string }
-    | { kind: 'system' }
-    | { kind: 'spark' };
-  session?: Session;
-  now: number;
-  surface: 'web' | 'mcp' | 'cli' | 'email' | 'webhook' | 'alarm';
+export type McpSurface<C> = {
+  boot(ctx: C): Answer<{ registers: { id: string; name: string }[] }>;
+  version(ctx: C): Answer<{ version: number }>;
+  whoami(ctx: C): Answer;
+  schema(args: { register: string }, ctx: C): Answer;
+  get(args: { register: string; seq: number }, ctx: C): Answer;
+  list(args: { register: string; where?: unknown; limit?: number; cursor?: string | null }, ctx: C): Answer<{ rows: Row[] }>;
+  search(args: { q: string; limit?: number }, ctx: C): Answer;
+  history(args: { register: string; seq: number }, ctx: C): Answer;
+  governance(args: never, ctx: C): Answer;
+  propose(args: never, ctx: C): Answer;
+  create(args: { register: string; fields: Args; note?: string }, ctx: C): Answer;
+  update(args: { register: string; seq: number; patch: Args; version?: number; note?: string }, ctx: C): Answer;
+  pages(ctx: C): Answer<{ slug: string; title: string }[]>;
+  page(args: { slug: string }, ctx: C): Answer;
+  metric(args: { metric: string }, ctx: C): Answer;
+  digestToday(args: { digest?: string }, ctx: C): Answer;
+  context?(args: Record<string, never>, ctx: C): Answer;        // build step 8
+  handoff?(args: Args, ctx: C): Answer;                          // build step 6
+  meet?(args: Args, ctx: C): Answer;                             // build step 16
+  sessionsLive?(args: Record<string, never>, ctx: C): Answer;    // build step 6
 };
 
-type Conflict = { version: number; current: unknown; actor: string };
-type Result<T> =
-  | { ok: true;  value: T; version: number }
-  | { ok: false; refusals: Refusal[] }
-  | { ok: false; conflict: Conflict };
+export type Tool = { name: string; description: string; input: Record<string, unknown>; writes: boolean };
+export type Resource = { uri: string; name: string; description: string; ttlMs: number };
 
-// ─── the record, as this package sees it: DATA minus markRead, plus READ+ minus project ──────
-type IndexValue = { registers: { id: string }[] };      // the ONE value shape this package reads (§5.2); 10 §4's example
-interface DataApi {
-  index(args: IndexArgs,   ctx: CallContext): Promise<Result<IndexValue>>;
-  search(args: SearchArgs, ctx: CallContext): Promise<Result<unknown>>;
-  get(args: GetArgs,       ctx: CallContext): Promise<Result<unknown>>;
-  list(args: ListArgs,     ctx: CallContext): Promise<Result<unknown>>;
-  create(args: CreateArgs, ctx: CallContext): Promise<Result<unknown>>;
-  update(args: UpdateArgs, ctx: CallContext): Promise<Result<unknown>>;
-  propose(args: ProposeArgs, ctx: CallContext): Promise<Result<{ id: string }>>;   // id = 'SG<n>'
-  log(args: LogArgs,       ctx: CallContext): Promise<Result<unknown>>;
-  page(args: { slug: string },         ctx: CallContext): Promise<Result<unknown>>;
-  metric(args: { id: string },         ctx: CallContext): Promise<Result<unknown>>;
-  schema(args: { register: string },   ctx: CallContext): Promise<Result<unknown>>;
-  dialect(args: Record<string, never>,  ctx: CallContext): Promise<Result<unknown>>;
-  digestToday(args: Record<string, never>, ctx: CallContext): Promise<Result<unknown>>;
-  sessionsLive(args: Record<string, never>, ctx: CallContext): Promise<Result<unknown>>;
-  learningsFor(args: { repo: string },  ctx: CallContext): Promise<Result<unknown>>;
-  whatsNew(args: { cursor?: number },   ctx: CallContext): Promise<Result<unknown>>;
-  boot(args: Record<string, never>,     ctx: CallContext): Promise<Result<unknown>>;
-}
+export const TOOLS: readonly Tool[];                  // fourteen, §4.4
+export const TEMPLATES: readonly { uriTemplate: string; name: string; description: string }[];   // four, §4.7
+export const HOUR = 3_600_000;
+export const MINUTE = 60_000;
+export function ttlOf(uri: string): number;           // §4.7's ttl column, by the address's first segment
 
-// ─── the handler ────────────────────────────────────────────────────────────────────────────
-type McpHandlerOptions = {
-  /** Verifies the bearer and builds the CallContext from headers alone — the body is not read yet.
-   *  null → 401 UNAUTHORIZED. surface must be 'mcp'. The handler replaces `session` from _meta and touches nothing else. */
-  context: (req: Request) => Promise<CallContext | null>;
-  /** Default 1_048_576 — 10 §8's 1 MB. Larger bodies are 413. */
-  maxBodyBytes?: number;
+export function tools<C>(surface: McpSurface<C>): {
+  list(): readonly Tool[];
+  call(name: string, args: Record<string, unknown>, ctx: C): Promise<Result<unknown>>;
+  resources(ctx: C): Promise<Resource[]>;
+  read(uri: string, ctx: C): Promise<Result<unknown>>;
 };
-type McpHandler = (req: Request) => Promise<Response>;
 
-function createMcpHandler(api: DataApi, opts: McpHandlerOptions): McpHandler;
-const DATA_API_METHODS: readonly (keyof DataApi)[];    // the seventeen names, for the host's adapter (§12) and the verdict test (§9)
+// src/rpc.ts, the ./rpc export
+export const VERSIONS: readonly ['2026-07-28', '2025-06-18', '2025-03-26'];
+export const METHODS: readonly ['initialize', 'ping', 'tools/list', 'tools/call',
+                                'resources/list', 'resources/templates/list', 'resources/read', 'prompts/list'];
+export type Reply =
+  | { jsonrpc: '2.0'; id: string | number; result: unknown }
+  | { jsonrpc: '2.0'; id: string | number | null; error: { message: string; data?: unknown } & Record<'code', number> };
+export function handle<C>(message: unknown, surface: McpSurface<C>, ctx: C): Promise<Reply | null>;
+
+// src/instructions.ts
+export const INSTRUCTIONS: string;                    // §4.6
 ```
 
-`createMcpHandler` never throws, and the function it returns never rejects: every failure, including a thrown
-`api`, is a `Response` (§6). It is a closure over `api` and `opts` with no state of its own, so a host may construct
-it once per record (the self-host) or once per request (the Worker, [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.3) — the
-cost is one object allocation either way. There is no `decls` argument: the handler runs where the record is a stub
-behind an RPC (01 §5), so the register list it needs is a read through `api` at `tools/list` (§5.2, §13 D13).
+**`C` is whatever the transport carries.** In process it is the record's `CallContext`; from the command line it is
+whatever the stdio loop passes, because the bearer travels in each request. The tools hand it on and never read it.
 
-```ts
-// ─── the tables ─────────────────────────────────────────────────────────────────────────────
-type ToolName = 'record_index' | 'search' | 'get' | 'list' | 'create' | 'update' | 'propose' | 'log';
-type Tool = {
-  name: ToolName;
-  method: 'index' | Exclude<ToolName, 'record_index'>;   // record_index → index (10 §3); the rest share their name
-  description: string;          // `list` alone contains the literal `{registers}`, filled at tools/list (§5.2)
-  schema: v.GenericSchema;      // Valibot, module scope — validates arguments (§5.3)
-  inputSchema: JsonSchema;      // generated from `schema` at build time — advertised (§5.2, §13 D1)
-};
-const TOOLS: readonly Tool[];   // eight, in 30 §5's order
+**The four optional methods** arrive with the session register. Until a surface has one, its tool refuses
+`NOT_IN_THIS_BUILD` with a sentence saying what to do instead, and its resource is not listed (§4.7).
 
-type ResourceParam = 'register' | 'slug' | 'id' | 'repo' | 'since';
-type Resource = {
-  name: string;                 // 'schema' 'dialect' 'whats-new' 'decisions' 'digest-today' 'page' 'metric' 'sessions-live' 'learnings' 'boot'
-  uri: string;                  // 'braindog:schema/{register}' — an RFC 6570 level-1 template, or a literal
-  param?: ResourceParam;
-  method: 'page' | 'metric' | 'schema' | 'dialect' | 'digestToday' | 'sessionsLive' | 'learningsFor' | 'whatsNew' | 'boot' | 'list';
-  args: (value?: string) => object;
-  ttlMs: number;
-  description: string;
-};
-const RESOURCES: readonly Resource[];   // ten — 10 §6's table
+**The error's number is spelt through `Record<'code', number>`** so that every `code:` written in this package is a
+refusal code, which is what the `refusals` gate counts.
 
-type Prompt = {
-  name: 'orient' | 'file-this' | 'write-up';
-  description: string;
-  arguments: { name: string; description: string; required: boolean }[];
-  messages: (args: Record<string, string>) => { role: 'user'; content: { type: 'text'; text: string } }[];
-};
-const PROMPTS: readonly Prompt[];       // three — 10 §6
-
-type Verdict = { group: 'DATA' | 'READ+' | 'VAULT' | 'JOBS' | 'ADMIN'; code: 'NEEDS_BROWSER_SESSION' | 'FORBIDDEN'; fix: string };
-const REFUSED: Readonly<Record<string, Verdict>>;   // twenty-one method names — §6
-
-const INSTRUCTIONS: string;             // §4.6 — the exact text; ASCII; ≤ 300 tokens by tokenBudget
-
-const BUDGETS = {
-  toolsList: 1_800, toolDescription: 200, instructions: 300, recordIndex: 500, listPage: 2_000,
-  registersShown: 24, bodyBytes: 1_048_576, ttlMs: 3_600_000,
-} as const;
-
-/** The estimator of §5.8. Deterministic, pure, O(n). Never below o200k_base on the calibration set; at most 1.4× it. */
-function tokenBudget(text: string): number;
-```
-
-Error contract of the tables: they are data; nothing in them throws. `TOOLS[i].schema` and `inputSchema` are
-constructed at module scope (ADR-040 — never inside a `fetch()` or a Durable Object constructor).
+Error contract: `handle` never throws, and a throw below its dispatch becomes `-32603` (§4.1). `call` and `read`
+return what the surface returns and add no throw of their own. `resources` never fails: it lists what reads, which
+for a caller who can read little is little.
 
 ---
 
 ## 3 · Files
 
-Five source files, one generated file, one script. Counted.
+Three source files, one test helper and three test files. Counted.
 
 ```
 packages/mcp/
-├── package.json                  @braindog/mcp · private · Apache-2.0 · "exports": { ".": "./src/index.ts" }
-│                                 dependencies: @braindog/declare workspace:*, valibot 1.4.2 (the pin declare uses)
-│                                 devDependencies: @valibot/to-json-schema (§11), fast-check 4.9.0
-│                                 scripts: test = node --test test/ · gen = node scripts/gen-schemas.ts · typecheck = tsc -p .
-├── tsconfig.json                 extends ../../tsconfig.base.json; references: ../declare
-├── scripts/
-│   └── gen-schemas.ts            Valibot → JSON Schema for the eight tools; strips `$schema`; writes src/tool-schemas.gen.ts   ~20 lines
+├── package.json         @braindog/mcp · private · "exports": { ".": "./src/index.ts", "./rpc": "./src/rpc.ts" }
+│                        dependencies: @braindog/ports, @braindog/record (the tests' real record), both workspace:*
+│                        scripts: test = node --test test/*.test.ts · typecheck = tsc --noEmit -p tsconfig.json
+├── tsconfig.json        extends ../../tsconfig.base.json
 ├── src/
-│   ├── index.ts                  createMcpHandler (the request loop of §5.1); the envelope types; DATA_API_METHODS; re-exports   ~150 lines
-│   ├── wire.ts                   JSON-RPC parse and shape checks, header agreement, _meta.session grammar,
-│   │                             json() and sse() responses, the seven error codes of §6                            ~110 lines
-│   ├── tools.ts                  the eight Valibot schemas and descriptions; TOOLS; REFUSED; argument → api call   ~200 lines
-│   ├── tool-schemas.gen.ts       GENERATED — `export default { record_index: {…}, … } as const`. Never edited      ~180 lines
-│   ├── resources.ts              RESOURCES, the URI matcher, PROMPTS, INSTRUCTIONS                                 ~130 lines
-│   └── budget.ts                 tokenBudget, BUDGETS                                                              ~30 lines
+│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, ttlOf, tools(): the fourteen, the resource list, the read
+│   ├── rpc.ts           handle(): framing, version negotiation, the result renderer
+│   └── instructions.ts  INSTRUCTIONS, §4.6
 └── test/
-    ├── golden.test.ts            every test/fixtures/*.json: request → expected response, stub api recording calls
-    ├── budget.test.ts            the calibration band; per-tool and instructions budgets; the 14- and 24-register sums
-    ├── schemas.test.ts           fresh toJsonSchema(schema) deep-equals tool-schemas.gen.ts — drift
-    ├── verdict.test.ts           the 38 routable methods each have exactly one verdict
-    ├── fuzz.test.ts              fast-check: no body ever makes the handler throw
-    └── fixtures/                 the golden pairs of §9; index-14.json and index-24.json (stub `index` values); calibration.json
+    ├── stub.ts          a surface that records every call and answers ok
+    ├── mcp.test.ts      the tools and resources over a real record: refusals teach, scoping, nothing listed that refuses
+    ├── rpc.test.ts      the golden JSON-RPC cases: one per tool, one per framing rule
+    └── budget.test.ts   tokenBudget (§5.8) over the rendered tools/list, the ceilings of §7, plain ASCII
 ```
 
-`tools/gates/mcp-budget.mjs` (33 §8's row) lives outside the package: ~25 lines that import `src/index.ts`, render
-`tools/list` over a stub `api` whose `index` returns `test/fixtures/index-24.json`, print the table of §7 and exit 1
-on a breach.
+`src/http.ts`, which exports `serveMcp()`, arrives with build step 3. There is no `mcp-budget` gate and no generated
+schema file: the budget is `budget.test.ts` (§7), and the fourteen input schemas are written by hand in `index.ts`
+(§4.4).
 
 ---
 
@@ -202,207 +158,225 @@ on a breach.
 
 ### 4.1 · JSON-RPC, as accepted and produced
 
-```ts
-type JsonRpcId = string | number;
-type Params = { _meta?: Meta; [k: string]: unknown };
-type Meta = { session?: Session; [k: string]: unknown };     // only `session` is read; every other key is ignored
+`handle` takes a message already parsed from JSON; a transport answers a body that does not parse with `-32700`
+itself. In order:
 
-type JsonRpcRequest      = { jsonrpc: '2.0'; id: JsonRpcId; method: string; params?: Params };
-type JsonRpcNotification = { jsonrpc: '2.0'; method: string; params?: Params };            // no id → 202, empty body
-type JsonRpcResult<T>    = { jsonrpc: '2.0'; id: JsonRpcId; result: T };
-type JsonRpcError        = { jsonrpc: '2.0'; id: JsonRpcId | null; error: { code: number; message: string; data?: unknown } };
-```
+1. An array is a batch, and is `-32600` with `id: null`. One message at a time.
+2. A message that is not an object is `-32600` with `id: null`.
+3. `id`, when present, is a string or a number, or the message is `-32600` with `id: null`. It is echoed exactly,
+   `0` included.
+4. No `method`, and a `result` or an `error`: a reply to a request this server never sends. `null`, unanswered.
+5. `jsonrpc` other than `'2.0'`, or a `method` that is not a string: `-32600`.
+6. No `id`: a notification. `null`, and nothing runs, because the client has said it will not read a reply.
+7. `params`, when present, is an object, or the message is `-32602`.
+8. Dispatch on the eight names of `METHODS`. Any other is `-32601`, with `data.allowed` naming the eight.
+9. A throw below the dispatch is `-32603`, with `message: 'internal'` and `data: { ref }`, where `ref` is
+   `crypto.randomUUID()`. The reference and the error go to `console.error`, which is stderr under stdio and the log
+   on a host. No exception text crosses the wire, because an exception message can carry a row's value or a path.
 
-Invariants a test checks: a body that is a JSON array is refused (batching is not in 2026-07-28); `id` is echoed
-exactly, never coerced; `_meta.session`, when present, is an object whose four optional fields match §4.2's grammar
-and carry no other key; `params._meta` is the only `_meta` the handler reads — a `_meta` at the top level of the
-request is ignored.
+| Number | When | `message`, then `data` |
+|---|---|---|
+| `-32600` | steps 1, 2, 3 and 5 | a sentence saying what a message is |
+| `-32601` | step 8 | `There is no method called <m>.`, then `{ allowed }` |
+| `-32602` | step 7; `tools/call` with no `name`, or with `arguments` that is not an object; `resources/read` with no `uri` | a sentence, then `{ allowed }` for a missing tool name |
+| `-32603` | step 9 | `internal`, then `{ ref }` |
+| `-32002` | `resources/read` of an address that is not there, or that the record refuses | the refusal's sentence, then `{ refusal }` |
 
-### 4.2 · `_meta.session` — the actor ladder's inputs (30 §3, 33 §2)
+**Versions.** `initialize` echoes `params.protocolVersion` when it is one of `VERSIONS` (`2026-07-28`, `2025-06-18`,
+`2025-03-26`) and otherwise answers the newest, so a client that predates 2026-07-28 still connects. The `Mcp-Method`
+and `Mcp-Name` headers are the HTTP transport's to check, and only when they are present (build step 3).
+
+### 4.2 · `_meta.session`, the actor ladder's inputs (30 §3, 33 §2)
 
 | Field | Grammar | Is |
 |---|---|---|
-| `spoken` | `^S[1-9][0-9]*$` | the caller's `session` row, `S<n>` — the kernel's register (ADR-026) |
+| `spoken` | `^S[1-9][0-9]*$` | the caller's `session` row, `S<n>`, in the kernel's register (ADR-026) |
 | `client_id` | `^[A-Za-z0-9._:-]{1,128}$` | the runtime's own id, for re-attach |
 | `host` | `^[A-Za-z0-9._-]{1,128}$` | the machine |
 | `repo` | `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, never containing `..` | a name, never a path (26 §5) |
+| `remote` | printable ASCII, at most 256 characters | the origin, normalised, with no user and so no credential |
+| `cwd` | printable ASCII, at most 512 characters | the working folder, which places the run in a project |
+| `agent` | `claude`, `codex`, `cursor` or `other` | the face on screen, the register's `agent` field |
 
-The handler copies the validated object onto `ctx.session` — the one field it adds to the host's `CallContext`.
-It never reads a principal, a scope, an actor or a `now` from the body. The record resolves `spoken` against its own
-rows and derives the actor (30 §3); the handler checks grammar only.
+`handle` does not read `_meta`. `ctx` is the transport's type (§2), so `serveMcp` reads `params._meta.session` out
+of the body and hands it to the host's `session` option, which checks it with `hintsOf` from `@braindog/host` and
+puts it on the context over the header hints, key by key. The stdio transport sends the same hints as request
+headers, `X-Braindog-Session`, `-Client`, `-Host`, `-Repo`, `-Remote`, `-Cwd` and `-Agent`, and both hosts check
+those with `sessionOf` on `/api` and `/mcp` alike. A hint that fails its grammar is dropped and the call goes
+through. Nothing reads a principal, a scope, an actor or a `now` from a body. The record resolves `spoken` against
+its own rows and derives the actor (30 §3), from a token's hints only.
 
 ### 4.3 · Results
 
 ```ts
+type Text = { type: 'text'; text: string };      // text is compact JSON, never pretty-printed
+
+type InitializeResult = {
+  protocolVersion: (typeof VERSIONS)[number];
+  capabilities: { tools: {}; resources: {}; prompts: {} };
+  serverInfo: { name: 'braindog'; version: string };
+  instructions: string;                           // INSTRUCTIONS
+};
 type ToolsListResult = {
-  tools: { name: ToolName; description: string; inputSchema: JsonSchema }[];   // eight
-  instructions: string;                                                        // INSTRUCTIONS, every time (ADR-054)
-  ttlMs: 3_600_000; cacheScope: 'record';                                      // 10 §4 rule 3
+  tools: { name: string; description: string; inputSchema: object; annotations?: { readOnlyHint: true } }[];
+  instructions: string;                           // INSTRUCTIONS, every time
+  ttlMs: 3_600_000; cacheScope: 'record';         // 10 §4 rule 3
 };
-
-type Text = { type: 'text'; text: string };
 type CallToolResult =
-  | { content: [Text]; _meta: { version: number } }                                            // ok: text = JSON of value
-  | { isError: true; content: [Text]; structuredContent: { refusals: Refusal[] } }              // 422's twin
-  | { isError: true; content: [Text]; structuredContent: { conflict: Conflict } }               // 409's twin
-  | { resultType: 'input_required'; requests: [DecisionRequest]; content: [Text] };             // MRTR — propose only
+  | { content: [Text] }                           // ok: the value
+  | { isError: true; content: [Text] };           // a refusal, or a conflict as VERSION_STALE
 
-type DecisionRequest = {
-  id: string;                          // the suggestion id, 'SG<n>'
-  kind: 'decision';
-  question: string;
-  options: { id: string; label: string; because: string }[];
-  requires_reason: true;
-};
-type InputResponse = { id: string; reason: string };          // 10 §5's shape: id = the chosen option
-
-type ReadResourceResult = { contents: [{ uri: string; mimeType: 'application/json'; text: string }]; ttlMs: number; cacheScope: 'record' };
-type ListResourcesResult = { resources: { uri: string; name: string; description: string; mimeType: 'application/json' }[]; ttlMs: 3_600_000; cacheScope: 'record' };
-type ListTemplatesResult = { resourceTemplates: { uriTemplate: string; name: string; description: string }[]; ttlMs: 3_600_000; cacheScope: 'record' };
-type ListPromptsResult   = { prompts: { name: string; description: string; arguments: Prompt['arguments'] }[]; ttlMs: 3_600_000; cacheScope: 'record' };
-type GetPromptResult     = { description: string; messages: ReturnType<Prompt['messages']> };
+type ListResourcesResult = { resources: { uri: string; name: string; description: string; mimeType: 'application/json' }[]; ttlMs: 60_000 };
+type ListTemplatesResult = { resourceTemplates: { uriTemplate: string; name: string; description: string; mimeType: 'application/json' }[]; ttlMs: 3_600_000 };
+type ReadResourceResult  = { contents: [{ uri: string; mimeType: 'application/json'; text: string }]; ttlMs: number };   // ttlOf(uri)
+type ListPromptsResult   = { prompts: [] };
 ```
 
-Invariants: an `ok` result has exactly one content block and it is `JSON.stringify` of the value (not JCS — nothing
-hashes it) — no `structuredContent`, because nothing consumes it and it would double the bytes; an error result's text has one line
-per refusal, in the CLI's voice (33 §5): `` `<CODE> · <at> '<found>' — <fix>` `` (`found` omitted when absent);
-`ttlMs` and `cacheScope` are top-level fields of the result, as 10 §1 names them.
+Invariants. An `ok` result has one content block, `JSON.stringify` of the value, and no `structuredContent`, because
+nothing consumes it and it would double the bytes. A refusal's text is the refusal itself,
+`{"code":"...","fix":"...","at":"...","allowed":[...]}`, because `allowed` is the half that teaches and a one-line
+rendering dropped it. A conflict's text is `{ code: 'VERSION_STALE', fix, version, actor, current }`, and `fix` names
+the actor and the version to send, so the retry needs no second read. `annotations.readOnlyHint` rides on the eight
+tools that never write, so a client can tell its user before one runs. `ttlMs` and `cacheScope` are top-level fields,
+as 10 §1 names them. The resource list is held for a minute rather than an hour because it names pages, and a page
+appears when its row does.
 
-### 4.4 · The eight input schemas, field by field
+### 4.4 · The fourteen tools, and what each reaches
 
-The Valibot schema is the source; the JSON Schema is generated from it (§13 D1). Every optional field's
-`description` leads with the normal case (10 §7 rule 2). Grammars are 34 §4's. Argument objects are 33 §2's.
+| Tool | Reaches | Arguments | Writes |
+|---|---|---|---|
+| `record_index` | `boot`, then `version` | none | no |
+| `context` | `context({})` | none | no |
+| `schema` | `schema({ register })` | `register` | no |
+| `get` | `get({ register, seq })` | `spoken`: `obligations#41`, or a prefixed id such as `S42` | no |
+| `list` | `list({ register, where?, limit?, cursor? })` | the same | no |
+| `search` | `search({ q, limit? })` | the same | no |
+| `history` | `history({ register, seq })` | `spoken`, qualified | no |
+| `governance` | `governance(args)` | `register?`, `id?`, `status?`, `limit?` | no |
+| `propose` | `propose(args)` | `question`, `body_kind`, `body` | yes |
+| `create` | `create({ register, fields, note? })` | the same | yes |
+| `update` | `update({ register, seq, patch, version?, note? })` | `spoken`, `patch`, `version?`, `note?` | yes |
+| `log` | `update({ register, seq, patch: {}, note })` | `spoken`, `note` | yes |
+| `handoff` | `handoff(args)` | `next?`, `tried?`, `note?`, `title?`, `state?` (`idle`, `handoff` or `done`) | yes |
+| `meet` | `meet(args)` | `name?`, `email?`, `handle?`, `where` | yes |
 
-```ts
-const RegisterId = v.pipe(v.string(), v.regex(/^[a-z][a-z0-9_]{0,31}$/));
-const Ulid       = v.pipe(v.string(), v.regex(/^[0-9A-HJKMNP-TV-Z]{26}$/));
-const Seq        = v.pipe(v.number(), v.integer(), v.minValue(1));
-const Path       = v.pipe(v.string(), v.regex(/^[a-z][a-z0-9_]{0,31}(\.[A-Za-z0-9_-]+)*$/));    // <field>(.<key>)*
-const Repo       = v.pipe(v.string(), v.regex(/^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/));
-const Tree       = v.record(v.string(), v.unknown());     // a where: predicate tree — the compiler validates it (34 §1)
+These are the fourteen of `loop/research-agent-path.md` §1.5. Five tools left to pay for the three new ones:
+`pages`, `page` and `metric` were already resources (§4.7); `credentials` could never answer a token, because the
+vault refuses every one; and `dry_run` previews a rule, which only a person installs. Its route stays for the command
+line and the web.
 
-record_index:  v.strictObject({
-  level: v.optional(v.pipe(v.picklist(['index', 'digest']), v.description('usually unset; digest costs far more'))),
-  scope: v.optional(v.strictObject({ repo: v.pipe(Repo, v.description('the repo you stand in')) })) })
-search:        v.strictObject({
-  q:         v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
-  registers: v.optional(v.pipe(v.array(RegisterId), v.description('usually unset: all you can read'))),
-  limit:     v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(50), v.description('default 25'))) })
-get:           v.strictObject({                            // exactly one address — checked in code, said in the description (§5.3 step 3)
-  spoken:   v.optional(v.pipe(v.string(), v.description("'SG23' or 'tasks#125'"))),
-  register: v.optional(RegisterId),
-  seq:      v.optional(Seq),
-  id:       v.optional(Ulid),
-  path:     v.optional(v.pipe(Path, v.description('field then keys, e.g. amount.currency; usually unset'))) })
-list:          v.strictObject({
-  register: RegisterId,
-  where:    v.optional(v.pipe(Tree, v.description('predicate tree; usually unset'))),
-  order:    v.optional(v.pipe(v.array(v.strictObject({ field: RegisterId, dir: v.picklist(['asc', 'desc']) })),
-                              v.description('usually unset: updated_at desc'))),
-  limit:    v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200), v.description('default 25'))),
-  cursor:   v.optional(v.pipe(v.string(), v.maxLength(512), v.description('from the previous page'))),
-  fields:   v.optional(v.pipe(v.array(RegisterId), v.description('usually unset'))) })
-create:        v.strictObject({
-  register: RegisterId,
-  fields:   v.pipe(v.record(v.string(), v.unknown()), v.description('field id to value')),
-  op_id:    v.pipe(Ulid, v.description('fresh ULID')) })
-update:        v.strictObject({                            // seq or id — checked in code (§5.3 step 3)
-  register: RegisterId,
-  seq:      v.optional(Seq),
-  id:       v.optional(Ulid),
-  patch:    v.pipe(v.record(v.string(), v.unknown()), v.description('only the fields that change')),
-  version:  v.pipe(v.number(), v.integer(), v.minValue(1), v.description("the row's current version")),
-  op_id:    v.pipe(Ulid, v.description('fresh ULID')) })
-propose:       v.strictObject({
-  question:  v.pipe(v.string(), v.minLength(1)),
-  options:   v.array(v.strictObject({ id: v.string(), label: v.string(), because: v.string() })),
-  body_kind: v.pipe(v.picklist(['options', 'pattern', 'rowset', 'change']), v.description('usually options')),
-  body:      v.pipe(v.record(v.string(), v.unknown()), v.description('typed body for body_kind')) })
-log:           v.strictObject({
-  note:   v.pipe(v.string(), v.minLength(1), v.maxLength(280), v.description('one sentence')),
-  target: v.optional(v.pipe(v.string(), v.description('usually unset; a spoken id'))) })
-```
+The tool layer holds no checks of its own beyond addressing:
 
-Field ids inside `fields`, `patch` and `order[].field` are not checked here beyond grammar; the record refuses
-`FIELD_UNKNOWN` (30 §4 step 1). Spoken ids in `get.spoken` and `log.target` are strings here; the record resolves
-them (34 §4). The bounds that appear — `limit ≤ 50`, `limit ≤ 200`, `note ≤ 280` — are 33 §2's; no other bound is
-invented (a `question` or `because` length is the record's call).
+- **Addresses.** `get` takes `register#number` or a prefixed id; `history`, `update` and `log` take `register#number`
+  only. Anything else is `VALUE_MALFORMED` at `spoken`, and the sentence shows the forms that work. A prefixed id is
+  found through the declarations: each register `boot` lists is asked for its `schema`, and the one whose
+  `seq_prefix` is the prefix is read by register and number, the one form the record's `get` takes. A register the
+  caller cannot read is never asked. A prefix no readable register holds is `REGISTER_UNKNOWN`, and the sentence
+  sends `SG` and `D` to `governance`. When the record's `get` takes a spoken id itself (build step 6), this becomes
+  one call.
+- **Arguments** are not validated against the schema here. The schemas are JSON Schema written by hand in
+  `index.ts`, with `additionalProperties: false` and `required` left out when empty. The record refuses a wrong field
+  by name (`FIELD_UNKNOWN`, `ENUM_VALUE_UNKNOWN`, with `allowed`), which teaches better than a protocol error would.
+- **A tool the record does not answer yet**, which is `context`, `handoff` or `meet` over a surface without the
+  method, is `NOT_IN_THIS_BUILD` with a sentence saying what to do instead.
+- **Any other name** is `ROUTE_UNKNOWN`, with the fourteen in `allowed`. The lookup is `Object.hasOwn`, because the
+  name comes from the caller and every name on `Object.prototype` would otherwise be found and called.
+- **A note** is an `update` with an empty patch, so it answers to the same permission and lands in the same history.
 
-### 4.5 · The descriptions, and how the register list is embedded
+### 4.5 · The descriptions
 
-```ts
-record_index: "Orient first. Registers with counts, open questions, what changed since your last call, and what to ask for next."
-search:       "Find rows by words (ids, names, amounts), then by meaning. Returns projected rows with spoken ids, never whole documents."
-get:          "One row by exactly one address: spoken ('SG23', 'tasks#125'), register and seq, or id; a bare '#7' never resolves. path returns the full value at it; without one, the projected row."
-list:         "Rows of one register, projected, newest first, 25 a page. Registers: {registers}. Pass the returned cursor for the next page."
-create:       "Add one row. fields are exactly the register's declared fields (resource schema/<register>); money is {amount, currency} in minor units."
-update:       "Change fields on one row (register and seq, or id). Send its current version (compare-and-set) and only the fields that change. VERSION_STALE means someone else wrote: re-read, re-apply."
-propose:      "Open a question for the person to decide; never decide yourself. Every option carries a because. Returns the suggestion id; the choice is made in their app."
-log:          "Append one audit note: one sentence a human reads in six weeks, about a material change. Not for routine edits; rows record themselves."
-```
-
-`{registers}` is filled once, in `list`, with `value.registers.map(r => r.id)` of the one `api.index({}, ctx)` call
-`tools/list` makes (§5.2) — the registers this token can read, in the record's order, comma-separated; past
-`BUDGETS.registersShown` (24) the tail is `, +<n> more (record_index lists all)`; an empty list renders
-`Registers: none you can read.` No other description carries the list, and no `inputSchema` carries it as an `enum`
-— the schemas stay static so they can be generated once (§13 D5). Every description is ASCII, states when to reach for the tool and when not, and never
-explains how the server works (10 §7 rule 1).
-
-### 4.6 · `INSTRUCTIONS` — the exact text
+Each says when to reach for the tool, never how the server works (10 §7 rule 1). No description names a register:
+`record_index` and `context` do that, so the fourteen are the same text for every record and a client's cached list
+does not go stale on an install. Plain ASCII, with no dash standing in for a sentence break; `budget.test.ts` asserts
+both. `index.ts` is the source, and these are copied from it:
 
 ```
-One person's business record, shared by every agent. Orient with record_index first; it says what to ask for next. Ask for the figure you need, never the whole record.
-Money is an integer in minor units with its currency. Divide by 100 before saying a number; never add two currencies.
-Writes are compare-and-set. On VERSION_STALE re-read the row and re-apply; the body names who changed it and carries the current row.
-An agent never decides. Lay out options with propose; a person chooses, with a reason, in their own app.
-A credential never goes in the record.
-Log each material change with log: one sentence a human reads in six weeks. Rows record themselves; skip routine edits.
-A refusal names the field, what it found, what it wanted, and the fix. Correct the call; never retry unchanged.
-Everything you write is read on a phone: short, scannable. Documents use the block dialect (resource dialect); a figure is a {{path}}, never typed.
+record_index  What this record holds: its registers, how many rows in each, and its version. The cheap way to learn register names.
+context       Where you are and what applies here: your session, your project, its open work, questions waiting on the person,
+              people, the keys and servers you may use (by name, never a value), skills and learnings, plus everything global.
+              Call it first, and again after a long pause.
+schema        The fields of one register, their types and what each may take. Read before writing.
+get           One row, by the id a person says out loud: obligations#41, S42 or LN7.
+list          Rows of one register, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"}, or {"all":[...]}.
+search        Rows whose text matches, across every register you can see. Every word is a prefix.
+history       The writes that made one row, in order, each with who and when.
+governance    What has been proposed and not yet answered, what was decided and why, and what was predicted. Open suggestions
+              unless you ask for more.
+propose       Put a question to the person, with what you would do about it. It changes nothing by itself, so it is the verb
+              to use when you are not sure, or to change what you may not.
+create        Add a row to a register. The record allocates its number and hands it back.
+update        Change a row. Send the version you read; a stale write is refused rather than merged, so read it again and reapply.
+log           Append one note to a row, changing nothing about it. One sentence, for the next reader.
+handoff       Keep your session's handoff true. next is the one concrete next step; 'carry on' is not one. tried adds a dead
+              end, and note adds a line of reasoning; both append and never overwrite. state handoff asks another session to
+              pick it up.
+meet          Someone you came across in the work: a commit author, a sender, a client. They are matched by email or handle,
+              added if new, and linked to your project with where you met them. Never guess an email.
 ```
 
-Eight lines, 161 words, 943 bytes, **268 tokens** by `tokenBudget`. It carries the five sentences 10 §8 requires
-(minor units; re-read on `VERSION_STALE`; no credential; log one sentence; read on a phone) and three the tool
-descriptions would otherwise repeat (orient first; never decide; the refusal teaches). It is returned with every
-`tools/list`, under the same `ttlMs`, because 2026-07-28 has no initialise step (ADR-054).
+`propose`'s `body` argument carries the other half of its description: a `rowset` row with `at` (`skills#3`),
+`version` and `patch` changes that row when the person accepts it (`loop/research-agent-path.md` §5.3).
 
-### 4.7 · Resources — the URI grammar
+### 4.6 · `INSTRUCTIONS`, the exact text
 
-Scheme `braindog:`, then the path 10 §6 writes. Ten, counted, each backed by one method (ADR-018 by construction).
+```
+BrainDog is one person's business record, shared by every agent that works for them. Call context first: it names your session, your project, and what applies here.
+Money is an integer in minor units with its currency. Divide by 100 before saying a number, and never add two currencies.
+Writes are compare-and-set. On VERSION_STALE, re-read the row and re-apply your change to the new copy. Never resend the copy you held.
+An agent never decides. Lay out options with propose; the person chooses in their app. To change something you may not change yourself, such as a skill's text or where a key applies, propose it.
+A credential never goes in a row, a note or a tool call. Deposit a key with the command braindog key add, which reads it from standard input.
+Before you stop, call handoff with the one next step. Record each dead end in tried the moment you rule it out.
+Record a learning only when a future session would otherwise get something wrong, and say the failure in because. Most sessions record none.
+When you meet a person in the work, such as a commit author, a sender or a client, call meet.
+A refusal names the field and the fix. Correct the call; never retry it unchanged.
+Everything you write is read on a phone. Keep it short and plain.
+```
 
-| # | URI | Method called | `ttlMs` | Why that ttl |
+Ten lines, 227 words, 1,255 bytes, **352 tokens** by `tokenBudget`, which is the plan's "about 270" by o200k_base
+once §5.8's stated bias is allowed for. It carries the rules every tool would otherwise repeat: call `context` first;
+minor units; re-read on `VERSION_STALE`; never decide, propose; never a credential, and how to deposit one; the
+handoff and `tried`; when a learning is worth recording; `meet`; the refusal teaches; read on a phone. The old line
+about `log` gave way to `handoff`, which is where a session's reasoning now goes. It is returned in `initialize` and
+again with every `tools/list`, because a client that skipped the first still reads the second.
+
+### 4.7 · Resources
+
+Scheme `braindog:`, then a path. Ten kinds, each backed by one method (ADR-018 by construction).
+
+| # | URI | Method called | `ttlMs` | Listed when |
 |---|---|---|---|---|
-| 1 | `braindog:schema/{register}` | `schema({ register })` | 3,600,000 | static between installs; `list_changed` invalidates |
-| 2 | `braindog:dialect` | `dialect({})` | 86,400,000 | sixteen kinds, closed (ADR-056) |
-| 3 | `braindog:whats-new{?since}` | `whatsNew({ cursor: Number(since) })` — absent → `{}` | 0 | a catch-up is never stale on purpose |
-| 4 | `braindog:decisions` | `list({ register: 'decision', limit: 50 })` | 60,000 | live rows; a minute is a phone's refresh |
-| 5 | `braindog:digest/today` | `digestToday({})` | 60,000 | as above |
-| 6 | `braindog:page/{slug}` | `page({ slug })` | 60,000 | resolved against live rows |
-| 7 | `braindog:metric/{id}` | `metric({ id })` | 60,000 | as above |
-| 8 | `braindog:sessions/live` | `sessionsLive({})` | 0 | who is working changes by the minute |
-| 9 | `braindog:learnings/for/{repo}` | `learningsFor({ repo })` | 60,000 | forty rows, `truncated` set honestly |
-| 10 | `braindog:boot` | `boot({})` | 0 | the first screen; one round trip (30 §5) |
+| 1 | `braindog:whoami` | `whoami()` | 0 | it reads |
+| 2 | `braindog:boot` | `boot()` | 60,000 | it reads |
+| 3 | `braindog:context` | `context({})` | 0 | the surface has `context` and it reads |
+| 4 | `braindog:sessions/live` | `sessionsLive({})` | 0 | the surface has `sessionsLive` and it reads |
+| 5 | `braindog:digest/today` | `digestToday({})` | 60,000 | it reads |
+| 6 | `braindog:decisions` | `governance({ register: 'suggestion' })` | 60,000 | it reads |
+| 7 | `braindog:schema/{register}` | `schema({ register })` | 3,600,000 | once for each register `boot` lists |
+| 8 | `braindog:page/{slug}` | `page({ slug })` | 60,000 | the page draws and not every block came back `FORBIDDEN` or `LEVEL_REQUIRED` |
+| 9 | `braindog:metric/{id}` | `metric({ metric: id })` | 60,000 | a listed page drew the figure and it reads |
+| 10 | `braindog:skill/{name}` | `list({ register: 'skills', where: { field: 'name', is: name }, limit: 1 })` | 3,600,000 | the caller can read `skills` and the row is not retired |
 
-`resources/list` is concrete where the handler can be: the five literal URIs with no parameter (2, 4, 5, 8, 10), then
-one `schema/<id>` per register of the same `api.index` read `tools/list` makes. `resources/templates/list` returns
-the four the handler cannot enumerate without a declarations read it does not have — 3, 6, 7 and 9 — as templates;
-an agent reaches a page or a metric by the name the person used or `record_index`'s `next` hints. `{register}`,
-`{slug}`, `{id}` match `^[a-z][a-z0-9_-]{0,63}$`; `{repo}` matches §4.2's `Repo`; `since` matches `^[0-9]{1,18}$`. Every content is `application/json`, the method's value serialised. Descriptions are one sentence
-each; two carry a rule because agents get it wrong (10 §6): `sessions/live` — *"two sessions in one working tree
-overwrite each other. Coordinate or stop."*; `learnings/for` — *"a learning changes what a session does, generalises,
-would otherwise be got wrong (not merely slower), and has no other home; most sessions record nothing, and that is
-the correct number"* (32 §3).
+**Every address is asked before it is advertised.** A listing that names what the caller may not read tells them it
+exists, and one that names what then refuses sends an agent to a certain refusal. So the list is never ahead of the
+record: each fixed resource and each figure is read first, a page is withheld when every block on it was withheld
+for the caller's ceiling or level, and a register comes from `boot`, which lists only what the caller may read. A
+figure is read before it is listed because a reading survives its own refusal: the kernel keeps the id on a cell it
+could not fill, and advertising that id would hand back the name the record's `METRIC_UNKNOWN` was chosen to hide.
+
+Row 4's description carries the sentence the start hook prints: *"Two sessions in one working tree overwrite each
+other. Coordinate or stop."* (32 §2.1). Row 10's description is the skill's `trigger`, because when to use a thing is
+the headline. Row 3 replaces the `learnings/for/{repo}` of an earlier revision: `context` carries the learnings for
+where the session stands. `dialect` and `whats-new` wait for their methods.
+
+`resources/templates/list` returns rows 7 to 10 as templates. The arguments are checked against a grammar before
+they are arguments: `{register}`, `{slug}` and `{id}` match `^[a-z][a-z0-9_-]{0,63}$`, and `{name}` matches
+`^[a-z0-9][a-z0-9-]{0,63}$`, the folder names the command line writes skills under. The address is split, never
+resolved, so `braindog:schema/../../x` is `ROUTE_UNKNOWN`.
 
 ### 4.8 · Prompts
 
-| Name | Argument | The user message, rendered |
-|---|---|---|
-| `orient` | — | *Call record_index. In under 120 words say what needs attention today — overdue obligations, renewals inside 30 days, open questions — citing spoken ids. Quote no figure you did not fetch.* |
-| `file-this` | `text` (required) | *Here is text to file:* ␤␤`<text>`␤␤ *Read schema/<register> for each register you would write to. Then call propose with body_kind 'rowset' listing the rows and one option per register, a because on each. Do not create rows directly.* |
-| `write-up` | `spoken` (required) | *Read the dialect resource and get({ spoken: '<spoken>' }). Draft a write-up for it in the block dialect: short blocks, a figure only as a {{path}}, never typed. Return the text; do not write it to the record.* |
-
-Argument values are inserted verbatim as text; they are never parsed, never placed in a URI, and capped at 8,192
-bytes (a longer `text` is `-32602`).
+None yet. `prompts/list` answers `{ prompts: [] }` and the capability is declared, so a client may ask. The three of
+10 §6 wait: the instructions and the skill teach in the meantime, and a prompt library is a third thing to keep true.
 
 ---
 
@@ -627,27 +601,27 @@ transport exchange and nothing else (§13 D7).
 
 ## 7 · Performance budget
 
-All token figures are `tokenBudget` of the exact text in this specification, serialised as the handler serialises
-it (`JSON.stringify`, no whitespace). The gate re-counts them on every CI run.
+All token figures are `tokenBudget` (§5.8) of the exact text `handle` returns, serialised as a transport sends it
+(`JSON.stringify`, no whitespace). `budget.test.ts` re-counts them on every run.
 
 | Item | Ceiling | Measured | How |
 |---|---|---|---|
-| `tools/list` result — `tools[]` + `instructions` + `ttlMs` + `cacheScope` | **≤ 1,800** | 1,713 at 14 registers · **1,741 at the 24-register cap** | `mcp-budget` gate; `budget.test.ts` |
-| One tool description, rendered | ≤ 200 | 29 (`record_index`) … 100 (`list`, 24 registers) | `budget.test.ts`, each of the eight |
-| One tool object (name + description + `inputSchema`) | — reported | 118 (`log`) … 318 (`list`) | printed by the gate |
-| `INSTRUCTIONS` | ≤ 300 | 268 | `budget.test.ts` |
-| `record_index` response | ≤ 500 | the record's — 10 §4's example is 106 | spec 45's fixture; relayed unchanged here |
-| A `list` page, default 25 rows | ≤ 2,000 | the record's | spec 45's fixture; relayed unchanged here |
-| Handler overhead per call, excluding `api` | ≤ 2 ms median | parse + validate + render of a 4 kB body | `budget.test.ts`: 200 calls against a stub `api`, median asserted |
-| Request body | ≤ 1,048,576 bytes | `413` past it | golden fixture |
-| Register ids shown in `list` | ≤ 24, then `+n more` | 40-register stub renders 24 | `budget.test.ts` |
-| `api.index` reads per `tools/list` or `resources/list` | 1 | once per client per `ttlMs` | golden 1, 21 |
-| `resources/list` entries | 5 + one per readable register | not in every turn; fetched on demand | — |
-| Prompt argument | ≤ 8,192 bytes | `-32602` past it | golden fixture |
+| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,600** | **2,311** (7,924 bytes) | `budget.test.ts` |
+| The fourteen tool objects alone | reported | 1,945 | the same count, less the instructions |
+| One tool description | < 200 | 17 (`history`) to 72 (`context`) | `budget.test.ts`, each of the fourteen |
+| One tool object: name, description, `inputSchema`, `annotations` | reported | 75 (`record_index`) to 210 (`propose`) | |
+| `INSTRUCTIONS` | ≤ 400 | 352 | `budget.test.ts` |
+| `record_index` response | ≤ 500 | the record's; 10 §4's example is 106 | relayed unchanged here |
+| A `list` page, default 25 rows | ≤ 2,000 | the record's | relayed unchanged here |
+| `resources/list` | none | not in any turn; fetched when wanted | |
 
-The headroom at the cap is 59 tokens. One more clause in a description is a clause out of another; the gate is the
-arbiter. *An earlier draft counted `instructions` outside the 1,800; every token of it sits in the context every
-turn, so it is inside.*
+**2,600, where an earlier revision set 1,800.** That ceiling was set for eight tools. The agent path needs fourteen,
+because `context`, `handoff` and `meet` are what an agent does every session (`loop/research-agent-path.md` §1.5),
+and those three cost 500 tokens with their schemas. The instructions grew from 268 to 352 for the same reason: they
+now say to call `context` first, to hand off, to record learnings sparingly and to call `meet`, so their own ceiling
+moved from 300 to 400. The headroom is 289 tokens. One more clause in a description is a clause out of another, and
+the test is the arbiter. The instructions are counted inside the figure, because every token of them sits in the
+context every turn.
 
 ---
 

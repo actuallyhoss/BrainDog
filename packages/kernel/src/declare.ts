@@ -21,8 +21,9 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { jsonPath } from '@braindog/where';
 
-import { FIELD_TYPES, type Json } from './coerce.ts';
+import { FIELD_TYPES, coerce, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
+import { SESSION_BODY } from './migrations/0002_session.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
 /* THE SCHEMA THE MATCHER RUNS AGAINST, so the names this file refuses and the names that fire are
    one list. See `MATCH_FIELDS`: they were two lists and they disagreed. A same-package edge, which
@@ -421,9 +422,9 @@ function metricBody(decl: Declaration): Refusal | null {
 }
 
 /**
- * The sixteen drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
+ * The eighteen drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
  *
- * `packages/render` owns `KINDS` and is the authority (`05 §2`'s *"v1 kinds — sixteen"*), but the
+ * `packages/render` owns `KINDS` and is the authority (`05 §2`), but the
  * kernel depends on `ports` and `where` and on nothing else — `31 §2` puts the renderer above it, so
  * importing the table would invert the layering and make the record unable to install a page without
  * a browser bundle in scope. The alternative to a copy is no check at all, and no check is what a
@@ -433,14 +434,24 @@ function metricBody(decl: Declaration): Refusal | null {
  * says nothing is the exact silence `04 §1` calls the closure load-bearing for.
  *
  * A COPY THAT DRIFTS IS WORSE THAN NO COPY, so the count is stated where it can be wrong, and the
- * test asserts the sixteen install. A SEVENTEENTH KIND NEEDS NO EDIT HERE: `05 §2` says a new kind
- * arrives as a `block.<id>` declaration, which this list admits by prefix and checks as a document of
- * its own.
+ * test asserts the eighteen install. A PACK'S OWN KIND NEEDS NO EDIT HERE: `05 §2` says it arrives as
+ * a `block.<id>` declaration, which this list admits by prefix and checks as a document of its own. A
+ * kind added to the renderer's table does, which is how `cards` and `section` arrived.
  */
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
-  'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table',
+  'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section',
 ] as const;
+
+/**
+ * What a column is on a card, `packages/render/src/cards.ts`'s `CARD_ROLES`, copied for the reason
+ * `BLOCK_KINDS` is. A card takes one of each role and up to three facts, as `cardFault` there says.
+ */
+const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark'] as const;
+const CARD_FACTS = 3;
+
+/** `42 §4.2`'s `Glyph`: a `section`'s icon names one. */
+const GLYPH = /^[a-z][a-z0-9-]{0,31}$/u;
 
 /** `06 §1.1`: at most 24 blocks, 1–16 `requires`, and the twelfths a `span` is measured in. */
 const BLOCK_CEILING = 24;
@@ -581,6 +592,8 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       order?: unknown;
       tone?: unknown;
       when?: unknown;
+      fold?: unknown;
+      icon?: unknown;
     };
     const at = `blocks[${i}]`;
     if (block === null || typeof block !== 'object')
@@ -596,7 +609,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       if (!declaredKind && !(BLOCK_KINDS as readonly unknown[]).includes(kind))
         return bad(
           'KIND_UNKNOWN',
-          `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not one of the sixteen, and no block declares it.`,
+          `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not one of the eighteen, and no block declares it.`,
           at,
           BLOCK_KINDS as unknown as string[],
         );
@@ -618,6 +631,13 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
 
     if (block.tone !== undefined && !(TONES as readonly unknown[]).includes(block.tone))
       return bad('DECLARATION_INVALID', `${String(block.tone)} is not an intent.`, at, TONES as unknown as string[]);
+
+    /* A `section`'s two keys. The block keys are not a closed list, so nothing refuses them on another
+       kind; only their shape is checked, because `fold: 'yes'` would draw a section shut by accident. */
+    if (block.fold !== undefined && typeof block.fold !== 'boolean')
+      return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
+    if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))
+      return bad('DECLARATION_INVALID', `${id}.${at}'s icon is a glyph name: lower-case letters, digits and dashes.`, at);
 
     if (block.source !== undefined) {
       const source = block.source;
@@ -669,9 +689,26 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       const columns = block.columns;
       if (!Array.isArray(columns) || columns.length === 0 || columns.length > COLUMN_CEILING)
         return bad('DECLARATION_INVALID', `${id}.${at} draws one to ${COLUMN_CEILING} columns.`, at);
-      for (const column of columns as { field?: unknown }[])
+      const roles = new Map<string, number>();
+      for (const column of columns as { field?: unknown; as?: unknown }[]) {
         if (typeof column?.field !== 'string' || column.field === '')
           return bad('DECLARATION_INVALID', `${id}.${at} names ${JSON.stringify(column?.field ?? null)} as a column, and a column names a field.`, at);
+        /* `as` IS A COLUMN'S ROLE ON A CARD, and only a `cards` block reads it. On any other kind it
+           would install and draw nothing different, so it is refused there. */
+        if (column.as === undefined) continue;
+        if (block.kind !== 'cards')
+          return bad('DECLARATION_INVALID', `${id}.${at} gives a column as, which is its role on a card, and only a cards block reads it.`, at);
+        if (typeof column.as !== 'string' || !(CARD_ROLES as readonly string[]).includes(column.as))
+          return bad('ENUM_VALUE_UNKNOWN', `${id}.${at}: ${JSON.stringify(column.as)} is not a role on a card.`, at, CARD_ROLES);
+        const n = (roles.get(column.as) ?? 0) + 1;
+        roles.set(column.as, n);
+        if (n > (column.as === 'fact' ? CARD_FACTS : 1))
+          return bad(
+            'OUT_OF_BOUNDS',
+            `${id}.${at} has ${n} columns as ${column.as}. A card takes one of each role, one figure among them, and at most ${CARD_FACTS} facts.`,
+            at,
+          );
+      }
     }
 
     if (block.order !== undefined) {
@@ -1413,6 +1450,10 @@ function createFault(
  *             re-derives the column from it.
  *   `done`    the states that mean finished, which is how a row is drawn ticked.
  *   `icon` · `holds`  the rail's glyph and the register's one line, both drawn by `apps/web`.
+ *   `seq_prefix`  the letters a row's spoken id starts with, `S` for `S42`; `get` resolves it, and
+ *             `validate` refuses one another register already speaks.
+ *   `scopes`  on the one register whose rows are projects, the fields listing their repositories
+ *             and folders; `resolveProject` places a run by them.
  *
  * `pack:` IS ON THIS LIST AND IS NOT READ FROM THE BODY, and that is deliberate rather than an
  * oversight: ownership is `declaration.pack_id`, written from the declaration's own `pack` and read
@@ -1422,7 +1463,7 @@ function createFault(
  */
 const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
-  'id', 'state', 'done', 'icon', 'holds',
+  'id', 'state', 'done', 'icon', 'holds', 'seq_prefix', 'scopes',
 ] as const;
 
 /**
@@ -1439,10 +1480,46 @@ const REGISTER_KEYS = [
  *   `pairs`           transfer detection, a bounded self-join nothing runs.
  *   `predicates`      named predicates. `where` refuses the `{ predicate: … }` leaf outright, so
  *                     declaring one here installs a name no predicate can reach.
- *   `seq_prefix`      `SEQ_PREFIX_TAKEN` is registered and emitted by nothing, and every spoken id
- *                     is `#` whatever the register says.
  */
-const REGISTER_UNBUILT = ['seq_prefix', 'key', 'delete', 'pairs', 'predicates', 'immutable_when'] as const;
+const REGISTER_UNBUILT = ['key', 'delete', 'pairs', 'predicates', 'immutable_when'] as const;
+
+/**
+ * The prefixes the kernel speaks. Governance numbers its decisions `D41` and its suggestions `SG23`,
+ * and the session register's rows are `S42`. Each maps to what uses it, for the refusal's sentence.
+ */
+const KERNEL_PREFIXES: ReadonlyMap<string, string> = new Map([
+  ['D', 'decisions'],
+  ['SG', 'suggestions'],
+  ['S', 'register.session'],
+]);
+
+/** `34 §4`'s grammar for a prefix other than `#`. */
+const SEQ_PREFIX = /^[A-Z][A-Z0-9]{0,3}$/;
+
+/**
+ * Whether one spoken id could belong to both prefixes. Equal ones can, and so can `P` and `P2`,
+ * because `P21` reads as either. `S` and `SG` cannot: `SG12` is never `S` and a number.
+ */
+function overlaps(a: string, b: string): boolean {
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return long.startsWith(short) && /^(?:[1-9][0-9]*)?$/.test(long.slice(short.length));
+}
+
+/**
+ * Who already speaks a prefix this register's ids would collide with, or `null`.
+ *
+ * `installed` holds the record's active declarations with the batch laid over them, so a second
+ * register in the same pack is found the same way as one already in the record.
+ */
+function prefixHolder(self: string, prefix: string, installed?: Known): { who: string; theirs: string } | null {
+  for (const [theirs, who] of KERNEL_PREFIXES) if (who !== self && overlaps(theirs, prefix)) return { who, theirs };
+  for (const [other, body] of installed ?? []) {
+    const theirs = body.seq_prefix;
+    if (other === self || !other.startsWith('register.') || typeof theirs !== 'string' || theirs === '#') continue;
+    if (overlaps(theirs, prefix)) return { who: other, theirs };
+  }
+  return null;
+}
 
 /**
  * A field's keys, same two lists and same two questions.
@@ -1461,10 +1538,14 @@ const REGISTER_UNBUILT = ['seq_prefix', 'key', 'delete', 'pairs', 'predicates', 
  *               readable, and how a `duration` is said. All three are drawn.
  *   `derived`   the kernel's own flag, set by nothing today, which refuses a write and skips
  *               validation when it is set.
+ *   `scope`     where a row applies; the write path holds a token to it, and `inScope` reads by it.
+ *   `min` · `max`  bounds, in UTF-8 bytes on text and documents and by value on numbers.
+ *   `required_when`  `{ field, is }`: required while another field of the row holds that value.
+ *   `by`        `decide`: once the row is made, only an accepted proposal changes the field.
  */
 const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
-  'redact', 'transitions', 'remind', 'repeat',
+  'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
   'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived',
 ] as const;
 
@@ -1476,29 +1557,246 @@ const FIELD_KEYS = [
  *                    derivation is an ordinary writable field holding whatever a caller sent, and
  *                    the `unique: true` + `derive: { normalise }` fingerprint dedupes on the raw
  *                    text or on nothing.
- *   `required_when`  a conditional requirement evaluated against the row being written. Nothing
- *                    evaluates it, so *"never set a tier without `tier_why`"* is prose again.
- *   `min` · `max`    bounds `02 §5` says are refused `OUT_OF_BOUNDS`. No coercer reads either, so
- *                    `max: 512000` on a `document` is a number in a file.
  *   `register`       the documented spelling of `to:`, above.
  *   `note`           a field's own comment, carried nowhere.
  */
-const FIELD_UNBUILT = ['register', 'min', 'max', 'derive', 'required_when', 'note'] as const;
+const FIELD_UNBUILT = ['register', 'derive', 'note'] as const;
 
 /**
- * And a transition's, which is where the two halves of one key part company.
- *
- * `to:` IS CORRECTLY ENFORCED, including that clearing a state is a move. So this is not an unbuilt
- * feature, it is one key of a two-key structure with the invariant in the other key. `index.ts`
- * destructures `{ to: string[] }` and reads nothing else. `requires:` is what stops an INCOMPLETE
- * row reaching a legal state, and `by:` is an authorisation control: `02 §5`'s `by: decide` means
- * *"a PERSON at the `decide` level. No token grants it"*, `record.update` gates on
- * `guard(ctx, 'write', register)` which a bearer token passes, and `HUMAN_ONLY` is registered and
- * emitted by nothing. It is the one door into `20 §1`'s level ladder that a declaration can open,
- * and nothing closes it.
+ * A transition's: where it goes, the fields a move out needs filled, and `by: decide` for a move
+ * only an accepted proposal makes. The write path reads all three.
  */
-const TRANSITION_KEYS = ['to'] as const;
-const TRANSITION_UNBUILT = ['requires', 'by'] as const;
+const TRANSITION_KEYS = ['to', 'requires', 'by'] as const;
+const TRANSITION_UNBUILT = [] as const;
+
+/* ── the field rules the write path keeps: bounds, conditions, and who changes what ── */
+
+/** What `min:` and `max:` bound in this build, and the ceilings a `max:` may lower and never raise. */
+const BY_BYTES = ['text', 'document'];
+const BY_VALUE = ['int', 'decimal', 'duration', 'money', 'quantity'];
+const WHOLE = ['text', 'document', 'int', 'duration', 'money'];
+const CEILING: Readonly<Record<string, number>> = { text: 16_384, document: 524_288 };
+/** Given a size by `02 §5` and bounded by nothing here yet. */
+const SIZED_UNBUILT = ['url', 'email', 'json', 'list'];
+
+/**
+ * `required_when:`'s operators. This build reads `is`; the rest of `02 §5`'s list is published and
+ * unread, and the operators that search rather than compare are refused by the list's own code.
+ */
+const WHEN_READ = ['field', 'is'];
+const WHEN_UNBUILT = ['not', 'in', 'not_in', 'gt', 'gte', 'lt', 'lte', 'before', 'after', 'between', 'empty', 'present', 'has', 'lacks'];
+const WHEN_REFUSED = ['contains', 'matches', 'near', 'starts', 'ends', 'via'];
+/** A condition compares one stored value, so the field it reads holds one. */
+const WHEN_TYPES = ['text', 'enum', 'bool', 'int'];
+
+/** Who changes a field or makes a move. `decide` is an accepted proposal, and the one word read. */
+const BY = ['decide'];
+
+/**
+ * The rules on each field that the write path keeps, checked once every field is known, because a
+ * condition and a move's `requires` name other fields of the register.
+ *
+ * A `secret` field is the vault door's alone (`index.ts`'s `depositGrant`), so everything that would
+ * put a value in it from anywhere else is refused here: `required` and `required_when`, which no
+ * create could meet, and a `default`, which is a value no door wrote. It is never searched and never
+ * a row's title, because it holds where a key is sealed and says nothing about the row.
+ */
+function fieldRules(id: string, fields: readonly Record<string, unknown>[], title: unknown): Refusal | null {
+  const byId = new Map(fields.map((f) => [String(f.id), f]));
+  for (const f of fields) {
+    const at = String(f.id);
+    const said = `${id}.${at}`;
+    const type = String(f.type);
+
+    for (const key of ['min', 'max'] as const) {
+      const n = f[key];
+      if (n === undefined) continue;
+      if (SIZED_UNBUILT.includes(type))
+        return bad(
+          'NOT_IN_THIS_BUILD',
+          `${said} declares ${key} on a ${type}, which the documents publish and this build bounds nowhere, so it would install and be kept by nothing. The repair is a deploy, not an edit.`,
+          at,
+        );
+      if (!BY_BYTES.includes(type) && !BY_VALUE.includes(type))
+        return bad('DECLARATION_INVALID', `${said} is a ${type}, which has no length or value to bound. min and max are for text, documents and numbers.`, at);
+      if (typeof n !== 'number' || !Number.isFinite(n) || (WHOLE.includes(type) && !Number.isInteger(n)) || (BY_BYTES.includes(type) && n < 0))
+        return bad(
+          'VALUE_MALFORMED',
+          `${said}'s ${key} is ${JSON.stringify(n)}, and ${BY_BYTES.includes(type) ? 'a length is a whole number of bytes' : WHOLE.includes(type) ? `a bound on a ${type} is a whole number` : 'a bound is a number'}.`,
+          at,
+        );
+    }
+    const lo = f.min as number | undefined;
+    const hi = f.max as number | undefined;
+    if (lo !== undefined && hi !== undefined && lo > hi)
+      return bad('OUT_OF_BOUNDS', `${said} takes at least ${lo} and at most ${hi}, and nothing is both.`, at);
+    const ceiling = CEILING[type];
+    if (ceiling !== undefined && hi !== undefined && hi > ceiling)
+      return bad('OUT_OF_BOUNDS', `${said}'s max is ${hi} bytes, above a ${type}'s ceiling of ${ceiling}. A max lowers the ceiling and never raises it.`, at);
+    /* A DEFAULT OUTSIDE ITS OWN BOUNDS refuses every create that leaves the field out, which is the
+       one fact worth hearing at install rather than at the first write. */
+    const size = f.default === undefined || (lo === undefined && hi === undefined) ? null : measure(type, f.default as Json);
+    if (size !== null && ((lo !== undefined && size < lo) || (hi !== undefined && size > hi)))
+      return bad('OUT_OF_BOUNDS', `${said}'s default measures ${size}, and the field takes ${range(lo, hi)}.`, at);
+
+    const when = f.required_when;
+    if (when !== undefined) {
+      const where = `${at}.required_when`;
+      if (when === null || typeof when !== 'object' || Array.isArray(when))
+        return bad('DECLARATION_INVALID', `${said}'s required_when is { field, is }: the field to read, and the value that makes this one required.`, where, WHEN_READ);
+      for (const key of Object.keys(when)) {
+        if (WHEN_READ.includes(key)) continue;
+        if (WHEN_REFUSED.includes(key))
+          return bad(
+            'REQUIRED_WHEN_OP_UNSUPPORTED',
+            `${said}'s required_when uses ${key}, which searches rather than compares. A requirement is one comparison on the row: use is.`,
+            where,
+            WHEN_READ,
+          );
+        if (WHEN_UNBUILT.includes(key))
+          return bad(
+            'NOT_IN_THIS_BUILD',
+            `${said}'s required_when uses ${key}, which the documents publish and this build reads nowhere; it reads is. The repair is a deploy, not an edit.`,
+            where,
+            WHEN_READ,
+          );
+        return bad('DECLARATION_INVALID', `${said}'s required_when declares ${key}, and there is no such key.`, where, WHEN_READ);
+      }
+      const { field, is } = when as { field?: unknown; is?: unknown };
+      const target = typeof field === 'string' ? byId.get(field) : undefined;
+      if (!target)
+        return bad('FIELD_UNKNOWN', `${said} is required when ${String(field)} holds a value, and ${id} has no such field.`, where, [...byId.keys()]);
+      if (target === f) return bad('DECLARATION_INVALID', `${said} is required when it holds a value itself, which says nothing.`, where);
+      if (!WHEN_TYPES.includes(String(target.type)))
+        return bad(
+          'DECLARATION_INVALID',
+          `${said} is required when ${String(field)} holds a value, and ${String(field)} is a ${String(target.type)}. required_when reads a text, an enum, a bool or an int.`,
+          where,
+          WHEN_TYPES,
+        );
+      if (is === undefined || is === null)
+        return bad('DECLARATION_INVALID', `${said}'s required_when names ${String(field)} and no value for it to hold.`, where, WHEN_READ);
+      const held = coerce(target as FieldDecl, is, {}, where);
+      if (!held.ok) return held.refusal;
+      const values = Array.isArray(target.values) ? (target.values as string[]) : [];
+      if (target.type === 'enum' && !values.includes(String(held.value)))
+        return bad('ENUM_VALUE_UNKNOWN', `${said} is required when ${String(field)} is ${String(is)}, and ${String(field)} has no such value.`, where, values);
+    }
+
+    if (f.by !== undefined && !BY.includes(String(f.by)))
+      return bad('ENUM_VALUE_UNKNOWN', `${said} changes by ${JSON.stringify(f.by)}, and the one word is decide: an accepted proposal.`, at, BY);
+
+    const moves = f.transitions;
+    if (moves !== null && typeof moves === 'object')
+      for (const [from, move] of Object.entries(moves as Record<string, { requires?: unknown; by?: unknown }>)) {
+        const where = `${at}.transitions.${from}`;
+        if (move.by !== undefined && !BY.includes(String(move.by)))
+          return bad('ENUM_VALUE_UNKNOWN', `${said}: the move out of ${from} is made by ${JSON.stringify(move.by)}, and the one word is decide: an accepted proposal.`, where, BY);
+        const needs = move.requires;
+        if (needs === undefined) continue;
+        if (!Array.isArray(needs) || needs.length === 0 || needs.some((n) => typeof n !== 'string'))
+          return bad('DECLARATION_INVALID', `${said}: the move out of ${from} requires a list of field names, and this is not.`, where);
+        const missing = (needs as string[]).find((n) => !byId.has(n));
+        if (missing !== undefined)
+          return bad('FIELD_UNKNOWN', `${said}: the move out of ${from} requires ${missing}, and ${id} has no such field.`, where, [...byId.keys()]);
+      }
+
+    const sealed = type === 'secret' || (type === 'list' && f.of === 'secret');
+    if (!sealed) continue;
+    if (type === 'list')
+      return bad('DECLARATION_INVALID', `${said} is a list of secrets, and the vault seals one key into one field. Declare a secret field for each key.`, at);
+    if (f.required === true || f.required_when !== undefined)
+      return bad('DECLARATION_INVALID', `${said} is a secret, which only the vault door writes, so no create could supply it. Leave it optional.`, at);
+    if (f.default !== undefined)
+      return bad('DECLARATION_INVALID', `${said} is a secret, which only the vault door writes, and a default would be a value no door wrote.`, at);
+    if (f.search === true)
+      return bad('SEARCH_FIELD_TYPE', `${said} is a secret, and search reads what a row says, never where its key is sealed.`, at, [...SEARCHABLE, 'list<text>']);
+    if (title === f.id)
+      return bad('DECLARATION_INVALID', `${id} names ${at} as its title, and a secret says where a key is sealed, not what the row is called.`, 'title');
+  }
+  return null;
+}
+
+/** `scope:`'s keys and their closed values (`42 §4.4`). */
+const SCOPE_KEYS = ['widen', 'same', 'links'];
+const WIDEN = ['any', 'person'];
+const SAME = ['both', 'nearer'];
+
+/**
+ * A field's `scope:`: a `ref` to one project, or a list of them, pointing at the register whose rows
+ * are projects.
+ *
+ * `widen` and `same` are about a row in one project and `links` is about a list of them, so each is
+ * refused on the other shape rather than installed and kept by nothing. The target is checked only
+ * when the caller says what is installed, as every check about two declarations is.
+ */
+function scopeBody(id: string, f: FieldLike, to: unknown, scope: unknown, installed?: Known): Refusal | null {
+  const said = `${id}.${f.id}`;
+  const at = `${f.id}.scope`;
+  if (scope === null || typeof scope !== 'object' || Array.isArray(scope))
+    return bad('DECLARATION_INVALID', `${said}'s scope is a body of widen, same and links, and this is not.`, at, SCOPE_KEYS);
+  for (const key of Object.keys(scope))
+    if (!SCOPE_KEYS.includes(key))
+      return bad('DECLARATION_INVALID', `${said}'s scope declares ${key}, and there is no such key.`, at, SCOPE_KEYS);
+  const { widen, same, links } = scope as Record<string, unknown>;
+  if (widen !== undefined && !WIDEN.includes(String(widen)))
+    return bad('ENUM_VALUE_UNKNOWN', `${said}: widen is any or person, and ${JSON.stringify(widen)} is neither.`, at, WIDEN);
+  if (same !== undefined && !SAME.includes(String(same)))
+    return bad('ENUM_VALUE_UNKNOWN', `${said}: same is both or nearer, and ${JSON.stringify(same)} is neither.`, at, SAME);
+  if (links !== undefined && links !== true) return bad('DECLARATION_INVALID', `${said}: links is true or left out.`, at);
+
+  const many = f.type === 'list' && f.of === 'ref';
+  if (f.type !== 'ref' && !many)
+    return bad('DECLARATION_INVALID', `${said} is a ${f.type}, and only a ref to a project, or a list of them, says where a row applies.`, at);
+  if (many && (widen !== undefined || same !== undefined))
+    return bad('DECLARATION_INVALID', `${said} is a list of projects, which takes links. widen and same are for a ref to one project.`, at);
+  if (!many && links !== undefined)
+    return bad('DECLARATION_INVALID', `${said} is a ref to one project, and links is for a list of them.`, at);
+  if (typeof to !== 'string') return bad('DECLARATION_INVALID', `${said} names no register with to:, so it points at no project.`, at);
+
+  if (!installed) return null;
+  const home = [...installed].find(([other, body]) => other.startsWith('register.') && body.scopes !== undefined)?.[0];
+  if (home === `register.${to}`) return null;
+  return bad(
+    'DECLARATION_INVALID',
+    home
+      ? `${said} points at ${to}, and the projects are the rows of ${home}, the register that declares scopes:.`
+      : `${said} points at ${to}, and no register declares scopes:, so nothing says what a project is.`,
+    at,
+  );
+}
+
+/**
+ * A register's `scopes:`, which makes its rows the projects.
+ *
+ * Each key names a `list` of `text` on this register. A series is refused, because its rows have no
+ * spoken id for a run to carry, and so is a second register declaring it: two registers of projects
+ * would give one folder two answers.
+ */
+function scopesBody(decl: Declaration, fields: readonly FieldLike[], scopes: unknown, installed?: Known): Refusal | null {
+  const keys = ['repos', 'folders'];
+  if (scopes === null || typeof scopes !== 'object' || Array.isArray(scopes) || Object.keys(scopes).length === 0)
+    return bad(
+      'DECLARATION_INVALID',
+      `${decl.id}'s scopes names the fields listing a project's repositories and folders, as { repos, folders }, and this is not.`,
+      'scopes',
+      keys,
+    );
+  for (const [key, name] of Object.entries(scopes)) {
+    if (!keys.includes(key)) return bad('DECLARATION_INVALID', `${decl.id}'s scopes declares ${key}, and there is no such key.`, 'scopes', keys);
+    const held = fields.find((f) => f.id === name);
+    if (!held)
+      return bad('FIELD_UNKNOWN', `${decl.id}'s scopes names ${String(name)} for its ${key}, and there is no such field.`, 'scopes', fields.map((f) => f.id));
+    if (held.type !== 'list' || held.of !== 'text')
+      return bad('DECLARATION_INVALID', `${decl.id}.${held.id} lists a project's ${key}, so it is a list of text.`, held.id);
+  }
+  if (decl.body.series === true)
+    return bad('DECLARATION_INVALID', `${decl.id} is a series, and a project needs a spoken id that a run can carry.`, 'scopes');
+  for (const [other, body] of installed ?? [])
+    if (other !== decl.id && other.startsWith('register.') && body.scopes !== undefined)
+      return bad('DECLARATION_INVALID', `${other} already declares scopes:, and one register holds the projects.`, 'scopes');
+  return null;
+}
 
 /**
  * An hour offset, which is the one unit `remind:` admits and `where:` does not.
@@ -1598,6 +1896,17 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
       `A declaration's id is its kind and its own id: ${decl.kind}.${String(own)}, not ${decl.id}.`,
       'id',
     );
+  /* THE KERNEL'S REGISTER HAS ONE WRITER, migration 2. Every agent write resolves to a row of it, so
+     a pack or a person declaring `register.session` would change what an agent is for the whole
+     record. `PROVIDES_CONFLICT` is `30 §6`'s code for an id somebody else already provides, and
+     the somebody here is the kernel, which seats it as `pack_id = 'kernel'`. The kernel's own bytes
+     are let through, because installing them writes only the row the migration wrote. */
+  if (decl.id === 'register.session' && (decl.pack !== 'kernel' || jcs(decl.body) !== SESSION_BODY))
+    return bad(
+      'PROVIDES_CONFLICT',
+      "register.session is the kernel's own register, and no pack or person may declare it.",
+      'register.session',
+    );
   /**
     * A DIGEST'S KEYS ARE TYPED AND CLOSED (09 §6), AND NOTHING CHECKED THEM. `validate` deep-checked
     * registers and returned `null` for everything else — so `channels: ['mcp']` installed and then
@@ -1624,7 +1933,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
    * as a declaration of this kind, and `pageBody` already admits `kind: 'block.<id>'` on a page by
    * prefix on the strength of it — but nothing in this repository reads a declaration whose kind is
    * `block`: `grep` finds the eight kinds in `KINDS` and in the migration's CHECK constraint, and
-   * no consumer anywhere. `packages/render` owns the sixteen drawn kinds as a compiled table, and
+   * no consumer anywhere. `packages/render` owns the eighteen drawn kinds as a compiled table, and
    * there is no path from an installed declaration into it. So the page draws the fallback and the
    * author is told nothing, which is `BLOCK_KINDS`'s own sentence one file over: *"no rows, no
    * refusal, no mark on the page."*
@@ -1785,8 +2094,16 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
       if (fault) return fault;
     }
 
-    /* ONE KEY OF A TWO-KEY STRUCTURE. `to:` is enforced on every move and `requires:` and `by:` are
-       destructured away, so a transition that carries them says three things and keeps one. */
+    /* `scope:` IS WHAT THE WRITE PATH HOLDS A TOKEN TO, so its shape and its target are checked here
+       rather than trusted there. */
+    const scope = (raw as { scope?: unknown }).scope;
+    if (scope !== undefined) {
+      const fault = scopeBody(id, f, (raw as { to?: unknown }).to, scope, installed);
+      if (fault) return fault;
+    }
+
+    /* A MOVE'S KEYS ARE CLOSED, and its `requires:` and `by:` are checked in `fieldRules` once every
+       field of the register is known. */
     const moves = (raw as { transitions?: unknown }).transitions;
     if (moves !== undefined) {
       if (moves === null || typeof moves !== 'object' || Array.isArray(moves))
@@ -1956,6 +2273,44 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
     if (held && held.type !== 'enum')
       return bad('STATE_NOT_ENUM', `${id}.${state}: state is a reserved id and is always an enum.`, state, ['enum']);
   }
+
+  const ruled = fieldRules(id, fields as unknown as Record<string, unknown>[], title);
+  if (ruled) return ruled;
+
+  /* A SPOKEN PREFIX NAMES ONE REGISTER, or `LN7` names two rows (`02 §2`). `#` is the default every
+     register shares, which is why it never resolves bare and is not checked here. */
+  const prefix = decl.body.seq_prefix;
+  if (prefix !== undefined && prefix !== '#') {
+    if (typeof prefix !== 'string' || !SEQ_PREFIX.test(prefix))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id}'s seq_prefix is # or a capital letter followed by up to three capitals or digits, and ${JSON.stringify(prefix)} is not.`,
+        'seq_prefix',
+      );
+    const holder = prefixHolder(decl.id, prefix, installed);
+    if (holder)
+      return bad(
+        'SEQ_PREFIX_TAKEN',
+        holder.theirs === prefix
+          ? `${decl.id}: seq_prefix '${prefix}' is taken by ${holder.who}. D, SG and S are the kernel's.`
+          : `${decl.id}: seq_prefix '${prefix}' clashes with '${holder.theirs}', taken by ${holder.who}, because ${prefix.length > holder.theirs.length ? prefix : holder.theirs}1 could mean either. Choose another.`,
+        'seq_prefix',
+      );
+  }
+
+  const scopes = decl.body.scopes;
+  if (scopes !== undefined) {
+    const fault = scopesBody(decl, fields as unknown as FieldLike[], scopes, installed);
+    if (fault) return fault;
+  }
+  /* ONE FIELD SAYS WHERE A ROW APPLIES, or one row could be in two places with two sets of rules. */
+  const scoping = (fields as unknown as { id: string; scope?: unknown }[]).filter((f) => f.scope !== undefined);
+  if (scoping.length > 1)
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} declares scope on ${scoping.map((f) => f.id).join(' and ')}, and one field says where a row applies.`,
+      scoping[1]?.id ?? 'fields',
+    );
 
   /* `search:` TAKES WHAT THE INDEX CAN TAKE. `02 §1` closes it at text, document, enum, url, email
      and `list<text>`; a `money` field named here produced an FTS column of `[object Object]` and a
@@ -2216,6 +2571,13 @@ function applyDeclarations(
  * own history.
  */
 export function retireDeclarations(sql: Sql, ids: readonly string[], transaction: <T>(fn: () => T) => T): Result<number> {
+  /* NOR IS THE KERNEL'S REGISTER RETIRED, for the reason `validate` refuses anyone declaring it:
+     every agent write resolves to a row of it, and retiring it would leave the record unable to say
+     which agent wrote anything. Refused whole, so no other id in the call is retired either. */
+  if (ids.includes('register.session'))
+    return no<number>('PROVIDES_CONFLICT', "register.session is the kernel's own register, and no pack or person may retire it.", {
+      at: 'register.session',
+    });
   return transaction(() => {
     let n = 0;
     for (const id of ids) {

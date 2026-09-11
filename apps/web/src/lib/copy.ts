@@ -178,6 +178,8 @@ export const copy = {
     code: 'Code',
     tree: 'Tree',
     stat: 'Figures',
+    cards: 'Cards',
+    section: 'Section heading',
   } as Record<string, string>,
 
   kinds: {

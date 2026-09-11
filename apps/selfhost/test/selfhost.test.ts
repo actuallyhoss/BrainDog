@@ -81,7 +81,7 @@ test('THE WHOLE STACK ANSWERS OVER A SOCKET', async () => {
   try {
     const boot = await s.call('boot');
     assert.equal(boot.status, 200);
-    assert.deepEqual((boot.body.value as { registers: { id: string }[] }).registers.map((r) => r.id), ['obligations']);
+    assert.deepEqual((boot.body.value as { registers: { id: string }[] }).registers.map((r) => r.id), ['session', 'obligations']);
 
     const made = await s.call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open', amount: { amount: 48_000, currency: 'GBP' } } });
     assert.equal(made.status, 200);

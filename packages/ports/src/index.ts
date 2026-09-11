@@ -359,7 +359,7 @@ export const fixOf = <T>(r: Result<T>): string =>
   refused(r)
     ? r.refusal.fix
     : conflicted(r)
-      ? `${r.conflict.actor} changed this since you read it — it is at version ${r.conflict.version} now. Read it again and re-apply.`
+      ? `${r.conflict.actor} changed this since you read it. It is at version ${r.conflict.version} now. Read it again and re-apply.`
       : '';
 export const no = <T>(code: string, fix: string, extra: Omit<Refusal, 'code' | 'fix'> = {}): Result<T> => ({
   ok: false,

@@ -15,13 +15,20 @@ import type { Clock, Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import kernel0001 from './migrations/0001_kernel.ts';
+import session0002 from './migrations/0002_session.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
-/** One file at v1. The index is the version, and a mis-numbered file is a defect, not a refusal. */
-export const MIGRATIONS: readonly Migration[] = [{ version: 1, slug: 'kernel', sql: kernel0001 }];
+/** The index is the version, and a mis-numbered file is a defect, not a refusal. */
+export const MIGRATIONS: readonly Migration[] = [
+  { version: 1, slug: 'kernel', sql: kernel0001 },
+  { version: 2, slug: 'session', sql: session0002 },
+];
 
-/** `PRAGMA user_version` at v1 — the `.dog` format revision, `30-BLUEPRINT` §11. */
+/**
+ * `PRAGMA user_version`, the `.dog` format revision of `30-BLUEPRINT` §11. Migration 2 adds a row and
+ * its indexes and no table or column, so the format a file is written in is still 1.
+ */
 export const FORMAT_VERSION = 1 as const;
 
 /** `DOG!` — the four bytes at offset 68 of every `.dog` file, and what `file(1)` reads. */

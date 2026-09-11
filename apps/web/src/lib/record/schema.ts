@@ -169,7 +169,19 @@ export type PageBlock = {
   span?: number;
   source?: string;
   where?: string;
-  columns?: readonly { field: string; label?: string; width?: string; align?: 'start' | 'end'; link?: boolean }[];
+  columns?: readonly {
+    field: string;
+    label?: string;
+    width?: string;
+    align?: 'start' | 'end';
+    link?: boolean;
+    /** What the column is on a `cards` block (05 §2). One figure and three facts at most. */
+    as?: 'title' | 'figure' | 'fact' | 'trend' | 'ring' | 'who' | 'when' | 'mark';
+  }[];
+  /** A `section` that starts shut, folding the blocks after it up to the next section. */
+  fold?: boolean;
+  /** The glyph beside a `section`'s heading. */
+  icon?: string;
   cells?: readonly { metric: string; label: string }[];
   order?: readonly { field: string; dir: 'asc' | 'desc' }[];
   limit?: number;
@@ -446,7 +458,7 @@ export type PackInfo = {
  * count of what a block draws is computed. Those two disagreeing is a slice line saying "Showing 5
  * of 38" over a chart with all thirty-eight rows in it.
  */
-export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge']);
+export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'section']);
 
 export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 

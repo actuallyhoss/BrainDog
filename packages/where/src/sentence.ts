@@ -272,7 +272,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     if (!decl) {
       bad.push({
         code: 'FIELD_UNKNOWN',
-        fix: `${sentence} — ${schema.register} has no field called ${field || '(nothing)'}.`,
+        fix: `${sentence}: ${schema.register} has no field called ${field || '(nothing)'}.`,
         at: field,
         /* THE RECORD'S OWN FIVE ARE IN THE LIST TOO, which is `38 §6`'s sentence for this refusal
            and the reason `addressable` is exported: a suggestion list that omits them teaches an
@@ -302,7 +302,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
            the code as *"an operator outside its type's set"*, which is `before` on a `text`. */
         bad.push({
           code: 'MATCH_OP_UNSUPPORTED',
-          fix: `${sentence} — ${field} is a ${decl.type}, and ${verb} is about dates.`,
+          fix: `${sentence}: ${field} is a ${decl.type}, and ${verb} is about dates.`,
           at: field,
         });
         continue;
@@ -311,7 +311,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       if (day === null) {
         bad.push({
           code: 'VALUE_MALFORMED',
-          fix: `${sentence} — ${rest || '(nothing)'} is not a date. Write 2026-10-01, +30d, or one of ${WORDS.join(', ')}.`,
+          fix: `${sentence}: ${rest || '(nothing)'} is not a date. Write 2026-10-01, +30d, or one of ${WORDS.join(', ')}.`,
           at: field,
           allowed: WORDS,
         });
@@ -329,7 +329,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
            every one of them inside error copy, where the reader is already stuck — and the control
            that produced the thing is labelled *Filter*. The word for what a person wrote is the word
            on the button they pressed. */
-        fix: `${sentence} — ${verb || '(nothing)'} is not something a filter can say. Write is, is not, before or after.`,
+        fix: `${sentence}: ${verb || '(nothing)'} is not something a filter can say. Write is, is not, before or after.`,
         at: field,
         allowed: ['is', 'is not', 'before', 'after', 'on'],
       });
@@ -342,7 +342,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     const negated = rest === 'not' || rest.startsWith('not ');
     const said = (negated ? rest.slice(3) : rest).trim();
     if (!said) {
-      bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence} — is${negated ? ' not' : ''} what?`, at: field });
+      bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: is${negated ? ' not' : ''} what?`, at: field });
       continue;
     }
 
@@ -383,7 +383,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       if (!operatorAllowed(op, decl.type)) {
         bad.push({
           code: 'MATCH_OP_UNSUPPORTED',
-          fix: `${sentence} — ${field} is a ${decl.type}, which cannot be asked "${op}".`,
+          fix: `${sentence}: ${field} is a ${decl.type}, which cannot be asked "${op}".`,
           at: field,
         });
         continue;
@@ -509,7 +509,7 @@ function refuseValue(
   if (decl.type === 'enum')
     return {
       code: 'ENUM_VALUE_UNKNOWN',
-      fix: `${sentence} — ${schema.register}.${field} has no value ${said}.`,
+      fix: `${sentence}: ${schema.register}.${field} has no value ${said}.`,
       at: field,
       allowed: (decl.values ?? []).map((v) => v.replace(/_/g, ' ')),
     };
@@ -534,8 +534,8 @@ function refuseValue(
   if (decl.type === 'ref')
     return {
       code: 'REF_UNKNOWN',
-      fix: `${sentence} — there is no ${decl.to ?? 'row'} called ${said}.`,
+      fix: `${sentence}: there is no ${decl.to ?? 'row'} called ${said}.`,
       at: field,
     };
-  return { code: 'VALUE_MALFORMED', fix: `${sentence} — ${said} is not a value ${field} can hold.`, at: field };
+  return { code: 'VALUE_MALFORMED', fix: `${sentence}: ${said} is not a value ${field} can hold.`, at: field };
 }

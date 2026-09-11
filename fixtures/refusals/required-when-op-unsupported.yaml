@@ -1,0 +1,5 @@
+code:   REQUIRED_WHEN_OP_UNSUPPORTED
+via:    lint
+raises: packages/kernel/src/declare.ts
+at:     x.required_when
+fix:    Compare with is: a requirement is one comparison on the row.

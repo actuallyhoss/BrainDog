@@ -149,10 +149,15 @@ transitions allow `active → abandoned` so the sweep's own write is legal; `las
 `instant` the kernel writes at step 6 of the write path on every write whose resolved actor is that
 session — a kernel-written field, not a derivation (§5), and **the heartbeat is not a write**: it is set
 in place with no `version` bump, no `updated_at` and no event ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4);
-the row also carries `token_id`, so a token's writes are one query; and **every agent write resolves to a
+the row also carries `token_id`, so a token's writes are one query, and `project`, the project the run was
+placed in by where it runs (§5), absent when the run is global; and **every agent write resolves to a
 session or opens one.** Its `declaration` row carries `pack_id = 'kernel'` — the only row that does, so a
 kernel-declared row and a user-authored one (`pack_id NULL`) are never confused. The CI rule *"the
-kernel contains no register declaration"* gains this one named exception.
+kernel contains no register declaration"* gains this one named exception. It arrives by migration 0002
+([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.2), which writes the declaration row and its eight indexes and
+nothing else. A record created before that migration takes the register on its next open with every row
+it held untouched, and a record that had declared a `register.session` of its own keeps its rows while
+the kernel's declaration becomes that id's next version.
 
 ### `state` is the one promoted field, and an earlier draft never said so
 
@@ -213,6 +218,7 @@ purge and erasure delete its row explicitly (§9, §10). `decision.supersedes RE
 | Entry seq | `INTEGER` | per register, from 1, allocated from `counter` | **yes** — "#125" |
 | Decision | `TEXT` | `D` + integer, per record, from `counter` | **yes** — "D41" |
 | Suggestion | `TEXT` | `SG` + integer, per record, from `counter` | **yes** — "SG23" |
+| Session | `INTEGER` | the `seq` of a row in the kernel's `session` register, said with its `seq_prefix` | **yes**: "S42" |
 | Person | `TEXT` | `p_` + 26-char ULID, minted by the `Directory` object and mirrored into `person` | no |
 | Declaration | `TEXT` | `kind.id`, e.g. `register.obligations` | yes, by authors |
 | Pack | `TEXT` | kebab-case, `^[a-z][a-z0-9-]{1,63}$`, globally unique in the Kennel | yes |
@@ -233,8 +239,11 @@ Two forms, and `get` accepts either — `{ spoken }`, `{ register, seq }` or `{ 
 `#` is the display default (`seq_prefix: "#"`) and **never resolves bare** — every register has a `#7`,
 so a bare `#7` is ambiguous the moment two registers keep the default, and the kernel refuses it rather
 than guessing. A non-`#` prefix must be unique among installed registers; a second register claiming
-`LN` is refused at install (`SEQ_PREFIX_TAKEN`). `D`, `SG` and `S` are reserved by the kernel. The
-full grammar is [34-GRAMMARS](34-GRAMMARS.md) §4.
+`LN` is refused at install (`SEQ_PREFIX_TAKEN`). `D` and `SG` are governance's and `S` is the session
+register's, so a register claiming one of them is refused the same way. So is a prefix that another
+followed by a number spells: `P` and `P2` would both read `P21`. That rule is what lets a prefixed id
+resolve against the installed prefixes with one match at most, where the pattern alone is greedy and
+reads `S42` as `S4` and 2. The full grammar is [34-GRAMMARS](34-GRAMMARS.md) §4.
 
 ### Identifiers
 
@@ -408,6 +417,15 @@ forever.
 Byte-exact, and the authority is [34-GRAMMARS](34-GRAMMARS.md) §3; step 3 of the write path (COERCE)
 parses to these shapes and nothing else, and the `where:` compiler compares against them.
 
+**A text never holds a key.** A `text` or `document` value, or a `list<text>` element, that looks like
+a credential is refused at step 3 as `VALUE_MALFORMED`, from every caller, with no `found` and a
+sentence that says to deposit the key in the vault. Looking like one means an issuer's own prefix (a
+private key's PEM header, `sk_live_`, `ghp_`, `github_pat_`, `xoxb-`, `AKIA` and the others
+[25-CONNECTORS](25-CONNECTORS.md) §7 names), a JWT, a webhook address, a password in a URL, or a run of
+32 or more base64 characters that mixes cases and digits and reads as random. Hex digests, git hashes,
+ULIDs, UUIDs, a link's path and anything shorter pass. A public key or a wallet address does not,
+because nothing tells it apart from a key.
+
 Each type is a validator, a form control, a renderer, a `where:` compilation and a line in the MCP
 schema. **A seventeenth is five pieces of work and a new way to be wrong**, which is the same
 argument the eight pack kinds rest on, and it is why the two below were added only after a stress
@@ -437,7 +455,11 @@ test showed exactly what their absence cost.
 Four of them are special:
 
 - **`secret`** never stores a value in `fields`. It stores a `grant` id. The row shows *what the
-  key opens*; the key itself is in the vault. See [12-SECURITY](12-SECURITY.md) §6.
+  key opens*; the key itself is in the vault. See [12-SECURITY](12-SECURITY.md) §6. No caller writes
+  it, a person included: the vault door seals a key and points the field at its grant in one write
+  ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4), and a create or update naming the field is
+  `IMMUTABLE_FIELD`. So a secret is never `required`, never given a `default`, never searched and
+  never a row's title.
 - **`file`** never stores bytes in `fields` either — same pattern, one indirection. It stores the
   digest, and the bytes are in R2 under the record's prefix. So a `.dog` stays a text database,
   the 2 MB row ceiling is never in play, and an export's manifest can report a missing attachment
@@ -481,7 +503,7 @@ fields:
   - { id: score,   type: int,  derive: { sum: [rev, unblock, clock, cheap] } }
   - { id: tier,    type: enum, values: [low, medium, high, urgent],
       derive: { band: { of: score, edges: [40, 60, 80] } } }
-  - { id: tier_why, type: text, required_when: { field: tier, present: true } }
+  - { id: tier_why, type: text, required_when: { field: tier, is: urgent } }
   - { id: currency, type: text, immutable: true, derive: { via: account, field: currency } }
   - { id: fingerprint, type: text, unique: true, derive: { normalise: lesson } }
 ```
@@ -489,7 +511,7 @@ fields:
 | Option | Does | Refuses |
 |---|---|---|
 | **`derive:`** | a **row-level** derived value. **Seven shapes, and the list is closed:** `sum: [f, …]` and `diff: [a, b]` — a missing operand counts as 0 · `product: [a, b]` and `ratio: { of, per }` — a missing operand yields missing, and a zero `per` yields missing, never 0 · `band: { of, edges }` — the edges exclusive upper bounds mapped onto the field's `values:` in order, *n* edges ↔ *n*+1 values, else `BAND_EDGES_MISMATCH`; a missing input yields missing · `via: <ref>, field: <far field>` → the one-hop subquery of §6 · `normalise: f` → lower-cased and trimmed, whitespace kept. **The inlines are `where`'s** — one definition, [38-SPEC-WHERE](38-SPEC-WHERE.md) §5.6 — and the kernel imports them, so the stored `unique:` fingerprint and the compiled inline can never disagree. Operands are this row's field ids (numeric for the arithmetic four) or one `lookup` — never aggregations. **Never stored**: computed at read and projection, and **inlined by the `where:` compiler** so `{ field: tier, is: urgent }` still works. Three of the shapes are the metric grammar's combinators (`diff` · `product` · `ratio`) and four are row-scoped only (`sum` over named fields, `band`, `via`, `normalise`); depth one; a derivation may not read another row except through one `via:` hop. **Kernel-written fields are not derivations**: `session.last_seen` is written at step 6 on every write from that session, and the identity accent is chosen at create by `@braindog/theme`'s `nextAccentHue` and stored frozen (ADR-028) — neither is a shape here, and an earlier draft of the kernel's own register used two operators (`touched_by`, `hue_from`) that this list never had | a derived field cannot be written, `index: true`, or `required`. **One exception:** `unique: true` on a derived field materialises the value into `fields` at step 6 of the write path so the partial unique index has an expression to cover — **the only stored derivation** |
-| **`required_when:`** | a conditional requirement, taking one `where:` leaf on the same row, restricted to `is not in not_in gt gte lt lte before after between empty present has lacks` — never `contains`, `matches`, `near` or `via:` (`REQUIRED_WHEN_OP_UNSUPPORTED`). *"Never set a tier without `tier_why`"* was prose in the brain; here it is a refusal that names both fields. **It borrows the leaf syntax and is not an eighth consumer** — it never compiles to SQL; it is one comparison evaluated against the row being written, in validation, the way `transitions:` is | — |
+| **`required_when:`** | a conditional requirement, `{ field, is }`: required while another field of the same row holds that value. `field` is a `text`, `enum`, `bool` or `int` of the register, and `is` is a value it can hold. *"An urgent tier says why"* was prose in the brain; here it is a refusal that names both fields. The leaf's other comparisons (`not in not_in gt gte lt lte before after between empty present has lacks`) are published and not read by this build (`NOT_IN_THIS_BUILD`), and `contains`, `matches`, `near` and `via:` never are (`REQUIRED_WHEN_OP_UNSUPPORTED`). **It borrows the leaf syntax and is not an eighth consumer**: it never compiles to SQL, and is one comparison against the row being written, made when either of the two fields is written, the way `transitions:` is | `REQUIRED_MISSING`, naming both fields |
 | **`unique: true`** | a partial unique index over the register — `CREATE UNIQUE INDEX entry_u_<reg>__<field> ON entry(json_extract(fields, '$.<field>')) WHERE register = '<reg>' AND deleted_at IS NULL`. The refusal names the existing row by its spoken id — `ALREADY_KNOWN: LN7` — which is what makes it useful rather than merely correct | — |
 | **`immutable: true`** | set once, on create. A later write to the field is refused with the reason. Distinct from `immutable_when:`, which locks a whole row by predicate | — |
 
@@ -520,17 +542,24 @@ pairs: { on: [currency, abs(amount)], opposite: amount, across: account, within:
 | **`identity: { mark: <enum field>, accent: <int field> }`** | the register's rows carry a mark and one accent hue, chosen once at create and validated distinct — [13-UI](13-UI.md) §2.1b, [32-PARITY](32-PARITY.md) §4.4, ADR-028. The hue is `@braindog/theme`'s `nextAccentHue` — the farthest point on the hue circle from every existing accent and from the three intent hues, deterministic — handed to the kernel as an injected chooser; the kernel stores it frozen and never computes a hue ([39-SPEC-THEME](39-SPEC-THEME.md)). *(An earlier draft put a golden-angle rule in the kernel.)* |
 | **`predicates: { overdue: { … } }`** | named predicates in the `where:` grammar, referenced from any `where:` on the same register as the leaf `{ predicate: overdue }` — §6. A saved view **is** a named predicate; its `order` is URL state, never stored; and saving one is a declaration write through `setDeclaration`, so it is the owner's ([50-SPEC-WEB](50-SPEC-WEB.md) §4.6) |
 
-**`by:` on a transition** — the last addition, and it generalises two of the brain's hard-coded
-routes:
+**`by: decide`, on a transition and on a field**, is the last addition, and it generalises two of the
+brain's hard-coded routes:
 
 ```yaml
 transitions:
-  proposed: { to: [active], by: decide }     # a PERSON at the `decide` level. No token grants it.
+  superseded: { to: [active], by: decide }                    # made only by an accepted proposal
+fields:
+  - { id: body, type: document, required: true, by: decide }  # a skill's text
 ```
 
 The brain refuses an agent promoting a learning, and an agent deciding a question, with a
-`HUMAN_ONLY` 403 on two specific routes. Here it is a word on the transition, using the level ladder
-in [20-COLLABORATION](20-COLLABORATION.md) §1, and it works for any register.
+`HUMAN_ONLY` 403 on two specific routes. Here it is one word, and it works for any register. On a
+transition it is a move only an accepted proposal makes. On a field it is a value set freely when the
+row is made and changed afterwards only by an accepted proposal, which is how a skill's text and
+version move: an agent proposes the new text, and the owner's one press applies it. A direct write
+that would make the move or change the value is `FORBIDDEN` from every caller, the owner included, and
+its sentence says to propose it. Who may accept is the level ladder's
+([20-COLLABORATION](20-COLLABORATION.md) §1); `decide` is the one word the kernel reads.
 
 ### `transitions:` — an enum that knows which moves are legal
 
@@ -552,7 +581,7 @@ append-only log then recorded the illegal move faithfully, forever.
 |---|---|
 | A missing `transitions:` means **every move is legal** | additive. Every register written before this existed keeps working |
 | A `create` may set **any** declared `state` value | `transitions:` govern *moves*, and the first value is not a move ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4) |
-| `requires:` names fields that must be non-null **to enter** that state | the "you cannot post an incomplete entry" rule, declared |
+| `requires:` names fields that must be filled for a move out of that state | the "you cannot post an incomplete entry" rule, declared; `REQUIRED_MISSING` names the first one missing |
 | The generated form **omits** illegal targets rather than disabling them | a disabled control invites a question the UI cannot answer |
 | The `move` rule action is validated against it at install | a rule that could never fire is caught in the diff, not in production |
 | A refusal names both ends | `register.transactions: state cannot move draft → void … it can` reads as feedback |
@@ -566,11 +595,53 @@ Three field options the review found used and never defined, and one that was de
 
 | Option | Does | Refuses |
 |---|---|---|
-| **`min:` / `max:`** | bounds on a field: byte length for `text`/`document` (`max` defaults to the type's cap, `min` to 0), numeric bounds for `int`/`decimal`/`money`/`quantity`/`duration`, element count for `list<T>` | `OUT_OF_BOUNDS`, naming both bounds |
+| **`min:` / `max:`** | bounds on a field: UTF-8 bytes for `text` and `document`, the value for `int`, `decimal` and `duration`, the `amount` in minor units for `money` and the `value` for `quantity`. A `max` lowers a type's cap below and never raises it, and a `default` sits inside its own bounds. Checked on a create and on a field a write sets, so a row is not refused for a bound it predates. `url`, `email`, `json` and `list<T>` have sizes the caps below describe, and this build bounds none of them (`NOT_IN_THIS_BUILD`), nor does it yet enforce the default caps | `OUT_OF_BOUNDS`, naming the declared bounds |
 | **`retired: true`** | the field stops rendering and stops being writable; the data stays in `fields` (§7). A retired field may not be `required`, `index`, `unique`, or in `search`/`mobile` | — |
 | **`redact: true`** | withholds the field's values from the audit log at write — `from_v`/`to_v` are the literal `--redacted--` ([20-COLLABORATION](20-COLLABORATION.md) §8). `secret` and `money` fields are redacted always, with or without the key; `redact:` is how any other field joins the list | — |
 | **a type change** | does not exist in v1: retire the field and add a new one. The conversion preview is authoring-tier scope | `FIELD_TYPE_CHANGED` |
 | **removing `index: true`** | drops the index in the same transaction; nothing else changes | — |
+
+### `scopes:` and `scope:`, where a row applies
+
+A row applies everywhere, or in one project. There are two scopes and no third (the owner's words are in
+`loop/DIRECTION.md` §0). A project is a row of the one register that declares `scopes:`, which in the
+shipped packs is `things`, labelled Projects.
+
+```yaml
+register: things
+scopes: { repos: repos, folders: folders }   # the fields listing where each project lives
+fields:
+  - { id: repos,   type: list, of: { type: text } }   # github.com/sam/braindog, or a bare name: braindog
+  - { id: folders, type: list, of: { type: text } }   # C:\Repos\braindog
+
+register: skills
+fields:
+  - { id: project, type: ref, register: things, scope: { widen: person, same: nearer } }
+```
+
+| Key | Does | Refuses |
+|---|---|---|
+| **`scopes: { repos?, folders? }`** | on a register: its rows are the projects. Each key names a `list<text>` field of the same register. One active register declares it, and a series cannot, because a run carries its project's spoken id | `DECLARATION_INVALID`; `FIELD_UNKNOWN` for a field the register lacks |
+| **`scope: {}`** | on a field: it names the project a row belongs to, and absent is global. It is a `ref` to the register declaring `scopes:`, or a list of them, and a register has one. When a token's create leaves a `ref` out, the record fills it with the run's project | `DECLARATION_INVALID` |
+| **`widen: person`** | a token's create lands in its run's project and names no other. A token may narrow a global row to a project, and never moves a row out of its project, to global or to another. That move is the owner's: one press, an `edit` event like any other. `any`, the default, holds a token to nothing | `FORBIDDEN`, whose sentence says to propose the move |
+| **`same: nearer`** | when a run reads by scope, a project row hides a global row with the same title, so a project's own skill replaces the one of that name that applies everywhere. A finished project row hides nothing. `both`, the default, reads both | — |
+| **`links: true`** | on a list of refs: a token may add a project and never remove one, which is how a person met in two projects stays linked to both | `FORBIDDEN` |
+
+**How a run learns its project.** The record places a run when the ladder opens it, and again when it
+re-attaches by its client id from a place it names:
+
+1. A remote equal to a `repos` entry, compared without the scheme, the `user@` or a trailing `.git`, with
+   the host lower-cased and `git@host:a/b` read as `host/a/b`.
+2. Else a `folders` entry the working folder is in, with `\` read as `/`, the drive letter lower-cased, a
+   trailing `/` dropped, and case ignored on a drive-letter path. The longest folder wins.
+3. Else a `repos` entry with no slash equal to the repository's folder name, ignoring case.
+4. Two projects matching at the same rung, or through folders of the same length, leave the run global
+   and are both reported: filing work under a guess is worse than filing it nowhere. No match is global.
+
+The answer is the run's `project`, the spoken id of the project row (`things#3`), written by the record
+and by no caller. A run named by its spoken id keeps the project it was placed in, so a later write cannot
+move it by sending other hints. **Scope is not access**: scope says where a row applies, and member levels
+([20-COLLABORATION](20-COLLABORATION.md) §1) say who may read it, so a global key still opens only on a grant.
 
 ### The caps, and where they come from
 

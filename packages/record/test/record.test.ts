@@ -125,7 +125,7 @@ test('A SHORT SCOPE WAS `SCOPE_INSUFFICIENT`, A CODE IN NO REGISTRY, and it is `
 
 test('EVERY REFUSAL A CALLER CAN REACH NAMES SOMETHING THEY CAN DO NEXT', () => {
   /* A refusal that says what is wrong and not what to do is half a sentence, and the half the
-     caller does not need. `PERSON_REQUIRED` has always read this way — "no token reaches it, a
+     caller does not need. `PERSON_REQUIRED` has always read this way — "no token reaches it. A
      person has to do it, signed in" — and it is the shape the others now copy.
 
      ASSERTED AS A PROPERTY, not string by string. Any of these can be reworded; none of them may
@@ -186,7 +186,7 @@ test('a person’s ladder is five rungs and a token’s is three, and no token r
     for (const need of ['decide', 'owner'] as const) {
       const r = allows(token('write', level), need);
       assert.equal(r?.code, 'FORBIDDEN', `${level} / ${need}`);
-      assert.match(r?.fix ?? '', /a person has to do it/);
+      assert.match(r?.fix ?? '', /A person has to do it/);
     }
   assert.equal(allows(person('owner'), 'owner'), null);
   assert.equal(allows(person('decide'), 'owner')?.code, 'LEVEL_REQUIRED');
@@ -267,7 +267,7 @@ test('a ceiling holds through every method that names a register', async () => {
 test('and boot shows only the registers the caller may touch, because a list of names is information', async () => {
   const { api, sql } = await record();
   const all = value<{ registers: { id: string }[] }>(await api.boot(owner));
-  assert.deepEqual(all.registers.map((r) => r.id).sort(), ['notes', 'obligations']);
+  assert.deepEqual(all.registers.map((r) => r.id).sort(), ['notes', 'obligations', 'session']);
 
   const scoped = value<{ registers: { id: string }[] }>(await api.boot({ ...owner, registers: ['obligations'] }));
   assert.deepEqual(scoped.registers.map((r) => r.id), ['obligations']);
@@ -347,15 +347,15 @@ test('A PAGE MADE OF FIGURES NAMES THE REGISTERS BEHIND THEM, and it used to nam
 
 /* ── who the record says did it ──────────────────────────────────────────── */
 
-test('A TOKEN WRITES AS THE PERSON WHO HOLDS IT, never as itself', async () => {
-  // The history has to answer "who did this", and "t_1" is not a who. The token is how, and the
-  // person is who — a record whose history names credentials cannot be read by a person.
+test('A TOKEN WRITES AS ITS RUN, never as itself and never as the person who holds it', async () => {
+  // The history has to answer "who did this", and "t_1" is not a who. The token is how, and the run
+  // it belongs to is who (30 §3): the person's own name on an agent's write would say they made it.
   const { api, sql } = await record();
   const row = value<{ id: string }>(
     await api.create({ register: 'obligations', fields: { what: 'a' } }, token('write')),
   );
   const events = value<{ actor: string }[]>(await api.history({ register: 'obligations', seq: 1 }, owner));
-  assert.equal(events[0]?.actor, 'p_1');
+  assert.equal(events[0]?.actor, 'S1');
   assert.ok(row.id);
   sql.close();
 });
@@ -451,7 +451,7 @@ test('AN AGENT MAY ASK AND MAY NOT ANSWER, and that is not a scope anybody can b
     /* AND THE SENTENCE NAMES A PERSON, not a bigger token — `SCOPE_INSUFFICIENT` would send whoever
        read it looking for a scope that does not exist, so the `fix` is asserted beside the code. */
     assert.equal((tried as { refusal: { code: string } }).refusal.code, 'FORBIDDEN');
-    assert.match((tried as { refusal: { fix: string } }).refusal.fix, /a person has to do it/);
+    assert.match((tried as { refusal: { fix: string } }).refusal.fix, /A person has to do it/);
   }
   assert.equal(api.kernel.count('obligations'), 0);
 

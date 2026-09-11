@@ -66,8 +66,10 @@ const indexes = (sql: NodeSql) =>
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'entry' ORDER BY name")
     .map((r) => r.name)
     /* The register indexes only — the schema's own (`entry_live`, `entry_state`, `entry_created_by`)
-       are not a declaration's to drop, and one appearing in this list would be its own finding. */
-    .filter((n) => registerOfIndex(n) !== null);
+       are not a declaration's to drop, and one appearing in this list would be its own finding.
+       The kernel's `session` register is in every record, and these tests are about the ones they
+       install. */
+    .filter((n) => registerOfIndex(n) !== null && registerOfIndex(n) !== 'session');
 
 /* ── 1 · a failed delivery arms its retry ────────────────────────────────── */
 

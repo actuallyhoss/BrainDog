@@ -29,7 +29,10 @@ import {
 import { no, ok } from '@braindog/ports';
 import {
   fill,
+  instant,
+  isStale,
   openRecord,
+  sessionDeclaration,
   type BindGrantArgs,
   type CreateRecordArgs,
   type Entry,
@@ -47,6 +50,8 @@ import {
   type RuleDecl,
   type Signer,
   type Verdict,
+  type SessionHints,
+  type WriteContext,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
@@ -113,10 +118,47 @@ export type CallContext = {
    * no session at all, a bearer or a self-host's open mode, which the vault answers exactly as before.
    */
   provedAt?: number;
+
+  /**
+   * What an agent says about its run: the session headers, or `_meta.session` over MCP, each checked
+   * by the host. A token's write hands them to the kernel's ladder; anybody else's call carries them
+   * and nothing reads them.
+   */
+  session?: SessionHints | undefined;
 };
 
 /** How recent a session's last proof must be for the vault: `12 §6`, `33 §10`. */
 const FRESH = 15 * 60_000;
+
+/* ── the kernel's `session` register: an agent's runs ─────────────────── */
+
+const RUN = sessionDeclaration().body as unknown as {
+  id: string;
+  seq_prefix: string;
+  state: string;
+  done: string[];
+  fields: { id: string; values?: string[] }[];
+};
+const SESSION = RUN.id;
+const PREFIX = RUN.seq_prefix;
+/** The states a run is live in: every declared one but the finished. */
+const LIVE = (RUN.fields.find((f) => f.id === RUN.state)?.values ?? []).filter((v) => !RUN.done.includes(v));
+/**
+ * The states a run leaves for `active` when it writes again, as the kernel's ladder moves them
+ * (`41 §5.4`). `handoff` is not one: it is a request waiting for the next run.
+ */
+const REVIVED: readonly string[] = ['idle', 'done', 'abandoned'];
+/** Where a run is and what it is doing. Re-attaching refreshes these, and never `next`, `tried` or `notes`. */
+const POSITION = ['agent', 'host', 'repo', 'remote', 'cwd', 'branch', 'head', 'doing'] as const;
+/** Why `attach` was called: the hook that fired, or the command line. */
+export const SOURCES = ['startup', 'resume', 'clear', 'compact', 'cli'] as const;
+const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session'] as const;
+/** How many entries `tried` and `notes` keep. The oldest goes first. */
+const KEPT = 50;
+/** The longest line a run carries, which is a note's ceiling. */
+const LINE = 280;
+/** The runtime's own id for a run, in the grammar its header has (`44 §4.2`). */
+const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 /** What a method needs. The ladder is ordered, and the check is an index comparison. */
 export type Need = 'read' | 'propose' | 'append' | 'write' | 'decide' | 'owner';
@@ -206,7 +248,7 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
   if (p.kind === 'token' && (need === 'decide' || need === 'owner'))
     return {
       code: 'FORBIDDEN',
-      fix: `This needs ${need}, and no token reaches it — a person has to do it, signed in.`,
+      fix: `This needs ${need}, and no token reaches it. A person has to do it, signed in.`,
       allowed: reach,
     };
 
@@ -270,6 +312,33 @@ export type Boot = {
   registers: { id: string; name: string; count: number }[];
   /** ISO 8601, UTC. The instant the record answered as of. */
   now: string;
+  /** The runs that are live now, as `sessionsLive` answers. Empty for a caller who may not read them. */
+  sessions: LiveRun[];
+  /** Open suggestions the caller may see, newest first: what waits on a person. */
+  waiting: Waiting[];
+};
+
+/** One live run: the row, its spoken id, and what is worked out when it is read. */
+export type LiveRun = Entry & {
+  spoken: string;
+  /** Not heard from in 45 minutes. A run that crashed never says so, so this is never stored. */
+  stale: boolean;
+  /** Seconds since it was last heard from. */
+  age_s: number;
+  /** Its repository is the one the caller said it is in: two runs in one working tree overwrite each other. */
+  same_repo: boolean;
+};
+
+/** One open suggestion, without its body: a `rowset` can carry two hundred rows, and `boot` is the first paint. */
+export type Waiting = { id: string; body_kind: string; opened_by: string; opened_at: string };
+
+/** `attach`: the run this agent is, and whether it was already there. */
+export type Attached = {
+  session: Entry;
+  spoken: string;
+  resumed: boolean;
+  /** The project the run is placed in, by spoken id, or `null` for none. */
+  project: string | null;
 };
 
 /**
@@ -587,9 +656,151 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
     return typeof named === 'string' && named !== '' && readable(ctx, named) !== null;
   };
 
-  /** Who the write path records. A token writes as the PERSON who holds it, never as itself. */
+  /**
+   * Who signs a call the kernel's ladder does not reach: a proposal, a decision, a pack's seed rows.
+   * For a token that is the person who holds it, because `kernel.propose` takes a name and no run.
+   */
   const actorOf = (ctx: CallContext): string =>
     ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
+
+  /** `agent:claude`: a token's name, when its write has no run to sign it (`30 §3`). */
+  const agentOf = (ctx: CallContext): string => `agent:${ctx.session?.agent ?? 'other'}`;
+
+  /**
+   * Who a row write is by, as the kernel's `WriteContext` says it.
+   *
+   * A TOKEN'S WRITE IS SIGNED BY ITS RUN. The principal and the run's hints go down, and the kernel's
+   * ladder finds or opens the run and signs with it, `S42` (`30 §3`). `actor` is then only what the
+   * events carry when no run could be opened, `agent:<name>`, and never the person: a person's name on
+   * an agent's write is the attribution the ladder replaces. Anybody else signs as themselves, which is
+   * how a person in a browser is never a run.
+   */
+  const writerOf = (ctx: CallContext): Pick<WriteContext, 'actor' | 'principal' | 'session'> =>
+    ctx.principal.kind === 'token'
+      ? {
+          actor: agentOf(ctx),
+          principal: { kind: 'token', token: ctx.principal.id },
+          ...(ctx.session === undefined ? {} : { session: ctx.session }),
+        }
+      : { actor: ctx.principal.id };
+
+  /** The fields a run starts with: every hint but its name, as the ladder's opening writes them. */
+  const opening = (hints: SessionHints): Patch =>
+    Object.fromEntries(Object.entries(hints).filter(([key, value]) => key !== 'spoken' && typeof value === 'string' && value !== ''));
+
+  /** Thrown to undo the write that asks the ladder, and caught where it is thrown. */
+  const UNDO = Symbol('undo');
+
+  /**
+   * The run a token's call belongs to, for the calls that must know it before they write.
+   *
+   * `attach` and `handoff` write the run's own row, and `log` signs a note rather than writing a row,
+   * so none of them can leave the finding to the write the way `create` does. THE LADDER IS ASKED, NOT
+   * COPIED. It runs only inside a write, so an empty row is written as this token and the transaction
+   * is undone: the actor that row was signed with names the run. Nothing the question did is kept, the
+   * counter included, so a run the ladder would have opened is opened here under that same number and
+   * signed by itself, as the ladder signs one.
+   *
+   * NEVER INSIDE ANOTHER TRANSACTION, because the undo would take the caller's own writes with it.
+   */
+  const runFor = (ctx: CallContext, hints: SessionHints, note: string): Result<{ run: Entry; spoken: string; opened: boolean }> => {
+    const as: CallContext = { ...ctx, session: hints };
+    let signed: string | undefined;
+    try {
+      kernel.transaction(() => {
+        const asked = kernel.create(SESSION, {}, { ...writerOf(as), cascade: false });
+        signed = asked.ok ? kernel.history(asked.value.id)[0]?.actor : undefined;
+        throw UNDO;
+      });
+    } catch (e) {
+      if (e !== UNDO) throw e;
+    }
+    const n = signed?.startsWith(PREFIX) ? Number(signed.slice(PREFIX.length)) : Number.NaN;
+    const numbered = Number.isSafeInteger(n) && n > 0;
+    const known = numbered ? kernel.get({ register: SESSION, seq: n }) : null;
+    if (known) return ok({ run: known, spoken: `${PREFIX}${n}`, opened: false });
+
+    /* OPENED WITH WHAT THE LADDER'S OPENING CARRIES: every hint but the name, the heartbeat, the token,
+       and the project the place resolves to. When the ladder could not open one either, this create
+       meets the same refusal, and that refusal is the answer. */
+    const project = kernel.resolveProject({ remote: hints.remote, repo: hints.repo, cwd: hints.cwd }).project;
+    const opened = kernel.create(SESSION, opening(hints), {
+      actor: numbered && signed !== undefined ? signed : agentOf(as),
+      note,
+      cascade: false,
+      stamp: {
+        last_seen: instant(clock.now()),
+        ...(ctx.principal.kind === 'token' ? { token_id: ctx.principal.id } : {}),
+        ...(project ? { project: project.spoken } : {}),
+      },
+    });
+    if (!opened.ok) return opened as Result<never>;
+    if (numbered && opened.value.seq !== n) throw new TypeError(`${String(signed)} was opened as ${PREFIX}${String(opened.value.seq)}`);
+    return ok({ run: opened.value, spoken: `${PREFIX}${String(opened.value.seq)}`, opened: true });
+  };
+
+  /**
+   * The runs that are live now, newest heard from first, with what is worked out when they are read.
+   *
+   * STALE IS DERIVED AND NEVER STORED: a run that crashed never says so, so the clock is compared with
+   * `last_seen` here. `same_repo` compares with the caller's own hints, and is `false` for a caller that
+   * sent none.
+   */
+  const live = (ctx: CallContext): LiveRun[] => {
+    const rows = kernel.list({
+      register: SESSION,
+      where: { field: RUN.state, in: LIVE },
+      order: [{ field: 'last_seen', dir: 'desc' }],
+      limit: 50,
+    });
+    if (!rows.ok) return [];
+    const now = clock.now();
+    const repo = ctx.session?.repo;
+    return rows.value.rows.map((row) => {
+      const seen = typeof row.fields.last_seen === 'string' ? row.fields.last_seen : row.updated_at;
+      return {
+        ...row,
+        spoken: `${PREFIX}${String(row.seq)}`,
+        stale: isStale(row, now),
+        age_s: Math.max(0, Math.floor((now - Date.parse(seen)) / 1000)),
+        same_repo: repo !== undefined && row.fields.repo === repo,
+      };
+    });
+  };
+
+  /**
+   * Open suggestions the caller may see, newest first, held to the ceiling `governance` holds them to.
+   * The body is one `governance({ id })` away.
+   */
+  const waitingFor = (ctx: CallContext): Waiting[] => {
+    const rows = kernel.governance('suggestion', { status: 'open', limit: 20 });
+    if (!rows.ok) return [];
+    return rows.value
+      .filter((row) => !holds(ctx, row))
+      .map((row) => ({ id: String(row.id), body_kind: String(row.body_kind), opened_by: String(row.opened_by), opened_at: String(row.opened_at) }));
+  };
+
+  /** An argument that is a line of text, `undefined` when it was not sent, or the refusal saying why not. */
+  const line = (args: Record<string, unknown>, key: string): Result<string | undefined> => {
+    const value = args[key];
+    if (value === undefined || value === null) return ok(undefined);
+    if (typeof value !== 'string' || !value.trim())
+      return no('VALUE_MALFORMED', `${key} is a line of text, and this one is ${JSON.stringify(value) ?? String(value)}.`, { at: key });
+    const said = value.trim();
+    if (said.length > LINE) return no('OUT_OF_BOUNDS', `${key} is at most ${LINE} characters, and this one is ${said.length}.`, { at: key });
+    return ok(said);
+  };
+
+  /** A key this call does not take, named with the ones it does, so a value is never dropped unsaid. */
+  const stray = (args: Record<string, unknown>, takes: readonly string[]): Refusal | null => {
+    const key = Object.keys(args).find((k) => !takes.includes(k));
+    return key === undefined
+      ? null
+      : { code: 'FIELD_UNKNOWN', fix: `${key} is not something this call takes. It takes ${takes.join(', ')}.`, at: key, allowed: [...takes] };
+  };
+
+  const listOf = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
+  const projectOf = (run: Entry): string | null => (typeof run.fields.project === 'string' ? run.fields.project : null);
 
   return {
     /**
@@ -609,7 +820,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
         if (readable(ctx, id)) continue;
         out.push({ id, name: decl.name, count: kernel.count(id) });
       }
-      return ok({ registers: out, now: new Date(clock.now()).toISOString() });
+      return ok({
+        registers: out,
+        now: new Date(clock.now()).toISOString(),
+        /* THE FIRST SCREEN IN ONE ROUND TRIP (`32 §3`): who is working, and what waits on a person, each
+           held to what the caller may read, as the registers above are. */
+        sessions: readable(ctx, SESSION) ? [] : live(ctx),
+        waiting: waitingFor(ctx),
+      });
     },
 
     /** What a register holds, so a caller can write a correct row on the first try. */
@@ -624,10 +842,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
           });
     },
 
-    async get(args: { register: string; seq: number }, ctx: CallContext): Promise<Result<Entry | null>> {
+    /**
+     * One row: by register and number, or as a person says it, `S1` or `tasks#3`.
+     *
+     * A SPOKEN ID NEEDS NO REGISTER, because the kernel resolves it against the installed prefixes. A row
+     * the caller may not read answers as a row that is not there: a refusal naming its register would
+     * say which registers exist, one guess at a time.
+     */
+    async get(args: { register?: string; seq?: number; spoken?: string }, ctx: CallContext): Promise<Result<Entry | null>> {
+      if (typeof args?.spoken === 'string') {
+        const stop = scoped(ctx, 'read');
+        if (stop) return { ok: false, refusal: stop };
+        const row = kernel.get(args.spoken.trim());
+        return ok(row && !readable(ctx, row.register) ? row : null);
+      }
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
-      return ok(kernel.get({ register: args.register, seq: args.seq }));
+      return ok(kernel.get({ register: args.register as string, seq: args.seq as number }));
     },
 
     async list(
@@ -690,7 +921,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       if (stop) return { ok: false, refusal: stop };
       return tail(
         kernel.create(args.register, args.fields, {
-          actor: actorOf(ctx),
+          ...writerOf(ctx),
           ...(args.note === undefined ? {} : { note: args.note }),
           ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
           /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
@@ -708,7 +939,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       if (stop) return { ok: false, refusal: stop };
       return tail(
         kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
-          actor: actorOf(ctx),
+          ...writerOf(ctx),
           ...(args.version === undefined ? {} : { version: args.version }),
           ...(args.note === undefined ? {} : { note: args.note }),
           ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
@@ -957,7 +1188,149 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
          patch, so a log entry bumped the row's VERSION — and anybody holding the version they read
          then got a spurious `VERSION_STALE` on their next real change, for a call that changed no
          field. 30 §2: `note` is "the one row a person or an agent writes on purpose". */
-      return tail(kernel.log(args.register, args.seq, actorOf(ctx), note));
+      /* A TOKEN'S NOTE IS SIGNED BY ITS RUN, found or opened as its writes are, and only once the row is
+         known to be there, so a note against nothing opens no run. It moves no heartbeat: `kernel.log`
+         takes a name and no `WriteContext`, and only a write's ladder moves one. */
+      if (ctx.principal.kind !== 'token' || !kernel.get({ register: args.register, seq: args.seq }))
+        return tail(kernel.log(args.register, args.seq, actorOf(ctx), note));
+      const run = runFor(ctx, ctx.session ?? {}, 'opened: auto');
+      return tail(kernel.log(args.register, args.seq, run.ok ? run.value.spoken : agentOf(ctx), note));
+    },
+
+    /* ── AN AGENT'S RUN ─────────────────────────────── */
+
+    /**
+     * Say which run this agent is, and where it stands. A token's call, needing `propose`.
+     *
+     * THE LADDER DECIDES WHICH RUN, as it does for every token write: the one named, the one holding this
+     * client id, a live one on the same host and repository, or a new one. A run already there is
+     * resumed, and what it is doing and where are refreshed. `next`, `tried` and `notes` are its handoff
+     * and are never touched here, because the start of a run is exactly when they are read.
+     */
+    async attach(
+      args: { client_id?: string; doing?: string; source: (typeof SOURCES)[number]; branch?: string; head?: string },
+      ctx: CallContext,
+    ): Promise<Result<Attached>> {
+      const stop = guard(ctx, 'propose');
+      if (stop) return { ok: false, refusal: stop };
+      if (ctx.principal.kind !== 'token')
+        return no('FORBIDDEN', 'attach is how an agent says which run it is, and a person is never a run.', { at: 'principal' });
+      const said = (args ?? {}) as Record<string, unknown>;
+      const wrong = stray(said, ['client_id', 'doing', 'source', 'branch', 'head']);
+      if (wrong) return { ok: false, refusal: wrong };
+      if (!(SOURCES as readonly unknown[]).includes(said.source))
+        return no('ENUM_VALUE_UNKNOWN', `source says why this run is attaching: one of ${SOURCES.join(', ')}.`, { at: 'source', allowed: SOURCES });
+      if (said.client_id !== undefined && (typeof said.client_id !== 'string' || !CLIENT_ID.test(said.client_id)))
+        return no('VALUE_MALFORMED', "client_id is the runtime's own id for this run: letters, digits and . _ : -, at most 128.", { at: 'client_id' });
+      const hints: SessionHints = { ...ctx.session, ...(typeof said.client_id === 'string' ? { client_id: said.client_id } : {}) };
+      for (const key of ['doing', 'branch', 'head'] as const) {
+        const value = line(said, key);
+        if (!value.ok) return value as Result<never>;
+        if (value.value !== undefined) hints[key] = value.value;
+      }
+      const source = String(said.source);
+
+      const found = runFor(ctx, hints, `opened: ${source}`);
+      if (!found.ok) return tail(found as Result<never>);
+      const { run, spoken, opened } = found.value;
+      if (opened) return tail(ok({ session: run, spoken, resumed: false, project: projectOf(run) }));
+
+      /* THE RUN'S OWN ROW, written as the run: the ladder finds it again from the same hints, signs the
+         edit with it, moves `last_seen`, and places it again when it came back by its client id. */
+      const patch: Patch = {};
+      for (const key of POSITION) if (typeof hints[key] === 'string' && hints[key] !== run.fields[key]) patch[key] = hints[key];
+      if (hints.client_id !== undefined && run.fields.client_id === undefined) patch.client_id = hints.client_id;
+      if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
+      const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}` });
+      if (!out.ok) return tail(out as Result<never>);
+      return tail(ok({ session: out.value, spoken, resumed: true, project: projectOf(out.value) }));
+    },
+
+    /**
+     * Keep a run's handoff true: the next step, a dead end, a line of reasoning, what it is doing, its
+     * state. Needs `propose`.
+     *
+     * `tried` AND `note` APPEND AND NEVER OVERWRITE, because a dead end one run recorded is what stops the
+     * next from walking into it. Each list keeps its last fifty, and the append is read and written in
+     * one transaction so that two handoffs cannot drop each other's line. `state` moves only along the
+     * register's declared transitions.
+     *
+     * A TOKEN HANDS OFF ITS OWN RUN, found by the ladder like any write of its. Naming a run is a
+     * person's, from the app: an agent that could name one could rewrite another run's handoff.
+     */
+    async handoff(
+      args: { next?: string; tried?: string; note?: string; doing?: string; state?: string; branch?: string; head?: string; session?: string },
+      ctx: CallContext,
+    ): Promise<Result<Entry>> {
+      const token = ctx.principal.kind === 'token';
+      const stop = guard(ctx, 'propose', token ? undefined : SESSION);
+      if (stop) return { ok: false, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const wrong = stray(said, HANDOFF);
+      if (wrong) return { ok: false, refusal: wrong };
+      if (token && said.session !== undefined)
+        return no('FORBIDDEN', 'A token hands off its own run, so it names none. A person names a run from the app.', { at: 'session' });
+      if (!token && typeof said.session !== 'string')
+        return no('REQUIRED_MISSING', `Name the run to hand off, such as ${PREFIX}3.`, { at: 'session' });
+
+      const lines: Partial<Record<'next' | 'tried' | 'note' | 'doing' | 'branch' | 'head', string>> = {};
+      for (const key of ['next', 'tried', 'note', 'doing', 'branch', 'head'] as const) {
+        const value = line(said, key);
+        if (!value.ok) return value as Result<never>;
+        if (value.value !== undefined) lines[key] = value.value;
+      }
+      if (said.state !== undefined && typeof said.state !== 'string')
+        return no('VALUE_MALFORMED', `state is one of the run's states: ${LIVE.join(', ')} or ${RUN.done.join(', ')}.`, { at: 'state' });
+      if (Object.keys(lines).length === 0 && said.state === undefined)
+        return no('REQUIRED_MISSING', 'A handoff carries at least one of next, tried, note, doing, state, branch or head.', { at: 'next' });
+
+      let run: Entry;
+      let by: Pick<WriteContext, 'actor' | 'principal' | 'session'>;
+      if (token) {
+        const hints: SessionHints = {
+          ...ctx.session,
+          ...(lines.doing === undefined ? {} : { doing: lines.doing }),
+          ...(lines.branch === undefined ? {} : { branch: lines.branch }),
+          ...(lines.head === undefined ? {} : { head: lines.head }),
+        };
+        const found = runFor(ctx, hints, 'opened: auto');
+        if (!found.ok) return tail(found as Result<never>);
+        run = found.value.run;
+        /* NAMED, so the write lands on the run it was found as: a run just opened may have no client id
+           or place for the ladder to find it by a second time. */
+        by = writerOf({ ...ctx, session: { ...hints, spoken: found.value.spoken } });
+      } else {
+        const named = kernel.get(String(said.session).trim());
+        if (!named || named.register !== SESSION)
+          return no('VALUE_MALFORMED', `${String(said.session)} is not a run. Runs are spoken ${PREFIX}1, ${PREFIX}2.`, { at: 'session' });
+        run = named;
+        by = writerOf(ctx);
+      }
+
+      return tail(
+        kernel.transaction(() => {
+          const now = kernel.get(run.id) ?? run;
+          const patch: Patch = {};
+          for (const key of ['next', 'doing', 'branch', 'head'] as const) if (lines[key] !== undefined) patch[key] = lines[key];
+          if (lines.tried !== undefined) patch.tried = [...listOf(now.fields.tried), lines.tried].slice(-KEPT);
+          if (lines.note !== undefined) patch.notes = [...listOf(now.fields.notes), lines.note].slice(-KEPT);
+          if (typeof said.state === 'string') patch.state = said.state;
+          else if (token && REVIVED.includes(now.state ?? '')) patch.state = 'active';
+          return kernel.update(SESSION, now.id, patch, by);
+        }),
+      );
+    },
+
+    /**
+     * The runs that are live now: active, idle, or waiting to be picked up. Each says whether it has gone
+     * quiet, how long since it was heard from, and whether it is in the caller's repository.
+     *
+     * A READ, AND IT OPENS NO RUN: an agent asking who else is working has not started yet.
+     */
+    async sessionsLive(_args: Record<string, never> | undefined, ctx: CallContext): Promise<Result<LiveRun[]>> {
+      const stop = guard(ctx, 'read', SESSION);
+      if (stop) return { ok: false, refusal: stop };
+      return ok(live(ctx));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */

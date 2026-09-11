@@ -1,0 +1,5 @@
+code:   SEQ_PREFIX_TAKEN
+via:    install
+raises: packages/kernel/src/declare.ts
+at:     seq_prefix
+fix:    Choose a prefix that no other register uses.

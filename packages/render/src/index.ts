@@ -11,8 +11,25 @@
  * at `braindog-render/svelte` and are held to this renderer by the parity gate.
  */
 
-export { parse, splitRow, type Block, type Degraded, type Markdown, type Row, type Segment } from './parse.ts';
-export { toHTML, describe, escape, holeLabel, verbatimText, type RenderOptions } from './html.ts';
+export { parse, splitRow, type Block, type Degraded, type Markdown, type ParseOptions, type Row, type Segment } from './parse.ts';
+export { toHTML, captioned, describe, escape, holeLabel, verbatimText, type RenderOptions } from './html.ts';
+export {
+  CARD_ROLES,
+  CARDS_NONE,
+  FOLD_HIDE,
+  FOLD_SHOW,
+  TREND,
+  cardFault,
+  cardLayout,
+  counted,
+  initialOf,
+  markOf,
+  ringDash,
+  ringOf,
+  trendOf,
+  type CardLayout,
+  type CardRole,
+} from './cards.ts';
 export { inline, text, magnitudeOfCell, safeHref, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,

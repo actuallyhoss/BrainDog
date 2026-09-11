@@ -1,47 +1,73 @@
 /**
- * The eight tools, which are the whole of what an agent sees.
+ * The fourteen tools, which are the whole of what an agent sees.
  *
- * THE COUNT IS THE DESIGN. `10-MCP` §6 puts a budget on it — the tool list is in every turn of every
- * session, so one more tool costs every conversation for ever. What a bigger surface buys is
- * convenience for the caller; what it costs is attention, permanently. So the record's own
- * vocabulary carries the load: `list` takes a predicate rather than there being fourteen filter
- * tools.
+ * THE COUNT IS THE DESIGN. `10-MCP` §4 puts a budget on it: the tool list is in every turn of every
+ * session, so one more tool costs every conversation for ever. So the record's own vocabulary
+ * carries the load: `list` takes a predicate rather than there being a filter tool per register.
  *
- * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource is a
- * read surface with a stable address and cacheable content; the list of them is fetched when it is
- * wanted and cached by its own `ttlMs`, so the per-register variability — one `schema/<register>`
- * each — costs nothing in a turn that does not ask for it. `page` and `metric` are resources for
- * that reason and for one more: ADR-018 says a screen needing an endpoint no agent can call is a
- * design error, and the web app's page read was exactly that until they existed.
+ * FOURTEEN, AND THE THREE NEWEST ARE THINGS AN AGENT DOES EVERY SESSION (`loop/research-agent-path.md`
+ * §1.5). `context` is the briefing for where it stands, `handoff` keeps its session's next step true,
+ * and `meet` records a person it came across. Five went to pay for them: `pages`, `page` and
+ * `metric` were already resources, `credentials` could never answer a token because the vault
+ * refuses every one, and `dry_run` previews a rule, which only a person installs.
  *
- * `schema` AND `history` ARE STILL TOOLS AS WELL, and that is deliberate rather than a leftover: an
- * agent that cannot read a register's fields writes a refused row, and a refused row costs more
- * than the tool does.
+ * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource list is
+ * fetched when it is wanted, so the per-register variability, one `schema/<register>` each, costs
+ * nothing in a turn that does not ask for it.
  *
- * `record_index` IS THE FIRST CALL AND IT IS CHEAP ON PURPOSE. An agent that has to guess a register
- * name writes a refused call, and a refused call costs more than the orientation would have.
- *
- * A REFUSAL IS THE TEACHER. Every tool answers in the record's own shape — `ok` and a value, or a
- * code and a sentence naming what to send instead — because the caller is a model that will try
- * again immediately, and the difference between a good refusal and a bad one is whether the second
+ * A REFUSAL IS THE TEACHER. Every tool answers in the record's own shape, `ok` and a value or a code
+ * and a sentence naming what to send instead, because the caller is a model that will try again
+ * immediately, and the difference between a good refusal and a bad one is whether the second
  * attempt works.
  */
 
 import type { Result } from '@braindog/ports';
-import type { CallContext, RecordApi } from '@braindog/record';
+
+type Answer<T = unknown> = Promise<Result<T>>;
+type Args = Record<string, unknown>;
+/** A row as `list` returns it. Only what the skill listing reads is named. */
+type Row = { state?: string | null; fields: Record<string, unknown> };
 
 /**
- * A read surface with a stable address and cacheable content — which is the definition of a
- * resource, and the reason these are not tools.
+ * The record, as the tools reach it: the methods they call and nothing else.
  *
- * THEY CLOSE A HOLE ADR-018 WOULD HAVE CALLED A DESIGN ERROR. Its rule is that any screen needing an
- * endpoint no agent can call is a design error, and the web app's page read is `page({ slug })`,
- * which no tool reaches. Every declared page and every figure on it was invisible to every agent.
+ * STRUCTURAL, IN THE MANNER OF THE HOST'S `RecordSurface`, so the same tools run over the record in
+ * process and over `@braindog/client` from the command line, and this package is tested with a stub.
  *
- * AND THE FIX IS NOT A NINTH TOOL. The tool list is in every turn of every session; a resource list
- * is fetched when it is wanted and cached by its `ttlMs`. That is the whole distinction, and it is
- * what keeps the per-register variability — one `schema/<register>` each — out of the budget the
- * tool count spends.
+ * `C` IS WHATEVER THE TRANSPORT CARRIES. In process it is the record's `CallContext`; from the
+ * command line it is nothing the tools look at, because the bearer travels in the request. The tools
+ * hand it on and never read it, which is what keeps authorisation in one place: the record.
+ *
+ * THE LAST FOUR ARE OPTIONAL BECAUSE THE RECORD DOES NOT ANSWER THEM YET. They arrive with the
+ * session register (build steps 6, 8 and 16). Until a surface has one, its tool refuses with what to
+ * do instead, and its resource is not listed.
+ */
+export type McpSurface<C> = {
+  boot(ctx: C): Answer<{ registers: { id: string; name: string }[] }>;
+  version(ctx: C): Answer<{ version: number }>;
+  whoami(ctx: C): Answer;
+  schema(args: { register: string }, ctx: C): Answer;
+  get(args: { register: string; seq: number }, ctx: C): Answer;
+  list(args: { register: string; where?: unknown; limit?: number; cursor?: string | null }, ctx: C): Answer<{ rows: Row[] }>;
+  search(args: { q: string; limit?: number }, ctx: C): Answer;
+  history(args: { register: string; seq: number }, ctx: C): Answer;
+  governance(args: never, ctx: C): Answer;
+  propose(args: never, ctx: C): Answer;
+  create(args: { register: string; fields: Args; note?: string }, ctx: C): Answer;
+  update(args: { register: string; seq: number; patch: Args; version?: number; note?: string }, ctx: C): Answer;
+  pages(ctx: C): Answer<{ slug: string; title: string }[]>;
+  page(args: { slug: string }, ctx: C): Answer;
+  metric(args: { metric: string }, ctx: C): Answer;
+  digestToday(args: { digest?: string }, ctx: C): Answer;
+  context?(args: Record<string, never>, ctx: C): Answer;
+  handoff?(args: Args, ctx: C): Answer;
+  meet?(args: Args, ctx: C): Answer;
+  sessionsLive?(args: Record<string, never>, ctx: C): Answer;
+};
+
+/**
+ * A read surface with a stable address and cacheable content, which is the definition of a
+ * resource and the reason these are not tools.
  *
  * EVERY RESOURCE IS BACKED BY A METHOD, so the permission ladder is the same one. One with no
  * method behind it would be a second read path with a second set of checks.
@@ -51,28 +77,24 @@ export type Resource = {
   uri: string;
   name: string;
   description: string;
-  /** How long a client may hold it. `0` is "ask every time" — what `whoami` is. */
+  /** How long a client may hold it. `0` is "ask every time", which is what `whoami` is. */
   ttlMs: number;
 };
 
 /** An hour. A register's shape changes when a pack is installed, and not between one. */
-const HOUR = 3_600_000;
+export const HOUR = 3_600_000;
 /** A minute. Long enough to stop a burst, short enough that a figure is not yesterday's. */
-const MINUTE = 60_000;
+export const MINUTE = 60_000;
 
 /**
  * The codes a scope check writes, which is what "this caller was not shown it" looks like on a block.
  *
- * TWO CODES, AND ONE FACT HAS THREE SENTENCES. `readable` is `guard(ctx, 'read', register)`, and the
- * two halves of that guard answer differently about the same register: outside the ceiling is
- * `FORBIDDEN`, inside the ceiling with a level that does not reach `read` is `LEVEL_REQUIRED`, and a
- * token whose scope is short of it is `FORBIDDEN` again with its own sentence. That third was
- * `SCOPE_INSUFFICIENT`, a code in no registry, until it went the way `PERSON_REQUIRED` had. A filter
- * that names only one of them is a filter on the ceiling where the question is the level.
+ * TWO CODES FOR ONE FACT. `readable` is `guard(ctx, 'read', register)`: outside the ceiling is
+ * `FORBIDDEN`, and inside it with a level that does not reach `read` is `LEVEL_REQUIRED`. A filter
+ * naming only the first filters on the ceiling where the question is the level.
  *
- * AND IT IS A LIST OF CODES RATHER THAN "ANY REFUSAL AT ALL". A block refused for a misspelt key is
- * a block somebody has to be able to see in order to fix, and withholding the page it is on would
- * hide the only sentence that says what is wrong with it.
+ * AND A LIST OF CODES RATHER THAN "ANY REFUSAL AT ALL". A block refused for a misspelt key is a block
+ * somebody has to be able to see in order to fix.
  */
 const WITHHELD = new Set(['FORBIDDEN', 'LEVEL_REQUIRED']);
 
@@ -87,17 +109,26 @@ export type Tool = {
 };
 
 const str = (description: string) => ({ type: 'string', description });
+const int = (description: string) => ({ type: 'integer', description });
+/* `required` is left out when empty: it is fourteen tools' worth of tokens that say nothing. */
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: 'object',
   properties,
-  required,
+  ...(required.length > 0 ? { required } : {}),
   additionalProperties: false,
 });
 
 export const TOOLS: readonly Tool[] = [
   {
     name: 'record_index',
-    description: 'What this record holds: its registers, how many rows in each, and its version. Call this first.',
+    description: 'What this record holds: its registers, how many rows in each, and its version. The cheap way to learn register names.',
+    input: obj({}),
+    writes: false,
+  },
+  {
+    name: 'context',
+    description:
+      'Where you are and what applies here: your session, your project, its open work, questions waiting on the person, people, the keys and servers you may use (by name, never a value), skills and learnings, plus everything global. Call it first, and again after a long pause.',
     input: obj({}),
     writes: false,
   },
@@ -109,19 +140,19 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'get',
-    description: 'One row, by the number a person says out loud — obligations#41.',
-    input: obj({ spoken: str('register#number, as a person says it.') }, ['spoken']),
+    description: 'One row, by the id a person says out loud: obligations#41, S42 or LN7.',
+    input: obj({ spoken: str('register#number, or a prefixed id such as S42.') }, ['spoken']),
     writes: false,
   },
   {
     name: 'list',
     description:
-      'Rows of one register, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"}, or {"all":[…]}.',
+      'Rows of one register, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"}, or {"all":[...]}.',
     input: obj(
       {
         register: str('A register id.'),
         where: { type: 'object', description: 'A predicate tree. Omit for everything.' },
-        limit: { type: 'integer', description: '1 to 500. Default 50.' },
+        limit: int('1 to 200. Default 25.'),
         cursor: str('From a previous answer, to continue.'),
       },
       ['register'],
@@ -131,47 +162,13 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'search',
     description: 'Rows whose text matches, across every register you can see. Every word is a prefix.',
-    input: obj({ q: str('What to look for. Plain words; the operators are not read.'), limit: { type: 'integer', description: '1 to 100. Default 20.' } }, ['q']),
+    input: obj({ q: str('What to look for. Plain words; the operators are not read.'), limit: int('1 to 50. Default 20.') }, ['q']),
     writes: false,
   },
   {
     name: 'history',
     description: 'The writes that made one row, in order, each with who and when.',
     input: obj({ spoken: str('register#number.') }, ['spoken']),
-    writes: false,
-  },
-  {
-    name: 'pages',
-    description: 'The pages this record can draw, by slug. A project page is one declaration per row, so there are more of these than there are declarations.',
-    input: obj({}),
-    writes: false,
-  },
-  {
-    name: 'page',
-    description:
-      'One page: every block run, as rows and figures rather than markup. A block the record could not draw says why, and the rest of the page still comes back.',
-    input: obj({ slug: str('A slug from pages.') }, ['slug']),
-    writes: false,
-  },
-  {
-    name: 'metric',
-    description:
-      'One figure, with the target it is measured against and how it compares to the window before. Add a parameter after a colon for a metric about one thing: project-owed:Kiln.',
-    input: obj({ metric: str('A metric id, optionally with :parameter.') }, ['metric']),
-    writes: false,
-  },
-  {
-    name: 'credentials',
-    description:
-      'What each credential OPENS — its label, what it reaches, its kind, when it was last used and when it is due for rotation. Never the credential itself, which no tool can read.',
-    input: obj({}),
-    writes: false,
-  },
-  {
-    name: 'dry_run',
-    description:
-      'What a rule would do, before anybody turns it on: how many rows it matches, how many it wins, which rule takes the rest, and a sample. It writes nothing.',
-    input: obj({ rule: { type: 'object', description: 'A rule declaration: register, when, then.' } }, ['rule']),
     writes: false,
   },
   {
@@ -182,19 +179,23 @@ export const TOOLS: readonly Tool[] = [
       register: str('suggestion (the default), decision, or prediction.'),
       id: str('One row, by its SG or D number.'),
       status: str('open (the default), resolved, or all.'),
-      limit: { type: 'integer', description: 'At most 200.' },
+      limit: int('At most 200.'),
     }),
     writes: false,
   },
   {
     name: 'propose',
     description:
-      'Put a question in front of a person, with what you would do about it. It changes NOTHING by itself, which is what makes it the verb to use when you are not sure.',
+      'Put a question to the person, with what you would do about it. It changes nothing by itself, so it is the verb to use when you are not sure, or to change what you may not.',
     input: obj(
       {
         question: str('What is being asked, in one sentence a person can answer.'),
-        body_kind: str('options · rowset · pattern · change'),
-        body: { type: 'object', description: 'The body for that kind. options needs at least two, each with id, label and because.' },
+        body_kind: str('options, rowset, pattern or change.'),
+        body: {
+          type: 'object',
+          description:
+            'The body for that kind. options needs at least two, each with id, label and because. A rowset row with at (skills#3), version and patch changes that row when accepted.',
+        },
       },
       ['question', 'body_kind', 'body'],
     ),
@@ -211,13 +212,12 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'update',
-    description:
-      'Change a row. Send the version you read, and a stale write is refused rather than merged — read it again and reapply.',
+    description: 'Change a row. Send the version you read; a stale write is refused rather than merged, so read it again and reapply.',
     input: obj(
       {
         spoken: str('register#number.'),
         patch: { type: 'object', description: 'Field ids to values. null clears a field.' },
-        version: { type: 'integer', description: "The row's version when you read it." },
+        version: int("The row's version when you read it."),
         note: str('One sentence a person reads in six weeks.'),
       },
       ['spoken', 'patch'],
@@ -230,53 +230,185 @@ export const TOOLS: readonly Tool[] = [
     input: obj({ spoken: str('register#number.'), note: str('One sentence.') }, ['spoken', 'note']),
     writes: true,
   },
+  {
+    name: 'handoff',
+    description:
+      "Keep your session's handoff true. next is the one concrete next step; 'carry on' is not one. tried adds a dead end, and note adds a line of reasoning; both append and never overwrite. state handoff asks another session to pick it up.",
+    input: obj({
+      next: str('The one concrete next step.'),
+      tried: str('A dead end, the moment you rule it out.'),
+      note: str('One line of reasoning.'),
+      /* `doing`, the kernel's own field: `title` is a reserved field id, and the record refuses it. */
+      doing: str('What this session is doing.'),
+      state: { type: 'string', enum: ['idle', 'handoff', 'done'] },
+    }),
+    writes: true,
+  },
+  {
+    name: 'meet',
+    description:
+      'Someone you came across in the work: a commit author, a sender, a client. They are matched by email or handle, added if new, and linked to your project with where you met them. Never guess an email.',
+    input: obj(
+      {
+        name: str('As written in the work.'),
+        email: str('Only as seen.'),
+        handle: str('provider:name, such as github:octocat.'),
+        where: str('Where you met them, such as commit 4464966 in braindog.'),
+      },
+      ['where'],
+    ),
+    writes: true,
+  },
 ];
 
-/** `obligations#41` — the only way an agent addresses a row, because it is the way a person says it. */
-const SPOKEN = /^([a-z][a-z0-9_]{0,31})#(\d+)$/;
+/** `obligations#41`, the way a person says a row. */
+const QUALIFIED = /^([a-z][a-z0-9_]{0,31})#([1-9][0-9]*)$/;
+/** `S42`, `LN7`: a register's own prefix and number. The record knows which register owns a prefix. */
+const PREFIXED = /^([A-Z]{1,4})([1-9][0-9]*)$/;
 
 const parse = (spoken: unknown): { register: string; seq: number } | null => {
-  const m = typeof spoken === 'string' ? SPOKEN.exec(spoken.trim()) : null;
+  const m = typeof spoken === 'string' ? QUALIFIED.exec(spoken.trim()) : null;
   return m ? { register: m[1]!, seq: Number(m[2]) } : null;
 };
 
-const badSpoken = (): Result<never> => ({
+const ROW = 'A row is addressed as register#number, like obligations#41.';
+const ROW_OR_ID = 'A row is addressed as register#number, like obligations#41, or by its prefixed id, like S42.';
+const badSpoken = (fix: string): Result<never> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix, at: 'spoken' } });
+
+/**
+ * A tool or resource whose record method has not arrived yet.
+ *
+ * `NOT_IN_THIS_BUILD` IS THE RECORD'S OWN WORD FOR THIS, and the sentence says what to do instead,
+ * so an agent carries on rather than retrying a call that cannot work today.
+ */
+const unbuilt = (name: string, instead: string): Result<never> => ({
   ok: false,
-  refusal: { code: 'VALUE_MALFORMED', fix: 'A row is addressed as register#number, like obligations#41.', at: 'spoken' },
+  refusal: { code: 'NOT_IN_THIS_BUILD', fix: `This record does not answer ${name} yet. ${instead}` },
+});
+
+const nowhere = (uri: string): Result<never> => ({
+  ok: false,
+  refusal: { code: 'ROUTE_UNKNOWN', fix: `There is nothing at ${uri}. Read braindog:boot for what this record holds.`, at: 'uri' },
 });
 
 /**
- * Run one tool against the record.
+ * An address split rather than resolved.
+ *
+ * `braindog:schema/../../x` is a path a stranger can write, and the part after the first slash is an
+ * argument to a method rather than a path on a disk, so it is split, never resolved.
+ */
+const split = (uri: string) => {
+  const path = uri.startsWith('braindog:') ? uri.slice('braindog:'.length) : '';
+  const cut = path.indexOf('/');
+  return { head: cut < 0 ? path : path.slice(0, cut), rest: cut < 0 ? '' : path.slice(cut + 1) };
+};
+
+/* The argument grammar. `schema/../../x` reaching the method would be refused there too, but by a
+   sentence about a register nobody has, which reads like a fact about the record. */
+const NAMED = /^[a-z][a-z0-9_-]{0,63}$/;
+/** A skill's folder name, the grammar the command line writes files under. */
+const SKILL = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/** How long each kind of resource may be held, by the first segment of its address. */
+const TTL = new Map([
+  ['whoami', 0],
+  ['context', 0],
+  ['sessions', 0],
+  ['boot', MINUTE],
+  ['digest', MINUTE],
+  ['decisions', MINUTE],
+  ['page', MINUTE],
+  ['metric', MINUTE],
+  ['schema', HOUR],
+  ['skill', HOUR],
+]);
+export const ttlOf = (uri: string): number => TTL.get(split(uri).head) ?? 0;
+
+const resource = (path: string, description: string): Resource => ({
+  uri: `braindog:${path}`,
+  name: path,
+  description,
+  ttlMs: ttlOf(`braindog:${path}`),
+});
+
+/** The resources with no parameter. Each is asked before it is listed, like everything else. */
+const FIXED: readonly Resource[] = [
+  resource('whoami', 'Who you are to this record, and which verbs you reach.'),
+  resource('boot', 'What this record holds, and how many rows are in each register.'),
+  resource('context', 'The briefing for where you are: your session, your project, and what applies here.'),
+  resource(
+    'sessions/live',
+    'Who else is working now, on what, and in which repository. Two sessions in one working tree overwrite each other. Coordinate or stop.',
+  ),
+  resource('digest/today', 'What the digest would say if it went now.'),
+  resource('decisions', 'What has been proposed and not yet answered.'),
+];
+
+/** The addresses a client fills in itself. A template is a grammar, so it names nothing a caller cannot see. */
+export const TEMPLATES = [
+  { uriTemplate: 'braindog:schema/{register}', name: 'schema', description: 'The fields of one register.' },
+  { uriTemplate: 'braindog:page/{slug}', name: 'page', description: 'One page, with every block run: rows and figures, never markup.' },
+  { uriTemplate: 'braindog:metric/{id}', name: 'metric', description: 'One figure, with its target and how it compares.' },
+  { uriTemplate: 'braindog:skill/{name}', name: 'skill', description: 'The text of one skill, and when to reach for it.' },
+] as const;
+
+/**
+ * Run one tool, list the resources, read one.
  *
  * The tool layer holds NO logic of its own beyond addressing: every refusal a caller sees comes from
  * the record, with the sentence the record wrote. A second set of checks here would be a second set
  * to keep in step, and the one that drifted would be the one an agent reads.
  */
-export function tools(api: RecordApi) {
-  const run: Record<string, (args: Record<string, unknown>, ctx: CallContext) => Promise<Result<unknown>>> = {
+export function tools<C>(surface: McpSurface<C>) {
+  const run: Record<string, (args: Args, ctx: C) => Answer> = {
     record_index: async (_args, ctx) => {
-      const boot = await api.boot(ctx);
+      const boot = await surface.boot(ctx);
       if (!boot.ok) return boot;
-      const version = await api.version(ctx);
-      /* `.version.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT and not a bare number. It
-         returned one, and this line spread the whole object under the key an agent reads as "what
-         changed since": an agent holding `{ version: { version: 41, ... } }` as its cursor would
-         send the object back and get a range scan from nothing. */
+      const version = await surface.version(ctx);
+      /* `.version.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT and not a bare number. An
+         agent holding the object as its cursor would send it back and get a range scan from nothing. */
       return { ok: true, value: { ...boot.value, version: version.ok ? version.value.version : null } };
     },
 
-    schema: (args, ctx) => api.schema({ register: String(args.register) }, ctx),
+    context: async (_args, ctx) =>
+      surface.context ? surface.context({}, ctx) : unbuilt('context', 'Call record_index for the registers, then list what is open.'),
 
+    schema: (args, ctx) => surface.schema({ register: String(args.register) }, ctx),
+
+    /**
+     * A PREFIXED ID IS FOUND THROUGH THE DECLARATIONS. `S42` is the register whose `seq_prefix` is
+     * `S`, and only the record's declarations say which that is, so the registers this caller may
+     * read are asked in turn. One read each, and only for this form of address; the qualified form
+     * is one call. A register the caller cannot read is never asked, so the answer names nothing
+     * they could not already see.
+     */
     get: async (args, ctx) => {
       const at = parse(args.spoken);
-      return at ? api.get(at, ctx) : badSpoken();
+      if (at) return surface.get(at, ctx);
+      const m = typeof args.spoken === 'string' ? PREFIXED.exec(args.spoken.trim()) : null;
+      if (!m) return badSpoken(ROW_OR_ID);
+      const boot = await surface.boot(ctx);
+      if (!boot.ok) return boot;
+      for (const register of boot.value.registers) {
+        const decl = await surface.schema({ register: register.id }, ctx);
+        if (decl.ok && (decl.value as { seq_prefix?: unknown }).seq_prefix === m[1])
+          return surface.get({ register: register.id, seq: Number(m[2]) }, ctx);
+      }
+      return {
+        ok: false,
+        refusal: {
+          code: 'REGISTER_UNKNOWN',
+          fix: `No register you can read numbers its rows ${m[1]}. A suggestion (SG) or a decision (D) is read with governance.`,
+          at: 'spoken',
+        },
+      };
     },
 
     list: (args, ctx) =>
-      api.list(
+      surface.list(
         {
           register: String(args.register),
-          ...(args.where === undefined ? {} : { where: args.where as never }),
+          ...(args.where === undefined ? {} : { where: args.where }),
           ...(args.limit === undefined ? {} : { limit: Number(args.limit) }),
           ...(args.cursor === undefined ? {} : { cursor: String(args.cursor) }),
         },
@@ -284,52 +416,27 @@ export function tools(api: RecordApi) {
       ),
 
     search: (args, ctx) =>
-      api.search({ q: String(args.q ?? ''), ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx),
+      surface.search({ q: String(args.q ?? ''), ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx),
 
     history: async (args, ctx) => {
       const at = parse(args.spoken);
-      return at ? api.history(at, ctx) : badSpoken();
+      return at ? surface.history(at, ctx) : badSpoken(ROW);
     },
 
-    pages: (_args, ctx) => api.pages(ctx),
-    page: (args, ctx) => api.page({ slug: String(args.slug ?? '') }, ctx),
-    metric: (args, ctx) => api.metric({ metric: String(args.metric ?? '') }, ctx),
+    governance: (args, ctx) => surface.governance(args as never, ctx),
 
     /**
-     * WHAT A KEY OPENS, NEVER THE KEY.
-     *
-     * There is no tool that reads a credential and there is not going to be one: the vault needs a
-     * person in a browser, and an agent holding a token is neither. What an agent CAN have is the
-     * index — "the Stripe live key reaches stripe.com, was last opened in June, is due for rotation
-     * in eleven days" — which is what makes "check nothing is about to expire" a thing it can do
-     * without anything being readable that should not be.
+     * AND THERE IS NO `decide` TOOL, deliberately. `decide` is a rung no token reaches (ADR-060), so
+     * a tool for it could only ever refuse, and a tool that always refuses is a tool an agent spends
+     * its turns discovering.
      */
-    credentials: (_args, ctx) => api.listGrants(ctx),
-
-    /**
-     * PREVIEW BEFORE PROPOSE. An agent writing a rule is exactly the caller who most needs to see
-     * what it would do first — it cannot look at the screen afterwards, and a rule that quietly
-     * tagged four hundred rows is a rule nobody can undo by hand.
-     */
-    dry_run: (args, ctx) => api.dryRun({ rule: (args.rule ?? {}) as never }, ctx),
-
-    governance: (args, ctx) => api.governance(args as never, ctx),
-
-    /**
-     * AND THERE IS NO `decide` TOOL, deliberately.
-     *
-     * `decide` is a rung no token reaches (ADR-060), so a tool for it could only ever return a
-     * refusal — and a tool that always refuses is a tool an agent spends its turns discovering. An
-     * agent may put a question in front of a person. It may not answer its own question, and that is
-     * not a scope anybody can be issued.
-     */
-    propose: (args, ctx) => api.propose(args as never, ctx),
+    propose: (args, ctx) => surface.propose(args as never, ctx),
 
     create: (args, ctx) =>
-      api.create(
+      surface.create(
         {
           register: String(args.register),
-          fields: (args.fields ?? {}) as Record<string, unknown>,
+          fields: (args.fields ?? {}) as Args,
           ...(args.note === undefined ? {} : { note: String(args.note) }),
         },
         ctx,
@@ -337,11 +444,11 @@ export function tools(api: RecordApi) {
 
     update: async (args, ctx) => {
       const at = parse(args.spoken);
-      if (!at) return badSpoken();
-      return api.update(
+      if (!at) return badSpoken(ROW);
+      return surface.update(
         {
           ...at,
-          patch: (args.patch ?? {}) as Record<string, unknown>,
+          patch: (args.patch ?? {}) as Args,
           ...(args.version === undefined ? {} : { version: Number(args.version) }),
           ...(args.note === undefined ? {} : { note: String(args.note) }),
         },
@@ -350,196 +457,148 @@ export function tools(api: RecordApi) {
     },
 
     /**
-     * A note changes nothing about the row and is still a write, because it is a thing somebody
-     * said and the record keeps what was said. It goes through `update` with an empty patch, so it
-     * answers to the same permission and lands in the same history.
+     * A note changes nothing about the row and is still a write, because the record keeps what was
+     * said. It goes through `update` with an empty patch, so it answers to the same permission and
+     * lands in the same history.
      */
     log: async (args, ctx) => {
       const at = parse(args.spoken);
-      if (!at) return badSpoken();
+      if (!at) return badSpoken(ROW);
       const note = String(args.note ?? '').trim();
       if (!note)
         return { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'A note is one sentence, and this one is empty.', at: 'note' } };
-      return api.update({ ...at, patch: {}, note }, ctx);
+      return surface.update({ ...at, patch: {}, note }, ctx);
     },
+
+    /* The arguments go through whole: which fields a session may set, and how `tried` appends, are
+       the record's rules, and it names the field when one is wrong. */
+    handoff: async (args, ctx) =>
+      surface.handoff ? surface.handoff(args, ctx) : unbuilt('handoff', 'Log the next step on the task you are working on instead.'),
+
+    meet: async (args, ctx) =>
+      surface.meet ? surface.meet(args, ctx) : unbuilt('meet', 'If there is a people register, add the person there with create.'),
+  };
+
+  /**
+   * Read one resource.
+   *
+   * THE URI IS PARSED AND NEVER PASSED THROUGH, and each segment is checked against a grammar
+   * before it becomes an argument.
+   */
+  const read = async (uri: string, ctx: C): Promise<Result<unknown>> => {
+    const { head, rest } = split(uri);
+
+    if (head === 'whoami' && !rest) return surface.whoami(ctx);
+    if (head === 'boot' && !rest) return surface.boot(ctx);
+    if (head === 'context' && !rest)
+      return surface.context ? surface.context({}, ctx) : unbuilt('context', 'Read braindog:boot instead.');
+    if (head === 'sessions' && rest === 'live')
+      return surface.sessionsLive ? surface.sessionsLive({}, ctx) : unbuilt('sessions/live', 'Nothing else lists live sessions yet.');
+    if (head === 'decisions' && !rest) return surface.governance({ register: 'suggestion' } as never, ctx);
+    if (head === 'digest' && rest === 'today') return surface.digestToday({}, ctx);
+    const named = NAMED.test(rest);
+    if (head === 'schema' && named) return surface.schema({ register: rest }, ctx);
+    if (head === 'page' && named) return surface.page({ slug: rest }, ctx);
+    if (head === 'metric' && named) return surface.metric({ metric: rest }, ctx);
+    if (head === 'skill' && SKILL.test(rest)) {
+      /* `list` BY NAME, BECAUSE A SKILL IS A ROW. The register's own read check is the permission,
+         and a register this record does not have answers `REGISTER_UNKNOWN` in the record's words. */
+      const found = await surface.list({ register: 'skills', where: { field: 'name', is: rest }, limit: 1 }, ctx);
+      if (!found.ok) return found;
+      const row = found.value.rows[0];
+      return row ? { ok: true, value: row } : nowhere(uri);
+    }
+    return nowhere(uri);
   };
 
   /**
    * What this caller can read, at this moment.
    *
-   * THE REGISTER SCHEMAS ARE THE ONLY VARIABLE PART, and they are scoped: a caller sees the
-   * registers they may touch and not the ones they may not, because a list of names is itself
-   * information. Everything else is fixed, which is what makes the list cacheable at all.
+   * EVERY ADDRESS IS ASKED BEFORE IT IS ADVERTISED. A listing that names what the caller may not read
+   * tells them it exists, and one that names what then refuses sends an agent to a certain refusal.
+   * So the list is never ahead of the record: each fixed resource and each figure is read first, a
+   * page is withheld when every block on it was withheld, and a register comes from `boot`, which
+   * lists only what the caller may read.
    */
-  const resources = async (ctx: CallContext): Promise<Result<Resource[]>> => {
-    const boot = await api.boot(ctx);
-    if (!boot.ok) return boot;
+  const resources = async (ctx: C): Promise<Resource[]> => {
+    const out: Resource[] = [];
+    const offer = async (r: Resource) => {
+      if ((await read(r.uri, ctx)).ok) out.push(r);
+    };
 
-    const out: Resource[] = [
-      { uri: 'braindog:whoami', name: 'whoami', description: 'Who you are to this record, and which verbs you reach.', ttlMs: 0 },
-      { uri: 'braindog:boot', name: 'boot', description: 'What this record holds, and how many rows are in each register.', ttlMs: MINUTE },
-      { uri: 'braindog:digest/today', name: 'digest/today', description: 'What the digest would say if it went now.', ttlMs: MINUTE },
-      { uri: 'braindog:decisions', name: 'decisions', description: 'What has been proposed and not yet answered.', ttlMs: MINUTE },
-    ];
+    for (const r of FIXED) await offer(r);
 
-    for (const register of boot.value.registers)
-      out.push({
-        uri: `braindog:schema/${register.id}`,
-        name: `schema/${register.id}`,
-        description: `What ${register.name} holds: its fields, their types, and what each may take.`,
-        ttlMs: HOUR,
-      });
+    const boot = await surface.boot(ctx);
+    const registers = boot.ok ? boot.value.registers : [];
+    for (const register of registers)
+      if (NAMED.test(register.id))
+        out.push(resource(`schema/${register.id}`, `What ${register.name} holds: its fields, their types, and what each may take.`));
 
-    /* AND A PAGE IS HELD TO THE CEILING TOO. Its rows are withheld either way, but a slug and a
-       title are information: `The Payroll Page` in a listing tells a caller what a register they
-       cannot read is called. */
+    /* A PAGE IS HELD TO THE LEVEL TOO. Its rows are withheld either way, but a slug and a title are
+       information: "Payroll, monthly" in a listing tells a caller what a register they cannot read
+       is called. */
     const seen: string[] = [];
-    const pages = await api.pages(ctx);
+    const pages = await surface.pages(ctx);
     if (pages.ok)
       for (const page of pages.value) {
-        const drawn = await api.page({ slug: page.slug }, ctx);
+        if (!NAMED.test(page.slug)) continue;
+        const drawn = await surface.page({ slug: page.slug }, ctx);
         if (!drawn.ok) continue;
         const blocks =
           (drawn.value as { blocks?: { refusals?: { code: string }[]; readings?: { metric: string }[] }[] }).blocks ?? [];
-        /**
-         * AND THE TEST WAS `FORBIDDEN` ALONE, WHICH IS HALF OF WHAT A SCOPE CHECK SAYS.
-         *
-         * The comment above is the right rule and this line applied it to one of the two callers it
-         * covers. A bookkeeper whose ceiling excludes the payroll register got `FORBIDDEN` on the
-         * block and no resource, which is correct. A contractor invited to FILE into that register
-         * and nothing else got `LEVEL_REQUIRED` on the same block, from the same check, about the
-         * same fact, and was handed `braindog:page/coffee` with the words "Payroll, monthly" sitting
-         * in its description. Neither of them may read a row of it. One of them was told what it is
-         * called.
-         *
-         * THE RECORD IS THE AUTHORITY AND THIS READS ITS ANSWER. Which registers a block draws from,
-         * and whether a `stat` block's figures count as drawing from one, are the record's question
-         * and are being answered in the record; this layer only asks whether every block on the page
-         * came back withheld, so it keeps saying the right thing as that answer improves underneath.
-         */
         if (blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => WITHHELD.has(r.code)))) continue;
-        /* THE FIGURES A PAGE NAMES, taken from what it actually drew rather than from a second read
-           of the declaration — so a metric an agent is offered is one this page really carries. */
+        /* The figures a page names, taken from what it drew rather than a second read of its
+           declaration, so a figure offered is one this page really carries. */
         for (const block of blocks) for (const reading of block.readings ?? []) seen.push(reading.metric);
-        out.push({
-          uri: `braindog:page/${page.slug}`,
-          name: `page/${page.slug}`,
-          description: `${page.title}, with every block run: rows and figures, never markup.`,
-          ttlMs: MINUTE,
-        });
+        out.push(resource(`page/${page.slug}`, `${page.title}, with every block run: rows and figures, never markup.`));
       }
 
-    /* AND THE FIGURES A PAGE DRAWS. The file's own header says `page` and `metric` are the two
-       resources that close ADR-018's hole, and only one of them was listed — so an agent could read
-       what a page says and not the figure it names. */
     /**
-     * AND EVERY ADDRESS IS ASKED BEFORE IT IS ADVERTISED, WHICH IT WAS NOT.
-     *
-     * The ids come off the readings a page carried, and a reading survives its own refusal: the
-     * kernel spreads the cell it could not fill, so the id of a figure the record will not admit
-     * exists arrived here with the rest and went straight into the list. The listing then said
-     * `braindog:metric/owed` and reading that address said `METRIC_UNKNOWN`. That second answer is
-     * the one the record goes to real trouble to give, and its reason is written out where it is
-     * given: a figure over a register you cannot reach is a figure that does not exist, said in
-     * those words, because answering `FORBIDDEN` for the names that are real and `METRIC_UNKNOWN`
-     * for the names that are not is one probe per guess at what this business measures. Handing the
-     * same names back in a listing is that oracle rebuilt one line further out, and the two answers
-     * also simply disagreed, so an agent walking the list called something certain to refuse.
-     *
-     * IT ASKS `read` AND NOT THE METHOD UNDER IT, because what is being published is an ADDRESS. A
-     * parameterised id carries a colon, the uri grammar below does not admit one, and those were
-     * advertised too: an address in this list that this surface will not answer is the same broken
-     * promise whether the reason is authorisation or punctuation. The figure is computed a second
-     * time for a page that already drew it, and that is the price of the list never being ahead of
-     * the record.
+     * AND A FIGURE IS READ BEFORE IT IS OFFERED, because a reading survives its own refusal. The
+     * kernel keeps the id on a cell it could not fill, so a figure the record says does not exist
+     * arrives here with the rest. The record answers `METRIC_UNKNOWN` for a figure over a register
+     * the caller cannot reach, so that a name leaks nothing; advertising the id would hand the name
+     * back one layer further out.
      */
-    for (const id of [...new Set(seen)]) {
-      const uri = `braindog:metric/${id}`;
-      if (!(await read(uri, ctx)).ok) continue;
-      out.push({
-        uri,
-        name: `metric/${id}`,
-        description: `The figure ${id}, with its target and how it compares.`,
-        ttlMs: MINUTE,
-      });
+    for (const id of new Set(seen)) await offer(resource(`metric/${id}`, `The figure ${id}, with its target and how it compares.`));
+
+    /* A SKILL BY NAME, when this caller can read the skills register at all. When to use it is the
+       headline, so it is the description. */
+    if (registers.some((r) => r.id === 'skills')) {
+      const skills = await surface.list({ register: 'skills', limit: 200 }, ctx);
+      const named = new Set<string>();
+      if (skills.ok)
+        for (const row of skills.value.rows) {
+          const name = row.fields.name;
+          if (row.state === 'retired' || typeof name !== 'string' || !SKILL.test(name) || named.has(name)) continue;
+          named.add(name);
+          const trigger = row.fields.trigger;
+          out.push(resource(`skill/${name}`, typeof trigger === 'string' ? `When to use it: ${trigger}` : `The text of the skill ${name}.`));
+        }
     }
 
-    return { ok: true, value: out };
-  };
-
-  /**
-   * Read one.
-   *
-   * THE URI IS PARSED AND NEVER PASSED THROUGH. `braindog:schema/../../x` is a path a stranger can
-   * write, and the segment after the first slash is an argument to a method rather than a path on a
-   * disk — so it is split, not resolved.
-   */
-  const read = async (uri: string, ctx: CallContext): Promise<Result<unknown>> => {
-    const path = uri.startsWith('braindog:') ? uri.slice('braindog:'.length) : '';
-    const cut = path.indexOf('/');
-    const head = cut < 0 ? path : path.slice(0, cut);
-    const rest = cut < 0 ? '' : path.slice(cut + 1);
-
-    if (head === 'whoami' && !rest) return api.whoami(ctx);
-    if (head === 'boot' && !rest) return api.boot(ctx);
-    if (head === 'decisions' && !rest) return api.governance({ register: 'suggestion' } as never, ctx);
-    if (head === 'digest' && rest === 'today') return api.digestToday({} as never, ctx);
-    /* AND THE ARGUMENT IS CHECKED AGAINST A GRAMMAR before it is one. `schema/../../x` reaching the
-       method would be refused there too, but by a sentence about a register nobody has — which
-       reads like a fact about the record rather than about the address that was asked for. */
-    const named = /^[a-z][a-z0-9_-]{0,63}$/.test(rest);
-    if (head === 'schema' && named) return api.schema({ register: rest }, ctx);
-    if (head === 'page' && named) return api.page({ slug: rest }, ctx);
-    /* `metric`, NOT `id`. The tool path got the name right and the resource did not, and the cast
-       hid it — so every metric resource answered `REQUIRED_MISSING` about an argument it was sent. */
-    if (head === 'metric' && named) return api.metric({ metric: rest } as never, ctx);
-
-    return {
-      ok: false,
-      refusal: {
-        code: 'ROUTE_UNKNOWN',
-        fix: `There is nothing at ${uri}. Read braindog:boot for what this record holds.`,
-        at: 'uri',
-      },
-    };
+    return out;
   };
 
   return {
     list: () => TOOLS,
     resources,
     read,
-    async call(name: string, args: Record<string, unknown>, ctx: CallContext): Promise<Result<unknown>> {
+    async call(name: string, args: Args, ctx: C): Promise<Result<unknown>> {
       /**
        * `Object.hasOwn`, BECAUSE THE NAME COMES FROM THE CALLER.
        *
-       * `run` is a plain object literal, so `run['constructor']` is `Object`, `run['toString']` is
-       * `Object.prototype.toString`, and every name on `Object.prototype` was truthy and got CALLED
-       * rather than refused. `call('constructor', args, ctx)` handed the caller their arguments back
-       * as the answer. `call('toString', …)` answered the string `[object Undefined]`. Six more,
-       * `valueOf` and `hasOwnProperty` and `isPrototypeOf` and `propertyIsEnumerable` and
-       * `toLocaleString` and `__proto__`, threw a `TypeError` out of a function whose type says it
-       * returns a `Result` and whose file header says every tool answers in the record's own shape.
-       * A refusal is a value here and an exception is not, and a caller reading `.ok` off the first
-       * two got `undefined` and then read `.refusal.fix` off nothing.
-       *
-       * THE SIBLING SURFACES WERE ALREADY SAFE AND THIS WAS THE ONE LOOKUP THAT WAS NOT. The host
-       * finds a route in a `Map`, the client checks a `Set`, and `read` above is a chain of `if`s.
-       * The record made this same repair one layer in, in the same word and for the same sentence:
-       * `ctx.levels['constructor']` is `Object`, not `undefined`.
-       *
-       * AND IT IS NOT REACHABLE OVER THE WIRE TODAY, because `/mcp` is not mounted. The input is a
-       * tool name a client chooses, so it becomes live the day somebody wires the route, which is
-       * the wrong day to find out.
+       * `run` is a plain object literal, so `run['constructor']` is `Object` and every name on
+       * `Object.prototype` was truthy and got called rather than refused: `constructor` handed the
+       * caller its arguments back, `toString` answered `[object Undefined]`, and the rest threw out
+       * of a function whose type says it returns a `Result`. Now that `rpc.ts` carries names from the
+       * wire, this is the lookup a stranger reaches first.
        */
       const tool = Object.hasOwn(run, name) ? run[name] : undefined;
       if (!tool)
         return {
           ok: false,
-          refusal: {
-            code: 'ROUTE_UNKNOWN',
-            fix: `There is no tool called ${name}.`,
-            allowed: TOOLS.map((t) => t.name),
-          },
+          refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no tool called ${name}.`, allowed: TOOLS.map((t) => t.name) },
         };
       return tool(args, ctx);
     },

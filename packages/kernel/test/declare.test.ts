@@ -78,7 +78,11 @@ test('THE SAME BYTES ARE NOT A NEW VERSION, whatever order the keys arrive in', 
   };
   const again = value<{ version: number; changed: boolean }[]>(await k.install([reordered]));
   assert.deepEqual(again, [{ id: 'register.obligations', version: 1, changed: false }]);
-  assert.equal(sql.all('SELECT version FROM declaration').length, 1, 'a second row was written for identical bytes');
+  assert.equal(
+    sql.all("SELECT version FROM declaration WHERE id = 'register.obligations'").length,
+    1,
+    'a second row was written for identical bytes',
+  );
   sql.close();
 });
 
@@ -114,7 +118,7 @@ test('a retired declaration keeps its row and stops being active', async () => {
   value(await k.install([OBLIGATIONS]));
   assert.equal(value<number>(k.retire(['register.obligations'])), 1);
   assert.equal(k.register('obligations'), undefined, 'a retired register is still active');
-  assert.equal(sql.all('SELECT 1 FROM declaration').length, 1, 'retiring deleted the row');
+  assert.equal(sql.all("SELECT 1 FROM declaration WHERE id = 'register.obligations'").length, 1, 'retiring deleted the row');
   assert.equal(refusal(k.create('obligations', { what: 'a' }, { actor: 'p_1' })).code, 'REGISTER_UNKNOWN');
   sql.close();
 });
@@ -214,7 +218,8 @@ test('a batch is all or nothing, so a page never names a register that failed to
   const { k, sql } = await record();
   const broken: Declaration = { id: 'register.bad', kind: 'register', body: { id: 'bad', title: 'x', fields: [] } as never };
   assert.equal(refusal(await k.install([OBLIGATIONS, broken])).code, 'DECLARATION_INVALID');
-  assert.equal(sql.all('SELECT 1 FROM declaration').length, 0, 'half the batch was installed');
+  /* Every record holds the kernel's own `register.session`, so only the batch's rows are counted. */
+  assert.equal(sql.all("SELECT 1 FROM declaration WHERE pack_id IS NOT 'kernel'").length, 0, 'half the batch was installed');
   sql.close();
 });
 
@@ -453,8 +458,10 @@ test('A FIELD TYPE THAT IS NOT ONE IS REFUSED, and the refusal guesses', () => {
 
   /* The sixteen still install. This is the assertion that would catch a check that refuses
      everything — a gate that is red for every input is as useless as one that is never red. */
-  for (const type of ['text', 'document', 'int', 'duration', 'decimal', 'money', 'quantity', 'day', 'instant', 'bool', 'ref', 'file', 'url', 'email', 'secret', 'json'])
+  for (const type of ['text', 'document', 'int', 'duration', 'decimal', 'money', 'quantity', 'day', 'instant', 'bool', 'ref', 'file', 'url', 'email', 'json'])
     assert.equal(refusedWith(withFields([{ id: 'what', type }], NO_STATE)), null, `${type} is a type and was refused`);
+  /* A secret installs beside a title and is never one: where a key is sealed names no row. */
+  assert.equal(refusedWith(withFields([{ id: 'what', type: 'text' }, { id: 'key', type: 'secret' }], NO_STATE)), null);
   assert.equal(refusedWith(withFields([{ id: 'what', type: 'enum', values: ['a'] }], NO_STATE)), null);
   assert.equal(refusedWith(withFields([{ id: 'what', type: 'list', of: 'text' }], NO_STATE)), null);
 });
@@ -863,7 +870,7 @@ test('A PAGE WAS CHECKED BY NOTHING, and it is the declaration with the most way
   assert.match(validateDeclaration(page({ blocks: many(25) }))?.fix ?? '', /25 blocks/);
 });
 
-test('A BLOCK KIND IS ONE OF THE SIXTEEN, and the closure is what the security argument is made of', () => {
+test('A BLOCK KIND IS ONE OF THE EIGHTEEN, and the closure is what the security argument is made of', () => {
   /**
    * `04 §1`: *"the closure is load-bearing rather than tidy — the security argument in §7 is an
    * ENUMERATION, and an enumeration only works over a finite list."*
@@ -878,14 +885,53 @@ test('A BLOCK KIND IS ONE OF THE SIXTEEN, and the closure is what the security a
   assert.equal(said?.at, 'blocks[0]', 'a refusal names the block that was wrong (04 §5)');
   assert.ok(said?.allowed?.includes('note'), 'the refusal offers no alternative');
 
-  /* THE SIXTEEN STILL INSTALL. A gate red for every input is as useless as one never red. */
-  for (const kind of ['note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params', 'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table'])
-    assert.equal(refusedWith(block({ kind })), null, `${kind} is one of the sixteen and was refused`);
+  /* THE EIGHTEEN STILL INSTALL. A gate red for every input is as useless as one never red. */
+  for (const kind of ['note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params', 'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section'])
+    assert.equal(refusedWith(block({ kind })), null, `${kind} is one of the eighteen and was refused`);
 
   /* AND A SEVENTEENTH ARRIVES AS A DECLARATION, which is the whole reason the primitive layer
      exists (05 §2) — admitted by prefix, and checked as a document of its own. */
   assert.equal(refusedWith(block({ kind: 'block.invoice_card' })), null);
   assert.equal(refusedWith(block({ kind: 'block.Invoice Card' })), 'KIND_UNKNOWN');
+});
+
+test('A SECTION AND A CARDS BLOCK INSTALL, and a column is one role on a card', async () => {
+  /* `06 §1.1`: `as` is a column's role on a `cards` block, one of each role and at most three facts,
+     which is `packages/render/src/cards.ts`'s `cardFault`. Refused here so the page is never drawn
+     with a degraded block its author was not told about. */
+  const cards = (columns: unknown[], also: Record<string, unknown> = {}) =>
+    page({
+      blocks: [
+        { kind: 'section', heading: 'Open', icon: 'receipt', fold: true, ...also },
+        { kind: 'cards', source: 'register.obligations', columns, empty: 'Nothing outstanding.' },
+      ],
+    });
+  const sound = cards([
+    { field: 'what', as: 'title' },
+    { field: 'amount', as: 'figure' },
+    { field: 'due', as: 'fact' },
+    { field: 'state', as: 'fact' },
+    { field: 'to', as: 'fact' },
+  ]);
+  const { k, sql } = await record();
+  value(await k.install([OBLIGATIONS, sound]));
+  sql.close();
+
+  const role = validateDeclaration(cards([{ field: 'what', as: 'headline' }]));
+  assert.equal(`${role?.code} at ${role?.at}`, 'ENUM_VALUE_UNKNOWN at blocks[1]');
+  assert.ok(role?.allowed?.includes('figure'));
+  const two = validateDeclaration(cards([{ field: 'amount', as: 'figure' }, { field: 'due', as: 'figure' }]));
+  assert.equal(`${two?.code} at ${two?.at}`, 'OUT_OF_BOUNDS at blocks[1]');
+  const facts = validateDeclaration(cards(['what', 'amount', 'due', 'state'].map((field) => ({ field, as: 'fact' }))));
+  assert.equal(`${facts?.code} at ${facts?.at}`, 'OUT_OF_BOUNDS at blocks[1]');
+  assert.match(facts?.fix ?? '', /at most 3 facts/);
+
+  /* `as` on a table would install and draw nothing different, so only a cards block takes it. */
+  const table = validateDeclaration(page({ blocks: [{ kind: 'table', source: 'register.obligations', columns: [{ field: 'what', as: 'title' }], empty: 'x' }] }));
+  assert.equal(`${table?.code} at ${table?.at}`, 'DECLARATION_INVALID at blocks[0]');
+
+  assert.equal(refusedWith(cards([{ field: 'what' }], { fold: 'yes' })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(cards([{ field: 'what' }], { icon: 'A Receipt' })), 'DECLARATION_INVALID');
 });
 
 test('AND THE DECLARATION THAT SEVENTEENTH ARRIVES AS WAS CHECKED BY NOTHING WHATEVER', () => {
@@ -1037,7 +1083,11 @@ test('AND A BATCH IS ALL OR NOTHING ABOUT A DEPENDENCY TOO', async () => {
   const { k, sql } = await record();
   const lone = refusal(await k.install([page({ requires: ['register.clients'], blocks: [{ kind: 'note' }] })]));
   assert.equal(lone.code, 'DEPENDENCY_UNRESOLVED');
-  assert.equal(sql.all('SELECT 1 FROM declaration').length, 0, 'a page whose register is nowhere was installed');
+  assert.equal(
+    sql.all("SELECT 1 FROM declaration WHERE pack_id IS NOT 'kernel'").length,
+    0,
+    'a page whose register is nowhere was installed',
+  );
 
   /* AND THE REGISTER ARRIVING BESIDE IT RESOLVES, which is what a pack is. */
   value(await k.install([OBLIGATIONS, page({ blocks: [{ kind: 'note' }] })]));
@@ -1650,13 +1700,15 @@ test('`02 §6.1`’s OWN LEDGER IS REFUSED AT INSTALL, rather than installed wit
   assert.equal(refusal(k.create('postings', { narrative: 'Opening', state: 'draft' }, { actor: 'p_1' })).code, 'REGISTER_UNKNOWN');
 
   /* THE SECOND HALF OF THE SAME DECLARATION, once the lock is off: `draft -> posted` carries
-     `requires: [date, narrative]`, and `index.ts` destructures `{ to: string[] }` and reads nothing
-     else. Reproduced before the check existed as `draft -> posted with date empty -> ACCEPTED`. */
+     `requires: [date, narrative]`, which the write path now keeps. Reproduced before it did as
+     `draft -> posted with date empty -> ACCEPTED`. */
   const { immutable_when: _lock, ...rest } = POSTINGS.body as Record<string, unknown>;
-  const half = refusal(await k.install([{ ...POSTINGS, body: rest as never }]));
-  assert.equal(half.code, 'NOT_IN_THIS_BUILD');
-  assert.equal(half.at, 'state.transitions.draft');
-  assert.match(half.fix, /requires/);
+  value(await k.install([{ ...POSTINGS, body: rest as never }]));
+  const draft = value<{ id: string }>(k.create('postings', { narrative: 'Opening', state: 'draft' }, { actor: 'p_1' }));
+  const half = refusal(k.update('postings', draft.id, { state: 'posted' }, { actor: 'p_1' }));
+  assert.equal(half.code, 'REQUIRED_MISSING');
+  assert.equal(half.at, 'date');
+  value(k.update('postings', draft.id, { state: 'posted', date: '2026-09-05' }, { actor: 'p_1' }));
 
   sql.close();
 });
@@ -1664,10 +1716,8 @@ test('`02 §6.1`’s OWN LEDGER IS REFUSED AT INSTALL, rather than installed wit
 test('AND EVERY OTHER PUBLISHED REGISTER KEY THIS BUILD READS NOWHERE IS NAMED, one at a time', () => {
   /* Each of these was reproduced as ACCEPTED against `validate` before the closed list existed, and
      each is a rule rather than a decoration: an upsert key that duplicates yesterday, a delete
-     guard that deletes, a self-join nothing runs, a predicate name no `where:` can reach, and a
-     spoken prefix every id ignores. */
+     guard that deletes, a self-join nothing runs, and a predicate name no `where:` can reach. */
   const cases: [string, Record<string, unknown>][] = [
-    ['seq_prefix', { seq_prefix: 'OB' }],
     ['key', { series: true, key: ['what'] }],
     ['delete', { delete: 'refuse_while_referenced' }],
     ['pairs', { pairs: { on: ['what'], opposite: 'what', across: 'what', within: '4d', mark: 'moved' } }],
@@ -1681,15 +1731,13 @@ test('AND EVERY OTHER PUBLISHED REGISTER KEY THIS BUILD READS NOWHERE IS NAMED, 
     assert.ok(said?.allowed?.includes('fields'), `${key}'s refusal does not say what a register body takes`);
   }
 
-  /* AND THE FIELD'S OWN SIX. `derive:` is the one `02 §5` calls the important option of the four,
+  /* AND THE FIELD'S OWN THREE. `derive:` is the one `02 §5` calls the important option of the four,
      and with nothing reading it a field declaring a derivation is an ordinary writable field
      holding whatever a caller sent, so `unique: true` + `derive: { normalise }`, which `32 §4.4`
-     uses as the duplicate-detection fixture, dedupes on the raw text or on nothing. */
+     uses as the duplicate-detection fixture, dedupes on the raw text or on nothing. `min`, `max`
+     and `required_when` left this list when the write path began keeping them. */
   const onAField: [string, Record<string, unknown>][] = [
     ['derive', { derive: { normalise: 'what' } }],
-    ['required_when', { required_when: { field: 'what', present: true } }],
-    ['min', { min: 1 }],
-    ['max', { max: 4 }],
     ['note', { note: 'a comment for the next reader' }],
     ['register', { register: 'people' }],
   ];
@@ -1701,16 +1749,60 @@ test('AND EVERY OTHER PUBLISHED REGISTER KEY THIS BUILD READS NOWHERE IS NAMED, 
   }
 });
 
-test('AND `by:` IS THE ONE DOOR INTO THE LEVEL LADDER A DECLARATION CAN OPEN', () => {
+/** A register whose only interesting key is its spoken prefix. */
+const prefixed = (seq_prefix: unknown, id = 'leads'): Declaration => ({
+  id: `register.${id}`,
+  kind: 'register',
+  body: { id, name: 'Leads', title: 'what', seq_prefix, fields: [{ id: 'what', type: 'text' }] } as never,
+});
+
+test('A SPOKEN PREFIX NAMES ONE REGISTER, so one the kernel already speaks is refused', () => {
+  /* Governance numbers its decisions D41 and its suggestions SG23, and the session register's rows
+     are S42. A register speaking any of them would make an id name two things. */
+  for (const [taken, who] of [['D', 'decisions'], ['SG', 'suggestions'], ['S', 'register.session']] as const) {
+    const said = validateDeclaration(prefixed(taken));
+    assert.equal(said?.code, 'SEQ_PREFIX_TAKEN', `${taken} was accepted`);
+    assert.equal(said?.at, 'seq_prefix');
+    assert.ok((said?.fix ?? '').includes(`is taken by ${who}`), said?.fix);
+  }
+
+  /* AND ONE THAT READS AS A KERNEL PREFIX AND A NUMBER, because `S12` would then be row 12 of the
+     session register and row 2 of this one. */
+  const s1 = validateDeclaration(prefixed('S1'));
+  assert.equal(s1?.code, 'SEQ_PREFIX_TAKEN');
+  assert.match(s1?.fix ?? '', /S11 could mean either/);
+
+  /* A shared letter is not a shared id: `SX4` is never `S` and a number, and `#` is everyone's. */
+  for (const fine of ['#', 'LN', 'SX', 'DX', 'P2', 'ABCD']) assert.equal(validateDeclaration(prefixed(fine)), null, `${fine} was refused`);
+  for (const wrong of ['ln', 'L-N', 'LEADS', '7L', '', 7])
+    assert.equal(validateDeclaration(prefixed(wrong))?.code, 'DECLARATION_INVALID', `${String(wrong)} was accepted`);
+});
+
+test('AND ONE ANOTHER REGISTER SPEAKS IS REFUSED AT INSTALL, whether it is in the record or in the same batch', async () => {
+  const { k, sql } = await record();
+  value(await k.install([prefixed('LN', 'learnings')]));
+
+  const taken = refusal(await k.install([prefixed('LN')]));
+  assert.equal(taken.code, 'SEQ_PREFIX_TAKEN');
+  assert.match(taken.fix, /is taken by register\.learnings/);
+  assert.equal(k.register('leads'), undefined, 'a refused register installed anyway');
+
+  assert.equal(refusal(await k.install([prefixed('LN2')])).code, 'SEQ_PREFIX_TAKEN', 'LN21 would name two rows');
+  assert.equal(refusal(await k.install([prefixed('PR'), prefixed('PR', 'prospects')])).code, 'SEQ_PREFIX_TAKEN');
+
+  /* A register is not in its own way: a new version keeps the prefix it had. */
+  const again = prefixed('LN', 'learnings');
+  value(await k.install([{ ...again, body: { ...again.body, one: 'learning' } }]));
+  assert.equal(k.register('learnings')?.seq_prefix, 'LN');
+  sql.close();
+});
+
+test('AND `by: decide` ON A MOVE INSTALLS, because the write path keeps it, and no other word does', () => {
   /**
-   * `02 §5`'s last addition: `proposed: { to: [active], by: decide }`, and the comment on the line
-   * is *"a PERSON at the `decide` level. No token grants it."* Read by nothing. `record.update`
-   * gates on `guard(ctx, 'write', register)`, which a bearer token at scope `write` passes, so an agent
-   * performs the one move the declaration reserved for a person and no event tells them apart.
-   * `HUMAN_ONLY` is in the registry and produced by no product code.
-   *
-   * This is why it is refused rather than ignored: the other unread keys cost an invariant, and
-   * this one costs an authorisation.
+   * `02 §5`'s `proposed: { to: [active], by: decide }`: a move only an accepted proposal makes.
+   * It was refused while nothing read it, because an unread `by:` costs an authorisation rather than
+   * an invariant. The write path keeps it now (`declare-features.test.ts`), so it installs, and a
+   * word the write path does not read is refused rather than kept by nothing.
    */
   const move = (body: Record<string, unknown>) =>
     validateDeclaration(
@@ -1720,14 +1812,12 @@ test('AND `by:` IS THE ONE DOOR INTO THE LEVEL LADDER A DECLARATION CAN OPEN', (
       ),
     );
 
-  const said = move({ to: ['active'], by: 'decide' });
-  assert.equal(said?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(move({ to: ['active'], by: 'decide' }), null);
+  const said = move({ to: ['active'], by: 'owner' });
+  assert.equal(said?.code, 'ENUM_VALUE_UNKNOWN');
   assert.equal(said?.at, 'state.transitions.proposed');
-  assert.match(said?.fix ?? '', /by/);
-
-  /* `to:` ON ITS OWN IS ENFORCED AND INSTALLS, which is what makes this one key of a two-key
-     structure rather than an unbuilt feature. */
-  assert.equal(move({ to: ['active'] }), null, 'the half that IS enforced was refused with the half that is not');
+  assert.deepEqual(said?.allowed, ['decide']);
+  assert.equal(move({ to: ['active'] }), null);
 });
 
 test('A KEY NO DOCUMENT PUBLISHES IS `DECLARATION_INVALID`, because there the repair IS an edit', () => {
