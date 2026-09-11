@@ -18,6 +18,8 @@
 
 import { BAR_HOLE, KINDS, TONE_ALIAS, TONES, isKind, type DegradeCode, type Kind, type Tone } from './kinds.ts';
 import { cardFault } from './cards.ts';
+import { feedFault } from './feed.ts';
+import { diffFault } from './diff.ts';
 
 /**
  * `page` is set by a page's own evaluator and never by a write-up. It admits the page-only kinds
@@ -256,7 +258,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
         fix: written
-          ? `"${written}" is not one of the eighteen kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the twenty kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -309,7 +311,9 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         fix:
           kind === 'section'
             ? `"section" is a heading on a page, so it has no place in a fence. Write a "##" heading. The block is shown as you wrote it.`
-            : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
+            : kind === 'feed'
+              ? `"feed" draws what happened in the record, on a page, so it has no rows in a fence. Use "timeline". The block is shown as you wrote it.`
+              : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
         raw,
         info,
         start,
@@ -340,13 +344,24 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     }
 
     /* A CARD'S COLUMNS ARE ROLES, and one figure and at most three facts is the kind's arity, stated
-       per role rather than per row. Too many is DIALECT_ARITY like any row that is too wide. */
-    const fault = kind === 'cards' ? cardFault(rows[0]?.cells ?? []) : null;
+       per role rather than per row. Too many is DIALECT_ARITY like any row that is too wide. A feed
+       row's first word is its group and a diff row's first character its mark, and a row that has
+       neither would be dropped from the drawing, so it degrades under the same code. */
+    const card = kind === 'cards' ? cardFault(rows[0]?.cells ?? []) : null;
+    const feed = kind === 'feed' ? feedFault(rows.map((r) => r.cells)) : null;
+    const diff = kind === 'diff' ? diffFault(rows.map((r) => r.cells[0] ?? '')) : null;
+    const fault = card
+      ? `A cards block has ${card}. A card takes one figure and at most three facts.`
+      : feed
+        ? `A feed block has ${feed}.`
+        : diff !== null
+          ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
+          : null;
     if (fault) {
       out.push({
         type: 'degraded',
         code: 'DIALECT_ARITY',
-        fix: `A cards block has ${fault}. A card takes one figure and at most three facts. The block is shown as you wrote it.`,
+        fix: `${fault} The block is shown as you wrote it.`,
         raw,
         info,
         start,

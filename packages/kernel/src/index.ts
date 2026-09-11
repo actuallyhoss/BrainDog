@@ -59,6 +59,7 @@ import {
   listGovernance,
   propose as openSuggestion,
   reopen,
+  questionOf,
   type Decided,
   type GovernDeps,
   type GovernRegister,
@@ -1060,13 +1061,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * title, so a project's own skill replaces the one of that name that applies everywhere. A
    * finished project row hides nothing, because it applies nowhere.
    *
-   * THE ONE READ `context` AND A PAGE'S `inherit:` ARE TO BE BUILT ON, so nearer-wins is decided in
-   * one place. `project` is a spoken id or a row id; `null` is a global run, which inherits all.
+   * THE ONE READ `context` AND A PAGE'S `inherit:` ARE BUILT ON, so nearer-wins is decided in one
+   * place. `project` is a spoken id or a row id; `null` is a global run, which inherits all. `open`
+   * leaves out finished rows, before the limit rather than after it, so a register with a long history
+   * still shows what is open.
    */
   function inScope(
     register: string,
     project: string | null,
-    opts: { limit?: number } = {},
+    opts: { limit?: number; open?: boolean } = {},
   ): Result<{ rows: Entry[]; inherited: Entry[] }> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
@@ -1080,13 +1083,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     const limit = Math.min(Math.max(1, Math.floor(Number(opts.limit)) || 50), 200);
     const at = `'$.${f.id}'`;
+    const done = decl.done ?? [];
+    const open = opts.open && done.length ? ` AND coalesce(e.state, '') NOT IN (${done.map(() => '?').join(', ')})` : '';
     const read = (where: string, ...params: string[]): Entry[] =>
       sql
         .all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND ${where}
+          `SELECT ${COLUMNS} FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND ${where}${open}
            ORDER BY e.updated_at DESC, e.id DESC LIMIT ?`,
           register,
           ...params,
+          ...(open ? done : []),
           limit,
         )
         .map(hydrate);
@@ -1096,7 +1102,6 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       : f.type === 'list'
         ? read(`EXISTS (SELECT 1 FROM json_each(e.fields, ${at}) WHERE value = ?)`, home.id)
         : read(`json_extract(e.fields, ${at}) = ?`, home.id);
-    const done = decl.done ?? [];
     const hide = home && f.scope?.same === 'nearer' ? home.id : null;
     const inherited = hide
       ? read(
@@ -1610,25 +1615,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return { actor, own: false };
     }
 
-    /* OPENED UNDER ITS OWN NAME. The number is read before the row takes it, so the `create` event is
-       signed by the run it creates; nothing else allocates in this transaction in between. */
-    const seq = Number(sql.one<{ n: number }>('SELECT next AS n FROM counter WHERE name = ?', `seq:${SESSION}`)?.n ?? 1);
-    const actor = `${prefix}${seq}`;
-    const opened = writing(SESSION, null, opening(w.session ?? {}), {
-      actor,
-      note: 'opened: auto',
-      cascade: false,
-      stamp: {
-        last_seen: now,
-        ...(w.principal?.token === undefined ? {} : { token_id: w.principal.token }),
-        ...(project === null ? {} : { project }),
-      },
-      ...batch,
-    });
-    if (opened.ok) {
-      if (opened.value.seq !== seq) throw new TypeError(`${actor} was opened as ${prefix}${String(opened.value.seq)}`);
-      return { actor, own: false };
-    }
+    const opened = openRun(w, project, now, 'opened: auto');
+    if (opened.ok) return { actor: `${prefix}${String(opened.value.seq)}`, own: false };
     /* A RUN THAT CANNOT BE OPENED IS A DEFECT, NOT A REFUSAL. The write it serves has passed every
        check and still goes in, under the caller's own name, and this observation is how anybody finds
        out that an agent's write went unattributed. */
@@ -1637,6 +1625,80 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         { kind: 'write.refused', subject: `${SESSION}.${opened.refusal.at ?? '-'}:${opened.refusal.code}` },
       ]);
     return { actor: w.actor, own: false };
+  }
+
+  /**
+   * A new run, opened under its own name with `note` saying why. In a transaction only.
+   *
+   * THE NUMBER IS READ BEFORE THE ROW TAKES IT, so the `create` event is signed by the run it creates;
+   * nothing else allocates in this transaction in between.
+   */
+  function openRun(w: WriteContext, project: string | null, now: string, note: string): Result<Entry> {
+    const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+    const seq = Number(sql.one<{ n: number }>('SELECT next AS n FROM counter WHERE name = ?', `seq:${SESSION}`)?.n ?? 1);
+    const opened = writing(SESSION, null, opening(w.session ?? {}), {
+      actor: `${prefix}${seq}`,
+      note,
+      cascade: false,
+      stamp: {
+        last_seen: now,
+        ...(w.principal?.token === undefined ? {} : { token_id: w.principal.token }),
+        ...(project === null ? {} : { project }),
+      },
+      ...(w.batch === undefined ? {} : { batch: w.batch }),
+    });
+    if (opened.ok && opened.value.seq !== seq) throw new TypeError(`${prefix}${seq} was opened as ${prefix}${String(opened.value.seq)}`);
+    return opened;
+  }
+
+  /** Who signs what this context says: a token's run, found or opened with its heartbeat moved, or `actor`. In a transaction only. */
+  function signedBy(w: WriteContext): string {
+    return w.principal?.kind === 'token' ? attribute(w, locateRun(w), null, instant(clock.now())).actor : w.actor;
+  }
+
+  /**
+   * The run a token's call belongs to, for a call that must know it before it writes: `attach` and
+   * `handoff`, which write the run's own row.
+   *
+   * A FOUND RUN IS NOT WRITTEN, not even its heartbeat, because the caller's next write goes through the
+   * ladder, which finds the same run and moves it. A run the ladder would open is opened here, signed by
+   * itself, with `note` saying why. A person is refused, because a person is never a run.
+   */
+  function runFor(w: WriteContext, note = 'opened: auto'): Result<{ run: Entry; spoken: string; opened: boolean }> {
+    const barred = schemaRefusal(state);
+    if (barred) return barred;
+    if (w.principal?.kind !== 'token')
+      return no('FORBIDDEN', 'A run belongs to an agent token, and a person is never one.', { at: 'principal' });
+    const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+    return transaction(() => {
+      const at = locateRun(w);
+      const found = at.found ? byId(at.found.id) : null;
+      if (found) return ok({ run: found, spoken: `${prefix}${String(found.seq)}`, opened: false });
+      const opened = openRun(w, at.project?.spoken ?? null, instant(clock.now()), note);
+      if (!opened.ok) return opened as Result<never>;
+      return ok({ run: opened.value, spoken: `${prefix}${String(opened.value.seq)}`, opened: true });
+    });
+  }
+
+  /** The run these hints name, by the ladder's first four rungs, or `null`. It only reads. */
+  function findRun(hints: SessionHints): Entry | null {
+    const found = findSession(sql, hints, clock.now());
+    return found ? byId(found.id) : null;
+  }
+
+  /**
+   * What a key's row may say about its grant, and never the key: whether a value is sealed, how often
+   * it was opened, and when and by whom last. Who is the latest `grant.read` event, never a column.
+   */
+  function keyState(id: string): { sealed: boolean; opened: number; last_opened: string | null; last_by: string | null } {
+    const grant = getGrant(sql, id);
+    const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND kind = 'grant.read' ORDER BY rowid DESC LIMIT 1", `grant:${id}`);
+    return {
+      sealed: Boolean(grant && grant.revoked_at === null),
+      opened: grant?.opened ?? 0,
+      last_opened: grant?.last_opened ?? null,
+      last_by: by?.actor ?? null,
+    };
   }
 
   function rules(entry: Entry, register: string, w: WriteContext, batch: string): Entry {
@@ -2617,8 +2679,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * spurious `VERSION_STALE` on their next real change, for a call that changed no field. `20 §1`
      * puts `log` in the `append` half beside `create` and `propose`, and `45 §5.1` says the same —
      * so it must not need `write` either.
+     *
+     * A TOKEN'S NOTE IS SIGNED BY ITS RUN, found or opened as its writes are, and it moves the run's
+     * heartbeat: an agent that only reads and notes is still working. The row is found first, so a note
+     * against nothing opens no run.
      */
-    log(register: string, seq: number, actor: string, note: string): Result<{ id: string }> {
+    log(register: string, seq: number, w: WriteContext, note: string): Result<{ id: string }> {
       const found = bySeq(register, seq);
       if (!found) return no<{ id: string }>('OUT_OF_BOUNDS', `There is no ${register} #${seq}.`, { at: 'seq' });
       return transaction(() => {
@@ -2626,9 +2692,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           kind: 'note',
           target: found.id,
           register: found.register,
-          actor,
+          actor: signedBy(w),
           note,
           at: instant(clock.now()),
+          ...(w.batch === undefined ? {} : { batch: w.batch }),
         });
         return ok({ id: found.id });
       });
@@ -2713,9 +2780,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** One governance row, or `null` — a missing one is a value, not a refusal. */
     governanceRow: (register: GovernRegister, id: string) => getGovernance(sql, register, id),
 
-    /** Open a suggestion. The body is checked here, so the person answering it never finds it broken. */
-    propose: (p: Proposal, actor: string): Result<{ id: string }> =>
-      transaction(() => openSuggestion(governDeps(), actor, p)),
+    /**
+     * Open a suggestion. The body is checked here, so the person answering it never finds it broken.
+     *
+     * A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are, and the run is found only once the
+     * body has passed, so a refused proposal opens none. A bare name signs as itself.
+     */
+    propose: (p: Proposal, w: WriteContext | string): Result<{ id: string }> =>
+      transaction(() => openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), p)),
+
+    /** A suggestion's question, which is its `suggest` event and no column: what a person reads it by. */
+    question: (id: string): string | null => questionOf(sql, id),
 
     /**
      * Answer one.
@@ -3020,6 +3095,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Which project a run in this place belongs to, and how it was told (`scope.ts`). Reads only. */
     resolveProject: (where: Whereabouts): Resolved => resolveProject(sql, registers, where),
     inScope,
+    runFor,
+    findRun,
+    keyState,
+    /** A row as a person says it, `S42` or `things#3`, from its id. */
+    nameOf,
     create: (register: string, fields: Patch, w: WriteContext) => write(register, null, fields, w),
     update: (register: string, ref: string, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
     /* Four arguments and no fifth: a `Door` is the kernel's own to open. */

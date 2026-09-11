@@ -120,7 +120,13 @@
       (block.where ?? '')
         .split(',')
         .map((c) => c.trim())
-        .filter((c) => c && !(param && c.toLowerCase() === `thing is ${param.title.toLowerCase()}`))
+        /* The page's own subject, in either spelling: by name through a `thing` ref, or by spoken id
+           through an agent run's `project`. Printing either says the page's name back to it. */
+        .filter(
+          (c) =>
+            c &&
+            !(param && [`thing is ${param.title}`, `project is ${param.register}#${param.seq}`].some((s) => s.toLowerCase() === c.toLowerCase())),
+        )
         .join(', '),
     );
 

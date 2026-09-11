@@ -216,7 +216,7 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | DATA | `propose` | `{ question, body_kind, body, op_id? }` — `body_kind ∈ options \| pattern \| rowset \| change` | `SG<n>`; Spark files a tier-A proposal here, once (46 §5) |
 | DATA | `log` | `{ note, target? }` — `note` ≤ 280 chars | the event |
 | DATA | `markRead` | `{ upTo }` — person principals only; `upTo` = an `event.rowid` | nothing; not an event |
-| DATA | `attach` | `{ source, client_id?, doing?, branch?, head? }`, `source` one of `startup` `resume` `clear` `compact` `cli`; a token only, needing `propose` | `{ session, spoken, resumed, project }`: the run the ladder found or opened, `project` its spoken id or `null`. Re-attaching refreshes where the run is and what it is doing, and never `next`, `tried` or `notes` |
+| DATA | `attach` | `{ source, client_id?, doing?, branch?, head? }`, `source` one of `startup` `resume` `clear` `compact` `cli`; a token only, needing `propose` | `{ session, spoken, resumed, project, context }`: the run the ladder found or opened, `project` its spoken id or `null`, and `context` the briefing READ+'s `context` gives for that run, so the start hook prints it from one answer. Re-attaching refreshes where the run is and what it is doing, and never `next`, `tried` or `notes` |
 | DATA | `handoff` | `{ next?, tried?, note?, doing?, state?, branch?, head?, session? }`, needing `propose`; `session` names a run, and only a person may name one | the run. `tried` and `note` append inside one transaction, fifty kept of each and the oldest dropped; `state` moves along the declared transitions |
 | READ+ | `page` | `{ slug }` | the page's `blocks[]` with their rows, one projection |
 | READ+ | `metric` | `{ id }` | the value, its partials and `currency_excluded` |
@@ -224,7 +224,7 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | READ+ | `dialect` | `{}` | the dialect of [34-GRAMMARS](34-GRAMMARS.md) §2, from the record's own constant — `record` never imports `render` |
 | READ+ | `digestToday` | `{}` | today's digest |
 | READ+ | `sessionsLive` | `{}` | the live runs, newest heard from first, each with `stale` (45 minutes), `age_s` and `same_repo` worked out as it is read; it opens no run |
-| READ+ | `learningsFor` | `{ repo }` | the learnings for one repo |
+| READ+ | `context` | `{}`; a read that never writes and opens no run | `{ session, project, ambiguous, handoff, live, waiting, registers, people, faded, next }`: where the caller stands, each part held to what it may read ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.3). The learnings for where a session stands arrive in `registers`, with every other register that has a scope field; a key arrives by its label, and its secret field as `{ sealed, opened, last_opened, last_by }` |
 | READ+ | `whatsNew` | `{ cursor? }` — cursor = `event.rowid`; default = the first rowid after the caller's `member.seen_at` | ≤ 60 events + `sinceCapped` |
 | READ+ | `project` | `{ query, budget }` — `secret` fields already replaced by their label | the `Projection` of 30 §9 |
 | READ+ | `boot` | `{}` | index + the live runs as `sessions` + open suggestions, without their bodies, as `waiting` + `whatsNew` + `theme { id, version, css }` + `me { person, level, owner, records }`, one round trip |
@@ -288,9 +288,12 @@ deterministic, `accent` the theme's hue chooser (`nextAccentHue`, [ADR-028](16-D
 `applyMigrations` runs before any cache load. `createRecordApi(deps): RecordApi` returns the sixty-six as named
 methods; a host routes `POST /api/<method>` by property lookup on that object — a two-line lookup in
 `@braindog/host`, never a `call` dispatcher in the record. `createSpark(deps): Spark` is the same shape for Spark's
-named methods (46 §2), served at `/api/spark/<method>`. `createMcpHandler(api: RecordApi, { context(req):
-Promise<CallContext | Response>, maxBodyBytes? })` wraps the `RecordApi` **type** only: the host authenticates and hands
-it a `CallContext` or a ready refusal `Response`; it is testable with a stub `RecordApi` and no Durable Object.
+named methods (46 §2), served at `/api/spark/<method>`. `@braindog/mcp` reaches the same methods for an agent:
+`handle(message, surface, ctx)` is the JSON-RPC core its stdio and HTTP transports share, and
+`serveMcp(request, surface, ctx, { maxBodyBytes?, session? })` is `POST /mcp`. Its `surface` is `McpSurface<C>`, a
+structural type naming only the methods the tools call, so a host passes the `RecordApi` itself once it has checked
+the bearer, or `null` for a caller it does not know, and the package is tested with a stub and no Durable Object
+([44-SPEC-MCP](44-SPEC-MCP.md) §2).
 
 ---
 
@@ -480,11 +483,13 @@ a byte-for-byte copy of that, and an export is the same content with `local` str
 | `Directory` | `idFromName('directory')` | persons, passkeys, sessions, magic links, invitations, `slug → rec_id`, the login lockout — the tables and flows of `@braindog/record/directory` (§10) |
 
 Classes extend `DurableObject`; `Record` exposes `createRecordApi(deps)`'s methods and `Spark` exposes
-`createSpark(deps)`'s, by name. Everything both hosts would otherwise write twice lives in **`@braindog/host`** — the
+`createSpark(deps)`'s, by name. Everything both hosts would otherwise write twice lives in **`@braindog/host`**: the
 route table as data (`ROUTES`), `httpStatus(result)`, `resolveContext(req, lookups)`, `serveApi(api, req, ctx)` over
-standard `Request`/`Response`, and the `createMcpHandler` wiring — platform-neutral, about three hundred lines,
-imported by the Worker and the self-host alike. The Worker resolves `slug → rec_id` at the Directory, then
-`env.RECORD.get(env.RECORD.idFromName(rec_id))`. The Worker itself is stateless.
+standard `Request`/`Response`, and the session hints `/api` and `/mcp` both read, `sessionOf` for the headers and
+`hintsOf` for `_meta.session`. It is platform-neutral, about three hundred lines, and imported by the Worker and the
+self-host alike; each host's `/mcp` branch calls `serveMcp` from `@braindog/mcp/http`. The Worker resolves
+`slug → rec_id` at the Directory, then `env.RECORD.get(env.RECORD.idFromName(rec_id))`. The Worker itself is
+stateless.
 
 ```jsonc
 // wrangler.jsonc — the skeleton
@@ -542,7 +547,7 @@ the one home; a count is never a budget — it is read from the owning enumerati
 | `router-groups` | script | every route declares its group; INTERNAL has no route; VAULT accepts no bearer; ADMIN accepts a bearer only with an operation grant, at exactly one ADMIN method |
 | `spark-actor` | script | `event WHERE actor = 'spark' AND kind NOT IN ('suggest','propose','predict')` is empty over the `corpus` record |
 | `grant-note` | script | no `grant.*` event note contains its grant's `label` or `opens`, over the `corpus` record (12 §8) |
-| `mcp-budget` | script | `tools/list` ≤ 1,800 tokens by `tokenBudget` (44 §5.8), each description within its budget (10 §4), over the `corpus` record; `budgets.mcp` and 44's `BUDGETS` are one number twice, asserted equal |
+| `mcp-budget` | test | not a gate script: `packages/mcp/test/budget.test.ts` holds `tools/list` at or under 2,600 tokens by `tokenBudget` (44 §5.8), measured at 2,311, each description under 200 and the instructions at or under 400 (44 §7) |
 | `secret-grep` | script | no write path, log line, push payload or prompt template can carry a `grant` plaintext |
 | `telemetry-allowlist` | script | the Analytics Engine blob allow-list of 08 §5 is exact |
 | `shot-allowlist` | script | the screenshot-mode provenance allow-list ([ADR-050](16-DECISIONS.md)) equals the extraction from the markup, both ways |

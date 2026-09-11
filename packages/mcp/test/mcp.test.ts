@@ -160,17 +160,22 @@ test('a note changes nothing and is still a write, so it lands in the history', 
   sql.close();
 });
 
-test('a prefixed id is found through the register that declares the prefix', async () => {
+test('a prefixed id goes to the record as spoken, in one call', async () => {
   /* `S42` and `LN7` are how a person says a session or a learning. Which register owns a prefix is
-     its declaration's `seq_prefix`, so the tool layer asks the declarations and then reads the row
-     by register and number, the one form the record's `get` takes. */
-  const { surface, calls } = stub({
-    boot: async () => ({ ok: true, value: { registers: [{ id: 'obligations', name: 'Obligations' }, { id: 'session', name: 'Agent runs' }] } }),
-    schema: async (args) => ({ ok: true, value: args.register === 'session' ? { seq_prefix: 'S' } : {} }),
-  });
+     the record's declarations' to say, so the record resolves it, and the tool layer scans nothing. */
+  const { surface, calls } = stub();
   const ctx: Ctx = { who: 'agent' };
   value(await tools(surface).call('get', { spoken: ' S42 ' }, ctx));
-  assert.deepEqual(calls.at(-1), { method: 'get', args: { register: 'session', seq: 42 }, ctx });
+  assert.deepEqual(calls, [{ method: 'get', args: { spoken: 'S42' }, ctx }]);
+});
+
+test('AND OVER A REAL RECORD, S1 IS THE RUN', async () => {
+  const { mcp, api, sql } = await agent();
+  const token: CallContext = { principal: { kind: 'token', id: 't', scope: 'write', person: 'p_1', level: 'owner' }, session: { client_id: 'c-1' } };
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, token));
+  assert.equal(value<{ fields: { client_id: string } }>(await mcp.call('get', { spoken: 'S1' }, owner)).fields.client_id, 'c-1');
+  assert.equal(value(await mcp.call('get', { spoken: 'S9' }, owner)), null);
+  sql.close();
 });
 
 test('AND A PREFIX NO READABLE REGISTER HOLDS IS A REFUSAL, never a throw', async () => {
@@ -244,18 +249,28 @@ test('an empty note is refused rather than written, because a note is for the ne
 });
 
 test('WHAT THE RECORD DOES NOT ANSWER YET IS A REFUSAL THAT SAYS WHAT TO DO, never a throw', async () => {
-  /* `context`, `handoff` and `meet` are in the list today and arrive in the record with the session
-     register. An agent that calls one now is told to carry on another way, in the record's own word
-     for it, so it does not spend turns retrying. */
+  /* `meet` is in the list and arrives in the record with build step 16. An agent that calls it now is
+     told to carry on another way, in the record's own word for it, so it does not spend turns retrying. */
   const { mcp, sql } = await agent();
-  for (const [name, instead] of [
-    ['context', /record_index/],
-    ['meet', /create/],
-  ] as const) {
-    const said = refusal(await mcp.call(name, { where: 'commit 4464966', next: 'x' }, owner));
-    assert.equal(said.code, 'NOT_IN_THIS_BUILD', name);
-    assert.match(said.fix, instead, name);
-  }
+  const said = refusal(await mcp.call('meet', { where: 'commit 4464966' }, owner));
+  assert.equal(said.code, 'NOT_IN_THIS_BUILD');
+  assert.match(said.fix, /create/);
+  sql.close();
+});
+
+test('CONTEXT AND HANDOFF ANSWER THROUGH THE RECORD, and context names the run that asked', async () => {
+  const { mcp, sql } = await agent();
+  const token: CallContext = {
+    principal: { kind: 'token', id: 't', scope: 'write', person: 'p_1', level: 'owner' },
+    session: { client_id: 'c-1', host: 'dev-pc', repo: 'braindog' },
+  };
+  const handed = value<{ fields: { next: string } }>(await mcp.call('handoff', { next: 'Run the gates.', doing: 'Step 8' }, token));
+  assert.equal(handed.fields.next, 'Run the gates.');
+
+  const here = value<{ session: { spoken: string } | null; registers: unknown[]; next: string }>(await mcp.call('context', {}, token));
+  assert.equal(here.session?.spoken, 'S1');
+  assert.ok(Array.isArray(here.registers));
+  assert.match(here.next, /handoff/);
   sql.close();
 });
 
@@ -342,15 +357,17 @@ test('A PAGE IS A RESOURCE, and every resource listed reads', async () => {
   sql.close();
 });
 
-test('AND WHAT THE RECORD CANNOT ANSWER YET IS NOT LISTED, and is listed once it can', async () => {
-  /* `context` and `sessions/live` have no method on today's record, so offering them would send an
-     agent to a certain refusal. A surface that has them lists them, and the sessions one carries the
-     sentence the start hook prints. */
+test('WHAT A SURFACE CANNOT ANSWER IS NOT LISTED, and the record answers context and sessions/live', async () => {
+  /* Offering an address the surface has no method for would send an agent to a certain refusal. The
+     record answers both since step 8, and the sessions one carries the sentence the start hook prints. */
   const { mcp, sql } = await agent();
   const today = (await mcp.resources(owner)).map((r) => r.uri);
-  assert.equal(today.includes('braindog:context'), false);
+  assert.equal(today.includes('braindog:context'), true, 'the record answers context since step 8');
   assert.equal(today.includes('braindog:sessions/live'), true, 'the record answers sessionsLive since step 6');
   sql.close();
+
+  const { context: _context, ...older } = stub().surface;
+  assert.equal((await tools(older).resources({ who: 'agent' })).some((r) => r.uri === 'braindog:context'), false);
 
   const later = await tools(stub().surface).resources({ who: 'agent' });
   assert.ok(later.some((r) => r.uri === 'braindog:context'));

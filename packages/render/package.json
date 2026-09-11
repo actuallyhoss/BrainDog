@@ -1,7 +1,7 @@
 {
   "name": "braindog-render",
   "version": "0.0.0",
-  "description": "The BrainDog block dialect: a parser, eighteen kinds over eight primitives, and two renderers held to one accessibility tree.",
+  "description": "The BrainDog block dialect: a parser, twenty kinds over eight primitives, and two renderers held to one accessibility tree.",
   "type": "module",
   "license": "MIT",
   "exports": {

@@ -353,9 +353,11 @@ const rowsFor = (register: string, where: string): string => {
 
 /** Whether it actually asserted anything — see the count at the call site. */
 const roundTrips = (register: string, where: string, from: string): boolean => {
+  /* A TEMPLATE'S `{{field}}` IS NOT A FILTER YET. `for:` expands it per row before anything draws.
+     Most do not compile unexpanded, but `project is {{spoken}}` does, as a literal on a text field,
+     so it is the placeholder that is checked and not whether it happens to compile. */
+  if (/\{\{\w+\}\}/.test(where)) return false;
   const first = compile(register, where);
-  /* A TEMPLATE'S `{{name}}` IS NOT A FILTER YET. `for:` expands it per row before anything draws;
-     until then it does not compile on either side of the trip, which is a different finding. */
   if (first.bad.length) return false;
   const said = saidPlainly(register, where);
   const back = compile(register, said);

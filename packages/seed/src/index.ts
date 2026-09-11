@@ -1,5 +1,6 @@
 /**
- * The record the product is shown with — eight registers and the rows in them.
+ * The record the product is shown with: seven registers, the rows in them, and the agent runs in the
+ * kernel's own `session` register.
  *
  * THIS IS THE ONE COPY. It was the web app's mock-up, which meant the shape of a register lived in
  * a Svelte app's `lib/` and the backend had nothing to be measured against; every figure the
@@ -17,7 +18,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import type { Declaration, FieldDecl, Json, Kernel } from '@braindog/kernel';
+import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type Json, type Kernel } from '@braindog/kernel';
 
 /** What a row holds, before the record has given it a number. */
 export type Fields = Record<string, Json | number | null | undefined>;
@@ -254,67 +255,8 @@ export const REGISTERS: Record<string, SeedRegister> = {
       { id: 'note', type: 'text' },
     ],
   },
-  /**
-   * AGENT SESSIONS ARE A REGISTER, and 02 §1 already made them the one register the kernel itself
-   * declares. That is the whole answer to "a Claude Code widget on my project page": there is no
-   * new machinery, no embedded runtime and no code in a block. A session is a typed row like an
-   * invoice is, so it can be listed, filtered, referenced by a `thing`, and drawn by any block kind
-   * that draws rows.
-   *
-   * `last_seen` is written by the kernel on every write from that session and is NOT a derivation
-   * (02 §5) — the heartbeat sets it in place with no version bump and no event, because a session
-   * saying "still here" is not a fact about the business.
-   */
-  sessions: {
-    id: 'sessions',
-    icon: 'session',
-    /* `Agent runs`, AND IT WAS `Sessions`. A session is a word this product's own author uses and
-       nobody else does: it is in the rail and as a block heading on a project page, and the thing
-       it names is one agent doing one piece of work. */
-    name: 'Agent runs',
-    one: 'run',
-    holds: 'what each agent is doing in this record, and what it has touched',
-    title: 'doing',
-    mobile: ['doing', 'agent', 'state'],
-    state: 'state',
-    done: ['ended'],
-    fields: [
-      { id: 'doing', label: 'Task', type: 'text', required: true, search: true },
-      { id: 'agent', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], index: true, required: true },
-      { id: 'state', label: 'Status', type: 'enum', values: ['live', 'idle', 'ended'], index: true, required: true },
-      { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
-      /* THE PIN. A session pinned to a thread is how context survives the session that made it:
-         close the window, come back on Tuesday, open the thread, and it is all there — what each
-         agent was doing, in order, next to the updates that say how it was going. Without it an
-         agent session is a thing that happened once and then could not be found again.
-
-         `Thread`, AND IT HAD NO LABEL AT ALL, so `labelOf` headed the column `Track` on three of
-         the busiest lists in the product. The list itself was renamed to Threads for the reason
-         written at its own declaration below — a reader meets `track` cold and it reads as music
-         or as shipping — and the three columns pointing at it went on saying the abandoned name,
-         which a reader meets two clicks after learning the new one. The id stays `track`, which is
-         what the URL, the predicate and every seeded row say. */
-      { id: 'track', label: 'Thread', type: 'ref', to: 'tracks', index: true },
-      { id: 'last_seen', label: 'Last seen', type: 'instant', index: true },
-      /* `Saves`, AND IT WAS `Writes`. The banner over this same list already made this exact
-         argument and this exact change — *"a write is a save"* — and renamed its own verbs to
-         *saves* and *rejected*; the column header beside it kept the schema's word. */
-      { id: 'wrote', label: 'Saves', type: 'int' },
-      { id: 'host', type: 'text' },
-      /* THE RUN, WHICH IS WHAT A SESSION IS DOING RIGHT NOW. A session row says what an agent is up
-         to in a sentence; the job is the tool calls behind that sentence, in order, with what each
-         one answered. Without this the two exist and cannot be got from one to the other — the job
-         screen was reachable from nowhere in the product at all. Absent on a session that has
-         ended, which is the honest state: the transcript is kept, the run is over.
-
-         `Steps`, AND IT WAS `Run`. This register is called Agent runs and its `one` is `run`, so a
-         run had a field called Run: the column and the thing the column is on were one word. What
-         the screen behind the link actually draws is the tool calls in order, which is what the
-         header now says. The id stays `job`, which is the address `/jobs/<id>` and the key every
-         seeded row carries. */
-      { id: 'job', label: 'Steps', type: 'text' },
-    ],
-  },
+  /* NO `sessions` HERE. Agent runs are the kernel's own `session` register (migration 0002), which
+     every agent write lands on. A second copy declared here drew a second "Agent runs" list. */
   /**
    * A TRACK IS A LINE OF WORK THAT OUTLIVES THE THINGS ON IT.
    *
@@ -666,15 +608,20 @@ export const TASKS: Fields[] = [
 ];
 
 /**
- * Live agent sessions. `hours(n)` rather than `day(n)`, because a session's age is measured in the
- * unit a person would say it in — "8m ago", not "0d ago".
+ * Agent runs, S1 to S5, in the kernel's `session` register and in its field names.
+ *
+ * `project` is the spoken id of a project, `things#1`, which is what the ladder writes when it places
+ * a run. `last_seen` uses `hours(n)` because a run's age is said in minutes and hours. Both are fields
+ * only the record writes, so these rows go in through `openRun` below.
+ *
+ * A person is never a run, so every run here is an agent's: three are Kiln's, and two are finished.
  */
-export const SESSIONS: Fields[] = [
-  { doing: 'Variable axis QA, instances 3 of 9', agent: 'claude', state: 'live', thing: 1, track: 1, last_seen: hours(0), wrote: 14, host: 'kiln-mbp', job: 'j_9K4A' },
-  { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'live', thing: 1, track: 3, last_seen: hours(0.1), wrote: 2, host: 'kiln-mbp' },
-  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', thing: 3, track: 2, last_seen: hours(3), wrote: 6, host: 'studio-desktop', job: 'j_7Q2F' },
-  { doing: 'Chasing Halden on 2026-041', agent: 'you', state: 'ended', thing: 2, last_seen: hours(26), wrote: 1, host: 'studio-desktop' },
-  { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'ended', thing: 1, track: 1, last_seen: hours(34), wrote: 41, host: 'kiln-mbp' },
+export const RUNS: Fields[] = [
+  { doing: 'Variable axis QA, instances 3 of 9', agent: 'claude', state: 'active', project: 'things#1', repo: 'kiln-type', host: 'kiln-mbp', branch: 'axis-qa', next: 'Sign off instances 4 to 6 once the mastering pass lands.', last_seen: hours(0.05) },
+  { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'active', project: 'things#1', repo: 'kiln-site', host: 'kiln-mbp', branch: 'specimen-copy', last_seen: hours(0.2) },
+  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', project: 'things#3', repo: 'portage', host: 'studio-desktop', next: 'Propose merging the two Fenwick services, citing the rows read.', tried: ['Matching on the invoice total; two services share it.'], last_seen: hours(2) },
+  { doing: 'Drafting the chaser for invoice 2026-041', agent: 'cursor', state: 'done', project: 'things#2', host: 'studio-desktop', last_seen: hours(26) },
+  { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'done', project: 'things#1', repo: 'kiln-type', host: 'kiln-mbp', last_seen: hours(34) },
 ];
 
 /* Five tracks, and the shape of the set is the point.
@@ -713,7 +660,7 @@ export const ROWS: Record<string, readonly Fields[]> = {
   things: THINGS,
   people: PEOPLE,
   tasks: TASKS,
-  sessions: SESSIONS,
+  session: RUNS,
   tracks: TRACKS,
   updates: UPDATES,
 };
@@ -1226,9 +1173,10 @@ export const PAGES: Record<string, SeedPage> = {
    * the page is about the project: what is open on it, who is working on it right now, what it is
    * owed, what it costs to keep alive.
    *
-   * The SESSIONS block is the interesting one. "A Claude Code widget I can code into" cannot be a
+   * The AGENTS block is the interesting one. "A Claude Code widget I can code into" cannot be a
    * block that runs code — 04 §7 has no interpreter to reach and 22 §3 names and rejects the three
-   * ways people try. It does not need to be. A session is a typed row (02 §1), so the widget is an
+   * ways people try. It does not need to be. An agent run is a typed row in the kernel's `session`
+   * register (02 §1), so the widget is an
    * ordinary register-bound block, and the instruction you type is an ordinary WRITE — which is the
    * product's own thesis stated back at it: the record is the coordinator, and it is better than a
    * model because it cannot be persuaded (23 §12).
@@ -1251,7 +1199,7 @@ export const PAGES: Record<string, SeedPage> = {
     for: { register: 'things', where: 'lane is building or earning' },
     nav: { section: 'Projects', order: 10 },
     icon: 'thing',
-    requires: ['register.tasks', 'register.sessions', 'register.obligations', 'register.services'],
+    requires: ['register.tasks', 'register.session', 'register.obligations', 'register.services'],
     blocks: [
       {
         kind: 'stat',
@@ -1281,8 +1229,12 @@ export const PAGES: Record<string, SeedPage> = {
         heading: 'Agents',
         span: 7,
         columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
-        source: 'register.sessions',
-        where: 'thing is {{name}}',
+        source: 'register.session',
+        /* BY `project`, WHICH HOLDS THE PROJECT'S SPOKEN ID, `things#1`. `{{spoken}}` is that id for the
+           row the template is about. The web's engine fills it; the kernel's `fill` in `pages.ts` does
+           not yet, and until it does this block draws nothing on a real record
+           (`pages-read.test.ts` holds it as a todo). */
+        where: 'project is {{spoken}}',
         order: [{ field: 'last_seen', dir: 'desc' }],
         limit: 6,
         empty: 'No agent has touched {{name}}.',
@@ -1442,7 +1394,7 @@ export const PAGES: Record<string, SeedPage> = {
 /* ── installing it ────────────────────────────────────────────────────────── */
 
 /**
- * The eight registers as kernel declarations.
+ * The seed's registers as kernel declarations. Agent runs are not among them: the kernel declares those.
  *
  * A pass-through, and that is the point: the shape above IS the declaration, so this is a cast plus
  * the two words the kernel needs to file it — not a translation with a chance to be wrong.
@@ -1525,7 +1477,9 @@ export function packDocument(): Record<string, unknown> {
        row per register with no order between them, so a `ref` in one would resolve against whatever
        happened to be written first — a different row on a different day. `updates` needs a `track`,
        so it arrives empty and the demonstration is what fills it. */
-    seeds: ORDER.filter((register) => (ROWS[register] ?? []).length > 0 && !needsARef(register)).map((register) => ({
+    /* ONLY WHAT THE PACK DECLARES. Agent runs are the kernel's register, and a run's `last_seen` and
+       `project` are fields no seed row may set, so an example run would stop the install halfway. */
+    seeds: ORDER.filter((register) => register in REGISTERS && (ROWS[register] ?? []).length > 0 && !needsARef(register)).map((register) => ({
       register,
       fields: forWrite(register, exampleRow(register)),
     })),
@@ -1557,8 +1511,32 @@ export type Seeded = { registers: number; rows: number; pages: number; metrics: 
  * THE ORDER IS THE REFERENCES. `things` and `people` are written before the rows that point at
  * them, because a `ref` is resolved at write and a row cannot point at one that does not exist
  * yet — which is a property of the record and not a quirk of this file.
+ *
+ * `session` is the kernel's register, which the seed writes into and does not declare.
  */
-export const ORDER = ['things', 'people', 'tracks', 'obligations', 'services', 'tasks', 'sessions', 'updates'] as const;
+export const ORDER = ['things', 'people', 'tracks', 'obligations', 'services', 'tasks', 'session', 'updates'] as const;
+
+/**
+ * Writes one agent run: THE ONE PLACE THE SEED SETS A FIELD ONLY THE RECORD WRITES.
+ *
+ * `last_seen`, `project` and `token_id` are refused `IMMUTABLE_FIELD` to every caller that names them in
+ * a patch, a person included, and that refusal stays whole. They go through the kernel's `stamp`, the
+ * in-process channel its own callers use for exactly these fields: the ladder, and the record's
+ * `attach`. No route can reach it, because a request's context carries no `stamp`. The ladder itself
+ * cannot write these rows. It stamps the record's clock, which the seed fixes at `NOW`, so every run
+ * would read "just now". It also places a run only through a projects register that declares
+ * `scopes:`, and `things` declares none until the agents pack.
+ */
+function openRun(kernel: Kernel, fields: Fields, actor: string): Result<unknown> {
+  const patch: Record<string, unknown> = {};
+  const stamp: Record<string, Json> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) continue;
+    if (KERNEL_WRITTEN.includes(key)) stamp[key] = value as Json;
+    else patch[key] = value;
+  }
+  return kernel.create('session', patch as never, { actor, stamp });
+}
 
 export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Result<Seeded>> {
   /* ONCE, AND THE SECOND TIME SAYS SO. Run twice, this doubled every register — and reported the
@@ -1588,7 +1566,7 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
   let rows = 0;
   for (const register of ORDER)
     for (const entry of ROWS[register] ?? []) {
-      const out = kernel.create(register, forWrite(register, entry), { actor });
+      const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, entry), { actor });
       if (!out.ok) return out as unknown as Result<Seeded>;
       rows++;
     }

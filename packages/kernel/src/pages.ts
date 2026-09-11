@@ -426,6 +426,10 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
   const escaped = (value: string): string => JSON.stringify(value).slice(1, -1);
   const text = JSON.stringify(doc).replace(/\{\{(\w+)\}\}/g, (whole, key: string) => {
     if (key === 'it') return param === undefined ? whole : escaped(param);
+    /* A ROW'S SPOKEN ID, spelled as the ladder writes a run's `project` (`things#1`), so a template page
+       finds its runs by `project is {{spoken}}`. A register with its own prefix would need its
+       declaration here; the projects register has none. */
+    if (key === 'spoken') return row ? escaped(row.register + '#' + String(row.seq)) : whole;
     const value = row?.fields[key];
     return value === null || value === undefined ? whole : escaped(String(value));
   });

@@ -16,11 +16,12 @@ import { refused, type Result } from '@braindog/ports';
 import { INSTRUCTIONS } from './instructions.ts';
 import { HOUR, MINUTE, TEMPLATES, TOOLS, tools, ttlOf, type McpSurface, type Tool } from './index.ts';
 
-/** Newest first. A version a client asks for is echoed when it is one of these; otherwise the first. */
+/** Newest first. `initialize` answers with one of these, as `negotiate` picks it. */
 export const VERSIONS = ['2026-07-28', '2025-06-18', '2025-03-26'] as const;
 
 export const METHODS = [
   'initialize',
+  'server/discover',
   'ping',
   'tools/list',
   'tools/call',
@@ -91,6 +92,22 @@ const listed = (t: Tool) => ({
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
+const SERVER = { name: 'braindog', version: '0.0.0' };
+const CAPABILITIES = { tools: {}, resources: {}, prompts: {} };
+
+/**
+ * The version an `initialize` is answered with, or `null` for none.
+ *
+ * THE ONE ASKED FOR, OR THE NEWEST OLDER ONE. A client that names a revision this server does not know
+ * is answered with the newest it speaks at or below that one, because a client cannot speak a revision
+ * newer than its own. Older than all of them is `null`, and the answer is an error naming the versions
+ * there are. A client that names no date is answered with the newest.
+ */
+export function negotiate(asked: unknown): (typeof VERSIONS)[number] | null {
+  if (typeof asked !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(asked)) return VERSIONS[0];
+  return VERSIONS.find((v) => v <= asked) ?? null;
+}
+
 /**
  * Answer one message.
  *
@@ -129,21 +146,33 @@ async function dispatch<C>(id: Id, method: string, params: Record<string, unknow
 
   switch (method) {
     case 'initialize': {
-      const protocolVersion = VERSIONS.find((v) => v === params.protocolVersion) ?? VERSIONS[0];
-      return answer(id, {
-        protocolVersion,
-        capabilities: { tools: {}, resources: {}, prompts: {} },
-        serverInfo: { name: 'braindog', version: '0.0.0' },
-        instructions: INSTRUCTIONS,
-      });
+      const protocolVersion = negotiate(params.protocolVersion);
+      /* THE REVISION'S OWN ANSWER to a version the server cannot meet: -32602, naming what it speaks. */
+      if (protocolVersion === null)
+        return fail(id, RPC.params, 'Unsupported protocol version', { supported: [...VERSIONS], requested: params.protocolVersion });
+      return answer(id, { protocolVersion, capabilities: CAPABILITIES, serverInfo: SERVER, instructions: INSTRUCTIONS });
     }
+
+    /* WHAT A 2026-07-28 CLIENT ASKS BEFORE ANYTHING ELSE, which that revision says every server answers:
+       the versions, the capabilities, who this is and the instructions. The same for every caller, so
+       any cache may keep it. */
+    case 'server/discover':
+      return answer(id, {
+        resultType: 'complete',
+        supportedVersions: [...VERSIONS],
+        capabilities: CAPABILITIES,
+        _meta: { 'io.modelcontextprotocol/serverInfo': SERVER },
+        instructions: INSTRUCTIONS,
+        ttlMs: HOUR,
+        cacheScope: 'public',
+      });
 
     case 'ping':
       return answer(id, {});
 
     /* The instructions again, because a client that skipped `initialize` still reads this. */
     case 'tools/list':
-      return answer(id, { tools: TOOLS.map(listed), instructions: INSTRUCTIONS, ttlMs: HOUR, cacheScope: 'record' });
+      return answer(id, { tools: TOOLS.map(listed), instructions: INSTRUCTIONS, ttlMs: HOUR, cacheScope: 'private' });
 
     case 'tools/call': {
       const args = params.arguments ?? {};

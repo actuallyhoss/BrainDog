@@ -768,6 +768,238 @@
     display: none;
   }
 
+  /* ── feed: what happened, grouped by who did it ──────────────────────────
+     the old tool's "Since you last looked": a list without a box, the count leading every row, and
+     the accent only on what is new. The block is its own container, so a narrow slot moves the time
+     under the words without a breakpoint. */
+
+  .feed {
+    display: grid;
+    gap: var(--sp-4);
+    container-type: inline-size;
+  }
+
+  .feed-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .feed-tally,
+  .feed-new {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .feed-tally {
+    color: var(--dim);
+    font-weight: 500;
+  }
+
+  .feed-new {
+    color: var(--accent-text);
+  }
+
+  .feed-rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .feed-row {
+    display: grid;
+    grid-template-columns: 3ch auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+    min-block-size: var(--row-h);
+    padding-block: var(--sp-2);
+    border-block-end: 1px solid var(--line);
+    font-size: var(--t-ui);
+  }
+
+  .feed-row:last-child {
+    border-block-end: 0;
+  }
+
+  /* THE COUNT IS WHAT IS READ FIRST, so it leads, in tabular figures down one edge. */
+  .feed-count {
+    color: var(--dim);
+    font-weight: 600;
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A face is round and a rule's mark is square, so the two are told apart by shape. */
+  .feed-face {
+    display: grid;
+    place-items: center;
+    align-self: center;
+    inline-size: 22px;
+    block-size: 22px;
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 650;
+    line-height: 1;
+  }
+
+  .feed-group[data-by='rule'] .feed-face {
+    background: var(--s3);
+    border-radius: var(--r-sm);
+  }
+
+  /* Nobody named is a gap in the column, not an empty circle. */
+  .feed-face:empty {
+    visibility: hidden;
+  }
+
+  .feed-what {
+    min-inline-size: 0;
+    color: var(--ink2);
+    overflow-wrap: anywhere;
+  }
+
+  .feed-who {
+    color: var(--ink2);
+    font-weight: 600;
+  }
+
+  .feed-what > .glyph {
+    margin-inline-start: var(--sp-1);
+  }
+
+  /* NEW IS BRIGHTER, and the head's "N new" and the line below say it in words as well. */
+  .feed-row[data-new] .feed-count {
+    color: var(--accent-text);
+  }
+
+  .feed-row[data-new] .feed-who {
+    color: var(--ink);
+  }
+
+  .feed-when {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  /* The row above already draws the rule, so the words sit under it rather than between two. */
+  .feed-seen {
+    padding-block: var(--sp-3) var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .feed-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  @container (inline-size < 30rem) {
+    .feed-row {
+      grid-template-columns: 3ch auto minmax(0, 1fr);
+    }
+
+    .feed-when {
+      grid-column: 3;
+    }
+  }
+
+  /* ── diff: before and after ──────────────────────────────────────────────
+     Track changes rather than a patch: a skill is prose, so its lines are in the UI face and wrap
+     inside the box, and a phone never scrolls one sideways. What was taken out keeps its words,
+     dimmed and struck, with a minus beside it; what was put in sits on the accent's wash with a
+     plus. Each mark's name is its word, and red stays for danger. */
+
+  .diff {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .diff-sum {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .diff-lines {
+    padding-block: var(--sp-2);
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+
+  .diff-line {
+    display: grid;
+    grid-template-columns: 1.5em minmax(0, 1fr);
+    padding-inline: var(--sp-2) var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+    text-decoration: none;
+  }
+
+  .diff-mark {
+    color: var(--dim);
+    text-align: center;
+  }
+
+  /* Pre-wrap keeps a line's own indentation, an empty line keeps its height, and a line of prose
+     wraps at a reading measure while its wash still spans the box. */
+  .diff-text {
+    max-inline-size: var(--measure);
+    min-block-size: 1lh;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .diff-line[data-op='add'] {
+    background: var(--accent-wash);
+    color: var(--ink);
+  }
+
+  .diff-line[data-op='add'] .diff-mark {
+    color: var(--accent-text);
+  }
+
+  .diff-line[data-op='del'] .diff-text {
+    color: var(--dim);
+    text-decoration: line-through;
+  }
+
+  .diff-toggle {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    padding-inline: calc(var(--sp-2) + 1.5em) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .diff-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .diff-toggle:hover {
+    background: var(--hover-wash);
+    color: var(--ink2);
+  }
+
+  @media (pointer: coarse) {
+    .diff-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* ── rows: spec, params ─────────────────────────────────────────────────── */
 
   /* UNBOXED, like the ledger and the table: rows on the page's own ground with a hairline between

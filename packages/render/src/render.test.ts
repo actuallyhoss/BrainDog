@@ -8,6 +8,7 @@ import { toHTML, verbatimText } from './html.ts';
 import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type Column, type TableRow } from '../svelte/types.ts';
 import { lanes } from './board.ts';
 import { ringDash, ringOf, trendOf } from './cards.ts';
+import { diffPlan, diffRows, lineDiff } from './diff.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
 import { leadingCode, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
 
@@ -15,8 +16,8 @@ const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
 /* ── the closed sets ──────────────────────────────────────────────────────── */
 
-test('eighteen kinds over eight primitives, and every kind names one that exists', () => {
-  assert.equal(Object.keys(KINDS).length, 18);
+test('twenty kinds over eight primitives, and every kind names one that exists', () => {
+  assert.equal(Object.keys(KINDS).length, 20);
   assert.equal(PRIMITIVES.length, 8);
   assert.equal(PRIMITIVES_VERSION, 1);
   for (const [kind, spec] of Object.entries(KINDS))
@@ -288,7 +289,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
-  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the eighteen kinds/u);
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the twenty kinds/u);
   assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });
@@ -1112,6 +1113,109 @@ test('and the two page kinds add no inline style: every mark is placed by an att
     onPage(`${AGENTS}\n\`\`\`cards\ntitle | trend | ring\nA | 1 2 3 | 2/4\n\`\`\`\n\`\`\`section | S\n | 2 | fold\n\`\`\``),
   );
   assert.doesNotMatch(html, /style=/u);
+});
+
+/* ── feed and diff: what agents did, and how a skill changed ──────────────── */
+
+const FEED =
+  '```feed\nagent | Claude | 14 | saves on [Variable axis QA](/r/things/4) | 3h ago\nrule | Late fees | 2 | reminders sent | 5h ago\n' +
+  'seen | 2d ago\nagent | Codex |  | opened Kiln | 3d ago | bad\nyou | You | 1 | decision on Pricing | 4d ago\n```';
+
+test('A FEED IS PAGE-ONLY, and a write-up is pointed at the kind that takes authored rows', () => {
+  const [seg] = parse(FEED);
+  assert.equal(seg?.type, 'degraded');
+  assert.match(seg?.type === 'degraded' ? seg.fix : '', /Use "timeline"/u);
+  assert.equal(onPage(FEED)[0]?.type, 'block');
+});
+
+test('a feed row is filed under agent, rule or you, and a row under anything else degrades rather than vanishing', () => {
+  for (const src of ['```feed\nclaude | Claude | 1 | saved | now\n```', '```feed\nseen | 1d ago\nseen | 2d ago\n```']) {
+    const [seg] = onPage(src);
+    assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_ARITY', src);
+  }
+});
+
+test('THE FEED KEEPS A MACHINE’S WORK APART FROM THE PERSON’S, and a burst is one row', () => {
+  const html = toHTML(onPage(FEED));
+  const groups = [...html.matchAll(/<div class="feed-group" data-by="([a-z]+)">/gu)].map((m) => m[1]);
+  assert.deepEqual(groups, ['agent', 'rule', 'you'], 'agents, then rules, then you');
+  assert.match(
+    html,
+    /<li class="feed-row" data-new><span class="feed-count num">14<\/span><span class="feed-face" aria-hidden="true">C<\/span><span class="feed-what"><span class="feed-who">Claude<\/span> saves on <a href="\/r\/things\/4">Variable axis QA<\/a><\/span><span class="feed-when">3h ago<\/span><\/li>/u,
+  );
+  assert.match(html, /<span class="feed-count num"><\/span>/u, 'a row with no count has a gap there, not a zero');
+  assert.match(html, /data-by="rule"><h3 class="feed-head">Rules<span class="feed-new num">2 new<\/span><\/h3><ul class="feed-rows"><li class="feed-row" data-new><span class="feed-count num">2<\/span><span class="feed-face" aria-hidden="true">L<\/span>/u);
+  assert.doesNotMatch(html, /style=/u);
+});
+
+test('new is said in words as well as in the accent: the head counts it, and a line says where the read rows begin', () => {
+  const html = toHTML(onPage(FEED));
+  assert.match(html, /<h3 class="feed-head">Agents<span class="feed-new num">14 new<\/span><\/h3>/u, 'a burst of fourteen is fourteen new things');
+  assert.match(html, /<li class="feed-seen">Before you last looked<\/li><li class="feed-row" data-intent="bad">/u);
+  assert.match(html, /<h3 class="feed-head">You<span class="feed-tally num">1<\/span><\/h3>/u, 'nothing new is a plain count');
+  assert.equal(html.match(/feed-seen/gu)?.length, 1, 'a group with nothing read, or nothing new, has no line');
+});
+
+test('an empty feed says one of two things: nothing new, or no mark yet', () => {
+  assert.match(toHTML(onPage('```feed\nseen | 2d ago\n```')), /<p class="feed-empty">Nothing new\.<\/p>/u);
+  assert.match(toHTML(onPage('```feed\nseen | \n```')), /<p class="feed-empty">Nothing to catch up on yet\. /u);
+  assert.match(toHTML(onPage('```feed\n```')), /<p class="feed-empty">Nothing new\.<\/p>/u);
+});
+
+test('with no mark, nothing is new, and the rows are still drawn', () => {
+  const html = toHTML(onPage('```feed\nagent | Claude | 3 | saves | 1h ago\nseen |\n```'));
+  assert.doesNotMatch(html, /data-new|feed-new|feed-seen/u);
+  assert.match(html, /Agents<span class="feed-tally num">3<\/span>/u);
+});
+
+test('A LINE DIFF PAIRS WHAT IT CAN, and a changed line reads as the old one, then the new one', () => {
+  assert.deepEqual(
+    diffRows('When a deploy fails,\nretry once.\nLog the run.\n', 'When a deploy fails,\nretry twice,\nthen page the owner.\nLog the run.'),
+    ['  When a deploy fails,', '- retry once.', '+ retry twice,', '+ then page the owner.', '  Log the run.'],
+  );
+  assert.deepEqual(
+    lineDiff('a\nb\nc\nd', 'a\nc\nd\ne').map((l) => `${l.op} ${l.text}`),
+    ['same a', 'del b', 'same c', 'same d', 'add e'],
+  );
+  assert.deepEqual(diffRows('', 'a'), ['+ a']);
+  assert.deepEqual(diffRows('a\nb', ''), ['- a', '- b']);
+  assert.deepEqual(diffRows('a\r\nb', 'a\nb'), ['  a', '  b'], 'a line ending is not a change');
+});
+
+test('a line that is itself a fence cannot close the diff, because every row starts with its mark', () => {
+  const segs = parse('```diff\n' + diffRows('a', '```\nb').join('\n') + '\n```');
+  assert.equal(segs.length, 1);
+  assert.equal(segs[0]?.type, 'block');
+});
+
+test('A DIFF ROW STARTS WITH ITS MARK, and a row that does not degrades with the row named', () => {
+  const [seg] = parse('```diff | Deploy\n  keep\n@@ -1 +1 @@\n```');
+  assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_ARITY');
+  assert.match(seg?.type === 'degraded' ? seg.fix : '', /"@@ -1 \+1 @@" does not/u);
+  assert.equal(parse('```diff\n-old\n+new\n same\n\n```')[0]?.type, 'block', 'a unified diff reads, and a blank line is a shared empty one');
+});
+
+test('a removed line is a del with a glyph named "removed", never a colour alone', () => {
+  const html = toHTML(parse('```diff | Deploy, v3 to v4\n  When a deploy fails,\n- retry once.\n+ retry twice.\n```'));
+  assert.match(html, /<figcaption class="block-head">Deploy, v3 to v4<\/figcaption>/u);
+  assert.match(html, /<p class="diff-sum">1 line added, 1 removed<\/p>/u);
+  assert.match(
+    html,
+    /<del class="diff-line" data-op="del"><span class="diff-mark" role="img" aria-label="removed">−<\/span><span class="diff-text">retry once\.<\/span><\/del>/u,
+  );
+  assert.match(html, /<ins class="diff-line" data-op="add"><span class="diff-mark" role="img" aria-label="added">\+<\/span>/u);
+  assert.doesNotMatch(html, /style=|tabindex/u, 'the lines wrap in their box, so there is no scroller to reach');
+});
+
+test('A LONG RUN OF SHARED LINES FOLDS, keeping three beside each change', () => {
+  const before = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join('\n');
+  const plan = diffPlan(diffRows(before, before.replace('line 10', 'line ten')));
+  assert.deepEqual(
+    plan.parts.map((p) => (p.fold ? `fold ${p.lines.length}` : p.lines.length)),
+    ['fold 6', 8, 'fold 7'],
+  );
+  assert.match(toHTML(parse('```diff\n' + diffRows(before, before).join('\n') + '\n```')), /<p class="diff-sum">No change<\/p><div class="diff-lines"><details class="diff-fold"><summary class="diff-toggle">20 lines unchanged<\/summary>/u);
+  assert.equal(diffPlan(['  a', '  b', '  c']).parts[0]?.fold, false, 'three lines are not worth a fold');
 });
 
 test('prose in a drawn block is not a style problem, it is a row', () => {

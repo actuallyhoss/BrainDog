@@ -85,7 +85,7 @@ test('an enum reads as words, not as an identifier', () => {
 });
 
 test('an int is grouped', () => {
-  assert.equal(display('sessions', 'wrote', 12_400), '12,400');
+  assert.equal(display('things', 'hue', 12_400), '12,400');
 });
 
 test('A LIST OPENS ON WHAT ANSWERS ITS QUESTION, and it used to open on every `index:` field', () => {
@@ -223,7 +223,7 @@ test('prose takes its direction from the text, machine-built strings do not', ()
   assert.equal(isProse('obligations', 'amount'), false, 'money');
   assert.equal(isProse('obligations', 'due'), false, 'day');
   assert.equal(isProse('obligations', 'direction'), false, 'enum');
-  assert.equal(isProse('sessions', 'wrote'), false, 'int');
+  assert.equal(isProse('things', 'hue'), false, 'int');
 });
 
 test('an unknown field is treated as prose, because that failure is the safe one', () => {
@@ -860,10 +860,10 @@ test('A ROW SAYS WHICH THING IT BELONGS TO, and every list was grey because noth
    */
   const first = (register: string) => ROWS[register]?.[0]?.fields ?? {};
 
-  /* Six of the eight registers the seed ships declare `thing -> things`, and `things` is the one
-     register with an `identity:`. So six of the eight lists in this product can say which project
-     a row belongs to in one glyph. */
-  for (const register of ['obligations', 'services', 'sessions', 'tracks', 'tasks']) {
+  /* Four of the seven registers the seed ships declare `thing -> things`, and `things` is the one
+     register with an `identity:`. So those four lists can say which project a row belongs to in one
+     glyph. An agent run names its project as spoken text, not a ref, so it is not among them. */
+  for (const register of ['obligations', 'services', 'tracks', 'tasks']) {
     const found = identityFor(register, first(register));
     assert.ok(found, `${register} row 1 belongs to no thing, and it declares a ref that reaches one`);
     assert.ok(found.mark.length > 0, `${register} gave a thing with no mark`);

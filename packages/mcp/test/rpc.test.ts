@@ -40,9 +40,42 @@ test('initialize hands over the instructions and a version both sides speak', as
     assert.equal(r.instructions, INSTRUCTIONS);
     assert.equal(r.serverInfo.name, 'braindog');
   }
-  for (const params of [{ protocolVersion: '2024-11-05' }, {}])
-    assert.equal(result<{ protocolVersion: string }>(await handle(req('initialize', params), surface, ctx)).protocolVersion, '2026-07-28');
+  assert.equal(result<{ protocolVersion: string }>(await handle(req('initialize', {}), surface, ctx)).protocolVersion, '2026-07-28');
   assert.equal(calls.length, 0, 'initialize read the record');
+});
+
+test('AN OLDER CLIENT IS ANSWERED WITH THE NEWEST VERSION AT OR BELOW ITS OWN, never a newer one', async () => {
+  /* A client names the revision it speaks. One this server does not know is answered with the newest
+     it does that is no newer, because a client cannot speak a revision written after it. */
+  const { surface } = stub();
+  const version = async (asked: string) =>
+    result<{ protocolVersion: string }>(await handle(req('initialize', { protocolVersion: asked }), surface, ctx)).protocolVersion;
+  assert.equal(await version('2025-11-25'), '2025-06-18');
+  assert.equal(await version('2025-06-01'), '2025-03-26');
+  assert.equal(await version('2027-01-01'), '2026-07-28');
+
+  /* Older than every one it speaks: no version is safe to answer with, so the error names them. */
+  const e = error(await handle(req('initialize', { protocolVersion: '2024-11-05' }), surface, ctx));
+  assert.equal(e.code, -32602);
+  assert.deepEqual(e.data, { supported: [...VERSIONS], requested: '2024-11-05' });
+});
+
+test('server/discover IS ANSWERED, with the versions, the capabilities, who this is and the instructions', async () => {
+  const { surface, calls } = stub();
+  const r = result<Record<string, unknown>>(
+    await handle(req('server/discover', { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' } }), surface, ctx),
+  );
+  assert.deepEqual(r, {
+    resultType: 'complete',
+    supportedVersions: [...VERSIONS],
+    capabilities: { tools: {}, resources: {}, prompts: {} },
+    _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'braindog', version: '0.0.0' } },
+    instructions: INSTRUCTIONS,
+    ttlMs: 3_600_000,
+    cacheScope: 'public',
+  });
+  assert.ok(METHODS.includes('server/discover'));
+  assert.equal(calls.length, 0, 'discover read the record');
 });
 
 test('ping answers, and prompts are an empty list for now', async () => {

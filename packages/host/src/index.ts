@@ -113,6 +113,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'version', group: 'READ+', writes: false, what: "The record's version, so a client can ask what changed since." },
   { name: 'whoami', group: 'READ+', writes: false, what: 'Who you are to this record, and which verbs you reach.' },
   { name: 'sessionsLive', group: 'READ+', writes: false, what: 'The runs that are live now, with how long since each was heard from.' },
+  { name: 'context', group: 'READ+', writes: false, what: 'Where an agent stands: its run, its project, the last handoff, who is live, what waits, and what applies here.' },
   { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.',
     takes: { digest: 'text' } },
   { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
@@ -306,6 +307,7 @@ export type RecordSurface = {
   attach(args: never, ctx: never): Promise<Result<unknown>>;
   handoff(args: never, ctx: never): Promise<Result<unknown>>;
   sessionsLive(args: never, ctx: never): Promise<Result<unknown>>;
+  context(args: never, ctx: never): Promise<Result<unknown>>;
 };
 
 export function handlersFor(api: RecordSurface): Record<string, Handler> {
@@ -349,6 +351,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     attach: (a, ctx) => api.attach(a as never, ctx as never),
     handoff: (a, ctx) => api.handoff(a as never, ctx as never),
     sessionsLive: (a, ctx) => api.sessionsLive(a as never, ctx as never),
+    context: (a, ctx) => api.context(a as never, ctx as never),
   };
   /* The table and the wiring, checked against each other where they are both in scope — so adding a
      route to one without the other throws at start rather than 404ing in production. */

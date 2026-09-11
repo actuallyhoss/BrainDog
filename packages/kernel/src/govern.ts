@@ -177,8 +177,11 @@ const MAX_ROWS = 200;
  * THE BODY IS CHECKED HERE AND NOT AT THE GATE, because the person answering it should not be the
  * one who finds out it was malformed. A proposal that cannot be applied is a proposal that should
  * never have been filed.
+ *
+ * `actor` MAY BE ASKED FOR, and then it is asked only once the body has passed. A token's proposal is
+ * signed by its run, and working out the run can open one: a proposal refused here must open nothing.
  */
-export function propose(deps: GovernDeps, actor: string, p: Proposal): Result<{ id: string }> {
+export function propose(deps: GovernDeps, actor: string | (() => string), p: Proposal): Result<{ id: string }> {
   if (!p?.question?.trim())
     return no<{ id: string }>('REQUIRED_MISSING', 'A proposal is a question somebody can answer.', { at: 'question' });
   if (!(BODY_KINDS as readonly string[]).includes(p.body_kind))
@@ -190,6 +193,7 @@ export function propose(deps: GovernDeps, actor: string, p: Proposal): Result<{ 
   const wrong = checkBody(deps, p.body_kind, p.body ?? {});
   if (wrong) return { ok: false, refusal: wrong };
 
+  const by = typeof actor === 'function' ? actor() : actor;
   const id = `SG${deps.allocate('suggestion')}`;
   const at = instant(deps.nowMs);
   deps.sql.exec(
@@ -197,7 +201,7 @@ export function propose(deps: GovernDeps, actor: string, p: Proposal): Result<{ 
     id,
     p.body_kind,
     JSON.stringify(p.body ?? {}),
-    actor,
+    by,
     at,
   );
   /* THE QUESTION GOES IN `to_v`, WHICH IS WHERE 45 §5.4 PUTS IT — and `note` is capped at 280 by
@@ -206,7 +210,7 @@ export function propose(deps: GovernDeps, actor: string, p: Proposal): Result<{ 
      copy. So a question over 280 characters was silently cut here and the cut version became the
      immutable `decision.question` — the record's permanent answer to "what was asked", wrong, with
      the original nowhere. */
-  event(deps, at, actor, 'suggest', `suggestion:${id}`, 'suggestion', p.question);
+  event(deps, at, by, 'suggest', `suggestion:${id}`, 'suggestion', p.question);
   return ok({ id });
 }
 
@@ -468,7 +472,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     }
   }
 
-  const question = questionOf(deps, id) ?? id;
+  const question = questionOf(deps.sql, id) ?? id;
   const decision = `D${deps.allocate('decision')}`;
   deps.sql.exec(
     'INSERT INTO decision (id, question, answer, reason, decided_by, ts, supersedes) VALUES (?, ?, ?, ?, ?, ?, NULL)',
@@ -635,10 +639,13 @@ export function reopen(deps: GovernDeps, id: string, why = 'What was accepted wo
  * `to_v` FIRST AND `note` AFTER IT. `to_v` is where it belongs and where it is written now; `note`
  * is where a record written by an earlier build put it, capped at 280. Reading both costs one
  * `coalesce` and means an old record's questions still answer for themselves.
+ *
+ * EXPORTED, because what waits on a person is read by its question: `boot` and `context` list open
+ * suggestions, and an id with no question is a list nobody can answer from.
  */
-function questionOf(deps: GovernDeps, id: string): string | null {
+export function questionOf(sql: Sql, id: string): string | null {
   return (
-    deps.sql.one<{ q: string | null }>(
+    sql.one<{ q: string | null }>(
       "SELECT coalesce(to_v, note) AS q FROM event WHERE kind = 'suggest' AND target = ? ORDER BY rowid LIMIT 1",
       `suggestion:${id}`,
     )?.q ?? null

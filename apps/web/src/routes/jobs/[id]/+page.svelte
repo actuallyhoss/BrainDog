@@ -13,7 +13,7 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { ROWS, job as jobById } from '$lib/record/api.ts';
+  import { ROWS, job as jobById, runName } from '$lib/record/api.ts';
   import { page as route } from '$app/state';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -40,15 +40,15 @@
    * WHAT THE RUN IS DOING, WHICH IS WHAT EVERY OTHER SCREEN CALLS IT.
    *
    * The heading was the job's `kind`, `qa`, lower case, then `j_9K4A` in the id face: a stranger
-   * asked what qa is. `/t/1` lists the same run under "Working on this" by the session's `doing`,
-   * the sentence the agent keeps about itself, and so does the session's own row. That is the
-   * title now. The kicker is the noun, Run, and the id stays the chip beside the title rather than
+   * asked what qa is. `/t/1` lists the same run among its project's agents by the run's `doing`,
+   * the sentence the agent keeps about itself, and so does the run's own row. That is the title
+   * now. The kicker is the noun, Run, and the id stays the chip beside the title rather than
    * joining the kicker, because an upper-cased `J_9K4A` is another id.
    *
-   * A run no session names keeps the kind as its title, which is what the heading said before.
+   * A job that names no run keeps the kind as its title, which is what the heading said before.
    */
   const doing = $derived(
-    JOB ? String((ROWS.sessions ?? []).find((s) => s.fields.job === JOB.id)?.fields.doing ?? '') : '',
+    JOB?.run ? String((ROWS.session ?? []).find((s) => runName(s) === JOB.run)?.fields.doing ?? '') : '',
   );
   const named = $derived(doing || JOB?.kind || copy.run);
 

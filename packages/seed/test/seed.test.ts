@@ -20,7 +20,7 @@ import { openRecord, type Entry, type Kernel } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { fixOf, sayOf } from '@braindog/ports';
 
-import { NOW, ORDER, REGISTERS, ROWS, TODAY, forWrite, installSeed } from '../src/index.ts';
+import { NOW, ORDER, REGISTERS, ROWS, TODAY, forWrite, hours, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -215,9 +215,39 @@ test('a ref is written as the number a person says, and only where the declarati
     thing: 'things#1',
     amount: 100,
   });
-  // `hue` is an int on `things` and stays one; `wrote` is an int on `sessions`.
+  // `hue` is an int on `things` and stays one; `effort` is a duration on `tasks`, beside a ref.
   assert.deepEqual(forWrite('things', { name: 'x', hue: 214 }), { name: 'x', hue: 214 });
-  assert.deepEqual(forWrite('sessions', { doing: 'x', wrote: 14, thing: 3 }), { doing: 'x', wrote: 14, thing: 'things#3' });
+  assert.deepEqual(forWrite('tasks', { what: 'x', effort: 14, thing: 3 }), { what: 'x', effort: 14, thing: 'things#3' });
   // An absent field is absent, and a null one is a null the write path knows how to clear.
   assert.deepEqual(forWrite('obligations', { party: null, thing: undefined }), { party: null });
+});
+
+/* ── agent runs are the kernel's ─────────────────────────────────────────── */
+
+test('ONE LIST OF AGENT RUNS on a seeded record: the kernel’s `session`, and nothing of the seed’s', async () => {
+  // The seed once declared `sessions` beside the kernel's `session`, and the rail drew two lists
+  // called Agent runs.
+  const { k, sql } = await seeded();
+  const named = (id: string) => (k.register(id) as unknown as { name?: string } | undefined)?.name;
+  const runs = [...k.registers().keys()].filter((id) => named(id) === 'Agent runs' || /^sessions?$/.test(id));
+  assert.deepEqual(runs, ['session']);
+  assert.equal(REGISTERS.sessions, undefined);
+  assert.equal(k.count('session'), ROWS.session?.length);
+  sql.close();
+});
+
+test('A SEEDED RUN CARRIES WHAT ONLY THE RECORD WRITES, and the refusal guarding those fields is whole', async () => {
+  const { k, sql } = await seeded();
+  const s1 = k.get('S1');
+  assert.ok(s1, 'S1 does not resolve');
+  assert.equal(s1.fields.project, 'things#1', 'a run names its project by spoken id, as the ladder does');
+  assert.equal(s1.fields.last_seen, ROWS.session?.[0]?.last_seen);
+  assert.ok(NOW - Date.parse(String(s1.fields.last_seen)) < 5 * 60_000, 'S1 should read as minutes ago, not as the clock');
+
+  // The seed's path is the kernel's own, not a door: a caller naming one of these is still refused.
+  for (const [field, value] of [['last_seen', hours(0)], ['project', 'things#1'], ['token_id', 't_example']] as const) {
+    const out = k.create('session', { doing: 'x', [field]: value }, { actor: 'p_seed' });
+    assert.equal(out.ok ? 'accepted' : 'refusal' in out ? out.refusal.code : 'conflict', 'IMMUTABLE_FIELD', `${field} was taken from a caller`);
+  }
+  sql.close();
 });

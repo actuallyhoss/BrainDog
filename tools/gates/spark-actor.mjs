@@ -224,6 +224,9 @@ const registers = [...record.registers().keys()];
 let register;
 let listed = null;
 for (const id of registers) {
+  /* Not the kernel's own register: it refuses its kernel-written fields before 30 §3's guard is
+     reached, so a refusal there would pass this gate for the wrong reason. */
+  if (id === 'session') continue;
   const tried = record.list({ register: id, limit: 1 });
   if (tried?.ok && tried.value.rows.length > 0) {
     register = id;
@@ -293,7 +296,7 @@ if (opened && !opened.ok) {
 const offers = [
   ['create', () => record.create(register, row.fields, { actor })],
   ['edit', () => record.update(register, row.id, {}, { actor })],
-  ['note', () => record.log(register, row.seq, actor, 'A note no model may sign on its own account.')],
+  ['note', () => record.log(register, row.seq, { actor }, 'A note no model may sign on its own account.')],
 ];
 if (opened?.ok)
   offers.push([

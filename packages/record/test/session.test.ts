@@ -97,7 +97,7 @@ test('A PERSON IS NEVER A RUN, whatever hints their call carries', async () => {
 });
 
 test('A TOKEN’S NOTE IS SIGNED BY ITS RUN, and a note against nothing opens none', async () => {
-  const { api, sql } = await record();
+  const { api, sql, clock } = await record();
   const task = value<Entry>(await api.create({ register: 'tasks', fields: { what: 'Draft' } }, owner));
   const said = agent({ ...HERE, client_id: 'c-1' });
 
@@ -107,6 +107,28 @@ test('A TOKEN’S NOTE IS SIGNED BY ITS RUN, and a note against nothing opens no
   value(await api.log({ register: 'tasks', seq: task.seq!, note: 'Read it through.' }, said));
   assert.deepEqual(runs(sql), [1]);
   assert.deepEqual(events(sql, task.id).at(-1), { actor: 'S1', kind: 'note', note: 'Read it through.' });
+
+  /* AND IT MOVES THE RUN'S HEARTBEAT, with no version and no event: a run that only reads and notes
+     is still working, and must not go stale for it. */
+  const s1 = await run(api, 'S1');
+  clock.advance(10 * MIN);
+  value(await api.log({ register: 'tasks', seq: task.seq!, note: 'Read it again.' }, said));
+  const later = await run(api, 'S1');
+  assert.deepEqual([later.fields.last_seen, later.version], [iso(NOW + 10 * MIN), s1.version]);
+  assert.deepEqual(events(sql, s1.id).map((e) => e.kind), ['create']);
+  sql.close();
+});
+
+test('A TOKEN’S PROPOSAL IS SIGNED BY ITS RUN, and a person’s by the person', async () => {
+  const { api, sql } = await record();
+  const body = { register: 'tasks', rows: [{ fields: { what: 'Proposed' } }] };
+  const mine = value<{ id: string }>(await api.propose({ question: 'Add this?', body_kind: 'rowset', body }, agent({ ...HERE, client_id: 'c-1' })));
+  const theirs = value<{ id: string }>(await api.propose({ question: 'And this?', body_kind: 'rowset', body }, owner));
+
+  const opened = value<{ opened_by: string }>(await api.governance({ id: mine.id }, owner));
+  assert.equal(opened.opened_by, 'S1');
+  assert.equal(value<{ opened_by: string }>(await api.governance({ id: theirs.id }, owner)).opened_by, 'p_1');
+  assert.deepEqual(runs(sql), [1]);
   sql.close();
 });
 
@@ -123,7 +145,9 @@ test('ATTACH OPENS A RUN SIGNED BY ITSELF, and attaching again resumes it and re
     { doing: 'Wire the ladder', branch: 'master', head: 'aee9762', last_seen: iso(NOW) },
   );
   assert.deepEqual(events(sql, first.session.id), [{ actor: 'S1', kind: 'create', note: 'opened: startup' }]);
-  assert.deepEqual(runs(sql), [1], 'asking the ladder left a row behind');
+  assert.deepEqual(runs(sql), [1], 'attaching opened more than the one run');
+  /* AND THE BRIEFING FOR IT RIDES IN THE SAME ANSWER, so the start hook needs one call. */
+  assert.deepEqual([first.context.session?.spoken, first.context.project], ['S1', null]);
 
   clock.advance(5 * MIN);
   const again = value<Attached>(await api.attach({ source: 'resume', client_id: 'c-1', branch: 'feature', head: '41b120e' }, agent(HERE)));
@@ -135,7 +159,7 @@ test('ATTACH OPENS A RUN SIGNED BY ITSELF, and attaching again resumes it and re
   assert.deepEqual(events(sql, again.session.id).at(-1)?.actor, 'S1');
   assert.ok(events(sql, again.session.id).some((e) => e.note === 'attached: resume'));
 
-  /* Another client is another run, and the number the question used was given back. */
+  /* Another client is another run, S2: finding S1 again spent no number. */
   assert.equal(value<Attached>(await api.attach({ source: 'startup', client_id: 'c-2' }, agent(HERE))).spoken, 'S2');
   assert.deepEqual(runs(sql), [1, 2]);
   sql.close();
@@ -260,7 +284,9 @@ test('BOOT CARRIES THE LIVE RUNS AND WHAT WAITS ON A PERSON, each held to what t
 
   const boot = value<Boot>(await api.boot(owner));
   assert.deepEqual(boot.sessions.map((s) => s.spoken), ['S1']);
-  assert.deepEqual(boot.waiting.map((w) => [w.id, w.body_kind]), [[asked.id, 'rowset']]);
+  /* WITH ITS QUESTION, which is the `suggest` event's and not a column: an id alone is nothing a
+     person can answer. */
+  assert.deepEqual(boot.waiting.map((w) => [w.id, w.body_kind, w.question]), [[asked.id, 'rowset', 'Add these?']]);
 
   const scoped = value<Boot>(await api.boot(agent(HERE, { registers: ['tasks'] })));
   assert.deepEqual(scoped.sessions, [], 'a token held to tasks read the runs');
@@ -268,7 +294,7 @@ test('BOOT CARRIES THE LIVE RUNS AND WHAT WAITS ON A PERSON, each held to what t
   sql.close();
 });
 
-test('GET ANSWERS S1, and a run the caller may not read answers as no row', async () => {
+test('GET ANSWERS S1, and a prefix the caller reads no register of is one no register has', async () => {
   const { api, sql } = await record();
   value(await api.attach({ source: 'startup', client_id: 'c-1' }, agent(HERE)));
   const task = value<Entry>(await api.create({ register: 'tasks', fields: { what: 'A task' } }, owner));
@@ -276,6 +302,12 @@ test('GET ANSWERS S1, and a run the caller may not read answers as no row', asyn
   assert.equal((await run(api, 'S1')).fields.client_id, 'c-1');
   assert.equal(value<Entry | null>(await api.get({ spoken: 'S9' }, owner)), null);
   assert.equal(value<Entry | null>(await api.get({ spoken: `tasks#${task.seq}` }, owner))?.id, task.id);
-  assert.equal(value<Entry | null>(await api.get({ spoken: 'S1' }, agent(HERE, { registers: ['tasks'] }))), null);
+
+  /* THE SAME REFUSAL FOR A PREFIX NOBODY HAS AND FOR ONE THE CALLER CANNOT READ, so the answer says
+     nothing about which registers exist. SG and D are sent to governance. */
+  const held = refusal(await api.get({ spoken: 'S1' }, agent(HERE, { registers: ['tasks'] })));
+  const none = refusal(await api.get({ spoken: 'LN7' }, owner));
+  assert.deepEqual([held.code, held.at, none.code], ['REGISTER_UNKNOWN', 'spoken', 'REGISTER_UNKNOWN']);
+  assert.match(refusal(await api.get({ spoken: 'SG12' }, owner)).fix, /governance/);
   sql.close();
 });

@@ -29,7 +29,6 @@ import {
 import { no, ok } from '@braindog/ports';
 import {
   fill,
-  instant,
   isStale,
   openRecord,
   sessionDeclaration,
@@ -159,6 +158,25 @@ const KEPT = 50;
 const LINE = 280;
 /** The runtime's own id for a run, in the grammar its header has (`44 §4.2`). */
 const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+
+/* ── what `context` shows (`loop/research-agent-path.md` §6.3) ──────────── */
+
+/** A register's rows `context` shows from the project, and again from everywhere, newest first. */
+const SHOWN = 20;
+/** The people linked to the project, most recently touched first. */
+const MET = 10;
+/** The open questions, newest first. */
+const ASKED = 8;
+/**
+ * A register whose rows fade: one with a `confirmed_on` day, as the agents pack's learnings have. A row
+ * neither confirmed nor made in the last ninety days is left out of `context` and counted in `faded`.
+ */
+const FADES = 'confirmed_on';
+const FADE_MS = 90 * 86_400_000;
+/** What a `Brief` is made of. A field with one of these ids does not overwrite it. */
+const BRIEF_KEYS: readonly string[] = ['spoken', 'version', 'scope', 'state'];
+/** A spoken id with a prefix, `S42` or `LN7`, as against `tasks#3`. */
+const PREFIXED = /^[A-Z][A-Z0-9]{0,3}[1-9][0-9]*$/;
 
 /** What a method needs. The ladder is ordered, and the check is an index comparison. */
 export type Need = 'read' | 'propose' | 'append' | 'write' | 'decide' | 'owner';
@@ -329,16 +347,67 @@ export type LiveRun = Entry & {
   same_repo: boolean;
 };
 
-/** One open suggestion, without its body: a `rowset` can carry two hundred rows, and `boot` is the first paint. */
-export type Waiting = { id: string; body_kind: string; opened_by: string; opened_at: string };
+/**
+ * One open suggestion, with its question and without its body: a `rowset` can carry two hundred rows,
+ * and `boot` is the first paint.
+ */
+export type Waiting = { id: string; body_kind: string; opened_by: string; opened_at: string; question: string };
 
-/** `attach`: the run this agent is, and whether it was already there. */
+/** `attach`: the run this agent is, whether it was already there, and the briefing for where it stands. */
 export type Attached = {
   session: Entry;
   spoken: string;
   resumed: boolean;
   /** The project the run is placed in, by spoken id, or `null` for none. */
   project: string | null;
+  context: Context;
+};
+
+/**
+ * One row as `context` shows it: its spoken id, its version for the compare-and-set, whether it is the
+ * project's own or applies everywhere, its state, and the register's `mobile` fields and title. A ref
+ * is its spoken id. A `secret` field is what is known about its grant, `{ sealed, opened, last_opened,
+ * last_by }`, and never the grant or a value.
+ */
+export type Brief = { spoken: string; version: number; scope: 'project' | 'global'; state: string | null } & Record<string, unknown>;
+
+/** Another run that is live now, as `context` shows it. */
+export type LiveBrief = {
+  spoken: string;
+  state: string | null;
+  doing: string | null;
+  agent: string | null;
+  repo: string | null;
+  project: string | null;
+  stale: boolean;
+  age_s: number;
+};
+
+/**
+ * `context`: where an agent stands, in one call (`loop/research-agent-path.md` §6.3). It never writes,
+ * and it never opens a run.
+ */
+export type Context = {
+  /** The caller's run, when it is a token that has one. */
+  session: { spoken: string; state: string | null } | null;
+  /** The project the caller stands in, and the rung that placed it. `null` is global. */
+  project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' } | null;
+  /** Projects that matched at the same strength, which leaves the caller global. */
+  ambiguous: string[];
+  /** The newest other run in this project, or this repository, that left a next step. */
+  handoff: { from: string; age_s: number; next: string; tried: string[]; head: string | null } | null;
+  /** The other runs that are live now. `stale` is worked out at 45 minutes. */
+  live: { same_repo: LiveBrief[]; elsewhere: LiveBrief[] };
+  /** Open suggestions, newest first, each with the question a person answers. */
+  waiting: { id: string; question: string }[];
+  /** Every register with a scope field the caller may read: the project's open rows, then the global ones nearer-wins leaves. */
+  registers: { id: string; name: string; rows: Brief[]; inherited: Brief[]; truncated: boolean }[];
+  /** The people linked to this project, most recently touched first. */
+  people: Brief[];
+  /** Rows of a fading register left out because nobody confirmed them in ninety days. */
+  faded: number;
+  /** One sentence: what to call next. */
+  next: string;
 };
 
 /**
@@ -657,8 +726,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
   };
 
   /**
-   * Who signs a call the kernel's ladder does not reach: a proposal, a decision, a pack's seed rows.
-   * For a token that is the person who holds it, because `kernel.propose` takes a name and no run.
+   * Who signs a call the kernel's ladder does not reach: a decision, an invitation, a pack's seed rows.
+   * For a token that is the person who holds it; a token reaches none of these but a read.
    */
   const actorOf = (ctx: CallContext): string =>
     ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
@@ -684,59 +753,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
         }
       : { actor: ctx.principal.id };
 
-  /** The fields a run starts with: every hint but its name, as the ladder's opening writes them. */
-  const opening = (hints: SessionHints): Patch =>
-    Object.fromEntries(Object.entries(hints).filter(([key, value]) => key !== 'spoken' && typeof value === 'string' && value !== ''));
-
-  /** Thrown to undo the write that asks the ladder, and caught where it is thrown. */
-  const UNDO = Symbol('undo');
-
   /**
-   * The run a token's call belongs to, for the calls that must know it before they write.
-   *
-   * `attach` and `handoff` write the run's own row, and `log` signs a note rather than writing a row,
-   * so none of them can leave the finding to the write the way `create` does. THE LADDER IS ASKED, NOT
-   * COPIED. It runs only inside a write, so an empty row is written as this token and the transaction
-   * is undone: the actor that row was signed with names the run. Nothing the question did is kept, the
-   * counter included, so a run the ladder would have opened is opened here under that same number and
-   * signed by itself, as the ladder signs one.
-   *
-   * NEVER INSIDE ANOTHER TRANSACTION, because the undo would take the caller's own writes with it.
+   * The run a token's call belongs to, for the calls that must know it before they write: `attach` and
+   * `handoff` write the run's own row. The kernel finds it by the ladder, or opens it signed by itself
+   * with `note`, and writes nothing to a run it found: the call's own write moves its heartbeat.
    */
-  const runFor = (ctx: CallContext, hints: SessionHints, note: string): Result<{ run: Entry; spoken: string; opened: boolean }> => {
-    const as: CallContext = { ...ctx, session: hints };
-    let signed: string | undefined;
-    try {
-      kernel.transaction(() => {
-        const asked = kernel.create(SESSION, {}, { ...writerOf(as), cascade: false });
-        signed = asked.ok ? kernel.history(asked.value.id)[0]?.actor : undefined;
-        throw UNDO;
-      });
-    } catch (e) {
-      if (e !== UNDO) throw e;
-    }
-    const n = signed?.startsWith(PREFIX) ? Number(signed.slice(PREFIX.length)) : Number.NaN;
-    const numbered = Number.isSafeInteger(n) && n > 0;
-    const known = numbered ? kernel.get({ register: SESSION, seq: n }) : null;
-    if (known) return ok({ run: known, spoken: `${PREFIX}${n}`, opened: false });
+  const runFor = (ctx: CallContext, hints: SessionHints, note: string): Result<{ run: Entry; spoken: string; opened: boolean }> =>
+    kernel.runFor(writerOf({ ...ctx, session: hints }), note);
 
-    /* OPENED WITH WHAT THE LADDER'S OPENING CARRIES: every hint but the name, the heartbeat, the token,
-       and the project the place resolves to. When the ladder could not open one either, this create
-       meets the same refusal, and that refusal is the answer. */
-    const project = kernel.resolveProject({ remote: hints.remote, repo: hints.repo, cwd: hints.cwd }).project;
-    const opened = kernel.create(SESSION, opening(hints), {
-      actor: numbered && signed !== undefined ? signed : agentOf(as),
-      note,
-      cascade: false,
-      stamp: {
-        last_seen: instant(clock.now()),
-        ...(ctx.principal.kind === 'token' ? { token_id: ctx.principal.id } : {}),
-        ...(project ? { project: project.spoken } : {}),
-      },
-    });
-    if (!opened.ok) return opened as Result<never>;
-    if (numbered && opened.value.seq !== n) throw new TypeError(`${String(signed)} was opened as ${PREFIX}${String(opened.value.seq)}`);
-    return ok({ run: opened.value, spoken: `${PREFIX}${String(opened.value.seq)}`, opened: true });
+  /** Seconds since a run was last heard from, or since its row last changed when it never was. */
+  const ageOf = (row: Entry): number => {
+    const seen = typeof row.fields.last_seen === 'string' ? row.fields.last_seen : row.updated_at;
+    return Math.max(0, Math.floor((clock.now() - Date.parse(seen)) / 1000));
   };
 
   /**
@@ -756,28 +784,179 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
     if (!rows.ok) return [];
     const now = clock.now();
     const repo = ctx.session?.repo;
-    return rows.value.rows.map((row) => {
-      const seen = typeof row.fields.last_seen === 'string' ? row.fields.last_seen : row.updated_at;
-      return {
-        ...row,
-        spoken: `${PREFIX}${String(row.seq)}`,
-        stale: isStale(row, now),
-        age_s: Math.max(0, Math.floor((now - Date.parse(seen)) / 1000)),
-        same_repo: repo !== undefined && row.fields.repo === repo,
-      };
-    });
+    return rows.value.rows.map((row) => ({
+      ...row,
+      spoken: `${PREFIX}${String(row.seq)}`,
+      stale: isStale(row, now),
+      age_s: ageOf(row),
+      same_repo: repo !== undefined && row.fields.repo === repo,
+    }));
   };
 
   /**
-   * Open suggestions the caller may see, newest first, held to the ceiling `governance` holds them to.
-   * The body is one `governance({ id })` away.
+   * Open suggestions the caller may see, newest first, held to the ceiling `governance` holds them to,
+   * each with its question, which is its `suggest` event rather than a column. The body is one
+   * `governance({ id })` away.
    */
   const waitingFor = (ctx: CallContext): Waiting[] => {
     const rows = kernel.governance('suggestion', { status: 'open', limit: 20 });
     if (!rows.ok) return [];
     return rows.value
       .filter((row) => !holds(ctx, row))
-      .map((row) => ({ id: String(row.id), body_kind: String(row.body_kind), opened_by: String(row.opened_by), opened_at: String(row.opened_at) }));
+      .map((row) => ({
+        id: String(row.id),
+        body_kind: String(row.body_kind),
+        opened_by: String(row.opened_by),
+        opened_at: String(row.opened_at),
+        question: kernel.question(String(row.id)) ?? '',
+      }));
+  };
+
+  /**
+   * One row as `context` shows it. A key's row carries its title and `mobile` fields, and for its secret
+   * field only what is known about the grant: whether a value is sealed, and who opened it last.
+   */
+  const brief = (decl: RegisterDecl, scopeField: string, row: Entry, scope: Brief['scope']): Brief => {
+    const shown = new Set([decl.title, ...((decl as { mobile?: readonly string[] }).mobile ?? [])]);
+    const out: Brief = { spoken: kernel.nameOf(row.id), version: row.version, scope, state: row.state };
+    for (const f of decl.fields) {
+      if (f.retired || f.id === scopeField || f.id === decl.state || BRIEF_KEYS.includes(f.id)) continue;
+      const value = row.fields[f.id];
+      if (f.type === 'secret') {
+        out[f.id] = typeof value === 'string' ? kernel.keyState(value) : { sealed: false, opened: 0, last_opened: null, last_by: null };
+        continue;
+      }
+      if (!shown.has(f.id) || value === undefined) continue;
+      out[f.id] =
+        f.type === 'ref' && typeof value === 'string'
+          ? kernel.nameOf(value)
+          : f.type === 'list' && f.of === 'ref' && Array.isArray(value)
+            ? value.map((id) => kernel.nameOf(String(id)))
+            : value;
+    }
+    return out;
+  };
+
+  const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
+
+  /**
+   * Where the caller stands, in one read of each thing (`loop/research-agent-path.md` §6.3). It never
+   * writes and never opens a run, and every part is held to what the caller may read.
+   *
+   * THE PLACE IS RESOLVED AS `attach` RESOLVES IT: from the hints the caller sent, or, when it sent none,
+   * from where its run was. A caller who may not read the projects register stands nowhere in
+   * particular: naming the project would name a row of a register it cannot see.
+   */
+  const briefing = (ctx: CallContext): Context => {
+    const hints = ctx.session ?? {};
+    const token = ctx.principal.kind === 'token';
+    const run = token ? kernel.findRun(hints) : null;
+    const place = hints.remote || hints.repo || hints.cwd ? hints : run ? { remote: text(run.fields.remote) ?? undefined, repo: text(run.fields.repo) ?? undefined, cwd: text(run.fields.cwd) ?? undefined } : {};
+    const repo = hints.repo ?? text(run?.fields.repo) ?? undefined;
+
+    const holder = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
+    const resolved = holder && !readable(ctx, holder.id) ? kernel.resolveProject(place) : { project: null, ambiguous: [] };
+    const home = resolved.project ? kernel.get(resolved.project.id) : null;
+    const identity = (holder as { identity?: { mark?: string; accent?: string } } | undefined)?.identity;
+    const mark = identity?.mark === undefined ? undefined : home?.fields[identity.mark];
+    const hue = identity?.accent === undefined ? undefined : home?.fields[identity.accent];
+    const project: Context['project'] =
+      resolved.project && home && holder
+        ? {
+            spoken: resolved.project.spoken,
+            name: text(home.fields[holder.title]) ?? resolved.project.spoken,
+            mark: typeof mark === 'string' ? mark : null,
+            hue: typeof hue === 'number' ? hue : null,
+            how: resolved.project.how,
+          }
+        : null;
+
+    /* THE RUNS, when the caller may read them: the newest other one here that left a next step, and
+       the others live now. Here is the project, or with no project the repository. */
+    const runs = !readable(ctx, SESSION);
+    const here = project ? { field: 'project', is: project.spoken } : repo ? { field: 'repo', is: repo } : null;
+    const left =
+      runs && here
+        ? kernel.list({
+            register: SESSION,
+            where: { all: [here, { field: 'next', present: true }] } as Predicate,
+            order: [{ field: 'last_seen', dir: 'desc' }],
+            limit: 2,
+          })
+        : null;
+    const other = left?.ok ? left.value.rows.find((row) => row.id !== run?.id) : undefined;
+    const handoff: Context['handoff'] = other
+      ? { from: `${PREFIX}${String(other.seq)}`, age_s: ageOf(other), next: String(other.fields.next), tried: listOf(other.fields.tried), head: text(other.fields.head) }
+      : null;
+    const others = runs ? live({ ...ctx, session: { ...hints, ...(repo === undefined ? {} : { repo }) } }).filter((r) => r.id !== run?.id) : [];
+    const liveBrief = (r: LiveRun): LiveBrief => ({
+      spoken: r.spoken,
+      state: r.state,
+      doing: text(r.fields.doing),
+      agent: text(r.fields.agent),
+      repo: text(r.fields.repo),
+      project: text(r.fields.project),
+      stale: r.stale,
+      age_s: r.age_s,
+    });
+
+    /* THE REGISTERS THAT SAY WHERE A ROW APPLIES, each held to the caller's level. A register whose
+       scope links a row to projects, as people are linked, is who is here rather than what applies. */
+    const cutoff = new Date(clock.now() - FADE_MS).toISOString().slice(0, 10);
+    const registers: Context['registers'] = [];
+    let people: Brief[] = [];
+    let faded = 0;
+    let fading = false;
+    for (const [id, decl] of kernel.registers()) {
+      const f = decl.fields.find((field) => field.scope !== undefined && !field.retired);
+      if (!f || readable(ctx, id)) continue;
+      if (f.scope?.links === true) {
+        const met = home ? kernel.inScope(id, home.id, { limit: MET }) : null;
+        if (met?.ok) people = [...people, ...met.value.rows.map((row) => brief(decl, f.id, row, 'project'))].slice(0, MET);
+        continue;
+      }
+      const fades = decl.fields.some((field) => field.id === FADES && field.type === 'day' && !field.retired);
+      const got = kernel.inScope(id, home?.id ?? null, { limit: fades ? 200 : SHOWN + 1, open: true });
+      if (!got.ok) continue;
+      const fresh = (rows: Entry[]): Entry[] => {
+        if (!fades) return rows;
+        const kept = rows.filter((row) => String(row.fields[FADES] ?? row.created_at.slice(0, 10)) >= cutoff);
+        faded += rows.length - kept.length;
+        return kept;
+      };
+      const rows = fresh(got.value.rows);
+      const inherited = fresh(got.value.inherited);
+      if (fades && rows.length + inherited.length > 0) fading = true;
+      registers.push({
+        id,
+        name: decl.name,
+        rows: rows.slice(0, SHOWN).map((row) => brief(decl, f.id, row, 'project')),
+        inherited: inherited.slice(0, SHOWN).map((row) => brief(decl, f.id, row, 'global')),
+        truncated: rows.length > SHOWN || inherited.length > SHOWN || (fades && Math.max(got.value.rows.length, got.value.inherited.length) >= 200),
+      });
+    }
+
+    const next =
+      token && !run
+        ? 'Your first write opens a session; before you stop, call handoff with the one next step.'
+        : handoff
+          ? `Start from the handoff ${handoff.from} left, and call handoff with your own next step before you stop.`
+          : fading
+            ? 'When a learning shown here held, set its confirmed_on to today with update, and call handoff before you stop.'
+            : 'Work from what is open here, and call handoff with the one next step before you stop.';
+
+    return {
+      session: run ? { spoken: `${PREFIX}${String(run.seq)}`, state: run.state } : null,
+      project,
+      ambiguous: project || !holder || readable(ctx, holder.id) ? [] : resolved.ambiguous,
+      handoff,
+      live: { same_repo: others.filter((r) => r.same_repo).map(liveBrief), elsewhere: others.filter((r) => !r.same_repo).map(liveBrief) },
+      waiting: waitingFor(ctx).slice(0, ASKED).map(({ id, question }) => ({ id, question })),
+      registers,
+      people,
+      faded,
+      next,
+    };
   };
 
   /** An argument that is a line of text, `undefined` when it was not sent, or the refusal saying why not. */
@@ -848,12 +1027,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
      * A SPOKEN ID NEEDS NO REGISTER, because the kernel resolves it against the installed prefixes. A row
      * the caller may not read answers as a row that is not there: a refusal naming its register would
      * say which registers exist, one guess at a time.
+     *
+     * A PREFIX NO REGISTER THE CALLER READS HOLDS is `REGISTER_UNKNOWN`, whether no register has it or
+     * the caller cannot read the one that does, so the two cannot be told apart. `SG` and `D` are
+     * governance's, which the sentence says, because they are the ones an agent reaches for.
      */
     async get(args: { register?: string; seq?: number; spoken?: string }, ctx: CallContext): Promise<Result<Entry | null>> {
       if (typeof args?.spoken === 'string') {
         const stop = scoped(ctx, 'read');
         if (stop) return { ok: false, refusal: stop };
-        const row = kernel.get(args.spoken.trim());
+        const said = args.spoken.trim();
+        if (PREFIXED.test(said)) {
+          const owner = [...kernel.registers().values()].find(
+            (d) => d.seq_prefix && d.seq_prefix !== '#' && said.startsWith(d.seq_prefix) && /^[1-9][0-9]*$/.test(said.slice(d.seq_prefix.length)),
+          );
+          if (!owner || readable(ctx, owner.id))
+            return no(
+              'REGISTER_UNKNOWN',
+              `No register you can read numbers its rows ${/^[A-Z]+/.exec(said)?.[0] ?? said}. A suggestion (SG) or a decision (D) is read with governance.`,
+              { at: 'spoken' },
+            );
+          return ok(kernel.get(said));
+        }
+        const row = kernel.get(said);
         return ok(row && !readable(ctx, row.register) ? row : null);
       }
       const stop = guard(ctx, 'read', args.register);
@@ -1188,13 +1384,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
          patch, so a log entry bumped the row's VERSION — and anybody holding the version they read
          then got a spurious `VERSION_STALE` on their next real change, for a call that changed no
          field. 30 §2: `note` is "the one row a person or an agent writes on purpose". */
-      /* A TOKEN'S NOTE IS SIGNED BY ITS RUN, found or opened as its writes are, and only once the row is
-         known to be there, so a note against nothing opens no run. It moves no heartbeat: `kernel.log`
-         takes a name and no `WriteContext`, and only a write's ladder moves one. */
-      if (ctx.principal.kind !== 'token' || !kernel.get({ register: args.register, seq: args.seq }))
-        return tail(kernel.log(args.register, args.seq, actorOf(ctx), note));
-      const run = runFor(ctx, ctx.session ?? {}, 'opened: auto');
-      return tail(kernel.log(args.register, args.seq, run.ok ? run.value.spoken : agentOf(ctx), note));
+      /* A TOKEN'S NOTE IS SIGNED BY ITS RUN, found or opened as its writes are, and it moves the run's
+         heartbeat. The kernel finds the row first, so a note against nothing opens no run. */
+      return tail(kernel.log(args.register, args.seq, { ...writerOf(ctx), ...(ctx.batch === undefined ? {} : { batch: ctx.batch }) }, note));
     },
 
     /* ── AN AGENT'S RUN ─────────────────────────────── */
@@ -1233,7 +1425,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       const found = runFor(ctx, hints, `opened: ${source}`);
       if (!found.ok) return tail(found as Result<never>);
       const { run, spoken, opened } = found.value;
-      if (opened) return tail(ok({ session: run, spoken, resumed: false, project: projectOf(run) }));
+      /* THE BRIEFING FOR THE RUN JUST NAMED, so the start hook prints it from this one answer. */
+      const briefed = (): Context => briefing({ ...ctx, session: { ...hints, spoken } });
+      if (opened) return tail(ok({ session: run, spoken, resumed: false, project: projectOf(run), context: briefed() }));
 
       /* THE RUN'S OWN ROW, written as the run: the ladder finds it again from the same hints, signs the
          edit with it, moves `last_seen`, and places it again when it came back by its client id. */
@@ -1243,7 +1437,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
       const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}` });
       if (!out.ok) return tail(out as Result<never>);
-      return tail(ok({ session: out.value, spoken, resumed: true, project: projectOf(out.value) }));
+      return tail(ok({ session: out.value, spoken, resumed: true, project: projectOf(out.value), context: briefed() }));
     },
 
     /**
@@ -1333,6 +1527,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       return ok(live(ctx));
     },
 
+    /**
+     * Where the caller stands, in one call: its run and project, the last handoff here, who else is
+     * live, what waits on a person, and the rows that apply here with the global ones they inherit. A
+     * READ, scoped as `boot` is, and it opens no run: an agent asking where it is has not started yet.
+     */
+    async context(_args: Record<string, never> | undefined, ctx: CallContext): Promise<Result<Context>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      return ok(briefing(ctx));
+    },
+
     /* ── THE DECISION GATE ─────────────────────────── */
 
     /**
@@ -1384,7 +1589,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       const named = args?.body_kind === 'rowset' ? (args.body as { register?: unknown })?.register : undefined;
       const stop = guard(ctx, 'propose', typeof named === 'string' ? named : undefined);
       if (stop) return { ok: false as const, refusal: stop };
-      return kernel.propose(args, actorOf(ctx));
+      /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. */
+      return kernel.propose(args, writerOf(ctx));
     },
 
     /**

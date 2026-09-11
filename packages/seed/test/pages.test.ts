@@ -91,9 +91,12 @@ const COMPUTED = new Set(['forecast.runway']);
  */
 const COMPUTED_FIGURES = new Set(['runway']);
 
-const schemaOf = (register: string): Schema => ({
+/* THE RECORD'S REGISTERS, NOT THE SEED'S LIST. A page may draw the kernel's own `session`, which the
+   seed writes into and does not declare, and a check that skipped what the seed did not declare
+   would skip exactly that block. */
+const schemaOf = (k: Kernel, register: string): Schema => ({
   register,
-  fields: Object.fromEntries((REGISTERS[register]?.fields ?? []).map((f) => [f.id, f as never])),
+  fields: Object.fromEntries((k.register(register)?.fields ?? []).map((f) => [f.id, f as never])),
 });
 
 /* ── the record holds them ───────────────────────────────────────────────── */
@@ -120,7 +123,7 @@ test('A PAGE IS A DOCUMENT THE RECORD HOLDS, and it travels in the file', async 
 /* ── every block is about something ──────────────────────────────────────── */
 
 test('EVERY BLOCK NAMES A SOURCE THE RECORD HAS', async () => {
-  const { sql } = await seeded();
+  const { k, sql } = await seeded();
   const missing: string[] = [];
 
   for (const [slug, page] of Object.entries(PAGES))
@@ -128,7 +131,7 @@ test('EVERY BLOCK NAMES A SOURCE THE RECORD HAS', async () => {
       if (!block.source) continue;
       if (COMPUTED.has(block.source)) continue;
       const register = block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
-      if (!register || !REGISTERS[register]) missing.push(`${slug}: ${block.source}`);
+      if (!register || !k.register(register)) missing.push(`${slug}: ${block.source}`);
     }
 
   assert.deepEqual(missing, []);
@@ -152,13 +155,16 @@ test('AND EVERY `where:` RESOLVES AGAINST THE REGISTER IT NAMES', async () => {
     for (const block of blocksOf(page as Record<string, unknown>)) {
       if (!block.where || !block.source || COMPUTED.has(block.source)) continue;
       const register = block.source.slice('register.'.length);
-      if (!REGISTERS[register]) continue;
+      if (!k.register(register)) continue;
 
-      const said = first
-        ? block.where.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(first[key] ?? ''))
+      /* `{{spoken}}` is the row's spoken id, `things#1` for the first row, rather than a field. */
+      const said = first && template
+        ? block.where.replace(/\{\{(\w+)\}\}/g, (_, key: string) =>
+            key === 'spoken' ? `${template.register}#1` : String(first[key] ?? ''),
+          )
         : block.where;
 
-      const out = parseWhere(said, schemaOf(register), {
+      const out = parseWhere(said, schemaOf(k, register), {
         nowMs: NOW,
         refByTitle: (to, title) => {
           const seq = (ROWS[to] ?? []).findIndex((r) => r[REGISTERS[to]!.title] === title);
@@ -176,7 +182,7 @@ test('AND EVERY `where:` RESOLVES AGAINST THE REGISTER IT NAMES', async () => {
 test('and every column a block draws is a field the register declares', async () => {
   // A column naming a field nobody declared renders as an empty cell under a heading that promises
   // one — which reads as "no value" rather than as "no such thing".
-  const { sql } = await seeded();
+  const { k, sql } = await seeded();
   const missing: string[] = [];
   /* The four the renderer supplies rather than the register: a row's number and, for the cash walk,
      its own three. Named, so a fifth is a failure. */
@@ -186,7 +192,7 @@ test('and every column a block draws is a field the register declares', async ()
     for (const block of blocksOf(page as Record<string, unknown>)) {
       if (!block.source || COMPUTED.has(block.source)) continue;
       const register = block.source.slice('register.'.length);
-      const decl = REGISTERS[register];
+      const decl = k.register(register);
       if (!decl) continue;
       for (const c of block.columns ?? []) {
         if (!c.field || DERIVED.has(c.field)) continue;
@@ -216,13 +222,13 @@ test('EVERY `stat` CELL NAMES A METRIC THE RECORD DECLARES', async () => {
   sql.close();
 });
 
-test('a page that `requires:` a register names one the seed installs', async () => {
-  const { sql } = await seeded();
+test('a page that `requires:` a register names one the seeded record holds', async () => {
+  const { k, sql } = await seeded();
   const missing: string[] = [];
   for (const [slug, page] of Object.entries(PAGES))
     for (const need of ((page as { requires?: string[] }).requires ?? [])) {
       const register = need.startsWith('register.') ? need.slice('register.'.length) : null;
-      if (!register || !REGISTERS[register]) missing.push(`${slug}: ${need}`);
+      if (!register || !k.register(register)) missing.push(`${slug}: ${need}`);
     }
   assert.deepEqual(missing, []);
   sql.close();

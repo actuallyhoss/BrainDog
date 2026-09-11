@@ -64,7 +64,7 @@ export type RecordApi = {
   dialect(args: Record<string, never>, ctx: CallContext): Promise<Result<DialectLine[]>>;
   digestToday(args: Record<string, never>, ctx: CallContext): Promise<Result<DigestPreview[]>>;
   sessionsLive(args: Record<string, never>, ctx: CallContext): Promise<Result<SessionsLive>>;
-  learningsFor(args: { repo: string }, ctx: CallContext): Promise<Result<Learnings>>;
+  context(args: Record<string, never>, ctx: CallContext): Promise<Result<Context>>;                     // in place of learningsFor, 30 §5
   whatsNew(args: { cursor?: number }, ctx: CallContext): Promise<Result<WhatsNew>>;
   project(args: ProjectArgs, ctx: CallContext): Promise<Result<Projection>>;
   boot(args: Record<string, never>, ctx: CallContext): Promise<Result<Boot>>;
@@ -133,8 +133,8 @@ the record had to have.)*
 | ADMIN | `person` with level `owner`, or a `person` whose `op` names the method (an operation grant, 48 §13 D1); `createToken` `listTokens` `revokeToken` `deviceApprove` admit any `person` | `auth.ts` |
 | INTERNAL | `system` — no route exists (33 §4); any other principal is `FORBIDDEN`; `export` also admits `system` for the nightly backup | `auth.ts` |
 
-`RecordApi` is what `apps/worker/src/do/record.ts` and `apps/selfhost` host — one line per method — and what
-`packages/mcp` wraps into the eight tools and the resources (10 §3, §6; 44 §2's `DataApi` is a structural subset).
+`RecordApi` is what both hosts serve, one route per method, and what `packages/mcp` reaches through its fourteen tools
+and its resources (10 §3, §6); 44 §2's `McpSurface<C>` names the subset the tools call, structurally.
 
 ---
 
@@ -152,7 +152,7 @@ packages/record/
 │   │                       VAULT; JOBS; the ARM+WAKE tail every write shares                    ~380 lines
 │   ├── auth.ts             principal → group gate; op reach; effective levels and scope; httpStatus   ~150 lines
 │   ├── read.ts             index · search · get · list · whatsNew · boot · whoami · project · page · schema · DIALECT ·
-│   │                       sessionsLive · learningsFor · digestToday; the projection mapper      ~420 lines
+│   │                       sessionsLive · context · digestToday; the projection mapper      ~420 lines
 │   ├── metrics.ts          evaluateMetric: window, aggregate SQL, group_by/bucket, comparability, FX as-of,
 │   │                       running, trend                                                         ~360 lines
 │   ├── rules.ts            runRules: order, the ten actions, once_per, fill(), hits, dry run       ~280 lines
@@ -245,7 +245,7 @@ The shape 46 §4.6 declares structurally, plus `state`, `version`, `updated_at`.
 
 1. `fields` holds only the register's `search:` ∪ `mobile:` ∪ `title` fields, plus `state`; never the whole document.
 2. Every row carries `spoken`; rows of a `series: true` register have none and are never projected (§13 #14).
-3. A `secret`-typed field is replaced by `grant.label` **inside the mapper**, before a `ProjectedRow` exists: `mapRow(entry, decl, labels)` reads `labels` from one `SELECT id, label FROM grant`. The same mapper serves `search`, `list`, `get` (levels `index`, `row`), `page`, `learningsFor` and `project`, so a `secret` never leaves DATA or READ+ as an id.
+3. A `secret`-typed field is replaced by `grant.label` **inside the mapper**, before a `ProjectedRow` exists: `mapRow(entry, decl, labels)` reads `labels` from one `SELECT id, label FROM grant`. The same mapper serves `search`, `list`, `get` (levels `index`, `row`), `page` and `project`. `context` shows a `secret` field as what the kernel knows of its grant, `{ sealed, opened, last_opened, last_by }` (§5.3). Either way a `secret` never leaves DATA or READ+ as an id.
 4. A `document` field is `{ words: n }` unless asked for: `get` with `level: 'full'` and a `path`. `project` never carries a document in v1 (46 §4.6: "documents: never").
 5. `summary` is `spoken | <title> | <mobile values…>` joined by ` | `, money as `CUR 12.34` (11 §6 rule 1).
 
@@ -269,7 +269,21 @@ type WhatsNew    = { events: EventRow[]; cursor: number; sinceCapped: boolean };
 type Boot        = { index: Index; sessions: SessionsLive; suggestions: SuggestionRow[]; whatsNew: WhatsNew };
 type Whoami      = { principal: CallContext['principal']; levels: { register: string; level: Level }[]; registers: '*' | string[] };
 type SessionsLive = { sessions: { spoken: string; title: string | null; repo: string | null; host: string | null; state: string; last_seen: string | null; stale: boolean }[]; same_repo: string[] };
-type Learnings   = { learnings: ProjectedRow[]; truncated: boolean };                                 // forty, ordered — 32 §5
+type Context     = {                                                                                  // where the caller stands, §5.3
+  session: { spoken: string; state: string | null } | null;                                           // the caller's run, when it is a token that has one
+  project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' } | null;   // null is global
+  ambiguous: string[];                                                                                // projects tied at the same strength
+  handoff: { from: string; age_s: number; next: string; tried: string[]; head: string | null } | null;
+  live: { same_repo: LiveBrief[]; elsewhere: LiveBrief[] };
+  waiting: { id: string; question: string }[];                                                        // open suggestions, newest eight
+  registers: { id: string; name: string; rows: Brief[]; inherited: Brief[]; truncated: boolean }[];   // twenty of each
+  people: Brief[];                                                                                    // linked to this project, ten
+  faded: number;                                                                                      // rows left out, unconfirmed in ninety days
+  next: string;                                                                                       // one sentence: what to call next
+};
+type Brief       = { spoken: string; version: number; scope: 'project' | 'global'; state: string | null } & Record<string, unknown>;
+type LiveBrief   = { spoken: string; state: string | null; doing: string | null; agent: string | null; repo: string | null;
+                     project: string | null; stale: boolean; age_s: number };
 type PageData    = { page: unknown; blocks: ({ kind: 'table'; heading?: string; rows: ProjectedRow[]; empty: string }
                    | { kind: 'stat'; cells: { metric: string; label: string; result: MetricResult }[] }
                    | { kind: string; heading?: string; body?: string; tone?: string; when: boolean })[] };
@@ -368,7 +382,7 @@ call(method, args, ctx):
 
 | Verb | Person level | Token scope | Methods |
 |---|---|---|---|
-| read | `≥ read` | any | `index` `search` `get` `list` `whatsNew` `boot` `whoami` `project` `page` `metric` `schema` `dialect` `digestToday` `sessionsLive` `learningsFor` |
+| read | `≥ read` | any | `index` `search` `get` `list` `whatsNew` `boot` `whoami` `project` `page` `metric` `schema` `dialect` `digestToday` `sessionsLive` `context` |
 | propose | `≥ append` | `≥ propose` | `propose` `log` |
 | create | `≥ append` | `write` | `create` |
 | update | `≥ write` | `write` | `update` |
@@ -481,22 +495,34 @@ may not import `render`; the `closed-lists` gate diffs it against `packages/rend
 2. `stale = last_seen < now − 45 min` (32 §2.1); never stored.
 3. `same_repo` = non-stale sessions whose `repo = ctx.session?.repo`, minus `ctx.session?.spoken`.
 
-**`learningsFor(repo)`** — no `learnings` register installed → `{ learnings: [], truncated: false }`. Else:
+**`context()`**: where the caller stands, in one call (`loop/research-agent-path.md` §6.3). A read, scoped as `boot`
+is: it needs `read`, never writes, and opens no run. Every part is held to what the caller may read.
 
-```sql
-SELECT e.id, e.register, e.seq, e.fields, e.state, e.version, e.updated_at FROM entry e
-WHERE e.register = 'learnings' AND e.deleted_at IS NULL AND e.state = 'active'
-  AND (json_extract(e.fields, '$.scope') IS NULL
-       OR json_extract(e.fields, '$.scope') IN (SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL
-             AND EXISTS (SELECT 1 FROM json_each(json_extract(fields, '$.repos')) WHERE value = ?)))
-ORDER BY CASE json_extract(e.fields, '$.kind') WHEN 'method' THEN 0 ELSE 1 END,
-         CASE WHEN json_extract(e.fields, '$.scope') IS NULL THEN 0 ELSE 1 END,
-         e.created_at DESC
-LIMIT 41
-```
+1. **The run.** For a token, the run the ladder finds from its hints (30 §3), without opening one: `session` is its
+   `{ spoken, state }`, and `null` for a person or for a token with no run yet.
+2. **The place.** The hints' `remote`, `repo` and `cwd`, or, when none was sent, the run's own. `resolveProject`
+   reads the one register that declares `scopes:` and answers the project with `how`, the rung that placed it:
+   `remote`, `folder` or `repo`. A tie is global, with the tied projects in `ambiguous`. A caller who may not read
+   that register stands nowhere in particular, because naming the project would name a row it cannot see. `mark`
+   and `hue` come from the register's `identity:` fields when it declares them.
+3. **The handoff.** When the caller may read `session`: the newest other run in this project, or with no project in
+   this repository, that has a `next`, as `{ from, age_s, next, tried, head }`.
+4. **Who is live.** `sessionsLive()` less the caller's own run, split into `same_repo` and `elsewhere`, each run as
+   `{ spoken, state, doing, agent, repo, project, stale, age_s }`.
+5. **What waits.** The open suggestions the caller may see, newest first, eight of them, each `{ id, question }`.
+6. **What applies here.** Every register with a scope field that the caller may read, through the kernel's
+   nearer-wins `inScope`: `rows` are the project's open rows and `inherited` the global rows the nearer scope
+   leaves, twenty of each, and `truncated` when there were more. A register whose scope field links rows to projects
+   is who is here rather than what applies: its rows linked to this project, ten of them, are `people`.
+7. **What fades.** A register with a `confirmed_on` day leaves out the rows nobody confirmed, or made, in ninety
+   days, and `faded` counts them.
+8. **`next`**, one sentence: open a run with the first write, start from the handoff, confirm the learnings that
+   held, or work from what is open; and in every case, call `handoff` before stopping.
 
-`?` = the register declaring a `list<text>` field `repos` (the portfolio pack's `entities`), then `repo`. Forty
-returned through `mapRow`; `truncated` when 41 came back (32 §5).
+Each row is a brief: `{ spoken, version, scope, state }`, then the register's title and `mobile` fields, with a ref
+given as its spoken id. A `secret` field is always shown, as `{ sealed, opened, last_opened, last_by }`, and the
+grant's id never appears (§4.4 rule 3). The learnings `learningsFor` returned in an earlier revision arrive here, in
+`registers`, beside every other register that says where a row applies.
 
 **`whatsNew(cursor?)`**
 
@@ -893,7 +919,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 | `boot` one round trip | `sql.exec` calls `≤ registers + 6`; exactly one `kernel.transaction`; `whatsNew` inside equals `whatsNew()` alone |
 | `index` | `open` = rows in non-terminal states; a register without `transitions` has `open: 0`; `fields` lists `{ id, type }`; `scope.repo` narrows only registers with `repos` |
 | `search` | a phrase with `"` and `OR` is matched literally; zero rows → one `search.empty` observation; with `vec` → the fused order |
-| `learningsFor` | 45 active → 40, `truncated: true`, `method` first, global before scoped, newest first within each |
+| `context` | over the seed, in `test/context.test.ts`: the run, the project and how it was placed, the last handoff, who is live here and elsewhere, what waits, the project's open rows, a learning faded after ninety days and counted, the people linked, and no run opened by the read; nearer wins for a skill of the same name; a key by its label and sealed state, with no value anywhere; an append grant is no register in the answer, and a caller with nothing to read is refused |
 | `sessionsLive` | `last_seen` 46 min ago → `stale: true`; `same_repo` excludes the caller |
 | `page` | `share` on its slug → ok; a `when: false` block → no rows; `empty` filled |
 | `project` budget | `budget.tokens: 500` → `used ≤ 500`, cut at the first row that does not fit; no `document` body; a `series` register contributes no rows; `{ metric }` → `rows: []` and the metric |

@@ -422,7 +422,7 @@ function metricBody(decl: Declaration): Refusal | null {
 }
 
 /**
- * The eighteen drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
+ * The twenty drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
  *
  * `packages/render` owns `KINDS` and is the authority (`05 §2`), but the
  * kernel depends on `ports` and `where` and on nothing else — `31 §2` puts the renderer above it, so
@@ -434,13 +434,13 @@ function metricBody(decl: Declaration): Refusal | null {
  * says nothing is the exact silence `04 §1` calls the closure load-bearing for.
  *
  * A COPY THAT DRIFTS IS WORSE THAN NO COPY, so the count is stated where it can be wrong, and the
- * test asserts the eighteen install. A PACK'S OWN KIND NEEDS NO EDIT HERE: `05 §2` says it arrives as
+ * test asserts the twenty install. A PACK'S OWN KIND NEEDS NO EDIT HERE: `05 §2` says it arrives as
  * a `block.<id>` declaration, which this list admits by prefix and checks as a document of its own. A
- * kind added to the renderer's table does, which is how `cards` and `section` arrived.
+ * kind added to the renderer's table does, which is how `cards`, `section`, `feed` and `diff` arrived.
  */
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
-  'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section',
+  'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
 ] as const;
 
 /**
@@ -609,7 +609,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       if (!declaredKind && !(BLOCK_KINDS as readonly unknown[]).includes(kind))
         return bad(
           'KIND_UNKNOWN',
-          `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not one of the eighteen, and no block declares it.`,
+          `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not one of the twenty, and no block declares it.`,
           at,
           BLOCK_KINDS as unknown as string[],
         );
@@ -1933,7 +1933,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
    * as a declaration of this kind, and `pageBody` already admits `kind: 'block.<id>'` on a page by
    * prefix on the strength of it — but nothing in this repository reads a declaration whose kind is
    * `block`: `grep` finds the eight kinds in `KINDS` and in the migration's CHECK constraint, and
-   * no consumer anywhere. `packages/render` owns the eighteen drawn kinds as a compiled table, and
+   * no consumer anywhere. `packages/render` owns the twenty drawn kinds as a compiled table, and
    * there is no path from an installed declaration into it. So the page draws the fallback and the
    * author is told nothing, which is `BLOCK_KINDS`'s own sentence one file over: *"no rows, no
    * refusal, no mark on the page."*

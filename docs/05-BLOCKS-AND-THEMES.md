@@ -1,6 +1,6 @@
 # 05 · Blocks and themes
 
-What an agent reaches for when it has something to show, and the reason eighteen kinds — and every
+What an agent reaches for when it has something to show, and the reason twenty kinds — and every
 kind a pack adds after them — can look like one product.
 
 > A block set is a **system**, not a catalogue. Every kind draws from the same eight primitives
@@ -19,9 +19,9 @@ Kinds are declarations over these. Primitives compose, so kinds do not have to.
 | `rows` | label · value · note, one per line | `spec`, `params` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar`, `gauge` |
 | `inline` | a run of pills | `chips` |
-| `list` | title · detail · optional state marker | `steps`, `todo`, `timeline` |
+| `list` | title · detail · optional state marker | `steps`, `todo`, `timeline`, `feed` (page only) |
 | `table` | real columns, a header, per-column alignment | `comparison`, `table` |
-| `media` | a figure with a caption | `code`, `tree` — and `diagram`, post-v1 |
+| `media` | a figure with a caption | `code`, `tree`, `diff` — and `diagram`, post-v1 |
 
 > **Three kinds were listed here that are in no version of the closed list** — `callout`,
 > `sparkline` and `tags`. They are removed. `callout` is `note` with a tone, `tags` is `chips`, and
@@ -37,7 +37,7 @@ inlines**. This is why a pack can add a kind without asking a designer.
 
 A kind is data, not code. A `block` declaration is a primitive, an `accepts:` list and a body of
 primitive nodes, each node one of `parts children rows columns empty value`; `$<name>` substitutes a
-whole node named in `accepts:` and is never spliced into a string. The eighteen ship as one TypeScript
+whole node named in `accepts:` and is never spliced into a string. The twenty ship as one TypeScript
 table — `src/kinds.ts`, `as const`, with a derived `Kind` union — whose shape is the shape a pack's
 `block` declaration takes, so a first-party kind and a pack's kind take one code path
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D4; an earlier draft said sixteen JSON files).
@@ -67,7 +67,7 @@ an agent gets it right first time because there is nothing to nest. The row shap
 strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
-### Kinds — eighteen
+### Kinds — twenty
 
 | Group | Kinds |
 |---|---|
@@ -75,13 +75,13 @@ strong, em, code spans and links; a blockquote, a table, an image or raw HTML is
 | Figures | `stat` · `bar` · `gauge` · `chips` |
 | Rows | `spec` · `params` |
 | Work | `todo` · `steps` · `timeline` · `board` |
-| Technical | `code` (annotated) · `tree` · `comparison` |
+| Technical | `code` (annotated) · `tree` · `comparison` · `diff`, how a text changed from one version to the next, before and after |
 | Register-bound | `table` — rows from a `source:` register with declared `columns:`; bound to a register rather than to authored rows, and **page-only** |
-| Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`. Both **page-only** |
+| Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`; `feed`, what agents, rules and you did since you last looked, grouped by who did it. All three **page-only** |
 
-Eighteen, counted: the sixteen of v1 and the two page kinds of the agent path
-(`loop/research-agent-path.md` step 20), which sit on existing primitives so `PRIMITIVES_VERSION` does
-not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
+Twenty, counted: the sixteen of v1 and the four kinds of the agent path
+(`loop/research-agent-path.md` steps 20 and 21), which sit on existing primitives so
+`PRIMITIVES_VERSION` does not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
 corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
 arbitrary SVG — `sparkline`, `series` and `forecast` are **post-v1**, and everything after them
 arrives as a pack, which is the whole reason for the primitive layer.
@@ -94,7 +94,7 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 - A row is split on `|` **after** unescaping — `\|` is a literal pipe, `\\` a literal backslash.
 - A trailing cell that is a tone word — `good` `warn` `bad` `info`, an alias from §7.4, or `hole` on a `bar` — is the tone. Anything else in that position is a cell.
 - `{{path}}` is substituted **per cell, after splitting**, and a substituted value is never re-parsed, so a value containing `|` cannot add a column.
-- More cells than the kind takes degrades the block to its fence with one line above it naming the kind and the row — `DIALECT_ARITY`; a kind outside the eighteen is `DIALECT_KIND_UNKNOWN`. Fewer cells leaves the trailing ones absent. Both happen at render; nothing is refused at write (§3).
+- More cells than the kind takes degrades the block to its fence with one line above it naming the kind and the row — `DIALECT_ARITY`; a kind outside the twenty is `DIALECT_KIND_UNKNOWN`. Fewer cells leaves the trailing ones absent. Both happen at render; nothing is refused at write (§3).
 
 | Kind | Cells, in order |
 |---|---|
@@ -116,6 +116,8 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 | `table` | **page-only**: `source:` and `columns:` on the block ([06-PAGES](06-PAGES.md) §1.1); a `table` fence in a write-up has no rows to draw and degrades to its fence like an unknown kind |
 | `cards` | **page-only**: the page's evaluator writes the rows. The first row names each column's role, `role` or `role: label`, from `title figure fact trend ring who when mark`; then one row per card, then a *tone*. One figure and at most three facts, or the block degrades under `DIALECT_ARITY`. A `trend` cell is a run of numbers, and a token that is not one is a gap; a `ring` cell is `3/5` or `60%` |
 | `section` | **page-only**: the heading is the section, drawn as a heading and never as a caption; one row, glyph \| count \| `fold`. A count of zero is not drawn. `fold` starts it shut, and the host hides the blocks after it up to the next section |
+| `feed` | **page-only**: the page's evaluator writes the rows from `activity`, newest first. A row is by \| who \| count \| what \| when \| *tone*, where *by* is `agent`, `rule` or `you` and names the row's group, so a machine's work is never folded into the person's. A burst is one row: `agent \| Claude \| 14 \| saves on Variable axis QA \| 3h ago`. One row `seen \| when` sits where the reader last looked: the rows above it are new, their count in the accent and their group headed "N new", and a line reading "Before you last looked" parts them from the rest; an empty *when* is no mark yet. Any other first word, or a second `seen` row, degrades under `DIALECT_ARITY`. Empty, it says "Nothing new." or, with no mark, "Nothing to catch up on yet." |
+| `diff` | rows verbatim, each marked `- ` (taken out), `+ ` (put in) or two spaces (in both); a unified diff's `-line` and ` line` read the same. A row with any other first character degrades under `DIALECT_ARITY`. `diffRows(before, after)` writes the rows for two versions. A removed line is a `del` with a minus whose name is the word "removed", an added one an `ins` with a plus named "added"; lines wrap in their box; a run of shared lines that would hide four or more, keeping three beside each change, folds into "N lines unchanged" |
 
 ---
 

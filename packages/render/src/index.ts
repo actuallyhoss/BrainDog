@@ -30,6 +30,33 @@ export {
   type CardLayout,
   type CardRole,
 } from './cards.ts';
+export {
+  FEED_BY,
+  FEED_EARLIER,
+  FEED_GROUPS,
+  FEED_NO_MARK,
+  FEED_NOTHING_NEW,
+  FEED_SEEN,
+  feedFault,
+  feedNew,
+  feedPlan,
+  type FeedBy,
+  type FeedGroup,
+} from './feed.ts';
+export {
+  DIFF_GLYPHS,
+  DIFF_WORDS,
+  diffFault,
+  diffFolded,
+  diffPlan,
+  diffRows,
+  diffSummary,
+  lineDiff,
+  readDiffRow,
+  type DiffLine,
+  type DiffOp,
+  type DiffPart,
+} from './diff.ts';
 export { inline, text, magnitudeOfCell, safeHref, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,

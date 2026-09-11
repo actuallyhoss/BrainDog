@@ -100,10 +100,10 @@ A7), and the install-time check refuses a key that is not in it, by name.
 
 | Key | Type | Default | Required |
 |---|---|---|---|
-| `kind` | one of the eighteen — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 — or a `block.<id>` this pack declares or the record has installed. A pack kind is **page-only** at stage 0: a write-up's fence takes the kinds that are not page-only ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.5) | — | yes |
+| `kind` | one of the twenty — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 — or a `block.<id>` this pack declares or the record has installed. A pack kind is **page-only** at stage 0: a write-up's fence takes the kinds that are not page-only ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.5) | — | yes |
 | `heading` | text. On a `section` it is the section, drawn as a heading | — | `section` |
 | `span` | int, 1–12 | 12 | no |
-| `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page). On a `section` it is what the count counts | — | `table`, `cards` |
+| `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6 | every row | no |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
 | `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool, tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts | — | `table`, `cards` |
@@ -115,6 +115,11 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `body` | markdown in the dialect | — | `note` |
 | `icon` | a glyph name, drawn beside a `section`'s heading | — | no |
 | `fold` | bool. A `section` that starts shut, folding the blocks after it up to the next section; one press opens it | `false` | no |
+| `since` | `seen`, the reader's read mark. On a `feed`, the rows after it are new; the evaluator writes the `seen` row where it falls, with an empty time when the reader has no mark yet | absent: nothing is new | no |
+| `first` | int, 1–50. On a `feed`, the most rows it draws, newest first, a collapsed burst being one row; what is past it goes in one last row per group, so no count loses anything | every row | no |
+| `row` | a spoken id, interpolatable: `'{{spoken}}'` on a template. On a `diff`, the row whose history it reads | — | `diff` |
+| `field` | a field id on that row, `document` or `text`. On a `diff`, the field whose versions it compares | — | `diff` |
+| `versions` | int, 2–10. On a `diff`, how many versions it shows, newest first; each is compared with the one before it, one `diff` fence each | `2` | no |
 | *`accepts` names* | on a pack-declared `kind`, the keys its `accepts:` names are legal here, typed `register · metric · number · text` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.6) | per the block declaration | as the declaration says |
 
 `tone_when` on a column is a `where:` leaf without `field:` — the column supplies it — plus a `tone`,
@@ -123,7 +128,15 @@ evaluated at render like `when`.
 A `cards` block lays one card per row in a grid that fills its container at 17rem a card, one column
 on a narrow one; the title opens the row. A `section` is a full-width heading with a count aside, and
 the blocks after it sit under it. Neither is a box: a card is one surface, and a section is a heading
-and air. *An earlier draft of this document defined none of these; thirty-seven
+and air.
+
+A `feed` reads `{ source: activity, where: "actor is agent", since: seen, first: 20, empty: … }`: the
+rows are grouped as agents, rules and you, with counts, and a burst is one row, "Claude: 14 saves on
+Variable axis QA". The host stamps the read mark when the reader leaves the page, never when it opens,
+so the rows that were new are still new on the way out. A `diff` reads `{ source: register.skills,
+row: '{{spoken}}', field: body, versions: 5, empty: … }` on a skill's page, and Decide draws the same
+kind for a document field in a proposed change. Both sources are computed by the kernel (`pages.ts`),
+alongside `forecast.runway`. *An earlier draft of this document defined none of these; thirty-seven
 keys were in use across four documents with no type, default or required flag between them.*
 
 ---

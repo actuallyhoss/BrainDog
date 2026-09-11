@@ -180,6 +180,8 @@ export const copy = {
     stat: 'Figures',
     cards: 'Cards',
     section: 'Section heading',
+    feed: 'What happened',
+    diff: 'Before and after',
   } as Record<string, string>,
 
   kinds: {
@@ -199,6 +201,8 @@ export const copy = {
     code: 'code, exactly as typed',
     tree: 'a shape with indentation',
     stat: 'two or three figures across the top',
+    feed: 'what agents, rules and you did since you last looked',
+    diff: 'how a text changed, line by line',
   } as Record<string, string>,
   arrangedNotSaved: (title: string) =>
     `${title} rearranged here. Nothing was saved yet.`,

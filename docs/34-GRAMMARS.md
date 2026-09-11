@@ -255,7 +255,7 @@ after splitting**, and a substituted value is never re-parsed — so a value con
 | `comparison` | header row, then rows | the header fixes the column count |
 | `table` | **page-only** | rows come from `source:` with declared `columns:`; a `table` fence in a write-up degrades |
 
-Under-arity leaves the trailing cells absent. Over-arity, or a kind not in the eighteen, degrades the block to its
+Under-arity leaves the trailing cells absent. Over-arity, or a kind not in the twenty, degrades the block to its
 visible fence with one line above it naming the kind and the row (`DIALECT_ARITY`, `DIALECT_KIND_UNKNOWN`). **A
 document is never refused for its dialect** — the fence is the feedback channel, at render, never at write. The
 per-kind markup — element and class names — is 36 §5.9's, mirrored in 05 §7.7; this table is the row shape under it.
@@ -298,7 +298,7 @@ sits in one cell. Any other `{word}` is text; to write a literal tag, put it in 
 
 ### 2.4 · Kinds are data
 
-A kind is a named composition of primitives plus a query. The eighteen ship as one `as const` TypeScript table,
+A kind is a named composition of primitives plus a query. The twenty ship as one `as const` TypeScript table,
 `packages/render/src/kinds.ts` — `render`'s `KINDS`, beside `PRIMITIVES`, `parse`, `toHTML` and `render` at the root, and
 no `expand`: kinds expansion is `declare`'s — so a first-party kind and a pack's kind take one code path. The closed key
 list per primitive (`parts children rows columns{field,label,width,align} empty value accepts`) is `declare`'s schema;
@@ -401,7 +401,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 |---|---|---|---|
 | Value types | 16 + 2 meta | §3 | 02 §5 |
 | Pack kinds | 8 | `register page block ingest rule metric theme digest` | 04 §1 |
-| Block kinds | 18 | §2.1 — one TypeScript table, `render`'s `KINDS` | 05 §2 |
+| Block kinds | 20 | §2.1 — one TypeScript table, `render`'s `KINDS` | 05 §2 |
 | Post-v1 kinds | 4 | `diagram sparkline series forecast` | 05 §2 |
 | Layout primitives | 8 | `panel grid rows proportional inline list table media` | 05 §1 |
 | Tone words | 4 (+4 aliases, +`hole`) | `good warn bad info` | 13 §2.3 |

@@ -329,3 +329,87 @@ test('NOBODY BUT THE KERNEL DECLARES register.session, and the kernel’s own by
   assert.equal(k.register('session')?.name, 'Agent runs');
   sql.close();
 });
+
+/* ── asking for the run before a write ───────────────────────────────────── */
+
+test('runFor OPENS A RUN SIGNED BY ITSELF, and finds it again without writing a thing', async () => {
+  /* `attach` and `handoff` must know the run before they write its row. This asks the ladder directly,
+     where the record used to write an empty row as the token and undo it to learn the answer. */
+  const { k, sql, clock } = await record();
+  const said = agent({ client_id: 'c-1', host: 'dev-pc', repo: 'braindog' });
+  const opened = value<{ run: Entry; spoken: string; opened: boolean }>(k.runFor(said, 'opened: startup'));
+  assert.deepEqual([opened.spoken, opened.opened], ['S1', true]);
+  assert.deepEqual(events(sql, opened.run.id), [{ actor: 'S1', kind: 'create', field: null, note: 'opened: startup' }]);
+  assert.deepEqual([opened.run.fields.token_id, opened.run.fields.last_seen], ['t_1', iso(NOW)]);
+
+  const before = sql.one<{ n: number }>('SELECT count(*) AS n FROM event')!.n;
+  clock.advance(5 * MIN);
+  const found = value<{ run: Entry; spoken: string; opened: boolean }>(k.runFor(said));
+  assert.deepEqual([found.spoken, found.opened, found.run.id], ['S1', false, opened.run.id]);
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM event')!.n, before, 'finding the run wrote an event');
+  const now = k.get('S1')!;
+  assert.deepEqual([now.version, now.fields.last_seen], [1, iso(NOW)], 'finding the run wrote to it');
+  assert.equal(sql.one<{ next: number }>("SELECT next FROM counter WHERE name = 'seq:session'")?.next, 2, 'a number was spent');
+
+  /* And the read-only half names it, or nothing, and writes nothing either. */
+  assert.equal(k.findRun({ client_id: 'c-1' })?.id, opened.run.id);
+  assert.equal(k.findRun({ client_id: 'c-9' }), null);
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM event')!.n, before);
+
+  assert.equal(refusal(k.runFor({ actor: 'p_owner' })).code, 'FORBIDDEN', 'a person was given a run');
+  assert.deepEqual(runs(sql), [1]);
+  sql.close();
+});
+
+test('A TOKEN’S NOTE IS SIGNED BY ITS RUN AND MOVES ITS HEARTBEAT, and a note against nothing opens none', async () => {
+  const { k, sql, clock } = await record();
+  const task = value<Entry>(k.create('tasks', { what: 'Draft' }, { actor: 'p_owner' }));
+  const said = agent({ client_id: 'c-1' });
+
+  assert.equal(refusal(k.log('tasks', 99, said, 'Nothing here.')).code, 'OUT_OF_BOUNDS');
+  assert.deepEqual(runs(sql), [], 'a note against nothing opened a run');
+
+  value(k.log('tasks', task.seq!, said, 'Read it through.'));
+  assert.deepEqual(events(sql, task.id).at(-1), { actor: 'S1', kind: 'note', field: null, note: 'Read it through.' });
+  const s1 = k.get('S1')!;
+
+  clock.advance(10 * MIN);
+  value(k.log('tasks', task.seq!, said, 'Read it again.'));
+  const later = k.get('S1')!;
+  assert.equal(later.fields.last_seen, iso(NOW + 10 * MIN), 'the note left the heartbeat where it was');
+  assert.equal(later.version, s1.version, 'the heartbeat bumped the version');
+  assert.deepEqual(events(sql, s1.id).map((e) => e.kind), ['create'], 'the heartbeat wrote an event');
+
+  /* A person's note is signed by the person and opens no run. */
+  value(k.log('tasks', task.seq!, { actor: 'p_owner' }, 'Checked.'));
+  assert.equal(events(sql, task.id).at(-1)?.actor, 'p_owner');
+  assert.deepEqual(runs(sql), [1]);
+  sql.close();
+});
+
+test('A TOKEN’S PROPOSAL IS SIGNED BY ITS RUN, a refused one opens none, and its question can be read back', async () => {
+  const { k, sql } = await record();
+  const options = {
+    question: 'Keep the address field?',
+    body_kind: 'options' as const,
+    body: { options: [{ id: 'keep', label: 'Keep it', because: 'Invoices print it.' }, { id: 'drop', label: 'Drop it', because: 'Nobody reads it.' }] },
+  };
+
+  assert.equal(refusal(k.propose({ ...options, question: ' ' }, agent({ client_id: 'c-1' }))).code, 'REQUIRED_MISSING');
+  assert.deepEqual(runs(sql), [], 'a refused proposal opened a run');
+
+  const made = value<{ id: string }>(k.propose(options, agent({ client_id: 'c-1' })));
+  assert.equal(k.governanceRow('suggestion', made.id)?.opened_by, 'S1');
+  assert.equal(
+    sql.one<{ actor: string }>("SELECT actor FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${made.id}`)?.actor,
+    'S1',
+  );
+  assert.equal(k.question(made.id), 'Keep the address field?');
+  assert.equal(k.question('SG99'), null);
+
+  /* A bare name still signs as itself: the record's own mechanisms propose that way. */
+  const mine = value<{ id: string }>(k.propose(options, 'p_owner'));
+  assert.equal(k.governanceRow('suggestion', mine.id)?.opened_by, 'p_owner');
+  assert.deepEqual(runs(sql), [1]);
+  sql.close();
+});

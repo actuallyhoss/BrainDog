@@ -38,16 +38,17 @@ type Row = { state?: string | null; fields: Record<string, unknown> };
  * command line it is nothing the tools look at, because the bearer travels in the request. The tools
  * hand it on and never read it, which is what keeps authorisation in one place: the record.
  *
- * THE LAST FOUR ARE OPTIONAL BECAUSE THE RECORD DOES NOT ANSWER THEM YET. They arrive with the
- * session register (build steps 6, 8 and 16). Until a surface has one, its tool refuses with what to
- * do instead, and its resource is not listed.
+ * THE LAST FOUR ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers `context`,
+ * `handoff` and `sessionsLive`, and not yet `meet` (build step 16). The command line offers only the
+ * routes its client knows, so it still works against an older host. Without one, its tool refuses
+ * with what to do instead, and its resource is not listed.
  */
 export type McpSurface<C> = {
   boot(ctx: C): Answer<{ registers: { id: string; name: string }[] }>;
   version(ctx: C): Answer<{ version: number }>;
   whoami(ctx: C): Answer;
   schema(args: { register: string }, ctx: C): Answer;
-  get(args: { register: string; seq: number }, ctx: C): Answer;
+  get(args: { register: string; seq: number } | { spoken: string }, ctx: C): Answer;
   list(args: { register: string; where?: unknown; limit?: number; cursor?: string | null }, ctx: C): Answer<{ rows: Row[] }>;
   search(args: { q: string; limit?: number }, ctx: C): Answer;
   history(args: { register: string; seq: number }, ctx: C): Answer;
@@ -264,7 +265,7 @@ export const TOOLS: readonly Tool[] = [
 /** `obligations#41`, the way a person says a row. */
 const QUALIFIED = /^([a-z][a-z0-9_]{0,31})#([1-9][0-9]*)$/;
 /** `S42`, `LN7`: a register's own prefix and number. The record knows which register owns a prefix. */
-const PREFIXED = /^([A-Z]{1,4})([1-9][0-9]*)$/;
+const PREFIXED = /^[A-Z]{1,4}[1-9][0-9]*$/;
 
 const parse = (spoken: unknown): { register: string; seq: number } | null => {
   const m = typeof spoken === 'string' ? QUALIFIED.exec(spoken.trim()) : null;
@@ -376,32 +377,15 @@ export function tools<C>(surface: McpSurface<C>) {
     schema: (args, ctx) => surface.schema({ register: String(args.register) }, ctx),
 
     /**
-     * A PREFIXED ID IS FOUND THROUGH THE DECLARATIONS. `S42` is the register whose `seq_prefix` is
-     * `S`, and only the record's declarations say which that is, so the registers this caller may
-     * read are asked in turn. One read each, and only for this form of address; the qualified form
-     * is one call. A register the caller cannot read is never asked, so the answer names nothing
-     * they could not already see.
+     * A PREFIXED ID GOES TO THE RECORD AS SPOKEN. Which register owns `S` is the record's declarations'
+     * to say, so it resolves `S42` itself, in one call, and answers a prefix no readable register holds
+     * with a sentence that sends `SG` and `D` to `governance`.
      */
     get: async (args, ctx) => {
       const at = parse(args.spoken);
       if (at) return surface.get(at, ctx);
-      const m = typeof args.spoken === 'string' ? PREFIXED.exec(args.spoken.trim()) : null;
-      if (!m) return badSpoken(ROW_OR_ID);
-      const boot = await surface.boot(ctx);
-      if (!boot.ok) return boot;
-      for (const register of boot.value.registers) {
-        const decl = await surface.schema({ register: register.id }, ctx);
-        if (decl.ok && (decl.value as { seq_prefix?: unknown }).seq_prefix === m[1])
-          return surface.get({ register: register.id, seq: Number(m[2]) }, ctx);
-      }
-      return {
-        ok: false,
-        refusal: {
-          code: 'REGISTER_UNKNOWN',
-          fix: `No register you can read numbers its rows ${m[1]}. A suggestion (SG) or a decision (D) is read with governance.`,
-          at: 'spoken',
-        },
-      };
+      const said = typeof args.spoken === 'string' ? args.spoken.trim() : '';
+      return PREFIXED.test(said) ? surface.get({ spoken: said }, ctx) : badSpoken(ROW_OR_ID);
     },
 
     list: (args, ctx) =>

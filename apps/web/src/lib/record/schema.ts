@@ -99,8 +99,9 @@ export type RegisterDecl = {
   /** What a person calls the collection, and one of them. Never an id in a heading (29 §5). */
   name: string;
   one: string;
-  /** One line saying what this register is FOR — the body of its `no-data-yet` state. */
-  holds: string;
+  /** One line saying what this register is FOR, the body of its `no-data-yet` state. The kernel's own
+      `session` declares none, so a reader says nothing rather than "holds undefined". */
+  holds?: string;
   /** The field that titles a row. */
   title: string;
   /** Three fields, declared, that become a two-line card below 640px. A declaration, not a media
@@ -117,6 +118,8 @@ export type RegisterDecl = {
   icon?: IconRef;
   /** The pack that owns it, or absent for a register the person made. */
   pack?: string;
+  /** What its rows are spoken as instead of `register#n`: `S` for the kernel's agent runs, `S1`. */
+  seq_prefix?: string;
 };
 
 /**
@@ -728,6 +731,8 @@ export type Job = {
   status: 'queued' | 'claimed' | 'running' | 'done' | 'failed' | 'stopped';
   model: string;
   started: string;
+  /** The agent run doing it, spoken `S1`. A run carries no job field, so the job names its run. */
+  run?: string;
   events: readonly { seq: number; tool: string; input: string; out: string; ok: boolean }[];
 };
 

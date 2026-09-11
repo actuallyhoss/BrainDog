@@ -1,10 +1,10 @@
 /**
- * The eight primitives, the eighteen kinds, and the four intent words.
+ * The eight primitives, the twenty kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
  *
- * The eighteen ship as ONE table rather than eighteen files, in the shape a pack's `block`
+ * The twenty ship as ONE table rather than twenty files, in the shape a pack's `block`
  * declaration takes, so a first-party kind and a kind a pack invented after the bundle shipped
  * travel one code path (22 §3, ADR-056).
  */
@@ -133,7 +133,7 @@ export type KindSpec = {
 };
 
 /**
- * Eighteen, counted. `diagram`, `sparkline`, `series` and `forecast` are post-v1 and arrive as a
+ * Twenty, counted. `diagram`, `sparkline`, `series` and `forecast` are post-v1 and arrive as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
@@ -176,6 +176,13 @@ const TABLE = {
      `glyph | count | fold`. Both reach a fence only from a page's own evaluator (`parse`'s `page`). */
   cards: { primitive: 'grid', cells: 0, tone: true, header: true, pageOnly: true, minSpan: 4, purpose: 'list' },
   section: { primitive: 'panel', cells: 3, tone: false, rows: 1, pageOnly: true, minSpan: 12, purpose: 'say' },
+
+  /* The agent path's two more, on existing primitives for the same reason. A `feed` row is
+     `by | who | count | what | when`, plus a `seen` row where the reader last looked (`src/feed.ts`);
+     it is page-only, because its rows are the record's activity. A `diff` is verbatim rows marked
+     `- `, `+ ` or two spaces (`src/diff.ts`), so a write-up can carry one too. */
+  feed: { primitive: 'list', cells: 5, tone: true, pageOnly: true, minSpan: 4, purpose: 'list' },
+  diff: { primitive: 'media', cells: 0, tone: false, verbatim: true, minSpan: 4, purpose: 'media' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

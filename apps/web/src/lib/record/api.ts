@@ -50,7 +50,7 @@ import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
-import { findingsFrom } from '@braindog/kernel';
+import { STALE_MS, findingsFrom } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
@@ -294,8 +294,8 @@ export function display(register: string, field: string, value: unknown, now: nu
        *
        * This was `relative(String(value).slice(0, 10), NOW)` — the truncation every caller in the
        * app had learned to write, because `relative()` takes a day and hands back its argument when
-       * given anything else. So the miss was hidden and the time went with it: `sessions.last_seen`
-       * and `updates.at` are instants, and a session seen two hours ago and one seen eleven hours
+       * given anything else. So the miss was hidden and the time went with it: `session.last_seen`
+       * and `updates.at` are instants, and a run seen two hours ago and one seen eleven hours
        * ago both read *today*. One formatter, on the one function every cell goes through.
        */
       return since(String(value), now);
@@ -384,9 +384,9 @@ export function identityOf(register: string, field: string, value: unknown): Ide
  *
  * The comment two hundred lines above this one says the rule out loud: *"One mark and one accent
  * per thing, and colour means WHICH PROJECT, everywhere."* Everywhere was four places, none of
- * them a row. Six of the eight registers the seed ships declare `thing -> things`, and `things` is
- * the one register with an `identity:`, so six of the eight lists in this product can say which
- * project a row belongs to in one glyph and have been saying it in a text column or not at all.
+ * them a row. Four of the seven registers the seed ships declare `thing -> things`, and `things` is
+ * the one register with an `identity:`, so those four lists can say which project a row belongs to
+ * in one glyph and had been saying it in a text column or not at all.
  *
  * FIRST MATCH IN DECLARED ORDER, and that is the register's choice rather than this function's.
  * A register lists its fields in the order it wants them read, so the first `ref` that reaches a
@@ -797,11 +797,29 @@ export const updatesFor = (seq: number): Entry[] =>
     .filter((u) => Number(u.fields.track) === seq)
     .sort((a, b) => String(b.fields.at).localeCompare(String(a.fields.at)));
 
-/** Every session pinned to a track, most recently seen first. */
-export const sessionsFor = (seq: number): Entry[] =>
-  (ROWS.sessions ?? [])
-    .filter((x) => Number(x.fields.track) === seq)
+/**
+ * The agent runs placed in one project, most recently seen first.
+ *
+ * BY PROJECT, BECAUSE A RUN HAS NO THREAD. The kernel's `session` register holds a run's `project` as
+ * the project's spoken id, `things#1`, and nothing narrower.
+ */
+export const runsOn = (project: string): Entry[] =>
+  (ROWS.session ?? [])
+    .filter((x) => x.fields.project === project)
     .sort((a, b) => String(b.fields.last_seen).localeCompare(String(a.fields.last_seen)));
+
+/** A run's spoken id, `S1`, which is the name the kernel signs its writes with. */
+export const runName = (run: Entry): string => `${REGISTERS.session?.seq_prefix ?? 'S'}${run.seq}`;
+
+/**
+ * Whether a run is working now: active, and heard from within the kernel's 45 minutes. Worked out on
+ * read, as the kernel does, because a run that crashed never says so.
+ */
+export const working = (run: Entry): boolean =>
+  run.fields.state === 'active' && NOW - Date.parse(String(run.fields.last_seen)) < STALE_MS;
+
+/** The job a run is doing, found by the run the job names, or `null`. */
+export const jobOf = (run: Entry): Job | null => Object.values(JOBS).find((j) => j.run === runName(run)) ?? null;
 
 /* ── what points AT this row ──────────────────────────────────────────────
    A `ref` declares `to:` and nothing declares the other direction, so the record could say "this
@@ -1548,6 +1566,8 @@ const READS = new Set([
   'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon',
   /* A section's two keys: `fold` starts it shut, `icon` names the glyph beside its heading. */
   'fold', 'icon',
+  /* A feed's and a diff's keys, so a page may declare them before their bindings land. */
+  'since', 'first', 'row', 'field', 'versions',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {

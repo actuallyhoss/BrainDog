@@ -28,9 +28,16 @@ import type { Entry, PageBlock, PageDecl } from './schema.ts';
 
 const FIELD = /\{\{([a-z][a-z0-9_]*)\}\}/gi;
 
-/** One string, with the row's own values in it. Unresolved names are left alone, on purpose. */
-export function fill(text: string, row: Entry): string {
+/**
+ * One string, with the row's own values in it. Unresolved names are left alone, on purpose.
+ *
+ * `{{spoken}}` is the row's spoken id, `things#1`, which is what an agent run's `project` holds. No
+ * field can be called `spoken`, because the record reserves the word. The kernel's own `fill` does not
+ * fill it yet, so on a real record a block that reads it draws nothing until it does.
+ */
+export function fill(text: string, row: Entry, spoken?: string): string {
   return text.replace(FIELD, (whole, field: string) => {
+    if (field === 'spoken') return spoken ?? whole;
     const value = row.fields[field];
     return value === null || value === undefined || value === '' ? whole : String(value);
   });
@@ -68,12 +75,12 @@ const fillCell = (c: { metric: string; label?: string }, row: Entry): { metric: 
   label: fill(c.label ?? c.metric, row),
 });
 
-const fillBlock = (b: PageBlock, row: Entry): PageBlock => ({
+const fillBlock = (b: PageBlock, row: Entry, spoken: string): PageBlock => ({
   ...b,
-  ...(b.heading === undefined ? {} : { heading: fill(b.heading, row) }),
-  ...(b.where === undefined ? {} : { where: fill(b.where, row) }),
-  ...(b.empty === undefined ? {} : { empty: fill(b.empty, row) }),
-  ...(b.body === undefined ? {} : { body: fill(b.body, row) }),
+  ...(b.heading === undefined ? {} : { heading: fill(b.heading, row, spoken) }),
+  ...(b.where === undefined ? {} : { where: fill(b.where, row, spoken) }),
+  ...(b.empty === undefined ? {} : { empty: fill(b.empty, row, spoken) }),
+  ...(b.body === undefined ? {} : { body: fill(b.body, row, spoken) }),
   ...(b.cells === undefined ? {} : { cells: b.cells.map((c) => fillCell(c, row)) }),
   ...(b.authored === undefined
     ? {}
@@ -152,6 +159,8 @@ export function resolvePages(declared: Record<string, PageDecl>): Record<string,
       /* A collision keeps the row's number, so two projects called the same thing are still two
          pages and neither of them silently replaces the other. */
       const slug = claim(slugify(title), row.seq);
+      /* The kernel's spelling of a spoken id (`scope.ts`): the register's prefix, or `register#`. */
+      const spoken = `${reg.seq_prefix && reg.seq_prefix !== '#' ? reg.seq_prefix : `${register}#`}${row.seq}`;
 
       out[slug] = {
         ...decl,
@@ -160,7 +169,7 @@ export function resolvePages(declared: Record<string, PageDecl>): Record<string,
         param: { register, seq: row.seq, title },
         identity: { register, seq: row.seq },
         ...(decl.nav ? { nav: { ...decl.nav, order: decl.nav.order + n } } : {}),
-        blocks: decl.blocks.map((b) => fillBlock(b, row)),
+        blocks: decl.blocks.map((b) => fillBlock(b, row, spoken)),
       };
     });
   }

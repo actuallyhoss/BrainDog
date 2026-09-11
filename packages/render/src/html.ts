@@ -18,6 +18,8 @@ import { KINDS, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { MISSING, leadingCode } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, markOf, ringDash, ringOf, trendOf } from './cards.ts';
+import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
+import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
 export type RenderOptions = InlineOptions & {
@@ -252,6 +254,7 @@ function inlinePrimitive(b: Block, o: RenderOptions): string {
 }
 
 function list(b: Block, o: RenderOptions): string {
+  if (b.kind === 'feed') return feed(b, o);
   const spec = KINDS[b.kind];
   const tag = spec.ordered ? 'ol' : 'ul';
   const body = b.rows
@@ -307,6 +310,7 @@ export function verbatimText(b: Block): string {
 }
 
 function media(b: Block): string {
+  if (b.kind === 'diff') return diff(b);
   const body = escape(verbatimText(b));
   const lang = b.kind === 'code' && b.heading ? ` data-lang="${escape(b.heading)}"` : '';
   /* FOCUSABLE, because a `pre` does not wrap: on a phone it is always the widest thing on the
@@ -408,6 +412,63 @@ function section(b: Block, o: RenderOptions): string {
       ? `<details class="sec-fold"><summary class="sec-toggle"><span class="sec-show">${FOLD_SHOW}</span><span class="sec-hide">${FOLD_HIDE}</span></summary></details>`
       : '';
   return `<div class="sec">${title}${toggle}</div>`;
+}
+
+/**
+ * `feed`: what agents, rules and you did, one group each, a burst on one row (`src/feed.ts`).
+ *
+ * The count leads the row. A new row's count takes the accent, and the words say it too: the head
+ * says how many are new, and a line says where the ones you had seen begin.
+ */
+function feed(b: Block, o: RenderOptions): string {
+  const plan = feedPlan(b.rows);
+  if (plan.groups.length === 0) return `<p class="feed-empty">${escape(plan.empty)}</p>`;
+  const said = (v: string | undefined): string => plain(inline(v ?? '', o));
+  const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
+  const body = plan.groups
+    .map((g) => {
+      const head =
+        g.fresh > 0 ? `<span class="feed-new num">${escape(feedNew(g.fresh))}</span>` : `<span class="feed-tally num">${g.total}</span>`;
+      const rows = g.rows
+        .map(({ row: r, fresh }, i) => {
+          const who = r.cells[1] ?? '';
+          const face = g.by === 'rule' ? markOf(said(who)) : initialOf(said(who));
+          const line = i === g.earlier ? `<li class="feed-seen">${escape(FEED_EARLIER)}</li>` : '';
+          return `${line}<li class="feed-row"${fresh ? ' data-new' : ''}${toneAttrs(r.tone)}><span class="feed-count num">${
+            counted(said(r.cells[2])) ? drawn(r.cells[2]) : ''
+          }</span><span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span><span class="feed-what"><span class="feed-who">${
+            who ? drawn(who) : MISSING
+          }</span> ${drawn(r.cells[3])}${toneGlyph(r.tone)}</span><span class="feed-when">${drawn(r.cells[4])}</span></li>`;
+        })
+        .join('');
+      return `<div class="feed-group" data-by="${g.by}"><h3 class="feed-head">${escape(g.label)}${head}</h3><ul class="feed-rows">${rows}</ul></div>`;
+    })
+    .join('');
+  return `<div class="feed">${body}</div>`;
+}
+
+/**
+ * `diff`: a text's lines, taken out, put in or shared (`src/diff.ts`). A long shared run folds into
+ * a `details`, so the change is on the screen and the rest is one press away.
+ */
+function diff(b: Block): string {
+  const plan = diffPlan(b.rows.map((r) => r.cells[0] ?? ''));
+  const line = (l: DiffLine): string => {
+    const tag = l.op === 'del' ? 'del' : l.op === 'add' ? 'ins' : 'div';
+    const mark =
+      l.op === 'same'
+        ? `<span class="diff-mark" aria-hidden="true"></span>`
+        : `<span class="diff-mark" role="img" aria-label="${DIFF_WORDS[l.op]}">${DIFF_GLYPHS[l.op]}</span>`;
+    return `<${tag} class="diff-line" data-op="${l.op}">${mark}<span class="diff-text">${escape(l.text)}</span></${tag}>`;
+  };
+  const body = plan.parts
+    .map((p) =>
+      p.fold
+        ? `<details class="diff-fold"><summary class="diff-toggle">${escape(diffFolded(p.lines.length))}</summary>${p.lines.map(line).join('')}</details>`
+        : p.lines.map(line).join(''),
+    )
+    .join('');
+  return `<div class="diff"><p class="diff-sum">${escape(plan.summary)}</p><div class="diff-lines">${body}</div></div>`;
 }
 
 const PRIMITIVE_RENDERERS = { panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;

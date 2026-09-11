@@ -297,10 +297,10 @@ a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 
 | Key | Type | Required | Default | Closed list |
 |---|---|---|---|---|
-| `kind` | a key of render's `KINDS` (eighteen), or a `block.<Id>` declared by this pack or installed (`KIND_UNKNOWN`) | yes | — | `Object.keys(KINDS)` ∪ declared blocks |
+| `kind` | a key of render's `KINDS` (twenty), or a `block.<Id>` declared by this pack or installed (`KIND_UNKNOWN`) | yes | — | `Object.keys(KINDS)` ∪ declared blocks |
 | `heading` | text ≤ 80; on a `section` it is the section, drawn as a heading | `section` | — | — |
 | `span` | int 1–12 | no | `12` | — |
-| `source` | `register.<Id>` · `metric.<Id>` · `block.<n>` (an earlier block on this page); on a `section`, what its count counts | `table`, `cards` | — | — |
+| `source` | `register.<Id>` · `metric.<Id>` · `block.<n>` (an earlier block on this page) · `activity`; on a `section`, what its count counts; on a `diff`, the register whose row it reads | `table`, `cards`, `feed`, `diff` | — | on a `feed`, `activity` only |
 | `where` | predicate, validated on the source register | no | every row | — |
 | `when` | `{ metric: Id, <op>: value }`, one leaf, ops `is not in not_in gt gte lt lte empty present` | no | always drawn | — |
 | `columns` | 1–16 of `{ field: Id, label?, width?: `^\d{1,3}(ch\|%)$` or `minmax(…)`, align?: start \| end, link?: bool, tone_when?: leaf + tone, as? }`; `as` only on `cards`, where each role appears once and `fact` at most three times (`OUT_OF_BOUNDS`) | `table`, `cards` | on `cards`, the first text column is `title`, the first figure that never truncates is `figure`, the rest `fact` | `as ∈ title figure fact trend ring who when mark` (`ENUM_VALUE_UNKNOWN`) |
@@ -312,6 +312,11 @@ a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 | `body` | the dialect, ≤ 64 KB | `note` | — | — |
 | `icon` | `Glyph`, beside a `section`'s heading | no | — | — |
 | `fold` | bool; a `section` that starts shut, folding the blocks after it up to the next section | no | `false` | — |
+| `since` | `seen`; on a `feed`, the rows after the reader's read mark are new | no | absent: nothing is new | `seen` (`ENUM_VALUE_UNKNOWN`) |
+| `first` | int 1–50; on a `feed`, the most rows it draws, newest first, a burst being one row; the rest go in one last row per group | no | every row | — |
+| `row` | a spoken id, interpolatable (`'{{spoken}}'` on a template); on a `diff`, the row whose history it reads | `diff` | — | — |
+| `field` | `Id` of a `document` or `text` field on that register; on a `diff`, the field compared | `diff` | — | the register's fields (`FIELD_UNKNOWN`) |
+| `versions` | int 2–10; on a `diff`, how many versions, newest first, each against the one before it | no | `2` | — |
 | *accepts names* | for a pack-declared `kind`, the keys its `accepts:` names, typed §4.6 | per the block declaration | — | — |
 
 ### 4.6 · `block` — 22 §3 · 05 §1 · 34 §2.4

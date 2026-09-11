@@ -57,10 +57,12 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Eighteen kinds over eight primitives
+## Twenty kinds over eight primitives
 
-Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards` and
-`section` are page-only: a page's evaluator writes their rows and passes `parse(src, { page: true })`.
+Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards`,
+`section` and `feed` are page-only: a page's evaluator writes their rows and passes
+`parse(src, { page: true })`. A `diff` is verbatim rows marked `- `, `+ ` or two spaces, and
+`diffRows(before, after)` writes them.
 
 | Primitive | Is | Kinds |
 |---|---|---|
@@ -69,16 +71,16 @@ Kinds are declarations over primitives, so primitives compose and kinds do not h
 | `rows` | label · value · note, one per line | `spec` `params` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` |
 | `inline` | a run of pills | `chips` |
-| `list` | title · detail · optional state marker | `steps` `todo` `timeline` |
+| `list` | title · detail · optional state marker | `steps` `todo` `timeline` `feed` |
 | `table` | real columns, a header, per-column alignment | `comparison` `table` |
-| `media` | a figure with a caption | `code` `tree` |
+| `media` | a figure with a caption | `code` `tree` `diff` |
 
 A board is a **grid of lists**. A roadmap is a **list with dates**. A risk matrix is a **grid of
 inlines**. Which is why a third party can add a kind without asking a designer — a kind is not code,
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; eighteen kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; twenty kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 

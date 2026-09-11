@@ -52,8 +52,40 @@ export type Boot = {
   /* OPTIONAL, because a host older than the session register answers without them. */
   /** The runs that are live now, as `sessionsLive` answers. */
   sessions?: LiveRun[];
-  /** Open suggestions, newest first: what waits on a person. */
-  waiting?: { id: string; body_kind: string; opened_by: string; opened_at: string }[];
+  /** Open suggestions, newest first, each with its question: what waits on a person. */
+  waiting?: { id: string; body_kind: string; opened_by: string; opened_at: string; question?: string }[];
+};
+
+/**
+ * One row as `context` shows it: its spoken id, version, scope, state, and its register's mobile fields.
+ * A key's secret field is `{ sealed, opened, last_opened, last_by }`, never a value.
+ */
+export type Brief = { spoken: string; version: number; scope: 'project' | 'global'; state: string | null } & Record<string, unknown>;
+
+/** `context`: where an agent stands, in one call. See `Context` in `@braindog/record`. */
+export type Context = {
+  session: { spoken: string; state: string | null } | null;
+  project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' } | null;
+  ambiguous: string[];
+  handoff: { from: string; age_s: number; next: string; tried: string[]; head: string | null } | null;
+  live: { same_repo: LiveBrief[]; elsewhere: LiveBrief[] };
+  waiting: { id: string; question: string }[];
+  registers: { id: string; name: string; rows: Brief[]; inherited: Brief[]; truncated: boolean }[];
+  people: Brief[];
+  faded: number;
+  next: string;
+};
+
+/** Another run that is live now, as `context` shows it. */
+export type LiveBrief = {
+  spoken: string;
+  state: string | null;
+  doing: string | null;
+  agent: string | null;
+  repo: string | null;
+  project: string | null;
+  stale: boolean;
+  age_s: number;
 };
 
 /** One live run: the row, its spoken id, and what is worked out when it is read. */
@@ -79,6 +111,8 @@ export type Attached = {
   resumed: boolean;
   /** The project the run is placed in, by spoken id, or `null` for none. */
   project: string | null;
+  /** The briefing for where the run stands. Optional, because a host older than `context` sends none. */
+  context?: Context;
 };
 
 /** `33 §4` line 356, six keys. `app` is `null` on a host that was not told what it is running. */
@@ -263,6 +297,8 @@ export function createClient(options: ClientOptions) {
       session?: string;
     }) => call<unknown>('handoff', args as Record<string, unknown>),
     sessionsLive: () => call<LiveRun[]>('sessionsLive'),
+    /** Where the caller stands: its run, its project, the last handoff, who is live, and what applies. */
+    context: () => call<Context>('context'),
   };
 }
 

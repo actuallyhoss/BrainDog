@@ -1,6 +1,6 @@
 /**
  * The two renderers, compared as trees: the Svelte drawers compiled and rendered on the server,
- * against `toHTML`, for every shape a `cards` and a `section` block can take.
+ * against `toHTML`, for every shape a `cards`, `section`, `feed` and `diff` block can take.
  *
  * "EQUAL BY CONSTRUCTION" WAS A PROMISE AND NOTHING KEPT IT. The rest of this package asserts the
  * Svelte side by reading its source as text, because a `.svelte` file cannot be mounted under
@@ -81,6 +81,19 @@ const SHAPES: Record<string, string> = {
   'a section that counts nothing': '```section | Working now\n | 0 | \n```',
   'a folded section with a glyph': '```section | Parked and retired\nthing | 4 | fold\n```',
   'a section that is only a heading': '```section | From everywhere\n```',
+  'a feed with bursts, a mark and a tone':
+    '```feed\nagent | Claude | 14 | saves on [Variable axis QA](/r/things/4) | 3h ago\nrule | Late fees | 2 | reminders sent | 5h ago\n' +
+    'seen | 2d ago\nagent | Codex |  | opened Kiln | 3d ago | bad\nyou | You | 1 | decision on Pricing | 4d ago\n```',
+  'a feed row with nobody named': '```feed\nagent |  | 2 | saves | now\n```',
+  'a feed with nothing new': '```feed\nseen | 2d ago\n```',
+  'a feed with no mark yet': '```feed\nseen | \n```',
+  'a diff with a change in the middle':
+    '```diff | Deploy, v3 to v4\n  When a deploy fails,\n- retry once.\n+ retry twice,\n+ then page the owner.\n  Log the run.\n```',
+  'a diff that folds its long runs':
+    '```diff\n' +
+    [...Array.from({ length: 9 }, (_, i) => `  line ${i + 1}`), '- line 10', '+ line ten', ...Array.from({ length: 10 }, (_, i) => `  line ${i + 11}`)].join('\n') +
+    '\n```',
+  'a diff with no change': '```diff\n  same\n  again\n```',
 };
 
 for (const [name, src] of Object.entries(SHAPES)) {

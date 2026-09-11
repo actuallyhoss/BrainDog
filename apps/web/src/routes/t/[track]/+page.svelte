@@ -1,18 +1,17 @@
 <!--
   A track: the thread you are in the middle of, and everything that has happened on it.
 
-  THIS PAGE IS THE REASON THE PIN EXISTS. An agent session is a thing that happened once; pinned to a
-  track it becomes part of a thread you can come back to on Tuesday and read in order. Without a
-  surface that gathers them, the field on the session row is a field nobody would ever look at.
-
   It is deliberately NOT a declared page. A declared page is a row that a person arranges, and there
   is one of those per page; tracks are created and finished continuously, and a page declaration per
   track would put a schema change behind every "I am going to start looking at X". The blocks here
-  are the same three questions every track asks — what has been said, who is working on it, what is
-  still open — and they are the same for every track by design.
+  are the same three questions every track asks: what has been said, which agents are on it, what is
+  still open. They are the same for every track by design.
+
+  AGENTS ARE THE RUNS ON THE THREAD'S PROJECT. A run in the kernel's `session` register carries a
+  project and no thread, so the section names the project rather than claiming the thread.
 
   The update thread is FIRST. The health chip in the header is derived from the newest row of it, so
-  putting the sessions or the tasks above it would separate the claim from its evidence by a screen.
+  putting the runs or the tasks above it would separate the claim from its evidence by a screen.
 -->
 <script lang="ts">
   import { since } from 'braindog-render';
@@ -30,9 +29,11 @@
     display,
     healthLabel,
     healthTone,
-    sessionsFor,
+    jobOf,
+    runsOn,
     trackHealth,
     updatesFor,
+    working,
   } from '$lib/record/api.ts';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
@@ -49,7 +50,9 @@
 
   const health = $derived(trackHealth(seq));
   const updates = $derived(updatesFor(seq));
-  const sessions = $derived(sessionsFor(seq));
+  /* The thread's project, and the runs placed in it by the project's spoken id, `things#1`. */
+  const project = $derived((ROWS.things ?? []).find((t) => track !== undefined && t.seq === Number(track.fields.thing)));
+  const runs = $derived(project ? runsOn(`things#${project.seq}`) : []);
   /**
    * The tasks on this track that are STILL OPEN, which is what the heading says.
    *
@@ -64,7 +67,7 @@
     ),
   );
 
-  const live = $derived(sessions.filter((s) => s.fields.state === 'live').length);
+  const live = $derived(runs.filter(working).length);
 
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
@@ -156,36 +159,37 @@
     </section>
 
     <aside class="side">
-      <Section title="Working on this" count={sessions.length}>
-      {#if sessions.length === 0}
-        <!-- `pinned` appeared nowhere else in the product and nothing pins anything. -->
-        <p class="quiet">Nobody is working on this.</p>
+      <!-- A thread on no project has no agents to name, so the section is not drawn. -->
+      {#if project}
+      <Section title="Agents on {project.fields.name}" count={runs.length}>
+      {#if runs.length === 0}
+        <p class="quiet">No agent has worked on {project.fields.name}.</p>
       {:else}
         <ul class="rows">
-          {#each sessions.slice(0, DOM_CAP) as s (s.seq)}
+          {#each runs.slice(0, DOM_CAP) as s (s.seq)}
+            {@const job = jobOf(s)}
             <li>
-              <a class="row" href="/r/sessions/{s.seq}">
-                <span class="dot" data-state={s.fields.state}></span>
+              <a class="row" href="/r/session/{s.seq}">
+                <span class="dot" data-live={working(s)}></span>
                 <span class="row-main">
                   <span class="row-title" dir="auto">{s.fields.doing}</span>
                   <span class="row-sub">{s.fields.agent} · {since(String(s.fields.last_seen), NOW)}</span>
                 </span>
               </a>
-              <!-- A SESSION SAYS WHAT IT IS DOING; THE RUN IS WHAT IT IS DOING IT WITH — the tool
-                   calls in order, with what each one answered. The two existed and there was no way
-                   to get from one to the other, so the run screen was reachable from nowhere in the
-                   product at all. Only on a session that carries one: an ended session kept its
-                   transcript and its run is over. -->
-              {#if s.fields.job}
-                <a class="row-run tap" href="/jobs/{s.fields.job}">{copy.watchRun}</a>
+              <!-- A RUN SAYS WHAT IT IS DOING; ITS JOB IS WHAT IT IS DOING IT WITH, the tool calls in
+                   order with what each one answered. This link is the job screen's door. Only on a run
+                   a job names. -->
+              {#if job}
+                <a class="row-run tap" href="/jobs/{job.id}">{copy.watchRun}</a>
               {/if}
             </li>
           {/each}
         </ul>
-        <CapLine shown={Math.min(sessions.length, DOM_CAP)} total={sessions.length} />
+        <CapLine shown={Math.min(runs.length, DOM_CAP)} total={runs.length} />
         {#if live}<p class="quiet">{live} working right now.</p>{/if}
       {/if}
       </Section>
+      {/if}
 
       <Section title="Still open" count={tasks.length}>
       {#if tasks.length === 0}
@@ -344,8 +348,8 @@
     font-size: var(--t-xs);
   }
 
-  /* Live is the only state that gets the accent. An idle session is not news and an ended one is
-     history; painting all three would make the colour mean "a session" rather than "working now". */
+  /* A run working now is the only one that gets the accent. An idle run is not news and a finished
+     one is history; painting all of them would make the colour mean "a run" rather than "working now". */
   .dot {
     inline-size: 7px;
     block-size: 7px;
@@ -354,7 +358,7 @@
     background: var(--edge);
   }
 
-  .dot[data-state='live'] {
+  .dot[data-live='true'] {
     background: var(--earn-fill);
   }
 

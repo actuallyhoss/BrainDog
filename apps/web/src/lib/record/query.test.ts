@@ -369,13 +369,13 @@ test('and an enum whose value is the word `today` is untouched', () => {
 test('AN INSTANT CELL IS BANDED, NOT TRUNCATED TO ITS DAY', () => {
   /* `display()`'s `instant` branch had no test at all — `api.test.ts` asserts `money`, `day`, `enum`,
      `int`, `duration`, `ref`, unknown and `secret`, and reverting this one broke nothing. It was
-     `relative(value.slice(0, 10))`, so a session seen two hours ago and one seen eleven hours ago
+     `relative(value.slice(0, 10))`, so a run seen two hours ago and one seen eleven hours ago
      both read *today*, on the register whose whole subject is what is happening now. */
   const at = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
-  assert.equal(display('sessions', 'last_seen', at(0)), 'just now');
-  assert.equal(display('sessions', 'last_seen', at(2)), '2h ago');
-  assert.equal(display('sessions', 'last_seen', at(11)), '11h ago');
-  assert.notEqual(display('sessions', 'last_seen', at(2)), display('sessions', 'last_seen', at(11)));
+  assert.equal(display('session', 'last_seen', at(0)), 'just now');
+  assert.equal(display('session', 'last_seen', at(2)), '2h ago');
+  assert.equal(display('session', 'last_seen', at(11)), '11h ago');
+  assert.notEqual(display('session', 'last_seen', at(2)), display('session', 'last_seen', at(11)));
   /* And a `day` field is still a DATE, which is the branch beside it and a different answer on
      purpose: a deadline is a date somebody diaries against, and an age is not. */
   assert.equal(display('obligations', 'due', '2026-09-03'), '3 Sep 2026');

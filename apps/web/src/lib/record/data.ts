@@ -40,13 +40,19 @@ export { LOOKUPS, NOW, TODAY } from '@braindog/seed';
 /** The pages the record ships with. They live in the seed, because a page is a document it holds. */
 export const PAGES = SEED_PAGES as unknown as Record<string, PageDecl>;
 import { NOW } from '@braindog/seed';
-import type { Counted } from '@braindog/kernel';
+import { sessionDeclaration, type Counted } from '@braindog/kernel';
 /* `find.ts` reads `REGISTERS` from this module; the cycle is fine in ESM because `answers` is only
    called at render time, and it is the point — the receipts count the way the record counts. */
 import { answers } from './find.ts';
 
-/** The eight registers, as this app types them. The seed's shape is a superset of this one. */
-export const REGISTERS = SEED_REGISTERS as unknown as Record<string, RegisterDecl>;
+/**
+ * The seed's registers and the kernel's `session`, as this app types them. The seed's shape is a
+ * superset of this one.
+ *
+ * AGENT RUNS COME FROM THE KERNEL'S OWN DECLARATION, the body migration 0002 seats, because that is
+ * what a real record's `boot` lists. A copy written here would be the second "Agent runs" again.
+ */
+export const REGISTERS = { ...SEED_REGISTERS, session: sessionDeclaration().body } as unknown as Record<string, RegisterDecl>;
 
 /**
  * WHICH RECORD THIS BUILD SHOWS, and the only place in the app that asks.
@@ -98,7 +104,7 @@ export const ROWS: Record<string, Entry[]> = {
   things: THINGS,
   people: PEOPLE,
   tasks: TASKS,
-  sessions: entriesOf('sessions'),
+  session: entriesOf('session'),
   tracks: entriesOf('tracks'),
   updates: entriesOf('updates'),
 };
@@ -728,6 +734,7 @@ export const JOBS: Record<string, Job> = {
     status: 'running',
     model: 'your machine · claude-opus-5',
     started: stamp(-0.05),
+    run: 'S1',
     events: [
       /* `things` HAS NO `state` FIELD — its state column is `lane`, and its values are
          `building | earning | parked | retired`. So the predicate does not compile, `matches()`
@@ -748,9 +755,10 @@ export const JOBS: Record<string, Job> = {
 };
 
 
-/** The one the reconcile session is running. Named, because two screens quote it by name. */
+/** The one the reconcile run, S3, is running. Named, because two screens quote it by name. */
 export const JOB: Job = {
   id: 'j_7Q2F',
+  run: 'S3',
   kind: 'reconcile',
   status: 'running',
   model: 'your machine · claude-opus-5',
@@ -822,7 +830,7 @@ export const PEOPLE_ACCESS: Person[] = [
      in the fixture came from `rung(null) = -1` — the test asserting the matrix runs BOTH ways was
      satisfied by the bookkeeper's own absence of a level. A contractor who may file expenses
      everywhere and DECIDE on the one track they run is the shape that makes it real. */
-  { id: 'jo', name: 'J. Okonkwo', level: 'append', scoped: [{ register: 'sessions', level: 'read' }, { register: 'tracks', level: 'decide' }], email: 'j@okonkwo.example', since: null, suspended: null, seen: null },
+  { id: 'jo', name: 'J. Okonkwo', level: 'append', scoped: [{ register: 'session', level: 'read' }, { register: 'tracks', level: 'decide' }], email: 'j@okonkwo.example', since: null, suspended: null, seen: null },
 ];
 
 /* ── the way back in ──────────────────────────────────────────────────────────── */

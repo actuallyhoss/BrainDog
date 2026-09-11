@@ -15,8 +15,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { healthLabel, healthTone, sessionsFor, trackHealth, updatesFor } from './api.ts';
-import { REGISTERS, ROWS } from './data.ts';
+import { healthLabel, healthTone, jobOf, runName, runsOn, trackHealth, updatesFor, working } from './api.ts';
+import { NOW, REGISTERS, ROWS } from './data.ts';
 
 /* ── the derivation ──────────────────────────────────────────────────────── */
 
@@ -92,21 +92,38 @@ test('updates read newest first, because that is the order a person reads a thre
   assert.deepEqual(list, [...list].sort().reverse());
 });
 
-/* ── the pin ─────────────────────────────────────────────────────────────── */
+/* ── the runs on a thread's project ──────────────────────────────────────── */
 
-test('a session can be pinned to a track, and most are not', () => {
-  const pinned = (ROWS.sessions ?? []).filter((x) => x.fields.track !== undefined);
-  assert.ok(pinned.length > 0, 'nothing is pinned, so the pin is untested');
-  assert.ok(
-    pinned.length < (ROWS.sessions ?? []).length,
-    'every session carries a track — the seed is demonstrating the over-assignment failure it exists to avoid',
-  );
+test('a run names its project by spoken id, and carries no thread', () => {
+  // The kernel's `session` register has a `project` and no `track`, so a thread reaches its runs
+  // through its project.
+  const runs = ROWS.session ?? [];
+  assert.ok(runs.length > 0, 'the sample holds no agent runs');
+  for (const r of runs) {
+    assert.match(String(r.fields.project), /^things#[1-9][0-9]*$/, `run ${r.seq} names no project`);
+    assert.equal(r.fields.track, undefined, `run ${r.seq} carries a thread the register does not declare`);
+  }
 });
 
-test('a track gathers its own sessions, most recently seen first', () => {
-  const seen = sessionsFor(1).map((x) => String(x.fields.last_seen));
-  assert.ok(seen.length >= 2, 'track 1 needs more than one session for the order to mean anything');
+test('a project gathers its own runs, most recently seen first', () => {
+  const seen = runsOn('things#1').map((x) => String(x.fields.last_seen));
+  assert.ok(seen.length >= 2, 'Kiln needs more than one run for the order to mean anything');
   assert.deepEqual(seen, [...seen].sort().reverse());
+});
+
+test('a run is working only while it is active and heard from in the last 45 minutes', () => {
+  const runs = ROWS.session ?? [];
+  const s1 = runs[0]!;
+  assert.equal(working(s1), true, 'S1 is active and was seen minutes ago');
+  assert.equal(working(runs[2]!), false, 'an idle run is not working');
+  const quiet = { ...s1, fields: { ...s1.fields, last_seen: new Date(NOW - 46 * 60_000).toISOString() } };
+  assert.equal(working(quiet), false, 'an active run quiet for 46 minutes is stale');
+});
+
+test('a job names its run, and the run finds its job', () => {
+  const s1 = (ROWS.session ?? [])[0]!;
+  assert.equal(runName(s1), 'S1');
+  assert.equal(jobOf(s1)?.id, 'j_9K4A');
 });
 
 test('track is not in any register’s mobile columns', () => {

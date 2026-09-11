@@ -1742,7 +1742,7 @@
             : `Nothing in ${decl.name} yet.`}
         query={emptyKind === 'no-results' ? [q, saidPlainly(id, whereOf(filters))].filter(Boolean).join(' · ') : undefined}
         body={emptyKind === 'no-data-yet'
-          ? `${decl.name} holds ${decl.holds}.`
+          ? decl.holds ? `${decl.name} holds ${decl.holds}.` : undefined
           : emptyKind === 'no-results' && q
             ? copy.searchesOnly(searched)
             : undefined}

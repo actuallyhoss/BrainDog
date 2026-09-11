@@ -163,7 +163,8 @@ const CAPPED: readonly (readonly [route: string, what: string, capped: RegExp])[
   ['audit/+page.svelte', 'the log, which grows with writes', /matched\.slice\(0, DOM_CAP\)/],
   ['inbox/+page.svelte', 'arrivals that matched no rule', /INBOX\.slice\(0, DOM_CAP\)/],
   ['decide/+page.svelte', 'every decision ever taken', /DECIDED\.slice\(0, DOM_CAP\)/],
-  ['t/[track]/+page.svelte', 'a track’s updates and its sessions', /updates\.slice\(0, DOM_CAP\)/],
+  ['t/[track]/+page.svelte', 'a track’s updates', /updates\.slice\(0, DOM_CAP\)/],
+  ['t/[track]/+page.svelte', 'the agent runs on a track’s project', /runs\.slice\(0, DOM_CAP\)/],
 ];
 
 test('every list surface applies the cap, and there is one cap', () => {

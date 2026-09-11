@@ -68,12 +68,12 @@
   <!-- `captioned` is the same rule `toHTML` reads: a `code` heading is its language and a `section`
        heading is the section itself, so neither becomes a caption. -->
   {#if captioned(block)}
-    <figcaption class="block-head" data-intent={block.tone}>
-      {#if block.tone}
-        <span class="glyph" role="img" aria-label={TONES[block.tone].label}>{TONES[block.tone].glyph}</span>
-      {/if}
-      <Text nodes={inline(block.heading ?? '', opts)} {opts} />
-    </figcaption>
+    <!-- The glyph and the words touch, as `toHTML` writes them: a line break between them was a
+         leading space in the caption's text that the other renderer does not have. -->
+    <figcaption class="block-head" data-intent={block.tone}
+      >{#if block.tone}<span class="glyph" role="img" aria-label={TONES[block.tone].label}>{TONES[block.tone].glyph}</span
+        >{/if}<Text nodes={inline(block.heading ?? '', opts)} {opts} /></figcaption
+    >
   {/if}
 
   {#if spec.primitive === 'table'}

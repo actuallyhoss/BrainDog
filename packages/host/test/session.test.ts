@@ -124,6 +124,30 @@ test('ATTACH AND sessionsLive THROUGH THE SHARED WIRING: a token is a run, and a
   assert.equal(person.body.refusal?.code, 'FORBIDDEN');
 });
 
+test('CONTEXT IS A READ+ GET THROUGH THE SHARED WIRING, naming the run the headers point at and opening none', async () => {
+  const route = ROUTES.find((r) => r.name === 'context') ?? assert.fail('context is not routed');
+  assert.deepEqual([route.group, route.writes], ['READ+', false]);
+
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 11, 12)) });
+  const handlers = handlersFor(api);
+  const agent: CallContext = {
+    principal: { kind: 'token', id: 'tok_1', scope: 'read', person: 'p_1', level: 'owner' },
+    session: { host: 'studio-pc', repo: 'braindog', agent: 'claude', client_id: 'c-1' },
+  };
+  const read = async () => {
+    const res = await serveApi(new Request('https://x/api/context'), handlers, agent);
+    return { status: res.status, body: (await res.json()) as { ok: boolean; value?: { session: unknown; next: string } } };
+  };
+
+  const first = await read();
+  assert.equal(first.status, 200);
+  assert.equal(first.body.value?.session, null, 'a run that does not exist was named');
+  assert.match(first.body.value?.next ?? '', /first write opens a session/);
+  assert.equal(sql.all("SELECT 1 FROM entry WHERE register = 'session'").length, 0, 'reading context opened a run');
+  sql.close();
+});
+
 test('A REMOTE LOSES ITS USERINFO, so a password in a git remote never reaches the record', () => {
   const said = sessionOf(new Headers({ 'x-braindog-remote': 'https://sam:hunter2@github.com/sam/braindog.git' }));
   assert.equal(said.remote, 'https://github.com/sam/braindog.git');

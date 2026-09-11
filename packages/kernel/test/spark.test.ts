@@ -76,7 +76,7 @@ test('AND `30 §3`’s QUERY IS EMPTY over a record that has been used', async (
 
   k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' });
   k.update('obligations', 'obligations#1', { state: 'paid' }, { actor: 'p_1' });
-  k.log('obligations', 1, 'p_1', 'Chased twice.');
+  k.log('obligations', 1, { actor: 'p_1' }, 'Chased twice.');
 
   const wrong = sql.all<{ kind: string }>(
     `SELECT kind FROM event WHERE actor = 'spark' AND kind NOT IN ('suggest','propose','predict')`,

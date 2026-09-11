@@ -19,7 +19,7 @@ import { openRecord, slugify, type Kernel, type PageResult } from '@braindog/ker
 import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
-import { LOOKUPS, NOW, PAGES, REGISTERS, THINGS, installSeed } from '../src/index.ts';
+import { LOOKUPS, NOW, PAGES, REGISTERS, RUNS, THINGS, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -96,7 +96,8 @@ test('A TEMPLATE IS ONE DECLARATION AND ONE PAGE PER ROW, slugged by the row it 
 
   const kiln = page(k, 'kiln');
   assert.match(kiln.title as string, /Kiln/, 'the title still carries its placeholder');
-  assert.ok(!JSON.stringify(kiln).includes('{{'), 'a placeholder survived into the page');
+  const survivors = new Set(JSON.stringify(kiln).match(/\{\{\w*\}\}/g) ?? []);
+  assert.deepEqual([...survivors], [], 'a placeholder survived into the page');
   sql.close();
 });
 
@@ -165,6 +166,21 @@ test('and a project page reads its metrics ABOUT THAT PROJECT', async () => {
   assert.notEqual(a, b, 'two projects read the same number, so the parameter did nothing');
   sql.close();
 });
+
+test(
+  'A PROJECT PAGE’S AGENTS ARE THE RUNS PLACED IN THAT PROJECT, newest seen first',
+  async () => {
+    const { k, sql } = await seeded();
+    const agents = page(k, 'kiln').blocks.find((b) => b.kind === 'cards' && b.source === 'register.session');
+    assert.ok(agents, 'the Kiln page has no Agents block over the kernel’s runs');
+    assert.deepEqual(agents.refusals, []);
+    const kilns = RUNS.filter((r) => r.project === 'things#1')
+      .sort((a, b) => String(b.last_seen).localeCompare(String(a.last_seen)))
+      .map((r) => r.doing);
+    assert.deepEqual(agents.rows.map((r) => r.fields.doing), kilns);
+    sql.close();
+  },
+);
 
 /* ── one block's refusal is one block ────────────────────────────────────── */
 

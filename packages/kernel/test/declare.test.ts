@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import { REGISTER_BODY_KEYS } from '../src/declare.ts';
 import { day } from '../src/ingest.ts';
-import { indexesFor, indexName, jcs, openRecord, validateDeclaration, type Declaration, type Kernel } from '../src/index.ts';
+import { indexesFor, indexName, jcs, openRecord, sessionDeclaration, validateDeclaration, type Declaration, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -870,7 +870,7 @@ test('A PAGE WAS CHECKED BY NOTHING, and it is the declaration with the most way
   assert.match(validateDeclaration(page({ blocks: many(25) }))?.fix ?? '', /25 blocks/);
 });
 
-test('A BLOCK KIND IS ONE OF THE EIGHTEEN, and the closure is what the security argument is made of', () => {
+test('A BLOCK KIND IS ONE OF THE TWENTY, and the closure is what the security argument is made of', () => {
   /**
    * `04 §1`: *"the closure is load-bearing rather than tidy — the security argument in §7 is an
    * ENUMERATION, and an enumeration only works over a finite list."*
@@ -885,14 +885,33 @@ test('A BLOCK KIND IS ONE OF THE EIGHTEEN, and the closure is what the security 
   assert.equal(said?.at, 'blocks[0]', 'a refusal names the block that was wrong (04 §5)');
   assert.ok(said?.allowed?.includes('note'), 'the refusal offers no alternative');
 
-  /* THE EIGHTEEN STILL INSTALL. A gate red for every input is as useless as one never red. */
-  for (const kind of ['note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params', 'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section'])
-    assert.equal(refusedWith(block({ kind })), null, `${kind} is one of the eighteen and was refused`);
+  /* THE TWENTY STILL INSTALL. A gate red for every input is as useless as one never red. */
+  for (const kind of ['note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params', 'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff'])
+    assert.equal(refusedWith(block({ kind })), null, `${kind} is one of the twenty and was refused`);
+  assert.match(validateDeclaration(block({ kind: 'prose' }))?.fix ?? '', /not one of the twenty/);
 
   /* AND A SEVENTEENTH ARRIVES AS A DECLARATION, which is the whole reason the primitive layer
      exists (05 §2) — admitted by prefix, and checked as a document of its own. */
   assert.equal(refusedWith(block({ kind: 'block.invoice_card' })), null);
   assert.equal(refusedWith(block({ kind: 'block.Invoice Card' })), 'KIND_UNKNOWN');
+});
+
+test('A PAGE DECLARING A FEED AND A DIFF INSTALLS, with the keys each reads', async () => {
+  /* `loop/research-agent-path.md` §7: what the brain learned lately, as a `feed`, and a skill's
+     versions, as a `diff`. The page lint holds no closed list of block keys, so `since`, `first`,
+     `row`, `field` and `versions` need no rule of their own here. */
+  const { k, sql } = await record();
+  value(await k.install([OBLIGATIONS]));
+  const lately = page({
+    blocks: [
+      { kind: 'feed', heading: 'Lately', span: 12, source: 'register.obligations', since: '-7d', first: 10 },
+      { kind: 'diff', heading: 'Versions', span: 12, source: 'register.obligations', row: 'obligations#1', field: 'what', versions: 5 },
+    ],
+  });
+  assert.equal(refusedWith(lately), null);
+  value(await k.install([lately]));
+  assert.ok(k.pages().some((p) => p.slug === 'invoicing'), 'the page did not install');
+  sql.close();
 });
 
 test('A SECTION AND A CARDS BLOCK INSTALL, and a column is one role on a card', async () => {
@@ -1109,9 +1128,10 @@ test('AND EVERY PAGE THE RECORD SHIPS SATISFIES ALL OF IT', async () => {
   assert.ok(SEED_PAGES.length >= 4, 'too few seeded pages for that to mean anything');
 
   /* AND AS A BATCH, which is the form they install in — every `requires` resolved against the
-     registers arriving beside them. */
+     registers arriving beside them, and against the kernel's own `session`, which every record has
+     from its first open and no pack declares. */
   const batch = [...declarations(), ...pageDeclarations(), ...metricDeclarations()];
-  const known = new Map(batch.map((d) => [d.id, d.body]));
+  const known = new Map([...batch, sessionDeclaration()].map((d) => [d.id, d.body]));
   for (const decl of batch)
     assert.equal(validateDeclaration(decl, known), null, `${decl.id} is refused when the record says what it holds`);
 });

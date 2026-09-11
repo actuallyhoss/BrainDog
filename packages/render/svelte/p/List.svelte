@@ -21,6 +21,7 @@
 <script lang="ts">
   import { inline, text, TONES, type Block, type RenderOptions, type Row } from '../../src/index.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
+  import Feed from '../Feed.svelte';
   import Text from '../Text.svelte';
 
   let {
@@ -89,6 +90,10 @@
   }
 </script>
 
+<!-- `feed` is on this primitive and groups its rows, so it has a drawer of its own, as `cards` does on `grid`. -->
+{#if block.kind === 'feed'}
+<Feed {block} {opts} />
+{:else}
 <svelte:element this={block.kind === 'steps' ? 'ol' : 'ul'} class="list" data-kind={block.kind}>
   {#each block.rows as row, i}
     {#if block.kind === 'todo'}
@@ -168,3 +173,4 @@
     {/if}
   {/each}
 </svelte:element>
+{/if}
