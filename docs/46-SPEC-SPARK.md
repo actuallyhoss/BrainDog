@@ -603,6 +603,12 @@ Five codes of its own, two shared with the record, two families passed through. 
 | `listJobs` and `readCancel` | one indexed statement each | `EXPLAIN QUERY PLAN` in the record's test; here, one `RecordApi` call per method asserted |
 | Meter query | one indexed count on `call_meter` | `EXPLAIN QUERY PLAN … USING INDEX call_meter` |
 
+Prompt caching: every template sends `SYSTEM`, then the schema, then the per-ask content, in that
+order and byte-identical across asks, so the stable prefix is cacheable wherever the provider caches
+prefixes (tier B and C keys especially). Nothing variable (the date, the scope, the question) may be
+interpolated into `SYSTEM`; it goes in the user message. The account row records cached input
+separately when `usage` reports it, so the meter reflects what a turn actually cost.
+
 Token heuristic: `ceil(utf8Bytes / 3)` — over-counts English by about a quarter and holds for Arabic. `ponytail:` swap for the provider's counter when the `usage.in ≤ 1.3×` assertion fails on a fixture.
 
 ## 8 · Security
