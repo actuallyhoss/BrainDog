@@ -30,9 +30,13 @@ import {
   enablePack as enableDeclaredPack,
   installDeclarations,
   jcs,
+  packSettings as declaredPackSettings,
+  readPackConfig,
   retireDeclarations,
+  writePackConfig,
   stageDeclarations,
   type Declaration,
+  type PackConfig,
   type PackToggle,
 } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
@@ -200,7 +204,8 @@ export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Snapshot, V
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
-export type { Declaration, DeclKind, Installed, PackToggle } from './declare.ts';
+export type { ConfigDecl, ConfigType, Declaration, DeclKind, Installed, PackConfig, PackToggle } from './declare.ts';
+export { CONFIG_TYPES, configReads, configValue, fillConfig, readConfig } from './declare.ts';
 
 /**
  * One pack as `packStates()` reads it. `version` is `null` for a pack the seed owns by its body, which
@@ -3156,6 +3161,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       }
       return ok(toggle);
     },
+
+    /** One pack's settings: what its manifest declares under `config:`, and the value each holds now. */
+    packConfig(id: string): Result<PackConfig> {
+      return readPackConfig(sql, id);
+    },
+
+    /**
+     * Set some of a pack's settings, checked against the manifest, with one `edit` event.
+     * Nothing installed changes: a declaration reads a setting when its pack is next planned and installed.
+     */
+    setPackConfig(id: string, values: unknown, opts: { actor?: string } = {}) {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+      return writePackConfig(sql, clock.now(), id, values, opts, transaction, mint);
+    },
+
+    /** Every pack's setting values, by pack id, as a plan fills `{{config:}}` from them. */
+    packSettings: () => declaredPackSettings(sql),
 
     registers: () => registers,
     register: (id: string) => registers.get(id),

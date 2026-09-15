@@ -215,7 +215,17 @@ async function startWork(io: Io, to: Target, at: Position, context: Context, run
     await step('skills sync', (client) => syncSkills({ client, context, home, configDir: io.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), top, dryRun: false }));
   if (wants('tools'))
     await step('tools scan', (client, signal) =>
-      scanTools({ client, context, top, cwd: at.cwd, home, dryRun: false, deposit: depositor({ file: hostsPath(io.env), env: io.env, host: to.key, headers, signal }) }),
+      scanTools({
+        client,
+        context,
+        top,
+        cwd: at.cwd,
+        home,
+        dryRun: false,
+        deposit: depositor({ file: hostsPath(io.env), env: io.env, host: to.key, headers, signal }),
+        /* The no-grant sentence once, not in every briefing. */
+        once: { host: to.key, hosts: hostsPath(io.env) },
+      }),
     );
   return lines;
 }

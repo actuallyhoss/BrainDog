@@ -25,7 +25,7 @@
 
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
-import { KINDS, digest, jcs, type DeclKind, type Json } from '@braindog/kernel';
+import { KINDS, configReads, configValue, digest, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Json } from '@braindog/kernel';
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 
@@ -61,6 +61,14 @@ export type Manifest = {
   /** Every id this pack claims. Derived, never declared — a list that can disagree with the file. */
   provides: string[];
   note?: string;
+  /**
+   * The settings a person can change without editing the file, by name. Absent when the pack declares none.
+   *
+   * A CLOSED SUBSET OF THE FIELD TYPES (text, enum, bool, money, day and duration), each with an optional
+   * default. A declaration reads one as `{{config:<key>}}`, and the value is written into the
+   * declaration when the pack is planned and installed. `readConfig` in the kernel checks the map.
+   */
+  config?: Record<string, ConfigDecl>;
 };
 
 export type Pack = {
@@ -81,6 +89,13 @@ export type Installed = {
   packs: { id: string; version: string }[];
   declarations: { id: string; version: number; kind: DeclKind; pack_id: string | null; body: string; checksum: string }[];
   rows: Record<string, number>;
+  /**
+   * The settings somebody chose, by pack id: `pack.manifest.config_values` for each pack that has any.
+   *
+   * OPTIONAL, because a record with no pack settings, and every caller written before settings
+   * existed, has nothing to say here. A missing map plans every setting at its default.
+   */
+  config?: Record<string, Record<string, Json>>;
 };
 
 export type Diff = {
@@ -125,6 +140,20 @@ export type Diff = {
    */
   renames: { from: string; to: string; rows: number }[];
   warnings: { at: string; say: string }[];
+  /**
+   * Each setting the pack declares and the value this install writes into its declarations.
+   *
+   * `kept` is a value somebody set on the installed version that is still legal for this one,
+   * `default` is this version's default, and `none` is a setting with neither, which no declaration
+   * reads, because `normalise` refuses a placeholder whose setting has no default.
+   */
+  config: { key: string; type: string; value: Json; from: 'kept' | 'default' | 'none' }[];
+  /**
+   * The lists this pack points at that the record does not hold and the pack does not declare.
+   * Reported here, refused by `install` and by the record's `planPack` as `REGISTER_UNRESOLVED`.
+   * `provider` is the first-party pack that declares the list, when there is one.
+   */
+  unresolved: { register: string; at: string; provider: string | null }[];
   base: { format: number; primitives: number; packs: [string, string][]; declarations: [string, number, string][] };
   planHash: string;
 };
@@ -240,6 +269,10 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
         );
       needs[dependency] = range;
     }
+  /* A PACK'S SETTINGS ARE CHECKED BEFORE ANYTHING READS THEM, with the kernel's own coercion, so a
+     money default is minor units and a currency here exactly as it is in a row. */
+  const settings = readConfig(doc.config);
+  if (!settings.ok) return settings as Result<Pack>;
   const manifest: Manifest = {
     pack: id,
     version,
@@ -253,6 +286,8 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     },
     provides: [],
     ...(typeof doc.note === 'string' ? { note: doc.note } : {}),
+    /* ONLY WHEN THERE ARE SETTINGS, so a pack written before `config:` existed keeps its checksum. */
+    ...(Object.keys(settings.value).length > 0 ? { config: settings.value } : {}),
   };
 
   const raw = doc.declarations;
@@ -346,6 +381,32 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     if (canonical === null) return malformed(`${declId} holds something this record cannot write down.`, declId);
     declarations.push({ kind, id: declId, body: stored, canonical });
   }
+
+  /* EVERY PLACEHOLDER NAMES A SETTING THIS PACK DECLARES, AND THAT SETTING HAS A DEFAULT. The first
+     install of a pack has no chosen values yet, so a placeholder with no default would reach the
+     kernel unfilled. A money value is an object, so it fills a whole value and never a piece of text. */
+  for (const d of declarations)
+    for (const read of configReads(d.body)) {
+      const where = `${d.id}.${read.at}`;
+      const setting = Object.hasOwn(settings.value, read.key) ? settings.value[read.key] : undefined;
+      if (setting === undefined)
+        return no<Pack>('FIELD_UNKNOWN', `${d.id} reads the setting ${read.key}, and ${id} declares no setting by that name.`, {
+          at: where,
+          allowed: Object.keys(settings.value),
+        });
+      if (setting.default === undefined)
+        return no<Pack>(
+          'REQUIRED_MISSING',
+          `${d.id} reads the setting ${read.key}, so ${read.key} needs a default for the first install.`,
+          { at: `config.${read.key}.default` },
+        );
+      if (setting.type === 'money' && !read.whole)
+        return no<Pack>(
+          'VALUE_MALFORMED',
+          `${where} puts the money setting ${read.key} inside longer text. A money setting fills a whole value on its own.`,
+          { at: where },
+        );
+    }
 
   const registers = new Map(declarations.filter((d) => d.kind === 'register').map((d) => [d.body.id as string, d.body]));
   const seeds: Seed[] = [];
@@ -634,7 +695,12 @@ const newer = (a: string, b: string): number => order(parts(a), parts(b));
  * names the conflict, the missing dependency and the rows that would be orphaned in one screen,
  * instead of failing on the first and making somebody find the rest one round trip at a time.
  */
-export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
+export async function plan(given: Pack, installed: Installed): Promise<Diff> {
+  /* THE BODIES ARE COMPARED AS THEY WOULD BE STORED, with every setting filled in. The installed body
+     is the filled one, so comparing it with the file's text would report a change on every plan of
+     a pack that reads a setting, and would miss the one a changed setting really makes. */
+  const config = settingsFor(given, installed);
+  const pack = filledWith(given, config);
   const live = new Map(installed.declarations.map((d) => [d.id, d]));
   const mine = pack.manifest.pack;
   const was = installed.packs.find((p) => p.id === mine)?.version ?? null;
@@ -711,6 +777,8 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
     }
   }
 
+  const unresolved = unresolvedOf(pack, installed, retires);
+
   const format = { wanted: pack.manifest.requires.format, has: installed.format, ok: installed.format >= pack.manifest.requires.format };
   const primitives = {
     wanted: pack.manifest.requires.primitives,
@@ -758,11 +826,142 @@ export async function plan(pack: Pack, installed: Installed): Promise<Diff> {
     newly_required: newlyRequired,
     renames,
     warnings: warningsOf(pack),
+    config,
+    unresolved,
     base,
     /* THE INTEGER HALF CATCHES A RECORD THAT MOVED and the hash half catches a PACK that was edited
        between the plan and the install — which no version number can see, and which is exactly what
        happens when the thing being approved is a file in somebody's editor. */
-    planHash: `${installed.record_version}.${await digest(jcs({ pack: pack.checksum, base } as unknown as Json))}`,
+    planHash: `${installed.record_version}.${await digest(
+      jcs({ pack: pack.checksum, base, ...(config.length > 0 ? { config } : {}) } as unknown as Json),
+    )}`,
+  };
+}
+
+/* ── settings, and the lists a pack points at ────────────────────────────── */
+
+/**
+ * The value each of a pack's settings takes in this install: the one somebody chose, when the new
+ * version still accepts it, or else this version's default.
+ */
+function settingsFor(pack: Pack, installed: Installed): Diff['config'] {
+  const declared = pack.manifest.config ?? {};
+  const chosen = installed.config?.[pack.manifest.pack] ?? {};
+  return Object.entries(declared).map(([key, setting]) => {
+    if (Object.hasOwn(chosen, key)) {
+      const still = configValue(key, setting, chosen[key]);
+      if (still.ok) return { key, type: setting.type, value: still.value, from: 'kept' as const };
+    }
+    if (setting.default !== undefined) return { key, type: setting.type, value: setting.default, from: 'default' as const };
+    return { key, type: setting.type, value: null, from: 'none' as const };
+  });
+}
+
+/** The pack with every `{{config:<key>}}` in its declarations filled from `config`. The same pack when there is nothing to fill. */
+function filledWith(pack: Pack, config: Diff['config']): Pack {
+  const values = Object.fromEntries(config.filter((c) => c.from !== 'none').map((c) => [c.key, c.value]));
+  if (Object.keys(values).length === 0) return pack;
+  const declarations = pack.declarations.map((d) => {
+    if (configReads(d.body).length === 0) return d;
+    const body = fillConfig(d.body, values) as Record<string, Json>;
+    return { ...d, body, canonical: canonicalise(body) ?? d.canonical };
+  });
+  return { ...pack, declarations };
+}
+
+/**
+ * The first-party pack that declares each list, so a refusal can name what to install.
+ *
+ * WRITTEN OUT HERE, because this package cannot import the seed that builds those packs. A test in
+ * `test/pack.test.ts` reads the seed's own manifests and fails when this map drifts from them.
+ */
+export const FIRST_PARTY_LISTS: ReadonlyMap<string, string> = new Map([
+  ['things', 'portfolio'],
+  ['people', 'people'],
+  ['obligations', 'money-core'],
+  ['services', 'estate'],
+  ['tasks', 'work'],
+  ['tracks', 'work'],
+  ['updates', 'work'],
+]);
+
+/** The kernel's own lists, which migration 2 seats in every record and no pack declares. */
+const KERNEL_LISTS = new Set(['session']);
+
+/** Every list a declaration points at, with where: a field's `to:`, a page's `requires` and block sources, a metric's `source`. */
+function pointsAt(decl: PackDeclaration): { register: string; at: string }[] {
+  const out: { register: string; at: string }[] = [];
+  const add = (value: unknown, at: string, prefixed: boolean) => {
+    if (typeof value !== 'string') return;
+    if (prefixed && !value.startsWith('register.')) return;
+    const register = value.replace(/^register\./, '');
+    if (register) out.push({ register, at });
+  };
+  const body = decl.body;
+  if (decl.kind === 'register')
+    for (const f of listOf(body, 'fields'))
+      if (isObject(f) && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref'))) add(f.to, `${decl.id}.fields.${String(f.id)}.to`, false);
+  if (decl.kind === 'page') {
+    for (const r of listOf(body, 'requires')) add(r, `${decl.id}.requires`, true);
+    listOf(body, 'blocks').forEach((b, i) => {
+      if (isObject(b)) add(b.source, `${decl.id}.blocks[${i}].source`, true);
+    });
+  }
+  if (decl.kind === 'metric') add(body.source, `${decl.id}.source`, true);
+  return out;
+}
+
+/**
+ * The lists this pack points at that nothing will hold once it is installed.
+ *
+ * HELD MEANS AFTER THE INSTALL: every live list, less the ones this version drops, plus the ones it
+ * declares. A list another pack declares but that is switched off is not held, because its
+ * declaration is retired while it is off.
+ */
+function unresolvedOf(pack: Pack, installed: Installed, retires: Diff['retires']): Diff['unresolved'] {
+  const dropped = new Set(retires.map((r) => r.id));
+  const held = new Set(KERNEL_LISTS);
+  for (const d of installed.declarations)
+    if (d.kind === 'register' && !dropped.has(d.id)) held.add(d.id.slice('register.'.length));
+  for (const d of pack.declarations) if (d.kind === 'register') held.add(d.id.slice('register.'.length));
+  const out: Diff['unresolved'] = [];
+  for (const d of pack.declarations)
+    for (const lean of pointsAt(d)) {
+      if (held.has(lean.register) || out.some((u) => u.register === lean.register)) continue;
+      out.push({ ...lean, provider: FIRST_PARTY_LISTS.get(lean.register) ?? null });
+    }
+  return out;
+}
+
+const joined = (items: readonly string[]): string =>
+  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+
+/**
+ * `REGISTER_UNRESOLVED` for a plan whose pack points at a list nothing holds, or `null`.
+ *
+ * ONE SENTENCE THAT NAMES THE LIST AND THE REPAIR. When every missing list is one a first-party pack
+ * declares, the repair names those packs; otherwise it is to install whatever declares the list, or
+ * to declare it in this pack.
+ */
+export function unresolvedFault(diff: Pick<Diff, 'pack' | 'unresolved'>): Refusal | null {
+  const first = diff.unresolved[0];
+  if (!first) return null;
+  const id = diff.pack.id;
+  const lists = diff.unresolved.map((u) => u.register);
+  const others = lists.slice(1);
+  const providers = [...new Set(diff.unresolved.map((u) => u.provider))];
+  const named = providers.filter((p): p is string => p !== null && p !== id);
+  const repair =
+    named.length > 0 && named.length === providers.length
+      ? `Install ${joined(named)} first: ${named.length === 1 ? 'it declares' : 'they declare'} ${joined(lists)}.`
+      : `Install the pack that declares ${joined(lists)} first, or declare ${lists.length === 1 ? 'it' : 'them'} in ${id}.`;
+  return {
+    code: 'REGISTER_UNRESOLVED',
+    fix: `${id} points at the ${first.register} list (${first.at}), which this record does not hold and ${id} does not declare.${
+      others.length > 0 ? ` It also points at ${joined(others)}.` : ''
+    } ${repair}`,
+    at: first.at,
+    allowed: lists,
   };
 }
 
@@ -991,6 +1190,12 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       { at: `requires.packs.${missing.id}` },
     );
 
+  /* A LIST NOTHING HOLDS IS REFUSED BEFORE ANYTHING IS STAGED. A field pointing at it would be a ref
+     no row can satisfy, and a page requiring it would draw an empty table under a heading that
+     promises one. */
+  const unheld = unresolvedFault(diff);
+  if (unheld) return { ok: false, refusal: unheld };
+
   /**
    * A RENAME IS REFUSED BEFORE THE ORPHAN IT ALSO IS, because it is the truer sentence.
    *
@@ -1056,8 +1261,22 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       { at: `${demanded.id}.fields.${demanded.field}.required` },
     );
 
+  /* THE SETTINGS ARE WRITTEN IN HERE, from the plan that was approved, so the bodies staged are the
+     bodies the plan compared. A text setting is a value a person chose after `normalise` looked, so
+     the colour rule is asked again of every body a setting filled. */
+  const filled = filledWith(pack, diff.config);
+  for (const d of filled.declarations) {
+    if (d.kind === 'theme' || d === pack.declarations.find((o) => o.id === d.id)) continue;
+    const painted = colour(d.body);
+    if (painted)
+      return no<Applied>(
+        'COLOUR_OUTSIDE_THEME',
+        `${d.id} sets ${painted.at} to ${painted.value} from a setting. A ${d.kind} names an intent (good, warn, bad or info), and the theme names the colour.`,
+        { at: `${d.id}.${painted.at}` },
+      );
+  }
   const staged = await host.stage(
-    pack.declarations.map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
+    filled.declarations.map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
   );
   if (!staged.ok) return staged;
 
@@ -1067,6 +1286,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
      identical document then reported an upgrade with an empty diff, which is the most confident
      wrong answer this module can give. */
   const { provides: _provides, ...manifest } = pack.manifest;
+  const kept = diff.config.filter((c) => c.from === 'kept').map((c) => [c.key, c.value] as const);
   try {
     return host.transaction((): Result<Applied> => {
       const put = staged.value();
@@ -1092,7 +1312,8 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         version: pack.manifest.version,
         source: pack.source.kind,
         ref: pack.source.ref ?? null,
-        manifest: jcs(manifest as unknown as Json),
+        /* THE CHOSEN SETTINGS TRAVEL WITH THE PACK ROW, and only the ones this version still accepts. */
+        manifest: jcs({ ...manifest, ...(kept.length > 0 ? { config_values: Object.fromEntries(kept) } : {}) } as unknown as Json),
         checksum: pack.checksum,
       });
 

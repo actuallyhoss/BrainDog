@@ -19,6 +19,8 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { LOOKUPS, NOW, ORDER, installSeed } from '@braindog/seed';
 
 import { list, REGISTERS, ROWS } from './api.ts';
+import { DECIDED, QUESTIONS, ROWSETS } from './data.ts';
+import { questionOf, rowsetOf } from './governance.ts';
 import { projected, terms } from './find.ts';
 import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type Refs } from './remote.ts';
 import type { Filter } from './schema.ts';
@@ -304,4 +306,36 @@ test('THE SEARCH BOX: nothing the sample finds is lost, and what the record adds
   assert.ok(added.length > 0, 'the record and the sample now agree on every word, so the note on treeOf is stale');
   assert.ok(!fromSample('obligations', [], 'on').includes(3), 'the sample now finds obligations#3 for "on"');
   assert.ok((fromRecord(k, refs, 'obligations', [], 'on') as number[]).includes(3), 'the record no longer finds obligations#3 for "on"');
+});
+
+/* ── the questions, on both sides ────────────────────────────────────────── */
+
+test('THE SEED FILES THE SAMPLE’S QUESTIONS, so /decide on the gates’ record draws what the sample draws', async () => {
+  const { k } = await seeded;
+  const open = k.governance('suggestion', { status: 'open' });
+  const decided = k.governance('decision');
+  assert.ok(open.ok && decided.ok);
+
+  /* THE IDS DIFFER AND THE QUESTIONS DO NOT. The record issues SG1 upward, so a question is matched by
+     what it asks, which is the only thing a person reads it by. */
+  const asked = new Map(open.value.map((row) => [k.question(String(row.id)), row] as const));
+  for (const q of QUESTIONS) {
+    const row = asked.get(q.title);
+    assert.ok(row, `the record has no open question asking "${q.title}" (${q.id})`);
+    const drawn = questionOf(row, q.title, q.rank);
+    if (row.body_kind === 'options') assert.deepEqual(drawn.options, q.options, `${q.id}'s options differ`);
+    /* EVERYTHING BUT THE VERSION, which is the one the row was read at on each side: 1 on a freshly
+       seeded record, and whatever the sample's entries carry. Answering compares against the record's. */
+    else {
+      const unversioned = (body: ReturnType<typeof rowsetOf>) => body && { ...body, rows: body.rows.map(({ version: _, ...r }) => r) };
+      assert.deepEqual(unversioned(rowsetOf(row)), unversioned(ROWSETS[q.id]), `${q.id}'s rows differ`);
+    }
+  }
+  assert.equal(open.value.length, QUESTIONS.length, 'the record holds an open question the sample does not show');
+
+  for (const q of DECIDED) {
+    const row: Record<string, unknown> | undefined = decided.value.find((d) => d.question === q.title);
+    assert.ok(row, `the record has no decision on "${q.title}" (${q.id})`);
+    assert.deepEqual([row.answer, row.reason], [q.decided?.option, q.decided?.reason], `${q.id}'s answer differs`);
+  }
 });

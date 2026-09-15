@@ -1898,6 +1898,16 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
       `A declaration's id is its kind and its own id: ${decl.kind}.${String(own)}, not ${decl.id}.`,
       'id',
     );
+  /* A `{{config:<key>}}` IS FILLED WHERE A PACK IS PLANNED AND INSTALLED, and nowhere else. One that
+     reaches here was never filled: a declaration installed outside a pack, or a key its pack does not
+     declare. Stored as it is, it would be a rule reading the literal text of a placeholder. */
+  const unfilled = configReads(decl.body)[0];
+  if (unfilled !== undefined)
+    return bad(
+      'FIELD_UNKNOWN',
+      `${decl.id} reads the setting ${unfilled.key}, and a setting is filled only when its pack is planned and installed with a value for it.`,
+      unfilled.at,
+    );
   /* THE KERNEL'S REGISTER HAS ONE WRITER, migration 2. Every agent write resolves to a row of it, so
      a pack or a person declaring `register.session` would change what an agent is for the whole
      record. `PROVIDES_CONFLICT` is `30 §6`'s code for an id somebody else already provides, and
@@ -2945,5 +2955,329 @@ export async function enablePack(
     declarations: back,
     said: `Enabled ${id}: ${back.length} ${back.length === 1 ? 'declaration' : 'declarations'} back, over the rows ${back.length === 1 ? 'it' : 'they'} had.`,
     batch,
+  });
+}
+
+/* ── a pack's settings: `config:` ────────────────────────────────────────── */
+
+/**
+ * The field types a setting may take (`loop/research-modular.md` §1.3).
+ *
+ * A CLOSED SUBSET, AND THE THREE LEFT OUT ARE THE POINT. A `ref` would let a pack configure its way
+ * into reading a list it did not declare, and a `secret` or a `file` would put a credential or a
+ * document in a manifest people share. What is left is a value a person can read on a settings
+ * screen, so `04 §7`'s enumeration of what a pack can do does not grow.
+ */
+export const CONFIG_TYPES = ['text', 'enum', 'bool', 'money', 'day', 'duration'] as const;
+export type ConfigType = (typeof CONFIG_TYPES)[number];
+
+/** One setting as a manifest declares it, after `readConfig` has checked it. */
+export type ConfigDecl = { type: ConfigType; values?: string[]; default?: Json; label?: string; note?: string };
+
+/** A pack's settings as the record holds them: what the manifest declares, and the value each holds now. */
+export type PackConfig = { id: string; version: string | null; config: Record<string, ConfigDecl>; values: Record<string, Json> };
+
+const CONFIG_NAME = /^[a-z][a-z0-9_]{0,31}$/;
+const CONFIG_KEYS = ['type', 'values', 'default', 'label', 'note'];
+const CONFIG_CEILING = 32;
+const CONFIG_TEXT_BYTES = 1024;
+const CONFIG_VALUES_CEILING = 64;
+
+/** `{{config:<key>}}`, anywhere in a string. The key is checked against the manifest, not here. */
+const PLACEHOLDER = /\{\{config:([^{}]*)\}\}/g;
+
+/**
+ * A value for one setting, coerced as a field of that type would be, or the refusal a field would get.
+ *
+ * THE WRITE PATH'S OWN COERCION, so a money setting is `{ amount, currency }` in minor units, a day
+ * is a day that exists, a duration is whole seconds and a text is refused when it looks like a key,
+ * exactly as a row's field is.
+ */
+export function configValue(key: string, decl: ConfigDecl, value: unknown, at = `config.${key}`): Result<Json> {
+  const field = { id: key, type: decl.type, ...(decl.values === undefined ? {} : { values: decl.values }) } as FieldDecl;
+  const out = coerce(field, value, {}, at);
+  if (!out.ok) return { ok: false, refusal: out.refusal };
+  const values = decl.values ?? [];
+  if (decl.type === 'enum' && !values.includes(out.value as string))
+    return no<Json>('ENUM_VALUE_UNKNOWN', `The setting ${key} is one of ${values.join(', ')}, and ${JSON.stringify(value)} is not.`, {
+      at,
+      allowed: values,
+    });
+  if (decl.type === 'text' && byteLength(out.value as string) > CONFIG_TEXT_BYTES)
+    return no<Json>('OUT_OF_BOUNDS', `The setting ${key} holds at most ${CONFIG_TEXT_BYTES} bytes of text.`, { at });
+  return ok(out.value);
+}
+
+/** Why a type is not a setting's, said for the three that are left out on purpose and for everything else. */
+function configTypeSentence(key: string, type: unknown): string {
+  const allowed = `A setting is ${CONFIG_TYPES.slice(0, -1).join(', ')} or ${CONFIG_TYPES[CONFIG_TYPES.length - 1]}.`;
+  if (type === 'ref')
+    return `The setting ${key} is a ref, and a setting never points at a list, so a pack cannot configure its way into one it did not declare. ${allowed}`;
+  if (type === 'secret' || type === 'file')
+    return `The setting ${key} is a ${type}, and a manifest is a file people share, so a setting never holds a credential or a file. ${allowed}`;
+  if (typeof type === 'string' && (FIELD_TYPES as readonly string[]).includes(type))
+    return `The setting ${key} is a ${type}, which a setting does not take. ${allowed}`;
+  return `The setting ${key} has the type ${JSON.stringify(type ?? null)}, which is not a type a setting takes. ${allowed}`;
+}
+
+/**
+ * A manifest's `config:` map, checked, with every default coerced; or the refusal naming what is wrong.
+ *
+ * THE SAME CHECKS A REGISTER'S FIELD GETS, over a map instead of a list: a name, a type from the
+ * closed subset, the values of an enum, and a default that is a legal value of its own type.
+ */
+export function readConfig(config: unknown): Result<Record<string, ConfigDecl>> {
+  if (config === undefined) return ok({});
+  if (config === null || typeof config !== 'object' || Array.isArray(config))
+    return no('PACK_MALFORMED', 'config is a map of settings, each with a name and a type.', { at: 'config' });
+  const entries = Object.entries(config as Record<string, unknown>);
+  if (entries.length > CONFIG_CEILING)
+    return no('OUT_OF_BOUNDS', `A pack declares at most ${CONFIG_CEILING} settings, and this one declares ${entries.length}.`, { at: 'config' });
+
+  const out: Record<string, ConfigDecl> = {};
+  for (const [key, raw] of entries) {
+    const at = `config.${key}`;
+    if (!CONFIG_NAME.test(key))
+      return no('PACK_MALFORMED', `${key} is not a setting name: lower-case letters, digits and underscores, at most 32.`, { at });
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw))
+      return no('PACK_MALFORMED', `The setting ${key} is a type and, when it has one, a default.`, { at });
+    const said = raw as Record<string, unknown>;
+    const stray = Object.keys(said).find((k) => !CONFIG_KEYS.includes(k));
+    if (stray !== undefined)
+      return no('FIELD_UNKNOWN', `The setting ${key} declares ${stray}, and a setting takes ${CONFIG_KEYS.join(', ')}.`, {
+        at: `${at}.${stray}`,
+        allowed: CONFIG_KEYS,
+      });
+
+    if (typeof said.type !== 'string' || !(CONFIG_TYPES as readonly string[]).includes(said.type))
+      return no('CONFIG_TYPE_UNSUPPORTED', configTypeSentence(key, said.type), { at: `${at}.type`, allowed: [...CONFIG_TYPES] });
+    const decl: ConfigDecl = { type: said.type as ConfigType };
+
+    if (decl.type === 'enum') {
+      const values = said.values;
+      if (
+        !Array.isArray(values) ||
+        values.length === 0 ||
+        values.length > CONFIG_VALUES_CEILING ||
+        values.some((v) => typeof v !== 'string' || v.trim() === '') ||
+        new Set(values).size !== values.length
+      )
+        return no('VALUE_MALFORMED', `The setting ${key} is an enum, so it lists one to ${CONFIG_VALUES_CEILING} different values.`, {
+          at: `${at}.values`,
+        });
+      decl.values = [...(values as string[])];
+    } else if (said.values !== undefined)
+      return no('FIELD_UNKNOWN', `The setting ${key} is a ${decl.type}, and only an enum lists values.`, { at: `${at}.values`, allowed: ['type', 'default', 'label', 'note'] });
+
+    for (const [name, ceiling] of [['label', 80], ['note', 280]] as const) {
+      const text = said[name];
+      if (text === undefined) continue;
+      if (typeof text !== 'string' || text.trim() === '' || byteLength(text) > ceiling)
+        return no('VALUE_MALFORMED', `The setting ${key}'s ${name} is text of at most ${ceiling} bytes.`, { at: `${at}.${name}` });
+      decl[name] = text;
+    }
+
+    if (said.default !== undefined) {
+      const value = configValue(key, decl, said.default, `${at}.default`);
+      if (!value.ok) return value as Result<Record<string, ConfigDecl>>;
+      decl.default = value.value;
+    }
+    out[key] = decl;
+  }
+  return ok(out);
+}
+
+/**
+ * Every `{{config:<key>}}` in a declaration body: the key, where it is, and whether it is the whole string.
+ *
+ * WHOLE OR PART MATTERS. A string that is exactly one placeholder is replaced by the setting's value as
+ * it is, so a money setting lands as `{ amount, currency }` and a bool as `true`. A placeholder inside a
+ * longer string is replaced by its text, which a money value does not have.
+ */
+export function configReads(body: unknown): { key: string; at: string; whole: boolean }[] {
+  const out: { key: string; at: string; whole: boolean }[] = [];
+  const seen = new WeakSet<object>();
+  const walk = (node: unknown, at: string): void => {
+    if (typeof node === 'string') {
+      for (const m of node.matchAll(PLACEHOLDER)) out.push({ key: m[1] ?? '', at, whole: m[0] === node });
+      return;
+    }
+    if (node === null || typeof node !== 'object' || seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) node.forEach((item, i) => walk(item, `${at}[${i}]`));
+    else for (const [k, v] of Object.entries(node)) walk(v, at === '' ? k : `${at}.${k}`);
+  };
+  walk(body, '');
+  return out;
+}
+
+/**
+ * A declaration body with every `{{config:<key>}}` filled from `values`.
+ *
+ * CALLED WHERE A PACK'S DECLARATIONS ARE PLANNED AND INSTALLED, and nowhere else: the value a
+ * declaration is stored with is the value it runs with, and a later change to the setting is read the
+ * next time the pack is planned and installed. A key with no value is left as it was written, and
+ * `validate` refuses a body that still carries one.
+ */
+export function fillConfig(body: Json, values: Readonly<Record<string, Json>>): Json {
+  if (typeof body === 'string') {
+    const whole = /^\{\{config:([^{}]*)\}\}$/.exec(body);
+    if (whole && Object.hasOwn(values, whole[1] ?? '')) return values[whole[1] ?? ''] ?? null;
+    return body.replace(PLACEHOLDER, (m, key: string) => {
+      if (!Object.hasOwn(values, key)) return m;
+      const value = values[key];
+      return typeof value === 'string' ? value : JSON.stringify(value);
+    });
+  }
+  if (Array.isArray(body)) return body.map((item) => fillConfig(item, values));
+  if (body !== null && typeof body === 'object')
+    return Object.fromEntries(Object.entries(body).map(([k, v]) => [k, fillConfig(v, values)]));
+  return body;
+}
+
+/** A `pack` row's manifest, parsed, or `null` for a pack with no row or a manifest nobody can read. */
+function manifestOf(sql: Sql, id: string): { version: string; manifest: Record<string, unknown> } | null {
+  const row = sql.one<{ version: string; manifest: string }>('SELECT version, manifest FROM pack WHERE id = ?', id);
+  if (!row) return null;
+  try {
+    const parsed = JSON.parse(row.manifest) as unknown;
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? { version: row.version, manifest: parsed as Record<string, unknown> }
+      : { version: row.version, manifest: {} };
+  } catch {
+    return { version: row.version, manifest: {} };
+  }
+}
+
+/**
+ * The declared settings on a manifest, the values somebody set, and the value each setting holds.
+ *
+ * `set` IS ONLY WHAT A PERSON CHOSE, and `values` is that or the default, or `null`. A plan needs the
+ * difference: a chosen value is carried to the next version, and a default is the new version's own.
+ */
+function settingsOf(manifest: Record<string, unknown>): {
+  config: Record<string, ConfigDecl>;
+  set: Record<string, Json>;
+  values: Record<string, Json>;
+} {
+  const read = readConfig(manifest.config);
+  const config = read.ok ? read.value : {};
+  const stored = manifest.config_values;
+  const held = stored !== null && typeof stored === 'object' && !Array.isArray(stored) ? (stored as Record<string, Json>) : {};
+  const set: Record<string, Json> = {};
+  const values: Record<string, Json> = {};
+  for (const [key, decl] of Object.entries(config)) {
+    if (Object.hasOwn(held, key) && held[key] !== null && held[key] !== undefined) set[key] = held[key];
+    values[key] = set[key] ?? decl.default ?? null;
+  }
+  return { config, set, values };
+}
+
+/**
+ * The settings somebody chose, by pack id. What a plan carries into the next install of a pack.
+ *
+ * NOT THE DEFAULTS. A default belongs to the version being installed, so a plan reads it from that
+ * version's manifest; only a value a person set outlives the version it was set on.
+ */
+export function packSettings(sql: Sql): Record<string, Record<string, Json>> {
+  const out: Record<string, Record<string, Json>> = {};
+  for (const row of sql.all<{ id: string }>('SELECT id FROM pack ORDER BY id')) {
+    const m = manifestOf(sql, row.id);
+    if (!m) continue;
+    const { set } = settingsOf(m.manifest);
+    if (Object.keys(set).length > 0) out[row.id] = set;
+  }
+  return out;
+}
+
+/**
+ * One pack's settings: what its manifest declares, and the value each holds now.
+ *
+ * A PACK THE SEED OWNS BY ITS BODIES HAS NO MANIFEST, so it declares no settings, and it is still a
+ * pack this record has: it answers with an empty map rather than a refusal.
+ */
+export function readPackConfig(sql: Sql, id: string): Result<PackConfig> {
+  const m = manifestOf(sql, id);
+  if (m) {
+    const { config, values } = settingsOf(m.manifest);
+    return ok({ id, version: m.version, config, values });
+  }
+  if (packStanding(sql, id).known) return ok({ id, version: null, config: {}, values: {} });
+  return no<PackConfig>('DECLARATION_UNKNOWN', `${id} is not a pack this record has installed.`, { at: 'id' });
+}
+
+/**
+ * Set some of a pack's settings, each checked against its declaration, in one transaction with one event.
+ *
+ * NOTHING IS REINSTALLED HERE. A declaration keeps the value it was installed with, and the new value
+ * is read the next time the pack is planned and installed: a setting that changed what a rule does in
+ * the middle of somebody's write would be a declaration change nobody approved. `null` puts a setting
+ * back to its default. The event is an `edit` aimed at the pack, with the settings before and after.
+ */
+export function writePackConfig(
+  sql: Sql,
+  now: number,
+  id: string,
+  values: unknown,
+  opts: { actor?: string },
+  transaction: Tx,
+  mint: () => string,
+): Result<PackConfig & { changed: string[]; said: string }> {
+  type Out = PackConfig & { changed: string[]; said: string };
+  const current = readPackConfig(sql, id);
+  if (!current.ok) return current as Result<Out>;
+  if (values === null || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length === 0)
+    return no<Out>('REQUIRED_MISSING', 'values is a map of setting names to the value each should hold.', { at: 'values' });
+
+  const { config } = current.value;
+  const declared = Object.keys(config);
+  const m = manifestOf(sql, id);
+  const set: Record<string, Json> = m ? { ...settingsOf(m.manifest).set } : {};
+  const before = { ...set };
+  for (const [key, raw] of Object.entries(values as Record<string, unknown>)) {
+    const decl = Object.hasOwn(config, key) ? config[key] : undefined;
+    if (decl === undefined)
+      return no<Out>(
+        'FIELD_UNKNOWN',
+        declared.length === 0 ? `${id} declares no settings.` : `${id} has no setting called ${key}. It has ${declared.join(', ')}.`,
+        { at: `values.${key}`, allowed: declared },
+      );
+    if (raw === null) {
+      delete set[key];
+      continue;
+    }
+    const value = configValue(key, decl, raw, `values.${key}`);
+    if (!value.ok) return value as Result<Out>;
+    set[key] = value.value;
+  }
+
+  const next: Record<string, Json> = Object.fromEntries(declared.map((k) => [k, set[k] ?? config[k]?.default ?? null]));
+  const changed = declared.filter(
+    (k) => Object.hasOwn(set, k) !== Object.hasOwn(before, k) || jcs(set[k] ?? null) !== jcs(before[k] ?? null),
+  );
+  if (changed.length === 0 || !m)
+    return ok({ ...current.value, changed: [], said: `${id}'s settings already hold those values, so nothing changed.` });
+
+  const { config_values: _was, ...rest } = m.manifest;
+  const manifest = Object.keys(set).length > 0 ? { ...rest, config_values: set } : rest;
+  const at = instant(now);
+  transaction(() => {
+    sql.exec('UPDATE pack SET manifest = ? WHERE id = ?', jcs(manifest as Json), id);
+    sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v) VALUES (?, ?, ?, 'edit', ?, 'pack', ?, ?)",
+      mint(),
+      at,
+      opts.actor ?? 'system',
+      `pack:${id}`,
+      jcs(Object.fromEntries(changed.map((k) => [k, current.value.values[k] ?? null])) as Json),
+      jcs(Object.fromEntries(changed.map((k) => [k, next[k] ?? null])) as Json),
+    );
+  });
+
+  return ok({
+    ...current.value,
+    values: next,
+    changed,
+    said: `Saved ${listed(changed)} for ${id}. ${changed.length === 1 ? 'It is' : 'They are'} read the next time ${id} is planned and installed.`,
   });
 }

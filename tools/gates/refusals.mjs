@@ -134,7 +134,7 @@ const counted = /([A-Z][a-z-]+(?: [a-z-]+)*), counted, in nine families — (\d+
 if (!counted) {
   findings.push("30 §6's counting sentence is not where this gate looks for it");
 } else {
-  const WORDS = { Ninety: 90, 'Ninety-nine': 99, 'One hundred': 100, Hundred: 100, 'One hundred and twelve': 112, 'One hundred and fifteen': 115 };
+  const WORDS = { Ninety: 90, 'Ninety-nine': 99, 'One hundred': 100, Hundred: 100, 'One hundred and twelve': 112, 'One hundred and fifteen': 115, 'One hundred and seventeen': 117 };
   const said = WORDS[counted[1]];
   if (said === undefined) findings.push(`30 §6 counts them as "${counted[1]}", which this gate cannot read as a number`);
   else if (said !== table.length) findings.push(`30 §6 says ${counted[1]} (${said}) and its table lists ${table.length}`);

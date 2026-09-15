@@ -33,7 +33,9 @@ import { skipDir } from './lib.mjs';
 const SAMPLES = {
   '[register]': 'obligations',
   '[seq]': '1',
-  '[id]': 'SG31',
+  /* SG5, AND NOT THE SAMPLE'S SG31. The gates read the seeded record, whose counters start at 1, and
+     `installSeed` files the sample's Kiln licensing question fifth: open, with three options. */
+  '[id]': 'SG5',
   '[slug]': 'money',
   '[area]': [
     'appearance',

@@ -10,6 +10,11 @@
  * under one variable, and nowhere else: not standard output, not standard error, not a file. A printed key lands in
  * a terminal's scrollback or an agent's transcript, which is the leak §5.7 closes by having no such command.
  *
+ * NOR IS A KEY PUT WHERE IT CHANGES THE COMMAND. A name such as `NODE_OPTIONS`, `LD_PRELOAD` or `PATH` is refused
+ * before any request, whether `--as` names it or a label makes it. On Windows a `.cmd` such as `pnpm` or `npx` is
+ * found through PATH and PATHEXT and started by `cmd.exe` with every argument escaped, and the key is never on that
+ * command line.
+ *
  * ONE OF THE THREE FILES THE `Plaintext` BRAND LIVES IN. The value is typed `Plaintext` where it is read and where
  * the host's answer is parsed. It leaves this file in the request `depositOne` sends and in the environment
  * `execOne` hands to the command, the two recorded exemptions in `secret-grep`.
@@ -19,6 +24,8 @@
  */
 
 import { spawn } from 'node:child_process';
+import { statSync } from 'node:fs';
+import { win32 } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { hostKey, inTheClear, readHosts } from './http.ts';
@@ -26,8 +33,11 @@ import { hostKey, inTheClear, readHosts } from './http.ts';
 /** A key in the clear. */
 type Plaintext = string & { readonly brand: 'Plaintext' };
 
-/** Start a command with these variables, and settle with its exit code once it ends, or reject if it did not start. */
-export type Spawner = (command: string, args: string[], vars: Record<string, string | undefined>) => Promise<number>;
+/**
+ * Start a command with these variables, and settle with its exit code once it ends, or reject if it did not start.
+ * `verbatim` hands the arguments to the program exactly as written, which `cmd.exe` needs for its escaping to hold.
+ */
+export type Spawner = (command: string, args: string[], vars: Record<string, string | undefined>, verbatim?: boolean) => Promise<number>;
 
 export type KeysIo = {
   /** The hosts file the vault grants are kept in. */
@@ -41,6 +51,10 @@ export type KeysIo = {
   headers: (host: string) => Promise<Record<string, string>>;
   /** How `exec` starts its command: `spawnInherit` on a real terminal. */
   spawn: Spawner;
+  /** The platform the command starts on: `process.platform` unless a test names another. */
+  platform?: string | undefined;
+  /** Whether a path is a file, for finding a command through PATH on Windows. */
+  isFile?: ((path: string) => boolean) | undefined;
   fetch?: typeof globalThis.fetch | undefined;
   now?: (() => number) | undefined;
   signal?: AbortSignal | undefined;
@@ -58,6 +72,87 @@ const SPOKEN = /^[a-z][a-z0-9_]{0,63}#[1-9][0-9]{0,8}$/;
 /** An environment variable name `exec` will set. */
 const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
 
+/**
+ * NAMES THAT CHANGE HOW A PROGRAM RUNS, which a key is never put in. A value under `NODE_OPTIONS`, `LD_PRELOAD` or
+ * `PERL5OPT` is read as code or a library to load, and one under `PATH`, `HOME` or `COMSPEC` changes what the command
+ * finds. A label that happens to make one of these names, or an `--as` typed by mistake, would change the command
+ * rather than hand it a key.
+ */
+const RUNS_THE_PROGRAM = new Set([
+  'PATH', 'PATHEXT', 'HOME', 'USERPROFILE', 'SHELL', 'ENV', 'BASH_ENV', 'COMSPEC', 'SYSTEMROOT', 'WINDIR',
+  'NODE_OPTIONS', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH',
+  'PYTHONPATH', 'PYTHONSTARTUP', 'PYTHONHOME', 'RUBYOPT', 'RUBYLIB', 'PERL5OPT', 'PERL5LIB', 'PERLLIB',
+  'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'PROMPT_COMMAND', 'PS4', 'IFS', 'SHELLOPTS', 'BASHOPTS', 'ZDOTDIR',
+]);
+const RUNS_BY_PREFIX = /^(?:NODE_|LD_|DYLD_)/;
+
+export const changesHowItRuns = (name: string): boolean => RUNS_THE_PROGRAM.has(name) || RUNS_BY_PREFIX.test(name);
+
+/** How a command is started: the program, its arguments, and whether they reach it exactly as written. */
+export type Launch = { command: string; args: string[]; verbatim: boolean };
+
+/** What Windows starts with no shell, and the two of them only `cmd.exe` can run. */
+const RUNNABLE = ['.com', '.exe', '.bat', '.cmd'];
+const BATCH = ['.bat', '.cmd'];
+
+/** Every character `cmd.exe` treats as more than itself. */
+const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
+
+/**
+ * One argument as `cmd.exe` must be handed it to pass it on unchanged.
+ *
+ * First as the C runtime reads a quoted argument: the backslashes before a quote or the end are doubled, and the
+ * quote is escaped. Then every character `cmd.exe` acts on is escaped with `^`, the quotes included, so no quote
+ * opens a stretch in which a `^` stops working. A batch file's `%*` is read by `cmd.exe` a second time, so for one
+ * the escaping is done twice. A `%` escaped this way is never expanded, because the name it would open ends in `^`.
+ */
+export function quoteForCmd(arg: string, batch: boolean): string {
+  const once = `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`.replace(CMD_META, '^$1');
+  return batch ? once.replace(CMD_META, '^$1') : once;
+}
+
+const BATCH_REFUSED = 'The command after -- is a Windows batch file, and cmd.exe cannot be handed its arguments safely here, so run the program it starts directly.';
+
+/**
+ * How to start a command with no shell.
+ *
+ * ELSEWHERE, AS IT IS. ON WINDOWS a name is found as `cmd.exe` would find it, through PATH and then PATHEXT, because
+ * Node with no shell tries only `.com` and `.exe`, so `pnpm` or `npx`, which are `.cmd` files, would not start. A
+ * program found is started by its path. A batch file is started by `cmd.exe /d /v:off /s /c`, with AutoRun and delayed
+ * expansion off and every argument escaped by `quoteForCmd`. The key is in the environment, never on that line. An
+ * argument with a line break cannot be escaped at all, nor can a `%` be while a variable's name ends in `^`, so those
+ * are one sentence. A command found nowhere is left as it was, and fails to start as it would have.
+ */
+export function planCommand(command: string, args: string[], env: Record<string, string | undefined>, o: { platform: string; isFile: (path: string) => boolean }): Launch | string {
+  if (o.platform !== 'win32') return { command, args, verbatim: false };
+  const read = (name: string) => Object.entries(env).find(([k]) => k.toUpperCase() === name)?.[1];
+  const exts = (read('PATHEXT') || '.COM;.EXE;.BAT;.CMD')
+    .split(';')
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => RUNNABLE.includes(e));
+  const names = RUNNABLE.includes(win32.extname(command).toLowerCase()) ? [command] : exts.map((e) => `${command}${e}`);
+  const dirs = /[\\/:]/.test(command)
+    ? ['']
+    : (read('PATH') ?? '')
+        .split(';')
+        .map((d) => d.trim().replace(/^"(.*)"$/, '$1'))
+        .filter((d) => d !== '');
+  const found = dirs.flatMap((dir) => names.map((name) => (dir ? win32.join(dir, name) : name))).find((path) => o.isFile(path));
+  if (found === undefined) return { command, args, verbatim: false };
+  if (!BATCH.includes(win32.extname(found).toLowerCase())) return { command: found, args, verbatim: false };
+  if (args.some((a) => /[\r\n\0]/.test(a)) || Object.keys(env).some((k) => k.endsWith('^'))) return BATCH_REFUSED;
+  const line = [win32.normalize(found).replace(CMD_META, '^$1'), ...args.map((a) => quoteForCmd(a, true))].join(' ');
+  return { command: win32.join(read('SYSTEMROOT') || 'C:\\Windows', 'System32', 'cmd.exe'), args: ['/d', '/v:off', '/s', '/c', `"${line}"`], verbatim: true };
+}
+
+const aFile = (path: string): boolean => {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+};
+
 type Door = { key: string; base: string; bearer: string; scope: string };
 type Answer = { status: number; body: Record<string, unknown> | null };
 
@@ -66,12 +161,14 @@ type Answer = { status: number; body: Record<string, unknown> | null };
  *
  * NO SHELL, so nothing in the command or its arguments is expanded, and the variable is not echoed by a shell's
  * tracing. Ctrl+C reaches the command from the terminal itself, so this process waits for it rather than dying first.
+ * A Windows batch file is the one exception, planned by `planCommand`: `cmd.exe` is the program, handed its escaped
+ * line verbatim.
  */
-export const spawnInherit: Spawner = (command, args, vars) =>
+export const spawnInherit: Spawner = (command, args, vars, verbatim) =>
   new Promise((done, fail) => {
     const ignore = () => {};
     process.on('SIGINT', ignore);
-    const child = spawn(command, args, { stdio: 'inherit', shell: false, env: vars });
+    const child = spawn(command, args, { stdio: 'inherit', shell: false, env: vars, windowsVerbatimArguments: verbatim === true });
     child.on('error', (e) => {
       process.off('SIGINT', ignore);
       fail(e);
@@ -171,9 +268,9 @@ async function getOne(door: Door, ask: { label: string } | { credential: string 
  * this function as its exemption. The variables are a copy, so this process's own environment never holds the key,
  * and the copy's entry is deleted as soon as the command has been started with it.
  */
-function execOne(run: { command: string; args: string[]; name: string }, value: Plaintext, io: KeysIo): Promise<number> {
+function execOne(run: Launch & { name: string }, value: Plaintext, io: KeysIo): Promise<number> {
   const handed: Record<string, string | undefined> = { ...io.env, [run.name]: value };
-  const exited = io.spawn(run.command, run.args, handed);
+  const exited = io.spawn(run.command, run.args, handed, run.verbatim);
   delete handed[run.name];
   return exited;
 }
@@ -226,7 +323,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
   }
 
   /* REFUSED BEFORE ANYTHING IS READ OR SENT, so a mistake costs nothing. */
-  let run: { command: string; args: string[]; name: string } | null = null;
+  let run: (Launch & { name: string }) | null = null;
   if (verb === 'exec') {
     const [program, ...programArgs] = command;
     if (program === undefined || !program) {
@@ -242,7 +339,16 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
       io.say('No environment variable name can be made from that label, so name one with --as.');
       return REFUSED;
     }
-    run = { command: program, args: programArgs, name };
+    if (changesHowItRuns(name)) {
+      io.say('That variable name changes how a command runs, so a key is never put in it; name another with --as.');
+      return REFUSED;
+    }
+    const plan = planCommand(program, programArgs, io.env, { platform: io.platform ?? process.platform, isFile: io.isFile ?? aFile });
+    if (typeof plan === 'string') {
+      io.say(plan);
+      return REFUSED;
+    }
+    run = { ...plan, name };
   }
 
   let value: Plaintext | null = null;

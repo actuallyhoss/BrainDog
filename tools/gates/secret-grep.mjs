@@ -229,6 +229,7 @@ const EXEMPT = [
   { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'depositOne', sinks: ['an outbound request', 'a serialisation'] },
   { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'execOne', sinks: ['a child process'] },
   { file: /^apps[\\/]selfhost[\\/]src[\\/]vault\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
+  { file: /^apps[\\/]worker[\\/]src[\\/]vault\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
 ];
 
 /** A regex that finds any of `names` as a whole identifier, never as a property after a dot. */
@@ -243,21 +244,30 @@ const namesRe = (names) =>
  * brand: so a name declared `: Plaintext` or made `as Plaintext` is a source, and so is every name assigned from an
  * expression that holds one, followed until nothing new is found.
  *
- * A CALL TO A FUNCTION DECLARED IN THE SAME FILE IS NOT FOLLOWED. `const answer = await depositOne(…, value)` is the
- * host's reply, not the value, and following it would make every sentence about a deposit a finding.
+ * A CALL TO A FUNCTION DECLARED IN THE SAME FILE IS FOLLOWED ONLY WHEN ITS RETURN TYPE NAMES THE BRAND.
+ * `const answer = await depositOne(…, value)` is the host's reply, not the value, and following it would make every
+ * sentence about a deposit a finding. `const got = await getOne(…)` is a key read back: `getOne` is declared to return
+ * `Promise<{ value: Plaintext } | …>`, so `got` holds one whatever it was called with, and
+ * `process.stdout.write(got.value)` is a finding. That shape was green until this rule, which the seeded negative
+ * `secret-grep-return` proves. An arrow function's return type is not read, and neither is a destructured result.
  */
+const FUNCTION = /\bfunction\s+([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*\(/g;
+const calleeOf = (rhs) => /^(?:await\s+)?([A-Za-z_$][\w$]*)\s*\(/.exec(rhs.trim())?.[1];
+
 function brandedNames(text) {
   const names = new Set();
   for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\??\s*:\s*Plaintext\b/g)) names.add(m[1]);
   for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=[^;\n]*\bas\s+Plaintext\b/g)) names.add(m[1]);
   const declared = new Set([...text.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]));
+  const returning = new Set([...text.matchAll(FUNCTION)].filter((m) => /\bPlaintext\b/.test(signatureOf(text, m).returns)).map((m) => m[1]));
   const assigned = [...text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)(?:\s*:[^=\n]+)?\s*=\s*([^;\n]+)/g)];
+  for (const [, name, rhs] of assigned) if (returning.has(calleeOf(rhs))) names.add(name);
   for (let grew = true; grew; ) {
     grew = false;
     const held = namesRe(names);
     for (const [, name, rhs] of assigned) {
       if (held === null || names.has(name) || !held.test(rhs)) continue;
-      const callee = /^(?:await\s+)?([A-Za-z_$][\w$]*)\s*\(/.exec(rhs.trim())?.[1];
+      const callee = calleeOf(rhs);
       if (callee !== undefined && declared.has(callee)) continue;
       names.add(name);
       grew = true;
@@ -267,23 +277,44 @@ function brandedNames(text) {
 }
 
 /**
+ * Where a declared function's body opens, and the text of its return type.
+ *
+ * The body is the first `{` after the parameters that is inside neither a return type's angle brackets nor a type
+ * literal. A type literal is a `{` that follows `:`, `|`, `&`, `,`, `(`, `<` or `=>`, and it is counted to its match,
+ * so `function f(): { value: Plaintext } {` finds the second brace and a return type that names the brand.
+ */
+function signatureOf(text, m) {
+  const params = argsOf(text, m.index + m[0].length - 1);
+  const from = m.index + m[0].length + params.length + 1;
+  let open = from;
+  for (let angle = 0; open < text.length; open++) {
+    const c = text[open];
+    if (c === '<') angle++;
+    else if (c === '>' && text[open - 1] !== '=') angle--;
+    else if (c === '{' && angle <= 0) {
+      const before = text.slice(from, open).trimEnd();
+      const literal = before !== '' && (':|&,(<'.includes(before.at(-1)) || before.endsWith('=>'));
+      if (!literal) break;
+      for (let depth = 0; open < text.length; open++) {
+        if (text[open] === '{') depth++;
+        else if (text[open] === '}' && --depth === 0) break;
+      }
+    }
+  }
+  return { returns: text.slice(from, open), open };
+}
+
+/**
  * The innermost `function NAME` whose body holds offset `at`, or `null`.
  *
- * The body is the first `{` after the parameters that is not inside a return type's angle brackets, counted to its
- * match. An arrow function has no name here, so an exemption can only ever name a declared function.
+ * The body is where `signatureOf` says it opens, counted to its match. An arrow function has no name here, so an
+ * exemption can only ever name a declared function.
  */
 function enclosing(text, at) {
   let inner = null;
-  for (const m of text.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*\(/g)) {
+  for (const m of text.matchAll(FUNCTION)) {
     if (m.index > at) break;
-    const params = argsOf(text, m.index + m[0].length - 1);
-    let open = m.index + m[0].length + params.length + 1;
-    for (let angle = 0; open < text.length; open++) {
-      const c = text[open];
-      if (c === '<') angle++;
-      else if (c === '>' && text[open - 1] !== '=') angle--;
-      else if (c === '{' && angle <= 0) break;
-    }
+    const { open } = signatureOf(text, m);
     let close = text.length;
     for (let i = open, depth = 0; i < text.length; i++) {
       if (text[i] === '{') depth++;

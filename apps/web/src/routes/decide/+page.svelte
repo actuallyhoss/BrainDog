@@ -25,14 +25,17 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
+  import { DECIDED as SAMPLE_DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
   import { ROWSETS } from '$lib/record/data.ts';
   import Changes from './[id]/Changes.svelte';
   import { updatesOf } from './[id]/changes.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
+  import { answer as send, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
+  /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
+  import { createClient } from '@braindog/client';
   import type { Question } from '$lib/record/schema.ts';
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -42,15 +45,84 @@
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { drew } from '../../lib/ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
   let { data } = $props();
 
-  const open = $derived([...data.questions].sort((a, b) => a.rank - b.rank));
-  const target = metric('open-questions');
+  /**
+   * WHERE THE QUEUE CAME FROM. `live` is the record's open suggestions, through `governance`; `sample`
+   * is a host with no record behind it, and it draws the sample questions; `refused` is a record that
+   * answered no, and its own sentence is what is drawn. Nothing is drawn while the first read is out,
+   * so the sample never shows over a live record.
+   */
+  let from = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
+  let live = $state<Queue | null>(null);
+  let refusal = $state('');
+  let client: ReturnType<typeof createClient> | null = null;
 
-  /* THE ROWS A PROPOSAL WOULD CHANGE, drawn on its card, because one press here answers it. */
-  const changed = $derived(new Map(open.map((q) => [q.id, updatesOf(ROWSETS[q.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v))])));
+  async function readLive() {
+    const at = opened();
+    client ??= createClient({ base: location.origin });
+    const out = await readQueue(client);
+    if (out.from === 'live') live = out.value;
+    if (out.from === 'refused') refusal = out.fix;
+    from = out.from;
+    closed(out.from !== 'refused', at);
+  }
+
+  $effect(() => {
+    untrack(() => void readLive());
+  });
+
+  /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
+  const now = $derived(from === 'live' ? Date.now() : NOW);
+
+  const open = $derived(
+    from === 'live' ? (live?.open ?? []) : from === 'sample' ? [...data.questions].sort((a, b) => a.rank - b.rank) : [],
+  );
+  /* Every decision ever taken: the record's, or the sample's. The name is the one the cap test reads. */
+  const DECIDED = $derived(from === 'live' ? (live?.decided ?? []) : from === 'sample' ? SAMPLE_DECIDED : []);
+  const target = metric('open-questions');
+  /* The same aim on a live record, with its tone taken from the record's own count. */
+  const aimTone = $derived(from === 'live' ? (open.length > 3 ? ('warn' as const) : ('good' as const)) : target.tone);
+
+  /* THE ROWS A PROPOSAL WOULD CHANGE, drawn on its card, because one press here answers it. One drawing
+     for both: the live record's rows and declarations, or the sample's. */
+  const changed = $derived(
+    new Map(
+      open.map((q) => [
+        q.id,
+        from === 'live' && live
+          ? updatesOf(live.rowsets[q.id], live.registers, live.rows, plainOf(live.registers))
+          : updatesOf(ROWSETS[q.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v)),
+      ]),
+    ),
+  );
+
+  /** What `decide` refused on each card, in the record's own sentence, and the card being sent. */
+  let fixes = $state(new Map<string, string>());
+  let sending = $state<string | null>(null);
+
+  /**
+   * SENDING AN ANSWER, on a live record. `decide` takes no answer without its reason, so the press picks
+   * and this sends. A refusal stays on the card; a decision leaves the queue, which is read again.
+   */
+  async function commit(q: Question, a: Answer) {
+    if (!client || sending !== null) return;
+    sending = q.id;
+    const out = await send(client, q.id, a.option, a.reason);
+    sending = null;
+    const next = new Map(fixes);
+    if (!out.ok) {
+      fixes = next.set(q.id, out.fix);
+      return;
+    }
+    next.delete(q.id);
+    fixes = next;
+    answers = withdraw(answers, q.id);
+    toasts.push(copy.decisionRecorded(a.title, q.id), { intent: 'good' });
+    await readLive();
+  }
 
   /**
    * SENTENCES THAT BELONG IN `copy.ts` AND ARE NOT THERE YET.
@@ -122,11 +194,18 @@
    * gate's `.card-rec` is, so one fact looks the same on both screens.
    */
   async function take(q: Question, key: string) {
-    const a = answerFor(q, key, new Date(NOW).toISOString());
+    const a = answerFor(q, key, new Date(now).toISOString());
     /* A key this question does not offer answers nothing. It cannot happen from these buttons; it
        is the guard for the day something else presses. */
     if (!a) return;
     answers = record(answers, a);
+
+    /* ON A LIVE RECORD THE PRESS PICKS AND THE REASON SENDS IT, so focus goes to the reason. */
+    if (from === 'live') {
+      await tick();
+      document.getElementById(`why-${q.id}`)?.focus();
+      return;
+    }
 
     /**
      * THE UNDO IS OFFERED IMMEDIATELY, WHICH IS ONLY HONEST BECAUSE NOTHING IS OUT.
@@ -167,19 +246,13 @@
   }
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
-   *
-   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says. Answering a card writes nothing and fetches nothing, so it does not move.
+   * DRAWN ONCE THE FIRST READ HAS ANSWERED, live or the sample. The read is bracketed by `opened()` and
+   * `closed()`, so a call still out takes `data-screen` away whatever this says; `Empty` says `refused`
+   * for the state it draws.
    */
-  $effect(() => drew('ready'));
+  $effect(() => {
+    if (from === 'live' || from === 'sample') drew('ready');
+  });
 </script>
 
 <svelte:head><title>{titleOf(copy.decide)}</title></svelte:head>
@@ -190,8 +263,16 @@
 <PageHead icon="decide" title={copy.decide} />
 
 <div class="page">
-  {#if open.length === 0}
-    <Empty kind="cleared" title={copy.noQuestions} body="{copy.lastDecided} {since(DECIDED[0]?.decided?.at ?? '', NOW)}." />
+  {#if from === 'reading'}
+    <!-- Nothing until the first read answers. -->
+  {:else if from === 'refused'}
+    <Empty kind="error" title={refusal} />
+  {:else if open.length === 0}
+    <Empty
+      kind="cleared"
+      title={copy.noQuestions}
+      body={DECIDED[0] ? `${copy.lastDecided} ${since(DECIDED[0].decided?.at ?? '', now)}.` : undefined}
+    />
   {:else}
     <!-- THE COUNTS DO NOT MOVE WHEN A CARD IS ANSWERED, and they are right not to. Nothing was
          written, so nothing left the queue: a heading that counted down would be this screen
@@ -202,7 +283,7 @@
            metric already knew it was failing (`tone: 'warn'` above three) and nothing drew it.
            `Chip` draws the tone with its glyph, so over the aim reads ⚠ and not only amber (13 §5.1). -->
       {#snippet aside()}
-        <Chip label={copy.aimFor(target.note)} tone={target.tone} />
+        <Chip label={copy.aimFor(target.note)} tone={aimTone} />
       {/snippet}
 
       <ol class="queue">
@@ -219,11 +300,11 @@
                      that question should find it here; it no longer comes first. -->
                 <span class="q-head">
                   {#if q.entity}<span class="q-entity">{q.entity}</span>{/if}
-                  <span class="q-age">opened {since(q.opened, NOW)}</span>
+                  <span class="q-age">opened {since(q.opened, now)}</span>
                   <span class="q-id">{q.id}</span>
                 </span>
                 <span class="q-title" id="q-{q.id}-title">{q.title}</span>
-                <span class="q-cost">{q.cost}</span>
+                {#if q.cost}<span class="q-cost">{q.cost}</span>{/if}
               </span>
               <Icon name="chevron" size="m" />
             </a>
@@ -277,8 +358,19 @@
                        nobody reads, and the reader has already done the thing it asks for. -->
                   {#if state !== 'written'}
                     <p class="why-note" id="why-note-{q.id}">
-                      {state === 'missing' ? SAY.reasonMissing : SAY.reasonThin}
+                      {state === 'missing' ? (from === 'live' ? copy.reasonRequired : SAY.reasonMissing) : SAY.reasonThin}
                     </p>
+                  {/if}
+                  <!-- A LIVE RECORD SENDS IT, and a refusal stays under the button in the record's words. -->
+                  {#if from === 'live'}
+                    <div class="send">
+                      <Button weight="primary" disabled={!said.reason.trim() || sending !== null} onclick={() => commit(q, said)}>
+                        {copy.commit}
+                      </Button>
+                    </div>
+                    {#if fixes.get(q.id)}
+                      <p class="why-fix" role="status" data-intent="bad">{fixes.get(q.id)}</p>
+                    {/if}
                   {/if}
                 </div>
               {:else}
@@ -320,7 +412,7 @@
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{q.decided?.reason}</span>
               </span>
-              <span class="line-when">{since(q.decided?.at ?? '', NOW)}<span class="decided-id">{q.id}</span></span>
+              <span class="line-when">{since(q.decided?.at ?? '', now)}<span class="decided-id">{q.id}</span></span>
             </a>
           </li>
         {/each}
@@ -518,6 +610,15 @@
     max-inline-size: var(--measure);
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  .send {
+    display: flex;
+  }
+
+  .why-fix {
+    max-inline-size: var(--measure);
+    font-size: var(--t-ui);
   }
 
   /* The row shape is `$lib/ui/rows.css`; the decided list uses three of its four columns. */

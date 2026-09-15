@@ -44,16 +44,31 @@
   import TabBar from '$lib/ui/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Palette from '$lib/palette/Palette.svelte';
+  /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
+     paint, and the palette reads the whole sample record to rank what it lists, so importing them
+     here put all of that in front of the first screen and in the entry's preload list. They are
+     asked for as the shell mounts: a `⌘K` pressed before the palette lands sets `palette.open`,
+     and the palette opens on that when it does. */
+  /* Named as types, which the compiler erases: the layout still reaches both, as `dead-copy` reads it. */
+  import type PaletteView from '$lib/palette/Palette.svelte';
+  import type KeymapView from '$lib/ui/Keymap.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { arrange } from '$lib/nav.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
-  import Keymap from '$lib/ui/Keymap.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
 
   let { data, children } = $props();
+
+  /* Held in state and drawn through `{#if}`, not `{#await}`: an await block is a runtime of its own,
+     and it landed in the entry chunk the lazy import was there to shrink. */
+  let Palette = $state<typeof PaletteView | null>(null);
+  let Keymap = $state<typeof KeymapView | null>(null);
+  $effect(() => {
+    void import('$lib/palette/Palette.svelte').then((m) => (Palette = m.default));
+    void import('$lib/ui/Keymap.svelte').then((m) => (Keymap = m.default));
+  });
 
   /* Three surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
      `/s/<token>` because a shared page is a capability URL: it renders one page, read-only,
@@ -328,7 +343,7 @@
     <Icon name="search" size="l" />
   </button>
 
-  <Palette bind:open={palette.open} nav={data.nav} />
+  {#if Palette}<Palette bind:open={palette.open} nav={data.nav} />{/if}
 {/if}
 
 <!--
@@ -349,7 +364,7 @@
 </svelte:head>
 
 <Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>
-  <Keymap />
+  {#if Keymap}<Keymap />{/if}
 </Sheet>
 
 <!--

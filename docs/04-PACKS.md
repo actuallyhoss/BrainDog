@@ -96,6 +96,24 @@ closed subset of field types (no `ref`, `secret` or `file`) that a pack declares
 at `/packs/<id>`, read back through `{{config:<key>}}`. `loop/research-modular.md` §1.3 has the shape
 and why the subset stays narrow.)*
 
+*(Built September 15th 2026. A setting is `config: { <key>: { type, values?, default?, label?, note? } }`, at most 32
+of them, each key lower-case letters, digits and underscores. The type is text, enum, bool, money, day or duration,
+and any other type is refused `CONFIG_TYPE_UNSUPPORTED`, with its own sentence for a ref, a secret and a file. A
+default is coerced as a field of that type would be, so a money default is minor units and a currency. A declaration
+reads a setting as `{{config:<key>}}`: a string that is only the placeholder becomes the typed value, and a
+placeholder inside longer text becomes the value's text, which a money setting cannot be. Every placeholder names a
+declared setting that has a default, or the pack is refused when it is read.)*
+
+*(What reads a setting, precisely. The value is written into a declaration when the pack document is planned and
+installed, and at no other time: `planPack` fills the bodies it compares, and `installPack` fills the bodies it
+stages. The chosen values live on the `pack` row, as `manifest.config_values` beside the manifest's `config`.
+`setPackConfig({ id, values })` checks each value against its declaration, stores it, writes one `edit` event aimed at
+`pack:<id>`, and changes no installed declaration; `null` puts a setting back to its default. The new value takes
+effect the next time the pack document is planned and installed, and that plan lists the declarations it changes.
+`enablePack` brings back the bodies a pack went off with, so it does not read a setting either. `packConfig({ id })`
+reads a pack's settings and the value each holds now. A chosen value the next version no longer accepts falls back to
+that version's default, and the plan says which values were kept and which are defaults.)*
+
 `requires` on the manifest is a map. `requires` on a `page` declaration is a list of `register.<id>`
 ([06-PAGES](06-PAGES.md) §1.1). The two never appear on the same object. *An earlier draft's manifest
 carried `braindog: ">=0.4 <2"`, a range against a version number the app does not have.*
@@ -289,7 +307,12 @@ Forty-one codes — the thirty-three an earlier draft counted and the eight bene
 three of them the theme's — `UPPER_SNAKE`, each with a fixture that produces it. The one table every code
 lives in is [30-BLUEPRINT](30-BLUEPRINT.md) §6, which counts a hundred and twelve across nine families; the
 grammar's own codes (`VIA_TWICE`, `CONTAINS_TOO_LONG`, …, and the three that guard an ingest's extractor
-forms — [07-INGEST](07-INGEST-AND-RULES.md) §3) are [34-GRAMMARS](34-GRAMMARS.md) §1. *An earlier draft of this table had no code column, and the last
+forms — [07-INGEST](07-INGEST-AND-RULES.md) §3) are [34-GRAMMARS](34-GRAMMARS.md) §1. *(Amended September 15th 2026:
+two more are raised by the pack path. `REGISTER_UNRESOLVED` refuses planning or installing a pack whose field `to:`,
+page `requires` or block source, or metric `source` names a list this record does not hold and the pack does not
+declare. Its sentence names the first-party pack that declares the list when there is one, so Money alone on an
+empty record is told to install People and Portfolio first. `CONFIG_TYPE_UNSUPPORTED` refuses a setting of a type §2
+leaves out. 30 §6 now counts a hundred and seventeen.)* *An earlier draft of this table had no code column, and the last
 row compared a `braindog` version the app does not have.* A dialect fault is never one of these — a
 document is not parsed at write; it degrades at render ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §3).
 

@@ -1618,7 +1618,7 @@ const exampleRow = (register: string): Fields => {
   return Object.fromEntries(Object.entries(first).filter(([key]) => !refs.has(key)));
 };
 
-export type Seeded = { registers: number; rows: number; pages: number; metrics: number };
+export type Seeded = { registers: number; rows: number; pages: number; metrics: number; suggestions: number; decisions: number };
 
 /**
  * Install the declarations, then write every row.
@@ -1692,6 +1692,20 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
       rows++;
     }
 
+  /* THE QUESTIONS GO IN LAST, because SG30's rowset names rows of `things` at the version they were
+     written at, and a proposal is checked against the rows it names when it is filed. */
+  let suggestions = 0;
+  let decisions = 0;
+  for (const q of governanceSeed(kernel)) {
+    const opened = kernel.propose({ question: q.question, body_kind: q.body_kind, body: q.body }, actor);
+    if (!opened.ok) return opened as unknown as Result<Seeded>;
+    suggestions++;
+    if (q.decided === undefined) continue;
+    const decided = kernel.decide(opened.value.id, { decide: q.decided }, actor);
+    if (!decided.ok) return decided as unknown as Result<Seeded>;
+    decisions++;
+  }
+
   return {
     ok: true,
     value: {
@@ -1699,8 +1713,139 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
       rows,
       pages: Object.keys(PAGES).length,
       metrics: Object.keys(METRICS).length,
+      suggestions,
+      decisions,
     },
   };
+}
+
+/** One question the sample's `/decide` shows, as `propose` files it, and its answer if it has one. */
+export type SeedQuestion = {
+  /** The id the in-browser sample gives it. The record issues its own, in the order they are filed. */
+  sample: string;
+  question: string;
+  body_kind: 'options' | 'rowset';
+  body: Record<string, unknown>;
+  decided?: { option: string; reason: string };
+};
+
+const option = (id: string, label: string, because: string, recommended = false) => ({
+  id,
+  label,
+  because,
+  ...(recommended ? { recommended: true } : {}),
+});
+
+/**
+ * The sample's governance rows: its open questions and the decisions it shows, with the same
+ * questions, options, recommended option and reasons as `apps/web/src/lib/record/data.ts`.
+ *
+ * THE IDS ARE THE RECORD'S, NOT THE SAMPLE'S. `suggestion` and `decision` are counters that start at
+ * 1 and move only when `propose` and `decide` allocate from them, so SG27 or D41 could only be
+ * reached by filing twenty-six questions and forty decisions the sample never shows. They are filed
+ * in the order of the sample's ids instead, with D41's question first because it is the oldest:
+ * SG1 (D1), SG2, SG3, SG4, SG5, SG6 (D2), SG7.
+ */
+export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
+  const thing = (name: string) => {
+    const seq = (ROWS.things ?? []).findIndex((r) => r.name === name) + 1;
+    return seq > 0 ? kernel.get(`things#${seq}`) : null;
+  };
+  const kiln = thing('Kiln');
+  const portage = thing('Portage');
+  const note = typeof kiln?.fields.note === 'string' ? kiln.fields.note : '';
+
+  return [
+    {
+      sample: 'D41',
+      question: 'Which registrar holds the Kiln names?',
+      body_kind: 'options',
+      body: {
+        options: [
+          option('nordhaven', 'Nordhaven Registry', 'Two-factor by default, and registry lock on the apex.'),
+          option('cove', 'Cove Domains', 'Cheaper by about a third, no registry lock.'),
+        ],
+      },
+      decided: {
+        option: 'nordhaven',
+        reason: 'Registry lock is the only control that survives a compromised account, and the names are the business.',
+      },
+    },
+    {
+      sample: 'SG27',
+      question: 'Does Tallow get retired, or parked for another year?',
+      body_kind: 'options',
+      body: {
+        options: [
+          option('retire', 'Retire it', 'Let the domain lapse, archive the repository, and take the row off every screen. Irreversible after the drop date.'),
+          option('park', 'Park it another year', 'Keep the name. The only cost is the renewal and the attention.'),
+        ],
+      },
+    },
+    {
+      sample: 'SG29',
+      question: 'Does Portage keep sending from portagemail.example, or move to the apex?',
+      body_kind: 'options',
+      body: {
+        options: [
+          option('stay', 'Keep the subdomain', 'Reputation stays where it is. The apex is free for a marketing site that does not exist yet.', true),
+          option('apex', 'Move to the apex', 'One domain to renew instead of two, and the from-address matches the site. Costs six weeks of warm-up now rather than later.'),
+        ],
+      },
+    },
+    {
+      sample: 'SG30',
+      question: 'Update Kiln’s note and move Portage to earning?',
+      body_kind: 'rowset',
+      body: {
+        register: 'things',
+        rows: [
+          ...(kiln
+            ? [{ at: `things#${kiln.seq}`, version: kiln.version, patch: { note: note.split('licensed direct.').join('licensed direct and through two resellers.') } }]
+            : []),
+          ...(portage ? [{ at: `things#${portage.seq}`, version: portage.version, patch: { lane: 'earning' } }] : []),
+        ],
+      },
+    },
+    {
+      sample: 'SG31',
+      question: 'Does Kiln licence per-seat, per-product, or one flat studio price?',
+      body_kind: 'options',
+      body: {
+        options: [
+          option('seat', 'Per seat', 'A price per designer, per year. Predictable for you, and the number every buyer already understands. Enforcement is honour-system, which is what everyone else in type does.'),
+          option('product', 'Per product', 'A price per shipped thing. Matches how the fonts are actually used and does not punish a large studio for having a large studio. Harder to quote in one line.', true),
+          option('flat', 'One studio price', 'One number, unlimited use, no counting. The simplest sentence on the page and the hardest to raise later.'),
+        ],
+      },
+    },
+    {
+      sample: 'SG33',
+      question: 'Add the two services on the Fenwick invoice?',
+      body_kind: 'options',
+      body: {
+        options: [
+          option('accept', 'Add both', 'Object storage and the Workers plan, with the renewal dates from the invoice.', true),
+          option('ignore', 'Leave them out', 'The invoice stays in the inbox and the services stay unrecorded.'),
+        ],
+      },
+      decided: {
+        option: 'accept',
+        reason: 'Both are live and both renew; an invoice line nobody has a row for is the thing this record exists to stop.',
+      },
+    },
+    {
+      sample: 'SG34',
+      question: `The backup on ${day(0)} did not run`,
+      body_kind: 'options',
+      body: {
+        options: [
+          option('run', 'Run it now', 'Take a backup immediately. It counts against the thirty like any other night.', true),
+          option('ignore', 'Ignore it', 'Tonight’s run will try again. If the reason has not gone away it will fail again, and ask again.'),
+        ],
+      },
+    },
+  ];
 }
 
 /**

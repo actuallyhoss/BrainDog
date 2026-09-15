@@ -134,7 +134,7 @@ async function setup(t: After, o: { project?: boolean; grant?: boolean; register
     if (typeof got === 'number') throw new Error(`connect ended with ${String(got)}`);
     return got;
   };
-  const scan = async (s: { dryRun?: boolean } = {}) => {
+  const scan = async (s: { dryRun?: boolean; once?: boolean } = {}) => {
     const c = await at();
     const said = await scanTools({
       client: c.client,
@@ -146,6 +146,7 @@ async function setup(t: After, o: { project?: boolean; grant?: boolean; register
       deposit: depositor({ file: hostsPath(env), env, host: c.to.key, headers: {} }),
       machine: 'test-machine',
       now: () => NOW,
+      ...(s.once === true ? { once: { host: c.to.key, hosts: hostsPath(env) } } : {}),
     });
     lines.push(...said);
     return said;
@@ -271,6 +272,35 @@ test('SCAN WITHOUT A VAULT GRANT: the keys are recorded by name only, nothing is
   ]);
   assert.deepEqual(h.of('vault/deposit'), []);
   assert.deepEqual(h.rows.map((r) => r.fields.needs), [['KILN_API_TOKEN', 'KILN_REGION'], ['header:Authorization']]);
+  nowhere(h, [token, auth]);
+});
+
+test('THE NO-GRANT SENTENCE IS SAID ONCE PER HOST, forgotten once a vault grant is kept, and said once again when there is none', async (t) => {
+  const h = await setup(t, { project: true });
+  const token = fakeValue();
+  const auth = fakeValue();
+  const key = hostKey(h.base);
+  const state = join(h.home, '.braindog', 'tools-said.json');
+  const noGrant = '1 key was recorded by name only, because this machine holds no vault grant it could deposit with, and the values were not kept. Run braindog login <host> --vault <project>, then scan again.';
+  const deploy = { command: 'npx', env: { KILN_API_TOKEN: token } };
+  h.mcp({ 'kiln-deploy': deploy });
+
+  assert.deepEqual(await h.scan({ once: true }), ['Tool kiln-deploy in .mcp.json was recorded as tools#1.', noGrant]);
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(state, 'utf8')) as object), [key]);
+  assert.deepEqual(await h.scan({ once: true }), [], 'the second start hook says nothing');
+  assert.deepEqual(await h.scan({ once: true }), []);
+  /* Typed by hand, the scan is not told to be quiet, so it says it every time. */
+  assert.deepEqual(await h.scan(), [noGrant]);
+
+  saveHosts(hostsPath(h.env), { default: key, hosts: { [key]: { vault: { [SCOPE]: { value: h.grant, expires: LATER } } } } });
+  assert.deepEqual(await h.scan({ once: true }), ['Tool kiln-deploy is recorded as tools#1, with 1 key deposited.']);
+  assert.deepEqual(JSON.parse(readFileSync(state, 'utf8')), {}, 'a kept grant forgets that it was said');
+
+  saveHosts(hostsPath(h.env), { default: key, hosts: { [key]: {} } });
+  h.mcp({ 'kiln-deploy': deploy, docs: { type: 'http', url: 'https://docs.example/mcp', headers: { Authorization: `Bearer ${auth}` } } });
+  assert.deepEqual(await h.scan({ once: true }), ['Tool docs in .mcp.json was recorded as tools#2.', noGrant]);
+  assert.deepEqual(await h.scan({ once: true }), []);
+  for (const value of [token, auth, h.grant]) assert.equal(readFileSync(state, 'utf8').includes(value), false);
   nowhere(h, [token, auth]);
 });
 

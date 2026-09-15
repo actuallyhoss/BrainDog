@@ -1,0 +1,5 @@
+code:   REGISTER_UNRESOLVED
+via:    install
+raises: packages/declare/src/index.ts
+at:     register.obligations.fields.counterparty.to
+fix:    Install the pack that declares the list first, or declare it in this pack.

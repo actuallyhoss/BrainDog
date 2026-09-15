@@ -208,9 +208,10 @@ const RECIPES = {
   'block-source': { route: '/p/kiln', press: ['j', 'o'] },
   'block-link': { route: '/p/kiln', press: ['j', 'y'] },
 
-  /* The gate is a question, and a question has an address. There is no `/gate` route. */
-  'gate-highlight': { route: '/decide/SG31', press: ['2'] },
-  'gate-defer': { route: '/decide/SG31', press: ['d'] },
+  /* The gate is a question, and a question has an address. There is no `/gate` route. SG5 is the
+     seeded record's Kiln licensing question (the sample's SG31): open, with three options. */
+  'gate-highlight': { route: '/decide/SG5', press: ['2'] },
+  'gate-defer': { route: '/decide/SG5', press: ['d'] },
 };
 
 const server = createServer(async (req, res) => {

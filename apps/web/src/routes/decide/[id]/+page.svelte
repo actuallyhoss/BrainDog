@@ -40,6 +40,10 @@
   import Changes from './Changes.svelte';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
+  import { answer as send, park, plainOf, readOne, type One } from '$lib/record/governance.ts';
+  /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
+  import { createClient } from '@braindog/client';
+  import { untrack } from 'svelte';
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -47,12 +51,59 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
-  const question = $derived([...QUESTIONS, ...DECIDED].find((q) => q.id === page.params.id));
+  /**
+   * WHERE THE QUESTION CAME FROM, as `/decide` decides it: the record through `governance`, the sample
+   * when there is no record here, or the record's own sentence when it refuses.
+   */
+  let from = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
+  let live = $state<One | null>(null);
+  let refusal = $state('');
+  let client: ReturnType<typeof createClient> | null = null;
+
+  async function readLive(id: string) {
+    const at = opened();
+    client ??= createClient({ base: location.origin });
+    const out = await readOne(client, id);
+    /* An answer for a question somebody has already navigated away from draws nothing. */
+    if (String(page.params.id) !== id) return closed(true, at);
+    live = out.from === 'live' ? out.value : null;
+    refusal = out.from === 'refused' ? out.fix : '';
+    from = out.from;
+    closed(out.from !== 'refused', at);
+  }
+
+  $effect(() => {
+    const id = String(page.params.id);
+    untrack(() => void readLive(id));
+  });
+
+  /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
+  const now = $derived(from === 'live' ? Date.now() : NOW);
+
+  const question = $derived(
+    from === 'live'
+      ? (live?.question ?? undefined)
+      : from === 'sample'
+        ? [...QUESTIONS, ...DECIDED].find((q) => q.id === page.params.id)
+        : undefined,
+  );
 
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. */
-  const updates = $derived(question ? updatesOf(ROWSETS[question.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v)) : []);
+  const updates = $derived(
+    !question
+      ? []
+      : from === 'live' && live
+        ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers))
+        : updatesOf(ROWSETS[question.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v)),
+  );
+
+  /** Sent and waiting, and what the record refused, in its own sentence. */
+  let sending = $state(false);
+  let fix = $state('');
+  /** A decision the record took on this screen, which has no way back. */
+  let saved = $state(false);
 
   /** Highlighted, not chosen. The two are different states and the interface says so. */
   let highlighted = $state<string | null>(null);
@@ -77,6 +128,7 @@
     committing = key;
     deferring = false;
     reason = '';
+    fix = '';
     queueMicrotask(() => field?.focus());
   }
 
@@ -84,9 +136,10 @@
     deferring = true;
     committing = null;
     reason = '';
+    fix = '';
     /* Seeded a fortnight out — 21 A5, seeds not blanks. A date picker opened on nothing makes the
        person do arithmetic before they can say the thing they already know. */
-    wake = new Date(NOW + 14 * 86_400_000).toISOString().slice(0, 10);
+    wake = new Date(now + 14 * 86_400_000).toISOString().slice(0, 10);
     queueMicrotask(() => field?.focus());
   }
 
@@ -175,12 +228,51 @@
    * way back, and two screens must not answer one act two ways.
    */
   let committed = $state<Answer | null>(null);
-  function commit() {
-    const a = committing ? answerFor(question, committing, new Date(NOW).toISOString()) : null;
+  async function commit() {
+    const a = committing ? answerFor(question, committing, new Date(now).toISOString()) : null;
     if (!a) return;
     const said: Answer = { ...a, reason };
+    if (from !== 'live' || !client) {
+      committed = said;
+      toasts.push(copy.notWritten(wouldRecord(said)), { intent: 'warn' });
+      return;
+    }
+    /* ON A LIVE RECORD IT IS SENT, with the reason `decide` requires, and only a yes settles it. */
+    if (sending) return;
+    sending = true;
+    const out = await send(client, a.question, a.option, reason);
+    sending = false;
+    if (!out.ok) {
+      fix = out.fix;
+      return;
+    }
+    fix = '';
+    saved = true;
     committed = said;
-    toasts.push(copy.notWritten(wouldRecord(said)), { intent: 'warn' });
+    toasts.push(copy.decisionRecorded(a.title, a.question), { intent: 'good' });
+  }
+
+  /** Parking it: said on the sample, sent to `decide` with the day and the why on a live record. */
+  async function deferIt() {
+    if (from !== 'live' || !client) {
+      deferring = false;
+      /* THE DAY, SPELLED. Every other date in the product reads "17 Sep 2026"; this one printed
+         `2026-09-17`, the storage spelling, in a sentence about when somebody will next look at a
+         decision. `day()` is the one formatter and it was one call away. */
+      toasts.push(copy.deferred(day(wake)), { intent: 'warn' });
+      return;
+    }
+    if (!question || sending) return;
+    sending = true;
+    const out = await park(client, question.id, wake, reason);
+    sending = false;
+    if (!out.ok) {
+      fix = out.fix;
+      return;
+    }
+    fix = '';
+    deferring = false;
+    toasts.push(copy.parkedUntil(day(wake)), { intent: 'good' });
   }
 
   /**
@@ -218,26 +310,27 @@
   }
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
-   *
-   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * DRAWN ONCE THE READ HAS ANSWERED, live or the sample. The read is bracketed by `opened()` and
+   * `closed()`, so a call still out takes `data-screen` away whatever this says.
    */
-  $effect(() => drew('ready'));
+  $effect(() => {
+    if (from === 'live' || from === 'sample') drew('ready');
+  });
 </script>
 
 <svelte:head><title>{titleOf(question?.title, copy.decide)}</title></svelte:head>
 
 <svelte:window {onkeydown} />
 
-{#if !question}
+{#if from === 'reading'}
+  <!-- Nothing until the read answers. -->
+{:else if from === 'refused'}
+  <div class="page">
+    <Empty kind="error" heading title={refusal}>
+      {#snippet actions()}<Button href="/decide">Back to Decide</Button>{/snippet}
+    </Empty>
+  </div>
+{:else if !question}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
@@ -270,7 +363,7 @@
         <p class="settled-head">
           <Icon name="check" size="m" />
           {copy.decidedBy}
-          {settled.by}, {since(settled.at, NOW)}
+          {settled.by}, {since(settled.at, now)}
         </p>
         <p class="settled-choice">{settled.title}</p>
         <p class="settled-reason">“{settled.reason}”</p>
@@ -279,7 +372,7 @@
              carries its own glyph and nothing in this app renders an intent without one (13 §5.1):
              a receipt that only went amber says nothing to a screen reader. Only for a decision
              made in this session, because one the record carries IS saved. -->
-        {#if committed}
+        {#if committed && !saved}
           <div class="settled-mock">
             <Chip label={copy.markNotWritten} tone="warn" />
             <Button weight="bare" aria-label={copy.takeItBackOf(question.title)} onclick={takeBack}>
@@ -290,9 +383,11 @@
       </div>
     {:else}
       <section class="cost">
-        <h2 class="cost-label">{copy.costOfDelay}</h2>
-        <p class="cost-body">{question.cost}</p>
-        <p class="cost-age">Opened {since(question.opened, NOW)}. Nobody has decided it.</p>
+        {#if question.cost}
+          <h2 class="cost-label">{copy.costOfDelay}</h2>
+          <p class="cost-body">{question.cost}</p>
+        {/if}
+        <p class="cost-age">Opened {since(question.opened, now)}. Nobody has decided it.</p>
       </section>
 
       <section class="options">
@@ -337,22 +432,12 @@
             <input class="commit-date" type="date" bind:value={wake} />
           </label>
           <div class="commit-actions">
-            <Button
-              weight="primary"
-              disabled={!reason.trim() || !wake}
-              onclick={() => {
-                deferring = false;
-                /* THE DAY, SPELLED. Every other date in the product reads "17 Sep 2026"; this one
-                   printed `2026-09-17`, the storage spelling, in a sentence about when somebody
-                   will next look at a decision. `day()` is the one formatter and it was one call
-                   away. */
-                toasts.push(copy.deferred(day(wake)), { intent: 'warn' });
-              }}
-            >
+            <Button weight="primary" disabled={!reason.trim() || !wake || sending} onclick={deferIt}>
               {copy.deferAction}
             </Button>
             <Button weight="bare" onclick={() => (deferring = false)}>{copy.arrangeCancel}</Button>
           </div>
+          {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
         </section>
       {:else if committing}
         <section class="commit">
@@ -381,7 +466,7 @@
           <div class="commit-actions">
             <Button
               weight="primary"
-              disabled={!reason.trim()}
+              disabled={!reason.trim() || sending}
               aria-describedby={reason.trim() ? undefined : 'commit-why'}
               onclick={commit}
             >
@@ -395,6 +480,7 @@
                  next press is the irreversible one. -->
             {#if reason.trim()}<span class="commit-note">{copy.immutable}</span>{/if}
           </div>
+          {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
           <!-- THE LINE THAT SAID "Nothing you do here is saved yet." UNDER A STILL-LIVE BUTTON is
                gone: this panel is replaced by the settled block the moment the press lands, and the
                chip on that block carries the same fact where it is the whole of the news. -->
@@ -602,6 +688,11 @@
     margin-block: var(--sp-2) 0;
     color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  .commit-fix {
+    margin-block-start: var(--sp-2);
+    font-size: var(--t-ui);
   }
 
   .commit-nudge {

@@ -88,6 +88,11 @@ const CASES = [
      encoded to bytes that reach a log. One finding proves both halves: the exemption covers that function and
      nothing else, and a value is followed into a name that is not `plaintext`. */
   { gate: 'secret-grep-vault', run: 'secret-grep', expect: /a plaintext reaches a log/, findings: 1 },
+  /* THE SIXTH: a key that comes back from a call. `const got = await getOne(…)` names no branded value, so
+     `process.stdout.write(got.value)` was green until a same-file function whose return type names the brand was
+     followed. The fixture also logs the answer of a deposit, a call whose return type does not, so one finding
+     proves the gate follows only a return typed as plaintext. */
+  { gate: 'secret-grep-return', run: 'secret-grep', expect: /a plaintext reaches standard output/, findings: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },

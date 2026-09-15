@@ -26,7 +26,7 @@ import { parseArgs } from 'node:util';
 
 import type { Brief, Client, Context } from '@braindog/client';
 
-import { hostsPath } from './http.ts';
+import { hostsPath, readHosts } from './http.ts';
 import { keys } from './keys.ts';
 import { connect, fixOf, isObject, readLock, samePath, sha256, spokenOf, Stopped, valueOf, writeLock, type AgentIo } from './skills.ts';
 
@@ -206,7 +206,51 @@ export type ToolScan = {
   deposit: Depositor | null;
   machine?: string;
   now?: () => number;
+  /**
+   * The host keys are deposited to and the hosts file its grants are kept in. When given, the sentence about keys
+   * kept by name for want of a vault grant is said once for that host, and again only once a grant has been kept.
+   */
+  once?: { host: string; hosts: string } | undefined;
 };
+
+/** Whether the hosts file keeps an unexpired vault grant for this host. */
+function grantHeld(hosts: string, host: string, now: number): boolean {
+  try {
+    const grants: unknown = readHosts(hosts).hosts[host]?.vault;
+    return Object.values(isObject(grants) ? grants : {}).some((g) => isObject(g) && typeof g.value === 'string' && g.value !== '' && typeof g.expires === 'string' && Date.parse(g.expires) > now);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether to say that keys were kept by name for want of a vault grant, now.
+ *
+ * ONCE PER HOST, because the start hook runs the scan at every session and the sentence would otherwise be in every
+ * briefing. It is remembered in `~/.braindog/tools-said.json`, keyed by host and holding only when it was said, until
+ * the hosts file keeps an unexpired vault grant for that host; then it is forgotten, so a grant that lapses later is
+ * said again. A state file that cannot be read or written costs only the quiet.
+ */
+function noGrantOnce(home: string, once: { host: string; hosts: string }, now: number, noGrant: boolean): boolean {
+  const file = join(home, '.braindog', 'tools-said.json');
+  try {
+    const said = readLock(file) ?? {};
+    const had = Object.hasOwn(said, once.host);
+    if (grantHeld(once.hosts, once.host, now)) {
+      if (had) {
+        delete said[once.host];
+        writeLock(file, said);
+      }
+      return noGrant;
+    }
+    if (!noGrant || had) return false;
+    said[once.host] = { no_grant_said: new Date(now).toISOString() };
+    writeLock(file, said);
+    return true;
+  } catch {
+    return noGrant;
+  }
+}
 
 /**
  * Scan once, and the lines that say what was recorded, proposed or skipped. Nothing at all when the record has no
@@ -386,12 +430,11 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
     if (!s.dryRun) writeLock(lockFile, lock);
   }
 
-  if (blocked.size > 0) {
-    const grant = [...blocked].some((b) => /vault grant/i.test(b));
-    if (grant)
-      lines.push(`${String(named)} key${named === 1 ? ' was' : 's were'} recorded by name only, because this machine holds no vault grant it could deposit with, and the values were not kept. Run braindog login <host> --vault <project>, then scan again.`);
-    for (const b of blocked) if (!grant || !/vault grant/i.test(b)) lines.push(b);
-  }
+  const noGrant = [...blocked].some((b) => /vault grant/i.test(b));
+  const sayIt = s.once === undefined || s.dryRun ? noGrant : noGrantOnce(s.home, s.once, now, noGrant);
+  if (noGrant && sayIt)
+    lines.push(`${String(named)} key${named === 1 ? ' was' : 's were'} recorded by name only, because this machine holds no vault grant it could deposit with, and the values were not kept. Run braindog login <host> --vault <project>, then scan again.`);
+  for (const b of blocked) if (!/vault grant/i.test(b)) lines.push(b);
   return lines;
 }
 

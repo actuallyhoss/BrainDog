@@ -25,6 +25,7 @@ import {
   type Host,
   type Installed,
   type PackSource,
+  unresolvedFault,
 } from '@braindog/declare';
 import { no, ok } from '@braindog/ports';
 import {
@@ -762,6 +763,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     packs: kernel.packs(),
     declarations: kernel.declarations() as Installed['declarations'],
     rows: kernel.census(),
+    config: kernel.packSettings(),
   });
 
   /**
@@ -1827,7 +1829,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
       const pack = await normalise(args?.doc, args?.source ?? { kind: 'local' });
       if (!pack.ok) return pack;
-      return ok({ diff: await plan(pack.value, installedState()), pack: pack.value.manifest });
+      const diff = await plan(pack.value, installedState());
+      /* A PACK POINTING AT A LIST NOTHING HOLDS IS REFUSED AT THE PLAN, and not only at the install,
+         because the repair is to install something else first and the plan is where a person reads it. */
+      const unheld = unresolvedFault(diff);
+      if (unheld) return { ok: false as const, refusal: unheld };
+      return ok({ diff, pack: pack.value.manifest });
     },
 
     /**
@@ -1899,6 +1906,37 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.packStates());
+    },
+
+    /**
+     * One pack's settings: what its manifest declares under `config:`, and the value each holds now.
+     *
+     * A READ, like `packs`. A pack the seed owns by its bodies declares no settings and answers with
+     * empty maps; a pack this record does not have is `DECLARATION_UNKNOWN`.
+     */
+    async packConfig(args: { id: string }, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['id']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
+      return kernel.packConfig(args.id);
+    },
+
+    /**
+     * Set some of a pack's settings, each checked against its declaration, with one event.
+     *
+     * NOTHING INSTALLED CHANGES HERE. A declaration holds the value it was installed with, and reads
+     * the new one the next time the pack is planned and installed. `null` puts a setting back to its
+     * default. An owner or admin in a browser session, like every other pack method.
+     */
+    async setPackConfig(args: { id: string; values: Record<string, unknown> }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['id', 'values']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
+      return tail(kernel.setPackConfig(args.id, args.values, { actor: actorOf(ctx) }));
     },
 
     /**

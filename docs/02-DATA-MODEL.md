@@ -419,6 +419,11 @@ forever.
 Byte-exact, and the authority is [34-GRAMMARS](34-GRAMMARS.md) §3; step 3 of the write path (COERCE)
 parses to these shapes and nothing else, and the `where:` compiler compares against them.
 
+*(Amended September 15th 2026: a pack's settings, its manifest's `config:` ([04-PACKS](04-PACKS.md) §2), take six of
+these types, `text`, `enum`, `bool`, `money`, `day` and `duration`, and are coerced to the same shapes by the same
+step. A `ref`, a `secret`, a `file` and every other type are refused `CONFIG_TYPE_UNSUPPORTED`. The chosen values are
+stored on the `pack` row's manifest, not in `entry`.)*
+
 **A text never holds a key.** A `text` or `document` value, or a `list<text>` element, that looks like
 a credential is refused at step 3 as `VALUE_MALFORMED`, from every caller, with no `found` and a
 sentence that says to deposit the key in the vault. Looking like one means an issuer's own prefix (a

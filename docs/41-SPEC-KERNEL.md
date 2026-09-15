@@ -119,6 +119,8 @@ export interface Kernel {
 | `retireDeclarations` | sets `retired = 1`, drops the indexes, deletes the pack row when `pack` is given | none |
 | `disablePack` | retires a pack's active declarations and any in `alsoDisable`, sets `pack.disabled_at`, keeps every row, in one transaction | `PACK_REQUIRED` · `SCOPES_IN_USE` · `DECLARATION_UNKNOWN` · `PROVIDES_CONFLICT` (the kernel) |
 | `enablePack` | reinstalls the declarations the pack went off with, through §5.6, and clears `pack.disabled_at` | the install path's own refusals · `DECLARATION_UNKNOWN` |
+| `packConfig` | one pack's declared settings and the value each holds: the chosen one, else the default, else null | `DECLARATION_UNKNOWN` |
+| `setPackConfig` | checks each value against the pack's `config:`, stores the chosen values on `pack.manifest`, and writes one `edit` event; reinstalls nothing | `DECLARATION_UNKNOWN` · `REQUIRED_MISSING` · `FIELD_UNKNOWN` · `ENUM_VALUE_UNKNOWN` · `OUT_OF_BOUNDS` · the write path's coercion codes |
 | `allocate` | `UPDATE counter … RETURNING next - 1` | `TypeError` outside a transaction |
 | `appendEvent` | one row into `event`, redaction applied, the `grant.*` note shape enforced | `TypeError` on a malformed internal call (a defect, not a refusal) |
 | `replay` | the original result of a write whose `op_id` was seen | — |
@@ -675,7 +677,23 @@ that it is off, and enabling keeps `pack_id` as it was.
 back from their retired rows and staged through §5.6 as one batch, so each returns as a new version with the same
 checksum (K21: `retired` never goes back to 0); then `UPDATE pack SET disabled_at = NULL` and one `install` event with
 `to_v` the same list, all in one transaction; then the cache is rebuilt and derived schedule rows re-armed. The pack's
-version and every `entry` row are unchanged.
+version and every `entry` row are unchanged. It reads no pack setting: each body comes back exactly as it went off.
+
+**Pack settings** (`declare.ts`, the 2026-09-15 build). `readConfig(config)` checks a manifest's `config:` map: at most
+32 keys matching `^[a-z][a-z0-9_]{0,31}$` (`OUT_OF_BOUNDS`, `PACK_MALFORMED`), the sub-keys `type`, `values`, `default`,
+`label` and `note` (`FIELD_UNKNOWN`), a type from text, enum, bool, money, day and duration (`CONFIG_TYPE_UNSUPPORTED`
+otherwise), an enum's one to 64 distinct values (`VALUE_MALFORMED`), and a default `configValue` accepts. `configValue`
+is `coerce` for a field of that type, then enum membership (`ENUM_VALUE_UNKNOWN`) and at most 1024 bytes of text
+(`OUT_OF_BOUNDS`). `fillConfig` replaces each `{{config:<key>}}` in a body, and `validate` refuses `FIELD_UNKNOWN` at
+the placeholder for a body that still carries one, so only the pack path, which fills them, installs such a body.
+
+`setPackConfig(id, values)`: the pack must be known (`DECLARATION_UNKNOWN`); `values` is a non-empty map
+(`REQUIRED_MISSING`) of declared keys (`FIELD_UNKNOWN`, `allowed` the declared keys); each value passes `configValue`,
+and `null` removes the chosen value so the default applies. When something changed, one `transaction()` rewrites
+`pack.manifest.config_values` and inserts one `edit` event, `target = 'pack:<id>'`, `target_kind = 'pack'`, `from_v` and
+`to_v` the JCS of the changed settings' values before and after. No declaration is touched: a setting is read only
+when the pack document is next planned and installed. `packSettings()` returns the chosen values by pack id, which
+the record hands a plan as `Installed.config`.
 
 ### 5.7 · `appendEvent` · `observe`
 

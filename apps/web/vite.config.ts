@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 
 import { ENVIRONMENTS } from '@braindog/theme';
 
@@ -79,11 +79,58 @@ const PALETTE = fileURLToPath(new URL(`../../packages/skin/${ENV === '' ? 'house
  */
 const API = process.env.BRAINDOG_API ?? 'http://127.0.0.1:8787';
 
+/**
+ * EACH ROUTE'S PRELOAD LIST LEAVES OUT WHAT THE ROOT LAYOUT'S LIST ALREADY NAMES.
+ *
+ * The generated app entry carries one list of chunks per route node, and it counts against the entry
+ * budget. The root layout is node 0, and Kit asks for it in the same tick as every other node, on the
+ * first load and on every navigation, so its list has already started each chunk it names: repeating
+ * them in twenty other lists preloaded nothing and cost bytes in the one file every visit downloads.
+ *
+ * ONLY SCRIPTS, AND ONLY ONCE NODE 0 HAS BEEN SEEN. Vite hands this the script dependencies and keeps
+ * stylesheets itself, so a route's styles still wait before it draws. The lists are resolved in the
+ * order the imports appear, node 0 first; were that ever not so, nothing is removed.
+ */
+const layoutDeps = new Map<string, Set<string>>();
+
+/**
+ * AND NO LIST NAMES A CHUNK THE ENTRY ITSELF IMPORTS. Those are running before any list is read, so
+ * naming them preloads nothing. The set is read from the bundle before Vite writes the lists.
+ */
+const entryGraph = new Set<string>();
+const entryGraphPlugin: Plugin = {
+  name: 'braindog:entry-graph',
+  generateBundle: {
+    order: 'pre',
+    handler(_, bundle) {
+      entryGraph.clear();
+      const walk = (file: string) => {
+        const chunk = bundle[file];
+        if (entryGraph.has(file) || chunk?.type !== 'chunk') return;
+        entryGraph.add(file);
+        for (const next of chunk.imports) walk(next);
+      };
+      for (const [file, chunk] of Object.entries(bundle)) if (chunk.type === 'chunk' && chunk.isEntry) walk(file);
+    },
+  },
+};
+
+function resolveDependencies(file: string, deps: string[], { hostId, hostType }: { hostId: string; hostType: 'html' | 'js' }) {
+  if (hostType !== 'js') return deps;
+  const kept = deps.filter((d) => d === file || !entryGraph.has(d));
+  if (/(?:^|\/)nodes\/0\.[\w-]+\.js$/u.test(file)) {
+    layoutDeps.set(hostId, new Set(kept));
+    return kept;
+  }
+  const layout = layoutDeps.get(hostId);
+  return layout ? kept.filter((d) => d === file || !layout.has(d)) : kept;
+}
+
 export default defineConfig({
-  plugins: [sveltekit()],
+  plugins: [sveltekit(), entryGraphPlugin],
   define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT), __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   server: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API } },
   preview: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API } },
-  build: { target: 'es2022', cssMinify: 'lightningcss' },
+  build: { target: 'es2022', cssMinify: 'lightningcss', modulePreload: { resolveDependencies } },
 });

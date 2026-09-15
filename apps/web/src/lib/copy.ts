@@ -403,6 +403,12 @@ export const copy = {
   immutable: 'A decision cannot be edited once it is made.',
   noQuestions: 'Nothing to decide.',
   lastDecided: 'The last one was decided',
+  /* A LIVE RECORD: what `decide` answered, and the two words a proposal that is not a choice takes. */
+  acceptIt: 'Accept',
+  rejectIt: 'Reject',
+  decisionRecorded: (option: string, id: string) => `${option} is recorded as the decision on ${id}.`,
+  parkedUntil: (on: string) => `Parked until ${on}.`,
+  changedSince: 'A row this would change has changed since it was proposed. Nothing was written.',
 
   /* the register grid */
   /* A NAME FOR THE SEARCH BOX. It had only a placeholder, which is not an accessible name and

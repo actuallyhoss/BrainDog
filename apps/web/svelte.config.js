@@ -27,5 +27,8 @@ export default {
   compilerOptions: {
     // One stylesheet the linter can attribute every declaration to a file (22 §2).
     css: 'external',
+    /* NO `window.__svelte.v` MARKER. It is a chunk of its own in the entry graph, read by nothing this
+       app ships, and the entry bundle has a budget. */
+    discloseVersion: false,
   },
 };

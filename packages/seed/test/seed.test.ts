@@ -251,3 +251,29 @@ test('A SEEDED RUN CARRIES WHAT ONLY THE RECORD WRITES, and the refusal guarding
   }
   sql.close();
 });
+
+/* ── the questions ───────────────────────────────────────────────────────── */
+
+test('THE SAMPLE’S QUESTIONS ARE FILED THROUGH propose AND decide, in the order that numbers them', async () => {
+  const { k, sql } = await seeded();
+  const out = await installSeed(await openRecord(openSqlite(), { now: () => NOW }));
+  assert.ok(out.ok, sayOf(out));
+  /* SEVEN QUESTIONS AND TWO ANSWERS: the five the sample's queue shows open, and D41 and SG33, which
+     it shows decided. A count that moves is a question added to one side and not the other. */
+  assert.deepEqual([out.value.suggestions, out.value.decisions], [7, 2]);
+
+  const open = k.governance('suggestion', { status: 'open' });
+  assert.ok(open.ok, fixOf(open));
+  assert.deepEqual(open.value.map((r) => r.id).sort(), ['SG2', 'SG3', 'SG4', 'SG5', 'SG7']);
+
+  const kiln = k.governanceRow('suggestion', 'SG5');
+  assert.equal(k.question('SG5'), 'Does Kiln licence per-seat, per-product, or one flat studio price?');
+  const options = (kiln?.body as { options: { id: string; recommended?: boolean }[] }).options;
+  assert.deepEqual(options.map((o) => o.id), ['seat', 'product', 'flat']);
+  assert.deepEqual(options.filter((o) => o.recommended).map((o) => o.id), ['product']);
+
+  assert.equal(k.governanceRow('suggestion', 'SG4')?.body_kind, 'rowset');
+  assert.equal(k.governanceRow('decision', 'D1')?.answer, 'nordhaven');
+  assert.equal(k.governanceRow('decision', 'D2')?.question, 'Add the two services on the Fenwick invoice?');
+  sql.close();
+});
