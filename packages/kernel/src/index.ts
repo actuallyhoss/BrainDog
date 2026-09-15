@@ -112,7 +112,22 @@ import {
 } from './vault.ts';
 import { sparkMayWrite } from './spark.ts';
 import { PEOPLE, meet as meetPerson, type MeetArgs, type Met } from './people.ts';
-import { KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, type Found, type SessionHints } from './session.ts';
+import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, type Found, type SessionHints } from './session.ts';
+import {
+  deviceApprove,
+  deviceList,
+  devicePoll,
+  deviceRevoke,
+  deviceStart,
+  deviceSweep,
+  vaultGrant,
+  type Approved,
+  type DeviceCode,
+  type DeviceRow,
+  type Exchanged,
+  type VaultGrant,
+  type Waiting,
+} from './device.ts';
 import {
   resolveProject,
   scopeFault,
@@ -127,6 +142,7 @@ export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statemen
 export { checkDogl, keyIdOf, b64url, manifestBytes, signDogl, type Signature, type Signer } from './dogl.ts';
 export { SPARK, SPARK_KINDS, sparkMayWrite } from './spark.ts';
 export { KERNEL_WRITTEN, STALE_MS, isStale, sessionDeclaration } from './session.ts';
+export { REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Reach, type VaultGrant, type Waiting } from './device.ts';
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
@@ -185,6 +201,12 @@ export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
 export type { Declaration, DeclKind, Installed, PackToggle } from './declare.ts';
+
+/**
+ * One pack as `packStates()` reads it. `version` is `null` for a pack the seed owns by its body, which
+ * has no `pack` row to carry one; `registers` are the ones it holds while on and the ones it went off with.
+ */
+export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
 
 /* ── what a register says about itself ───────────────────────────────────── */
 
@@ -1895,6 +1917,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (!entry) return no('VALUE_MALFORMED', `${row} is not a row of ${register}.`, { at: 'row' });
       return ok(history(entry.id).map((e) => ({ ts: e.ts, actor: e.actor, kind: e.kind, field: e.field, to: e.to })));
     },
+    /* THE RUNS NOT FINISHED, the most recently heard from first. The block applies its own `where` and `limit`. */
+    sessionsLive: () =>
+      sql
+        .all<{ id: string }>(
+          `SELECT id FROM entry WHERE register = '${SESSION}' AND deleted_at IS NULL AND state NOT IN (SELECT value FROM json_each(?))
+           ORDER BY json_extract(fields, '$.last_seen') DESC`,
+          JSON.stringify(FINISHED),
+        )
+        .map((r) => byId(r.id))
+        .filter((e): e is Entry => e !== null),
   });
 
   /**
@@ -2164,6 +2196,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             .ok,
       ),
     );
+    /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
+    transaction(() => deviceSweep(tokenDeps()));
     return { ...out, sessions };
   }
 
@@ -2803,6 +2837,27 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     verifyToken: (bearer: string, surface?: string): Promise<Result<Verified>> =>
       verifyToken(tokenDeps(), bearer, surface),
 
+    /* ── device grants, 12 §6.1 ───────────────────────────── */
+
+    /** A device asks for a code. INTERNAL: the host calls it from `/auth/device`, limited per address. */
+    deviceStart: (args: { reach: string; label: string; ua?: string; scope?: string }): Promise<Result<DeviceCode>> =>
+      deviceStart(tokenDeps(), args),
+
+    /** The owner types the six digits. A wrong code costs every pending request a try. */
+    deviceApprove: (person: string, args: { user_code: string }): Promise<Result<Approved>> => deviceApprove(tokenDeps(), person, args),
+
+    /** The device asks again, and after approval gets its bearer once. INTERNAL. */
+    devicePoll: (args: { device_code: string }): Promise<Result<Waiting | Exchanged>> => devicePoll(tokenDeps(), args),
+
+    /** Every grant by its handle, never by the id a device polls with. */
+    deviceList: (): Promise<DeviceRow[]> => deviceList(tokenDeps()),
+
+    /** Revoke one; a login grant takes its token with it. */
+    deviceRevoke: (person: string, handle: string): Promise<Result<DeviceRow>> => deviceRevoke(tokenDeps(), person, handle),
+
+    /** A vault bearer, checked. INTERNAL. */
+    vaultGrant: (bearer: string): Promise<Result<VaultGrant>> => vaultGrant(tokenDeps(), bearer),
+
     /* ── the decision gate ─────────────────────────────────── */
 
     /**
@@ -3119,6 +3174,54 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** The `pack` rows: what is installed, and at which version. */
     packs: () => sql.all<{ id: string; version: string }>('SELECT id, version FROM pack ORDER BY id'),
+
+    /**
+     * Every pack this record has, on or off, with the registers each one holds.
+     *
+     * BESIDE `packs()` AND NOT INSTEAD OF IT, because a plan compares `pack` rows and nothing else.
+     * The seed installs its first-party packs with no `pack` row, owned only by `pack:` in the body,
+     * so a pack like People is found by its declarations while on, and by its last `retire` event
+     * while off, which is the only record that it went off (`declare.ts`, `packStanding`).
+     */
+    packStates: (): PackState[] => {
+      const owner = "coalesce(pack_id, json_extract(body, '$.pack'))";
+      const live = new Map<string, string[]>();
+      for (const r of sql.all<{ owner: string; id: string }>(
+        `SELECT ${owner} AS owner, id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND ${owner} IS NOT NULL ORDER BY id`,
+      ))
+        live.set(r.owner, [...(live.get(r.owner) ?? []), r.id]);
+      const last = new Map(
+        sql
+          .all<{ target: string; kind: string; ts: string; to_v: string | null }>(
+            "SELECT target, kind, ts, to_v FROM event WHERE rowid IN (SELECT MAX(rowid) FROM event WHERE target_kind = 'pack' AND kind IN ('retire', 'install', 'uninstall') GROUP BY target)",
+          )
+          .map((e) => [e.target.slice('pack:'.length), e]),
+      );
+      const rows = new Map(sql.all<{ id: string; version: string; disabled_at: string | null }>('SELECT id, version, disabled_at FROM pack').map((r) => [r.id, r]));
+      const wentOff = (id: string): string[] => {
+        const e = last.get(id);
+        if (e?.kind !== 'retire' || !e.to_v) return [];
+        try {
+          return (JSON.parse(e.to_v) as unknown[]).filter((x): x is string => typeof x === 'string');
+        } catch {
+          return [];
+        }
+      };
+      const registersOf = (ids: readonly string[]) => ids.filter((d) => d.startsWith('register.')).map((d) => d.slice('register.'.length));
+
+      const out: PackState[] = [];
+      /* `kernel` IS THE RECORD'S OWN and no person may turn it off, so it is not a pack on this list. */
+      for (const id of new Set([...rows.keys(), ...live.keys(), ...last.keys()])) {
+        if (id === 'kernel') continue;
+        const row = rows.get(id);
+        const on = live.get(id) ?? [];
+        const offAt = row ? row.disabled_at : on.length === 0 && last.get(id)?.kind === 'retire' ? (last.get(id)?.ts ?? null) : null;
+        /* A BODY-OWNED PACK WITH NOTHING LIVE AND NO `retire` LAST was uninstalled, or never was. */
+        if (!row && on.length === 0 && offAt === null) continue;
+        out.push({ id, version: row?.version ?? null, disabled_at: offAt, registers: registersOf(offAt === null ? on : wentOff(id)) });
+      }
+      return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    },
 
     /** Live rows per register, which is what makes an orphan countable before it is one. */
     census: (): Record<string, number> =>

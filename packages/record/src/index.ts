@@ -982,6 +982,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       : { code: 'FIELD_UNKNOWN', fix: `${key} is not something this call takes. It takes ${takes.join(', ')}.`, at: key, allowed: [...takes] };
   };
 
+  /**
+   * A refusal that comes down to a pack being off, said as that and naming the pack.
+   *
+   * THE KERNEL ANSWERS FROM THE DECLARATIONS' SIDE. A write to a register that went off is
+   * `REGISTER_UNKNOWN`, and enabling a pack before one it leans on is a field pointing at nothing. Both
+   * are true and neither says what to do; `PACK_DISABLED` with the pack in `allowed` does. Only a
+   * register a disabled pack went off with counts, so every other refusal passes through as it was.
+   */
+  const offPack = <T>(out: Result<T>, names: (register: string) => boolean, besides?: string): Result<T> => {
+    if (out.ok || !('refusal' in out)) return out;
+    for (const p of kernel.packStates()) {
+      if (p.disabled_at === null || p.id === besides) continue;
+      const register = p.registers.find(names);
+      if (register !== undefined)
+        return no<T>('PACK_DISABLED', `${register} belongs to ${p.id}, which is turned off. Enable ${p.id} first.`, {
+          at: 'pack',
+          allowed: [p.id],
+        });
+    }
+    return out;
+  };
+
+  /** A write's refusal, when the register it named went off with its pack. */
+  const offRegister = <T>(register: string, out: Result<T>): Result<T> =>
+    !out.ok && 'refusal' in out && out.refusal.code === 'REGISTER_UNKNOWN' ? offPack(out, (r) => r === register) : out;
+
   const listOf = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
   const projectOf = (run: Entry): string | null => (typeof run.fields.project === 'string' ? run.fields.project : null);
 
@@ -1120,14 +1146,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false, refusal: stop };
       return tail(
-        kernel.create(args.register, args.fields, {
-          ...writerOf(ctx),
-          ...(args.note === undefined ? {} : { note: args.note }),
-          ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-          /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
-             without its own id the record has no way to know the second is the first. */
-          ...(args.op_id === undefined ? {} : { opId: args.op_id }),
-        }),
+        offRegister(
+          args.register,
+          kernel.create(args.register, args.fields, {
+            ...writerOf(ctx),
+            ...(args.note === undefined ? {} : { note: args.note }),
+            ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+            /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
+               without its own id the record has no way to know the second is the first. */
+            ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+          }),
+        ),
       );
     },
 
@@ -1138,13 +1167,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
       return tail(
-        kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
-          ...writerOf(ctx),
-          ...(args.version === undefined ? {} : { version: args.version }),
-          ...(args.note === undefined ? {} : { note: args.note }),
-          ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-          ...(args.op_id === undefined ? {} : { opId: args.op_id }),
-        }),
+        offRegister(
+          args.register,
+          kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
+            ...writerOf(ctx),
+            ...(args.version === undefined ? {} : { version: args.version }),
+            ...(args.note === undefined ? {} : { note: args.note }),
+            ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+            ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+          }),
+        ),
       );
     },
 
@@ -1698,11 +1730,49 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       return tail(uninstall(args.id, packHost(ctx)));
     },
 
-    /** What is installed, and at what version. A read, because a list of names is not a change. */
+    /**
+     * Turn a pack off. Its declarations are retired, its `pack` row stays, and every row under it is kept.
+     *
+     * NOTHING CASCADES UNASKED. A pack another one leans on is refused `PACK_REQUIRED`, naming them,
+     * and `alsoDisable` is the caller choosing to turn those off in the same transaction.
+     */
+    async disablePack(args: { id: string; alsoDisable?: readonly string[] }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['id', 'alsoDisable']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
+      const also: unknown = args.alsoDisable;
+      if (also !== undefined && (!Array.isArray(also) || also.some((p) => typeof p !== 'string' || !p)))
+        return no('VALUE_MALFORMED', 'alsoDisable is a list of pack ids.', { at: 'alsoDisable' });
+      return tail(
+        kernel.disablePack(args.id, { ...(also === undefined ? {} : { alsoDisable: also as string[] }), actor: actorOf(ctx) }),
+      );
+    },
+
+    /** Turn a disabled pack back on, over the rows it kept. A pack it leans on that is still off is named. */
+    async enablePack(args: { id: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['id']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
+      const out = await kernel.enablePack(args.id, { actor: actorOf(ctx) });
+      /* A REGISTER ID IS `[a-z][a-z0-9_]*`, so it goes into the pattern as it is. */
+      const fix = !out.ok && 'refusal' in out ? out.refusal.fix : '';
+      return tail(offPack(out, (r) => new RegExp(`\\b${r}\\b`).test(fix), args.id));
+    },
+
+    /**
+     * Every pack, on or off, with the registers each holds. A read, because a list of names is not a change.
+     *
+     * OFF IS NOT ABSENT. A disabled pack is here with its `disabled_at`, and so is a pack the seed owns
+     * by its declarations' bodies, which has no `pack` row and so no version.
+     */
     async packs(ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(kernel.packs());
+      return ok(kernel.packStates());
     },
 
     /**

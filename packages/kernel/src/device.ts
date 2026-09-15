@@ -1,0 +1,363 @@
+/**
+ * Device grants: how a new machine's CLI or hook signs in, RFC 8628 (`12-SECURITY` §6.1).
+ *
+ * THE DEVICE POLLS WITH A LONG RANDOM ID AND THE OWNER TYPES SIX DIGITS. The two are never the same
+ * value, so polling cannot be turned into a way of guessing codes, and the code is kept only as
+ * `sha256(id + ':' + code)`: a copy of this table approves nothing.
+ *
+ * ONE ROW, TWO LIVES. A row is pending, then approved in a browser, then active once the device
+ * exchanges it for its bearer. A denied row is kept, because "I said no to a request I did not make"
+ * is the line this table exists to be able to show.
+ *
+ * THE POLL ID IS NEVER SHOWN. Between approval and exchange, whoever holds it can take the bearer, so
+ * a listing, an event and a revoke name a row by a handle derived from the id and not by the id.
+ */
+
+import type { Result } from '@braindog/ports';
+import { no, ok } from '@braindog/ports';
+
+import { instant } from './migrate.ts';
+import { DEFAULT_DAYS, createToken, revokeToken, type TokenDeps } from './token.ts';
+
+/** `device_grant.reach`, as migration 4's CHECK has it. */
+export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token', 'vault'] as const;
+export type Reach = (typeof REACHES)[number];
+
+export type DeviceStatus = 'pending' | 'approved' | 'active' | 'expired' | 'denied' | 'revoked';
+
+/** A code lives ten minutes, pending or approved and not yet exchanged. */
+export const CODE_MS = 10 * 60_000;
+/** The fifth wrong code denies every pending row. */
+export const CODE_TRIES = 5;
+/** An active grant not heard from in fourteen days is deregistered by the sweep. */
+export const SILENT_MS = 14 * 86_400_000;
+/** Seconds between polls, as RFC 8628's `interval`. */
+export const POLL_INTERVAL = 5;
+
+/**
+ * A vault grant's life. Shorter for `*`, because a grant over every key that belongs to no project is
+ * the wider of the two, and a wider grant should run out sooner.
+ */
+export const VAULT_DAYS = 30;
+export const VAULT_ALL_DAYS = 7;
+
+/** The reaches that approve one ADMIN operation, spent within the code's ten minutes (`30` §10). */
+const OPERATIONS: readonly Reach[] = ['export', 'import', 'pack', 'token'];
+
+export type DeviceCode = { device_code: string; user_code: string; expires: string; interval: typeof POLL_INTERVAL };
+export type Waiting = { pending: true; interval: typeof POLL_INTERVAL };
+export type Exchanged = { pending: false; bearer: string; reach: Reach; scope: string | null; expires: string };
+export type Approved = { handle: string; reach: Reach; scope: string | null; label: string | null; ua: string | null };
+
+/** What a listing shows: never the poll id, the code's hash or the bearer's. */
+export type DeviceRow = {
+  handle: string;
+  status: DeviceStatus;
+  reach: Reach;
+  scope: string | null;
+  label: string | null;
+  ua: string | null;
+  tries: number;
+  expires: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  last_used: string | null;
+};
+
+export type VaultGrant = { handle: string; scope: string; person: string; expires: string };
+
+type Stored = Omit<DeviceRow, 'handle'> & { id: string; code_hash: string; token_hash: string | null };
+
+const VISIBLE = 'id, status, reach, scope, label, ua, tries, expires, approved_by, approved_at, last_used';
+
+const b64url = (bytes: Uint8Array): string => {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+/** Six digits, uniformly. Rejection rather than a remainder, which would make the low codes likelier. */
+function sixDigits(random: (n: number) => Uint8Array): string {
+  const limit = Math.floor(0x1_0000_0000 / 1_000_000) * 1_000_000;
+  for (;;) {
+    const b = random(4);
+    const n = (b[0]! * 0x100_0000 + (b[1]! << 16) + (b[2]! << 8) + b[3]!) >>> 0;
+    if (n < limit) return String(n % 1_000_000).padStart(6, '0');
+  }
+}
+
+/** Equal hex strings, compared without stopping at the first difference. */
+function same(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/** The name a row goes by everywhere a person can see it. */
+const handleOf = async (deps: TokenDeps, id: string): Promise<string> => (await deps.digest(`device:${id}`)).slice(0, 16);
+
+const shown = async (deps: TokenDeps, row: Omit<Stored, 'code_hash' | 'token_hash'>): Promise<DeviceRow> => {
+  const { id, ...rest } = row;
+  return { handle: await handleOf(deps, id), ...rest };
+};
+
+/** Whether a project row exists: a live row of the register that declares `scopes:`. */
+function isProject(deps: TokenDeps, id: string): boolean {
+  return (
+    deps.sql.one(
+      `SELECT 1 AS hit FROM entry WHERE id = ? AND deleted_at IS NULL AND register = (
+         SELECT json_extract(body, '$.id') FROM declaration
+         WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_extract(body, '$.scopes') IS NOT NULL
+         LIMIT 1)`,
+      id,
+    ) !== undefined
+  );
+}
+
+/**
+ * A device asks: a pending row, and the two values only this reply will ever carry.
+ *
+ * INTERNAL. The device has no credential yet, so the host calls this from `/auth/device` and limits
+ * it per address.
+ */
+export async function deviceStart(
+  deps: TokenDeps,
+  args: { reach: string; label: string; ua?: string; scope?: string },
+): Promise<Result<DeviceCode>> {
+  if (!(REACHES as readonly string[]).includes(args?.reach))
+    return no('ENUM_VALUE_UNKNOWN', `${String(args?.reach)} is not a reach a device can ask for.`, { at: 'reach', allowed: REACHES });
+  const label = typeof args.label === 'string' ? args.label.trim() : '';
+  if (label === '') return no('REQUIRED_MISSING', 'Name the device, so the person approving it knows what is asking.', { at: 'label' });
+  if (label.length > 120) return no('OUT_OF_BOUNDS', 'A device label is at most 120 characters.', { at: 'label' });
+
+  const reach = args.reach as Reach;
+  const scope = args.scope ?? null;
+  if (reach === 'vault') {
+    if (!scope) return no('REQUIRED_MISSING', 'A vault grant names the project whose keys it opens, or * for the keys of none.', { at: 'scope' });
+    if (scope !== '*' && !isProject(deps, scope)) return no('REF_UNKNOWN', `${scope} is not a project in this record.`, { at: 'scope' });
+  } else if (scope !== null) {
+    return no('OUT_OF_BOUNDS', 'Only a vault grant carries a scope.', { at: 'scope' });
+  }
+
+  const id = b64url(deps.random(32));
+  const userCode = sixDigits(deps.random);
+  const expires = instant(deps.nowMs + CODE_MS);
+  deps.sql.exec(
+    `INSERT INTO device_grant (id, code_hash, status, reach, scope, label, ua, tries, expires)
+     VALUES (?, ?, 'pending', ?, ?, ?, ?, 0, ?)`,
+    id,
+    await deps.digest(`${id}:${userCode}`),
+    reach,
+    scope,
+    label,
+    args.ua?.slice(0, 200) ?? null,
+    expires,
+  );
+  return ok({ device_code: id, user_code: userCode, expires, interval: POLL_INTERVAL });
+}
+
+/**
+ * The owner types the code. A browser session only; the record's group gate sees to that.
+ *
+ * A MISS COSTS EVERY PENDING ROW A TRY. A guesser cannot spread guesses across requests to stay
+ * under the count, and the fifth denies them all. A malformed entry costs nothing, because a typo
+ * should not spend somebody else's enrolment.
+ */
+export async function deviceApprove(deps: TokenDeps, person: string, args: { user_code: string }): Promise<Result<Approved>> {
+  const code = typeof args?.user_code === 'string' ? args.user_code : '';
+  if (!/^\d{6}$/.test(code)) return no('VALUE_MALFORMED', 'A device code is six digits.', { at: 'user_code' });
+
+  const now = instant(deps.nowMs);
+  deps.sql.exec("UPDATE device_grant SET status = 'expired' WHERE status IN ('pending', 'approved') AND expires <= ?", now);
+  const pending = deps.sql.all<Stored>(`SELECT ${VISIBLE}, code_hash, token_hash FROM device_grant WHERE status = 'pending'`);
+
+  /* EVERY ROW IS HASHED, a match or not, so the time taken says nothing about which row was close. */
+  let hit: Stored | undefined;
+  for (const row of pending) if (same(await deps.digest(`${row.id}:${code}`), row.code_hash) && !hit) hit = row;
+
+  if (hit) {
+    const at = instant(deps.nowMs);
+    deps.sql.exec(
+      "UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ? AND status = 'pending'",
+      person,
+      at,
+      hit.id,
+    );
+    const handle = await handleOf(deps, hit.id);
+    deps.sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'access.grant', ?, 'device_grant', ?, ?)",
+      deps.mint(),
+      at,
+      person,
+      `device:${handle}`,
+      hit.reach,
+      (hit.label ?? '').slice(0, 280) || null,
+    );
+    return ok({ handle, reach: hit.reach, scope: hit.scope, label: hit.label, ua: hit.ua });
+  }
+
+  deps.sql.exec("UPDATE device_grant SET tries = tries + 1 WHERE status = 'pending'");
+  if (deps.sql.one("SELECT 1 AS hit FROM device_grant WHERE status = 'pending' AND tries >= ?", CODE_TRIES)) {
+    deps.sql.exec("UPDATE device_grant SET status = 'denied' WHERE status = 'pending'");
+    return no('DEVICE_CODE_TRIES', 'Five wrong codes denied every waiting device, so ask the device to start again.', { at: 'user_code' });
+  }
+  return no('FORBIDDEN', 'No device is waiting with that code.', { at: 'user_code' });
+}
+
+/** How long an exchanged grant lasts, by what it reaches. */
+function lifeMs(row: Stored): number {
+  if (row.reach === 'vault') return (row.scope === '*' ? VAULT_ALL_DAYS : VAULT_DAYS) * 86_400_000;
+  if (OPERATIONS.includes(row.reach)) return CODE_MS;
+  return DEFAULT_DAYS * 86_400_000;
+}
+
+/**
+ * The device polls. Once a row is approved, this is the exchange, and it happens once.
+ *
+ * A `login` exchange mints a `token` row through `createToken`, scope `write`, ninety days, the
+ * device's label, owned by the person who approved it: the bearer is the same shape as every other
+ * token's and is verified by the same code. Any other reach gets a bearer of that shape held only as
+ * `token_hash` on this row. Either way the bearer is in this reply and nowhere else.
+ */
+export async function devicePoll(deps: TokenDeps, args: { device_code: string }): Promise<Result<Waiting | Exchanged>> {
+  const id = typeof args?.device_code === 'string' ? args.device_code : '';
+  const row = id ? deps.sql.one<Stored>(`SELECT ${VISIBLE}, code_hash, token_hash FROM device_grant WHERE id = ?`, id) : undefined;
+  if (!row) return no('FORBIDDEN', 'That device code is not one this record knows.', { at: 'device_code' });
+
+  const now = instant(deps.nowMs);
+  const expired = no<Exchanged>('DEVICE_CODE_EXPIRED', 'Ask the device to start again.', { at: 'device_code' });
+  if ((row.status === 'pending' || row.status === 'approved') && row.expires <= now) {
+    deps.sql.exec("UPDATE device_grant SET status = 'expired' WHERE id = ? AND status = ?", id, row.status);
+    return expired;
+  }
+  if (row.status === 'pending') return ok({ pending: true, interval: POLL_INTERVAL });
+  if (row.status === 'expired') return expired;
+  if (row.status === 'denied')
+    return no('DEVICE_CODE_TRIES', 'Five wrong codes denied this request, so ask the device to start again.', { at: 'device_code' });
+  if (row.status !== 'approved' || !row.approved_by)
+    return no('FORBIDDEN', 'This device code has already been used. Ask the device to start again.', { at: 'device_code' });
+
+  const record = deps.recordId();
+  if (!record) return no('OUT_OF_BOUNDS', 'This record has no id yet, and a bearer carries the record it is for.', { at: 'record' });
+
+  /* CLAIMED BEFORE THE FIRST AWAIT. Nothing runs between the read above and this write, so a second
+     poll finds the row active and is refused instead of minting a second bearer. */
+  let expires = instant(deps.nowMs + lifeMs(row));
+  deps.sql.exec("UPDATE device_grant SET status = 'active', expires = ?, last_used = ? WHERE id = ? AND status = 'approved'", expires, now, id);
+
+  let bearer: string;
+  if (row.reach === 'login') {
+    const minted = await createToken(deps, row.approved_by, {
+      scope: 'write',
+      days: DEFAULT_DAYS,
+      ...(row.label === null ? {} : { label: row.label }),
+    });
+    if (!minted.ok) {
+      deps.sql.exec("UPDATE device_grant SET status = 'approved' WHERE id = ?", id);
+      return minted;
+    }
+    bearer = minted.value.bearer;
+    expires = minted.value.expires_at;
+  } else {
+    bearer = `${record}.${b64url(deps.random(32))}`;
+  }
+  deps.sql.exec('UPDATE device_grant SET token_hash = ?, expires = ? WHERE id = ?', await deps.digest(bearer.slice(record.length + 1)), expires, id);
+
+  return ok({ pending: false, bearer, reach: row.reach, scope: row.scope, expires });
+}
+
+/** Every grant, newest first, with what a revoke button needs and nothing a hash could be rebuilt from. */
+export async function deviceList(deps: TokenDeps): Promise<DeviceRow[]> {
+  const rows = deps.sql.all<Omit<Stored, 'code_hash' | 'token_hash'>>(
+    `SELECT ${VISIBLE} FROM device_grant ORDER BY coalesce(approved_at, expires) DESC, id`,
+  );
+  return Promise.all(rows.map((r) => shown(deps, r)));
+}
+
+/**
+ * Revoke one, without ending anybody's session. A login grant takes its token with it.
+ *
+ * IDEMPOTENT, and a row that has already finished, denied or expired, is left saying what it said.
+ */
+export async function deviceRevoke(deps: TokenDeps, person: string, handle: string): Promise<Result<DeviceRow>> {
+  let found: Stored | undefined;
+  for (const row of deps.sql.all<Stored>(`SELECT ${VISIBLE}, code_hash, token_hash FROM device_grant`))
+    if ((await handleOf(deps, row.id)) === handle) found = row;
+  if (!found) return no('OUT_OF_BOUNDS', `There is no device called ${String(handle)}.`, { at: 'handle' });
+
+  const { code_hash: _code, token_hash: tokenHash, ...visible } = found;
+  if (!['pending', 'approved', 'active'].includes(found.status)) return ok(await shown(deps, visible));
+
+  const at = instant(deps.nowMs);
+  deps.sql.exec("UPDATE device_grant SET status = 'revoked' WHERE id = ?", found.id);
+  if (found.reach === 'login' && tokenHash) {
+    const token = deps.sql.one<{ id: string }>('SELECT id FROM token WHERE hash = ?', tokenHash);
+    if (token) revokeToken(deps, person, token.id);
+  }
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, ?, 'access.revoke', ?, 'device_grant', ?)",
+    deps.mint(),
+    at,
+    person,
+    `device:${handle}`,
+    found.reach,
+  );
+  return ok(await shown(deps, { ...visible, status: 'revoked' }));
+}
+
+/**
+ * A vault-grant bearer, checked. INTERNAL: the host calls it before it opens a key for an agent.
+ *
+ * The same one sentence for every way it fails, as `verifyToken` does, and the approver's suspension
+ * stops the grant with them.
+ */
+export async function vaultGrant(deps: TokenDeps, bearer: string): Promise<Result<VaultGrant>> {
+  const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
+  const record = cut < 0 ? '' : bearer.slice(0, cut);
+  const secret = cut < 0 ? '' : bearer.slice(cut + 1);
+  const wrong = no<VaultGrant>('FORBIDDEN', 'That vault grant is not one this record knows.', { at: 'vault' });
+  if (!record || !secret || record !== deps.recordId()) return wrong;
+
+  const row = deps.sql.one<{ id: string; scope: string | null; approved_by: string | null; expires: string; suspended_at: string | null }>(
+    `SELECT d.id AS id, d.scope AS scope, d.approved_by AS approved_by, d.expires AS expires, p.suspended_at AS suspended_at
+     FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
+     WHERE d.token_hash = ? AND d.reach = 'vault' AND d.status = 'active'`,
+    await deps.digest(secret),
+  );
+  if (!row || !row.scope || !row.approved_by || row.suspended_at || row.expires <= instant(deps.nowMs)) return wrong;
+
+  deps.sql.exec('UPDATE device_grant SET last_used = ? WHERE id = ?', instant(deps.nowMs), row.id);
+  return ok({ handle: await handleOf(deps, row.id), scope: row.scope, person: row.approved_by, expires: row.expires });
+}
+
+/**
+ * The hourly sweep's part. Codes past their ten minutes expire, and so does an active grant that ran
+ * out or has been silent for fourteen days; a login grant's token is revoked with it. A denied row is
+ * never touched. Returns how many rows it moved.
+ */
+export function deviceSweep(deps: TokenDeps): number {
+  const now = instant(deps.nowMs);
+  const cutoff = instant(deps.nowMs - SILENT_MS);
+  let moved = deps.sql.all<{ id: string }>(
+    "SELECT id FROM device_grant WHERE status IN ('pending', 'approved') AND expires <= ?",
+    now,
+  ).length;
+  deps.sql.exec("UPDATE device_grant SET status = 'expired' WHERE status IN ('pending', 'approved') AND expires <= ?", now);
+
+  /* A LOGIN GRANT IS HEARD FROM THROUGH ITS TOKEN. `verifyToken` writes the token's `last_used_at`,
+     not this row's, so the newer of the two is when the device last spoke. */
+  const active = deps.sql.all<{ id: string; expires: string; last_used: string | null; token_id: string | null; token_used: string | null }>(
+    `SELECT d.id AS id, d.expires AS expires, d.last_used AS last_used, t.id AS token_id, t.last_used_at AS token_used
+     FROM device_grant d LEFT JOIN token t ON d.reach = 'login' AND t.hash = d.token_hash
+     WHERE d.status = 'active'`,
+  );
+  for (const row of active) {
+    const heard = [row.last_used, row.token_used].filter((x): x is string => x !== null).sort().pop() ?? '';
+    if (row.expires > now && heard >= cutoff) continue;
+    deps.sql.exec("UPDATE device_grant SET status = 'expired' WHERE id = ?", row.id);
+    if (row.token_id) revokeToken(deps, 'system', row.token_id);
+    moved++;
+  }
+  return moved;
+}

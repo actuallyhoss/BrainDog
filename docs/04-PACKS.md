@@ -229,7 +229,10 @@ by dropping them.
 > the same transaction. The pack holding the `scopes:` register is refused `SCOPES_IN_USE` while any
 > field left on still points at its projects. An install or upgrade of a disabled pack is refused
 > `PACK_DISABLED`. Disabling or enabling a pack already in that state changes nothing and says so.
-> A write to a disabled register is `REGISTER_UNKNOWN`, as for any register that is not active.
+> A write through the record to a register whose pack is off is `PACK_DISABLED`, naming the pack in
+> `allowed`; the kernel alone still answers `REGISTER_UNKNOWN`, as for any register that is not active.
+> In the app, every installed pack at `/packs` has an On and Off switch, an off pack stays listed and
+> dimmed, and a refused switch names the packs that lean on it and offers turning them off together.
 
 ---
 

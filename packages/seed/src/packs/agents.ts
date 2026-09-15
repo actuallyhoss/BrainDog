@@ -139,9 +139,158 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
   },
 };
 
-export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, SeedRegister> } = {
+/**
+ * The pack's pages (`loop/research-agent-path.md` §7): what the agents are doing and what they found
+ * out, at `/p/agents`, and a page per skill with its versions.
+ *
+ * NO PEOPLE ON THEM. "People met lately" would make the page require `register.people`, and then a
+ * record without People could not take this pack. The people an agent meets are on the People page.
+ *
+ * "WORKING NOW" READS `register.session` UNTIL THE INSTALL CHECK ADMITS `sessions.live`. The page
+ * layer computes that source, and `declare.ts` admits only `forecast.runway` among the computed
+ * ones, so a block naming it would stop the pack installing. The rows are the same: the runs not
+ * done or abandoned, the most recently seen first.
+ */
+export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: string }> = {
+  agents: {
+    page: 'agents',
+    title: 'Agents',
+    nav: { section: 'Agents', order: 10 },
+    icon: 'session',
+    requires: ['register.session', 'register.learnings', 'register.skills'],
+    blocks: [
+      {
+        kind: 'cards',
+        heading: 'Working now',
+        span: 12,
+        source: 'sessions.live',
+        columns: [
+          { field: 'doing', as: 'title' },
+          { field: 'agent', as: 'who' },
+          { field: 'project', label: 'Project', as: 'fact' },
+          { field: 'next', label: 'Next', as: 'fact' },
+          { field: 'last_seen', as: 'when' },
+        ],
+        limit: 12,
+        empty: 'No agent is working right now.',
+      },
+      {
+        kind: 'cards',
+        heading: 'Learnings',
+        span: 6,
+        source: 'register.learnings',
+        where: 'state is active',
+        columns: [
+          { field: 'lesson', as: 'title' },
+          { field: 'kind', label: 'Kind', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'fact' },
+          { field: 'confirmed_on', as: 'when' },
+        ],
+        order: [{ field: 'seq', dir: 'desc' }],
+        limit: 8,
+        empty: 'Nothing learned yet.',
+      },
+      {
+        kind: 'cards',
+        heading: 'Skills',
+        span: 6,
+        source: 'register.skills',
+        where: 'state is active',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'trigger', label: 'When to use it', as: 'fact' },
+          { field: 'rev', label: 'Version', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'fact' },
+        ],
+        order: [{ field: 'seq', dir: 'desc' }],
+        limit: 8,
+        empty: 'No skills yet.',
+      },
+    ],
+  },
+  /* One page per skill in use. The trigger leads, because it is the sentence that makes a session
+     reach for the skill, and the versions follow, each against the one before it. */
+  skill: {
+    page: 'skill',
+    title: '{{name}}',
+    for: { register: 'skills', where: 'state is active' },
+    icon: 'skill',
+    requires: ['register.skills'],
+    blocks: [
+      { kind: 'note', span: 12, body: '{{trigger}}' },
+      {
+        kind: 'diff',
+        heading: 'Versions',
+        span: 12,
+        source: 'register.skills',
+        row: '{{spoken}}',
+        field: 'body',
+        versions: 5,
+        empty: 'One version so far.',
+      },
+    ],
+  },
+};
+
+/**
+ * What a project page gains where this pack is installed: the keys, tools and skills it runs on, its
+ * own first and then the ones that apply everywhere.
+ *
+ * BLOCKS FOR THE SEED'S `project` TEMPLATE, AND NOT A PAGE OF THEIR OWN, because a second template
+ * over projects would put a second page at every project's address. They are not written into the
+ * template itself either: the template ships in the starter pack, which a record without this pack
+ * installs, and a page requiring a register the record lacks is refused.
+ *
+ * `project is {{name}}` AND NOT `{{spoken}}`, because a ref is matched by its title. A retired row is
+ * left out by state, so a skill nobody uses is not listed as one the project runs on. Each list is in name order, the project's own rows first.
+ */
+export const RUNS_ON: { requires: readonly string[]; blocks: readonly Record<string, unknown>[] } = {
+  requires: ['register.credentials', 'register.tools', 'register.skills'],
+  blocks: [
+    { kind: 'section', heading: 'Runs on', icon: 'plug', span: 12 },
+    {
+      kind: 'spec',
+      heading: 'Keys',
+      span: 4,
+      source: 'register.credentials',
+      where: 'project is {{name}}, state is not retired',
+      inherit: true,
+      columns: [{ field: 'label' }, { field: 'project', as: 'scope' }],
+      order: [{ field: 'label', dir: 'asc' }],
+      limit: 8,
+      empty: 'No keys apply to {{name}}.',
+    },
+    {
+      kind: 'spec',
+      heading: 'Tools',
+      span: 4,
+      source: 'register.tools',
+      where: 'project is {{name}}, state is not retired',
+      inherit: true,
+      columns: [{ field: 'name' }, { field: 'project', as: 'scope' }],
+      order: [{ field: 'name', dir: 'asc' }],
+      limit: 8,
+      empty: 'No tools apply to {{name}}.',
+    },
+    {
+      kind: 'spec',
+      heading: 'Skills',
+      span: 4,
+      source: 'register.skills',
+      where: 'project is {{name}}, state is active',
+      inherit: true,
+      columns: [{ field: 'name' }, { field: 'project', as: 'scope' }],
+      order: [{ field: 'name', dir: 'asc' }],
+      limit: 8,
+      empty: 'No skills apply to {{name}}.',
+    },
+  ],
+};
+
+export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, SeedRegister>; pages: typeof AGENTS_PAGES } = {
   manifest: { id: 'agents', version: '1.0.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
+  pages: AGENTS_PAGES,
 };
 
 /**
@@ -159,10 +308,13 @@ export function agentsPackDocument(): Record<string, unknown> {
     license: 'MIT',
     requires: { format: 1, primitives: 1, packs: {} },
     /* Every register carries `tags`, as the seed's own do, so a pack seed can be marked `example`. */
-    declarations: Object.values(AGENTS_REGISTERS).map(({ id, ...rest }) => ({
-      register: id,
-      ...rest,
-      fields: [...rest.fields, { id: 'tags', type: 'list', of: 'text' }],
-    })),
+    declarations: [
+      ...Object.values(AGENTS_REGISTERS).map(({ id, ...rest }) => ({
+        register: id,
+        ...rest,
+        fields: [...rest.fields, { id: 'tags', type: 'list', of: 'text' }],
+      })),
+      ...Object.values(AGENTS_PAGES),
+    ],
   };
 }

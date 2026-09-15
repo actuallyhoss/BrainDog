@@ -474,7 +474,7 @@ const TONES = ['good', 'warn', 'bad', 'info'] as const;
  */
 const SOURCE = /^(?:register|metric)\.[a-z][a-z0-9_-]{0,31}$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
-const COMPUTED_SOURCES = ['forecast.runway'] as const;
+const COMPUTED_SOURCES = ['forecast.runway', 'sessions.live'] as const;
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
 const metricNamed = (said: string): string => said.split(':')[0] ?? '';
@@ -2574,7 +2574,13 @@ function applyDeclarations(
  * two years ago is about a shape, and a record that cannot say what that shape was cannot read its
  * own history.
  */
-export function retireDeclarations(sql: Sql, ids: readonly string[], transaction: <T>(fn: () => T) => T): Result<number> {
+export function retireDeclarations(
+  sql: Sql,
+  ids: readonly string[],
+  transaction: <T>(fn: () => T) => T,
+  /** Declarations leaving in the same operation, retired by a later call: a disable turns packs off one at a time. */
+  alsoGoing: readonly string[] = [],
+): Result<number> {
   /* NOR IS THE KERNEL'S REGISTER RETIRED, for the reason `validate` refuses anyone declaring it:
      every agent write resolves to a row of it, and retiring it would leave the record unable to say
      which agent wrote anything. Refused whole, so no other id in the call is retired either. */
@@ -2582,6 +2588,22 @@ export function retireDeclarations(sql: Sql, ids: readonly string[], transaction
     return no<number>('PROVIDES_CONFLICT', "register.session is the kernel's own register, and no pack or person may retire it.", {
       at: 'register.session',
     });
+
+  /* THE SCOPES GUARD, FOR UNINSTALL AS FOR DISABLE. Uninstall retires through here, and taking out the
+     register that holds the projects while a field left in place still points at them would leave
+     that field naming projects nothing can resolve. */
+  const rows = liveRows(sql);
+  const home = rows.find((r) => ids.includes(r.id) && r.kind === 'register' && r.body.scopes !== undefined);
+  if (home) {
+    const scoped = scopedFieldsLeft(rows, (r) => ids.includes(r.id) || alsoGoing.includes(r.id));
+    if (scoped.length > 0)
+      return no<number>(
+        'SCOPES_IN_USE',
+        `${home.id} holds the projects, and ${scoped.join(', ')} still ${scoped.length === 1 ? 'points' : 'point'} at them. Take out the ${scoped.length === 1 ? 'register that declares that field' : 'registers that declare those fields'} in the same call, or keep ${home.id}.`,
+        { at: scoped[0]! },
+      );
+  }
+
   return transaction(() => {
     let n = 0;
     for (const id of ids) {
@@ -2684,6 +2706,17 @@ function packStanding(sql: Sql, id: string) {
     }
   const disabled = row ? row.disabled_at !== null : active.length === 0 && wentOff !== null;
   return { row, active, wentOff, disabled, known: row !== null || active.length > 0 || wentOff !== null };
+}
+
+/** The fields that say which project a row belongs to, left once `leaving` has gone, as `register.x.field`. */
+function scopedFieldsLeft(rows: readonly LiveRow[], leaving: (r: LiveRow) => boolean): string[] {
+  const scoped: string[] = [];
+  for (const r of rows) {
+    if (r.kind !== 'register' || leaving(r)) continue;
+    for (const f of Array.isArray(r.body.fields) ? (r.body.fields as Record<string, unknown>[]) : [])
+      if (f !== null && typeof f === 'object' && f.scope !== undefined && f.retired !== true) scoped.push(`${r.id}.${String(f.id)}`);
+  }
+  return scoped;
 }
 
 const REGISTER_REF = /^register\.([a-z][a-z0-9_]*)$/;
@@ -2790,12 +2823,7 @@ export function disablePack(
 
   const home = rows.find((r) => r.kind === 'register' && r.owner !== null && off.has(r.owner) && r.body.scopes !== undefined);
   if (home) {
-    const scoped: string[] = [];
-    for (const r of rows) {
-      if (r.kind !== 'register' || (r.owner !== null && off.has(r.owner))) continue;
-      for (const f of Array.isArray(r.body.fields) ? (r.body.fields as Record<string, unknown>[]) : [])
-        if (f !== null && typeof f === 'object' && f.scope !== undefined && f.retired !== true) scoped.push(`${r.id}.${String(f.id)}`);
-    }
+    const scoped = scopedFieldsLeft(rows, (r) => r.owner !== null && off.has(r.owner));
     if (scoped.length > 0)
       return no<PackToggle>(
         'SCOPES_IN_USE',
@@ -2810,7 +2838,12 @@ export function disablePack(
     transaction(() => {
       for (const p of turning) {
         const ids = rows.filter((r) => r.owner === p).map((r) => r.id);
-        const done = retireDeclarations(sql, ids, transaction);
+        const done = retireDeclarations(
+          sql,
+          ids,
+          transaction,
+          rows.filter((r) => r.owner !== null && off.has(r.owner)).map((r) => r.id),
+        );
         if (!done.ok) throw new Rollback(done);
         retired.push(...ids);
         sql.exec('UPDATE pack SET disabled_at = ? WHERE id = ?', at, p);

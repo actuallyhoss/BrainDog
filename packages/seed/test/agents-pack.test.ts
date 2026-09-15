@@ -11,7 +11,7 @@ import { normalise, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { AGENTS_PACK, AGENTS_REGISTERS, NOW, ROWS, agentsPackDocument, declarations, installAgentsPack, installSeed } from '../src/index.ts';
+import { AGENTS_PACK, AGENTS_REGISTERS, NOW, ROWS, RUNS, agentsPackDocument, declarations, installAgentsPack, installSeed } from '../src/index.ts';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -48,13 +48,15 @@ test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () =
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
   assert.equal(pack.manifest.version, '1.0.0');
-  assert.deepEqual([...pack.manifest.provides].sort(), ['register.credentials', 'register.learnings', 'register.skills', 'register.tools']);
+  assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
+
+const PROVIDES = ['page.agents', 'page.skill', 'register.credentials', 'register.learnings', 'register.skills', 'register.tools'];
 
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.0.0' });
-  assert.deepEqual([...k.packClaims('agents')].sort(), ['register.credentials', 'register.learnings', 'register.skills', 'register.tools']);
+  assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
   sql.close();
@@ -179,6 +181,71 @@ test('NO KEY ROW HOLDS A VALUE, in the seed or in the record', async () => {
   assert.equal(out.rows.length, ROWS.credentials?.length);
   for (const row of out.rows) assert.equal(row.fields.value, undefined, `${String(row.fields.label)} holds a value`);
   assert.equal(sql.all('SELECT 1 FROM grant').length, 0, 'the seed sealed something');
+  sql.close();
+});
+
+/* ── the pages ───────────────────────────────────────────────────────────── */
+
+type Drawn = { heading?: string; kind: string; rows: { fields: Record<string, unknown> }[]; matched: number; refusals: unknown[]; scopes?: (string | null)[]; inherited?: number; history?: { text: string }[]; body?: string };
+
+const opened = (k: Kernel, slug: string): Drawn[] => value<{ blocks: Drawn[] }>(k.page(slug)).blocks;
+const headed = (blocks: Drawn[], heading: string): Drawn => {
+  const found = blocks.find((b) => b.heading === heading);
+  assert.ok(found, `no block headed ${heading}`);
+  return found;
+};
+
+test('/p/agents: the runs working now, the newest seen first, then what was learned and the skills in use', async () => {
+  const { k, sql } = await seeded();
+  const blocks = opened(k, 'agents');
+  for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.heading}: ${JSON.stringify(b.refusals)}`);
+
+  const live = RUNS.filter((r) => r.state === 'active' || r.state === 'idle').sort((a, z) => String(z.last_seen).localeCompare(String(a.last_seen)));
+  assert.deepEqual(headed(blocks, 'Working now').rows.map((r) => r.fields.doing), live.map((r) => r.doing), 'a finished run is listed, or the order is not by last seen');
+
+  const learnings = headed(blocks, 'Learnings');
+  assert.equal(learnings.matched, ROWS.learnings!.filter((r) => (r.state ?? 'active') === 'active').length, 'a superseded learning is counted');
+  assert.ok(!headed(blocks, 'Skills').rows.some((r) => r.fields.state === 'retired'), 'a retired skill is listed');
+  sql.close();
+});
+
+test('A SKILL IN USE HAS A PAGE: its trigger, then its versions; a retired one has none', async () => {
+  const { k, sql } = await seeded();
+  const slugs = k.pages().map((p) => p.slug);
+  assert.ok(slugs.includes('reconcile-invoice'), slugs.join(', '));
+  assert.ok(!slugs.includes('chase-invoice'), 'the retired skill has a page');
+
+  const [trigger, versions] = opened(k, 'reconcile-invoice');
+  const row = ROWS.skills!.find((r) => r.name === 'reconcile-invoice')!;
+  assert.equal(trigger?.body, row.trigger);
+  assert.equal(versions?.kind, 'diff');
+  assert.deepEqual(versions?.refusals, []);
+  assert.deepEqual(versions?.history?.map((v) => v.text), [row.body], 'a seeded skill has one version, the text it holds');
+  sql.close();
+});
+
+test('A PROJECT PAGE SAYS WHAT IT RUNS ON: its own keys, tools and skills, then the ones from everywhere', async () => {
+  const { k, sql } = await seeded();
+  const blocks = opened(k, 'kiln');
+  assert.ok(blocks.some((b) => b.kind === 'section' && b.heading === 'Runs on'));
+  const said = (heading: string, field: string) => {
+    const b = headed(blocks, heading);
+    assert.deepEqual(b.refusals, [], `${heading}: ${JSON.stringify(b.refusals)}`);
+    return b.rows.map((r, i) => `${String(r.fields[field])} @ ${b.scopes?.[i] ?? 'everywhere'}`);
+  };
+  const skills = said('Skills', 'name');
+  assert.ok(skills.includes('review-pr @ Kiln') && !skills.includes('review-pr @ everywhere'), skills.join(', '));
+  assert.ok(!skills.some((s) => s.startsWith('chase-invoice')), 'a retired skill is listed');
+  assert.ok(said('Keys', 'label').includes('Nordhaven API @ everywhere'));
+  assert.ok(said('Tools', 'name').includes('fenwick @ Kiln'));
+  sql.close();
+});
+
+test('the People page lists the newest person first, with where they were met', async () => {
+  const { k, sql } = await seeded();
+  const [everyone] = opened(k, 'people');
+  assert.deepEqual(everyone?.refusals, []);
+  assert.equal(everyone?.rows[0]?.fields.name, ROWS.people!.at(-1)?.name);
   sql.close();
 });
 

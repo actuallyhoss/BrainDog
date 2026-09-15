@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
-import { AGENTS_REGISTERS, LOOKUPS, NOW, ROWS as SEED_ROWS, installSeed, stamp } from '@braindog/seed';
+import { AGENTS_REGISTERS, LOOKUPS, NOW, ROWS as SEED_ROWS, RUNS_ON, installSeed, stamp } from '@braindog/seed';
 
 import { readBlock as webBlock, REGISTERS, ROWS } from './api.ts';
 import type { Entry, Fields, PageBlock, RegisterDecl } from './schema.ts';
@@ -48,12 +48,15 @@ function openSqlite(): Sql {
   return sql as unknown as Sql;
 }
 
-/* The agents registers and rows, as `data.ts`'s `entriesOf` maps the rest: a ref stays its seq. */
+/* The agents registers and rows, as `data.ts`'s `entriesOf` maps the rest: a ref stays its seq. A field
+   a seed row leaves out takes its declared default, as the kernel's create gives it, or a skill with no
+   `state` would be active in one engine and nothing in the other. */
 for (const [id, decl] of Object.entries(AGENTS_REGISTERS)) {
   REGISTERS[id] = decl as unknown as RegisterDecl;
   ROWS[id] = (SEED_ROWS[id] ?? []).map((raw, i): Entry => {
     const seq = i + 1;
     const fields: Record<string, unknown> = {};
+    for (const f of decl.fields as readonly { id: string; default?: unknown }[]) if (f.default !== undefined) fields[f.id] = f.default;
     for (const [key, value] of Object.entries(raw)) if (value !== undefined) fields[key] = value;
     return { seq, fields: fields as Fields, version: 1 + (seq % 4), created: stamp(-seq * 37), by: 'you' };
   });
@@ -91,6 +94,11 @@ function depsOf(k: Kernel): PageDeps {
       return f?.to ? { field: f.id, to: f.to } : null;
     },
     inScope: (register, project, opts) => k.inScope(register, project, opts),
+    sessionsLive: () => {
+      const done = k.register('session')?.done ?? [];
+      const out = k.list({ register: 'session', where: { none: [{ field: 'state', in: [...done] }] }, order: [{ field: 'last_seen', dir: 'desc' }], limit: 200 });
+      return out.ok ? out.value.rows : [];
+    },
   };
 }
 
@@ -156,6 +164,54 @@ test('Kiln’s fenwick tool hides the global one, and keys and learnings add up,
     }
   const keys = await both('credentials', 'Kiln');
   assert.ok(keys.kernel.rows.includes('Nordhaven API @ Everywhere') && keys.kernel.rows.includes('Fenwick deploy key @ Kiln'), keys.kernel.rows.join(', '));
+});
+
+test('THE RUNS WORKING NOW are the same runs, in the same order, in both engines', async () => {
+  const deps = await seeded;
+  const block = {
+    kind: 'cards',
+    source: 'sessions.live',
+    columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
+    empty: 'No agent is working right now.',
+  } as KernelBlock & PageBlock;
+  const doing = (b: KernelBlock & PageBlock) => {
+    const kernel = kernelBlock(deps, b);
+    const web = webBlock(b);
+    assert.deepEqual(kernel.refusals, [], JSON.stringify(kernel.refusals));
+    assert.deepEqual(web.refusals, [], web.refusals.join('; '));
+    assert.equal(web.total, kernel.matched);
+    return { kernel: kernel.rows.map((r) => String(r.fields.doing)), web: web.entries.map((e) => String(e.fields.doing)) };
+  };
+  const all = doing(block);
+  assert.equal(all.kernel.length, 3, 'the two finished runs are not live');
+  assert.equal(all.kernel[0], 'Variable axis QA, instances 3 of 9', 'the run seen most recently leads');
+  assert.deepEqual(all.web, all.kernel);
+  const codex = doing({ ...block, where: 'agent is codex' });
+  assert.deepEqual(codex.kernel, ['Drafting the specimen page copy']);
+  assert.deepEqual(codex.web, codex.kernel);
+
+  const ordered = { ...block, order: [{ field: 'doing', dir: 'asc' }] } as KernelBlock & PageBlock;
+  assert.equal(kernelBlock(deps, ordered).refusals[0]?.code, 'DECLARATION_INVALID');
+  assert.match(webBlock(ordered).refusals.join('; '), /order:/);
+});
+
+test('“RUNS ON”, AS THE PROJECT TEMPLATE DECLARES IT, names the same rows in both engines', async () => {
+  const deps = await seeded;
+  for (const project of ['Kiln', 'Portage'])
+    for (const declared of RUNS_ON.blocks) {
+      if (declared.kind === 'section') continue;
+      const block = JSON.parse(JSON.stringify(declared).split('{{name}}').join(project)) as KernelBlock & PageBlock;
+      const title = block.columns![0]!.field;
+      const kernel = kernelBlock(deps, block);
+      const web = webBlock(block);
+      const at = `${String(block.heading)} on ${project}`;
+      assert.deepEqual(kernel.refusals, [], `${at}, the kernel: ${JSON.stringify(kernel.refusals)}`);
+      assert.deepEqual(web.refusals, [], `${at}, the app: ${web.refusals.join('; ')}`);
+      const rows = kernel.rows.map((r, i) => `${String(r.fields[title])} @ ${kernel.scopes?.[i] ?? 'Everywhere'}`);
+      assert.deepEqual(web.rows.map((r) => `${r.cells[0]} @ ${r.cells[1]}`), rows, at);
+      assert.deepEqual({ inherited: web.inherited, matched: web.total }, { inherited: kernel.inherited, matched: kernel.matched }, at);
+      if (block.heading === 'Skills') assert.ok(!rows.some((r) => r.startsWith('chase-invoice')), `${at}: a retired skill is listed`);
+    }
 });
 
 test('an as: scope column on a field that does not say where a row applies is refused by both engines', async () => {

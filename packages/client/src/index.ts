@@ -118,6 +118,12 @@ export type Attached = {
 /** `meet`: who they turned out to be, whether they were added or linked, and the merge question it opened. */
 export type Met = { person: string; created: boolean; linked: boolean; merge: string | null };
 
+/** `packs`: one pack, on or off. `version` is `null` for a pack the seed owns by its bodies. See `PackState` in `@braindog/kernel`. */
+export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
+
+/** `disablePack` and `enablePack`: the packs that turned, and the declarations that went or came back. */
+export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };
+
 /** `33 §4` line 356, six keys. `app` is `null` on a host that was not told what it is running. */
 export type Version = {
   version: number;
@@ -262,7 +268,10 @@ export function createClient(options: ClientOptions) {
     pages: () => call<unknown[]>('pages'),
     page: (slug: string) => call<unknown>('page', { slug }),
     metric: (metric: string) => call<unknown>('metric', { metric }),
-    packs: () => call<unknown[]>('packs'),
+    packs: () => call<PackState[]>('packs'),
+    /* ADMIN, SO A BROWSER SESSION. Nothing cascades: `alsoDisable` names what a `PACK_REQUIRED` listed. */
+    disablePack: (args: { id: string; alsoDisable?: string[] }) => call<PackToggle>('disablePack', args as Record<string, unknown>),
+    enablePack: (args: { id: string }) => call<PackToggle>('enablePack', args as Record<string, unknown>),
     governance: (args: { register?: string; id?: string; status?: string; limit?: number } = {}) =>
       call<unknown>('governance', args as Record<string, unknown>),
     members: () => call<unknown[]>('members'),

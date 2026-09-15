@@ -17,6 +17,7 @@ import { no, ok } from '@braindog/ports';
 import kernel0001 from './migrations/0001_kernel.ts';
 import session0002 from './migrations/0002_session.ts';
 import packDisabled0003 from './migrations/0003_pack_disabled.ts';
+import device0004 from './migrations/0004_device.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -25,12 +26,14 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 1, slug: 'kernel', sql: kernel0001 },
   { version: 2, slug: 'session', sql: session0002 },
   { version: 3, slug: 'pack_disabled', sql: packDisabled0003 },
+  { version: 4, slug: 'device', sql: device0004 },
 ];
 
 /**
  * `PRAGMA user_version`, the `.dog` format revision of `30-BLUEPRINT` §11. Migration 2 adds a row and
  * its indexes and no table or column. Migration 3 adds one nullable column, which an older file
  * imports without (the positional read in `dogl.ts` takes fewer columns), so the format is still 1.
+ * Migration 4 rebuilds `device_grant`, a `local` table no file carries, so it is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

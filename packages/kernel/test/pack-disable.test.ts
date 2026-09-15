@@ -279,6 +279,23 @@ test('THE PACK HOLDING THE PROJECTS IS REFUSED WHILE A FIELD LEFT ON STILL POINT
   sql.close();
 });
 
+test('AND UNINSTALLING IT IS REFUSED THE SAME WAY, since uninstall retires through the same door', async () => {
+  const { k, sql } = await record(PROJECTS, TASKS, LEARNINGS);
+  const refused = k.retire(['register.things']);
+  assert.equal(codeOf(refused), 'SCOPES_IN_USE');
+  assert.equal(refusalOf(refused)?.at, 'register.learnings.project');
+  assert.match(refusalOf(refused)?.fix ?? '', /register\.learnings\.project, register\.tasks\.thing still point/);
+  assert.ok(k.registers().has('things'), 'a refused retire took something out');
+
+  /* Only one of the two leaving with it is still refused, naming the one left. */
+  assert.equal(refusalOf(k.retire(['register.things', 'register.learnings']))?.at, 'register.tasks.thing');
+
+  /* All three together is an uninstall of the lot, and goes through. */
+  assert.equal(value(k.retire(['register.things', 'register.learnings', 'register.tasks'])), 3);
+  assert.equal(k.registers().has('things'), false);
+  sql.close();
+});
+
 /* ── a pack the seed installed ───────────────────────────────────────────── */
 
 test('A PACK OWNED ONLY BY ITS BODY, AS THE SEED INSTALLS PEOPLE, GOES OFF AND COMES BACK THE SAME', async () => {
@@ -331,11 +348,12 @@ test('A RECORD FROM BEFORE MIGRATION 3 TAKES IT ON OPEN, and its packs arrive en
   const { k, sql } = await record(NOTES);
   value(k.create('notes', { body: 'Call the bank' }, BY));
   sql.exec('ALTER TABLE pack DROP COLUMN disabled_at');
-  sql.exec('DELETE FROM migration WHERE version = 3');
+  /* And the ledger above it, since the runner applies only what is above the highest version it holds. */
+  sql.exec('DELETE FROM migration WHERE version >= 3');
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [3]);
+  assert.deepEqual(result.value.applied, [3, 4]);
   assert.deepEqual({ ...sql.one<Record<string, unknown>>('SELECT id, version, disabled_at FROM pack') },{ id: 'notebook', version: '1.0.0', disabled_at: null });
 
   const reopened = await openRecord(sql, fixedClock(NOW));

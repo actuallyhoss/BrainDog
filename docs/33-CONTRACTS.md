@@ -244,6 +244,8 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | ADMIN | `planPack` | `{ doc, source? }` | read-only: the `Diff` and its `planHash` |
 | ADMIN | `installPack` | `{ doc, source?, planHash }` | applied under `PLAN_STALE`: the pack row, its declarations, its seeds, one `install` event |
 | ADMIN | `uninstallPack` | `{ id, force? }` | retires; the rows stay (04 §4); a retire over rows is `WOULD_ORPHAN` until `force` |
+| ADMIN | `disablePack` | `{ id, alsoDisable? }`; any other key is `FIELD_UNKNOWN` | `{ id, state, changed, packs, declarations, said }`; the `pack` row and every row stay (04 §4). Refused, 422: `PACK_REQUIRED` with the dependents in `allowed`, which a second call passes as `alsoDisable`; `SCOPES_IN_USE` |
+| ADMIN | `enablePack` | `{ id }`; any other key is `FIELD_UNKNOWN` | the same shape, the declarations back over the same rows. Refused, 422: `PACK_DISABLED` with the pack still off in `allowed`, when this one leans on it |
 | ADMIN | `setDeclaration` | `{ body }` — one in-app declaration; no `mode` | the declaration's new version; a rule is tested and applied by `ruleTest` / `ruleApply`, never here |
 | ADMIN | `ruleApply` | `{ id, dry }` | `dry: true` → the `DryRun`; `false` → the rows written, no undo (07 §6) |
 | ADMIN | `invite` | `{ email, levels }` — the owner mints; one email, 24 h | the invitation; acceptance is `acceptInvite` |

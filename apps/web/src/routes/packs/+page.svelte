@@ -10,10 +10,14 @@
   approve four schema reviews before they have seen one of their own rows is worse than a tour.
 -->
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { createClient } from '@braindog/client';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
+  import { blocked, choose, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
+  import { read } from '$lib/data/record.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -22,25 +26,65 @@
   import type { PackInfo } from '$lib/record/schema.ts';
   import { drew } from '../../lib/ui/screen.svelte.ts';
 
-  const installed = PACKS.filter((p) => p.installed);
-  const available = PACKS.filter((p) => !p.installed);
+  /* THE CATALOGUE CARRIES NAMES AND BLURBS; the record carries which packs there are and whether each is on. */
+  const byId = new Map(PACKS.map((p) => [p.id, p]));
+  const nameOf = (id: string) => byId.get(id)?.name ?? id;
+
+  let states = $state<PackState[] | null>(null);
+  let refused = $state<Refusal | null>(null);
+  let blocks = $state<Record<string, Blocked>>({});
+  let busy = $state<string | null>(null);
+  let source: Source | null = null;
+
+  const installed = $derived(states ?? []);
+  const available = $derived(PACKS.filter((p) => !p.installed && !installed.some((s) => s.id === p.id)));
 
   let diff = $state<string | null>(null);
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   * THE LIST IS THE RECORD'S NOW, READ ONCE, and the sample's when there is no record to read.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * from a shell that has fetched nothing. The read is bracketed by `read()`, so the attribute stays
+   * away while `packs` is out, and `drew('ready')` is the claim for when it has come back.
    */
+  onMount(() => {
+    void read(async () => {
+      const chosen = await choose(createClient({ base: location.origin }));
+      source = chosen.source;
+      if (!chosen.first.ok) {
+        refused = chosen.first.refusal;
+        return false;
+      }
+      states = chosen.first.value;
+      return true;
+    });
+  });
   $effect(() => drew('ready'));
+
+  /**
+   * One press of a switch, or of the button a refusal offered.
+   *
+   * A REFUSAL STAYS ON THE CARD IT BELONGS TO, and a turn that succeeds clears the ones it answered:
+   * its own, and any card that was waiting on the pack that just came back on.
+   */
+  async function turn(id: string, on: boolean, alsoDisable: readonly string[] = []) {
+    if (!source || busy !== null) return;
+    busy = id;
+    try {
+      const out = on ? await source.enable(id) : await source.disable(id, alsoDisable);
+      if (!out.ok) {
+        blocks = { ...blocks, [id]: blocked(id, out.refusal, alsoDisable) };
+        return;
+      }
+      const turned = new Set([id, ...out.value.packs]);
+      blocks = Object.fromEntries(Object.entries(blocks).filter(([k, b]) => !turned.has(k) && !(b.kind === 'off' && turned.has(b.pack))));
+      const again = await source.packs();
+      if (again.ok) states = again.value;
+    } finally {
+      busy = null;
+    }
+  }
 </script>
 
 <!--
@@ -104,24 +148,53 @@
        point, because the list of packs that are NOT installed is directly below it. -->
   <Section title={copy.installed} count={installed.length}>
     <div class="grid-packs">
-      {#if installed.length === 0}
+      {#if refused}
+        <Empty kind="error" title={refused.fix} />
+      {:else if states && installed.length === 0}
         <Empty kind="no-data-yet" title={copy.noPacksYet} body={copy.noPacksBody} />
       {/if}
-      {#each installed as pack}
-        <article class="pack">
+      {#each installed as state (state.id)}
+        {@const pack = byId.get(state.id)}
+        {@const off = state.disabled_at !== null}
+        {@const block = blocks[state.id]}
+        <!-- OFF IS DIMMED AND SAID, NEVER ABSENT. Its rows are still in the record, and this card is
+             the only way back to them. -->
+        <article class="pack" data-off={off ? '' : undefined}>
           <header class="pack-head">
-            <h3 class="pack-name">{pack.name}</h3>
-            <span class="pack-version">{pack.version}</span>
+            <h3 class="pack-name">{nameOf(state.id)}</h3>
+            {#if off}<span class="pack-off">{copy.packTurnedOff}</span>{/if}
+            {#if state.version}<span class="pack-version">{state.version}</span>{/if}
           </header>
-          <p class="pack-blurb">{pack.blurb}</p>
+          {#if pack}<p class="pack-blurb">{pack.blurb}</p>{/if}
           <ul class="pack-gives">
             <!-- Names, not ids. A pack's feature list said `obligations` and `money` where the rest
                  of the product says Obligations and Overview, on the one screen whose whole job is
                  to tell somebody what they are about to install. A pack that is NOT installed names
                  things this record does not have yet, so the id is the honest fallback there. -->
-            {#each pack.registers as r}<li><Icon name="rows" size="s" />{REGISTERS[r]?.name ?? r}</li>{/each}
-            {#each pack.pages as p}<li><Icon name="doc" size="s" />{pages()[p]?.title ?? PAGES[p]?.title ?? p}</li>{/each}
+            {#each state.registers as r}<li><Icon name="rows" size="s" />{REGISTERS[r]?.name ?? r}</li>{/each}
+            {#each pack?.pages ?? [] as p}<li><Icon name="doc" size="s" />{pages()[p]?.title ?? PAGES[p]?.title ?? p}</li>{/each}
           </ul>
+          <div class="segmented" role="group" aria-label={copy.packSwitch(nameOf(state.id))}>
+            <button type="button" class="segment" aria-pressed={!off} data-on={off ? undefined : ''} disabled={busy !== null} onclick={() => off && turn(state.id, true)}>{copy.on}</button>
+            <button type="button" class="segment" aria-pressed={off} data-on={off ? '' : undefined} disabled={busy !== null} onclick={() => !off && turn(state.id, false)}>{copy.off}</button>
+          </div>
+          <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
+          {#if block}
+            <p class="pack-said" role="status">
+              {#if block.kind === 'required'}
+                <span>{copy.packNeededBy(block.also.map(nameOf))}</span>
+                <Button weight="quiet" tone="bad" disabled={busy !== null} onclick={() => turn(block.id, false, block.also)}>{copy.packOffTogether(block.also.length)}</Button>
+              {:else if block.kind === 'scopes'}
+                <span>{copy.packScopesInUse(block.registers.map((r) => REGISTERS[r]?.name ?? r))}</span>
+              {:else if block.kind === 'off'}
+                <span>{copy.packIsOff(nameOf(block.pack))}</span>
+                <Button weight="quiet" disabled={busy !== null} onclick={() => turn(block.pack, true)}>{copy.packTurnOn(nameOf(block.pack))}</Button>
+              {:else}
+                <span>{block.fix}</span>
+              {/if}
+            </p>
+          {/if}
+          {#if pack}
           <footer class="pack-foot">
             <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>
               {copy.installDiff}
@@ -140,6 +213,7 @@
             >{copy.uninstall}</Button>
           </footer>
           {#if diff === pack.id}{@render plan(pack)}{/if}
+          {/if}
         </article>
       {/each}
     </div>
@@ -290,6 +364,33 @@
     font-family: var(--font-ui);
     font-size: var(--t-md);
     font-weight: 500;
+  }
+
+  /* OFF, AND STILL HERE. The contents dim; the switch and what stopped it do not, because they are
+     what a person reads next. */
+  .pack[data-off] :is(.pack-name, .pack-version, .pack-blurb, .pack-gives) {
+    opacity: 0.55;
+  }
+
+  .pack-off {
+    margin-inline-start: auto;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 600;
+  }
+
+  .pack-off + .pack-version {
+    margin-inline-start: 0;
+  }
+
+  .pack-said {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .pack-version {

@@ -22,7 +22,7 @@ import { parseWhere, type Schema } from '@braindog/where';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
-import { LOOKUPS, METRICS, NOW, PAGES, REGISTERS, ROWS, installSeed } from '../src/index.ts';
+import { AGENTS_PAGES, LOOKUPS, METRICS, NOW, PAGES, REGISTERS, ROWS, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -105,7 +105,7 @@ test('A PAGE IS A DOCUMENT THE RECORD HOLDS, and it travels in the file', async 
   const { k, sql } = await seeded();
 
   const held = sql.all<{ id: string; kind: string }>("SELECT id, kind FROM declaration WHERE kind = 'page' AND superseded_at IS NULL");
-  assert.equal(held.length, Object.keys(PAGES).length, 'a page did not install');
+  assert.equal(held.length, Object.keys(PAGES).length + Object.keys(AGENTS_PAGES).length, 'a page did not install');
   for (const slug of Object.keys(PAGES)) assert.ok(held.some((d) => d.id === `page.${slug}`), `page.${slug} is missing`);
 
   // The metrics too — a `stat` block names one, and a page whose figures are not in the record is a

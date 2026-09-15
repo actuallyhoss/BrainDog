@@ -798,6 +798,16 @@ export const copy = {
      things; declaring them is what the file did before any of this concerned them. */
   uninstallWould: (pack: string) =>
     `${pack} and everything it added would be removed, with what changes shown first, and the rows it created would stay`,
+  /* TURNING ONE OFF. An add-on that is off stays on the screen, dimmed and labelled, because its
+     rows are still in the record. A refused switch says who leans on it and offers the cascade as a
+     second press, never as a side effect of the first. */
+  packTurnedOff: 'Turned off',
+  packSwitch: (name: string) => `${name}, on or off`,
+  packNeededBy: (names: string[]) => `Needed by ${list(names)}`,
+  packOffTogether: (others: number) => (others === 1 ? 'Turn both off' : `Turn all ${others + 1} off`),
+  packIsOff: (name: string) => `${name} is off`,
+  packTurnOn: (name: string) => `Turn on ${name}`,
+  packScopesInUse: (names: string[]) => `Its projects are still used by ${list(names)}`,
   installDiff: 'What this adds',
   /* `04 §3`'s seven sections, in a person's words. Only the ones that say something render: a
      `CHANGES` heading over nothing is a warning that does not apply, and `06 §1` is that those

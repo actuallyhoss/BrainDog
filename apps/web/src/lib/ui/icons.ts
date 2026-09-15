@@ -97,6 +97,14 @@ export const PATHS = {
   history: 'M4 12a8 8 0 1 0 2.3-5.6M4 4v5h5M12 8v4l3 2',
   lock: 'M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3',
   key: 'M14.5 9.5a4 4 0 1 1-1.6 3.2L7 19H4v-3l6.3-6.3a4 4 0 0 1 4.2-.2zM16.5 7.5v.01',
+
+  /* The agents pack's registers. A learning is a bulb, a thing found out; a skill is a bolt, a thing
+     done on cue; a tool is a plug, because it is connected rather than written; and `globe` is where
+     a row applies when it applies to every project. */
+  learning: 'M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.3v.4h5v-.4c0-.9.4-1.7 1.1-2.3A6 6 0 0 0 12 3z',
+  skill: 'M13 3 5 13.5h6L10 21l8-10.5h-6z',
+  plug: 'M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0zM12 16v5',
+  globe: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9M12 3c-2.4 2.5-3.6 5.5-3.6 9s1.2 6.5 3.6 9',
 } as const;
 
 export type IconName = keyof typeof PATHS;

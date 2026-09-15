@@ -133,6 +133,8 @@ export const ROUTES: readonly Route[] = [
     takes: { doc: 'json', source: 'json' } },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved. A browser session only.' },
   { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
+  { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },
+  { name: 'enablePack', group: 'ADMIN', writes: true, what: 'Turn a pack back on, over the rows it kept.' },
   { name: 'setDeclaration', group: 'ADMIN', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
   { name: 'retireDeclaration', group: 'ADMIN', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
   { name: 'ruleApply', group: 'ADMIN', writes: true, what: 'Run one rule over the rows already there. `dry` first: there is no undo.' },
@@ -292,6 +294,8 @@ export type RecordSurface = {
   planPack(args: never, ctx: never): Promise<Result<unknown>>;
   installPack(args: never, ctx: never): Promise<Result<unknown>>;
   uninstallPack(args: never, ctx: never): Promise<Result<unknown>>;
+  disablePack(args: never, ctx: never): Promise<Result<unknown>>;
+  enablePack(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   ruleApply(args: never, ctx: never): Promise<Result<unknown>>;
@@ -337,6 +341,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     planPack: (a, ctx) => api.planPack(a as never, ctx as never),
     installPack: (a, ctx) => api.installPack(a as never, ctx as never),
     uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),
+    disablePack: (a, ctx) => api.disablePack(a as never, ctx as never),
+    enablePack: (a, ctx) => api.enablePack(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),
     retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),
     ruleApply: (a, ctx) => api.ruleApply(a as never, ctx as never),

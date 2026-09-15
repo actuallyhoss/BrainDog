@@ -103,7 +103,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `kind` | one of the twenty — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 — or a `block.<id>` this pack declares or the record has installed. A pack kind is **page-only** at stage 0: a write-up's fence takes the kinds that are not page-only ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.5) | — | yes |
 | `heading` | text. On a `section` it is the section, drawn as a heading | — | `section` |
 | `span` | int, 1–12 | 12 | no |
-| `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
+| `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6 | every row | no |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
 | `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool, tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere | — | `table`, `cards` |
@@ -136,8 +136,15 @@ rows are grouped as agents, rules and you, with counts, and a burst is one row, 
 Variable axis QA". The host stamps the read mark when the reader leaves the page, never when it opens,
 so the rows that were new are still new on the way out. A `diff` reads `{ source: register.skills,
 row: '{{spoken}}', field: body, versions: 5, empty: … }` on a skill's page, and Decide draws the same
-kind for a document field in a proposed change. Both sources are computed by the kernel (`pages.ts`),
-alongside `forecast.runway`.
+kind for a document field in a proposed change. `sessions.live` is the runs working now: the rows of
+the kernel's `session` register not in one of its `done` states, the most recently seen first, so its
+`where` and columns name that register's fields and it takes no `order`. All three sources are
+computed by the kernel (`pages.ts`), alongside `forecast.runway`.
+
+The agents pack draws them. `/p/agents` is "Working now", "Learnings" and "Skills" as `cards`; a
+skill's page is its trigger as a `note` and "Versions" as a `diff`; and a project page gains "Runs on",
+a `section` over its keys, tools and skills, each with `inherit: true`, `where: project is {{name}}`
+and the retired rows left out by state. `{{spoken}}` does not match a ref, which matches by title.
 
 The feed's evaluator reads the newest 500 events. An actor is an agent (a run, `agent:<name>` or
 `spark`), a rule (`rule:`, `ingest:` or `system`) or you (a person), and a feed's `where` asks about

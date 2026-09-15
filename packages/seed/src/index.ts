@@ -22,9 +22,9 @@ import type { Result } from '@braindog/ports';
 import { install, normalise, plan, type Applied, type Installed } from '@braindog/declare';
 import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type Json, type Kernel } from '@braindog/kernel';
 
-import { AGENTS_PACK, AGENTS_REGISTERS, agentsPackDocument } from './packs/agents.ts';
+import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './packs/agents.ts';
 
-export { AGENTS_PACK, AGENTS_REGISTERS, agentsPackDocument, type PackManifest } from './packs/agents.ts';
+export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 
 /** What a row holds, before the record has given it a number. */
 export type Fields = Record<string, Json | number | null | undefined>;
@@ -1472,16 +1472,19 @@ export const PAGES: Record<string, SeedPage> = {
     blocks: [
       {
         /* CARDS, with a face for each person, as the old tool draws people: a table of four columns read
-           as a directory. Each card still opens the person's row. */
+           as a directory. Each card still opens the person's row. Where they were met and in which
+           projects, because most people here arrive from an agent's commit rather than by hand, and
+           the newest first, because the person met yesterday is the one somebody is asking about. */
         kind: 'cards',
         heading: 'Everyone',
         source: 'register.people',
         columns: [
           { field: 'name', label: 'Name', as: 'who' },
+          { field: 'met', label: 'Met', as: 'fact' },
+          { field: 'projects', label: 'Met in', as: 'fact' },
           { field: 'role', label: 'Role', as: 'fact' },
-          { field: 'rate', label: 'Rate', as: 'fact' },
-          { field: 'email', label: 'Email', as: 'fact' },
         ],
+        order: [{ field: 'seq', dir: 'desc' }],
         empty: 'Nobody yet.',
       },
     ],
@@ -1509,6 +1512,13 @@ export const declarations = (): Declaration[] =>
  */
 export const pageDeclarations = (): Declaration[] =>
   Object.values(PAGES).map((body) => ({ id: `page.${body.page}`, kind: 'page' as const, body: body as never }));
+
+/** The project template with the agents pack's "Runs on" after its own blocks, for a record holding that pack. */
+export const projectWithRunsOn = (): SeedPage => ({
+  ...PAGES.project!,
+  requires: [...((PAGES.project!.requires as string[] | undefined) ?? []), ...RUNS_ON.requires],
+  blocks: [...((PAGES.project!.blocks as unknown[] | undefined) ?? []), ...RUNS_ON.blocks],
+});
 
 export const metricDeclarations = (): Declaration[] =>
   Object.values(METRICS).map((body) => ({ id: `metric.${body.metric}`, kind: 'metric' as const, body: body as never }));
@@ -1664,10 +1674,14 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
         },
       };
 
-  const installed = await kernel.install([...declarations(), ...pageDeclarations(), ...metricDeclarations()]);
+  /* THE PROJECT TEMPLATE WAITS FOR THE AGENTS PACK, because its "Runs on" blocks read the pack's
+     registers, and a page requiring a register the record does not hold yet is refused. */
+  const installed = await kernel.install([...declarations(), ...pageDeclarations().filter((d) => d.id !== 'page.project'), ...metricDeclarations()]);
   if (!installed.ok) return installed as Result<Seeded>;
   const agents = await installAgentsPack(kernel, actor);
   if (!agents.ok) return agents as unknown as Result<Seeded>;
+  const project = await kernel.install([{ id: 'page.project', kind: 'page', body: projectWithRunsOn() as never }]);
+  if (!project.ok) return project as Result<Seeded>;
 
   let rows = 0;
   for (const register of [...ORDER, ...AGENTS_ORDER])

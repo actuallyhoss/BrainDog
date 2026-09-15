@@ -137,6 +137,10 @@ function depsOver(k: Kernel, sql: NodeSql): PageDeps {
       events: sql.all<ActivityEvent>('SELECT ts, actor, kind, target, note FROM event ORDER BY rowid DESC LIMIT ?', limit),
       seen: null,
     }),
+    sessionsLive: () => {
+      const out = k.list({ register: 'session', where: { field: 'state', in: ['active', 'idle'] }, order: [{ field: 'last_seen', dir: 'desc' }], limit: 200 });
+      return out.ok ? out.value.rows : [];
+    },
   };
 }
 
@@ -317,6 +321,44 @@ test('A FEED IS THE RECORD’S EVENTS, a burst on one row, and no count lost pas
 
   const { activity: _unwired, ...bare } = deps;
   assert.equal(readBlock(bare, { kind: 'feed', source: 'activity', empty: 'Nothing yet.' }).refusals[0]?.code, 'NOT_IN_THIS_BUILD');
+  sql.close();
+});
+
+/* ── the runs working now ────────────────────────────────────────────────── */
+
+test('SESSIONS.LIVE IS THE RUNS NOT FINISHED, the most recently seen first, filtered and cut as a register is', async () => {
+  const { k, sql } = await record();
+  const deps = depsOver(k, sql);
+  const run = (doing: string, agent: string, state: string, hoursAgo: number) =>
+    value(k.create('session', { doing, agent, state }, { actor: OWNER.actor, stamp: { last_seen: new Date(NOW - hoursAgo * 3_600_000).toISOString(), project: 'things#1' } }));
+  run('Axis QA', 'claude', 'active', 1);
+  run('Specimen copy', 'codex', 'idle', 0.1);
+  run('Kerning pass', 'claude', 'done', 0.05);
+
+  const block: PageBlock = {
+    kind: 'cards',
+    source: 'sessions.live',
+    columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
+    empty: 'No agent is working right now.',
+  };
+  const live = readBlock(deps, block);
+  assert.deepEqual(live.refusals, []);
+  assert.deepEqual(live.rows.map((r) => r.fields.doing), ['Specimen copy', 'Axis QA'], 'a finished run is not live, and the newest seen leads');
+  assert.equal(live.matched, 2);
+
+  assert.deepEqual(readBlock(deps, { ...block, where: 'agent is claude' }).rows.map((r) => r.fields.doing), ['Axis QA']);
+  const cut = readBlock(deps, { ...block, limit: 1 });
+  assert.equal(cut.rows.length, 1);
+  assert.equal(cut.matched, 2, 'the count is of every live run, not of the ones shown');
+
+  assert.equal(readBlock(deps, { ...block, order: [{ field: 'doing' }] }).refusals[0]?.code, 'DECLARATION_INVALID');
+  assert.equal(readBlock(deps, { ...block, columns: [{ field: 'colour' }] }).refusals[0]?.code, 'FIELD_UNKNOWN');
+  assert.equal(readBlock(deps, { ...block, where: 'colour is red' }).rows.length, 0);
+
+  const { sessionsLive: _unwired, ...bare } = deps;
+  const early = readBlock(bare, block);
+  assert.equal(early.refusals[0]?.code, 'NOT_IN_THIS_BUILD');
+  assert.deepEqual(early.rows, []);
   sql.close();
 });
 

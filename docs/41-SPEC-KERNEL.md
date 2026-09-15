@@ -246,7 +246,9 @@ packages/kernel/
 ├── src/
 │   ├── migrations/0001_kernel.ts   the DDL of 30 §1 plus the seed rows, as one exported string
 │   ├── migrations/0002_session.ts  register.session, the kernel's one register, as its canonical bytes
+│   ├── migrations/0004_device.ts   device_grant rebuilt: the seventh reach, vault, and its scope
 │   ├── migrate.ts                  the runner, the checksum, the ledger, schemaState
+│   ├── device.ts                   device grants, RFC 8628: start, approve, poll, list, revoke, vaultGrant, the sweep
 │   ├── coerce.ts                   the sixteen types → canonical JSON; TEXT_* detection; ULID; spoken ids; derive
 │   ├── write.ts                    steps 1–10 and 12a; the actor ladder; validate; transition; pairs; persist
 │   ├── events.ts                   appendEvent, the redaction list, JCS values, op_id replay, observe
@@ -267,6 +269,7 @@ holds what the kernel knows about the one register it declares (§5.4 step 1.4).
 |---|---|---|
 | `migrations/0001_kernel.ts` | `export default \`…\`` — the DDL of [30-BLUEPRINT](30-BLUEPRINT.md) §1 **verbatim, cited not restated**, minus `CREATE TABLE migration` (the runner owns it), plus the additions of §5.2. Carries `-- format-bump 1`. A `.ts` module because a package with no build step and no `node:fs` cannot load a `.sql` file (§13 #2) | ~320 lines, mostly DDL |
 | `migrate.ts` | `MIGRATIONS` (an ordered array of `{ version, slug, sql }`), `canon()`, `checksum()`, `applyMigrations`, `schemaState` | ~90 |
+| `device.ts` | `deviceStart`, `deviceApprove`, `devicePoll`, `deviceList`, `deviceRevoke`, `vaultGrant`, `deviceSweep` over `device_grant`, each taking the token path's deps (SQL, clock, randomness, digest) so it is tested without a kernel; the rules of [12-SECURITY](12-SECURITY.md) §6.1 | ~330 |
 | `coerce.ts` | `coerce(field, value) → Json \| Refusal` per type; `isJsonQuoted`, `hasEscapedNewline`; `ulid()`; `spoken()`/`parseSpoken()`; `deriveValue()` for the seven shapes; `instant(ms)` | ~260 |
 | `write.ts` | `writeInTxn()` — the numbered steps of §5.4 with their SQL; `resolveActor()`; `validate()`; `transition()`; `pairs()`; `persist()` | ~420 |
 | `events.ts` | `appendEvent`, `REDACTED`, `redactedValue()`, `eventRows()` for a write, `replay`, `observe` | ~110 |
@@ -412,6 +415,11 @@ The runner:
    ```
    `PRAGMA application_id = 1145193761` is issued the same way in the first migration.
 6. Reload the declaration cache; return `{ kernel: MIGRATIONS.length, format: FORMAT_VERSION, applied }`.
+
+`0004_device.ts` rebuilds `device_grant` (create `device_grant_next`, copy every row, drop, rename), because
+SQLite cannot change a `CHECK` in place: `reach` gains `vault`, seven values, and a nullable `scope` holds a
+project row id or `*`. The table is `local` and travels in no file, so there is no format bump. Migration 1's DDL
+and [30-BLUEPRINT](30-BLUEPRINT.md) §1 still print the six-value table migration 4 replaces.
 
 The caller runs this from the Durable Object constructor under `blockConcurrencyWhile`, or at self-host open; the
 kernel does not know which.
@@ -963,7 +971,7 @@ missing `dog_sig` → `SIGNATURE_INVALID`; `#dogl 2` → `FORMAT_NEWER_THAN_READ
 entry → `IMPORT_NOT_EMPTY`; a write between two pages → `CHECKSUM_MISMATCH` on the second; a `migration` row in
 the file numbered past this build's last → `SCHEMA_NEWER`; an unknown column in `#table entry …` is reported and dropped.
 
-**Migrations**: `test/migrate.test.ts`: a fresh database → `kernel = 2`, `format = 1`, `applied = [1, 2]`,
+**Migrations**: `test/migrate.test.ts`: a fresh database → `kernel = 4`, `format = 1`, `applied = [1, 2, 3, 4]`; migration 4 copies every `device_grant` row and its `CHECK` takes `vault` and refuses an eighth reach;
 `dog_meta.format = '1'`, 31 `dog_section` rows of which 6 are `local`; `applyMigrations` twice applies nothing and
 changes no row, index or ledger line; the checksums of `0001_kernel.ts` and `0002_session.ts` equal constants in
 the test (an edit to an applied migration fails here first); a record at migration 1 with registers, rows and

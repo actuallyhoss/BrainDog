@@ -178,13 +178,25 @@ export type PageBlock = {
     width?: string;
     align?: 'start' | 'end';
     link?: boolean;
-    /** What the column is on a `cards` block (05 §2). One figure and three facts at most. */
-    as?: 'title' | 'figure' | 'fact' | 'trend' | 'ring' | 'who' | 'when' | 'mark';
+    /**
+     * What the column is on a `cards` block (05 §2). One figure and three facts at most. `scope`, on
+     * any other kind, draws where the row applies: its project, or Everywhere.
+     */
+    as?: 'title' | 'figure' | 'fact' | 'trend' | 'ring' | 'who' | 'when' | 'mark' | 'scope';
   }[];
   /** A `section` that starts shut, folding the blocks after it up to the next section. */
   fold?: boolean;
   /** The glyph beside a `section`'s heading. */
   icon?: string;
+  /** The project's rows, then the ones that apply everywhere (06 §1.1). */
+  inherit?: boolean;
+  /** A `feed`'s: `seen` marks the rows after the reader's read mark as new, and `first` caps the rows. */
+  since?: 'seen';
+  first?: number;
+  /** A `diff`'s: the row whose history it reads, the text field it compares, and how many versions. */
+  row?: string;
+  field?: string;
+  versions?: number;
   cells?: readonly { metric: string; label: string }[];
   order?: readonly { field: string; dir: 'asc' | 'desc' }[];
   limit?: number;

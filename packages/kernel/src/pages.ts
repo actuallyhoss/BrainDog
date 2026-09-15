@@ -174,10 +174,15 @@ export type PageDeps = {
   history?: (register: string, row: string) => Result<RowEvent[]>;
   /** The newest `limit` events, newest first, and the reader's read mark. */
   activity?: (limit: number) => { events: ActivityEvent[]; seen: string | null };
+  /** Every run of the kernel's `session` register not in one of its `done` states, the most recently seen first. */
+  sessionsLive?: () => Entry[];
 };
 
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
-const COMPUTED = new Set(['forecast.runway', 'activity']);
+const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live']);
+
+/** The register `sessions.live` reads, whose fields its `where` and columns name. */
+const SESSION = 'session';
 
 /** How many events a feed reads. Bursts are counted from events, so a feed of 20 rows reads more than 20. */
 const FEED_EVENTS = 500;
@@ -411,6 +416,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   }
   /* A FEED READS THE RECORD'S EVENTS, not a register's rows. */
   if (block.source === 'activity') return activityBlock(deps, block, base, also);
+  if (block.source === 'sessions.live') return liveBlock(deps, block, base, also);
   if (COMPUTED.has(block.source))
     return {
       ...base,
@@ -632,6 +638,34 @@ function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
     matched: kept.length,
     ...(block.since === 'seen' ? { seen: read.seen } : {}),
   };
+}
+
+/* ── the runs working now ────────────────────────────────────────────────── */
+
+/**
+ * The runs that are not finished, as rows of `session`, the most recently seen first.
+ *
+ * WHICH RUNS ARE LIVE IS THE HOST'S TO SAY, from the register's own `done` list, so a page and a
+ * briefing agree. The order is the host's too: `order:` is refused rather than ignored.
+ */
+function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.sessionsLive)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its live runs onto a page yet.', at: 'source' }) };
+  const schema = deps.schemaOf(SESSION);
+  if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This record keeps no runs.', at: 'source' }) };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'sessions.live comes the most recently seen first, so it takes no order:.', at: 'order' }) };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => f !== 'seq' && !Object.hasOwn(schema.fields, f));
+  if (unknown.length)
+    return {
+      ...base,
+      refusals: also({ code: 'FIELD_UNKNOWN', fix: `${SESSION} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }),
+    };
+  const said = predicateOf(block.where, schema, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const kept = deps.sessionsLive().filter((r) => evaluate(said.predicate, r.fields, schema));
+  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  return { ...base, rows: kept.slice(0, limit), matched: kept.length };
 }
 
 /* ── one row's history ───────────────────────────────────────────────────── */

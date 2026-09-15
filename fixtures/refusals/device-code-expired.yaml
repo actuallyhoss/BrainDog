@@ -1,0 +1,5 @@
+code:   DEVICE_CODE_EXPIRED
+via:    rpc
+raises: packages/kernel/src/device.ts
+at:     device_code
+fix:    Ask the device to start again.

@@ -33,7 +33,8 @@ export function sessionDeclaration(): Declaration {
 
 const DECLARED = sessionDeclaration().body;
 const PREFIX = String(DECLARED.seq_prefix);
-const FINISHED = DECLARED.done as readonly string[];
+/** The states a run does not come back from, which is what a page of live runs leaves out. */
+export const FINISHED = DECLARED.done as readonly string[];
 
 /**
  * The fields only the record writes: when the run was last heard from, the project it resolved to,
