@@ -1,0 +1,5 @@
+code:   PACK_REQUIRED
+via:    rpc
+raises: packages/kernel/src/declare.ts
+at:     alsoDisable
+fix:    Disable the packs that depend on it in the same call, or leave it on.

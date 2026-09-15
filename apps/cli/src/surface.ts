@@ -22,8 +22,8 @@ const reachable = <T>(r: Result<T>): Result<T> =>
   refused(r) && r.refusal.code === 'UNREACHABLE' ? { ok: false, refusal: { ...r.refusal, fix: UNREACHABLE_FIX } } : r;
 
 /**
- * The four methods `McpSurface` marks optional. The record answers `context`, `handoff` and
- * `sessionsLive`; `meet` is not built yet, so its tool keeps its own "not yet" sentence.
+ * The four methods `McpSurface` marks optional. This client routes all four since build step 16; the
+ * probe below stays so that a client built before a route landed gives its tool's own "not yet" sentence.
  */
 const LATER = ['context', 'handoff', 'meet', 'sessionsLive'] as const;
 

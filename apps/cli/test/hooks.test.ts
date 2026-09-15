@@ -8,7 +8,7 @@
 
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createServer, type IncomingHttpHeaders } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
@@ -53,8 +53,11 @@ const CONTEXT = {
   next: 'Start from the handoff S6 left, and call handoff with your own next step before you stop.',
 };
 
-/** `attach` answers S7, resumed when the event says so; `handoff` answers the row. With `hang`, nothing ever answers. */
-async function stubHost(t: { after: (fn: () => Promise<void>) => void }, hang = false) {
+/**
+ * `attach` answers S7, resumed when the event says so; `handoff` answers the row; `meet` adds a person, or
+ * refuses as a record without People does when `people` is false. With `hang`, nothing ever answers.
+ */
+async function stubHost(t: { after: (fn: () => Promise<void>) => void }, hang = false, people = true) {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -72,7 +75,13 @@ async function stubHost(t: { after: (fn: () => Promise<void>) => void }, hang = 
       const row = { id: 'e_7', seq: 7, state: 'active', version: 2, fields: {} };
       if (method === 'attach') return answer({ ok: true, value: { session: row, spoken: 'S7', resumed: body.source !== 'startup', project: 'things#1', context: CONTEXT } });
       if (method === 'handoff') return answer({ ok: true, value: { ...row, state: body.state } });
-      answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub answers attach and handoff, and not ${method}.` } });
+      if (method === 'meet')
+        return answer(
+          people
+            ? { ok: true, value: { person: 'people#1', created: true, linked: true, merge: null } }
+            : { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: 'There is no people register, so nobody can be met. Nothing was written.', at: 'register' } },
+        );
+      answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub answers attach, handoff and meet, and not ${method}.` } });
     });
   });
   await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -230,6 +239,70 @@ test('THE END HOOK SETS IDLE, NEVER DONE, on the run the session file names, and
   assert.deepEqual(Object.values(await run(['hook', 'end'], env, JSON.stringify({ cwd: bare }))).slice(0, 3), [0, '', '']);
   assert.equal((await run(['hook', 'end'], envFor(folder('config'), {}), '')).stdout, '');
   assert.equal(host.seen.length, 1);
+});
+
+/* ── the people harvest ────────────────────────────────────────────────── */
+
+/** A repository in a temporary folder with its own identity, so the commits and the owner's address are the test's. */
+function repository(): { dir: string; commit: (author?: string) => string } {
+  const dir = folder('repo');
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true }).trim();
+  git('init', '--quiet');
+  git('config', 'user.name', 'Owner');
+  git('config', 'user.email', 'owner@example.com');
+  git('config', 'commit.gpgsign', 'false');
+  let n = 0;
+  return {
+    dir,
+    commit: (author) => {
+      git('commit', '--quiet', '--allow-empty', '-m', `change ${String(++n)}`, ...(author === undefined ? [] : ['--author', author]));
+      return git('rev-parse', '--short', 'HEAD');
+    },
+  };
+}
+
+test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run goes idle: no bots, not the owner, at most ten, and silent when refused', async (t) => {
+  const repo = repository();
+  const start = repo.commit();
+  repo.commit('dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>');
+  repo.commit('Claude <noreply@anthropic.com>');
+  for (let i = 1; i <= 11; i++) repo.commit(`Person ${String(i)} <person${String(i)}@example.com>`);
+  repo.commit('Person 11 <PERSON11@example.com>');
+  repo.commit();
+  const last = repo.commit('Ada Lovelace <123+ada@users.noreply.github.com>');
+  const name = repo.dir.split(/[\\/]/).at(-1)!;
+  const end = JSON.stringify({ session_id: 'claude-run-3', cwd: repo.dir, hook_event_name: 'SessionEnd', reason: 'logout' });
+  const signedIn = (base: string) => {
+    const env = envFor(folder('config'), { BRAINDOG_HOST: base, BRAINDOG_TOKEN: TOKEN });
+    writeSession(sessionPath(env, repo.dir), { host: base, spoken: 'S7', client_id: 'claude-run-3', head_at_start: start, at: '2026-09-15T00:00:00Z' });
+    return env;
+  };
+
+  const host = await stubHost(t);
+  const out = await run(['hook', 'end'], signedIn(host.base), end);
+  assert.deepEqual([out.code, out.stdout, out.stderr], [0, '', '']);
+  assert.deepEqual(host.seen.map((s) => s.method), [...Array<string>(10).fill('meet'), 'handoff']);
+  const met = host.seen.filter((s) => s.method === 'meet');
+  /* Newest first: GitHub's private address as a handle, the owner's commit left out, and one person once. */
+  assert.deepEqual(met[0]!.body, { name: 'Ada Lovelace', handle: 'github:ada', where: `commit ${last} in ${name}` });
+  assert.deepEqual(
+    met.slice(1).map((s) => s.body.email),
+    [11, 10, 9, 8, 7, 6, 5, 4, 3].map((i) => `person${String(i)}@example.com`),
+  );
+  for (const s of met) {
+    assert.match(String(s.body.where), new RegExp(`^commit [0-9a-f]{4,40} in ${name}$`));
+    assert.equal(s.headers['x-braindog-session'], 'S7');
+  }
+
+  /* People switched off: the first is refused, no more are sent, and the run still goes idle. */
+  const off = await stubHost(t, false, false);
+  const quiet = await run(['hook', 'end'], signedIn(off.base), end);
+  assert.deepEqual([quiet.code, quiet.stdout, quiet.stderr], [0, '', '']);
+  assert.deepEqual(off.seen.map((s) => s.method), ['meet', 'handoff']);
+
+  /* A port nobody listens on: nothing said, and exit 0. */
+  const down = await run(['hook', 'end'], signedIn('http://127.0.0.1:9'), end);
+  assert.deepEqual([down.code, down.stdout, down.stderr], [0, '', '']);
 });
 
 test('the MCP server sends the run and client from the session file, and a hook refuses a stray argument with exit 0', async () => {

@@ -24,7 +24,17 @@ import { attempt } from './tx.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { jsonPath, compile, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
-import { installDeclarations, jcs, retireDeclarations, stageDeclarations, type Declaration } from './declare.ts';
+import {
+  disablePack as disableDeclaredPack,
+  disabledPackFault,
+  enablePack as enableDeclaredPack,
+  installDeclarations,
+  jcs,
+  retireDeclarations,
+  stageDeclarations,
+  type Declaration,
+  type PackToggle,
+} from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
 import { checkDogl, exportDogl, importDogl, signDogl, type Section, type Signer } from './dogl.ts';
 import {
@@ -174,7 +184,7 @@ export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Snapshot, V
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
-export type { Declaration, DeclKind, Installed } from './declare.ts';
+export type { Declaration, DeclKind, Installed, PackToggle } from './declare.ts';
 
 /* ── what a register says about itself ───────────────────────────────────── */
 
@@ -1873,6 +1883,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return out.ok ? out.value : null;
     },
     ctx: evalContext(),
+    scopeOf: (register) => {
+      const f = scopeFieldOf(registers.get(register)?.fields ?? []);
+      return f && 'to' in f && typeof f.to === 'string' ? { field: f.id, to: f.to } : null;
+    },
+    inScope: (register, project, opts) => inScope(register, project, opts),
+    /* A ROW NAMED THE WAY A PAGE NAMES IT, `skills#3`, and only in the register the block reads. */
+    history: (register, row) => {
+      const m = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(row);
+      const entry = m && m[1] === register ? bySeq(register, Number(m[2])) : null;
+      if (!entry) return no('VALUE_MALFORMED', `${row} is not a row of ${register}.`, { at: 'row' });
+      return ok(history(entry.id).map((e) => ({ ts: e.ts, actor: e.actor, kind: e.kind, field: e.field, to: e.to })));
+    },
   });
 
   /**
@@ -3029,6 +3051,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (refused) return refused as Result<() => Result<unknown>>;
       const cannot = unreadable(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
+      /* THE PACK PATH IS WHERE AN UPGRADE ARRIVES, so a disabled pack is refused here as well as in
+         `installDeclarations`. */
+      const off = disabledPackFault(sql, batch);
+      if (off) return { ok: false as const, refusal: off };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;
       return ok(() => {
@@ -3048,6 +3074,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const out = retireDeclarations(sql, ids, transaction);
       if (out.ok) reload();
       return out;
+    },
+
+    /**
+     * Turn a pack off, keeping its `pack` row and every row under its registers (`declare.ts`).
+     * `alsoDisable` names the dependents to turn off in the same transaction.
+     */
+    disablePack(id: string, opts: { alsoDisable?: readonly string[]; actor?: string } = {}): Result<PackToggle> {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+      const out = disableDeclaredPack(sql, clock.now(), id, opts, transaction, mint);
+      if (out.ok && out.value.changed) reload();
+      return out;
+    },
+
+    /** Turn a disabled pack back on over the declarations it went off with, and re-arm what they earn. */
+    async enablePack(id: string, opts: { actor?: string } = {}): Promise<Result<PackToggle>> {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+      const out = await enableDeclaredPack(sql, clock.now(), id, opts, transaction, mint);
+      if (!out.ok) return out;
+      const { batch, ...toggle } = out.value;
+      if (toggle.changed) {
+        reload();
+        armDerived(batch);
+      }
+      return ok(toggle);
     },
 
     registers: () => registers,

@@ -10,7 +10,7 @@
  * for `lib/data/call.ts` is the whole of what the wiring costs.
  */
 
-import { day as fmtDay, money, relative, since, integer, MISSING } from 'braindog-render';
+import { day as fmtDay, diffRows, money, relative, since, integer, MISSING } from 'braindog-render';
 
 import { amountOf, currencyOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
@@ -1432,7 +1432,29 @@ export type BlockResult = PageBlock & {
   stale_at: string;
   register?: string | undefined;
   metrics?: Metric[] | undefined;
+  /** On a block that inherits: how many of `entries`, at the end, apply everywhere rather than to the project. */
+  inherited?: number;
+  /** A `feed` block's rows before they are words, newest first, a burst being one row. */
+  feed?: FeedRow[];
+  /** On a feed with `since: seen`: the reader's read mark, or `null` when they have none yet. */
+  seen?: string | null;
+  /** A `diff` block's versions of its field, newest first. */
+  history?: { at: string; by: string; text: string }[];
 };
+
+/** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */
+export type FeedRow = {
+  by: 'agent' | 'rule' | 'you';
+  who: string | null;
+  count: number;
+  kind: string | null;
+  target: string | null;
+  note: string | null;
+  at: string;
+};
+
+/** The block keys this engine reads that `schema.ts`'s `PageBlock` does not carry yet. */
+type Declared = PageBlock & { inherit?: boolean; since?: string; first?: number; row?: string; field?: string; versions?: number };
 
 /**
  * The cash walk, shaped as an ordinary table block.
@@ -1568,6 +1590,8 @@ const READS = new Set([
   'fold', 'icon',
   /* A feed's and a diff's keys, so a page may declare them before their bindings land. */
   'since', 'first', 'row', 'field', 'versions',
+  /* A block that reads its project's rows and the ones it inherits from everywhere. */
+  'inherit',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -1608,7 +1632,8 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
   return { page: decl, blocks, values: values() };
 }
 
-function readBlock(b: PageBlock): BlockResult {
+/** Exported for the test that holds this engine against the kernel's over the seed. */
+export function readBlock(b: PageBlock): BlockResult {
   {
     /* A BLOCK MAY BE SOURCED FROM A WALK, NOT ONLY A REGISTER. 05 §2 defers a `forecast` KIND to
        post-v1 and says the primitive layer is what exists so that it can be drawn without one, so
@@ -1616,12 +1641,17 @@ function readBlock(b: PageBlock): BlockResult {
        cash walk. Nothing about the block is new, and the day a real `forecast` kind ships, the
        declaration that changes is the kind, not the query. */
     if (b.source === 'forecast.runway') return runwayBlock(b);
+    /* A FEED READS THE LEDGER and a diff reads one row's history, so neither is a register's rows. */
+    if (b.source === 'activity') return activityBlock(b);
+    if (b.kind === 'diff') return diffBlock(b);
 
     const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : undefined;
     const all = register ? (ROWS[register] ?? []) : [];
-    const { entries: matched, refusals } = register
-      ? filterForBlock(register, all, b)
-      : { entries: [], refusals: [] };
+    const { entries: matched, refusals, own } = register
+      ? (b as Declared).inherit === true
+        ? inheritFor(register, all, b)
+        : { ...filterForBlock(register, all, b), own: undefined }
+      : { entries: [], refusals: [], own: undefined };
 
     /* WHAT THE DECLARATION SAID THAT THIS BUILD DOES NOT READ.
        Three shapes reached here and were answered with an empty block, which is the state reserved
@@ -1633,7 +1663,7 @@ function readBlock(b: PageBlock): BlockResult {
          - a key the type does not carry at all — `when:` is in 06 §1.1 and is not read anywhere.
        All three are the block's own error, so they go where `explain()` goes. */
     const said = [...refusals];
-    if (b.source && !register) said.push(`source: ${b.source} is not a source this build reads. It reads register.<id> and forecast.runway`);
+    if (b.source && !register) said.push(`source: ${b.source} is not a source this build reads. It reads register.<id>, forecast.runway and activity`);
     if (register) {
       /* `seq` is a column and not a field: it is on the ROW rather than in its fields, and `toRows`
          renders it as `#4`. Any pack may name it, so it belongs in the set a column may resolve to
@@ -1641,6 +1671,15 @@ function readBlock(b: PageBlock): BlockResult {
       const declared = new Set(['seq', ...(REGISTERS[register]?.fields ?? []).map((f) => f.id)]);
       for (const c of b.columns ?? [])
         if (!declared.has(c.field)) said.push(`columns: there is no field called ${c.field} on ${register}`);
+      /* WHERE A ROW APPLIES IS THE SCOPE FIELD'S TO SAY, as the kernel checks it. */
+      const scope = scopeFieldOf(register);
+      for (const c of b.columns ?? [])
+        if (roleOf(c) === 'scope' && c.field !== scope?.id)
+          said.push(
+            scope
+              ? `columns: as: scope draws where a row applies, which ${register} says in ${scope.id}, not ${c.field}`
+              : `columns: as: scope draws where a row applies, and ${register} has no field that says so`,
+          );
     }
     for (const key of Object.keys(b))
       if (!READS.has(key)) said.push(`${key}: is not a key this build reads`);
@@ -1654,10 +1693,19 @@ function readBlock(b: PageBlock): BlockResult {
           width: c.width ?? 'minmax(12ch,1fr)',
           align: c.align ?? 'start',
           truncate: c.field === 'amount' || c.field === 'cost' ? ('never' as const) : ('end' as const),
-          /* A card's role for this column. Without it every cards block fell back to the guessed roles. */
-          ...(c.as === undefined ? {} : { as: c.as }),
+          /* A card's role for this column. Without it every cards block fell back to the guessed roles.
+             `scope` is not a role the renderer draws: it says what the cell holds, which is settled here. */
+          ...(c.as === undefined || roleOf(c) === 'scope' ? {} : { as: c.as }),
         }))
       : [];
+    const rows = toRows(register ?? '', entries, columns);
+    (b.columns ?? []).forEach((c, i) => {
+      if (roleOf(c) !== 'scope') return;
+      entries.forEach((e, n) => {
+        const cells = rows[n]?.cells;
+        if (cells) cells[i] = absent(e.fields[c.field]) ? EVERYWHERE : (cells[i] ?? null);
+      });
+    });
     return {
       ...b,
       register,
@@ -1665,7 +1713,8 @@ function readBlock(b: PageBlock): BlockResult {
       entries,
       matched,
       refusals: said,
-      rows: toRows(register ?? '', entries, columns),
+      rows,
+      ...(own === undefined ? {} : { inherited: Math.max(0, entries.length - own) }),
       /* A KIND THAT REDUCES DRAWS THE WHOLE ANSWER, so it is never showing a slice of it. `bar`,
          `chips` and `gauge` iterate `matched` — every row — and apply `limit:` to their GROUPS; this
          counted `entries` for every kind alike, so the first author to write `limit: 5` on a bar
@@ -1712,6 +1761,178 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): { ent
        whoever wrote the declaration — usually an agent — learned nothing. 10 §7's fourth rule is
        that the refusal is the teacher. */
     refusals: predicate ? explain(predicate) : [],
+  };
+}
+
+/** A column's `as`, widened: `schema.ts` lists the card roles, and `scope` is a cell rather than a role. */
+const roleOf = (c: { as?: string | undefined }): string | undefined => c.as;
+
+/** What a scope cell reads for a row that applies to every project. */
+const EVERYWHERE = 'Everywhere';
+
+const absent = (v: unknown): boolean => v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+
+/** The field that says where a register's rows apply, as `packages/kernel/src/scope.ts` finds it. */
+const scopeFieldOf = (register: string): (FieldDecl & { scope?: { same?: string }; to?: string }) | undefined =>
+  (REGISTERS[register]?.fields as (FieldDecl & { scope?: { same?: string }; retired?: boolean })[] | undefined)?.find(
+    (f) => f.scope !== undefined && !f.retired,
+  );
+
+/**
+ * A project's rows, then the rows that apply everywhere, as the kernel's `inScope` decides it: where
+ * the register says the nearer wins, an open project row hides a global row of the same title.
+ * `own` is how many of `entries`, at the front, are the project's.
+ */
+function inheritFor(register: string, all: Entry[], b: PageBlock): { entries: Entry[]; refusals: string[]; own: number } {
+  const none = (refusal: string) => ({ entries: [], refusals: [refusal], own: 0 });
+  const decl = REGISTERS[register];
+  const scope = scopeFieldOf(register);
+  if (!decl || !scope) return none(`inherit: ${register} has no field that says where its rows apply, so there is nothing to inherit`);
+  const w = compile(register, b.where);
+  if (w.bad.length) return { entries: [], refusals: explain(w), own: 0 };
+  const home = w.clauses.find((c): c is Extract<typeof c, { values: string[] }> => c.field === scope.id && c.op === 'is' && c.values.length === 1);
+  if (!home) return none(`where: a block that inherits names its project, as ${scope.id} is <project>`);
+
+  const said = home.values[0]!.trim().toLowerCase();
+  const projects = scope.to ? (ROWS[scope.to] ?? []) : [];
+  const projectTitle = scope.to ? REGISTERS[scope.to]?.title : undefined;
+  const project = projects.find((p) => String(p.seq) === said || String(p.fields[projectTitle ?? ''] ?? '').toLowerCase() === said);
+  const at = (e: Entry): boolean => {
+    const v = e.fields[scope.id];
+    return project !== undefined && (Array.isArray(v) ? v.includes(project.seq) : v === project.seq);
+  };
+
+  const title = decl.title ?? '';
+  const done = new Set<string>(decl.done ?? []);
+  const open = (e: Entry): boolean => !done.has(String(e.fields[decl.state ?? ''] ?? ''));
+  const claimed = new Set(scope.scope?.same === 'nearer' ? all.filter((e) => at(e) && open(e)).map((e) => String(e.fields[title] ?? '')) : []);
+  const rest = { ...w, clauses: w.clauses.filter((c) => c !== home) };
+
+  const order = b.order?.[0];
+  const sorted = (list: Entry[]) => (order ? sortRows(register, list, order.field, order.dir ?? 'asc') : list);
+  const own = sorted(all.filter((e) => at(e) && matches(e, rest, NOW)));
+  const global = sorted(all.filter((e) => absent(e.fields[scope.id]) && matches(e, rest, NOW) && !claimed.has(String(e.fields[title] ?? ''))));
+  return { entries: [...own, ...global], refusals: [], own: own.length };
+}
+
+/** The shell every block that is not a register's rows returns, so each says only what it adds. */
+const computed = (b: PageBlock, refusals: string[]): BlockResult => ({
+  ...b,
+  register: undefined,
+  columns: [],
+  entries: [],
+  matched: [],
+  refusals,
+  rows: [],
+  shown: 0,
+  total: 0,
+  drawn: b.drawn ?? drawnWhen(b),
+  stale_at: new Date(NOW).toISOString(),
+  metrics: undefined,
+});
+
+/** The kinds of actor a feed groups by, the kernel's `FEED_BY`. */
+const FEED_KINDS: readonly string[] = ['agent', 'rule', 'you'];
+
+/** The kind of actor behind a ledger event, the kernel's `byOf` over this build's spelling of actors. */
+const feedByOf = (by: string): FeedRow['by'] => (by === 'you' ? 'you' : /^rule[.:]/.test(by) || by === 'system' ? 'rule' : 'agent');
+
+/**
+ * A feed over the ledger: a run of events by one actor, of one kind, on one row is one row with a
+ * count, and past `first:` rows a group's remainder is one row. The kernel's `feedRows`, mirrored.
+ */
+function activityBlock(b: PageBlock): BlockResult {
+  const d = b as Declared;
+  /* THE THREE THINGS A FEED'S `where:` MAY ASK, each `is` or `is not`, joined by `and`. */
+  type Asked = { actor: string; kind: string; target: string };
+  const tests: ((e: Asked) => boolean)[] = [];
+  const bad: string[] = [];
+  for (const part of (b.where ?? '').split(/\s+and\s+/i).filter((p) => p.trim())) {
+    const m = /^\s*(actor|kind|target)\s+is(\s+not)?\s+(.+?)\s*$/i.exec(part);
+    if (!m) {
+      bad.push(`where: a feed asks about actor, kind or target, and "${part.trim()}" is none of them`);
+      continue;
+    }
+    const field = m[1]!.toLowerCase() as keyof Asked;
+    const values = m[3]!.split(/\s+or\s+|,\s*/i).map((v) => v.trim());
+    if (field === 'actor' && values.some((v) => !FEED_KINDS.includes(v))) bad.push('where: an actor is agent, rule or you');
+    const negate = m[2] !== undefined;
+    tests.push((e) => values.includes(e[field]) !== negate);
+  }
+  if (bad.length) return computed(b, bad);
+
+  const kept = AUDIT.filter((e) => tests.every((t) => t({ actor: feedByOf(e.by), kind: e.kind, target: e.target ?? '' })));
+  const bursts: FeedRow[] = [];
+  for (const e of kept) {
+    const last = bursts.at(-1);
+    if (last && last.who === e.by && last.kind === e.kind && last.target === (e.target ?? null)) last.count += 1;
+    else bursts.push({ by: feedByOf(e.by), who: e.by, count: 1, kind: e.kind, target: e.target ?? null, note: e.note ?? null, at: e.at });
+  }
+  let feed = bursts;
+  if (d.first !== undefined) {
+    const cap = Math.min(50, Math.max(1, Math.floor(d.first)));
+    const taken = new Map<string, number>();
+    const rest = new Map<string, FeedRow>();
+    feed = [];
+    for (const row of bursts) {
+      const n = taken.get(row.by) ?? 0;
+      taken.set(row.by, n + 1);
+      if (n < cap) feed.push(row);
+      else {
+        const folded = rest.get(row.by);
+        if (folded) folded.count += row.count;
+        else rest.set(row.by, { by: row.by, who: null, count: row.count, kind: null, target: null, note: null, at: row.at });
+      }
+    }
+    feed.push(...rest.values());
+  }
+  /* A DEMO READER HAS NO READ MARK, so the seen row carries no time: the renderer's "not looked yet". */
+  const seen = d.since === 'seen' ? { key: 'seen', cells: ['seen', ''], href: undefined, tone: undefined } : null;
+  return {
+    ...computed(b, []),
+    feed,
+    ...(d.since === 'seen' ? { seen: null } : {}),
+    rows: [
+      ...feed.map((r, i) => ({
+        key: `${r.at}-${i}`,
+        cells: [r.by, r.who === null ? '' : actorOf(r.who), String(r.count), r.note ?? [r.kind, r.target].filter(Boolean).join(' '), relative(r.at, NOW)],
+        href: undefined,
+        tone: undefined,
+      })),
+      ...(seen ? [seen] : []),
+    ],
+    shown: feed.length,
+    total: kept.length,
+  };
+}
+
+/**
+ * A diff over one row's text field. THIS BUILD KEEPS NO FIELD HISTORY, so a row has one version, the
+ * one it holds, and the block draws that version with nothing to compare it to.
+ */
+function diffBlock(b: PageBlock): BlockResult {
+  const d = b as Declared;
+  const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : undefined;
+  if (!register || !REGISTERS[register]) return computed(b, [`source: ${b.source ?? ''} is not a register this build holds`]);
+  if (!d.row) return computed(b, ['row: a diff names the row whose history it reads, as row: skills#2']);
+  if (!d.field) return computed(b, ['field: a diff names the field it compares, as field: body']);
+  const decl = REGISTERS[register]!.fields.find((f) => f.id === d.field);
+  if (!decl) return computed(b, [`field: there is no field called ${d.field} on ${register}`]);
+  if (decl.type !== 'document' && decl.type !== 'text') return computed(b, [`field: a diff compares text, and ${d.field} is ${decl.type}`]);
+  const seq = Number(/(\d+)$/.exec(d.row)?.[1]);
+  const row = (ROWS[register] ?? []).find((e) => e.seq === seq);
+  if (!row) return computed(b, [`row: ${d.row} is not a row of ${register}`]);
+  const text = row.fields[d.field];
+  const history = typeof text === 'string' ? [{ at: row.created, by: row.by, text }] : [];
+  return {
+    ...computed(b, []),
+    history,
+    rows:
+      history.length > 1
+        ? diffRows(history[1]!.text, history[0]!.text).map((line, i) => ({ key: String(i), cells: [line], href: undefined, tone: undefined }))
+        : [],
+    shown: history.length,
+    total: history.length,
   };
 }
 

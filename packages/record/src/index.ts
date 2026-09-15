@@ -51,6 +51,9 @@ import {
   type Verdict,
   type SessionHints,
   type WriteContext,
+  PEOPLE,
+  type MeetArgs,
+  type Met,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
@@ -152,6 +155,7 @@ const POSITION = ['agent', 'host', 'repo', 'remote', 'cwd', 'branch', 'head', 'd
 /** Why `attach` was called: the hook that fired, or the command line. */
 export const SOURCES = ['startup', 'resume', 'clear', 'compact', 'cli'] as const;
 const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session'] as const;
+const MEET = ['name', 'email', 'handle', 'where'] as const;
 /** How many entries `tried` and `notes` keep. The oldest goes first. */
 const KEPT = 50;
 /** The longest line a run carries, which is a note's ceiling. */
@@ -1536,6 +1540,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       return ok(briefing(ctx));
+    },
+
+    /* ── PEOPLE ─────────────────────────────── */
+
+    /**
+     * Someone met in the work: matched by email or handle, or added, with where they were met, and linked to
+     * the project of the caller's run (`loop/research-agent-path.md` §5.6). Needs `propose` on people.
+     *
+     * THE KERNEL WRITES AS THE CALLER'S RUN, found by the ladder as every token write is, so the person is
+     * signed by the run and placed in its project. A person in the app is never a run, and links none.
+     *
+     * PEOPLE IS A MODULE THE OWNER MAY SWITCH OFF. Without the register this is `REGISTER_UNKNOWN`, and the
+     * kernel writes nothing, a run included.
+     */
+    async meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>> {
+      const stop = guard(ctx, 'propose', PEOPLE);
+      if (stop) return { ok: false, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const wrong = stray(said, MEET);
+      if (wrong) return { ok: false, refusal: wrong };
+      return tail(kernel.meet(said as MeetArgs, writerOf(ctx)));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */

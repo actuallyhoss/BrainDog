@@ -220,6 +220,16 @@ by dropping them.
 > shape changed while it was off. Disabling a pack another active pack's `requires` still names is
 > refused, naming the dependents, the same way an install names a conflict before it applies.
 > `loop/research-modular.md` §1.2 and §1.5 have the mechanism.
+>
+> **Built September 15th 2026.** `pack.disabled_at` is migration 3. Disabling writes one `retire`
+> event aimed at the pack, listing the declarations that went off, and enabling brings back exactly
+> those, each as a new version with the same checksum, over the same rows. A pack leaned on by
+> another active pack, through a field's `to:`, a page's `requires` or its manifest's
+> `requires.packs`, is refused `PACK_REQUIRED`, and `alsoDisable` names the dependents to turn off in
+> the same transaction. The pack holding the `scopes:` register is refused `SCOPES_IN_USE` while any
+> field left on still points at its projects. An install or upgrade of a disabled pack is refused
+> `PACK_DISABLED`. Disabling or enabling a pack already in that state changes nothing and says so.
+> A write to a disabled register is `REGISTER_UNKNOWN`, as for any register that is not active.
 
 ---
 

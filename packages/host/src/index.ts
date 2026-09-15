@@ -153,6 +153,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
   { name: 'attach', group: 'DATA', writes: true, what: 'Say which run this agent is and where it stands. A token only: a person is never a run.' },
   { name: 'handoff', group: 'DATA', writes: true, what: "Keep a run's handoff true: the next step, what was tried, a note, its state." },
+  { name: 'meet', group: 'DATA', writes: true, what: 'Someone met in the work: matched by email or handle, or added, and linked to your project.' },
 ];
 
 /**
@@ -308,6 +309,7 @@ export type RecordSurface = {
   handoff(args: never, ctx: never): Promise<Result<unknown>>;
   sessionsLive(args: never, ctx: never): Promise<Result<unknown>>;
   context(args: never, ctx: never): Promise<Result<unknown>>;
+  meet(args: never, ctx: never): Promise<Result<unknown>>;
 };
 
 export function handlersFor(api: RecordSurface): Record<string, Handler> {
@@ -352,6 +354,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     handoff: (a, ctx) => api.handoff(a as never, ctx as never),
     sessionsLive: (a, ctx) => api.sessionsLive(a as never, ctx as never),
     context: (a, ctx) => api.context(a as never, ctx as never),
+    meet: (a, ctx) => api.meet(a as never, ctx as never),
   };
   /* The table and the wiring, checked against each other where they are both in scope — so adding a
      route to one without the other throws at start rather than 404ing in production. */

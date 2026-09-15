@@ -124,8 +124,11 @@ async function hook(args: string[]): Promise<void> {
     /* The error could quote anything, so the start hook says only that it failed. */
     if (which === 'start') write('BrainDog: the start hook failed, so this session works without shared context.');
   }
-  /* Not waiting for the event loop, which an idle keep-alive socket to the host would hold open. */
-  process.exit(0);
+  /* LEFT TO END ON ITS OWN, and ended after a second if an idle keep-alive socket to the host holds it
+     open. `process.exit` straight after more than one request aborted Node 24 on Windows with a libuv
+     assertion, a non-zero exit, which is the one thing a hook must never do. */
+  process.exitCode = 0;
+  setTimeout(() => process.exit(0), 1_000).unref();
 }
 
 function install(args: string[]): void {

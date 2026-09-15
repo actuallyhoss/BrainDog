@@ -19,8 +19,10 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
-import type { Predicate, Schema } from '@braindog/where';
+import type { Leaf, Predicate, Schema } from '@braindog/where';
+import { evaluate } from '@braindog/where';
 
+import type { Json } from './coerce.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
@@ -31,8 +33,25 @@ export type PageBlock = {
   span?: number;
   source?: string;
   where?: string;
-  columns?: { field: string; label?: string }[];
+  /** `as: 'scope'` draws where the row applies: its project, or everywhere. */
+  columns?: { field: string; label?: string; as?: string }[];
   cells?: { metric: string; label?: string }[];
+  /** A `section`'s: whether it starts shut, and the glyph beside its heading. */
+  fold?: boolean;
+  icon?: string;
+  /**
+   * Over a register with a scope field: the rows of the project `where:` names, then the rows that
+   * apply everywhere, a project's row hiding a global one of the same title where the register says
+   * the nearer wins (`scope.ts`).
+   */
+  inherit?: boolean;
+  /** A `feed`'s: `seen` marks the rows after the reader's read mark as new, and `first` caps the rows. */
+  since?: 'seen';
+  first?: number;
+  /** A `diff`'s: the row whose history it reads, the field it compares, and how many versions. */
+  row?: string;
+  field?: string;
+  versions?: number;
   order?: { field: string; dir?: 'asc' | 'desc' }[];
   limit?: number;
   /** `forecast.runway` only: what is liquid today, and the legs the walk reads. */
@@ -72,6 +91,8 @@ const READS = new Set([
      for as long as every branch below overwrote the refusal list, and it is a false refusal either
      way: they are keys this file wrote. */
   'rows', 'matched', 'readings', 'walk', 'refusals',
+  'fold', 'icon', 'inherit', 'since', 'first', 'row', 'field', 'versions',
+  'inherited', 'scopes', 'feed', 'seen', 'history',
 ]);
 
 export type PageDecl = {
@@ -93,9 +114,32 @@ export type BlockResult = PageBlock & {
   readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal }[];
   /** A `forecast.runway` block's walk. */
   walk?: Runway;
+  /** On a block that inherits: how many of `rows`, at the end, apply everywhere rather than to the project. */
+  inherited?: number;
+  /** Where each row applies, aligned with `rows`: its project's title, or `null` for everywhere. */
+  scopes?: (string | null)[];
+  /** A `feed` block's rows, newest first, a burst being one row. */
+  feed?: FeedRow[];
+  /** On a feed with `since: seen`: the reader's read mark, or `null` when they have none yet. */
+  seen?: string | null;
+  /** A `diff` block's versions of its field, newest first, at most `versions` of them. */
+  history?: { at: string; by: string; text: string }[];
   /** What this block could not do. Non-empty means the block drew nothing. */
   refusals: Refusal[];
 };
+
+/** The kinds of actor a feed groups by, `packages/render/src/feed.ts`'s `FEED_BY`, copied as `BLOCK_KINDS` is in `declare.ts`. */
+export const FEED_BY = ['agent', 'rule', 'you'] as const;
+export type FeedBy = (typeof FEED_BY)[number];
+
+/** One row of a feed. `who`, `kind` and `target` are `null` on the row that folds a group's rows past `first:`. */
+export type FeedRow = { by: FeedBy; who: string | null; count: number; kind: string | null; target: string | null; note: string | null; at: string };
+
+/** One event, as the activity source reads it. */
+export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null };
+
+/** One event about a row, oldest first. A create carries every field in `to` and `field: null`. */
+export type RowEvent = { ts: string; actor: string; kind: string; field: string | null; to: Json | null };
 
 export type PageResult = { page: string; title: string; blocks: BlockResult[]; [key: string]: unknown };
 
@@ -118,10 +162,28 @@ export type PageDeps = {
   /** The cash walk, when a block names it. */
   runway: (opening: number, legs: readonly Leg[], horizon?: number) => Runway | null;
   ctx: EvalContext;
+  /*
+   * OPTIONAL, so a host that has not wired one of these gets `NOT_IN_THIS_BUILD` on the block that
+   * needs it rather than a type error in every caller.
+   */
+  /** The field that says where a register's rows apply, and the register of projects it points at. */
+  scopeOf?: (register: string) => { field: string; to: string } | null;
+  /** The kernel's `inScope`, which is where nearer-wins is decided. */
+  inScope?: (register: string, project: string, opts: { limit?: number; open?: boolean }) => Result<{ rows: Entry[]; inherited: Entry[] }>;
+  /** Every event about one row of `register`, oldest first. `row` is a spoken id or a row id. */
+  history?: (register: string, row: string) => Result<RowEvent[]>;
+  /** The newest `limit` events, newest first, and the reader's read mark. */
+  activity?: (limit: number) => { events: ActivityEvent[]; seen: string | null };
 };
 
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
-const COMPUTED = new Set(['forecast.runway']);
+const COMPUTED = new Set(['forecast.runway', 'activity']);
+
+/** How many events a feed reads. Bursts are counted from events, so a feed of 20 rows reads more than 20. */
+const FEED_EVENTS = 500;
+
+/** How many versions a `diff` shows: `42 §4.5` bounds `versions` at 2 to 10. */
+const VERSIONS = { least: 2, most: 10 } as const;
 
 /**
  * Every page a person could open, templates expanded.
@@ -347,6 +409,8 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
       return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }) };
     return { ...base, walk, matched: walk.steps.length, refusals: also(...walk.refusals) };
   }
+  /* A FEED READS THE RECORD'S EVENTS, not a register's rows. */
+  if (block.source === 'activity') return activityBlock(deps, block, base, also);
   if (COMPUTED.has(block.source))
     return {
       ...base,
@@ -358,8 +422,40 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (!register || !schema)
     return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: `${block.source} is not a source this record reads.`, at: 'source' }) };
 
+  /* A DIFF READS ONE ROW'S HISTORY, not the rows a predicate matches. */
+  if (block.kind === 'diff') return diffBlock(deps, block, register, schema, base, also);
+
   const said = predicateOf(block.where, schema, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+
+  /* WHERE A ROW APPLIES IS THE REGISTER'S SCOPE FIELD, and nothing else can answer it. Both keys that
+     ask are checked before any query, so a block that cannot say which project draws nothing rather
+     than every row of the register. */
+  const inherit = block.inherit === true;
+  const scoped = (block.columns ?? []).filter((c) => c.as === 'scope');
+  if ((inherit && (!deps.scopeOf || !deps.inScope)) || (scoped.length && !deps.scopeOf))
+    return {
+      ...base,
+      refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read where a row applies yet.', at: inherit ? 'inherit' : 'columns' }),
+    };
+  const scope = inherit || scoped.length ? (deps.scopeOf?.(register) ?? null) : null;
+  if (inherit && !scope)
+    return {
+      ...base,
+      refusals: also({ code: 'FIELD_UNKNOWN', fix: `${register} has no field that says where its rows apply, so there is nothing to inherit.`, at: 'inherit' }),
+    };
+  const astray = scoped.find((c) => c.field !== scope?.field);
+  if (astray)
+    return {
+      ...base,
+      refusals: also({
+        code: 'DECLARATION_INVALID',
+        fix: scope
+          ? `as: scope draws where a row applies, which ${register} says in ${scope.field}, not ${astray.field}.`
+          : `as: scope draws where a row applies, and ${register} has no field that says so.`,
+        at: 'columns',
+      }),
+    };
 
   /* A LIMIT OF ZERO DRAWS NOTHING, which is what it says. `Math.max(1, …)` turned it into one row —
      a block declaring it wanted no rows and getting one is a block nobody can write. */
@@ -368,12 +464,15 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   /* THE ORDER GOES TO THE QUERY, not to the page after it. Sorting the rows that came back is
      sorting a page that was already chosen: "the five largest" would be five arbitrary rows put in
      order, which is a different answer and an invisible one. */
-  const listed = deps.list({
-    register,
-    where: said.predicate,
-    limit,
-    ...(block.order?.length ? { order: block.order } : {}),
-  });
+  const listed: Result<Listed> =
+    inherit && scope
+      ? listInherited(deps, register, scope, said.predicate, limit, block.order)
+      : deps.list({
+          register,
+          where: said.predicate,
+          limit,
+          ...(block.order?.length ? { order: block.order } : {}),
+        });
   if (!listed.ok) return { ...base, refusals: refused(listed) ? also(listed.refusal) : also() };
 
   /* THE COLUMNS ARE CHECKED AGAINST THE REGISTER. A column naming a field nobody declared renders as
@@ -398,7 +497,178 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
       }),
     };
 
-  return { ...base, rows: listed.value.rows, matched: listed.value.matched };
+  const rows = listed.value.rows;
+  return {
+    ...base,
+    rows,
+    matched: listed.value.matched,
+    ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
+    ...(scope ? { scopes: scopesOf(deps, rows, scope) } : {}),
+  };
+}
+
+/* ── where a row applies ─────────────────────────────────────────────────── */
+
+type Listed = { rows: Entry[]; matched: number; inherited?: number };
+
+/**
+ * A project's rows, then the rows that apply everywhere.
+ *
+ * `inScope` DECIDES WHAT IS HIDDEN, so the page and a run's context cannot disagree about which
+ * global row a project's row replaces. It does not take a predicate, so the rows themselves come from
+ * `list`, and what `inScope` contributes is the set of titles a project row has claimed.
+ */
+function listInherited(
+  deps: PageDeps,
+  register: string,
+  scope: { field: string; to: string },
+  predicate: Predicate | undefined,
+  limit: number,
+  order: PageBlock['order'],
+): Result<Listed> {
+  const clauses: Predicate[] =
+    predicate === undefined ? [] : Array.isArray((predicate as { all?: unknown }).all) ? (predicate as { all: Predicate[] }).all : [predicate];
+  const home = clauses.find((n): n is Leaf => (n as Leaf).field === scope.field && typeof (n as Leaf).is === 'string');
+  if (!home)
+    return no('REQUIRED_MISSING', `A block that inherits names its project in where:, as ${scope.field} is <project>.`, { at: 'where' });
+  const project = home.is as string;
+  const rest = clauses.filter((n) => n !== home);
+
+  const claimed = deps.inScope!(register, project, { open: true, limit: 200 });
+  if (!claimed.ok) return claimed;
+  const shown = deps.inScope!(register, project, { limit: 200 });
+  if (!shown.ok) return shown;
+  const title = deps.titleOf(register);
+  const titleOf = (e: Entry): string => String(e.fields[title ?? ''] ?? '');
+  const visible = new Set(shown.value.inherited.map(titleOf));
+  const hidden = title ? [...new Set(claimed.value.rows.map(titleOf))].filter((t) => !visible.has(t)) : [];
+
+  const sorted = order?.length ? { order } : {};
+  const own = deps.list({ register, where: predicate, limit, ...sorted });
+  if (!own.ok) return own;
+  const room = limit - own.value.rows.length;
+  const everywhere: Predicate = {
+    all: [...rest, { field: scope.field, empty: true }, ...(hidden.length ? [{ none: [{ field: title!, in: hidden }] }] : [])],
+  };
+  /* ASKED EVEN WITH NO ROOM, because `matched` is what the total is a total of. */
+  const global = deps.list({ register, where: everywhere, limit: Math.max(1, room), ...sorted });
+  if (!global.ok) return global;
+  const tail = global.value.rows.slice(0, Math.max(0, room));
+  return ok({ rows: [...own.value.rows, ...tail], matched: own.value.matched + global.value.matched, inherited: tail.length });
+}
+
+/** Where each row applies, as the title of its project, or `null` for a row that applies everywhere. */
+function scopesOf(deps: PageDeps, rows: readonly Entry[], scope: { field: string; to: string }): (string | null)[] {
+  const said = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? [v] : []);
+  const ids = [...new Set(rows.flatMap((r) => said(r.fields[scope.field])))];
+  const title = deps.titleOf(scope.to);
+  const listed = ids.length && title ? deps.list({ register: scope.to, where: { field: 'id', in: ids }, limit: 200 }) : null;
+  const names = new Map(listed?.ok ? listed.value.rows.map((r) => [r.id, String(r.fields[title!] ?? r.id)] as const) : []);
+  return rows.map((r) => {
+    const at = said(r.fields[scope.field]);
+    return at.length ? at.map((id) => names.get(id) ?? id).join(', ') : null;
+  });
+}
+
+/* ── activity ────────────────────────────────────────────────────────────── */
+
+/** What a feed's `where:` may ask about an event. `actor` is the kind of actor, which is what the groups are. */
+const ACTIVITY: Schema = {
+  register: 'activity',
+  fields: { actor: { type: 'enum', values: FEED_BY }, kind: { type: 'text' }, target: { type: 'text' } },
+};
+
+/**
+ * The kind of actor behind an event, by `30 §3`'s grammar.
+ *
+ * A run and a token are agents, and so is `spark`; a rule, an ingest and the record's own work are
+ * rules, because nobody chose them at that moment. Anything else is a person.
+ */
+export function byOf(actor: string): FeedBy {
+  if (/^S\d+$/.test(actor) || actor.startsWith('agent:') || actor === 'spark') return 'agent';
+  if (actor.startsWith('rule:') || actor.startsWith('ingest:') || actor === 'system') return 'rule';
+  return 'you';
+}
+
+/**
+ * Events, newest first, as feed rows: a run of events by one actor, of one kind, on one target is
+ * one row with a count, and past `first` rows a group's remainder is one row, so no count is lost.
+ */
+export function feedRows(events: readonly ActivityEvent[], first?: number): FeedRow[] {
+  const bursts: FeedRow[] = [];
+  for (const e of events) {
+    const last = bursts.at(-1);
+    if (last && last.who === e.actor && last.kind === e.kind && last.target === e.target) last.count += 1;
+    else bursts.push({ by: byOf(e.actor), who: e.actor, count: 1, kind: e.kind, target: e.target, note: e.note, at: e.ts });
+  }
+  if (first === undefined) return bursts;
+  const cap = Math.min(50, Math.max(1, Math.floor(first)));
+  const kept: FeedRow[] = [];
+  const rest = new Map<FeedBy, FeedRow>();
+  const taken = new Map<FeedBy, number>();
+  for (const row of bursts) {
+    const n = taken.get(row.by) ?? 0;
+    taken.set(row.by, n + 1);
+    if (n < cap) kept.push(row);
+    else {
+      const folded = rest.get(row.by);
+      if (folded) folded.count += row.count;
+      else rest.set(row.by, { by: row.by, who: null, count: row.count, kind: null, target: null, note: null, at: row.at });
+    }
+  }
+  return [...kept, ...rest.values()];
+}
+
+function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.activity)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its activity onto a page yet.', at: 'source' }) };
+  const said = predicateOf(block.where, ACTIVITY, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const read = deps.activity(FEED_EVENTS);
+  const kept = read.events.filter((e) => evaluate(said.predicate, { actor: byOf(e.actor), kind: e.kind, target: e.target }, ACTIVITY));
+  return {
+    ...base,
+    feed: feedRows(kept, block.first),
+    matched: kept.length,
+    ...(block.since === 'seen' ? { seen: read.seen } : {}),
+  };
+}
+
+/* ── one row's history ───────────────────────────────────────────────────── */
+
+/** The values one text field held, oldest first, an event that left it as it was being no version. */
+export function versionsOf(events: readonly RowEvent[], field: string): { at: string; by: string; text: string }[] {
+  const out: { at: string; by: string; text: string }[] = [];
+  for (const e of events) {
+    const to = e.field === null ? (e.to !== null && typeof e.to === 'object' && !Array.isArray(e.to) ? e.to[field] : undefined) : e.field === field ? e.to : undefined;
+    if (typeof to !== 'string' || out.at(-1)?.text === to) continue;
+    out.push({ at: e.ts, by: e.actor, text: to });
+  }
+  return out;
+}
+
+function diffBlock(
+  deps: PageDeps,
+  block: PageBlock,
+  register: string,
+  schema: Schema,
+  base: BlockResult,
+  also: (...more: readonly Refusal[]) => Refusal[],
+): BlockResult {
+  const refuse = (refusal: Refusal): BlockResult => ({ ...base, refusals: also(refusal) });
+  if (!block.row) return refuse({ code: 'REQUIRED_MISSING', fix: 'A diff names the row whose history it reads, as row: skills#2.', at: 'row' });
+  if (!block.field) return refuse({ code: 'REQUIRED_MISSING', fix: 'A diff names the field it compares, as field: body.', at: 'field' });
+  const decl = schema.fields[block.field];
+  if (!decl) return refuse({ code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${block.field}.`, at: 'field', allowed: Object.keys(schema.fields) });
+  /* LINES ARE WHAT A DIFF COMPARES, so a field that holds no text has no diff to draw. */
+  if (decl.type !== 'document' && decl.type !== 'text')
+    return refuse({ code: 'DECLARATION_INVALID', fix: `A diff compares text, and ${block.field} is ${decl.type}.`, at: 'field' });
+  if (!deps.history) return refuse({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read a row’s history onto a page yet.', at: 'source' });
+  const events = deps.history(register, block.row);
+  if (!events.ok) return { ...base, refusals: refused(events) ? also(events.refusal) : also() };
+  const all = versionsOf(events.value, block.field).reverse();
+  const n = Math.min(VERSIONS.most, Math.max(VERSIONS.least, Math.floor(block.versions ?? VERSIONS.least)));
+  return { ...base, history: all.slice(0, n), matched: all.length };
 }
 
 /* ── the small parts ─────────────────────────────────────────────────────── */

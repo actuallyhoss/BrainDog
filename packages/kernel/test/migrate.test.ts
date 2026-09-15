@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 2, format: 1, applied: [1, 2] });
+  assert.deepEqual(result.value, { kernel: 3, format: 1, applied: [1, 2, 3] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -51,9 +51,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 2);
+  assert.equal(sql.all('SELECT version FROM migration').length, 3);
   sql.close();
 });
 
@@ -102,7 +102,9 @@ async function beforeMigration2() {
   assert.ok(k.create('notes', { body: 'Call the bank' }, { actor: 'p_1' }).ok);
   sql.exec("DELETE FROM declaration WHERE id = 'register.session'");
   for (const name of sessionIndexes(sql)) sql.exec(`DROP INDEX ${name}`);
-  sql.exec('DELETE FROM migration WHERE version = 2');
+  /* And migration 3's, since the runner applies only what is above the highest version it holds. */
+  sql.exec('ALTER TABLE pack DROP COLUMN disabled_at');
+  sql.exec('DELETE FROM migration WHERE version >= 2');
   return sql;
 }
 
@@ -112,7 +114,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2]);
+  assert.deepEqual(result.value.applied, [2, 3]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -235,6 +237,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
   assert.deepEqual(await Promise.all(MIGRATIONS.map((m) => checksum(m.sql))), [
     'fa653de2288f0aaeefa53cf1c0c19077f9842a76fb46f369d45707831290667d',
     '16c5b5dc98bfba0191673904850dad59761cfba49680b037aef9333dfc7dc676',
+    '53e31fd7d2c5a0e3e356de5567f115d0ceec87b0d3fa80a18487a3a7e7ed4d74',
   ]);
 });
 

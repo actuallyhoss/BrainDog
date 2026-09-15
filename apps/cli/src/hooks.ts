@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
+import type { Client } from '@braindog/client';
 import { refused } from '@braindog/ports';
 
 import { briefing, type Moved } from './brief.ts';
@@ -173,8 +174,64 @@ export async function hookStart(io: Io): Promise<void> {
   io.write(briefing(run, at, await movedSince(event.cwd, run.context?.handoff?.head ?? null, at.head)));
 }
 
+/* ── the people met in this session's commits ──────────────────────────── */
+
+/** The most authors one session's end sends to `meet` (`loop/research-agent-path.md` §4.4). */
+export const MET_PER_SESSION = 10;
+
+/** One author as `meet` takes them, and the commit they were met in. */
+export type Author = { name?: string; email?: string; handle?: string; commit: string };
+
+/* GitHub's private address names an account and reaches nobody, so it is sent as a handle. */
+const GITHUB_PRIVATE = /^(?:[0-9]+\+)?([^@\s]+)@users\.noreply\.github\.com$/;
+
 /**
- * SessionEnd: the run goes idle, with the branch and commit it stopped at.
+ * The authors in `git log --format=%an%x1f%ae%x1f%h`, newest commit first, each once, at most ten.
+ *
+ * NOBODY TO MEET: a bot, by a name ending in `[bot]` or an address whose name is `[bot]` or noreply; the
+ * owner, by the addresses passed in; and an author with no address, because a name alone is what `meet`
+ * never joins on.
+ */
+export function authorsOf(log: string, own: readonly string[]): Author[] {
+  const mine = new Set(own.map((a) => a.trim().toLowerCase()));
+  const seen = new Set<string>();
+  const out: Author[] = [];
+  for (const line of log.split('\n')) {
+    const [name = '', address = '', commit = ''] = line.split('\x1f').map((s) => s.trim());
+    const email = address.toLowerCase();
+    const local = email.split('@')[0] ?? '';
+    if (!commit || !email.includes('@') || /\[bot\]$/i.test(name) || /\[bot\]$|^no-?reply$/.test(local) || mine.has(email)) continue;
+    const account = GITHUB_PRIVATE.exec(email)?.[1];
+    const key = account === undefined ? email : `github:${account}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...(name ? { name } : {}), ...(account === undefined ? { email } : { handle: key }), commit });
+    if (out.length === MET_PER_SESSION) break;
+  }
+  return out;
+}
+
+/**
+ * Send the authors of the commits made since the run began to `meet`, as the run.
+ *
+ * IT ONLY READS THE REPOSITORY, AND IT IS SILENT. Any refusal ends it, People switched off and a host that
+ * is down included, except one author's malformed address, which skips that author. None of this is the
+ * session's to hear about.
+ */
+export async function harvest(cwd: string, from: string | null, repo: string | null, meet: Client['meet'], until: number): Promise<void> {
+  if (from === null || repo === null) return;
+  const [log, own] = await Promise.all([git(cwd, 'log', '--format=%an%x1f%ae%x1f%h', `${from}..HEAD`), git(cwd, 'config', 'user.email')]);
+  if (log === null) return;
+  for (const { commit, ...who } of authorsOf(log, own === null ? [] : [own])) {
+    if (Date.now() >= until) return;
+    const out = await meet({ ...who, where: `commit ${commit} in ${repo}` });
+    if (refused(out) && out.refusal.code !== 'VALUE_MALFORMED') return;
+  }
+}
+
+/**
+ * SessionEnd: the people met in this session's commits, then the run goes idle, with the branch and
+ * commit it stopped at.
  *
  * IDLE, NEVER DONE. A terminal closing is not the work finishing, and a crashed session never says it
  * stopped, so only a person or the agent itself marks a run done. A run already handed off, done or
@@ -190,7 +247,13 @@ export async function hookEnd(io: Io): Promise<void> {
   if (event.client_id !== undefined && held.client_id !== undefined && event.client_id !== held.client_id) return;
 
   const at = await positionOf(event.cwd);
-  const client = clientFor(to, async () => sessionHeaders(at, 'claude', held), AbortSignal.timeout(hookBudget(io.env)));
+  const budget = hookBudget(io.env);
+  /* One client and one deadline for both, so the hook's whole budget is one number. */
+  const client = clientFor(to, async () => sessionHeaders(at, 'claude', held), AbortSignal.timeout(budget));
+  /* THE HARVEST GOES FIRST, AND STOPS SENDING AT HALF THE BUDGET. A write brings an idle run back to
+     active, so people met after the handoff would undo it; and the handoff, which is what this hook is
+     for, keeps time to land. */
+  await harvest(event.cwd, held.head_at_start, at.repo, client.meet, Date.now() + budget / 2);
   await client.handoff({
     state: 'idle',
     ...(at.branch === null ? {} : { branch: at.branch }),

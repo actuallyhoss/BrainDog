@@ -1,0 +1,5 @@
+code:   SCOPES_IN_USE
+via:    rpc
+raises: packages/kernel/src/declare.ts
+at:     register.tasks.thing
+fix:    Disable the packs whose fields are scoped to its projects in the same call, or leave it on.

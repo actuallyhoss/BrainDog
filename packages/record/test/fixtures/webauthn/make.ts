@@ -16,6 +16,10 @@ import { writeFileSync } from 'node:fs';
 import { b64url } from '../../../src/webauthn.ts';
 import { KEYS_URL, asJSON, assert, register, testKeys, type CborIn, type TestKey } from './authenticator.ts';
 
+/* THE TEST RUNNER PICKS THIS FILE UP WITH EVERYTHING UNDER test/, and a vector rewritten on every run is one nobody
+   wrote down. It writes only when run by hand, which is when NODE_TEST_CONTEXT is absent. */
+const write: typeof writeFileSync = process.env['NODE_TEST_CONTEXT'] === undefined ? writeFileSync : () => {};
+
 const ORIGIN = 'https://studio.example';
 const RP_ID = 'studio.example';
 const PERSON = 'p_fixture_person';
@@ -36,7 +40,7 @@ async function makeKeys(): Promise<{ es256: TestKey; rs256: TestKey }> {
 
 const keys = testKeys() ?? (await makeKeys());
 const kept = { note: 'Throwaway test keys for the WebAuthn vectors. They open nothing.', es256: keys.es256, rs256: keys.rs256 };
-writeFileSync(KEYS_URL, `${JSON.stringify(kept, null, 2)}\n`);
+write(KEYS_URL, `${JSON.stringify(kept, null, 2)}\n`);
 
 const vectors: Record<string, unknown> = { origin: ORIGIN, rpId: RP_ID, person: PERSON };
 for (const [name, key] of [['es256', keys.es256], ['rs256', keys.rs256]] as const) {
@@ -61,5 +65,5 @@ for (const [name, key] of [['es256', keys.es256], ['rs256', keys.rs256]] as cons
   };
 }
 
-writeFileSync(new URL('./vectors.json', import.meta.url), `${JSON.stringify(vectors, null, 2)}\n`);
+write(new URL('./vectors.json', import.meta.url), `${JSON.stringify(vectors, null, 2)}\n`);
 console.log('wrote the WebAuthn vectors and kept the test keys');

@@ -60,6 +60,8 @@ export type RecordApi = {
   // RUNS: 2, added with the session register (loop/research-agent-path.md §6)
   attach(args: AttachArgs, ctx: CallContext): Promise<Result<Attached>>;                               // which run this agent is, and its briefing
   handoff(args: HandoffArgs, ctx: CallContext): Promise<Result<Entry>>;                                // the next step, what was tried, the state
+  // PEOPLE: 1, added with the agents pack (loop/research-agent-path.md §5.6)
+  meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>>;                                         // someone met in the work, matched or added, as the run
   // READ+ — 11
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
   metric(args: { id: string }, ctx: CallContext): Promise<Result<MetricResult>>;
@@ -386,7 +388,7 @@ call(method, args, ctx):
 | Verb | Person level | Token scope | Methods |
 |---|---|---|---|
 | read | `≥ read` | any | `index` `search` `get` `list` `whatsNew` `boot` `whoami` `project` `page` `metric` `schema` `dialect` `digestToday` `sessionsLive` `context` |
-| propose | `≥ append` | `≥ propose` | `propose` `log` `attach` `handoff` |
+| propose | `≥ append` | `≥ propose` | `propose` `log` `attach` `handoff` `meet` (on `people`) |
 | create | `≥ append` | `write` | `create` |
 | update | `≥ write` | `write` | `update` |
 | decide | `≥ decide`, person only | — | `update` on `suggestion` with `patch.decide` or `patch.resolved_as` |
@@ -928,6 +930,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 | `context` | over the seed, in `test/context.test.ts`: the run, the project and how it was placed, the last handoff, who is live here and elsewhere, what waits, the project's open rows, a learning faded after ninety days and counted, the people linked, and no run opened by the read; nearer wins for a skill of the same name; a key by its label and sealed state, with no value anywhere; an append grant is no register in the answer, and a caller with nothing to read is refused |
 | `sessionsLive` | `last_seen` 46 min ago → `stale: true`; `same_repo` excludes the caller |
 | `attach` · `handoff` | in `test/session.test.ts`: attach opens a run signed by itself and resumes it for the same client; a person is never a run; re-attaching never overwrites the handoff and brings a finished run back; a handoff appends `tried` and `note`, keeps the last fifty of each, and moves `state` along the transitions; a token hands off only its own run |
+| `meet` | in `test/meet.test.ts`: somebody new is added, signed by the run and linked to its project; somebody already there is matched and gains the line and the handle and nothing else; with People switched off it is `REGISTER_UNKNOWN` and nothing is written, a run included; a stray key is `FIELD_UNKNOWN`, a `read` token and a token that does not reach `people` are `FORBIDDEN`, and a person in the app links no project |
 | `page` | `share` on its slug → ok; a `when: false` block → no rows; `empty` filled |
 | `project` budget | `budget.tokens: 500` → `used ≤ 500`, cut at the first row that does not fit; no `document` body; a `series` register contributes no rows; `{ metric }` → `rows: []` and the metric |
 | `whoami` | a token → its person's `levels` and `registers`; no session row is opened |

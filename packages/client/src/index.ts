@@ -115,6 +115,9 @@ export type Attached = {
   context?: Context;
 };
 
+/** `meet`: who they turned out to be, whether they were added or linked, and the merge question it opened. */
+export type Met = { person: string; created: boolean; linked: boolean; merge: string | null };
+
 /** `33 §4` line 356, six keys. `app` is `null` on a host that was not told what it is running. */
 export type Version = {
   version: number;
@@ -299,6 +302,8 @@ export function createClient(options: ClientOptions) {
     sessionsLive: () => call<LiveRun[]>('sessionsLive'),
     /** Where the caller stands: its run, its project, the last handoff, who is live, and what applies. */
     context: () => call<Context>('context'),
+    /** Someone met in the work, a commit author or a sender, as the caller's run. */
+    meet: (args: { name?: string; email?: string; handle?: string; where: string }) => call<Met>('meet', args as Record<string, unknown>),
   };
 }
 

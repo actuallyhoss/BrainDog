@@ -248,13 +248,70 @@ test('an empty note is refused rather than written, because a note is for the ne
   sql.close();
 });
 
-test('WHAT THE RECORD DOES NOT ANSWER YET IS A REFUSAL THAT SAYS WHAT TO DO, never a throw', async () => {
-  /* `meet` is in the list and arrives in the record with build step 16. An agent that calls it now is
-     told to carry on another way, in the record's own word for it, so it does not spend turns retrying. */
-  const { mcp, sql } = await agent();
-  const said = refusal(await mcp.call('meet', { where: 'commit 4464966' }, owner));
+test('WHAT A HOST DOES NOT ANSWER YET IS A REFUSAL THAT SAYS WHAT TO DO, never a throw', async () => {
+  /* A host older than build step 16 has no `meet`. An agent that calls it there is told to carry on
+     another way, in the record's own word for it, so it does not spend turns retrying. */
+  const { meet: _meet, ...older } = stub().surface;
+  const said = refusal(await tools(older).call('meet', { where: 'commit 4464966' }, { who: 'agent' }));
   assert.equal(said.code, 'NOT_IN_THIS_BUILD');
   assert.match(said.fix, /create/);
+});
+
+/** Projects, and people with the fields the agents pack gives them, which are the fields `meet` writes. */
+const THINGS = {
+  id: 'register.things',
+  kind: 'register' as const,
+  body: {
+    id: 'things',
+    name: 'Projects',
+    title: 'name',
+    scopes: { repos: 'repos' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'repos', type: 'list', of: 'text' },
+    ],
+  } as never,
+};
+const PEOPLE = {
+  id: 'register.people',
+  kind: 'register' as const,
+  body: {
+    id: 'people',
+    name: 'People',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'email', type: 'email', unique: true, index: true },
+      { id: 'handles', type: 'list', of: 'text' },
+      { id: 'projects', type: 'list', of: 'ref', to: 'things', scope: { links: true } },
+      { id: 'met', type: 'list', of: 'text' },
+      { id: 'merged_into', type: 'ref', to: 'people' },
+    ],
+  } as never,
+};
+
+test('MEET ANSWERS THROUGH THE RECORD: refused where People is switched off, then added, then matched', async () => {
+  const { mcp, api, sql } = await agent();
+  const token: CallContext = {
+    principal: { kind: 'token', id: 't', scope: 'propose', person: 'p_1', level: 'owner' },
+    session: { client_id: 'c-1', host: 'dev-pc', repo: 'braindog' },
+  };
+  const rows = () => sql.all('SELECT 1 FROM entry').length;
+
+  const off = refusal(await mcp.call('meet', { name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 4464966 in braindog' }, token));
+  assert.equal(off.code, 'REGISTER_UNKNOWN');
+  assert.equal(rows(), 0, 'a refused meet wrote something, a run perhaps');
+
+  assert.ok((await api.kernel.install([THINGS, PEOPLE])).ok);
+  const added = value<{ person: string; created: boolean }>(
+    await mcp.call('meet', { name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 4464966 in braindog' }, token),
+  );
+  assert.deepEqual([added.person, added.created], ['people#1', true]);
+
+  const again = value<{ person: string; created: boolean }>(
+    await mcp.call('meet', { handle: 'github:ada', email: 'ADA@example.com', where: 'commit 5a7b1c2 in braindog' }, token),
+  );
+  assert.deepEqual([again.person, again.created], ['people#1', false]);
   sql.close();
 });
 

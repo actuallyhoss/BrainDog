@@ -76,6 +76,8 @@ export interface Kernel {
   register(id: string): RegisterDecl | undefined;    // by register id, from the cache
   installDeclarations(batch: InstallBatch, ctx: CallContext): Promise<Result<{ versions: Record<string, number> }>>;
   retireDeclarations(req: { ids: string[]; pack?: string }, ctx: CallContext): Result<{ retired: number }>;
+  disablePack(id: string, opts?: { alsoDisable?: string[]; actor?: string }): Result<PackToggle>;
+  enablePack(id: string, opts?: { actor?: string }): Promise<Result<PackToggle>>;
 
   // ── provenance ──────────────────────────────────────────────────────────────────────────────
   allocate(counter: string): number;                 // in a transaction only, else TypeError
@@ -115,6 +117,8 @@ export interface Kernel {
 | `search` | FTS5 phrase search over `entry_fts`, live rows, optional register filter | none |
 | `installDeclarations` | new declaration versions, their indexes and counters, the pack row, and the events, in one transaction | `PLAN_STALE` · `UNIQUE_VIOLATION` (an index over duplicates) |
 | `retireDeclarations` | sets `retired = 1`, drops the indexes, deletes the pack row when `pack` is given | none |
+| `disablePack` | retires a pack's active declarations and any in `alsoDisable`, sets `pack.disabled_at`, keeps every row, in one transaction | `PACK_REQUIRED` · `SCOPES_IN_USE` · `DECLARATION_UNKNOWN` · `PROVIDES_CONFLICT` (the kernel) |
+| `enablePack` | reinstalls the declarations the pack went off with, through §5.6, and clears `pack.disabled_at` | the install path's own refusals · `DECLARATION_UNKNOWN` |
 | `allocate` | `UPDATE counter … RETURNING next - 1` | `TypeError` outside a transaction |
 | `appendEvent` | one row into `event`, redaction applied, the `grant.*` note shape enforced | `TypeError` on a malformed internal call (a defect, not a refusal) |
 | `replay` | the original result of a write whose `op_id` was seen | — |
@@ -644,6 +648,26 @@ layer owns quiet hours. At most 100 rows per field per write, nearest first (§1
 `retireDeclarations`: `UPDATE declaration SET retired = 1 WHERE id = ? AND superseded_at IS NULL AND retired = 0`
 per id; drop the register's index families; one `retire` event per declaration; with `pack`: `DELETE FROM pack WHERE id = ?`
 and one `uninstall` event, `target = 'pack:<id>'`. Rows are untouched ([04-PACKS](04-PACKS.md) §4).
+
+A batch naming a disabled pack is refused `PACK_DISABLED` at `pack` before step 1, by `installDeclarations` and by
+the pack path's staged install alike.
+
+`disablePack(id, { alsoDisable })`: a pack already disabled is a no-op that says so. Otherwise, before any write, with
+the set being `id` and every enabled pack in `alsoDisable`: (1) any active declaration of another pack whose body names
+a register the set owns (a field's `to:`, any `register.<id>` string), or any enabled `pack` row whose
+`manifest.requires.packs` names one of the set → `PACK_REQUIRED` at `alsoDisable`, `allowed` the dependents; (2) when
+the set owns the register declaring `scopes:`, any active field outside the set with `scope:` → `SCOPES_IN_USE` at
+`register.<reg>.<field>`. Then in one `transaction()`, per pack: `retireDeclarations` over its active ids,
+`UPDATE pack SET disabled_at = ?`, and one `retire` event, `target = 'pack:<id>'`, `target_kind = 'pack'`, `from_v` the
+pack version, `to_v` the JCS list of retired ids. A declaration belongs to a pack by `pack_id`, or by its body's `pack:`
+when the seed installed it without the pack path; such a pack has no `pack` row, that event is then the only record
+that it is off, and enabling keeps `pack_id` as it was.
+
+`enablePack(id)`: an enabled pack is a no-op that says so. Otherwise the ids in the last `retire` event's `to_v`, read
+back from their retired rows and staged through §5.6 as one batch, so each returns as a new version with the same
+checksum (K21: `retired` never goes back to 0); then `UPDATE pack SET disabled_at = NULL` and one `install` event with
+`to_v` the same list, all in one transaction; then the cache is rebuilt and derived schedule rows re-armed. The pack's
+version and every `entry` row are unchanged.
 
 ### 5.7 · `appendEvent` · `observe`
 

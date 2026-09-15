@@ -38,8 +38,8 @@ type Row = { state?: string | null; fields: Record<string, unknown> };
  * command line it is nothing the tools look at, because the bearer travels in the request. The tools
  * hand it on and never read it, which is what keeps authorisation in one place: the record.
  *
- * THE LAST FOUR ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers `context`,
- * `handoff` and `sessionsLive`, and not yet `meet` (build step 16). The command line offers only the
+ * THE LAST FOUR ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers all four since
+ * build step 16, and a host older than that does not. The command line offers only the
  * routes its client knows, so it still works against an older host. Without one, its tool refuses
  * with what to do instead, and its resource is not listed.
  */

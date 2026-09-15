@@ -106,7 +106,8 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6 | every row | no |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
-| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool, tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts | — | `table`, `cards` |
+| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool, tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere | — | `table`, `cards` |
+| `inherit` | bool. On a block over a register with a scope field ([02-DATA-MODEL](02-DATA-MODEL.md) §5), the rows of the project its `where` names, then the rows that apply everywhere. A project's row hides a global row of the same title where the field says `same: nearer`; otherwise both show. The project is named in `where` as `project is {{name}}` | `false` | no |
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
 | `limit` | int | 50, at most 500 | no |
 | `empty` | text, interpolatable | — | **yes, on every block with a `source`** |
@@ -136,7 +137,20 @@ Variable axis QA". The host stamps the read mark when the reader leaves the page
 so the rows that were new are still new on the way out. A `diff` reads `{ source: register.skills,
 row: '{{spoken}}', field: body, versions: 5, empty: … }` on a skill's page, and Decide draws the same
 kind for a document field in a proposed change. Both sources are computed by the kernel (`pages.ts`),
-alongside `forecast.runway`. *An earlier draft of this document defined none of these; thirty-seven
+alongside `forecast.runway`.
+
+The feed's evaluator reads the newest 500 events. An actor is an agent (a run, `agent:<name>` or
+`spark`), a rule (`rule:`, `ingest:` or `system`) or you (a person), and a feed's `where` asks about
+`actor`, `kind` and `target`. Consecutive events by one actor, of one kind, on one row are one row
+with a count. A diff's versions are the values its field held, newest first: the value it was
+created with, then each edit to that field.
+
+A block with `inherit: true` reads through the kernel's `inScope`, the read a run's `context` is
+built on, so a page and a briefing cannot disagree about which skill applies. Kiln's page shows
+Kiln's `review-pr` and not the global one of that name; Portage, with no `review-pr` of its own,
+shows the global one. The project's rows come first, and `inherited` counts the rows after them that
+apply everywhere, which the page draws faint under "From everywhere". Keys and learnings, whose scope
+field does not say `same: nearer`, add up instead. *An earlier draft of this document defined none of these; thirty-seven
 keys were in use across four documents with no type, default or required flag between them.*
 
 ---

@@ -696,6 +696,8 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         /* `as` IS A COLUMN'S ROLE ON A CARD, and only a `cards` block reads it. On any other kind it
            would install and draw nothing different, so it is refused there. */
         if (column.as === undefined) continue;
+        /* EXCEPT `scope`, which the page layer fills with where the row applies, on any kind but a card. */
+        if (column.as === 'scope' && block.kind !== 'cards') continue;
         if (block.kind !== 'cards')
           return bad('DECLARATION_INVALID', `${id}.${at} gives a column as, which is its role on a card, and only a cards block reads it.`, at);
         if (typeof column.as !== 'string' || !(CARD_ROLES as readonly string[]).includes(column.as))
@@ -2372,6 +2374,8 @@ export async function installDeclarations(
   batch: readonly Declaration[],
   transaction: <T>(fn: () => T) => T,
 ): Promise<Result<Installed[]>> {
+  const off = disabledPackFault(sql, batch);
+  if (off) return { ok: false, refusal: off };
   const staged = await stageDeclarations(batch, knownTo(sql, batch), ownersTo(sql, batch));
   /* PASSED THROUGH WHOLE. Rebuilding the envelope by hand dropped whichever arm the rebuild did
      not know about, and there are three of them now. */
@@ -2602,5 +2606,311 @@ export function retireDeclarations(sql: Sql, ids: readonly string[], transaction
     return n === 0 && ids.length > 0
       ? no<number>('DECLARATION_UNKNOWN', `None of ${ids.join(', ')} is installed.`)
       : ok(n);
+  });
+}
+
+/* ── disabling and enabling a pack ───────────────────────────────────────── */
+
+/** What a disable or an enable did, with a sentence, because a call that changed nothing must say so. */
+export type PackToggle = {
+  id: string;
+  state: 'enabled' | 'disabled';
+  changed: boolean;
+  /** Every pack this call turned, the one asked for first. Empty on a no-op. */
+  packs: string[];
+  /** The declarations retired or brought back. */
+  declarations: string[];
+  said: string;
+};
+
+type Tx = <T>(fn: () => T) => T;
+
+/** Carries a refusal out of a transaction, so the transaction rolls back instead of committing half. */
+class Rollback extends Error {
+  result: Result<unknown>;
+  constructor(result: Result<unknown>) {
+    super('rolled back');
+    this.result = result;
+  }
+}
+
+/**
+ * Who owns a declaration. The pack path writes `pack_id`; the seed installs the first-party packs as
+ * plain declarations whose only owner is the body's `pack:`, and People must be able to go off too.
+ */
+const OWNER = "coalesce(pack_id, json_extract(body, '$.pack'))";
+
+type LiveRow = { id: string; kind: string; owner: string | null; body: Record<string, unknown> };
+
+function liveRows(sql: Sql): LiveRow[] {
+  return sql
+    .all<{ id: string; kind: string; pack_id: string | null; body: string }>(
+      'SELECT id, kind, pack_id, body FROM declaration WHERE superseded_at IS NULL AND retired = 0 ORDER BY id',
+    )
+    .map((r) => {
+      let body: Record<string, unknown> = {};
+      try {
+        body = JSON.parse(r.body) as Record<string, unknown>;
+      } catch {
+        /* an unparseable body names nothing, and `knownTo` treats it the same way */
+      }
+      return { id: r.id, kind: r.kind, owner: r.pack_id ?? (typeof body.pack === 'string' ? body.pack : null), body };
+    });
+}
+
+/**
+ * Where a pack stands.
+ *
+ * THE DISABLE EVENT IS WHAT SAYS WHICH DECLARATIONS WENT OFF. Retired rows alone cannot: a register
+ * an upgrade dropped is also a retired row of the pack, and enabling must not bring that back. And
+ * the first-party packs the seed installs have declarations and no `pack` row, so for them the event
+ * is the only place the fact can live.
+ */
+function packStanding(sql: Sql, id: string) {
+  const row = sql.one<{ version: string; disabled_at: string | null }>('SELECT version, disabled_at FROM pack WHERE id = ?', id) ?? null;
+  const active = sql
+    .all<{ id: string }>(`SELECT id FROM declaration WHERE ${OWNER} = ? AND superseded_at IS NULL AND retired = 0 ORDER BY id`, id)
+    .map((r) => r.id);
+  const last = sql.one<{ kind: string; to_v: string | null }>(
+    "SELECT kind, to_v FROM event WHERE target = ? AND target_kind = 'pack' AND kind IN ('retire', 'install', 'uninstall') ORDER BY rowid DESC LIMIT 1",
+    `pack:${id}`,
+  );
+  let wentOff: string[] | null = null;
+  if (last?.kind === 'retire' && last.to_v)
+    try {
+      wentOff = (JSON.parse(last.to_v) as unknown[]).filter((x): x is string => typeof x === 'string');
+    } catch {
+      wentOff = [];
+    }
+  const disabled = row ? row.disabled_at !== null : active.length === 0 && wentOff !== null;
+  return { row, active, wentOff, disabled, known: row !== null || active.length > 0 || wentOff !== null };
+}
+
+const REGISTER_REF = /^register\.([a-z][a-z0-9_]*)$/;
+
+/** `a`, `a and b`, `a, b and c`: a list as a person reads one, since six packs can go off at once. */
+const listed = (items: readonly string[]): string =>
+  items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+
+/** Every register a declaration body leans on: a field's `to:`, and any `register.<id>` it names. */
+function namedRegisters(node: unknown, into = new Set<string>()): Set<string> {
+  if (typeof node === 'string') {
+    const m = REGISTER_REF.exec(node);
+    if (m?.[1]) into.add(m[1]);
+  } else if (Array.isArray(node)) {
+    for (const n of node) namedRegisters(n, into);
+  } else if (node !== null && typeof node === 'object') {
+    const o = node as Record<string, unknown>;
+    if (typeof o.to === 'string' && (o.type === 'ref' || o.type === 'list')) into.add(o.to);
+    for (const v of Object.values(o)) namedRegisters(v, into);
+  }
+  return into;
+}
+
+/**
+ * A pack's declarations installed and to be installed stay as they were when it was turned off.
+ *
+ * Upgrading a disabled pack would compute its diff against declarations that are not active, so
+ * `WOULD_ORPHAN` would stop meaning what it says (`loop/research-modular.md` §1.4). Enable first.
+ */
+export function disabledPackFault(sql: Sql, batch: readonly Declaration[]): Refusal | null {
+  for (const pack of new Set(batch.map((d) => d.pack ?? d.body.pack).filter((p): p is string => typeof p === 'string')))
+    if (packStanding(sql, pack).disabled)
+      return { code: 'PACK_DISABLED', fix: `${pack} is disabled. Enable it first, then install or upgrade it.`, at: 'pack' };
+  return null;
+}
+
+/**
+ * Turn packs off: their declarations are retired, their `pack` rows stay, and no row is touched.
+ *
+ * TWO GUARDS BEFORE ANYTHING IS WRITTEN. A pack another active pack leans on is refused, naming the
+ * dependents, and `alsoDisable` is how a caller chooses the cascade; nothing cascades unasked. The
+ * pack holding the `scopes:` register is refused while any field left on still points at its
+ * projects, because scope resolution is built on that one register.
+ */
+export function disablePack(
+  sql: Sql,
+  now: number,
+  id: string,
+  opts: { alsoDisable?: readonly string[]; actor?: string },
+  transaction: Tx,
+  mint: () => string,
+): Result<PackToggle> {
+  const asked = [id, ...(opts.alsoDisable ?? [])];
+  if (asked.includes('kernel'))
+    return no<PackToggle>('PROVIDES_CONFLICT', "kernel is the record's own, and no pack or person may disable it.", { at: 'pack' });
+
+  const standing = new Map(asked.map((p) => [p, packStanding(sql, p)]));
+  for (const [p, s] of standing)
+    if (!s.known)
+      return no<PackToggle>('DECLARATION_UNKNOWN', `${p} is not a pack this record has installed.`, {
+        at: p === id ? 'pack' : 'alsoDisable',
+      });
+
+  if (standing.get(id)?.disabled)
+    return ok({ id, state: 'disabled', changed: false, packs: [], declarations: [], said: `${id} is already disabled, so nothing changed.` });
+
+  const turning = [...new Set(asked)].filter((p) => !standing.get(p)?.disabled);
+  const off = new Set(turning);
+  const rows = liveRows(sql);
+
+  const owned = new Set(
+    rows.filter((r) => r.kind === 'register' && r.owner !== null && off.has(r.owner)).map((r) => r.id.slice('register.'.length)),
+  );
+  const dependents = new Set<string>();
+  for (const r of rows) {
+    if (r.owner === null || r.owner === 'kernel' || off.has(r.owner)) continue;
+    for (const register of namedRegisters(r.body))
+      if (owned.has(register)) {
+        dependents.add(r.owner);
+        break;
+      }
+  }
+  for (const p of sql.all<{ id: string; manifest: string }>('SELECT id, manifest FROM pack WHERE disabled_at IS NULL')) {
+    if (off.has(p.id)) continue;
+    try {
+      const needs = (JSON.parse(p.manifest) as { requires?: { packs?: unknown } }).requires?.packs;
+      if (needs !== null && typeof needs === 'object' && Object.keys(needs).some((k) => off.has(k))) dependents.add(p.id);
+    } catch {
+      /* a manifest nobody can read declares no dependency anybody can honour */
+    }
+  }
+  if (dependents.size > 0) {
+    const named = [...dependents].sort();
+    const labelled = named.map((p) => {
+      const v = sql.one<{ version: string }>('SELECT version FROM pack WHERE id = ?', p)?.version;
+      return v ? `${p} ${v}` : p;
+    });
+    return no<PackToggle>(
+      'PACK_REQUIRED',
+      `${listed(turning)} ${turning.length === 1 ? 'is' : 'are'} required by ${listed(labelled)}, which ${named.length === 1 ? 'is' : 'are'} still on. Add ${named.length === 1 ? 'it' : 'them'} to alsoDisable to turn ${named.length === 1 ? 'it' : 'them'} off in the same call, or leave ${id} on.`,
+      { at: 'alsoDisable', allowed: named },
+    );
+  }
+
+  const home = rows.find((r) => r.kind === 'register' && r.owner !== null && off.has(r.owner) && r.body.scopes !== undefined);
+  if (home) {
+    const scoped: string[] = [];
+    for (const r of rows) {
+      if (r.kind !== 'register' || (r.owner !== null && off.has(r.owner))) continue;
+      for (const f of Array.isArray(r.body.fields) ? (r.body.fields as Record<string, unknown>[]) : [])
+        if (f !== null && typeof f === 'object' && f.scope !== undefined && f.retired !== true) scoped.push(`${r.id}.${String(f.id)}`);
+    }
+    if (scoped.length > 0)
+      return no<PackToggle>(
+        'SCOPES_IN_USE',
+        `${home.id} holds the projects, and ${scoped.join(', ')} still ${scoped.length === 1 ? 'points' : 'point'} at them. Turn off the packs that declare ${scoped.length === 1 ? 'that field' : 'those fields'} in the same call, or leave ${id} on.`,
+        { at: scoped[0]! },
+      );
+  }
+
+  const at = instant(now);
+  const retired: string[] = [];
+  try {
+    transaction(() => {
+      for (const p of turning) {
+        const ids = rows.filter((r) => r.owner === p).map((r) => r.id);
+        const done = retireDeclarations(sql, ids, transaction);
+        if (!done.ok) throw new Rollback(done);
+        retired.push(...ids);
+        sql.exec('UPDATE pack SET disabled_at = ? WHERE id = ?', at, p);
+        /* `retire`, THE KIND FOR DECLARATIONS GOING OUT OF USE, aimed at the pack. Its `to_v` is the
+           list enable reads back, so the event is the record of exactly what went off. */
+        sql.exec(
+          "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v) VALUES (?, ?, ?, 'retire', ?, 'pack', ?, ?)",
+          mint(),
+          at,
+          opts.actor ?? 'system',
+          `pack:${p}`,
+          standing.get(p)?.row?.version ?? null,
+          jcs(ids),
+        );
+      }
+    });
+  } catch (e) {
+    if (e instanceof Rollback) return e.result as Result<PackToggle>;
+    throw e;
+  }
+
+  return ok({
+    id,
+    state: 'disabled',
+    changed: true,
+    packs: turning,
+    declarations: retired,
+    said: `Disabled ${listed(turning)}:${retired.length} ${retired.length === 1 ? 'declaration' : 'declarations'} retired, and every row under them kept.`,
+  });
+}
+
+/**
+ * Turn a disabled pack back on, through the install path, over the declarations it went off with.
+ *
+ * NO NEW PLAN AND NO DIFF, because the bodies are the ones already in the table. Each comes back
+ * as a new version with the same checksum, which is what `applyDeclarations` does for any retired
+ * declaration reinstalled: `declaration.retired` only ever goes 0 to 1 (`41` K21), so the shape's
+ * new period of being live is a new row. The pack's version and every entry row are unchanged.
+ */
+export async function enablePack(
+  sql: Sql,
+  now: number,
+  id: string,
+  opts: { actor?: string },
+  transaction: Tx,
+  mint: () => string,
+): Promise<Result<PackToggle & { batch: Declaration[] }>> {
+  type Out = PackToggle & { batch: Declaration[] };
+  const s = packStanding(sql, id);
+  if (!s.known) return no<Out>('DECLARATION_UNKNOWN', `${id} is not a pack this record has installed.`, { at: 'pack' });
+  if (!s.disabled)
+    return ok({ id, state: 'enabled', changed: false, packs: [], declarations: [], said: `${id} is already enabled, so nothing changed.`, batch: [] });
+
+  const ids =
+    s.wentOff ??
+    sql.all<{ id: string }>(`SELECT id FROM declaration WHERE ${OWNER} = ? AND superseded_at IS NULL AND retired = 1`, id).map((r) => r.id);
+  const batch: Declaration[] = [];
+  for (const decl of ids) {
+    const row = sql.one<{ kind: string; pack_id: string | null; body: string }>(
+      `SELECT kind, pack_id, body FROM declaration WHERE id = ? AND ${OWNER} = ? AND superseded_at IS NULL AND retired = 1`,
+      decl,
+      id,
+    );
+    /* `pack_id` AS IT WAS, so a declaration the seed installed comes back owned the way it went off. */
+    if (row)
+      batch.push({ id: decl, kind: row.kind as DeclKind, body: JSON.parse(row.body) as Record<string, Json>, pack: row.pack_id ?? undefined });
+  }
+
+  const staged = await stageDeclarations(batch, knownTo(sql, batch), ownersTo(sql, batch));
+  if (!staged.ok) return staged;
+
+  const at = instant(now);
+  try {
+    transaction(() => {
+      const out = staged.value(sql, now, transaction);
+      if (!out.ok) throw new Rollback(out);
+      sql.exec('UPDATE pack SET disabled_at = NULL WHERE id = ?', id);
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v) VALUES (?, ?, ?, 'install', ?, 'pack', ?, ?)",
+        mint(),
+        at,
+        opts.actor ?? 'system',
+        `pack:${id}`,
+        s.row?.version ?? null,
+        jcs(batch.map((d) => d.id)),
+      );
+    });
+  } catch (e) {
+    if (e instanceof Rollback) return e.result as Result<Out>;
+    throw e;
+  }
+
+  const back = batch.map((d) => d.id);
+  return ok({
+    id,
+    state: 'enabled',
+    changed: true,
+    packs: [id],
+    declarations: back,
+    said: `Enabled ${id}: ${back.length} ${back.length === 1 ? 'declaration' : 'declarations'} back, over the rows ${back.length === 1 ? 'it' : 'they'} had.`,
+    batch,
   });
 }

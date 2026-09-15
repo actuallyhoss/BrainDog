@@ -125,7 +125,7 @@ export function serveMcp<C>(request: Request, surface: McpSurface<C>, ctx: C | n
 whatever the stdio loop passes, because the bearer travels in each request. The tools hand it on and never read it.
 
 **The four optional methods** are optional because a host may not answer them. The record answers `context`,
-`handoff` and `sessionsLive` since build steps 6 and 8, and `meet` arrives with step 16. The command line offers only
+`handoff` and `sessionsLive` since build steps 6 and 8, and `meet` since step 16. The command line offers only
 the routes its client knows, so it still works against an older host. Without one, the tool refuses
 `NOT_IN_THIS_BUILD` with a sentence saying what to do instead, and the resource is not listed (§4.7).
 
@@ -306,8 +306,8 @@ The tool layer holds no checks of its own beyond addressing:
 - **Arguments** are not validated against the schema here. The schemas are JSON Schema written by hand in
   `index.ts`, with `additionalProperties: false` and `required` left out when empty. The record refuses a wrong field
   by name (`FIELD_UNKNOWN`, `ENUM_VALUE_UNKNOWN`, with `allowed`), which teaches better than a protocol error would.
-- **A tool the surface does not answer**, which is `meet` until build step 16, or `context` and `handoff` over a
-  host older than build step 8, is `NOT_IN_THIS_BUILD` with a sentence saying what to do instead.
+- **A tool the surface does not answer**, which is `meet` over a host older than build step 16, or `context` and
+  `handoff` over one older than build step 8, is `NOT_IN_THIS_BUILD` with a sentence saying what to do instead.
 - **Any other name** is `ROUTE_UNKNOWN`, with the fourteen in `allowed`. The lookup is `Object.hasOwn`, because the
   name comes from the caller and every name on `Object.prototype` would otherwise be found and called.
 - **A note** is an `update` with an empty patch, so it answers to the same permission and lands in the same history.
@@ -727,7 +727,7 @@ and each case is named for what it holds.
 | File | Holds |
 |---|---|
 | `packages/mcp/test/rpc.test.ts` | `handle` over `stub.ts`. `initialize` negotiates, and an older client gets the newest version at or below its own. `server/discover` answers without reading the record, with `cacheScope: 'public'`. `ping`, and `prompts/list` as an empty list. `tools/list` is the fourteen, with the instructions and the read-only ones marked, and reads nothing. Each tool reaches its method with the transport's context. A value is compact JSON, a refusal is carried whole, and a conflict carries the current row and who changed it. An unknown tool, or a name off `Object.prototype`, runs nothing. A throw is `-32603` and a reference, with no exception text. A notification returns `null`, and the id is echoed exactly. A batch or a malformed message is `-32600`, an unknown method `-32601`, and parameters of the wrong shape `-32602`. Resources are listed, templated and read with their `ttlMs`, and an address that is not there, or is refused, is `-32002` |
-| `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is fourteen, and there is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number` or by a prefixed id, and `S1` is the run. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and the five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
+| `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is fourteen, and there is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number` or by a prefixed id, and `S1` is the run. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and so does `meet`, refused `REGISTER_UNKNOWN` with People switched off and then adding and matching a person; a host without `meet` is `NOT_IN_THIS_BUILD`. The five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
 | `packages/mcp/test/http.test.ts` | `serveMcp` in §5.1's order: 405 with `Allow: POST`; 403 for any `Origin`; 415; 401 before a byte of the body; 413 on the claim and on the bytes; 400 with `-32700` for bytes that are not JSON or not UTF-8, and `-32600` for a batch; 202 for a notification; no session minted, and one a client sends ignored; 404 for a method this server does not have; the mirrored headers held to the body, required of a 2026-07-28 request and not of an older one; `-32022` for an unsupported version, `initialize` exempt; 500 for a throw; `no-store` on every answer, and no CORS or session header |
 | `packages/mcp/test/budget.test.ts` | §5.8's estimator on its worked examples, the ceilings of §7, and plain ASCII in everything a client shows a model (§5.9) |
 | `apps/cli/test/stdio.test.ts` | `braindog mcp` spawned against a stub `/api`. `initialize` and `tools/list` answer without touching the host. A list call carries the bearer and the session headers. The token comes from the hosts file when the environment has none. A line that is not JSON is a parse error, and the server keeps serving. A host that does not answer, or has nothing listening, gets the unreachable sentence. Calls in flight are answered when stdin ends. A startup failure is one line on stderr. The token is never printed |
@@ -794,7 +794,7 @@ which is why `@braindog/record` is a dependency.
 | 3 | `POST /mcp` on both hosts: `serveMcp`, with `gate` run first on the Worker so that both refuse in one order | `packages/mcp/src/http.ts`, `apps/worker/src/index.ts`, `apps/selfhost/src/server.ts` |
 | 6 | The record answers `handoff` and `sessionsLive`, and both hosts read the session hints from headers and from `_meta.session` | `packages/record`, `packages/host/src/session.ts` |
 | 8 | The record answers `context`, and `attach` returns it | `packages/record` |
-| 16 | The record answers `meet`, which switches the `meet` tool on | not built |
+| 16 | The record answers `meet`, which switches the `meet` tool on, and the end hook sends it the authors of a session's commits | `packages/record`, `packages/host`, `packages/client`, `apps/cli/src/hooks.ts` |
 
 Beside step 8, `rpc.ts` gained `server/discover` and the version rule of §4.1, the two protocol gaps the forty-first
 pass left open (`loop/BACKLOG.md`).
@@ -848,7 +848,7 @@ the documents that still cite the earlier decision.
 - [x] stdio in `apps/cli` and `POST /mcp` on both hosts serve the same `handle`; every HTTP answer carries
       `Cache-Control: no-store`, and no body carries an exception message.
 - [x] The record answers `context`, `handoff` and `sessionsLive`, so their tools and resources are live.
-- [ ] The record answers `meet` (build step 16). Until it does, the tool refuses `NOT_IN_THIS_BUILD`.
+- [x] The record answers `meet` (build step 16), so its tool is live. A host older than that refuses it `NOT_IN_THIS_BUILD`.
 - [ ] The tokenizer calibration of §9 is built.
 - [x] 10, 33 and 45 agree with this document: fourteen tools, `context` in place of `learningsFor`, and no
       `createMcpHandler`.

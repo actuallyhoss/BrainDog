@@ -159,8 +159,8 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twelve, counted, in nine
- * families — 47 pack and declaration · 14 grammar · 18 write path · 7 auth and vault · 8 format and
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and fifteen, counted, in nine
+ * families — 50 pack and declaration · 14 grammar · 18 write path · 7 auth and vault · 8 format and
  * lifecycle · 2 dialect · 5 spark · 7 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -175,7 +175,7 @@ export type Conflict = {
  * into the list of everything that can appear in a `code`.
  */
 
-/** Pack and declaration — 47. */
+/** Pack and declaration — 50. */
 const PACK = [
   'KIND_UNKNOWN', 'FIELD_TYPE_UNKNOWN', 'FIELDS_OVER_CAP', 'INDEXES_OVER_CAP', 'PATTERN_OVER_CAP',
   'METRIC_NEEDS_TARGET_OR_WINDOW', 'MIXED_CURRENCY', 'CONTRAST_FLOOR', 'REQUIRED_ON_POPULATED', 'ID_RENAMED',
@@ -193,6 +193,8 @@ const PACK = [
      belongs here rather than under a family whose first line is "refused before any row is written". */
   'DECLARATION_UNKNOWN', 'PAGE_UNKNOWN', 'METRIC_UNKNOWN', 'SOURCE_UNKNOWN', 'LOOKUP_UNKNOWN',
   'LOOKUP_MISSING',
+  /* Turning a pack off and on, 2026-09-15: an upgrade of a disabled pack, and the two guards on disabling. */
+  'PACK_DISABLED', 'PACK_REQUIRED', 'SCOPES_IN_USE',
 ] as const;
 
 /** Grammar — 14. */
@@ -263,7 +265,7 @@ const CONNECTOR = [
 const HOST = [
   'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
 ] as const;
-/** The hundred and twelve, in `30 §6`'s order. */
+/** The hundred and fifteen, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
   ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SPARK, ...CONNECTOR, ...HOST,
 ] as const;
@@ -276,7 +278,7 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the hundred and twelve. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and fifteen. `30-BLUEPRINT` §6, and the list is above.
    *
    * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was

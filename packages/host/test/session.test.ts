@@ -148,6 +148,68 @@ test('CONTEXT IS A READ+ GET THROUGH THE SHARED WIRING, naming the run the heade
   sql.close();
 });
 
+/** Projects, and people with the fields the agents pack gives them, which are the fields `meet` writes. */
+const THINGS = {
+  id: 'register.things',
+  kind: 'register' as const,
+  body: {
+    id: 'things',
+    name: 'Projects',
+    title: 'name',
+    scopes: { repos: 'repos' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'repos', type: 'list', of: 'text' },
+    ],
+  } as never,
+};
+const PEOPLE = {
+  id: 'register.people',
+  kind: 'register' as const,
+  body: {
+    id: 'people',
+    name: 'People',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'email', type: 'email', unique: true, index: true },
+      { id: 'handles', type: 'list', of: 'text' },
+      { id: 'projects', type: 'list', of: 'ref', to: 'things', scope: { links: true } },
+      { id: 'met', type: 'list', of: 'text' },
+      { id: 'merged_into', type: 'ref', to: 'people' },
+    ],
+  } as never,
+};
+
+test('MEET IS A DATA WRITE THROUGH THE SHARED WIRING: 422 where People is switched off, and a person added where it is not', async () => {
+  const route = ROUTES.find((r) => r.name === 'meet') ?? assert.fail('meet is not routed');
+  assert.deepEqual([route.group, route.writes], ['DATA', true]);
+
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 15, 12)) });
+  const handlers = handlersFor(api);
+  const agent: CallContext = {
+    principal: { kind: 'token', id: 'tok_1', scope: 'propose', person: 'p_1', level: 'owner' },
+    session: { host: 'studio-pc', repo: 'braindog', agent: 'claude', client_id: 'c-1' },
+  };
+  const post = async (body: unknown) => {
+    const res = await serveApi(new Request('https://x/api/meet', { method: 'POST', body: JSON.stringify(body) }), handlers, agent);
+    return { status: res.status, body: (await res.json()) as { ok: boolean; value?: Record<string, unknown>; refusal?: Record<string, unknown> } };
+  };
+  const said = { name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 4464966 in braindog' };
+
+  const off = await post(said);
+  assert.equal(off.status, 422);
+  assert.equal(off.body.refusal?.code, 'REGISTER_UNKNOWN');
+  assert.equal(sql.all('SELECT 1 FROM entry').length, 0, 'a refused meet wrote something');
+
+  assert.ok((await api.kernel.install([THINGS, PEOPLE])).ok);
+  const on = await post(said);
+  assert.equal(on.status, 200);
+  assert.deepEqual([on.body.value?.person, on.body.value?.created], ['people#1', true]);
+  sql.close();
+});
+
 test('A REMOTE LOSES ITS USERINFO, so a password in a git remote never reaches the record', () => {
   const said = sessionOf(new Headers({ 'x-braindog-remote': 'https://sam:hunter2@github.com/sam/braindog.git' }));
   assert.equal(said.remote, 'https://github.com/sam/braindog.git');

@@ -40,7 +40,7 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 |---|---|---|---|---|
 | `login <host>` | `<host>` = `https://origin[/slug]` | `POST /auth/device` then `POST /auth/device/token` until approved | the six digits and the URL (stderr); `logged in to <host> as <label> · expires <date>` | 0 · 1 · 3 |
 | `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers of `loop/research-agent-path.md` §3.4, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
-| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file. `end`: `POST /api/handoff { state: 'idle', branch, head }` as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
+| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
 | `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
@@ -99,7 +99,13 @@ the entries are:
   and reprint the briefing the model just lost. With no token it prints one line naming `BRAINDOG_TOKEN` and
   the hosts file, because `login` is not built yet. A host that does not answer within 8 seconds is one line
   too.
-- **End.** It sets the run `idle`, with its branch and commit, and prints nothing. It never sets `done`: a
+- **End.** First it meets the people in this session's commits: the authors of `git log` since the run's first
+  head, read only, each once and at most 10, sent to `meet` with an email, or a `github:` handle for GitHub's
+  private address, and `where` as `commit <h> in <repo>`. Bots, by a name ending in `[bot]` or a noreply
+  address, and the machine's own `git config user.email` are left out. It goes first because a write brings an
+  idle run back to active, and it stops sending once half of the 8 seconds has passed. Any refusal but one author's malformed address ends
+  it silently, so a record with People switched off or a host that is down costs nothing.
+  Then it sets the run `idle`, with its branch and commit, and prints nothing. It never sets `done`: a
   terminal closing is not the work finishing, and a session that crashes never says so. A run already handed
   off, done or abandoned has no declared move to `idle`, so the record refuses the call and the run stays as it
   was. When another session in the same folder has rewritten the session file since, its client id differs,
@@ -110,8 +116,7 @@ the entries are:
   or stop."; the questions waiting on the owner, followed by "Do not decide for them."; the open rows of every
   scoped register; the people on the project; learnings; keys, by label only; skills; and `context.next` last.
   Over 40 lines or 3,000 characters, the rows go first, from the bottom, and one line says how many.
-- **Not yet.** Skills sync and tools scan at start are the plan's step 19, and the people harvest from commits
-  at end is its step 16.
+- **Not yet.** Skills sync and tools scan at start are the plan's step 19.
 
 ### The config file
 
@@ -656,6 +661,9 @@ cover `mcp`. `brief.test.ts` covers the briefing with no host:
 - one line and exit 0 for a host that never answers and for a closed port;
 - the not-signed-in line;
 - `end` sending `state: 'idle'`, and leaving another session's run alone;
+- `end` sending the authors of the session's commits in a temporary repository to `meet` first: bots and the
+  owner left out, a GitHub private address as a handle, at most 10, and silent with People switched off and
+  with a closed port;
 - `install` as a dry run, then with `--apply` and its copy, then with nothing left to change;
 - no child ever printing the token.
 

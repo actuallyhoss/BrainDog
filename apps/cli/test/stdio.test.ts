@@ -171,12 +171,6 @@ test('A LIST CALL goes to /api/list with the bearer and the session headers, and
   assert.equal(hit.headers['x-braindog-agent'], 'claude');
   assert.match(String(hit.headers['x-braindog-cwd']), /cli$/);
 
-  /* A route the record does not have yet is the tool's own sentence, and asks the host nothing. */
-  const meet = await s.ask('tools/call', { name: 'meet', arguments: { where: 'commit 4464966' } });
-  assert.equal(meet.result.isError, true);
-  assert.match(String(said(meet).fix), /^This record does not answer meet yet\./);
-  assert.equal(host.seen.filter((x) => x.method === 'meet').length, 0);
-
   assert.equal((await s.end()).code, 0);
 });
 
