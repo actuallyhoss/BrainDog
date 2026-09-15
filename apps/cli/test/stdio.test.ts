@@ -294,9 +294,10 @@ test('a command from a later step says so, and an unknown one is not echoed unle
     printed.push(r.stdout, r.stderr);
     return r;
   };
-  const login = run('login', 'app.brain.dog');
-  assert.equal(login.status, 1);
-  assert.equal(login.stderr.trim(), 'braindog login is not built yet.');
+  /* `login` is built now (`login.test.ts`), and run here it would reach a real host. */
+  const later = run('logout');
+  assert.equal(later.status, 1);
+  assert.equal(later.stderr.trim(), 'braindog logout is not built yet.');
 
   const typo = run('mpc');
   assert.equal(typo.status, 1);
@@ -308,7 +309,7 @@ test('a command from a later step says so, and an unknown one is not echoed unle
 
   const help = run('--help');
   assert.equal(help.status, 0);
-  assert.match(help.stdout, /^braindog mcp /);
+  assert.match(help.stdout, /^braindog login <host>\n[\s\S]*^braindog mcp /m);
 });
 
 /* ── last, over everything above ───────────────────────────────────────── */

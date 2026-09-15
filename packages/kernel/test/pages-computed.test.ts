@@ -362,6 +362,28 @@ test('SESSIONS.LIVE IS THE RUNS NOT FINISHED, the most recently seen first, filt
   sql.close();
 });
 
+test('A RUN’S PROJECT IS NAMED, not left as the spoken id the ladder wrote', async () => {
+  const { k, sql } = await record();
+  const deps = depsOver(k, sql);
+  const run = (doing: string, hoursAgo: number, project?: string) =>
+    value(
+      k.create('session', { doing, agent: 'claude', state: 'active' }, {
+        actor: OWNER.actor,
+        stamp: { last_seen: new Date(NOW - hoursAgo * 3_600_000).toISOString(), ...(project === undefined ? {} : { project }) },
+      }),
+    );
+  run('Axis QA', 0.1, 'things#1');
+  run('Newsletter', 0.2, 'things#2');
+  run('Nowhere yet', 0.3);
+  run('A project since deleted', 0.4, 'things#9');
+
+  const live = readBlock(deps, { kind: 'cards', source: 'sessions.live', columns: [{ field: 'doing', as: 'title' }, { field: 'project', as: 'fact' }], empty: 'None.' });
+  assert.deepEqual(live.refusals, []);
+  assert.equal(live.rows[0]?.fields.project, 'things#1', 'the row keeps what the run holds');
+  assert.deepEqual(live.scopes, ['Kiln', 'Portage', null, 'things#9'], 'a name, nothing for no project, and an id that names no row as it was written');
+  sql.close();
+});
+
 test('an actor is an agent, a rule or you, and each is its own group', () => {
   const at = '2026-09-15T12:00:00Z';
   const event = (actor: string): ActivityEvent => ({ ts: at, actor, kind: 'edit', target: actor, note: null });

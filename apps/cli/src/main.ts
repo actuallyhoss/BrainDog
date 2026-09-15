@@ -2,8 +2,8 @@
 /**
  * `braindog`, the command on an agent's machine.
  *
- * THREE COMMANDS ARE BUILT: `mcp`, the stdio server Claude Code launches (`loop/research-agent-path.md`
- * §1.1), and `hook` and `install`, the session hooks of its §4. The rest of the plan's §4.2 is named, so
+ * FOUR COMMANDS ARE BUILT: `mcp`, the stdio server Claude Code launches (`loop/research-agent-path.md`
+ * §1.1), `hook` and `install`, the session hooks of its §4, and `login`, the device grant of its step 12. The rest of the plan's §4.2 is named, so
  * a person who types one learns it is coming rather than that it does not exist.
  *
  * `init` AND `serve` BELONG TO THE SELF-HOST, which has no `bin` of its own and whose messages tell
@@ -20,6 +20,7 @@ import { parseArgs } from 'node:util';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { installInto, profilesOf } from './install.ts';
+import { login } from './login.ts';
 import { AGENTS, isAgent, positionOf, sessionHeaders } from './position.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
@@ -33,10 +34,12 @@ const stop = (line: string): never => {
   return process.exit(1);
 };
 
-const LATER = ['login', 'logout', 'session', 'key', 'run', 'skills', 'tools', 'context', '--version'];
+const LATER = ['logout', 'session', 'key', 'run', 'skills', 'tools', 'context', '--version'];
 
 const usage = () =>
   [
+    'braindog login <host>',
+    '  Sign this machine in. It prints six digits to approve in the app, and keeps the token in the hosts file.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',
@@ -86,6 +89,21 @@ async function mcp(args: string[]): Promise<void> {
   /* Every reply is flushed by now. Exiting rather than waiting for the event loop to empty, because an
      idle keep-alive socket to the host could hold it open. */
   process.exit(0);
+}
+
+/** `braindog login <host>`: one host, and the exit code `login` decides. */
+async function signIn(args: string[]): Promise<void> {
+  const [host, ...more] = args;
+  if (host === undefined || more.length > 0 || host.startsWith('-'))
+    return stop('braindog login takes one host, as in braindog login https://app.brain.dog/<slug>, and nothing else.');
+  const stopping = new AbortController();
+  /* Ctrl+C ends the wait with one sentence rather than a stack. */
+  process.on('SIGINT', () => stopping.abort());
+  const code = await login(host, { file: hostsPath(process.env), say, signal: stopping.signal });
+  /* LEFT TO END ON ITS OWN, for the reason `hook` gives: exiting straight after several requests aborted Node 24
+     on Windows, and a success must exit 0. */
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 1_000).unref();
 }
 
 function selfhost(command: 'init' | 'serve', args: string[]): void {
@@ -153,6 +171,7 @@ function install(args: string[]): void {
 const [command, ...rest] = process.argv.slice(2);
 try {
   if (command === 'mcp') await mcp(rest);
+  else if (command === 'login') await signIn(rest);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(rest);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);

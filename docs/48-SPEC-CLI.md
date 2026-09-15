@@ -38,7 +38,7 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 
 | Command | Arguments · flags | Calls | Prints | Exit |
 |---|---|---|---|---|
-| `login <host>` | `<host>` = `https://origin[/slug]` | `POST /auth/device` then `POST /auth/device/token` until approved | the six digits and the URL (stderr); `logged in to <host> as <label> · expires <date>` | 0 · 1 · 3 |
+| `login <host>` | `<host>` = `https://origin[/slug]` | `POST /auth/device` then `POST /auth/device/token` until approved | the six digits and the URL (stderr); `logged in to <host> as <label> · token expires <date>`; an expired code, a denial and Ctrl+C are one sentence each | 0 · 1 · 3 |
 | `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers of `loop/research-agent-path.md` §3.4, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
 | `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
@@ -97,7 +97,7 @@ the entries are:
 - **Start.** It attaches to the run, writes the session file, and prints the briefing, which Claude Code adds
   to the model's context. `compact` and `clear` send the same `session_id`, so they re-attach to the same run
   and reprint the briefing the model just lost. With no token it prints one line naming `BRAINDOG_TOKEN` and
-  the hosts file, because `login` is not built yet. A host that does not answer within 8 seconds is one line
+  the hosts file, and `braindog login <host>`. A host that does not answer within 8 seconds is one line
   too.
 - **End.** First it meets the people in this session's commits: the authors of `git log` since the run's first
   head, read only, each once and at most 10, sent to `meet` with an email, or a `github:` handle for GitHub's
@@ -216,10 +216,10 @@ type Result<T> = { ok: true; value: T; version: number }
 type Refusal   = { code: RefusalCode; at: string; found?: unknown; wanted?: string; fix: string };
 
 // the device flow — /auth/* routes, 33 §4; the shapes are §13 D1
-type DeviceRequest = { slug?: string; reach: Reach; label: string; subject?: string };
-type Reach         = 'login' | 'runner' | 'export' | 'import' | 'pack' | 'token';
-type DeviceCode    = { device_code: string; user_code: string; verification_uri: string; expires_in: 600; interval: 5 };
-type DevicePoll    = { pending: true; interval: number } | { token: string; expires: string; reach: Reach };
+type DeviceRequest = { slug?: string; reach: Reach; label: string; scope?: string; subject?: string };
+type Reach         = 'login' | 'runner' | 'export' | 'import' | 'pack' | 'token' | 'vault';
+type DeviceCode    = { device_code: string; user_code: string; verification_uri: string; expires_in: 600; expires: string; interval: 5 };
+type DevicePoll    = { pending: true; interval: number } | { pending: false; bearer: string; reach: Reach; scope: string | null; expires: string };
 
 // export — POST /api/export answers 200 text/plain; charset=utf-8: the .dogl of 41 §5.10, streamed (§13 D3)
 type ExportArgs  = { sections?: ('data' | 'origin' | 'governance')[]; redact_grants?: boolean };
@@ -336,10 +336,10 @@ parses the `Result` that comes back.
 
 `device(host, request, onCode)` — RFC 8628 over the `Result` envelope:
 
-1. `POST ${origin}/auth/device` with `{ slug, reach, label: `${os.hostname()} · braindog-cli ${__BUILD__}`, subject }` → `DeviceCode`. `slug` is the host's path segment; absent, the self-host's only record.
+1. `POST ${origin}/auth/device` with `{ slug, reach, label: `${os.hostname()} · braindog-cli`, subject }` → `DeviceCode`, or a `429` with `Retry-After` once this address has started ten in 15 minutes. `slug` is the host's path segment; absent, the self-host's only record.
 2. Refuse a `verification_uri` whose origin differs from the host's — a phished approval page is the one thing this flow must never print.
 3. `onCode(code)` prints to stderr: `Open ${verification_uri} and enter  ${user_code.slice(0,3)} ${user_code.slice(3)}   (10 minutes)`.
-4. Every `interval` seconds until `expires_in` has elapsed: `POST /auth/device/token { device_code }`. `pending` → sleep the reply's `interval` (so a slow-down is obeyed). A token → return it. A refusal (`DEVICE_CODE_EXPIRED`, `DEVICE_CODE_TRIES`) → `Refused`. `expires_in` elapsed with no answer → `Refused([DEVICE_CODE_EXPIRED])`.
+4. Every `interval` seconds until `expires_in` has elapsed: `POST /auth/device/token { slug, device_code }`. `pending` → sleep the reply's `interval` (so a slow-down is obeyed). A bearer → return it. A refusal (`DEVICE_CODE_EXPIRED`, `DEVICE_CODE_TRIES`) → `Refused`. `expires_in` elapsed with no answer → `Refused([DEVICE_CODE_EXPIRED])`.
 
 `admin(host, method, args, reach, subject)` — how a CLI reaches an ADMIN method without an admin token (§13 D1):
 
@@ -350,9 +350,10 @@ parses the `Result` that comes back.
 ### 5.3 · `login <host>`
 
 1. Parse `<host>`: `https:` required except for `localhost` and `127.0.0.1`; `origin[/slug]`; the key is the normalised string.
-2. `device(host, { reach: 'login' })` — the exchange returns the `read`+`write` agent token, 90 days (33 §5).
+2. `device(host, { reach: 'login' })`: the exchange returns a `write` token, 90 days (33 §5). The hosts file is read first, so a broken one fails before anybody approves.
 3. `saveHost`: read `hosts.json` (or `{ hosts: {} }`), set `hosts[key].token = { value, expires, label }` and `default = key`; write `hosts.json.tmp` with `mode: 0o600`; `renameSync`.
 4. Print `logged in to <key> as <label> · token expires <date>`. The token is never printed.
+5. Every other ending is one sentence and exit 1: `The code expired before anyone approved it. Run braindog login <key> to start again.`, `The request was denied after five wrong codes were typed. Run braindog login <key> to start again.`, and on Ctrl+C `Sign-in was stopped before it finished, and nothing was saved.` A host that does not answer is exit 3. Built in `apps/cli/src/login.ts`.
 
 ### 5.4 · `export`
 
@@ -748,8 +749,8 @@ operation* from a browser session, and the exchange returns a ten-minute **opera
 memory. This is the "device grant approved in the browser" ADR-060 already names for the install path,
 generalised to the other owner acts; ADR-060 stays literally true — no token row has an admin scope, and a
 stolen `hosts.json` cannot export or install. Wire: `POST /auth/device { slug?, reach, label, subject? }` and
-`POST /auth/device/token { device_code }`, `Result` envelopes (§4.2). Storage: `device_grant` gains
-`reach TEXT NOT NULL CHECK (reach IN ('login','runner','export','import','pack','token'))`; a `login` exchange
+`POST /auth/device/token { slug?, device_code }`, `Result` envelopes (§4.2). Storage: `device_grant` gains
+`reach TEXT NOT NULL CHECK (reach IN ('login','runner','export','import','pack','token'))`, with `'vault'` added by kernel migration 4; a `login` exchange
 mints the `token` row and leaves the grant row as the approval's audit; a `runner` exchange returns the 90-day
 bearer of 12 §6.1; the four operation reaches return a bearer whose hash sits in `token_hash` with `expires`
 left at the code's ten minutes. The Worker resolves an operation bearer to the approver's person principal with

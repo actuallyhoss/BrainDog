@@ -134,6 +134,24 @@ export type Version = {
   spark: boolean;
 };
 
+/** `listDevices` and `revokeDevice`: one device grant, by its handle and never its poll id. See `DeviceRow` in `@braindog/kernel`. */
+export type DeviceRow = {
+  handle: string;
+  status: 'pending' | 'approved' | 'active' | 'expired' | 'denied' | 'revoked';
+  reach: 'login' | 'runner' | 'export' | 'import' | 'pack' | 'token' | 'vault';
+  scope: string | null;
+  label: string | null;
+  ua: string | null;
+  tries: number;
+  expires: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  last_used: string | null;
+};
+
+/** `deviceApprove`: the device that was let in, as the person approving it should see it. */
+export type DeviceApproved = Pick<DeviceRow, 'handle' | 'reach' | 'scope' | 'label' | 'ua'>;
+
 /** One page of rows, with the keyset cursor that reaches the next one. */
 export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 
@@ -276,6 +294,10 @@ export function createClient(options: ClientOptions) {
       call<unknown>('governance', args as Record<string, unknown>),
     members: () => call<unknown[]>('members'),
     listTokens: () => call<unknown[]>('listTokens'),
+    /* ADMIN, SO A BROWSER SESSION, and approving also asks for a sign-in in the last fifteen minutes. */
+    listDevices: () => call<DeviceRow[]>('listDevices'),
+    deviceApprove: (args: { user_code: string }) => call<DeviceApproved>('deviceApprove', args as Record<string, unknown>),
+    revokeDevice: (args: { handle: string }) => call<DeviceRow>('revokeDevice', args as Record<string, unknown>),
     listGrants: () => call<unknown[]>('listGrants'),
     whoami: () => call<unknown>('whoami'),
     planPack: (args: { doc: unknown; source?: { kind: string; ref?: string } }) =>

@@ -138,8 +138,11 @@ so the rows that were new are still new on the way out. A `diff` reads `{ source
 row: '{{spoken}}', field: body, versions: 5, empty: … }` on a skill's page, and Decide draws the same
 kind for a document field in a proposed change. `sessions.live` is the runs working now: the rows of
 the kernel's `session` register not in one of its `done` states, the most recently seen first, so its
-`where` and columns name that register's fields and it takes no `order`. All three sources are
-computed by the kernel (`pages.ts`), alongside `forecast.runway`.
+`where` and columns name that register's fields and it takes no `order`. A run holds its project as a
+spoken id, `things#1`, so the block's `scopes` name each run's project by its title, and a host draws
+that name. A run not heard from within the kernel's `STALE_MS` is drawn dimmed, through the cards'
+`quiet` role, which the evaluator writes and a declaration does not. All three sources are computed by
+the kernel (`pages.ts`), alongside `forecast.runway`.
 
 The agents pack draws them. `/p/agents` is "Working now", "Learnings" and "Skills" as `cards`; a
 skill's page is its trigger as a `note` and "Versions" as a `diff`; and a project page gains "Runs on",
@@ -237,6 +240,9 @@ conversation's opening turn, "who are you," installs it with no diff to approve,
 this section already grants the register turn one's own screen chooses, and writes the person's own
 row before this picker is ever seen. `loop/research-modular.md` §2 has the flow, and §1.7 has why
 People, alone of the six, is a special case here.)*
+
+*(Built September 15th 2026, for the row and not for the picker: the first run writes the person's
+own People row only while People is on, and this picker is still unbuilt.)*
 
 Three things that arrive with a pack, and the third is the one that matters:
 

@@ -21,10 +21,10 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { handlersFor, hintsOf, serveApi, withSession } from '@braindog/host';
-import { deriveSessionKey, relyingParty, serveAuth, type Provisioned } from '@braindog/host/auth';
+import { deriveSessionKey, relyingParty, serveAuth, type DeviceDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
-import { ulids, type CreateRecordArgs, type OutboxRow } from '@braindog/kernel';
-import { createRecordApi, type CallContext, type RecordApi } from '@braindog/record';
+import { ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type Waiting } from '@braindog/kernel';
+import { createRecordApi, type CallContext, type Limited, type RecordApi } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
 
@@ -252,6 +252,25 @@ export class Record$ extends DurableObject<Env> {
     const api = await this.#record();
     const made = await api.createRecord(args);
     return made.ok ? null : refusalOf(made);
+  }
+
+  /**
+   * A device asks to sign in to this record, counted against its address. `/auth/device` is the only way here.
+   *
+   * AN RPC AND NEVER A ROUTE, like `create`: `deviceStart` and `devicePoll` are INTERNAL, because the device has
+   * no credential to check yet.
+   */
+  async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.deviceStart(args, ip);
+  }
+
+  /** The device asks again, and once approved takes its bearer, once. `/auth/device/token` only. */
+  async devicePoll(args: { device_code: string }): Promise<Result<Waiting | Exchanged>> {
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.devicePoll(args);
   }
 
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
@@ -649,6 +668,7 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const from = env.AUTH_MAIL_FROM;
   const email = env.EMAIL;
+  const url = new URL(request.url);
   return serveAuth(request, {
     on: 'worker',
     origin: `https://${env.PUBLIC_HOST ?? ''}`,
@@ -669,7 +689,39 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
         }
       : {}),
     operator: { key: env.PROVISION_KEY, provision: (args) => provision(env, args) },
+    /* THE NAME THE REQUEST CAME BY, so a device that reached this Worker at another address is not sent to
+       `PUBLIC_HOST` to be approved. Devices sign in only where sign-in is on, because approving needs a session. */
+    reached: url.host,
+    ...((env.SESSION_SECRET ?? '').length >= 32 ? { device: devices(env) } : {}),
   });
+}
+
+/**
+ * The device grant's record half, over RPC: the record the slug names, or one refusal when it names none.
+ *
+ * THE SLUG TRAVELS ON BOTH CALLS, because a poll id says nothing about which record issued it and this Worker
+ * holds many.
+ */
+function devices(env: Env): DeviceDoor {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const recordOf = async (slug: string | undefined) => {
+    const found = slug ? await directory.resolve(slug) : null;
+    return found ? env.RECORD.get(env.RECORD.idFromName(found.record)) : null;
+  };
+  const nowhere = {
+    ok: false as const,
+    refusal: { code: 'FORBIDDEN', fix: 'Name a record this BrainDog holds, as in braindog login https://<host>/<slug>.', at: 'slug' },
+  };
+  return {
+    start: async ({ slug, ip, ...ask }) => {
+      const record = await recordOf(slug);
+      return record ? ((await record.deviceStart(ask, ip)) as unknown as Result<DeviceCode> | Limited) : nowhere;
+    },
+    poll: async ({ slug, device_code }) => {
+      const record = await recordOf(slug);
+      return record ? ((await record.devicePoll({ device_code })) as unknown as Result<Waiting | Exchanged>) : nowhere;
+    },
+  };
 }
 
 /** The one letter sign-in sends: plain text, the link on a line of its own, and what it is for. */

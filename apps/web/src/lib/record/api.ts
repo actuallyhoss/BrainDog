@@ -50,7 +50,7 @@ import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
-import { STALE_MS, findingsFrom } from '@braindog/kernel';
+import { STALE_MS, findingsFrom, isStale } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
@@ -1431,6 +1431,11 @@ export type BlockResult = PageBlock & {
       TIMESTAMP, not a vibe (19 §6). */
   stale_at: string;
   register?: string | undefined;
+  /**
+   * On `sessions.live`, whether each run in `entries` has not been heard from within the kernel's
+   * `STALE_MS`. A card grid draws such a run dimmed.
+   */
+  quiet?: boolean[] | undefined;
   metrics?: Metric[] | undefined;
   /** On a block that inherits: how many of `entries`, at the end, apply everywhere rather than to the project. */
   inherited?: number;
@@ -1707,6 +1712,15 @@ export function readBlock(b: PageBlock): BlockResult {
         if (cells) cells[i] = absent(e.fields[c.field]) ? EVERYWHERE : (cells[i] ?? null);
       });
     });
+    /* A RUN HOLDS ITS PROJECT AS A SPOKEN ID, and the kernel's page layer names it, so this does too. */
+    if (live)
+      (b.columns ?? []).forEach((c, i) => {
+        if (c.field !== 'project') return;
+        entries.forEach((e, n) => {
+          const cells = rows[n]?.cells;
+          if (cells) cells[i] = projectName(e.fields.project) ?? cells[i] ?? null;
+        });
+      });
     return {
       ...b,
       register,
@@ -1715,6 +1729,8 @@ export function readBlock(b: PageBlock): BlockResult {
       matched,
       refusals: said,
       rows,
+      /* The kernel's own test of a run gone quiet, so the two hosts dim the same runs. */
+      ...(live ? { quiet: entries.map((e) => isStale({ fields: e.fields as never, updated_at: e.created }, NOW)) } : {}),
       ...(own === undefined ? {} : { inherited: Math.max(0, entries.length - own) }),
       /* A KIND THAT REDUCES DRAWS THE WHOLE ANSWER, so it is never showing a slice of it. `bar`,
          `chips` and `gauge` iterate `matched` — every row — and apply `limit:` to their GROUPS; this
@@ -1774,6 +1790,18 @@ const liveRuns = (): Entry[] => {
   return (ROWS[SESSION] ?? [])
     .filter((e) => !done.has(String(e.fields.state ?? '')))
     .sort((a, z) => String(z.fields.last_seen ?? '').localeCompare(String(a.fields.last_seen ?? '')));
+};
+
+/** A spoken id as the ladder writes a run's project: `things#1`. */
+const SPOKEN = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
+
+/** The title of the row a spoken id names, or `undefined` when it names none, so the id is kept as written. */
+const projectName = (value: unknown): string | undefined => {
+  const m = typeof value === 'string' ? SPOKEN.exec(value) : null;
+  if (!m) return undefined;
+  const title = REGISTERS[m[1]!]?.title;
+  const name = title ? (ROWS[m[1]!] ?? []).find((e) => e.seq === Number(m[2]))?.fields[title] : undefined;
+  return absent(name) ? undefined : String(name);
 };
 
 /** What a scope cell reads for a row that applies to every project. */

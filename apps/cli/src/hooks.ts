@@ -31,7 +31,7 @@ export const HOOK_MS = 8_000;
 export const hookBudget = (env: Env): number => Math.min(HOOK_MS, budgetOf(env));
 
 export const notSignedIn = (hosts: string): string =>
-  `BrainDog: this machine is not signed in. Set BRAINDOG_TOKEN, or put a token for the host in ${hosts}. braindog login is not built yet.`;
+  `BrainDog: this machine is not signed in. Run braindog login <host>, set BRAINDOG_TOKEN, or put a token for the host in ${hosts}.`;
 
 export const unreachable = (ms: number): string =>
   `BrainDog did not answer within ${String(ms / 1000)} seconds, so this session works without shared context.`;

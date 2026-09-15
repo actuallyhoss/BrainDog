@@ -5,15 +5,21 @@
  * and two drawers that each worked it out would be two answers.
  */
 
-/** What a column IS on a card. Closed, because each one is drawn differently. */
-export const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark'] as const;
+/**
+ * What a column IS on a card. Closed, because each one is drawn differently.
+ *
+ * `quiet` is never printed: a card whose `quiet` cell says anything is drawn dimmed, as a run not
+ * heard from lately is. The page's evaluator writes it from the record's clock, so a declaration
+ * does not name it (`packages/kernel/src/declare.ts` keeps the eight a page may declare).
+ */
+export const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'quiet'] as const;
 
 export type CardRole = (typeof CARD_ROLES)[number];
 
 const isRole = (s: string): s is CardRole => (CARD_ROLES as readonly string[]).includes(s);
 
 /** One figure and at most three facts, so a card stays a card rather than a form. */
-const MOST: Record<CardRole, number> = { title: 1, figure: 1, fact: 3, trend: 1, ring: 1, who: 1, when: 1, mark: 1 };
+const MOST: Record<CardRole, number> = { title: 1, figure: 1, fact: 3, trend: 1, ring: 1, who: 1, when: 1, mark: 1, quiet: 1 };
 
 /** A header cell is `role` or `role: label`. */
 function headCell(cell: string): { word: string; label: string } {
@@ -55,7 +61,12 @@ export type CardLayout = {
   facts: number[];
   /** A person under a titled card. -1 when the person is the card's name. */
   who: number;
+  /** The column that dims a card when it says anything. */
+  quiet: number;
 };
+
+/** Whether a card is dimmed: its `quiet` cell holds anything but space. */
+export const isQuiet = (L: CardLayout, cells: readonly string[]): boolean => L.quiet >= 0 && (cells[L.quiet] ?? '').trim() !== '';
 
 /**
  * The header row, read leniently: a role it does not know is left out rather than thrown.
@@ -79,6 +90,7 @@ export function cardLayout(cells: readonly string[]): CardLayout {
     ring: first('ring'),
     facts: read.flatMap((c, i) => (c.word === 'fact' ? [i] : [])).slice(0, MOST.fact),
     who: title >= 0 ? who : -1,
+    quiet: first('quiet'),
   };
 }
 

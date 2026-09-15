@@ -67,6 +67,9 @@ export function saveHosts(file: string, hosts: HostsFile): void {
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 
+/** http to anywhere but this machine, where a bearer would cross a network in the clear. */
+export const inTheClear = (url: URL): boolean => url.protocol === 'http:' && !LOOPBACK.has(url.hostname);
+
 /**
  * A host as the hosts file keys it: `https://origin[/slug]`, no trailing slash. A bare name means https.
  *
@@ -113,7 +116,7 @@ export function target(flag: string | undefined, env: Env, file: string, now: nu
   if (!named) throw new Error(`No BrainDog host is set. Pass --host, set BRAINDOG_HOST, or name a default in ${file}.`);
   const key = hostKey(named);
   const url = new URL(key);
-  if (url.protocol === 'http:' && !LOOPBACK.has(url.hostname))
+  if (inTheClear(url))
     throw new Error(`${key} is http, not https. BrainDog sends a token only over https, except to this machine.`);
 
   let token = env.BRAINDOG_TOKEN || undefined;

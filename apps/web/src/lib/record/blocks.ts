@@ -293,17 +293,21 @@ function cardsRows(block: BlockResult): string[] {
   const roles = cardRoles(columns);
   const fields = REGISTERS[block.register ?? '']?.fields ?? [];
   const labelOf = (c: Column) => (c.label !== c.field ? c.label : (fields.find((f) => f.id === c.field)?.label ?? c.label));
-  const head = columns.map((c, i) => escapeCell(`${roles[i]}: ${labelOf(c)}`)).join(' | ');
+  /* A RUN GONE QUIET IS THE EVALUATOR'S TO SAY, so it is a column of its own and not a declared one. */
+  const quiet = block.quiet;
+  const head = [...columns.map((c, i) => escapeCell(`${roles[i]}: ${labelOf(c)}`)), ...(quiet ? ['quiet'] : [])].join(' | ');
   /* The card's name: its title, or the person when it has none, which is what the renderer heads it with. */
   const named = roles.includes('title') ? roles.indexOf('title') : roles.indexOf('who');
-  const rows = block.entries.map((entry, i) => {
-    /* AN ENUM VALUE IN SENTENCE CASE, as the lists set it: "client" on a card read as a stored value.
-       Enums only, because an email or a name must keep the case it was written in. */
-    const said = (c: Column): string => {
-      const v = display(block.register ?? '', c.field, entry.fields[c.field]) ?? '';
+  const rows = block.entries.map((_, i) => {
+    /* THE ROW'S OWN CELLS, as the evaluator said them: a scope as Everywhere, and a run's project by
+       its name. AN ENUM VALUE IN SENTENCE CASE, as the lists set it: "client" on a card read as a
+       stored value. Enums only, because an email or a name must keep the case it was written in. */
+    const said = (c: Column, j: number): string => {
+      const v = block.rows[i]?.cells[j] ?? '';
       return fields.find((f) => f.id === c.field)?.type === 'enum' && v ? v.charAt(0).toUpperCase() + v.slice(1) : v;
     };
-    const cells = columns.map((c) => escapeCell(said(c)));
+    const cells = columns.map((c, j) => escapeCell(said(c, j)));
+    if (quiet) cells.push(quiet[i] ? 'quiet' : '');
     /* THE NAME OPENS THE ROW, so a card is a door the way a register row is. It is written as the
        dialect's own link, so no host callback is needed; a name holding a bracket stays text rather
        than breaking the link written around it. */

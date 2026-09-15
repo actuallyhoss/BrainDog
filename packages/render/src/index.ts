@@ -23,6 +23,7 @@ export {
   cardLayout,
   counted,
   initialOf,
+  isQuiet,
   markOf,
   ringDash,
   ringOf,

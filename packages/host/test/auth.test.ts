@@ -56,6 +56,8 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'POST /auth/logout both',
       'POST /auth/claim/mint worker',
       'POST /auth/provision worker',
+      'POST /auth/device both',
+      'POST /auth/device/token both',
     ],
   );
 });
@@ -70,6 +72,12 @@ test('every flow has one route, named by the rule, and only reads are GETs', () 
     assert.equal(rows.length, 1, `${flow} has ${rows.length} routes`);
     const expected = flow === 'key.exchange' ? '/auth/token' : `/auth/${flow.replaceAll('.', '/')}`;
     assert.equal(rows[0]?.path, expected);
+  }
+  for (const flow of ['device', 'device.token'] as const) {
+    const rows = AUTH_ROUTES.filter((r) => r.flow === flow);
+    assert.equal(rows.length, 1, `${flow} has ${rows.length} routes`);
+    assert.equal(rows[0]?.path, `/auth/${flow.replaceAll('.', '/')}`);
+    assert.equal(rows[0]?.needs, 'nothing', 'a device has no credential yet');
   }
   assert.equal(new Set(AUTH_ROUTES.map((r) => r.path)).size, AUTH_ROUTES.length, 'two routes share a path');
   assert.deepEqual(AUTH_ROUTES.filter((r) => r.method === 'GET').map((r) => r.flow), ['methods', 'session', 'passkeys']);

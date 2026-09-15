@@ -447,6 +447,11 @@
     background: var(--s2);
   }
 
+  /* A RUN NOT HEARD FROM LATELY, dimmed and not hidden, so it still says what it was doing. */
+  .cards-item[data-quiet] {
+    opacity: 0.6;
+  }
+
   .cards-head {
     display: flex;
     align-items: center;

@@ -31,14 +31,20 @@
 
 import type { AssertionJSON, Auth, AuthCall, AuthFlow, AuthResult, Mail, Methods, RegistrationJSON, Refusal, Result, Who } from '@braindog/ports';
 
+import { DEVICE_ROUTES, serveDevice, type DeviceDoor, type DeviceFlow } from './device.ts';
 import { httpStatus } from './index.ts';
+
+export { DEVICE_ROUTES, type DeviceAsk, type DeviceDoor, type DeviceFlow, type DeviceStarted } from './device.ts';
 
 /** One sign-in route: where it is, who serves it, and what it needs. */
 export type AuthRoute = {
   path: string;
   method: 'GET' | 'POST';
-  /** The `AuthCall` it becomes. `provision` is the one that is not a flow: it makes a record, then mints a claim. */
-  flow: AuthFlow | 'provision';
+  /**
+   * The `AuthCall` it becomes. `provision` is the one that is not a flow: it makes a record, then mints a claim.
+   * The two device flows reach a record and never the Directory, and `device.ts` answers them.
+   */
+  flow: AuthFlow | 'provision' | DeviceFlow;
   /** The server key is the self-host's, and provisioning is the Worker's; everything else is both. */
   on: 'both' | 'selfhost' | 'worker';
   /** Nothing, the session cookie, or the operator's key. A route that needs a session still answers without one: 401. */
@@ -68,6 +74,7 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/logout', method: 'POST', flow: 'logout', on: 'both', needs: 'nothing', what: 'End this session and clear the cookie.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
+  ...DEVICE_ROUTES,
 ];
 
 /** Why `/auth/methods` offers nothing: no key to take the MACs under, or an origin no cookie can be set on. */
@@ -291,6 +298,10 @@ export type AuthDoor = {
         provision: (args: { slug: string; email: string; name?: string }) => Promise<Result<Provisioned>>;
       }
     | undefined;
+  /** The `host[:port]` this request arrived by: the socket's `Host`, or the Worker's URL. A device is told to open `origin` only when the two agree. */
+  reached?: string | undefined;
+  /** The record's half of the device grant. Absent where no device may sign in, and both device routes are 404. */
+  device?: DeviceDoor | undefined;
 };
 
 type Header = readonly [string, string];
@@ -413,6 +424,8 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
     return refusal(405, { code: 'FORBIDDEN', fix: `${route.path} is a ${route.method}.` }, [['allow', route.method]]);
 
   if (route.needs === 'operator') return operated(request, route, door);
+  /* A DEVICE HAS NO COOKIE AND NO PAGE, so its two routes are answered before the checks a browser's are. */
+  if (route.flow === 'device' || route.flow === 'device.token') return serveDevice(request, route, door);
 
   const mode = cookieMode(door.origin);
   const sid = mode === null ? undefined : readSid(request, mode);

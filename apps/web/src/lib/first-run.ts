@@ -16,6 +16,19 @@
 import type { IconName } from './ui/icons.ts';
 
 export const firstRun = {
+  /* FIRST RUN, TURN 1 (`loop/research-modular.md` §2). A question, a field and four chips; what was
+     heard is said back, and nothing explains the screen. The chips append words, so each is a clause
+     a person could have typed, never a choice. */
+  whoQuestion: 'Who are you?',
+  whoPlaceholder: 'Your name, and what you do',
+  whoChips: ['I run a studio', 'I freelance', "I'm part of a team", 'I do this for someone else'],
+  whoChipsLabel: 'Add to your answer',
+  gotYou: (name: string) => `Got it, you're ${name}.`,
+  gotIt: 'Got it.',
+  whoEdit: 'Edit your answer',
+  /* TURN 3, beside the row they typed. Said only when the People row was actually made. */
+  youArePending: (name: string, mark: string) => `${name} is in People too, marked ${mark}.`,
+  youAreKnown: (name: string) => `${name} is in People too.`,
   /* first run.
 
      THE FIRST SCREEN SETS THE CEILING. It used to open with "What do you want to stop forgetting?"

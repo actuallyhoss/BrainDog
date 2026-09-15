@@ -15,6 +15,7 @@
     cardLayout,
     initialOf,
     inline,
+    isQuiet,
     leadingCode,
     markOf,
     ringDash,
@@ -50,7 +51,7 @@
       {@const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null}
       {@const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null}
       {@const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null}
-      <li class="cards-item" data-intent={r.tone}>
+      <li class="cards-item" data-intent={r.tone} data-quiet={isQuiet(L, r.cells) ? '' : undefined}>
         <div class="cards-head">
           {#if mark}<span class="cards-mark" aria-hidden="true">{mark}</span>
           {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>{/if}

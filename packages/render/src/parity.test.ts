@@ -73,6 +73,8 @@ const page = (src: string): BlockSegment => {
 const SHAPES: Record<string, string> = {
   'agents working now':
     '```cards\nmark: Project | title: Doing | who: Agent | fact: Next | when: Seen\nKiln | Fix the invoice export | Claude | Ship the fix | 3m ago | warn\nSite | Rewrite pricing | Codex |  | 2h ago\n```',
+  'a run gone quiet, dimmed and still saying everything':
+    '```cards\ntitle: Doing | who: Agent | fact: Project | when: Seen | quiet\nAxis QA | Claude | Kiln | 3m ago | \nReconcile | Claude | Portage | 2h ago | quiet | warn\n```',
   'people, named by their faces': '```cards\nwho: Name | fact: Role | fact: Met at | when: Seen\nAmara Lee | Designer | Kiln kickoff | 2d ago\nthe assistant | Agent |  | \n```',
   'figures, trends, rings and a link':
     '```cards\ntitle | figure: Owed to you | trend: Weekly | ring: Done\n[Kiln](/r/things/1) | GBP 4,800.00 | 18 20 - 24 | 3/5\nSite |  | 7 | 60%\nMarsh | USD 12.00 | 1 2 3 | nearly\n```',

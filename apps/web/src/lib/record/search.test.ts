@@ -244,9 +244,11 @@ test('the questions group really is the doorless one, so that branch is reachabl
      door and gives the questions group none, which is what makes the branch above real. */
   const found = search('a', 9_999);
   const doorless = found.groups.filter((g) => g.href === null);
-  assert.equal(doorless.length, 1, 'the shape of `groups` changed');
-  assert.equal(doorless[0]?.kind, 'Decide');
-  for (const g of found.groups) if (g.kind !== 'Decide') assert.ok(g.href, `${g.kind} lost its door`);
+  assert.equal(doorless[0]?.kind, 'Decide', 'the shape of `groups` changed');
+  /* The pages group has no door either, because `/p/*` is not a filtered list, and `a` finds Agents. */
+  const pagesGroup = (g: (typeof found.groups)[number]) => g.hits.every((h) => h.href.startsWith('/p/'));
+  assert.equal(doorless.filter((g) => !pagesGroup(g)).length, 1, 'a doorless group that is neither the questions nor the pages');
+  for (const g of found.groups) if (g.kind !== 'Decide' && !pagesGroup(g)) assert.ok(g.href, `${g.kind} lost its door`);
 });
 
 test('the debounced URL write does not land on the next page', () => {

@@ -116,7 +116,10 @@ export type BlockResult = PageBlock & {
   walk?: Runway;
   /** On a block that inherits: how many of `rows`, at the end, apply everywhere rather than to the project. */
   inherited?: number;
-  /** Where each row applies, aligned with `rows`: its project's title, or `null` for everywhere. */
+  /**
+   * Where each row applies, aligned with `rows`: its project's title, or `null` for everywhere. On
+   * `sessions.live`, the name of the project each run was placed in.
+   */
   scopes?: (string | null)[];
   /** A `feed` block's rows, newest first, a burst being one row. */
   feed?: FeedRow[];
@@ -665,7 +668,36 @@ function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const kept = deps.sessionsLive().filter((r) => evaluate(said.predicate, r.fields, schema));
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  return { ...base, rows: kept.slice(0, limit), matched: kept.length };
+  const rows = kept.slice(0, limit);
+  return { ...base, rows, matched: kept.length, scopes: projectsOf(deps, rows) };
+}
+
+/** A spoken id as the ladder writes a run's project: `things#1`. */
+const SPOKEN = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
+
+/**
+ * The project each run was placed in, by its name, aligned with `rows`, or `null` for a run placed nowhere.
+ *
+ * A RUN HOLDS ITS PROJECT AS A SPOKEN ID, which a reader cannot use, so it is named here as
+ * `scopesOf` names a ref, and every host draws the same name. An id that names no row is kept as it
+ * was written rather than dropped. A register with its own prefix is not read, as `fill` does not.
+ */
+function projectsOf(deps: PageDeps, rows: readonly Entry[]): (string | null)[] {
+  const asked = new Map<string, Set<number>>();
+  for (const r of rows) {
+    const m = SPOKEN.exec(typeof r.fields.project === 'string' ? r.fields.project : '');
+    if (m) asked.set(m[1]!, (asked.get(m[1]!) ?? new Set<number>()).add(Number(m[2])));
+  }
+  const names = new Map<string, string>();
+  for (const [register, seqs] of asked) {
+    const title = deps.titleOf(register);
+    const listed = title ? deps.list({ register, where: { field: 'seq', in: [...seqs] }, limit: 200 }) : null;
+    if (listed?.ok) for (const r of listed.value.rows) names.set(`${register}#${r.seq}`, String(r.fields[title!] ?? ''));
+  }
+  return rows.map((r) => {
+    const at = r.fields.project;
+    return typeof at === 'string' && at !== '' ? names.get(at) || at : null;
+  });
 }
 
 /* ── one row's history ───────────────────────────────────────────────────── */

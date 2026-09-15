@@ -22,7 +22,7 @@ const value = <T>(r: { ok: true; value: T } | { ok: false; refusal: { code: stri
 test('THE SAMPLE LISTS EVERY INSTALLED ADD-ON, AND ONE TURNED OFF IS STILL LISTED', async () => {
   const s = sample(() => AT);
   const first = value(await s.packs());
-  assert.deepEqual(first.map((p) => p.id), ['money-core', 'estate', 'people', 'work', 'portfolio']);
+  assert.deepEqual(first.map((p) => p.id), ['money-core', 'estate', 'people', 'work', 'portfolio', 'agents']);
   assert.ok(first.every((p) => p.disabled_at === null));
 
   assert.deepEqual(value(await s.disable('people')).packs, ['people']);
@@ -38,14 +38,14 @@ test('A REFUSED SWITCH NAMES WHO LEANS ON IT, AND THE SECOND PRESS TURNS THEM OF
   const refused = await s.disable('portfolio');
   assert.ok(!refused.ok);
   const b = blocked('portfolio', refused.refusal);
-  assert.deepEqual(b, { kind: 'required', id: 'portfolio', also: ['estate', 'money-core', 'people', 'work'] });
+  assert.deepEqual(b, { kind: 'required', id: 'portfolio', also: ['agents', 'estate', 'money-core', 'people', 'work'] });
   assert.ok(value(await s.packs()).every((p: PackState) => p.disabled_at === null), 'a refused switch turned something off');
   assert.equal(copy.packOffTogether(4), 'Turn all 5 off');
   assert.equal(copy.packOffTogether(1), 'Turn both off');
   assert.equal(copy.packNeededBy(['Money', 'Work']), 'Needed by Money and Work');
 
   assert.ok(b.kind === 'required');
-  assert.deepEqual(value(await s.disable('portfolio', b.also)).packs, ['portfolio', 'estate', 'money-core', 'people', 'work']);
+  assert.deepEqual(value(await s.disable('portfolio', b.also)).packs, ['portfolio', 'agents', 'estate', 'money-core', 'people', 'work']);
 
   /* BACK ON IN ORDER. The dependent first points at the one it needs. */
   const early = await s.enable('work');

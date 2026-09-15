@@ -106,6 +106,7 @@ export async function choose(client: Caller): Promise<{ source: Source; first: A
  * Portfolio is the one that cannot go off alone.
  */
 export const LEANS_ON: Readonly<Record<string, readonly string[]>> = {
+  agents: ['portfolio'],
   estate: ['portfolio'],
   'money-core': ['portfolio'],
   people: ['portfolio'],

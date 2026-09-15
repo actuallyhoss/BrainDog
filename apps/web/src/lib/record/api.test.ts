@@ -154,14 +154,16 @@ test('an undeclared field is stringified rather than dropped', () => {
 
 /* ── the credential ──────────────────────────────────────────────────────── */
 
-test('no register declares a secret, so there is nothing for display to leak', () => {
-  // The strongest form of this guarantee is structural, not behavioural: the vault indexes what a
-  // key OPENS and the value is never a field on a row, so no rendering path can reach one. If a
-  // register ever grows a `secret` field, this fails and the masking below becomes the live test.
+test('the one secret field a register declares holds nothing in any row, so there is nothing for display to leak', () => {
+  // The strongest form of this guarantee is structural, not behavioural: a key's row indexes what it
+  // OPENS. The agents pack declares `credentials.value`, which names the grant the vault sealed a key
+  // into and which only the vault door writes, so no row here holds one and the masking below is the
+  // live test for the day one does.
   const declared = Object.entries(REGISTERS).flatMap(([id, reg]) =>
     reg.fields.filter((f) => f.type === 'secret').map((f) => `${id}.${f.id}`),
   );
-  assert.deepEqual(declared, [], 'a secret reached the record');
+  assert.deepEqual(declared, ['credentials.value'], 'a secret field reached the record');
+  for (const key of ROWS.credentials ?? []) assert.ok(!('value' in key.fields), `credentials#${key.seq} holds a value`);
 });
 
 test('a vault row carries no value, only what the key opens', () => {

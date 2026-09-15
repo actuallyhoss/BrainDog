@@ -15,14 +15,22 @@
       have seen one of their own rows is worse than a tour.
 
   And there is no skip, because a record with zero registers has no legal screen.
+
+  AHEAD OF ALL OF IT, "Who are you?" (`loop/research-modular.md` §2): a sentence, read without a
+  model, said back, and written as the person's own People row when the first row is added.
 -->
 <script lang="ts">
+  import { onDestroy, tick, untrack } from 'svelte';
+  import { createClient } from '@braindog/client';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { REGISTERS } from '$lib/record/api.ts';
+  import { choose as recordOrSample } from '$lib/record/packs.ts';
+  import { methods } from '$lib/auth.ts';
   import { addKey } from '$lib/start.ts';
-  import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
+  import { hear, introduce, personRow, withChip, type Heard } from '$lib/who.ts';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import Define from '$lib/ui/Define.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -72,6 +80,8 @@
 
   function key(e: KeyboardEvent) {
     if (picked !== null || e.metaKey || e.ctrlKey || e.altKey) return;
+    /* A DIGIT TYPED INTO "Who are you?" is part of the answer, not a jump to a choice. */
+    if (typing()) return;
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. This screen draws no sheet of its own, and
        the shell's palette opens over every route: `1` to `5` moved the highlight behind it. See
        `covered`, which six route handlers needed and none of them had. */
@@ -88,6 +98,108 @@
   }
 
   let choices = $state<HTMLDivElement | undefined>(undefined);
+
+  /* ── turn 1: who are you ─────────────────────────────────────────────── */
+
+  /* The sentence stays in memory and never in the address (`research-modules.md` §5). Component
+     state survives `?add=` because that is the same route, so going Back finds the answer kept. */
+  let who = $state('');
+  let heard = $state<Heard | null>(null);
+  /* Said back with an edit button once focus leaves the answer or Enter is pressed. While the
+     field has focus it stays a field, so the screen never takes it from under somebody typing. */
+  let settled = $state(false);
+  let field = $state<HTMLInputElement | undefined>(undefined);
+  let question = $state<HTMLHeadingElement | undefined>(undefined);
+  let hearing: ReturnType<typeof setTimeout> | undefined;
+  onDestroy(() => clearTimeout(hearing));
+
+  function listen() {
+    clearTimeout(hearing);
+    heard = who.trim() ? hear(who) : null;
+  }
+
+  /* 250 ms, the palette's debounce for its own live region: a reader is told once per pause. */
+  function typed() {
+    clearTimeout(hearing);
+    hearing = setTimeout(listen, 250);
+  }
+
+  function chip(words: string) {
+    who = withChip(who, words);
+    settled = false;
+    listen();
+    void tick().then(() => {
+      field?.focus();
+      field?.setSelectionRange(who.length, who.length);
+    });
+  }
+
+  function enter(e: KeyboardEvent) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    listen();
+    if (!heard) return;
+    settled = true;
+    void tick().then(() => question?.focus());
+  }
+
+  /* DECIDED AFTER THE DOM SETTLES, not from `relatedTarget`: pressing Edit removes the focused button,
+     and judging that focusout on the spot would settle the answer straight back. */
+  function leave(e: FocusEvent) {
+    const box = e.currentTarget as HTMLElement;
+    void tick().then(() => {
+      if (box.contains(document.activeElement)) return;
+      listen();
+      if (heard) settled = true;
+    });
+  }
+
+  /* THE CARET GOES IN ON ARRIVAL AND ON EDIT, at the end of what is there. `who` is read untracked,
+     or every keystroke would put the caret back at the end. */
+  $effect(() => {
+    if (!field) return;
+    field.focus();
+    const end = untrack(() => who.length);
+    field.setSelectionRange(end, end);
+  });
+
+  /* ── turn 3: the person's own People row ─────────────────────────────── */
+
+  let known = $state<{ name: string; waiting: boolean } | null>(null);
+  /** The demo's waiting People row, so a second press corrects it rather than adding another. */
+  let me: number | null = null;
+  /** Who a live record has already met from this screen, so a second press does not meet them twice. */
+  let met: string | null = null;
+
+  /**
+   * Meet the person who answered turn 1.
+   *
+   * THE SAME SOURCE `/packs` READS: the record when there is one, which also says whether People is
+   * on, and the sample when there is not. A refusal is not drawn. The row they typed is this
+   * screen's outcome, and a People row that could not be made is not a failure of it.
+   */
+  async function remember() {
+    const now = heard;
+    if (!now?.name) return;
+    const client = createClient({ base: location.origin });
+    const chosen = await recordOrSample(client);
+    const packs = chosen.first.ok ? chosen.first.value : null;
+    if (chosen.source.sample) {
+      const asked = introduce(now, null, packs);
+      if (!asked) return;
+      const row = personRow(asked, now.bio);
+      if (me === null || !pending.replace('people', me, row)) me = pending.add('people', row);
+      known = { name: asked.name, waiting: true };
+      return;
+    }
+    const signed = await methods();
+    const asked = introduce(now, signed.ok ? (signed.value.me?.email ?? null) : null, packs);
+    if (!asked || met === asked.name) return;
+    const out = await client.meet(asked);
+    if (!out.ok) return;
+    met = asked.name;
+    known = { name: asked.name, waiting: false };
+  }
 
   /* THE FORM PUTS ITS OWN CARET IN. This screen used to hold a `field` binding nothing ever bound —
      the form below is generated from the declaration, so the page cannot reach its first input — and
@@ -237,6 +349,7 @@
       made = pending.add(choice.key, taken);
     }
     said = true;
+    void remember();
   }
 
   /**
@@ -278,12 +391,46 @@
     </header>
 
     {#if !choice}
+      <div class="who" role="group" aria-labelledby="who-h" onfocusout={leave}>
+        <h1 class="question step" id="who-h">{firstRun.whoQuestion}</h1>
+        {#if settled && heard}
+          <div class="heard">
+            <p class="heard-said">{heard.name ? firstRun.gotYou(heard.name) : firstRun.gotIt}</p>
+            <Button weight="bare" onclick={() => (settled = false)}>{firstRun.whoEdit}</Button>
+          </div>
+        {:else}
+          <input
+            class="who-field"
+            type="text"
+            autocomplete="off"
+            aria-labelledby="who-h"
+            placeholder={firstRun.whoPlaceholder}
+            bind:this={field}
+            bind:value={who}
+            oninput={typed}
+            onkeydown={enter}
+          />
+          <div class="who-chips" role="group" aria-label={firstRun.whoChipsLabel}>
+            {#each firstRun.whoChips as c}
+              <!-- A mouse press keeps focus in the field, so appending words never settles the answer. -->
+              <button type="button" class="who-chip" onmousedown={(e) => e.preventDefault()} onclick={() => chip(c)}>{c}</button>
+            {/each}
+          </div>
+        {/if}
+        <!-- ALWAYS IN THE DOCUMENT, so a screen reader hears the change rather than a region arriving.
+             Empty once settled, where the same sentence is drawn as the line above. -->
+        <p class="heard-now" role="status">{#if heard && !settled}{heard.name ? firstRun.gotYou(heard.name) : firstRun.gotIt}{/if}</p>
+      </div>
+
+      {#if heard}
+      <div class="turn">
       <!-- SAY WHAT THIS IS BEFORE ASKING WHAT THEY WANT. The question on its own let the three
            examples under it define the product, and three examples always define it downward. -->
-      <h1 class="lede">{firstRun.firstLede}</h1>
+      <!-- A paragraph and not the `h1` it was: "Who are you?" is the page's heading now. -->
+      <p class="lede">{firstRun.firstLede}</p>
       <p class="body">{firstRun.firstBody}</p>
 
-      <h2 class="question">{firstRun.firstQuestion}</h2>
+      <h2 class="question" tabindex="-1" bind:this={question}>{firstRun.firstQuestion}</h2>
 
       <div class="choices" role="group" aria-label={firstRun.firstQuestion} bind:this={choices}>
         {#each CHOICES as c, i}
@@ -319,6 +466,8 @@
              absent one, because somebody spends their first minute pasting it into a terminal. -->
         <p class="agent-note">{firstRun.agentNotYet}</p>
       </section>
+      </div>
+      {/if}
     {:else}
       <h1 class="question step">{choice.field}</h1>
 
@@ -398,6 +547,9 @@
                  came last. That it is not saved is now said once as a sentence and once as the name
                  of the mark the reader will find on the row. -->
             <p class="kept-what">{firstRun.rowIsThere(thing, list, copy.markNotWritten)}</p>
+            {#if known}
+              <p class="kept-what">{known.waiting ? firstRun.youArePending(known.name, copy.markNotWritten) : firstRun.youAreKnown(known.name)}</p>
+            {/if}
             <p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>
             <p class="kept-why">{firstRun.keptExamples}</p>
             <div class="actions">
@@ -430,6 +582,84 @@
 
   .kept-what {
     font-weight: 600;
+  }
+
+  /* ── turn 1 ───────────────────────────────────────────────────────────── */
+
+  .who {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .who .question.step {
+    margin-block-end: var(--sp-1);
+  }
+
+  /* The one control on the screen, so it is drawn at the size of a sentence rather than a form row. */
+  .who-field {
+    inline-size: 100%;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-md);
+  }
+
+  .who-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .who-chip {
+    min-block-size: 36px;
+    padding-inline: var(--sp-3);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  /* A FINGER NEEDS 44PX, where a mouse is fine at 36. */
+  @media (pointer: coarse) {
+    .who-chip {
+      min-block-size: 44px;
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .who-chip:hover {
+      background: var(--s2);
+      border-color: var(--edge);
+    }
+  }
+
+  .heard {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .heard-said {
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+  }
+
+  .heard-now {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .turn {
+    margin-block-start: var(--sp-7);
   }
 
   .kept-why {

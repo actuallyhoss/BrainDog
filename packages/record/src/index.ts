@@ -54,6 +54,12 @@ import {
   PEOPLE,
   type MeetArgs,
   type Met,
+  type Approved,
+  type DeviceCode,
+  type DeviceRow,
+  type Exchanged,
+  type VaultGrant,
+  type Waiting as DeviceWaiting,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
@@ -129,8 +135,28 @@ export type CallContext = {
   session?: SessionHints | undefined;
 };
 
-/** How recent a session's last proof must be for the vault: `12 §6`, `33 §10`. */
+/** How recent a session's last proof must be for the vault and for approving a device: `12 §6`, `33 §10`. */
 const FRESH = 15 * 60_000;
+
+/** Device starts one address may make in fifteen minutes before the next waits (`12 §3`, the `device:` key). */
+const STARTS = 10;
+const WINDOW = 15 * 60_000;
+
+/** A start refused by the count, with the seconds until the address may try again. The host answers it 429. */
+export type Limited = { ok: false; retryAfter: number };
+
+/**
+ * One start counted against an address, in the record's own `auth_fail` (`30 §1`).
+ *
+ * THE FIRST START OPENS A FIFTEEN-MINUTE WINDOW AND THE ELEVENTH LOCKS IT for fifteen minutes from then, and the
+ * count stops at eleven so a lock cannot be pushed further out. Nothing clears it early, because a start compares
+ * no secret and so has no success to reward. `?1` the key, `?2` now plus fifteen minutes, `?3` the ten allowed.
+ */
+const COUNT_START = `INSERT INTO auth_fail (key, n, until) VALUES (?1, 1, ?2)
+ON CONFLICT (key) DO UPDATE SET
+  n     = MIN(n + 1, ?3 + 1),
+  until = CASE WHEN n = ?3 THEN ?2 ELSE until END
+RETURNING n, until`;
 
 /* ── the kernel's `session` register: an agent's runs ─────────────────── */
 
@@ -487,8 +513,8 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'build'>) {
-  const { clock, scheduler, build } = deps;
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build'>) {
+  const { sql, clock, scheduler, build } = deps;
   /**
    * After every write: re-arm the alarm, then ring the doorbell.
    *
@@ -626,6 +652,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
         at: 'principal',
       };
     return allows(ctx, 'owner');
+  };
+
+  /**
+   * Count one device start against `key`: the seconds to wait, or `null` to go on.
+   *
+   * FAIL CLOSED. A statement that throws or returns no row refuses for the whole window, because a count
+   * that stops when its table misbehaves is a limit anybody can switch off. A window that has passed is
+   * deleted first, so the insert below starts it again at one.
+   */
+  const counted = (key: string): number | null => {
+    const now = clock.now();
+    let row: { n: number; until: string } | undefined;
+    try {
+      sql.exec("DELETE FROM auth_fail WHERE key LIKE 'device:%' AND until <= ?", new Date(now).toISOString());
+      row = sql.one<{ n: number; until: string }>(COUNT_START, key, new Date(now + WINDOW).toISOString(), STARTS);
+    } catch {
+      row = undefined;
+    }
+    if (!row) return Math.ceil(WINDOW / 1000);
+    return row.n > STARTS ? Math.max(1, Math.ceil((Date.parse(row.until) - now) / 1000)) : null;
   };
 
   /** The declaration state a plan is built against. */
@@ -1955,6 +2001,53 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
       return tail(kernel.revokeToken(actorOf(ctx), args.id));
     },
 
+    /* ── ADMIN: DEVICES, 12 §6.1 ──────────────────────── */
+
+    /**
+     * Let in the device showing these six digits.
+     *
+     * AN OWNER, AND NOT ANY PERSON. A login approval mints a ninety-day write token owned by the approver, which
+     * is `createToken` by another road, and `createToken` is owner-only; a road with a lower bar would be the
+     * easier way to the same bearer.
+     *
+     * AND A SIGN-IN PROVED IN THE LAST FIFTEEN MINUTES, which the kernel cannot check because only a host knows
+     * when somebody proved who they are. A browser left signed in for a month should not be enough to let a
+     * machine in. `provedAt` comes only from a session row: the server key carries none, and is proved on the
+     * request that presents it.
+     */
+    async deviceApprove(args: { user_code: string }, ctx: CallContext): Promise<Result<Approved>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      /* Nothing presented is no sign-in at all, for the reason `createToken` gives. */
+      if (ctx.credentialed === false)
+        return {
+          ok: false as const,
+          refusal: {
+            code: 'NEEDS_BROWSER_SESSION',
+            fix: 'Approving a device hands out a bearer that works from anywhere, so it needs a credential. Sign in, or send BRAINDOG_TOKEN.',
+            at: 'principal',
+          },
+        };
+      if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'principal' } };
+      return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never)));
+    },
+
+    /** Every device grant, named by its handle and never by the id the device polls with. */
+    async listDevices(ctx: CallContext): Promise<Result<DeviceRow[]>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(await kernel.deviceList());
+    },
+
+    /** Revoke one by its handle. A login grant takes its token with it; the session that approved it stays. */
+    async revokeDevice(args: { handle: string }, ctx: CallContext): Promise<Result<DeviceRow>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (typeof args?.handle !== 'string' || !args.handle) return no('REQUIRED_MISSING', 'Which device? Name it by its handle.', { at: 'handle' });
+      return tail(await kernel.deviceRevoke(actorOf(ctx), args.handle));
+    },
+
     /* ── ADMIN: THE RECORD AS A FILE ───────────────────── */
 
     /**
@@ -2077,6 +2170,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'clock' | 'scheduler' | 'bui
      */
     async createRecord(args: CreateRecordArgs) {
       return tail(kernel.createRecord(args));
+    },
+
+    /**
+     * A device asks to sign in. INTERNAL: `/auth/device` calls it, and it is not in `ROUTES`.
+     *
+     * NO `CallContext`, because the device has no credential yet. What stands in for one is the address it came
+     * from, counted before anything is written, and the approval a person gives elsewhere.
+     */
+    async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
+      const wait = counted(`device:${ip}`);
+      if (wait !== null) return { ok: false, retryAfter: wait };
+      return tail(await kernel.deviceStart(args ?? ({} as never)));
+    },
+
+    /** The device asks again, and once approved takes its bearer, once. INTERNAL, for `/auth/device/token`. */
+    async devicePoll(args: { device_code: string }): Promise<Result<DeviceWaiting | Exchanged>> {
+      return tail(await kernel.devicePoll(args ?? ({} as never)));
+    },
+
+    /** A vault-grant bearer, checked before the host opens a key for an agent. INTERNAL, and no route reaches it. */
+    async vaultGrant(bearer: string): Promise<Result<VaultGrant>> {
+      return kernel.vaultGrant(bearer);
     },
 
     /** A row's history: the writes that made it, each with who and when. */

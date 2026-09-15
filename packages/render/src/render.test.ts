@@ -1086,6 +1086,15 @@ test('a title that is a link makes the card a door', () => {
   assert.match(html, /<h3 class="cards-title"><a href="\/r\/things\/1">Kiln<\/a><\/h3>/u);
 });
 
+test('a card whose quiet cell says anything is dimmed, and the cell itself is never printed', () => {
+  const html = toHTML(onPage('```cards\ntitle | when: Seen | quiet\nAxis QA | 3m ago | \nReconcile | 2h ago | quiet\n```'));
+  assert.equal(html.match(/data-quiet=""/gu)?.length, 1, 'only the card that went quiet is dimmed');
+  assert.match(html, /<li class="cards-item" data-quiet=""><div class="cards-head"><h3 class="cards-title">Reconcile<\/h3>/u);
+  assert.doesNotMatch(html, />quiet</u, 'the marker reached the screen as a word');
+  const [twice] = onPage('```cards\ntitle | quiet | quiet\nA |  | \n```');
+  assert.equal(twice?.type, 'degraded', 'two quiet columns');
+});
+
 test('a card grid with no cards says so in a sentence', () => {
   assert.match(toHTML(onPage('```cards\ntitle | fact: Role\n```')), /<p class="cards-empty">Nothing to show\.<\/p>/u);
 });

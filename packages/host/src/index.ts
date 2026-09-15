@@ -144,6 +144,9 @@ export const ROUTES: readonly Route[] = [
   { name: 'listTokens', group: 'ADMIN', writes: false, what: 'Every agent token, with when it was last used. Never the token.' },
   { name: 'createToken', group: 'ADMIN', writes: true, what: 'Mint one. The secret is in the answer and is stored nowhere.' },
   { name: 'revokeToken', group: 'ADMIN', writes: true, what: 'Revoke one. The second call says the same as the first.' },
+  { name: 'deviceApprove', group: 'ADMIN', writes: true, what: 'Let in the device showing these six digits. A sign-in in the last fifteen minutes.' },
+  { name: 'listDevices', group: 'ADMIN', writes: false, what: 'Every device grant by its handle, with when it was last heard from. Never the id it polls with.' },
+  { name: 'revokeDevice', group: 'ADMIN', writes: true, what: 'Revoke one device by its handle. A login grant takes its token with it.' },
   /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event — 12 §6's rule that a
      vault whose reads are not audited cannot say whether anything got out — and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
@@ -166,7 +169,7 @@ export const ROUTES: readonly Route[] = [
  * token, which is the one thing this product says it does not do. `listGrants` is here because it
  * carries what a key OPENS and never the key. The others arrive when a host can prove a session.
  */
-export const UNROUTED = ['openGrant', 'bindGrant', 'revokeGrant', 'createRecord'] as const;
+export const UNROUTED = ['openGrant', 'bindGrant', 'revokeGrant', 'createRecord', 'deviceStart', 'devicePoll', 'vaultGrant'] as const;
 
 const BY_NAME = new Map(ROUTES.map((r) => [r.name, r]));
 
@@ -305,6 +308,9 @@ export type RecordSurface = {
   listTokens(ctx: never): Promise<Result<unknown>>;
   createToken(args: never, ctx: never): Promise<Result<unknown>>;
   revokeToken(args: never, ctx: never): Promise<Result<unknown>>;
+  deviceApprove(args: never, ctx: never): Promise<Result<unknown>>;
+  listDevices(ctx: never): Promise<Result<unknown>>;
+  revokeDevice(args: never, ctx: never): Promise<Result<unknown>>;
   export(args: never, ctx: never): Promise<Result<unknown>>;
   import(args: never, ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
@@ -352,6 +358,9 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     listTokens: (_a, ctx) => api.listTokens(ctx as never),
     createToken: (a, ctx) => api.createToken(a as never, ctx as never),
     revokeToken: (a, ctx) => api.revokeToken(a as never, ctx as never),
+    deviceApprove: (a, ctx) => api.deviceApprove(a as never, ctx as never),
+    listDevices: (_a, ctx) => api.listDevices(ctx as never),
+    revokeDevice: (a, ctx) => api.revokeDevice(a as never, ctx as never),
     export: (a, ctx) => api.export(a as never, ctx as never),
     import: (a, ctx) => api.import(a as never, ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),

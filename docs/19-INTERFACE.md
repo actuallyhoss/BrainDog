@@ -419,6 +419,13 @@ answered in a sentence, deterministic like the screen below, and written directl
 row in People, with no diff to approve. It is a different question from screen 1's, which stays about
 the business, so the two are not merged into one field. `loop/research-modular.md` §2 has the flow.)*
 
+*(Built September 15th 2026. `/start` opens on "Who are you?": one field with the caret in it and four
+chips that append words. A quarter of a second after typing stops it says what it heard, "Got it,
+you're Sam.", with an edit button, and screen 1 appears under it. Adding screen 1's row also meets
+the person: `meet({ name, email, where: 'onboarding' })` on a live record, or a waiting People row
+marked *Not saved* on the demo. With People off the name is still said back, no row is written, and
+nothing reports that as a failure.)*
+
 **Screen 1 — one row, typed by hand.** Not pack selection, not a capture box, not a dashboard.
 
 ```

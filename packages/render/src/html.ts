@@ -17,7 +17,7 @@
 import { KINDS, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { MISSING, leadingCode } from './format.ts';
-import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, markOf, ringDash, ringOf, trendOf } from './cards.ts';
+import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
@@ -391,7 +391,9 @@ function cards(b: Block, o: RenderOptions): string {
         L.who >= 0 && r.cells[L.who]
           ? `<div class="cards-who">${whoFace ? `<span class="cards-face" aria-hidden="true">${escape(whoFace)}</span>` : ''}<span class="cards-name">${drawn(r, L.who)}</span></div>`
           : '';
-      return `<li class="cards-item"${toneAttrs(r.tone)}><div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${middle}${facts}${who}</li>`;
+      /* DIMMED BY AN ATTRIBUTE, so the host's CSS decides how, and the card keeps every word it had. */
+      const quiet = isQuiet(L, r.cells) ? ' data-quiet=""' : '';
+      return `<li class="cards-item"${toneAttrs(r.tone)}${quiet}><div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${middle}${facts}${who}</li>`;
     })
     .join('');
   return `<ul class="cards-grid">${body}</ul>`;

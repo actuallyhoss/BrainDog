@@ -666,7 +666,24 @@ export async function start(options: {
     auth: off === null ? directory.auth : null,
     hosts: new Set([...loopback, new URL(origin).host]),
     origins: new Set([...loopback.map((h) => `http://${h}`), origin]),
-    door: { on: 'selfhost', origin, auth: directory.auth, open: token === undefined },
+    door: {
+      on: 'selfhost',
+      origin,
+      auth: directory.auth,
+      open: token === undefined,
+      /* A DEVICE SIGNS IN ONLY WHERE SOMEBODY CAN APPROVE IT WITH A CREDENTIAL: a session, or the server key. An
+         open self-host needs no bearer, and `deviceApprove` refuses its credential-less owner anyway. One record,
+         so a slug has nothing to choose between. */
+      ...(token === undefined
+        ? {}
+        : {
+            device: {
+              start: ({ ip, reach, label, scope, ua }) =>
+                api.deviceStart({ reach, label, ...(scope === undefined ? {} : { scope }), ...(ua === undefined ? {} : { ua }) }, ip),
+              poll: ({ device_code }) => api.devicePoll({ device_code }),
+            },
+          }),
+    },
   };
 
   /* WHAT THE BOOT LINE NAMES: the ways in that are live, from the Directory's own answer. */
@@ -750,7 +767,10 @@ async function answer(
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
   const request = new Request(url, { method, headers, ...(chunks.length ? { body: Buffer.concat(chunks) } : {}) });
-  if (/^\/+auth(?:\/|$)/.test(path)) return write(res, await serveAuth(request, { ...site.door, ip: ipOf(req, trustProxy) }));
+  /* `reached` IS THE `Host` THE SOCKET GOT, so a device that called this process by another name is not told to
+     approve itself at the configured origin. */
+  if (/^\/+auth(?:\/|$)/.test(path))
+    return write(res, await serveAuth(request, { ...site.door, ip: ipOf(req, trustProxy), reached: req.headers.host ?? '' }));
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
 

@@ -68,8 +68,9 @@ rather than by an incident, which is the only good way to find it.
 and the sign-in half is data: `AUTH_ROUTES` in `packages/host/src/auth.ts`, which both hosts answer through one
 `serveAuth` and the `router-groups` gate reads. A route's path is its flow with the dots as slashes
 (`POST /auth/passkey/assert`, `POST /auth/magic/redeem`), except the server key's exchange, which is
-`POST /auth/token`. The device grant, the invitation and the record switch (`/auth/device`, `/auth/device/token`,
-`/auth/device/approve`, `/auth/invite`, `/auth/switch`) are specified and not built, and keep those paths when
+`POST /auth/token`. The device grant's two routes, `POST /auth/device` and `POST /auth/device/token`, are rows of
+the same table, kept in `packages/host/src/device.ts`. The operation grant's approval, the invitation and the
+record switch (`/auth/device/approve`, `/auth/invite`, `/auth/switch`) are specified and not built, and keep those paths when
 they land. A bearer on the wire is `<rec_id>.<secret>`; the record keeps only `sha256(secret)`, in `token.hash`
 or `device_grant.token_hash`.
 **Passkeys first, and no passwords at all.** A record holding credentials should not be protected
@@ -295,7 +296,10 @@ never opened the vault all ask the same way.
 | The device polls with a **long random id, never the code** | conflating them makes polling a million-guess oracle |
 | The code is stored **hashed, never in clear** — `code_hash = sha256(id ‖ ':' ‖ user_code)`, the long random poll id as its salt; the record has no `SESSION_SECRET` and depends on no host secret to check it ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.11) | a pending row is readable by anything that reads the database. *An earlier draft hashed it under the session secret* |
 | **One row, two lives**: pending → approved → active | two tables would mean delete-and-reinsert at approval, and a crash between them loses the approval he just gave |
-| Approval is **browser-session only** — a bearer gets `403 NEEDS_BROWSER_SESSION` (it is authenticated, so it is forbidden — and the `401` rule in §8 stays true) | an agent may not approve its own request |
+| Approval is **the owner's, from a sign-in proved in the last 15 minutes**. A bearer gets `403 NEEDS_BROWSER_SESSION` (it is authenticated, so it is forbidden, and the `401` rule in §8 stays true), and an older sign-in is asked to sign in again. The self-host's server key is proved on the request that presents it | an agent may not approve its own request, and an approval hands out a 90-day bearer that works from anywhere, so it asks what `openGrant` asks |
+| **Starts are counted per address**: ten in 15 minutes, then `429` with `Retry-After` for 15 minutes, in the `auth_fail` table sign-in already counts in. A count that cannot be read refuses | a start costs nothing to send, and a list of codes nobody asked for hides the one somebody did |
+| **The address to approve at is the host's own**: `verification_uri` is always `<origin>/settings/agents`. A start that reached the host by another name, or that a page on another origin sent, is `403`, and the CLI refuses a `verification_uri` on another origin before it prints a digit | six digits typed into a page somebody else runs are an approval they can spend |
+| **Neither route logs a code, a poll id or a bearer** | more people read a log than read the record |
 | A wrong code bumps `tries` on *every* pending row; five → `denied` (`DEVICE_CODE_TRIES`). A malformed entry spends no try | a guesser cannot spread guesses across waiting requests to stay under the count, and a typo should not spend somebody else's enrolment |
 | **The poll id is never shown.** A listing, an event and a revoke name a row by a handle, the first 16 hex of `sha256('device:' ‖ id)` | between approval and exchange, whoever holds the id can take the bearer |
 | **A denied row is kept** | *"I said no to a request I did not make"* is the single most important line this table can produce |

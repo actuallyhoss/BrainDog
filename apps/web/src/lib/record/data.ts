@@ -12,7 +12,16 @@
  * shape the client will hand it later, and swapping one for the other changes no reader.
  */
 
-import { PAGES as SEED_PAGES, ROWS as SEED_ROWS, REGISTERS as SEED_REGISTERS, day, stamp } from '@braindog/seed';
+import {
+  AGENTS_PAGES,
+  AGENTS_REGISTERS,
+  PAGES as SEED_PAGES,
+  ROWS as SEED_ROWS,
+  REGISTERS as SEED_REGISTERS,
+  day,
+  projectWithRunsOn,
+  stamp,
+} from '@braindog/seed';
 
 import type {
   AuditEvent,
@@ -37,8 +46,14 @@ import type {
 
 export { LOOKUPS, NOW, TODAY } from '@braindog/seed';
 
-/** The pages the record ships with. They live in the seed, because a page is a document it holds. */
-export const PAGES = SEED_PAGES as unknown as Record<string, PageDecl>;
+/**
+ * The pages the record ships with. They live in the seed, because a page is a document it holds.
+ *
+ * THE AGENTS PACK'S PAGES ARE HERE BECAUSE ITS REGISTERS ARE: `/p/agents`, a page per skill, and the
+ * project template with "Runs on" after its own blocks, taken from the seed as a record holding the
+ * pack installs them.
+ */
+export const PAGES = { ...SEED_PAGES, project: projectWithRunsOn(), ...AGENTS_PAGES } as unknown as Record<string, PageDecl>;
 import { NOW } from '@braindog/seed';
 import { sessionDeclaration, type Counted } from '@braindog/kernel';
 /* `find.ts` reads `REGISTERS` from this module; the cycle is fine in ESM because `answers` is only
@@ -46,13 +61,13 @@ import { sessionDeclaration, type Counted } from '@braindog/kernel';
 import { answers } from './find.ts';
 
 /**
- * The seed's registers and the kernel's `session`, as this app types them. The seed's shape is a
- * superset of this one.
+ * The seed's registers, the agents pack's, and the kernel's `session`, as this app types them. The
+ * seed's shape is a superset of this one.
  *
  * AGENT RUNS COME FROM THE KERNEL'S OWN DECLARATION, the body migration 0002 seats, because that is
  * what a real record's `boot` lists. A copy written here would be the second "Agent runs" again.
  */
-export const REGISTERS = { ...SEED_REGISTERS, session: sessionDeclaration().body } as unknown as Record<string, RegisterDecl>;
+export const REGISTERS = { ...SEED_REGISTERS, ...AGENTS_REGISTERS, session: sessionDeclaration().body } as unknown as Record<string, RegisterDecl>;
 
 /**
  * WHICH RECORD THIS BUILD SHOWS, and the only place in the app that asks.
@@ -80,13 +95,16 @@ const VARIANT = typeof __BRAINDOG_VARIANT__ === 'string' ? __BRAINDOG_VARIANT__ 
  * and the seed writes them in order. Everything in this file that says `party: 1` is saying
  * `people#1`, and it still is.
  *
- * The values themselves are untouched — an `undefined` is dropped, which is what a write path does
- * with an absent field, and nothing else is converted.
+ * The values themselves are untouched. An `undefined` is dropped, which is what a write path does
+ * with an absent field, and a field the row leaves out takes its declared default, as the kernel's
+ * create gives it: a skill written without `state` is active in the record, so it is active here.
  */
 function entriesOf(register: string): Entry[] {
+  const declared = (REGISTERS[register]?.fields ?? []) as readonly { id: string; default?: unknown }[];
   return (SEED_ROWS[register] ?? []).map((raw, i) => {
     const seq = i + 1;
     const fields: Record<string, unknown> = {};
+    for (const f of declared) if (f.default !== undefined) fields[f.id] = f.default;
     for (const [key, value] of Object.entries(raw)) if (value !== undefined) fields[key] = value;
     return { seq, fields: fields as Fields, version: 1 + (seq % 4), created: stamp(-seq * 37), by: 'you' };
   });
@@ -107,6 +125,10 @@ export const ROWS: Record<string, Entry[]> = {
   session: entriesOf('session'),
   tracks: entriesOf('tracks'),
   updates: entriesOf('updates'),
+  learnings: entriesOf('learnings'),
+  skills: entriesOf('skills'),
+  credentials: entriesOf('credentials'),
+  tools: entriesOf('tools'),
 };
 
 /* ── where this record runs ───────────────────────────────────────────────────── */
@@ -444,7 +466,7 @@ export const PACKS: PackInfo[] = [
   { id: 'people', name: 'People', blurb: 'Collaborators, contractors, accountants.', version: '1.0.3', installed: true, registers: ['people'], pages: [], author: 'braindog' },
   { id: 'work', name: 'Work', blurb: 'Tasks, tracks, dates.', version: '1.1.0', installed: true, registers: ['tasks'], pages: ['work'], author: 'braindog' },
   { id: 'portfolio', name: 'Portfolio', blurb: 'The things you run, and the plan for each.', version: '1.0.0', installed: true, registers: ['things'], pages: [], author: 'braindog' },
-  { id: 'agents', name: 'Agents', blurb: 'What your agents learn, the skills they use, the keys they are handed and the tools they run, each for one project or for all.', version: '1.0.0', installed: false, registers: ['learnings', 'skills', 'credentials', 'tools'], pages: ['agents'], author: 'braindog', titles: { learnings: 'Learnings', skills: 'Skills', credentials: 'Keys', tools: 'Tools', agents: 'Agents' } },
+  { id: 'agents', name: 'Agents', blurb: 'What your agents learn, the skills they use, the keys they are handed and the tools they run, each for one project or for all.', version: '1.0.0', installed: true, registers: ['learnings', 'skills', 'credentials', 'tools'], pages: ['agents'], author: 'braindog', titles: { learnings: 'Learnings', skills: 'Skills', credentials: 'Keys', tools: 'Tools', agents: 'Agents' } },
   /* IT WANTS TO SIT ABOVE YOUR MONEY PAGE, AND IT DOES NOT GET TO. `04 §4`'s worked example is this
      pack, and the record had no way to hold the fact — so the diff's `CHANGES` section was behind a
      condition that could never be true and the three sentences about it rendered nowhere. A trust

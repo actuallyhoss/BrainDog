@@ -86,7 +86,7 @@ export type RecordApi = {
   claimJob(args: { runner_id?: string }, ctx: CallContext): Promise<Result<Claim | Idle>>;
   postJobEvent(args: JobEventIn, ctx: CallContext): Promise<Result<Ack>>;
   readCancel(args: { job_id: string }, ctx: CallContext): Promise<Result<{ cancel: 0 | 1; lease_until: string | null }>>;
-  // ADMIN — 14
+  // ADMIN — 16
   planPack(args: { doc: unknown; source?: PackSource }, ctx: CallContext): Promise<Result<Diff>>;
   installPack(args: { doc: unknown; source?: PackSource; planHash: string }, ctx: CallContext): Promise<Result<Applied>>;
   uninstallPack(args: { id: string }, ctx: CallContext): Promise<Result<Retired>>;
@@ -100,8 +100,10 @@ export type RecordApi = {
   createToken(args: { scope: Scope; name: string; expires_at?: string }, ctx: CallContext): Promise<Result<TokenMinted>>;   // added
   listTokens(args: Record<string, never>, ctx: CallContext): Promise<Result<TokenRow[]>>;              // added
   revokeToken(args: { id: string }, ctx: CallContext): Promise<Result<null>>;                          // added
-  deviceApprove(args: { user_code: string }, ctx: CallContext): Promise<Result<{ id: string; reach: Reach }>>;   // added
-  // INTERNAL — 11
+  deviceApprove(args: { user_code: string }, ctx: CallContext): Promise<Result<Approved>>;   // the owner, signed in within 15 minutes
+  listDevices(ctx: CallContext): Promise<Result<DeviceRow[]>>;                               // by handle, never the poll id
+  revokeDevice(args: { handle: string }, ctx: CallContext): Promise<Result<DeviceRow>>;       // a login's token goes with it
+  // INTERNAL — 12
   drainSchedule(args: Record<string, never>, ctx: CallContext): Promise<Result<Drained>>;
   leaseOutbox(args: { kinds: OutboxKind[]; n: number }, ctx: CallContext): Promise<Result<OutboxRow[]>>;
   ackOutbox(args: { id: string; state: 'done' | 'failed'; result?: unknown; error?: string }, ctx: CallContext): Promise<Result<null>>;
@@ -111,8 +113,9 @@ export type RecordApi = {
   arrive(args: ArriveArgs, ctx: CallContext): Promise<Result<Arrived>>;                                // added — 33 §4's arrival write
   applyPull(args: PullPage, ctx: CallContext): Promise<Result<{ wrote: number; kept: number }>>;      // added — 47 §2
   ingestVerify(args: { ingest_id: string }, ctx: CallContext): Promise<Result<IngestVerify>>;          // added — 51 §5.4
-  deviceStart(args: { reach: Reach; label: string; ua?: string }, ctx: CallContext): Promise<Result<DeviceCode>>;   // added — 12 §6.1
-  devicePoll(args: { device_code: string }, ctx: CallContext): Promise<Result<DevicePoll>>;            // added
+  deviceStart(args: { reach: Reach; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited>;   // counted per address, 12 §6.1
+  devicePoll(args: { device_code: string }): Promise<Result<DeviceWaiting | Exchanged>>;   // the bearer once, after approval
+  vaultGrant(bearer: string): Promise<Result<VaultGrant>>;                                 // a vault reach's bearer, for the host's key doors
 };
 
 export const GROUPS: Record<keyof RecordApi, Group>;        // every method's group, for the router gate — §8
@@ -135,7 +138,7 @@ the record had to have.)*
 | READ+ | `person` · `token`; `share` reaches `page` for its one slug and nothing else | `auth.ts` |
 | VAULT | `person` with level `owner`, no `op`; a bearer of any kind is `NEEDS_BROWSER_SESSION` | `auth.ts` |
 | JOBS | `createJob` `cancelJob` `listJobs`: `person` `owner`; `claimJob` `postJobEvent` `readCancel`: `runner` | `auth.ts` |
-| ADMIN | `person` with level `owner`, or a `person` whose `op` names the method (an operation grant, 48 §13 D1); `createToken` `listTokens` `revokeToken` `deviceApprove` admit any `person` | `auth.ts` |
+| ADMIN | `person` with level `owner`, or a `person` whose `op` names the method (an operation grant, 48 §13 D1); `createToken` `listTokens` `revokeToken` admit any `person`. `deviceApprove` admits only the owner, from a sign-in proved in the last 15 minutes: an approval hands out a 90-day bearer that works from anywhere, so it asks what VAULT asks. An earlier draft admitted any `person` | `auth.ts` |
 | INTERNAL | `system` — no route exists (33 §4); any other principal is `FORBIDDEN`; `export` also admits `system` for the nightly backup | `auth.ts` |
 
 `RecordApi` is what both hosts serve, one route per method, and what `packages/mcp` reaches through its fourteen tools
@@ -196,7 +199,7 @@ type CallContext = {
 
 type Level = 'read' | 'append' | 'write' | 'decide' | 'owner';          // ordered; member.level CHECK — 20 §1
 type Scope = 'read' | 'propose' | 'write';                              // ordered; one word per token row — 30 §1
-type Reach = 'login' | 'runner' | 'export' | 'import' | 'pack' | 'token';   // device_grant.reach — §13 #11
+type Reach = 'login' | 'runner' | 'export' | 'import' | 'pack' | 'token' | 'vault';   // device_grant.reach, §13 #11; 'vault' since kernel migration 4
 type Derived = { levels: Map<string, Level>; scope: CompileScope };     // computed once per call — 30 §10
 type CompileScope = { registers: '*' | string[]; rows?: Predicate };    // where.compile's ctx.scope — 38 §2.5
 ```
@@ -300,7 +303,13 @@ type BindGrantArgs = { id?: string; label: string; opens: string | null; kind: G
 type TokenMinted = { id: string; token: string; scope: Scope; name: string; created_at: string };      // token: shown once
 type TokenRow    = { id: string; person_id: string; scope: Scope; label: string | null; created_at: string; last_used_at: string | null; last_surface: string | null; expires_at: string | null };
 type DeviceCode  = { device_code: string; user_code: string; expires: string; interval: 5 };
-type DevicePoll  = { pending: true; interval: 5 } | { token: string; expires: string; reach: Reach };
+type DeviceWaiting = { pending: true; interval: 5 };
+type Exchanged   = { pending: false; bearer: string; reach: Reach; scope: string | null; expires: string };   // the bearer, once
+type Approved    = { handle: string; reach: Reach; scope: string | null; label: string | null; ua: string | null };
+type DeviceRow   = { handle: string; status: DeviceStatus; reach: Reach; scope: string | null; label: string | null; ua: string | null; tries: number; expires: string; approved_by: string | null; approved_at: string | null; last_used: string | null };   // never the poll id or a hash
+type DeviceStatus = 'pending' | 'approved' | 'active' | 'expired' | 'denied' | 'revoked';
+type Limited     = { ok: false; retryAfter: number };   // the eleventh start from one address in 15 minutes
+type VaultGrant  = { handle: string; scope: string; person: string; expires: string };
 type IngestVerify = { kind: 'path'; token: string } | { kind: 'hmac_sha256'; header: string; sealed: SealedGrant };
 type ArriveArgs  = { channel: 'email' | 'webhook' | 'pull' | 'paste' | 'api'; ingest_id?: string; headers: Record<string, string>; body: string; sha256: string; verified: boolean };
 type Arrived     = { raw: string; state: string; wrote: number };
@@ -392,8 +401,8 @@ call(method, args, ctx):
 | create | `≥ append` | `write` | `create` |
 | update | `≥ write` | `write` | `update` |
 | decide | `≥ decide`, person only | — | `update` on `suggestion` with `patch.decide` or `patch.resolved_as` |
-| owner | `owner` on `'*'`, person only | — | VAULT · ADMIN (or `op` reach) · `createJob` `cancelJob` `listJobs` · `snapshot` |
-| person | any level, person only | — | `markRead` `createToken` `listTokens` `revokeToken` `deviceApprove` |
+| owner | `owner` on `'*'`, person only | — | VAULT · ADMIN (or `op` reach) · `createJob` `cancelJob` `listJobs` · `snapshot` · `deviceApprove` `listDevices` `revokeDevice`, the first from a sign-in proved in the last 15 minutes |
+| person | any level, person only | — | `markRead` `createToken` `listTokens` `revokeToken` |
 | runner | — | the `runner` kind | `claimJob` `postJobEvent` `readCancel` |
 
 Effective level for a token = `min(scopeLevel(scope), memberLevel)` with `read → read`, `propose → append`
@@ -634,7 +643,9 @@ RETURNING *
 
 **`revokeToken({ id })`** — `UPDATE token SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL AND (? = 1 OR person_id = ?)`; 0 rows → `OUT_OF_BOUNDS` at `id`; `appendEvent` `access.revoke` (target `token:<id>`).
 
-**`deviceApprove({ user_code })`** — any `person` from a browser (12 §6.1: an agent may not approve its own request — a bearer never reaches ADMIN). `pending = SELECT id, code_hash, reach FROM device_grant WHERE status = 'pending' AND expires > ?`; the row whose `code_hash === hex(sha256(id + ':' + user_code))` (constant-time compare over every pending row) → `UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?`, `appendEvent({ kind: 'access.grant', actor, target: 'device:' + id, target_kind: 'device_grant', to_v: reach, note: label })`, return `{ id, reach }`. No row → `UPDATE device_grant SET tries = tries + 1 WHERE status = 'pending'`; then `UPDATE device_grant SET status = 'denied' WHERE status = 'pending' AND tries >= 5 RETURNING id` — any → `DEVICE_CODE_TRIES`; else `FORBIDDEN` at `user_code`. A denied row is kept (12 §6.1).
+**`deviceApprove({ user_code })`**, by the owner from a sign-in proved in the last 15 minutes, which the record checks because the kernel cannot know when somebody signed in (12 §6.1: an agent may not approve its own request, and a bearer never reaches ADMIN). A code that is not six digits is `VALUE_MALFORMED` and spends no try. `pending = SELECT id, code_hash, reach FROM device_grant WHERE status = 'pending' AND expires > ?`; the row whose `code_hash === hex(sha256(id + ':' + user_code))` (constant-time compare over every pending row) → `UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?`, `appendEvent({ kind: 'access.grant', actor, target: 'device:' + handle, target_kind: 'device_grant', to_v: reach, note: label })`, return `{ handle, reach, scope, label, ua }`, where `handle` is the first 16 hex of `sha256('device:' + id)`. No row → `UPDATE device_grant SET tries = tries + 1 WHERE status = 'pending'`; then `UPDATE device_grant SET status = 'denied' WHERE status = 'pending' AND tries >= 5 RETURNING id` — any → `DEVICE_CODE_TRIES`; else `FORBIDDEN` at `user_code`. A denied row is kept (12 §6.1).
+
+**`listDevices({})`**, the owner's: every `device_grant` row as a `DeviceRow`, named by its handle and never by its id. **`revokeDevice({ handle })`**, the owner's: the row with that handle → `revoked`, a login's token revoked with it, and one `access.revoke` event naming the handle; no row → `OUT_OF_BOUNDS` at `handle`.
 
 ### 5.7 · The rules pass (`rules.ts`) — step 9 of the write path, run here through the kernel's hook
 
@@ -779,7 +790,7 @@ body, never a credential (12 §6 rule 5).
 
 **`deviceStart({ reach, label, ua })`** — `user_code` = six digits from `crypto.getRandomValues`, `device_code` = base64url of 32 bytes; `INSERT INTO device_grant(id, code_hash, status, label, ua, tries, expires, reach) VALUES (?, hex(sha256(id + ':' + user_code)), 'pending', ?, ?, 0, now + 10 min, ?)` with `id = device_code` (the poll id is never the code — 12 §6.1); return `{ device_code, user_code, expires, interval: 5 }`.
 
-**`devicePoll({ device_code })`** — `SELECT * FROM device_grant WHERE id = ?`; none → `FORBIDDEN`; `pending` and `expires < now` → `UPDATE … SET status = 'expired'`, `DEVICE_CODE_EXPIRED`; `pending` → `{ pending: true, interval: 5 }`; `denied` → `DEVICE_CODE_TRIES`; `approved` → `token` = 32 random bytes, `UPDATE device_grant SET status = 'active', token_hash = hex(sha256(token)), expires = ?, last_used = ? WHERE id = ?` — `expires = now + 90 d` for `login`/`runner`, `now + 10 min` for an operation reach (48 §13 D1) — return `{ token, expires, reach }`; any other status → `FORBIDDEN`.
+**`devicePoll({ device_code })`** — `SELECT * FROM device_grant WHERE id = ?`; none → `FORBIDDEN`; `pending` and `expires < now` → `UPDATE … SET status = 'expired'`, `DEVICE_CODE_EXPIRED`; `pending` → `{ pending: true, interval: 5 }`; `denied` → `DEVICE_CODE_TRIES`; `approved` → `token` = 32 random bytes, `UPDATE device_grant SET status = 'active', token_hash = hex(sha256(token)), expires = ?, last_used = ? WHERE id = ?` — `expires = now + 90 d` for `login`/`runner`, `now + 10 min` for an operation reach (48 §13 D1) — return `{ pending: false, bearer, reach, scope, expires }`. A `login` exchange mints its bearer as a `token` row through `createToken` instead (scope `write`, 90 days, the device's label, owned by the approver), so there is one verifier; a second poll, and any other status → `FORBIDDEN`. `deviceStart` counts starts per address, given by the host, before it asks the kernel: ten in 15 minutes in `auth_fail`, then `Limited`.
 
 ---
 

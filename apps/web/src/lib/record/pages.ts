@@ -81,6 +81,8 @@ const fillBlock = (b: PageBlock, row: Entry, spoken: string): PageBlock => ({
   ...(b.where === undefined ? {} : { where: fill(b.where, row, spoken) }),
   ...(b.empty === undefined ? {} : { empty: fill(b.empty, row, spoken) }),
   ...(b.body === undefined ? {} : { body: fill(b.body, row, spoken) }),
+  /* A diff names the row it reads, and on a template that row is the page's own: `row: {{spoken}}`. */
+  ...(b.row === undefined ? {} : { row: fill(b.row, row, spoken) }),
   ...(b.cells === undefined ? {} : { cells: b.cells.map((c) => fillCell(c, row)) }),
   ...(b.authored === undefined
     ? {}

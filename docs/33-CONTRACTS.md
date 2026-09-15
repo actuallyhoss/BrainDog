@@ -257,7 +257,9 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | ADMIN | `createToken` | `{ scope, name }` — one scope word, the ladder's top | the bearer `<rec_id>.<secret>`, shown once; the row stores `sha256(secret)` |
 | ADMIN | `listTokens` | `{}` | the tokens with `last_used_at`, `last_surface`; never a secret |
 | ADMIN | `revokeToken` | `{ id }` | nothing |
-| ADMIN | `deviceApprove` | `{ code, op? }` — from a browser; five tries | the grant's `reach`; an `access.grant` event names the approver |
+| ADMIN | `deviceApprove` | `{ user_code }`, by the owner from a sign-in proved in the last 15 minutes; five wrong codes deny every waiting device | `{ handle, reach, scope, label, ua }`; an `access.grant` event names the approver |
+| ADMIN | `listDevices` | `{}` | every device grant by its handle, with its status, reach, label and last use; never a poll id, a code or a bearer |
+| ADMIN | `revokeDevice` | `{ handle }` | the row, now `revoked`, and a login's token revoked with it; an unknown handle is `OUT_OF_BOUNDS` |
 | ADMIN | `deleteRecord` | `{ slug }` — typed to confirm; a browser session, re-authenticated | the record is gone: the Worker `destroy()`s the object and removes the R2 prefix (§10) |
 | INTERNAL | `drainSchedule` | `{}` | the alarm handler: the due rows fired, the next `due_at` |
 | INTERNAL | `leaseOutbox` | `{ kinds, n }` | the leased rows; one statement, so a double drain finds nothing |
@@ -271,8 +273,9 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | INTERNAL | `sealedGrant` | `{ grant_id }` | `{ ciphertext, nonce, aad, kek_id, wrapped_dek }` for a connector run |
 | INTERNAL | `changed` | `{ since }` | `{ version, registers }` — the live channel's frame |
 | INTERNAL | `acceptInvite` | `{ invitation, person }` — the Directory's verified person | `person_record`, the `person` mirror, the `member` rows, one `access.grant` event per register |
-| INTERNAL | `deviceStart` | `{ reach, label, subject? }` — `subject` is stored in `ua` | `{ device_code, user_code, verification_uri, interval }` |
-| INTERNAL | `devicePoll` | `{ device_code }` | `{ pending }`, or `{ token, expires, reach }` once approved |
+| INTERNAL | `deviceStart` | `{ reach, label, ua?, scope? }` and the caller's address | `{ device_code, user_code, expires, interval }`; the eleventh start from one address in 15 minutes is `{ ok: false, retryAfter }`. The host adds `verification_uri` and `expires_in` |
+| INTERNAL | `devicePoll` | `{ device_code }` | `{ pending: true, interval }`, or `{ pending: false, bearer, reach, scope, expires }` once, after approval |
+| INTERNAL | `vaultGrant` | a `vault` reach's bearer | `{ handle, scope, person, expires }` for the host's key doors; `verifyToken` never accepts one |
 | INTERNAL | `rewrapKeys` | `{ from, to, rows }` | the rows re-wrapped under the new KEK (53) |
 | INTERNAL | `opsReport` | `{ observation? }` | the runbooks' figures (53) |
 
@@ -393,7 +396,7 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/auth/*` | GET · POST | per route | the sign-in routes below, which are the Directory's (§10) |
 | everything else | GET | — | the static shell: one `build/`, served as assets by both hosts; no server renders a request |
 
-**The `/auth/*` routes, once.** `AUTH_ROUTES` in `packages/host/src/auth.ts` is this table as data, and both hosts
+**The `/auth/*` routes, once.** `AUTH_ROUTES` in `packages/host/src/auth.ts` is this table as data (its two device rows come from `device.ts`), and both hosts
 answer it through one `serveAuth`. A POST needs `application/json` and a same-origin `Origin`. A 200 is the `/api`
 envelope; a sign-in that does not sign somebody in is `401 UNAUTHORIZED` "That did not sign you in."; the lockout
 is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout store that fails is `503`.
@@ -409,9 +412,11 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 | `/auth/magic/redeem` | POST | both | `{ linkToken }` or `{ claimToken }`: spent once, by a press, never by a GET |
 | `/auth/passkeys` · `/auth/passkey/remove` | GET · POST | both | a person's own passkeys, and removing one, the last included |
 | `/auth/logout` | POST | both | ends the session and clears the cookie |
+| `/auth/device` | POST | both | `{ slug?, reach, label, scope? }` with no credential, and no `Origin` needed because a CLI sends none: `{ device_code, user_code, verification_uri, expires_in, expires, interval }`, where `verification_uri` is always `<origin>/settings/agents`. `403` when the host was reached by another name or a page on another origin sent it; ten starts per address in 15 minutes, then `429` |
+| `/auth/device/token` | POST | both | `{ slug?, device_code }`: `{ pending: true, interval }` until approved, then the bearer once. `slug` names the record on Cloud; the self-host holds one, and answers both routes only when `BRAINDOG_TOKEN` is set |
 | `/auth/provision` · `/auth/claim/mint` | POST | Cloud | the operator's, behind `PROVISION_KEY`: a record, its Directory rows and a 24-hour claim link handed back, never mailed |
 
-Specified and not built: `/auth/device`, `/auth/device/token` and `/auth/device/approve` (the operation grant of
+Specified and not built: `/auth/device/approve` (the operation grant of
 §10), `/auth/invite` and `/auth/switch`. They keep these paths when they land.
 `Cache-Control: no-store` on `/api/*` and `/mcp`; no CORS; `run_worker_first: ['/api/*', '/mcp', '/a/*', '/in/*',
 '/s/*', '/ws/*', '/auth/*', '/.well-known/*']`. INTERNAL methods have no route. There is no admin scope: VAULT never
@@ -638,7 +643,7 @@ tables are `dir_`-prefixed, at Directory version 3.
 | Sign in | passkey first where one exists, the magic link as the fallback — the self-host's only path in phase 2; both produce a `session` row, which carries the record; a self-host also takes its server key at `/auth/token`; **no passwords** |
 | Invite | `invite({ email, levels })` (ADMIN, the owner) mints an invitation — one email, 24 h; the invitee signs in behind `GET /auth/invite/<token>` and the host calls `acceptInvite` (INTERNAL) with the Directory's verified person, which writes `person_record`, the record's `person` mirror, the `member` rows and one `access.grant` event per register |
 | Agent token | minted from a browser session (`createToken`) or by `braindog login`'s device flow; scoped `read` / `propose` / `write` — one word stored, the ladder's top; the bearer is `<rec_id>.<secret>` and the record's `token` table stores `sha256(secret)` with `last_used_at` and `last_surface`; one record |
-| Device grant | six digits, ten minutes, five tries; `code_hash = sha256(id ‖ ':' ‖ user_code)` — `id` is the poll id, never the code; approved from a browser (`deviceApprove`); `verification_uri` is `${origin}/settings/agents`; `device_grant.reach` names what the grant reaches — `login` or `runner` mint a 90-day bearer in `token_hash`; the CLI, an agent and a runner all enrol this way |
+| Device grant | six digits, ten minutes, five tries; `code_hash = sha256(id ‖ ':' ‖ user_code)` — `id` is the poll id, never the code; approved by the owner from a sign-in proved in the last 15 minutes (`deviceApprove`); `verification_uri` is `${origin}/settings/agents`; `device_grant.reach` names what the grant reaches — `login` or `runner` mint a 90-day bearer in `token_hash`; the CLI, an agent and a runner all enrol this way |
 | Operation grant | `reach ∈ export \| import \| pack \| token`: from a browser session the owner approves **one named operation** after seeing its summary; the approval is single-use, expires in ten minutes, is recorded in `device_grant.reach` and an `access.grant` event, and the bearer then reaches exactly that ADMIN method once with `ctx.op` set (§4; [ADR-060](16-DECISIONS.md) as amended) |
 | Suspend | `person.suspended_at` in the Directory; the record's mirror follows on the next request; suspending a person suspends their tokens in the same record transaction |
 | Delete | `deleteRecord({ slug })` — the owner, a browser session re-authenticated, the slug typed; the Worker `destroy()`s the object's storage and removes the R2 prefix; the lapse ladder runs the same deletion at day 90 of `billing = lapsed` (02 §9) |

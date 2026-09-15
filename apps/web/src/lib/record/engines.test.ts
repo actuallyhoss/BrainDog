@@ -3,19 +3,20 @@
  *
  * A project page reads its own rows and the ones it inherits. The kernel decides what a project row
  * hides through `inScope`, and this app decides it again in `api.ts`, so the two are asked the same
- * blocks over the same rows and must name the same rows in the same places. The agents registers are
- * not in the demo's data yet, so they are added here, the way `data.ts` maps every other register.
+ * blocks over the same rows and must name the same rows in the same places. The agents pack's
+ * registers, rows and pages are the demo's own, from `data.ts`, so what is held here is what the
+ * demo draws.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { openRecord, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
-import { AGENTS_REGISTERS, LOOKUPS, NOW, ROWS as SEED_ROWS, RUNS_ON, installSeed, stamp } from '@braindog/seed';
+import { isStale, openRecord, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
+import { AGENTS_PAGES, LOOKUPS, NOW, RUNS_ON, installSeed } from '@braindog/seed';
 
-import { readBlock as webBlock, REGISTERS, ROWS } from './api.ts';
-import type { Entry, Fields, PageBlock, RegisterDecl } from './schema.ts';
+import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
+import type { PageBlock } from './schema.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
 
@@ -46,20 +47,6 @@ function openSqlite(): Sql {
     },
   };
   return sql as unknown as Sql;
-}
-
-/* The agents registers and rows, as `data.ts`'s `entriesOf` maps the rest: a ref stays its seq. A field
-   a seed row leaves out takes its declared default, as the kernel's create gives it, or a skill with no
-   `state` would be active in one engine and nothing in the other. */
-for (const [id, decl] of Object.entries(AGENTS_REGISTERS)) {
-  REGISTERS[id] = decl as unknown as RegisterDecl;
-  ROWS[id] = (SEED_ROWS[id] ?? []).map((raw, i): Entry => {
-    const seq = i + 1;
-    const fields: Record<string, unknown> = {};
-    for (const f of decl.fields as readonly { id: string; default?: unknown }[]) if (f.default !== undefined) fields[f.id] = f.default;
-    for (const [key, value] of Object.entries(raw)) if (value !== undefined) fields[key] = value;
-    return { seq, fields: fields as Fields, version: 1 + (seq % 4), created: stamp(-seq * 37), by: 'you' };
-  });
 }
 
 /** The deps a host wires, from the kernel's public reads. */
@@ -212,6 +199,61 @@ test('“RUNS ON”, AS THE PROJECT TEMPLATE DECLARES IT, names the same rows in
       assert.deepEqual({ inherited: web.inherited, matched: web.total }, { inherited: kernel.inherited, matched: kernel.matched }, at);
       if (block.heading === 'Skills') assert.ok(!rows.some((r) => r.startsWith('chase-invoice')), `${at}: a retired skill is listed`);
     }
+});
+
+test('/p/AGENTS, AS THE PACK DECLARES IT, draws the same runs, learnings and skills in both engines', async () => {
+  const deps = await seeded;
+  const drawn = page('agents');
+  assert.ok(drawn, 'the demo has no /p/agents');
+  for (const [n, declared] of (AGENTS_PAGES.agents!.blocks as readonly Record<string, unknown>[]).entries()) {
+    const block = declared as KernelBlock & PageBlock;
+    const at = String(block.heading);
+    const kernel = kernelBlock(deps, block);
+    const web: NonNullable<ReturnType<typeof page>>['blocks'][number] = drawn.blocks[n]!;
+    assert.deepEqual(kernel.refusals, [], `${at}, the kernel: ${JSON.stringify(kernel.refusals)}`);
+    assert.deepEqual(web.refusals, [], `${at}, the demo: ${web.refusals.join('; ')}`);
+    const title = block.columns![0]!.field;
+    assert.ok(kernel.rows.length > 0, `${at} draws nothing on the seed`);
+    assert.deepEqual(web.rows.map((r) => r.cells[0]), kernel.rows.map((r) => String(r.fields[title])), at);
+    assert.equal(web.total, kernel.matched, at);
+    if (block.source !== 'sessions.live') continue;
+
+    const project = block.columns!.findIndex((c) => c.field === 'project');
+    assert.deepEqual(web.rows.map((r) => r.cells[project]), kernel.scopes, `${at}: each run's project, by its name`);
+    assert.deepEqual(kernel.scopes, ['Kiln', 'Kiln', 'Portage']);
+    assert.deepEqual(
+      web.quiet,
+      kernel.rows.map((r) => isStale({ fields: r.fields, updated_at: r.updated_at }, NOW)),
+      `${at}: the runs dimmed are the ones the kernel calls stale`,
+    );
+    assert.deepEqual(web.quiet, [false, false, true], 'the run seen two hours ago has gone quiet');
+  }
+});
+
+test('A PAGE PER SKILL IN USE, and a key in the demo is an index row that holds no value', async () => {
+  const deps = await seeded;
+  const active = kernelBlock(deps, { kind: 'table', source: 'register.skills', where: 'state is active', columns: [{ field: 'name' }], empty: 'None.' } as KernelBlock);
+  const skillPages = Object.values(pages()).filter((p) => p.identity?.register === 'skills');
+  assert.equal(skillPages.length, active.matched, 'one page for each active skill, and none for the retired one');
+  for (const p of skillPages) assert.deepEqual(page(p.page)?.blocks.flatMap((b) => b.refusals), [], p.page);
+
+  assert.ok((ROWS.credentials ?? []).length > 0);
+  for (const key of ROWS.credentials ?? []) assert.ok(!('value' in key.fields), `${String(key.fields.label)} carries a value`);
+});
+
+test('KILN AND PORTAGE DRAW "RUNS ON" in the demo, with no block refused', () => {
+  for (const slug of ['kiln', 'portage']) {
+    const drawn = page(slug);
+    assert.ok(drawn, `the demo has no /p/${slug}`);
+    const at = drawn.blocks.findIndex((b) => b.heading === 'Runs on');
+    assert.ok(at >= 0, `/p/${slug} has no Runs on`);
+    const after = drawn.blocks.slice(at + 1);
+    assert.deepEqual(after.map((b) => b.heading), ['Keys', 'Tools', 'Skills'], slug);
+    for (const b of after) {
+      assert.deepEqual(b.refusals, [], `${String(b.heading)} on ${slug}`);
+      assert.ok(b.rows.length > 0, `${String(b.heading)} on ${slug} draws nothing`);
+    }
+  }
 });
 
 test('an as: scope column on a field that does not say where a row applies is refused by both engines', async () => {
