@@ -84,7 +84,12 @@
       {#if token === undefined || (token && seen === null)}
         <p class="status" role="status">{copy.inviteChecking}</p>
       {:else if token === null}
-        <Empty kind="error" title={copy.inviteNoLink} body={copy.inviteAskNew} />
+        <!-- NOT AN ERROR, AND THE READINESS CONTRACT IS WHERE THAT SHOWS. Somebody who opens `/invite` with no
+             fragment has met no failure: there is simply no invitation at this address, which is a designed empty
+             state. Drawn as `error` it set `data-screen="refused"`, and `layout` and `a11y` sweep this route bare,
+             so both measured an error card at fifteen widths and reported the screen as never auditable. A token
+             the host rejects below is still `error`, because that one is a refusal. -->
+        <Empty kind="no-results" title={copy.inviteNoLink} body={copy.inviteAskNew} />
       {:else if seen && !seen.ok}
         <Empty kind="error" title={sentence(seen)} body={copy.inviteAskNew} />
       {:else if seen && seen.ok && !joined}
