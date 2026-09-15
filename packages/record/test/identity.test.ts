@@ -720,7 +720,7 @@ test('each way in is off until the host turns it on, and methods says which are 
 
 /* ── the migration ────────────────────────────────────────────────────── */
 
-test('A DIRECTORY WRITTEN BY VERSION 2 IS BROUGHT TO 3, and signs its person in', async () => {
+test('A DIRECTORY WRITTEN BY VERSION 2 IS BROUGHT FORWARD, and signs its person in', async () => {
   const sql = openSqlite();
   sql.exec(`
     CREATE TABLE dir_person (id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT, created_at TEXT NOT NULL);
@@ -738,9 +738,10 @@ test('A DIRECTORY WRITTEN BY VERSION 2 IS BROUGHT TO 3, and signs its person in'
 
   const config = { mac: new Uint8Array(32).fill(7), magic: false, key: { serverKey } };
   const d = createDirectory(sql, fixedClock(NOW), config);
-  assert.equal(DIRECTORY_VERSION, 3);
-  assert.equal(sql.one<{ value: string }>("SELECT value FROM dir_meta WHERE key = 'version'")?.value, '3');
+  assert.equal(DIRECTORY_VERSION, 4);
+  assert.equal(sql.one<{ value: string }>("SELECT value FROM dir_meta WHERE key = 'version'")?.value, '4');
   assert.equal(sql.all("SELECT 1 FROM pragma_table_info('dir_person') WHERE name = 'suspended_at'").length, 1, 'suspended_at was not added');
+  assert.equal(sql.one<{ plan: string }>("SELECT plan FROM dir_record WHERE id = 'rec_old'")?.plan, 'hosted', 'version 4 did not follow version 3');
   assert.deepEqual(ok(await keyIn(d)).body, { person: 'p_ada', email: 'ada@example.com', record: 'rec_old', provedAt: NOW });
 
   /* And opening it again runs nothing twice: ADD COLUMN would throw the second time. */

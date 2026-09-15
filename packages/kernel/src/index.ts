@@ -106,6 +106,7 @@ import {
   ACTION_KINDS,
   fireAction,
   finishAction,
+  listActions,
   originsOf,
   prepareAction,
   resumeAction as resumeScheduledAction,
@@ -208,7 +209,7 @@ export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, actionJitterMs, answerHash, originsOf } from './actions.ts';
-export type { ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionsRun, Execute } from './actions.ts';
+export type { ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, Execute } from './actions.ts';
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
 export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
@@ -2702,6 +2703,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Start a paused scheduled action again, now. A refused key pauses one, and nothing else restarts it. */
     resumeAction: (ingest: string, actor: string) =>
       transaction(() => resumeScheduledAction({ sql, mint, nowMs: clock.now() }, ingest, actor)),
+
+    /** Every active scheduled action: its schedule, its key by label, its last run and this month's counts. A read. */
+    actions: () => listActions(sql, clock.now()),
 
     /** Every https origin an active `pull`, `call` or `poll` names. A host's executor sends to these and nothing else. */
     actionOrigins: (): string[] =>

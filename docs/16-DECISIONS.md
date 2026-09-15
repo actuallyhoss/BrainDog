@@ -1533,5 +1533,27 @@ a route.
 
 ---
 
+## ADR-069 · Usage is counted per record in the Directory, and a hosted record waits at its allowance
+
+**Decided.** Every scheduled action's run writes one `pull` event in the record with its runs, requests,
+bytes, run time and failures, and its scope (a project, or `global`). The host adds that event to a ledger
+in the Directory, `dir_usage_day` by record, UTC day, scope and action, counting each event id once
+(`dir_usage_run`). A month is the sum of its days and an account is the sum of the records it owns. Each
+record has a plan: `hosted` allows 15,000 runs, 150,000 requests, 1 GB fetched and 50 hours of run time a
+month; `selfhost` is counted and never limited. Before a run starts the host asks the Directory, and at the
+limit the action waits until the first of the next month with an event that says so in one sentence. It is
+never paused and never skipped silently. Metering started with the first run. Directory version 4.
+
+**Rejected:** the count in the record, because billing is the account's and the record is the customer's
+data, and a customer's export should not carry the operator's meter; a refusal code at the limit, because
+nothing a caller asked for was refused and 30 §6 already has what an install needs; an install-time refusal
+against the allowance, because the record cannot see the Directory; overage charges, until a payment
+provider exists (research-scheduled-actions §4.8).
+
+**Would reverse it:** a price per run rather than per record, which would move the allowance from the plan
+to an invoice line; or the owner choosing a different allowance, which changes `ALLOWANCE` and nothing else.
+
+---
+
 *Next: [17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md).*
 

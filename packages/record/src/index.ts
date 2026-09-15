@@ -1913,6 +1913,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
+     * Every scheduled action: what it calls and how often, its state, its last run, its next run, and this month's
+     * counts from its own `pull` events (`loop/research-scheduled-actions.md` §4.6). READ+.
+     *
+     * A KEY BY ITS LABEL. The list is built from the schedule, the vault's index and the run events, and nothing
+     * sealed is read to build it, so a token that may read the record may read this.
+     */
+    async actions(ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.actions());
+    },
+
+    /**
      * Every pack, on or off, with the registers each holds. A read, because a list of names is not a change.
      *
      * OFF IS NOT ABSENT. A disabled pack is here with its `disabled_at`, and so is a pack the seed owns

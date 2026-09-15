@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS dir_record (
   id         TEXT PRIMARY KEY,              -- 'rec_01J…' — the argument to idFromName. It NEVER changes.
   owner      TEXT NOT NULL DEFAULT '',      -- the founding owner. 33 §593: record_dir.owner_person
   created_at TEXT NOT NULL,
-  closed_at  TEXT
+  closed_at  TEXT,
+  plan       TEXT NOT NULL DEFAULT 'hosted' -- 'hosted' or 'selfhost': the monthly allowance its scheduled actions run under
 );
 
 -- A slug is a name for a record and a record has one live name. A released row stays as a tombstone:
@@ -182,6 +183,34 @@ CREATE TABLE IF NOT EXISTS dir_fail (
   first INTEGER NOT NULL,
   until INTEGER
 );
+
+-- USAGE. What each record's scheduled actions used, by UTC day, scope and action: the account's ledger,
+-- kept here and not in the record, because billing concerns the account (loop/DIRECTION.md 0b). A month is
+-- the sum of its days, and an account is the sum of the records it owns. The host counts, from each run's
+-- pull event, starting from the first run.
+CREATE TABLE IF NOT EXISTS dir_usage_day (
+  record   TEXT NOT NULL,
+  day      TEXT NOT NULL,                   -- 'YYYY-MM-DD', UTC
+  scope    TEXT NOT NULL,                   -- the action's project, or 'global'
+  action   TEXT NOT NULL,                   -- the ingest id
+  runs     INTEGER NOT NULL DEFAULT 0,
+  requests INTEGER NOT NULL DEFAULT 0,
+  bytes    INTEGER NOT NULL DEFAULT 0,
+  ms       INTEGER NOT NULL DEFAULT 0,
+  failures INTEGER NOT NULL DEFAULT 0,
+  held     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (record, day, scope, action)
+) WITHOUT ROWID;
+
+-- Every run already counted, by its event id, so the same run reported twice is counted once. Kept forty
+-- days, and a run older than that is not counted at all, so pruning this table can never count one twice.
+CREATE TABLE IF NOT EXISTS dir_usage_run (
+  record TEXT NOT NULL,
+  event  TEXT NOT NULL,
+  at     INTEGER NOT NULL,                  -- when the run was metered, epoch milliseconds
+  PRIMARY KEY (record, event)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS dir_usage_run_at ON dir_usage_run(record, at);
 `;
 
 export type Person = { id: string; email: string; name: string | null; created_at: string };
@@ -191,16 +220,89 @@ export type Membership = { record: string; slug: string | null; closed: boolean 
 
 export type Directory = ReturnType<typeof createDirectory>;
 
+/* ── plans and usage ─────────────────────────────────────────────────────── */
+
+/** The plans a record can be on. `hosted` is the record at $12 a month; `selfhost` is counted and never limited. */
+export const PLANS = ['hosted', 'selfhost'] as const;
+export type Plan = (typeof PLANS)[number];
+
+/** One month's allowance: runs, requests, bytes fetched and run time in milliseconds. Failures are never limited. */
+export type Allowance = { runs: number; requests: number; bytes: number; ms: number };
+
+/**
+ * What each plan allows a record's scheduled actions in a calendar month, UTC.
+ *
+ * THE OWNER'S DEFAULTS until he says otherwise (`loop/research-scheduled-actions.md` §4.4 and its first
+ * question): twenty hourly actions are 14,600 runs, so 15,000 is the hosted record's allowance. `null` is
+ * no limit.
+ */
+export const ALLOWANCE: Record<Plan, Allowance | null> = {
+  hosted: { runs: 15_000, requests: 150_000, bytes: 1_000_000_000, ms: 50 * 3_600_000 },
+  selfhost: null,
+};
+
+export type UsageTotals = { runs: number; requests: number; bytes: number; ms: number; failures: number; held: number };
+
+/** One run to count: a row of the kernel's `ActionsRun.usage`, which is the run's `pull` event. */
+export type RunUsage = { event: string; at: string; ingest: string; scope: string; usage: UsageTotals };
+
+/** One record's usage over a range, and its month so far against its allowance. */
+export type RecordUsage = {
+  record: string;
+  slug: string | null;
+  plan: Plan;
+  closed: boolean;
+  month: { month: string; used: UsageTotals; allowance: Allowance | null; resets: string };
+  totals: UsageTotals;
+  projects: ({ scope: string } & UsageTotals)[];
+  actions: ({ scope: string; action: string } & UsageTotals)[];
+  days: ({ day: string } & UsageTotals)[];
+};
+
+/** Everything a person owns, summed. What `GET /account/usage` answers. */
+export type AccountUsage = { from: string; to: string; totals: UsageTotals; records: RecordUsage[] };
+
+const DAY_MS = 86_400_000;
+/** How long a counted run's id is kept, and so how old a run may be and still be counted. */
+const KEEP_RUNS_MS = 40 * DAY_MS;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const dayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+const monthStart = (ms: number): number => Date.UTC(new Date(ms).getUTCFullYear(), new Date(ms).getUTCMonth(), 1);
+const nextMonth = (ms: number): number => Date.UTC(new Date(ms).getUTCFullYear(), new Date(ms).getUTCMonth() + 1, 1);
+const thousands = (n: number): string => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+const SUMS = 'SUM(runs) AS runs, SUM(requests) AS requests, SUM(bytes) AS bytes, SUM(ms) AS ms, SUM(failures) AS failures, SUM(held) AS held';
+const totalsOf = (row: Record<string, unknown> | undefined): UsageTotals => ({
+  runs: Number(row?.runs ?? 0),
+  requests: Number(row?.requests ?? 0),
+  bytes: Number(row?.bytes ?? 0),
+  ms: Number(row?.ms ?? 0),
+  failures: Number(row?.failures ?? 0),
+  held: Number(row?.held ?? 0),
+});
+
+/** What a record has used up, in the words the held sentence says it in. */
+const SPENT: Record<keyof Allowance, (limit: number) => string> = {
+  runs: (n) => `its ${thousands(n)} runs`,
+  requests: (n) => `its ${thousands(n)} requests`,
+  bytes: (n) => `its ${thousands(n / 1_000_000_000)} GB of fetched data`,
+  ms: (n) => `its ${thousands(n / 3_600_000)} hours of run time`,
+};
+
+const planOf = (value: string | undefined): Plan => ((PLANS as readonly string[]).includes(value ?? '') ? (value as Plan) : 'hosted');
+
 /**
  * The Directory's own schema revision. `49 §5.1` step 4.
  *
- * THREE, and every step past one is a migration with a number: `TO_2`, then `TO_3`. It is here
+ * FOUR, and every step past one is a migration with a number: `TO_2`, `TO_3`, then `TO_4`. It is here
  * rather than nowhere because a tenant map has the same problem a record does: a build that opens one
  * written by a NEWER build reads tables whose columns it does not know about, and every answer it
  * gives is confidently wrong about which record a name means. `FORMAT_NEWER_THAN_READER` is what the
  * format layer says (`03 §11`), and this is the one place the Directory can say it.
  */
-export const DIRECTORY_VERSION = 3;
+export const DIRECTORY_VERSION = 4;
 
 /**
  * From one to two: the level leaves `dir_member` and the founding owner joins `dir_record`.
@@ -234,6 +336,16 @@ const TO_2 = [
  * that is already there, and `dir_person` is.
  */
 const TO_3 = ['ALTER TABLE dir_person ADD COLUMN suspended_at TEXT'];
+
+/**
+ * From three to four: usage.
+ *
+ * ONE COLUMN AGAIN. `dir_usage_day` and `dir_usage_run` are new tables, which `SCHEMA` creates on every open;
+ * the plan is a column on a table that already exists. Every record already there is `hosted`, which is the
+ * safe reading: a self-host sets its records to `selfhost`, and a limit that should not apply is a sentence
+ * somebody reads, where a limit that should apply and did not is a bill nobody can explain.
+ */
+const TO_4 = ["ALTER TABLE dir_record ADD COLUMN plan TEXT NOT NULL DEFAULT 'hosted'"];
 
 /**
  * Run it, and answer `null` when the driver will not.
@@ -302,6 +414,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
   sql.transactionSync(() => {
     if (version === 1) for (const statement of TO_2) sql.exec(statement);
     if (version >= 1 && version < 3) for (const statement of TO_3) sql.exec(statement);
+    if (version >= 1 && version < 4) for (const statement of TO_4) sql.exec(statement);
     sql.exec(
       "INSERT INTO dir_meta (key, value) VALUES ('version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
       String(DIRECTORY_VERSION),
@@ -444,10 +557,12 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
      * no record is a 404 that looks like a bug. Naming is provisioning on the platform; here it is
      * the row that says which name the platform is given.
      */
-    provision: (args: { slug: string; email: string; name?: string; record?: string }): Result<Named & { person: string }> =>
+    provision: (args: { slug: string; email: string; name?: string; record?: string; plan?: Plan }): Result<Named & { person: string }> =>
       sql.transactionSync(() => {
         const wrong = bad(args.slug);
         if (wrong) return no<Named & { person: string }>('VALUE_MALFORMED', wrong, { at: 'slug' });
+        if (args.plan !== undefined && !(PLANS as readonly string[]).includes(args.plan))
+          return no<Named & { person: string }>('ENUM_VALUE_UNKNOWN', `${String(args.plan)} is not a plan. A record is on ${PLANS.join(' or ')}.`, { at: 'plan' });
         if (args.record !== undefined && !REC_ID.test(args.record))
           return no<Named & { person: string }>(
             'VALUE_MALFORMED',
@@ -500,7 +615,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
            name that can never be issued again. */
         const record = args.record ?? `rec_${mint()}`;
         const now = at();
-        sql.exec('INSERT INTO dir_record (id, owner, created_at) VALUES (?, ?, ?)', record, person.id, now);
+        sql.exec('INSERT INTO dir_record (id, owner, created_at, plan) VALUES (?, ?, ?, ?)', record, person.id, now, args.plan ?? 'hosted');
         sql.exec('INSERT INTO dir_slug (slug, record, claimed_at) VALUES (?, ?, ?)', args.slug, record, now);
         sql.exec('INSERT INTO dir_member (person, record, added_at) VALUES (?, ?, ?)', person.id, record, now);
         return ok({ record, slug: args.slug, person: person.id });
@@ -657,5 +772,150 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
      */
     namesOf: (record: string): { slug: string; claimed_at: string; released_at: string | null }[] =>
       sql.all('SELECT slug, claimed_at, released_at FROM dir_slug WHERE record = ? ORDER BY rowid', record),
+
+    /**
+     * Put a record on a plan. A self-host puts every record it serves on `selfhost`, once, at start.
+     */
+    setPlan: (record: string, plan: Plan): Result<null> =>
+      sql.transactionSync(() => {
+        if (!(PLANS as readonly string[]).includes(plan))
+          return no<null>('ENUM_VALUE_UNKNOWN', `${String(plan)} is not a plan. A record is on ${PLANS.join(' or ')}.`, { at: 'plan' });
+        if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ?', record))
+          return no<null>('OUT_OF_BOUNDS', `There is no record ${record}.`, { at: 'record' });
+        sql.exec('UPDATE dir_record SET plan = ? WHERE id = ?', plan, record);
+        return ok(null);
+      }),
+
+    /**
+     * Count one run, from the `pull` event the kernel wrote for it.
+     *
+     * THE SAME RUN TWICE IS COUNTED ONCE. The event's id goes into `dir_usage_run` first, in the same
+     * transaction as the day row, and a run whose id is already there adds nothing. A host can therefore report
+     * a pass again after a crash, or report from two places, and the ledger does not move.
+     *
+     * A RUN OLDER THAN FORTY DAYS IS NOT COUNTED, because that is how long the ids are kept: counting it after
+     * its id was pruned is the one way to count it twice. The answer says so rather than pretending.
+     */
+    meter: (record: string, run: RunUsage): Result<'counted' | 'already counted' | 'too old'> =>
+      sql.transactionSync(() => {
+        type Counted = 'counted' | 'already counted' | 'too old';
+        const at = typeof run?.at === 'string' ? Date.parse(run.at) : Number.NaN;
+        const u = run?.usage;
+        const whole = u !== undefined && [u.runs, u.requests, u.bytes, u.ms, u.failures, u.held].every((n) => Number.isSafeInteger(n) && n >= 0);
+        const named = (s: unknown): boolean => typeof s === 'string' && s !== '';
+        if (!named(run?.event) || !Number.isFinite(at) || !named(run?.ingest) || !named(run?.scope) || !whole)
+          return no<Counted>(
+            'VALUE_MALFORMED',
+            "A run to count is a row of the runner's usage: an event id, a time, an action, a scope and six whole numbers.",
+            { at: 'run' },
+          );
+        if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ?', record))
+          return no<Counted>('OUT_OF_BOUNDS', `There is no record ${record}.`, { at: 'record' });
+
+        const cutoff = clock.now() - KEEP_RUNS_MS;
+        if (at < cutoff) return ok<Counted>('too old');
+        sql.exec('DELETE FROM dir_usage_run WHERE record = ? AND at < ?', record, cutoff);
+        if (sql.one('SELECT 1 AS x FROM dir_usage_run WHERE record = ? AND event = ?', record, run.event)) return ok<Counted>('already counted');
+
+        sql.exec('INSERT INTO dir_usage_run (record, event, at) VALUES (?, ?, ?)', record, run.event, at);
+        sql.exec(
+          `INSERT INTO dir_usage_day (record, day, scope, action, runs, requests, bytes, ms, failures, held)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (record, day, scope, action) DO UPDATE SET
+             runs = runs + excluded.runs, requests = requests + excluded.requests, bytes = bytes + excluded.bytes,
+             ms = ms + excluded.ms, failures = failures + excluded.failures, held = held + excluded.held`,
+          record,
+          dayOf(at),
+          run.scope,
+          run.ingest,
+          u.runs,
+          u.requests,
+          u.bytes,
+          u.ms,
+          u.failures,
+          u.held,
+        );
+        return ok<Counted>('counted');
+      }),
+
+    /**
+     * May this record's action run now? `null` is yes; otherwise, until when it waits, and the one sentence
+     * its event says.
+     *
+     * ASKED BEFORE THE RUN STARTS, by the host's executor, which answers `{ held }` instead of sending. At the
+     * limit the action waits for the first of the next month, UTC, and is never skipped silently: the
+     * sentence names the action, the day it runs again, and what the record used up. A plan with no allowance
+     * is never held, and neither is a record this directory does not know.
+     */
+    mayRun: (record: string, action: string): { until: number; say: string } | null => {
+      const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
+      const allowance = row ? ALLOWANCE[planOf(row.plan)] : null;
+      if (!allowance) return null;
+      const now = clock.now();
+      const until = nextMonth(now);
+      const used = totalsOf(
+        sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ?`, record, dayOf(monthStart(now)), dayOf(until)),
+      );
+      const over = (['runs', 'requests', 'bytes', 'ms'] as const).find((k) => used[k] >= allowance[k]);
+      if (over === undefined) return null;
+      const turns = new Date(until);
+      return {
+        until,
+        say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This record has used ${SPENT[over](allowance[over])} for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}.`,
+      };
+    },
+
+    /**
+     * What the records this person owns used, from one UTC day to another inclusive: by project, by action
+     * and by day, with each record's month so far against its allowance.
+     *
+     * OWNED, NOT REACHED. Usage is billing, and billing is the owner's, so a member of somebody else's record
+     * sees nothing of it here. A person who owns nothing gets an empty list, not a refusal.
+     */
+    usage: (person: string, range: { from: string; to: string }): Result<AccountUsage> => {
+      for (const key of ['from', 'to'] as const)
+        if (!DAY.test(range[key] ?? '') || !Number.isFinite(Date.parse(`${range[key]}T00:00:00Z`)))
+          return no<AccountUsage>('VALUE_MALFORMED', `${key} is a day written YYYY-MM-DD, and ${String(range[key])} is not.`, { at: key });
+      const span = (Date.parse(`${range.to}T00:00:00Z`) - Date.parse(`${range.from}T00:00:00Z`)) / DAY_MS;
+      if (span < 0 || span > 366)
+        return no<AccountUsage>('OUT_OF_BOUNDS', 'A usage range runs forward from `from` to `to`, and covers at most a year and a day.', { at: 'to' });
+
+      const now = clock.now();
+      const start = dayOf(monthStart(now));
+      const resets = dayOf(nextMonth(now));
+      const owned = sql.all<{ id: string; plan: string; closed_at: string | null }>(
+        'SELECT id, plan, closed_at FROM dir_record WHERE owner = ? ORDER BY created_at, id',
+        person,
+      );
+      const where = 'FROM dir_usage_day WHERE record = ? AND day >= ? AND day <= ?';
+      const records = owned.map((r): RecordUsage => {
+        const plan = planOf(r.plan);
+        return {
+          record: r.id,
+          slug: slugOf(r.id),
+          plan,
+          closed: r.closed_at !== null,
+          month: {
+            month: start.slice(0, 7),
+            used: totalsOf(sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ?`, r.id, start, resets)),
+            allowance: ALLOWANCE[plan],
+            resets,
+          },
+          totals: totalsOf(sql.one(`SELECT ${SUMS} ${where}`, r.id, range.from, range.to)),
+          projects: sql
+            .all<{ scope: string }>(`SELECT scope, ${SUMS} ${where} GROUP BY scope ORDER BY scope`, r.id, range.from, range.to)
+            .map((g) => ({ scope: g.scope, ...totalsOf(g) })),
+          actions: sql
+            .all<{ scope: string; action: string }>(`SELECT scope, action, ${SUMS} ${where} GROUP BY scope, action ORDER BY scope, action`, r.id, range.from, range.to)
+            .map((g) => ({ scope: g.scope, action: g.action, ...totalsOf(g) })),
+          days: sql
+            .all<{ day: string }>(`SELECT day, ${SUMS} ${where} GROUP BY day ORDER BY day`, r.id, range.from, range.to)
+            .map((g) => ({ day: g.day, ...totalsOf(g) })),
+        };
+      });
+      const totals = totalsOf({});
+      for (const r of records) for (const k of Object.keys(totals) as (keyof UsageTotals)[]) totals[k] += r.totals[k];
+      return ok({ from: range.from, to: range.to, totals, records });
+    },
   };
 }

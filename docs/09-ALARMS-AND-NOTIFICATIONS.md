@@ -49,9 +49,21 @@ owner is told through `notify`. Only `resumeAction`, an ADMIN method, starts it 
 `pull` event carrying `runs`, `requests`, `bytes`, `ms` and `failures`, scoped to the action's `project` or
 to `global`.
 
-**Not in this pass.** The Worker's alarm does not run `runActions` yet; the self-host does (below). The
-Directory's per-account usage ledger is not built either: the usage sits on each run's event, and a ledger
-that sums it per account is later work.
+**Both hosts run them** *(September 15th 2026)*. The self-host's timer does (below), and so does the Worker's
+alarm: after the drain, `Record$.alarm` calls `runActions` with `apps/worker/src/actions.ts`, five runs an alarm
+at most. Its rules are the self-host's, over `fetch`: https only, an origin an active declaration names,
+same-origin redirects three at most, ten seconds, two megabytes, and the key opened from the Worker key store
+only when `KEK` is bound. It resolves no name, because Cloudflare does not route a Worker's `fetch` to a private
+address, and it refuses a host written as a literal private address. With `KEK` unbound, an action that names a
+key sends nothing and its run event says so in one sentence. The kernel does not pause the action for that: it
+runs again at its next interval and sends nothing again, until `KEK` is bound.
+
+**The usage ledger.** Each run's usage is on its event, and both hosts also hand it to the Directory. Before a
+run, the host asks `mayRun(record, action)`. A record on the hosted plan at its monthly allowance is held: the host
+sends nothing, the kernel moves the action to the first of next month, and the event says so in one sentence.
+After a pass, the host hands each metered run to `meter`, which counts a run's event once however often it is
+reported. A self-host's records are on the `selfhost` plan, which has no allowance, so a self-host is never held.
+`GET /account/usage?from=YYYY-MM-DD&to=YYYY-MM-DD` answers a signed-in person with what the records they own used.
 
 `state` has **five** values — `pending` · `firing` · `done` · `failed` · `paused`. `paused` is a
 connector's row after its credential was rejected or its ladder ran out (§2,
@@ -160,7 +172,11 @@ draft made it a no-op because the poller shares the process — sharing a proces
 executor, `apps/selfhost/src/actions.ts`, and `pull.fetch` is kept out of the deliverer's lease. The executor
 sends only to an https origin that an active declaration names, read again on every run. It follows a
 redirect only to the same origin, three at most, and refuses one to any other host. It gives a run ten
-seconds and reads at most two megabytes, counted as the answer streams. It opens the key by reference from
+seconds and reads at most two megabytes, counted as the answer streams. Before it connects, it resolves the host
+and refuses it when any address it gives is unspecified, loopback, private, link-local, unique-local,
+carrier-grade NAT, multicast or reserved, or an IPv6 form carrying one of those. It then connects to the address
+it checked, so a second lookup cannot swap it, and checks every redirect hop the same way. A refused address
+pauses nothing: the run's event records it as one failure, in one sentence. It opens the key by reference from
 the key store for that one request and sends it as a bearer, and nothing it opens goes back to the record.
 
 ---

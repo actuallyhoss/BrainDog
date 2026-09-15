@@ -89,6 +89,7 @@
       "/ws",
       "/ws/*",
       "/auth/*",
+      "/account/*",
       "/.well-known/*"
     ]
   },

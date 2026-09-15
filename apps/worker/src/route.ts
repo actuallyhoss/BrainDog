@@ -59,6 +59,9 @@ export const servesApi = (pathname: string): boolean => /^\/+api\/+[^/]/.test(pa
 /** `/auth/*`: sign-in, which is the Directory's and never reaches a record (`51 §5.8`). */
 export const servesAuth = (pathname: string): boolean => /^\/+auth(?:\/|$)/.test(pathname);
 
+/** `/account/*`: a signed-in person's account, which is the Directory's and never reaches a record. */
+export const servesAccount = (pathname: string): boolean => /^\/+account(?:\/|$)/.test(pathname);
+
 /**
  * `/mcp`: an agent's MCP client, with its bearer and nothing else (`loop/research-agent-path.md` §1.1).
  * One path and no subpaths, because the transport is one endpoint and `run_worker_first` names it alone.

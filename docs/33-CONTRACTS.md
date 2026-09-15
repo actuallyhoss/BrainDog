@@ -185,7 +185,7 @@ type Refusal = { code: RefusalCode; at: string; found?: unknown; wanted?: string
 ```
 
 Six principal kinds, counted. **Who declares what:** `Refusal` and `RefusalCode` are `@braindog/ports`' (type-only);
-`CallContext` and `Result<T>` are `@braindog/kernel`'s; `RecordApi` — the object with the sixty-six methods below — is
+`CallContext` and `Result<T>` are `@braindog/kernel`'s; `RecordApi` — the object with the seventy-eight methods below — is
 `@braindog/record`'s (`export type RecordApi`). Every consumer imports the type; nothing re-declares any of the four
 structurally.
 
@@ -199,11 +199,12 @@ the alarm and the queue build a `system` context. The record derives `actor` and
 reach check itself, and never trusts a caller-supplied actor. There is no 412: a stale `version` is a 409 whose body
 names who changed the row.
 
-**The sixty-six methods, one row each.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
+**The seventy-eight methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
 any token in scope (`markRead` person principals only) · READ+ any token, and the MCP resources · VAULT a browser
 session only · JOBS the browser four by session and the runner three by the runner's grant, every MCP token refused ·
 ADMIN a browser session, or a bearer carrying an operation grant for that one operation · INTERNAL the host only, no
-route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
+route. The shapes are decided here. 12 · 14 · 4 · 7 · 22 · 19, as 30 §5 counts them. `ROUTES` in `@braindog/host`
+routes 50 of the seventy-eight at `/api/<method>`, 21 of them ADMIN.
 
 | Group | Method | Args | Returns / notes |
 |---|---|---|---|
@@ -218,6 +219,7 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | DATA | `markRead` | `{ upTo }` — person principals only; `upTo` = an `event.rowid` | nothing; not an event |
 | DATA | `attach` | `{ source, client_id?, doing?, branch?, head? }`, `source` one of `startup` `resume` `clear` `compact` `cli`; a token only, needing `propose` | `{ session, spoken, resumed, project, context }`: the run the ladder found or opened, `project` its spoken id or `null`, and `context` the briefing READ+'s `context` gives for that run, so the start hook prints it from one answer. Re-attaching refreshes where the run is and what it is doing, and never `next`, `tried` or `notes` |
 | DATA | `handoff` | `{ next?, tried?, note?, doing?, state?, branch?, head?, session? }`, needing `propose`; `session` names a run, and only a person may name one | the run. `tried` and `note` append inside one transaction, fifty kept of each and the oldest dropped; `state` moves along the declared transitions |
+| DATA | `meet` | `{ name?, email?, handle?, where }`: at least one of the first three, and always `where`; any other key is `FIELD_UNKNOWN`; needs `propose` on `people` | `{ person, created, linked, merge }`: the person matched by email or handle, or added, with where they were met, and linked to the project of the caller's run; `merge` is the suggestion this call opened, or `null`. A record with People switched off refuses it `REGISTER_UNKNOWN` and writes nothing, a run included |
 | READ+ | `page` | `{ slug }` | the page's `blocks[]` with their rows, one projection |
 | READ+ | `metric` | `{ id }` | the value, its partials and `currency_excluded` |
 | READ+ | `schema` | `{ register }` | the register's declared fields and states |
@@ -230,6 +232,8 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | READ+ | `boot` | `{}` | index + the live runs as `sessions` + open suggestions, without their bodies, as `waiting` + `whatsNew` + `theme { id, version, css }` + `me { person, level, owner, records }`, one round trip |
 | READ+ | `whoami` | `{}` | the principal as the record resolves it: its levels and the registers in scope |
 | READ+ | `ruleTest` | `{ id, against }` — raw ids, a register, or a file's rows | the dry run's `Report` (23 §4): `won / lost / takenBy`; writes nothing |
+| READ+ | `packConfig` | `{ id }`; any other key is `FIELD_UNKNOWN` | `{ id, version, config, values }`: what the pack's manifest declares under `config:`, and the value each setting holds now. A pack the seed owns by its bodies has `version: null` and empty maps; a pack this record does not have is `DECLARATION_UNKNOWN` |
+| READ+ | `actions` | `{}` | one row per active `pull`, `call` or `poll`: `{ ingest, channel, project, host, every, key, state, next, last, month, days }`. `project` is `null` for every project; `key` is the vault label and never a value; `state` is its schedule row's, `pending firing paused done`, and `next` its `due_at` while pending or firing. `last` is the latest run's `{ at, outcome, status, note }` from its `pull` event; `month` is this UTC month's `{ runs, requests, bytes, failures, held }`, where a held run counts no run; `days` holds the same four counts for each day from the 1st. A pack that is off lists none |
 | VAULT | `listGrants` | `{}` | grants with labels; never a value |
 | VAULT | `openGrant` | `{ id, kek_id }` | the **sealed** material `{ ciphertext, nonce, aad, kek_id, wrapped_dek }`; the host unwraps and decrypts, the record never does (ADR-062) |
 | VAULT | `bindGrant` | `{ id?, label, opens, kind, sealed }` — the mirror of `openGrant`: sealed material in | the grant row; a present `id` rotates it and keeps exactly two versions |
@@ -246,6 +250,8 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | ADMIN | `uninstallPack` | `{ id, force? }` | retires; the rows stay (04 §4); a retire over rows is `WOULD_ORPHAN` until `force` |
 | ADMIN | `disablePack` | `{ id, alsoDisable? }`; any other key is `FIELD_UNKNOWN` | `{ id, state, changed, packs, declarations, said }`; the `pack` row and every row stay (04 §4). Refused, 422: `PACK_REQUIRED` with the dependents in `allowed`, which a second call passes as `alsoDisable`; `SCOPES_IN_USE` |
 | ADMIN | `enablePack` | `{ id }`; any other key is `FIELD_UNKNOWN` | the same shape, the declarations back over the same rows. Refused, 422: `PACK_DISABLED` with the pack still off in `allowed`, when this one leans on it |
+| ADMIN | `resumeAction` | `{ ingest }`; any other key is `FIELD_UNKNOWN`, and none is `REQUIRED_MISSING` | `{ ingest, kind }`: the paused `pull`, `call` or `poll` row pending and due now, with one `pull` event naming who resumed it; an action that is not paused is `OUT_OF_BOUNDS`. A 401, a 403 or `WRONG_KEY` pauses an action, and this is the only way it runs again; a key marked stale stays stale |
+| ADMIN | `setPackConfig` | `{ id, values }`: each value checked against the manifest's `config:`, and `null` puts a setting back to its default; any other key is `FIELD_UNKNOWN` | `{ id, version, config, values, changed, said }`, with one `edit` event. Nothing installed changes: a declaration reads the new value the next time the pack is planned and installed. A pack this record does not have is `DECLARATION_UNKNOWN` |
 | ADMIN | `setDeclaration` | `{ body }` — one in-app declaration; no `mode` | the declaration's new version; a rule is tested and applied by `ruleTest` / `ruleApply`, never here |
 | ADMIN | `ruleApply` | `{ id, dry }` | `dry: true` → the `DryRun`; `false` → the rows written, no undo (07 §6) |
 | ADMIN | `invite` | `{ email, levels }` — the owner mints; one email, 24 h | the invitation; acceptance is `acceptInvite` |
@@ -276,6 +282,8 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 | INTERNAL | `deviceStart` | `{ reach, label, ua?, scope? }` and the caller's address | `{ device_code, user_code, expires, interval }`; the eleventh start from one address in 15 minutes is `{ ok: false, retryAfter }`. The host adds `verification_uri` and `expires_in` |
 | INTERNAL | `devicePoll` | `{ device_code }` | `{ pending: true, interval }`, or `{ pending: false, bearer, reach, scope, expires }` once, after approval |
 | INTERNAL | `vaultGrant` | a `vault` reach's bearer | `{ handle, scope, person, expires }` for the host's key doors; `verifyToken` never accepts one |
+| INTERNAL | `depositGrant` | `{ label, opens?, kind? }`, the `VaultGrant`, the session hints and `seal(target)`; `/api/vault/deposit` calls it after `vaultGrant` | `{ credential, label, version, rotated }`: the record names the grant id, version and AAD in `target`, the host seals under its key store inside `seal`, and only sealed bytes are bound, with the row, in one transaction; a label already in the grant's scope rotates its grant. No label, or one over 120 characters, is `REQUIRED_MISSING`, and so is a new key that does not say what it opens; a record with no wrapped key is `NOT_IN_THIS_BUILD` |
+| INTERNAL | `openForGrant` | `{ label } \| { credential }`, the `VaultGrant`, the session hints and the `kek_id`; `/api/vault/open` calls it after `vaultGrant` | `openGrant`'s sealed material with the row's `credential` and `label`, and one `grant.read` event signed by the caller's run; the host opens it and answers once. A key outside the grant's scope is `FORBIDDEN`, and one with no sealed value is `GRANT_REVOKED` |
 | INTERNAL | `rewrapKeys` | `{ from, to, rows }` | the rows re-wrapped under the new KEK (53) |
 | INTERNAL | `opsReport` | `{ observation? }` | the runbooks' figures (53) |
 
@@ -304,7 +312,7 @@ share a name is two update rows on `people`: the older row takes the union of bo
 
 **The factories.** `openRecord({ sql, clock, random, accent })` opens the kernel — randomness injected so a fixture is
 deterministic, `accent` the theme's hue chooser (`nextAccentHue`, [ADR-028](16-DECISIONS.md); 13 §2.1b) — and
-`applyMigrations` runs before any cache load. `createRecordApi(deps): RecordApi` returns the sixty-six as named
+`applyMigrations` runs before any cache load. `createRecordApi(deps): RecordApi` returns the seventy-eight as named
 methods; a host routes `POST /api/<method>` by property lookup on that object — a two-line lookup in
 `@braindog/host`, never a `call` dispatcher in the record. `createSpark(deps): Spark` is the same shape for Spark's
 named methods (46 §2), served at `/api/spark/<method>`. `@braindog/mcp` reaches the same methods for an agent:
@@ -394,6 +402,7 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/ws` | GET (upgrade) | cookie | Cloud: the hibernatable WebSocket, the frame `{ version, registers }` on change; self-host phase 2: 404, the client polls `/api/version` |
 | `/ws/runner` | GET (upgrade) | the runner's grant | Cloud only: the doorbell socket, `{ t: 'wake' }`; the self-host runner long-polls (§11) |
 | `/auth/*` | GET · POST | per route | the sign-in routes below, which are the Directory's (§10) |
+| `/account/*` | GET | **cookie only** | the account routes below, which are the Directory's like sign-in and never reach a record |
 | everything else | GET | — | the static shell: one `build/`, served as assets by both hosts; no server renders a request |
 
 **The `/auth/*` routes, once.** `AUTH_ROUTES` in `packages/host/src/auth.ts` is this table as data (its two device rows come from `device.ts`), and both hosts
@@ -418,8 +427,19 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 
 Specified and not built: `/auth/device/approve` (the operation grant of
 §10), `/auth/invite` and `/auth/switch`. They keep these paths when they land.
-`Cache-Control: no-store` on `/api/*` and `/mcp`; no CORS; `run_worker_first: ['/api/*', '/mcp', '/a/*', '/in/*',
-'/s/*', '/ws/*', '/auth/*', '/.well-known/*']`. INTERNAL methods have no route. There is no admin scope: VAULT never
+
+**The `/account/*` routes.** `ACCOUNT_ROUTES` in `packages/host/src/auth.ts` is this table as data, and both hosts
+answer it through one `serveAccount`. The session cookie is the only credential it reads: a bearer, no cookie, a host
+where nobody signs in or an ended session is 401 `UNAUTHORIZED`. A path not in the table is 404 `ROUTE_UNKNOWN`, and
+another method is 405 with `Allow: GET`. `router-groups` reads the table: every row a GET under `/account/`, served by
+both hosts, behind the session, and named here.
+
+| Route | Method | Host | Does |
+|---|---|---|---|
+| `/account/usage` | GET | both | `?from=YYYY-MM-DD&to=YYYY-MM-DD`: `{ from, to, totals, records }`, what the records the signed-in person owns used between the two days, each with its month so far against its plan's allowance. A day in another shape is `VALUE_MALFORMED`; a range that runs backwards or covers more than a year and a day is `OUT_OF_BOUNDS` |
+
+`Cache-Control: no-store` on `/api/*` and `/mcp`; no CORS; `run_worker_first: ['/api/*', '/mcp', '/a', '/a/*', '/in/*',
+'/s/*', '/ws', '/ws/*', '/auth/*', '/account/*', '/.well-known/*']`, the list in `apps/worker/wrangler.jsonc`. INTERNAL methods have no route. There is no admin scope: VAULT never
 sees a bearer, and ADMIN sees one only when it carries an operation grant for exactly that method.
 
 **Error bodies.** Both hosts return the `Result` envelope unchanged; the status is `host.httpStatus(result)`: `ok`
@@ -536,7 +556,8 @@ stateless.
                              { "binding": "KEK_PREV", "store_id": "…", "secret_name": "braindog-kek-prev" } ],
   // Worker secrets: SESSION_SECRET · TOKENS_VALID_FROM · AGE_RECIPIENT — the only age material the Worker holds
   "assets": { "directory": "apps/web/build", "binding": "ASSETS", "not_found_handling": "single-page-application",
-              "run_worker_first": ["/api/*", "/mcp", "/a/*", "/in/*", "/s/*", "/ws/*", "/auth/*", "/.well-known/*"] },
+              "run_worker_first": ["/api/*", "/mcp", "/a", "/a/*", "/in/*", "/s/*", "/ws", "/ws/*", "/auth/*", "/account/*",
+                                   "/.well-known/*"] },
   "observability": { "enabled": true }
 }
 ```

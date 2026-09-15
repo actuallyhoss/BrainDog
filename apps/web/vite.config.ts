@@ -70,6 +70,7 @@ const PALETTE = fileURLToPath(new URL(`../../packages/skin/${ENV === '' ? 'house
  *
  * BOTH, BECAUSE SIGN-IN IS SAME-ORIGIN TOO. `/auth/*` sets the session cookie and `/api/*` reads it, so
  * a proxy that forwarded one and not the other would sign somebody in to a record the lists cannot read.
+ * `/account/*` reads the same cookie, so `/usage` goes the same way.
  *
  * The register list reads the record from its own origin, as it does on both hosts, so under
  * `vite dev` and `vite preview` something has to answer `/api/*` from this origin. `node
@@ -130,7 +131,7 @@ export default defineConfig({
   plugins: [sveltekit(), entryGraphPlugin],
   define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT), __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
-  server: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API } },
-  preview: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API } },
+  server: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API, '/account': API } },
+  preview: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API, '/account': API } },
   build: { target: 'es2022', cssMinify: 'lightningcss', modulePreload: { resolveDependencies } },
 });

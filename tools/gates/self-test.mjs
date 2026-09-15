@@ -97,6 +97,9 @@ const CASES = [
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },
   { gate: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
+  /* THE ACCOUNT TABLE, which reads the session cookie and nothing else. The fixture holds a correct row beside the
+     seeded one, so a count of one proves the gate reads each row rather than going red on the table. */
+  { gate: 'router-groups-account', run: 'router-groups', expect: /an account route reads the session cookie/, findings: 1 },
   /* THE REAL DEFECT, KEPT VERBATIM. `members` was routed ADMIN and guarded `guard(ctx, 'read')`, and
      thirteen of the fourteen ADMIN routes called `admin`. The fixture holds that one line beside
      three correct methods, so a count of one is what proves the gate distinguishes them rather than

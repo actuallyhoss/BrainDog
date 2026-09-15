@@ -36,6 +36,55 @@ import { httpStatus } from './index.ts';
 
 export { DEVICE_ROUTES, type DeviceAsk, type DeviceDoor, type DeviceFlow, type DeviceStarted } from './device.ts';
 
+/* ── the account ─────────────────────────────────────────────────────────── */
+
+/** One account route: where it is, and that it needs the session cookie. Both hosts serve every row. */
+export type AccountRoute = { path: string; method: 'GET'; on: 'both'; needs: 'session'; what: string };
+
+/**
+ * The routes that answer about a person's account rather than a record (`loop/research-scheduled-actions.md` §4.6).
+ *
+ * THE DIRECTORY'S, LIKE SIGN-IN, and never a record's: usage is billing, and a record cannot see its own allowance.
+ * A person sees the records they own and nothing of anybody else's.
+ */
+export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
+  { path: '/account/usage', method: 'GET', on: 'both', needs: 'session', what: 'What the records you own used between two days, and each month so far against its allowance.' },
+];
+
+/** What a host hands `serveAccount`: its origin, the Directory's sign-in or `null` where nobody signs in, and the ledger. */
+export type AccountDoor = {
+  origin: string;
+  auth: Auth | null;
+  usage: (person: string, range: { from: string; to: string }) => Result<unknown> | Promise<Result<unknown>>;
+};
+
+/**
+ * Answer one `/account/*` request.
+ *
+ * THE SESSION COOKIE AND NOTHING ELSE. A bearer is an agent or the server key, and neither is a person with an
+ * account. No cookie, a host where nobody signs in, or a session that has ended is 401 `UNAUTHORIZED`.
+ */
+export async function serveAccount(request: Request, door: AccountDoor): Promise<Response> {
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/\/+$/, '');
+  const route = ACCOUNT_ROUTES.find((r) => r.path === path);
+  if (!route) return refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no account route at that address.' });
+  if (request.method !== route.method)
+    return refusal(405, { code: 'FORBIDDEN', fix: `${route.path} is a ${route.method}.` }, [['allow', route.method]]);
+
+  const mode = cookieMode(door.origin);
+  const sid = mode === null ? undefined : readSid(request, mode);
+  if (!door.auth || mode === null || sid === undefined)
+    return refusal(401, { code: 'UNAUTHORIZED', fix: 'Sign in to see what your records used.' });
+  const seen = await door.auth({ flow: 'session', sid });
+  if (seen.status !== 200) return answered(seen, mode);
+
+  /* A ROTATION REACHES THE COOKIE whatever the ledger answers. */
+  const kept: Header[] = seen.session === undefined ? [] : [['set-cookie', seen.session === 'clear' ? clearCookie(mode) : sessionCookie(seen.session.sid, mode)]];
+  const out = await door.usage((seen.body as Who).person, { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' });
+  return reply(out.ok ? 200 : httpStatus(out), out, kept);
+}
+
 /** One sign-in route: where it is, who serves it, and what it needs. */
 export type AuthRoute = {
   path: string;

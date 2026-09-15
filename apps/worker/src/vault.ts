@@ -97,6 +97,31 @@ async function grantKey(store: KeyStore, record: string, key: SealTarget['key'],
   }
 }
 
+/**
+ * A scheduled action's key, opened for one request, or `null` when it does not open under this store.
+ *
+ * HERE AND NOT IN `actions.ts`, because this is one of the three files the `Plaintext` brand lives in: the bytes are
+ * the read door's, and the value leaves as the one string the executor puts in one `Authorization` header.
+ */
+export async function openSealed(
+  store: KeyStore,
+  record: string,
+  sealed: { id: string; key: SealTarget['key']; nonce: Uint8Array; aad: string; ciphertext: Uint8Array },
+): Promise<string | null> {
+  const key = await grantKey(store, record, sealed.key, sealed.id);
+  if (!key) return null;
+  try {
+    const plain = new Uint8Array(
+      await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sealed.nonce, additionalData: utf8(sealed.aad) }, key, sealed.ciphertext),
+    ) as Plaintext;
+    const said = new TextDecoder().decode(plain);
+    plain.fill(0);
+    return said;
+  } catch {
+    return null;
+  }
+}
+
 /** The one answer a value leaves in. */
 function answerOpen(credential: string, label: string, plain: Plaintext): Response {
   const body = JSON.stringify({ ok: true, value: { credential, label, value: new TextDecoder().decode(plain) } });

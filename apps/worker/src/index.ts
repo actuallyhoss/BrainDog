@@ -21,19 +21,20 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { handlersFor, hintsOf, serveApi, withSession, type SessionHints, type VaultGrantSeen } from '@braindog/host';
-import { deriveSessionKey, relyingParty, serveAuth, type DeviceDoor, type Provisioned } from '@braindog/host/auth';
+import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
 
-import { createDirectory, type Directory as Dir } from '@braindog/record/directory';
+import { createDirectory, type AccountUsage, type Directory as Dir, type RunUsage } from '@braindog/record/directory';
 
+import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass } from './actions.ts';
 import { alarmScheduler } from './alarm.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { inward, isRecordId, servesApi, servesAuth, servesMcp } from './route.ts';
+import { inward, isRecordId, servesAccount, servesApi, servesAuth, servesMcp } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { serveWorkerVault, servesVault } from './vault.ts';
@@ -211,6 +212,37 @@ export class Record$ extends DurableObject<Env> {
   override async alarm(): Promise<void> {
     const api = await this.#record();
     await api.kernel.drain(this.#alarm);
+    await this.#act(api);
+  }
+
+  /**
+   * The scheduled actions due on this record: `pull`, `call` and `poll`, sent from this alarm (`09 §1`).
+   *
+   * AFTER THE DRAIN, so a row the drain just fired is a job this pass leases, and a retry the drain just released is
+   * one too. `ALARM_RUNS` keeps one alarm inside `research-scheduled-actions` §2.3's ceilings, and `runActions` tails
+   * the alarm when it is done, so work left over sets the next one.
+   *
+   * THE KEY STORE ONLY WHEN `KEK` IS BOUND. Unbound, an action that names a key sends nothing and its run event says
+   * why in one sentence (`actions.ts`).
+   *
+   * A PASS THAT THROWS IS LOGGED AND NOT RETHROWN. The drain has already re-armed, and a throwing `alarm()` is
+   * retried by the platform, which would run the drain again for a failure that was the network's.
+   */
+  async #act(api: RecordApi): Promise<void> {
+    if (api.kernel.refused()) return;
+    const record = api.kernel.identity()?.id;
+    if (!record) return;
+    try {
+      /* THE DIRECTORY'S LEDGER, OVER RPC: asked before each run, and told every run the pass metered. A record on the
+         hosted plan at its monthly allowance answers `held`, sends nothing, and waits for the first of next month. */
+      const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
+      const inner = actionExecutor(() => api.kernel.actionOrigins(), { openKey: keyOpener(api, this.env.KEK) });
+      const execute = holding(inner, record, (r, action) => ledger.mayRun(r, action));
+      const out = await api.kernel.runActions(execute, { limit: ALARM_RUNS, scheduler: this.#alarm });
+      await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
+    } catch (e) {
+      console.error('actions:', e instanceof Error ? e.message : String(e));
+    }
   }
 
   /**
@@ -445,6 +477,22 @@ export class Directory$ extends DurableObject<Env> {
     return named.ok ? null : refusalOf(named);
   }
 
+  /** Whether a record's scheduled action may run now: `null`, or until when it waits and why. A record's alarm asks before each run. */
+  mayRun(record: string, action: string): { until: number; say: string } | null {
+    return this.#directory().mayRun(record, action);
+  }
+
+  /** Count one run a record's alarm metered. `null` is counted, already counted or too old to count; a refusal is a row that is not a run. */
+  meter(record: string, run: RunUsage): Refusal | null {
+    const out = this.#directory().meter(record, run);
+    return out.ok ? null : refusalOf(out);
+  }
+
+  /** `GET /account/usage`: what the records this person owns used between two days. */
+  usage(person: string, range: { from: string; to: string }): Result<AccountUsage> {
+    return this.#directory().usage(person, range);
+  }
+
   /**
    * Whether this address is a record this installation created, and has not closed.
    *
@@ -645,6 +693,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const url = new URL(request.url);
     /* SIGN-IN FIRST, AND IT IS THE DIRECTORY'S: nothing under `/auth/` reaches a record. */
     if (servesAuth(url.pathname)) return signIn(request, env, ctx);
+    if (servesAccount(url.pathname)) return account(request, env);
     /* AN AGENT'S MCP CLIENT, BEFORE ANY DOOR IS ASKED, so neither the cookie nor the demo is ever read for it. */
     if (servesMcp(url.pathname)) return agent(request, env);
     /* THE KEY DOORS, before any door is asked: their bearer is a vault grant, and neither a cookie nor a login
@@ -730,6 +779,19 @@ async function agent(request: Request, env: Env): Promise<Response> {
   const found = await bearerOf(request, 'mcp', bearerDeps(env));
   if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent();
   return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
+}
+
+/**
+ * `/account/*`, through the same `serveAccount` the self-host runs: the Directory's usage ledger, for the session
+ * cookie. Without `SESSION_SECRET` nobody signs in, so every account route is 401.
+ */
+async function account(request: Request, env: Env): Promise<Response> {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  return serveAccount(request, {
+    origin: `https://${env.PUBLIC_HOST ?? ''}`,
+    auth: (env.SESSION_SECRET ?? '').length >= 32 ? (((call: AuthCall) => directory.auth(call)) as unknown as Auth) : null,
+    usage: (person, range) => directory.usage(person, range) as unknown as Promise<Result<AccountUsage>>,
+  });
 }
 
 /**

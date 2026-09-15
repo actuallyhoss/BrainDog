@@ -227,7 +227,7 @@ async function init(args: readonly string[]): Promise<void> {
         `${file} holds the record ${standing.slug}, whose owner is a person this directory does not know. Restore the directory it was created with, or move the record aside.`,
       );
     }
-    const late = directory.provision({ slug, email, record: standing.id });
+    const late = directory.provision({ slug, email, record: standing.id, plan: 'selfhost' });
     dirSql.close();
     if (!late.ok) return refuse(fixOf(late));
     say(`record ${standing.slug} finished · owner ${email} · the record existed and the directory did not name it`);
@@ -291,7 +291,7 @@ async function init(args: readonly string[]): Promise<void> {
 
   /* AND THEN THE NAME. `record:` is what makes the ordering expressible at all — without it the
      Directory mints its own id and the two halves disagree for ever. */
-  const named = directory.provision({ slug, email, record: id });
+  const named = directory.provision({ slug, email, record: id, plan: 'selfhost' });
   if (!named.ok) {
     sql.close();
     dirSql.close();

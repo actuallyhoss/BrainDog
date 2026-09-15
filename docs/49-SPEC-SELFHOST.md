@@ -43,8 +43,8 @@ export function startServer(config: Config): Promise<{ port: number; close(): Pr
 export function openDirectory(path: string, driver: Config['sqlite']): Directory;
 export function openRecordFile(slugDir: string, deps: HostDeps): OpenRecord;    // throws BootRefused on !caps.fts5
 export const ROUTES: readonly Route[];                                          // §4.7 — the router-groups gate walks it
-export const METHOD_GROUPS: Readonly<Record<RoutableMethod, Group>>;            // 41 entries — 30 §5 less INTERNAL,
-                                                                                //   plus 48 §5.12's createToken listTokens revokeToken
+export const METHOD_GROUPS: Readonly<Record<RoutableMethod, Group>>;            // 49 routes, as @braindog/host's ROUTES:
+                                                                                //   21 ADMIN, createToken listTokens revokeToken among them
 
 type Config = {
   data: string;            // BRAINDOG_DATA        default '/data'
@@ -221,8 +221,8 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 
 | Route | Method | Auth | Group | Phase |
 |---|---|---|---|---|
-| `/api/<method>` for the 9 DATA + 10 READ+ methods | POST | bearer-or-cookie | DATA · READ+ | 2 |
-| `/api/<method>` for VAULT (4), ADMIN (9 + `createToken listTokens revokeToken`, 48 §5.12), `createJob cancelJob listJobs` | POST | cookie — ADMIN also an operation grant whose `reach` names the method (§5.2 step 7) | VAULT · ADMIN · JOBS | 2 (JOBS 7) |
+| `/api/<method>` for the 12 DATA + 15 READ+ methods | POST | bearer-or-cookie | DATA · READ+ | 2 |
+| `/api/<method>` for VAULT (1), ADMIN (21, `createToken listTokens revokeToken` among them, 48 §5.12), `createJob cancelJob listJobs` | POST | cookie — ADMIN also an operation grant whose `reach` names the method (§5.2 step 7) | VAULT · ADMIN · JOBS | 2 (JOBS 7) |
 | `/api/claimJob[?wait=N]` · `/api/postJobEvent` · `/api/readCancel` | POST | runner | JOBS | 7 |
 | `/api/boot` · `/api/pages/:slug` · `/api/schema/:register` · `/api/version` | GET | bearer-or-cookie | READ+ | 2 |
 | `/api/snapshot` · `/api/snapshots` · `/api/snapshots/:id` | POST · GET · GET | cookie | ADMIN | 2 |
@@ -233,12 +233,13 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 | `/<ID>` (34 §4's two spoken grammars) | GET | cookie | READ+ | 2 |
 | the sign-in routes of 33 §4 (`AUTH_ROUTES`), the operator's two excepted: `/auth/methods` · `/auth/session` · `/auth/token` · `/auth/magic/start` · `/auth/magic/redeem` · `/auth/passkeys` · `/auth/passkey/remove` · `/auth/logout` | GET · POST | none, or the session cookie | AUTH | 2 |
 | `/auth/invite` | GET | none | AUTH | 2 |
+| `/account/usage?from&to` (`ACCOUNT_ROUTES`): what the records the signed-in person owns used, from the Directory's ledger | GET | the session cookie | AUTH | 2 |
 | `/auth/device` · `/auth/device/token` · `/auth/device/approve` | POST | none · none · cookie | AUTH | 2 |
 | `/auth/passkey/register/options` · `/auth/passkey/register` · `/auth/passkey/assert/options` · `/auth/passkey/assert` | POST | cookie · cookie · none · none | AUTH | 3 |
 | `/ws` | GET | — | PUBLIC | 404 in phase 2 (§13 #4) |
 | everything else, `GET /signin` included: the built app, falling back to its `index.html`, contained by `realpath`, served with `frame-ancestors 'none'` | GET | none | SHELL | 3 |
 
-Forty-one `/api/<method>` routes are generated from `METHOD_GROUPS`; INTERNAL methods have none; `restore`
+Forty-nine `/api/<method>` routes come from `ROUTES` in `@braindog/host`, 21 of them ADMIN; INTERNAL methods have none; `restore`
 answers 404 on this host (§13 #10). The `router-groups` gate (33 §8) asserts every entry has a `group`, that
 no VAULT route has `auth` other than `cookie` and no ADMIN route admits a `token` principal, and that the
 `METHOD_GROUPS` keys equal 30 §5's six groups less INTERNAL plus 48's three token methods.
@@ -653,6 +654,7 @@ boot or on the wire ever prints a token, a code, a cookie value or a payload.
 | Hashes only | sessions, magic links, invitations, bearer tokens, device grants are stored as SHA-256 or HMAC; the tables cannot approve themselves |
 | Attachments | key = content SHA-256; type from bytes; SVG 415; 2 MB checked twice; served `nosniff`, `default-src 'none'; sandbox`, `noindex`, immutable |
 | `Http` | private, loopback, link-local, CGNAT and ULA ranges refused after resolution; `redirect: 'manual'`; 2 MB cap; timeout from the caller. `ponytail:` resolve-then-connect leaves a rebinding window |
+| Scheduled actions | `src/actions.ts`, September 15th 2026: https to an origin an active declaration names; the host resolved before connecting and refused when any address it gives is unspecified (`0/8`, `::`), loopback (`127/8`, `::1`), private (`10/8`, `172.16/12`, `192.168/16`), link-local (`169.254/16`, `fe80::/10`), unique-local (`fc00::/7`), carrier-grade NAT (`100.64/10`), multicast (`224/4`, `ff00::/8`), reserved (`240/4`), or an IPv6 form carrying one of those (mapped, compatible, NAT64); the socket connects through a `lookup` that answers only the checked address, so no second lookup happens; every same-origin redirect hop resolved and checked again, three at most; 10 s; 2 MB. A refused address is `PULL_ORIGIN_REFUSED` with one sentence, a failure on the run's event that pauses nothing and is not retried. Each run asks the Directory's `mayRun` first and each pass's usage goes to `meter`; the record is put on the `selfhost` plan at its first pass (and `init` provisions it there), so a self-host is never held |
 | SMTP | credentials from env, not the vault — the vault cannot hold what sends its own recovery mail (12 §6); TLS required |
 | Backups | a snapshot holds sealed `grant` rows and the KEK-wrapped `vault_key`; the six `local` tables are empty; it opens nothing without the KEK file. `braindog verify` proves it unchanged |
 | Logs | `{ code, route, recId }` and shapes only; the `secret-grep` gate (33 §8) runs over this app's write paths and log lines |
@@ -685,7 +687,7 @@ and captures `DATA`).
 
 | Input | Expected |
 |---|---|
-| walk `ROUTES` | every entry has a `group`; VAULT entries have `auth: 'cookie'`; no ADMIN entry admits a `token` principal; `METHOD_GROUPS` has 41 keys and no INTERNAL method |
+| walk `ROUTES` | every entry has a `group`; VAULT entries have `auth: 'cookie'`; no ADMIN entry admits a `token` principal; `ROUTES` has 49 method routes, 21 of them ADMIN, and no INTERNAL method |
 | `POST /api/listGrants` with a `write` bearer | 403 `NEEDS_BROWSER_SESSION` |
 | `POST /api/installPack` with `BRAINDOG_TOKEN` | reaches the record (200 or 422 from it) |
 | `POST /api/list` with cookie, with bearer | 200 both; response has `Cache-Control: no-store` and no `Access-Control-*` header |
@@ -791,7 +793,7 @@ assertion pair, an RS256 pair, each generated once with `subtle` and stored.
 - `ponytail:` record resolution probes every open record for a bearer, a webhook id or a blob; fine under ten records; a hash → slug map when a host serves more.
 - `ponytail:` the device poll's `interval` is a constant 5 and there is no `slow_down`; add it when a device is seen polling faster than it was told.
 - `ponytail:` one KEK, no rotation set; `byId` knows one id. Rotation = a second file and a `kek_id` → file map.
-- `ponytail:` `Http` resolves then connects; a DNS-rebinding window remains. Close it with an `undici` `Agent` whose `connect` re-checks the address when `undici` is ever a dependency.
+- `ponytail:` `Http` resolves then connects; a DNS-rebinding window remains. The scheduled actions' executor does not have it: `src/actions.ts` connects to the address it checked (§8). Close it with an `undici` `Agent` whose `connect` re-checks the address when `undici` is ever a dependency.
 - `ponytail:` SMTP is AUTH PLAIN over TLS, text/plain, base64, one message per connection; `html` is dropped. Add LOGIN and multipart when a provider needs them.
 - `ponytail:` the per-token bucket is a `Map` in memory; a restart forgets it. That is the correct cost for one owner's box.
 - `ponytail:` passkey challenges live in memory for five minutes; a restart forgets a ceremony in flight.
@@ -885,7 +887,7 @@ Twenty-three, counted.
 - [ ] `node apps/selfhost/src/main.ts init demo --owner a@b.c`, then `… serve`, on a clean `BRAINDOG_DATA`: creates `kek` (0600) and `vapid.json`, and answers `GET /api/version` with the record's version.
 - [ ] A build with `fts5: false` refuses with the exact block of §6 and exit code 1 (`boot-probe` green).
 - [ ] `main.ts init demo` creates the record, its three wrapped keys, the Directory rows and `inbound.token`; `main.ts dev` serves a scratch record and prints its token.
-- [ ] `ROUTES` passes `router-groups`: every route grouped, no bearer at VAULT, no `token` principal at ADMIN, 41 method routes, none INTERNAL.
+- [ ] `ROUTES` passes `router-groups`: every route grouped, no bearer at VAULT, no `token` principal at ADMIN, 49 method routes, 21 of them ADMIN, none INTERNAL.
 - [ ] Magic link round-trips through the mock SMTP; the token exchange works with no SMTP; the lockout refuses the eleventh attempt and fails closed on a missing reservation.
 - [ ] Device flow on 48's wire: `login` yields a `write` token once; `runner` a 90-day bearer; `export` a ten-minute operation grant that reaches `export` and nothing else; five wrong codes deny; expiry after ten minutes.
 - [ ] A write re-arms the timer; the timer drains within 250 ms of `due_at`; a 40-day row is clamped and chained.

@@ -29,6 +29,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import BlockBar from '$lib/ui/BlockBar.svelte';
   import AddBlock from '$lib/ui/AddBlock.svelte';
+  import Actions from './Actions.svelte';
+  import { words as actionWords } from '$lib/record/actions.ts';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropIndex, spanOf as declaredSpan } from '$lib/record/arrange.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -688,6 +690,11 @@
               IT IS A `status`, NOT AN ASIDE. The count changes when the rows do, and somebody who
               cannot see the list end short is exactly who needs to be told it did.
             -->
+            <!-- THE SCHEDULED ACTIONS THIS PROJECT RUNS ON, under the agents pack's own "Runs on" heading and
+                 above its keys, tools and skills. Not while arranging: a list that fetches is not a block to move. -->
+            {#if block.kind === 'section' && block.heading === actionWords.runsOn && param && !arranging}
+              <Actions project={param.title} />
+            {/if}
             {#if !drawn.refusal && block.total > block.shown}
               {@const to = openHref(block)}
               <p class="block-slice" role="status">

@@ -415,6 +415,14 @@ without changing them. That is the test for whether something belongs in this li
 > *are* additive to the pack format, which is why they were allowed to be kernel rather than a ninth
 > kind.
 
+> **And what connectors cost is metered, from the first run (2026-09-15, [ADR-069](16-DECISIONS.md)).**
+> Every scheduled fetch, call and poll is counted per record in the Directory, outside the record: runs,
+> requests, bytes, run time and failures, by day, project and action. A Hosted record's allowance is
+> 15,000 runs, 150,000 requests, 1 GB fetched and 50 hours of run time a month, the default until the
+> owner confirms it. At the limit an action waits for the next month and says so in one sentence. A
+> self-host is counted and never limited. The price does not change, and the month-24 case above assumes
+> no overage.
+
 | Scope | Shape | Why it is additive |
 |---|---|---|
 | **Pull connectors** | `ingest` + `fetch:` | **NOT purely additive — see above.** ~53% of 609 real connectors are expressible, ~71% within the declarative tier, 64% of the endpoints this buyer uses — the ceiling is measured, and it depends on which population you mean |

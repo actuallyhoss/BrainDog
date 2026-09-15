@@ -177,10 +177,62 @@ if (existsSync(authFile)) {
   }
 }
 
+/* ── the account table, as data: `ACCOUNT_ROUTES` in `packages/host/src/auth.ts` ─────────────── */
+
+/**
+ * THE SAME RULE, FOR THE THIRD TABLE. An account route is the Directory's, like sign-in, and none of `30 §5`'s six
+ * groups. Its group is its prefix and its door: every row lives under `/account/`, is a GET that both hosts serve,
+ * and needs the session cookie, which is the only thing `serveAccount` reads. A row in another shape is a row this
+ * gate cannot read, and that is a finding too.
+ *
+ * AND THE PREFIX HAS TO REACH THE WORKER. Off `run_worker_first`, `/account/usage` is answered by the app shell with
+ * a 200 and `index.html`, which looks like a route and is not one. `33 §4` names the prefix and every path.
+ */
+let accountRoutes = [];
+if (existsSync(authFile)) {
+  const auth = readFileSync(authFile, 'utf8');
+  const start = auth.indexOf('export const ACCOUNT_ROUTES');
+  if (start < 0 && /export async function serveAccount\b/.test(auth))
+    findings.push('packages/host/src/auth.ts serves /account/* and has no ACCOUNT_ROUTES table this gate can read');
+  if (start >= 0) {
+    const table = auth.slice(start, auth.indexOf('];', start));
+    accountRoutes = [...table.matchAll(/\{ path: '([^']+)', method: '([A-Z]+)', on: '([a-z]+)', needs: '([a-z]+)'/g)].map((m) => ({
+      path: m[1],
+      method: m[2],
+      on: m[3],
+      needs: m[4],
+    }));
+    const rows = (table.match(/\{ path:/g) ?? []).length;
+    if (rows !== accountRoutes.length) findings.push(`ACCOUNT_ROUTES has ${rows} rows and this gate reads ${accountRoutes.length} of them`);
+
+    const paths = new Set();
+    for (const r of accountRoutes) {
+      if (paths.has(r.path)) findings.push(`${r.path} is in the account table twice`);
+      paths.add(r.path);
+      if (!/^\/account\/[a-z][a-z0-9/-]*$/.test(r.path)) findings.push(`${r.path} is in the account table, and an account route lives under /account/`);
+      if (r.method !== 'GET') findings.push(`${r.path} is a ${r.method}, and an account route is a GET`);
+      if (r.on !== 'both') findings.push(`${r.path} is served on ${r.on}, and both hosts serve every account route`);
+      if (r.needs !== 'session') findings.push(`${r.path} needs ${r.needs}, and an account route reads the session cookie and nothing else`);
+    }
+
+    const wrangler = join(root, 'apps', 'worker', 'wrangler.jsonc');
+    if (accountRoutes.length > 0 && existsSync(wrangler) && !/"run_worker_first"\s*:\s*\[[^\]]*"\/account\/\*"/.test(readFileSync(wrangler, 'utf8')))
+      findings.push("apps/worker/wrangler.jsonc does not send /account/* to the Worker first, so the app shell answers every account route");
+
+    const contracts = join(root, 'docs', '33-CONTRACTS.md');
+    if (accountRoutes.length > 0 && existsSync(contracts)) {
+      const doc = readFileSync(contracts, 'utf8');
+      if (!doc.includes('`/account/*`')) findings.push('33 §4 does not list /account/*');
+      for (const r of accountRoutes) if (!doc.includes(`\`${r.path}\``)) findings.push(`${r.path} is an account route and 33 §4 does not name it`);
+    }
+  }
+}
+
 if (findings.length === 0) {
   const shape = GROUPS.map((g) => `${routes.filter((r) => r.group === g).length} ${g}`).join(' · ');
   console.log(`  router-groups: ${routes.length} routes, every one with a group — ${shape}`);
   if (authRoutes.length > 0) console.log(`  router-groups: ${authRoutes.length} sign-in routes, one per flow, named by the rule`);
+  if (accountRoutes.length > 0) console.log(`  router-groups: ${accountRoutes.length} account route(s), each a GET under /account/ behind the session cookie`);
 } else {
   console.error(`\n  router-groups: ${findings.length} finding(s) — 30 §5\n`);
   for (const f of [...new Set(findings)]) console.error(`    ${f}`);

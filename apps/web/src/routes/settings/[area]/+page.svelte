@@ -32,6 +32,7 @@
   } from '$lib/record/device.ts';
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
+  import { words as actionWords } from '$lib/record/actions.ts';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
@@ -1703,6 +1704,7 @@
       <Section title={copy.billing}>
         <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.billingSelfHost : copy.billingCloud}</p>
         <div class="row-actions">
+          <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
           <Button weight="quiet" href="/settings/export"><Icon name="download" size="s" />{copy.export}</Button>
         </div>
       </Section>

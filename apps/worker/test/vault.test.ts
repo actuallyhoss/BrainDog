@@ -95,12 +95,14 @@ test('THE ROUTE ASKS FOR THE KEY DOORS BEFORE THE API, which would otherwise tak
   assert.ok(api > 0 && vault < api, 'the key doors are routed after the API');
 });
 
-test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors get keys only when it is bound, and provisioning opens it first', () => {
+test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors and the alarm get keys only when it is bound, and provisioning opens it first', () => {
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8');
   assert.match(source, /keys: isBound\(env\.KEK\)\s*\?/, 'the key doors get keys whether or not KEK is bound');
   const provision = source.slice(source.indexOf('async function provision('));
   const opened = provision.indexOf('keyStoreOf(env.KEK)');
   assert.ok(opened > 0 && opened < provision.indexOf('directory.prepare('), 'provisioning writes before it opens the key store');
   assert.match(provision, /\.\.\.\(store \? \{ keys: await recordKeys\(store, id\) \} : \{\}\)/, 'provisioning does not wrap keys when the store is bound');
-  assert.equal((source.match(/env\.KEK\b/g) ?? []).length, 3, 'something other than the doors and provisioning reads KEK');
+  /* THE FOURTH IS THE ALARM'S, and it goes through `keyOpener`, which answers `null` when KEK is unbound. */
+  assert.match(source, /keyOpener\(api, this\.env\.KEK\)/, 'the alarm reads KEK some other way than through keyOpener');
+  assert.equal((source.match(/env\.KEK\b/g) ?? []).length, 4, 'something other than the doors, provisioning and the alarm reads KEK');
 });

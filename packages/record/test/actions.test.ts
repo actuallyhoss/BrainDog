@@ -87,3 +87,25 @@ test('A STRAY ARGUMENT, A MISSING INGEST AND AN ACTION THAT IS NOT PAUSED ARE EA
   assert.equal(state(), 'paused');
   sql.close();
 });
+
+test('THE ACTIONS READ ANSWERS A TOKEN: why one is paused, a held run in the month, and never a key', async () => {
+  const { api, sql } = await paused();
+  type Row = { ingest: string; state: string; key: string | null; last: { outcome: string; status: number | null; note: string } | null; month: Record<string, number> };
+  const read = async (ctx: CallContext): Promise<Row[]> => {
+    const out = (await api.actions(ctx)) as Out;
+    assert.ok(out.ok, out.refusal?.fix);
+    return out.value as Row[];
+  };
+
+  const [row] = await read(token);
+  assert.deepEqual([row?.ingest, row?.state, row?.key, row?.last?.outcome, row?.last?.status], ['balance', 'paused', 'example read', 'paused', 401]);
+  assert.match(row?.last?.note ?? '', /401/);
+
+  assert.ok(((await api.resumeAction({ ingest: 'balance' }, owner)) as Out).ok);
+  await api.kernel.runActions(async () => ({ status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: { until: Date.UTC(2026, 9, 1), say: 'balance is waiting until 1 October.' } }));
+  const [held] = await read(writer);
+  assert.deepEqual([held?.state, held?.last?.outcome, held?.month.held, held?.month.runs], ['pending', 'held', 1, 1]);
+
+  assert.doesNotMatch(JSON.stringify(await read(owner)), /ciphertext|nonce|kek_2f/);
+  sql.close();
+});

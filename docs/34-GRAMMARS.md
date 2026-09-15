@@ -418,11 +418,11 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Notification fields | 6 | `tone say because to key urgent` | 09 §4 |
 | Series kinds | 5 | `gauge flow cumulative unique fact` | 08 §3 |
 | Suggestion body kinds | 4 (+ `query`, never filed) | `options pattern rowset change` · `query` is the palette's unfiled answer | 23 §4 |
-| Refusal codes | 99, in 8 families | pack and declaration 41 · grammar 13 · write path 18 · auth and vault 7 · format and lifecycle 6 · dialect 2 · spark 5 · connector 7 | 30 §6 |
+| Refusal codes | 122, in 9 families | pack and declaration 52 · grammar 14 · write path 18 · auth and vault 7 · format and lifecycle 8 · dialect 2 · spark 5 · connector 12 · host and client 4 | 30 §6 |
 | `SqlErrorCode` | 13 | 33 §3 — the adapter vocabulary, not refusal codes | 30 §13 |
 | `Http` error names | 4 | `PrivateRange TooLarge Timeout Network` — a vocabulary, not refusal codes | 33 §1 |
 | Event kinds | 40 | 30 §2 | 30 §2 |
-| Schedule kinds | 10 | `digest reminder rule retry purge rotate pull analyse score snapshot` | 30 §1 |
+| Schedule kinds | 12 | `digest reminder rule retry purge rotate pull call poll analyse score snapshot` | 30 §1 |
 | `schedule.state` | 5 | `pending firing done failed paused` | 09 §1 |
 | Outbox kinds | 9 | `notify.email notify.push notify.webhook pull.fetch export.r2 erase.r2 infer.embed infer.prose infer.draft` | 30 §1 |
 | Outbox states | 5 | `pending leased done failed dead` | 30 §1 |
@@ -445,7 +445,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Kernel tables | 27 + 4 header | 30 §1 | 30 §1 |
 | `local` tables | 6 | `token device_grant auth_fail observation job job_event` — the other 25 travel | 02 §1 |
 | Erase stores | 19 + R2 | 02 §10, in one transaction; R2 through the outbox is the twentieth | 02 §10 |
-| Record methods | 64 | 9 DATA · 12 READ+ · 4 VAULT · 7 JOBS · 16 ADMIN · 16 INTERNAL — 33 §2 | 30 §5 |
+| Record methods | 77 | 12 DATA · 13 READ+ · 4 VAULT · 7 JOBS · 22 ADMIN · 19 INTERNAL — 33 §2 | 30 §5 |
 | RPC groups | 6 | `DATA READ+ VAULT JOBS ADMIN INTERNAL` | 30 §5 |
 | `/auth/*` routes | 10 | 33 §4 | 33 §4 |
 | DO classes | 3 | `Record Spark Directory` | 01 §1 |

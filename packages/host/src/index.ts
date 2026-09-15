@@ -132,6 +132,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'packs', group: 'READ+', writes: false, what: 'Which packs this record has, and at what version.' },
   { name: 'packConfig', group: 'READ+', writes: false, what: "One pack's settings, and the value each holds now.",
     takes: { id: 'text' } },
+  { name: 'actions', group: 'READ+', writes: false, what: "Every scheduled action: what it calls, how often, whether it is paused and why, and this month's runs." },
   { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved. A browser session only.' },
@@ -317,6 +318,7 @@ export type RecordSurface = {
   enablePack(args: never, ctx: never): Promise<Result<unknown>>;
   resumeAction(args: never, ctx: never): Promise<Result<unknown>>;
   packConfig(args: never, ctx: never): Promise<Result<unknown>>;
+  actions(ctx: never): Promise<Result<unknown>>;
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
@@ -370,6 +372,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     enablePack: (a, ctx) => api.enablePack(a as never, ctx as never),
     resumeAction: (a, ctx) => api.resumeAction(a as never, ctx as never),
     packConfig: (a, ctx) => api.packConfig(a as never, ctx as never),
+    actions: (_a, ctx) => api.actions(ctx as never),
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),
     retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),

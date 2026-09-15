@@ -558,6 +558,99 @@ export const PACK_SETTINGS: Readonly<Record<string, Record<string, { type: 'text
   },
 };
 
+/* ── scheduled actions ───────────────────────────────────────────────────── */
+
+import type { ActionRow } from './actions.ts';
+
+/**
+ * The sample's scheduled actions: three for Kiln, one for Portage, one for every project.
+ *
+ * ONE OF EACH STATE a person reads on "Runs on" (`loop/research-scheduled-actions.md` §6.2): live, paused
+ * because the provider refused the key, and retrying after a 503. Each day of the month so far carries its
+ * runs, so `/usage` draws the same numbers the rows say, and the month is the sum of its days.
+ *
+ * A FUNCTION, SO NOTHING HERE REACHES THE ENTRY CHUNK. The layout imports this module for everything else,
+ * and a function nobody in the entry calls is dropped with its rows.
+ */
+export const ACTION_SAMPLE = (): ActionRow[] => {
+  const month = new Date(NOW).toISOString().slice(0, 7);
+  const today = new Date(NOW).getUTCDate();
+  const days = (runs: (d: number) => number, requests: number, bytes: number, failures: (d: number) => number = () => 0) =>
+    Array.from({ length: today }, (_, i) => {
+      const n = runs(i + 1);
+      return { day: `${month}-${String(i + 1).padStart(2, '0')}`, runs: n, requests: n * requests, bytes: n * bytes, failures: failures(i + 1) };
+    });
+  const row = (r: Omit<ActionRow, 'month'>): ActionRow => ({
+    ...r,
+    month: r.days.reduce(
+      (t, d) => ({ runs: t.runs + d.runs, requests: t.requests + d.requests, bytes: t.bytes + d.bytes, failures: t.failures + d.failures, held: 0 }),
+      { runs: 0, requests: 0, bytes: 0, failures: 0, held: 0 },
+    ),
+  });
+  return [
+    row({
+      ingest: 'kiln-stripe-balance',
+      channel: 'poll',
+      project: 'Kiln',
+      host: 'api.stripe.com',
+      every: '1h',
+      key: 'Stripe read',
+      state: 'paused',
+      next: null,
+      last: { at: stamp(-5), outcome: 'paused', status: 401, note: 'kiln-stripe-balance stopped: api.stripe.com answered 401 to the key "Stripe read".' },
+      days: days((d) => (d < today ? 24 : 7), 1, 2_400, (d) => (d === today ? 1 : 0)),
+    }),
+    row({
+      ingest: 'kiln-npm-downloads',
+      channel: 'pull',
+      project: 'Kiln',
+      host: 'api.npmjs.org',
+      every: '1d',
+      key: 'npm read',
+      state: 'pending',
+      next: stamp(14),
+      last: { at: stamp(-10), outcome: 'ok', status: 200, note: 'kiln-npm-downloads fetched from api.npmjs.org.' },
+      days: days(() => 1, 2, 18_000),
+    }),
+    row({
+      ingest: 'kiln-invoice-paid',
+      channel: 'call',
+      project: 'Kiln',
+      host: 'hooks.kiln.example',
+      every: '6h',
+      key: 'Kiln hook',
+      state: 'pending',
+      next: stamp(3),
+      last: { at: stamp(-3), outcome: 'ok', status: 202, note: 'kiln-invoice-paid called hooks.kiln.example, and it answered 202.' },
+      days: days(() => 4, 1, 640),
+    }),
+    row({
+      ingest: 'portage-github-issues',
+      channel: 'poll',
+      project: 'Portage',
+      host: 'api.github.com',
+      every: '15m',
+      key: 'GitHub read',
+      state: 'pending',
+      next: stamp(1),
+      last: { at: stamp(-1), outcome: 'failed', status: 503, note: 'portage-github-issues failed and will try again later.' },
+      days: days(() => 96, 1, 5_200, (d) => (d === today ? 3 : 0)),
+    }),
+    row({
+      ingest: 'exchange-rates',
+      channel: 'pull',
+      project: null,
+      host: 'api.frankfurter.app',
+      every: '1d',
+      key: 'Rates',
+      state: 'pending',
+      next: stamp(20),
+      last: { at: stamp(-4), outcome: 'ok', status: 200, note: 'exchange-rates fetched from api.frankfurter.app.' },
+      days: days(() => 1, 1, 1_100),
+    }),
+  ];
+};
+
 /* ── what happened while you were away ───────────────────────────────────
    The read mark advances when the person LEAVES the screen, never when it opens: the predecessor
    shipped the other way round and found that For You had never once drawn its second half, because

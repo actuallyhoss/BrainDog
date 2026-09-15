@@ -227,7 +227,7 @@ request's record; a `bearer` auth carries a hash, never the secret; `system` is 
   "assets": {
     "directory": "apps/web/build", "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/mcp", "/a", "/a/*", "/in/*", "/s/*", "/ws", "/ws/*", "/auth/*"] },
+    "run_worker_first": ["/api/*", "/mcp", "/a", "/a/*", "/in/*", "/s/*", "/ws", "/ws/*", "/auth/*", "/account/*"] },
   "observability": { "enabled": true }
 }
 ```
@@ -390,6 +390,12 @@ The lockout (12 §8) is 49 §5.5's, over `dir_fail`: reserve before compare; ten
 with `Retry-After`, sticky for fifteen minutes; a first strike forgotten after fifteen minutes; an address cleared
 by a success on it; a reservation that returns no row is **503**, fail closed. Agent tokens never touch `/auth/*`,
 so they bypass it (32 §2.3).
+
+**`/account/*`, September 15th 2026.** `GET /account/usage?from=YYYY-MM-DD&to=YYYY-MM-DD` is `serveAccount` from the
+same file, over the Directory's RPC `Directory.usage(person, range)`. It reads the session cookie and nothing else,
+and answers what the records that person owns used. With no cookie, or without `SESSION_SECRET`, it is 401
+`UNAUTHORIZED`.
+
 ### 5.9 · The DO `Sql` adapter (`sql-do.ts`)
 
 ```ts
@@ -463,6 +469,19 @@ point — the DO loses precision silently (30 §13).
 3. After `alarm()` returns: the push of §5.7 step 4. A throw before re-arm cannot happen — the `finally` is the
    package's; the platform's own retry of a throwing `alarm()` (09 §1) is a second ladder this host neither adds to
    nor suppresses.
+4. *Scheduled actions, September 15th 2026.* After the drain, `Record$.alarm` calls
+   `api.kernel.runActions(execute, { limit: ALARM_RUNS, scheduler })` with the executor of `src/actions.ts`. It sends
+   https only, to an origin an active declaration names; refuses a host written as a literal private or local address
+   with `postable()`; follows same-origin redirects, three at most; and gives a run 10 seconds and 2 MB. The key is
+   opened from the Worker key store (`keyOpener`, over `vault.ts`'s `openSealed`) only when `KEK` is bound. Unbound, an
+   action that names a key sends nothing, and its run event carries *"This host holds no key store yet, so the key
+   "<label>" was not opened and nothing was sent."* The kernel records that as a failure it does not retry and does
+   not pause, so the row runs again at its next interval and sends nothing again until `KEK` is bound. `ALARM_RUNS` is
+   5: at most 20 subrequests and 50 seconds an alarm, inside `loop/research-scheduled-actions.md` §2.3's 800
+   subrequests and ten minutes. A pass that throws is logged by its message and not rethrown, because the drain has
+   already re-armed. Before each run the executor asks the Directory's `mayRun(record, action)` over RPC. A record on
+   the hosted plan at its monthly allowance answers `held`: nothing is sent, and the action waits for the first of
+   next month. After the pass, each metered run goes to `Directory.meter`, which counts a run's event once.
 
 ### 5.11 · The queue consumer (`outbox.ts`)
 
@@ -646,6 +665,7 @@ Only codes from 30 §6 appear in a body; the Worker mints none. The adapter's th
 | CPU per `/api/*` request | ≤ 20 ms; a whole page renders in 2.12 ms | 22 §5 · `ms` in the log line, p95 per method |
 | CPU per invocation ceiling | 30 s default, 300 s max — a long import is not a request | 01 §2 · never approached; the alarm batch is 100 rows |
 | Queue consumer per message | ≤ 5 s wall for `notify.*`; `pull.fetch` bounded by ≤ 5 runs × ≤ 50 pages ≤ 200 subrequests | 25 §9, 30 §8 · `ms` per kind |
+| Scheduled actions per alarm | ≤ 5 runs (`ALARM_RUNS`) × ≤ 4 requests (one and three redirects) = 20 subrequests; ≤ 5 × 10 s = 50 s wall | `loop/research-scheduled-actions.md` §2.3 · asserted in `test/actions.test.ts` |
 | Subrequests per invocation | 1,000 (paid) — the cron fan-out stops at 900 records | 25 §9 · counted in `scheduled()` |
 | Memory per isolate | 128 MB — **which is why `export` streams pages of ≤ 1,000 rows** through a `TransformStream` and never buffers a record | 01 §2, 33 §9 · a 10 GB record exports without an OOM in staging |
 | Snapshot buffer | ≤ 40 MiB plaintext (§10) — age has no streaming mode this spec relies on | §13 A12 · the refusal sentence appears above the cap |
@@ -688,6 +708,10 @@ Workers AI, Email, Secrets Store. Each control, where it sits, and what never tr
    `device_grant.token_hash`; a theft of every table impersonates nobody (26 §2.1).
 5. **`redirect: 'manual'` and the private-range refusal** in `cfHttp` and `cfDispatch.webhook`; `connect`
    re-validates any `Location` against the declared origin before following (25 §7 rule 5).
+   *Scheduled actions, September 15th 2026.* The alarm's executor, `src/actions.ts`, holds the self-host's rules
+   (§5.10 step 4) and resolves no name. Cloudflare does not route a Worker's `fetch` to a private address, so the
+   check the self-host makes after resolving a name is the platform's on this host; what the executor refuses itself
+   is a host written as a literal private, loopback or link-local address, `localhost` or `.internal`.
 6. **The asset route is sandboxed**: type from bytes, SVG 415, `nosniff`, `default-src 'none'; sandbox`,
    `noindex`, the 64-hex regex, the record prefix in every key (12 §8, 12 §2).
 7. **`no-store` on every JSON answer, no CORS anywhere, a 401 that says one word, a 500 that says nothing** (12 §8).

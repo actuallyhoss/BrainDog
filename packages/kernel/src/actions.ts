@@ -16,10 +16,13 @@
  *   1 · Fifteen minutes, or a provider's own higher floor, refused at declaration: `declare.ts`.
  *   2 · Jitter is arithmetic over the record, the pack and the action, never random: `actionJitterMs`.
  *   3 · The install diff names every host and how often: `@braindog/declare`'s `calls_out`.
- *   4 · A 401 or a 403 is never retried. The row pauses, an event says so, the owner is told through the one
- *       notification path, and only `resumeAction` starts it again: `finishAction`.
+ *   4 · A 401 or a 403 is never retried, and neither is a key the host could not open (`WRONG_KEY`). The row
+ *       pauses, an event says so, the owner is told through the one notification path, and only `resumeAction`
+ *       starts it again: `finishAction`.
  *   5 · Every run is metered from the first: one `pull` event per run, carrying runs, requests, bytes, run
- *       time and failures, and the project it ran for or `global`: `meter`.
+ *       time and failures, and the project it ran for or `global`: `meter`. The pass hands each run back in
+ *       `usage`, for the host to add to the Directory's ledger. A host that finds the plan's limit reached
+ *       answers `held` instead of sending, and the action waits for the next month with an event that says so.
  */
 
 import type { Result, Sql } from '@braindog/ports';
@@ -77,7 +80,20 @@ export type ActionRequest = {
 
 /** What the executor answers: the provider's status and body, or why it sent nothing or stopped. */
 export type ActionAnswer =
-  | { status: number; body: string; bytes: number; ms: number; requests: number }
+  | {
+      status: number;
+      body: string;
+      bytes: number;
+      ms: number;
+      requests: number;
+      /**
+       * Set when the host sent nothing because the account is at its plan's monthly limit: `status` is 0 and
+       * every count is 0. THE HOST ASKS BEFORE THE RUN STARTS, because the allowance is the Directory's and the
+       * record cannot see it. `until` is when the action may run again, and `say` is the one sentence its event
+       * carries.
+       */
+      held?: { until: number; say: string };
+    }
   | {
       refused: { code: 'PULL_ORIGIN_REFUSED' | 'PULL_PROVIDER_UNAVAILABLE' | 'PULL_REQUEST_REFUSED' | 'WRONG_KEY'; fix: string };
       bytes: number;
@@ -86,6 +102,21 @@ export type ActionAnswer =
     };
 
 export type Execute = (request: ActionRequest) => Promise<ActionAnswer>;
+
+/**
+ * One run's usage, as its `pull` event wrote it. What a host hands the Directory's ledger.
+ *
+ * `event` is the event's id, which is what makes counting it twice count it once.
+ */
+export type Metered = {
+  event: string;
+  at: string;
+  ingest: string;
+  channel: string;
+  scope: string;
+  outcome: 'ok' | 'changed' | 'unchanged' | 'paused' | 'failed' | 'refused' | 'dropped' | 'held';
+  usage: { runs: number; requests: number; bytes: number; ms: number; failures: number; held: number };
+};
 
 /** What one pass did, counted. */
 export type ActionsRun = {
@@ -103,6 +134,10 @@ export type ActionsRun = {
   refused: number;
   /** Jobs whose declaration had gone by the time they ran. */
   dropped: number;
+  /** Runs the host held because the account reached its plan's limit. Nothing was sent for these. */
+  held: number;
+  /** Every run this pass metered, in order. The host adds each to the Directory's ledger. */
+  usage: Metered[];
 };
 
 export type ActionDeps = {
@@ -248,7 +283,7 @@ export type Ready = { job: OutboxRow; decl: ActionDecl; request: ActionRequest; 
  * THE KEY IS LOOKED UP BY ITS ID AND ITS LABEL AND NOTHING ELSE. `grant` in the request is a reference the
  * host resolves, and the columns this reads are the two a person already sees on the vault screen.
  */
-export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | null {
+export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Metered {
   let payload: { channel?: string; ingest?: string; grant?: string };
   try {
     payload = JSON.parse(job.payload) as typeof payload;
@@ -266,8 +301,7 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | null {
       ? `${ingest} is no longer declared, or its pack is off, so nothing was sent.`
       : `${ingest} declares no https address this runner can call, so nothing was sent.`;
     deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
-    meter(deps, { ingest, channel, host: null, project: found?.decl.project, status: null, outcome: 'dropped', requests: 0, bytes: 0, ms: 0, failures: 0 }, why);
-    return null;
+    return meter(deps, { ingest, channel, host: null, project: found?.decl.project, status: null, outcome: 'dropped', requests: 0, bytes: 0, ms: 0, failures: 0 }, why);
   }
 
   const { decl } = found;
@@ -279,8 +313,7 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | null {
   if (named !== undefined && !key) {
     deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
     pause(deps, channel, ingest, `${ingest} is paused: the key it sends to ${host} is gone.`);
-    meter(deps, { ingest, channel, host, project: decl.project, status: null, outcome: 'paused', requests: 0, bytes: 0, ms: 0, failures: 1 }, `${ingest} did not run: the key it sends to ${host} is gone.`);
-    return null;
+    return meter(deps, { ingest, channel, host, project: decl.project, status: null, outcome: 'paused', requests: 0, bytes: 0, ms: 0, failures: 1 }, `${ingest} did not run: the key it sends to ${host} is gone.`);
   }
 
   const row = deps.sql.one<{ payload: string }>('SELECT payload FROM schedule WHERE kind = ? AND key = ?', channel, ingest);
@@ -329,7 +362,7 @@ type Usage = {
   host: string | null;
   project: string | undefined;
   status: number | null;
-  outcome: 'ok' | 'changed' | 'unchanged' | 'paused' | 'failed' | 'refused' | 'dropped';
+  outcome: Metered['outcome'];
   requests: number;
   bytes: number;
   ms: number;
@@ -344,23 +377,30 @@ type Usage = {
  * `global`, so a per-account ledger in the Directory can sum these without reading anything else. No key,
  * no body and no header is in it: a host, a status and five numbers.
  */
-export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: Usage, say: string): void {
+export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: Usage, say: string): Metered {
+  const event = deps.mint();
+  const at = instant(deps.nowMs);
+  const scope = usage.project ?? 'global';
+  /* A RUN THAT NEVER STARTED IS NOT A RUN. A job whose pack was turned off, or one the plan's limit held, sent
+     nothing, so it counts nothing against the allowance. It is still an event, so it is never silent. */
+  const counted = {
+    runs: usage.outcome === 'dropped' || usage.outcome === 'held' ? 0 : 1,
+    requests: usage.requests,
+    bytes: usage.bytes,
+    ms: usage.ms,
+    failures: usage.failures,
+    held: usage.outcome === 'held' ? 1 : 0,
+  };
   deps.sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'pull', ?, 'declaration', ?, ?)",
-    deps.mint(),
-    instant(deps.nowMs),
+    event,
+    at,
     `ingest:${usage.ingest}`,
     `declaration:ingest.${usage.ingest}`,
-    JSON.stringify({
-      channel: usage.channel,
-      host: usage.host,
-      status: usage.status,
-      outcome: usage.outcome,
-      scope: usage.project ?? 'global',
-      usage: { runs: 1, requests: usage.requests, bytes: usage.bytes, ms: usage.ms, failures: usage.failures },
-    }),
+    JSON.stringify({ channel: usage.channel, host: usage.host, status: usage.status, outcome: usage.outcome, scope, usage: counted }),
     say.slice(0, 280),
   );
+  return { event, at, ingest: usage.ingest, channel: usage.channel, scope, outcome: usage.outcome, usage: counted };
 }
 
 /**
@@ -377,12 +417,30 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
  * 429, 5XX, A TIMEOUT AND THE NETWORK WALK THE LADDER, by acking the job `failed`: the outbox's backoff,
  * doubling minutes, and at the eighth failure a dead letter a person sees. Every rung is an event.
  *
- * ANYTHING ELSE IS REFUSED AND NOT RETRIED: an origin the host would not call, an answer over the cap, a
- * key the host could not open, any other 4xx. Retrying those sends the same wrong request again.
+ * `WRONG_KEY` PAUSES TOO. The host holds no key store, or the key did not open on it, so nothing was sent and
+ * nothing would be sent next time. The row pauses with the executor's sentence; the key is not marked stale.
+ *
+ * ANYTHING ELSE IS REFUSED AND NOT RETRIED: an origin the host would not call, an answer over the cap, any
+ * other 4xx. Retrying those sends the same wrong request again.
  */
-export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswer, hash: string): Usage['outcome'] {
+export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswer, hash: string): Metered {
   const { job, decl, request, host } = ready;
   const { ingest, channel } = request;
+
+  /* HELD AT THE PLAN'S LIMIT: nothing was sent. The job is finished, the action waits until `until` (or later,
+     if it was already due later), and the event carries the host's one sentence. It is not paused, so nobody
+     has to resume it: it runs again on its own when the month turns. */
+  if ('held' in answer && answer.held !== undefined) {
+    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+    deps.sql.exec(
+      "UPDATE schedule SET due_at = MAX(due_at, ?) WHERE kind = ? AND key = ? AND state = 'pending'",
+      instant(answer.held.until),
+      channel,
+      ingest,
+    );
+    return meter(deps, { ingest, channel, host, project: decl.project, status: null, outcome: 'held', requests: 0, bytes: 0, ms: 0, failures: 0 }, answer.held.say);
+  }
+
   const base = { ingest, channel, host, project: decl.project, requests: answer.requests, bytes: answer.bytes, ms: answer.ms };
   const status = 'status' in answer ? answer.status : null;
 
@@ -390,8 +448,16 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
     deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
     if (request.grant) deps.sql.exec('UPDATE grant SET stale_at = ? WHERE id = ?', instant(deps.nowMs), request.grant.id);
     pause(deps, channel, ingest, `${ingest} is paused: ${host} refused the key "${request.grant?.label ?? 'none'}" with ${status}.`);
-    meter(deps, { ...base, status, outcome: 'paused', failures: 1 }, `${ingest} stopped: ${host} answered ${status} to the key "${request.grant?.label ?? 'none'}". It will not retry until somebody resumes it.`);
-    return 'paused';
+    return meter(deps, { ...base, status, outcome: 'paused', failures: 1 }, `${ingest} stopped: ${host} answered ${status} to the key "${request.grant?.label ?? 'none'}". It will not retry until somebody resumes it.`);
+  }
+
+  /* THE HOST COULD NOT OPEN THE KEY: it holds no key store yet, or the key does not open on it. Nothing was sent,
+     and the next interval would send nothing again, so the action pauses the way a refused key does, with the
+     executor's sentence. The key is NOT marked stale, because no provider ever saw it. */
+  if ('refused' in answer && answer.refused.code === 'WRONG_KEY') {
+    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+    pause(deps, channel, ingest, `${ingest} is paused. ${answer.refused.fix}`);
+    return meter(deps, { ...base, status: null, outcome: 'paused', failures: 1 }, `${ingest} stopped. ${answer.refused.fix} It will not retry until somebody resumes it.`);
   }
 
   if (status !== null && status >= 200 && status < 300 && 'body' in answer) {
@@ -426,8 +492,7 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
         row.id,
       );
     deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
-    meter(deps, { ...base, status, outcome, failures: outcome === 'refused' ? 1 : 0 }, say);
-    return outcome;
+    return meter(deps, { ...base, status, outcome, failures: outcome === 'refused' ? 1 : 0 }, say);
   }
 
   const transient =
@@ -441,13 +506,11 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
 
   if (transient) {
     deps.ack({ id: job.id, state: 'failed', error: why, leasedUntil: job.leasedUntil });
-    meter(deps, { ...base, status, outcome: 'failed', failures: 1 }, `${ingest} failed and will try again later. ${why}`);
-    return 'failed';
+    return meter(deps, { ...base, status, outcome: 'failed', failures: 1 }, `${ingest} failed and will try again later. ${why}`);
   }
 
   deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
-  meter(deps, { ...base, status, outcome: 'refused', failures: 1 }, `${ingest} was not retried. ${why}`);
-  return 'refused';
+  return meter(deps, { ...base, status, outcome: 'refused', failures: 1 }, `${ingest} was not retried. ${why}`);
 }
 
 /* ── the pass ───────────────────────────────────────────────────────────── */
@@ -456,8 +519,8 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
 export type RunnerSteps = {
   drain: () => Drained;
   lease: (n: number) => OutboxRow[];
-  prepare: (job: OutboxRow) => Ready | null;
-  finish: (ready: Ready, answer: ActionAnswer, hash: string) => Usage['outcome'];
+  prepare: (job: OutboxRow) => Ready | Metered;
+  finish: (ready: Ready, answer: ActionAnswer, hash: string) => Metered;
 };
 
 /** The SHA-256 of an answer, hex. What a `poll` compares. */
@@ -479,11 +542,12 @@ export async function answerHash(body: string): Promise<string> {
  */
 export async function runActions(steps: RunnerSteps, execute: Execute, n = 5): Promise<ActionsRun> {
   const drained = steps.drain();
-  const out: ActionsRun = { fired: drained.done, ran: 0, ok: 0, changed: 0, paused: 0, failed: 0, refused: 0, dropped: 0 };
+  const out: ActionsRun = { fired: drained.done, ran: 0, ok: 0, changed: 0, paused: 0, failed: 0, refused: 0, dropped: 0, held: 0, usage: [] };
 
   for (const job of steps.lease(n)) {
     const ready = steps.prepare(job);
-    if (!ready) {
+    if (!('request' in ready)) {
+      out.usage.push(ready);
       out.dropped++;
       continue;
     }
@@ -499,9 +563,15 @@ export async function runActions(steps: RunnerSteps, execute: Execute, n = 5): P
         requests: 1,
       };
     }
-    out.ran++;
     const hash = 'body' in answer ? await answerHash(answer.body) : '';
-    const outcome = steps.finish(ready, answer, hash);
+    const metered = steps.finish(ready, answer, hash);
+    out.usage.push(metered);
+    const { outcome } = metered;
+    if (outcome === 'held') {
+      out.held++;
+      continue;
+    }
+    out.ran++;
     if (outcome === 'ok' || outcome === 'unchanged') out.ok++;
     else if (outcome === 'changed') (out.ok++, out.changed++);
     else if (outcome === 'paused') out.paused++;
@@ -534,6 +604,122 @@ export function resumeAction(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, i
     `${ingest} was resumed, and runs now.`,
   );
   return ok({ ingest, kind: row.kind });
+}
+
+/* ── the list a person reads ────────────────────────────────────────────── */
+
+type Totals = { runs: number; requests: number; bytes: number; failures: number };
+
+/**
+ * One scheduled action, as the record's `actions` read answers it (`loop/research-scheduled-actions.md` §4.6).
+ *
+ * THE KEY IS ITS LABEL, from the vault's index. Nothing sealed is read to build this, and the run sentences are the
+ * `pull` events' own notes, which carry a host, a status and a label and never a value.
+ */
+export type ActionRow = {
+  ingest: string;
+  channel: ActionKind;
+  /** The project it runs for, or `null` for every project. */
+  project: string | null;
+  host: string | null;
+  every: string;
+  key: string | null;
+  state: 'pending' | 'firing' | 'paused' | 'done';
+  /** When it runs next, while it is pending or firing. A paused or finished action has none. */
+  next: string | null;
+  last: { at: string; outcome: Metered['outcome']; status: number | null; note: string } | null;
+  /** This calendar month so far, UTC. `held` is how many runs the plan's limit held, which count no run. */
+  month: Totals & { held: number };
+  /** This month by UTC day, from the first to today, oldest first. */
+  days: ({ day: string } & Totals)[];
+};
+
+const ROW_STATES: readonly string[] = ['pending', 'firing', 'paused', 'done'];
+
+type Run = { status: number | null; outcome: Metered['outcome']; usage: Metered['usage'] };
+
+/** A `pull` event's `to_v`, when `meter` wrote it. Anything else on the same target is not a run. */
+function runOf(to_v: string): Run | null {
+  try {
+    const v = JSON.parse(to_v) as Partial<Run>;
+    return typeof v.usage === 'object' && v.usage !== null && typeof v.outcome === 'string' ? (v as Run) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Every active `pull`, `call` and `poll`, with its schedule, its last run and this month's counts.
+ *
+ * FROM THE RECORD'S OWN ROWS: the declaration, the schedule row it runs from, the key's label, and the `pull` events
+ * `meter` wrote. A pack that is off has retired its declarations, so its actions are not in the list.
+ */
+export function listActions(sql: Sql, nowMs: number): ActionRow[] {
+  const today = instant(nowMs);
+  const month = today.slice(0, 7);
+  const upTo = Number(today.slice(8, 10));
+
+  return sql
+    .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+    .map((r) => JSON.parse(r.body) as ActionDecl & { ingest: string })
+    .filter((decl) => (ACTION_KINDS as readonly string[]).includes(decl.channel))
+    .map((decl): ActionRow => {
+      const channel = decl.channel as ActionKind;
+      const target = `declaration:ingest.${decl.ingest}`;
+      const row = sql.one<{ state: string; due_at: string }>('SELECT state, due_at FROM schedule WHERE kind = ? AND key = ?', channel, decl.ingest);
+      const state = row && ROW_STATES.includes(row.state) ? (row.state as ActionRow['state']) : 'done';
+      const address = addressOf(decl);
+
+      let last: ActionRow['last'] = null;
+      for (const e of sql.all<{ ts: string; to_v: string; note: string | null }>(
+        "SELECT ts, to_v, note FROM event WHERE kind = 'pull' AND target = ? AND to_v IS NOT NULL ORDER BY rowid DESC LIMIT 20",
+        target,
+      )) {
+        const run = runOf(e.to_v);
+        if (run) {
+          last = { at: e.ts, outcome: run.outcome, status: run.status ?? null, note: e.note ?? '' };
+          break;
+        }
+      }
+
+      const totals = { runs: 0, requests: 0, bytes: 0, failures: 0, held: 0 };
+      const days = Array.from({ length: upTo }, (_, i) => ({ day: `${month}-${String(i + 1).padStart(2, '0')}`, runs: 0, requests: 0, bytes: 0, failures: 0 }));
+      for (const e of sql.all<{ ts: string; to_v: string }>(
+        "SELECT ts, to_v FROM event WHERE kind = 'pull' AND target = ? AND to_v IS NOT NULL AND ts >= ? ORDER BY rowid",
+        target,
+        `${month}-01`,
+      )) {
+        const run = runOf(e.to_v);
+        if (!run || e.ts.slice(0, 7) !== month) continue;
+        const u = run.usage;
+        totals.runs += u.runs ?? 0;
+        totals.requests += u.requests ?? 0;
+        totals.bytes += u.bytes ?? 0;
+        totals.failures += u.failures ?? 0;
+        totals.held += u.held ?? 0;
+        const day = days[Number(e.ts.slice(8, 10)) - 1];
+        if (day) {
+          day.runs += u.runs ?? 0;
+          day.requests += u.requests ?? 0;
+          day.bytes += u.bytes ?? 0;
+          day.failures += u.failures ?? 0;
+        }
+      }
+
+      return {
+        ingest: decl.ingest,
+        channel,
+        project: typeof decl.project === 'string' && decl.project !== '' ? decl.project : null,
+        host: address && originOf(address) ? new URL(address).host : null,
+        every: decl.every,
+        key: decl.grant === undefined || decl.grant === '' ? null : (keyNamed(sql, decl.grant)?.label ?? decl.grant),
+        state,
+        next: row && (state === 'pending' || state === 'firing') ? row.due_at : null,
+        last,
+        month: totals,
+        days,
+      };
+    });
 }
 
 /** Every origin the active scheduled actions name. The self-host sends to these and to nothing else. */

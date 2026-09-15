@@ -18,6 +18,7 @@ import {
   openRecord,
   type ActionAnswer,
   type ActionRequest,
+  type ActionRow,
   type Declaration,
   type Execute,
   type GrantRow,
@@ -249,20 +250,106 @@ test('A 403 PAUSES THE SAME WAY, and a key that is not in the vault pauses befor
   assert.match(missing.sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = 'ingest:balance'")?.note ?? '', /not in the vault/);
 });
 
+test('A HOST WITH NO KEY STORE PAUSES THE ACTION ONCE: nothing is sent again, the key is not marked stale, and resuming re-arms it', async () => {
+  const { k, sql, clock, keys } = await record(POLL());
+  const fix = 'This host holds no key store yet, so the key "example read" was not opened and nothing was sent.';
+  const stand = host({ refused: { code: 'WRONG_KEY', fix }, bytes: 0, ms: 1, requests: 0 }, said(200, 'balance 120'));
+
+  const first = await k.runActions(stand.execute);
+  assert.deepEqual({ paused: first.paused, refused: first.refused, failed: first.failed }, { paused: 1, refused: 0, failed: 0 });
+  assert.equal(row(sql, 'poll', 'balance')?.state, 'paused');
+  assert.equal(sql.one<{ s: string | null }>('SELECT stale_at AS s FROM grant WHERE id = ?', keys['example read']!)?.s, null, 'a key nobody tried was marked stale');
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry'").length, 0, 'a retry was armed');
+  assert.equal(meters(sql, 'balance')[0]?.outcome, 'paused');
+  assert.ok(meters(sql, 'balance')[0]?.note.includes(fix));
+
+  const notes = () => sql.all<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = 'ingest:balance'");
+  assert.equal(notes().length, 1);
+  assert.ok(notes()[0]!.note.includes(fix), 'the owner was not told what the executor said');
+
+  /* The next interval, and the one after: nothing is sent, and nobody is told twice. */
+  clock.advance(6 * HOUR);
+  const later = await k.runActions(stand.execute);
+  assert.deepEqual({ ran: later.ran, fired: later.fired }, { ran: 0, fired: 0 });
+  assert.equal(stand.seen.length, 1);
+  assert.equal(notes().length, 1);
+
+  assert.ok(k.resumeAction('balance', 'p_1').ok);
+  assert.equal(row(sql, 'poll', 'balance')?.state, 'pending');
+  const resumed = await k.runActions(stand.execute);
+  assert.deepEqual({ ran: resumed.ran, changed: resumed.changed }, { ran: 1, changed: 1 });
+  assert.equal(stand.seen.length, 2);
+});
+
 /* ── rule five: metered from the first run ───────────────────────────────── */
 
 test('EVERY RUN IS METERED from the first: runs, requests, bytes, run time and failures, scoped', async () => {
   const { k, sql } = await record(POLL(), CALL());
-  await k.runActions(host(said(200, 'balance 120')).execute);
+  const run = await k.runActions(host(said(200, 'balance 120')).execute);
 
   assert.deepEqual(
     meters(sql, 'ping').map(({ note: _, ...m }) => m),
-    [{ channel: 'call', host: 'hooks.example.test', status: 200, outcome: 'ok', scope: 'studio', usage: { runs: 1, requests: 1, bytes: 11, ms: 3, failures: 0 } }],
+    [{ channel: 'call', host: 'hooks.example.test', status: 200, outcome: 'ok', scope: 'studio', usage: { runs: 1, requests: 1, bytes: 11, ms: 3, failures: 0, held: 0 } }],
   );
   assert.deepEqual(
     meters(sql, 'balance').map(({ note: _, ...m }) => m),
-    [{ channel: 'poll', host: 'api.example.test', status: 200, outcome: 'changed', scope: 'global', usage: { runs: 1, requests: 1, bytes: 11, ms: 3, failures: 0 } }],
+    [{ channel: 'poll', host: 'api.example.test', status: 200, outcome: 'changed', scope: 'global', usage: { runs: 1, requests: 1, bytes: 11, ms: 3, failures: 0, held: 0 } }],
   );
+
+  /* AND THE PASS HANDS EVERY RUN BACK, by its event's id, which is what the Directory's ledger counts once. */
+  const events = sql.all<{ id: string; ts: string }>("SELECT id, ts FROM event WHERE kind = 'pull' AND to_v IS NOT NULL ORDER BY rowid");
+  assert.deepEqual(run.usage.map((m) => [m.event, m.at]), events.map((e) => [e.id, e.ts]));
+  assert.deepEqual(run.usage.map((m) => [m.ingest, m.scope, m.usage.runs]).sort(), [['balance', 'global', 1], ['ping', 'studio', 1]]);
+});
+
+/* ── the plan's limit ────────────────────────────────────────────────────── */
+
+test('AT THE PLAN’S LIMIT A RUN WAITS FOR THE NEXT MONTH: nothing is sent, nothing is paused, and an event says so', async () => {
+  const { k, sql, clock } = await record(CALL());
+  const OCTOBER = Date.UTC(2026, 9, 1);
+  const say = 'ping is waiting until 1 October. This record has used its 15,000 runs for September.';
+
+  /* The host asks the Directory before it sends, and answers `held` when the record is at its limit. */
+  const asked: ActionRequest[] = [];
+  const run = await k.runActions(async (request) => {
+    asked.push(request);
+    return { status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: { until: OCTOBER, say } };
+  });
+  assert.deepEqual([run.held, run.ran, run.ok, run.paused], [1, 0, 0, 0]);
+  assert.equal(asked.length, 1);
+  assert.deepEqual(
+    meters(sql, 'ping').map((m) => ({ outcome: m.outcome, usage: m.usage, note: m.note })),
+    [{ outcome: 'held', usage: { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 }, note: say }],
+  );
+  assert.deepEqual(run.usage.map((m) => [m.outcome, m.usage.held]), [['held', 1]]);
+  assert.equal(row(sql, 'call', 'ping')?.state, 'pending', 'a held action was paused, so somebody would have to resume it');
+  assert.equal(Date.parse(row(sql, 'call', 'ping')?.due_at ?? ''), OCTOBER);
+  assert.equal(sql.one<{ state: string }>("SELECT state FROM outbox WHERE kind = 'pull.fetch'")?.state, 'done');
+
+  /* Before the month turns nothing fires; when it turns, the action runs on its own. */
+  clock.advance(2 * HOUR);
+  const early = host(said(200));
+  await k.runActions(early.execute);
+  assert.equal(early.seen.length, 0, 'a held action ran before the month turned');
+
+  clock.advance(OCTOBER - clock.now());
+  const later = host(said(200));
+  assert.equal((await k.runActions(later.execute)).ran, 1);
+  assert.equal(later.seen.length, 1);
+});
+
+test('A TURNED-OFF PACK’S WAITING JOB SENDS NOTHING AND COUNTS NO RUN, and still leaves an event', async () => {
+  const { k, sql } = await record(CALL({}, 'bank'));
+  await k.runActions(host(said(503)).execute);
+  assert.ok(k.disablePack('bank').ok);
+  /* Its retry comes round after the pack is off. */
+  sql.exec("UPDATE outbox SET state = 'pending' WHERE kind = 'pull.fetch'");
+
+  const stand = host(said(200));
+  const run = await k.runActions(stand.execute);
+  assert.equal(stand.seen.length, 0);
+  assert.deepEqual(run.usage.map((m) => [m.outcome, m.usage.runs, m.usage.requests]), [['dropped', 0, 0]]);
+  assert.match(meters(sql, 'ping').at(-1)?.note ?? '', /pack is off/);
 });
 
 /* ── a poll acts only on a change ────────────────────────────────────────── */
@@ -329,4 +416,41 @@ test('TURNING THE PACK OFF STOPS RE-ARMING, turning it on arms again, and uninst
 
   k.forgetPack('bank');
   assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind IN ('call', 'poll')").length, 0);
+});
+
+/* ── the list ────────────────────────────────────────────────────────────── */
+
+test('THE LIST SAYS WHY AN ACTION IS PAUSED, counts a held run in the month, and carries no key', async () => {
+  const { k, keys } = await record(POLL(), CALL());
+  const OCTOBER = Date.UTC(2026, 9, 1);
+  const say = 'ping is waiting until 1 October. This record has used its 15,000 runs for September.';
+  await k.runActions(async (request) =>
+    request.channel === 'poll' ? said(401, 'no') : { status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: { until: OCTOBER, say } },
+  );
+
+  const rows = k.actions();
+  assert.deepEqual(rows.map((r) => r.ingest), ['balance', 'ping']);
+  const [balance, ping] = rows as [ActionRow, ActionRow];
+
+  assert.deepEqual(
+    { channel: balance.channel, project: balance.project, host: balance.host, every: balance.every, key: balance.key, state: balance.state, next: balance.next },
+    { channel: 'poll', project: null, host: 'api.example.test', every: '1h', key: 'example read', state: 'paused', next: null },
+  );
+  assert.deepEqual({ outcome: balance.last?.outcome, status: balance.last?.status }, { outcome: 'paused', status: 401 });
+  assert.match(balance.last?.note ?? '', /answered 401 to the key "example read"/);
+  assert.deepEqual(balance.month, { runs: 1, requests: 1, bytes: 2, failures: 1, held: 0 });
+  assert.equal(balance.days.length, 15);
+  assert.deepEqual(balance.days[0], { day: '2026-09-01', runs: 0, requests: 0, bytes: 0, failures: 0 });
+  assert.deepEqual(balance.days.at(-1), { day: '2026-09-15', runs: 1, requests: 1, bytes: 2, failures: 1 });
+
+  assert.deepEqual(
+    { project: ping.project, key: ping.key, state: ping.state, outcome: ping.last?.outcome, note: ping.last?.note },
+    { project: 'studio', key: 'hook key', state: 'pending', outcome: 'held', note: say },
+  );
+  assert.equal(Date.parse(ping.next ?? ''), OCTOBER);
+  assert.deepEqual(ping.month, { runs: 0, requests: 0, bytes: 0, failures: 0, held: 1 });
+
+  const said_ = JSON.stringify(rows);
+  assert.doesNotMatch(said_, /ciphertext|nonce|kek_2f/);
+  for (const id of Object.values(keys)) assert.ok(!said_.includes(id), 'a grant id reached the list');
 });

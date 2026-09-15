@@ -24,9 +24,11 @@ import {
   relyingParty,
   sameKey,
   sameOrigin,
+  serveAccount,
   serveAuth,
   sessionContext,
   sessionCookie,
+  type AccountDoor,
   type AuthDoor,
   type CookieMode,
 } from '@braindog/host/auth';
@@ -36,7 +38,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
-import { actionExecutor, keyOpener, type OpenKey, type Send } from './actions.ts';
+import { actionExecutor, holding, keyOpener, meterPass, type OpenKey, type Send } from './actions.ts';
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -145,6 +147,8 @@ type Site = {
   door: Omit<AuthDoor, 'ip'>;
   /** The key doors: a vault grant's bearer, and this process's key store when it has one. */
   vault: VaultDoor;
+  /** `/account/*`: the Directory's usage ledger, for a signed-in person. */
+  usage: AccountDoor['usage'];
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -516,12 +520,22 @@ export async function start(options: {
    */
   let execute: Execute | null = null;
   let acting = false;
+  /* THE DIRECTORY IS OPENED BELOW, after the record, so a pass that fires first waits for the next one. */
+  let ledger: Directory | null = null;
+  let planned: string | null = null;
   const act = async (): Promise<void> => {
-    if (!options.actions || acting) return;
+    if (!options.actions || acting || !ledger) return;
+    const record = api.kernel.identity()?.id;
+    if (!record) return;
     acting = true;
     try {
+      /* A SELF-HOST IS NEVER HELD. Its records are put on `selfhost`, which has no allowance, once per process, and
+         again until the Directory knows the record: `init` provisions on that plan, and this covers a record made
+         before plans existed. */
+      if (planned !== record && ledger.setPlan(record, 'selfhost').ok) planned = record;
       execute ??= actionExecutor(api, { openKey: options.actions.openKey ?? keyOpener(api, options.keys), send: options.actions.send });
-      const out = await api.kernel.runActions(execute);
+      const out = await api.kernel.runActions(holding(execute, record, ledger.mayRun));
+      await meterPass(ledger.meter, record, out.usage);
       if (out.fired > 0 || out.ran > 0 || out.dropped > 0) await api.kernel.tail(scheduler);
     } catch (e) {
       console.error('actions:', e instanceof Error ? e.message : String(e));
@@ -696,8 +710,10 @@ export async function start(options: {
         }
       : undefined,
   );
+  ledger = directory;
   const loopback = [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`];
   site = {
+    usage: directory.usage,
     api,
     token,
     origin,
@@ -811,6 +827,8 @@ async function answer(
      approve itself at the configured origin. */
   if (/^\/+auth(?:\/|$)/.test(path))
     return write(res, await serveAuth(request, { ...site.door, ip: ipOf(req, trustProxy), reached: req.headers.host ?? '' }));
+  /* `/account/*` IS THE DIRECTORY'S TOO, and reads only the session cookie. */
+  if (/^\/+account(?:\/|$)/.test(path)) return write(res, await serveAccount(request, { origin: site.origin, auth: site.auth, usage: site.usage }));
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
 

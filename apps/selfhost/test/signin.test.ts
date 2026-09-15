@@ -300,3 +300,36 @@ test('THE BOOT LINE NAMES THE WAYS IN AND NEVER THE KEY, on stdout or stderr', (
     rmSync(data, { recursive: true, force: true });
   }
 });
+
+test('GET /account/usage IS THE SIGNED-IN PERSON’S LEDGER: a cookie and nothing else, and a day written as a day', async () => {
+  const s = await stack();
+  try {
+    const nobody = await s.call('/account/usage?from=2026-09-01&to=2026-09-30');
+    assert.equal(nobody.status, 401);
+    assert.equal(nobody.body?.refusal?.code, 'UNAUTHORIZED');
+
+    /* THE SERVER KEY AS A BEARER IS NOT A PERSON, so it reads no account. */
+    const bearer = await s.call('/account/usage?from=2026-09-01&to=2026-09-30', { bearer: s.serverKey ?? '' });
+    assert.equal(bearer.status, 401);
+
+    const sid = await s.keyIn();
+    const mine = await s.call('/account/usage?from=2026-09-01&to=2026-09-30', { sid });
+    assert.equal(mine.status, 200, mine.raw);
+    const value = mine.body?.value as unknown as { from: string; to: string; records: { record: string; totals: { runs: number } }[] };
+    assert.equal(value.from, '2026-09-01');
+    assert.equal(value.to, '2026-09-30');
+    assert.deepEqual(value.records.map((r) => [r.record, r.totals.runs]), [[REC, 0]]);
+
+    const wrong = await s.call('/account/usage?from=September&to=2026-09-30', { sid });
+    assert.notEqual(wrong.status, 200);
+    assert.equal(wrong.body?.refusal?.code, 'VALUE_MALFORMED');
+
+    const posted = await s.call('/account/usage', { body: {}, sid });
+    assert.equal(posted.status, 405);
+    const elsewhere = await s.call('/account/nothing', { sid });
+    assert.equal(elsewhere.status, 404);
+    s.clean();
+  } finally {
+    await s.close();
+  }
+});
