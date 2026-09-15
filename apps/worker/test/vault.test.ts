@@ -102,7 +102,7 @@ test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors and the alarm get keys o
   const opened = provision.indexOf('keyStoreOf(env.KEK)');
   assert.ok(opened > 0 && opened < provision.indexOf('directory.prepare('), 'provisioning writes before it opens the key store');
   assert.match(provision, /\.\.\.\(store \? \{ keys: await recordKeys\(store, id\) \} : \{\}\)/, 'provisioning does not wrap keys when the store is bound');
-  /* THE FOURTH IS THE ALARM'S, and it goes through `keyOpener`, which answers `null` when KEK is unbound. */
+  /* THE LAST IS THE ALARM'S, and it goes through `keyOpener`, which answers `null` when KEK is unbound. */
   assert.match(source, /keyOpener\(api, this\.env\.KEK\)/, 'the alarm reads KEK some other way than through keyOpener');
-  assert.equal((source.match(/env\.KEK\b/g) ?? []).length, 4, 'something other than the doors, provisioning and the alarm reads KEK');
+  assert.equal((source.match(/env\.KEK\b/g) ?? []).length, 5, 'something other than the two doors, the half they share, provisioning and the alarm reads KEK');
 });

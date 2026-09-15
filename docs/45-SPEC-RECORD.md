@@ -62,7 +62,7 @@ export type RecordApi = {
   handoff(args: HandoffArgs, ctx: CallContext): Promise<Result<Entry>>;                                // the next step, what was tried, the state
   // PEOPLE: 1, added with the agents pack (loop/research-agent-path.md §5.6)
   meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>>;                                         // someone met in the work, matched or added, as the run
-  // READ+ — 13
+  // READ+ — 14
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
   metric(args: { id: string }, ctx: CallContext): Promise<Result<MetricResult>>;
   schema(args: { register: string }, ctx: CallContext): Promise<Result<unknown>>;
@@ -73,6 +73,7 @@ export type RecordApi = {
   whatsNew(args: { cursor?: number }, ctx: CallContext): Promise<Result<WhatsNew>>;
   recentHistory(args: { cursor?: number; limit?: number }, ctx: CallContext): Promise<Result<HistoryPage>>;
   inbox(args: { cursor?: number; limit?: number }, ctx: CallContext): Promise<Result<InboxPage>>;       // an owner's, no token's
+  backlinks(args: { register: string; seq: number; limit?: number; cursor?: string }, ctx: CallContext): Promise<Result<Backlinks>>;   // what points at one row, held to what the caller reads
   project(args: ProjectArgs, ctx: CallContext): Promise<Result<Projection>>;
   boot(args: Record<string, never>, ctx: CallContext): Promise<Result<Boot>>;
   whoami(args: Record<string, never>, ctx: CallContext): Promise<Result<Whoami>>;                       // added — §13 #1
@@ -582,6 +583,14 @@ not yet one transaction. A session's briefing comes from `context`, not `boot`.
 
 ### 5.4 · VAULT (`api.ts`) — owner, browser session, no `op`; the record never decrypts (ADR-062)
 
+**The two ways in, and why two.** These four are a browser session's at `/api/<method>`, except that the sealed
+shape itself is not routed: `openGrant` answers material a browser cannot open and `bindGrant` takes material a
+browser cannot make, so neither is in `ROUTES` (33 §4). What reaches them from a screen is the host, through
+INTERNAL `depositGrant` and `openForGrant`, which a host calls with a vault grant at `/api/vault/*` or with a
+browser session at `/api/keys/*`. A session is held to this section's own gate wherever it comes in: an owner, no
+token of any kind, and a proof under fifteen minutes old. *(The second pair of doors added September 16th 2026;
+no method was added, and the counts of 30 §5 are unchanged.)*
+
 **`listGrants()`** — `SELECT id, label, opens, kind, version, kdf, wrapped_by, scopes, kek_id, bytes, hint, opened, last_opened, created_at, expires_at, rotate_every, stale_at, rotated_at, revoked_at FROM grant ORDER BY label`. Never `ciphertext`, `nonce`, `prev_*`.
 
 **`openGrant({ id, kek_id })`**
@@ -970,6 +979,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 | `recentHistory` paging | pages of 3 join to the whole log newest first, no line twice, `cursor` `null` only on the last; a fractional `limit` is `VALUE_MALFORMED`; a caller who may only append to a register reads none of its lines |
 | `inbox` | five unmatched arrivals with one `ignored` → the other four newest first, their count equal to `boot`'s `counts.inbox`; pages of 3 join to the whole, no arrival twice; no `sha256` or raw `headers` in the answer; a fractional `limit` and a `cursor` of 0 are `VALUE_MALFORMED`; a token held to one register, a record-wide token, a `write` person, a person with no level and an owner held to one register are each `FORBIDDEN` |
 | `fileArrival` · `archiveArrival` | filing an arrival writes one row titled by its subject, with a `create` event and the arrival's `state` event in one batch, and the inbox and `counts.inbox` lose it; filing it again answers the same row and writes nothing; a refused row leaves the arrival waiting; archiving is `ignored`, twice is one event; archiving a filed arrival and filing an archived one are `OUT_OF_BOUNDS`; a token is `NEEDS_BROWSER_SESSION`, a writer is refused, and an owner held to one register is `FORBIDDEN` |
+| `backlinks` | two fields of one register pointing at one row are two groups, ordered by register then field, each with `matched` for the whole and `rows` for the page; a row never lists itself; an archived row is not listed; pages of 2 join to the whole across the groups with no row twice, `cursor` `null` only on the last; a token held to one register reads only that register's group, and its `matched` counts only what it may read; a row the record does not hold is `from: []`; a `seq` of 0 and a cursor that is not one of ours are `VALUE_MALFORMED`; a caller who may not read the row's own register is refused before anything is counted |
 | `boot` shell | `record`, `me` with the member's name, `counts.decide`, `counts.inbox` `null` below owner; the JSON of a scoped boot names no register, row or question outside the scope; `whatsNew` inside equals `whatsNew()` alone |
 | `index` | `open` = rows in non-terminal states; a register without `transitions` has `open: 0`; `fields` lists `{ id, type }`; `scope.repo` narrows only registers with `repos` |
 | `search` | a phrase with `"` and `OR` is matched literally; zero rows → one `search.empty` observation; with `vec` → the fused order |

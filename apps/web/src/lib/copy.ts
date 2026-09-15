@@ -1585,6 +1585,59 @@ export const copy = {
   inviteSignInFirst: 'Sign in',
   /* A key taken out of service from the vault screen: the bytes go, the row stays. */
   keyRevoked: (label: string) => label + ' is out of service. Its row stays, because what it opened is a fact.',
+  /* Lane H */
+  /**
+   * WHAT THE CAPTURE LINE FILLED IN, AND THE FACT THAT IT DID.
+   *
+   * A required field the screen answers on somebody's behalf is a fact written into their record that nobody told
+   * it. The row is the cheapest thing in the product to make and it must not also be the quietest: the chip says
+   * it on the row, and this says it once where they are looking, in the reader's own spelling of each value rather
+   * than the record's — `direction` filled as `owed_by_me` is said back as "which way owed by me".
+   *
+   * IT SAYS WHERE TO CHANGE IT, because the answer is one press away on the row itself and a sentence reporting a
+   * value with nowhere to go is a sentence that makes somebody open a form.
+   */
+  captureFilled: (what: readonly string[]) => `Filled in ${list([...what])}. Change any of it on the row.`,
+  /* The same fact as the chip on the row, which has the width for it only on a card. The grid wears `Added`. */
+  markAddedFilled: (what: readonly string[]) => `Added, with ${list([...what])} filled in`,
+  /* An example row that is a real row: it is named as one, so nobody has to wonder which of these they typed. */
+  exampleTitle: (one: string) => `Example ${one}`,
+  exampleAdded: (one: string) => `Added an example ${one}. Put it back if you do not want it.`,
+  markExample: 'Example',
+  /* Lane I */
+  /**
+   * EDITING A ROW WHERE IT IS READ, which is the half this screen did not have.
+   *
+   * The page could show every field and change none of them: the one control in the header opened a
+   * toast saying the row "would open for editing". A detail screen that cannot edit is a report, and
+   * the product's own answer to "change any of it" was on the list behind it, a screen away from the
+   * row a person is looking at.
+   *
+   * ONE FIELD AT A TIME, so what is saved is what was changed: a form over eight fields sends eight
+   * values and a `version`, and the seven nobody touched are seven chances to overwrite somebody
+   * else's write with what was on screen when the page was opened.
+   */
+  /* `editValue` IS ALREADY HERE, as "Change <field>", and it says what this control does. A second
+     spelling of one sentence is the drift a copy file exists to prevent. */
+  editSave: 'Save',
+  editCancel: 'Cancel',
+  /* A SAVE THAT CHANGES NOTHING IS NOT A WRITE. Sending it would put a line in the row's history
+     saying a field went from a value to the same value, which is a fact about a press, not the row. */
+  editNoChange: 'Nothing was changed.',
+  /* What a field the row does not carry yet says, where a value would be. It is a fact about the
+     row — the register declares the field and this row has not answered it — and not an absence. */
+  editNotSet: 'Not set',
+  /* Archive and put back, on the row itself, in the words the list already uses for the same verb. */
+  rowArchive: 'Archive',
+  rowRestore: 'Put back',
+  rowArchiveWould: 'The row would be archived',
+  rowRestoreWould: 'The row would be put back',
+  rowRestored: (what: string) => `${what} is back.`,
+  /* The row is archived: said on the row, because every list leaves it out and nothing else here would. */
+  rowArchivedNote: 'This row is archived. It is left out of every list until it is put back.',
+  /* What points at this row, when the record refuses that read alone: the sections are absent and the
+     reason is said once, rather than the page looking like nothing points here. */
+  linksRefused: 'What points at this row could not be read.',
 } as const;
 
 export type Copy = typeof copy;

@@ -318,6 +318,25 @@ export type Entry = {
 
 export type Patch = Record<string, unknown>;
 
+/**
+ * What points at one row, grouped by the FIELD that points.
+ *
+ * ONE GROUP PER RELATION AND NOT PER REGISTER, because two fields of one register can name the same
+ * row and mean different things: an update's `track` is what it is about and its `supersedes` is what
+ * it replaces, and a reader who is shown them in one list is being told they are one thing.
+ *
+ * `matched` IS THE WHOLE COUNT AND `rows` IS THE PAGE, so a caller can say "All 12" without asking
+ * for twelve rows it is not going to draw.
+ */
+export type BackGroup = { register: string; field: string; matched: number; rows: Entry[] };
+
+/** `backlinks`: the row that was asked about, what points at it, and where the next page starts. */
+export type Backlinks = {
+  to: { register: string; seq: number | null; id: string | null };
+  from: BackGroup[];
+  cursor: string | null;
+};
+
 export type WriteContext = {
   /**
    * Who. `p_…` for a person, a mechanism name for the record's own paths. On a token's write it is
@@ -1189,6 +1208,119 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        of a query that refuses to be paged. */
     const paging = q.order?.length ? null : more && last ? `${last.updated_at}|${last.id}` : null;
     return ok({ rows, matched, cursor: paging });
+  }
+
+  /**
+   * What points at one row: the rows of other registers whose `ref` fields hold this row's id.
+   *
+   * NOTHING WAS ADDED TO THE DATA MODEL. A `ref` declares `to:`, so the inverse of every reference is
+   * already stated once, on the field that declares it; this reads that declaration backwards and asks
+   * the rows. The record had no way to answer "what is this person's" at all, which is the half
+   * somebody opens a person for.
+   *
+   * `only` IS WHAT THE CALLER MAY READ, and it is the caller's business to work out: a register left
+   * out of it is not asked about, so a row in a list somebody cannot open cannot be inferred from the
+   * shape of the answer either. `undefined` asks every register, which is the host's own read.
+   *
+   * ONE `ref` FIELD AND NOT A `list<ref>`. A list of references is stored as a JSON array, so
+   * answering it is a scan with `json_each` per register rather than an equality one index can serve.
+   * It is left out rather than half-done, and a caller that needs it still has `list` with a `where`.
+   *
+   * PAGED ACROSS THE GROUPS IN ONE ORDER: relations by register then field, rows newest first, and the
+   * cursor names the relation it stopped in as well as the position — `<register>.<field>|<when>|<id>`.
+   */
+  function backlinks(q: {
+    register: string;
+    seq: number;
+    only?: readonly string[];
+    limit?: number;
+    cursor?: string | null;
+  }): Result<Backlinks> {
+    const barred = schemaRefusal(state);
+    if (barred) return barred;
+    if (!registers.has(q.register))
+      return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+
+    const limit = Math.min(Math.max(1, Math.floor(Number(q.limit)) || 20), 200);
+    const row = bySeq(q.register, q.seq);
+    const to = { register: q.register, seq: row?.seq ?? null, id: row?.id ?? null };
+    /* A ROW THAT IS NOT THERE HAS NOTHING POINTING AT IT, and saying so is not a refusal: `get`
+       answers `null` for the same row, and two reads of one row disagreeing about whether it exists
+       is worse than an empty answer. */
+    if (!row) return ok({ to, from: [], cursor: null });
+
+    const parts = typeof q.cursor === 'string' && q.cursor !== '' ? q.cursor.split('|') : null;
+    if (parts !== null && (parts.length !== 3 || !/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(parts[0] ?? '')))
+      return no('VALUE_MALFORMED', 'A cursor is the one the page above answered with.', { at: 'cursor' });
+
+    /* THE FIELD ID GOES INTO SQL, so it comes from the declaration and is checked against the grammar
+       anyway (34 §4). A name this pattern does not admit is left out rather than quoted into a path. */
+    const named = /^[a-z][a-z0-9_]{0,31}$/;
+    const allowed = q.only === undefined ? null : new Set(q.only);
+    const pairs: { register: string; field: string }[] = [];
+    for (const decl of [...registers.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+      if (allowed !== null && !allowed.has(decl.id)) continue;
+      const fields = [...decl.fields]
+        .filter((f) => f.type === 'ref' && f.to === q.register && !f.retired && named.test(f.id))
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      for (const f of fields) pairs.push({ register: decl.id, field: f.id });
+    }
+
+    const from: BackGroup[] = [];
+    let at = parts === null ? null : parts[0]!;
+    let taken = 0;
+    let last: { key: string; row: Entry } | null = null;
+    let more = false;
+
+    for (const pair of pairs) {
+      const key = `${pair.register}.${pair.field}`;
+      /* EVERY RELATION BEFORE THE ONE THE CURSOR STOPPED IN IS BEHIND US. The order is the same on
+         every call, so skipping to it is the same walk rather than a second one. */
+      if (at !== null && key !== at) continue;
+      const resuming = at !== null;
+      at = null;
+
+      const where = `register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${pair.field}') = ? AND id <> ?`;
+      /* ONE MORE THAN THERE IS ROOM FOR, which is how the walk learns there is a next page without
+         asking a second question, and how a relation whose rows are all drawn still notices the next
+         relation has some. */
+      const want = limit - taken + 1;
+      const page = resuming
+        ? sql.all<Record<string, unknown>>(
+            `SELECT ${COLUMNS} FROM entry WHERE ${where} AND (updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
+            pair.register,
+            row.id,
+            row.id,
+            parts![1]!,
+            parts![1]!,
+            parts![2]!,
+            want,
+          )
+        : sql.all<Record<string, unknown>>(
+            `SELECT ${COLUMNS} FROM entry WHERE ${where} ORDER BY updated_at DESC, id DESC LIMIT ?`,
+            pair.register,
+            row.id,
+            row.id,
+            want,
+          );
+      if (page.length === 0) continue;
+
+      const rows = page.slice(0, limit - taken).map(hydrate);
+      if (rows.length > 0) {
+        const matched = Number(
+          sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, pair.register, row.id, row.id)?.n ?? 0,
+        );
+        from.push({ register: pair.register, field: pair.field, matched, rows });
+        taken += rows.length;
+        last = { key, row: rows.at(-1)! };
+      }
+      if (page.length > rows.length) {
+        more = true;
+        break;
+      }
+    }
+
+    return ok({ to, from, cursor: more && last ? `${last.key}|${last.row.updated_at}|${last.row.id}` : null });
   }
 
   /** `MAX(event.rowid)`, which is the record's version: what changed since is a range scan. */
@@ -3853,6 +3985,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     refused: () => state.refusal,
     get,
     list,
+    /** What points at one row, from the `to:` every `ref` field already declares. */
+    backlinks,
     count,
     version,
     history,

@@ -19,35 +19,41 @@
  * brand lives in (`tools/gates/secret-grep.mjs`). Nothing here logs.
  */
 
-import { serveVault, servesVault, VAULT_HEADERS, vaultReply, type SessionHints, type VaultAsk, type VaultGrantSeen } from '@braindog/host';
-import type { Deposited, OpenedForGrant, SealTarget, Sealed } from '@braindog/record';
+import {
+  serveKeys, serveVault, servesKeys, servesVault, VAULT_HEADERS, vaultReply,
+  type KeysDoor, type SessionHints, type VaultGrantSeen,
+} from '@braindog/host';
+import type { CallContext, Deposited, OpenedForGrant, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
 
 import { unwrap, type KeyStore } from './keys.ts';
 import { recordOf } from './route.ts';
 
-export { servesVault };
+export { servesKeys, servesVault };
 
 /** A value in the clear. Named in this file and never passed out of it but to the one answer that asked. */
 type Plaintext = Uint8Array & { readonly brand: 'Plaintext' };
 
-/** The record's half of the doors, over RPC: every call names the record the grant was checked against. */
+/** Who a deposit or a read is by: an agent's checked vault grant, or a person's browser session. */
+export type By = VaultGrantSeen | CallContext;
+
+/** The record's half of the doors, over RPC: every call names the record the caller was checked against. */
 export type KeyDeps = {
-  /** `env.KEK`'s store, opened after the grant is checked, or `null` when the secret is empty. */
+  /** `env.KEK`'s store, opened after the caller is checked, or `null` when the secret is empty. */
   store(): Promise<KeyStore | null>;
   /** The fingerprint the record's vault is wrapped by, or `null` for a record made before the store was bound. */
   wrappingKey(record: string): Promise<string | null>;
   depositGrant(
     record: string,
-    args: { label?: unknown; opens?: unknown; kind?: unknown },
-    grant: VaultGrantSeen,
+    args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown },
+    by: By,
     hints: SessionHints,
     seal: (target: SealTarget) => Promise<Result<Sealed>>,
   ): Promise<Result<Deposited>>;
   openForGrant(
     record: string,
     args: { label?: unknown; credential?: unknown },
-    grant: VaultGrantSeen,
+    by: By,
     hints: SessionHints,
     kekId: string,
   ): Promise<Result<OpenedForGrant>>;
@@ -139,12 +145,12 @@ async function ready(keys: KeyDeps, record: string): Promise<Result<KeyStore>> {
   return ok(store);
 }
 
-/** Both doors over one record, whose grant `serveVault` has already checked. */
+/** Both steps over one record, whose caller a door has already checked. */
 function doors(keys: KeyDeps, record: () => string | null) {
-  const deposit = async (ask: VaultAsk): Promise<Result<unknown>> => {
+  const deposit = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Result<unknown>> => {
     const id = record();
     if (id === null) return UNKNOWN;
-    const said = ask.body.value;
+    const said = body.value;
     if (typeof said !== 'string' || said.length === 0) return no('REQUIRED_MISSING', 'A deposit carries the value, as a string.', { at: 'value' });
     const value = utf8(said) as Plaintext;
     try {
@@ -161,20 +167,26 @@ function doors(keys: KeyDeps, record: () => string | null) {
         const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: utf8(target.aad) }, key, value);
         return ok({ ciphertext: new Uint8Array(sealed), nonce, kdf: 'hkdf-sha256', kek_id: target.key.kek_id, bytes: value.length, hint });
       };
-      return await keys.depositGrant(id, { label: ask.body.label, opens: ask.body.opens, kind: ask.body.kind }, ask.grant, ask.hints, seal);
+      /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT. A vault grant already carries its
+         project, and reading a second one out of its body would be a way to put a key out of its reach. */
+      const args =
+        'principal' in by
+          ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential }
+          : { label: body.label, opens: body.opens, kind: body.kind };
+      return await keys.depositGrant(id, args, by, hints, seal);
     } finally {
       value.fill(0);
     }
   };
 
-  const open = async (ask: VaultAsk): Promise<Response> => {
+  const open = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Response> => {
     const id = record();
     if (id === null) return vaultReply(UNKNOWN);
     const opened = await ready(keys, id);
     if (!opened.ok) return vaultReply(opened);
     const store = opened.value;
     const { kekId } = await store.current();
-    const out = await keys.openForGrant(id, { label: text(ask.body.label), credential: text(ask.body.credential) }, ask.grant, ask.hints, kekId);
+    const out = await keys.openForGrant(id, { label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
     if (!out.ok) return vaultReply(out);
     const sealed = out.value;
     const key = await grantKey(store, id, sealed.key, sealed.id);
@@ -201,6 +213,7 @@ function doors(keys: KeyDeps, record: () => string | null) {
  */
 export function serveWorkerVault(request: Request, deps: GrantDeps): Promise<Response> {
   let checked: string | null = null;
+  const steps = deps.keys ? doors(deps.keys, () => checked) : null;
   return serveVault(request, {
     grant: async (bearer) => {
       const record = recordOf(`Bearer ${bearer}`);
@@ -209,6 +222,37 @@ export function serveWorkerVault(request: Request, deps: GrantDeps): Promise<Res
       if (out.ok) checked = record;
       return out;
     },
-    keys: deps.keys ? doors(deps.keys, () => checked) : undefined,
+    keys: steps
+      ? {
+          deposit: (ask) => steps.deposit(ask.grant, ask.body, ask.hints),
+          open: (ask) => steps.open(ask.grant, ask.body, ask.hints),
+        }
+      : undefined,
   });
+}
+
+/** What the app's own key doors need: the origins this Worker answers for, the record the session names, and the keys. */
+export type SessionKeyDeps = { origins: ReadonlySet<string>; record: string; keys?: KeyDeps | undefined };
+
+/**
+ * Answer one of the app's own key doors, `/api/keys/*`, for a browser session the Worker has already resolved.
+ *
+ * THE RECORD IS THE SESSION'S, not the request's. `doorOf` decided which record this person's cookie names, and
+ * that is what is passed in: nothing in the body may name a second one, for the reason the vault door holds the
+ * record its grant was checked against rather than reading it twice.
+ */
+export function serveWorkerKeys(request: Request, ctx: CallContext, deps: SessionKeyDeps): Promise<Response> {
+  const steps = deps.keys ? doors(deps.keys, () => deps.record) : null;
+  const door: KeysDoor<CallContext> = {
+    origins: deps.origins,
+    ...(steps
+      ? {
+          keys: {
+            put: (ask) => steps.deposit(ask.ctx, ask.body, ask.hints),
+            open: (ask) => steps.open(ask.ctx, ask.body, ask.hints),
+          },
+        }
+      : {}),
+  };
+  return serveKeys(request, door, ctx);
 }

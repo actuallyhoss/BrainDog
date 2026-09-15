@@ -8,8 +8,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { copy } from '../copy.ts';
-import { outbound, rowWriter } from './rows-write.ts';
+import { capturedFields, holdInPlace, outbound, rowWriter } from './rows-write.ts';
 import type { Fetch } from './row-live.ts';
+import type { Entry } from './schema.ts';
 
 const BASE = 'http://record.test';
 
@@ -248,6 +249,89 @@ test('a saved view is one page declaration over the list, with its filter, order
   const fix = 'Only an owner can change what this record declares.';
   const refused = host((url) => refs(url) ?? json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix } }));
   assert.deepEqual(await rowWriter(BASE, refused.io).saveView('obligations', 'x', address, []), { ok: false, why: 'refused', fix });
+});
+
+const entry = (seq: number, fields: Record<string, unknown> = {}): Entry => ({ seq, version: 1, created: '2026-09-01T09:00:00.000Z', by: 'you', fields: fields as Entry['fields'] });
+
+test('a held row is drawn where it was, not where the answer now puts it', () => {
+  const answer = [entry(9), entry(1), entry(2), entry(3)];
+  /* The row was read at index 2 and the record has since moved it to the head. */
+  const held = new Map([[3, { at: 2, entry: entry(3, { state: 'open' }) }]]);
+  assert.deepEqual(holdInPlace(answer, held).map((e) => e.seq), [9, 1, 3, 2]);
+
+  /* AND IT IS DRAWN FROM THE ANSWER, so a second write to a held row still shows. */
+  const moved = [entry(3, { state: 'paid' }), entry(9), entry(1), entry(2)];
+  const out = holdInPlace(moved, held);
+  assert.deepEqual(out.map((e) => e.seq), [9, 1, 3, 2]);
+  assert.equal(out[2]?.fields.state, 'paid');
+});
+
+test('a held row the answer has dropped comes back at its place, as it was', () => {
+  /* THE FOLD CASE: reopened under `state is paid`, so the list it is in no longer matches it. */
+  const held = new Map([[3, { at: 1, entry: entry(3, { state: 'open' }) }]]);
+  const out = holdInPlace([entry(1), entry(2)], held);
+  assert.deepEqual(out.map((e) => e.seq), [1, 3, 2]);
+  assert.equal(out[1]?.fields.state, 'open');
+
+  /* A hold taken past the end of a shorter answer is clamped rather than dropped. */
+  assert.deepEqual(holdInPlace([], new Map([[3, { at: 40, entry: entry(3) }]])).map((e) => e.seq), [3]);
+  /* Nothing held is the answer itself. */
+  assert.deepEqual(holdInPlace([entry(1)], new Map()).map((e) => e.seq), [1]);
+});
+
+test('a typed line becomes a row the record accepts, and says what it filled in', () => {
+  const at = Date.UTC(2026, 8, 3, 12);
+  const out = capturedFields('obligations', 'Rent, September', [], at);
+  /* Every required field the declaration names, and the title as typed. */
+  assert.deepEqual(out.fields, {
+    what: 'Rent, September',
+    direction: 'owed_by_me',
+    amount: { amount: 0, currency: 'GBP' },
+    due: '2026-09-03',
+    state: 'open',
+  });
+  /* SAID IN THE READER'S SPELLING, never the record's: `owed_by_me` is "owed by me". */
+  assert.deepEqual(out.filled, ['which way owed by me', 'amount GBP 0.00', 'due 3 Sep 2026', 'status open']);
+});
+
+test('the address answers what it already says, and is never guessed at from a set', () => {
+  const at = Date.UTC(2026, 8, 3, 12);
+  /* The bar writes `in`, a hand-written URL writes `is`, and both are one answer on screen. */
+  for (const op of ['in', 'is']) {
+    const out = capturedFields('obligations', 'Rent', [{ field: 'direction', op, values: ['owed to me'] }], at);
+    assert.equal(out.fields.direction, 'owed_to_me', op);
+    /* Inherited, so it is not in what the screen filled in on its own. */
+    assert.ok(!out.filled.some((s) => s.startsWith('which way')), op);
+  }
+  /* TWO VALUES NAME A SET, and picking one of them would store a guess as if it had been said. */
+  const set = capturedFields('obligations', 'Rent', [{ field: 'direction', op: 'in', values: ['owed to me', 'owed by me'] }], at);
+  assert.equal(set.fields.direction, 'owed_by_me', 'the declaration answers it, not the chip');
+  assert.ok(set.filled.some((s) => s.startsWith('which way')));
+  /* The title is what the reader is typing, so a filter on it is never inherited. */
+  assert.equal(capturedFields('obligations', 'Rent', [{ field: 'what', op: 'is', values: ['Rates'] }], at).fields.what, 'Rent');
+});
+
+test('what cannot be inferred is left for the record to refuse in its own words', () => {
+  const at = Date.UTC(2026, 8, 3, 12);
+  /* `updates` requires a ref and a document: there is no emptiest row in another register, and no emptiest prose. */
+  const out = capturedFields('updates', 'Mastering pass landed', [], at);
+  assert.ok(!('track' in out.fields), 'a required ref is not invented');
+  assert.equal(out.fields.health, 'on_track');
+  assert.equal(out.fields.at, new Date(at).toISOString());
+  assert.ok(!out.filled.some((s) => s.startsWith('thread')));
+
+  /* A register with one required enum beyond its title fills that and nothing else. */
+  const task = capturedFields('tasks', 'Chase Halden', [], at);
+  assert.deepEqual(task.fields, { what: 'Chase Halden', state: 'open' });
+  assert.deepEqual(task.filled, ['status open']);
+});
+
+test('the currency comes from the rows on screen, never from a guess', () => {
+  const at = Date.UTC(2026, 8, 3, 12);
+  const seen = [entry(1, { amount: { amount: 480_000, currency: 'EUR' } })];
+  const out = capturedFields('obligations', 'Rent', [], at, seen);
+  assert.deepEqual(out.fields.amount, { amount: 0, currency: 'EUR' });
+  assert.ok(out.filled.includes('amount EUR 0.00'));
 });
 
 test('both register screens write through this module', () => {

@@ -16,7 +16,10 @@ import type { AddressInfo } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
-import { handlersFor, hintsOf, httpStatus, serveApi, serveVault, servesVault, sessionOf, withSession, type Handler, type VaultDoor } from '@braindog/host';
+import {
+  handlersFor, hintsOf, httpStatus, serveApi, serveKeys, serveVault, servesKeys, servesVault, sessionOf, withSession,
+  type Handler, type KeysDoor, type VaultDoor,
+} from '@braindog/host';
 import {
   clearCookie,
   cookieMode,
@@ -45,7 +48,7 @@ import { actionExecutor, holding, keyOpener, meterPass, type OpenKey, type Send 
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
-import { vaultDoor } from './vault.ts';
+import { keysDoor, vaultDoor } from './vault.ts';
 
 /** The `Sql` port over `node:sqlite`. The one thing this file exists to supply. */
 export function openSqlite(path: string): Sql & { close(): void } {
@@ -160,6 +163,8 @@ type Site = {
   door: Omit<AuthDoor, 'ip'>;
   /** The key doors: a vault grant's bearer, and this process's key store when it has one. */
   vault: VaultDoor;
+  /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
+  keys: KeysDoor<CallContext>;
   /** `/account/*`: the Directory's usage ledger, for a signed-in person. */
   /** The copies kept beside the record file, `<slug>/snapshots/` (`53 §5.4`); absent for a database in memory. */
   snapshots: FileSnapshots | undefined;  usage: AccountDoor['usage'];
@@ -767,6 +772,9 @@ export async function start(options: {
   );
   ledger = directory;
   const loopback = [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`];
+  /* THE ORIGINS THIS PROCESS ANSWERS FOR, WRITTEN ONCE. Open mode's cross-origin check and the app's own key
+     doors ask the same question, and two lists of the same addresses would be two rules that drift. */
+  const origins = new Set([...loopback.map((h) => `http://${h}`), origin]);
   site = {
     usage: directory.usage,
     api,
@@ -775,8 +783,9 @@ export async function start(options: {
     mode,
     auth: off === null ? directory.auth : null,
     hosts: new Set([...loopback, new URL(origin).host]),
-    origins: new Set([...loopback.map((h) => `http://${h}`), origin]),
+    origins,
     vault: vaultDoor(api, options.keys),
+    keys: keysDoor(api, options.keys, origins),
     snapshots: kept,
     door: {
       on: 'selfhost',
@@ -913,7 +922,16 @@ async function answer(
   /* THE SESSION HEADERS ON EVERY DOOR, checked: the record reads a token's and ignores anybody else's. */
   /* A KEPT COPY AS THE FILE IT IS (`49 §5.13`): `GET /api/snapshots/<id>`, for whoever `snapshots` answers. */
   const copyAsked = /^\/+api\/+snapshots\/+([^/]+)\/*$/.exec(path);
-  if (copyAsked && method === 'GET' && 'ctx' in seen) return write(res, await copyOf(decodeURIComponent(copyAsked[1]!), seen.ctx, site), seen.cookie);  if ('ctx' in seen) return write(res, await serveApi(request, handlers, withSession(seen.ctx, sessionOf(request.headers))), seen.cookie);
+  if (copyAsked && method === 'GET' && 'ctx' in seen) return write(res, await copyOf(decodeURIComponent(copyAsked[1]!), seen.ctx, site), seen.cookie);
+  /* AND THE APP'S OWN KEY DOORS, AFTER THE SESSION AND NOT BEFORE IT, which is the whole difference between them
+     and `/api/vault/*` above: those take a bearer `contextFor` would not know, and these take the session it just
+     worked out. `serveKeys` refuses a bearer and any origin this host does not answer for; who the session is
+     stays the record's question. */
+  if ('ctx' in seen) {
+    const ctx = withSession(seen.ctx, sessionOf(request.headers));
+    const out = servesKeys(path) ? await serveKeys(request, site.keys, ctx) : await serveApi(request, handlers, ctx);
+    return write(res, out, seen.cookie);
+  }
   /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —
      a credential nobody minted, a credential belonging to somebody who is not on the record, and a
      record with no owner who may act — so a client could not tell which of the three to do something

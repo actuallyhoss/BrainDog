@@ -13,7 +13,7 @@
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
-  import { holeLabel, relative, since, TONES } from 'braindog-render';
+  import { exponentOf, holeLabel, relative, since, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -22,7 +22,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { actorOf, backlinks, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, toneOf, values } from '$lib/record/api.ts';
+  import { actorOf, backlinks, currencyFor, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, toneOf, values } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -35,6 +35,8 @@
   import { readHistory, type Told } from '$lib/record/history-live.ts';
   import { rowReader, type Got, type RowReader } from '$lib/record/row-live.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
+  import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
+  import type { FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
 
   const id = $derived(page.params.register ?? '');
@@ -68,9 +70,15 @@
      person's page could not show the invoices that are theirs — which is the half somebody opens a
      person for. Nothing was added to the data model: the inverse of every ref is already stated
      once, on the field that declares it. */
-  /* NOT ON A LIVE RECORD: the record has no backlinks read yet, and the sample's would be another
-     record's rows pointing at this one. The section is left out until that read exists. */
-  const incoming = $derived(row && !live ? backlinks(id, seq) : []);
+  /* AND ON A LIVE RECORD IT IS THE RECORD'S OWN READ, which it was not: the section was left out
+     entirely, because the sample's backlinks would be another record's rows pointing at this one.
+     `backlinks` on the record walks the same `to:` declarations this sample walk does, so the live
+     groups win wherever there are any and the sample keeps the screen it always had. */
+  let linked = $state<Linked | null>(null);
+  let links: LinkReader | null = null;
+  const incoming = $derived(
+    linked?.from === 'live' ? linked.groups : row && !live ? backlinks(id, seq) : [],
+  );
 
   /* THE ROW AND ITS HISTORY, IN ONE BRACKET, so `data-screen` never appears between the two reads. An
      answer for a row somebody has already left is dropped. `clock` is the reader's on a live record
@@ -85,15 +93,27 @@
     askedFor = key;
     got = null;
     told = null;
+    linked = null;
+    archived = false;
+    stopEdit();
     const at = opened();
     reader ??= rowReader(location.origin);
-    const [r, h] = await Promise.all([reader.read(register, n), readHistory(location.origin, register, n)]);
+    links ??= linkReader(location.origin);
+    /* THREE READS IN ONE BRACKET, for the reason the two were: `data-screen` must not appear between
+       them, and what points at a row is part of the row's screen rather than a thing that arrives
+       after it. */
+    const [r, h, l] = await Promise.all([
+      reader.read(register, n),
+      readHistory(location.origin, register, n),
+      links.read(register, n),
+    ]);
     const current = askedFor === key;
     closed(!current || (r.from !== 'refused' && h.from !== 'refused'), at);
     if (!current) return;
     clock = r.from === 'live' ? Date.now() : NOW;
     got = r;
     told = h;
+    linked = l;
   }
 
   $effect(() => {
@@ -139,6 +159,205 @@
     const current = askedFor === key;
     closed(!current || h.from !== 'refused', at);
     if (current) told = h;
+  }
+
+  /**
+   * EDITING, ONE FIELD AT A TIME.
+   *
+   * THE SCREEN COULD SHOW EVERY FIELD AND CHANGE NONE OF THEM. The one control in the header opened
+   * a toast saying the row "would open for editing", so the detail screen was a report and the only
+   * way to change a value was the list behind it — a screen away from the row a person is reading.
+   *
+   * ONE FIELD AND NOT A FORM, which is the whole shape of this. A form over eight fields sends eight
+   * values against one `version`, so the seven nobody touched are seven chances to write back what
+   * was on screen when the page was opened, over somebody else's change. A patch of one key is the
+   * smallest true statement of what somebody did, and it is the only one this screen can make
+   * honestly.
+   *
+   * THE WRITE GOES THROUGH `rows-write.ts`, the module the list writes through, so a ref typed as a
+   * number becomes its row's id and an enum goes in its declared spelling in ONE place rather than
+   * two that drift.
+   */
+  let editing = $state<string | null>(null);
+  let draft = $state('');
+  let ticked = $state(false);
+  /* What the box held when it opened, so a save that changes nothing is not sent as a write. */
+  let was = '';
+  let wasTicked = false;
+  let saving = $state(false);
+  /* THE RECORD'S OWN SENTENCE, under the field it is about, with the typed text left where it was. */
+  let problem = $state<string | null>(null);
+  /**
+   * ARCHIVED IN THIS TAB.
+   *
+   * A row the record has archived reads back as NO ROW — `get` hides a row with `deleted_at` set,
+   * and this screen answers that with "there is no obligation #12". So the moment just after
+   * archiving is the only one in which `Put back` can be offered on the row itself, and it is
+   * offered there rather than nowhere.
+   */
+  let archived = $state(false);
+
+  /* A secret is never drawn and never edited: a credential does not go in a row (the vault is a
+     different surface with different rules), and `readableFields` has already left it out. */
+  const editable = (f: FieldDecl): boolean => f.type !== 'secret';
+
+  /** The value as a box holds it: money in major units, everything else as the record stores it. */
+  function draftOf(f: FieldDecl, value: unknown): string {
+    if (value === null || value === undefined) return '';
+    if (f.type !== 'money') return String(value);
+    const minor = amountOf(value);
+    if (minor === null) return '';
+    return String(minor / 10 ** exponentOf(currencyOf(value) ?? currencyFor(id, f.id) ?? 'GBP'));
+  }
+
+  function startEdit(f: FieldDecl) {
+    if (!row) return;
+    /* ON THE SAMPLE, THE TOAST THIS SCREEN HAS ALWAYS SHOWN. There is no record to write to, and a
+       box that takes what you type and drops it is worse than one that says so. */
+    if (!live) {
+      toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' });
+      return;
+    }
+    problem = null;
+    editing = f.id;
+    draft = draftOf(f, row.fields[f.id]);
+    ticked = row.fields[f.id] === true;
+    was = draft;
+    wasTicked = ticked;
+  }
+
+  function stopEdit() {
+    editing = null;
+    draft = '';
+    problem = null;
+  }
+
+  /** The header's own control: the row's title is the field somebody means by "edit the row". */
+  function editTitle() {
+    if (!live) {
+      toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' });
+      return;
+    }
+    const fields = readableFields(id);
+    const f = fields.find((x) => x.id === decl?.title) ?? fields.find(editable);
+    if (f) startEdit(f);
+  }
+
+  const changed = (f: FieldDecl): boolean => (f.type === 'bool' ? ticked !== wasTicked : draft.trim() !== was.trim());
+
+  /**
+   * What the record would refuse about a money box, said where it was typed rather than at the save.
+   *
+   * THE EXPONENT IS THE CURRENCY'S: two decimals is most currencies and not all of them, and a field
+   * that assumed two would refuse `KWD 1.250` and quietly mangle `JPY 1250`.
+   */
+  function wrongMoney(f: FieldDecl): string | null {
+    if (f.type !== 'money') return null;
+    const raw = draft.trim();
+    if (raw === '') return null;
+    if (!/^-?\d+(\.\d+)?$/.test(raw)) return copy.moneyShape;
+    const exp = exponentOf(currencyOf(row?.fields[f.id]) ?? currencyFor(id, f.id) ?? 'GBP');
+    const places = raw.includes('.') ? raw.length - raw.indexOf('.') - 1 : 0;
+    return places > exp ? copy.moneyPlaces(exp) : null;
+  }
+
+  /**
+   * The one field, in the shape the record stores.
+   *
+   * A MONEY IS AN AMOUNT AND A CURRENCY and the box holds only the amount, so it is put back
+   * together here, beside the exponent that took it apart. Everything else goes as it was typed and
+   * `outbound` converts it: an empty box is `null`, which is how the record is told the row no
+   * longer carries that field.
+   */
+  function patchOf(f: FieldDecl): Fields {
+    if (f.type === 'bool') return { [f.id]: ticked };
+    const raw = draft.trim();
+    if (f.type !== 'money') return { [f.id]: raw };
+    if (raw === '') return { [f.id]: null };
+    const currency = currencyOf(row?.fields[f.id]) ?? currencyFor(id, f.id) ?? 'GBP';
+    return { [f.id]: { amount: Math.round(Number(raw) * 10 ** exponentOf(currency)), currency } };
+  }
+
+  /** The history again, so the change somebody just made is in the list beside the row. */
+  async function refreshHistory(register: string, n: number) {
+    const key = `${register}#${n}`;
+    const at = opened();
+    const h = await readHistory(location.origin, register, n);
+    const current = askedFor === key;
+    closed(!current || h.from !== 'refused', at);
+    if (current) told = h;
+  }
+
+  async function saveEdit(f: FieldDecl) {
+    if (!row || saving || !live) return;
+    const bad = wrongMoney(f);
+    if (bad) {
+      problem = bad;
+      return;
+    }
+    /* A SAVE THAT CHANGES NOTHING IS NOT A WRITE: sending it would put a line in the row's history
+       saying a field went from a value to the same value, which is a fact about a press. */
+    if (!changed(f)) {
+      toasts.push(copy.editNoChange);
+      stopEdit();
+      return;
+    }
+    const register = id;
+    const n = seq;
+    const key = `${register}#${n}`;
+    saving = true;
+    problem = null;
+    writer ??= rowWriter(location.origin);
+    const out = await writer.update(register, n, patchOf(f), row.version);
+    saving = false;
+    if (askedFor !== key) return;
+    if (out.ok) {
+      got = { from: 'live', entry: out.entry };
+      stopEdit();
+      toasts.push(copy.writeMarkSaved);
+      void refreshHistory(register, n);
+      return;
+    }
+    /* A CONFLICT RE-READS AND SAYS SO. What is on screen is now the record's latest rather than what
+       this tab was holding, so there is nothing for the box to stay open over. */
+    if (out.why === 'conflict') {
+      if (out.entry) got = { from: 'live', entry: out.entry };
+      else void readRow(register, n);
+      stopEdit();
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    /* A REFUSAL KEEPS THE TYPED TEXT and says what the record said, under the box it was typed in.
+       Clearing it would be this screen deciding the words were worthless because the record said no. */
+    problem = out.fix;
+  }
+
+  /** Archive the row, or put it back: the same verb the list offers on the same row. */
+  async function setArchived(to: boolean) {
+    if (!row || saving) return;
+    if (!live) {
+      toasts.push(copy.notWritten(to ? copy.rowArchiveWould : copy.rowRestoreWould), { intent: 'warn' });
+      return;
+    }
+    const named = String(row.fields[decl?.title ?? ''] ?? decl?.one.toLowerCase() ?? '');
+    const register = id;
+    const n = seq;
+    const key = `${register}#${n}`;
+    saving = true;
+    writer ??= rowWriter(location.origin);
+    const out = to ? await writer.archive(register, n, row.version) : await writer.restore(register, n, row.version);
+    saving = false;
+    if (askedFor !== key) return;
+    if (!out.ok) {
+      if (out.why === 'conflict' && out.entry) got = { from: 'live', entry: out.entry };
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    got = { from: 'live', entry: out.entry };
+    archived = to;
+    stopEdit();
+    toasts.push(to ? copy.writeArchived(named) : copy.rowRestored(named));
+    void refreshHistory(register, n);
   }
 
   const history = $derived(told && told.from !== 'refused' ? told.lines : []);
@@ -307,12 +526,26 @@
           }}>{copy.undoRow}</Button
         >
       {:else}
-        <Button weight="quiet" onclick={() => toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' })}>{copy.editRow}</Button>
+        <Button weight="quiet" onclick={editTitle}>{copy.editRow}</Button>
+        <!-- ARCHIVE IS THE LIST'S OWN VERB, on the row itself: a row that can be archived in one
+             place and not the other is two products. `Put back` stands where `Archive` was for as
+             long as this tab holds the row it just archived — see `archived` for why that moment is
+             the only one it can be offered in. -->
+        {#if archived}
+          <Button weight="quiet" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
+        {:else}
+          <Button weight="quiet" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</Button>
+        {/if}
       {/if}
     {/snippet}
   </PageHead>
 
   <div class="page">
+    <!-- SAID ON THE ROW, because every list leaves an archived row out and nothing else on this
+         screen would say why it has gone from them. -->
+    {#if archived}
+      <p class="archived-note">{copy.rowArchivedNote}</p>
+    {/if}
     {#if hasLead && row && decl}
       <section class="lead" aria-label={decl.one}>
         {#if figure !== null && figureField}
@@ -341,21 +574,80 @@
             <div class="fact">
               <dt class="field-label">{labelOf(f)}</dt>
               <dd class="field-value" data-type={f.type} dir={dirOf(id, f.id)}>
-                {#if value === null || value === undefined || value === ''}
-                  <span class="missing">Not set</span>
-                {:else if f.type === 'money'}
-                  <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />
-                {:else if f.id === decl.state}
-                  <Chip label={String(value).replace(/_/g, ' ')} {tone} />
-                {:else if identityOf(id, f.id, value)}
-                  <IdentityMark identity={identityOf(id, f.id, value)!} size="md" />
-                {:else if f.type === 'day'}
-                  {display(id, f.id, value, clock)}
-                  <span class="rel">{relative(String(value), clock)}</span>
-                {:else if f.type === 'enum'}
-                  <span class="enum-word">{display(id, f.id, value, clock)}</span>
+                {#if editing === f.id}
+                  <!-- THE BOX IS THE ONE THE NEW-ROW FORM DRAWS, BY TYPE, because which control a
+                       field takes is a property of its declared type and not of the screen it is
+                       on. The classes are `controls.css`'s, so this is the same field shape as the
+                       rest of the product rather than a second one that drifts.
+
+                       A `ref` IS TYPED AS THE NUMBER A PERSON SAYS, beside the name of the list it
+                       points at, and not picked from a menu: the rows of the other register are a
+                       read this screen has not made, and a menu built from the sample would offer
+                       another record's rows. The number goes through the same conversion the list
+                       writes through, and a number with no row is refused by the record in a
+                       sentence that lands under the box. -->
+                  <form
+                    class="editor"
+                    onsubmit={(e) => {
+                      e.preventDefault();
+                      void saveEdit(f);
+                    }}
+                  >
+                    {#if f.type === 'bool'}
+                      <label class="edit-check"><input type="checkbox" bind:checked={ticked} /> {copy.yes}</label>
+                    {:else if f.type === 'enum'}
+                      <select class="edit-input" bind:value={draft}>
+                        <option value="">{copy.noneChosen}</option>
+                        {#each f.values ?? [] as v}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
+                      </select>
+                    {:else if f.type === 'day'}
+                      <div class="field"><input class="field-input" type="date" bind:value={draft} /></div>
+                    {:else if f.type === 'money'}
+                      <div class="field">
+                        {#if currencyOf(value) ?? currencyFor(id, f.id)}<span class="edit-unit">{currencyOf(value) ?? currencyFor(id, f.id)}</span>{/if}
+                        <input class="field-input num" type="text" inputmode="decimal" bind:value={draft} />
+                      </div>
+                    {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
+                      <div class="field">
+                        <input class="field-input num" type="text" inputmode="decimal" bind:value={draft} />
+                        {#if f.unit}<span class="edit-unit">{f.unit}</span>{/if}
+                      </div>
+                    {:else if f.type === 'ref'}
+                      <div class="field">
+                        <input class="field-input num" type="text" inputmode="numeric" bind:value={draft} />
+                        {#if f.to}<span class="edit-unit">{REGISTERS[f.to]?.name ?? f.to}</span>{/if}
+                      </div>
+                    {:else}
+                      <div class="field"><input class="field-input" type="text" bind:value={draft} /></div>
+                    {/if}
+                    <div class="edit-actions">
+                      <Button type="submit" weight="primary" disabled={saving}>{saving ? copy.writeMarkSaving : copy.editSave}</Button>
+                      <Button weight="bare" onclick={stopEdit}>{copy.editCancel}</Button>
+                    </div>
+                  </form>
+                  {#if problem}<p class="edit-why">{problem}</p>{/if}
                 {:else}
-                  {display(id, f.id, value, clock)}
+                  {#if value === null || value === undefined || value === ''}
+                    <span class="missing">{copy.editNotSet}</span>
+                  {:else if f.type === 'money'}
+                    <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />
+                  {:else if f.id === decl.state}
+                    <Chip label={String(value).replace(/_/g, ' ')} {tone} />
+                  {:else if identityOf(id, f.id, value)}
+                    <IdentityMark identity={identityOf(id, f.id, value)!} size="md" />
+                  {:else if f.type === 'day'}
+                    {display(id, f.id, value, clock)}
+                    <span class="rel">{relative(String(value), clock)}</span>
+                  {:else if f.type === 'enum'}
+                    <span class="enum-word">{display(id, f.id, value, clock)}</span>
+                  {:else}
+                    {display(id, f.id, value, clock)}
+                  {/if}
+                  {#if live && editable(f)}
+                    <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
+                      <Icon name="edit" size="s" />
+                    </button>
+                  {/if}
                 {/if}
               </dd>
             </div>
@@ -364,20 +656,48 @@
 
         <!-- A `document` field is the dialect, drawn by the same interpreter a declared page uses.
              The read view IS the renderer, so what you are looking at is the artefact (22 §8). -->
+        <!-- A DOCUMENT THE ROW DOES NOT CARRY YET IS STILL A FIELD THE REGISTER DECLARES. The slot
+             was drawn only where there was already prose, so on a row with none this was the one
+             field on the screen with no way in: not empty, absent, and indistinguishable from a
+             register that declares no document at all. -->
         {#each documents as f}
-          {#if row.fields[f.id]}
-            <article class="document-slot">
-              <h2 class="doc-label">{labelOf(f)}</h2>
-              <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked
-                   span rather than a `<button>` nobody wrote a handler for; with it, this screen
-                   owns what pressing one does. No `dayHref`: there is no calendar in this build,
-                   and a date that links to one is an anchor to the error page. -->
-              <Document
-                src={String(row.fields[f.id])}
-                opts={{ resolve, link, now: clock, hole: (path) => toasts.push(copy.notWritten(holeFix(path)), { intent: 'warn' }) }}
-              />
-            </article>
-          {/if}
+          <article class="document-slot">
+            <h2 class="doc-label">{labelOf(f)}</h2>
+            {#if editing === f.id}
+              <form
+                class="editor"
+                onsubmit={(e) => {
+                  e.preventDefault();
+                  void saveEdit(f);
+                }}
+              >
+                <textarea class="edit-area" rows="10" bind:value={draft}></textarea>
+                <div class="edit-actions">
+                  <Button type="submit" weight="primary" disabled={saving}>{saving ? copy.writeMarkSaving : copy.editSave}</Button>
+                  <Button weight="bare" onclick={stopEdit}>{copy.editCancel}</Button>
+                </div>
+              </form>
+              {#if problem}<p class="edit-why">{problem}</p>{/if}
+            {:else}
+              {#if row.fields[f.id]}
+                <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked
+                     span rather than a `<button>` nobody wrote a handler for; with it, this screen
+                     owns what pressing one does. No `dayHref`: there is no calendar in this build,
+                     and a date that links to one is an anchor to the error page. -->
+                <Document
+                  src={String(row.fields[f.id])}
+                  opts={{ resolve, link, now: clock, hole: (path) => toasts.push(copy.notWritten(holeFix(path)), { intent: 'warn' }) }}
+                />
+              {:else}
+                <p class="missing">{copy.editNotSet}</p>
+              {/if}
+              {#if live}
+                <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
+                  <Icon name="edit" size="s" />
+                </button>
+              {/if}
+            {/if}
+          </article>
         {/each}
 
         {#each incoming as rel}
@@ -398,6 +718,12 @@
             {/if}
           </section>
         {/each}
+        <!-- THE ONE READ ON THIS SCREEN THAT CAN BE REFUSED BY ITSELF: a caller may read this row
+             and not the lists that point at it. Drawing nothing would say nothing points here,
+             which is a different fact about the record. -->
+        {#if linked?.from === 'refused'}
+          <section class="incoming"><Empty kind="error" compact title={copy.linksRefused} /></section>
+        {/if}
       </section>
 
       <aside class="side">
@@ -489,6 +815,94 @@
 
   .copy-id:hover {
     background: var(--hover-wash);
+  }
+
+  /* THE CONTROL THAT OPENS A FIELD, beside the value it changes. `.tap` is the invisible 44 x 44
+     hit box: a 16px glyph in a padded span is a 16px target to a finger. */
+  .edit-field {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--sp-1);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--dim);
+    cursor: pointer;
+  }
+
+  .edit-field:hover {
+    background: var(--hover-wash);
+    color: var(--ink2);
+  }
+
+  /* The box and its two buttons: in a line where there is room, wrapped where there is not. */
+  .editor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    inline-size: 100%;
+  }
+
+  .edit-input,
+  .edit-area {
+    min-block-size: max(var(--ctl-h), var(--tap));
+    padding-inline: var(--sp-3);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+  }
+
+  .edit-area {
+    inline-size: 100%;
+    padding-block: var(--sp-2);
+    line-height: 1.6;
+    resize: vertical;
+  }
+
+  .edit-input:hover,
+  .edit-area:hover {
+    border-color: var(--edge);
+  }
+
+  /* The currency, the unit, or the list a ref points at: printed beside the box, never typed. */
+  .edit-unit {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .edit-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: max(var(--ctl-h), var(--tap));
+    color: var(--ink);
+    font-size: var(--t-ui);
+  }
+
+  .edit-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* WHAT THE RECORD SAID, under the box it was typed in, with the words still in it. */
+  .edit-why {
+    margin: var(--sp-1) 0 0;
+    color: var(--ink2);
+    font-size: var(--t-xs);
+  }
+
+  .archived-note {
+    margin: 0 0 var(--sp-4);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .incoming {

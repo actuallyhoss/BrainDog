@@ -37,7 +37,7 @@ import { consume, pump } from './pump.ts';
 import { inward, isRecordId, servesAccount, servesApi, servesAuth, servesMcp } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
-import { serveWorkerVault, servesVault } from './vault.ts';
+import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
 
 /** Why an owner cannot invite anybody here: an invitation is spent by signing in, and sign-in needs its secret. */
 const INVITES_OFF = 'Sign-in is off on this host until SESSION_SECRET is set, so an invitation link would lead nowhere.';
@@ -348,27 +348,30 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * A key deposited through the key door. AN RPC AND NEVER A ROUTE: `depositGrant` is INTERNAL.
+   * A key deposited through a key door. AN RPC AND NEVER A ROUTE: `depositGrant` is INTERNAL.
+   *
+   * `by` IS A VAULT GRANT OR A BROWSER SESSION, and which one it is decides what the record allows. The Worker
+   * checked one or the other before calling; the gate itself is the record's, in `depositGrant`.
    *
    * `seal` IS THE WORKER'S, CALLED BACK OVER RPC. The value stays in the Worker's closure and this object receives
    * only the sealed bytes `seal` returns, which is ADR-062 across the RPC boundary.
    */
   async depositGrant(
-    args: { label?: unknown; opens?: unknown; kind?: unknown },
-    grant: VaultGrant,
+    args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown },
+    by: VaultGrant | CallContext,
     hints: SessionHints,
     seal: (target: SealTarget) => Promise<Result<Sealed>>,
   ): Promise<Result<Deposited>> {
     const api = await this.#record();
     const broken = api.kernel.refused();
-    return broken ? { ok: false, refusal: broken } : api.depositGrant(args, grant, hints, seal);
+    return broken ? { ok: false, refusal: broken } : api.depositGrant(args, by, hints, seal);
   }
 
   /** A key's sealed material, for the Worker to open. AN RPC AND NEVER A ROUTE: `openForGrant` is INTERNAL. */
-  async openForGrant(args: { label?: unknown; credential?: unknown }, grant: VaultGrant, hints: SessionHints, kekId: string): Promise<Result<OpenedForGrant>> {
+  async openForGrant(args: { label?: unknown; credential?: unknown }, by: VaultGrant | CallContext, hints: SessionHints, kekId: string): Promise<Result<OpenedForGrant>> {
     const api = await this.#record();
     const broken = api.kernel.refused();
-    return broken ? { ok: false, refusal: broken } : api.openForGrant(args, grant, hints, kekId);
+    return broken ? { ok: false, refusal: broken } : api.openForGrant(args, by, hints, kekId);
   }
 
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
@@ -749,15 +752,26 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       access: (record, person) => env.RECORD.get(env.RECORD.idFromName(record)).access(person),
     });
 
+    /* THE APP'S OWN KEY DOORS ARE A BROWSER SESSION'S AND NOBODY ELSE'S. `/api/keys/*` is not a record method, so
+       it is answered here rather than forwarded; every other door reaching it is refused with the record's own
+       sentence rather than with a route that does not exist. */
+    const keysAsked = servesKeys(url.pathname) !== null;
+
     /* THE PUBLIC DEMO: nothing the caller sent names it, and `demoRecord` says everything it opens. It skips
        the Directory on purpose. The Directory answers which record a NAME means, and this has no name,
        only the deployment's constant. */
-    if (door.door === 'demo') return env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx));
+    if (door.door === 'demo')
+      return keysAsked ? noSession() : env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx));
 
     /* A PERSON, on the record their session names, and a rotation rides back on the record's answer. The
        record authorises exactly as it does for a bearer: every check is inside `createRecordApi`. */
     if (door.door === 'session')
-      return withCookie(await env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx)), door.cookie);
+      return withCookie(
+        keysAsked
+          ? await appKeys(request, env, door.record, door.ctx)
+          : await env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx)),
+        door.cookie,
+      );
 
     if (door.door === 'refused') {
       if (door.status === 401 && door.refusal === undefined) return unauthorized();
@@ -765,6 +779,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       const body = door.refusal !== undefined ? { ok: false, refusal: door.refusal } : door.retryAfter === undefined ? { ok: false } : { ok: false, retryAfter: door.retryAfter };
       return withCookie(json(body, door.status, extra), door.cookie);
     }
+
+    /* AND WHAT IS LEFT AT `/api/keys/*` IS A BEARER OR NOTHING, which is the one thing those doors do not take. */
+    if (keysAsked) return noSession();
 
     /* A BEARER. This Worker serves MANY records, and a request that says who it is by nothing but the
        header it carries says so here, or not at all. `session.ts` holds the path, and `/mcp` takes the same one. */
@@ -785,20 +802,48 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
  */
 function keyDoor(request: Request, env: Env): Promise<Response> {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
-  const record = (id: string) => env.RECORD.get(env.RECORD.idFromName(id));
   return serveWorkerVault(request, {
     knows: (id) => directory.knows(id),
-    vaultGrant: async (id, bearer) => (await record(id).vaultGrant(bearer)) as unknown as Result<VaultGrantSeen>,
-    keys: isBound(env.KEK)
-      ? {
-          store: () => keyStoreOf(env.KEK),
-          wrappingKey: (id) => record(id).wrappingKey(),
-          depositGrant: async (id, args, grant, hints, seal) =>
-            (await record(id).depositGrant(args, grant as unknown as VaultGrant, hints, seal)) as unknown as Result<Deposited>,
-          openForGrant: async (id, args, grant, hints, kekId) =>
-            (await record(id).openForGrant(args, grant as unknown as VaultGrant, hints, kekId)) as unknown as Result<OpenedForGrant>,
-        }
-      : undefined,
+    vaultGrant: async (id, bearer) => (await recordKeyHalf(env).vaultGrant(id, bearer)),
+    keys: isBound(env.KEK) ? keyHalf(env) : undefined,
+  });
+}
+
+/** The record's half of both doors, over RPC. One shape, so the two doors cannot drift into different calls. */
+function keyHalf(env: Env): KeyDeps {
+  const record = (id: string) => env.RECORD.get(env.RECORD.idFromName(id));
+  return {
+    store: () => keyStoreOf(env.KEK),
+    wrappingKey: (id) => record(id).wrappingKey(),
+    depositGrant: async (id, args, by, hints, seal) =>
+      (await record(id).depositGrant(args, by as unknown as VaultGrant, hints, seal)) as unknown as Result<Deposited>,
+    openForGrant: async (id, args, by, hints, kekId) =>
+      (await record(id).openForGrant(args, by as unknown as VaultGrant, hints, kekId)) as unknown as Result<OpenedForGrant>,
+  };
+}
+
+/** `vaultGrant` over RPC, which the vault door needs and the app's doors do not: a session is not a grant. */
+const recordKeyHalf = (env: Env) => ({
+  vaultGrant: async (id: string, bearer: string) =>
+    (await env.RECORD.get(env.RECORD.idFromName(id)).vaultGrant(bearer)) as unknown as Result<VaultGrantSeen>,
+});
+
+/** The one sentence every caller that is not a browser session gets at `/api/keys/*`. It is the record's own. */
+const noSession = (): Response =>
+  json({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot reach the vault.', at: 'principal' } }, 403);
+
+/**
+ * `/api/keys/*`: the app's own key doors, for the browser session `doorOf` has already resolved.
+ *
+ * THE RECORD IS THE SESSION'S. Nothing in the body names one, and the host step seals for the record whose cookie
+ * this is. `serveKeys` has already refused a bearer and any origin this Worker does not answer for; what is left
+ * for the record to decide is whether this person may reach the vault at all, which is `vault(ctx)`.
+ */
+function appKeys(request: Request, env: Env, id: string, ctx: CallContext): Promise<Response> {
+  return serveWorkerKeys(request, ctx, {
+    origins: new Set([`https://${env.PUBLIC_HOST ?? ''}`]),
+    record: id,
+    keys: isBound(env.KEK) ? keyHalf(env) : undefined,
   });
 }
 

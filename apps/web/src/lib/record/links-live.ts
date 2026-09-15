@@ -1,0 +1,122 @@
+/**
+ * What points at one row on `/r/<register>/<seq>`, read from the record.
+ *
+ * A ROUTE-ONLY MODULE, like `row-live.ts`: the client carries the route table as a value.
+ *
+ * THE RECORD HAD NO REVERSE INDEX, so this screen drew the sample's backlinks and nothing else. It
+ * did not need one: the inverse of every `ref` is already stated once, on the field that declares
+ * `to:`, and `backlinks` on the record walks exactly those declarations. Nothing was added to the
+ * data model.
+ *
+ * GROUPED BY THE FIELD THAT POINTS, not by the register, which is the shape the sample's own
+ * `backlinks()` answers and the shape this page already draws: two fields of one register can point
+ * at the same place and mean different things, and collapsing them loses which.
+ *
+ * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the page reads the sample as it
+ * always did. Any other refusal is the record's own sentence.
+ */
+
+import { createClient, type ClientOptions } from '@braindog/client';
+
+import { columnsFor, iconFor, labelOf, REGISTERS, toRows, type Backlink } from './api.ts';
+import { noRecord } from './device.ts';
+import { entryOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
+
+export type Fetch = NonNullable<ClientOptions['fetch']>;
+
+/**
+ * One page of what points here.
+ *
+ * `cursor` IS THE RECORD'S OWN, and it walks ACROSS the relations rather than within one: a
+ * relation whose rows are all drawn carries the walk into the next, so a row named by two fields of
+ * two lists pages through both without the screen knowing how many relations there are.
+ */
+export type Linked =
+  | { from: 'live'; groups: Backlink[]; cursor: string | null }
+  | { from: 'sample' }
+  | { from: 'refused'; fix: string };
+
+export type LinkReader = { read(register: string, seq: number, cursor?: string): Promise<Linked> };
+
+/** Enough to fill the sections a row's page draws, and a `cursor` when there is more. */
+export const LINKS_PAGE = 24;
+
+function missed(out: object): Linked {
+  if (!('refusal' in out)) return { from: 'refused', fix: 'The row changed while it was being read.' };
+  const refusal = out.refusal as { code: string; fix: string };
+  return noRecord(refusal.code) ? { from: 'sample' } : { from: 'refused', fix: refusal.fix };
+}
+
+/**
+ * A backlinks reader for one tab.
+ *
+ * A REF ARRIVES AS THE TARGET ROW'S ULID and every column here is drawn by the register's own
+ * helpers, so each register a pointing list refs is walked once and kept, the way `row-live.ts`
+ * keeps its maps. A register this reader may not list is left out, and its refs draw as the id they
+ * arrived as rather than as a wrong name.
+ */
+export function linkReader(base: string, io?: Fetch): LinkReader {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const maps = new Map<string, RefMap>();
+
+  async function mapOf(register: string): Promise<RefMap | null> {
+    const kept = maps.get(register);
+    if (kept) return kept;
+    const rows: Pick<RecordRow, 'id' | 'seq'>[] = [];
+    let cursor: string | null = null;
+    do {
+      const out = await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
+      if (!out.ok) return null;
+      rows.push(...(out.value.rows as RecordRow[]));
+      cursor = out.value.cursor;
+    } while (cursor !== null);
+    const map = refMapOf(rows);
+    maps.set(register, map);
+    return map;
+  }
+
+  async function refsFor(register: string): Promise<Map<string, RefMap>> {
+    const refs = new Map<string, RefMap>();
+    for (const target of targetsOf(register)) {
+      const map = await mapOf(target);
+      if (map) refs.set(target, map);
+    }
+    return refs;
+  }
+
+  return {
+    async read(register, seq, cursor) {
+      /* A PENDING ROW HAS NO NUMBER THE RECORD COULD HOLD, so nothing is asked. */
+      if (!Number.isInteger(seq) || seq < 1) return { from: 'sample' };
+      const out = await client.backlinks({ register, seq, limit: LINKS_PAGE, ...(cursor === undefined ? {} : { cursor }) });
+      if (!out.ok) return missed(out);
+
+      const now = Date.now();
+      const groups: Backlink[] = [];
+      for (const g of out.value.from) {
+        const r = REGISTERS[g.register];
+        const f = r?.fields.find((x) => x.id === g.field);
+        /* A LIST THIS BUILD DOES NOT DECLARE IS LEFT OUT rather than drawn with its id for a name: a
+           pack can add a register after this app shipped, and a heading reading `service_events` over
+           columns nothing here can label is worse than the section being absent. */
+        if (!r || !f) continue;
+        const refs = await refsFor(g.register);
+        const rows = (g.rows as RecordRow[]).map((row) => entryOf(g.register, row, refs));
+        /* The pointing field is dropped from the columns: every row in this list has the same value
+           for it, which is the row you are already looking at. */
+        const columns = columnsFor(g.register).filter((c) => c.field !== g.field).slice(0, 3);
+        groups.push({
+          register: g.register,
+          name: r.name,
+          label: labelOf(f),
+          icon: iconFor(r.icon, 'rows'),
+          total: g.matched,
+          rows: toRows(g.register, rows, columns, now),
+          columns,
+          href: `/r/${g.register}?f=${g.field}:is:${seq}`,
+        });
+      }
+      return { from: 'live', groups, cursor: out.value.cursor };
+    },
+  };
+}

@@ -30,6 +30,7 @@ import {
 import { no, ok } from '@braindog/ports';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
+import type { Backlinks } from '@braindog/kernel';
 import {
   fill,
   GRANT_KINDS,
@@ -795,15 +796,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const mintGrant = ulids(() => clock.now());
 
   /**
-   * The key a vault grant may reach, by spoken id or by label, or `null`.
+   * The key a caller may reach, by spoken id or by label, or `null`.
    *
    * A PROJECT GRANT REACHES ITS PROJECT'S KEYS AND A `*` GRANT REACHES THE KEYS OF NO PROJECT, and nothing
    * else. A key outside the scope and a key that is not there are both `null`, so the answer says nothing about
    * another project's keys.
+   *
+   * A `null` GRANT IS AN OWNER IN A BROWSER, WHO REACHES EVERY KEY THIS RECORD HOLDS. Scope is what an agent is
+   * held to, because a grant is issued for one project and lives on a machine; a person who may see the whole
+   * record is not narrowed by a credential they were never issued. Who they are was settled by `vault(ctx)`
+   * before this is asked.
    */
-  const keyFor = (by: { label: string } | { credential: string }, grant: VaultGrant): Entry | null => {
+  const keyFor = (by: { label: string } | { credential: string }, grant: VaultGrant | null): Entry | null => {
     const within = (row: Entry | null): row is Entry => {
       if (!row || row.register !== KEYS || row.deleted_at) return false;
+      if (grant === null) return true;
       const project = typeof row.fields.project === 'string' && row.fields.project ? row.fields.project : null;
       return grant.scope === '*' ? project === null : project === grant.scope;
     };
@@ -823,15 +830,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return null;
   };
 
-  /** One sentence for a key the grant does not reach, whether it is elsewhere or nowhere. */
-  const unreached = <T>(grant: VaultGrant): Result<T> =>
-    no<T>(
-      'FORBIDDEN',
-      grant.scope === '*'
-        ? 'This vault grant opens only the keys that belong to no project, and none of those is that key.'
-        : "This vault grant opens only its own project's keys, and none of those is that key.",
-      { at: 'credential' },
-    );
+  /**
+   * One sentence for a key the caller does not reach, whether it is elsewhere or nowhere.
+   *
+   * AN OWNER GETS A DIFFERENT CODE BECAUSE THEY HAVE A DIFFERENT PROBLEM. A grant that cannot reach a key is
+   * refused, and the sentence must not say whether the key exists somewhere else. An owner reaches every key
+   * there is, so the only way they can miss is by naming one that is not there, which is `REF_UNKNOWN` and a
+   * sentence they can act on.
+   */
+  const unreached = <T>(grant: VaultGrant | null): Result<T> =>
+    grant === null
+      ? no<T>('REF_UNKNOWN', 'This record holds no key by that name.', { at: 'credential' })
+      : no<T>(
+          'FORBIDDEN',
+          grant.scope === '*'
+            ? 'This vault grant opens only the keys that belong to no project, and none of those is that key.'
+            : "This vault grant opens only its own project's keys, and none of those is that key.",
+          { at: 'credential' },
+        );
 
   /**
    * Who a door's deposit or read is by: the run the caller names, `S12`, while it is live, and otherwise the
@@ -2714,20 +2730,34 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * A key deposited through a host's vault door. INTERNAL: the door calls it after `vaultGrant`, and no route
-     * reaches it.
+     * A key deposited through a host's key door. INTERNAL: a door calls it once it knows who is asking, and no
+     * route reaches it.
+     *
+     * TWO CALLERS AND ONE TRANSACTION. `/api/vault/deposit` calls it with a vault grant an agent holds, after
+     * `vaultGrant`; the app's own `/api/keys/put` calls it with a browser session. The session is held to the
+     * vault gate here rather than at the door, so the rule is the record's: an owner, no token of any kind, and
+     * a proof under fifteen minutes old (`12 §6` rules 2 and 3).
      *
      * THE VALUE NEVER COMES HERE. This names the grant id, version and additional data the bytes must be sealed
      * for; the host seals them with its key store inside `seal`; and only sealed bytes are bound, through the
      * kernel's `depositGrant`, in one transaction with the row. The row keeps the index: its label, what it opens,
-     * its kind, and for a new key the grant's project. A key of that label already in scope rotates its grant.
+     * its kind, and for a new key its project. A key already there, named outright or found by its label within
+     * reach, rotates its grant rather than becoming a second row saying the same thing.
      */
     async depositGrant(
-      args: { label?: unknown; opens?: unknown; kind?: unknown },
-      grant: VaultGrant,
+      args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown },
+      by: VaultGrant | CallContext,
       hints: SessionHints,
       seal: (target: SealTarget) => Promise<Result<Sealed>>,
     ): Promise<Result<Deposited>> {
+      /* WHICH OF THE TWO IS ASKING. A context has a principal and a grant has a scope; nothing else tells them
+         apart, and `principal` is the one a grant can never grow. */
+      const ctx = 'principal' in by ? by : null;
+      const grant = 'principal' in by ? null : by;
+      if (ctx) {
+        const stop = vault(ctx);
+        if (stop) return { ok: false as const, refusal: stop };
+      }
       const label = typeof args?.label === 'string' ? args.label.trim() : '';
       if (!label || label.length > 120)
         return no('REQUIRED_MISSING', 'A key has a label a person would say, in 120 characters or fewer.', { at: 'label' });
@@ -2736,7 +2766,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args.kind !== undefined && !(GRANT_KINDS as readonly unknown[]).includes(args.kind))
         return no('ENUM_VALUE_UNKNOWN', 'That is not a kind of key.', { at: 'kind', allowed: GRANT_KINDS });
 
-      const row = keyFor({ label }, grant);
+      /* THE ROW THIS IS ABOUT: the one named, or the one of that label within reach. Naming a row is how a screen
+         says "replace THIS key's value" without a label being the identity of anything, and a name that is not
+         reached is refused rather than quietly creating a second row beside it. */
+      const named = typeof args.credential === 'string' ? args.credential.trim() : '';
+      const row = named === '' ? keyFor({ label }, grant) : keyFor({ credential: named }, grant);
+      if (named !== '' && row === null) return unreached(grant);
       const opens = said || (typeof row?.fields.opens === 'string' ? row.fields.opens : '');
       if (!opens) return no('REQUIRED_MISSING', 'A new key says what it opens, such as a host or an account.', { at: 'opens' });
 
@@ -2756,11 +2791,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!sealed.ok) return sealed;
 
       const declares = (field: string) => kernel.register(KEYS)?.fields.some((f) => f.id === field && !f.retired) === true;
+      /* WHERE A NEW KEY BELONGS. An agent's key goes in the grant's own project, and a person says which one, by
+         spoken id or by row id; either way what is stored is the row id a key's `project` field holds, so the
+         door's later scope comparisons are like with like. Neither names a project for a key that already exists. */
+      const asked = typeof args.project === 'string' ? args.project.trim() : '';
+      const project = grant !== null ? (grant.scope === '*' ? null : grant.scope) : asked === '' ? null : (kernel.get(asked)?.id ?? asked);
       const fields: Patch = {
         label,
         opens,
         ...(declares('kind') ? { kind } : {}),
-        ...(row === null && grant.scope !== '*' ? { project: grant.scope } : {}),
+        ...(row === null && project !== null ? { project } : {}),
       };
       const s = sealed.value;
       const out = kernel.depositGrant(
@@ -2771,19 +2811,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           fields,
           grant: { label, opens, kind, ciphertext: s.ciphertext, nonce: s.nonce, kdf: s.kdf, wrapped_by: 'kek', kek_id: s.kek_id, bytes: s.bytes, hint: s.hint, sealed_for: { id, version } },
         },
-        { actor: vaultActor(hints) },
+        /* An agent's deposit is signed by its run, and a person's by the person: a person's name on an agent's
+           act is the attribution a run replaces, and an agent's name on a person's act is the same mistake back. */
+        { actor: ctx ? actorOf(ctx) : vaultActor(hints) },
       );
       if (!out.ok) return tail(out);
       return tail(ok({ credential: kernel.nameOf(out.value.entry.id), label, version: out.value.grant.version, rotated: version > 1 }));
     },
 
     /**
-     * A key's sealed material for a host's vault door to open. INTERNAL, like `depositGrant`.
+     * A key's sealed material for a host's key door to open. INTERNAL, like `depositGrant`, and the same two
+     * callers: an agent's vault grant, or a person's browser session held to the vault gate.
      *
-     * The key must be in the grant's scope; then the kernel counts the read and writes `grant.read`, signed by the
-     * run the caller names. The host unwraps and decrypts, and the record never holds what it opens.
+     * The key must be within reach; then the kernel counts the read and writes `grant.read`, signed by the run an
+     * agent names or by the person themselves. The host unwraps and decrypts, and the record never holds what it
+     * opens. This is the whole of `12 §6.1`'s "reveal is never a readable address": it is a call that is counted.
      */
-    async openForGrant(args: { label?: unknown; credential?: unknown }, grant: VaultGrant, hints: SessionHints, kek_id: string): Promise<Result<OpenedForGrant>> {
+    async openForGrant(args: { label?: unknown; credential?: unknown }, by: VaultGrant | CallContext, hints: SessionHints, kek_id: string): Promise<Result<OpenedForGrant>> {
+      const ctx = 'principal' in by ? by : null;
+      const grant = 'principal' in by ? null : by;
+      if (ctx) {
+        const stop = vault(ctx);
+        if (stop) return { ok: false as const, refusal: stop };
+      }
       const label = typeof args?.label === 'string' ? args.label.trim() : '';
       const credential = typeof args?.credential === 'string' ? args.credential.trim() : '';
       if (!label && !credential) return no('REQUIRED_MISSING', 'Name the key by its label, or by its spoken id such as credentials#3.', { at: 'label' });
@@ -2791,7 +2841,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!row) return unreached(grant);
       const held = typeof row.fields[KEY_FIELD] === 'string' ? String(row.fields[KEY_FIELD]) : '';
       if (!held) return no('GRANT_REVOKED', `${kernel.nameOf(row.id)} holds no sealed value.`, { at: 'credential' });
-      const out = kernel.openGrant({ id: held, kek_id }, vaultActor(hints));
+      const out = kernel.openGrant({ id: held, kek_id }, ctx ? actorOf(ctx) : vaultActor(hints));
       if (!out.ok) return out;
       return ok({ ...out.value, credential: kernel.nameOf(row.id), label: typeof row.fields.label === 'string' ? row.fields.label : label });
     },
@@ -2802,6 +2852,45 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false, refusal: stop } as Result<never>;
       const row = kernel.get({ register: args.register, seq: args.seq });
       return ok(row ? kernel.history(row.id) : []);
+    },
+
+    /**
+     * What points at one row: the rows of other lists whose `ref` fields name it.
+     *
+     * THE READ THE RECORD DID NOT HAVE. A `ref` declares `to:` and nothing declared the other
+     * direction, so a person's page could show everything about the person and nothing that is
+     * theirs — which is the half somebody opens a person for. Nothing is added to the data model:
+     * the inverse of every reference is already stated once, on the field that declares it.
+     *
+     * HELD TO WHAT THE CALLER MAY READ, register by register, by the same question `list` asks. A
+     * register this caller cannot read is not asked about at all, so its rows cannot be inferred
+     * from a count either — and reading the row itself is the first condition, because what points
+     * at a row is a fact about that row.
+     */
+    async backlinks(
+      args: { register: string; seq: number; limit?: number; cursor?: string },
+      ctx: CallContext,
+    ): Promise<Result<Backlinks>> {
+      const stop = guard(ctx, 'read', args?.register);
+      if (stop) return { ok: false, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['register', 'seq', 'limit', 'cursor']);
+      if (extra) return { ok: false, refusal: extra };
+      /* COERCED AT THE EDGE, like `list`'s own three: these arrive from a query string a stranger
+         wrote, and a refusal is a value here where an exception is not. */
+      if (!Number.isSafeInteger(args?.seq) || args.seq < 1)
+        return no('VALUE_MALFORMED', 'A row is named by its number, a whole number from 1.', { at: 'seq' });
+      if (args.limit !== undefined && !Number.isSafeInteger(args.limit))
+        return no('VALUE_MALFORMED', 'A limit is a whole number of rows.', { at: 'limit' });
+      if (args.cursor !== undefined && typeof args.cursor !== 'string')
+        return no('VALUE_MALFORMED', 'A cursor is the one the page above answered with.', { at: 'cursor' });
+      const only = [...kernel.registers().keys()].filter((register) => readable(ctx, register) === null);
+      return kernel.backlinks({
+        register: args.register,
+        seq: args.seq,
+        only,
+        ...(args.limit === undefined ? {} : { limit: args.limit }),
+        ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
+      });
     },
 
     /**

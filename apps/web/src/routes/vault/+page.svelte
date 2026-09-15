@@ -15,7 +15,7 @@
   browser history and in URL-bar autocomplete (19 §5).
 -->
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { createClient } from '@braindog/client';
   import { since, relative } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
@@ -36,6 +36,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
   /** Where the rows came from: the record, the sample on a host with no record, or a record that said no. */
@@ -149,9 +150,157 @@
       return;
     }
     toasts.push(copy.keyRevoked(k.label), { intent: 'good' });
+    await reread();
+  }
+
+  /** The index, read again from the record rather than patched here, so the line a person reads is the record. */
+  async function reread() {
+    if (!client) return;
     const [credentials, grants] = await Promise.all([client.list({ register: 'credentials', limit: 200 }), client.listGrants()]);
     type Row = { id: string; fields: Record<string, unknown>; state: string | null };
     if (credentials.ok) keys = keysOf(credentials.value.rows as Row[], grants.ok ? (grants.value as GrantState[]) : [], names);
+  }
+
+  /* ── putting a key in, and reading one back ── */
+
+  /**
+   * THE TWO DOORS THIS SECTION USES ARE NOT RECORD METHODS. `/api/keys/put` and `/api/keys/open` are a step on
+   * the host in front of the record: this page sends a value once, the host seals it with its own key store, and
+   * the record is handed sealed bytes and never a credential (ADR-062). They take a browser session, refuse every
+   * bearer, and want an owner whose last sign-in is under fifteen minutes old, which is the record's own rule.
+   */
+  let sheet = $state<{ mode: 'add' } | { mode: 'replace'; row: KeyRow } | null>(null);
+  const blank = () => ({ label: '', opens: '', kind: 'api_token', project: '', value: '' });
+  let form = $state(blank());
+  let saving = $state(false);
+  let sheetSaid = $state('');
+  const sheetTitle = $derived(sheet === null ? words.addKey : sheet.mode === 'replace' ? words.replaceTitle(sheet.row.label) : words.addKey);
+  const sheetHint = $derived(sheet?.mode === 'replace' ? words.valueAgain : words.valueHint);
+
+  /**
+   * THE ONE KEY ON THE SCREEN, and the two timers that take it away: it hides itself after thirty seconds, and a
+   * copy leaves the clipboard a minute later (`12 §6` rule 2). Only one is ever shown, so revealing a second puts
+   * the first away rather than leaving two of them on the page.
+   */
+  const HIDE_S = 30;
+  const CLIP_MS = 60_000;
+  let shown = $state<{ id: string; label: string; value: string; left: number } | null>(null);
+  let revealing = $state('');
+  let ticker: ReturnType<typeof setInterval> | null = null;
+  let clipboard: ReturnType<typeof setTimeout> | null = null;
+
+  function forget() {
+    if (ticker) clearInterval(ticker);
+    ticker = null;
+    shown = null;
+  }
+
+  /* AND LEAVING THE SCREEN PUTS IT AWAY. A route change destroys this component, and a timer still holding the
+     last value would be a value alive in a tab nobody is looking at. */
+  onDestroy(() => {
+    forget();
+    if (clipboard) clearTimeout(clipboard);
+  });
+
+  const shut = () => {
+    sheet = null;
+  };
+
+  function openAdd() {
+    if (from !== 'live' || !client) {
+      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      return;
+    }
+    sheetSaid = '';
+    form = blank();
+    sheet = { mode: 'add' };
+  }
+
+  function openReplace(row: KeyRow) {
+    if (from !== 'live' || !client) {
+      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      return;
+    }
+    sheetSaid = '';
+    form = blank();
+    sheet = { mode: 'replace', row };
+  }
+
+  /**
+   * A KEY PUT IN, OR ONE ROW'S VALUE REPLACED.
+   *
+   * THE RECORD'S OWN SENTENCE IS SHOWN IN THE SHEET rather than as a toast, because what it is about is a field
+   * that is still on the screen, and a sheet that closes on a refusal is a sheet that throws away the typing.
+   */
+  async function saveKey(e?: SubmitEvent) {
+    e?.preventDefault();
+    if (sheet === null || saving) return;
+    if (from !== 'live' || !client) {
+      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      return;
+    }
+    const mode = sheet.mode;
+    saving = true;
+    sheetSaid = '';
+    const at = opened();
+    const out = await client.putKey(
+      sheet.mode === 'add'
+        ? { label: form.label, opens: form.opens, kind: form.kind, value: form.value, ...(form.project === '' ? {} : { project: form.project }) }
+        : { label: sheet.row.label, opens: sheet.row.opens, credential: sheet.row.id, value: form.value },
+    );
+    closed(true, at);
+    saving = false;
+    if (!out.ok) {
+      sheetSaid = 'refusal' in out ? out.refusal.fix : copy.writeRaced;
+      return;
+    }
+    toasts.push(mode === 'add' ? words.keyAdded(out.value.label) : words.keyReplaced(out.value.label), { intent: 'good' });
+    form = blank();
+    sheet = null;
+    await reread();
+  }
+
+  /**
+   * ONE KEY, READ BACK ONCE. The record counts it as a `grant.read`, so revealing is an act and not an address:
+   * nothing here is reachable by a URL, nothing is written into the query string, and nothing is kept.
+   */
+  async function revealKey(k: KeyRow) {
+    if (from !== 'live' || !client) {
+      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      return;
+    }
+    if (revealing !== '') return;
+    revealing = k.id;
+    const at = opened();
+    const out = await client.openKey({ credential: k.id });
+    closed(true, at);
+    revealing = '';
+    if (!out.ok) {
+      toasts.push('refusal' in out ? out.refusal.fix : copy.writeRaced, { intent: 'warn' });
+      return;
+    }
+    forget();
+    shown = { id: k.id, label: out.value.label, value: out.value.value, left: HIDE_S };
+    ticker = setInterval(() => {
+      if (shown === null) return;
+      const left = shown.left - 1;
+      if (left <= 0) forget();
+      else shown = { ...shown, left };
+    }, 1000);
+  }
+
+  /** A copy, and the clipboard cleared a minute later whatever is on the screen by then (`12 §6` rule 2). */
+  async function copyShown() {
+    if (shown === null) return;
+    try {
+      await navigator.clipboard.writeText(shown.value);
+    } catch {
+      /* A browser that will not write to the clipboard says so by doing nothing, and the value is still on screen. */
+      return;
+    }
+    toasts.push(words.copied, { intent: 'good' });
+    if (clipboard) clearTimeout(clipboard);
+    clipboard = setTimeout(() => void navigator.clipboard.writeText('').catch(() => undefined), CLIP_MS);
   }
 </script>
 
@@ -215,6 +364,11 @@
       {#if from !== 'reading' && keys.length === 0}
         <Empty kind="no-data-yet" title={words.noKeys} body={words.noKeysHow} />
       {/if}
+      {#if from !== 'reading'}
+        <div class="row-actions">
+          <Button weight="primary" onclick={openAdd}>{words.addKey}</Button>
+        </div>
+      {/if}
       <ul class="whos">
         {#each keys as k (k.id)}
           <li class="who">
@@ -227,12 +381,32 @@
               </span>
             </div>
             {#if k.opens}<p class="who-why">{k.opens}</p>{/if}
-            {#if k.grant && k.sealed}
-              <!-- ONLY WHERE THERE IS SOMETHING TO TAKE OUT OF SERVICE: an index row points at no grant. -->
-              <div class="who-do">
-                <Button weight="bare" tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</Button>
+            {#if shown && shown.id === k.id}
+              <!--
+                THE ONE PLACE A VALUE IS DRAWN. It goes by itself, the countdown says when, and nothing puts it in
+                the address, in the page title or in a toast.
+              -->
+              <div class="shown">
+                <output class="shown-value" for={`key-${k.id}`}>{shown.value}</output>
+                <div class="who-do">
+                  <Button weight="quiet" onclick={() => void copyShown()}>{words.copyValue}</Button>
+                  <Button weight="bare" onclick={forget}>{words.hide}</Button>
+                  <span class="who-detail">{words.hidesIn(shown.left)}</span>
+                </div>
               </div>
             {/if}
+            <div class="who-do">
+              {#if k.grant && k.sealed}
+                <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
+                <Button weight="quiet" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
+                  {revealing === k.id ? words.revealing : words.reveal}
+                </Button>
+              {/if}
+              <Button weight="quiet" onclick={() => openReplace(k)}>{words.replace}</Button>
+              {#if k.grant && k.sealed}
+                <Button weight="bare" tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</Button>
+              {/if}
+            </div>
           </li>
         {/each}
       </ul>
@@ -261,6 +435,46 @@
       </ul>
     </Section>
   {/if}
+
+  <Sheet open={sheet !== null} title={sheetTitle} subtitle={sheetHint} onclose={shut}>
+    <form class="key-form" id="key-form" onsubmit={saveKey} novalidate>
+      {#if sheet?.mode === 'add'}
+        <label class="field-label" for="key-label">{words.nameField}</label>
+        <div class="field"><input class="field-input" id="key-label" type="text" autocomplete="off" bind:value={form.label} /></div>
+        <p class="field-hint">{words.nameHint}</p>
+
+        <label class="field-label" for="key-opens">{words.opensAsk}</label>
+        <div class="field"><input class="field-input" id="key-opens" type="text" autocomplete="off" bind:value={form.opens} /></div>
+        <p class="field-hint">{words.opensHint}</p>
+
+        <label class="field-label" for="key-kind">{words.kindField}</label>
+        <div class="field">
+          <select class="field-input" id="key-kind" bind:value={form.kind}>
+            {#each words.kinds as kind (kind.id)}<option value={kind.id}>{kind.name}</option>{/each}
+          </select>
+        </div>
+
+        <label class="field-label" for="key-project">{words.projectField}</label>
+        <div class="field">
+          <select class="field-input" id="key-project" bind:value={form.project}>
+            <option value="">{words.projectNone}</option>
+            {#each [...names] as [id, name] (id)}<option value={id}>{name}</option>{/each}
+          </select>
+        </div>
+      {/if}
+
+      <label class="field-label" for="key-value">{words.valueField}</label>
+      <!-- A PASSWORD FIELD, so it is not drawn while it is typed and no browser offers to remember it. -->
+      <div class="field">
+        <input class="field-input" id="key-value" type="password" autocomplete="off" spellcheck="false" bind:value={form.value} />
+      </div>
+      {#if sheetSaid}<p class="code-said" data-intent="bad" role="status">{sheetSaid}</p>{/if}
+    </form>
+    {#snippet footer()}
+      <Button weight="quiet" onclick={shut}>{words.cancel}</Button>
+      <Button weight="primary" type="submit" form="key-form" disabled={saving}>{saving ? words.saving : words.save}</Button>
+    {/snippet}
+  </Sheet>
 </div>
 
 <style>
@@ -366,6 +580,42 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
+  }
+
+  /* The revealed value: its own block, monospaced, wrapping rather than scrolling, and never truncated. */
+  .shown {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--s2);
+  }
+
+  .shown-value {
+    color: var(--ink);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+
+  .key-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .field-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .field-hint {
+    margin: 0 0 var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   @media (width < 900px) {

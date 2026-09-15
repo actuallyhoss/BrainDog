@@ -104,7 +104,10 @@ test('a pending row sends nothing', async () => {
 test('the row page draws the live row, its refusal, and no sample backlinks when live', () => {
   const page = readFileSync(new URL('../../routes/r/[register]/[seq]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\$lib\/record\/row-live\.ts'/u);
-  assert.match(page, /const incoming = \$derived\(row && !live \? backlinks\(id, seq\) : \[\]\)/u);
+  /* THE SAMPLE'S BACKLINKS ARE STILL THE SAMPLE'S, and a live row now draws the record's own. The
+     live groups win where there are any, because on a record the sample's would be another record's
+     rows pointing at this one. */
+  assert.match(page, /const incoming = \$derived\(\s*linked\?\.from === 'live' \? linked\.groups : row && !live \? backlinks\(id, seq\) : \[\],?\s*\)/u);
   assert.match(page, /\{:else if got\?\.from === 'refused'\}/u);
   assert.match(page, /title=\{got\.fix\}/u);
   assert.match(page, /got\?\.from === 'live' \? \(got\.entry \?\? undefined\)/u, 'a live row that is not there falls back to the sample again');

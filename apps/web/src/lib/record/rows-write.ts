@@ -21,7 +21,9 @@
 import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
+import { currencyFor, display, labelOf } from './api.ts';
 import { REGISTERS } from './data.ts';
+import { currencyOf } from './money.ts';
 import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type RefMap, type Refs } from './remote.ts';
 import type { Fetch } from './row-live.ts';
 import type { Entry, Fields, Filter } from './schema.ts';
@@ -94,6 +96,129 @@ export function viewPage(register: string, slug: string, title: string, address:
       },
     ],
   };
+}
+
+/** A row the screen is holding still: where it was drawn, and what it was when it was pinned. */
+export type Held = { at: number; entry: Entry };
+
+/**
+ * THE ROWS AS THE READER LAST SAW THEM, with a changed row where it was rather than where it now belongs.
+ *
+ * A WRITE MOVES A ROW AND THE READER DID NOT ASK IT TO. The record answers in its own order — `updated_at` first —
+ * so the row somebody just marked `paid` comes back at the head of the next page, three screens from the one they
+ * were reading. The row they were looking at is the one thing that must not move while they are looking at it.
+ *
+ * A HELD ROW THE ANSWER NO LONGER CARRIES COMES BACK ANYWAY, at the index it was pinned at, drawn from the copy
+ * taken when it was held. That is the fold case: a row reopened under `state is paid` stops matching the list it
+ * is in, and it belongs, for as long as the receipt is up, to the fold the reader is standing in rather than to
+ * the one it now sorts into. Filtering it away the instant it changed would take the row off the screen at exactly
+ * the moment the reader wants to check they hit the right one.
+ *
+ * THE LATEST VALUES, THE REMEMBERED PLACE. A held row still in the answer is drawn from the answer, so a second
+ * write to it shows; only its position is the remembered one. `at` is clamped, because a hold taken at index 40 of
+ * a page that has since been replaced by a shorter answer is a position that no longer exists.
+ *
+ * OLDEST HOLD FIRST, so two rows held in one gesture land in the order they were pinned rather than in map order.
+ */
+export function holdInPlace(entries: readonly Entry[], held: ReadonlyMap<number, Held>): Entry[] {
+  if (held.size === 0) return [...entries];
+  const out = entries.filter((e) => !held.has(e.seq));
+  for (const hold of [...held.values()].sort((a, b) => a.at - b.at)) {
+    const now = entries.find((e) => e.seq === hold.entry.seq) ?? hold.entry;
+    out.splice(Math.min(hold.at, out.length), 0, now);
+  }
+  return out;
+}
+
+/** A captured row: the fields it goes out with, and what the screen filled in on the reader's behalf. */
+export type Captured = { fields: Fields; filled: readonly string[] };
+
+/**
+ * ONE TYPED LINE, AS A ROW THE RECORD WILL ACCEPT.
+ *
+ * A TITLE-ONLY CAPTURE IS REFUSED ON THE LIST A PERSON OPENS MOST. `obligations` declares four required fields
+ * beyond its title, so the cheapest write in the product answered the most common list with the record's own
+ * `REQUIRED_MISSING` sentence. The line either fills them or it is a control that works everywhere except where it
+ * is used.
+ *
+ * WHAT IT INFERS COMES FROM WHERE THE READER IS STANDING, in two layers:
+ *
+ *   THE ADDRESS. A chip in the URL is an answer already on screen, and asking for it again is asking somebody to
+ *   repeat themselves to a machine that heard them. One value only: `in` with two values names a SET, and picking
+ *   a member of a set for somebody is guessing at the one moment they have not said which. `is` and `in` both
+ *   arrive here because the bar writes `in` and a hand-written URL writes `is`, and one spelling reaching the
+ *   record and the other not would be the filter working on Tuesday.
+ *
+ *   THE DECLARATION. What is still required and still unanswered takes the emptiest value of its type: the first
+ *   declared state, today's date, nothing owed. Each one is a value a person can see and change on the row, and
+ *   every one of them is SAID — `filled` is the sentence the screen owes them, because a field filled in silently
+ *   is the product writing a fact nobody told it.
+ *
+ * WHAT IT WILL NOT INVENT. A `ref` points at a row in another register and there is no emptiest one; a `text` or a
+ * `document` is prose. Those go unfilled, the record refuses the row in its own words, and the line puts back what
+ * was typed — which is the honest end of a write this screen cannot complete on its own.
+ *
+ * THE CURRENCY IS READ FROM THE ROWS ON SCREEN, never guessed. An amount under a code the list does not use is the
+ * one formatting mistake this product cannot ship; with no rows to read and nothing declared, the field is left
+ * out and the record says what it wants.
+ */
+export function capturedFields(
+  register: string,
+  said: string,
+  filters: readonly Filter[],
+  now: number,
+  seen: readonly Entry[] = [],
+): Captured {
+  const decl = REGISTERS[register];
+  if (!decl) return { fields: {}, filled: [] };
+  const fields: Fields = { [decl.title]: said };
+
+  for (const f of filters) {
+    if (f.values.length !== 1 || (f.op !== 'is' && f.op !== 'in')) continue;
+    const field = decl.fields.find((x) => x.id === f.field);
+    if (!field || field.id === decl.title) continue;
+    if (field.type !== 'enum' && field.type !== 'text') continue;
+    const value = declaredValue(register, f.field, f.values[0] ?? '');
+    if (field.type === 'enum' && !field.values?.includes(value)) continue;
+    fields[f.field] = value;
+  }
+
+  const filled: string[] = [];
+  for (const f of decl.fields) {
+    if (!f.required || f.id === decl.title || Object.hasOwn(fields, f.id)) continue;
+    const value = emptiest(register, f, now, seen);
+    if (value === undefined) continue;
+    fields[f.id] = value;
+    filled.push(`${labelOf(f).toLowerCase()} ${display(register, f.id, value, now) ?? ''}`.trim());
+  }
+  return { fields, filled };
+}
+
+/** The emptiest value a required field can honestly take, or `undefined` where there is not one. */
+function emptiest(register: string, f: { id: string; type: string; values?: readonly string[] }, now: number, seen: readonly Entry[]): Fields[string] | undefined {
+  switch (f.type) {
+    case 'enum':
+      return f.values?.[0];
+    case 'day':
+      return new Date(now).toISOString().slice(0, 10);
+    case 'instant':
+      return new Date(now).toISOString();
+    case 'money': {
+      for (const e of seen) {
+        const held = currencyOf(e.fields[f.id]);
+        if (held) return { amount: 0, currency: held };
+      }
+      const declared = currencyFor(register, f.id);
+      return declared === null ? undefined : { amount: 0, currency: declared };
+    }
+    case 'int':
+    case 'decimal':
+      return 0;
+    case 'bool':
+      return false;
+    default:
+      return undefined;
+  }
 }
 
 export type RowWriter = {

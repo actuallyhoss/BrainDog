@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRecordApi, type Boot, type CallContext, type HistoryPage, type InboxPage, type WhatsNew } from '../src/index.ts';
-import type { ArrivalSettled } from '@braindog/kernel';
+import type { ArrivalSettled, Backlinks } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -327,5 +327,142 @@ test('ONLY AN OWNER IN A BROWSER FILES OR ARCHIVES AN ARRIVAL, and a refused cal
   assert.notEqual(codeOf(await api.archiveArrival({ id: ids[0]! }, writer)), null, 'a writer archived an arrival');
   assert.equal(codeOf(await api.fileArrival({ id: ids[0]!, register: 'obligations' }, heldToPart)), 'FORBIDDEN');
   assert.equal(value<InboxPage>(await api.inbox({}, owner)).arrivals.length, 4);
+  sql.close();
+});
+
+/**
+ * WHAT POINTS AT ONE ROW. Three relations into `obligations`: two fields of one list, one field of
+ * another, and a field on `mentions` that points at its own list, which is the only way a row can
+ * come back as its own backlink.
+ */
+const MENTIONS = {
+  id: 'register.mentions',
+  kind: 'register' as const,
+  body: {
+    id: 'mentions',
+    name: 'Mentions',
+    title: 'what',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'about', type: 'ref', to: 'obligations' },
+      { id: 'also', type: 'ref', to: 'obligations' },
+      { id: 'parent', type: 'ref', to: 'mentions' },
+    ],
+  } as never,
+};
+
+const JOTTINGS = {
+  id: 'register.jottings',
+  kind: 'register' as const,
+  body: {
+    id: 'jottings',
+    name: 'Jottings',
+    title: 'body',
+    fields: [
+      { id: 'body', type: 'text', required: true },
+      { id: 'about', type: 'ref', to: 'obligations' },
+    ],
+  } as never,
+};
+
+/** Invoice 41 with four rows naming it across three relations, and Invoice 42 with one. */
+async function linkedRecord() {
+  const made = await record();
+  assert.ok((await made.api.kernel.install([OBLIGATIONS, DIARY, MENTIONS, JOTTINGS])).ok);
+  value(await made.api.create({ register: 'obligations', fields: { what: 'Invoice 41' } }, owner));
+  value(await made.api.create({ register: 'obligations', fields: { what: 'Invoice 42' } }, owner));
+  value(await made.api.create({ register: 'mentions', fields: { what: 'Chased it', about: 'obligations#1' } }, owner));
+  value(await made.api.create({ register: 'mentions', fields: { what: 'Chased again', about: 'obligations#1' } }, owner));
+  value(await made.api.create({ register: 'mentions', fields: { what: 'Mentioned in passing', also: 'obligations#1' } }, owner));
+  value(await made.api.create({ register: 'mentions', fields: { what: 'About the other one', about: 'obligations#2' } }, owner));
+  value(await made.api.create({ register: 'jottings', fields: { body: 'Rang about it', about: 'obligations#1' } }, owner));
+  return made;
+}
+
+const keysOf = (page: Backlinks): string[] => page.from.map((g) => `${g.register}.${g.field}`);
+const titlesOf = (page: Backlinks): string[] =>
+  page.from.flatMap((g) => g.rows.map((r) => String(r.fields.what ?? r.fields.body)));
+
+test('WHAT POINTS AT ONE ROW IS GROUPED BY THE FIELD THAT POINTS, and an archived row points at nothing', async () => {
+  const { api, sql } = await linkedRecord();
+  const page = value<Backlinks>(await api.backlinks({ register: 'obligations', seq: 1 }, owner));
+  assert.equal(page.to.register, 'obligations');
+  assert.equal(page.to.seq, 1);
+  assert.deepEqual(keysOf(page), ['jottings.about', 'mentions.about', 'mentions.also'], 'one group per field that points, lists in order');
+  assert.deepEqual(page.from.map((g) => g.matched), [1, 2, 1]);
+  assert.deepEqual(titlesOf(page), ['Rang about it', 'Chased again', 'Chased it', 'Mentioned in passing'], 'newest first inside each group');
+  assert.equal(page.cursor, null);
+  assert.ok(!JSON.stringify(page).includes('About the other one'), 'a row naming the other invoice came back');
+
+  value(await api.update({ register: 'mentions', seq: 2, patch: { deleted_at: new Date(NOW).toISOString() } }, owner));
+  const after = value<Backlinks>(await api.backlinks({ register: 'obligations', seq: 1 }, owner));
+  assert.deepEqual(after.from.map((g) => g.matched), [1, 1, 1], 'an archived row was still counted');
+  assert.ok(!titlesOf(after).includes('Chased again'), 'an archived row was still drawn');
+  sql.close();
+});
+
+test('A ROW THAT POINTS AT ITSELF IS NOT ITS OWN BACKLINK', async () => {
+  const { api, sql } = await linkedRecord();
+  const own = value<{ seq: number }>(await api.create({ register: 'mentions', fields: { what: 'Threaded' } }, owner));
+  value(await api.update({ register: 'mentions', seq: own.seq, patch: { parent: `mentions#${own.seq}` } }, owner));
+  const self = value<Backlinks>(await api.backlinks({ register: 'mentions', seq: own.seq }, owner));
+  assert.deepEqual(keysOf(self), [], 'the row came back pointing at itself');
+  sql.close();
+});
+
+test('THE PAGES JOIN TO THE WHOLE, no row twice, and a drawn relation carries the walk into the next', async () => {
+  const { api, sql } = await linkedRecord();
+  const whole = titlesOf(value<Backlinks>(await api.backlinks({ register: 'obligations', seq: 1 }, owner)));
+  assert.equal(whole.length, 4);
+
+  const seen: string[] = [];
+  let cursor: string | null = null;
+  let rounds = 0;
+  do {
+    const page: Backlinks = value<Backlinks>(
+      await api.backlinks({ register: 'obligations', seq: 1, limit: 1, ...(cursor === null ? {} : { cursor }) }, owner),
+    );
+    seen.push(...titlesOf(page));
+    cursor = page.cursor;
+    rounds += 1;
+  } while (cursor !== null && rounds < 12);
+  assert.equal(cursor, null, 'the walk never reached its end');
+  assert.deepEqual(seen, whole, 'pages of one join to the whole answer, in the same order, no row twice');
+  sql.close();
+});
+
+test('BACKLINKS ARE HELD TO WHAT THE CALLER MAY READ, on both the count and the rows', async () => {
+  const { api, sql } = await linkedRecord();
+  const heldToMentions: CallContext = {
+    principal: { kind: 'token', id: 't_3', scope: 'read', person: 'p_1', level: 'owner' },
+    registers: ['obligations', 'mentions'],
+  };
+  const held = value<Backlinks>(await api.backlinks({ register: 'obligations', seq: 1 }, heldToMentions));
+  assert.deepEqual(keysOf(held), ['mentions.about', 'mentions.also'], 'a list this caller may not read was named');
+  assert.ok(!JSON.stringify(held).includes('Rang about it'), 'a row from a list this caller may not read came through');
+
+  assert.deepEqual(
+    keysOf(value<Backlinks>(await api.backlinks({ register: 'obligations', seq: 1 }, project))),
+    [],
+    'a token held to one list saw the others',
+  );
+
+  const nobody: CallContext = { principal: { kind: 'person', id: 'p_9', level: null } };
+  assert.equal(codeOf(await api.backlinks({ register: 'obligations', seq: 1 }, nobody)), 'FORBIDDEN');
+  assert.equal(codeOf(await api.backlinks({ register: 'diary', seq: 1 }, project)), 'FORBIDDEN', 'a caller read backlinks into a list it may not read');
+  sql.close();
+});
+
+test('A ROW THAT IS NOT THERE HAS NOTHING POINTING AT IT, and a number or a cursor that is not one is refused', async () => {
+  const { api, sql } = await linkedRecord();
+  const gone = value<Backlinks>(await api.backlinks({ register: 'obligations', seq: 99 }, owner));
+  assert.deepEqual(gone.from, [], 'a row that is not there had backlinks');
+  assert.equal(gone.to.seq, null);
+  assert.equal(gone.cursor, null);
+
+  assert.equal(codeOf(await api.backlinks({ register: 'obligations', seq: 0 }, owner)), 'VALUE_MALFORMED');
+  assert.equal(codeOf(await api.backlinks({ register: 'obligations', seq: 1, cursor: 'nonsense' }, owner)), 'VALUE_MALFORMED');
+  assert.equal(codeOf(await api.backlinks({ register: 'obligations', seq: 1, limit: 1.5 }, owner)), 'VALUE_MALFORMED');
+  assert.equal(codeOf(await api.backlinks({ register: 'nope', seq: 1 }, owner)), 'REGISTER_UNKNOWN');
   sql.close();
 });

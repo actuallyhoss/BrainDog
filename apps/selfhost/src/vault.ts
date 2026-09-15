@@ -1,11 +1,17 @@
 /**
- * The self-host's vault step: where a key an agent deposits is sealed, and where one it reads is opened.
+ * The self-host's key step: where a key put in is sealed, and where one read back is opened.
  * `12 §6`, ADR-062, `loop/research-agent-path.md` §5.7.
  *
  * ONE OF THE THREE FILES THE `Plaintext` BRAND LIVES IN (`tools/gates/secret-grep.mjs`). A value arrives in a
- * deposit's body, is sealed here under a key derived from the record's own, and is dropped; the record is handed
- * sealed bytes. A read runs the other way and answers once, from `answerOpen`, with `no-store`, which is the
- * gate's recorded exemption for this file. Nothing here logs.
+ * body, is sealed here under a key derived from the record's own, and is dropped; the record is handed sealed
+ * bytes. A read runs the other way and answers once, from `answerOpen`, with `no-store`, which is the gate's
+ * recorded exemption for this file. Nothing here logs.
+ *
+ * TWO DOORS AND ONE STEP. `vaultDoor` is `/api/vault/*`, whose credential is a vault grant on an agent's machine
+ * and which refuses any request carrying an `Origin`. `keysDoor` is `/api/keys/*`, the app's own, whose
+ * credential is a browser session and which requires one. They share the sealing and opening below and nothing
+ * else, so the second is a door beside the first rather than a hole in it: what decides whether a session may do
+ * this is the record's `vault(ctx)` gate, which wants an owner, no token, and a proof under fifteen minutes old.
  *
  * THE BYTES ARE `47 §4.6`'S. The record's DEK is unwrapped under the KEK with `record ‖ 0x1F ‖ "record"`; the
  * grant key is HKDF-SHA-256 over it with an empty salt and the grant id as info; the value is AES-256-GCM under
@@ -15,14 +21,17 @@
 import { randomBytes } from 'node:crypto';
 import type { webcrypto } from 'node:crypto';
 
-import { VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor } from '@braindog/host';
-import type { RecordApi, SealTarget, Sealed } from '@braindog/record';
+import { VAULT_HEADERS, vaultReply, type KeysDoor, type SessionHints, type VaultDoor, type VaultGrantSeen } from '@braindog/host';
+import type { CallContext, RecordApi, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
 
 import { unwrap, type KeyStore } from './keys.ts';
 
 /** A value in the clear. Named in this file and never passed out of it but to the one answer that asked. */
 type Plaintext = Uint8Array & { readonly brand: 'Plaintext' };
+
+/** Who a deposit or a read is by: an agent's checked vault grant, or a person's browser session. */
+type By = VaultGrantSeen | CallContext;
 
 /** 64 KiB, which is more than a private key or an env file of keys. */
 const VALUE_LIMIT = 65_536;
@@ -51,6 +60,7 @@ async function grantKey(store: KeyStore, record: string, key: SealTarget['key'],
 }
 
 const WRONG_KEY = 'This host key store does not open this record, so no key was sealed or opened.';
+const NO_IDENTITY = 'This record has no identity yet, so it keeps no keys.';
 
 /** The one answer a value leaves in. */
 function answerOpen(credential: string, label: string, plain: Plaintext): Response {
@@ -61,16 +71,20 @@ function answerOpen(credential: string, label: string, plain: Plaintext): Respon
   return new Response(body, { status: 200, headers });
 }
 
-/** The self-host's door, over the record in this process. Without a key store both doors answer `NOT_IN_THIS_BUILD`. */
-export function vaultDoor(api: RecordApi, store: KeyStore | undefined): VaultDoor {
-  const grant = (bearer: string) => api.vaultGrant(bearer);
-  if (!store) return { grant };
+/**
+ * The two steps, over the record in this process, for whoever a door has already checked.
+ *
+ * `by` GOES STRAIGHT THROUGH TO THE RECORD, unread. Which caller it is decides what the record will allow, and
+ * that decision is the record's: a host that reasoned about it here would be a second ladder next to the one
+ * `30 §10` says must be the only one.
+ */
+function steps(api: RecordApi, store: KeyStore) {
   const recordId = (): string | null => api.kernel.identity()?.id ?? null;
 
-  const deposit = async (ask: VaultAsk): Promise<Result<unknown>> => {
+  const deposit = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Result<unknown>> => {
     const record = recordId();
-    if (record === null) return no('NOT_IN_THIS_BUILD', 'This record has no identity yet, so it keeps no keys.', { at: 'record' });
-    const said = ask.body.value;
+    if (record === null) return no('NOT_IN_THIS_BUILD', NO_IDENTITY, { at: 'record' });
+    const said = body.value;
     if (typeof said !== 'string' || said.length === 0) return no('REQUIRED_MISSING', 'A deposit carries the value, as a string.', { at: 'value' });
     const value = utf8(said) as Plaintext;
     if (value.length > VALUE_LIMIT) {
@@ -86,18 +100,25 @@ export function vaultDoor(api: RecordApi, store: KeyStore | undefined): VaultDoo
       const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: utf8(target.aad) }, key, value);
       return ok({ ciphertext: new Uint8Array(sealed), nonce, kdf: 'hkdf-sha256', kek_id: target.key.kek_id, bytes: value.length, hint });
     };
+    /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT, which is why this is two shapes rather than
+       one spread. A vault grant already carries its project, and reading a second one out of its body would be a
+       way to put a key somewhere the grant does not reach. */
+    const args =
+      'principal' in by
+        ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential }
+        : { label: body.label, opens: body.opens, kind: body.kind };
     try {
-      return await api.depositGrant({ label: ask.body.label, opens: ask.body.opens, kind: ask.body.kind }, ask.grant, ask.hints, seal);
+      return await api.depositGrant(args, by, hints, seal);
     } finally {
       value.fill(0);
     }
   };
 
-  const open = async (ask: VaultAsk): Promise<Response> => {
+  const open = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Response> => {
     const record = recordId();
-    if (record === null) return vaultReply(no('NOT_IN_THIS_BUILD', 'This record has no identity yet, so it keeps no keys.', { at: 'record' }));
+    if (record === null) return vaultReply(no('NOT_IN_THIS_BUILD', NO_IDENTITY, { at: 'record' }));
     const { kekId } = await store.current();
-    const out = await api.openForGrant({ label: text(ask.body.label), credential: text(ask.body.credential) }, ask.grant, ask.hints, kekId);
+    const out = await api.openForGrant({ label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
     if (!out.ok) return vaultReply(out);
     const sealed = out.value;
     const key = await grantKey(store, record, sealed.key, sealed.id);
@@ -112,5 +133,32 @@ export function vaultDoor(api: RecordApi, store: KeyStore | undefined): VaultDoo
     return answerOpen(sealed.credential, sealed.label, new Uint8Array(opened) as Plaintext);
   };
 
-  return { grant, keys: { deposit, open } };
+  return { deposit, open };
+}
+
+/** An agent's door, `/api/vault/*`. Without a key store both halves answer `NOT_IN_THIS_BUILD`. */
+export function vaultDoor(api: RecordApi, store: KeyStore | undefined): VaultDoor {
+  const grant = (bearer: string) => api.vaultGrant(bearer);
+  if (!store) return { grant };
+  const { deposit, open } = steps(api, store);
+  return {
+    grant,
+    keys: {
+      deposit: (ask) => deposit(ask.grant, ask.body, ask.hints),
+      open: (ask) => open(ask.grant, ask.body, ask.hints),
+    },
+  };
+}
+
+/** The app's own door, `/api/keys/*`, for a browser session. Without a key store both halves answer the same. */
+export function keysDoor(api: RecordApi, store: KeyStore | undefined, origins: ReadonlySet<string>): KeysDoor<CallContext> {
+  if (!store) return { origins };
+  const { deposit, open } = steps(api, store);
+  return {
+    origins,
+    keys: {
+      put: (ask) => deposit(ask.ctx, ask.body, ask.hints),
+      open: (ask) => open(ask.ctx, ask.body, ask.hints),
+    },
+  };
 }

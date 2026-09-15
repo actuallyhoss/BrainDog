@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { MISSING, type Tone } from 'braindog-render';
@@ -48,7 +48,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import * as pending from '$lib/record/pending.svelte.ts';
-  import { rowWriter, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
+  import { capturedFields, holdInPlace, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -237,6 +237,27 @@
    */
   let edits = $state(new Map<number, Fields>());
 
+  /**
+   * WHERE A ROW WAS WHEN SOMEBODY ACTED ON IT, so that is where it stays.
+   *
+   * THE RECEIPT IS HALF THE PROMISE AND THIS IS THE OTHER HALF. A chip saying `Archived` is worth nothing on a row
+   * that has jumped three screens away by the time it is drawn: the record answers in its own order, newest write
+   * first, so every write this screen makes is a write that moves its row. `holdInPlace` pins it, and `rows-write.ts`
+   * carries the argument and the tests.
+   *
+   * THE FIRST HOLD WINS. Two writes to one row are one row held once, at the place the reader found it, not walked
+   * one index further each time somebody touches it.
+   */
+  let held = $state(new Map<number, Held>());
+
+  const hold = (seq: number) => {
+    if (held.has(seq)) return;
+    const at = result.entries.findIndex((e) => e.seq === seq);
+    const entry = result.entries[at];
+    if (at < 0 || !entry) return;
+    held = new Map(held).set(seq, { at, entry });
+  };
+
   const receipt = (seq: number, r: Receipt) => {
     receipts = new Map(receipts).set(seq, r);
   };
@@ -328,6 +349,12 @@
        being about anything. */
     receipts = new Map();
     edits = new Map();
+    /* AND THE HOLDS GO WITH THE RECEIPTS THEY BELONG TO. A hold is a position in ONE answer: keeping it across a
+       new question would pin a row to an index in a list it is not in, which is the receipt's own argument one
+       layer down. The flash goes for the same reason — a row marked as just added, on a screen somebody has
+       just filtered to, is a mark about a different screen. */
+    held = new Map();
+    fresh = new Map();
     capture = '';
     editing = null;
   });
@@ -487,12 +514,47 @@
        the old one is a control that reports success and does nothing, which is the shape this
        repository hunts. The patch is over the answer rather than in it: `pages` still holds what
        the record returned, so `Put back` is dropping a key rather than reversing an arithmetic. */
-    entries: [...pending.of(id), ...pages.flat()].map((e) => {
+    /* AND A ROW SOMEBODY HAS JUST ACTED ON IS WHERE THEY LEFT IT. `holdInPlace` pins each held row to the index it
+       was read at and brings back one the answer has since dropped — the reopened row that no longer matches the
+       chip it was found under. The hold is released when the question changes, with the receipt it belongs to. */
+    entries: holdInPlace(
+      [...pending.of(id), ...pages.flat()],
+      held,
+    ).map((e) => {
       const patch = edits.get(e.seq);
       return patch ? { ...e, fields: { ...e.fields, ...patch } } : e;
     }),
     matched: matched + pending.of(id).length,
   });
+
+  /**
+   * THE ROW THE READER JUST MADE, MARKED FOR A MOMENT SO THE EYE CAN FIND IT.
+   *
+   * IT IS CLEARED IN `$effect.pre` AND THAT IS THE WHOLE TRICK. A mark cleared in an ordinary `$effect` is cleared
+   * AFTER the list has drawn, which marks the list dirty and draws it a second time — and the second draw rebuilds
+   * the marked cell, cancelling the animation it had just started. The row flashed for a frame and settled, which
+   * reads as a rendering fault rather than as an answer. Cleared before the draw, each pass either has the mark or
+   * does not, and the one that has it keeps it for the whole of its animation.
+   *
+   * IT SITS BELOW `result` BECAUSE IT READS IT. `$effect.pre` runs during the first render pass, and `const` in the
+   * same scope is not hoisted, so declared any higher this reads `result` before it exists and every register screen
+   * throws on first paint. Neither the typechecker nor the tests can see that; only the compiled output can.
+   *
+   * A MARK FOR A ROW THAT IS NO LONGER IN THE ANSWER GOES WITH IT, so nothing accumulates across a question.
+   */
+  const FRESH_MS = 2_000;
+  let fresh = $state(new Map<number, number>());
+
+  $effect.pre(() => {
+    const drawn = result.entries;
+    untrack(() => {
+      if (fresh.size === 0) return;
+      const at = Date.now();
+      const keep = new Map([...fresh].filter(([seq, put]) => at - put < FRESH_MS && drawn.some((e) => e.seq === seq)));
+      if (keep.size !== fresh.size) fresh = keep;
+    });
+  });
+
   /**
    * THE ROWS IN HAND, WHICH IS NOT THE ROWS FETCHED.
    *
@@ -804,11 +866,50 @@
     pages = pages.map((p) => p.map((e) => (e.seq === entry.seq ? entry : e)));
   }
 
-  function addLanded(entry: Entry) {
+  /**
+   * THE NEW ROW, AT THE TOP, WEARING A MARK, AND ON THE SCREEN.
+   *
+   * CLOSING THE LOOP IS THREE THINGS AND THE LINE DID ONE. A row was appended to the answer and the reader was left
+   * to find it: on a filtered list, or one scrolled down, the only evidence that the most common write in the
+   * product had worked was a count changing somewhere above the fold. The mark says which row is new, the receipt
+   * says what happened to it, and the scroll happens ONLY when the row is not already in front of them.
+   *
+   * `filled` IS SAID ON THE ROW AND IN THE TOAST, because a field this screen answered on somebody's behalf is a
+   * fact nobody told it. The chip takes the long form where there is room for it and `Added` where there is not.
+   */
+  function addLanded(entry: Entry, filled: readonly string[] = [], mark?: string) {
     pages = [[entry, ...(pages[0] ?? [])], ...pages.slice(1)];
     matched += 1;
     if (booted) booted = { ...booted, registers: booted.registers.map((r) => (r.id === id ? { ...r, count: r.count + 1 } : r)) };
-    receipt(entry.seq, { mark: copy.writeMarkAdded, intent: 'good' });
+    receipt(entry.seq, {
+      mark: mark ?? (filled.length > 0 ? copy.markAddedFilled(filled) : copy.writeMarkAdded),
+      short: copy.writeMarkAdded,
+      intent: 'good',
+    });
+    fresh = new Map(fresh).set(entry.seq, Date.now());
+    void showRow(entry.seq);
+  }
+
+  /**
+   * BRING THE ROW INTO VIEW, AND ONLY IF IT IS NOT ALREADY THERE.
+   *
+   * AN UNCONDITIONAL `scrollIntoView` MOVES THE PAGE UNDER SOMEBODY WHO CAN ALREADY SEE THE ROW, which is the
+   * gesture every list that does it is disliked for: the reader typed one line, the row appeared where they were
+   * looking, and the screen jumped anyway. `block: 'nearest'` does nothing when the element is inside the
+   * scroller, so the test is whether it is inside `#main`'s box at all.
+   *
+   * THE ROW IS FOUND BY ITS OWN MARK rather than by an index into the body, because the two bodies number their
+   * rows differently and the mark is on whichever one is drawn.
+   */
+  async function showRow(seq: number) {
+    await tick();
+    const el = body?.querySelector(`[data-fresh="${seq}"]`)?.closest('.tr, .card-line');
+    const scroller = body?.closest('#main');
+    if (!el || !scroller) return;
+    const row = el.getBoundingClientRect();
+    const box = scroller.getBoundingClientRect();
+    if (row.top >= box.top && row.bottom <= box.bottom) return;
+    el.scrollIntoView({ block: 'nearest' });
   }
 
   /** A write that did not land: the row as it now stands, when there is one, and the record's sentence. */
@@ -868,17 +969,11 @@
     /* ON A LIVE RECORD THE LINE EMPTIES AT ONCE, and what was typed goes back into it if the record says no. */
     if (!sample) {
       capture = '';
-      const was = asked;
-      void writes()
-        .create(id, { ...inherited, [title]: said })
-        .then((out) => {
-          if (!out.ok) {
-            missed(was, out);
-            if (capture === '') capture = said;
-            return;
-          }
-          if (asked === was) addLanded(out.entry);
-        });
+      void createRow(said, (back) => {
+        /* WHAT WAS TYPED GOES BACK IN THE BOX, and only if nothing else has been typed since. Overwriting a
+           second line somebody has already started would lose the newer one to report the older. */
+        if (capture === '') capture = back;
+      });
       return;
     }
     /* THE SAME PLACE THE FIRST-RUN SCREEN PUTS ITS ROW. A row typed here and a row typed on `/start`
@@ -929,6 +1024,51 @@
   }
 
   /**
+   * ONE TYPED LINE, WRITTEN AS A ROW THE RECORD WILL TAKE.
+   *
+   * THE INFERENCE IS `capturedFields` AND IT IS NOT HERE. What the address already answers and what the
+   * declaration still requires are the piece of this screen that can write a WRONG value rather than an ugly one,
+   * so it lives in a module with tests rather than in a component nothing can reach.
+   *
+   * A REFUSAL PUTS THE TYPING BACK. The record's own sentence says what it wanted, and the words are in the box
+   * again rather than gone — which is the difference between a control that failed and a control that ate
+   * something. `onBack` is the caller's, because the capture line and the example button put it in different
+   * places.
+   */
+  async function createRow(said: string, onBack: (back: string) => void, mark?: string) {
+    const was = asked;
+    const { fields, filled } = capturedFields(id, said, filters, now, result.entries);
+    const out = await writes().create(id, fields);
+    if (!out.ok) {
+      missed(was, out);
+      onBack(said);
+      return;
+    }
+    if (asked !== was) return;
+    addLanded(out.entry, filled, mark);
+    /* AND THE FILLED FIELDS ARE SAID ONCE, WHERE THEY ARE LOOKING. The chip carries it on the row for as long as
+       the answer is up; this is for the reader whose eye is on the line they just typed in. */
+    if (filled.length > 0) toasts.push(copy.captureFilled(filled));
+  }
+
+  /**
+   * The empty state's offer, made good: one real row, named as an example.
+   *
+   * ON THE SAMPLE IT SAYS WHAT IT WOULD HAVE DONE, exactly as it always has — there is no record behind that
+   * screen and `notWritten` is the honest answer. On a live record it writes, through the same path as the
+   * capture line, so an example row and a typed row are the same kind of thing and are put back the same way.
+   */
+  function addExample() {
+    if (sample || !decl) {
+      toasts.push(copy.notWritten(copy.exampleWouldBeAdded), { intent: 'warn' });
+      return;
+    }
+    void createRow(copy.exampleTitle(decl.one.toLowerCase()), () => {}, copy.markExample).then(() => {
+      if (!sample && decl) toasts.push(copy.exampleAdded(decl.one.toLowerCase()));
+    });
+  }
+
+  /**
    * Move one row's state, from the row.
    *
    * IT TOOK THREE PRESSES AND A BULK BAR. The only way to change one row's state was to select it,
@@ -946,6 +1086,7 @@
     const field = decl?.state;
     if (!sample && seq > 0 && field) {
       const was = asked;
+      hold(seq);
       receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
       void writes()
         .update(id, seq, { [field]: state }, rowAt(seq)?.version)
@@ -997,6 +1138,15 @@
 
   let editing = $state<{ seq: number; field: string } | null>(null);
   let editValue = $state('');
+
+  /**
+   * ESCAPE HAPPENED, SO THE BLUR THAT FOLLOWS IT IS NOT A COMMIT.
+   *
+   * It is a plain `let` and not `$state`, deliberately: nothing draws it, it is written and read inside one pair
+   * of events, and a reactive read would be a dependency on a value that is always false by the time anything
+   * could look at it. `commitEdit` puts it down as it reads it.
+   */
+  let cancelled = false;
 
 
 
@@ -1053,9 +1203,41 @@
     editValue = asText(shownValue(seq, field));
   }
 
+  /**
+   * FOCUS LEFT THE FIELD — AND THE EDITOR CLOSES ONLY IF IT LEFT THE ROW.
+   *
+   * `relatedTarget` IS WHERE FOCUS WENT, and it is the whole of the test. A row carries the cell being edited, the
+   * pencil of every other editable cell, the picker and two or three verbs, and every one of them is inside the
+   * thing the reader is working on: treating a move between them as "finished" is the editor closing under the
+   * gesture that was reaching for it.
+   *
+   * A NULL `relatedTarget` IS A COMMIT, not an exception. Focus going nowhere at all — the window losing it, a
+   * click on the page's own background — is a person who has stopped editing, and holding the cell open in that
+   * state is a control the reader has walked away from and cannot see.
+   */
+  function leftTheRow(e: FocusEvent) {
+    const to = e.relatedTarget;
+    const row = (e.currentTarget as HTMLElement).closest('.tr, .card-line');
+    if (row && to instanceof Node && row.contains(to)) return;
+    commitEdit();
+  }
+
   function commitEdit() {
     const at = editing;
     if (!at) return;
+    /**
+     * ESCAPE CANCELS, AND THE BLUR THAT FOLLOWS IT MUST NOT COMMIT.
+     *
+     * THIS IS A BUG NO SCREENSHOT CAN HOLD. Closing the editor takes the element out of the document, which fires
+     * `focusout` on the way — so a cancel and a commit arrive in that order, one gesture, and the value somebody
+     * pressed Escape to throw away was written by the event that clearing it caused. The flag is read once and
+     * put down, so it cancels exactly the blur its own Escape produced and never the next edit's.
+     */
+    if (cancelled) {
+      cancelled = false;
+      editing = null;
+      return;
+    }
     editing = null;
     const said = editValue.trim();
     /* NOTHING CHANGED IS NOT AN EDIT. A receipt for a value somebody looked at and left alone is a
@@ -1068,6 +1250,7 @@
     if (!sample && at.seq > 0) {
       const was = asked;
       const value = said === '' ? null : said;
+      hold(at.seq);
       setPatch(at.seq, at.field, value);
       receipt(at.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
       void writes()
@@ -1646,6 +1829,7 @@
     const was = asked;
     const landed: Entry[] = [];
     let first: string | null = null;
+    for (const seq of seqs) hold(seq);
     for (const seq of seqs) receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
     for (const seq of seqs) {
       const out = await writes().archive(id, seq, rowAt(seq)?.version);
@@ -2002,7 +2186,12 @@
             <Button href="/r/{id}">{copy.clearFilters}</Button>
           {:else if emptyKind === 'no-data-yet'}
             <Button weight="primary" onclick={() => (createOpen = true)}>{copy.addOne}</Button>
-            <Button onclick={() => toasts.push(copy.notWritten(copy.exampleWouldBeAdded), { intent: 'warn' })}>{copy.showExample}</Button>
+            <!-- ON A LIVE RECORD IT ADDS THE EXAMPLE ROW, through the same `create` and the same inference the
+                 capture line uses: an empty list offering to show you what a row looks like, and answering with a
+                 sentence about what it would have done, is the defect this phase exists to remove. It is a REAL
+                 row, named as an example and wearing `Put back`, so nobody has to wonder which of these they
+                 typed. On the sample it says `notWritten` exactly as it always has. -->
+            <Button onclick={addExample}>{copy.showExample}</Button>
           {/if}
         {/snippet}
       </Empty>
@@ -2100,6 +2289,7 @@
                 type="button"
                 class="card-undo tap"
                 aria-label={copy.undoRowOf(name)}
+                onmousedown={(ev) => ev.preventDefault()}
                 onclick={(ev) => {
                   ev.stopPropagation();
                   said.undo?.();
@@ -2143,6 +2333,13 @@
         -->
         {#snippet ownMark(seq: number)}
           {@const own = identityFor(id, rowAt(seq)?.fields ?? {})}
+          <!-- THE MARK ON A ROW THAT HAS JUST ARRIVED, and it is drawn whether or not the register has an
+               identity: `ownMark` renders on every title cell and the project's glyph only on some, so hanging
+               this off that one would have marked new rows on Money and on nothing else. It is `aria-hidden`
+               because the row already says what happened to it in words, in the chip one cell over — this is
+               for the eye finding the row, and a second announcement of the same fact is noise. `showRow`
+               finds the row by this attribute, so what is scrolled to and what is marked cannot disagree. -->
+          {#if fresh.has(seq)}<span class="fresh" data-fresh={seq} aria-hidden="true"></span>{/if}
           {#if own}<span
               class="row-mark"
               style={own.retired ? undefined : `--hue:${own.hue}`}
@@ -2204,6 +2401,14 @@
                 has finished with the cell, and throwing their typing away for it is the behaviour
                 every spreadsheet taught them not to expect. `stopPropagation` on the keys, or the
                 grid's own handler reads them as navigation and the caret leaves mid-word.
+
+                IT COMMITS ON LEAVING THE ROW, NOT ON LEAVING THE FIELD, and the difference is a bug no screenshot
+                can hold. `blur` fires when focus moves anywhere at all, including to the row's own verbs one cell
+                over — so pressing `Put back` beside a cell you were editing committed the edit on the way to
+                undoing it, and clicking the pencil of the next cell along wrote the first before opening the
+                second. `focusout` carries where focus WENT, so focus landing inside the same row leaves the
+                editor open and everything else commits, which is the rule a person already holds: you have
+                finished with a row when you leave the row.
               -->
               {@const f = fieldOf(column.field)}
               {#if f?.type === 'enum'}
@@ -2214,10 +2419,13 @@
                   bind:value={editValue}
                   onclick={(e) => e.stopPropagation()}
                   onchange={commitEdit}
-                  onblur={commitEdit}
+                  onfocusout={leftTheRow}
                   onkeydown={(e) => {
                     e.stopPropagation();
-                    if (e.key === 'Escape') editing = null;
+                    if (e.key === 'Escape') {
+                      cancelled = true;
+                      editing = null;
+                    }
                   }}
                 >
                   {#each f.values ?? [] as v}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
@@ -2230,11 +2438,14 @@
                   type={f?.type === 'day' ? 'date' : f?.type === 'text' ? 'text' : 'number'}
                   bind:value={editValue}
                   onclick={(e) => e.stopPropagation()}
-                  onblur={commitEdit}
+                  onfocusout={leftTheRow}
                   onkeydown={(e) => {
                     e.stopPropagation();
                     if (e.key === 'Enter') commitEdit();
-                    else if (e.key === 'Escape') editing = null;
+                    else if (e.key === 'Escape') {
+                      cancelled = true;
+                      editing = null;
+                    }
                   }}
                 />
               {/if}
@@ -2256,11 +2467,19 @@
                 <span class="said">
                   <Chip label={said.short ?? said.mark} tone={said.intent} />
                   {#if said.undo}
+                    <!-- IT REFUSES FOCUS ON MOUSEDOWN, which is the third of the three rules and the one that
+                         reads as superstition until it is measured. A press is mousedown, then focus, then
+                         mouseup, then click — so the focus that a press moves happens BEFORE the click it is
+                         part of. Undoing an edit from a cell you were typing in therefore committed that edit
+                         first, from the focusout the press itself caused, and the undo then put back a value
+                         that had just been overwritten by the gesture meant to discard it. Preventing the
+                         default on mousedown keeps focus where it is; the click still fires. -->
                     <button
                       type="button"
                       class="verb"
                       tabindex="-1"
                       aria-label={copy.undoRowOf(name)}
+                      onmousedown={(e) => e.preventDefault()}
                       onclick={(e) => {
                         e.stopPropagation();
                         said.undo?.();
@@ -2274,6 +2493,7 @@
                     class="verb icon"
                     tabindex="-1"
                     aria-label={copy.archiveRow(name)}
+                    onmousedown={(e) => e.preventDefault()}
                     onclick={(e) => {
                       e.stopPropagation();
                       archive(seq);
@@ -3128,6 +3348,44 @@
   .cell-pen:focus-visible {
     color: var(--ink);
     opacity: 1;
+  }
+
+  /**
+   * THE ROW THAT JUST ARRIVED, MARKED FOR A MOMENT.
+   *
+   * A BAR AT THE HEAD OF THE ROW AND NOT A WASH OVER IT. A tinted row competes with the row's own tone, which is
+   * the declared deadline state and means something; this is a rule in the accent, in the gutter where nothing
+   * else is drawn, so the two cannot be confused. It fades rather than blinks: the point is to be findable for
+   * the second somebody's eye takes to arrive, not to demand attention it has already got.
+   *
+   * IT ANIMATES ONCE BECAUSE IT IS MOUNTED ONCE. `fresh` is cleared in `$effect.pre`, before the list redraws, so
+   * the element exists for one continuous stretch rather than being rebuilt mid-animation — which is the failure
+   * the map's own comment records.
+   */
+  .fresh {
+    display: inline-block;
+    inline-size: 3px;
+    block-size: 1em;
+    margin-inline-end: var(--sp-2);
+    background: var(--accent);
+    border-radius: var(--r-pill);
+    vertical-align: text-bottom;
+    animation: fresh-in var(--d-enter) var(--ease-out);
+  }
+
+  @keyframes fresh-in {
+    from {
+      opacity: 0;
+      transform: scaleY(0.4);
+    }
+  }
+
+  /* UNDER `prefers-reduced-motion` THE MARK STAYS AND THE MOVEMENT GOES. It is the thing that says which row is
+     new, so deleting it would take the answer with the animation. */
+  @media (prefers-reduced-motion: reduce) {
+    .fresh {
+      animation: none;
+    }
   }
 
   /* ── capture, and the verbs on the row ────────────────────────────────── */

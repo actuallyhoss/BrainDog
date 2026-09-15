@@ -20,6 +20,7 @@ import { conflicted, refused } from '@braindog/ports';
 
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen } from './vault.ts';
+export { keysReply, serveKeys, servesKeys, type KeysAsk, type KeysDoor } from './keys.ts';
 
 /**
  * What one argument IS, so the text a stranger typed becomes the value the handler was written for.
@@ -109,6 +110,8 @@ export const ROUTES: readonly Route[] = [
     takes: { register: 'text', where: 'json', limit: 'integer', cursor: 'text', order: 'json' } },
   { name: 'history', group: 'READ+', writes: false, what: 'The writes that made one row, in order, each with who and when.',
     takes: { register: 'text', seq: 'integer' } },
+  { name: 'backlinks', group: 'READ+', writes: false, what: 'What points at one row: the rows of other lists whose reference fields name it, a page at a time.',
+    takes: { register: 'text', seq: 'integer', limit: 'integer', cursor: 'text' } },
   { name: 'whatsNew', group: 'READ+', writes: false, what: 'What changed since you last read, newest first, held to what you may see.',
     takes: { cursor: 'integer' } },
   { name: 'recentHistory', group: 'READ+', writes: false, what: 'Every change to this record, newest first, a page at a time, held to what you may see.',
@@ -195,9 +198,14 @@ export const ROUTES: readonly Route[] = [
  * `openGrant` AND `bindGrant` STILL ARE NOT, and a session is not what they are waiting for. They are
  * the two ends of the sealed shape: `openGrant` answers sealed material a browser cannot open, and
  * `bindGrant` takes sealed material a browser cannot make, because the key store is the host's and the
- * record never sees a plaintext credential (ADR-062). Reaching them from a screen needs a host step
- * that seals and opens for a session, as `/api/vault/deposit` and `/api/vault/open` do for a vault
- * grant's bearer — and that door refuses any request carrying an `Origin`, which every page sends.
+ * record never sees a plaintext credential (ADR-062). What a screen needs is a host step that seals and
+ * opens for a session, and since 2026-09-16 there is one: `/api/keys/put` and `/api/keys/open`, in
+ * `keys.ts`, which take a browser session, no bearer of any kind, and an `Origin` this host answers for.
+ *
+ * THAT IS A SECOND DOOR AND NOT A LOOSENING OF THE FIRST. `/api/vault/deposit` and `/api/vault/open`
+ * still take a vault grant's bearer and still refuse any request carrying an `Origin`, which every page
+ * sends (`12 §6` rule 9). The two doors share the host's key step and no credential at all, so neither
+ * one is a way round the other.
  */
 export const UNROUTED = [
   'openGrant',
@@ -322,6 +330,7 @@ export type RecordSurface = {
   get(args: never, ctx: never): Promise<Result<unknown>>;
   list(args: never, ctx: never): Promise<Result<unknown>>;
   history(args: never, ctx: never): Promise<Result<unknown>>;
+  backlinks(args: never, ctx: never): Promise<Result<unknown>>;
   whatsNew(args: never, ctx: never): Promise<Result<unknown>>;
   recentHistory(args: never, ctx: never): Promise<Result<unknown>>;
   inbox(args: never, ctx: never): Promise<Result<unknown>>;
@@ -389,6 +398,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     get: (a, ctx) => api.get(a as never, ctx as never),
     list: (a, ctx) => api.list(a as never, ctx as never),
     history: (a, ctx) => api.history(a as never, ctx as never),
+    backlinks: (a, ctx) => api.backlinks(a as never, ctx as never),
     whatsNew: (a, ctx) => api.whatsNew(a as never, ctx as never),
     recentHistory: (a, ctx) => api.recentHistory(a as never, ctx as never),
     inbox: (a, ctx) => api.inbox(a as never, ctx as never),

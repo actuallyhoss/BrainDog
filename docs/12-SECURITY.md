@@ -287,6 +287,17 @@ FOR" is structural rather than remembered.
    such as `PATH`, `NODE_OPTIONS` or `LD_PRELOAD`, and on Windows a batch file is started through `cmd.exe` with
    its arguments escaped and the key kept off that command line ([48-SPEC-CLI](48-SPEC-CLI.md) §8). This is not
    rule 3's agent tool: no MCP tool reaches either door.
+   *(Added September 16th 2026: the owner's own two doors, which are a second pair and not a loosening of these.
+   `POST /api/keys/put` and `POST /api/keys/open` take a browser session and an `Origin` the host answers for,
+   refuse every bearer with `403 NEEDS_BROWSER_SESSION` including the self-host's server key, and refuse a request
+   carrying no `Origin` at all, which is how they can take a cookie where rule 9's doors cannot. Behind them is the
+   same host step: the `KeyStore` seals the value and the record is handed sealed bytes, through the same INTERNAL
+   `depositGrant` and `openForGrant`. What decides whether the session may reach a key is rule 2's gate and not the
+   door: an owner, no token, and a proof under fifteen minutes old; a person reaches every key the record holds,
+   where a vault grant reaches only its own project's. A read is the same counted `grant.read`, signed by the
+   person, and the value leaves in the same one answer with `no-store`. The Keys screen is the only caller:
+   it puts a key in, replaces one row's value, and reveals one for thirty seconds, clearing the clipboard after
+   sixty. `/api/vault/deposit` and `/api/vault/open` are unchanged and still refuse a page, whatever its origin.)*
    *(Added September 15th 2026, `loop/research-agent-path.md` step 18. `tools/gates/secret-grep.mjs` holds
    the value's shapes in the three files that may name it, and follows a call to a function in the same file
    whose return type names the brand.)*

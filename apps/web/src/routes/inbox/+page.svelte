@@ -242,6 +242,36 @@
                 {/if}
               </div>
 
+              <!--
+                THIS BLOCK IS THE SAMPLE'S, AND IT CANNOT BE WIRED UP YET. Said here rather than
+                left to be rediscovered, because the two buttons below look live and are not.
+
+                THE RECORD SUGGESTS NOTHING. A live arrival is an `InboxLine`, and it carries the
+                channel, the sender, the subject, the body and when it came. There is no `suggestion`
+                on it and `itemOf` sets none, so `item.suggestion` is only ever set on the sample
+                rows in `data.ts`: on a real record this block never draws at all. Wiring the
+                buttons would be wiring a control that nothing reaches.
+
+                WHAT IS MISSING, IN ORDER:
+
+                  A PATTERN TO OFFER. Making a rule needs a `when` predicate, and nothing in the
+                  record derives one from an email. "From billing@fenwick.example" is a guess at
+                  which part of the arrival is the pattern — the sender, the subject, an amount in
+                  the body — and the guess would be stored as a rule that files future arrivals
+                  without asking. The sample writes the sentence by hand, which is why it reads well.
+
+                  A PLACE TO PUT IT. A rule is a declaration, so writing one is `setDeclaration`,
+                  which is ADMIN: the inbox is already an owner-only read, so the level is not the
+                  obstacle, but it means the rule goes through the same lint a pack gets and a
+                  refusal has to be drawn here.
+
+                  SOMETHING TO DECLINE. `Not this one` has no write behind it either. There is no
+                  suggestion row on the record to dismiss, so there is nothing to record a decline
+                  against and nothing that would remember it next time.
+
+                The honest half is already live beside this: `File it in` and `Archive` both write,
+                through `fileArrival` and `archiveArrival`.
+              -->
               {#if item.suggestion}
                 <div class="pattern">
                   <!-- IT WAS A DSL STRING UNDER THE HIGHEST-EMPHASIS CONTROL ON THE PAGE.

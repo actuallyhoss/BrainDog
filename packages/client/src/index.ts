@@ -242,6 +242,21 @@ export type ActionRow = {
 /** `resumeAction`: the action that runs again now. */
 export type ActionResumed = { ingest: string; kind: 'pull' | 'call' | 'poll' };
 
+/**
+ * `backlinks`: one relation pointing at the row that was asked about.
+ *
+ * One group per FIELD and not per register, because two fields of one register can name the same row
+ * and mean different things. `matched` is the whole count and `rows` is the page of it.
+ */
+export type BacklinkGroup = { register: string; field: string; matched: number; rows: unknown[] };
+
+/** `backlinks`: the row asked about, what points at it, and where the next page starts. */
+export type BacklinksAnswer = {
+  to: { register: string; seq: number | null; id: string | null };
+  from: BacklinkGroup[];
+  cursor: string | null;
+};
+
 /** One of the five levels a member holds, on the record or on one register. */
 export type Level = 'owner' | 'decide' | 'write' | 'append' | 'read';
 
@@ -319,6 +334,12 @@ const unreachable = (why: string): Refusal => ({
   code: 'UNREACHABLE',
   fix: `The record could not be reached: ${why}`,
 });
+
+/** `putKey`: the row the key is on, and which version of its grant this made. Never anything sealed. */
+export type KeyPut = { credential: string; label: string; version: number; rotated: boolean };
+
+/** `openKey`: one key, read back once. The answer is `no-store`, and reading it is counted as a `grant.read`. */
+export type KeyOpened = { credential: string; label: string; value: string };
 
 /**
  * Call one method.
@@ -398,8 +419,50 @@ export function createClient(options: ClientOptions) {
     return body as Result<T>;
   }
 
+  /**
+   * The app's own key doors, `POST /api/keys/put` and `POST /api/keys/open`.
+   *
+   * NOT THROUGH `call`, BECAUSE THEY ARE NOT METHODS. `ROUTES` is the record's surface; these are a host step in
+   * front of it at a fixed path, and a name in `NAMES` would be a name `handlersFor` had to route. The value is
+   * sealed by the host and the record is handed sealed bytes, which is why a browser may send one at all.
+   *
+   * AND NO BEARER IS SENT, EVER, even where this client holds one. A bearer is the thing these doors refuse, so
+   * sending the caller's would turn every call into `NEEDS_BROWSER_SESSION`. The cookie and the `Origin` are the
+   * browser's own and it sends both by itself.
+   */
+  async function keyDoor<T>(which: 'put' | 'open', args: Record<string, unknown>): Promise<Result<T>> {
+    let res: Response;
+    try {
+      res = await doFetch(`${base}/api/keys/${which}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(args),
+      });
+    } catch (e) {
+      return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
+    }
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
+    }
+    if (body === null || typeof body !== 'object' || !('ok' in body))
+      return { ok: false, refusal: unreachable(`${res.status} with an answer this client does not recognise`) };
+    if (body.ok === false && !('refusal' in body) && !('conflict' in body))
+      return { ok: false, refusal: unreachable(`${res.status} with a failure carrying neither a refusal nor a conflict`) };
+    return body as Result<T>;
+  }
+
   return {
     call,
+    /* THE TWO KEY DOORS. A browser session, no bearer, this origin, and an owner whose last proof is under
+       fifteen minutes old, which the record decides. `12 §6` rules 2, 3 and 9. */
+    /** Put a key in, or replace the value of one named by `credential`. The host seals it; the record never sees it. */
+    putKey: (args: { label: string; value: string; opens?: string; kind?: string; project?: string; credential?: string }) =>
+      keyDoor<KeyPut>('put', args as unknown as Record<string, unknown>),
+    /** Read one key back, once, by its label or by its spoken id. */
+    openKey: (args: { label?: string; credential?: string }) => keyDoor<KeyOpened>('open', args as unknown as Record<string, unknown>),
     boot: () => call<Boot>('boot'),
     version: () => call<Version>('version'),
     schema: (register: string) => call<unknown>('schema', { register }),
@@ -414,6 +477,9 @@ export function createClient(options: ClientOptions) {
     search: (q: string, limit?: number) =>
       call<{ register: string; seq: number; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }) }),
     history: (register: string, seq: number) => call<unknown[]>('history', { register, seq }),
+    /** What points at one row, held to the lists this caller may read. `limit` is rows across the whole answer. */
+    backlinks: (args: { register: string; seq: number; limit?: number; cursor?: string }) =>
+      call<BacklinksAnswer>('backlinks', args as Record<string, unknown>),
     /** What changed since the caller's read mark, or since `cursor`, an event rowid, when one is given. */
     whatsNew: (cursor?: number) => call<WhatsNew>('whatsNew', cursor === undefined ? {} : { cursor }),
     /** The record's log, newest first. `cursor` is the one the page above answered with. */
