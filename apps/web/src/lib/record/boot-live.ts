@@ -35,6 +35,8 @@ type Sample = ReturnType<typeof boot>;
 export type Shell = Omit<Sample, 'me'> & {
   me: { person: string; level: string; owner: boolean; records: { slug: string; name: string; level: string }[] };
   inbox: number;
+  /* HOW MANY QUESTIONS ARE OPEN, which `questions` cannot say: `boot` caps that list at twenty, and the count is the record's. */
+  open: number;
   now: number;
   live: boolean;
   upTo: number | null;
@@ -128,6 +130,7 @@ export function layoutOf(b: Boot): Shell {
     version: b.whatsNew?.upTo ?? 0,
     assistant: false,
     inbox: b.counts?.inbox ?? 0,
+    open: b.counts?.decide ?? (b.waiting ?? []).length,
     now: Number.isFinite(Date.parse(b.now)) ? Date.parse(b.now) : Date.now(),
     live: true,
     upTo: b.whatsNew?.upTo ?? null,
@@ -138,4 +141,4 @@ export function layoutOf(b: Boot): Shell {
 export const refusedShell = (): Shell => layoutOf({ registers: [], now: new Date().toISOString() });
 
 /** The sample's shell, with what only a shell carries. */
-export const sampleShell = (sample: Sample, inbox: number): Shell => ({ ...sample, inbox, now: NOW, live: false, upTo: null });
+export const sampleShell = (sample: Sample, inbox: number): Shell => ({ ...sample, inbox, open: sample.questions.length, now: NOW, live: false, upTo: null });

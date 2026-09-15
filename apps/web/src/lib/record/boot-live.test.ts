@@ -78,6 +78,7 @@ test("the record's boot is drawn in the shell's shape, with nothing of the sampl
   assert.deepEqual(shell.me, { person: 'p_1', level: 'write', owner: false, records: [{ slug: 'the-studio', name: 'The Studio', level: 'write' }] });
   assert.deepEqual(shell.questions.map((q) => [q.id, q.title]), [['SG4', 'Renew the domain?']]);
   assert.equal(shell.inbox, 0, 'a count the record withheld became a number');
+  assert.equal(shell.open, 30, 'the rail counted the list boot caps, not the questions the record has open');
   assert.equal(shell.now, Date.parse('2026-09-15T12:00:00.000Z'));
   assert.equal(shell.upTo, 9);
   assert.equal(shell.sinceCapped, true);

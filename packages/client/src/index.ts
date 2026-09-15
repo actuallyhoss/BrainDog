@@ -93,6 +93,23 @@ export type WhatsNew = { events: EventLine[]; upTo: number | null; sinceCapped: 
 /** `recentHistory`: one page, newest first, and the cursor for the page below it. */
 export type HistoryPage = { events: EventLine[]; cursor: number | null };
 
+/** One arrival no rule filed, as `inbox` sends it. See `InboxLine` in `@braindog/kernel`. */
+export type InboxLine = {
+  rowid: number;
+  id: string;
+  ts: string;
+  channel: string;
+  from: string;
+  to: string;
+  subject: string;
+  body: string | null;
+  state: 'untriaged' | 'review';
+  reason: string | null;
+};
+
+/** `inbox`: one page of what arrived and no rule filed, newest first, and the cursor for the page below it. */
+export type InboxPage = { arrivals: InboxLine[]; cursor: number | null };
+
 /**
  * One row as `context` shows it: its spoken id, version, scope, state, and its register's mobile fields.
  * A key's secret field is `{ sealed, opened, last_opened, last_by }`, never a value.
@@ -348,6 +365,8 @@ export function createClient(options: ClientOptions) {
     /** The record's log, newest first. `cursor` is the one the page above answered with. */
     recentHistory: (args: { cursor?: number | null; limit?: number } = {}) =>
       call<HistoryPage>('recentHistory', args as Record<string, unknown>),
+    /** What arrived and no rule filed, newest first. An owner's read; `cursor` is the one the page above answered with. */
+    inbox: (args: { cursor?: number; limit?: number } = {}) => call<InboxPage>('inbox', args as Record<string, unknown>),
     create: (args: { register: string; fields: Record<string, unknown>; note?: string }) =>
       call<unknown>('create', args as Record<string, unknown>),
     update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) =>

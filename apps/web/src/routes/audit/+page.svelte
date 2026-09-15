@@ -118,7 +118,7 @@
    * what the record called each target, a row's title or a question from its governance row. Until the page arrives the
    * screen draws no lines and no empty state, and a refusal is the record's own sentence.
    */
-  let live = $state<{ events: AuditEvent[]; names: Map<string, string> } | null>(null);
+  let live = $state<{ events: AuditEvent[]; names: Map<string, string>; cursor: number | null } | null>(null);
   let refused = $state<string | null>(null);
   const LOG = $derived(route.data.live ? (live?.events ?? []) : AUDIT);
   const clock = $derived(route.data.live ? Date.now() : NOW);
@@ -139,6 +139,28 @@
       })
       .finally(() => closed(ok, at));
   });
+
+  /**
+   * THE PAGE BELOW, WHEN ASKED FOR. A log longer than one page says so with a control instead of stopping at two hundred
+   * lines without a word. What arrives is added under what is drawn, and the filters apply to everything read so far.
+   * A refusal here is said under the list, and the lines already drawn stay.
+   */
+  let older = $state(false);
+  let olderFix = $state<string | null>(null);
+  async function loadOlder() {
+    const had = live;
+    if (!had || had.cursor === null || older) return;
+    older = true;
+    olderFix = null;
+    try {
+      const m = await import('$lib/record/news-live.ts');
+      const out = await m.readLog(location.origin, route.data.me.person, undefined, had.cursor);
+      if (out.from === 'live') live = { events: [...had.events, ...out.events], names: new Map([...had.names, ...out.names]), cursor: out.cursor };
+      else if (out.from === 'refused') olderFix = out.fix;
+    } finally {
+      older = false;
+    }
+  }
 
   /**
    * WHAT IT WAS DONE TO. A spoken id stays a spoken id — `services#6` is the product's own way of
@@ -417,6 +439,12 @@
     {/each}
   </ul>
   <CapLine shown={shown.length} total={matched.length} />
+  {#if route.data.live && live && live.cursor !== null}
+    <div class="older">
+      <Button weight="quiet" onclick={loadOlder} disabled={older}>{copy.olderEntries}</Button>
+    </div>
+  {/if}
+  {#if olderFix}<p class="foot">{olderFix}</p>{/if}
   <!-- IT EXPLAINED THE DATA MODEL TO SOMEBODY WHO CAME TO SEE WHO CHANGED WHAT. "The log and the
        version are the same fact, so a version number is a place in this list" is true, and it is a
        sentence about how the record is built. What a reader needs from the number is what it is
@@ -427,6 +455,11 @@
 </div>
 
 <style>
+  .older {
+    display: flex;
+    margin-block: var(--sp-3);
+  }
+
   /* WIDE ENOUGH FOR A NAME, in the reading face rather than the id face. It sits in the grid slot
      `.seq` would have taken, so the ledger's columns still line up down the page. */
   /* A NAME WRAPS ON A CARD TOO. `reply rule` and `renewal rule` are two words and the card's first

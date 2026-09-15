@@ -89,7 +89,7 @@ export async function markAll(base: string, upTo: number | null, io?: Fetch): Pr
 export const LOG_PAGE = 200;
 
 export type LogRead =
-  | { from: 'live'; events: AuditEvent[]; names: Map<string, string>; more: boolean }
+  | { from: 'live'; events: AuditEvent[]; names: Map<string, string>; more: boolean; cursor: number | null }
   | { from: 'sample' }
   | { from: 'refused'; fix: string };
 
@@ -101,14 +101,15 @@ function targetOf(e: EventLine): string | undefined {
 }
 
 /**
- * The newest page of the record's log, in the lines History draws.
+ * The newest page of the record's log, in the lines History draws, or with `before` the page below the one that
+ * answered with that cursor.
  *
  * `names` IS WHAT EACH TARGET IS CALLED, as the record resolved it: a row's title, or a question from its governance
  * row. History read those from the sample's rows and questions, which say nothing about a live record.
  */
-export async function readLog(base: string, me: string | null, io?: Fetch): Promise<LogRead> {
+export async function readLog(base: string, me: string | null, io?: Fetch, before: number | null = null): Promise<LogRead> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.recentHistory({ limit: LOG_PAGE });
+  const out = await client.recentHistory({ limit: LOG_PAGE, ...(before === null ? {} : { cursor: before }) });
   if (!out.ok) {
     const refusal = refusalOf(out);
     return noRecord(refusal.code) ? { from: 'sample' } : { from: 'refused', fix: refusal.fix };
@@ -129,5 +130,5 @@ export async function readLog(base: string, me: string | null, io?: Fetch): Prom
       version: e.rowid,
     });
   }
-  return { from: 'live', events, names, more: out.value.cursor !== null };
+  return { from: 'live', events, names, more: out.value.cursor !== null, cursor: out.value.cursor };
 }

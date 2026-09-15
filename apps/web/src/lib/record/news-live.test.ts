@@ -134,7 +134,18 @@ test("the log is the record's newest page, named by what the record called each 
   assert.equal(out.names.get('obligations#2'), 'Rent');
   assert.equal(out.names.get('suggestion:SG4'), 'Renew the domain?');
   assert.equal(out.more, true);
+  assert.equal(out.cursor, 8);
   assert.equal(new URL(sent[0]!.url).searchParams.get('limit'), String(LOG_PAGE));
+  assert.equal(new URL(sent[0]!.url).searchParams.get('cursor'), null, 'the first page asked for a page below something');
 
   assert.deepEqual(await readLog(BASE, null, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } })).io), { from: 'sample' });
+});
+
+test('the page below is asked for with the cursor the page above answered, and the last page has none', async () => {
+  const { io, sent } = host(() => json(200, { ok: true, value: { events: [line({ rowid: 7, kind: 'export', note: 'Older' })], cursor: null } }));
+  const out = await readLog(BASE, 'p_1', io, 8);
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.equal(new URL(sent[0]!.url).searchParams.get('cursor'), '8');
+  assert.deepEqual([out.events.map((e) => e.seq), out.more, out.cursor], [[7], false, null]);
 });

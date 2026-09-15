@@ -66,6 +66,7 @@ import {
   type VaultGrant,
   type Waiting as DeviceWaiting,
   type EventLine as LogLine,
+  type InboxLine,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
@@ -430,6 +431,9 @@ export type WhatsNew = { events: EventLine[]; upTo: number | null; sinceCapped: 
 
 /** `recentHistory`: one page of the log, newest first, and the cursor for the page below it. */
 export type HistoryPage = { events: EventLine[]; cursor: number | null };
+
+/** `inbox`: one page of what arrived and no rule filed, newest first, and the cursor for the page below it. */
+export type InboxPage = { arrivals: InboxLine[]; cursor: number | null };
 
 /** One live run: the row, its spoken id, and what is worked out when it is read. */
 export type LiveRun = Entry & {
@@ -2626,6 +2630,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const { lines, next } = walk(ctx, cursor ?? null, 1, limit + 1);
       const events = lines.slice(0, limit);
       return ok({ events, cursor: lines.length > limit ? (events.at(-1)?.rowid ?? null) : next });
+    },
+
+    /**
+     * What arrived and no rule filed, newest first, a page at a time: the list `counts.inbox` counts.
+     *
+     * AN OWNER'S, AND NO TOKEN'S. The inbox holds whatever was sent in, about any register or none, so it cannot be held
+     * to a register the way the log is: a caller who may not read the whole record reads none of it. The refusal is
+     * `FORBIDDEN` for all of them, and the sentence says which of the three it was.
+     */
+    async inbox(args: { cursor?: number; limit?: number } | undefined, ctx: CallContext): Promise<Result<InboxPage>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const owner = allows(ctx, 'owner');
+      if (owner) return { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
+      if (!wholeRecord(ctx))
+        return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
+      const cursor = args?.cursor;
+      if (cursor !== undefined && !(Number.isSafeInteger(cursor) && cursor >= 1))
+        return no('VALUE_MALFORMED', 'A cursor is the number of an arrival, a whole number from 1.', { at: 'cursor' });
+      const asked = args?.limit;
+      if (asked !== undefined && !Number.isSafeInteger(asked))
+        return no('VALUE_MALFORMED', 'A limit is a whole number of arrivals.', { at: 'limit' });
+      const limit = Math.min(Math.max(1, asked ?? 50), 200);
+      const lines = kernel.inboxBefore(cursor ?? null, limit + 1);
+      const arrivals = lines.slice(0, limit);
+      return ok({ arrivals, cursor: lines.length > limit ? (arrivals.at(-1)?.rowid ?? null) : null });
     },
 
     /**

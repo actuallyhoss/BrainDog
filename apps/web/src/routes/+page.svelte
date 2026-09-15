@@ -182,9 +182,9 @@
          `USABILITY.md`'s second question is whether the product grows as the record grows, and a
          digest of nothing is its own example. `/decide` is still in the rail and still on `g d`, so
          nothing becomes unreachable: what goes is the count of nothing. -->
-    {#if data.questions.length > 0}
+    {#if data.open > 0}
       <a class="to-decide tap" href="/decide">
-        <span class="to-decide-n num">{data.questions.length}</span>
+        <span class="to-decide-n num">{data.open}</span>
         <span>to decide</span>
       </a>
     {/if}
@@ -268,7 +268,7 @@
       {@const anything =
         (data.live
           ? data.index.registers.reduce((n, r) => n + r.count, 0)
-          : Object.values(ROWS).reduce((n, list) => n + list.length, 0)) + data.questions.length}
+          : Object.values(ROWS).reduce((n, list) => n + list.length, 0)) + data.open}
       <Empty
         kind={anything === 0 ? 'no-data-yet' : 'cleared'}
         title={anything === 0 ? copy.recordEmpty : copy.nothingNeedsYou}

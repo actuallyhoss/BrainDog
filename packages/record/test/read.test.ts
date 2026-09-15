@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRecordApi, type Boot, type CallContext, type HistoryPage, type WhatsNew } from '../src/index.ts';
+import { createRecordApi, type Boot, type CallContext, type HistoryPage, type InboxPage, type WhatsNew } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -207,6 +207,68 @@ test('A CALLER WHO MAY READ NOTHING IS REFUSED ALL THREE', async () => {
   const nobody: CallContext = { principal: { kind: 'person', id: 'p_9', level: null } };
   for (const r of [await api.whatsNew(undefined, nobody), await api.recentHistory(undefined, nobody), await api.boot(nobody)]) {
     assert.equal(r.ok, false, 'a caller with no level read the log');
+  }
+  sql.close();
+});
+
+/** Five emails no rule claims, the oldest first, and the fourth dealt with, so the inbox holds four. */
+async function inboxRecord() {
+  const made = await record();
+  const ids: string[] = [];
+  for (const n of [1, 2, 3, 4, 5]) {
+    const out = value<{ raw: string; state: string }>(
+      made.api.kernel.arrive({ channel: 'email', headers: { From: `billing${n}@fenwick.example`, Subject: `Invoice ${n}` }, body: `Body ${n}`, sha256: `s${n}` }),
+    );
+    assert.equal(out.state, 'untriaged');
+    ids.push(out.raw);
+  }
+  made.sql.exec("UPDATE inbox_raw SET state = 'ignored' WHERE id = ?", ids[3]!);
+  return { ...made, ids };
+}
+
+test('THE INBOX IS WHAT ARRIVED AND NO RULE FILED, newest first, a page at a time, and the count on the rail agrees', async () => {
+  const { api, sql } = await inboxRecord();
+  const whole = value<InboxPage>(await api.inbox({ limit: 200 }, owner));
+  assert.deepEqual(whole.arrivals.map((a) => a.subject), ['Invoice 5', 'Invoice 3', 'Invoice 2', 'Invoice 1'], 'newest first, and the dealt-with one left out');
+  assert.equal(whole.cursor, null);
+  assert.equal(value<Boot>(await api.boot(owner)).counts.inbox, whole.arrivals.length);
+
+  const first = whole.arrivals[0]!;
+  assert.equal(first.from, 'billing5@fenwick.example', 'the header a person reads, lower-cased on arrival');
+  assert.equal(first.body, 'Body 5');
+  assert.equal(first.channel, 'email');
+  const said = JSON.stringify(whole);
+  for (const kept of ['sha256', 'headers', '"s5"']) assert.ok(!said.includes(kept), `${kept} left the record through the inbox`);
+
+  const pages: string[][] = [];
+  let cursor: number | null = null;
+  do {
+    const page: InboxPage = value<InboxPage>(await api.inbox({ limit: 3, ...(cursor === null ? {} : { cursor }) }, owner));
+    pages.push(page.arrivals.map((a) => a.id));
+    cursor = page.cursor;
+  } while (cursor !== null);
+  assert.deepEqual(pages.flat(), whole.arrivals.map((a) => a.id), 'pages of three join to the whole inbox, no arrival twice');
+  assert.equal(pages.length, 2);
+
+  assert.equal((await api.inbox({ limit: 1.5 }, owner)).ok, false);
+  const bad = await api.inbox({ cursor: 0 }, owner);
+  assert.equal(bad.ok ? null : 'refusal' in bad ? bad.refusal.code : null, 'VALUE_MALFORMED');
+  sql.close();
+});
+
+test('ONLY AN OWNER READS THE INBOX: a scoped token, a record-wide token, a writer and a stranger are each refused FORBIDDEN', async () => {
+  const { api, sql } = await inboxRecord();
+  const token: CallContext = { principal: { kind: 'token', id: 't_2', scope: 'write', person: 'p_1', level: 'owner' } };
+  const writer: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'write' } };
+  const nobody: CallContext = { principal: { kind: 'person', id: 'p_9', level: null } };
+  const heldToPart: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, registers: ['obligations'] };
+  for (const [who, ctx] of [['a scoped token', project], ['a record-wide token', token], ['a writer', writer], ['a stranger', nobody], ['an owner held to one register', heldToPart]] as const) {
+    const out = await api.inbox(undefined, ctx);
+    assert.equal(out.ok, false, `${who} read the inbox`);
+    if (out.ok || !('refusal' in out)) continue;
+    assert.equal(out.refusal.code, 'FORBIDDEN', `${who} was refused with ${out.refusal.code}`);
+    assert.ok(out.refusal.fix.length > 20, `${who} was refused without a sentence`);
+    assert.ok(!out.refusal.fix.includes('Invoice'), `${who} was told what the inbox holds`);
   }
   sql.close();
 });

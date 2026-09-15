@@ -7,32 +7,94 @@
   text nodes, never parsed (50 §8).
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
+  import { page as route } from '$app/state';
   import { titleOf } from '$lib/title.ts';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { DOM_CAP, INBOX, NOW, SOURCES } from '$lib/record/api.ts';
+  import { DOM_CAP, INBOX as SAMPLE, NOW, SOURCES } from '$lib/record/api.ts';
+  import type { InboxItem } from '$lib/record/schema.ts';
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { drew } from '../../lib/ui/screen.svelte.ts';
-
-  let open = $state<string | null>(INBOX[0]?.id ?? null);
+  import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   * ON A LIVE RECORD THE INBOX IS THE RECORD'S, its newest page, and nothing of the sample is mixed
+   * into it. Until the page arrives the screen draws no rows and no empty state, and a refusal is
+   * the record's own sentence: the inbox is an owner's, so anybody else is told so by the record.
+   *
+   * `sampled` IS A LIVE SHELL WHOSE READ FOUND NO RECORD, which draws the sample as before.
+   * `unrouted` IS A HOST OLDER THAN THIS READ: there is a record, so the sample would be a lie about
+   * it, and there is no list to draw from it either.
+   */
+  let live = $state<{ items: InboxItem[]; cursor: number | null } | null>(null);
+  let refused = $state<string | null>(null);
+  let unrouted = $state(false);
+  let sampled = $state(false);
+  const fromRecord = $derived(route.data.live && !sampled);
+  const INBOX = $derived(fromRecord ? (live?.items ?? []) : SAMPLE);
+  const clock = $derived(fromRecord ? Date.now() : NOW);
+  const answered = $derived(!fromRecord || live !== null);
+
+  let open = $state<string | null>(route.data.live ? null : (SAMPLE[0]?.id ?? null));
+
+  $effect(() => {
+    if (!route.data.live) return;
+    /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
+    const at = untrack(opened);
+    let ok = false;
+    void import('$lib/record/inbox-live.ts')
+      .then((m) => m.readInbox(location.origin))
+      .then((out) => {
+        if (out.from === 'live') {
+          live = { items: out.items, cursor: out.cursor };
+          open = out.items[0]?.id ?? null;
+          ok = true;
+        } else if (out.from === 'sample') {
+          sampled = true;
+          open = SAMPLE[0]?.id ?? null;
+          ok = true;
+        } else if (out.from === 'unrouted') {
+          unrouted = true;
+          ok = true;
+        } else refused = out.fix;
+      })
+      .finally(() => closed(ok, at));
+  });
+
+  /**
+   * THE PAGE BELOW, WHEN ASKED FOR. An inbox longer than one page says so with a control instead of
+   * stopping at two hundred without a word. What arrives is added under what is drawn, and a refusal
+   * here is said under the list, with the arrivals already drawn left where they are.
+   */
+  let older = $state(false);
+  let olderFix = $state<string | null>(null);
+  async function loadOlder() {
+    const had = live;
+    if (!had || had.cursor === null || older) return;
+    older = true;
+    olderFix = null;
+    try {
+      const m = await import('$lib/record/inbox-live.ts');
+      const out = await m.readInbox(location.origin, undefined, had.cursor);
+      if (out.from === 'live') live = { items: [...had.items, ...out.items], cursor: out.cursor };
+      else if (out.from === 'refused') olderFix = out.fix;
+    } finally {
+      older = false;
+    }
+  }
+
+  /**
+   * THE SAMPLE COMPUTES ITS CONTENT SYNCHRONOUSLY, AND A LIVE RECORD DOES NOT.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * from a shell that has fetched nothing. On the sample this claim is true as the screen mounts. On
+   * a live record the read above is bracketed with `opened()` and `closed()`, and a call still out
+   * takes the attribute away whatever this line says, so the claim is only made once the answer is in.
    */
   $effect(() => drew('ready'));
 </script>
@@ -41,11 +103,16 @@
 
 <PageHead icon="inbox"
   title={copy.inbox}
-  count={INBOX.length}
+  count={answered && !unrouted && !refused ? INBOX.length : undefined}
+  atLeast={fromRecord && live !== null && live.cursor !== null}
 />
 
 <div class="page">
-  {#if INBOX.length === 0}
+  {#if refused}
+    <Empty kind="error" title={refused} />
+  {:else if !answered || unrouted}
+    <!-- Nothing before the first answer, and nothing from a host that has no inbox to read. -->
+  {:else if INBOX.length === 0}
     <!--
       AN EMPTY INBOX IS TWO DIFFERENT FACTS AND THIS DREW ONE OF THEM, WRONGLY.
 
@@ -59,8 +126,15 @@
       `copy.ts` argues against directly above the button eight lines below. Both sentences were
       typed here rather than in `copy.ts`, which is precisely why the rename that produced
       `archiveArrival` never reached them.
+
+      A LIVE RECORD CANNOT TELL THESE APART FROM THE INBOX ALONE, so it draws the sentence that is
+      true in both, without the tick, and with the door to a connector.
     -->
-    {#if SOURCES.length === 0}
+    {#if fromRecord}
+      <Empty kind="no-data-yet" title={copy.inboxClear} body={copy.inboxClearWhy}>
+        {#snippet actions()}<Button href="/settings/ingest">{copy.inboxConnect}</Button>{/snippet}
+      </Empty>
+    {:else if SOURCES.length === 0}
       <Empty kind="no-data-yet" title={copy.inboxNothingYet} body={copy.inboxNothingYetWhy}>
         {#snippet actions()}<Button href="/settings/ingest">{copy.inboxConnect}</Button>{/snippet}
       </Empty>
@@ -69,7 +143,7 @@
     {/if}
   {:else}
     <ul class="ledger">
-      {#each INBOX.slice(0, DOM_CAP) as item}
+      {#each INBOX.slice(0, DOM_CAP) as item (item.id)}
         <li>
           <button
             type="button"
@@ -83,16 +157,17 @@
                  column because a spoken id is `#41`; a domain is not, so `fenwick.example.com`
                  arrived as `fenwick.examp` — hard-cut, with no ellipsis to say it had been. Six
                  senders in a row, each unreadable and each unreadable in the same way, so the column
-                 said "example" six times and nothing else. -->
+                 said "example" six times and nothing else. An arrival with no address, a webhook
+                 or a paste, shows the channel it came in on. -->
             <span class="seq" data-open={open === item.id ? '' : undefined} title={item.from}>
-              <Icon name="chevronDown" size="s" /><span class="host">{item.from.split('@')[1]}</span>
+              <Icon name="chevronDown" size="s" /><span class="host">{item.from.split('@')[1] ?? item.from}</span>
             </span>
             <span class="line-main">
               <span class="line-title">{item.subject}</span>
               <span class="line-detail">{item.from}</span>
             </span>
             <span class="line-amount"></span>
-            <span class="line-when">{since(item.arrived, NOW)}</span>
+            <span class="line-when">{since(item.arrived, clock)}</span>
           </button>
 
           {#if open === item.id}
@@ -151,6 +226,12 @@
       {/each}
     </ul>
     <CapLine shown={Math.min(INBOX.length, DOM_CAP)} total={INBOX.length} />
+    {#if fromRecord && live && live.cursor !== null}
+      <div class="older">
+        <Button weight="quiet" onclick={loadOlder} disabled={older}>{copy.olderEntries}</Button>
+      </div>
+    {/if}
+    {#if olderFix}<p class="foot">{olderFix}</p>{/if}
   {/if}
 </div>
 
@@ -222,6 +303,10 @@
     color: var(--ink2);
     font-size: var(--t-ui);
     line-height: 1.6;
+    /* A body is text somebody else wrote, line breaks included, and one unbroken token must not
+       push the card wider than the screen. */
+    white-space: pre-line;
+    overflow-wrap: anywhere;
   }
 
   .pattern {
@@ -265,6 +350,22 @@
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
+  }
+
+  /* The page below is one control, the height every control is on this pointer. */
+  .older {
+    display: flex;
+    justify-content: center;
+  }
+
+  .older :global(.btn) {
+    min-block-size: var(--ctl-h);
+  }
+
+  .foot {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    text-align: center;
   }
 
   @media (width < 900px) {

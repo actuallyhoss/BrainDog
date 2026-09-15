@@ -363,6 +363,25 @@ export type EventLine = {
   note: string | null;
 };
 
+/**
+ * One arrival no rule filed, as the inbox shows it: who sent it, what it says, and why it is waiting.
+ *
+ * NOT THE ROW. `sha256` is the host's fact about the bytes and `headers` is whatever a mail server sent, so the three
+ * headers a person reads are taken out of it and the rest stays behind.
+ */
+export type InboxLine = {
+  rowid: number;
+  id: string;
+  ts: string;
+  channel: string;
+  from: string;
+  to: string;
+  subject: string;
+  body: string | null;
+  state: 'untriaged' | 'review';
+  reason: string | null;
+};
+
 /** A page's place in the rail, when its declaration gives one in the shape `{ section, order }`. */
 const navOf = (nav: unknown): { section: string; order: number } | null => {
   if (typeof nav !== 'object' || nav === null) return null;
@@ -2951,6 +2970,44 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Arrivals nothing claimed and nobody has dealt with yet: how many the inbox holds. */
     inboxWaiting: (): number =>
       Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM inbox_raw WHERE state IN ('untriaged', 'review')")?.n ?? 0),
+
+    /**
+     * The arrivals `inboxWaiting` counts, below `before`, newest first: what the record's `inbox` pages through.
+     *
+     * `rowid` AND NOT `ts`, because a burst arrives inside one millisecond and a cursor on `ts` would drop or repeat the
+     * rest of it. Rows are only ever inserted, so the order they were stored in is the order they arrived in.
+     */
+    inboxBefore: (before: number | null, limit: number): InboxLine[] =>
+      sql
+        .all<{ rowid: number; id: string; ts: string; channel: string; headers: string | null; body: string | null; state: string; reason: string | null }>(
+          "SELECT rowid, id, ts, channel, headers, body, state, reason FROM inbox_raw WHERE state IN ('untriaged', 'review') AND rowid < ? ORDER BY rowid DESC LIMIT ?",
+          before ?? Number.MAX_SAFE_INTEGER,
+          limit,
+        )
+        .map((r) => {
+          /* A HEADER THAT IS NOT TEXT IS NOT ONE. `headers` was written by `arrive` as JSON, and a row restored from
+             somewhere else is still read without throwing. */
+          let headers: Record<string, unknown> = {};
+          try {
+            const parsed: unknown = JSON.parse(r.headers ?? '{}');
+            if (parsed && typeof parsed === 'object') headers = parsed as Record<string, unknown>;
+          } catch {
+            headers = {};
+          }
+          const text = (key: string): string => (typeof headers[key] === 'string' ? (headers[key] as string) : '');
+          return {
+            rowid: Number(r.rowid),
+            id: r.id,
+            ts: r.ts,
+            channel: r.channel,
+            from: text('from'),
+            to: text('to'),
+            subject: text('subject'),
+            body: r.body,
+            state: r.state === 'review' ? 'review' : 'untriaged',
+            reason: r.reason,
+          };
+        }),
 
     /* `seenAt()` WAS HERE AND IS GONE. Its only caller was `markRead`'s own return — it wrote the
        mark, then read it back through a second method — and `markRead` returns the mark now, which

@@ -185,7 +185,7 @@ type Refusal = { code: RefusalCode; at: string; found?: unknown; wanted?: string
 ```
 
 Six principal kinds, counted. **Who declares what:** `Refusal` and `RefusalCode` are `@braindog/ports`' (type-only);
-`CallContext` and `Result<T>` are `@braindog/kernel`'s; `RecordApi` — the object with the seventy-nine methods below — is
+`CallContext` and `Result<T>` are `@braindog/kernel`'s; `RecordApi` — the object with the eighty methods below — is
 `@braindog/record`'s (`export type RecordApi`). Every consumer imports the type; nothing re-declares any of the four
 structurally.
 
@@ -199,12 +199,12 @@ the alarm and the queue build a `system` context. The record derives `actor` and
 reach check itself, and never trusts a caller-supplied actor. There is no 412: a stale `version` is a 409 whose body
 names who changed the row.
 
-**The seventy-nine methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
-any token in scope (`markRead` person principals only) · READ+ any token, and the MCP resources · VAULT a browser
-session only · JOBS the browser four by session and the runner three by the runner's grant, every MCP token refused ·
-ADMIN a browser session, or a bearer carrying an operation grant for that one operation · INTERNAL the host only, no
-route. The shapes are decided here. 12 · 15 · 4 · 7 · 22 · 19, as 30 §5 counts them. `ROUTES` in `@braindog/host`
-routes 52 of the seventy-nine at `/api/<method>`, 21 of them ADMIN.
+**The eighty methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
+any token in scope (`markRead` person principals only) · READ+ any token, and the MCP resources, except `inbox`, an
+owner's in a browser · VAULT a browser session only · JOBS the browser four by session and the runner three by the
+runner's grant, every MCP token refused · ADMIN a browser session, or a bearer carrying an operation grant for that one
+operation · INTERNAL the host only, no route. The shapes are decided here. 12 · 16 · 4 · 7 · 22 · 19, as 30 §5 counts
+them. `ROUTES` in `@braindog/host` routes 53 of the eighty at `/api/<method>`, 21 of them ADMIN.
 
 | Group | Method | Args | Returns / notes |
 |---|---|---|---|
@@ -229,6 +229,7 @@ routes 52 of the seventy-nine at `/api/<method>`, 21 of them ADMIN.
 | READ+ | `context` | `{}`; a read that never writes and opens no run | `{ session, project, ambiguous, handoff, live, waiting, registers, people, faded, next }`: where the caller stands, each part held to what it may read ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.3). The learnings for where a session stands arrive in `registers`, with every other register that has a scope field; a key arrives by its label, and its secret field as `{ sealed, opened, last_opened, last_by }` |
 | READ+ | `whatsNew` | `{ cursor? }` — cursor = `event.rowid`, read from it upward; default = the first rowid after the caller's `member.seen_at`, a token reading its person's | `{ events, upTo, sinceCapped }`: at most 60 lines, **newest first**, each with `register`, `seq` and `title` when it is about something the caller may read; `upTo` is the newest line's rowid, what `markRead` takes; `sinceCapped` when more lie between the mark and the oldest line. A row's line goes to whoever may read its register, a question's to whoever `governance` shows it to, a line about access or keys to an owner, and any other line only to a caller who reads the whole record |
 | READ+ | `recentHistory` | `{ cursor?, limit? }`: `cursor` is the one the page above answered with; `limit` 50, max 200 | `{ events, cursor }`: the whole log newest first, each line held as `whatsNew` holds it; `cursor` is `null` only at the bottom. One call walks at most 5,000 lines, and a page is short only where the walk stopped |
+| READ+ | `inbox` | `{ cursor?, limit? }`: `cursor` is the one the page above answered with, an `inbox_raw` rowid; `limit` 50, max 200. An owner on `'*'` only: every token, every other level and a caller held to part of the record is refused `FORBIDDEN` | `{ arrivals, cursor }`: what `boot`'s `counts.inbox` counts, the `untriaged` and `review` rows of `inbox_raw`, newest first, each `{ rowid, id, ts, channel, from, to, subject, body, state, reason }`; the three headers are read out of `headers`, and neither `headers` nor `sha256` is sent. `cursor` is `null` only at the bottom |
 | READ+ | `project` | `{ query, budget }` — `secret` fields already replaced by their label | the `Projection` of 30 §9 |
 | READ+ | `boot` | `{}` | `{ registers, now, sessions, waiting, record, me, pages, counts, whatsNew }`, one round trip: the readable registers with counts; the live runs; open suggestions without their bodies, capped at 20; `record { slug, name, locale }`; `me { kind, person, name, level }`; `pages [{ slug, title, nav, icon }]` filtered as `pages` filters them; `counts { decide, inbox }`, `inbox` `null` below owner; and `whatsNew` exactly as the method answers with no cursor. `theme` is not in it yet |
 | READ+ | `whoami` | `{}` | the principal as the record resolves it: its levels and the registers in scope |
@@ -313,7 +314,7 @@ share a name is two update rows on `people`: the older row takes the union of bo
 
 **The factories.** `openRecord({ sql, clock, random, accent })` opens the kernel — randomness injected so a fixture is
 deterministic, `accent` the theme's hue chooser (`nextAccentHue`, [ADR-028](16-DECISIONS.md); 13 §2.1b) — and
-`applyMigrations` runs before any cache load. `createRecordApi(deps): RecordApi` returns the seventy-nine as named
+`applyMigrations` runs before any cache load. `createRecordApi(deps): RecordApi` returns the eighty as named
 methods; a host routes `POST /api/<method>` by property lookup on that object — a two-line lookup in
 `@braindog/host`, never a `call` dispatcher in the record. `createSpark(deps): Spark` is the same shape for Spark's
 named methods (46 §2), served at `/api/spark/<method>`. `@braindog/mcp` reaches the same methods for an agent:

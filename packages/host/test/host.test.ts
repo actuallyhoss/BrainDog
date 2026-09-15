@@ -99,6 +99,27 @@ test('what is new and the log are reads, with their numbers checked on the way i
   sql.close();
 });
 
+test('the inbox is a read an owner makes, and a token is refused it', async () => {
+  const { api, call, sql } = await host();
+  api.kernel.arrive({ channel: 'email', headers: { From: 'billing@fenwick.example', Subject: 'Your invoice' }, body: 'Total GBP 58.00', sha256: 'h1' });
+  api.kernel.arrive({ channel: 'email', headers: { From: 'ap@halden.example', Subject: 'RE: Invoice 41' }, body: 'Paying on the 12th', sha256: 'h2' });
+
+  const page = await call('inbox?limit=1');
+  assert.equal(page.status, 200);
+  const value = page.body.value as { arrivals: { subject: string }[]; cursor: number | null };
+  assert.deepEqual(value.arrivals.map((a) => a.subject), ['RE: Invoice 41']);
+  assert.notEqual(value.cursor, null);
+
+  const token: CallContext = { principal: { kind: 'token', id: 't_1', scope: 'read', person: 'p_1', level: 'owner' } };
+  const refused = await call('inbox', undefined, token);
+  assert.equal(refused.body.refusal?.code, 'FORBIDDEN');
+  assert.equal(refused.body.value, undefined);
+
+  const bad = await call('inbox?cursor=soon');
+  assert.equal(bad.body.refusal?.code, 'VALUE_MALFORMED');
+  sql.close();
+});
+
 test('A WRITE IS A POST, because a GET that changes something is a change a prefetch can make', async () => {
   const { call, sql } = await host();
   const wrong = await call('create');

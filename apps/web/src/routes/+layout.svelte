@@ -269,7 +269,7 @@
         record={data.index.name}
         records={data.me.records}
         registers={data.index.registers}
-        open={data.questions.length}
+        open={data.open}
         inbox={data.inbox}
       />
     </div>
@@ -321,7 +321,7 @@
   </div>
 
   <div class="tab-slot">
-    <TabBar open={data.questions.length} inbox={data.inbox} onmore={() => (moreOpen = true)} />
+    <TabBar open={data.open} inbox={data.inbox} onmore={() => (moreOpen = true)} />
   </div>
 
   <!--
