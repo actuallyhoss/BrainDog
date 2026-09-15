@@ -1,6 +1,7 @@
 /**
- * The record the product is shown with: seven registers, the rows in them, and the agent runs in the
- * kernel's own `session` register.
+ * The record the product is shown with: seven registers, the rows in them, the agent runs in the
+ * kernel's own `session` register, and the agents pack (`packs/agents.ts`), installed through the pack
+ * path with its learnings, skills, keys and tools.
  *
  * THIS IS THE ONE COPY. It was the web app's mock-up, which meant the shape of a register lived in
  * a Svelte app's `lib/` and the backend had nothing to be measured against; every figure the
@@ -18,7 +19,12 @@
  */
 
 import type { Result } from '@braindog/ports';
+import { install, normalise, plan, type Applied, type Installed } from '@braindog/declare';
 import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type Json, type Kernel } from '@braindog/kernel';
+
+import { AGENTS_PACK, AGENTS_REGISTERS, agentsPackDocument } from './packs/agents.ts';
+
+export { AGENTS_PACK, AGENTS_REGISTERS, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 
 /** What a row holds, before the record has given it a number. */
 export type Fields = Record<string, Json | number | null | undefined>;
@@ -44,11 +50,22 @@ export type SeedRegister = {
   identity?: { mark: string; accent: string };
   icon?: string;
   pack?: string;
+  seq_prefix?: string;
+  /** On the one register whose rows are projects: its fields listing repositories and folders. */
+  scopes?: { repos?: string; folders?: string };
 };
 
 export type SeedField = FieldDecl & {
   label?: string;
   required?: boolean;
+  default?: Json;
+  /** Where a row applies: a ref to a project, or a list of them. */
+  scope?: { widen?: 'any' | 'person'; same?: 'both' | 'nearer'; links?: true };
+  min?: number;
+  max?: number;
+  required_when?: { field: string; is: Json };
+  by?: 'decide';
+  transitions?: Readonly<Record<string, { to: readonly string[]; requires?: readonly string[]; by?: 'decide' }>>;
   index?: boolean;
   unique?: boolean;
   immutable?: boolean;
@@ -228,6 +245,9 @@ export const REGISTERS: Record<string, SeedRegister> = {
     // Rows of this register HAVE an identity: one mark and one accent each, chosen at create and
     // frozen, never hand-picked and never the only signal (13 §2.1b).
     identity: { mark: 'mark', accent: 'hue' },
+    /* THE PROJECTS, for every register with a `scope:` field: a run is placed in the project whose
+       repositories or folders it is working in, and is global anywhere else. */
+    scopes: { repos: 'repos', folders: 'folders' },
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
       { id: 'lane', label: 'Status', type: 'enum', values: ['building', 'earning', 'parked', 'retired'], index: true, required: true },
@@ -236,6 +256,8 @@ export const REGISTERS: Record<string, SeedRegister> = {
       { id: 'mark', type: 'text' },
       { id: 'hue', type: 'int' },
       { id: 'note', type: 'document' },
+      { id: 'repos', label: 'Repositories', type: 'list', of: 'text' },
+      { id: 'folders', label: 'Folders', type: 'list', of: 'text' },
     ],
   },
   people: {
@@ -249,10 +271,20 @@ export const REGISTERS: Record<string, SeedRegister> = {
     pack: 'people',
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
-      { id: 'role', type: 'enum', values: ['client', 'contractor', 'accountant', 'registrar'], index: true, required: true },
+      /* Optional, because a person an agent meets in a commit has no role until somebody gives one. */
+      { id: 'role', type: 'enum', values: ['client', 'contractor', 'accountant', 'registrar', 'collaborator', 'other'], index: true },
       { id: 'rate', type: 'money' },
-      { id: 'email', type: 'text' },
+      /* Unique, because an email is how a person met twice is known to be one person. */
+      { id: 'email', type: 'email', unique: true, index: true },
       { id: 'note', type: 'text' },
+      /* Not `search: true` yet: the search box asks every searchable field `matches`, and the kernel
+         refuses that on a list, so People could not be searched at all. */
+      { id: 'handles', label: 'Handles', type: 'list', of: 'text' },
+      /* A token may add a project here and never remove one. */
+      { id: 'projects', label: 'Met in', type: 'list', of: 'ref', to: 'things', scope: { links: true } },
+      /* Where and when each meeting happened, one dated line each, newest last. */
+      { id: 'met', label: 'Met', type: 'list', of: 'text' },
+      { id: 'merged_into', label: 'Merged into', type: 'ref', to: 'people' },
     ],
   },
   /* NO `sessions` HERE. Agent runs are the kernel's own `session` register (migration 0002), which
@@ -351,7 +383,8 @@ export const REGISTERS: Record<string, SeedRegister> = {
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
       { id: 'state', label: 'Status', type: 'enum', values: ['open', 'doing', 'blocked', 'done', 'dropped'], index: true, required: true },
-      { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      /* A task on no project is global. */
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true, scope: {} },
       { id: 'by', label: 'Due', type: 'day', index: true, deadline: true, remind: ['0d'] },
       /* Usually unset, and the schema has to be the thing that says so — the prose two documents
          away saying "most tasks carry no thread" is what lost last time (10 §7). */
@@ -482,10 +515,12 @@ export const THINGS: Fields[] = [
      with printed shares of 61 / 29 / 10 that are exactly those over that total. Three figures agreed
      and the fourth did not, and the fourth is the one the register sorts, the grid shows and any
      future roll-up reads. */
-  { name: 'Kiln', lane: 'earning', revenue: gbp(1_840_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE },
-  { name: 'Marlow & Co', lane: 'earning', revenue: gbp(420_000), since: '2023-01-08', mark: '▲', hue: 305 },
-  { name: 'Portage', lane: 'building', revenue: gbp(0), since: '2026-05-02', mark: '●', hue: 176 },
-  { name: 'Tallow', lane: 'parked', revenue: gbp(0), since: '2025-02-20', mark: '◼', hue: 261 },
+  /* Where each project's work happens. Kiln is on a Mac and Portage on a Windows desktop, so both
+     path shapes are placed; Portage's repository is named bare, as its runs report it. */
+  { name: 'Kiln', lane: 'earning', revenue: gbp(1_840_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['git.kiln.example/type/kiln-type', 'git.kiln.example/type/kiln-site'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'] },
+  { name: 'Marlow & Co', lane: 'earning', revenue: gbp(420_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['git.marlow.example/brand/marlow-site'], folders: ['/Users/studio/Clients/marlow'] },
+  { name: 'Portage', lane: 'building', revenue: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'] },
+  { name: 'Tallow', lane: 'parked', revenue: gbp(0), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
 ];
 
 
@@ -494,10 +529,10 @@ export const THINGS: Fields[] = [
 export const PEOPLE: Fields[] = [
   { name: 'Halden Type Co', role: 'client', rate: null, email: 'ap@halden.example', note: 'Pays on 45 days, always' },
   { name: 'Ravensworth Ltd', role: 'client', rate: null, email: 'accounts@ravensworth.example', note: '' },
-  { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly' },
+  { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly', handles: ['git:jokonkwo'], met: ['2026-08-20 · commit 3f2a91c in kiln-site'] },
   { name: 'Pell & Vine', role: 'accountant', rate: null, email: 'hello@pellvine.example', note: 'Year end is 31 March' },
   { name: 'Nordhaven Registry', role: 'registrar', rate: null, email: 'support@nordhaven.example', note: '' },
-  { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', note: 'Backend, two days a week' },
+  { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'] },
 ];
 
 /* ── obligations ─────────────────────────────────────────────────────────── */
@@ -654,6 +689,64 @@ export const UPDATES: Fields[] = [
   { body: 'Parked behind SG29. Nothing moves until the sending question is decided.', health: 'on_track', track: 4, by: 'you', at: stamp(-45 * 24) },
 ];
 
+/* ── the agents pack's rows ───────────────────────────────────────────────────
+   Spread across Kiln (1), Marlow & Co (2), Portage (3) and everywhere (null), so a project page shows
+   its own rows over the global ones it inherits, and a project skill hides the global one it shares
+   a name with. A ref is the number a person says, as everywhere in this file. */
+
+export const LEARNINGS: Fields[] = [
+  { lesson: 'Run the mastering pass before signing off an axis instance.', because: 'Three instances were signed off before mastering, and two had to be reopened when the outlines changed underneath them.', kind: 'method', project: 1, topic: 'axis-qa', confirmed_on: day(-3) },
+  { lesson: 'kilnfonts.example is the address every delivered licence PDF links to.', because: 'A 2024 licence PDF was opened against a staging copy without the domain, and its download link led nowhere.', kind: 'fact', project: 1, topic: 'domains', confirmed_on: day(-26) },
+  { lesson: 'Match a Fenwick invoice line to a service by renewal date, not by amount.', because: 'Two Fenwick services share one monthly total, so matching on the amount picked the wrong service in the September reconciliation.', kind: 'method', project: 3, topic: 'reconcile', confirmed_on: day(0) },
+  { lesson: 'Attach the rows a proposal read, or the record refuses it.', because: 'A merge of two services was proposed without the rows behind it, was refused, and the run had to list the services again.', kind: 'method', project: null, topic: 'proposals', confirmed_on: day(-1) },
+  { lesson: 'Money in this record is an integer in minor units, with its currency beside it.', because: 'A total was once read as pounds when it held pence, and a summary quoted a figure one hundred times too large.', kind: 'fact', project: null, topic: 'money' },
+  { lesson: 'Chase an unpaid invoice once it is 30 days past its date.', because: 'Two invoices sat unpaid for a month in the spring, and nobody noticed until the quarter closed.', kind: 'method', project: null, topic: 'invoices', state: 'superseded', why: 'Halden pays on 45-day terms, so a chaser at 30 days arrived before anything was late.' },
+  { lesson: 'Chase Halden Type Co only once their 45-day terms have run out.', because: 'The chaser for invoice 2026-041 went out at 30 days, and Halden replied that nothing was due yet.', kind: 'method', project: 2, topic: 'invoices', supersedes: 6, confirmed_on: day(-9) },
+];
+
+const REVIEW = `# Review a branch
+
+1. Read the whole diff, not only the files the description names.
+2. Look for debugging output, commented-out code and files that were not meant to be committed.
+3. Run the tests the change touches, then the full suite.
+4. Say what you checked and what you did not.`;
+
+const REVIEW_KILN = `# Review a Kiln branch
+
+1. Everything in the global review.
+2. Open every changed instance and check its outlines after the mastering pass.
+3. Compare kerning pairs against the last release, lowercase first.
+4. Name the instances you did not open.`;
+
+export const SKILLS: Fields[] = [
+  { name: 'review-pr', trigger: 'Before merging a branch, to read the whole diff for mistakes and leftover debugging.', what: 'A review checklist for any repository.', kind: 'skill', project: null, body: REVIEW, rev: 3, because: [4] },
+  { name: 'review-pr', trigger: 'Before merging a Kiln branch. It adds the outline and kerning checks to the review.', what: 'The review, with the checks a type family needs.', kind: 'skill', project: 1, body: REVIEW_KILN, rev: 2, because: [1] },
+  { name: 'log-handoff', trigger: 'At the end of a run, to leave the next step and what was tried for whoever comes next.', kind: 'command', project: null, body: '# Leave a handoff\n\nBefore the run ends, write the next step, what was tried and did not work, and the commit it stopped on.', rev: 1 },
+  { name: 'reconcile-invoice', trigger: 'When an invoice arrives, to match each line to a service before proposing any change.', kind: 'skill', project: 3, body: '# Reconcile an invoice\n\n1. List the services from the invoice’s provider.\n2. Match each line by renewal date, then by amount.\n3. Propose any change with the rows you read attached.', rev: 4, because: [3, 4] },
+  { name: 'chase-invoice', trigger: 'When an invoice is 30 days past its date.', kind: 'skill', project: null, body: '# Chase an invoice\n\nSend a short reminder once an invoice is 30 days past its date.', rev: 2, because: [6], state: 'retired' },
+];
+
+/* INDEX ROWS ONLY. None names `value`: that field is the vault door's, and a create naming it is refused.
+   A key in the vault is deposited; one that is not says where it is kept. */
+export const CREDENTIALS: Fields[] = [
+  { label: 'Fenwick deploy key', opens: 'Workers deploys for kiln.example', provider: 'Fenwick Cloud', kind: 'api_token', project: 1, origin: '.mcp.json on kiln-mbp', verified: day(-2), expires: day(12), state: 'stale' },
+  { label: 'Object storage, write', opens: 'The font binaries bucket', provider: 'Fenwick Cloud', kind: 'ssh_key', project: 1, where: 'The studio password manager, in the Kiln folder', state: 'live' },
+  { label: 'Ledger Post sending key', opens: 'Newsletter delivery for Portage', provider: 'Ledger Post', kind: 'api_token', project: 3, origin: 'Deposited from studio-desktop', verified: day(-12), state: 'live' },
+  { label: 'Nordhaven API', opens: 'DNS for every domain the studio holds', provider: 'Nordhaven Registry', kind: 'api_token', project: null, verified: day(-41), expires: day(49), state: 'live' },
+  { label: 'Tallyard bookkeeping', opens: 'Read-only ledger export', provider: 'Tallyard', kind: 'password', project: null, where: 'The studio password manager', verified: day(-88), state: 'invalid' },
+  { label: 'Fenwick Cloud recovery codes', opens: 'The Fenwick Cloud account, if its two-factor device is lost', provider: 'Fenwick Cloud', kind: 'recovery_codes', project: null, where: 'Printed, in the studio safe', state: 'live' },
+];
+
+/* `needs` names keys by their row, never by their value. Kiln's `fenwick` hides the global one. */
+export const TOOLS: Fields[] = [
+  { name: 'braindog', kind: 'mcp', transport: 'stdio', command: 'braindog', args: ['mcp'], needs: ['BRAINDOG_TOKEN'], trigger: 'To read and write this record from an agent.', project: null, hosts: ['kiln-mbp', 'studio-desktop'], seen: hours(0.05), origin: '~/.claude.json on kiln-mbp', state: 'active' },
+  { name: 'fenwick', kind: 'mcp', transport: 'http', endpoint: 'https://mcp.fenwick.example/v1', trigger: 'To read Fenwick Cloud usage and invoices.', project: null, hosts: ['studio-desktop'], seen: hours(2), state: 'active' },
+  { name: 'fenwick', kind: 'mcp', transport: 'http', endpoint: 'https://mcp.fenwick.example/v1', needs: ['header:Authorization=credentials#1'], trigger: 'To deploy kiln.example and read its Workers logs.', project: 1, hosts: ['kiln-mbp'], seen: hours(0.2), origin: '.mcp.json in kiln-site', state: 'active' },
+  { name: 'ledger-post', kind: 'mcp', transport: 'stdio', command: 'npx', args: ['-y', 'ledger-post-mcp'], needs: ['LEDGER_POST_KEY=credentials#3'], trigger: 'To check newsletter delivery and bounces for Portage.', project: 3, hosts: ['studio-desktop'], seen: hours(2), origin: '.mcp.json in portage', state: 'active' },
+  { name: 'outline-check', kind: 'cli', command: 'outline-check', args: ['--all-instances'], trigger: 'After the mastering pass, to find outline errors in every instance.', project: 1, hosts: ['kiln-mbp'], seen: hours(34), state: 'active' },
+  { name: 'nordhaven-dns', kind: 'integration', endpoint: 'https://api.nordhaven.example/v2', needs: ['header:Authorization=credentials#4'], trigger: 'To change DNS records for any domain the studio holds.', project: null, seen: hours(24 * 20), state: 'stale' },
+];
+
 export const ROWS: Record<string, readonly Fields[]> = {
   obligations: OBLIGATIONS,
   services: SERVICES,
@@ -663,6 +756,10 @@ export const ROWS: Record<string, readonly Fields[]> = {
   session: RUNS,
   tracks: TRACKS,
   updates: UPDATES,
+  learnings: LEARNINGS,
+  skills: SKILLS,
+  credentials: CREDENTIALS,
+  tools: TOOLS,
 };
 
 
@@ -1416,11 +1513,11 @@ export const pageDeclarations = (): Declaration[] =>
 export const metricDeclarations = (): Declaration[] =>
   Object.values(METRICS).map((body) => ({ id: `metric.${body.metric}`, kind: 'metric' as const, body: body as never }));
 
-/** Which fields of which register are refs, and to what. Read from the declarations, never listed. */
+/** Which fields of which register are refs, or lists of them, and to what. Read from the declarations, never listed. */
 const refsOf = (register: string): Map<string, string> =>
   new Map(
-    (REGISTERS[register]?.fields ?? [])
-      .filter((f) => f.type === 'ref' && typeof f.to === 'string')
+    ((REGISTERS[register] ?? AGENTS_REGISTERS[register])?.fields ?? [])
+      .filter((f) => (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) && typeof f.to === 'string')
       .map((f) => [f.id, f.to as string]),
   );
 
@@ -1438,7 +1535,14 @@ export function forWrite(register: string, fields: Fields): Record<string, unkno
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined) continue;
     const to = refs.get(key);
-    out[key] = to !== undefined && typeof value === 'number' ? `${to}#${value}` : value;
+    out[key] =
+      to === undefined
+        ? value
+        : typeof value === 'number'
+          ? `${to}#${value}`
+          : Array.isArray(value)
+            ? value.map((item) => (typeof item === 'number' ? `${to}#${item}` : item))
+            : value;
   }
   return out;
 }
@@ -1524,8 +1628,8 @@ export const ORDER = ['things', 'people', 'tracks', 'obligations', 'services', '
  * in-process channel its own callers use for exactly these fields: the ladder, and the record's
  * `attach`. No route can reach it, because a request's context carries no `stamp`. The ladder itself
  * cannot write these rows. It stamps the record's clock, which the seed fixes at `NOW`, so every run
- * would read "just now". It also places a run only through a projects register that declares
- * `scopes:`, and `things` declares none until the agents pack.
+ * would read "just now", and it would place each run by where the seed says it worked rather than by
+ * the project the row names.
  */
 function openRun(kernel: Kernel, fields: Fields, actor: string): Result<unknown> {
   const patch: Record<string, unknown> = {};
@@ -1562,14 +1666,75 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
 
   const installed = await kernel.install([...declarations(), ...pageDeclarations(), ...metricDeclarations()]);
   if (!installed.ok) return installed as Result<Seeded>;
+  const agents = await installAgentsPack(kernel, actor);
+  if (!agents.ok) return agents as unknown as Result<Seeded>;
 
   let rows = 0;
-  for (const register of ORDER)
+  for (const register of [...ORDER, ...AGENTS_ORDER])
     for (const entry of ROWS[register] ?? []) {
       const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, entry), { actor });
       if (!out.ok) return out as unknown as Result<Seeded>;
       rows++;
     }
 
-  return { ok: true, value: { registers: Object.keys(REGISTERS).length, rows, pages: Object.keys(PAGES).length, metrics: Object.keys(METRICS).length } };
+  return {
+    ok: true,
+    value: {
+      registers: Object.keys(REGISTERS).length + Object.keys(AGENTS_REGISTERS).length,
+      rows,
+      pages: Object.keys(PAGES).length,
+      metrics: Object.keys(METRICS).length,
+    },
+  };
+}
+
+/**
+ * The agents pack's registers, in the order their rows are written: a skill cites learnings.
+ *
+ * NOT IN `ORDER`, which is the seed's own registers: the web's sample engine is compared against
+ * the record register by register over that list, and it declares none of the pack's.
+ */
+export const AGENTS_ORDER = ['learnings', 'skills', 'credentials', 'tools'] as const;
+
+/**
+ * Install the agents pack THROUGH THE PACK PATH: normalised, planned and installed as any pack is,
+ * so the record holds a `pack` row for it and uninstalling it keeps its rows.
+ *
+ * The manifest's registers are checked first, because the document format names only packs it
+ * depends on. The refusal is the kernel's for a page whose register never arrived.
+ */
+export async function installAgentsPack(kernel: Kernel, actor = 'p_seed'): Promise<Result<Applied>> {
+  for (const want of AGENTS_PACK.manifest.requires)
+    if (!kernel.register(want.replace(/^register\./, '')))
+      return {
+        ok: false,
+        refusal: {
+          code: 'DEPENDENCY_UNRESOLVED',
+          fix: `${AGENTS_PACK.manifest.id} requires ${want}, and it is not installed. Install the pack that declares it first.`,
+          at: 'requires',
+        },
+      };
+
+  const pack = await normalise(agentsPackDocument(), { kind: 'local' });
+  if (!pack.ok) return pack;
+  const state: Installed = {
+    format: 1,
+    primitives: 1,
+    record_version: kernel.version(),
+    packs: kernel.packs(),
+    declarations: kernel.declarations() as Installed['declarations'],
+    rows: kernel.census(),
+  };
+  const diff = await plan(pack.value, state);
+  return install(pack.value, diff, {
+    count: (register) => kernel.count(register),
+    stage: (batch) => kernel.stageInstall(batch as never),
+    transaction: (fn) => kernel.transaction(fn),
+    reload: () => kernel.reload(),
+    retire: (ids) => kernel.retire(ids),
+    seed: (register, fields) => kernel.create(register, { ...fields, tags: ['example'] }, { actor, cascade: false } as never) as never,
+    remember: (row) => kernel.rememberPack(row),
+    forget: (id) => kernel.forgetPack(id),
+    claimed: (id) => kernel.packClaims(id),
+  }, diff.planHash);
 }

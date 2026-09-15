@@ -63,8 +63,19 @@ export type GovernDeps = {
   allocate: (name: string) => number;
   /** Whether a register exists, so a `rowset` cannot name one that does not. */
   hasRegister: (register: string) => boolean;
-  /** The write path, for the rows an accepted `rowset` writes. */
-  write: (register: string, patch: Record<string, unknown>, actor: string, batch: string) => Result<{ id: string }>;
+  /** A row of `register` by its spoken id or row id, deleted ones included, for a `rowset` row that updates it. */
+  row: (register: string, at: string) => { id: string; deleted: boolean } | null;
+  /**
+   * The write path, for the rows an accepted `rowset` writes. With `update` it changes that row,
+   * compare-and-set on `update.version`, and otherwise it creates one.
+   */
+  write: (
+    register: string,
+    patch: Record<string, unknown>,
+    actor: string,
+    batch: string,
+    update?: { id: string; version: number },
+  ) => Result<{ id: string; version: number }>;
   /**
    * Read a prediction's measure over a window, for the baseline frozen at acceptance.
    *
@@ -254,7 +265,7 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
         fix: `A rowset is at most ${MAX_ROWS} rows, and this one is ${rows.length}. More than that is an import.`,
         at: 'body.rows',
       };
-    return null;
+    return checkUpdates(deps, register, rows as Record<string, unknown>[]);
   }
 
   if (kind === 'pattern') {
@@ -283,6 +294,73 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
     if (wrong) return wrong;
   }
   return null;
+}
+
+/** The keys a `rowset` row that updates carries, and nothing beside them. */
+const UPDATE_KEYS = ['at', 'version', 'patch'];
+
+/**
+ * The rows of a `rowset` that update: `{ at, version, patch }`, where a row without `at` creates.
+ *
+ * CHECKED AT FILING, for the reason every body is: the row it names exists and is live, the version
+ * it was read at is there to compare against, and the patch says something. Whether the patch is
+ * valid is the write path's, at acceptance, as it is for the rows a rowset creates.
+ */
+function checkUpdates(deps: GovernDeps, register: string, rows: readonly Record<string, unknown>[]): Refusal | null {
+  const named = new Set<string>();
+  for (const [i, r] of rows.entries()) {
+    if (!('at' in r)) continue;
+    const where = `body.rows[${i}]`;
+    const row = typeof r.at === 'string' ? deps.row(register, r.at) : null;
+    if (!row || row.deleted)
+      return { code: 'VALUE_MALFORMED', fix: `${String(r.at)} is not a live row of ${register}.`, at: `${where}.at` };
+    /* ONE UPDATE PER ROW. A second would be compared against the version the first leaves, so it
+       could never apply, and the proposal would be one nobody can accept. */
+    if (named.has(row.id))
+      return { code: 'VALUE_MALFORMED', fix: `${String(r.at)} is updated twice. Put both changes in one patch.`, at: `${where}.at` };
+    named.add(row.id);
+    if (r.version === undefined)
+      return {
+        code: 'REQUIRED_MISSING',
+        fix: 'An update carries the version its row was read at, so a row changed since is not overwritten.',
+        at: `${where}.version`,
+      };
+    if (typeof r.version !== 'number' || !Number.isInteger(r.version) || r.version < 1)
+      return { code: 'VALUE_MALFORMED', fix: 'version is the whole number the row was read at.', at: `${where}.version` };
+    const patch = r.patch;
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch) || Object.keys(patch).length === 0)
+      return { code: 'VALUE_MALFORMED', fix: 'An update carries a patch: the fields it changes, with their new values.', at: `${where}.patch` };
+    const extra = Object.keys(r).find((key) => !UPDATE_KEYS.includes(key));
+    if (extra !== undefined)
+      return { code: 'FIELD_UNKNOWN', fix: 'A row that updates carries at, version and patch, and nothing beside them.', at: `${where}.${extra}` };
+  }
+  return null;
+}
+
+/**
+ * One update row of an accepted `rowset`, as the person deciding, compare-and-set.
+ *
+ * A DELETE IS ITS OWN WRITE, after the fields. The write path logs a delete as a single event, so
+ * the fields changed beside it would be missing from the history. The delete is compared against
+ * the version the first write left.
+ */
+function applyUpdate(
+  deps: GovernDeps,
+  register: string,
+  r: Record<string, unknown>,
+  actor: string,
+  batch: string,
+): Result<{ id: string; version: number }> {
+  const row = deps.row(register, String(r.at));
+  if (!row) return no('VALUE_MALFORMED', `${String(r.at)} is no longer a row of ${register}.`, { at: 'body.rows' });
+  const { deleted_at, ...fields } = r.patch as Record<string, unknown>;
+  let version = Number(r.version);
+  if (Object.keys(fields).length > 0) {
+    const made = deps.write(register, fields, actor, batch, { id: row.id, version });
+    if (!made.ok || deleted_at === undefined) return made;
+    version = made.value.version;
+  }
+  return deps.write(register, { deleted_at }, actor, batch, { id: row.id, version });
 }
 
 /**
@@ -445,10 +523,14 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       const register = String(body.register);
       const mechanism = typeof body.ingest === 'string' ? `ingest:${body.ingest}` : actor;
       for (const r of (body.rows ?? []) as Record<string, unknown>[]) {
-        const made = deps.write(register, r, mechanism, batch);
+        /* AN UPDATE IS SIGNED BY THE PERSON DECIDING, whoever drew the proposal, because changing a
+           row that exists is what their press authorised. A row a rowset creates keeps the ingest's
+           name when an ingest produced it. */
+        const made = 'at' in r ? applyUpdate(deps, register, r, actor, batch) : deps.write(register, r, mechanism, batch);
         /* ALL THE ROWS OR NONE. Half a rowset accepted is a decision whose answer is not true of the
-           record, and the caller's transaction is what undoes the rest. */
-        if (!made.ok) return made;
+           record, and the caller's transaction is what undoes the rest. A stale version is the
+           house conflict, and it undoes the rest the same way. */
+        if (!made.ok) return made as Result<Decided>;
         wrote.push(made.value.id);
       }
     } else if (row.body_kind === 'pattern' || row.body_kind === 'change') {

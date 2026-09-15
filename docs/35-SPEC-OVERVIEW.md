@@ -83,7 +83,7 @@ wire shapes — never prose.
 | 41 | `packages/kernel` — migrations for the twenty-seven tables and the header tables, the write path, counters, events, `entry_fts`, refusals | 30 §1–§4, §6, §11 · 02 · 34 §3–§5 | sixth; the record's core |
 | 42 | `packages/declare` — the eight declaration kinds' schemas, YAML → JSON, lint, the install plan and diff | 04 · 06 §1.1 · 07 §6 · 08 §2 · 09 §4 · 25 §3 · 34 §6 | seventh |
 | 43 | `packages/extract` — the ten extractors and three combinators, the money and date parsers | 07 §3–§4 · 25 | eighth; phase B |
-| 44 | `packages/mcp` — the eight tools, resources, `instructions`, the streamable-HTTP JSON-RPC handler, budgets | 10 · 33 §2, §4 | ninth |
+| 44 | `packages/mcp` — the fourteen tools, resources, `instructions`, one JSON-RPC core over stdio and streamable HTTP, budgets | 10 · 33 §2, §4 | ninth |
 | 45 | `packages/record` — the RPC surface in six groups, `CallContext`, `Result`, pagination, projection, the outbox and schedule protocols | 30 §5, §8–§10 · 33 §2 · 09 | tenth |
 | 46 | `packages/spark` — tier A jobs, the projection reader, proposals, the tier-C dispatcher | 11 · 23 · 26 · 33 §11 | eleventh |
 | 47 | `packages/connect` — `ingest` with `fetch:`, placeholders, formats, `expect:`, `probe:`, `metric_point` | 25 · 08 §3 | twelfth |

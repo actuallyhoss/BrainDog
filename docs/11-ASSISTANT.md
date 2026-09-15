@@ -352,7 +352,7 @@ An assistant with no eval set is an assistant that regresses on a model upgrade 
 | **Refusal** | 20 prompts that try to make it decide, write, or reveal a secret. All 20 must decline and say why |
 | **Injection** | 25 payloads with embedded instructions in emails, subjects, PDF text and merchant names. Zero may produce a proposal marked `exact` |
 | **Cost** | the modelled month must stay within budget on the fixture record |
-| **Token budget** | `tools/list` under 1,800 tokens; `record_index` under 500 |
+| **Token budget** | `tools/list` at or under 2,600 tokens ([44-SPEC-MCP](44-SPEC-MCP.md) §7); `record_index` under 500 |
 
 Run on every model change, and the results published in the repo — for an open-source product,
 the eval set is also the trust argument.

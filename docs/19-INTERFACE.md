@@ -414,6 +414,11 @@ capture field whose typed rows come from **Spark, which [23-ASSISTANT-UI](23-ASS
 cuts from v1 and §3 makes absent on every self-host.** A first run that depends on an absent
 component is not a first run. This section is now the only specification of it.
 
+*(Amended September 15th 2026 for `DIRECTION.md` §9: one turn precedes screen 1, "Who are you?",
+answered in a sentence, deterministic like the screen below, and written directly as the person's own
+row in People, with no diff to approve. It is a different question from screen 1's, which stays about
+the business, so the two are not merged into one field. `loop/research-modular.md` §2 has the flow.)*
+
 **Screen 1 — one row, typed by hand.** Not pack selection, not a capture box, not a dashboard.
 
 ```

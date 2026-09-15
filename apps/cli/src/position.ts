@@ -25,7 +25,7 @@ export type Position = {
 };
 
 /* Three seconds each, because a hung git (a network drive, a held lock) must not hold the first call. */
-const git = (cwd: string, ...args: string[]) =>
+export const git = (cwd: string, ...args: string[]) =>
   new Promise<string | null>((done) =>
     execFile('git', args, { cwd, timeout: 3_000, windowsHide: true }, (e, out) => done(e ? null : out.trim() || null)),
   );
@@ -85,9 +85,11 @@ export function normaliseRemote(url: string): string | null {
 
 const printable = (max: number) => new RegExp(`^[\\x20-\\x7e]{1,${max}}$`);
 
-/* The grammar of the plan's §3.4. `Session` and `Client` wait for the session file the start hook
-   writes, so they are not sent yet. */
+/* The grammar of the plan's §3.4. `Session` and `Client` come from the session file the start hook
+   writes, so a process without one sends neither. */
 const GRAMMAR: Record<string, RegExp> = {
+  'x-braindog-session': /^S[1-9][0-9]*$/,
+  'x-braindog-client': /^[A-Za-z0-9._:-]{1,128}$/,
   'x-braindog-host': /^[A-Za-z0-9._-]{1,128}$/,
   'x-braindog-repo': /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
   'x-braindog-remote': printable(256),
@@ -100,8 +102,10 @@ const GRAMMAR: Record<string, RegExp> = {
  * and because `fetch` refuses a header value that is not Latin-1: a folder named in another script
  * would otherwise turn every call into a failure.
  */
-export function sessionHeaders(p: Position, agent?: Agent): Record<string, string> {
+export function sessionHeaders(p: Position, agent?: Agent, run?: { spoken?: string | undefined; client_id?: string | undefined }): Record<string, string> {
   const values: Record<string, string | null | undefined> = {
+    'x-braindog-session': run?.spoken,
+    'x-braindog-client': run?.client_id,
     'x-braindog-host': p.host,
     'x-braindog-repo': p.repo,
     'x-braindog-remote': p.remote,

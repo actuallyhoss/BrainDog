@@ -623,7 +623,7 @@ boot or on the wire ever prints a token, a code, a cookie value or a payload.
 | Measure | Budget | How measured |
 |---|---|---|
 | Cold start, ten records, warm disk | ≤ 400 ms to `listen`; CI asserts < 1,000 ms | `test/boot.test.ts`: `performance.now()` around `startServer` over ten fixture records |
-| Per record at boot | ≤ 25 ms — `openNodeSqlite` (four PRAGMAs, `measureCaps`, `bootProbe`: < 2 ms per 37 §7), `applyMigrations` no-op, `pendingWork()`, `createMcpHandler` | same test, per-record timings logged |
+| Per record at boot | ≤ 25 ms — `openNodeSqlite` (four PRAGMAs, `measureCaps`, `bootProbe`: < 2 ms per 37 §7), `applyMigrations` no-op, `pendingWork()`, `serveMcp` | same test, per-record timings logged |
 | `GET /api/version`, cookie | ≥ 2,000 req/s on Node 24.13.0, one process, 4 cores | `tools/bench/selfhost.mjs`: `fetch` in 50 concurrent loops for 5 s; reported, not gated |
 | `POST /api/list`, 25 rows, cookie | ≥ 500 req/s | same script |
 | Auth overhead per request | ≤ 60 µs — one indexed `SELECT` (session or token), one `member` read | `performance.now()` deltas in the request loop under `BRAINDOG_TRACE=1` |

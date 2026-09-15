@@ -29,6 +29,10 @@ CREATE INDEX schedule_due ON schedule(state, due_at);
 **Ten kinds, and the `CHECK` is the count** — the same DDL as [30-BLUEPRINT](30-BLUEPRINT.md) §1. *(An
 earlier draft here listed six, had no `CHECK`, and left `attempts` nullable.)*
 
+*(Amended September 15th 2026 for `DIRECTION.md` §0b: the `CHECK` gains `call` and `poll` beside
+`pull`, the outbound and watching halves of a scheduled action, both metered per account in the
+Directory rather than in this table. `loop/research-modular.md` §3.2 and §3.3 have the detail.)*
+
 `state` has **five** values — `pending` · `firing` · `done` · `failed` · `paused`. `paused` is a
 connector's row after its credential was rejected or its ladder ran out (§2,
 [25-CONNECTORS](25-CONNECTORS.md) §9); the claim below never takes it. The handler is one INTERNAL method

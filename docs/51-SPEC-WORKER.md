@@ -773,7 +773,7 @@ A third runtime package is a new ADR.
 ## 12 · Build order
 
 **Before this:** `packages/ports` with `preflight`, the case array and the Node reference run (37); `packages/record`
-with `createRecord`, `Method`/`GROUPS` and the methods of §13 D11 (45); `packages/mcp`'s `createMcpHandler` (44);
+with `createRecord`, `Method`/`GROUPS` and the methods of §13 D11 (45); `packages/mcp`'s `serveMcp` (44);
 `packages/connect`'s `ingest` (47); `packages/spark`'s `createSpark` (46 — a stub that refuses is enough for phase 5);
 `apps/web/build` (50) for `ASSETS`; the Directory flows (§13 D10). Phases 0–4 of BUILD.md.
 

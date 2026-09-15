@@ -101,6 +101,7 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { sparkMayWrite } from './spark.ts';
+import { PEOPLE, meet as meetPerson, type MeetArgs, type Met } from './people.ts';
 import { KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, type Found, type SessionHints } from './session.ts';
 import {
   resolveProject,
@@ -152,6 +153,8 @@ export {
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { BODY_KINDS, GOVERNANCE } from './govern.ts';
+export { MET_CAP, PEOPLE } from './people.ts';
+export type { MeetArgs, Met } from './people.ts';
 export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export type { Member } from './members.ts';
@@ -2014,9 +2017,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     mint,
     allocate,
     hasRegister: (register) => registers.has(register),
+    row: (register, at) => {
+      const found = get(at, { includeDeleted: true });
+      return found && found.register === register ? { id: found.id, deleted: found.deleted_at !== null } : null;
+    },
     /* `decided`, because a row an accepted proposal writes is a decision carried out: the one way a
-       field or a move declared `by: 'decide'` changes. */
-    write: (register, patch, actor, batch) => write(register, null, patch, { actor, batch }, { decided: true }),
+       field or a move declared `by: 'decide'` changes. An update carries its version, so a row
+       changed since the proposal answers the house conflict. */
+    write: (register, patch, actor, batch, update) =>
+      write(
+        register,
+        update?.id ?? null,
+        patch,
+        { actor, batch, ...(update === undefined ? {} : { version: update.version }) },
+        { decided: true },
+      ),
     /* THE FROZEN BASELINE, read through the one evaluator every figure in this record goes through.
        A prediction's measure is a metric body without a target or a window (24 §4.6) — both are
        supplied here from the prediction's own, which is what makes it gradeable at all. */
@@ -2804,6 +2819,35 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** Put one back in the queue, for the change the gate accepted and could not land. */
     reopen: (id: string, why?: string): Result<null> => transaction(() => reopen(governDeps(), id, why)),
+
+    /**
+     * Someone met in the work: matched by email or handle, or added, and linked to the project of the
+     * caller's run (`people.ts`). One transaction, so a refusal anywhere writes nothing, a run included.
+     * The caller's `version` and `opId` are not carried, because they describe no row meet writes.
+     */
+    meet: (args: MeetArgs, w: WriteContext): Result<Met> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      const as: WriteContext = {
+        actor: w.actor,
+        ...(w.principal === undefined ? {} : { principal: w.principal }),
+        ...(w.session === undefined ? {} : { session: w.session }),
+      };
+      return attempt(sql, transaction, () =>
+        meetPerson(
+          {
+            sql,
+            nowMs: clock.now(),
+            fields: registers.get(PEOPLE)?.fields,
+            project: () => (as.principal?.kind === 'token' ? (locateRun(as).project?.id ?? null) : null),
+            nameOf,
+            write: (ref, patch, version) => write(PEOPLE, ref, patch, version === undefined ? as : { ...as, version }),
+            propose: (p) => openSuggestion(governDeps(), () => signedBy(as), p),
+          },
+          args,
+        ),
+      );
+    },
 
     /* ── the outbox: work that must leave the record ────────────────── */
 

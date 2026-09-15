@@ -2,9 +2,9 @@
  * `context`, over the seed: where an agent working on Kiln stands, in one call.
  *
  * The seed is the record this product shows itself with, so the shape is asserted against it rather
- * than against a toy. What its projects cannot say yet, their repositories and which rows are a
- * project's, is declared here the way the agents pack will declare it (`loop/research-agent-path.md`
- * §5.2), and so are the skills, the keys and the learnings.
+ * than against a toy. The seed installs the agents pack with sample rows of its own, so each test
+ * narrows the registers to the fields it writes and asserts only on the rows it wrote: a sample row
+ * added to the demo must not break what `context` is held to.
  */
 
 import { test } from 'node:test';
@@ -129,6 +129,8 @@ async function kiln() {
 }
 
 const registerOf = (here: Context, id: string) => here.registers.find((r) => r.id === id) ?? assert.fail(`${id} is not in the answer`);
+/** The rows among `rows` whose `key` is one this test wrote. */
+const mine = <R>(rows: readonly R[], key: string, wrote: readonly unknown[]): R[] => rows.filter((r) => wrote.includes((r as Record<string, unknown>)[key]));
 
 /* ── the shape ───────────────────────────────────────────────────────────── */
 
@@ -188,7 +190,11 @@ test('CONTEXT OVER THE SEED: the run, Kiln, the last handoff, who is live, what 
 
   /* A learning nobody confirmed in ninety days is counted, not shown. */
   const learnings = registerOf(here, 'learnings');
-  assert.deepEqual([learnings.rows.map((r) => r.lesson), learnings.inherited.length, here.faded], [['Export the variable font last.'], 0, 1]);
+  const lessons = ['Export the variable font last.', 'Proof on paper before the web.'];
+  assert.deepEqual(
+    [mine(learnings.rows, 'lesson', lessons).map((r) => r.lesson), mine(learnings.inherited, 'lesson', lessons).length, here.faded],
+    [['Export the variable font last.'], 0, 1],
+  );
   assert.match(here.next, new RegExp(`handoff ${before.spoken} left`));
 
   assert.deepEqual(here.people.map((p) => [p.spoken, p.scope]), [[`people#${String(person.seq)}`, 'project']]);
@@ -202,14 +208,15 @@ test('NEARER WINS: Kiln’s own skill hides the global one of the same name, and
   value(await api.create({ register: 'skills', fields: { name: 'deploy', trigger: 'Shipping a site' } }, owner));
   value(await api.create({ register: 'skills', fields: { name: 'review-pr', trigger: 'Before a Kiln merge', project } }, owner));
 
+  const triggers = ['Before any merge', 'Shipping a site', 'Before a Kiln merge'];
   const skills = registerOf(value<Context>(await api.context({}, agent({ ...HERE, client_id: 'c-1' }))), 'skills');
-  assert.deepEqual(skills.rows.map((r) => [r.name, r.trigger, r.scope]), [['review-pr', 'Before a Kiln merge', 'project']]);
-  assert.deepEqual(skills.inherited.map((r) => [r.name, r.scope]), [['deploy', 'global']]);
+  assert.deepEqual(mine(skills.rows, 'trigger', triggers).map((r) => [r.name, r.trigger, r.scope]), [['review-pr', 'Before a Kiln merge', 'project']]);
+  assert.deepEqual(mine(skills.inherited, 'trigger', triggers).map((r) => [r.name, r.scope]), [['deploy', 'global']]);
   assert.equal(skills.truncated, false);
 
   /* A run in no project inherits every global skill, and has no rows of its own. */
   const global = registerOf(value<Context>(await api.context({}, agent({ host: 'kiln-mbp', repo: 'elsewhere', client_id: 'c-9' }))), 'skills');
-  assert.deepEqual([global.rows.length, global.inherited.map((r) => r.name).sort()], [0, ['deploy', 'review-pr']]);
+  assert.deepEqual([mine(global.rows, 'trigger', triggers).length, mine(global.inherited, 'trigger', triggers).map((r) => r.name).sort()], [0, ['deploy', 'review-pr']]);
   sql.close();
 });
 
@@ -255,10 +262,10 @@ test('A KEY IS NAMED, NEVER GIVEN: its label, what it opens and whether it is se
   const briefed = value<Context>(await api.context({}, said));
   const keys = registerOf(briefed, 'credentials');
   assert.deepEqual(
-    keys.rows.map((r) => [r.label, r.opens, r.value]),
+    mine(keys.rows, 'label', ['Shop', 'DNS']).map((r) => [r.label, r.opens, r.value]),
     [['Shop', 'the Kiln shop', { sealed: true, opened: 1, last_opened: iso(NOW + 5 * MIN), last_by: opener }]],
   );
-  assert.deepEqual(keys.inherited.map((r) => [r.label, (r.value as { sealed: boolean }).sealed]), [['DNS', true]]);
+  assert.deepEqual(mine(keys.inherited, 'label', ['Shop', 'DNS']).map((r) => [r.label, (r.value as { sealed: boolean }).sealed]), [['DNS', true]]);
 
   for (const [what, answer] of [['context', JSON.stringify(briefed)], ['attach', JSON.stringify(attached)]] as const) {
     assert.ok(!answer.includes(secret), `${what} carries the key`);

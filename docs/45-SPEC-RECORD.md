@@ -57,6 +57,9 @@ export type RecordApi = {
   propose(args: ProposeArgs, ctx: CallContext): Promise<Result<{ id: string }>>;
   log(args: LogArgs, ctx: CallContext): Promise<Result<EventRow>>;
   markRead(args: { upTo: number }, ctx: CallContext): Promise<Result<null>>;
+  // RUNS: 2, added with the session register (loop/research-agent-path.md §6)
+  attach(args: AttachArgs, ctx: CallContext): Promise<Result<Attached>>;                               // which run this agent is, and its briefing
+  handoff(args: HandoffArgs, ctx: CallContext): Promise<Result<Entry>>;                                // the next step, what was tried, the state
   // READ+ — 11
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
   metric(args: { id: string }, ctx: CallContext): Promise<Result<MetricResult>>;
@@ -383,7 +386,7 @@ call(method, args, ctx):
 | Verb | Person level | Token scope | Methods |
 |---|---|---|---|
 | read | `≥ read` | any | `index` `search` `get` `list` `whatsNew` `boot` `whoami` `project` `page` `metric` `schema` `dialect` `digestToday` `sessionsLive` `context` |
-| propose | `≥ append` | `≥ propose` | `propose` `log` |
+| propose | `≥ append` | `≥ propose` | `propose` `log` `attach` `handoff` |
 | create | `≥ append` | `write` | `create` |
 | update | `≥ write` | `write` | `update` |
 | decide | `≥ decide`, person only | — | `update` on `suggestion` with `patch.decide` or `patch.resolved_as` |
@@ -540,6 +543,9 @@ grant's id never appears (§4.4 rule 3). The learnings `learningsFor` returned i
 4. `index` = `index({ level: 'index' })` steps 1–2 with `fields`. Return `{ rows, index, budget: { used, limit: budget.tokens } }`.
 
 **`boot()`** — one `kernel.transaction` holding a read snapshot: `index` (steps 1–5), `sessionsLive`, `SELECT id, body_kind, body, opened_by, opened_at, defer_until FROM suggestion WHERE status = 'open' ORDER BY opened_at LIMIT 50`, `whatsNew()` with the default cursor. One round trip, at most `registers + 6` statements.
+
+As built, `boot` answers `registers`, `now`, `sessions` and `waiting`, each held to what the caller may read.
+`whatsNew` is not in it yet, so a caller reads it on its own. A session's briefing comes from `context`, not `boot`.
 
 ---
 
@@ -921,6 +927,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 | `search` | a phrase with `"` and `OR` is matched literally; zero rows → one `search.empty` observation; with `vec` → the fused order |
 | `context` | over the seed, in `test/context.test.ts`: the run, the project and how it was placed, the last handoff, who is live here and elsewhere, what waits, the project's open rows, a learning faded after ninety days and counted, the people linked, and no run opened by the read; nearer wins for a skill of the same name; a key by its label and sealed state, with no value anywhere; an append grant is no register in the answer, and a caller with nothing to read is refused |
 | `sessionsLive` | `last_seen` 46 min ago → `stale: true`; `same_repo` excludes the caller |
+| `attach` · `handoff` | in `test/session.test.ts`: attach opens a run signed by itself and resumes it for the same client; a person is never a run; re-attaching never overwrites the handoff and brings a finished run back; a handoff appends `tried` and `note`, keeps the last fifty of each, and moves `state` along the transitions; a token hands off only its own run |
 | `page` | `share` on its slug → ok; a `when: false` block → no rows; `empty` filled |
 | `project` budget | `budget.tokens: 500` → `used ≤ 500`, cut at the first row that does not fit; no `document` body; a `series` register contributes no rows; `{ metric }` → `rows: []` and the metric |
 | `whoami` | a token → its person's `levels` and `registers`; no session row is opened |

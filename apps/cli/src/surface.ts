@@ -21,7 +21,10 @@ export const UNREACHABLE_FIX =
 const reachable = <T>(r: Result<T>): Result<T> =>
   refused(r) && r.refusal.code === 'UNREACHABLE' ? { ok: false, refusal: { ...r.refusal, fix: UNREACHABLE_FIX } } : r;
 
-/** The four methods the record does not answer yet, which `McpSurface` marks optional. */
+/**
+ * The four methods `McpSurface` marks optional. The record answers `context`, `handoff` and
+ * `sessionsLive`; `meet` is not built yet, so its tool keeps its own "not yet" sentence.
+ */
 const LATER = ['context', 'handoff', 'meet', 'sessionsLive'] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {

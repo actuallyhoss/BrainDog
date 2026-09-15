@@ -23,6 +23,13 @@ A self-hoster on a laptop cannot provide an always-up endpoint. That asymmetry i
 crippled free tier — it is a genuine infrastructure difference, and it is the honest reason the
 hosted tier has value even though the code is free.
 
+*(Amended September 15th 2026 for `DIRECTION.md` §0b: `channel:` gains two more values beside
+`pull`, `call` (an outbound POST fired by a schedule or a rule) and `poll` (watch an endpoint, act
+through a rule on a change), declared inside this same `ingest` kind rather than a new one, so the
+eight-kind list in [04-PACKS](04-PACKS.md) §1 stays closed. Both are safe by the same rules as `pull`
+in [25-CONNECTORS](25-CONNECTORS.md) §4 and §7: a literal origin, one preflight, the install diff
+naming every host. `loop/research-modular.md` §3.2 has the detail and the runner it still needs.)*
+
 ---
 
 ## 2 · Everything lands raw first

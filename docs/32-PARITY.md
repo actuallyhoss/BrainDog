@@ -397,7 +397,7 @@ the count is stated once and does not drift.
 
 | Pack | Registers | Installed when |
 |---|---|---|
-| **`agents`** | `learnings` · `skills` · `credentials` | **the first agent token is minted** — §8 |
+| **`agents`** | `learnings` · `skills` · `credentials` (labelled Keys) · `tools`; requires `register.things` and nothing else | **the first agent token is minted** — §8. The demo record installs it through the pack path, as any pack arrives |
 | **`work`** | `tasks` · `tracks` · `dates` | the first `create` into any of them, or by choice |
 | **`portfolio`** | `entities` · `plan_steps` | by choice; the shape the brain is |
 | **`money-core`** | as [02-DATA-MODEL](02-DATA-MODEL.md) §3, plus `income` · `recurring` · `installments` · `assets` · `snapshots` · `company` | by choice |
@@ -409,40 +409,68 @@ the count is stated once and does not drift.
 [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) designed an *automatic* loop and found the sensing
 half missing. **The brain has been running the *manual* half for a month**: a session records what
 a future session would otherwise get wrong, as a row with an id, with the failure that produced it
-as a mandatory field, and **a human promotes it** — agent-written learnings land `proposed`, in no
-digest and no default read, until the owner moves them to `active`. That is the decision gate applied
-to instructions.
+as a mandatory field. **Capturing one needs nobody** (`loop/DIRECTION.md`): a learning lands
+`active` at the session's project, or everywhere when the session has none. What a human decides is
+the widening: making a project's learning hold everywhere is a proposal, and so is bringing back a
+learning that was superseded or reverted. That is the decision gate applied to instructions, at the
+one point where an instruction starts reaching every project at once.
+
+*(This section once had agent-written learnings land `proposed`, in no digest and no default read,
+until the owner moved them. The owner overruled it: a gate on every capture is a gate nobody opens,
+and the scope rule already stops a session writing outside its own project.)*
 
 ```yaml
 register: learnings
 seq_prefix: "LN"
 fields:
-  - { id: kind,    type: enum, values: [method, fact], required: true }
   - { id: lesson,  type: text, required: true, min: 12, max: 400 }
   - { id: because, type: text, required: true, min: 24, max: 600 }   # THE FAILURE THAT PRODUCED IT
-  - { id: scope,   type: ref, register: entities }                    # empty = global
+  - { id: kind,    type: enum, values: [method, fact], required: true }
+  - { id: project, type: ref, to: things, scope: { widen: person } }  # empty = everywhere; only a person widens it
   - { id: topic,   type: text, index: true }
-  - { id: fingerprint, type: text, unique: true, derive: { normalise: lesson } }   # → 409 ALREADY_KNOWN; the one derived field that IS stored, because unique: needs an index — ADR-027
-  - { id: supersedes, type: ref, register: learnings }
-  - { id: state,   type: enum, values: [proposed, active, superseded, reverted], default: proposed,
-      transitions: { proposed:   { to: [active], by: decide },
-                     active:     { to: [reverted, superseded], requires: [why] },
-                     superseded: { to: [active], by: decide } } }   # reverting a replacement restores this
+  - { id: confirmed_on, type: day }                                    # an agent that relied on it sets today
+  - { id: supersedes, type: ref, to: learnings }
+  - { id: state,   type: enum, values: [active, superseded, reverted], default: active,
+      transitions: { active:     { to: [superseded, reverted], requires: [why] },
+                     superseded: { to: [active], by: decide },
+                     reverted:   { to: [active], by: decide } } }   # reverting a replacement restores this
   - { id: why,     type: text, min: 24 }
-immutable_when: { field: state, in: [reverted] }    # a reverted learning is frozen; a superseded one can come back
 ```
 
 *(An earlier draft locked `superseded` rows, which made the "exactly invertible" pair below
-impossible — restoring a superseded learning is a state move on a row the lock had frozen.)*
+impossible — restoring a superseded learning is a state move on a row the lock had frozen. The
+`fingerprint` that refused a duplicate waits for `derive`; until it lands, duplicates are merged by
+hand.)*
 
 Three rules the brain enforces that the declaration carries: **superseding is not reverting** —
 revert when it was wrong, supersede when something more accurate replaced it, and reverting a
 replacement restores what it displaced, so the pair is exactly invertible; the read is ordered
-**method before fact, global before scoped, newest within each**, forty by default with `truncated`
-set honestly; and the four-part test for whether something qualifies — *changes what a session does ·
-generalises · a session without it would get it WRONG, not merely slower · has no other home* — is
-the MCP resource's description, because it is the thing agents most often get wrong. **Calibration:
-most sessions record nothing, and that is the correct number.**
+**method before fact, project before global, newest within each**, forty by default with `truncated`
+set honestly, and a learning nobody has confirmed in ninety days fades from the briefing and is
+counted rather than deleted; and the four-part test for whether something qualifies — *changes what a
+session does · generalises · a session without it would get it WRONG, not merely slower · has no
+other home* — is the MCP resource's description, because it is the thing agents most often get
+wrong. **Calibration: most sessions record nothing, and that is the correct number.**
+
+**The other three registers**, declared field by field in `loop/research-agent-path.md` §5.2 and
+shipped in `packages/seed/src/packs/agents.ts`:
+
+| Register | What a row is | What it refuses |
+|---|---|---|
+| `skills` | a skill or command: its name, when to reach for it, its text and its version, at a project or everywhere | a change to `body` or `rev` except by an accepted proposal, so the text changes by the owner's press |
+| `credentials`, labelled **Keys** | what a key opens and where it applies; the key is sealed in the vault, or the row says where it is kept | any write to `value`, which only the vault door sets; and key-shaped text in any field |
+| `tools` | an MCP server, command line or integration: how it starts, and the keys it needs by row, never by value | an MCP server with no transport, a `stdio` one with no command, an `http` one with no address |
+
+**Nearer wins, by name, for skills and tools**: a project's `review-pr` hides the global one inside
+that project and nowhere else. Keys and learnings add up instead, the project's first. Every row's
+`project` points at the register that declares `scopes:`, which is `things`, whose rows list their
+repositories and folders, so a session is placed in a project by where it is working.
+
+**The pack needs projects and nothing else.** Every module can be switched off, People included, so
+no field in it points at a person, and a record without People installs it and loses nothing it
+holds. The people an agent meets are the `people` pack's business: that register gains `handles`,
+`projects` (a token may add one and never remove one), `met` and `merged_into`, and a `role` that is
+no longer required.
 
 ### The follow-up cascade, as a rule with `via:`
 

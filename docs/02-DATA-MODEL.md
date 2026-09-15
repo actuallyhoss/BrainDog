@@ -25,6 +25,8 @@ migration     -- applied kernel migrations: version, applied_at, checksum
 -- `Directory`, one instance; on the self-host it is `directory.sqlite` in the same process, same schema, same Sql
 -- port. The record keeps what a .dog must resolve offline and what is scoped to one record.
 person        -- id ('p_' + ULID, minted by the Directory), email, name, suspended_at. Mirror; actors and members resolve here
+              -- CORE, not a pack: "who are you" is answered here at sign-in, independent of whether
+              -- the `people` pack is installed or enabled, per `loop/research-modular.md` §2.3
 token         -- agent tokens, one record each: id, person_id, hash, scope CHECK (read|propose|write), label, created_at,
               -- last_used_at, last_surface, expires_at, revoked_at
 auth_fail     -- per-record lockouts (device codes, share tokens): key, n, until. Never exported
@@ -642,6 +644,11 @@ The answer is the run's `project`, the spoken id of the project row (`things#3`)
 and by no caller. A run named by its spoken id keeps the project it was placed in, so a later write cannot
 move it by sending other hints. **Scope is not access**: scope says where a row applies, and member levels
 ([20-COLLABORATION](20-COLLABORATION.md) §1) say who may read it, so a global key still opens only on a grant.
+
+*(Amended September 15th 2026 for modularity: the register declaring `scopes:` is load-bearing rather
+than an ordinary module, because every other pack's `scope: {}` field is a `ref` into it. Disabling or
+uninstalling it while such a field still points at it is refused, naming what would orphan. See
+`loop/research-modular.md` §1.5.)*
 
 ### The caps, and where they come from
 

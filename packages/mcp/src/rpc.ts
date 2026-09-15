@@ -188,11 +188,12 @@ async function dispatch<C>(id: Id, method: string, params: Record<string, unknow
       return answer(id, {
         resources: listing.map(({ uri, name, description }) => ({ uri, name, description, mimeType: JSON_TYPE })),
         ttlMs: MINUTE,
+        cacheScope: 'private',
       });
     }
 
     case 'resources/templates/list':
-      return answer(id, { resourceTemplates: TEMPLATES.map((t) => ({ ...t, mimeType: JSON_TYPE })), ttlMs: HOUR });
+      return answer(id, { resourceTemplates: TEMPLATES.map((t) => ({ ...t, mimeType: JSON_TYPE })), ttlMs: HOUR, cacheScope: 'private' });
 
     case 'resources/read': {
       if (typeof params.uri !== 'string') return fail(id, RPC.params, 'resources/read needs a uri.');
@@ -204,12 +205,13 @@ async function dispatch<C>(id: Id, method: string, params: Record<string, unknow
       return answer(id, {
         contents: [{ uri: params.uri, mimeType: JSON_TYPE, text: JSON.stringify(r.value ?? null) }],
         ttlMs: ttlOf(params.uri),
+        cacheScope: 'private',
       });
     }
 
     /* None yet. The skill and the instructions teach; a prompt library is a third thing to keep true. */
     case 'prompts/list':
-      return answer(id, { prompts: [] });
+      return answer(id, { prompts: [], ttlMs: HOUR, cacheScope: 'private' });
 
     default:
       return fail(id, RPC.method, `There is no method called ${method}.`, { allowed: METHODS });

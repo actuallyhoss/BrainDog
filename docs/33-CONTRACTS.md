@@ -279,9 +279,23 @@ route. The shapes are decided here. 11 · 12 · 4 · 7 · 16 · 16.
 rowid as `version` — the kernel's replay, never the host's (41 §13 #9).
 
 **Suggestion bodies:** `options { question, options: [{ id, label, because }], requires_reason: true }` ·
-`pattern { ingest: <declaration body>, samples: [raw_id…] }` · `rowset { register, rows: [{ fields }] }` ·
+`pattern { ingest: <declaration body>, samples: [raw_id…] }` · `rowset { register, rows: [{ fields } | { at, version, patch }], ingest? }` ·
 `change { declaration_id, from, to, observed, prediction }` — accepting a `change` writes the `prediction` row
 (24 §4.6). Spark's palette answer has a fifth shape, `query`, which is never filed (23 §4).
+
+**A `rowset` row that carries `at` updates a row; any other row creates one.** `at` is the row's spoken id or row id
+in `register`, `version` is the version it was read at, and `patch` holds the fields it changes, with `deleted_at` to
+delete the row. Nothing sits beside those three keys. Filing checks that the row is live, that no row is named twice,
+and that `version` and a non-empty `patch` are there; whether the patch is valid is the write path's, at acceptance, as
+it is for a row a rowset creates. Accepting applies each update as the person who decides, compare-and-set, and it is
+the one way a field or a move declared `by: decide` changes. A delete is written after the fields, as its own event.
+Every row lands or none does: a version that has moved answers the conflict of `Result<T>`, no row of the rowset is
+created or changed, no decision is recorded, and the suggestion stays open. A row that creates is signed by
+`ingest:<id>` when the body names an `ingest`; an update is always signed by the person deciding. So a skill's new
+version is `{ at: 'skills#3', version: 7, patch: { body, rev: 5, because: ['learnings#12', 'learnings#15'] } }`,
+promoting a learning is `{ at: 'LN7', version: 4, patch: { project: null } }`, and `meet`'s merge of two people who
+share a name is two update rows on `people`: the older row takes the union of both rows' `handles`, `met` and
+`projects`, and the newer gets `merged_into` and `deleted_at` (`packages/kernel/src/people.ts`).
 
 **The factories.** `openRecord({ sql, clock, random, accent })` opens the kernel — randomness injected so a fixture is
 deterministic, `accent` the theme's hue chooser (`nextAccentHue`, [ADR-028](16-DECISIONS.md); 13 §2.1b) — and

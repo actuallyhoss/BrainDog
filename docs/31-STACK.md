@@ -520,9 +520,9 @@ this product rather than about Ajv:
 does not. Writing the MCP tool-definition generator against it would be a vendor-neutral seam;
 choosing Valibot binds that generator to `@valibot/to-json-schema` instead. **That is cheap, because
 the generator runs at build time** — but it is the cost, and it should be named rather than
-discovered. Named, then: `scripts/gen-schemas.ts` converts the tool schemas and writes the committed
-`src/tool-schemas.gen.ts`; a drift test fails when the two disagree
-([44-SPEC-MCP](44-SPEC-MCP.md) §13 D1).
+discovered. Named, then, and since avoided: the fourteen tools carry hand-written JSON Schemas in
+`packages/mcp/src/index.ts`, so no generator runs and nothing can drift from one
+([44-SPEC-MCP](44-SPEC-MCP.md) §2).
 
 *(One more measured trap, whichever is picked: `z.toJSONSchema()` **silently drops `.refine()`** —
 emitting a schema without the constraint — while Valibot and ArkType throw. An MCP tool definition

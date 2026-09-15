@@ -71,7 +71,7 @@ the loop's log is [BUILD.md](../BUILD.md).
 | 41 | [Spec · kernel](41-SPEC-KERNEL.md) | `packages/kernel`: migrations, the write path, counters, events, `entry_fts`, refusals, `.dogl` |
 | 42 | [Spec · declare](42-SPEC-DECLARE.md) | `packages/declare`: the eight kinds' schemas, YAML → JSON, lint, plan, install |
 | 43 | [Spec · extract](43-SPEC-EXTRACT.md) | `packages/extract`: the ten extractors, three combinators, money and date parsing |
-| 44 | [Spec · mcp](44-SPEC-MCP.md) | `packages/mcp`: the eight tools, resources, `instructions`, the streamable-HTTP handler, budgets |
+| 44 | [Spec · mcp](44-SPEC-MCP.md) | `packages/mcp`: the fourteen tools, resources, `instructions`, one JSON-RPC core over stdio and streamable HTTP, budgets |
 | 45 | [Spec · record](45-SPEC-RECORD.md) | `packages/record`: the six RPC groups, `CallContext`, `Result`, metrics, rules, schedule and outbox |
 | 46 | [Spec · spark](46-SPEC-SPARK.md) | `packages/spark`: tier A jobs, the projection reader, proposals, the tier-C dispatcher |
 | 47 | [Spec · connect](47-SPEC-CONNECT.md) | `packages/connect`: `ingest` with `fetch:`, placeholders, formats, `expect:`, `probe:`, `metric_point` |

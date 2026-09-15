@@ -16,7 +16,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
-import { LOOKUPS, NOW, REGISTERS, installSeed } from '../src/index.ts';
+import { AGENTS_REGISTERS, LOOKUPS, NOW, REGISTERS, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -62,7 +62,8 @@ test('every browser-only declaration key comes back from the record exactly as t
   const { k, sql } = await seeded();
   try {
     let checked = 0;
-    for (const [id, seed] of Object.entries(REGISTERS)) {
+    // The agents pack's registers too: they arrive through the pack path, and the keys must survive it.
+    for (const [id, seed] of Object.entries({ ...REGISTERS, ...AGENTS_REGISTERS })) {
       const read = k.register(id) as unknown as Record<string, unknown> | undefined;
       assert.ok(read, `${id} did not come back at all`);
       const wrote = seed as unknown as Record<string, unknown>;

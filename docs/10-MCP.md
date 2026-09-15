@@ -197,9 +197,10 @@ headers, and an HTTP client sends it in `_meta.session` ([44-SPEC-MCP](44-SPEC-M
 
 ### `boot`, and the read mark
 
-`boot()` — a READ+ method and a resource — returns the index, the live sessions, the open suggestions
-and `whatsNew` since the caller's read mark, **in one round trip.** It is what a hook prints at
-session start, and it is what the web app opens with. The read mark is one value per person, written
+`boot()` — a READ+ method and a resource — returns the index, the live sessions and the open
+suggestions, **in one round trip.** It is what the web app opens with. `whatsNew` since the caller's
+read mark is its own call for now, and a session's hook prints `context`, which says where the session
+stands ([44-SPEC-MCP](44-SPEC-MCP.md) §4.4). The read mark is one value per person, written
 with `MAX()`, stored outside the record's rows ([30-BLUEPRINT](30-BLUEPRINT.md) §1) — so a late
 device never moves it back and a read is never a write.
 

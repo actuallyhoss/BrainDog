@@ -173,7 +173,7 @@ every context window of every session in every client, forever.
 orientation response and cut it to a ~1,300-token index — a 95% reduction on the first call of
 every session with no loss of capability.
 
-**Enforced by:** token budgets asserted in CI. `tools/list` under 1,800 tokens.
+**Enforced by:** token budgets asserted in CI. `tools/list` under 1,800 tokens, raised to 2,600 when the surface grew to fourteen tools ([44-SPEC-MCP](44-SPEC-MCP.md) §7).
 
 **Would reverse it:** an MCP client the buyer uses that cannot read resources, which would force
 schemas back into tool descriptions and break the 1,800-token budget.
@@ -952,7 +952,8 @@ never run inside `fetch()` or a Durable Object constructor (`EvalError` in worke
 `ajv/dist/standalone` at build time is the fallback if JSON Schema ever becomes primary. The MCP
 tool-definition generator binds to `@valibot/to-json-schema`, and it runs at build:
 `scripts/gen-schemas.ts` writes the committed tool schemas and a drift test keeps them equal to
-their Valibot source ([44-SPEC-MCP](44-SPEC-MCP.md) §13 D1).
+their Valibot source ([44-SPEC-MCP](44-SPEC-MCP.md) §13 D1). Superseded for MCP: the fourteen tools carry
+hand-written JSON Schemas in `packages/mcp/src/index.ts`, so no generator runs (44 §2).
 
 **Rejected:** ArkType — a 90.7 ms cold start for one schema module and an error path 12× its
 success path, the wrong asymmetry for a validator whose whole job is producing refusals.
@@ -1211,6 +1212,10 @@ document and the authorization server are deferred with a stated reason, and whe
 its own AS. A stateless one-day shim for a named client is the only permitted exception, removed at
 the offramp date.
 
+**Amended, September 2026.** The same JSON-RPC core also answers over stdio, through `braindog mcp`,
+and answers `initialize`, negotiating the newest version it supports at or below the one asked for.
+`tools/list` is held at or under 2,600 tokens since the surface grew to fourteen tools ([44-SPEC-MCP](44-SPEC-MCP.md) §1, §7).
+
 **Rejected:** a dual-transport server. It carries the statelessness assumption of the old transport
 forever.
 
@@ -1415,7 +1420,7 @@ corpus — either swaps the module behind the same subpath.
 **Decided.** A thirteenth package, `@braindog/host`, holds what the Worker and the self-host would
 otherwise each write: the route table as data (`ROUTES`), `httpStatus(result)`,
 `resolveContext(req, lookups)` — cookie, bearer and operation-grant parsing over the host's own
-lookups — `serveApi(api, req, ctx)` over standard `Request`/`Response`, and the `createMcpHandler`
+lookups — `serveApi(api, req, ctx)` over standard `Request`/`Response`, and the `serveMcp`
 wiring. Platform-neutral, about three hundred lines, and they must never drift between
 [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) and [51-SPEC-WORKER](51-SPEC-WORKER.md). It is last in the
 package order, and the order gains a swap: **`record` before `mcp`** — `render → ports → where →

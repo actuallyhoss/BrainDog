@@ -121,7 +121,7 @@ authoring tier, no assistant.
 | Foundations: repo, CI, the four token gates, the storage adapter + conformance suite | 9–12 |
 | The record object, the Worker, magic-link auth, agent tokens, the CLI, `.dog` export | 20–26 |
 | `@braindog/host` — the route table, `httpStatus`, the request context and `serveApi`, written once for the Worker and the self-host ([ADR-064](16-DECISIONS.md)) | 2 |
-| MCP: eight tools, resources, the token budget in CI | 8–12 |
+| MCP: fourteen tools, resources, the token budget in CI | 8–12 |
 | Native screens per register + the spine + the vault + the decide queue | 20–26 |
 | Alarms, `schedule`, reminders, one hard-coded weekly digest | 8–10 |
 | Cloud: Stripe, signup, backups, the inbound endpoint, inbound email | 12–15 |
@@ -237,7 +237,7 @@ the re-costed total for every described stage is §1's 248–317.*
 | A1 | Foundations | 5 | repo, CI, the token system and its four guards, the nine port interfaces, `.dog` header, migration runner |
 | A2 | The kernel | 12 | the 27 kernel tables, ids, money, time, provenance, **the `where:` compiler**, FTS5 wiring |
 | A3 | Record object + API + auth | 10 | the Durable Object, `@braindog/host` — the route table and request context both hosts share — then the Worker and the self-host, passkeys, agent tokens, the CLI |
-| A4 | MCP | 5 | the eight tools, resources, prompts, the token budget in CI, **MRTR decision gate** |
+| A4 | MCP | 5 | the fourteen tools, resources, prompts, the token budget in CI, **MRTR decision gate** |
 | A5 | The app, native | 12 | shell, nav, register lists, entry detail, command palette, search, the decide queue, the vault |
 | A6 | Cloud | 6 | Stripe, signup, backups, the inbound endpoint, email |
 

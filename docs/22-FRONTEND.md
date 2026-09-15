@@ -729,7 +729,7 @@ screen.** The assertion: **header cell widths === body cell widths, exactly.** T
 pass is one declared track list in a custom property, shared.
 
 **Nine fixture records** — one per reference page, eight, plus `corpus`, the whole-corpus record the
-`mcp-budget`, `dog-roundtrip` and `spark-actor` gates read — checked in as text: pack YAML, row JSON
+`dog-roundtrip` and `spark-actor` gates read — checked in as text: pack YAML, row JSON
 per register, a `seed.json` manifest. Rows are committed for ≤ 60 and generated beyond that by
 `rows/gen.mjs` from the seed's RNG, output committed and `--check`ed in CI; the data is synthetic by
 rule — generated names, `.example` hosts, 2030–2031 dates, refs as `register#seq`, no ULID or hash on

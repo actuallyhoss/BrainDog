@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, type Declaration, type Kernel } from '../src/index.ts';
+import { openRecord, type Declaration, type Entry, type Kernel, type WriteContext } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -559,6 +559,294 @@ test('AND THE PREDICTION IT WRITES IS ONE THE SCORER CAN READ', async () => {
   const question = sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${asked.id}`);
   assert.match(question?.to_v ?? '', /Supersede that decision, or say why you are keeping it/);
   assert.match(question?.to_v ?? '', /observed 1/);
+  sql.close();
+});
+
+/* ── a rowset that changes rows that exist ──────────────────────────────── */
+
+/** A rowset of `{ at, version, patch }` rows, and any creates beside them. */
+const updates = (rows: Record<string, unknown>[], register = 'obligations') => ({
+  question: 'Change these?',
+  body_kind: 'rowset' as const,
+  body: { register, rows },
+});
+
+const conflictOf = (r: unknown): { version: number; actor: string } => {
+  const x = r as { ok: boolean; conflict?: { version: number; actor: string } };
+  assert.equal(x.ok, false, 'a stale update went through');
+  assert.ok(x.conflict, 'a stale update was answered with something other than the conflict');
+  return x.conflict;
+};
+
+test('AN ACCEPTED UPDATE CHANGES THE ROW, as the person who decided, beside the rows it creates', async () => {
+  const { k, sql } = await record();
+  const row = value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
+  const made = value<{ id: string }>(
+    k.propose(
+      {
+        question: 'HSBC paid Invoice 41, and Invoice 42 arrived?',
+        body_kind: 'rowset',
+        body: {
+          register: 'obligations',
+          ingest: 'hsbc-sms',
+          rows: [{ at: 'obligations#1', version: row.version, patch: { party: 'HSBC', state: 'paid' } }, { what: 'Invoice 42' }],
+        },
+      },
+      'p_1',
+    ),
+  );
+  assert.equal(k.get(row.id)?.fields.party, undefined, 'a proposal changed the row before anybody answered it');
+
+  const out = value<{ decision: string; wrote: string[] }>(k.decide(made.id, { decide: { option: 'accept', reason: 'HSBC paid it' } }, 'p_2'));
+  assert.equal(out.wrote.length, 2);
+  assert.equal(out.wrote[0], row.id);
+
+  const after = k.get(row.id)!;
+  assert.equal(after.fields.party, 'HSBC');
+  assert.equal(after.fields.state, 'paid');
+  assert.equal(after.version, row.version + 1);
+
+  /* The update is the decider's; the row created beside it keeps the ingest's name. */
+  const events = sql.all<{ kind: string; field: string | null; actor: string; batch: string | null }>(
+    'SELECT kind, field, actor, batch FROM event WHERE target = ? AND kind <> ? ORDER BY rowid',
+    `entry:${row.id}`,
+    'create',
+  );
+  assert.deepEqual(
+    events.map((e) => `${e.kind} ${e.field} by ${e.actor}`),
+    ['edit party by p_2', 'edit state by p_2'],
+  );
+  assert.equal(sql.one<{ actor: string }>("SELECT actor FROM event WHERE kind = 'create' AND target = ?", `entry:${out.wrote[1]}`)?.actor, 'ingest:hsbc-sms');
+  sql.close();
+});
+
+test('A STALE VERSION IS THE HOUSE CONFLICT, and not one row of the rowset lands', async () => {
+  const { k, sql } = await record();
+  const one = value<Entry>(k.create('obligations', { what: 'Invoice 41' }, { actor: 'p_1' }));
+  const two = value<Entry>(k.create('obligations', { what: 'Invoice 42' }, { actor: 'p_1' }));
+  const made = value<{ id: string }>(
+    k.propose(
+      updates([
+        { at: 'obligations#1', version: one.version, patch: { party: 'HSBC' } },
+        { at: two.id, version: two.version, patch: { party: 'Monzo' } },
+      ]),
+      'p_1',
+    ),
+  );
+
+  /* Somebody edits the second row after the proposal was drawn. */
+  value(k.update('obligations', two.id, { what: 'Invoice 42, reissued' }, { actor: 'p_3', version: two.version }));
+
+  const clash = conflictOf(k.decide(made.id, { decide: { option: 'accept', reason: 'both are right' } }, 'p_2'));
+  assert.equal(clash.version, two.version + 1);
+  assert.equal(clash.actor, 'p_3');
+
+  assert.equal(k.get(one.id)?.fields.party, undefined, 'half a rowset landed');
+  assert.equal(k.get(one.id)?.version, one.version);
+  assert.equal(sql.all("SELECT 1 FROM event WHERE actor = 'p_2'").length, 0);
+  assert.equal(sql.all('SELECT 1 FROM decision').length, 0);
+  assert.equal(k.governanceRow('suggestion', made.id)?.status, 'open', 'the question was answered and nothing happened');
+  sql.close();
+});
+
+test('AN UPDATE ROW IS CHECKED WHEN IT IS FILED: a live row, its version, a patch, and nothing else', async () => {
+  const { k, sql } = await record();
+  const row = value<Entry>(k.create('obligations', { what: 'Invoice 41' }, { actor: 'p_1' }));
+  const filed = (r: Record<string, unknown>[]) => {
+    const x = refusal(k.propose(updates(r), 'p_1'));
+    return `${x.code} at ${x.at}`;
+  };
+
+  assert.equal(filed([{ at: 'obligations#9', version: 1, patch: { party: 'x' } }]), 'VALUE_MALFORMED at body.rows[0].at');
+  assert.equal(filed([{ what: 'new' }, { at: 'obligations#1', patch: { party: 'x' } }]), 'REQUIRED_MISSING at body.rows[1].version');
+  assert.equal(filed([{ at: 'obligations#1', version: 1.5, patch: { party: 'x' } }]), 'VALUE_MALFORMED at body.rows[0].version');
+  assert.equal(filed([{ at: 'obligations#1', version: 1, patch: {} }]), 'VALUE_MALFORMED at body.rows[0].patch');
+  assert.equal(filed([{ at: 'obligations#1', version: 1, patch: { party: 'x' }, what: 'y' }]), 'FIELD_UNKNOWN at body.rows[0].what');
+  assert.equal(
+    filed([
+      { at: 'obligations#1', version: 1, patch: { party: 'x' } },
+      { at: row.id, version: 1, patch: { what: 'y' } },
+    ]),
+    'VALUE_MALFORMED at body.rows[1].at',
+    'one row updated twice can never be accepted',
+  );
+
+  value(k.update('obligations', row.id, { deleted_at: true }, { actor: 'p_1' }));
+  assert.equal(filed([{ at: 'obligations#1', version: 2, patch: { party: 'x' } }]), 'VALUE_MALFORMED at body.rows[0].at');
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0);
+  sql.close();
+});
+
+/* ── what only a decision changes ────────────────────────────────────────── */
+
+const LEARNINGS: Declaration = {
+  id: 'register.learnings',
+  kind: 'register',
+  body: {
+    id: 'learnings',
+    name: 'Learnings',
+    title: 'lesson',
+    state: 'state',
+    seq_prefix: 'LN',
+    done: ['superseded', 'reverted'],
+    fields: [
+      { id: 'lesson', type: 'text', required: true },
+      { id: 'project', type: 'ref', to: 'things', scope: { widen: 'person' } },
+      { id: 'why', type: 'text' },
+      {
+        id: 'state',
+        type: 'enum',
+        values: ['active', 'superseded', 'reverted'],
+        default: 'active',
+        transitions: {
+          active: { to: ['superseded', 'reverted'], requires: ['why'] },
+          superseded: { to: ['active'], by: 'decide' },
+          reverted: { to: ['active'], by: 'decide' },
+        },
+      },
+    ],
+  } as never,
+};
+
+const SKILLS: Declaration = {
+  id: 'register.skills',
+  kind: 'register',
+  body: {
+    id: 'skills',
+    name: 'Skills',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'project', type: 'ref', to: 'things', scope: { widen: 'person', same: 'nearer' } },
+      { id: 'body', type: 'document', required: true, by: 'decide' },
+      { id: 'rev', type: 'int', default: 1, required: true, by: 'decide' },
+      { id: 'because', type: 'list', of: 'ref', to: 'learnings' },
+    ],
+  } as never,
+};
+
+const THINGS: Declaration = {
+  id: 'register.things',
+  kind: 'register',
+  body: {
+    id: 'things',
+    name: 'Projects',
+    title: 'name',
+    scopes: { repos: 'repos' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'repos', type: 'list', of: 'text' },
+    ],
+  } as never,
+};
+
+const AGENT: WriteContext = {
+  actor: 'p_owner',
+  principal: { kind: 'token', token: 't_1' },
+  session: { client_id: 'cc-1', host: 'h', repo: 'braindog' },
+};
+
+async function agentsRecord(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(await k.install([THINGS, LEARNINGS, SKILLS]));
+  value(k.create('things', { name: 'BrainDog', repos: ['braindog'] }, { actor: 'p_owner' }));
+  return { k, sql };
+}
+
+test('A FIELD AND A MOVE `by: decide` CHANGE THROUGH AN ACCEPTED PROPOSAL, and through nothing else', async () => {
+  const { k, sql } = await agentsRecord();
+  const skill = value<Entry>(k.create('skills', { name: 'review-pr', body: '# Review\nRead the diff first.' }, AGENT));
+  const lesson = value<Entry>(k.create('learnings', { lesson: 'Read the tests before the diff.' }, AGENT));
+  const gone = value<Entry>(
+    k.update('learnings', lesson.id, { state: 'superseded', why: 'A later learning says the same thing better.' }, { actor: 'p_owner' }),
+  );
+
+  /* Directly, the owner and the agent are both refused. */
+  assert.equal(refusal(k.update('skills', skill.id, { rev: 2 }, { actor: 'p_owner' })).code, 'FORBIDDEN');
+  assert.equal(refusal(k.update('learnings', lesson.id, { state: 'active' }, AGENT)).code, 'FORBIDDEN');
+
+  const made = value<{ id: string }>(
+    k.propose(
+      {
+        question: 'Move review-pr to version 2?',
+        body_kind: 'rowset',
+        body: { register: 'skills', rows: [{ at: 'skills#1', version: skill.version, patch: { rev: 2 } }] },
+      },
+      AGENT,
+    ),
+  );
+  const back = value<{ id: string }>(
+    k.propose(
+      {
+        question: 'Bring LN1 back?',
+        body_kind: 'rowset',
+        body: { register: 'learnings', rows: [{ at: 'LN1', version: gone.version, patch: { state: 'active' } }] },
+      },
+      AGENT,
+    ),
+  );
+
+  value(k.decide(made.id, { decide: { option: 'accept', reason: 'the new text is right' } }, 'p_owner'));
+  value(k.decide(back.id, { decide: { option: 'accept', reason: 'it holds again' } }, 'p_owner'));
+  assert.equal(k.get(skill.id)?.fields.rev, 2);
+  assert.equal(k.get(lesson.id)?.state, 'active');
+  sql.close();
+});
+
+test('A SKILL CHANGES VERSION END TO END: the agent proposes, the owner accepts, and history keeps both texts', async () => {
+  const { k, sql } = await agentsRecord();
+  const ln1 = value<Entry>(k.create('learnings', { lesson: 'Run the gates after the build, never beside it.' }, AGENT));
+  const ln2 = value<Entry>(k.create('learnings', { lesson: 'A browser gate needs a build that is not moving.' }, AGENT));
+  const before = '# Gates\nRun every gate.';
+  const after = '# Gates\nBuild first, then run the gates one at a time.';
+  const skill = value<Entry>(k.create('skills', { name: 'gates', body: before }, AGENT));
+  assert.equal(skill.fields.project, k.get('things#1')?.id, 'the skill did not start in the run’s project');
+
+  /* The agent cannot write the text itself. */
+  assert.equal(refusal(k.update('skills', skill.id, { body: after }, AGENT)).at, 'body');
+
+  const mark = Number(sql.one<{ n: number }>('SELECT MAX(rowid) AS n FROM event')?.n);
+  const made = value<{ id: string }>(
+    k.propose(
+      {
+        question: 'Change the gates skill to build first?',
+        body_kind: 'rowset',
+        body: {
+          register: 'skills',
+          rows: [{ at: 'skills#1', version: skill.version, patch: { body: after, rev: 2, because: ['learnings#1', 'learnings#2'] } }],
+        },
+      },
+      AGENT,
+    ),
+  );
+  const out = value<{ decision: string; wrote: string[] }>(k.decide(made.id, { decide: { option: 'accept', reason: 'LN1 and LN2 both say so' } }, 'p_owner'));
+  assert.deepEqual(out.wrote, [skill.id]);
+
+  const now = k.get(skill.id)!;
+  assert.equal(now.fields.body, after);
+  assert.equal(now.fields.rev, 2);
+  assert.deepEqual(now.fields.because, [ln1.id, ln2.id]);
+  assert.equal(now.version, skill.version + 1);
+
+  const trail = sql.all<{ actor: string; kind: string; field: string | null; target_kind: string; from_v: string | null; to_v: string | null }>(
+    'SELECT actor, kind, field, target_kind, from_v, to_v FROM event WHERE rowid > ? ORDER BY rowid',
+    mark,
+  );
+  assert.deepEqual(
+    trail.map((e) => `${e.actor} ${e.kind} ${e.target_kind}${e.field ? ` ${e.field}` : ''}`),
+    [
+      `S1 suggest suggestion`,
+      `p_owner edit entry body`,
+      `p_owner edit entry rev`,
+      `p_owner edit entry because`,
+      `p_owner decide decision`,
+      `p_owner resolve suggestion`,
+    ],
+  );
+  const body = trail.find((e) => e.field === 'body')!;
+  assert.equal(JSON.parse(body.from_v!), before);
+  assert.equal(JSON.parse(body.to_v!), after);
   sql.close();
 });
 

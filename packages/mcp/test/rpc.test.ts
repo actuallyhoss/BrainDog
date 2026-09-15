@@ -81,7 +81,7 @@ test('server/discover IS ANSWERED, with the versions, the capabilities, who this
 test('ping answers, and prompts are an empty list for now', async () => {
   const { surface } = stub();
   assert.deepEqual(result(await handle(req('ping'), surface, ctx)), {});
-  assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { prompts: [] });
+  assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
 });
 
 test('tools/list is the fourteen, with the instructions again and the read-only ones marked', async () => {
@@ -273,6 +273,7 @@ test('resources are listed, templated and read, with how long each may be held',
   );
   assert.deepEqual(read.contents[0], { uri: 'braindog:schema/obligations', mimeType: 'application/json', text: '{"fields":[]}' });
   assert.equal(read.ttlMs, 3_600_000);
+  assert.equal((read as { cacheScope?: string }).cacheScope, 'private');
 });
 
 test('a resource that is not there, or is refused, is -32002 with the sentence', async () => {

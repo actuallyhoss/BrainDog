@@ -387,10 +387,14 @@ sentence must all say the same number; `EVENT_KINDS` in `packages/kernel` must e
 
 **`mcp-budget`** (10 §4)
 
+Not a gate today. The budget is held by `packages/mcp/test/budget.test.ts`, which keeps `tools/list` at or
+under 2,600 tokens by `tokenBudget` (44 §7), and `budgets.json` carries no `mcp` entry. The steps below are
+the gate this becomes when the corpus record exists.
+
 1. Assert `BUDGETS` of [44-SPEC-MCP](44-SPEC-MCP.md) §2 deep-equals `budgets.mcp` on the five shared keys — one
    place for the numbers, and 44's constant must match it.
 2. Render `tools/list` (with `instructions`) over the stub `api` of 44 §3 (`test/fixtures/index-24.json`) — the shape
-   44 assigns this script; then `createMcpHandler` over the materialised `corpus` record for a `record_index`
+   44 assigns this script; then `serveMcp` over the materialised `corpus` record for a `record_index`
    response and a default `list` page.
 3. Count each with 44 §5.8's `tokenBudget` — the calibrated estimator, never `bytes / 4` (44 §5.8 measured it
    under-counting minified JSON by a fifth).

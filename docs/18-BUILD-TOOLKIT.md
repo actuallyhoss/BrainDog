@@ -163,7 +163,7 @@ D1, D4).
 | **The CSS rows above are the twelve rules of `css-rules.mjs`** — one regex tokeniser, zero dependencies, no Stylelint | a rule that needs a parser is added the day one does, not before (52 §13 D10) |
 | Contrast gate over every shipped theme | a theme that ships unreadable |
 | **Rendered-box measurement in a real browser** | the class of layout bug that is invisible in source. Most recently: a grid using `auto-fit` produced **7 tracks for 3 items**, leaving a 550 px empty slab — correct in every selector, wrong on screen |
-| MCP token budgets | `tools/list` over 1,800 tokens |
+| MCP token budgets | `tools/list` over 2,600 tokens (`packages/mcp/test/budget.test.ts`) |
 | Telemetry blob allowlist — and its twin, the **screenshot-mode allowlist** (`shot-allowlist`): the committed `allow.json` equals exactly the literals the source declares | a field value reaching Analytics Engine; a runtime string legible under `data-shot` (52 §13 D9; [50-SPEC-WEB](50-SPEC-WEB.md) §13 D4) |
 | **Clean room**: `clean-room.txt` is the owner's file, and the gate asserts only that it is non-empty | a repository whose first rule ([00-README](00-README.md) §1) has no artefact at all (52 §13 D20) |
 | Secret-in-log grep | a credential in a log, a push payload, or a prompt |

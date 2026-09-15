@@ -18,7 +18,7 @@ import { install, normalise, plan, type Diff, type Host, type Installed, type Pa
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { METRICS, PAGES, REGISTERS, declarations, installSeed, metricDeclarations, packDocument, pageDeclarations } from '../src/index.ts';
+import { AGENTS_REGISTERS, METRICS, PAGES, REGISTERS, declarations, installSeed, metricDeclarations, packDocument, pageDeclarations } from '../src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12);
 
@@ -154,6 +154,6 @@ test('the full seed is a dataset and not a pack, and stays one', async () => {
   const { k, sql } = await record();
   const out = value<{ rows: number; registers: number }>(await installSeed(k));
   assert.ok(out.rows > 30, 'the demonstration lost its rows');
-  assert.equal(out.registers, Object.keys(REGISTERS).length);
+  assert.equal(out.registers, Object.keys(REGISTERS).length + Object.keys(AGENTS_REGISTERS).length);
   sql.close();
 });

@@ -91,6 +91,11 @@ key that is not here is refused by name.
 | `seeds` | `[{ register, fields, note? }]` — the example rows: at most one per register, own registers only, no `ref`/`secret`/`file` values; marked by the value `example` in the register's declared `tags` field, applied through the write path with `cascade = false`, and counted on their own line in the diff (§3) — [42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.5 | optional |
 | `provides` | **derived** — the `kind.id` of every declaration. It may be written out for a reader, and if it is, it must equal the derived list — `PROVIDES_MISMATCH` otherwise | derived |
 
+*(Amended September 15th 2026 for modularity: the manifest gains one more optional key, `config:`, a
+closed subset of field types (no `ref`, `secret` or `file`) that a pack declares and an owner fills
+at `/packs/<id>`, read back through `{{config:<key>}}`. `loop/research-modular.md` §1.3 has the shape
+and why the subset stays narrow.)*
+
 `requires` on the manifest is a map. `requires` on a `page` declaration is a list of `register.<id>`
 ([06-PAGES](06-PAGES.md) §1.1). The two never appear on the same object. *An earlier draft's manifest
 carried `braindog: ">=0.4 <2"`, a range against a version number the app does not have.*
@@ -207,6 +212,14 @@ searchable by id, and re-adopted automatically if the pack is reinstalled.
 This is only possible because of the one-table decision in
 [02-DATA-MODEL](02-DATA-MODEL.md) §1. A pack that created real tables could only be uninstalled
 by dropping them.
+
+> **Amended September 15th 2026 for modularity: disable is not uninstall.** Uninstall retires a
+> pack's declarations and drops the `pack` row itself. A pack can now also be **disabled**: the same
+> retiring, without dropping the row, so it stays listed at `/packs`, greyed, with its version and
+> config intact, and **enable** reinstates it with no new plan or diff, because nothing about its
+> shape changed while it was off. Disabling a pack another active pack's `requires` still names is
+> refused, naming the dependents, the same way an install names a conflict before it applies.
+> `loop/research-modular.md` §1.2 and §1.5 have the mechanism.
 
 ---
 

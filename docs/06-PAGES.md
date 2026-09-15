@@ -211,6 +211,12 @@ to what is in it, and on day one it is empty."* `throughline` is this exact arch
 The six are the first-party packs of [04-PACKS](04-PACKS.md) §6. *An earlier draft's picker offered
 four, with `Skills` as a pack; `skills` is a register inside `agents`.*
 
+*(Amended September 15th 2026: People is ticked here already, not offered as a choice. The first-run
+conversation's opening turn, "who are you," installs it with no diff to approve, the same exception
+this section already grants the register turn one's own screen chooses, and writes the person's own
+row before this picker is ever seen. `loop/research-modular.md` §2 has the flow, and §1.7 has why
+People, alone of the six, is a special case here.)*
+
 Three things that arrive with a pack, and the third is the one that matters:
 
 1. Registers — the shape.

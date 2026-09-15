@@ -40,6 +40,8 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 |---|---|---|---|---|
 | `login <host>` | `<host>` = `https://origin[/slug]` | `POST /auth/device` then `POST /auth/device/token` until approved | the six digits and the URL (stderr); `logged in to <host> as <label> · expires <date>` | 0 · 1 · 3 |
 | `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers of `loop/research-agent-path.md` §3.4, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
+| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file. `end`: `POST /api/handoff { state: 'idle', branch, head }` as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
+| `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
 | `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
 | `dev` | self-host only; `--port <n>` (default 8080) | spawns the self-host entry: `dev` | the child's output | the child's |
@@ -59,25 +61,57 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 | `runner run` | `--once` | `POST /api/claimJob { wait: 20 }` · `postJobEvent` · `readCancel`; spawns `claude` | one line per job to stderr; never exits unless `--once` | 0 · 1 · 3 |
 | `--version` | — | nothing | `app <date>+<sha> · format 1 · kernel <n> · primitives 1` | 0 |
 
-Nineteen commands plus `--version`, counted: the seventeen of the first design, then `mcp` and `serve`.
+Twenty-one commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
+(its two events in one row) and `install`.
 `--json` puts exactly one JSON document on stdout (§4.5) and moves every progress line to stderr. `mcp` takes
 no `--json`, because its stdout is the protocol. `--host` beats `BRAINDOG_HOST`, which beats `hosts.json`'s
 `default`. A host is written `https://origin[/slug]`; a bare name means https, and plain http is refused
 except to this machine, because the bearer would cross the network in the clear.
 
-**Built today: `mcp`, `init` and `serve`.** The command runs from a checkout as
+**Built today: `mcp`, `hook`, `install`, `init` and `serve`.** The command runs from a checkout as
 `node apps/cli/src/main.ts`. Until §3's bundle exists, the manifest's `bin` points at that file and the manifest
 stays `private`, so `tools/release.mjs` does not offer a file npm could not run. `init` and `serve` are the
 self-host's, which has no `bin` of its own and tells people to type them, so this command claims the name and
-spawns the self-host for both. The agent path adds `hook start|end`, `logout`, `session`, `key add|exec` (alias
-`run`), `skills sync`, `tools scan|write`, `context` and `install` (`loop/research-agent-path.md` §4.2). Each
-gets its row here in the step that builds it; until then the command says it is not built yet.
+spawns the self-host for both. The agent path adds `logout`, `session`, `key add|exec` (alias `run`),
+`skills sync`, `tools scan|write` and `context` (`loop/research-agent-path.md` §4.2). Each gets its row here in
+the step that builds it; until then the command says it is not built yet.
 
 Claude Code registers `mcp` once per profile, and no token appears in the line or in the file it writes:
 
 ```
 claude mcp add-json braindog '{"type":"stdio","command":"node","args":["<checkout>/apps/cli/src/main.ts","mcp","--agent","claude"]}' --scope user
 ```
+
+### The session hooks
+
+`install` puts two entries in Claude Code's user settings. Each runs a shim in `apps/cli/hooks/`,
+`braindog-hook.ps1` on Windows and `braindog-hook.sh` elsewhere, which passes the event on stdin to
+`braindog hook start` or `braindog hook end` and exits 0 whatever happens. From a checkout at `C:\Repos\braindog`
+the entries are:
+
+```
++ hooks.SessionStart: {"hooks":[{"type":"command","command":"powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Repos\\braindog\\apps\\cli\\hooks\\braindog-hook.ps1\" start","timeout":20}]}
++ hooks.SessionEnd: {"hooks":[{"type":"command","command":"powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Repos\\braindog\\apps\\cli\\hooks\\braindog-hook.ps1\" end","timeout":15}]}
+```
+
+- **Start.** It attaches to the run, writes the session file, and prints the briefing, which Claude Code adds
+  to the model's context. `compact` and `clear` send the same `session_id`, so they re-attach to the same run
+  and reprint the briefing the model just lost. With no token it prints one line naming `BRAINDOG_TOKEN` and
+  the hosts file, because `login` is not built yet. A host that does not answer within 8 seconds is one line
+  too.
+- **End.** It sets the run `idle`, with its branch and commit, and prints nothing. It never sets `done`: a
+  terminal closing is not the work finishing, and a session that crashes never says so. A run already handed
+  off, done or abandoned has no declared move to `idle`, so the record refuses the call and the run stays as it
+  was. When another session in the same folder has rewritten the session file since, its client id differs,
+  and the hook leaves that run alone.
+- **The briefing**, in this order, each part left out when the record has no such register or nothing in it:
+  who the run is and where; the last handoff, what it already tried, and whether HEAD has moved since; other
+  runs live in this repository, followed by "Two sessions in one working tree overwrite each other. Coordinate
+  or stop."; the questions waiting on the owner, followed by "Do not decide for them."; the open rows of every
+  scoped register; the people on the project; learnings; keys, by label only; skills; and `context.next` last.
+  Over 40 lines or 3,000 characters, the rows go first, from the bottom, and one line says how many.
+- **Not yet.** Skills sync and tools scan at start are the plan's step 19, and the people harvest from commits
+  at end is its step 16.
 
 ### The config file
 
@@ -90,14 +124,28 @@ mode 0600 · written atomically (write hosts.json.tmp, rename)
 Shape in §4.1. `BRAINDOG_TOKEN` wins over the file and is never written to it. A token is never an argument,
 because argv shows in process lists and in an agent's config.
 
+```
+<the folder above hosts.json>/sessions/<12 hex>.json    one per working folder · mode 0600 · written atomically
+```
+
+**The session file** says which run a working folder is: `{ host, spoken, client_id, head_at_start, at }`, and
+never a token. `hook start` writes it. `mcp` reads it on every request and sends `X-Braindog-Session` and
+`X-Braindog-Client` when its `host` is the host being called, and `hook end` reads it to find the run to idle.
+The name is the first 12 hex characters of the SHA-256 of the folder's absolute path, lower-cased on Windows,
+because Claude Code starts `mcp` in that folder and tells it nothing else. It sits in the user's config folder
+rather than in the repository, where `git status` would show it and a commit could carry it, and rather than in
+a temp folder, which is emptied and can be shared between users. Two sessions in one folder share one file, and
+the later start wins; that is the case the briefing's warning is for.
+
 ### Environment
 
 | Variable | Read by | Means |
 |---|---|---|
 | `BRAINDOG_HOST` | every remote command | the host when `--host` is absent |
 | `BRAINDOG_TOKEN` | every remote command | the bearer, as-is: an agent token on Cloud, the owner bearer of 33 §6 on a self-host |
-| `XDG_CONFIG_HOME` | config | the directory above `braindog/hosts.json` |
-| `BRAINDOG_TIMEOUT_MS` | `mcp` | the budget of one tool call, in milliseconds; 20,000 when unset or not a whole number |
+| `XDG_CONFIG_HOME` | config | the directory above `braindog/hosts.json` and `braindog/sessions/` |
+| `BRAINDOG_TIMEOUT_MS` | `mcp`, `hook` | for `mcp`, the budget of one tool call, in milliseconds; 20,000 when unset or not a whole number. For `hook`, the whole hook's budget, which it may shorten below 8,000 and never lengthen |
+| `CLAUDE_CONFIG_DIR` | `install` | the Claude Code profile folder when no `--config-dir` is given; `~/.claude` when unset |
 | `BRAINDOG_SELFHOST` | `init`, `serve`, `dev` | the path of the self-host entry file (§5.14) |
 | `BRAINDOG_DATA`, `PORT` | `init`, `serve`, `dev` | passed through to the spawned self-host, unread by the CLI |
 
@@ -126,7 +174,9 @@ apps/cli/
     └── *.test.ts         §9
 ```
 
-Six source files, counted. Published artefact: `dist/braindog.mjs`, one file, built by
+Six source files in the first design, counted. The agent path adds `position.ts`, `stdio.ts` and `surface.ts`
+for `mcp`; `hooks.ts` (the two hooks and the session file), `brief.ts` (the briefing) and `install.ts` for the
+hooks; and `hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Published artefact: `dist/braindog.mjs`, one file, built by
 `esbuild src/main.ts --bundle --platform=node --format=esm --target=node24 --banner:js='#!/usr/bin/env node'
 --define:__BUILD__='"<yyyy.mm.dd>+<sha7>"' --outfile=dist/braindog.mjs`. `tsc --noEmit` type-checks; tests run
 the `.ts` sources directly under Node 24.13 (`node --test`). esbuild is a devDependency only (§13 D4).
@@ -540,6 +590,9 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | `export` · `import` | the `.dogl` is verified after it arrives and before it is sent; the `.dog` and `.dogl` are written `0600` — they carry the whole record with its sealed grants (03 §5) |
 | Attachments | bytes are hashed before they are written under their name; the content address is the check |
 | The runner | `--restricted`, `--permission-mode dontAsk`, `--strict-mcp-config`, an empty working directory it owns, the closed kind list and the 64-byte no-whitespace arg rule, the `mcp__braindog__` tool filter, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
+| The session file | ids, a commit and the host's address, never a token; `0600` beside `hosts.json`; its ids are sent only to the host that wrote it |
+| Hook output | the briefing names a row by its spoken id and its own words, and a key by its label only; it reads only string fields, so a key's sealed-state projection never reaches the model. A failure line is fixed text or the host's refusal sentence, never an exception's message. A commit named by the record is checked to look like one before git sees it |
+| `install` | a dry run unless `--apply`; a copy of the settings file before any write; never a project's `.mcp.json`; a settings file it cannot parse is not quoted, because its `env` may hold keys |
 | Logging | a line names a host, a command, a code, a count — never a token, a row, a grant, a prompt (12 §8) |
 | Input | `parseArgs` in strict mode; a `.dogl` line that is neither `#…` nor a JSON array is an error; the only DDL a `.dog` build runs is the kernel's own |
 
@@ -585,6 +638,26 @@ push and T17 nightly; `gates.yml`'s `licence-closure` runs `npm pack --dry-run -
 `@braindog/` and no `../../`; `LICENSE` starts with the Apache-2.0 words (31 §4 rule 8); `graph` asserts the six
 imports of §1 point down the order; `release.yml` builds and publishes through trusted publishing, `0.0.1` by
 hand first (31 §6).
+
+**The agent path's tests**, which run today with `node --test` in `apps/cli`. `stdio.test.ts` and `http.test.ts`
+cover `mcp`. `brief.test.ts` covers the briefing with no host:
+- the owner's order;
+- the two-sessions warning, word for word;
+- no value, where a key carries a sentinel both in a field other than its label and in its sealed-state
+  projection;
+- 40 lines and 3,000 characters under thirty full registers, still keeping the warning, the questions and the
+  next step;
+- a record with people, keys, skills and learnings switched off;
+- a tie between two projects.
+
+`hooks.test.ts` covers the command against a stub host on `node:http`:
+- `attach` and the session file;
+- `compact` re-attaching by client id;
+- one line and exit 0 for a host that never answers and for a closed port;
+- the not-signed-in line;
+- `end` sending `state: 'idle'`, and leaving another session's run alone;
+- `install` as a dry run, then with `--apply` and its copy, then with nothing left to change;
+- no child ever printing the token.
 
 ---
 
