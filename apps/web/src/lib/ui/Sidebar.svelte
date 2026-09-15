@@ -229,8 +229,13 @@
     <Menu label={copy.switchRecord}>
       {#snippet trigger()}
         <span class="record">
-          <span class="record-avatar" aria-hidden="true">{record.slice(0, 1)}</span>
-          <span class="record-name">{record}</span>
+          {#if record}
+            <span class="record-avatar" aria-hidden="true">{record.slice(0, 1)}</span>
+            <span class="record-name">{record}</span>
+          {:else}
+            <!-- A RECORD WITH NO NAME YET still needs a trigger that says what it does, or the button is empty. -->
+            <span class="record-name">{copy.switchRecord}</span>
+          {/if}
           <Icon name="chevronDown" size="s" />
         </span>
       {/snippet}

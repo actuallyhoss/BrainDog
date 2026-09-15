@@ -676,7 +676,10 @@ test('A RECORD `init` MADE EXPORTS A FILE THAT VERIFIES, AND IMPORTS INTO ANOTHE
     const at = lines.findIndex((l) => l.startsWith('["record_id"'));
     assert.ok(at > 0, 'no dog_meta row to edit');
     const bent = [...lines];
-    bent[at] = bent[at]!.replace(id, `${id.slice(0, -1)}X`);
+    /* The id is random, so the new last character must differ from the old one, or one run in
+       every few dozen edits nothing and the file still verifies. */
+    const last = id.slice(-1) === 'X' ? 'Y' : 'X';
+    bent[at] = bent[at]!.replace(id, `${id.slice(0, -1)}${last}`);
     assert.equal((await checkDogl(bent)).ok, false, 'an edited record id verified');
 
     sql.close();

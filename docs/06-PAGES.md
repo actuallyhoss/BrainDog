@@ -103,7 +103,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `kind` | one of the twenty — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 — or a `block.<id>` this pack declares or the record has installed. A pack kind is **page-only** at stage 0: a write-up's fence takes the kinds that are not page-only ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.5) | — | yes |
 | `heading` | text. On a `section` it is the section, drawn as a heading | — | `section` |
 | `span` | int, 1–12 | 12 | no |
-| `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
+| `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now) · `actions` (the record's scheduled actions, one row each). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6 | every row | no |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
 | `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool, tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere | — | `table`, `cards` |
@@ -141,8 +141,23 @@ the kernel's `session` register not in one of its `done` states, the most recent
 `where` and columns name that register's fields and it takes no `order`. A run holds its project as a
 spoken id, `things#1`, so the block's `scopes` name each run's project by its title, and a host draws
 that name. A run not heard from within the kernel's `STALE_MS` is drawn dimmed, through the cards'
-`quiet` role, which the evaluator writes and a declaration does not. All three sources are computed by
-the kernel (`pages.ts`), alongside `forecast.runway`.
+`quiet` role, which the evaluator writes and a declaration does not. `actions` is the record's
+scheduled actions, one row each and the same list as the `actions` read: its `where` and columns name
+`ingest`, `channel`, `project`, `host`, `every`, `key`, `state`, `next`, `last_at`, `last_outcome`,
+`last_status`, `last_note`, `runs` and `failures`, a key is its label, and it takes no `order`. All four
+sources are computed by the kernel (`pages.ts`), alongside `forecast.runway`.
+
+**A live figure comes with the answer.** Outside a template, every `{{path}}` in a block's `heading`,
+`body`, `empty` and authored cells that the record holds a value for is on the block as `values`, keyed
+by the path as written ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §7.1): a metric's reading
+(`{{due-30d}}`, money as `{ amount, currency }`), a row's field by spoken id (`{{tasks#125.state}}`),
+and a register's count (`{{blockers.count}}`). The paths inside a typed form count (`{{ago:tasks#3.due}}`)
+and a code span does not. A field is read from the row's own properties, and only when the register
+declares it as a figure: a document, a note, a secret, a ref and a list are not figures. Nothing else is
+worked out, so `{{tasks.open}}` is not answered yet. A path the record holds nothing for is absent and
+draws `—`, a block that does not draw reads none, and the registers a path names are the block's
+registers (`registersOf`). Inside a template, `{{field}}` fills from the row's own fields the same way,
+and an expanded page carries `param: { register, seq, title }`, the row it is about.
 
 The agents pack draws them. `/p/agents` is "Working now", "Learnings" and "Skills" as `cards`; a
 skill's page is its trigger as a `note` and "Versions" as a `diff`; and a project page gains "Runs on",

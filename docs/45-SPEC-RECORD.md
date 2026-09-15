@@ -71,6 +71,7 @@ export type RecordApi = {
   sessionsLive(args: Record<string, never>, ctx: CallContext): Promise<Result<SessionsLive>>;
   context(args: Record<string, never>, ctx: CallContext): Promise<Result<Context>>;                     // in place of learningsFor, 30 §5
   whatsNew(args: { cursor?: number }, ctx: CallContext): Promise<Result<WhatsNew>>;
+  recentHistory(args: { cursor?: number; limit?: number }, ctx: CallContext): Promise<Result<HistoryPage>>;
   project(args: ProjectArgs, ctx: CallContext): Promise<Result<Projection>>;
   boot(args: Record<string, never>, ctx: CallContext): Promise<Result<Boot>>;
   whoami(args: Record<string, never>, ctx: CallContext): Promise<Result<Whoami>>;                       // added — §13 #1
@@ -273,8 +274,13 @@ type UpdateArgs  = { register: string; seq?: number; id?: string; patch: Record<
 type ProposeArgs = { question: string; body_kind: 'options' | 'pattern' | 'rowset' | 'change'; body: object; op_id?: string };
 type LogArgs     = { note: string; target?: string };                                                 // note ≤ 280
 type ProjectArgs = ({ registers?: string[]; where?: Predicate; q?: string; limit?: number } | { metric: string }) & { budget: { tokens: number } };
-type WhatsNew    = { events: EventRow[]; cursor: number; sinceCapped: boolean };                      // ≤ 60 events
-type Boot        = { index: Index; sessions: SessionsLive; suggestions: SuggestionRow[]; whatsNew: WhatsNew };
+type EventLine   = EventRow & { register: string | null; seq: number | null; title: string | null };
+type WhatsNew    = { events: EventLine[]; upTo: number | null; sinceCapped: boolean };                 // ≤ 60, newest first
+type HistoryPage = { events: EventLine[]; cursor: number | null };                                     // newest first
+type Boot        = { registers: RegisterCount[]; now: string; sessions: LiveRun[]; waiting: Waiting[];
+                     record: { slug; name; locale } | null; me: { kind; person; name; level };
+                     pages: { slug; title; nav; icon }[]; counts: { decide: number; inbox: number | null };
+                     whatsNew: WhatsNew };
 type Whoami      = { principal: CallContext['principal']; levels: { register: string; level: Level }[]; registers: '*' | string[] };
 type SessionsLive = { sessions: { spoken: string; title: string | null; repo: string | null; host: string | null; state: string; last_seen: string | null; stale: boolean }[]; same_repo: string[] };
 type Context     = {                                                                                  // where the caller stands, §5.3
@@ -396,7 +402,7 @@ call(method, args, ctx):
 
 | Verb | Person level | Token scope | Methods |
 |---|---|---|---|
-| read | `≥ read` | any | `index` `search` `get` `list` `whatsNew` `boot` `whoami` `project` `page` `metric` `schema` `dialect` `digestToday` `sessionsLive` `context` |
+| read | `≥ read` | any | `index` `search` `get` `list` `whatsNew` `recentHistory` `boot` `whoami` `project` `page` `metric` `schema` `dialect` `digestToday` `sessionsLive` `context` |
 | propose | `≥ append` | `≥ propose` | `propose` `log` `attach` `handoff` `meet` (on `people`) |
 | create | `≥ append` | `write` | `create` |
 | update | `≥ write` | `write` | `update` |
@@ -541,8 +547,11 @@ grant's id never appears (§4.4 rule 3). The learnings `learningsFor` returned i
 **`whatsNew(cursor?)`**
 
 1. `cursor ?? SELECT COALESCE(MIN(rowid), (SELECT COALESCE(MAX(rowid), 0) + 1 FROM event)) FROM event WHERE ts > COALESCE((SELECT seen_at FROM member WHERE person_id = ? AND register = '*'), '')` — the first rowid after the read mark; a token uses its person's.
-2. `SELECT ev.rowid, ev.id, ev.ts, ev.actor, ev.kind, ev.target, ev.target_kind, ev.field, ev.from_v, ev.to_v, ev.note, e.register FROM event ev LEFT JOIN entry e ON ev.target_kind = 'entry' AND e.id = substr(ev.target, 7) WHERE ev.rowid >= ? AND (e.register IS NULL OR e.register IN (<scope>)) ORDER BY ev.rowid LIMIT 61`.
-3. 61 rows → keep 60, `sinceCapped: true`; `cursor` = last kept rowid + 1. Values were redacted at write (20 §8); nothing is filtered here.
+2. Walk the log down from the newest event, `SELECT rowid, id, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event WHERE rowid < ? ORDER BY rowid DESC LIMIT 500` a batch at a time, stopping below step 1's rowid, at 61 kept lines, or after 5,000 lines walked.
+3. Keep a line when the caller may see it: an `entry` line when `readable` passes on its row's register (and it carries `register`, `seq` and the row's title); a `suggestion` or `decision` line when `holds` does not (with the question as its title); a line about access or keys (`grant.*`, `access.*`, `share.*`, a `token`, `member`, `device_grant` or `vault_key` target) for an owner only; a `register.<id>` declaration when that register is readable; any other line only for a caller who reads the whole record.
+4. 61 kept → answer the newest 60, `sinceCapped: true`; the walk stopping early is `sinceCapped: true` too. `upTo` = the newest kept rowid. Values were redacted at write (20 §8).
+
+*Amended September 15th 2026: newest first, where it was oldest first with `cursor` = last + 1. A first screen draws the latest lines, and oldest first showed somebody away a month the first sixty things that happened after they left. The whole log in order is `recentHistory`, which walks the same way below its `cursor` and keeps the same lines.*
 
 **`whoami()`** — `{ principal, levels: [...derived.levels], registers: derived.scope.registers }`. No SQL beyond §5.1's; the ladder does not run, so nothing is opened.
 
@@ -555,8 +564,10 @@ grant's id never appears (§4.4 rule 3). The learnings `learningsFor` returned i
 
 **`boot()`** — one `kernel.transaction` holding a read snapshot: `index` (steps 1–5), `sessionsLive`, `SELECT id, body_kind, body, opened_by, opened_at, defer_until FROM suggestion WHERE status = 'open' ORDER BY opened_at LIMIT 50`, `whatsNew()` with the default cursor. One round trip, at most `registers + 6` statements.
 
-As built, `boot` answers `registers`, `now`, `sessions` and `waiting`, each held to what the caller may read.
-`whatsNew` is not in it yet, so a caller reads it on its own. A session's briefing comes from `context`, not `boot`.
+As built, `boot` answers `registers`, `now`, `sessions` and `waiting` (20 open suggestions), and what the web shell
+draws: `record`, `me` (with the member's name), `pages` filtered as `pages` filters them, `counts { decide, inbox }`
+(`inbox` is `null` below owner) and `whatsNew` with the default cursor, each held to what the caller may read. It is
+not yet one transaction. A session's briefing comes from `context`, not `boot`.
 
 ---
 
@@ -935,9 +946,10 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 
 | Case | Input → expected |
 |---|---|
-| `whatsNew` cap | 70 events after the mark → 60, `sinceCapped: true`, `cursor` = rowid 61's; with that cursor → 10, `false` |
-| `whatsNew` scope | an event on a register outside scope is absent; a `decide` event is present |
-| `boot` one round trip | `sql.exec` calls `≤ registers + 6`; exactly one `kernel.transaction`; `whatsNew` inside equals `whatsNew()` alone |
+| `whatsNew` cap | 70 events after the mark → the newest 60, `sinceCapped: true`, `upTo` = the newest rowid; with `cursor` = newest − 9 → 10, `false` |
+| `whatsNew` scope | a token held to one register: an event on another register, its declaration, a question over its rows, a line about access and a whole-record line are absent; a question on its own register is present; `whatsNew` and `recentHistory` agree |
+| `recentHistory` paging | pages of 3 join to the whole log newest first, no line twice, `cursor` `null` only on the last; a fractional `limit` is `VALUE_MALFORMED`; a caller who may only append to a register reads none of its lines |
+| `boot` shell | `record`, `me` with the member's name, `counts.decide`, `counts.inbox` `null` below owner; the JSON of a scoped boot names no register, row or question outside the scope; `whatsNew` inside equals `whatsNew()` alone |
 | `index` | `open` = rows in non-terminal states; a register without `transitions` has `open: 0`; `fields` lists `{ id, type }`; `scope.repo` narrows only registers with `repos` |
 | `search` | a phrase with `"` and `OR` is matched literally; zero rows → one `search.empty` observation; with `vec` → the fused order |
 | `context` | over the seed, in `test/context.test.ts`: the run, the project and how it was placed, the last handoff, who is live here and elsewhere, what waits, the project's open rows, a learning faded after ninety days and counted, the people linked, and no run opened by the read; nearer wins for a skill of the same name; a key by its label and sealed state, with no value anywhere; an append grant is no register in the answer, and a caller with nothing to read is refused |

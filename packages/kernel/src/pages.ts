@@ -93,7 +93,7 @@ const READS = new Set([
      way: they are keys this file wrote. */
   'rows', 'matched', 'readings', 'walk', 'refusals',
   'fold', 'icon', 'inherit', 'since', 'first', 'row', 'field', 'versions',
-  'inherited', 'scopes', 'feed', 'seen', 'history',
+  'inherited', 'scopes', 'feed', 'seen', 'history', 'values',
 ]);
 
 export type PageDecl = {
@@ -128,6 +128,11 @@ export type BlockResult = PageBlock & {
   seen?: string | null;
   /** A `diff` block's versions of its field, newest first, at most `versions` of them. */
   history?: { at: string; by: string; text: string }[];
+  /**
+   * Every `{{path}}` in the block's heading, body, empty sentence or authored cells that the record
+   * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
+   */
+  values?: Record<string, Json>;
   /** What this block could not do. Non-empty means the block drew nothing. */
   refusals: Refusal[];
 };
@@ -290,9 +295,15 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
   if (found.refusal)
     return ok({ ...found.decl, page: found.slug, blocks: [{ kind: 'note', rows: [], matched: 0, refusals: [found.refusal] }] });
 
+  /* AN EXPANDED PAGE SAYS WHICH ROW IT IS ABOUT, so a host can name the project without guessing it
+     from the title. The title is already the row's, so this says nothing the page did not. */
+  const title = found.row ? deps.titleOf(found.row.register) : null;
   return ok({
     ...found.decl,
     page: found.slug,
+    ...(found.row && found.row.seq !== null
+      ? { param: { register: found.row.register, seq: found.row.seq, title: String((title && Object.hasOwn(found.row.fields, title) ? found.row.fields[title] : null) ?? '') } }
+      : {}),
     blocks: found.decl.blocks.map((b) => readBlock(deps, b)),
   });
 }
@@ -360,6 +371,11 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      matched nothing" are different facts and a renderer that cannot tell them apart draws the empty
      state of a block that was never meant to be on the page. */
   if (!drawnWhen(deps, block)) return { ...base, drawn: false };
+
+  /* THE PAGE'S LIVE FIGURES ARE THE RECORD'S TO SAY, so the host does not answer them from a copy of
+     its own. Only for a block that draws: a figure in a block that is not on the page is not read. */
+  const values = valuesOf(deps, block);
+  if (values) base.values = values;
 
   if (block.kind === 'stat' || block.cells) {
     return {
@@ -663,6 +679,9 @@ const ACTIONS: Schema = {
     next: { type: 'text' },
     last_at: { type: 'text' },
     last_outcome: { type: 'text' },
+    /* The last run's HTTP status and note, so a host can say why an action paused or waits. */
+    last_status: { type: 'int' },
+    last_note: { type: 'text' },
     runs: { type: 'int' },
     failures: { type: 'int' },
   },
@@ -684,6 +703,8 @@ const actionEntry = (a: ActionRow): Entry => ({
     next: a.next,
     last_at: a.last?.at ?? null,
     last_outcome: a.last?.outcome ?? null,
+    last_status: a.last?.status ?? null,
+    last_note: a.last?.note ?? null,
     runs: a.month.runs,
     failures: a.month.failures,
   },
@@ -841,7 +862,8 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
        finds its runs by `project is {{spoken}}`. A register with its own prefix would need its
        declaration here; the projects register has none. */
     if (key === 'spoken') return row ? escaped(row.register + '#' + String(row.seq)) : whole;
-    const value = row?.fields[key];
+    /* OWN PROPERTIES ONLY. `{{constructor}}` read the prototype and filled a heading with source code. */
+    const value = row && Object.hasOwn(row.fields, key) ? row.fields[key] : undefined;
     return value === null || value === undefined ? whole : escaped(String(value));
   });
   return JSON.parse(text);
@@ -894,8 +916,118 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const at = block.when.metric.indexOf(':');
       add(metric?.(at < 0 ? block.when.metric : block.when.metric.slice(0, at))?.source);
     }
+    /* AND SO DOES A `{{path}}` IN ITS PROSE, which the page answer now fills from the record. */
+    for (const path of pathsOf(block)) {
+      const said = pathOf(path);
+      if (!said) continue;
+      if ('metric' in said) add(metric?.(said.metric)?.source);
+      else named.add(said.register);
+    }
   }
   return [...named];
+}
+
+/* ── live values ─────────────────────────────────────────────────────────── */
+
+/** Lexically a path, `05 §7.1`, as the renderer reads one. */
+const PATH = /^[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?(?:\.[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?)*$/;
+
+/** The eight typed forms of `05 §7.2`, whose argument may be a path. */
+const TYPED = new Set(['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct', 'ref']);
+
+/**
+ * The field types a path may read. `05 §7.1` rule 2: a document or a note is an argument, not a figure.
+ * A secret is never a figure, and a ref or a list would be an id, so each is left out by not being named.
+ */
+const FIGURES = new Set(['text', 'url', 'email', 'enum', 'int', 'number', 'decimal', 'money', 'day', 'instant', 'bool', 'boolean', 'duration', 'pct']);
+
+/**
+ * Every `{{path}}` a reader would see in a block, each once: in its heading, body, empty sentence and
+ * authored cells, outside code spans, as a bare path or as a typed form's path argument.
+ */
+export function pathsOf(block: PageBlock): string[] {
+  const authored = (block as { authored?: unknown }).authored;
+  const cells = Array.isArray(authored)
+    ? authored.flatMap((r) => (r !== null && typeof r === 'object' && Array.isArray((r as { cells?: unknown }).cells) ? (r as { cells: unknown[] }).cells : []))
+    : [];
+  const out = new Set<string>();
+  for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells]) {
+    if (typeof text !== 'string') continue;
+    /* CODE SPANS FIRST, as the renderer lifts them: a `{{…}}` in backticks is text, not a question. */
+    for (const m of text.replace(/`[^`]*`/g, ' ').matchAll(/\{\{([^{}]*)\}\}/g)) {
+      const body = (m[1] ?? '').trim();
+      const colon = body.indexOf(':');
+      const form = colon > 0 ? body.slice(0, colon).trim() : '';
+      const raw = TYPED.has(form) ? body.slice(colon + 1).trim() : body;
+      /* A typed form's literal is the author's value; `ref`'s `tasks#241` is a literal and not a path. */
+      if (TYPED.has(form) && (!/^[A-Za-z]/.test(raw) || (form === 'ref' && /^[a-z][a-z0-9_]*#\d+$/.test(raw)))) continue;
+      if (PATH.test(raw)) out.add(raw);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * What a path names, in `05 §7.1`'s grammar outside a template: a metric, a row's field by spoken id,
+ * or a register's count. Nothing else is read: `tasks.open` and `portfolio.revenue` are not yet, and a
+ * path that names none of these is `null` rather than a guess.
+ */
+function pathOf(path: string): { metric: string } | { register: string; seq: number; field: string } | { register: string; count: true } | null {
+  const parts = path.split('.');
+  if (parts.length === 1) return /^[a-z][a-z0-9_-]*$/.test(path) ? { metric: path } : null;
+  if (parts.length !== 2) return null;
+  const [head, tail] = parts as [string, string];
+  const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(head);
+  if (row) return { register: row[1]!, seq: Number(row[2]), field: tail };
+  if (tail === 'count' && /^[a-z][a-z0-9_]*$/.test(head)) return { register: head, count: true };
+  return null;
+}
+
+/** A stored value a reader may be shown: a scalar, or a money's amount and currency and nothing else. */
+function figure(v: Json | undefined): Json | undefined {
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return v;
+  if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.amount === 'number' && typeof v.currency === 'string')
+    return { amount: v.amount, currency: v.currency };
+  return undefined;
+}
+
+/**
+ * One path's value, or `undefined` when the record holds none.
+ *
+ * NOTHING IS COMPUTED HERE THAT THE RECORD DOES NOT ALREADY ANSWER: a declared metric's reading, a
+ * stored field, a count `list` already returns. A field is read from the row's OWN properties and only
+ * when the register declares it, so `tasks#1.constructor` is nothing rather than the prototype.
+ */
+function valueAt(deps: PageDeps, path: string): Json | undefined {
+  const said = pathOf(path);
+  if (!said) return undefined;
+  if ('metric' in said) {
+    const decl = deps.metric(said.metric);
+    const read = decl ? deps.read(decl) : null;
+    if (!read?.ok || read.value.value === null) return undefined;
+    return read.value.unit ? { amount: read.value.value, currency: read.value.unit } : read.value.value;
+  }
+  const schema = deps.schemaOf(said.register);
+  if (!schema) return undefined;
+  if ('count' in said) {
+    const listed = deps.list({ register: said.register, limit: 1 });
+    return listed.ok ? listed.value.matched : undefined;
+  }
+  const decl = Object.hasOwn(schema.fields, said.field) ? schema.fields[said.field] : undefined;
+  if (!decl || !FIGURES.has(decl.type)) return undefined;
+  const listed = deps.list({ register: said.register, where: { field: 'seq', is: said.seq }, limit: 1 });
+  const row = listed.ok ? listed.value.rows[0] : undefined;
+  return row && Object.hasOwn(row.fields, said.field) ? figure(row.fields[said.field]) : undefined;
+}
+
+/** Every path in a block the record holds a value for, or `undefined` when there are none. */
+function valuesOf(deps: PageDeps, block: PageBlock): Record<string, Json> | undefined {
+  const out: Record<string, Json> = {};
+  for (const path of pathsOf(block)) {
+    const v = valueAt(deps, path);
+    if (v !== undefined) out[path] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /**

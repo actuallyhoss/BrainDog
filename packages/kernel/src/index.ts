@@ -348,6 +348,28 @@ export type WriteContext = {
 
 const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
 
+/** One line of the log as the record-wide reads scan it: the event, with its values parsed. */
+export type EventLine = {
+  rowid: number;
+  id: string;
+  ts: string;
+  actor: string;
+  kind: string;
+  target: string | null;
+  target_kind: string | null;
+  field: string | null;
+  from: Json | null;
+  to: Json | null;
+  note: string | null;
+};
+
+/** A page's place in the rail, when its declaration gives one in the shape `{ section, order }`. */
+const navOf = (nav: unknown): { section: string; order: number } | null => {
+  if (typeof nav !== 'object' || nav === null) return null;
+  const { section, order } = nav as { section?: unknown; order?: unknown };
+  return typeof section === 'string' && section !== '' ? { section, order: typeof order === 'number' ? order : 0 } : null;
+};
+
 /**
  * What only the kernel's own paths say about a write, and so is not on `WriteContext`, which a caller
  * fills in.
@@ -2574,6 +2596,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         slug: p.slug,
         title: p.decl.title,
         registers: registersOf(p.decl, pageDeps().metric),
+        /* WHERE IT SITS IN THE RAIL, for `boot`. A declaration's `nav` is checked at install, so only its shape is asked here. */
+        nav: navOf(p.decl.nav),
+        icon: typeof p.decl.icon === 'string' ? p.decl.icon : null,
       })),
 
     /**
@@ -2870,6 +2895,62 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** The newest event, which is what a client that has read everything passes as `upTo`. */
     newestEvent: (): number => Number(sql.one<{ v: number | null }>('SELECT MAX(rowid) AS v FROM event')?.v ?? 0),
+
+    /**
+     * Events below `before`, newest first, a batch at a time: what `whatsNew` and `recentHistory` scan.
+     *
+     * UNFILTERED ON PURPOSE. Which of these a caller may see is the record's question, and it is asked
+     * of each row there, so the kernel hands over the log in order and nothing else.
+     */
+    eventsBefore: (before: number | null, limit: number): EventLine[] =>
+      sql
+        .all<{
+          rowid: number;
+          id: string;
+          ts: string;
+          actor: string;
+          kind: string;
+          target: string | null;
+          target_kind: string | null;
+          field: string | null;
+          from_v: string | null;
+          to_v: string | null;
+          note: string | null;
+        }>(
+          'SELECT rowid, id, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event WHERE rowid < ? ORDER BY rowid DESC LIMIT ?',
+          before ?? Number.MAX_SAFE_INTEGER,
+          limit,
+        )
+        .map((e) => ({
+          rowid: Number(e.rowid),
+          id: e.id,
+          ts: e.ts,
+          actor: e.actor,
+          kind: e.kind,
+          target: e.target,
+          target_kind: e.target_kind,
+          field: e.field,
+          from: read(e.from_v),
+          to: read(e.to_v),
+          note: e.note,
+        })),
+
+    /**
+     * The first event after this person's read mark, or one past the newest when nothing is after it.
+     * `45 §5.3` step 1; a person with no mark has read nothing, so it is the first event there is.
+     */
+    unreadFrom: (person: string | null): number =>
+      Number(
+        sql.one<{ v: number }>(
+          `SELECT COALESCE(MIN(rowid), (SELECT COALESCE(MAX(rowid), 0) + 1 FROM event)) AS v FROM event
+            WHERE ts > COALESCE((SELECT seen_at FROM member WHERE person_id = ? AND register = '*'), '')`,
+          person ?? '',
+        )?.v ?? 1,
+      ),
+
+    /** Arrivals nothing claimed and nobody has dealt with yet: how many the inbox holds. */
+    inboxWaiting: (): number =>
+      Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM inbox_raw WHERE state IN ('untriaged', 'review')")?.n ?? 0),
 
     /* `seenAt()` WAS HERE AND IS GONE. Its only caller was `markRead`'s own return — it wrote the
        mark, then read it back through a second method — and `markRead` returns the mark now, which

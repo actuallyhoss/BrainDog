@@ -329,7 +329,8 @@ function cardsRows(block: BlockResult): string[] {
  */
 function sectionRow(block: BlockResult): string {
   const { icon, fold } = block as BlockResult & { icon?: string; fold?: boolean };
-  const count = block.register ? String(block.matched.length) : '';
+  /* `total` AND NOT `matched.length`: a live answer sends the count and only the rows that fit. */
+  const count = block.register ? String(block.total) : '';
   return `${escapeCell(icon ?? '')} | ${count} | ${fold ? 'fold' : ''}`;
 }
 

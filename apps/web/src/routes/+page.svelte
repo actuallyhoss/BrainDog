@@ -17,7 +17,8 @@
   import { Block, Degraded } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import * as pref from '$lib/pref.ts';
-  import { identityFor, NOW, ROWS, actorOf, metric } from '$lib/record/api.ts';
+  import { identityFor, NOW, ROWS, actorOf, metric, type Metric } from '$lib/record/api.ts';
+  import type { News } from '$lib/record/news-live.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -26,16 +27,21 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
-  import { drew } from '../lib/ui/screen.svelte.ts';
+  import { untrack } from 'svelte';
+
+  import { closed, drew, opened } from '../lib/ui/screen.svelte.ts';
 
   let { data } = $props();
 
-  const today = new Date(NOW).toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  });
+  /* THE RECORD'S DAY ON A LIVE RECORD, and the sample's frozen one otherwise. */
+  const today = $derived(
+    new Date(data.now).toLocaleDateString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+    }),
+  );
 
   const days = (iso: unknown) =>
     typeof iso === 'string' ? (Date.parse(`${iso}T12:00:00Z`) - NOW) / 86_400_000 : Infinity;
@@ -73,9 +79,44 @@
    */
   let seen = $state(pref.read().seen);
 
-  const fresh = $derived(data.whatsNew.filter((item) => !seen || item.at > seen));
+  /**
+   * ON A LIVE RECORD THE MARK IS THE RECORD'S, in `member.seen_at`, and `whatsNew` answers only what is after it. So the
+   * feed is the answer as it came, first from the shell's `boot` and then from a fresh read when the screen opens, and
+   * marking it read is `markRead` with the newest line's number.
+   */
+  let feed = $state<News | null>(null);
+  let tiles = $state<Metric[] | null>(null);
+  const news = $derived(data.live ? (feed ?? { items: data.whatsNew, upTo: data.upTo, sinceCapped: data.sinceCapped }) : null);
+
+  const fresh = $derived(news ? news.items : data.whatsNew.filter((item) => !seen || item.at > seen));
+  const capped = $derived(news ? news.sinceCapped : data.sinceCapped);
+
+  $effect(() => {
+    if (!data.live) return;
+    const me = data.me.person;
+    /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
+    const at = untrack(opened);
+    let ok = false;
+    void import('$lib/record/news-live.ts')
+      .then((m) => m.readHome(location.origin, me))
+      .then((out) => {
+        if (out.from !== 'live') return;
+        tiles = out.tiles;
+        feed = out.news;
+        ok = true;
+      })
+      .finally(() => closed(ok, at));
+  });
 
   function markRead() {
+    if (news) {
+      /* CLEARED HERE AT ONCE, and a mark that did not land leaves the record's where it was, so the same lines come back
+         on the next visit rather than being lost. */
+      const upTo = news.upTo;
+      feed = { items: [], upTo, sinceCapped: false };
+      void import('$lib/record/news-live.ts').then((m) => m.markAll(location.origin, upTo));
+      return;
+    }
     /* The newest item's own instant, not the wall clock. Marking read means "I have seen these",
        and an arrival written a second later must not be swallowed by a mark taken a second after
        that — which is the race a `Date.now()` here would lose silently and rarely. */
@@ -85,19 +126,23 @@
     pref.write({ seen: newest });
   }
 
+  /* NOT YET READ FROM A LIVE RECORD: the obligations due this week and the services lapsing are the sample's rows, so a
+     live Home draws neither rather than somebody else's. */
   const dueSoon = $derived(
-    (ROWS.obligations ?? [])
-      .filter((e) => (e.fields.state === 'open' || e.fields.state === 'part') && days(e.fields.due) <= 7)
-      .sort((a, b) => String(a.fields.due).localeCompare(String(b.fields.due))),
+    data.live
+      ? []
+      : (ROWS.obligations ?? [])
+          .filter((e) => (e.fields.state === 'open' || e.fields.state === 'part') && days(e.fields.due) <= 7)
+          .sort((a, b) => String(a.fields.due).localeCompare(String(b.fields.due))),
   );
 
-  const lapsing = $derived((ROWS.services ?? []).filter((e) => e.fields.state === 'lapsing'));
+  const lapsing = $derived(data.live ? [] : (ROWS.services ?? []).filter((e) => e.fields.state === 'lapsing'));
   const shown = $derived(dueSoon.slice(0, NEEDS_CAP));
   const hidden = $derived(dueSoon.length - shown.length);
 
   /* Home writes the dialect and the renderer draws it, exactly as an agent would — one code path
      from the first `<figure>` down, and no bespoke chart component to keep in step. */
-  const cells = $derived(['owed-to-you', 'due-30d', 'overdue'].map((id) => metric(id)));
+  const cells = $derived(data.live ? (tiles ?? []) : ['owed-to-you', 'due-30d', 'overdue'].map((id) => metric(id)));
 
   /* A FIGURE IS A DOOR. `hrefFor` derives a tile's address from the same predicate the figure is
      computed over, so the tile and the list it opens cannot disagree — and until now that
@@ -196,11 +241,13 @@
       not position.
     -->
     <Section title={copy.rightNow}>
+      {#if cells.length > 0}
       <div class="strip">
         {#each strip as segment}
           {#if segment.type === 'block'}<Block block={segment} opts={stripOpts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
         {/each}
       </div>
+      {/if}
     </Section>
 
     <Section title={copy.needsYou}>
@@ -218,7 +265,10 @@
       thing to do is not "add an obligation" — it is to be shown what any of this is.
     -->
     {#if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0}
-      {@const anything = Object.values(ROWS).reduce((n, list) => n + list.length, 0) + data.questions.length}
+      {@const anything =
+        (data.live
+          ? data.index.registers.reduce((n, r) => n + r.count, 0)
+          : Object.values(ROWS).reduce((n, list) => n + list.length, 0)) + data.questions.length}
       <Empty
         kind={anything === 0 ? 'no-data-yet' : 'cleared'}
         title={anything === 0 ? copy.recordEmpty : copy.nothingNeedsYou}
@@ -284,7 +334,7 @@
                 {/if}
               </span>
               <span class="line-amount"></span>
-              <span class="line-when">{since(q.opened, NOW)}</span>
+              <span class="line-when">{since(q.opened, data.now)}</span>
             </a>
           </li>
         {/each}
@@ -368,7 +418,7 @@
               <Face name={who} you={who === 'you'} />
               <span class="event-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
               <span class="event-text">{item.text}</span>
-              <span class="event-when">{since(item.at, NOW)}</span>
+              <span class="event-when">{since(item.at, data.now)}</span>
             </a>
           </li>
         {/each}
@@ -378,9 +428,9 @@
            whole shape is "here is what happened". `19 §2` gives `/audit` that job, so the overflow
            points at it — and it now also fires for the rows this screen itself is not drawing, which
            the record's flag knew nothing about. -->
-      {#if data.sinceCapped || fresh.length > NEWS_CAP}
+      {#if capped || fresh.length > NEWS_CAP}
         <a class="more" href="/audit">
-          {data.sinceCapped ? copy.andMore : copy.moreInTheLog(fresh.length - NEWS_CAP)}
+          {capped ? copy.andMore : copy.moreInTheLog(fresh.length - NEWS_CAP)}
           <Icon name="arrow" size="s" />
         </a>
       {/if}
@@ -563,9 +613,11 @@
      down the card, which reads as a rendering fault rather than as eleven warnings. The state lives
      in the date column instead: one place, one column, aligned. */
 
+  /* A DOOR, SO A TARGET: 44px tall on a coarse pointer like `.mark`, and the words stay their size. */
   .more {
     display: inline-flex;
     align-items: center;
+    min-block-size: var(--ctl-h);
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
     color: var(--accent-text);

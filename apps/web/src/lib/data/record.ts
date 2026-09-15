@@ -14,6 +14,7 @@
 import { createClient, type Boot } from '@braindog/client';
 
 import { heldBy, list, NOW, PAGE, REGISTERS, sortRows } from '../record/api.ts';
+import { readBoot } from '../record/boot-live.ts';
 import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
@@ -191,9 +192,6 @@ const refusing = (refusal: Refusal): Source => {
    `Source`, and does not know which one it was handed except to say so.
    ───────────────────────────────────────────────────────────────────────────────────────────── */
 
-/** The two refusals that mean "there is no record here", as opposed to "the record said no". */
-const SAMPLE_WHEN: ReadonlySet<string> = new Set(['UNREACHABLE', 'UNAUTHORIZED']);
-
 const ok = <T>(value: T): Said<T> => ({ ok: true, value });
 
 const SAMPLE: Source = {
@@ -235,12 +233,13 @@ let chosen: Promise<Source> | null = null;
  */
 export function open(): Promise<Source> {
   chosen ??= (async (): Promise<Source> => {
-    const client = createClient({ base: location.origin });
-    const probe = said(await client.boot());
-    if (probe.ok) return remote(client, probe.value);
-    if (SAMPLE_WHEN.has(probe.refusal.code)) return SAMPLE;
+    /* THE SHELL'S OWN ANSWER, not a second probe. The layout asked `boot` before this screen drew, and
+       `boot-live.ts` kept it for the tab under the same two refusals that mean there is no record. */
+    const booted = await readBoot(location.origin);
+    if (booted.from === 'live') return remote(createClient({ base: location.origin }), booted.boot);
+    if (booted.from === 'sample') return SAMPLE;
     chosen = null;
-    return refusing(probe.refusal);
+    return refusing({ code: booted.code, fix: booted.fix });
   })();
   return chosen;
 }

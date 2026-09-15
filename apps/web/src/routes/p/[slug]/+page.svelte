@@ -34,33 +34,62 @@
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropIndex, spanOf as declaredSpan } from '$lib/record/arrange.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { untrack } from 'svelte';
+  import { pageReader, resolverOf, type LiveBlock, type Opened } from '$lib/record/page-live.ts';
+  import ActionRows from './ActionRows.svelte';
+  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
   const slug = $derived(route.params.slug ?? '');
-  const result = $derived(readPage(slug));
   const showSource = $derived(route.url.searchParams.get('src') === '1');
-  const resolved = values();
 
-  /** Every `{{path}}` is resolved server-side and handed over; a missing value is an em dash. */
-  /* NOW IS THE RECORD'S CLOCK, not the browser's. `inline` defaults it to `Date.now()`, so every
-     `{{ago:}}` in prose was formatted against the wall clock while every other date on the screen
-     came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
-     the same row, two clicks apart. In production that reads differently on two devices and drifts
-     a day further every day. */
-  /* `hole` IS WHAT MAKES A HOLE PRESSABLE, and this screen owns what pressing one does. Without
-     it the renderer draws a marked span instead of a `<button>` with no handler. There is no
-     `dayHref` because there is no calendar in this build. */
-  const opts = {
-    resolve: (path: string) => resolved[path] ?? null,
-    now: NOW,
-    hole: (path: string | null) =>
-      toasts.push(
-        copy.notWritten(
-          path ? `${holeLabel(path)} would be opened for whoever can supply it` : 'The unknown would be opened for whoever can supply it',
-        ),
-        { intent: 'warn' },
+  /**
+   * WHERE THE PAGE CAME FROM: the record's `page` answer, the sample when there is no record here, the
+   * record saying it has no such page, or the record's own sentence. Nothing draws until it answers.
+   */
+  let got = $state<Opened | null>(null);
+  let reader: ReturnType<typeof pageReader> | null = null;
+
+  async function readLive(asked: string) {
+    const at = opened();
+    got = null;
+    reader ??= pageReader(location.origin);
+    const out = await reader.read(asked);
+    /* An answer for a page somebody has already left draws nothing. */
+    if ((route.params.slug ?? '') !== asked) return closed(true, at);
+    got = out;
+    closed(out.from !== 'refused', at);
+  }
+
+  $effect(() => {
+    const asked = slug;
+    untrack(() => void readLive(asked));
+  });
+
+  const live = $derived(got?.from === 'live' ? got : null);
+  /* A LIVE PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; the sample is read only when there is no record. */
+  const result = $derived<{ page: PageDecl; blocks: LiveBlock[] } | undefined>(
+    got?.from === 'live' ? got.page : got?.from === 'sample' ? (readPage(slug) ?? undefined) : undefined,
+  );
+  const sampleValues = $derived<Record<string, string>>(got?.from === 'sample' ? values() : {});
+
+  /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`, or by the sample's figures when
+     there is no record; a missing value is `—`. `now` is the clock the rows were read against: the
+     reader's for a live page, the sample's own `NOW` otherwise, so `{{ago:}}` agrees with the dates
+     beside it. `hole` is what makes a hole pressable; this screen owns what pressing one does. On a
+     live record a value the record cannot answer is not pressable: nobody can supply a declared
+     figure from this screen, so it is marked and left alone. */
+  const pressHole = (path: string | null) =>
+    toasts.push(
+      copy.notWritten(
+        path ? `${holeLabel(path)} would be opened for whoever can supply it` : 'The unknown would be opened for whoever can supply it',
       ),
-  };
+      { intent: 'warn' },
+    );
+  const optsFor = (block: LiveBlock) => ({
+    resolve: live ? resolverOf(block.values) : (path: string) => sampleValues[path] ?? null,
+    now: live ? live.now : NOW,
+    ...(live ? {} : { hole: pressHole }),
+  });
 
   /**
    * The declared span, clamped to what the KIND can survive.
@@ -146,7 +175,7 @@
     const slots = arrangement.slots ?? blocks.map((b, i) => ({ i, span: spanOf(b) }));
     return slots
       .map((slot) => ({ slot, block: blocks[slot.i] }))
-      .filter((x): x is { slot: { i: number; span: number }; block: BlockResult } => Boolean(x.block));
+      .filter((x): x is { slot: { i: number; span: number }; block: LiveBlock } => Boolean(x.block));
   });
 
   function beginArrange() {
@@ -347,7 +376,7 @@
   const all = $derived([...(result?.blocks ?? []), ...extra.map((b) => resolveExtra(b))]);
 
   /** An added block, run through the page read so it carries rows rather than a declaration. */
-  function resolveExtra(block: PageBlock): BlockResult {
+  function resolveExtra(block: PageBlock): LiveBlock {
     const template = result?.blocks.find((b) => b.register === block.source?.replace('register.', ''));
     return {
       ...(template ?? { rows: [], entries: [], matched: [], shown: 0, total: 0, drawn: true, stale_at: '' }),
@@ -424,26 +453,28 @@
 
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
-   *
-   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * DRAWN ONCE THE READ HAS ANSWERED, live, the sample, or a page the record does not have. The read is
+   * bracketed by `opened()` and `closed()`, so a call still out takes `data-screen` away whatever this
+   * says; `Empty` says `refused` for the state it draws.
    */
-  $effect(() => drew('ready'));
+  $effect(() => {
+    if (got && got.from !== 'refused') drew('ready');
+  });
 </script>
 
 <svelte:head><title>{titleOf(result?.page?.title)}</title></svelte:head>
 
 <svelte:window {onkeydown} />
 
-{#if !result}
+{#if got === null}
+  <!-- Nothing until the record answers: a sample page drawn and then swapped is two pages. -->
+{:else if got.from === 'refused'}
+  <div class="page">
+    <Empty kind="error" heading title={got.fix}>
+      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+    </Empty>
+  </div>
+{:else if !result}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
@@ -454,7 +485,7 @@
       kind="error"
       heading
       title={copy.noSuch('page', slug)}
-      body={copy.theseExist('Pages', Object.values(readPages()).map((p) => p.title))}
+      body={copy.theseExist('Pages', got.from === 'missing' ? got.titles : Object.values(readPages()).map((p) => p.title))}
     >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
@@ -532,12 +563,13 @@
                states and says collapsing them into one is the failure; a filter that matched nothing
                and a register with nothing in it are different facts, and the second is the one
                somebody can act on. -->
-          {@const held = block.register ? REGISTERS[block.register] : undefined}
+          <!-- On a live page the register's size is known only when the block reads all of it. -->
+          {@const held = block.register && !(live && block.where) ? REGISTERS[block.register] : undefined}
           {@const drawn = draw(
             block,
             held
               ? {
-                  rows: heldBy(block.register!),
+                  rows: live ? block.total : heldBy(block.register!),
                   name: held.name,
                   ...(held.holds ? { holds: held.holds } : {}),
                   /* WHERE THE FIRST ROW WOULD GO, and `19 §6` says the action for this state is
@@ -630,7 +662,11 @@
             <!-- Never hidden and never centred: the page's shape is information, and a page that
                  silently shrinks teaches that blocks come and go (19 §6). ONE surface for all
                  sixteen kinds, so "nothing matched" and "this block is broken" are told apart. -->
-            {#if drawn.refusal}
+            {#if block.cannot}
+              <p class="block-cannot">{block.cannot}</p>
+            {:else if block.actions?.length && !block.refusals.length}
+              <ActionRows rows={block.actions} now={live?.now ?? NOW} />
+            {:else if drawn.refusal}
               {@const act = drawn.refusal.action}
               <Empty
                 compact
@@ -666,7 +702,7 @@
                 -->
                 {#if segment.type === 'block'}<Block
                     block={segment}
-                    opts={{ ...opts, cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
+                    opts={{ ...optsFor(block), cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
                     onmove={(row, to) => toasts.push(copy.cardMovedTo(row.cells[1] ?? copy.cardFallback, to), { intent: 'warn' })}
                     ontick={(row, done) =>
                       toasts.push(copy.taskTicked(row.cells[0] ?? copy.cardFallback, done), { intent: 'warn' })}
@@ -695,7 +731,7 @@
             {#if block.kind === 'section' && block.heading === actionWords.runsOn && param && !arranging}
               <Actions project={param.title} />
             {/if}
-            {#if !drawn.refusal && block.total > block.shown}
+            {#if !drawn.refusal && !block.cannot && block.total > block.shown}
               {@const to = openHref(block)}
               <p class="block-slice" role="status">
                 {block.source === 'forecast.runway'
@@ -742,6 +778,12 @@
      sentence about the same thing seen from the page rather than from the list. Left-aligned rather
      than centred: it sits under content of every shape here, and a centred line under a two-row
      `spec` block reads as a caption for it. */
+  .block-cannot {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
   .block-slice {
     margin: 0;
     padding-block-start: var(--sp-2);

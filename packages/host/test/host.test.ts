@@ -81,6 +81,24 @@ test('a read is a GET with its arguments in the query string, and a predicate su
   sql.close();
 });
 
+test('what is new and the log are reads, with their numbers checked on the way in', async () => {
+  const { call, sql } = await host();
+  await call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } });
+
+  const news = await call('whatsNew');
+  assert.equal(news.status, 200);
+  assert.equal((news.body.value as { events: { title: string | null }[] }).events[0]?.title, 'Invoice 41');
+
+  const page = await call('recentHistory?limit=1');
+  assert.equal(page.status, 200);
+  assert.equal((page.body.value as { events: unknown[] }).events.length, 1);
+
+  const bad = await call('recentHistory?cursor=soon');
+  assert.equal(bad.status, 422);
+  assert.equal(bad.body.refusal?.code, 'VALUE_MALFORMED');
+  sql.close();
+});
+
 test('A WRITE IS A POST, because a GET that changes something is a change a prefetch can make', async () => {
   const { call, sql } = await host();
   const wrong = await call('create');

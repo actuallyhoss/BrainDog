@@ -65,6 +65,7 @@ import {
   type Exchanged,
   type VaultGrant,
   type Waiting as DeviceWaiting,
+  type EventLine as LogLine,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
@@ -393,7 +394,42 @@ export type Boot = {
   sessions: LiveRun[];
   /** Open suggestions the caller may see, newest first: what waits on a person. */
   waiting: Waiting[];
+  /** The record's own name, which the shell draws above everything else. `null` before it is provisioned. */
+  record: { slug: string; name: string; locale: string } | null;
+  /** Who is asking: the person behind the call, the name they gave, and what they hold on the record. */
+  me: { kind: 'person' | 'token' | 'system'; person: string | null; name: string | null; level: Level | null };
+  /** The pages the caller may open, as `pages` lists them, each with its place in the rail when it has one. */
+  pages: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null }[];
+  /**
+   * How many questions wait on a person, and how many arrivals wait in the inbox.
+   *
+   * COUNTS AND NOT LISTS. `waiting` is capped for the first paint and a rail badge is the whole number. The inbox holds
+   * whatever was sent in, so only an owner is told how much; anybody else gets `null`, which is not zero.
+   */
+  counts: { decide: number; inbox: number | null };
+  /** What changed since the caller last read, exactly as `whatsNew` answers with no cursor. */
+  whatsNew: WhatsNew;
 };
+
+/** One line of the log as a caller sees it: the event, and what it is about when they may read that. */
+export type EventLine = LogLine & {
+  /** The row's register and number, when the event is about a row. */
+  register: string | null;
+  seq: number | null;
+  /** What the thing is called: a row's title, or a question. */
+  title: string | null;
+};
+
+/**
+ * `whatsNew`: what changed since the read mark, NEWEST FIRST and at most sixty.
+ *
+ * `upTo` is the newest event in the answer, which is what `markRead` takes to say all of these were seen.
+ * `sinceCapped` says there is more between the mark and the oldest line here; the rest is `recentHistory`'s.
+ */
+export type WhatsNew = { events: EventLine[]; upTo: number | null; sinceCapped: boolean };
+
+/** `recentHistory`: one page of the log, newest first, and the cursor for the page below it. */
+export type HistoryPage = { events: EventLine[]; cursor: number | null };
 
 /** One live run: the row, its spoken id, and what is worked out when it is read. */
 export type LiveRun = Entry & {
@@ -945,6 +981,115 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }));
   };
 
+  /** Whether the caller reads the record as a whole, rather than the registers they were invited to. */
+  const wholeRecord = (ctx: CallContext): boolean =>
+    ctx.principal.kind === 'system' ||
+    (ctx.principal.level !== null && (ctx.registers === undefined || ctx.registers === '*'));
+
+  /**
+   * One event as this caller may see it, or `null` when they may not.
+   *
+   * THE SAME QUESTIONS THE OTHER READS ASK, one event at a time. A row's event goes to whoever may `list` its register,
+   * a question's to whoever `governance` shows it to, and a line about keys, access or links to an owner only, because
+   * the vault and the members list are theirs. Everything else is about the record as a whole, so somebody invited to
+   * named registers does not see it.
+   */
+  const lineOf = (ctx: CallContext, e: LogLine): EventLine | null => {
+    const bare: EventLine = { ...e, register: null, seq: null, title: null };
+    const target = e.target ?? '';
+    const colon = target.indexOf(':');
+    const kind = e.target_kind ?? (colon > 0 ? target.slice(0, colon) : null);
+    const id = colon > 0 ? target.slice(colon + 1) : target;
+    if (kind === 'entry') {
+      const row = kernel.get(id, { includeDeleted: true });
+      if (!row || readable(ctx, row.register)) return null;
+      const title = kernel.register(row.register)?.title;
+      return { ...bare, register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') || null : null };
+    }
+    if (kind === 'suggestion' || kind === 'decision') {
+      const row = kernel.governanceRow(kind, id);
+      if (row && holds(ctx, row)) return null;
+      /* A DECISION NAMES THE QUESTION IT ANSWERS, and the words are that question's. */
+      const asked = kind === 'suggestion' ? id : typeof row?.question === 'string' ? row.question : null;
+      const title = asked === null ? null : (kernel.question(asked) ?? (kind === 'decision' ? asked : null));
+      return { ...bare, title };
+    }
+    if (/^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person'].includes(kind ?? ''))
+      return allows(ctx, 'owner') === null ? bare : null;
+    if (id.startsWith('register.')) return readable(ctx, id.slice('register.'.length)) ? null : bare;
+    return wholeRecord(ctx) ? bare : null;
+  };
+
+  /* A BATCH IS WHAT ONE STATEMENT READS, AND THE CAP IS WHAT ONE CALL WILL WALK. A caller who may see one register of a
+     busy record would otherwise walk the whole log to fill a page; past the cap the answer is short and says where it
+     stopped, and the next call carries on from there. */
+  const BATCH = 500;
+  const WALK = 5_000;
+  /** How many lines `whatsNew` answers with: a screen's worth, `45 §5.3`. */
+  const NEWS = 60;
+
+  /**
+   * Walk the log down from `before`, no lower than `floor`, keeping what the caller may see, until `want` are kept.
+   * `next` is where a further walk would start, and `null` once nothing is left above the floor.
+   */
+  const walk = (ctx: CallContext, before: number | null, floor: number, want: number): { lines: EventLine[]; next: number | null } => {
+    const lines: EventLine[] = [];
+    let at = before;
+    let walked = 0;
+    while (walked < WALK) {
+      const batch = kernel.eventsBefore(at, BATCH);
+      for (const e of batch) {
+        if (e.rowid < floor) return { lines, next: null };
+        walked += 1;
+        at = e.rowid;
+        const line = lineOf(ctx, e);
+        if (line) lines.push(line);
+        if (lines.length === want) return { lines, next: at };
+      }
+      if (batch.length < BATCH) return { lines, next: null };
+    }
+    return { lines, next: at };
+  };
+
+  /** What changed since `cursor`, or since the caller's read mark. A token reads its person's mark. */
+  const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
+    const p = ctx.principal;
+    const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
+    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(person), NEWS + 1);
+    const events = lines.slice(0, NEWS);
+    return { events, upTo: events[0]?.rowid ?? null, sinceCapped: next !== null };
+  };
+
+  /**
+   * What the shell draws around every screen, held to the caller as `boot`'s registers are: the record's name, who is
+   * asking, the pages they may open, and the two counts on the rail.
+   */
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'whatsNew'> => {
+    const p = ctx.principal;
+    const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
+    const identity = kernel.identity();
+    const open = kernel.governance('suggestion', { status: 'open', limit: 200 });
+    return {
+      record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale } : null,
+      me: {
+        kind: p.kind,
+        person,
+        name: person === null ? null : (kernel.members().find((m) => m.person_id === person)?.name ?? null),
+        level: p.kind === 'system' ? null : p.level,
+      },
+      /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
+      pages: kernel
+        .pages()
+        .filter((page) => page.registers.length === 0 || page.registers.some((id) => !readable(ctx, id)))
+        .map((page) => ({ slug: page.slug, title: page.title, nav: page.nav, icon: page.icon })),
+      counts: {
+        decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
+        inbox: allows(ctx, 'owner') === null ? kernel.inboxWaiting() : null,
+      },
+      whatsNew: newsFor(ctx),
+    };
+  };
+
   /**
    * One row as `context` shows it. A key's row carries its title and `mobile` fields, and for its secret
    * field only what is known about the grant: whether a value is sealed, and who opened it last.
@@ -1165,6 +1310,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            held to what the caller may read, as the registers above are. */
         sessions: readable(ctx, SESSION) ? [] : live(ctx),
         waiting: waitingFor(ctx),
+        ...shellFor(ctx),
       });
     },
 
@@ -1393,7 +1539,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             .blockRegisters(b)
             .map((register) => readable(ctx, register))
             .find((said) => said !== null);
-          return beyond ? { ...b, rows: [], matched: 0, ...(b.readings ? { readings: [] } : {}), refusals: [beyond] } : b;
+          return beyond ? { ...b, rows: [], matched: 0, ...(b.readings ? { readings: [] } : {}), ...(b.values ? { values: {} } : {}), refusals: [beyond] } : b;
         }),
       });
     },
@@ -2444,6 +2590,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false, refusal: stop } as Result<never>;
       const row = kernel.get({ register: args.register, seq: args.seq });
       return ok(row ? kernel.history(row.id) : []);
+    },
+
+    /**
+     * What changed since this person last read: the read half of `markRead`.
+     *
+     * NEWEST FIRST AND CAPPED, because it is what a first screen draws under "since you were away", and the oldest sixty
+     * lines of a month away are the wrong sixty. The whole of it, in order, is `recentHistory`.
+     */
+    async whatsNew(args: { cursor?: number } | undefined, ctx: CallContext): Promise<Result<WhatsNew>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const cursor = args?.cursor;
+      if (cursor !== undefined && !(Number.isSafeInteger(cursor) && cursor >= 1))
+        return no('VALUE_MALFORMED', 'A cursor is the number of an event, a whole number from 1.', { at: 'cursor' });
+      return ok(newsFor(ctx, cursor));
+    },
+
+    /**
+     * The record's whole log, newest first, a page at a time: every change, by whom, held to what the caller may see.
+     *
+     * `cursor` is the one the page above answered with, and a page is short only where the walk stopped, never because
+     * the caller may see less, so a `cursor` of `null` is the one sign there is nothing further down.
+     */
+    async recentHistory(args: { cursor?: number; limit?: number } | undefined, ctx: CallContext): Promise<Result<HistoryPage>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const cursor = args?.cursor;
+      if (cursor !== undefined && !(Number.isSafeInteger(cursor) && cursor >= 1))
+        return no('VALUE_MALFORMED', 'A cursor is the number of an event, a whole number from 1.', { at: 'cursor' });
+      const asked = args?.limit;
+      if (asked !== undefined && !Number.isSafeInteger(asked))
+        return no('VALUE_MALFORMED', 'A limit is a whole number of lines.', { at: 'limit' });
+      const limit = Math.min(Math.max(1, asked ?? 50), 200);
+      const { lines, next } = walk(ctx, cursor ?? null, 1, limit + 1);
+      const events = lines.slice(0, limit);
+      return ok({ events, cursor: lines.length > limit ? (events.at(-1)?.rowid ?? null) : next });
     },
 
     /**

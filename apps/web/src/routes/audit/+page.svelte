@@ -28,8 +28,10 @@
      it is used as a place in it, rather than indexing the map with a stranger and rendering
      `undefined.word`. `isEventKind` is the kernel's own guard, beside the list. */
   import { isEventKind } from '@braindog/kernel';
-  import type { EventKind } from '$lib/record/schema.ts';
-  import { drew } from '../../lib/ui/screen.svelte.ts';
+  import type { AuditEvent, EventKind } from '$lib/record/schema.ts';
+  import { untrack } from 'svelte';
+
+  import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
   /**
    * What an event kind is called, and what it looks like — all forty of them.
@@ -112,6 +114,33 @@
   const kindOf = (k: EventKind) => KIND[k];
 
   /**
+   * ON A LIVE RECORD THE LOG IS THE RECORD'S, its newest page, and nothing of the sample is mixed into it: the names are
+   * what the record called each target, a row's title or a question from its governance row. Until the page arrives the
+   * screen draws no lines and no empty state, and a refusal is the record's own sentence.
+   */
+  let live = $state<{ events: AuditEvent[]; names: Map<string, string> } | null>(null);
+  let refused = $state<string | null>(null);
+  const LOG = $derived(route.data.live ? (live?.events ?? []) : AUDIT);
+  const clock = $derived(route.data.live ? Date.now() : NOW);
+
+  $effect(() => {
+    if (!route.data.live) return;
+    const me = route.data.me.person;
+    /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
+    const at = untrack(opened);
+    let ok = false;
+    void import('$lib/record/news-live.ts')
+      .then((m) => m.readLog(location.origin, me))
+      .then((out) => {
+        if (out.from === 'live') {
+          live = out;
+          ok = true;
+        } else if (out.from === 'refused') refused = out.fix;
+      })
+      .finally(() => closed(ok, at));
+  });
+
+  /**
    * WHAT IT WAS DONE TO. A spoken id stays a spoken id — `services#6` is the product's own way of
    * naming a row out loud, and `19 §2` is explicit that a row has a number you can say. What does
    * not stay is `page.money`, which is a DECLARATION id: the page has a title, every other screen
@@ -147,6 +176,7 @@
    * what it did before rather than an empty name.
    */
   const nameOf = (target: string): string | null => {
+    if (route.data.live) return live?.names.get(target) ?? null;
     const row = /^([a-z0-9_-]+)#(\d+)$/.exec(target);
     if (row) {
       const reg = REGISTERS[row[1]!];
@@ -194,8 +224,8 @@
    * AND THEY APPEAR WHEN THERE IS SOMETHING TO CHOOSE BETWEEN. One actor is not a filter; it is a
    * fact, and a control offering it is a control that cannot change anything.
    */
-  const actors = $derived([...new Set(AUDIT.map((e) => e.by))]);
-  const kinds = $derived([...new Set(AUDIT.map((e) => e.kind))]);
+  const actors = $derived([...new Set(LOG.map((e) => e.by))]);
+  const kinds = $derived([...new Set(LOG.map((e) => e.kind))]);
 
   const who = $derived(route.url.searchParams.get('by') ?? '');
   const what = $derived(route.url.searchParams.get('kind') ?? '');
@@ -216,11 +246,11 @@
    * AND IT APPEARS WHEN THERE IS SOMETHING TO CHOOSE BETWEEN, like the two beside it: a log whose
    * every entry is on one day has nothing to narrow.
    */
-  const days = $derived([...new Set(AUDIT.map((e) => e.at.slice(0, 10)))].sort().reverse());
+  const days = $derived([...new Set(LOG.map((e) => e.at.slice(0, 10)))].sort().reverse());
   const when = $derived(route.url.searchParams.get('on') ?? '');
 
   const matched = $derived(
-    AUDIT.filter((e) => (!who || e.by === who) && (!what || e.kind === what) && (!when || e.at.slice(0, 10) === when)),
+    LOG.filter((e) => (!who || e.by === who) && (!what || e.kind === what) && (!when || e.at.slice(0, 10) === when)),
   );
   /* THE LOG GROWS WITH WRITES, NOT WITH ROWS, so on a record of any size this is the longest list in
      the product — and it was the one rendering every entry it held. `13 §4.3`'s cap, and the line
@@ -252,7 +282,7 @@
 
 <svelte:head><title>{titleOf(copy.audit)}</title></svelte:head>
 
-<PageHead icon="history" title={copy.audit} count={matched.length} total={AUDIT.length} />
+<PageHead icon="history" title={copy.audit} count={matched.length} total={LOG.length} />
 
 <div class="page">
   <!-- A CHOICE APPEARS WHEN THERE IS ONE TO MAKE. Two actors and two kinds is a filter; one of
@@ -323,14 +353,16 @@
     in it — which is every record for about a minute — had the same sentence as a filter that missed:
     `no-data-yet` and `no-results` collapsed, which `19 §6` calls the failure.
   -->
-  {#if matched.length === 0}
+  {#if refused}
+    <Empty kind="error" title={refused} />
+  {:else if matched.length === 0 && (!route.data.live || live)}
     <Empty
-      kind={AUDIT.length === 0 ? 'no-data-yet' : 'no-results'}
-      title={AUDIT.length === 0 ? copy.auditNone : copy.noneMatching(AUDIT.length, 'entries')}
-      query={AUDIT.length === 0
+      kind={LOG.length === 0 ? 'no-data-yet' : 'no-results'}
+      title={LOG.length === 0 ? copy.auditNone : copy.noneMatching(LOG.length, 'entries')}
+      query={LOG.length === 0
         ? undefined
         : [who ? actorOf(who) : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
-      body={AUDIT.length === 0 ? copy.auditHolds : undefined}
+      body={LOG.length === 0 ? copy.auditHolds : undefined}
     >
       {#snippet actions()}
         {#if who || what}<Button href="/audit">{copy.clearFilters}</Button>{/if}
@@ -378,7 +410,7 @@
             lines tall for two numbers somebody wants once they have found the line.
           -->
           <span class="line-when">
-            <time datetime={e.at} title="{stamp(e.at)} · v{e.version.toLocaleString('en')}">{since(e.at, NOW)}</time>
+            <time datetime={e.at} title="{stamp(e.at)} · v{e.version.toLocaleString('en')}">{since(e.at, clock)}</time>
           </span>
         </div>
       </li>
@@ -389,8 +421,8 @@
        version are the same fact, so a version number is a place in this list" is true, and it is a
        sentence about how the record is built. What a reader needs from the number is what it is
        FOR: it is how you name a moment when you talk to somebody about it. -->
-  {#if AUDIT[0]}
-    <p class="foot">{copy.auditVersion(AUDIT[0].version.toLocaleString('en'))}</p>
+  {#if LOG[0]}
+    <p class="foot">{copy.auditVersion(LOG[0].version.toLocaleString('en'))}</p>
   {/if}
 </div>
 

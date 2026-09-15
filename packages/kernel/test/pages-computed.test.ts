@@ -420,6 +420,8 @@ test('AN `actions` BLOCK LISTS THE RECORD’S SCHEDULED ACTIONS, keys by label, 
     ],
   );
   assert.equal(all.matched, 2);
+  /* THE LAST RUN'S STATUS AND NOTE, so a host can say why an action paused rather than guess. */
+  assert.deepEqual([all.rows[0]?.fields.last_status, all.rows[0]?.fields.last_note], [200, '']);
   assert.deepEqual(readBlock(deps, { ...block, where: 'state is paused' }).rows.map((r) => r.fields.ingest), ['kiln_status']);
   assert.equal(readBlock(deps, { ...block, limit: 1 }).matched, 2);
 

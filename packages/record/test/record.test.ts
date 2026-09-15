@@ -1560,3 +1560,43 @@ test('A PAGE LIST IS SCOPED, because a title is a sentence about what the record
   for (const p of rows) assert.deepEqual(Object.keys(p).sort(), ['slug', 'title'], 'a page carried more than its name');
   sql.close();
 });
+
+test("A PAGE'S FIGURES GO WHERE ITS ROWS GO, and a caller scoped away from their register gets none", async () => {
+  /* `page()` blanks the rows and readings of a block over a register the caller may not read. The kernel now also
+     answers a block's `{{path}}` figures in `values`, and a figure is a register's content one number wide, so a block
+     scoped away from its register must lose those too. */
+  const { api, sql } = await record();
+  value(
+    await api.kernel.install([
+      {
+        id: 'metric.open-count',
+        kind: 'metric',
+        body: { metric: 'open-count', name: 'Open', source: 'register.obligations', where: 'state is open', value: { count: 'what' }, format: 'int', target: { lte: 99 }, window: '30d' } as never,
+      },
+      {
+        id: 'page.desk',
+        kind: 'page',
+        body: {
+          page: 'desk',
+          title: 'Desk',
+          requires: ['register.obligations', 'register.notes'],
+          blocks: [
+            { kind: 'note', heading: 'Open: {{open-count}}', body: 'The first is {{obligations#1.amount}}.' },
+            { kind: 'table', source: 'register.notes' },
+          ],
+        } as never,
+      },
+    ]),
+  );
+  value(await api.create({ register: 'obligations', fields: { what: 'Rent', amount: { amount: 120_000, currency: 'GBP' }, state: 'open' } }, owner));
+
+  type Page = { blocks: { values?: Record<string, unknown> }[] };
+  const mine = value<Page>(await api.page({ slug: 'desk' }, owner));
+  assert.deepEqual(mine.blocks[0]?.values?.['open-count'], 1, 'the owner lost the figure, so the check below proves nothing');
+
+  const scoped: CallContext = { ...token('read'), registers: ['notes'] };
+  const theirs = value<Page>(await api.page({ slug: 'desk' }, scoped));
+  assert.deepEqual(theirs.blocks[0]?.values ?? {}, {}, 'a figure from a register outside the ceiling');
+  assert.ok(!JSON.stringify(theirs).includes('120000'), 'an amount from a register outside the ceiling');
+  sql.close();
+});

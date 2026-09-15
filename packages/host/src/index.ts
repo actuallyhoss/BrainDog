@@ -109,6 +109,10 @@ export const ROUTES: readonly Route[] = [
     takes: { register: 'text', where: 'json', limit: 'integer', cursor: 'text', order: 'json' } },
   { name: 'history', group: 'READ+', writes: false, what: 'The writes that made one row, in order, each with who and when.',
     takes: { register: 'text', seq: 'integer' } },
+  { name: 'whatsNew', group: 'READ+', writes: false, what: 'What changed since you last read, newest first, held to what you may see.',
+    takes: { cursor: 'integer' } },
+  { name: 'recentHistory', group: 'READ+', writes: false, what: 'Every change to this record, newest first, a page at a time, held to what you may see.',
+    takes: { cursor: 'integer', limit: 'integer' } },
   { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.',
     takes: { q: 'text', limit: 'integer' } },
   { name: 'version', group: 'READ+', writes: false, what: "The record's version, so a client can ask what changed since." },
@@ -297,6 +301,8 @@ export type RecordSurface = {
   get(args: never, ctx: never): Promise<Result<unknown>>;
   list(args: never, ctx: never): Promise<Result<unknown>>;
   history(args: never, ctx: never): Promise<Result<unknown>>;
+  whatsNew(args: never, ctx: never): Promise<Result<unknown>>;
+  recentHistory(args: never, ctx: never): Promise<Result<unknown>>;
   search(args: never, ctx: never): Promise<Result<unknown>>;
   pages(ctx: never): Promise<Result<unknown>>;
   page(args: never, ctx: never): Promise<Result<unknown>>;
@@ -351,6 +357,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     get: (a, ctx) => api.get(a as never, ctx as never),
     list: (a, ctx) => api.list(a as never, ctx as never),
     history: (a, ctx) => api.history(a as never, ctx as never),
+    whatsNew: (a, ctx) => api.whatsNew(a as never, ctx as never),
+    recentHistory: (a, ctx) => api.recentHistory(a as never, ctx as never),
     search: (a, ctx) => api.search(a as never, ctx as never),
     pages: (_a, ctx) => api.pages(ctx as never),
     page: (a, ctx) => api.page(a as never, ctx as never),

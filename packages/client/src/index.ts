@@ -54,7 +54,44 @@ export type Boot = {
   sessions?: LiveRun[];
   /** Open suggestions, newest first, each with its question: what waits on a person. */
   waiting?: { id: string; body_kind: string; opened_by: string; opened_at: string; question?: string }[];
+  /* OPTIONAL TOO, for the same reason: a host older than the layout's reads answers without them. */
+  /** The record's own name, or `null` for one that was never provisioned. */
+  record?: { slug: string; name: string; locale: string } | null;
+  /** Who is asking: the person behind the call, their name, and what they hold on the record. */
+  me?: { kind: 'person' | 'token' | 'system'; person: string | null; name: string | null; level: string | null };
+  /** The pages the caller may open, each with its place in the rail when it has one. */
+  pages?: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null }[];
+  /** How many questions wait on a person, and how many arrivals wait in the inbox: `null` when the caller may not see it. */
+  counts?: { decide: number; inbox: number | null };
+  /** What changed since the caller last read, as `whatsNew` answers. */
+  whatsNew?: WhatsNew;
 };
+
+/** One line of the log, as `whatsNew` and `recentHistory` send it. See `EventLine` in `@braindog/record`. */
+export type EventLine = {
+  rowid: number;
+  id: string;
+  ts: string;
+  actor: string;
+  kind: string;
+  target: string | null;
+  target_kind: string | null;
+  field: string | null;
+  from: unknown;
+  to: unknown;
+  note: string | null;
+  /** The row's register and number, when the event is about a row. */
+  register: string | null;
+  seq: number | null;
+  /** What the thing is called: a row's title, or a question. */
+  title: string | null;
+};
+
+/** `whatsNew`: newest first, at most sixty. `upTo` is what `markRead` takes to mark all of them read. */
+export type WhatsNew = { events: EventLine[]; upTo: number | null; sinceCapped: boolean };
+
+/** `recentHistory`: one page, newest first, and the cursor for the page below it. */
+export type HistoryPage = { events: EventLine[]; cursor: number | null };
 
 /**
  * One row as `context` shows it: its spoken id, version, scope, state, and its register's mobile fields.
@@ -306,6 +343,11 @@ export function createClient(options: ClientOptions) {
     search: (q: string, limit?: number) =>
       call<{ register: string; seq: number; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }) }),
     history: (register: string, seq: number) => call<unknown[]>('history', { register, seq }),
+    /** What changed since the caller's read mark, or since `cursor`, an event rowid, when one is given. */
+    whatsNew: (cursor?: number) => call<WhatsNew>('whatsNew', cursor === undefined ? {} : { cursor }),
+    /** The record's log, newest first. `cursor` is the one the page above answered with. */
+    recentHistory: (args: { cursor?: number | null; limit?: number } = {}) =>
+      call<HistoryPage>('recentHistory', args as Record<string, unknown>),
     create: (args: { register: string; fields: Record<string, unknown>; note?: string }) =>
       call<unknown>('create', args as Record<string, unknown>),
     update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) =>

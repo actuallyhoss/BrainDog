@@ -301,7 +301,7 @@ a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 | `kind` | a key of render's `KINDS` (twenty), or a `block.<Id>` declared by this pack or installed (`KIND_UNKNOWN`) | yes | — | `Object.keys(KINDS)` ∪ declared blocks |
 | `heading` | text ≤ 80; on a `section` it is the section, drawn as a heading | `section` | — | — |
 | `span` | int 1–12 | no | `12` | — |
-| `source` | `register.<Id>` · `metric.<Id>` · `block.<n>` (an earlier block on this page) · `activity` · `sessions.live`, the runs of `session` not done, the most recently seen first, whose `where` and columns name that register's fields and which refuses `order` (`DECLARATION_INVALID`); on a `section`, what its count counts; on a `diff`, the register whose row it reads | `table`, `cards`, `feed`, `diff` | — | on a `feed`, `activity` only |
+| `source` | `register.<Id>` · `metric.<Id>` · `block.<n>` (an earlier block on this page) · `activity` · `sessions.live`, the runs of `session` not done, the most recently seen first, whose `where` and columns name that register's fields and which refuses `order` (`DECLARATION_INVALID`) · `actions`, the record's scheduled actions, one row each, which refuses `order` too; on a `section`, what its count counts; on a `diff`, the register whose row it reads | `table`, `cards`, `feed`, `diff` | — | on a `feed`, `activity` only |
 | `where` | predicate, validated on the source register | no | every row | — |
 | `when` | `{ metric: Id, <op>: value }`, one leaf, ops `is not in not_in gt gte lt lte empty present` | no | always drawn | — |
 | `columns` | 1–16 of `{ field: Id, label?, width?: `^\d{1,3}(ch\|%)$` or `minmax(…)`, align?: start \| end, link?: bool, tone_when?: leaf + tone, as? }`; `as` only on `cards`, where each role appears once and `fact` at most three times (`OUT_OF_BOUNDS`), except `as: scope`, which a `table` takes too and which names the register's scope field (`DECLARATION_INVALID`) | `table`, `cards` | on `cards`, the first text column is `title`, the first figure that never truncates is `figure`, the rest `fact` | `as ∈ title figure fact trend ring who when mark scope` (`ENUM_VALUE_UNKNOWN`); the renderer's `quiet` role is not among them, because the evaluator writes it from the record's clock |
@@ -320,6 +320,10 @@ a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 | `field` | `Id` of a `document` or `text` field on that register; on a `diff`, the field compared | `diff` | — | the register's fields (`FIELD_UNKNOWN`) |
 | `versions` | int 2–10; on a `diff`, how many versions, newest first, each against the one before it | no | `2` | — |
 | *accepts names* | for a pack-declared `kind`, the keys its `accepts:` names, typed §4.6 | per the block declaration | — | — |
+
+`heading`, `body`, `empty` and authored cells may carry `{{path}}` (05 §7.1). Nothing checks a path at
+install: outside `for:` the record answers each one it holds on the block's `values` when the page is
+read, and a path it holds nothing for draws `—` (06 §1).
 
 ### 4.6 · `block` — 22 §3 · 05 §1 · 34 §2.4
 
