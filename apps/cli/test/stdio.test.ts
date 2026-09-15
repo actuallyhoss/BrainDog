@@ -309,7 +309,7 @@ test('a command from a later step says so, and an unknown one is not echoed unle
 
   const help = run('--help');
   assert.equal(help.status, 0);
-  assert.match(help.stdout, /^braindog login <host>\n[\s\S]*^braindog mcp /m);
+  assert.match(help.stdout, /^braindog login <host> \[--vault <project\|\*>\]\n[\s\S]*^braindog keys put <label>[\s\S]*^braindog keys exec <label[\s\S]*^braindog mcp /m);
 });
 
 /* ── last, over everything above ───────────────────────────────────────── */

@@ -18,6 +18,10 @@
 
   AHEAD OF ALL OF IT, "Who are you?" (`loop/research-modular.md` §2): a sentence, read without a
   model, said back, and written as the person's own People row when the first row is added.
+
+  THEN "What's your business?" (`loop/research-modules.md` §5), turn 2: a sentence read by `shape.ts`,
+  said back in two columns, and made into lists and first rows by one press. The one-row screen above
+  is still here, one press away, for somebody who would rather choose (§9 ruling 11).
 -->
 <script lang="ts">
   import { onDestroy, tick, untrack } from 'svelte';
@@ -25,6 +29,8 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
+  import { shape, titleOfRow, toTurnOn, type Shape } from '$lib/shape.ts';
+  import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
   import { choose as recordOrSample } from '$lib/record/packs.ts';
   import { methods } from '$lib/auth.ts';
@@ -80,6 +86,8 @@
 
   function key(e: KeyboardEvent) {
     if (picked !== null || e.metaKey || e.ctrlKey || e.altKey) return;
+    /* THE NUMBERS NAME THE FIVE CARDS, and the cards are drawn only on the list. */
+    if (!fromList) return;
     /* A DIGIT TYPED INTO "Who are you?" is part of the answer, not a jump to a choice. */
     if (typing()) return;
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. This screen draws no sheet of its own, and
@@ -162,6 +170,166 @@
     const end = untrack(() => who.length);
     field.setSelectionRange(end, end);
   });
+
+  /* ── turn 2: what's your business ────────────────────────────────────── */
+
+  /* In memory like turn 1's answer, never in the address. */
+  let about = $state('');
+  let read = $state<Shape | null>(null);
+  let area = $state<HTMLTextAreaElement | undefined>(undefined);
+  let reading: ReturnType<typeof setTimeout> | undefined;
+  onDestroy(() => clearTimeout(reading));
+
+  function understand() {
+    clearTimeout(reading);
+    read = about.trim() ? shape(about, new Date().toISOString().slice(0, 10)) : null;
+  }
+
+  /* Turn 1's 250 ms, so both answers are said back on the same beat. */
+  function aboutTyped() {
+    clearTimeout(reading);
+    reading = setTimeout(understand, 250);
+  }
+
+  function aboutChip(words: string) {
+    about = withChip(about, words);
+    understand();
+    void tick().then(() => {
+      area?.focus();
+      area?.setSelectionRange(about.length, about.length);
+    });
+  }
+
+  const packOf = (id: string) => PACKS.find((p) => p.id === id);
+
+  /** A pack as the rail names it: its page's title, else its first list's name. */
+  function packName(id: string): string {
+    const p = packOf(id);
+    if (!p) return id;
+    const page = p.pages[0];
+    return (page ? p.titles?.[page] : undefined) ?? REGISTERS[p.registers[0] ?? '']?.name ?? p.name;
+  }
+
+  const shapeSaid = $derived(
+    !read || read.declined === 'empty'
+      ? ''
+      : read.declined === 'language'
+        ? firstRun.shapeLanguage
+        : read.declined === 'unread'
+          ? firstRun.shapeUnread
+          : firstRun.shapeHeardCount(read.heard.length),
+  );
+
+  /** "Your record": each list that will be on, with the rows it gets and what a row still needs. */
+  const lists = $derived.by(() => {
+    const now = read;
+    if (!now || now.declined) return [];
+    const person = heard?.name ?? null;
+    return toTurnOn(now, person !== null).map((id) => ({
+      id,
+      name: packName(id),
+      rows: [
+        ...(id === 'people' && person ? [{ title: person, note: firstRun.shapeYou }] : []),
+        ...now.rows
+          .filter((r) => packOf(id)?.registers.includes(r.register))
+          .map((r) => ({
+            title: titleOfRow(r),
+            note: r.missing.length > 0 ? firstRun.shapeNeeds(firstRun.shapeAnd(r.missing.map((m) => firstRun.shapeMissing[m] ?? m))) : null,
+          })),
+      ],
+    }));
+  });
+
+  type Outcome = { made: { name: string; list: string; register: string }[]; on: string[]; absent: string[]; refused: string[]; waiting: boolean };
+  let outcome = $state<Outcome | null>(null);
+  let making = $state(false);
+  /** Rows this screen already made, by register and title, so a second press corrects or skips rather than duplicates. */
+  const madeRows = new Map<string, number>();
+
+  /**
+   * Make my record: turn the lists on, write the rows the sentence filled, and meet the person.
+   *
+   * THE SAME SOURCE `/packs` READS, so a live record and the demo take one path. A pack that is off
+   * is turned on. A pack the record does not hold is named and skipped: installing one needs its
+   * pack document, and the app ships none per first-party pack, so nothing here pretends to.
+   */
+  async function make() {
+    understand();
+    const now = read;
+    if (!now || now.declined !== null || making) return;
+    making = true;
+    try {
+      const client = createClient({ base: location.origin });
+      const chosen = await recordOrSample(client);
+      const installed = chosen.first.ok ? chosen.first.value : [];
+      const out: Outcome = { made: [], on: [], absent: [], refused: [], waiting: chosen.source.sample };
+
+      const usable = new Set<string>();
+      for (const id of toTurnOn(now, Boolean(heard?.name))) {
+        const state = installed.find((p) => p.id === id);
+        if (!state) {
+          out.absent.push(packName(id));
+          continue;
+        }
+        if (state.disabled_at !== null) {
+          const on = await chosen.source.enable(id);
+          if (!on.ok) {
+            out.refused.push(firstRun.shapeRefused(packName(id), on.refusal.fix));
+            continue;
+          }
+          if (on.value.changed) out.on.push(packName(id));
+        }
+        usable.add(id);
+      }
+
+      /* The sequence each row got, by its index in the shape, so an invoice can point at its client. */
+      const seqs: (number | null)[] = [];
+      for (const [i, row] of now.rows.entries()) {
+        seqs[i] = null;
+        const pack = PACKS.find((p) => p.registers.includes(row.register))?.id ?? '';
+        if (row.missing.length > 0 || !usable.has(pack)) continue;
+        const title = titleOfRow(row);
+        const list = REGISTERS[row.register]?.name ?? row.register;
+        const key = `${row.register}:${title}`;
+        const had = madeRows.get(key);
+
+        if (chosen.source.sample) {
+          /* NO `party` ON THE DEMO: a waiting row cannot point at another waiting row, because the
+             demo resolves a ref against the seed's rows and would print `people#-1`. */
+          const fields: Fields = { ...row.fields };
+          if (had === undefined || !pending.replace(row.register, had, fields)) madeRows.set(key, pending.add(row.register, fields));
+          out.made.push({ name: title, list, register: row.register });
+          continue;
+        }
+
+        if (had !== undefined) {
+          seqs[i] = had;
+          continue;
+        }
+        const party = row.party === undefined ? null : (seqs[row.party] ?? null);
+        const done = await client.create({ register: row.register, fields: { ...row.fields, ...(party === null ? {} : { party: `people#${party}` }) } });
+        if (!done.ok) {
+          out.refused.push(firstRun.shapeRefused(title, 'refusal' in done ? done.refusal.fix : ''));
+          continue;
+        }
+        const seq = (done.value as { seq?: number | null }).seq ?? null;
+        if (seq !== null) {
+          madeRows.set(key, seq);
+          seqs[i] = seq;
+        }
+        out.made.push({ name: title, list, register: row.register });
+      }
+
+      /* TURN 1'S ROW IN THE SAME PRESS, after People is on, so `remember` reads it as on. */
+      await remember();
+      outcome = out;
+    } finally {
+      making = false;
+    }
+  }
+
+  /** Which of the two ways in is on screen. In the address, so Back from the list returns to the sentence. */
+  const fromList = $derived(page.url.searchParams.has('list'));
 
   /* ── turn 3: the person's own People row ─────────────────────────────── */
 
@@ -422,7 +590,90 @@
         <p class="heard-now" role="status">{#if heard && !settled}{heard.name ? firstRun.gotYou(heard.name) : firstRun.gotIt}{/if}</p>
       </div>
 
-      {#if heard}
+      {#if heard && !fromList}
+      <section class="turn" aria-labelledby="shape-h">
+        <h2 class="question" id="shape-h" tabindex="-1" bind:this={question}>{firstRun.shapeQuestion}</h2>
+        <textarea
+          class="who-field shape-field"
+          rows="3"
+          aria-labelledby="shape-h"
+          placeholder={firstRun.shapePlaceholder}
+          bind:this={area}
+          bind:value={about}
+          oninput={aboutTyped}
+        ></textarea>
+        <div class="who-chips shape-chips" role="group" aria-label={firstRun.whoChipsLabel}>
+          {#each firstRun.shapeChips as c}
+            <button type="button" class="who-chip" onmousedown={(e) => e.preventDefault()} onclick={() => aboutChip(c)}>{c}</button>
+          {/each}
+        </div>
+        <!-- Always in the document, for the reason turn 1's line gives. -->
+        <p class="heard-now" role="status">{shapeSaid}</p>
+
+        {#if read && read.declined === null}
+          <div class="preview">
+            <section class="col" aria-labelledby="heard-col">
+              <h3 class="col-h" id="heard-col">{firstRun.shapeHeard}</h3>
+              <ul class="col-list">
+                {#each read.heard as h}
+                  <li>
+                    <q class="said">{h.text}</q>
+                    <span class="became"><span aria-hidden="true">→</span> {h.loose ? firstRun.shapeNoCurrency : firstRun.shapeAnd(h.packs.map(packName))}</span>
+                  </li>
+                {/each}
+              </ul>
+            </section>
+            <section class="col" aria-labelledby="record-col">
+              <h3 class="col-h" id="record-col">{firstRun.shapeRecord}</h3>
+              <ul class="col-list">
+                {#each lists as l (l.id)}
+                  <li>
+                    <span class="list-name">{l.name}</span>
+                    {#if l.rows.length > 0}
+                      <ul class="col-rows">
+                        {#each l.rows as r}
+                          <li>{r.title}{#if r.note} <span class="became">{r.note}</span>{/if}</li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            </section>
+          </div>
+        {/if}
+
+        <div class="actions shape-actions">
+          <Button weight="primary" disabled={!read || read.declined !== null || making} onclick={() => void make()}>{firstRun.shapeMake}</Button>
+          <Button weight="bare" onclick={() => void goto('/start?list', { keepFocus: true, noScroll: true })}>{firstRun.shapeFromList}</Button>
+        </div>
+
+        {#if outcome}
+          <div class="kept" role="status">
+            {#if outcome.made.length > 0}
+              {@const items = firstRun.shapeAnd(outcome.made.map((m) => firstRun.shapeIn(m.name, m.list)))}
+              <p class="kept-what">{outcome.waiting ? firstRun.shapeMadeWaiting(items, copy.markNotWritten) : firstRun.shapeMade(items)}</p>
+            {:else if outcome.absent.length === 0 && outcome.refused.length === 0}
+              <p class="kept-what">{firstRun.shapeReady}</p>
+            {/if}
+            {#if known}
+              <p class="kept-what">{known.waiting ? firstRun.youArePending(known.name, copy.markNotWritten) : firstRun.youAreKnown(known.name)}</p>
+            {/if}
+            {#if outcome.on.length > 0}<p class="kept-why">{firstRun.shapeTurnedOn(firstRun.shapeAnd(outcome.on))}</p>{/if}
+            {#if outcome.absent.length > 0}<p class="kept-why">{firstRun.shapeAbsent(firstRun.shapeAnd(outcome.absent))}</p>{/if}
+            {#each outcome.refused as r}<p class="kept-why">{r}</p>{/each}
+            {#if outcome.waiting}<p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>{/if}
+            {#if outcome.made[0]}
+              <div class="actions">
+                <Button href={`/r/${outcome.made[0].register}?first=1`}>{firstRun.seeTheList(outcome.made[0].list)}</Button>
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </section>
+      {/if}
+
+      {#if heard && fromList}
       <div class="turn">
       <!-- SAY WHAT THIS IS BEFORE ASKING WHAT THEY WANT. The question on its own let the three
            examples under it define the product, and three examples always define it downward. -->
@@ -454,6 +705,10 @@
            *row* trailed two sentences behind the only place the word appears — `19 §6` asks for it
            "in the sentence that needs it", and the sentence that needs it is the first one. -->
       <p class="hint">{firstRun.firstRowIs} <Define noun="row" /> {firstRun.firstHint}</p>
+
+      <div class="actions">
+        <Button weight="bare" onclick={() => void goto('/start', { keepFocus: true, noScroll: true })}>{firstRun.shapeDescribe}</Button>
+      </div>
 
       <section class="agent" aria-labelledby="agent-h">
         <h2 class="agent-h" id="agent-h"><Icon name="session" size="m" />{firstRun.agentTitle}</h2>
@@ -523,7 +778,7 @@
           >
           <!-- BACK IS A NAVIGATION TOO, so the browser's own Back and this button end up in the
                same place instead of disagreeing about where "back" is. -->
-          <Button weight="bare" onclick={() => void goto('/start')}>{copy.goBack}</Button>
+          <Button weight="bare" onclick={() => void goto('/start?list')}>{copy.goBack}</Button>
         </div>
 
         <!--
@@ -660,6 +915,73 @@
 
   .turn {
     margin-block-start: var(--sp-7);
+  }
+
+  /* ── turn 2 ───────────────────────────────────────────────────────────── */
+
+  .turn .question {
+    margin-block-start: 0;
+  }
+
+  .shape-field {
+    resize: vertical;
+    line-height: var(--lh-body);
+  }
+
+  .shape-chips {
+    margin-block-start: var(--sp-3);
+  }
+
+  /* Two columns where there is room and one on a phone, the same rule as the cards. */
+  .preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: var(--sp-5);
+    margin-block-start: var(--sp-4);
+  }
+
+  .col {
+    min-inline-size: 0;
+  }
+
+  .col-h {
+    margin-block-end: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 600;
+  }
+
+  .col-list,
+  .col-rows {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .col-rows {
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-1);
+    padding-inline-start: var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .said,
+  .list-name {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .became {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .shape-actions {
+    flex-wrap: wrap;
+    margin-block-start: var(--sp-4);
   }
 
   .kept-why {

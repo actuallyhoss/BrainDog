@@ -18,11 +18,10 @@
  * are the things that persist or transmit. A call that puts one inside the other is red, and the
  * sentence names both, because "you logged a secret" is only actionable if it says which.
  *
- * AND `Plaintext` LIVES IN TWO MODULES. `52 §5.2`: the brand appears in the two hosts' vault steps
- * only — `49 §5` step 9 and `51 §5`, where `openGrant` and `bindGrant` unwrap. Anywhere else is a
- * plaintext that has travelled, and a type that has travelled is a value that has. Neither module
- * exists yet, so today the brand appears nowhere and this rule holds vacuously — which is exactly
- * what it should say the day somebody adds the first one in the wrong file.
+ * AND `Plaintext` LIVES IN THREE MODULES. `52 §5.2`: the brand appears in the two hosts' vault steps,
+ * where a key is sealed and opened, and `loop/research-agent-path.md` §8 adds the CLI's `keys.ts`,
+ * where an agent's key is read in and handed to one command. Anywhere else is a plaintext that has travelled,
+ * and a type that has travelled is a value that has.
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -111,6 +110,15 @@ const SINKS = [
   { id: 'a serialisation', re: /JSON\.stringify\s*\(/g, wire: false },
   { id: 'a response', re: /new Response\s*\(/g },
   { id: 'an outbound request', re: /(?<![.\w])fetch\s*\(/g, wire: false },
+  /* AND STANDARD OUTPUT, where a key is one line away from a terminal's scrollback or an agent's transcript. No
+     command prints a key (`loop/research-agent-path.md` §5.7), so no function anywhere is exempt from this sink. */
+  { id: 'standard output', re: /\bprocess\.stdout\.write\s*\(/g },
+  { id: 'standard output', re: /\bwriteFileSync\s*\((?=\s*1\s*,)/g },
+  /* AND A CHILD PROCESS, which can print, log or keep its arguments and its environment. `braindog keys exec` hands
+     a key to one command this way, and that one call is exempt below; any other is a finding. NOT A SINK FOR THE
+     FOUR SIGN-IN VALUES, for the reason an outbound request is not: a self-host is handed its own server key in its
+     environment, and that is the one thing the key exists for. */
+  { id: 'a child process', re: /\b(?:spawn|spawnSync|execFile|execFileSync|fork)\s*\(/g, wire: false },
 ];
 
 /**
@@ -201,10 +209,93 @@ function walk(dir, out = []) {
  * Where the brand is allowed to be named.
  *
  * BY PATH, because the rule is about which MODULE holds it rather than which line. `52 §5.2` names
- * the two hosts' vault steps, and neither file exists yet — so this list is the shape of the answer
- * rather than a set of exemptions somebody has already used.
+ * the two hosts' vault steps, and the agent path adds the CLI's key commands.
  */
-const BRAND_HOMES = [/^apps[\\/]selfhost[\\/]src[\\/]vault\.ts$/, /^apps[\\/]worker[\\/]src[\\/]vault\.ts$/];
+const BRAND_HOMES = [
+  /^apps[\\/]selfhost[\\/]src[\\/]vault\.ts$/,
+  /^apps[\\/]worker[\\/]src[\\/]vault\.ts$/,
+  /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/,
+];
+
+/**
+ * THE SINKS A BRAND HOME MAY USE, EACH BY FILE AND BY FUNCTION.
+ *
+ * A key has to leave somewhere: a deposit is sent to its host once, a read is answered once, and a key read back on
+ * an agent's machine goes into the environment of one command. Those three places are named here, nothing on the
+ * read side is exempt from standard output, and the same sink anywhere else in the same file is still a finding, which is what the seeded
+ * negative `secret-grep-vault` proves.
+ */
+const EXEMPT = [
+  { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'depositOne', sinks: ['an outbound request', 'a serialisation'] },
+  { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'execOne', sinks: ['a child process'] },
+  { file: /^apps[\\/]selfhost[\\/]src[\\/]vault\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
+];
+
+/** A regex that finds any of `names` as a whole identifier, never as a property after a dot. */
+const namesRe = (names) =>
+  names.size === 0 ? null : new RegExp(`(?<![.\\w$])(?:${[...names].map((n) => n.split('$').join('\\$')).join('|')})(?![\\w$])`);
+
+/**
+ * THE SHAPES A DEPOSITED VALUE TAKES IN A BRAND HOME.
+ *
+ * None of them is called `plaintext`. A key arrives as a string in a body, becomes bytes, is sealed, and on the way
+ * back is bytes and then a string in an answer, under whatever names the code gives it. What they share is the
+ * brand: so a name declared `: Plaintext` or made `as Plaintext` is a source, and so is every name assigned from an
+ * expression that holds one, followed until nothing new is found.
+ *
+ * A CALL TO A FUNCTION DECLARED IN THE SAME FILE IS NOT FOLLOWED. `const answer = await depositOne(…, value)` is the
+ * host's reply, not the value, and following it would make every sentence about a deposit a finding.
+ */
+function brandedNames(text) {
+  const names = new Set();
+  for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\??\s*:\s*Plaintext\b/g)) names.add(m[1]);
+  for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=[^;\n]*\bas\s+Plaintext\b/g)) names.add(m[1]);
+  const declared = new Set([...text.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]));
+  const assigned = [...text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)(?:\s*:[^=\n]+)?\s*=\s*([^;\n]+)/g)];
+  for (let grew = true; grew; ) {
+    grew = false;
+    const held = namesRe(names);
+    for (const [, name, rhs] of assigned) {
+      if (held === null || names.has(name) || !held.test(rhs)) continue;
+      const callee = /^(?:await\s+)?([A-Za-z_$][\w$]*)\s*\(/.exec(rhs.trim())?.[1];
+      if (callee !== undefined && declared.has(callee)) continue;
+      names.add(name);
+      grew = true;
+    }
+  }
+  return names;
+}
+
+/**
+ * The innermost `function NAME` whose body holds offset `at`, or `null`.
+ *
+ * The body is the first `{` after the parameters that is not inside a return type's angle brackets, counted to its
+ * match. An arrow function has no name here, so an exemption can only ever name a declared function.
+ */
+function enclosing(text, at) {
+  let inner = null;
+  for (const m of text.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*\(/g)) {
+    if (m.index > at) break;
+    const params = argsOf(text, m.index + m[0].length - 1);
+    let open = m.index + m[0].length + params.length + 1;
+    for (let angle = 0; open < text.length; open++) {
+      const c = text[open];
+      if (c === '<') angle++;
+      else if (c === '>' && text[open - 1] !== '=') angle--;
+      else if (c === '{' && angle <= 0) break;
+    }
+    let close = text.length;
+    for (let i = open, depth = 0; i < text.length; i++) {
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}' && --depth === 0) {
+        close = i;
+        break;
+      }
+    }
+    if (at > open && at < close) inner = m[1];
+  }
+  return inner;
+}
 
 const findings = [];
 let scanned = 0;
@@ -217,13 +308,16 @@ for (const top of ['packages', 'apps'])
     scanned++;
     const rel = relative(root, file);
     const text = decomment(readFileSync(file, 'utf8'));
+    const home = BRAND_HOMES.some((h) => h.test(rel));
+    const branded = home ? namesRe(brandedNames(text)) : null;
 
     for (const sink of SINKS) {
       sink.re.lastIndex = 0;
       for (const m of text.matchAll(sink.re)) {
         const raw = argsOf(text, m.index + m[0].length - 1);
         const args = sink.bound ? bound(raw) : raw;
-        const plain = sourceIn(args, text);
+        const plain = sourceIn(args, text) || (branded !== null && branded.test(args));
+        if (plain && EXEMPT.some((e) => e.file.test(rel) && e.sinks.includes(sink.id) && enclosing(text, m.index) === e.fn)) continue;
         if (plain || (sink.wire !== false && WIRE.test(args)))
           findings.push({
             where: `${rel}:${lineOf(text, m.index)}`,
@@ -233,9 +327,9 @@ for (const top of ['packages', 'apps'])
       }
     }
 
-    /* THE BRAND, AND THE TWO MODULES IT LIVES IN. A `Plaintext` in a third file is a plaintext that
+    /* THE BRAND, AND THE THREE MODULES IT LIVES IN. A `Plaintext` in a fourth file is a plaintext that
        has been handed somewhere it was not unwrapped, and a type travelling is a value travelling. */
-    if (/\bPlaintext\b/.test(text) && !BRAND_HOMES.some((home) => home.test(rel))) {
+    if (/\bPlaintext\b/.test(text) && !home) {
       const at = text.search(/\bPlaintext\b/);
       findings.push({
         where: `${rel}:${lineOf(text, at)}`,

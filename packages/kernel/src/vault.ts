@@ -21,7 +21,7 @@
  */
 
 import type { Result, Sql } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import { clash, no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
@@ -96,6 +96,13 @@ export type BindGrantArgs = {
   expires_at?: string | null;
   /** `90d`, `1y` — puts a `rotate` row in the schedule. */
   rotate_every?: string | null;
+  /**
+   * The grant id and version a host sealed these bytes for, when it sealed them before the bind.
+   *
+   * THE AAD NAMES BOTH, so bytes stored under any other id or version would never open. A bind that
+   * would do that is refused, or answered as a conflict when another deposit moved the grant first.
+   */
+  sealed_for?: { id: string; version: number };
 };
 
 export type VaultDeps = {
@@ -156,6 +163,12 @@ export function bindGrant(
     });
   if (args.id !== undefined && !ID.test(args.id))
     return no<GrantRow>('VALUE_MALFORMED', `A grant id is g_ plus a 26-character ULID. ${args.id} is not.`, { at: 'id' });
+  const sealed = args.sealed_for;
+  if (sealed !== undefined && (!ID.test(sealed.id) || !Number.isInteger(sealed.version) || sealed.version < 1))
+    return no<GrantRow>('VALUE_MALFORMED', 'The bytes were sealed for a grant id and version this record cannot hold.', { at: 'sealed_for' });
+  /* Sealed for a fresh grant while another deposit gave the row one: that deposit arrived first. */
+  if (sealed !== undefined && args.id !== undefined && sealed.id !== args.id)
+    return clash<GrantRow>(0, { id: args.id }, 'system');
 
   /* THE SPANS ARE CHECKED BEFORE THE FIRST WRITE. `attempt` below would roll a late refusal back
      anyway — that is what it is for — but a refusal that arrives before anything was tried is the
@@ -170,8 +183,19 @@ export function bindGrant(
   const at = instant(deps.nowMs);
 
   return attempt(sql, transaction, () => {
-    const id = args.id ?? `g_${deps.mint()}`;
+    const id = args.id ?? sealed?.id ?? `g_${deps.mint()}`;
     const rotating = args.id !== undefined;
+
+    /* SEALED FOR A VERSION THIS BIND WOULD NOT WRITE. The host sealed against what it was told the grant
+       was, and another deposit got there first: a conflict, so the caller seals again for what is there now. */
+    if (sealed !== undefined) {
+      const now = sql.one<{ version: number }>('SELECT version FROM grant WHERE id = ?', id);
+      const next = rotating ? (now ? now.version + 1 : 0) : now ? 0 : 1;
+      if (next !== sealed.version && (now || !rotating)) {
+        const by = sql.one<{ actor: string }>('SELECT actor FROM event WHERE target = ? ORDER BY rowid DESC LIMIT 1', `grant:${id}`);
+        return clash<GrantRow>(now?.version ?? 0, { id, version: now?.version ?? 0 }, by?.actor ?? 'system');
+      }
+    }
 
     if (rotating) {
       /* A DIFFERENT KIND IS A DIFFERENT GRANT. The rotate UPDATE writes fourteen columns and `kind`

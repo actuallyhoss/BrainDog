@@ -19,6 +19,7 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { conflicted, refused } from '@braindog/ports';
 
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
+export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen } from './vault.ts';
 
 /**
  * What one argument IS, so the text a stranger typed becomes the value the handler was written for.
@@ -169,7 +170,18 @@ export const ROUTES: readonly Route[] = [
  * token, which is the one thing this product says it does not do. `listGrants` is here because it
  * carries what a key OPENS and never the key. The others arrive when a host can prove a session.
  */
-export const UNROUTED = ['openGrant', 'bindGrant', 'revokeGrant', 'createRecord', 'deviceStart', 'devicePoll', 'vaultGrant'] as const;
+export const UNROUTED = [
+  'openGrant',
+  'bindGrant',
+  'revokeGrant',
+  'createRecord',
+  'deviceStart',
+  'devicePoll',
+  'vaultGrant',
+  /* The key doors' record half: `vault.ts` calls them after `vaultGrant`, with sealed bytes only. */
+  'depositGrant',
+  'openForGrant',
+] as const;
 
 const BY_NAME = new Map(ROUTES.map((r) => [r.name, r]));
 

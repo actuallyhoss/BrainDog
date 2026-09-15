@@ -25,11 +25,16 @@
     AUTH_METHODS, DEPLOYMENT, DEVICES, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS,
     REGISTERS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, boot, pages,
   } from '$lib/record/api.ts';
-  import { LEVELS, type Level, type Person, type Device } from '$lib/record/schema.ts';
-  import { CODE_DIGITS, approve } from '$lib/record/device.ts';
+  import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
+  import {
+    CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, noRecord, reachKey, revocable, sampleMachines,
+    sampleTokens, standing, type Answer, type DeviceRow, type Minted, type TokenRow,
+  } from '$lib/record/device.ts';
+  /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
+  import { createClient } from '@braindog/client';
   import { TONES, bytes, relative, since } from 'braindog-render';
   import { untrack } from 'svelte';
-  import { methods, passkeyRegister, passkeys, removePasskey, signOut, support, type Methods, type PasskeyInfo } from '$lib/auth.ts';
+  import { methods, passkeyRegister, passkeySignIn, passkeys, removePasskey, signOut, support, type Methods, type PasskeyInfo } from '$lib/auth.ts';
 
   /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
      `the studio` — and one of the two was a literal. */
@@ -41,76 +46,198 @@
      snapshots of a ninety-three-row record. Four distinct copies, four identical strings, on the one
      screen whose entire job is to say which copy is which. */
 
-  /**
-   * THE CODE-ENTRY CONTROL'S STATE, and the device rows are part of it.
-   *
-   * `19 §2` gives this area three things and the screen had one of them. This is the second: the
-   * field a person types into after `braindog runner enroll` prints six digits and the URL that
-   * lands here. Everything the typing DOES lives in `device.ts`, which is a pure module `node --test`
-   * can import — the four lines here are the assignment.
-   *
-   * `devices` starts as the seed and is not the seed: a wrong guess spends a try on every waiting
-   * row, and five deny them all. That is a change to the record, so the list this page draws has to
-   * be the one the attempt handed back rather than the constant it started from.
-   */
-  let typed = $state('');
-  /* The slug, typed to confirm — `02 §9`, and the button is disabled until it matches. Its own
-     state, because a field that shared the device code's would be armed by typing six digits. */
+  /* The slug, typed to confirm (`02 §9`); the button is disabled until it matches. */
   let typedSlug = $state('');
-  let devices = $state<Device[]>([...DEVICES]);
-  let said = $state<{ tone: 'good' | 'bad'; line: string } | null>(null);
-  let codeField = $state<HTMLInputElement | undefined>(undefined);
 
-  /** The row's Approve, and anything else that means *the code goes here*. */
-  const focusCode = () => codeField?.focus();
+  /* ── agents: the live record's machines and tokens, or the sample's where there is no record ── */
 
   /**
-   * WHICH OF THE SIX STATES CARRIES A MARK, and which colour it is.
-   *
-   * Written once, because it was written twice — inline on the `data-intent` and again on the glyph —
-   * and both copies named two of the four states that need one. `13 §5.1`: colour never carries
-   * meaning alone, so a state that earns an intent earns a glyph in the same breath, and one map is
-   * how they cannot drift apart.
+   * WHERE THIS AREA'S ROWS CAME FROM. `sample` is a host with no record behind it, the public demo,
+   * where nothing can be approved; `refused` is a record that answered no, and its sentence is shown.
    */
+  let agentsFrom = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
+  let agentsRefusal = $state('');
+  let machines = $state<DeviceRow[]>([]);
+  let tokens = $state<TokenRow[]>([]);
+  let agentClient: ReturnType<typeof createClient> | null = null;
+  const agentsNow = () => (agentsFrom === 'sample' ? NOW : Date.now());
+
+  let typed = $state('');
+  let approving = $state(false);
+  let answer = $state<Answer | null>(null);
+  /* THE BEARER LIVES HERE AND NOWHERE ELSE, and only until Done or leaving the area. */
+  let minted = $state<{ label: string; bearer: string } | null>(null);
+  let mintLabel = $state('');
+  let minting = $state(false);
+  let mintRefusal = $state('');
+  let origin = $state('');
+
+  /** A mark for the states that need one; `13 §5.1`, so the glyph and the tone come from one map. */
   const DEVICE_TONE: Record<string, 'good' | 'warn' | 'bad' | undefined> = {
     pending: 'warn',
     approved: 'good',
     expired: 'warn',
     denied: 'bad',
-    /* WARN AND NOT BAD, because nothing went wrong that anybody has to answer for. The request was
-       closed by the record after four mistyped codes; the machine asks again and it works. `bad` is
-       for a refusal somebody made. */
-    locked: 'warn',
   };
 
-  /**
-   * A NEW ATTEMPT CLEARS THE LAST ANSWER, and this had to be said out loud because it was not.
-   *
-   * `aria-invalid` and `aria-describedby` were set on submit and cleared only by the NEXT submit, so
-   * the field stayed marked invalid while somebody typed the correct code into it — announcing a
-   * refusal that was about a value no longer in the box.
-   */
-  function retype(value: string) {
-    typed = value;
-    said = null;
-  }
-
-  function tryCode(e: SubmitEvent) {
-    e.preventDefault();
-    const attempt = approve(devices, typed, NOW);
-    devices = attempt.rows;
-    if (attempt.result.ok) {
-      const { label, reach } = { label: attempt.result.value.label, reach: attempt.result.value.reach };
-      said = { tone: 'good', line: copy.approvedNow(label, copy.reachMeans[reach] ?? reach) };
-      typed = '';
+  $effect(() => {
+    if (area !== 'agents') {
+      minted = null;
       return;
     }
-    /* THE REFUSAL IS THE RECORD'S OWN, `fix` and all. `30 §6`'s sentences are written to be read by
-       whoever hit them, so wrapping one in a friendlier apology would be replacing the useful half.
-       The field KEEPS what was typed on a refusal: six digits with one wrong is a thing to correct,
-       and a box that empties itself makes you read the code off the other machine again. */
-    said = { tone: 'bad', line: attempt.result.refusal.fix };
+    untrack(() => void readAgents());
+  });
+
+  async function readAgents() {
+    const at = opened();
+    origin = location.origin;
+    agentClient ??= createClient({ base: origin });
+    const listed = await agentClient.listDevices();
+    if (!listed.ok) {
+      const refusal = 'refusal' in listed ? listed.refusal : { code: 'VERSION_STALE', fix: '' };
+      if (noRecord(refusal.code)) {
+        machines = sampleMachines(DEVICES);
+        tokens = sampleTokens(TOKENS);
+        agentsFrom = 'sample';
+      } else {
+        agentsRefusal = refusal.fix;
+        agentsFrom = 'refused';
+      }
+      closed(true, at);
+      return;
+    }
+    machines = listed.value;
+    const held = await agentClient.listTokens();
+    tokens = held.ok ? standing(held.value as TokenRow[]) : [];
+    agentsFrom = 'live';
+    closed(true, at);
   }
+
+  /* A new keystroke clears the last answer, so the field is never marked wrong for a value it no longer holds. */
+  function retype(value: string) {
+    typed = value;
+    answer = null;
+  }
+
+  async function tryCode(e?: SubmitEvent) {
+    e?.preventDefault();
+    if (approving) return;
+    const entry = codeOf(typed);
+    if (!entry.ok) {
+      answer = { kind: 'malformed', why: entry.why, digits: entry.digits };
+      return;
+    }
+    if (agentsFrom === 'sample' || !agentClient) {
+      answer = { kind: 'demo' };
+      return;
+    }
+    approving = true;
+    const at = opened();
+    const out = await agentClient.deviceApprove({ user_code: entry.code });
+    closed(true, at);
+    approving = false;
+    /* `deviceApprove` carries no version, so a conflict cannot come back; it is read as a miss rather than drawn blank. */
+    answer = 'conflict' in out ? { kind: 'wrong' } : answerOf(out);
+    /* THE CODE STAYS IN THE FIELD ON A REFUSAL: six digits with one wrong is a thing to correct. */
+    if (answer.kind === 'approved') {
+      typed = '';
+      const again = await agentClient.listDevices();
+      if (again.ok) machines = again.value;
+    }
+  }
+
+  /* What the status line under the field says, or nothing. */
+  const answerLine = $derived.by((): { tone: 'good' | 'bad'; line: string } | null => {
+    const a = answer;
+    if (!a) return null;
+    switch (a.kind) {
+      case 'approved':
+        return { tone: 'good', line: copy.approvedNow(a.label ?? copy.unnamedMachine, copy.reachMeans[reachKey(a.reach, a.scope)] ?? a.reach) };
+      case 'malformed':
+        return { tone: 'bad', line: a.why === 'empty' ? copy.codeEmpty : a.why === 'short' ? copy.codeShort(a.digits) : a.why === 'long' ? copy.codeLong(a.digits) : copy.codeOther };
+      case 'wrong':
+        return { tone: 'bad', line: copy.codeWrong };
+      case 'tries':
+        return { tone: 'bad', line: copy.codeTries };
+      case 'expired':
+        return { tone: 'bad', line: copy.codeExpired };
+      case 'signin':
+        return { tone: 'bad', line: copy.signInAgainWhy };
+      case 'demo':
+        return { tone: 'bad', line: copy.notOnDemo };
+      default:
+        return { tone: 'bad', line: a.fix };
+    }
+  });
+
+  /**
+   * SIGNING IN AGAIN WITHOUT LEAVING, where a passkey can do it: the code stays typed and is sent
+   * again. Anywhere else the person goes to `/signin`.
+   */
+  let reproving = $state(false);
+  async function signInAgain() {
+    if (reproving) return;
+    const here = support();
+    const offered = await methods();
+    if (!(offered.ok && offered.value.passkey && here.webauthn && here.secure)) {
+      location.assign('/signin');
+      return;
+    }
+    reproving = true;
+    const who = await passkeySignIn();
+    reproving = false;
+    if (who.ok) await tryCode();
+  }
+
+  async function revokeMachine(row: DeviceRow) {
+    if (agentsFrom !== 'live' || !agentClient) {
+      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      return;
+    }
+    const at = opened();
+    const out = await agentClient.revokeDevice({ handle: row.handle });
+    closed(true, at);
+    if (out.ok) machines = machines.map((m) => (m.handle === row.handle ? out.value : m));
+    else toasts.push('refusal' in out ? out.refusal.fix : copy.notOnDemo, { intent: 'warn' });
+  }
+
+  async function revokeTokenRow(row: TokenRow) {
+    if (agentsFrom !== 'live' || !agentClient) {
+      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      return;
+    }
+    const at = opened();
+    const out = await agentClient.call<TokenRow>('revokeToken', { id: row.id });
+    closed(true, at);
+    if (out.ok) tokens = tokens.filter((t) => t.id !== row.id);
+    else if ('refusal' in out) toasts.push(out.refusal.fix, { intent: 'warn' });
+  }
+
+  async function connectAgent(e: SubmitEvent) {
+    e.preventDefault();
+    const label = mintLabel.trim().slice(0, LABEL_MAX);
+    if (!label || minting) return;
+    if (agentsFrom !== 'live' || !agentClient) {
+      mintRefusal = copy.notOnDemo;
+      return;
+    }
+    minting = true;
+    mintRefusal = '';
+    const at = opened();
+    const out = await agentClient.call<Minted>('createToken', { scope: 'write', label, days: TOKEN_DAYS });
+    closed(true, at);
+    minting = false;
+    if (!out.ok) {
+      mintRefusal = 'refusal' in out ? out.refusal.fix : '';
+      return;
+    }
+    minted = { label, bearer: out.value.bearer };
+    mintLabel = '';
+    const held = await agentClient.listTokens();
+    if (held.ok) tokens = standing(held.value as TokenRow[]);
+  }
+
+  const lines = $derived(connectLines(origin));
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -333,13 +460,6 @@
     read: 'Reads',
   };
   const levelSaid = (level: string | null) => (level === null ? copy.noRecordLevel : (LEVEL_SAID[level] ?? level));
-
-  /* WHERE A MACHINE REACHES YOU FROM, said as what it is. `mcp` and `cli` are protocol names. */
-  const SURFACE_SAID: Record<string, string> = {
-    mcp: 'through an AI assistant',
-    cli: 'from the command line',
-  };
-  const surfaceSaid = (surface: string) => SURFACE_SAID[surface] ?? copy.overSurface(surface);
 
   /**
    * WHAT `invite({ person, levels, why })` WOULD WRITE, said in the words it would write it in.
@@ -1167,50 +1287,16 @@
       </Section>
     {:else if area === 'agents'}
       <!--
-        `12 §6.1`, and the sentence that decides the shape of this list: "ONE ROW, TWO LIVES:
-        pending → approved → active." A machine asks, you approve on a device you are already
-        holding, and the same row becomes the grant. "The code is not the security. What the code
-        proves is that the approver is looking at the device that asked."
-
-        AND A DENIED ROW IS KEPT. `12 §6.1` calls *"I said no to a request I did not make"* the
-        single most important line this table can produce — a denial that leaves no trace is a
-        break-in attempt nobody can see afterwards.
+        THE FIELD COMES FIRST, because a machine prints this address: the person arriving is holding six
+        digits and looking for the box. A `<form>`, so Enter sends it.
       -->
-      <!--
-        THE FIELD COMES FIRST, because of who is standing here.
-
-        Four documents make `${origin}/settings/agents` the address a machine PRINTS (`33 §10`,
-        `49 §5.9`, `26 §2.3`, `53 §5`), so the person arriving is holding six digits their terminal
-        just showed them and looking for the box. Putting the list first would mean scrolling past
-        five rows of history to reach the one control they came for.
-
-        A `<form>` rather than a button, so Enter submits — the whole interaction is type-six-digits-
-        and-go, and a control that needs the mouse for the last step of that is a control somebody
-        types into and then hunts around.
-      -->
-      <Section title={copy.enterCode}>
-        <p class="hint">{copy.enterCodeHow}</p>
-        <!-- THE SAMPLE SAYS NOTHING HERE WILL MATCH, BEFORE ANYBODY TRIES. Its waiting request carries no
-             fingerprint on purpose (`data.ts` and `device.test.ts` say why: no code a person types may
-             approve a request in a record nobody owns), and a field that fails every entry without
-             saying so is the one control a machine sends people to. Every record this build can open
-             is the sample; when a real record can be opened, this line is drawn for the sample only. -->
-        <p class="hint">{copy.enterCodeSample}</p>
-        <form class="code-form" onsubmit={tryCode}>
+      <Section title={copy.approveTitle}>
+        <form class="code-form" onsubmit={tryCode} novalidate>
           <label class="code-label" for="user-code">{copy.codeLabel}</label>
           <div class="code-row">
             <div class="field field-lg">
-              <!--
-                PASTE IS NEVER BLOCKED, and neither is the space. `12 §3` names paste as the reason
-                this field satisfies WCAG 2.2's accessible-authentication criterion for free, and
-                `48 §5.2` step 3 prints the code AS TWO GROUPS — `enter  314 159` — so a field that
-                refused the space would be refusing the exact string it told you to read. `normalise`
-                drops everything that is not a digit and truncates nothing.
-
-                `inputmode="numeric"` for the phone keypad, `autocomplete="one-time-code"` so a
-                password manager or an OS handoff can fill it, and no `maxlength`: a seven-digit
-                entry is a mistake worth refusing out loud rather than silently trimming to six.
-              -->
+              <!-- Paste is never blocked and there is no `maxlength`: the CLI prints the code in two
+                   groups, and seven digits is refused out loud rather than trimmed to a different code. -->
               <input
                 class="field-input code-input"
                 id="user-code"
@@ -1220,120 +1306,49 @@
                 autocapitalize="off"
                 spellcheck="false"
                 placeholder={'0'.repeat(CODE_DIGITS)}
-                bind:this={codeField}
                 value={typed}
                 oninput={(e) => retype((e.currentTarget as HTMLInputElement).value)}
                 aria-describedby="user-code-said"
-                aria-invalid={said?.tone === 'bad' ? 'true' : undefined}
+                aria-invalid={answerLine?.tone === 'bad' ? 'true' : undefined}
               />
             </div>
-            <Button weight="primary" type="submit">{copy.codeGo}</Button>
+            <Button weight="primary" type="submit" disabled={approving}>{copy.codeGo}</Button>
           </div>
-          <!--
-            `13 §7`'s `role="status"`: the answer is announced where it is read, rather than as a
-            toast that has gone by the time somebody using a screen reader reaches it. Its tone is
-            carried by `data-intent` AND by the word itself, because `13 §5.1` forbids colour from
-            carrying meaning alone.
-
-            THE REGION IS ALWAYS IN THE DOCUMENT, EMPTY OR NOT. It was inside `{#if said}`, so the
-            element and its first sentence arrived in the same paint — and a live region inserted
-            together with its content is not reliably announced by any screen reader. The region has
-            to be there first for a change to be a change. It takes no space while empty.
-          -->
-          <p class="code-said" id="user-code-said" role="status" data-intent={said?.tone}>{said?.line ?? ''}</p>
+          <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+          <p class="code-said" id="user-code-said" role="status" data-intent={answerLine?.tone}>{answerLine?.line ?? ''}</p>
+          {#if answer?.kind === 'signin'}
+            <div class="row-actions">
+              <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+            </div>
+          {/if}
         </form>
       </Section>
 
-      <!-- THE COUNT IS THE ROWS BENEATH IT. This counted only the ACTIVE machines and then drew all
-           four — 2 over a list of four — which is the one `Section` in the product whose number and
-           list disagreed, on the screen where "how many machines can act as me" is the whole
-           question. A pending request and a denial are rows you are meant to see; if the heading is
-           to say `active`, it has to say so in the heading.
-
-           AND IT COUNTS `devices`, NOT `DEVICES`. The list this page draws is the one the last
-           attempt handed back: five wrong codes deny every waiting row, which changes what is on the
-           screen, and a heading reading the constant would go on counting a state the record left. -->
-      <Section title={copy.connected} count={devices.length}>
-        <p class="hint">{copy.connectedHow}</p>
-        <!-- A DESIGNED EMPTY, NOT AN EMPTY `<ul>`. Four of the twelve areas rendered a heading, a
-             `0`, one sentence and nothing at all — and this is one of the two where `13 §5.2`'s
-             copyable agent prompt is most obviously the right thing, because the way a machine gets
-             here is a command somebody runs on it. -->
-        {#if devices.length === 0}
-          <Empty kind="no-data-yet" title={copy.noDevices} body={copy.noDevicesWhy} agentPrompt={copy.enrollPrompt} />
+      <!-- Every row the record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). -->
+      <Section title={copy.machines} count={machines.length}>
+        {#if agentsFrom === 'refused'}
+          <Empty kind="error" title={agentsRefusal} />
+        {:else if agentsFrom !== 'reading' && machines.length === 0}
+          <Empty kind="no-data-yet" title={copy.noDevices} agentPrompt={copy.enrollPrompt} />
         {/if}
-<ul class="whos">
-          {#each devices as d}
-            {@const claims = d.reach === 'login' || d.reach === 'runner'}
-            <li class="who" data-intent={DEVICE_TONE[d.state]}>
+        <ul class="whos">
+          {#each machines as d (d.handle)}
+            {@const tone = DEVICE_TONE[d.status]}
+            <li class="who" data-intent={tone}>
               <div class="who-head">
-                <!-- ALL FOUR TONED STATES, and it marked two. `approved` and `expired` fell through
-                     to the plain session glyph with no intent, so a request that had run out of time
-                     drew identically to a connected machine — and a row LOST its mark at the moment
-                     you approved it, which reads as the approval having undone something. `13 §5.1`:
-                     the word is the meaning and the mark is the redundancy, so both move together. -->
-                {#if DEVICE_TONE[d.state]}
-                  <span class="glyph" role="img" aria-label={TONES[DEVICE_TONE[d.state]!].label}
-                    >{TONES[DEVICE_TONE[d.state]!].glyph}</span>
+                {#if tone}
+                  <span class="glyph" role="img" aria-label={TONES[tone].label}>{TONES[tone].glyph}</span>
                 {:else}<Icon name="session" size="s" />{/if}
-                <span class="who-name">{d.name}</span>
-                <!-- `since` AND NOT `relative`. These columns are instants, and `relative()` takes a
-                     DAY — it is anchored on a `YYYY-MM-DD` pattern and hands back its argument when
-                     the pattern misses, so every row on this screen printed
-                     `2026-09-03T11:57:00.000Z`. Truncating to the day, which is what every other
-                     caller does, would render a three-minute-old request and an eleven-hour-old one
-                     both as *today* — on the table whose whole decision is whether ten minutes have
-                     passed. -->
+                <!-- The label the machine sent. The handle is how the record names the row, and it means nothing to a person. -->
+                <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
+                <!-- `since`, because `last_used` is an instant and `relative` takes a day. -->
                 <span class="who-detail">
-                  {copy.deviceState[d.state]} · {surfaceSaid(d.surface)} ·
-                  {d.lastSeen ? copy.usedWhen(since(d.lastSeen, NOW)) : copy.askedWhen(since(d.at, NOW))}
+                  {copy.deviceState[d.status] ?? d.status} · {d.last_used ? copy.usedWhen(since(d.last_used, agentsNow())) : copy.neverUsed}
                 </span>
-                <!--
-                  WHAT IT WOULD BE ALLOWED TO DO, WHICH IS THE THING BEING DECIDED.
-
-                  `49 §5.9` step 2.3: *"the screen said what it was about to grant before the click"*.
-                  The row said what was ASKING — a name, a surface, a time — and never what approving
-                  it would let it do, so Approve and Deny sat under a sentence that could not tell a
-                  ten-minute one-shot export from a ninety-day bearer that runs code as you.
-
-                  And `ua` under it, `30 §1`'s "second free-text column the approver reads",
-                  attributed rather than asserted because the column is trusted for nothing. Its
-                  meaning turns on the reach: for the four operation grants it is the SUBJECT the
-                  command sent — what would be exported, imported or installed.
-                -->
-                <span class="who-detail who-reach">
-                  <!-- The separator carries its own spaces. Svelte trims the leading whitespace of a
-                       block, so `…{#if d.ua} ·` rendered `for ninety days· says it is …`. -->
-                  {copy.reachMeans[d.reach] ?? d.reach}{#if d.ua && !claims}{' · '}{copy.aboutWhat(d.ua)}{/if}
-                </span>
-                <!-- WHAT THE MACHINE SAYS IT IS, A STEP QUIETER. For a sign-in or a runner `ua` is a
-                     user agent, trusted for nothing, so it sits under the decision rather than in it. -->
-                {#if d.ua && claims}<span class="who-detail who-ua">{copy.saysItIs(d.ua)}</span>{/if}
+                <span class="who-detail who-reach">{copy.reachMeans[reachKey(d.reach, d.scope)] ?? d.reach}</span>
                 <span class="who-do">
-                  {#if d.state === 'pending'}
-                    <!--
-                      IT TAKES YOU TO THE FIELD, because there is nothing else it could honestly do.
-                      `12 §6.1`: *"what the code proves is that the approver is looking at the device
-                      that asked"* — so a button on the row that approved without a code would be
-                      approving on the strength of the request having been made, which is the whole
-                      thing the flow exists to prevent.
-                      It used to push a toast DESCRIBING that, which left the screen with two Approve
-                      affordances: a primary one that did nothing and explained, and the real one in
-                      another section. A control that names the step it cannot take should be the
-                      step.
-                    -->
-                    <Button weight="primary" onclick={focusCode}>{copy.approve}</Button>
-                    <!-- A PLAIN BUTTON. Saying no to a request is the safe answer, not a destructive one. -->
-                    <Button
-                      weight="bare"
-                      onclick={() => toasts.push(copy.notWritten('The request would be denied, and the denial kept'), { intent: 'warn' })}
-                    >{copy.deny}</Button>
-                  {:else if d.state === 'active'}
-                    <Button
-                      weight="bare"
-                      tone="bad"
-                      onclick={() => toasts.push(copy.notWritten(`${d.name} would stop being able to act as you`), { intent: 'warn' })}
-                    >{copy.revoke}</Button>
+                  {#if revocable(d)}
+                    <Button weight="bare" tone="bad" onclick={() => void revokeMachine(d)}>{copy.revokeKey}</Button>
                   {/if}
                 </span>
               </div>
@@ -1342,62 +1357,79 @@
         </ul>
       </Section>
 
-      <!--
-        THE THIRD OF THIS AREA'S THREE THINGS, and the one with no surface anywhere in the product.
-
-        `12 §3`: *"Every token records `last_used_at` and the surface it was used from, and the app
-        lists them with a revoke button. A credential you cannot see being used is a credential you
-        cannot know is stolen."* The list above is the REQUEST — who asked, and when. This is the
-        RESULT, and they are not the same set: a `login` grant mints a key and is itself never a
-        bearer, an operation grant makes a key that lives ten minutes, and a key can outlive the row
-        that made it. Nothing on any of forty-two routes answered *what can act as me right now*.
-
-        NEVER THE KEY ITSELF. `12 §3`'s first paragraph and this product's first promise: the record
-        keeps `sha256(secret)` and the secret is shown once, at the moment it is made, on the machine
-        that made it. What a list can honestly hold is what the key OPENS — a name, what it can do,
-        where it was last used from, and when it stops working.
-      -->
-      <Section title={copy.keys} count={TOKENS.length}>
-        <p class="hint">{copy.keysHow}</p>
-        {#if TOKENS.length === 0}
-          <Empty kind="no-data-yet" title={copy.noKeys} body={copy.noKeysWhy} />
+      <!-- `12 §3`: what can act as you, with a revoke button, and never the secret itself. -->
+      <Section title={copy.tokens} count={tokens.length}>
+        {#if agentsFrom === 'live' || agentsFrom === 'sample'}
+          {#if tokens.length === 0}
+            <Empty kind="no-data-yet" title={copy.noKeys} />
+          {/if}
         {/if}
         <ul class="whos">
-          {#each TOKENS as t}
-            <!-- THE ONE NOBODY HAS EVER USED IS THE ONE TO LOOK AT, and a list that draws it exactly
-                 like the other two has buried the only row that needed the reader. `13 §5.1`: the
-                 tone is carried by the words `never used` as well as by the mark. -->
-            <li class="who" data-intent={t.lastUsed === null ? 'warn' : undefined}>
+          {#each tokens as t (t.id)}
+            <!-- The one nobody has used is the one to look at, so it carries a mark as well as the words. -->
+            <li class="who" data-intent={t.last_used_at === null ? 'warn' : undefined}>
               <div class="who-head">
-                {#if t.lastUsed === null}
+                {#if t.last_used_at === null}
                   <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
-                {:else}<Icon name="session" size="s" />{/if}
-                <span class="who-name">{t.label}</span>
+                {:else}<Icon name="key" size="s" />{/if}
+                <span class="who-name">{t.label ?? copy.unnamedToken}</span>
+                <span class="who-detail">{copy.keyCan[t.scope] ?? t.scope}</span>
                 <span class="who-detail">
-                  {copy.keyCan[t.scope] ?? t.scope} · {surfaceSaid(t.surface)}
-                </span>
-                <!-- `since` FOR THE INSTANT AND `relative` FOR THE DAYS, and the mixture is the
-                     point rather than an inconsistency: `created` and `expires` are days and
-                     `lastUsed` is an instant. This row had `relative` on all three, so it printed
-                     `made 4w ago · used 2026-09-03T10:00:00.000Z · ends in 8w` — the same defect the
-                     commit above it was written to fix, ninety lines further down the same block,
-                     found by a review rather than by me. -->
-                <span class="who-detail">
-                  {copy.madeWhen(relative(t.created, NOW))} ·
-                  {t.lastUsed ? copy.usedWhen(since(t.lastUsed, NOW)) : copy.neverUsed} ·
-                  {copy.endsWhen(relative(t.expires, NOW))}
+                  {t.last_used_at ? copy.usedWhen(since(t.last_used_at, agentsNow())) : copy.neverUsed}{#if t.expires_at}{' · '}{copy.endsWhen(relative(t.expires_at.slice(0, 10), agentsNow()))}{/if}
                 </span>
                 <span class="who-do">
-                  <Button
-                    weight="bare"
-                    tone="bad"
-                    onclick={() => toasts.push(copy.notWritten(`${t.label} would stop working immediately, and your own session would not`), { intent: 'warn' })}
-                  >{copy.revokeKey}</Button>
+                  <Button weight="bare" tone="bad" onclick={() => void revokeTokenRow(t)}>{copy.revokeKey}</Button>
                 </span>
               </div>
             </li>
           {/each}
         </ul>
+
+        <!--
+          CONNECT AN AGENT. The bearer is drawn once, from `minted`, which Done and leaving the area both
+          empty; nothing else on this screen holds it. The two lines carry no token (`48 §2`).
+        -->
+        {#if minted}
+          {@const bearer = minted.bearer}
+          <div class="code-form" role="status">
+            <p class="code-label">{copy.tokenOnce}</p>
+            <p class="mono wrap">{bearer}</p>
+            <div class="row-actions">
+              <Button weight="primary" onclick={() => void clipboard.put(bearer, copy.tokenCopied)}>{copy.copyToken}</Button>
+            </div>
+            <p class="code-label">{copy.onNewMachine}</p>
+            <p class="mono wrap">{lines.login}</p>
+            <div class="row-actions">
+              <Button weight="quiet" onclick={() => void clipboard.put(lines.login, copy.lineCopied)}>{copy.copyLine}</Button>
+            </div>
+            <p class="code-label">{copy.inClaudeCode}</p>
+            <p class="mono wrap">{lines.mcp}</p>
+            <div class="row-actions">
+              <Button weight="quiet" onclick={() => void clipboard.put(lines.mcp, copy.lineCopied)}>{copy.copyLine}</Button>
+              <Button weight="bare" onclick={() => (minted = null)}>{copy.connectDone}</Button>
+            </div>
+          </div>
+        {:else}
+          <form class="code-form" onsubmit={connectAgent}>
+            <label class="code-label" for="agent-label">{copy.connectTitle}</label>
+            <div class="code-row">
+              <div class="field">
+                <input
+                  class="field-input"
+                  id="agent-label"
+                  type="text"
+                  maxlength={LABEL_MAX}
+                  placeholder={copy.connectLabel}
+                  aria-label={copy.connectLabel}
+                  bind:value={mintLabel}
+                  aria-describedby="agent-label-said"
+                />
+              </div>
+              <Button weight="primary" type="submit" disabled={minting || mintLabel.trim() === ''}>{copy.connectGo}</Button>
+            </div>
+            <p class="code-said" id="agent-label-said" role="status" data-intent={mintRefusal ? 'bad' : undefined}>{mintRefusal}</p>
+          </form>
+        {/if}
       </Section>
     {:else if area === 'ingest'}
       <!--
@@ -1785,7 +1817,8 @@
          about changes they cannot make. It is the last thing on three screens where it means
          nothing, which is how a reader learns to skip it on the nine where it means something. -->
     <!-- Not under the live passkeys: adding and removing one there is really kept, by the host. -->
-    {#if !REPORTS.has(area) && !(area === 'recovery' && livePasskeys)}
+    <!-- Nor on Agents: a live record keeps what is done there, and the demo says in its own sentence that nothing can be. -->
+    {#if !REPORTS.has(area) && area !== 'agents' && !(area === 'recovery' && livePasskeys)}
       <p class="mock">{KEEPS.has(area) ? copy.mockNoticeSome : copy.mockNotice}</p>
     {/if}
   </div>
@@ -1892,11 +1925,6 @@
   .who-reach {
     flex: 1 1 100%;
     color: var(--ink2);
-  }
-
-  .who-ua {
-    flex: 1 1 100%;
-    font-size: var(--t-xs);
   }
 
   /* The controls sit at the end of the head line and never shrink: a button that wraps its own

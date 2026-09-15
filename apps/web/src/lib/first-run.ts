@@ -29,6 +29,37 @@ export const firstRun = {
   /* TURN 3, beside the row they typed. Said only when the People row was actually made. */
   youArePending: (name: string, mark: string) => `${name} is in People too, marked ${mark}.`,
   youAreKnown: (name: string) => `${name} is in People too.`,
+
+  /* TURN 2 (`loop/research-modules.md` §5). A question, a field and §5's six chips; what was heard
+     and what the record will hold are two short columns, and the screen explains neither. */
+  shapeQuestion: "What's your business?",
+  shapePlaceholder: 'What you sell, who for, and what you keep track of',
+  shapeChips: ['I send invoices', 'Domains and hosting', 'Client projects', 'A small team', 'I use Claude or Codex', 'I sell products'],
+  shapeHeard: 'What I heard',
+  shapeRecord: 'Your record',
+  shapeHeardCount: (n: number) => (n === 1 ? 'Heard one thing.' : `Heard ${n} things.`),
+  /* An amount with no currency is said back, so the person sees why it is not in the row. */
+  shapeNoCurrency: 'no currency, so not kept',
+  shapeLanguage: 'This reads English only for now.',
+  shapeUnread: 'Nothing here makes a list yet.',
+  shapeYou: 'you',
+  shapeNeeds: (what: string) => `needs ${what}`,
+  shapeMissing: { amount: 'an amount', due: 'a due date' } as Record<string, string>,
+  /* A title the record keeps, built only from what was typed: the cadence and the client's name. */
+  shapeInvoice: (cadence: string | null, client: string | null) =>
+    `${cadence ? `${cadence.charAt(0).toUpperCase()}${cadence.slice(1)} invoice` : 'Invoice'}${client ? ` to ${client}` : ''}`,
+  shapeMake: 'Make my record',
+  shapeFromList: 'Start from a list instead',
+  shapeDescribe: 'Describe your business instead',
+  shapeAnd: (items: readonly string[]) =>
+    items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`,
+  shapeIn: (name: string, list: string) => `${name} in ${list}`,
+  shapeMade: (items: string) => `Made ${items}.`,
+  shapeMadeWaiting: (items: string, mark: string) => `Made ${items}, marked ${mark}.`,
+  shapeReady: 'Your lists are ready.',
+  shapeTurnedOn: (names: string) => `Turned on ${names}.`,
+  shapeAbsent: (names: string) => `Not installed on this record: ${names}. Nothing was made there.`,
+  shapeRefused: (name: string, fix: string) => `${name} was not made. ${fix}`,
   /* first run.
 
      THE FIRST SCREEN SETS THE CEILING. It used to open with "What do you want to stop forgetting?"

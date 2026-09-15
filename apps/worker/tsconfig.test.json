@@ -4,6 +4,7 @@
     "test/**/*.ts",
     "src/alarm.ts",
     "src/route.ts",
-    "src/session.ts"
+    "src/session.ts",
+    "src/vault.ts"
   ]
 }

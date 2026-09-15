@@ -24,7 +24,15 @@ export type LoginIo = {
   /** How this machine is named to the person approving it. */
   label?: string | undefined;
   now?: (() => number) | undefined;
+  /**
+   * A vault grant rather than a login: `things#3`, a project row id, or `*` for the keys of no project. Its bearer is
+   * kept under that scope in the hosts file, beside the login token and never in its place.
+   */
+  vault?: string | undefined;
 };
+
+/** A project by its spoken id or row id, or `*`. Checked before it is sent or written into a sentence. */
+const SCOPE = /^(?:\*|[a-z][a-z0-9_]{0,63}#[1-9][0-9]{0,8}|[0-9A-HJKMNP-TV-Z]{26})$/;
 
 /** `48 §4.4`: a refusal, a local failure or a stop is 1, and a host that did not answer is 3. */
 const REFUSED = 1;
@@ -57,6 +65,11 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   }
   const slug = url.pathname.replace(/^\/+/, '');
   const where = slug ? { slug } : {};
+  const vault = io.vault;
+  if (vault !== undefined && !SCOPE.test(vault)) {
+    io.say('--vault names a project by its spoken id, such as things#3, or * for the keys that belong to no project.');
+    return REFUSED;
+  }
 
   /* READ BEFORE ANYTHING IS ASKED, so a broken hosts file is found before somebody approves a device whose token
      would have nowhere to go. */
@@ -68,7 +81,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   }
 
   const label = (io.label ?? `${hostname()} · braindog-cli`).slice(0, 120);
-  const again = `Run braindog login ${key} to start again.`;
+  const again = `Run braindog login ${key}${vault === undefined ? '' : ` --vault ${vault}`} to start again.`;
 
   /* A REDIRECT IS REFUSED, not followed: the device routes never send one, and following it would hand the poll id
      to an address nobody chose. */
@@ -102,7 +115,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   };
 
   try {
-    const started = await send('/auth/device', { ...where, reach: 'login', label });
+    const started = await send('/auth/device', { ...where, ...(vault === undefined ? { reach: 'login' } : { reach: 'vault', scope: vault }), label });
     const code = started.body?.ok === true && isObject(started.body.value) ? started.body.value : null;
     if (!code) {
       io.say(refusedLine(started));
@@ -160,14 +173,25 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
       /* READ AGAIN, because minutes have passed and another command may have written the file since. */
       try {
         const hosts = readHosts(io.file);
-        hosts.hosts[key] = { ...hosts.hosts[key], token: { value: bearer, expires, label } };
-        hosts.default = key;
+        const held = hosts.hosts[key];
+        if (vault === undefined) {
+          hosts.hosts[key] = { ...held, token: { value: bearer, expires, label } };
+          hosts.default = key;
+        } else {
+          /* A vault grant sits beside the login and never replaces it, and it makes a host the default only when none is. */
+          hosts.hosts[key] = { ...held, vault: { ...held?.vault, [vault]: { value: bearer, expires } } };
+          hosts.default ??= key;
+        }
         saveHosts(io.file, hosts);
       } catch {
         io.say(`The device was approved and ${io.file} could not be written, so the token was not kept. ${again}`);
         return REFUSED;
       }
-      io.say(`logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`);
+      io.say(
+        vault === undefined
+          ? `logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`
+          : `vault grant for ${vault} on ${key} kept as ${label} · expires ${expires.slice(0, 10)}`,
+      );
       return 0;
     }
   } catch {

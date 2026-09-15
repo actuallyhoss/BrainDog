@@ -1386,6 +1386,12 @@ the connector DEK and the signing key. The record has no `KeyStore` port, so the
 structural rather than policed. *(Iteration 2 added the self-host half and the third key; an earlier
 version said "the Worker" and left the connector DEK to be found at first bind.)*
 
+*Note, September 15th 2026:* the agent path's key doors keep this. A deposit through `/api/vault/deposit`
+is sealed by the host before `depositGrant` binds it, and a read through `/api/vault/open` is opened by the
+host from what `openForGrant` returns sealed; the plaintext goes back once, to a terminal holding a vault
+grant, rather than to a browser ([12-SECURITY](12-SECURITY.md) §6 rule 9). The Worker checks the grant and
+answers `NOT_IN_THIS_BUILD` until it has a key store bound.
+
 **Rejected:** decryption inside the object. It would give the record a `KeyStore` port and make a
 compromised record a compromised vault; today a compromised record yields ciphertext.
 

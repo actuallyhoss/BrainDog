@@ -84,6 +84,10 @@ const CASES = [
   /* THE FOURTH: a session id in a log. The same fixture posts the server key to its own host, which is the
      one transmission sign-in's four names exist for, so a count of one proves the gate tells them apart. */
   { gate: 'secret-grep-wire', run: 'secret-grep', expect: /sign-in secret reaches a log/, findings: 1 },
+  /* THE FIFTH: an agent's key in `apps/cli/src/keys.ts`, sent from `depositOne`, the file's recorded exemption, and
+     encoded to bytes that reach a log. One finding proves both halves: the exemption covers that function and
+     nothing else, and a value is followed into a name that is not `plaintext`. */
+  { gate: 'secret-grep-vault', run: 'secret-grep', expect: /a plaintext reaches a log/, findings: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },

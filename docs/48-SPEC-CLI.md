@@ -38,7 +38,9 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 
 | Command | Arguments · flags | Calls | Prints | Exit |
 |---|---|---|---|---|
-| `login <host>` | `<host>` = `https://origin[/slug]` | `POST /auth/device` then `POST /auth/device/token` until approved | the six digits and the URL (stderr); `logged in to <host> as <label> · token expires <date>`; an expired code, a denial and Ctrl+C are one sentence each | 0 · 1 · 3 |
+| `login <host>` | `<host>` = `https://origin[/slug]` · `--vault <project\|*>` | `POST /auth/device` then `POST /auth/device/token` until approved; with `--vault`, `reach: 'vault'` and `scope` | the six digits and the URL (stderr); `logged in to <host> as <label> · token expires <date>`, or with `--vault` `vault grant for <scope> on <host> kept as <label> · expires <date>`; an expired code, a denial and Ctrl+C are one sentence each | 0 · 1 · 3 |
+| `keys put <label>` | `--opens <what>` · `--kind <kind>` · `--vault <project>` · `--host <host>`; the value on stdin, never an argument | `POST /api/vault/deposit { label, opens?, kind?, value }` with the vault grant as bearer and the session headers | `deposited <credentials#n> on <host> · version <n>`, or `rotated …` when the label was already a key in scope; never the value or the label | 0 · 1 · 3 |
+| `keys exec <label \| credentials#n> -- <command> [args...]` | `--as <ENV_NAME>` · `--vault <project>` · `--host <host>` | `POST /api/vault/open { label }` or `{ credential }`, as `put`; then the command, with no shell, its own standard streams, and the key in one environment variable, named by `--as` or made from the label | nothing of its own, and never the value; a missing command, a bad `--as`, or a label no name can be made from is one sentence before any request | the command's exit code (1 for a signal) · 1 · 3 |
 | `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers of `loop/research-agent-path.md` §3.4, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
 | `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
@@ -61,18 +63,18 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 | `runner run` | `--once` | `POST /api/claimJob { wait: 20 }` · `postJobEvent` · `readCancel`; spawns `claude` | one line per job to stderr; never exits unless `--once` | 0 · 1 · 3 |
 | `--version` | — | nothing | `app <date>+<sha> · format 1 · kernel <n> · primitives 1` | 0 |
 
-Twenty-one commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
-(its two events in one row) and `install`.
+Twenty-three commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
+(its two events in one row), `install`, and `keys put` and `keys exec`.
 `--json` puts exactly one JSON document on stdout (§4.5) and moves every progress line to stderr. `mcp` takes
 no `--json`, because its stdout is the protocol. `--host` beats `BRAINDOG_HOST`, which beats `hosts.json`'s
 `default`. A host is written `https://origin[/slug]`; a bare name means https, and plain http is refused
 except to this machine, because the bearer would cross the network in the clear.
 
-**Built today: `mcp`, `hook`, `install`, `init` and `serve`.** The command runs from a checkout as
+**Built today: `mcp`, `hook`, `install`, `login`, `keys put`, `keys exec`, `init` and `serve`.** The command runs from a checkout as
 `node apps/cli/src/main.ts`. Until §3's bundle exists, the manifest's `bin` points at that file and the manifest
 stays `private`, so `tools/release.mjs` does not offer a file npm could not run. `init` and `serve` are the
 self-host's, which has no `bin` of its own and tells people to type them, so this command claims the name and
-spawns the self-host for both. The agent path adds `logout`, `session`, `key add|exec` (alias `run`),
+spawns the self-host for both. The agent path adds `logout`, `session`, `run` (an alias of `keys exec`),
 `skills sync`, `tools scan|write` and `context` (`loop/research-agent-path.md` §4.2). Each gets its row here in
 the step that builds it; until then the command says it is not built yet.
 
@@ -198,9 +200,13 @@ type HostsFile = {
   hosts: Record<string, {                            // key: 'https://brain.dog/acme' — origin + '/' + slug, no trailing slash
     token?:  { value: string; expires: string; label: string };   // login: the read+write agent token, 90 days
     runner?: { value: string; expires: string; label: string };   // runner enroll: the 90-day device grant
+    vault?:  Record<string, { value: string; expires: string }>;  // login --vault: key = the project's id, or '*'
   }>;
 };
 ```
+
+A vault grant is kept under its scope, so one host can hold grants for several projects; `keys` uses `--vault`,
+or the only one held.
 
 Invariants a test checks: the file's mode is `0600` on POSIX; a write is a rename of a complete file; a `value`
 appears in no other file, no log line, no `--json` output; an `expires` in the past makes the CLI say
@@ -596,6 +602,7 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | `export` · `import` | the `.dogl` is verified after it arrives and before it is sent; the `.dog` and `.dogl` are written `0600` — they carry the whole record with its sealed grants (03 §5) |
 | Attachments | bytes are hashed before they are written under their name; the content address is the check |
 | The runner | `--restricted`, `--permission-mode dontAsk`, `--strict-mcp-config`, an empty working directory it owns, the closed kind list and the 64-byte no-whitespace arg rule, the `mcp__braindog__` tool filter, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
+| `keys` | the value is read from stdin, never an argument, and no command prints a key: `exec` puts it into the environment of the one command it spawns, with no shell, and never on stdout, stderr or a file; it travels only in the one deposit request and the one read's answer, neither of which follows a redirect. The vault grant goes only to `/api/vault/*`, and no sentence quotes a value, a grant or a label (12 §6 rule 9) |
 | The session file | ids, a commit and the host's address, never a token; `0600` beside `hosts.json`; its ids are sent only to the host that wrote it |
 | Hook output | the briefing names a row by its spoken id and its own words, and a key by its label only; it reads only string fields, so a key's sealed-state projection never reaches the model. A failure line is fixed text or the host's refusal sentence, never an exception's message. A commit named by the record is checked to look like one before git sees it |
 | `install` | a dry run unless `--apply`; a copy of the settings file before any write; never a project's `.mcp.json`; a settings file it cannot parse is not quoted, because its `env` may hold keys |

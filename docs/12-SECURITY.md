@@ -273,6 +273,19 @@ FOR" is structural rather than remembered.
    **proven at bind**, never assumed. When a provider rotates a refresh token mid-run, connect re-seals
    it (version + 1) and the record stores it from the ack with one `grant.rotate` event — the previous
    version kept as `prev_ciphertext`.
+9. **An agent's keys go through two doors, under a vault grant and nothing else.** `POST /api/vault/deposit`
+   and `POST /api/vault/open` take as their bearer a device grant of reach `vault`, approved by a person for
+   one project or for `*`, the keys of no project; 30 days for a project and 7 for `*`. The bearer is checked
+   with `vaultGrant`, which never accepts a login token, and a key whose row's project is not the grant's
+   scope is `403 FORBIDDEN`. A page is refused, whatever its origin. The host seals a deposit and opens a
+   read with its `KeyStore`, as in rule 7's group; the record names the grant id, version and AAD and binds
+   only sealed bytes, and the credentials row keeps its label, what it opens and its project. A read is
+   rule 1's `grant.read`, signed by the run the caller names (`S12`) when one is live, and the value
+   leaves in that one answer with `no-store`. On the command line, `braindog keys put` reads the value
+   from stdin, never an argument, and `braindog keys exec` puts a key read back into the environment of the
+   one command it runs, and never prints it. This is not rule 3's agent tool: no MCP tool reaches either door.
+   *(Added September 15th 2026, `loop/research-agent-path.md` step 18. `tools/gates/secret-grep.mjs` holds
+   the value's shapes in the three files that may name it.)*
 
 
 ### 6.1 · The device-authorisation grant, and five refinements from the predecessor

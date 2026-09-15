@@ -20,10 +20,10 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { handlersFor, hintsOf, serveApi, withSession } from '@braindog/host';
+import { handlersFor, hintsOf, serveApi, withSession, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAuth, type DeviceDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
-import { ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type Waiting } from '@braindog/kernel';
+import { ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Limited, type RecordApi } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
@@ -35,6 +35,7 @@ import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
 import { inward, isRecordId, servesApi, servesAuth, servesMcp } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
+import { serveWorkerVault, servesVault } from './vault.ts';
 
 /**
  * Cloudflare's `send_email` binding. `from` is the sender Email Service needs; sign-in mail sets it from
@@ -271,6 +272,13 @@ export class Record$ extends DurableObject<Env> {
     const api = await this.#record();
     const broken = api.kernel.refused();
     return broken ? { ok: false, refusal: broken } : api.devicePoll(args);
+  }
+
+  /** A vault grant's bearer, checked for the key doors. AN RPC AND NEVER A ROUTE: `vaultGrant` is INTERNAL. */
+  async vaultGrant(bearer: string): Promise<Result<VaultGrant>> {
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.vaultGrant(bearer);
   }
 
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
@@ -600,6 +608,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     if (servesAuth(url.pathname)) return signIn(request, env, ctx);
     /* AN AGENT'S MCP CLIENT, BEFORE ANY DOOR IS ASKED, so neither the cookie nor the demo is ever read for it. */
     if (servesMcp(url.pathname)) return agent(request, env);
+    /* THE KEY DOORS, before any door is asked: their bearer is a vault grant, and neither a cookie nor a login
+       token may reach them. */
+    if (servesVault(url.pathname)) return keyDoor(request, env);
     if (!servesApi(url.pathname))
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
 
@@ -640,6 +651,16 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        what a caller may do is inside `createRecordApi`, so the CLI and the MCP server answer to the same ladder
        as the browser. `inward` writes the context over whatever the caller sent and drops the bearer. */
     return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
+}
+
+/** `/api/vault/*`: the grant is checked by the record its bearer names, and then `vault.ts` answers. */
+function keyDoor(request: Request, env: Env): Promise<Response> {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  return serveWorkerVault(request, {
+    knows: (record) => directory.knows(record),
+    vaultGrant: async (record, bearer) =>
+      (await env.RECORD.get(env.RECORD.idFromName(record)).vaultGrant(bearer)) as unknown as Result<VaultGrantSeen>,
+  });
 }
 
 /**

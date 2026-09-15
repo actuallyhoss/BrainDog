@@ -16,7 +16,7 @@ import type { AddressInfo } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
-import { handlersFor, hintsOf, httpStatus, serveApi, sessionOf, withSession, type Handler } from '@braindog/host';
+import { handlersFor, hintsOf, httpStatus, serveApi, serveVault, servesVault, sessionOf, withSession, type Handler, type VaultDoor } from '@braindog/host';
 import {
   clearCookie,
   cookieMode,
@@ -39,6 +39,7 @@ import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports'
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
+import { vaultDoor } from './vault.ts';
 
 /** The `Sql` port over `node:sqlite`. The one thing this file exists to supply. */
 export function openSqlite(path: string): Sql & { close(): void } {
@@ -141,6 +142,8 @@ type Site = {
   origins: ReadonlySet<string>;
   /** `/auth/*`, less the address, which is per request. */
   door: Omit<AuthDoor, 'ip'>;
+  /** The key doors: a vault grant's bearer, and this process's key store when it has one. */
+  vault: VaultDoor;
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -666,6 +669,7 @@ export async function start(options: {
     auth: off === null ? directory.auth : null,
     hosts: new Set([...loopback, new URL(origin).host]),
     origins: new Set([...loopback.map((h) => `http://${h}`), origin]),
+    vault: vaultDoor(api, options.keys),
     door: {
       on: 'selfhost',
       origin,
@@ -773,6 +777,10 @@ async function answer(
     return write(res, await serveAuth(request, { ...site.door, ip: ipOf(req, trustProxy), reached: req.headers.host ?? '' }));
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
+
+  /* THE KEY DOORS, BEFORE ANY OTHER CREDENTIAL IS READ: their bearer is a vault grant, which `contextFor` would
+     not know, and a cookie or a login token must not reach them at all. */
+  if (servesVault(path)) return write(res, await serveVault(request, site.vault));
 
   const seen = await contextFor(request, req.headers.host ?? '', site);
   /* THE SESSION HEADERS ON EVERY DOOR, checked: the record reads a token's and ignores anybody else's. */

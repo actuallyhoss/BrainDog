@@ -29,8 +29,12 @@ import {
 import { no, ok } from '@braindog/ports';
 import {
   fill,
+  GRANT_KINDS,
   isStale,
   openRecord,
+  ulids,
+  type GrantKind,
+  type SealedGrant,
   sessionDeclaration,
   type BindGrantArgs,
   type CreateRecordArgs,
@@ -144,6 +148,30 @@ const WINDOW = 15 * 60_000;
 
 /** A start refused by the count, with the seconds until the address may try again. The host answers it 429. */
 export type Limited = { ok: false; retryAfter: number };
+
+/**
+ * What a host's vault door seals a deposited key for: the grant id and version the bytes will belong to, the
+ * additional data that binds them there, and the record's wrapped key. The record hands this out and cannot use it.
+ */
+export type SealTarget = {
+  grant: string;
+  version: number;
+  aad: string;
+  key: { wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null };
+};
+
+/** What the host hands back: sealed bytes, and what they are unopened. Never the value. */
+export type Sealed = { ciphertext: Uint8Array; nonce: Uint8Array; kdf: string; kek_id: string; bytes: number; hint: string };
+
+/** A deposit, as the door answers it: the row's spoken id and the grant's version, and nothing sealed. */
+export type Deposited = { credential: string; label: string; version: number; rotated: boolean };
+
+/** A key's sealed material for the door to open, and the row it belongs to. */
+export type OpenedForGrant = SealedGrant & { credential: string; label: string };
+
+/** The register a vault door deposits into and opens from, and its sealed field. */
+const KEYS = 'credentials';
+const KEY_FIELD = 'value';
 
 /**
  * One start counted against an address, in the record's own `auth_fail` (`30 §1`).
@@ -672,6 +700,58 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
     if (!row) return Math.ceil(WINDOW / 1000);
     return row.n > STARTS ? Math.max(1, Math.ceil((Date.parse(row.until) - now) / 1000)) : null;
+  };
+
+  /* ── the vault doors' half ── */
+
+  const mintGrant = ulids(() => clock.now());
+
+  /**
+   * The key a vault grant may reach, by spoken id or by label, or `null`.
+   *
+   * A PROJECT GRANT REACHES ITS PROJECT'S KEYS AND A `*` GRANT REACHES THE KEYS OF NO PROJECT, and nothing
+   * else. A key outside the scope and a key that is not there are both `null`, so the answer says nothing about
+   * another project's keys.
+   */
+  const keyFor = (by: { label: string } | { credential: string }, grant: VaultGrant): Entry | null => {
+    const within = (row: Entry | null): row is Entry => {
+      if (!row || row.register !== KEYS || row.deleted_at) return false;
+      const project = typeof row.fields.project === 'string' && row.fields.project ? row.fields.project : null;
+      return grant.scope === '*' ? project === null : project === grant.scope;
+    };
+    if ('credential' in by) {
+      const row = kernel.get(by.credential);
+      return within(row) ? row : null;
+    }
+    const ids = sql.all<{ id: string }>(
+      "SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.label') = ? ORDER BY seq",
+      KEYS,
+      by.label,
+    );
+    for (const { id } of ids) {
+      const row = kernel.get(id);
+      if (within(row)) return row;
+    }
+    return null;
+  };
+
+  /** One sentence for a key the grant does not reach, whether it is elsewhere or nowhere. */
+  const unreached = <T>(grant: VaultGrant): Result<T> =>
+    no<T>(
+      'FORBIDDEN',
+      grant.scope === '*'
+        ? 'This vault grant opens only the keys that belong to no project, and none of those is that key.'
+        : "This vault grant opens only its own project's keys, and none of those is that key.",
+      { at: 'credential' },
+    );
+
+  /**
+   * Who a door's deposit or read is by: the run the caller names, `S12`, while it is live, and otherwise the
+   * agent. Never the person who approved the grant, whose name on an agent's act is the attribution a run replaces.
+   */
+  const vaultActor = (hints: SessionHints): string => {
+    const run = hints.spoken ? kernel.findRun({ spoken: hints.spoken }) : null;
+    return run && run.seq !== null ? `${PREFIX}${run.seq}` : `agent:${hints.agent ?? 'other'}`;
   };
 
   /** The declaration state a plan is built against. */
@@ -2181,7 +2261,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
       const wait = counted(`device:${ip}`);
       if (wait !== null) return { ok: false, retryAfter: wait };
-      return tail(await kernel.deviceStart(args ?? ({} as never)));
+      /* A PROJECT IS NAMED THE WAY A PERSON SAYS IT, `things#3`, and the grant holds its row id, which is what a
+         key's `project` field holds, so the door compares like with like. */
+      const said = args?.scope;
+      const scope = typeof said === 'string' && said !== '*' ? (kernel.get(said)?.id ?? said) : said;
+      return tail(await kernel.deviceStart({ ...(args ?? ({} as never)), ...(scope === undefined ? {} : { scope }) }));
     },
 
     /** The device asks again, and once approved takes its bearer, once. INTERNAL, for `/auth/device/token`. */
@@ -2192,6 +2276,89 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /** A vault-grant bearer, checked before the host opens a key for an agent. INTERNAL, and no route reaches it. */
     async vaultGrant(bearer: string): Promise<Result<VaultGrant>> {
       return kernel.vaultGrant(bearer);
+    },
+
+    /**
+     * A key deposited through a host's vault door. INTERNAL: the door calls it after `vaultGrant`, and no route
+     * reaches it.
+     *
+     * THE VALUE NEVER COMES HERE. This names the grant id, version and additional data the bytes must be sealed
+     * for; the host seals them with its key store inside `seal`; and only sealed bytes are bound, through the
+     * kernel's `depositGrant`, in one transaction with the row. The row keeps the index: its label, what it opens,
+     * its kind, and for a new key the grant's project. A key of that label already in scope rotates its grant.
+     */
+    async depositGrant(
+      args: { label?: unknown; opens?: unknown; kind?: unknown },
+      grant: VaultGrant,
+      hints: SessionHints,
+      seal: (target: SealTarget) => Promise<Result<Sealed>>,
+    ): Promise<Result<Deposited>> {
+      const label = typeof args?.label === 'string' ? args.label.trim() : '';
+      if (!label || label.length > 120)
+        return no('REQUIRED_MISSING', 'A key has a label a person would say, in 120 characters or fewer.', { at: 'label' });
+      const said = typeof args.opens === 'string' ? args.opens.trim() : '';
+      if (said.length > 280) return no('OUT_OF_BOUNDS', 'What a key opens is said in 280 characters or fewer.', { at: 'opens' });
+      if (args.kind !== undefined && !(GRANT_KINDS as readonly unknown[]).includes(args.kind))
+        return no('ENUM_VALUE_UNKNOWN', 'That is not a kind of key.', { at: 'kind', allowed: GRANT_KINDS });
+
+      const row = keyFor({ label }, grant);
+      const opens = said || (typeof row?.fields.opens === 'string' ? row.fields.opens : '');
+      if (!opens) return no('REQUIRED_MISSING', 'A new key says what it opens, such as a host or an account.', { at: 'opens' });
+
+      const held = typeof row?.fields[KEY_FIELD] === 'string' ? String(row.fields[KEY_FIELD]) : null;
+      const live = held === null ? null : sql.one<{ version: number; kind: GrantKind }>('SELECT version, kind FROM grant WHERE id = ? AND revoked_at IS NULL', held);
+      const kind = (args.kind as GrantKind | undefined) ?? live?.kind ?? (typeof row?.fields.kind === 'string' ? (row.fields.kind as GrantKind) : 'api_token');
+      const id = live && held !== null ? held : `g_${mintGrant()}`;
+      const version = live ? live.version + 1 : 1;
+
+      const key = sql.one<{ wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null }>(
+        "SELECT wrapped, nonce, wrapped_by, kek_id FROM vault_key WHERE purpose = 'record'",
+      );
+      if (!key) return no('NOT_IN_THIS_BUILD', 'This record has no wrapped key, so it cannot hold a sealed value.', { at: 'credential' });
+
+      /* The same additional data `openGrant` hands back, so what is sealed here is what opens there. */
+      const sealed = await seal({ grant: id, version, aad: `${kernel.identity()?.id ?? 'self'}\u001f${id}\u001f${version}`, key });
+      if (!sealed.ok) return sealed;
+
+      const declares = (field: string) => kernel.register(KEYS)?.fields.some((f) => f.id === field && !f.retired) === true;
+      const fields: Patch = {
+        label,
+        opens,
+        ...(declares('kind') ? { kind } : {}),
+        ...(row === null && grant.scope !== '*' ? { project: grant.scope } : {}),
+      };
+      const s = sealed.value;
+      const out = kernel.depositGrant(
+        {
+          register: KEYS,
+          ref: row?.id ?? null,
+          field: KEY_FIELD,
+          fields,
+          grant: { label, opens, kind, ciphertext: s.ciphertext, nonce: s.nonce, kdf: s.kdf, wrapped_by: 'kek', kek_id: s.kek_id, bytes: s.bytes, hint: s.hint, sealed_for: { id, version } },
+        },
+        { actor: vaultActor(hints) },
+      );
+      if (!out.ok) return tail(out);
+      return tail(ok({ credential: kernel.nameOf(out.value.entry.id), label, version: out.value.grant.version, rotated: version > 1 }));
+    },
+
+    /**
+     * A key's sealed material for a host's vault door to open. INTERNAL, like `depositGrant`.
+     *
+     * The key must be in the grant's scope; then the kernel counts the read and writes `grant.read`, signed by the
+     * run the caller names. The host unwraps and decrypts, and the record never holds what it opens.
+     */
+    async openForGrant(args: { label?: unknown; credential?: unknown }, grant: VaultGrant, hints: SessionHints, kek_id: string): Promise<Result<OpenedForGrant>> {
+      const label = typeof args?.label === 'string' ? args.label.trim() : '';
+      const credential = typeof args?.credential === 'string' ? args.credential.trim() : '';
+      if (!label && !credential) return no('REQUIRED_MISSING', 'Name the key by its label, or by its spoken id such as credentials#3.', { at: 'label' });
+      const row = keyFor(credential ? { credential } : { label }, grant);
+      if (!row) return unreached(grant);
+      const held = typeof row.fields[KEY_FIELD] === 'string' ? String(row.fields[KEY_FIELD]) : '';
+      if (!held) return no('GRANT_REVOKED', `${kernel.nameOf(row.id)} holds no sealed value.`, { at: 'credential' });
+      const out = kernel.openGrant({ id: held, kek_id }, vaultActor(hints));
+      if (!out.ok) return out;
+      return ok({ ...out.value, credential: kernel.nameOf(row.id), label: typeof row.fields.label === 'string' ? row.fields.label : label });
     },
 
     /** A row's history: the writes that made it, each with who and when. */

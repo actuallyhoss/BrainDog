@@ -1,171 +1,191 @@
 /**
- * Approving a device grant: RFC 8628's second half, and the half this app had none of.
+ * `/settings/agents`, the address every device code points at: what the screen decides, with no runes.
  *
- * `19 §2` gives `/settings/agents` three things — the tokens, the connected machines, and *"the
- * code-entry control — the `verification_uri` of every device flow"*. Four documents make
- * `${origin}/settings/agents` the address a machine prints and sends a person to (`33 §10`,
- * `49 §5.9`, `26 §2.3`, `53 §5`), and the screen at that address had a list and no field. Somebody
- * who runs `braindog runner enroll`, reads six digits off their terminal and opens the URL it
- * printed arrived at something they could only look at.
+ * PURE, SO `node --test` CAN IMPORT IT. A `.svelte.ts` file needs the compiler, and the parts with
+ * consequences are here: what counts as a code, what each answer from `deviceApprove` means to the
+ * person, and how the sample's rows become the record's.
  *
- * PURE, AND THEREFORE TESTABLE. Same split as `arrange.ts`: a `.svelte.ts` file uses the `$state`
- * rune, which exists only after the Svelte compiler has run, so `node --test` cannot import one. The
- * reactive part is an assignment; the arithmetic — who pays for a wrong guess, when five is reached,
- * what a match returns — is where a bug would live, and it is all here.
+ * THE RECORD'S SHAPE, NOT THE MOCK'S. The kernel names a grant by a handle and never by its poll id,
+ * and five wrong codes leave rows `denied`. The screen draws `listDevices` and `listTokens` as they
+ * come back, so the sample is converted into those rows rather than drawn from its own.
  *
- * A REFUSAL IS A VALUE. Every way this can fail is a `Result` a caller can render, including the two
- * the record itself would send back over the wire.
+ * NO APPROVAL IS SIMULATED. The kernel owns the arithmetic of a wrong guess and tests it; the demo has
+ * no account, so approving there says it cannot be done instead of acting it out.
  */
 
-import type { Device, Reach } from './schema.ts';
+import type { DeviceApproved, DeviceRow } from '@braindog/client';
 
-/** `30 §1`'s `tries INTEGER NOT NULL DEFAULT 0`, and `12 §6.1`'s five. */
-export const CODE_TRIES = 5;
+import type { Device, Token } from './schema.ts';
 
-/** `49 §5.9` step 1: `now + 10 min`, for a pending row and for an operation grant that is approved. */
-export const CODE_MINUTES = 10;
+export type { DeviceRow };
 
-/** Six digits is a million — `12 §6.1`, and the reason the count of tries is the actual control. */
+/** Six digits is a million, which is only safe beside five tries and ten minutes (`12 §6.1`). */
 export const CODE_DIGITS = 6;
 
-/**
- * A refusal as the record writes one: a code from `30 §6`'s closed list, where it happened, and the
- * one thing to do about it. No apology and no blame.
- */
-export type Refusal = { code: string; fix: string; at?: string };
+/** `listTokens`, as `TokenRow` in `@braindog/kernel` has it. Never the bearer. */
+export type TokenRow = {
+  id: string;
+  person_id: string;
+  scope: 'read' | 'propose' | 'write';
+  label: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  last_surface: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+};
 
-/** What an approval grants, which is what `49 §5.9` step 2.3 says the screen must have said first. */
-export type Approved = { id: string; reach: Reach; label: string; subject: string | null };
+/** `createToken`: the only copy of the bearer there will ever be. */
+export type Minted = { id: string; bearer: string; scope: string; expires_at: string };
 
-/**
- * The answer, and the rows as they now stand.
- *
- * THE ROWS COME BACK EVEN WHEN THE ANSWER IS A REFUSAL, and that is the point rather than an
- * oversight: a wrong guess CHANGES THE RECORD. `49 §5.9` step 2.1 spends the try on every pending
- * row before it looks at any of them, and the fifth one denies them all. A function that returned
- * only the refusal would leave the caller drawing four rows that no longer exist in that state.
- */
-export type Attempt = { rows: Device[]; result: { ok: true; value: Approved } | { ok: false; refusal: Refusal } };
-
-const no = (code: string, fix: string, at = 'user_code'): Attempt['result'] => ({ ok: false, refusal: { code, fix, at } });
+/** A refusal as the client hands one back, and only the keys read here. */
+export type Refusal = { code: string; fix: string };
 
 /**
- * The separators a code is printed with, gone. Everything else stays and is refused.
+ * The separators a code is printed with, gone, and nothing else.
  *
- * `12 §3`: *"paste is never blocked on the fallback code field"*, and the thing people paste is what
- * `48 §5.2` step 3 printed at them: `Open <uri> and enter  314 159`. A field that rejects the space
- * it told you to read is a field that rejects its own output. Hyphens for the same reason, and the
- * non-breaking space a terminal or a chat client will have substituted on the way.
- *
- * IT USED TO STRIP EVERY NON-DIGIT, which made the refusal sentence beside it untrue — it says
- * *"spaces are fine; nothing else is"* and `314x159` was silently accepted as `314159`. That is not
- * a cosmetic disagreement: an accepted entry SPENDS A TRY ON EVERY WAITING ROW, so a paste that
- * dragged a word in with it cost somebody else's enrolment one of its five, which is the exact harm
- * the shape check exists to prevent. Seven digits was refused out loud and arbitrary letters were
- * swallowed.
- *
- * IT DOES NOT TRUNCATE. Seven digits is not a code with a typo whose shape you can guess; it is a
- * mistake, and `wellFormed` refuses it rather than approving whatever the first six happen to be.
+ * The CLI prints the code in two groups, so a paste carries a space, and a terminal or chat client may
+ * have made it a non-breaking one. Anything else stays and is refused: an entry that reaches the record
+ * spends a try on every waiting machine, so a paste that dragged a word along must not be sent.
  */
-export const normalise = (typed: string): string => typed.replace(/[\s\u00a0\u2000-\u200b_.\u2010-\u2015-]+/gu, '');
+export const normalise = (typed: string): string => typed.replace(/[\s  -​_.‐-―-]+/gu, '');
 
-/** Six digits and nothing else. */
-export const wellFormed = (code: string): boolean => new RegExp(`^\\d{${CODE_DIGITS}}$`, 'u').test(code);
+/** What the field holds: a code to send, or which of three mistakes it is. Nothing malformed is sent. */
+export type Entry =
+  | { ok: true; code: string }
+  | { ok: false; why: 'empty' | 'short' | 'long' | 'other'; digits: number };
 
-/**
- * `sha256(id ‖ ':' ‖ user_code)`'s stand-in, and the same djb2 `list()` hashes a question with.
- *
- * **This is not a security control, and a review proved exactly how much it is not.** It is djb2
- * folded to 32 bits over a domain of one million codes, so brute-forcing every six-digit string
- * takes under a second in Node — and against the fingerprint this file used to ship in `data.ts` it
- * returned a single preimage. The comment beside that row claimed the code "exists nowhere" and the
- * test named `THE SHIPPED RECORD CANNOT BE APPROVED BY ANYBODY` proved it by trying four guesses.
- * Four guesses is not a proof; the search space is small enough to enumerate.
- *
- * The salt argument was inverted too. `sha256(id ‖ code)` resists preimage because SHA-256 does, not
- * because of the salt — the salt is there so two grants showing the same six digits do not collide.
- * That property this does preserve, and it is the only one claimed now.
- *
- * WHAT THE SHIPPED SEED DOES INSTEAD is carry no fingerprint at all: the empty string, which this
- * function cannot return (its shortest output is one character), so no code matches it by
- * construction rather than by hope. `device.test.ts` asserts that, and builds its own rows with its
- * own codes for the success path.
- */
-export function fingerprint(id: string, code: string): string {
-  const text = `${id}:${code}`;
-  let h = 5381;
-  for (let i = 0; i < text.length; i += 1) h = (h * 33) ^ text.charCodeAt(i);
-  return (h >>> 0).toString(36);
-}
-
-/** A grant still waiting, and not one whose ten minutes ran out while nobody looked. */
-const waiting = (d: Device, nowMs: number): boolean => d.state === 'pending' && Date.parse(d.at) + CODE_MINUTES * 60_000 > nowMs;
-
-/**
- * Type a code in and see what happens — `49 §5.9` step 2, in order, because the order is load-bearing.
- *
- * 1. A malformed entry never reaches the record at all. It is not politeness: a try is spent on
- *    EVERY pending row, so sending `12` would charge a colleague's enrolment for your typo, and five
- *    typos would deny it. The wire has nothing to say about a string that cannot be a code.
- * 2. Every live pending row pays one try. Before the lookup, so a guesser cannot tell a near miss
- *    from a wrong shape by timing or by what came back.
- * 3. A match becomes `approved` — not `active`. `12 §6.1`'s "one row, two lives": the row is
- *    approved here and becomes active when the DEVICE polls and exchanges it for its token, which is
- *    a thing that happens on the other machine and may not happen at all.
- * 4. No match, and any pending row now at five, denies every pending row — `DEVICE_CODE_TRIES`, with
- *    the fix `49 §5.9` step 2.4 gives verbatim. Denied rows are kept: *"I said no to a request I did
- *    not make"* is the most important line this table can produce.
- * 5. No match and under five is a bare miss. The record answers 404 with no body, so this says the
- *    same thing and volunteers no count — a browser that displayed "two tries left" would be
- *    displaying something the API does not tell it, and the fix line covers the outcome.
- *
- * A row whose ten minutes are up is stepped to `expired` on the way past, which is how that state is
- * reached anywhere: nobody expires a grant, time does.
- */
-export function approve(rows: readonly Device[], typed: string, nowMs: number): Attempt {
+export function codeOf(typed: string): Entry {
   const code = normalise(typed);
-  if (!wellFormed(code))
-    return {
-      rows: [...rows],
-      /* WHICH WAY IT WAS WRONG, because the three are three different mistakes and one sentence for
-         all of them is a sentence that stops being read. It is also what makes a second identical
-         attempt announce anything at all: a `role="status"` whose text is byte-identical to what it
-         already holds is not a change, so a reader who mistypes twice hears nothing the second
-         time. */
-      result: no(
-        'VALUE_MALFORMED',
-        /\d/u.test(code) && !/^\d+$/u.test(code)
-          ? `A device code is ${CODE_DIGITS} digits and a space. There is something else in this one.`
-          : code.length === 0
-            ? `Type the ${CODE_DIGITS} digits the machine is showing.`
-            : code.length < CODE_DIGITS
-              ? `That is ${code.length} digit${code.length === 1 ? '' : 's'}. A device code is ${CODE_DIGITS}.`
-              : `That is ${code.length} digits. A device code is ${CODE_DIGITS}, so this is not one with an extra on the end.`,
-      ),
-    };
-
-  const next = rows.map((d): Device => {
-    if (d.state !== 'pending') return d;
-    if (!waiting(d, nowMs)) return { ...d, state: 'expired' };
-    return { ...d, tries: d.tries + 1 };
-  });
-
-  const at = next.findIndex((d) => waiting(d, nowMs) && d.codeHash === fingerprint(d.id, code));
-  const hit = next[at];
-  if (hit)
-    return {
-      rows: next.map((d, i) => (i === at ? { ...d, state: 'approved' } : d)),
-      result: { ok: true, value: { id: hit.id, reach: hit.reach, label: hit.name, subject: hit.ua } },
-    };
-
-  if (next.some((d) => d.state === 'pending' && d.tries >= CODE_TRIES))
-    return {
-      /* `locked`, NOT `denied`. The lockout is correct and stays — a code a stranger can guess is a
-         code worth rate-limiting — but it is the RECORD closing the request, and filing it under the
-         state that means "a person refused this" made the screen assert a decision nobody took. */
-      rows: next.map((d) => (d.state === 'pending' ? { ...d, state: 'locked' } : d)),
-      result: no('DEVICE_CODE_TRIES', 'Ask the device to start again.'),
-    };
-
-  return { rows: next, result: no('FORBIDDEN', 'No machine is waiting with that code.') };
+  if (/^\d+$/u.test(code) && code.length === CODE_DIGITS) return { ok: true, code };
+  if (code === '') return { ok: false, why: 'empty', digits: 0 };
+  if (!/^\d+$/u.test(code)) return { ok: false, why: 'other', digits: 0 };
+  /* Seven digits is refused rather than trimmed: trimming would approve whichever machine the first
+     six happen to match. */
+  return { ok: false, why: code.length < CODE_DIGITS ? 'short' : 'long', digits: code.length };
 }
+
+/**
+ * What the screen says after a press.
+ *
+ * `signin` IS ITS OWN KIND because it is the one refusal with a way forward on this screen: a sign-in
+ * older than fifteen minutes cannot approve, and signing in again is the fix. `refused` carries the
+ * record's own sentence for anything else, a host that could not be reached included.
+ */
+export type Answer =
+  | { kind: 'approved'; label: string | null; reach: DeviceRow['reach']; scope: string | null }
+  | { kind: 'malformed'; why: 'empty' | 'short' | 'long' | 'other'; digits: number }
+  | { kind: 'wrong' }
+  | { kind: 'tries' }
+  | { kind: 'expired' }
+  | { kind: 'signin' }
+  | { kind: 'demo' }
+  | { kind: 'refused'; fix: string };
+
+export function answerOf(out: { ok: true; value: DeviceApproved } | { ok: false; refusal: Refusal }): Answer {
+  if (out.ok) return { kind: 'approved', label: out.value.label, reach: out.value.reach, scope: out.value.scope };
+  switch (out.refusal.code) {
+    /* The kernel answers a code that matches nothing with FORBIDDEN, and says no more on purpose. */
+    case 'FORBIDDEN':
+      return { kind: 'wrong' };
+    case 'DEVICE_CODE_TRIES':
+      return { kind: 'tries' };
+    case 'DEVICE_CODE_EXPIRED':
+      return { kind: 'expired' };
+    case 'NEEDS_BROWSER_SESSION':
+      return { kind: 'signin' };
+    /* The field refuses these first; a record that disagrees about the shape is still a shape mistake. */
+    case 'VALUE_MALFORMED':
+      return { kind: 'malformed', why: 'other', digits: 0 };
+    default:
+      return { kind: 'refused', fix: out.refusal.fix };
+  }
+}
+
+/**
+ * The key a reach's sentence is filed under. A vault grant's life depends on its scope: `*` is the
+ * keys of no project and lasts seven days, one project lasts thirty.
+ */
+export const reachKey = (reach: DeviceRow['reach'], scope: string | null): string =>
+  reach === 'vault' ? (scope === '*' ? 'vaultAll' : 'vault') : reach;
+
+/** The rows a revoke still changes. A finished row keeps saying what it said, so it has no button. */
+export const revocable = (row: DeviceRow): boolean => row.status === 'pending' || row.status === 'approved' || row.status === 'active';
+
+/** Tokens still working. A revoked one can do nothing, so it is not something to look after. */
+export const standing = (rows: readonly TokenRow[]): TokenRow[] => rows.filter((t) => t.revoked_at === null);
+
+/**
+ * The two refusals that mean there is no record here to read, as `lib/data/record.ts` decides it: a
+ * static host's SPA fallback, or a Worker with no record behind it. The screen then draws the sample.
+ */
+export const noRecord = (code: string): boolean => code === 'UNREACHABLE' || code === 'UNAUTHORIZED';
+
+/** A handle for a sample row, derived from its id the way the kernel derives one, and never printed. */
+function handleOf(id: string): string {
+  let h = 5381;
+  for (const c of `device:${id}`) h = (h * 33) ^ c.charCodeAt(0);
+  return (h >>> 0).toString(16).padStart(16, '0');
+}
+
+const TEN_MINUTES = 10 * 60_000;
+const NINETY_DAYS = 90 * 86_400_000;
+
+/**
+ * The sample's machines as `listDevices` would return them.
+ *
+ * `locked` BECOMES `denied`, because that is what the kernel writes when the fifth wrong code turns
+ * every waiting machine away. `expires` is the code's ten minutes, or ninety days from the ask for a
+ * grant that went on to work.
+ */
+export function sampleMachines(devices: readonly Device[]): DeviceRow[] {
+  return devices.map((d): DeviceRow => {
+    const asked = Date.parse(d.at);
+    return {
+      handle: handleOf(d.id),
+      status: d.state === 'locked' ? 'denied' : d.state,
+      reach: d.reach,
+      scope: null,
+      label: d.name,
+      ua: d.ua,
+      tries: d.tries,
+      expires: new Date(asked + (d.state === 'active' ? NINETY_DAYS : TEN_MINUTES)).toISOString(),
+      approved_by: null,
+      approved_at: null,
+      last_used: d.lastSeen,
+    };
+  });
+}
+
+/** The sample's tokens as `listTokens` would return them. */
+export const sampleTokens = (tokens: readonly Token[]): TokenRow[] =>
+  tokens.map((t): TokenRow => ({
+    id: t.id,
+    person_id: 'you',
+    scope: t.scope,
+    label: t.label,
+    created_at: t.created,
+    last_used_at: t.lastUsed,
+    last_surface: t.surface,
+    expires_at: t.expires,
+    revoked_at: null,
+  }));
+
+/**
+ * The two lines a person copies after connecting an agent. NEITHER CARRIES THE BEARER: `braindog login`
+ * starts its own device flow, and the MCP registration reads its bearer from the hosts file or
+ * `BRAINDOG_TOKEN`, so no token lands in a shell history or in Claude Code's config (`48 §2`).
+ */
+export function connectLines(origin: string): { login: string; mcp: string } {
+  const server = { type: 'stdio', command: 'braindog', args: ['mcp', '--agent', 'claude'] };
+  return {
+    login: `braindog login ${origin}`,
+    mcp: `claude mcp add-json braindog '${JSON.stringify(server)}' --scope user`,
+  };
+}
+
+/** How long a token minted from this screen lasts, as `createToken` is asked for it. */
+export const TOKEN_DAYS = 90;
+
+/** The label `deviceStart` allows, and the one this screen asks for when minting. */
+export const LABEL_MAX = 120;

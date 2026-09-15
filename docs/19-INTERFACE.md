@@ -48,7 +48,7 @@ Nothing else in this document may break those two keystrokes.
 | Search | `/search?q=` | The structured fallback when the palette's ranked list was not enough |
 | Vault | `/vault` | What each key opens, and when each was last rotated |
 | Packs | `/packs` · `/packs/browse` · `/packs/<id>` | Installed · the Kennel · one pack with its diff |
-| Settings | `/settings/<area>` | identity · **recovery** · **people & sharing** · agents · ingest · theme · keyboard · **navigation** · notifications · backups · billing · export. **`recovery` and `people & sharing` were missing from an earlier draft** — the first left a passkey-primary product with no designed way back in, and the second left [20-COLLABORATION](20-COLLABORATION.md)'s 5-person × 14-register access matrix with no screen anywhere in 24 documents. `navigation` was missing too: it holds the *Suggest new pages* switch that [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §4 places there. `agents` holds the tokens, the connected machines and the code-entry control — the `verification_uri` of every device flow — where a device code or an **operation grant** (one named operation, its summary shown, ten minutes) is approved ([12-SECURITY](12-SECURITY.md) §3). `export` ends in the danger area: **Delete this record** — `deleteRecord`, re-authentication, the slug typed to confirm ([02-DATA-MODEL](02-DATA-MODEL.md) §9) |
+| Settings | `/settings/<area>` | identity · **recovery** · **people & sharing** · agents · ingest · theme · keyboard · **navigation** · notifications · backups · billing · export. **`recovery` and `people & sharing` were missing from an earlier draft** — the first left a passkey-primary product with no designed way back in, and the second left [20-COLLABORATION](20-COLLABORATION.md)'s 5-person × 14-register access matrix with no screen anywhere in 24 documents. `navigation` was missing too: it holds the *Suggest new pages* switch that [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §4 places there. `agents` is three sections, in this order. **Approve a machine** is the six-digit field, the `verification_uri` of every device flow, where a device code or an **operation grant** (one named operation, ten minutes) is approved with `deviceApprove`; a sign-in older than fifteen minutes is sent to sign in again. **Machines** lists `listDevices` by label, what each may reach and when it was last seen, revoked by handle and never showing a code. **Tokens** lists `listTokens` with Revoke, and *Connect an agent* mints a ninety-day write token whose bearer is shown once beside `braindog login <origin>` and the `claude mcp add-json` line. The demo draws sample rows and approves nothing ([12-SECURITY](12-SECURITY.md) §3, §6.1). `export` ends in the danger area: **Delete this record** — `deleteRecord`, re-authentication, the slug typed to confirm ([02-DATA-MODEL](02-DATA-MODEL.md) §9) |
 | Onboarding | `/start` | Pack selection, then one capture. **Not a tour** |
 | Audit | `/audit` | Every write, by whom, against which version |
 | **Job** | `/jobs/<id>` | A tier-C run: the route opens the palette in job mode over the shell — never a page. The view polls `jobEvents({ id, after })`; the list is `listJobs` ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1) |
@@ -425,6 +425,15 @@ you're Sam.", with an edit button, and screen 1 appears under it. Adding screen 
 the person: `meet({ name, email, where: 'onboarding' })` on a live record, or a waiting People row
 marked *Not saved* on the demo. With People off the name is still said back, no row is written, and
 nothing reports that as a failure.)*
+
+*(Built September 15th 2026, turn 2, from `loop/research-modules.md` §5. Under "Who are you?" the
+screen asks "What's your business?", answered in a sentence and read by keyword and pattern rules with
+no model (`apps/web/src/lib/shape.ts`). As typing pauses, two columns say what was heard and what the
+record will hold. **Make my record** turns on the first-party lists the sentence names, with Projects
+whenever another list points at it and People whenever turn 1 heard a name; writes only the rows the
+sentence fills, so an invoice needs an amount typed with its currency and a day; and meets the person
+from turn 1 in the same press. A sentence in another language is declined, not guessed at. Screen 1
+below is kept one press away, as "Start from a list instead".)*
 
 **Screen 1 — one row, typed by hand.** Not pack selection, not a capture box, not a dashboard.
 

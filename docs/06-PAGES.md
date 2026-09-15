@@ -244,6 +244,12 @@ People, alone of the six, is a special case here.)*
 *(Built September 15th 2026, for the row and not for the picker: the first run writes the person's
 own People row only while People is on, and this picker is still unbuilt.)*
 
+*(Built September 15th 2026, turn 2: on day one a sentence does this picker's first job. "What's your
+business?" turns on the first-party packs its words name, with no diff to approve, under the same
+exception as above. On a live record it turns on a pack that is off and does not install one the
+record lacks, because the app holds no document per first-party pack; that is still this screen's
+job, with its diffs.)*
+
 Three things that arrive with a pack, and the third is the one that matters:
 
 1. Registers — the shape.

@@ -259,7 +259,6 @@ export const copy = {
   /* The bar over a sample record. It says what the record is, and where the way out is: a stranger
      landing on somebody else's company with no explanation is the first screen this product had. */
   sampleWhat: 'This is a sample record.',
-  enterCodeSample: 'In this sample no machine is waiting, so no code will match. On your own record, the six digits your terminal printed go here.',
   densityPreview: 'How a list looks',
   sourcesAdd: 'New sources arrive the way new lists do: with an add-on, or set up by your assistant.',
   sourcesAddGo: 'Browse add-ons',
@@ -1170,20 +1169,12 @@ export const copy = {
   yourRecords: 'Records you can open',
   thisOne: 'you are here',
 
-  /* agents — `12 §6.1`'s device grants */
-  /* THE HEADING SAYS WHAT IT COUNTS. It said **Connected machines** over four rows whose own state
-     words are `connected`, `connected`, `waiting for you`, `you said no` — so the number counted two
-     machines the same screen calls not-connected. A previous fix reasoned carefully about the
-     NUMBER, concluded "if the heading is to say `active`, it has to say so in the heading", and left
-     the heading saying Connected. This is the other half of it. */
-  connected: 'Machines that have asked',
-  /* `13 §5.2` GIVES `no-data-yet` A CONTENT CONTRACT: what this is for, and — where it applies — the
-     copyable prompt. Four settings areas rendered a heading, a `0` and an empty `<ul>`; these two
-     are the ones where a machine or a connector is what fills the list, so the prompt is the thing
-     that fills it. */
+  /* agents — `12 §6.1`'s device grants. The heading counts every row beneath it, denied ones included,
+     so it names machines rather than connections. */
+  machines: 'Machines',
+  /* `13 §5.2`: an empty list the person fills from a machine carries the command that fills it. */
   noDevices: 'No machine has asked yet.',
-  noDevicesWhy: 'A machine that wants to act as you asks here first, and waits until you say yes.',
-  enrollPrompt: 'braindog runner enroll',
+  enrollPrompt: 'braindog login',
   noSources: 'Nothing feeds this record yet.',
   noSourcesWhy: 'A connector pulls rows in on a schedule from a mailbox, a bank feed or a repository, and reports here when it fails.',
   ingestPrompt: 'read my record, then set up a connector for the mailbox I file invoices in',
@@ -1197,42 +1188,19 @@ export const copy = {
      what they want to know is that there is a backup and how old it is. */
   noSnapshots: 'No backup yet.',
   noSnapshotsWhy: 'A backup is the whole record at one moment, kept so you can go back to it.',
-  connectedHow: 'A machine asks, and you approve it here on a device you are already holding.',
-  /* ALL SIX THE RECORD CAN BE IN, and four of them had a word.
-
-     `approved` is the state a row sits in between your click and the machine's next poll — up to
-     five seconds, and longer if the machine has gone away — so a screen without it has no way to
-     tell you that approving worked. `expired` is what a pending row becomes ten minutes after it
-     was made, which is the most common end a device grant has. Both were reachable in the DDL and
-     unnameable on the screen. */
+  /* The kernel's six. `approved` is the seconds between the press and the machine's next poll, and a
+     denied row is kept: "I said no to a request I did not make" is the line this table exists for. */
   deviceState: {
     pending: 'waiting for you',
     approved: 'approved, waiting for the machine',
     active: 'connected',
     expired: 'ran out of time',
-    /* `12 §6.1`: a denied row is KEPT. "I said no to a request I did not make" is the single most
-       important line this table can produce. */
-    denied: 'you said no',
-    /* AND THE ONE THAT USED TO BORROW THAT SENTENCE. A request closed because the code was mistyped
-       too many times is the record's decision and not the reader's, and it was filed as `denied` —
-       so four typos put "you said no" beside a request nobody had answered. The lockout is right and
-       stays; what it is called was wrong. */
-    locked: 'too many wrong codes',
-    revoked: 'you disconnected it',
+    denied: 'turned away',
+    revoked: 'revoked',
   } as Record<string, string>,
-  overSurface: (surface: string) => `over ${surface}`,
-  askedWhen: (ago: string) => `asked ${ago}`,
-  approve: 'Approve',
-  deny: 'Deny',
-  revoke: 'Disconnect',
 
-  /* WHAT APPROVING IT WOULD ALLOW — `49 §5.9` step 2.3, *"the screen said what it was about to grant
-     before the click"*, which the row could not say because it did not carry the reach.
-
-     THE SIX ARE NOT ONE THING WITH SIX NAMES. Two mint a bearer good for ninety days; the other four
-     are one operation, ten minutes, single-use (`48 §13 D1`). That difference is the entire decision
-     a person is making, so each sentence says the life as well as the power. `19 §9` bans `scope` on
-     a screen — "say what they can see" — so none of these is a word from the schema. */
+  /* WHAT IT MAY REACH, with its life, because that difference is the whole decision. `19 §9` keeps
+     every word from the schema off the screen. A vault grant's life depends on its scope. */
   reachMeans: {
     login: 'sign in as you, for ninety days',
     runner: 'do work for you on this machine, for ninety days',
@@ -1240,49 +1208,54 @@ export const copy = {
     import: 'load rows into this record, once, in the next ten minutes',
     pack: 'install one add-on, once, in the next ten minutes',
     token: 'make one more key, once, in the next ten minutes',
+    vault: 'open the keys of one project, for thirty days',
+    vaultAll: 'open the keys that belong to no project, for seven days',
   } as Record<string, string>,
-  /* `30 §1` calls `ua` "client-supplied — shown to the approver, TRUSTED FOR NOTHING", so the
-     sentence says who is claiming it rather than stating it as fact. A machine that lies about what
-     it is has told you nothing; a machine quoted as claiming something has told you what it claims. */
-  saysItIs: (ua: string) => `says it is ${ua}`,
-  /* For the four operation reaches `ua` is not a user agent at all — `48 §5.2` sends the command's
-     `subject` in that column, which is the thing that would be exported, imported or installed. It
-     is the only part of an operation grant that makes it decidable. */
-  aboutWhat: (subject: string) => `about ${subject}`,
 
-  /* the code-entry control — `19 §2` names it as one of this area's three things, and the screen
-     had zero `<input>` in `<main>`. Four documents make this address the `verification_uri` a
-     machine prints (`33 §10`, `49 §5.9`, `26 §2.3`, `53 §5`), so the person arriving here is
-     holding six digits and looking for somewhere to put them. */
-  enterCode: 'A machine showing a code',
-  /* `12 §6.1`: "The code is not the security … what the code proves is that the approver is looking
-     at the device that asked." The sentence says the same thing without saying it about security. */
-  enterCodeHow: 'A machine asking for access shows six digits. Typing them here is how you say the machine in front of you is the one that asked.',
+  /* The code entry: the `verification_uri` every device flow prints. */
+  approveTitle: 'Approve a machine',
   codeLabel: 'The six digits it is showing',
-  codeGo: 'Approve it',
-  approvedNow: (label: string, means: string) => `${label} is approved and it can ${means}. It becomes connected the next time it asks.`,
+  codeGo: 'Approve',
+  codeEmpty: 'Type the six digits the machine is showing.',
+  codeShort: (n: number) => `That is ${n} digit${n === 1 ? '' : 's'}. A code is six.`,
+  codeLong: (n: number) => `That is ${n} digits. A code is six.`,
+  codeOther: 'A code is six digits, and this has something else in it.',
+  /* The record says no more than this about a miss, so neither does the screen: no count of tries. */
+  codeWrong: 'No machine is waiting with that code.',
+  codeTries: 'Five wrong codes turned away every waiting machine. Start again on the machine.',
+  codeExpired: 'That code ran out of time. Run braindog login again on the machine.',
+  signInAgainWhy: 'Approving a machine needs a sign-in from the last fifteen minutes.',
+  signInAgain: 'Sign in again',
+  approvedNow: (label: string, means: string) => `${label} is approved. It can ${means}.`,
+  unnamedMachine: 'A machine with no name',
+  /* One sentence for every control here that would need an account. */
+  notOnDemo: 'The demo has no account, so nothing here can be approved, revoked or connected.',
 
-  /* the tokens — `12 §3`, and the first of this area's three things to have no surface at all.
-
-     *"Every token records `last_used_at` and the surface it was used from, and the app lists them
-     with a revoke button. A credential you cannot see being used is a credential you cannot know is
-     stolen."* The screen listed the machines that had ASKED, which is the request and not the
-     result, so nothing in the product answered *what can act as me right now*. */
-  keys: 'What can act as you',
-  keysHow: 'Each of these was made when you approved a machine. Revoking one stops it working immediately, without ending your own session.',
+  /* the tokens — `12 §3`: listed with a revoke button, and never the token itself */
+  tokens: 'Tokens',
   noKeys: 'Nothing can act as you.',
-  noKeysWhy: 'Approving a machine makes one of these. Until then, only your own session can reach this record.',
-  /* `19 §9` again: never `scope`, and never the three words from the ladder either. What it can do,
-     said as what it can do. There is no fourth and there is deliberately no `admin` (ADR-060) — an
-     agent may put a question in front of a person and may not answer its own. */
+  /* `19 §9` again: what it can do, said as what it can do. There is no `admin` (ADR-060). */
   keyCan: {
     read: 'can read, and change nothing',
     propose: 'can read and suggest, and change nothing itself',
     write: 'can read and change rows',
   } as Record<string, string>,
-  madeWhen: (ago: string) => `made ${ago}`,
   endsWhen: (when: string) => `ends ${when}`,
   revokeKey: 'Revoke',
+  unnamedToken: 'A token with no name',
+
+  /* Connect an agent: a write token for ninety days, its bearer shown once. */
+  connectTitle: 'Connect an agent',
+  connectLabel: 'Name the machine',
+  connectGo: 'Connect',
+  tokenOnce: 'Shown once. Copy it now.',
+  copyToken: 'Copy the token',
+  tokenCopied: 'Token copied',
+  onNewMachine: 'On a new machine',
+  inClaudeCode: 'In Claude Code',
+  copyLine: 'Copy',
+  lineCopied: 'Line copied',
+  connectDone: 'Done',
 
   /* ingest — `25 §9` draws this screen */
   sources: 'Where rows come in from',
