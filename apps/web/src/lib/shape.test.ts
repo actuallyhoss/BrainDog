@@ -6,9 +6,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { AGENTS_PACK, FIRST_PARTY, firstPartyManifest } from '@braindog/seed';
+
 import { firstRun } from './first-run.ts';
 import { PACKS } from './record/data.ts';
-import { shape, titleOfRow, toTurnOn, writable, type Shape } from './shape.ts';
+import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, writable, type PackId, type Shape } from './shape.ts';
 
 const TODAY = '2026-09-15';
 const read = (s: string): Shape => shape(s, TODAY);
@@ -188,4 +190,18 @@ test('WHAT TURNS ON: dependencies first, and People whenever turn 1 heard a name
   assert.deepEqual(toTurnOn(read(''), false), []);
   assert.deepEqual(toTurnOn(read(''), true), ['portfolio', 'people']);
   assert.deepEqual(toTurnOn(read('I use Claude'), true), ['portfolio', 'people', 'agents']);
+  /* An invoice is to somebody, so Money brings People with it. */
+  assert.deepEqual(toTurnOn(read('I send invoices'), false), ['portfolio', 'people', 'money-core']);
+  assert.deepEqual(toTurnOn(read('Domains and hosting'), false), ['portfolio', 'estate']);
+});
+
+test('WHAT EACH LIST LEANS ON is what the seed says its pack requires, and comes before it', () => {
+  const ownerOf = new Map<string, PackId>();
+  for (const id of FIRST_PARTY) for (const p of firstPartyManifest(id).provides) ownerOf.set(p, id);
+  const leans = (requires: readonly string[]) => [...new Set(requires.map((r) => ownerOf.get(r) ?? r))].sort();
+
+  for (const id of FIRST_PARTY) assert.deepEqual([...LEANS_ON[id]].sort(), leans(firstPartyManifest(id).requires), id);
+  assert.deepEqual([...LEANS_ON.agents].sort(), leans(AGENTS_PACK.manifest.requires));
+  for (const id of INSTALL_ORDER)
+    for (const needs of LEANS_ON[id]) assert.ok(INSTALL_ORDER.indexOf(needs) < INSTALL_ORDER.indexOf(id), `${id} is before ${needs}`);
 });

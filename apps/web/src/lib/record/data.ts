@@ -290,6 +290,23 @@ export const QUESTIONS: Question[] = [
     ],
   },
   /**
+   * A PROPOSAL THAT CHANGES ROWS THE RECORD ALREADY HAS. Its body is in `ROWSETS` below: Kiln's note
+   * gains a line and Portage moves to earning. Answering it would write both, compared against the
+   * versions they were read at.
+   */
+  {
+    id: 'SG30',
+    title: 'Update Kiln’s note and move Portage to earning?',
+    cost: 'Portage sent its first invoice this week, and Home still counts it as building.',
+    rank: 5,
+    opened: stamp(-20),
+    entity: 'Portage',
+    options: [
+      { key: 'accept', title: 'Make both changes', body: 'Both rows change as shown, and only if neither has changed since it was read.', recommended: true },
+      { key: 'ignore', title: 'Leave them', body: 'Nothing changes, and the proposal closes.' },
+    ],
+  },
+  /**
    * THE NIGHT THAT DID NOT RUN, ASKED AS A QUESTION.
    *
    * `12 §8` is the sentence the backups screen was built on — *"a failed night writes an `export`
@@ -440,6 +457,28 @@ export const INBOX: InboxItem[] = [
   { id: 'in_8f02', arrived: stamp(-73), from: 'support@ledgerpost.example', subject: 'Sending domain not verified', body: 'portagemail.example has no DKIM record. Messages are being sent, but a growing share will land in spam until this is fixed.' },
 ];
 
+/* ── proposals that carry rows ────────────────────────────────────────────
+   A `rowset` body, as `propose` files it (`packages/kernel/src/govern.ts`), by the question it asks.
+   A row with `at` updates that row at the version it was read at; a row without one creates. */
+
+export type RowsetBody = { register: string; rows: readonly Record<string, unknown>[] };
+
+const KILN = THINGS.find((t) => t.fields.name === 'Kiln');
+const PORTAGE = THINGS.find((t) => t.fields.name === 'Portage');
+const KILN_NOTE = typeof KILN?.fields.note === 'string' ? KILN.fields.note : '';
+
+export const ROWSETS: Record<string, RowsetBody> = {
+  SG30: {
+    register: 'things',
+    rows: [
+      ...(KILN
+        ? [{ at: `things#${KILN.seq}`, version: KILN.version, patch: { note: KILN_NOTE.split('licensed direct.').join('licensed direct and through two resellers.') } }]
+        : []),
+      ...(PORTAGE ? [{ at: `things#${PORTAGE.seq}`, version: PORTAGE.version, patch: { lane: 'earning' } }] : []),
+    ],
+  },
+};
+
 /* ── the vault ───────────────────────────────────────────────────────────
    The register indexes what a key OPENS, never the key. No agent tool returns a secret, reveal is
    deliberate and audited, and the backup benefit and the exfiltration path are the same object. */
@@ -452,6 +491,31 @@ export const VAULT: Credential[] = [
   { id: 'cr_05', label: 'Object storage, write', opens: 'Font binaries bucket', kind: 'ssh_key', rotated: day(-303), stale: true },
   { id: 'cr_06', label: 'Kestrel ingest', opens: 'Error reports from kiln.example', kind: 'api_token', rotated: day(-64) },
 ];
+
+/**
+ * What the sample knows about each key's grant, by credential id: where it applies (a project's name,
+ * or null for global), whether a value is sealed, and how often it was opened. Two are index rows.
+ */
+export const VAULT_OPENED: Record<string, { project: string | null; sealed: boolean; opened: number; lastOpened: string | null }> = {
+  cr_01: { project: 'Kiln', sealed: true, opened: 14, lastOpened: stamp(-5) },
+  cr_02: { project: null, sealed: true, opened: 3, lastOpened: stamp(-24 * 9) },
+  cr_03: { project: 'Portage', sealed: true, opened: 22, lastOpened: stamp(-26) },
+  cr_04: { project: null, sealed: false, opened: 0, lastOpened: null },
+  cr_05: { project: 'Kiln', sealed: false, opened: 0, lastOpened: null },
+  cr_06: { project: 'Kiln', sealed: true, opened: 0, lastOpened: null },
+};
+
+/**
+ * The sample's vault grants: one waiting for its six digits, and two machines that may open keys, one
+ * for a project and one global. `quiet` has connected nothing, as `DEVICES` below.
+ */
+const ALL_VAULT_GRANTS: { id: string; name: string; state: 'pending' | 'active'; project: string | null; at: string; lastSeen: string | null }[] = [
+  { id: 'vg_01', name: 'Codex, studio desktop', state: 'pending', project: 'Portage', at: stamp(-0.03), lastSeen: null },
+  { id: 'vg_02', name: 'braindog CLI, studio desktop', state: 'active', project: 'Kiln', at: stamp(-24 * 4), lastSeen: stamp(-5) },
+  { id: 'vg_03', name: 'Claude Code, this laptop', state: 'active', project: null, at: stamp(-24 * 2), lastSeen: stamp(-26) },
+];
+
+export const VAULT_GRANTS = VARIANT === 'quiet' ? [] : ALL_VAULT_GRANTS;
 
 /* ── packs ───────────────────────────────────────────────────────────────── */
 

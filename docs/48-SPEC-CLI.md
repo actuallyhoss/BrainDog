@@ -41,8 +41,11 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 | `login <host>` | `<host>` = `https://origin[/slug]` · `--vault <project\|*>` | `POST /auth/device` then `POST /auth/device/token` until approved; with `--vault`, `reach: 'vault'` and `scope` | the six digits and the URL (stderr); `logged in to <host> as <label> · token expires <date>`, or with `--vault` `vault grant for <scope> on <host> kept as <label> · expires <date>`; an expired code, a denial and Ctrl+C are one sentence each | 0 · 1 · 3 |
 | `keys put <label>` | `--opens <what>` · `--kind <kind>` · `--vault <project>` · `--host <host>`; the value on stdin, never an argument | `POST /api/vault/deposit { label, opens?, kind?, value }` with the vault grant as bearer and the session headers | `deposited <credentials#n> on <host> · version <n>`, or `rotated …` when the label was already a key in scope; never the value or the label | 0 · 1 · 3 |
 | `keys exec <label \| credentials#n> -- <command> [args...]` | `--as <ENV_NAME>` · `--vault <project>` · `--host <host>` | `POST /api/vault/open { label }` or `{ credential }`, as `put`; then the command, with no shell, its own standard streams, and the key in one environment variable, named by `--as` or made from the label | nothing of its own, and never the value; a missing command, a bad `--as`, or a label no name can be made from is one sentence before any request | the command's exit code (1 for a signal) · 1 · 3 |
+| `skills sync` | `--host <host>` · `--dry-run` | `GET /api/context`; `GET /api/get` for each skill it writes or checks; `POST /api/propose` with a rowset update of `body` and `rev` for a local edit; `POST /api/create` with `managed: false` for a file found by hand. Writes `<CLAUDE_CONFIG_DIR or ~/.claude>/skills/<name>/SKILL.md` or `commands/<name>.md`, a project's under `<top-level>/.claude/`, and the lock at `~/.braindog/skills-lock.json` | one line per file written, updated, deleted, kept and proposed, or registered, a file in a repository marked `(in the repository, not committed)`; `Skills are in sync.` when there was nothing to do | 0 · 1 · 3 |
+| `tools scan` | `--host <host>` · `--dry-run` | reads `<top-level>/.mcp.json` and `~/.claude.json` (`mcpServers`, and `projects[<path>].mcpServers`) and writes neither; `GET /api/context` and `/api/get`; `POST /api/create` for a new server, `POST /api/update` of `hosts` and `seen` for a matching row, `POST /api/propose` with a rowset for one that differs; each key through `keys put` | one line per server recorded, proposed or skipped, and one sentence when keys were recorded by name only for want of a vault grant; never a value | 0 · 1 · 3 |
+| `tools write` | `--scope user\|project` · `--dry-run` · `--host <host>` | `GET /api/context` and `/api/get`; reads the entry already in `~/.claude.json` or `<top-level>/.mcp.json`; with `--scope`, `claude mcp remove` and `claude mcp add-json <name> <json> --scope <scope>`, only for an entry that is absent, still what `~/.braindog/tools-lock.json` says was written, or still the command the scan read | each entry it would add or replace, as `+ <name> at <scope> scope: <json>` or `~ …`, a line for each need an entry cannot carry, then what was applied; no entry holds a value | 0 · 1 · 3 |
 | `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers of `loop/research-agent-path.md` §3.4, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
-| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
+| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
 | `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
@@ -63,19 +66,19 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 | `runner run` | `--once` | `POST /api/claimJob { wait: 20 }` · `postJobEvent` · `readCancel`; spawns `claude` | one line per job to stderr; never exits unless `--once` | 0 · 1 · 3 |
 | `--version` | — | nothing | `app <date>+<sha> · format 1 · kernel <n> · primitives 1` | 0 |
 
-Twenty-three commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
-(its two events in one row), `install`, and `keys put` and `keys exec`.
+Twenty-six commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
+(its two events in one row), `install`, `keys put` and `keys exec`, and `skills sync`, `tools scan` and `tools write`.
 `--json` puts exactly one JSON document on stdout (§4.5) and moves every progress line to stderr. `mcp` takes
 no `--json`, because its stdout is the protocol. `--host` beats `BRAINDOG_HOST`, which beats `hosts.json`'s
 `default`. A host is written `https://origin[/slug]`; a bare name means https, and plain http is refused
 except to this machine, because the bearer would cross the network in the clear.
 
-**Built today: `mcp`, `hook`, `install`, `login`, `keys put`, `keys exec`, `init` and `serve`.** The command runs from a checkout as
+**Built today: `mcp`, `hook`, `install`, `login`, `keys put`, `keys exec`, `skills sync`, `tools scan`, `tools write`, `init` and `serve`.** The command runs from a checkout as
 `node apps/cli/src/main.ts`. Until §3's bundle exists, the manifest's `bin` points at that file and the manifest
 stays `private`, so `tools/release.mjs` does not offer a file npm could not run. `init` and `serve` are the
 self-host's, which has no `bin` of its own and tells people to type them, so this command claims the name and
-spawns the self-host for both. The agent path adds `logout`, `session`, `run` (an alias of `keys exec`),
-`skills sync`, `tools scan|write` and `context` (`loop/research-agent-path.md` §4.2). Each gets its row here in
+spawns the self-host for both. The agent path adds `logout`, `session`, `run` (an alias of `keys exec`)
+and `context` (`loop/research-agent-path.md` §4.2). Each gets its row here in
 the step that builds it; until then the command says it is not built yet.
 
 Claude Code registers `mcp` once per profile, and no token appears in the line or in the file it writes:
@@ -118,7 +121,11 @@ the entries are:
   or stop."; the questions waiting on the owner, followed by "Do not decide for them."; the open rows of every
   scoped register; the people on the project; learnings; keys, by label only; skills; and `context.next` last.
   Over 40 lines or 3,000 characters, the rows go first, from the bottom, and one line says how many.
-- **Not yet.** Skills sync and tools scan at start are the plan's step 19.
+- **Skills sync and tools scan.** On `startup` and `resume` only, and only when the record has a skills or tools
+  register, `start` runs `skills sync` and then `tools scan` after it attaches, each on its own client within 3
+  seconds and inside what is left of the 8. Their lines go before `context.next` while the briefing's caps
+  allow. A failure is one fixed line, and the hook still exits 0. A `compact` or a `clear` runs neither, and a
+  record with neither register costs no request and no file read.
 
 ### The config file
 
@@ -144,6 +151,16 @@ rather than in the repository, where `git status` would show it and a commit cou
 a temp folder, which is emptied and can be shared between users. Two sessions in one folder share one file, and
 the later start wins; that is the case the briefing's warning is for.
 
+```
+~/.braindog/skills-lock.json    { <absolute path>: { spoken, version, sha256, proposed_sha? } } · mode 0600 · written atomically
+~/.braindog/tools-lock.json     { written: { <scope>|<top-level>|<name>: sha256 }, asked: { <same key>: sha256 } } · mode 0600 · written atomically
+```
+
+**The lock files** say what BrainDog last wrote, so a file or an entry changed since is never overwritten. The
+skills lock keys each skill file by its absolute path; `proposed_sha` is the hash of a local edit already proposed,
+so one edit is asked about once. The tools lock keeps the hash of each Claude Code entry `tools write` applied, and
+the hash of each server's shape `tools scan` proposed, made from names only. Neither holds a value.
+
 ### Environment
 
 | Variable | Read by | Means |
@@ -152,7 +169,7 @@ the later start wins; that is the case the briefing's warning is for.
 | `BRAINDOG_TOKEN` | every remote command | the bearer, as-is: an agent token on Cloud, the owner bearer of 33 §6 on a self-host |
 | `XDG_CONFIG_HOME` | config | the directory above `braindog/hosts.json` and `braindog/sessions/` |
 | `BRAINDOG_TIMEOUT_MS` | `mcp`, `hook` | for `mcp`, the budget of one tool call, in milliseconds; 20,000 when unset or not a whole number. For `hook`, the whole hook's budget, which it may shorten below 8,000 and never lengthen |
-| `CLAUDE_CONFIG_DIR` | `install` | the Claude Code profile folder when no `--config-dir` is given; `~/.claude` when unset |
+| `CLAUDE_CONFIG_DIR` | `install`, `skills sync`, `hook start` | the Claude Code profile folder when no `--config-dir` is given, and where global skills are written; `~/.claude` when unset |
 | `BRAINDOG_SELFHOST` | `init`, `serve`, `dev` | the path of the self-host entry file (§5.14) |
 | `BRAINDOG_DATA`, `PORT` | `init`, `serve`, `dev` | passed through to the spawned self-host, unread by the CLI |
 
@@ -183,7 +200,8 @@ apps/cli/
 
 Six source files in the first design, counted. The agent path adds `position.ts`, `stdio.ts` and `surface.ts`
 for `mcp`; `hooks.ts` (the two hooks and the session file), `brief.ts` (the briefing) and `install.ts` for the
-hooks; and `hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Published artefact: `dist/braindog.mjs`, one file, built by
+hooks; `keys.ts` for the key doors; `skills.ts` and `tools.ts` for the sync, the scan and the write; and
+`hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Published artefact: `dist/braindog.mjs`, one file, built by
 `esbuild src/main.ts --bundle --platform=node --format=esm --target=node24 --banner:js='#!/usr/bin/env node'
 --define:__BUILD__='"<yyyy.mm.dd>+<sha7>"' --outfile=dist/braindog.mjs`. `tsc --noEmit` type-checks; tests run
 the `.ts` sources directly under Node 24.13 (`node --test`). esbuild is a devDependency only (§13 D4).
@@ -606,6 +624,9 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | The session file | ids, a commit and the host's address, never a token; `0600` beside `hosts.json`; its ids are sent only to the host that wrote it |
 | Hook output | the briefing names a row by its spoken id and its own words, and a key by its label only; it reads only string fields, so a key's sealed-state projection never reaches the model. A failure line is fixed text or the host's refusal sentence, never an exception's message. A commit named by the record is checked to look like one before git sees it |
 | `install` | a dry run unless `--apply`; a copy of the settings file before any write; never a project's `.mcp.json`; a settings file it cannot parse is not quoted, because its `env` may hold keys |
+| `skills sync` | a name matching `^[a-z0-9][a-z0-9-]{0,63}$`, whose path resolves inside the skills or commands folder, or nothing is written; a file is overwritten or deleted only while its SHA-256 is still the lock's, so a local edit is never lost; a row with `managed: false` is never written; a file in a repository is reported and never committed; the lock holds paths, spoken ids, versions and hashes |
+| `tools scan` | both configs are read only; a key-named (`…KEY`, `…TOKEN`, `…SECRET`, `…PASSWORD`, `…PAT`, `Authorization`) or key-shaped env or header value goes only to `keys put`, and the row keeps `NAME=credentials#N`; with no vault grant it keeps the name, drops the value, and says so in one sentence; a key in a command, an argument or an address keeps the server out of the record; a config it cannot parse is named, never quoted; no line, row, proposal or lock holds a value |
+| `tools write` | a dry run unless `--scope` names one; a stdio tool's keys are handed over by `braindog keys exec`, so no entry holds one; a header that needs a key is left out and said; `claude` runs with no shell and its output is not relayed; a project's `.mcp.json` changes only under `--scope project`, typed by hand; an entry changed by hand since is left |
 | Logging | a line names a host, a command, a code, a count — never a token, a row, a grant, a prompt (12 §8) |
 | Input | `parseArgs` in strict mode; a `.dogl` line that is neither `#…` nor a JSON array is an error; the only DDL a `.dog` build runs is the kernel's own |
 

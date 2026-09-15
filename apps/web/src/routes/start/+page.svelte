@@ -30,6 +30,7 @@
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { shape, titleOfRow, toTurnOn, type Shape } from '$lib/shape.ts';
+  import { firstPartyDocument, firstPartyManifest, type FirstPartyId } from '@braindog/seed';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
   import { choose as recordOrSample } from '$lib/record/packs.ts';
@@ -240,7 +241,7 @@
     }));
   });
 
-  type Outcome = { made: { name: string; list: string; register: string }[]; on: string[]; absent: string[]; refused: string[]; waiting: boolean };
+  type Outcome = { made: { name: string; list: string; register: string }[]; on: string[]; added: string[]; absent: string[]; refused: string[]; waiting: boolean };
   let outcome = $state<Outcome | null>(null);
   let making = $state(false);
   /** Rows this screen already made, by register and title, so a second press corrects or skips rather than duplicates. */
@@ -250,8 +251,11 @@
    * Make my record: turn the lists on, write the rows the sentence filled, and meet the person.
    *
    * THE SAME SOURCE `/packs` READS, so a live record and the demo take one path. A pack that is off
-   * is turned on. A pack the record does not hold is named and skipped: installing one needs its
-   * pack document, and the app ships none per first-party pack, so nothing here pretends to.
+   * is turned on. A first-party pack a live record does not hold is added from its own document,
+   * planned and then installed with that plan's hash, in the order `toTurnOn` gives, which puts
+   * every list after the ones it points at. A plan or an install that is refused is said in one
+   * sentence and nothing is made in that list. The demo holds every first-party pack, so a pack it
+   * lacks is only named.
    */
   async function make() {
     understand();
@@ -262,13 +266,26 @@
       const client = createClient({ base: location.origin });
       const chosen = await recordOrSample(client);
       const installed = chosen.first.ok ? chosen.first.value : [];
-      const out: Outcome = { made: [], on: [], absent: [], refused: [], waiting: chosen.source.sample };
+      const out: Outcome = { made: [], on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample };
 
+      /* The lists this record holds with their pack on, so a pack is added only after what it points at. */
+      const held = new Set(installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers));
       const usable = new Set<string>();
       for (const id of toTurnOn(now, Boolean(heard?.name))) {
         const state = installed.find((p) => p.id === id);
         if (!state) {
-          out.absent.push(packName(id));
+          const doc = chosen.source.sample ? null : firstPartyDocument(id);
+          if (!doc) {
+            out.absent.push(packName(id));
+            continue;
+          }
+          const refused = await addPack(client, id as FirstPartyId, doc, held);
+          if (refused) {
+            out.refused.push(refused);
+            continue;
+          }
+          out.added.push(packName(id));
+          usable.add(id);
           continue;
         }
         if (state.disabled_at !== null) {
@@ -278,6 +295,7 @@
             continue;
           }
           if (on.value.changed) out.on.push(packName(id));
+          for (const r of state.registers) held.add(r);
         }
         usable.add(id);
       }
@@ -326,6 +344,29 @@
     } finally {
       making = false;
     }
+  }
+
+  /**
+   * Add one first-party pack to a live record: what it points at first, then its plan, then the
+   * install that approves exactly that plan. Answers the sentence to show when it was not added.
+   *
+   * THE MANIFEST IS CHECKED HERE because the document names no pack it depends on (a record whose
+   * lists came from the seed has no `pack` row for them), and the record installs a list whose fields
+   * point at one it does not hold.
+   */
+  async function addPack(client: ReturnType<typeof createClient>, id: FirstPartyId, doc: Record<string, unknown>, held: Set<string>): Promise<string | null> {
+    const manifest = firstPartyManifest(id);
+    const lacking = manifest.requires.map((r) => r.slice('register.'.length)).filter((r) => !held.has(r));
+    if (lacking.length > 0) return firstRun.shapeNeedsFirst(packName(id), firstRun.shapeAnd(lacking.map((r) => REGISTERS[r]?.name ?? r)));
+
+    const planned = await client.planPack({ doc });
+    if (!planned.ok) return firstRun.shapeNotAdded(packName(id), 'refusal' in planned ? planned.refusal.fix : firstRun.shapeChanged);
+    const planHash = (planned.value as { diff?: { planHash?: string } }).diff?.planHash ?? '';
+    const done = await client.call('installPack', { doc, planHash });
+    if (!done.ok) return firstRun.shapeNotAdded(packName(id), 'refusal' in done ? done.refusal.fix : firstRun.shapeChanged);
+
+    for (const p of manifest.provides) if (p.startsWith('register.')) held.add(p.slice('register.'.length));
+    return null;
   }
 
   /** Which of the two ways in is on screen. In the address, so Back from the list returns to the sentence. */
@@ -660,6 +701,7 @@
               <p class="kept-what">{known.waiting ? firstRun.youArePending(known.name, copy.markNotWritten) : firstRun.youAreKnown(known.name)}</p>
             {/if}
             {#if outcome.on.length > 0}<p class="kept-why">{firstRun.shapeTurnedOn(firstRun.shapeAnd(outcome.on))}</p>{/if}
+            {#if outcome.added.length > 0}<p class="kept-why">{firstRun.shapeAdded(firstRun.shapeAnd(outcome.added))}</p>{/if}
             {#if outcome.absent.length > 0}<p class="kept-why">{firstRun.shapeAbsent(firstRun.shapeAnd(outcome.absent))}</p>{/if}
             {#each outcome.refused as r}<p class="kept-why">{r}</p>{/each}
             {#if outcome.waiting}<p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>{/if}

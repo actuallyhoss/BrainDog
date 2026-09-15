@@ -404,6 +404,14 @@ the count is stated once and does not drift.
 | **`estate`** | `services` · `domains` | by choice |
 | **`people`** | the counterparties every other pack refers to — `money-core` requires it ([04-PACKS](04-PACKS.md) §2) | when a pack that requires it installs, or by choice |
 
+*(Built September 15th 2026. `portfolio`, `people`, `money-core`, `estate` and `work` each ship as a
+pack document of their own (`packages/seed/src/packs/first-party.ts`), split from the combined starter
+so the two cannot drift: a test holds the five, plus the project template, equal to the starter. The
+project template reads tasks, money and services at once, so it is in no single pack and stays in the
+starter. Each manifest's `requires` is read from the bodies: `people`, `estate` and `work` need
+`register.things`; `money-core` needs `register.things` and `register.people`; `portfolio` needs
+nothing. Onboarding installs a missing one through `planPack` and `installPack`.)*
+
 ### The `agents` pack, and why learnings are the half of self-improvement already working
 
 [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) designed an *automatic* loop and found the sensing

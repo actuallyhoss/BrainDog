@@ -289,11 +289,33 @@ export function shape(sentence: string, today: string = new Date().toISOString()
   return { currency: amounts[0]?.currency ?? null, packs, rows, heard, team, declined: null };
 }
 
+/**
+ * Which lists each one points at, so turning one on turns those on too. Every list points at a
+ * project, and Money points at the person an invoice is to. `shape.test.ts` holds this to the
+ * seed's pack manifests.
+ */
+export const LEANS_ON: Readonly<Record<PackId, readonly PackId[]>> = {
+  portfolio: [],
+  people: ['portfolio'],
+  'money-core': ['portfolio', 'people'],
+  estate: ['portfolio'],
+  work: ['portfolio'],
+  agents: ['portfolio'],
+};
+
 /** The packs to turn on, dependencies first, with People added when turn 1 heard a name. */
 export function toTurnOn(s: Shape, person: boolean): PackId[] {
   const wanted = new Set<PackId>(s.packs.map((p) => p.id));
   if (person) wanted.add('people');
-  if (wanted.size > 0) wanted.add('portfolio');
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const id of [...wanted])
+      for (const needs of LEANS_ON[id])
+        if (!wanted.has(needs)) {
+          wanted.add(needs);
+          grew = true;
+        }
+  }
   return INSTALL_ORDER.filter((id) => wanted.has(id));
 }
 

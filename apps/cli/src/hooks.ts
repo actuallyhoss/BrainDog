@@ -11,19 +11,22 @@
 
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
-import type { Client } from '@braindog/client';
+import type { Client, Context } from '@braindog/client';
 import { refused } from '@braindog/ports';
 
-import { briefing, type Moved } from './brief.ts';
+import { briefing, MAX_CHARS, MAX_LINES, type Moved } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
-import { git, positionOf, sessionHeaders } from './position.ts';
+import { git, positionOf, sessionHeaders, type Position } from './position.ts';
+import { syncSkills } from './skills.ts';
+import { depositor, scanTools } from './tools.ts';
 
 type Env = Record<string, string | undefined>;
 
 /** What a hook needs from its process, passed in so a test can hold all of it. */
-export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void };
+export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string };
 
 /** The start hook's whole budget: git, then `attach`, well inside the twenty seconds Claude Code gives it. */
 export const HOOK_MS = 8_000;
@@ -141,6 +144,7 @@ export async function hookStart(io: Io): Promise<void> {
   if (typeof to === 'string') return io.write(to);
 
   const ms = hookBudget(io.env);
+  const began = Date.now();
   const signal = AbortSignal.timeout(ms);
   const at = await positionOf(event.cwd);
   const client = clientFor(to, async () => sessionHeaders(at, 'claude'), signal);
@@ -171,7 +175,64 @@ export async function hookStart(io: Io): Promise<void> {
     /* A folder that cannot be written costs the MCP server its attribution, not the session its briefing. */
   }
 
-  io.write(briefing(run, at, await movedSince(event.cwd, run.context?.handoff?.head ?? null, at.head)));
+  const text = briefing(run, at, await movedSince(event.cwd, run.context?.handoff?.head ?? null, at.head));
+  /* Only a session that begins: a compaction or a clear is the same session going on (plan §4.3 step 6). */
+  const extra =
+    run.context !== undefined && (event.source === 'startup' || event.source === 'resume')
+      ? await startWork(io, to, at, run.context, { spoken: run.spoken, ...(event.client_id === undefined ? {} : { client_id: event.client_id }) }, began + ms)
+      : [];
+  io.write(withLines(text, extra));
+}
+
+/** Each of the sync and the scan gets at most this long, inside what is left of the hook's budget. */
+export const START_WORK_MS = 3_000;
+
+/**
+ * Skills sync, then tools scan, at a session's start, and a line for each thing either one did.
+ *
+ * NOTHING AT ALL WHEN THE RECORD HAS NEITHER REGISTER: no request, no file read. Each runs on its own client and
+ * deadline, and a failure is one fixed line, because an error could quote anything.
+ */
+async function startWork(io: Io, to: Target, at: Position, context: Context, run: { spoken: string; client_id?: string }, until: number): Promise<string[]> {
+  const wants = (id: string) => context.registers.some((r) => r.id === id);
+  if (!wants('skills') && !wants('tools')) return [];
+  const home = io.home ?? homedir();
+  const found = await git(at.cwd, 'rev-parse', '--show-toplevel');
+  const top = found === null ? null : resolve(found);
+  const headers = sessionHeaders(at, 'claude', run);
+  const lines: string[] = [];
+  const step = async (label: string, work: (client: Client, signal: AbortSignal) => Promise<string[]>) => {
+    const left = until - Date.now() - 250;
+    if (left <= 0) return;
+    const signal = AbortSignal.timeout(Math.min(START_WORK_MS, left));
+    try {
+      for (const line of await work(clientFor(to, async () => headers, signal), signal)) lines.push(clipLine(`BrainDog: ${line}`));
+    } catch {
+      lines.push(`BrainDog: the ${label} failed, so it was skipped this time.`);
+    }
+  };
+  if (wants('skills'))
+    await step('skills sync', (client) => syncSkills({ client, context, home, configDir: io.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), top, dryRun: false }));
+  if (wants('tools'))
+    await step('tools scan', (client, signal) =>
+      scanTools({ client, context, top, cwd: at.cwd, home, dryRun: false, deposit: depositor({ file: hostsPath(io.env), env: io.env, host: to.key, headers, signal }) }),
+    );
+  return lines;
+}
+
+const clipLine = (line: string): string => (line.length > 300 ? `${line.slice(0, 297)}...` : line);
+
+/** The briefing with these lines before its last one, the next step, as many as fit its caps. */
+export function withLines(text: string, extra: string[]): string {
+  if (extra.length === 0) return text;
+  const lines = text.split('\n');
+  const last = lines.pop() ?? '';
+  for (const line of extra) {
+    if (lines.length + 2 > MAX_LINES || [...lines, line, last].join('\n').length > MAX_CHARS) break;
+    lines.push(line);
+  }
+  lines.push(last);
+  return lines.join('\n');
 }
 
 /* ── the people met in this session's commits ──────────────────────────── */

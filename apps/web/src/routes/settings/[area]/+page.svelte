@@ -27,9 +27,12 @@
   } from '$lib/record/api.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   import {
-    CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, noRecord, reachKey, revocable, sampleMachines,
+    CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, connectLines, noRecord, reachKey, revocable, sampleMachines,
     sampleTokens, standing, type Answer, type DeviceRow, type Minted, type TokenRow,
   } from '$lib/record/device.ts';
+  /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
+  import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
+  import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { TONES, bytes, relative, since } from 'braindog-render';
@@ -83,6 +86,7 @@
   $effect(() => {
     if (area !== 'agents') {
       minted = null;
+      offer = null;
       return;
     }
     untrack(() => void readAgents());
@@ -122,24 +126,13 @@
   async function tryCode(e?: SubmitEvent) {
     e?.preventDefault();
     if (approving) return;
-    const entry = codeOf(typed);
-    if (!entry.ok) {
-      answer = { kind: 'malformed', why: entry.why, digits: entry.digits };
-      return;
-    }
-    if (agentsFrom === 'sample' || !agentClient) {
-      answer = { kind: 'demo' };
-      return;
-    }
     approving = true;
     const at = opened();
-    const out = await agentClient.deviceApprove({ user_code: entry.code });
+    answer = await approve(typed, agentsFrom === 'sample' ? null : agentClient);
     closed(true, at);
     approving = false;
-    /* `deviceApprove` carries no version, so a conflict cannot come back; it is read as a miss rather than drawn blank. */
-    answer = 'conflict' in out ? { kind: 'wrong' } : answerOf(out);
     /* THE CODE STAYS IN THE FIELD ON A REFUSAL: six digits with one wrong is a thing to correct. */
-    if (answer.kind === 'approved') {
+    if (answer.kind === 'approved' && agentClient) {
       typed = '';
       const again = await agentClient.listDevices();
       if (again.ok) machines = again.value;
@@ -147,46 +140,16 @@
   }
 
   /* What the status line under the field says, or nothing. */
-  const answerLine = $derived.by((): { tone: 'good' | 'bad'; line: string } | null => {
-    const a = answer;
-    if (!a) return null;
-    switch (a.kind) {
-      case 'approved':
-        return { tone: 'good', line: copy.approvedNow(a.label ?? copy.unnamedMachine, copy.reachMeans[reachKey(a.reach, a.scope)] ?? a.reach) };
-      case 'malformed':
-        return { tone: 'bad', line: a.why === 'empty' ? copy.codeEmpty : a.why === 'short' ? copy.codeShort(a.digits) : a.why === 'long' ? copy.codeLong(a.digits) : copy.codeOther };
-      case 'wrong':
-        return { tone: 'bad', line: copy.codeWrong };
-      case 'tries':
-        return { tone: 'bad', line: copy.codeTries };
-      case 'expired':
-        return { tone: 'bad', line: copy.codeExpired };
-      case 'signin':
-        return { tone: 'bad', line: copy.signInAgainWhy };
-      case 'demo':
-        return { tone: 'bad', line: copy.notOnDemo };
-      default:
-        return { tone: 'bad', line: a.fix };
-    }
-  });
+  const answerLine = $derived(lineOf(answer));
 
-  /**
-   * SIGNING IN AGAIN WITHOUT LEAVING, where a passkey can do it: the code stays typed and is sent
-   * again. Anywhere else the person goes to `/signin`.
-   */
+  /* SIGNING IN AGAIN WITHOUT LEAVING, where a passkey can do it: the code stays typed and is sent again. */
   let reproving = $state(false);
   async function signInAgain() {
     if (reproving) return;
-    const here = support();
-    const offered = await methods();
-    if (!(offered.ok && offered.value.passkey && here.webauthn && here.secure)) {
-      location.assign('/signin');
-      return;
-    }
     reproving = true;
-    const who = await passkeySignIn();
+    const back = await reprove({ support, methods, passkeySignIn }, (href) => location.assign(href));
     reproving = false;
-    if (who.ok) await tryCode();
+    if (back) await tryCode();
   }
 
   async function revokeMachine(row: DeviceRow) {
@@ -195,10 +158,10 @@
       return;
     }
     const at = opened();
-    const out = await agentClient.revokeDevice({ handle: row.handle });
+    const out = await revoke(agentClient, machines, row.handle);
     closed(true, at);
-    if (out.ok) machines = machines.map((m) => (m.handle === row.handle ? out.value : m));
-    else toasts.push('refusal' in out ? out.refusal.fix : copy.notOnDemo, { intent: 'warn' });
+    if (out.ok) machines = out.rows;
+    else toasts.push(out.fix, { intent: 'warn' });
   }
 
   async function revokeTokenRow(row: TokenRow) {
@@ -235,6 +198,47 @@
     mintLabel = '';
     const held = await agentClient.listTokens();
     if (held.ok) tokens = standing(held.value as TokenRow[]);
+    await offerPack(agentClient);
+  }
+
+  /*
+   * THE AGENTS ADD-ON, OFFERED ONCE A TOKEN IS SHOWN, when this record does not have it. The plan is
+   * the record's own `planPack` answer in the Packs screen's words, and Install sends its `planHash`
+   * back, so what installs is what was shown. Not now changes nothing.
+   */
+  let offer = $state<Plan | null>(null);
+  let installing = $state(false);
+  let offerSaid = $state('');
+
+  const packName = (kind: 'register' | 'page', id: string): string => {
+    const named = kind === 'register' ? AGENTS_PACK.registers[id]?.name : AGENTS_PACK.pages[id]?.title;
+    return typeof named === 'string' && !named.includes('{{') ? named : id.charAt(0).toUpperCase() + id.slice(1);
+  };
+
+  async function offerPack(client: ReturnType<typeof createClient>) {
+    const at = opened();
+    const held = await client.packs();
+    if (!held.ok || held.value.some((p) => p.id === AGENTS_PACK.manifest.id)) {
+      closed(true, at);
+      return;
+    }
+    const planned = await client.planPack({ doc: agentsPackDocument(), source: { kind: 'local' } });
+    closed(true, at);
+    offerSaid = '';
+    offer = planned.ok ? planOf((planned.value as { diff?: unknown }).diff, packName) : null;
+  }
+
+  async function installOffer() {
+    if (!offer || installing || !agentClient) return;
+    installing = true;
+    const at = opened();
+    const out = await agentClient.call<unknown>('installPack', { doc: agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash });
+    closed(true, at);
+    installing = false;
+    if (out.ok) {
+      offer = null;
+      toasts.push(vaultWords.packInstalled, { intent: 'good' });
+    } else offerSaid = 'refusal' in out ? out.refusal.fix : copy.notOnDemo;
   }
 
   const lines = $derived(connectLines(origin));
@@ -1406,9 +1410,42 @@
             <p class="mono wrap">{lines.mcp}</p>
             <div class="row-actions">
               <Button weight="quiet" onclick={() => void clipboard.put(lines.mcp, copy.lineCopied)}>{copy.copyLine}</Button>
-              <Button weight="bare" onclick={() => (minted = null)}>{copy.connectDone}</Button>
+              <Button weight="bare" onclick={() => ((minted = null), (offer = null))}>{copy.connectDone}</Button>
             </div>
           </div>
+          {#if offer}
+            <div class="code-form">
+              <p class="code-label">{copy.installDiff}</p>
+              {#if offer.summary}<p class="who-why">{offer.summary}</p>{/if}
+              <dl class="plan">
+                <dt>{copy.diffAdds}</dt>
+                <dd>
+                  <ul class="plan-adds">
+                    {#each offer.adds as add (add.kind + add.name)}
+                      <li>
+                        <Icon name={add.kind === 'list' ? 'rows' : 'doc'} size="s" />
+                        <span class="plan-name">{add.name}</span>
+                        <span class="plan-detail">{add.detail}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                </dd>
+                {#if offer.conflicts.length}
+                  <dt>{copy.diffConflicts}</dt>
+                  <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>
+                {/if}
+                <dt>{copy.diffSeeds}</dt>
+                <dd>{offer.seeds}</dd>
+                <dt>{copy.diffTouches}</dt>
+                <dd>{offer.touches}</dd>
+              </dl>
+              <div class="row-actions">
+                <Button weight="primary" disabled={installing || offer.conflicts.length > 0} onclick={() => void installOffer()}>{copy.install}</Button>
+                <Button weight="bare" onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
+              </div>
+              <p class="code-said" role="status" data-intent={offerSaid ? 'bad' : undefined}>{offerSaid}</p>
+            </div>
+          {/if}
         {:else}
           <form class="code-form" onsubmit={connectAgent}>
             <label class="code-label" for="agent-label">{copy.connectTitle}</label>
@@ -2150,6 +2187,56 @@
      400px screen. `13 §10` and the layout gate's first rule: the page body never scrolls sideways. */
   .wrap {
     overflow-wrap: anywhere;
+  }
+
+  /* THE PACKS SCREEN'S PLAN, drawn the same way where an agent is connected. */
+  .plan {
+    display: grid;
+    grid-template-columns: minmax(6ch, max-content) minmax(0, 1fr);
+    gap: var(--sp-1) var(--sp-4);
+    margin: 0;
+    padding: var(--sp-3);
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 1.6;
+  }
+
+  .plan dt {
+    color: var(--dim);
+    font-weight: 600;
+  }
+
+  .plan dd,
+  .plan dd p {
+    margin: 0;
+  }
+
+  .plan-adds {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .plan-adds li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2);
+  }
+
+  .plan-name {
+    color: var(--ink);
+  }
+
+  .plan-detail {
+    color: var(--dim);
+    font-size: var(--t-xs);
   }
 
   /* THE ONE PLACE A MONOSPACE FACE IS RIGHT. `Money.svelte` argues against it for figures — a mono

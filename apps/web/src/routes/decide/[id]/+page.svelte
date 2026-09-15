@@ -35,7 +35,10 @@
   import { day, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
-  import { DECIDED, NOW, QUESTIONS } from '$lib/record/api.ts';
+  import { DECIDED, NOW, QUESTIONS, REGISTERS, ROWS, display } from '$lib/record/api.ts';
+  import { ROWSETS } from '$lib/record/data.ts';
+  import Changes from './Changes.svelte';
+  import { updatesOf, words as changeWords } from './changes.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -47,6 +50,9 @@
   import { drew } from '../../../lib/ui/screen.svelte.ts';
 
   const question = $derived([...QUESTIONS, ...DECIDED].find((q) => q.id === page.params.id));
+
+  /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. */
+  const updates = $derived(question ? updatesOf(ROWSETS[question.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v)) : []);
 
   /** Highlighted, not chosen. The two are different states and the interface says so. */
   let highlighted = $state<string | null>(null);
@@ -250,6 +256,15 @@
          so a question decided a moment ago on this screen went on showing the options, the reason
          field and a live commit button, which is the one state where the product has to say plainly
          that it is finished. -->
+    {#if updates.length}
+      <section class="changed">
+        <div class="options-head">
+          <h2 class="options-title">{changeWords.heading}</h2>
+        </div>
+        <Changes {updates} />
+      </section>
+    {/if}
+
     {#if settled}
       <div class="settled">
         <p class="settled-head">

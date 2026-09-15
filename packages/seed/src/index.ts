@@ -25,6 +25,7 @@ import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type Json, type Kerne
 import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './packs/agents.ts';
 
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
+export { FIRST_PARTY, crossPack, firstPartyDocument, firstPartyManifest, type FirstPartyId } from './packs/first-party.ts';
 
 /** What a row holds, before the record has given it a number. */
 export type Fields = Record<string, Json | number | null | undefined>;

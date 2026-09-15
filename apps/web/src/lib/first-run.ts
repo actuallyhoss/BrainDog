@@ -59,6 +59,13 @@ export const firstRun = {
   shapeReady: 'Your lists are ready.',
   shapeTurnedOn: (names: string) => `Turned on ${names}.`,
   shapeAbsent: (names: string) => `Not installed on this record: ${names}. Nothing was made there.`,
+  /* A LIST THE LIVE RECORD DID NOT HAVE, added through its own plan. Its example rows are said,
+     because they are rows the person did not type and will find in the list. */
+  shapeAdded: (names: string) => `Added ${names}, with example rows marked example.`,
+  /* A list that could not be added, in one sentence, and nothing is made in it. */
+  shapeNotAdded: (name: string, fix: string) => `${name} was not added: ${fix}`,
+  shapeNeedsFirst: (name: string, needs: string) => `${name} was not added, because it needs ${needs} first.`,
+  shapeChanged: 'the record changed while it was being added, so try again.',
   shapeRefused: (name: string, fix: string) => `${name} was not made. ${fix}`,
   /* first run.
 

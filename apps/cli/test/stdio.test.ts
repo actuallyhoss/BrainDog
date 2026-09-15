@@ -309,7 +309,8 @@ test('a command from a later step says so, and an unknown one is not echoed unle
 
   const help = run('--help');
   assert.equal(help.status, 0);
-  assert.match(help.stdout, /^braindog login <host> \[--vault <project\|\*>\]\n[\s\S]*^braindog keys put <label>[\s\S]*^braindog keys exec <label[\s\S]*^braindog mcp /m);
+  assert.match(help.stdout, /^braindog login <host> \[--vault <project\|\*>\]\n[\s\S]*^braindog keys put <label>[\s\S]*^braindog keys exec <label[\s\S]*^braindog skills sync \[--host <host>\] \[--dry-run\]\n[\s\S]*^braindog tools scan \[--host <host>\] \[--dry-run\]\n[\s\S]*^braindog tools write \[--scope user\|project\] \[--dry-run\]\n[\s\S]*^braindog mcp /m);
+  assert.doesNotMatch(help.stdout, /Not built yet: .*(?:skills|tools)/);
 });
 
 /* ── last, over everything above ───────────────────────────────────────── */

@@ -565,27 +565,12 @@ export const copy = {
   rowsWord: (n: number) => (n === 1 ? 'row' : 'rows'),
   noneMatching: (total: number, what: string) => `${total} ${what}, none matching:`,
   auditHolds: 'Every change to this record shows up here, with who made it and when.',
-  vaultEmpty: 'No logins saved yet.',
   /* A THREAD'S TWO EMPTY STATES, AND BOTH SAID `track`. The register was renamed to Threads and the
      rename reached the head and the kicker of this screen, which read it from the declaration; the
      three sentences below them were typed into the route, so they went on saying the word the rest
      of the product had stopped using. They are here so the next rename reaches them. */
   threadNoUpdate: 'An update is a sentence, a health and a date. It is the only thing on a thread that says how it is actually going.',
   threadNoTasks: 'No open tasks on this thread.',
-  /**
-   * AND WHERE ONE COMES FROM, which is the half an empty state owes its reader and this did not have.
-   *
-   * It said what a credential row IS and stopped, on the one screen in the product with no control
-   * that puts anything into it, while the comment standing over the empty state claimed the
-   * sentence "says where one comes from". `12 §6` is where it actually comes from: `bindGrant`
-   * mints the id, "a `secret` field may hold only an id that exists", and `opens` is what makes the
-   * vault better than a password manager because "the credential is attached to the thing it
-   * operates". So a credential arrives by being saved on a row, and the row is what it opens.
-   *
-   * IT ALSO SAID `key`, WHICH `19 §9` BANS OUTRIGHT on this screen: the blurb three lines up
-   * carries the whole argument and the sentence beside it kept the word anyway.
-   */
-  vaultHolds: 'Save a login on the thing it belongs to and it appears here. The password itself is locked away and never shown.',
   select: 'Select',
   deselect: 'Deselect',
   /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
@@ -738,42 +723,7 @@ export const copy = {
      detail is there to say what pressing Enter does, in the reader's word for the thing: a number. */
   openById: 'Open by number',
   askBrainDog: 'Ask BrainDog',
-
-  /**
-   * THE VAULT, AND THE ONE WORD IT MAY NOT USE.
-   *
-   * `19 §9` bans `key` outright — "say **field**" — and in the same table renames this screen's row
-   * to **credential**, with the reason spelled out: "Not `key`, which this same table bans because
-   * it means a JSON key." This blurb said `key` and the whole screen never said `credential` once.
-   *
-   * Two documents still say the wrong thing and will keep saying it: `19 §2`'s screen inventory
-   * ("What each key opens") and `50 §2.2` ("what each key opens"). `19 §9` is the later, explicit
-   * correction and names the collision it is fixing, so it wins.
-   *
-   * IT IS A DISPLAY RENAME ONLY. `grant`, `grant.read` and `grant.kind` stay as they are in the
-   * schema, the API and the `.dog` — `19 §9` again: "renaming a column to improve a label is how a
-   * spoken id stops resolving."
-   *
-   * AND THEN `login` ON THE SCREEN, which is the word a stranger has for what they keep in a vault.
-   * These notes, and the schema, keep `credential` and `grant`.
-   */
-  vaultBlurb: 'What each login opens, and when each was last rotated. The password itself is never shown here.',
-  opens: 'Opens',
-  rotated: 'Rotated',
-  reveal: 'Reveal once',
-  revealWarning: 'Revealing is recorded in History with your name on it.',
-  /* `n` NOT ROTATED, said once. It was a hardcoded literal in the markup with this string sitting
-     unrendered beside it — two sentences about one fact, and the one in `copy.ts` unreachable. */
-  staleCount: (n: number) => `${n} not rotated in six months`,
-  /* The five of `12 §6` and `30 §1`'s CHECK, as a reader says them rather than as the column
-     stores them. `50 §10`'s precedent: "field labels are ids with `_` as a space." */
-  credentialKinds: {
-    api_token: 'API token',
-    password: 'Password',
-    ssh_key: 'SSH key',
-    recovery_codes: 'Recovery codes',
-    note: 'Note',
-  } as Record<string, string>,
+  /* The Vault's words are in `record/vault.ts`, which only its two routes load. */
 
   /* packs */
   installed: 'Installed',

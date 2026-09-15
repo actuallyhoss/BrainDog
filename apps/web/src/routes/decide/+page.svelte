@@ -28,7 +28,10 @@
   import { tick } from 'svelte';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { DECIDED, DOM_CAP, NOW, metric } from '$lib/record/api.ts';
+  import { DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
+  import { ROWSETS } from '$lib/record/data.ts';
+  import Changes from './[id]/Changes.svelte';
+  import { updatesOf } from './[id]/changes.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import type { Question } from '$lib/record/schema.ts';
   import { CapLine } from 'braindog-render/svelte';
@@ -45,6 +48,9 @@
 
   const open = $derived([...data.questions].sort((a, b) => a.rank - b.rank));
   const target = metric('open-questions');
+
+  /* THE ROWS A PROPOSAL WOULD CHANGE, drawn on its card, because one press here answers it. */
+  const changed = $derived(new Map(open.map((q) => [q.id, updatesOf(ROWSETS[q.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v))])));
 
   /**
    * SENTENCES THAT BELONG IN `copy.ts` AND ARE NOT THERE YET.
@@ -202,6 +208,7 @@
       <ol class="queue">
         {#each open as q, i (q.id)}
           {@const said = answers.get(q.id)}
+          {@const updates = changed.get(q.id) ?? []}
           <li class="q">
             <a class="q-open" href="/decide/{q.id}">
               <span class="q-rank num">{i + 1}</span>
@@ -220,6 +227,10 @@
               </span>
               <Icon name="chevron" size="m" />
             </a>
+
+            {#if updates.length}
+              <div class="q-changes"><Changes {updates} /></div>
+            {/if}
 
             <!-- THE VERBS, BESIDE THE LINK AND NOT INSIDE IT. One card, two regions, separated by a
                  rule so the boundary is visible rather than inferred: above it opens the question,
@@ -427,6 +438,11 @@
   .q :global(.icon) {
     align-self: center;
     color: var(--dim);
+  }
+
+  .q-changes {
+    padding: var(--sp-3) var(--sp-4);
+    border-block-start: 1px solid var(--line);
   }
 
   /* WHERE THE LINK STOPS AND THE CONTROLS START, drawn rather than left to be inferred. The two
