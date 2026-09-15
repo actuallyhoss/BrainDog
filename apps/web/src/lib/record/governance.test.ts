@@ -199,3 +199,28 @@ test('an options body with no usable options offers the two words, and a blank q
   assert.equal(q.title, 'SG9');
   assert.deepEqual(q.options.map((o) => o.title), [copy.acceptIt, copy.rejectIt]);
 });
+
+test('an open change that calls out carries its lines, from the egress the record worked out, and nothing else does', async () => {
+  const change = {
+    id: 'SG7',
+    body_kind: 'change',
+    status: 'open',
+    opened_by: 'S12',
+    opened_at: '2026-09-14T09:00:00Z',
+    body: {
+      declaration_id: 'ingest.paid_hook',
+      to: { declarations: [] },
+      egress: [{ ingest: 'paid_hook', channel: 'call', host: 'hooks.example.test', every: '15m', trigger: 'schedule', per_day: null, key: 'hook key', sends: [], key_line: null }],
+      approve: ['CALLS OUT hooks.example.test · every 15m · grant "hook key"'],
+    },
+  };
+  const base = client();
+  const over = client({ governance: async (args) => (args.id === 'SG7' ? { ok: true, value: change } : base.governance(args)) });
+  const out = await readOne(over, 'SG7');
+  assert.ok(out.from === 'live');
+  assert.deepEqual(out.value.calls, [{ ingest: 'paid_hook', channel: 'call', host: 'hooks.example.test', every: '15m', key: 'hook key', sends: [] }]);
+  assert.equal(out.value.question?.options.map((o) => o.key).join(), 'accept,reject');
+
+  const plain = await readOne(client(), 'SG2');
+  assert.ok(plain.from === 'live' && plain.value.calls.length === 0);
+});

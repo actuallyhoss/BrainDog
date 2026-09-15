@@ -109,3 +109,121 @@ test('THE ACTIONS READ ANSWERS A TOKEN: why one is paused, a held run in the mon
   assert.doesNotMatch(JSON.stringify(await read(owner)), /ciphertext|nonce|kek_2f/);
   sql.close();
 });
+
+/* ── a pack that calls out, approved in the same press ─────────────────── */
+
+const HOOK_KEY = {
+  label: 'hook key',
+  opens: 'hooks.example.test',
+  kind: 'api_token',
+  ciphertext: new Uint8Array([1, 2, 3]),
+  nonce: new Uint8Array([9, 8, 7]),
+  kdf: 'hkdf',
+  wrapped_by: 'kek',
+  kek_id: 'kek_2f',
+} as const;
+
+const BOOKS = (version: string, ...calls: Record<string, unknown>[]) => ({
+  pack: 'studio-books',
+  version,
+  summary: 'What a small studio owes.',
+  author: 'Halden',
+  license: 'MIT',
+  declarations: [
+    { register: 'invoices', name: 'Invoices', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'tags', type: 'list', of: 'text' }] },
+    ...calls,
+  ],
+  seeds: [],
+});
+const PING = { ingest: 'ping', channel: 'call', url: 'https://hooks.example.test/in', every: '15m', grant: 'hook key', body: { text: 'up' } };
+const STATUS = {
+  ingest: 'status',
+  channel: 'poll',
+  url: 'https://status.example.test/v1',
+  every: '1h',
+  grant: 'hook key',
+  extract: { what: { after: 'status ' } },
+  writes: { register: 'invoices' },
+};
+
+type Planned = { diff: { planHash: string; approve: string[]; calls_out: { ingest: string; change: string }[] } };
+const valueOf = <T>(r: unknown): T => {
+  const x = r as Out;
+  assert.ok(x.ok, x.refusal?.fix);
+  return x.value as T;
+};
+
+async function books() {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const armed = (ingest: string) => sql.one<{ state: string }>('SELECT state FROM schedule WHERE key = ?', ingest)?.state ?? null;
+  const planOf = async (doc: unknown) => valueOf<Planned>(await api.planPack({ doc }, owner)).diff;
+  return { sql, api, armed, planOf };
+}
+
+test('A PACK THAT CALLS OUT ARMS NOTHING UNTIL THE OWNER APPROVES ITS LINES, in the same press', async () => {
+  const { sql, api, armed, planOf } = await books();
+  const doc = BOOKS('1.0.0', PING);
+  const planned = await planOf(doc);
+  assert.deepEqual(planned.approve, ['CALLS OUT hooks.example.test · every 15m · grant "hook key"']);
+
+  /* NOT APPROVED: the whole pack stays out, because the install is one transaction, and nothing is armed. */
+  const bare = refusal(await api.installPack({ doc, planHash: planned.planHash }, owner));
+  assert.deepEqual([bare.code, bare.at], ['REQUIRED_MISSING', 'approve']);
+  assert.equal(armed('ping'), null);
+  assert.equal(api.kernel.register('invoices'), undefined, 'the rest of the pack installed without the approval');
+
+  /* Lines that are not the plan's are not an approval of it. */
+  const other = ['CALLS OUT friendly.example.test · every 15m · grant "hook key"'];
+  assert.equal(refusal(await api.installPack({ doc, planHash: planned.planHash, approve: other }, owner)).code, 'PLAN_STALE');
+  assert.equal(refusal(await api.installPack({ doc, planHash: planned.planHash, approve: 'yes' as never }, owner)).code, 'VALUE_MALFORMED');
+
+  /* A TOKEN CANNOT APPROVE, even carrying the exact lines. */
+  assert.equal(refusal(await api.installPack({ doc, planHash: planned.planHash, approve: planned.approve }, token)).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(armed('ping'), null);
+
+  /* The key it sends is in the vault before anything is armed, as accepting a proposal asks. */
+  const keyless = refusal(await api.installPack({ doc, planHash: planned.planHash, approve: planned.approve }, owner));
+  assert.equal(keyless.code, 'REQUIRED_MISSING');
+  assert.match(keyless.fix, /"hook key"/);
+  assert.equal(armed('ping'), null);
+
+  assert.ok(api.kernel.bindGrant(HOOK_KEY, 'p_1').ok);
+  const again = await planOf(doc);
+  valueOf(await api.installPack({ doc, planHash: again.planHash, approve: again.approve }, owner));
+  assert.equal(armed('ping'), 'pending', 'approving did not arm the call');
+
+  /* AND THE PRESS IS KEPT, word for word, signed by the owner who made it. */
+  const said = sql.one<{ actor: string; note: string | null }>("SELECT actor, note FROM event WHERE kind = 'install' AND target = 'pack:studio-books' ORDER BY rowid DESC LIMIT 1");
+  assert.deepEqual({ ...said }, { actor: 'p_1', note: again.approve.join('\n') });
+  sql.close();
+});
+
+test('AN UPDATE ASKS ONLY FOR WHAT IS NEW, and declining it leaves the installed version and its actions running', async () => {
+  const { sql, api, armed, planOf } = await books();
+  assert.ok(api.kernel.bindGrant(HOOK_KEY, 'p_1').ok);
+  const v1 = BOOKS('1.0.0', PING);
+  const first = await planOf(v1);
+  valueOf(await api.installPack({ doc: v1, planHash: first.planHash, approve: first.approve }, owner));
+
+  const v2 = BOOKS('1.1.0', PING, STATUS);
+  const second = await planOf(v2);
+  assert.deepEqual(second.calls_out.map((c) => [c.ingest, c.change]), [['ping', 'same'], ['status', 'new']]);
+  assert.deepEqual(second.approve, ['CALLS OUT status.example.test · every 1h · grant "hook key"'], 'an action already approved was asked for again');
+
+  /* DECLINED: the update does not land, the version installed keeps running, and the new action is not armed. */
+  assert.equal(refusal(await api.installPack({ doc: v2, planHash: second.planHash }, owner)).code, 'REQUIRED_MISSING');
+  assert.equal(armed('ping'), 'pending');
+  assert.equal(armed('status'), null);
+  assert.deepEqual(valueOf<{ id: string; version: string | null }[]>(await api.packs(owner)).map((p) => p.version), ['1.0.0']);
+
+  valueOf(await api.installPack({ doc: v2, planHash: second.planHash, approve: second.approve }, owner));
+  assert.equal(armed('status'), 'pending');
+  assert.equal(armed('ping'), 'pending');
+
+  /* Installing what is installed asks for nothing. */
+  const same = await planOf(v2);
+  assert.deepEqual(same.approve, []);
+  valueOf(await api.installPack({ doc: v2, planHash: same.planHash }, owner));
+  sql.close();
+});

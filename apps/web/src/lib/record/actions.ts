@@ -469,13 +469,20 @@ export type CallOut = {
   key: string | null;
   /** The record fields it sends, or `null` when the diff does not say. */
   sends: string[] | null;
+  /** A call a rule runs, alone or beside its interval. Absent for one that runs only on its interval. */
+  trigger?: 'rule' | 'both';
+  /** The most rule-fired calls a day, when a rule runs it. */
+  perDay?: number;
+  /** The record's own sentence about a project action sending a key, which is approved with the line. */
+  note?: string;
 };
 
 const CHANNELS: ReadonlySet<string> = new Set(['pull', 'call', 'poll']);
 
 /**
- * `planPack`'s `calls_out`, read defensively: the diff is the record's JSON, and a key it lacks is left
- * unsaid rather than guessed. `grant` is the key's label. `sends` is read when a build carries it.
+ * `planPack`'s `calls_out`, or a proposal's `egress`, read defensively: the record's JSON, and a key it lacks
+ * is left unsaid rather than guessed. `grant` (a plan) or `key` (a proposal) is the key's label. A call only a
+ * rule runs has no interval, and is kept with its daily ceiling.
  */
 export function callsOutOf(raw: unknown): CallOut[] {
   if (!Array.isArray(raw)) return [];
@@ -485,16 +492,20 @@ export function callsOutOf(raw: unknown): CallOut[] {
     const o = c as Record<string, unknown>;
     const ingest = str(o.ingest);
     const every = str(o.every);
-    if (!ingest || !every) return [];
+    const trigger = o.trigger === 'rule' || o.trigger === 'both' ? o.trigger : null;
+    if (!ingest || (!every && trigger !== 'rule')) return [];
     const channel = str(o.channel) ?? 'pull';
+    const note = str(o.key_line);
     return [
       {
         ingest,
         channel: (CHANNELS.has(channel) ? channel : 'pull') as Channel,
         host: str(o.host),
-        every,
+        every: every ?? '',
         key: str(o.grant) ?? str(o.key),
         sends: Array.isArray(o.sends) ? o.sends.filter((s): s is string => typeof s === 'string') : null,
+        ...(trigger === null ? {} : { trigger, perDay: typeof o.per_day === 'number' ? o.per_day : 100 }),
+        ...(note === null ? {} : { note }),
       },
     ];
   });
@@ -520,13 +531,27 @@ export const installWords = {
       : `${about}, ${share} of this record's ${allowance.toLocaleString('en-GB')}.`;
   },
   noLimit: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, with no monthly limit on this record.`,
+  byRule: (perDay: number) => `when a rule runs it, at most ${perDay.toLocaleString('en-GB')} a day`,
+  /* THE ONE APPROVAL (`research-scheduled-actions.md` §5): said under the lines, before the press. */
+  asksOnce: 'Installing asks you to approve these once, and none of them runs until you do.',
+  acceptApproves: 'Accepting approves these, and they start running. Declining runs none of them.',
+  wouldAsk: (name: string, calls: number) =>
+    `${name} would ask you once to approve the ${calls === 1 ? 'call it makes' : `${calls} calls it makes`}, shown in its plan`,
 } as const;
+
+/** How often one runs: its interval, when a rule runs it, or both. */
+const whenOf = (c: CallOut): string =>
+  c.trigger === 'rule'
+    ? installWords.byRule(c.perDay ?? 100)
+    : c.trigger === 'both'
+      ? `${often(c.every)} and ${installWords.byRule(c.perDay ?? 100)}`
+      : often(c.every);
 
 /** One line per action: what it does, the host, how often, the key by label, and the fields it sends. */
 export const callLine = (c: CallOut): string =>
   [
     `${words.verb[c.channel]} ${c.host ?? installWords.noHost}`,
-    often(c.every),
+    whenOf(c),
     c.key ? words.key(c.key) : installWords.noKey,
     c.sends ? installWords.sends(c.sends) : '',
   ]

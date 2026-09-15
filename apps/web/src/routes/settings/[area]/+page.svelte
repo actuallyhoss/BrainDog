@@ -219,6 +219,10 @@
     return typeof named === 'string' && !named.includes('{{') ? named : id.charAt(0).toUpperCase() + id.slice(1);
   };
 
+  /* THE LINES THE OFFER DRAWS ARE THE LINES INSTALL APPROVES. The record refuses an install that adds a
+     call without them, and this screen shows every one through `CallsOut` before Install is pressed. */
+  let offerApprove: string[] = [];
+
   async function offerPack(client: ReturnType<typeof createClient>) {
     const at = opened();
     const held = await client.packs();
@@ -229,16 +233,17 @@
     const planned = await client.planPack({ doc: agentsPackDocument(), source: { kind: 'local' } });
     closed(true, at);
     offerSaid = '';
-    const diff = planned.ok ? (planned.value as { diff?: { calls_out?: unknown } }).diff : undefined;
+    const diff = planned.ok ? (planned.value as { diff?: { calls_out?: unknown; approve?: unknown } }).diff : undefined;
     offer = planned.ok ? planOf(diff, packName) : null;
     offerCalls = callsOutOf(diff?.calls_out);
+    offerApprove = Array.isArray(diff?.approve) ? diff.approve.filter((l): l is string => typeof l === 'string') : [];
   }
 
   async function installOffer() {
     if (!offer || installing || !agentClient) return;
     installing = true;
     const at = opened();
-    const out = await agentClient.call<unknown>('installPack', { doc: agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash });
+    const out = await agentClient.call<unknown>('installPack', { doc: agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) });
     closed(true, at);
     installing = false;
     if (out.ok) {

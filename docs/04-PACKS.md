@@ -430,6 +430,13 @@ refused at install. The screen draws each as one line: what it does, the host, h
 somebody resumes it. The worst such a pack achieves is one scheduled request to a host named on the screen
 you approved.
 
+**Approved in the same press** *(September 15th 2026)*. `planPack`'s diff carries `approve`: the `CALLS OUT`
+line of each action that is `new` or `changed` against what is installed, and a project action's key line after
+its own. `installPack` arms them only when `approve` comes back with exactly those lines, and otherwise refuses
+with nothing written, the rest of the pack included. An action that is `same` asks for nothing and keeps running.
+A key it sends must already be in the vault. The lines go into the `install` event's note, signed by the owner. A
+token cannot install, so an agent's actions arrive as a proposal whose acceptance is the same approval.
+
 ### The one thing packs cannot protect against, stated plainly
 
 A pack can *mislead*. `metric.profit` could aggregate the wrong field with a plausible name and

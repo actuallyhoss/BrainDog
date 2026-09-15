@@ -1,14 +1,16 @@
 <!--
-  What an install or update would call, inside the diff's definition list (`research-scheduled-actions.md` §5).
+  What an install, an update or a proposal would call, inside a definition list (`research-scheduled-actions.md` §5).
 
-  A `dt` AND A `dd`, NOT A WRAPPER, so it drops into the Packs screen's diff and Settings' plan alike. One
+  A `dt` AND A `dd`, NOT A WRAPPER, so it drops into the Packs screen's diff, Settings' plan and the gate alike. One
   line per action, then the runs a month they add against the hosted allowance, or with no limit on a
   self-host. Nothing when the pack calls nothing, because an empty section teaches people to skip it.
+
+  `note` IS WHAT THE PRESS BELOW IT DOES, said once under the lines: the one approval that arms them.
 -->
 <script lang="ts">
   import { callLine, estimateOf, installWords, type CallOut } from '$lib/record/actions.ts';
 
-  let { calls, hosted }: { calls: readonly CallOut[]; hosted: boolean } = $props();
+  let { calls, hosted, note }: { calls: readonly CallOut[]; hosted: boolean; note?: string } = $props();
 
   const estimate = $derived(estimateOf(calls, hosted));
 </script>
@@ -21,10 +23,12 @@
         <li>
           <span class="calls-name">{c.ingest}</span>
           <span class="calls-line">{callLine(c)}</span>
+          {#if c.note}<span class="calls-note">{c.note}</span>{/if}
         </li>
       {/each}
     </ul>
     {#if estimate}<p class="calls-estimate">{estimate}</p>{/if}
+    {#if note}<p class="calls-estimate">{note}</p>{/if}
   </dd>
 {/if}
 
@@ -62,6 +66,11 @@
 
   .calls-line {
     color: var(--ink2);
+  }
+
+  .calls-note {
+    flex-basis: 100%;
+    color: var(--dim);
   }
 
   .calls-estimate {

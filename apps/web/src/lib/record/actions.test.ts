@@ -14,6 +14,7 @@ import {
   callLine,
   callsOutOf,
   estimateOf,
+  installWords,
   everyMs,
   HOSTED_RUNS,
   runsAMonth,
@@ -298,4 +299,33 @@ test('the sample pack that is not installed draws its calls in the diff', () => 
   const d = packDiff(pack);
   assert.equal(d.calls.length, 3);
   assert.equal(estimateOf(d.calls, true), "About 1,490 runs a month, 10% of this record's 15,000.");
+});
+
+test('a call only a rule runs keeps its line, its daily ceiling and the key note it is approved with', () => {
+  const calls = callsOutOf([
+    {
+      ingest: 'made',
+      channel: 'call',
+      host: 'hooks.example.test',
+      every: null,
+      trigger: 'rule',
+      per_day: 100,
+      key: 'hook key',
+      sends: ['skus.code'],
+      key_line: 'made runs for the project studio and sends the key "hook key".',
+    },
+    { ingest: 'both', channel: 'call', host: 'hooks.example.test', every: '1h', trigger: 'both', per_day: 100, key: null, sends: [] },
+    { ingest: 'nothing', channel: 'call', host: 'hooks.example.test', every: null },
+  ]);
+  assert.equal(calls.length, 2, 'a scheduled call with no interval was kept');
+  assert.equal(callLine(calls[0]!), 'Calls hooks.example.test, when a rule runs it, at most 100 a day, with the key "hook key", sends code');
+  assert.equal(calls[0]!.note, 'made runs for the project studio and sends the key "hook key".');
+  assert.equal(callLine(calls[1]!), 'Calls hooks.example.test, every hour and when a rule runs it, at most 100 a day, with no key, sends no fields');
+  assert.equal(estimateOf(calls.slice(0, 1), true), null, 'a rule-only call was counted as runs a month');
+});
+
+test('installing a pack that calls out says it asks once, and accepting a proposal says what the press does', () => {
+  assert.equal(installWords.wouldAsk('Studio shop', 1), 'Studio shop would ask you once to approve the call it makes, shown in its plan');
+  assert.equal(installWords.wouldAsk('Studio shop', 3), 'Studio shop would ask you once to approve the 3 calls it makes, shown in its plan');
+  for (const said of [installWords.asksOnce, installWords.acceptApproves, installWords.wouldAsk('A', 2)]) assert.doesNotMatch(said, /—/u);
 });

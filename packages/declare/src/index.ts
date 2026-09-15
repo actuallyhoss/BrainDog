@@ -147,6 +147,12 @@ export type Diff = {
     /** Against what is installed: a new action, one whose host, key or fields differ, or the same. */
     change: 'new' | 'changed' | 'same';
   }[];
+  /**
+   * The lines installing this plan asks the owner to approve: each `new` or `changed` action's `line`, then its
+   * `key_line` when it has one. Empty when it calls nothing new, so an install that only keeps what was approved
+   * before asks for nothing. `install` arms none of them unless the same lines come back with it.
+   */
+  approve: string[];
   /** Rules that would interrupt somebody rather than wait for the digest. */
   interrupts: string[];
   /** By construction: a pack declares shape and seeds examples, and has no verb that reads a row. */
@@ -216,10 +222,18 @@ export type Host = {
   reload: () => void;
   retire: (ids: readonly string[]) => Result<unknown>;
   seed: (register: string, fields: Record<string, Json>, note: string | undefined) => Result<unknown>;
-  /** The `pack` row, and the ids it claims — read on uninstall. */
-  remember: (row: { id: string; version: string; source: string; ref: string | null; manifest: string; checksum: string }) => void;
+  /**
+   * The `pack` row, and the ids it claims — read on uninstall. `approved` is the calls-out lines the owner approved
+   * with this install, word for word, when it asked for any.
+   */
+  remember: (row: { id: string; version: string; source: string; ref: string | null; manifest: string; checksum: string; approved?: readonly string[] }) => void;
   forget: (id: string) => void;
   claimed: (pack: string) => string[];
+  /**
+   * Whether the vault holds a key by this label or id. OPTIONAL: a host without a vault checks nothing, and a record
+   * refuses an approved call whose key is missing, because arming it would pause it on its first run.
+   */
+  keyHeld?: (name: string) => boolean;
 };
 
 /* ── reading the document ────────────────────────────────────────────────── */
@@ -829,6 +843,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
       .map((d) => [d.id, d.version, d.checksum] as [string, number, string])
       .sort((a, b) => a[0].localeCompare(b[0])),
   };
+  const calls = callsOf(pack, installed);
 
   return {
     pack: {
@@ -849,7 +864,8 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     conflicts,
     seeds: { count: pack.seeds.length, registers: pack.seeds.map((s) => ({ register: s.register, rows: 1 })) },
     spawns: spawnsOf(pack),
-    calls_out: callsOf(pack, installed),
+    calls_out: calls,
+    approve: calls.flatMap((c) => (c.change === 'same' ? [] : c.key_line === null ? [c.line] : [c.line, c.key_line])),
     interrupts: interruptsOf(pack),
     touches: { rows_read: 0, rows_written: 0 },
     orphans,
@@ -1206,7 +1222,7 @@ function warningsOf(pack: Pack): { at: string; say: string }[] {
  * it does not have, and the way to not have half a pack is to check everything before writing
  * anything and to write it all in one go.
  */
-export async function install(pack: Pack, diff: Diff, host: Host, planHash: string): Promise<Result<Applied>> {
+export async function install(pack: Pack, diff: Diff, host: Host, planHash: string, approve: readonly string[] = []): Promise<Result<Applied>> {
   if (planHash !== diff.planHash)
     return no<Applied>(
       'PLAN_STALE',
@@ -1340,6 +1356,28 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       { at: `${demanded.id}.fields.${demanded.field}.required` },
     );
 
+  /* WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS, OR NOTHING IS ARMED (`loop/research-scheduled-actions.md` §5).
+     A new action, or a new host, key or field on one, installs only beside the exact lines the plan printed for it.
+     An action that is the same as the installed one was approved already and asks for nothing. Nothing is written
+     before this, so a missing or different approval leaves the record as it was, the rest of the pack included. */
+  if (diff.approve.length > 0 && approve.length === 0)
+    return no<Applied>(
+      'REQUIRED_MISSING',
+      `${diff.pack.id} calls other services. Approve the ${diff.approve.length === 1 ? 'line' : `${diff.approve.length} lines`} its plan calls out, then install.`,
+      { at: 'approve' },
+    );
+  if (approve.length !== diff.approve.length || approve.some((line, i) => line !== diff.approve[i]))
+    return no<Applied>(
+      'PLAN_STALE',
+      'What you approved is not what this install would call out. Read the plan again.',
+      { at: 'approve' },
+    );
+  if (host.keyHeld)
+    for (const c of diff.calls_out) {
+      if (c.change === 'same' || c.grant === null || host.keyHeld(c.grant)) continue;
+      return no<Applied>('REQUIRED_MISSING', `Add the key called "${c.grant}" to the vault, then install.`, { at: 'approve' });
+    }
+
   /* THE SETTINGS ARE WRITTEN IN HERE, from the plan that was approved, so the bodies staged are the
      bodies the plan compared. A text setting is a value a person chose after `normalise` looked, so
      the colour rule is asked again of every body a setting filled. */
@@ -1394,6 +1432,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         /* THE CHOSEN SETTINGS TRAVEL WITH THE PACK ROW, and only the ones this version still accepts. */
         manifest: jcs({ ...manifest, ...(kept.length > 0 ? { config_values: Object.fromEntries(kept) } : {}) } as unknown as Json),
         checksum: pack.checksum,
+        ...(diff.approve.length > 0 ? { approved: diff.approve } : {}),
       });
 
       return ok({

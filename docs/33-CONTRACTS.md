@@ -245,8 +245,8 @@ routes 50 of the seventy-eight at `/api/<method>`, 21 of them ADMIN.
 | JOBS | `claimJob` | `{ wait? }` — the host holds the long-poll (≤ 20 s, a check every 1.5 s) and calls the record's one-statement claim | `{ job, lease_until, bearer, mcp }` or `{ job: null, idle_ms }`; the runner's grant only (§11) |
 | JOBS | `postJobEvent` | `{ job_id, seq, kind, body }` — `seq` must be `job.seq + 1` | `{ seq, cancel, lease_until }` |
 | JOBS | `readCancel` | `{ job_id }` | `{ cancel, lease_until }` — renews the lease |
-| ADMIN | `planPack` | `{ doc, source? }` | read-only: the `Diff` and its `planHash` |
-| ADMIN | `installPack` | `{ doc, source?, planHash }` | applied under `PLAN_STALE`: the pack row, its declarations, its seeds, one `install` event |
+| ADMIN | `planPack` | `{ doc, source? }` | read-only: the `Diff`, its `approve` lines and its `planHash` |
+| ADMIN | `installPack` | `{ doc, source?, planHash, approve? }` | applied under `PLAN_STALE`. A plan whose `calls_out` has a `new` or `changed` action needs `approve`, exactly the plan's `approve` lines: without them `REQUIRED_MISSING` at `approve`, different ones `PLAN_STALE`, and a key they send that is not in the vault `REQUIRED_MISSING`; nothing is written on any of the three. The `install` event keeps the lines in its note, signed by the owner. Applied: the pack row, its declarations, its seeds, one `install` event |
 | ADMIN | `uninstallPack` | `{ id, force? }` | retires; the rows stay (04 §4); a retire over rows is `WOULD_ORPHAN` until `force` |
 | ADMIN | `disablePack` | `{ id, alsoDisable? }`; any other key is `FIELD_UNKNOWN` | `{ id, state, changed, packs, declarations, said }`; the `pack` row and every row stay (04 §4). Refused, 422: `PACK_REQUIRED` with the dependents in `allowed`, which a second call passes as `alsoDisable`; `SCOPES_IN_USE` |
 | ADMIN | `enablePack` | `{ id }`; any other key is `FIELD_UNKNOWN` | the same shape, the declarations back over the same rows. Refused, 422: `PACK_DISABLED` with the pack still off in `allowed`, when this one leans on it |

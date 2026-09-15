@@ -8,33 +8,54 @@
 
   IT IS THE SAME QUERY, GROUPED RATHER THAN RANKED. The palette interleaves so the first screenful
   spans the record; this keeps each list whole with its own count, because a person who has come here
-  has already decided the ranked answer was not the one they wanted. One `search()` call, read two
-  ways.
+  has already decided the ranked answer was not the one they wanted.
+
+  THE ANSWER IS THE RECORD'S, through `search-live.ts`, and the sample's when there is no record here.
 
   THE QUERY IS IN THE URL because it is what you are looking at (`19 §5`), which also makes a result
   page a thing you can send somebody. The field writes it back with `replaceState`, throttled, for
   the reason the register's search box does: seven characters is not seven places you have been.
 -->
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { search } from '$lib/record/api.ts';
+  import type { SearchResult } from '$lib/record/api.ts';
+  import { searcher, type Found, type Searcher } from '$lib/record/search-live.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
-  import { drew } from '../../lib/ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
   const q = $derived(route.url.searchParams.get('q') ?? '');
 
-  /* NO LIMIT ON THE SEARCH, so the counts are the record's own. The PAGE still caps what it draws —
-     it is the palette's overflow, not an exemption from `13 §4.3` — but it caps per list and says
-     where the rest is, which the palette could not because there was nowhere to point. */
-  const found = $derived(search(q, Number.MAX_SAFE_INTEGER));
+  /* ONE READ PER ADDRESS, and the address is written at most every 150 ms below, so typing is not a
+     request per key. An answer to a query that has since changed is dropped. The PAGE caps what it
+     draws per list and says where the rest is; the record caps its own answer at a hundred. */
+  let finder: Searcher | null = null;
+  let answer = $state<Found | null>(null);
+  let asked = 0;
+
+  async function ask(want: string) {
+    const mine = ++asked;
+    const at = opened();
+    finder ??= searcher(location.origin);
+    const out = await finder.find(want);
+    closed(mine !== asked || out.from !== 'refused', at);
+    if (mine === asked) answer = out;
+  }
+
+  $effect(() => {
+    const want = q;
+    untrack(() => void ask(want));
+  });
+
+  const NOTHING: SearchResult = { hits: [], total: 0, groups: [] };
+  const found = $derived(answer && answer.from !== 'refused' ? answer.value : NOTHING);
 
   /* TEN A LIST. Enough to recognise the one you meant, few enough that nine matching lists is a page
      rather than a scroll — and every list carries the door to its own remainder. */
@@ -61,19 +82,18 @@
   }
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   * DRAWN ONCE AN ANSWER HAS COME BACK, the record's or the sample's.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
    * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
    * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
    * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * the other claim. The read is bracketed by `opened()` and `closed()`, so a call still out takes
+   * the attribute away whatever this line says.
    */
-  $effect(() => drew('ready'));
+  $effect(() => {
+    if (answer && answer.from !== 'refused') drew('ready');
+  });
 </script>
 
 <svelte:head><title>{titleOf(q || copy.search)}</title></svelte:head>
@@ -100,6 +120,10 @@
          nav, and `19 §6`'s `no-data-yet` is the state for a surface waiting on you rather than on
          the record. -->
     <Empty kind="no-data-yet" title={copy.searchWaiting} body={copy.searchWhere} />
+  {:else if !answer}
+    <!-- Nothing until the first answer, so the sample never shows over a live record. -->
+  {:else if answer.from === 'refused'}
+    <Empty kind="error" title={answer.fix} />
   {:else if found.total === 0}
     <Empty kind="no-results" title={copy.searchNone} query={q}>
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}

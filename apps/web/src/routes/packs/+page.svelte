@@ -17,6 +17,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { DEPLOYMENT, PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
+  import { installWords } from '$lib/record/actions.ts';
   import { blocked, choose, words, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { read } from '$lib/data/record.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -128,7 +129,7 @@
       <dd>{#each d.conflicts as c}<p>{c}</p>{/each}</dd>
     {/if}
 
-    <CallsOut calls={d.calls} hosted={DEPLOYMENT.kind !== 'self-host'} />
+    <CallsOut calls={d.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
 
     <dt>{copy.diffSeeds}</dt>
     <dd>{d.seeds}</dd>
@@ -256,8 +257,20 @@
                   weight="quiet"
                   disabled={Boolean(pack.conflicts?.length)}
                   aria-describedby={pack.conflicts?.length ? `conflict-${pack.id}` : undefined}
-                  onclick={() =>
-                    toasts.push(copy.notWritten(`${pack.name} would be installed all at once, after you have seen what it adds`), { intent: 'warn' })}
+                  onclick={() => {
+                    /* A PACK THAT CALLS OUT ASKS ONCE, and the lines it asks about are opened under it. The sample
+                       saves nothing either way, and says so. */
+                    const calls = packDiff(pack).calls.length;
+                    if (calls > 0) diff = pack.id;
+                    toasts.push(
+                      copy.notWritten(
+                        calls > 0
+                          ? installWords.wouldAsk(pack.name, calls)
+                          : `${pack.name} would be installed all at once, after you have seen what it adds`,
+                      ),
+                      { intent: 'warn' },
+                    );
+                  }}
                 >{copy.install}</Button>
               </span>
             </div>

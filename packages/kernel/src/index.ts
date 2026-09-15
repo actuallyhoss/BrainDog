@@ -108,6 +108,7 @@ import {
   egressOf,
   fireAction,
   finishAction,
+  keyNamed,
   listActions,
   originsOf,
   prepareAction,
@@ -1966,6 +1967,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         )
         .map((r) => byId(r.id))
         .filter((e): e is Entry => e !== null),
+    /* THE RECORD'S SCHEDULED ACTIONS, as the `actions` read lists them: keys by label, nothing sealed read. */
+    actions: () => listActions(sql, clock.now()),
   });
 
   /**
@@ -2748,6 +2751,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Every active scheduled action: its schedule, its key by label, its last run and this month's counts. A read. */
     actions: () => listActions(sql, clock.now()),
 
+    /** Whether the vault holds a live key by this label or id. The row is looked at, never its bytes. */
+    keyHeld: (name: string): boolean => keyNamed(sql, name) !== null,
+
     /** Every https origin an active `pull`, `call` or `poll` names. A host's executor sends to these and nothing else. */
     actionOrigins: (): string[] =>
       originsOf(
@@ -3397,8 +3403,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           .map((r) => [r.register, Number(r.n)]),
       ),
 
-    /** A `pack` row, written when its declarations have landed. */
-    rememberPack: (row: { id: string; version: string; source: string; ref: string | null; manifest: string; checksum: string }) =>
+    /**
+     * A `pack` row, written when its declarations have landed.
+     *
+     * AND THE CALLS-OUT LINES THE OWNER APPROVED WITH IT, word for word, in the `install` event's note and signed by
+     * whoever approved them, so "what did I agree to send" has an answer that does not depend on the pack staying as it was.
+     */
+    rememberPack: (row: { id: string; version: string; source: string; ref: string | null; manifest: string; checksum: string; approved?: readonly string[]; by?: string }) =>
       transaction(() => {
         sql.exec(
           `INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum)
@@ -3413,12 +3424,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           instant(clock.now()),
           row.checksum,
         );
+        const approved = row.approved !== undefined && row.approved.length > 0;
         sql.exec(
-          "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, 'system', 'install', ?, 'pack', ?)",
+          "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'install', ?, 'pack', ?, ?)",
           mint(),
           instant(clock.now()),
+          approved && row.by ? row.by : 'system',
           `pack:${row.id}`,
           row.version,
+          approved ? row.approved!.join('\n') : null,
         );
       }),
 

@@ -10,6 +10,7 @@
   stop resolving. Change the display name instead; it is free.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
   import { holeLabel, relative, since, TONES } from 'braindog-render';
@@ -21,7 +22,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { actorOf, AUDIT, backlinks, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, toneOf, values } from '$lib/record/api.ts';
+  import { actorOf, backlinks, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, toneOf, values } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -31,7 +32,9 @@
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import { Table } from 'braindog-render/svelte';
-  import { drew } from '../../../../lib/ui/screen.svelte.ts';
+  import { readHistory, type Told } from '$lib/record/history-live.ts';
+  import { rowReader, type Got, type RowReader } from '$lib/record/row-live.ts';
+  import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -40,7 +43,8 @@
   /**
    * THE ROW MAY NOT BE IN THE RECORD YET, AND THIS SCREEN USED TO SAY IT DID NOT EXIST.
    *
-   * `entry()` reads `ROWS`, which is what the record holds. A row somebody typed into the capture
+   * A written row is the record's answer to `get`, or `entry()` over the sample when there is no
+   * record here. A row somebody typed into the capture
    * line is in `pending` instead, wearing a NEGATIVE sequence so it can never collide with a real
    * one, and the list draws it with `Not saved` on it. Opening that row landed on "There is no
    * obligation #-1" - the product telling somebody the thing they had just typed, and could see one
@@ -49,7 +53,13 @@
    * They are read in that order because a written row is the truth: if the same number ever
    * answered from both, the record wins.
    */
-  const written = $derived(entry(id, seq));
+  let got = $state<Got | null>(null);
+  const live = $derived(got?.from === 'live');
+  /* NOTHING IS DRAWN UNTIL THE ROW HAS BEEN READ, so the sample never shows over a live row. */
+  const waiting = $derived(Number.isInteger(seq) && seq >= 1 && got === null);
+  const written = $derived(
+    got?.from === 'live' ? (got.entry ?? undefined) : got?.from === 'sample' ? entry(id, seq) : undefined,
+  );
   const unwritten = $derived(written ? undefined : pending.of(id).find((r) => r.seq === seq));
   const row = $derived(written ?? unwritten);
 
@@ -57,12 +67,46 @@
      person's page could not show the invoices that are theirs — which is the half somebody opens a
      person for. Nothing was added to the data model: the inverse of every ref is already stated
      once, on the field that declares it. */
-  const incoming = $derived(row ? backlinks(id, seq) : []);
+  /* NOT ON A LIVE RECORD: the record has no backlinks read yet, and the sample's would be another
+     record's rows pointing at this one. The section is left out until that read exists. */
+  const incoming = $derived(row && !live ? backlinks(id, seq) : []);
 
-  const history = $derived(AUDIT.filter((e) => e.target === `${id}#${seq}`));
+  /* THE ROW AND ITS HISTORY, IN ONE BRACKET, so `data-screen` never appears between the two reads. An
+     answer for a row somebody has already left is dropped. `clock` is the reader's on a live record
+     and the sample's own otherwise, since a sample date read against today is wrong by months. */
+  let told = $state<Told | null>(null);
+  let clock = $state(NOW);
+  let askedFor = '';
+  let reader: RowReader | null = null;
 
-  const state = $derived(decl?.state ? String(row?.fields[decl.state] ?? '') : '');
-  const tone = $derived(decl?.done?.includes(state) ? ('good' as const) : undefined);
+  async function readRow(register: string, n: number) {
+    const key = `${register}#${n}`;
+    askedFor = key;
+    got = null;
+    told = null;
+    const at = opened();
+    reader ??= rowReader(location.origin);
+    const [r, h] = await Promise.all([reader.read(register, n), readHistory(location.origin, register, n)]);
+    const current = askedFor === key;
+    closed(!current || (r.from !== 'refused' && h.from !== 'refused'), at);
+    if (!current) return;
+    clock = r.from === 'live' ? Date.now() : NOW;
+    got = r;
+    told = h;
+  }
+
+  $effect(() => {
+    const register = id;
+    const n = seq;
+    if (Number.isInteger(n) && n >= 1) untrack(() => void readRow(register, n));
+  });
+
+  const history = $derived(told && told.from !== 'refused' ? told.lines : []);
+  /* THE RECORD'S ROW DOES NOT SAY WHO ADDED IT; its oldest event does. */
+  const addedBy = $derived(live ? (history.at(-1)?.by ?? '') : (row?.by ?? ''));
+
+  const stateValue = $derived(decl?.state ? String(row?.fields[decl.state] ?? '') : '');
+  const tone = $derived(decl?.done?.includes(stateValue) ? ('good' as const) : undefined);
 
 
   /* A `document` is an argument, not a figure, so it never sits in the field list beside a date and
@@ -88,16 +132,17 @@
   const figureField = $derived(shortFields.find((f) => f.type === 'money'));
   const dueField = $derived(shortFields.find((f) => (f as { deadline?: boolean }).deadline === true));
   const figure = $derived(figureField && row ? amountOf(row.fields[figureField.id]) : null);
-  const leadTone = $derived(row ? (toneOf(id, row) ?? tone) : undefined);
+  const leadTone = $derived(row ? (toneOf(id, row, clock) ?? tone) : undefined);
   const due = $derived(dueField && row ? row.fields[dueField.id] : undefined);
-  const hasLead = $derived(figure !== null || state !== '');
+  const hasLead = $derived(figure !== null || stateValue !== '');
   const leadIds = $derived(
-    new Set([figure !== null ? figureField?.id : undefined, due ? dueField?.id : undefined, state ? decl?.state : undefined].filter((x): x is string => Boolean(x))),
+    new Set([figure !== null ? figureField?.id : undefined, due ? dueField?.id : undefined, stateValue ? decl?.state : undefined].filter((x): x is string => Boolean(x))),
   );
   const listed = $derived(shortFields.filter((f) => !leadIds.has(f.id)));
 
   const resolved = values();
-  const resolve = (path: string) => resolved[path] ?? null;
+  /* THE SAMPLE'S VALUES ARE NOT THIS RECORD'S, so on a live row every value is a hole until pages read them. */
+  const resolve = (path: string) => (live ? null : (resolved[path] ?? null));
   /** A link the host cannot resolve is plain text, never a dead anchor (36 §13 D16). */
   /** What closing a hole would do. Named, because "nothing was written" alone says nothing. */
   const holeFix = (path: string | null): string =>
@@ -144,26 +189,33 @@
   }
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   * DRAWN ONCE THE ROW HAS BEEN READ, from the record or the sample.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
    * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
    * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
    * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * the other claim. The row and history reads are bracketed by `opened()` and `closed()`, so while
+   * they are out the attribute is away whatever this line says.
    */
-  $effect(() => drew('ready'));
+  $effect(() => {
+    if (!waiting) drew('ready');
+  });
 </script>
 
 <svelte:window {onkeydown} />
 
 <svelte:head><title>{titleOf(row && decl && String(row.fields[decl.title] ?? ""), decl?.name)}</title></svelte:head>
 
-{#if !decl || !row}
+{#if waiting}
+  <!-- Nothing until the row has been read. -->
+{:else if got?.from === 'refused'}
+  <div class="page">
+    <Empty kind="error" heading title={got.fix}>
+      {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
+    </Empty>
+  </div>
+{:else if !decl || !row}
   <div class="page">
     <!-- A URL NAMING A ROW THAT IS NOT THERE IS A REFUSAL. Nothing broke, so there is no request
          id to quote; no filter ran, so "nothing matched" describes something that did not happen.
@@ -229,14 +281,14 @@
           </p>
         {/if}
         <p class="lead-line">
-          {#if state}
+          {#if stateValue}
             <span class="lead-state" data-intent={leadTone}>
               {#if leadTone}<span class="glyph" role="img" aria-label={TONES[leadTone].label}>{TONES[leadTone].glyph}</span>{/if}
-              <span class="lead-word">{state.replace(/_/g, ' ')}</span>
+              <span class="lead-word">{stateValue.replace(/_/g, ' ')}</span>
             </span>
           {/if}
           {#if due && dueField}
-            <span class="lead-due">{labelOf(dueField)} {display(id, dueField.id, due)} <span class="rel">{relative(String(due), NOW)}</span></span>
+            <span class="lead-due">{labelOf(dueField)} {display(id, dueField.id, due, clock)} <span class="rel">{relative(String(due), clock)}</span></span>
           {/if}
         </p>
       </section>
@@ -258,12 +310,12 @@
                 {:else if identityOf(id, f.id, value)}
                   <IdentityMark identity={identityOf(id, f.id, value)!} size="md" />
                 {:else if f.type === 'day'}
-                  {display(id, f.id, value)}
-                  <span class="rel">{relative(String(value), NOW)}</span>
+                  {display(id, f.id, value, clock)}
+                  <span class="rel">{relative(String(value), clock)}</span>
                 {:else if f.type === 'enum'}
-                  <span class="enum-word">{display(id, f.id, value)}</span>
+                  <span class="enum-word">{display(id, f.id, value, clock)}</span>
                 {:else}
-                  {display(id, f.id, value)}
+                  {display(id, f.id, value, clock)}
                 {/if}
               </dd>
             </div>
@@ -282,7 +334,7 @@
                    and a date that links to one is an anchor to the error page. -->
               <Document
                 src={String(row.fields[f.id])}
-                opts={{ resolve, link, now: NOW, hole: (path) => toasts.push(copy.notWritten(holeFix(path)), { intent: 'warn' }) }}
+                opts={{ resolve, link, now: clock, hole: (path) => toasts.push(copy.notWritten(holeFix(path)), { intent: 'warn' }) }}
               />
             </article>
           {/if}
@@ -335,11 +387,14 @@
           <dt>Added</dt>
           <!-- IN WORDS, like the other two surfaces that answer "who changed my record". `actorOf`
                moved into `api.ts` when Home and `/audit` were found spelling the same two actors two
-               ways; this route reads the same `AUDIT` array and was the third. -->
-          <dd>{since(row.created, NOW)} by {actorOf(row.by)}</dd>
+               ways; this route was the third. -->
+          <dd>{since(row.created, clock)}{#if addedBy} by {actorOf(addedBy)}{/if}</dd>
         </dl>
 
-        {#if history.length}
+        {#if told?.from === 'refused'}
+          <h2 class="side-title">History</h2>
+          <Empty kind="error" compact title={told.fix} />
+        {:else if history.length}
           <h2 class="side-title">History</h2>
           <ol class="history">
             {#each history as e}
@@ -348,7 +403,7 @@
                 <Face name={who} you={who === 'you'} size="s" />
                 <span class="history-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <span class="history-note">{e.note}</span>
-                <span class="history-when">{since(e.at, NOW)}</span>
+                <span class="history-when">{since(e.at, clock)}</span>
               </li>
             {/each}
           </ol>

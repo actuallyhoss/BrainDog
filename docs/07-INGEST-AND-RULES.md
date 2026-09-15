@@ -290,6 +290,9 @@ body: { text: "{row.what} is paid" }   # optional; without one the sent fields g
   that is not in the vault pauses it.
 - **Never from a bulk apply.** Running a rule over rows that were already there queues no calls; the
   apply counts what it skipped as `calls_skipped`.
+- **Approved once, before it can run.** A pack whose plan adds a call, or changes its host, key or
+  fields, installs only with `approve`, the plan's own `CALLS OUT` lines, in the same `installPack`. An
+  agent proposes the call as a `change`, and accepting it is the same approval. A token does neither.
 
 **`register:` is mandatory on a rule; a rule runs over one register**, and `field: renews` resolves
 against it at install. *(An earlier draft's canonical example had no such key, and the dry run in this

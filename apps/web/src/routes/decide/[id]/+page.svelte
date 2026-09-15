@@ -35,7 +35,9 @@
   import { day, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
-  import { DECIDED, NOW, QUESTIONS, REGISTERS, ROWS, display } from '$lib/record/api.ts';
+  import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display } from '$lib/record/api.ts';
+  import { installWords } from '$lib/record/actions.ts';
+  import CallsOut from '$lib/ui/CallsOut.svelte';
   import { ROWSETS } from '$lib/record/data.ts';
   import Changes from './Changes.svelte';
   import { updatesOf, words as changeWords } from './changes.ts';
@@ -358,6 +360,17 @@
       </section>
     {/if}
 
+    <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
+         sent, as the record worked them out when the proposal was filed. Accept and Decline below are the one
+         approval (`research-scheduled-actions.md` §5), so the lines go once the question is settled. -->
+    {#if from === 'live' && live && live.calls.length > 0 && !settled && !live.closed}
+      <section class="changed">
+        <dl class="calls-out">
+          <CallsOut calls={live.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.acceptApproves} />
+        </dl>
+      </section>
+    {/if}
+
     {#if settled}
       <div class="settled">
         <p class="settled-head">
@@ -544,6 +557,15 @@
     font-family: var(--font-ui);
     font-size: var(--t-ui);
     font-weight: 500;
+  }
+
+  .calls-out {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 1.6;
   }
 
 

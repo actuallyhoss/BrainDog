@@ -229,6 +229,14 @@ test('and it says what a pack would DO, before anybody has to read the file', as
       change: 'new',
     },
   ]);
+  /* WHAT INSTALLING ASKS THE OWNER TO APPROVE: every new line, and a project action's key line after its own. */
+  assert.deepEqual(diff.approve, [
+    'CALLS OUT no host declared · every 6h · grant "g_1"',
+    'CALLS OUT api.example.test · every 1h · grant "example read"',
+    'CALLS OUT hooks.example.test · every 15m · grant "hook key"',
+    'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends skus.code',
+    'made runs for the project studio and sends the key "hook key". Keys are not kept per project yet, so any project\'s action can send this key.',
+  ]);
   assert.ok(diff.warnings.some((w) => w.say.includes('arrives empty')));
 });
 

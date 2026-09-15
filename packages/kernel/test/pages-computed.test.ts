@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { no, ok } from '@braindog/ports';
 import type { Schema } from '@braindog/where';
 
+import type { ActionRow } from '../src/actions.ts';
 import { openRecord, type Declaration, type Entry, type Kernel } from '../src/index.ts';
 import { feedRows, readBlock, versionsOf, type ActivityEvent, type BlockResult, type PageBlock, type PageDeps } from '../src/pages.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
@@ -389,4 +390,57 @@ test('an actor is an agent, a rule or you, and each is its own group', () => {
   const event = (actor: string): ActivityEvent => ({ ts: at, actor, kind: 'edit', target: actor, note: null });
   const rows = feedRows(['S4', 'agent:claude', 'spark', 'rule:renewal', 'ingest:mail', 'system', 'p_1'].map(event));
   assert.deepEqual(rows.map((r) => r.by), ['agent', 'agent', 'agent', 'rule', 'rule', 'rule', 'you']);
+});
+
+test('AN `actions` BLOCK LISTS THE RECORD’S SCHEDULED ACTIONS, keys by label, and filters on where each stands', async () => {
+  const { k, sql } = await record();
+  const action = (ingest: string, state: ActionRow['state'], project: string | null): ActionRow => ({
+    ingest,
+    channel: 'poll',
+    project,
+    host: 'status.example.test',
+    every: '1h',
+    key: 'status read',
+    state,
+    next: state === 'paused' ? null : '2026-09-09T13:00:00.000Z',
+    last: { at: '2026-09-09T11:00:00.000Z', outcome: 'ok', status: 200, note: '' },
+    month: { runs: 3, requests: 3, bytes: 90, failures: 1, held: 0 },
+    days: [],
+  });
+  const deps: PageDeps = { ...depsOver(k, sql), actions: () => [action('balance', 'pending', null), action('kiln_status', 'paused', 'Kiln')] };
+
+  const block: PageBlock = { kind: 'table', source: 'actions', columns: [{ field: 'ingest' }, { field: 'host' }, { field: 'key' }, { field: 'state' }] };
+  const all = readBlock(deps, block);
+  assert.deepEqual(all.refusals, []);
+  assert.deepEqual(
+    all.rows.map((r) => [r.fields.ingest, r.fields.key, r.fields.state, r.fields.runs, r.fields.last_outcome]),
+    [
+      ['balance', 'status read', 'pending', 3, 'ok'],
+      ['kiln_status', 'status read', 'paused', 3, 'ok'],
+    ],
+  );
+  assert.equal(all.matched, 2);
+  assert.deepEqual(readBlock(deps, { ...block, where: 'state is paused' }).rows.map((r) => r.fields.ingest), ['kiln_status']);
+  assert.equal(readBlock(deps, { ...block, limit: 1 }).matched, 2);
+
+  assert.equal(readBlock(deps, { ...block, order: [{ field: 'ingest' }] }).refusals[0]?.code, 'DECLARATION_INVALID');
+  assert.equal(readBlock(deps, { ...block, columns: [{ field: 'secret' }] }).refusals[0]?.code, 'FIELD_UNKNOWN');
+  const { actions: _unwired, ...bare } = deps;
+  assert.equal(readBlock(bare, block).refusals[0]?.code, 'NOT_IN_THIS_BUILD');
+
+  /* AND THROUGH THE RECORD'S OWN WIRING, an installed poll is a row of it. */
+  value(
+    await k.install([
+      { id: 'register.notes', kind: 'register', body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text' }] } as never },
+      {
+        id: 'ingest.balance',
+        kind: 'ingest',
+        body: { ingest: 'balance', channel: 'poll', url: 'https://api.example.test/v1/balance', every: '1h', grant: 'example read', extract: { what: { after: 'balance ' } }, writes: { register: 'notes' } } as never,
+      },
+    ]),
+  );
+  const wired = k.block({ kind: 'table', source: 'actions' } as PageBlock);
+  assert.deepEqual(wired.refusals, []);
+  assert.deepEqual(wired.rows.map((r) => [r.fields.ingest, r.fields.host, r.fields.state]), [['balance', 'api.example.test', 'pending']]);
+  sql.close();
 });

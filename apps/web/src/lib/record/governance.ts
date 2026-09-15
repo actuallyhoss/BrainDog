@@ -13,6 +13,7 @@
 import { money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { callsOutOf, type CallOut } from './actions.ts';
 import type { RowsetBody } from './data.ts';
 import { noRecord } from './device.ts';
 import type { Question } from './schema.ts';
@@ -41,8 +42,11 @@ export type Rows = { registers: Record<string, Decl>; rows: Record<string, Held[
 
 export type Queue = Rows & { open: Question[]; decided: Question[]; rowsets: Record<string, RowsetBody> };
 
-/** `closed` is a question no longer open: a decision, or a suggestion somebody has settled. */
-export type One = Rows & { question: Question | null; rowset: RowsetBody | undefined; closed: boolean };
+/**
+ * `closed` is a question no longer open: a decision, or a suggestion somebody has settled. `calls` is what an open
+ * `change` would call out once accepted, from the `egress` the record worked out when it was filed.
+ */
+export type One = Rows & { question: Question | null; rowset: RowsetBody | undefined; closed: boolean; calls: CallOut[] };
 
 export const words = {
   /* A settled suggestion whose decision this screen could not find among the ones it reads. */
@@ -233,26 +237,27 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
     decision ? null : client.boot(),
   ]);
   if (!got.ok) return missed(got);
-  if (!isRow(got.value)) return { from: 'live', value: { question: null, rowset: undefined, registers: {}, rows: {}, closed: false } };
+  if (!isRow(got.value)) return { from: 'live', value: { question: null, rowset: undefined, registers: {}, rows: {}, closed: false, calls: [] } };
   const row = got.value;
 
   if (decision) {
     const all = await everything(client);
     const settled = pairs(all.decisions.some((d) => d.id === row.id) ? all.decisions : [...all.decisions, row], all.suggestions);
-    return { from: 'live', value: { question: decisionOf(row, settled.get(id)), rowset: undefined, registers: {}, rows: {}, closed: true } };
+    return { from: 'live', value: { question: decisionOf(row, settled.get(id)), rowset: undefined, registers: {}, rows: {}, closed: true, calls: [] } };
   }
 
   const drawn = questionOf(row, questionsAsked(booted).get(id), 1);
   if (row.status === 'open') {
     const rowset = rowsetOf(row);
-    return { from: 'live', value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false } };
+    const calls = callsOutOf(isRow(row.body) ? row.body.egress : undefined);
+    return { from: 'live', value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false, calls } };
   }
   const all = await everything(client);
   const settled = pairs(all.decisions, all.suggestions);
   const by = all.decisions.find((d) => settled.get(String(d.id))?.id === row.id);
   const decided = by ? decisionOf(by).decided : undefined;
   const question = by ? { ...drawn, title: text(by.question) || id, ...(decided ? { decided } : {}) } : drawn;
-  return { from: 'live', value: { question, rowset: undefined, registers: {}, rows: {}, closed: true } };
+  return { from: 'live', value: { question, rowset: undefined, registers: {}, rows: {}, closed: true, calls: [] } };
 }
 
 const sentOf = (out: Wire<unknown>): Sent =>

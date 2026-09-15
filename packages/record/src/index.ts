@@ -785,9 +785,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         cascade: false,
         ...(note === undefined ? {} : { note }),
       } as never),
-    remember: (row) => kernel.rememberPack(row),
+    remember: (row) => kernel.rememberPack({ ...row, by: actorOf(ctx) }),
     forget: (id) => kernel.forgetPack(id),
     claimed: (pack) => kernel.packClaims(pack),
+    keyHeld: (name) => kernel.keyHeld(name),
   });
 
   /**
@@ -1843,16 +1844,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * THE HASH IS THE APPROVAL. `planHash` carries the record's version and the pack's checksum, so
      * a record that moved and a pack that was edited between the plan and the install are both
      * `PLAN_STALE` — and the second one is the case no version number can see.
+     *
+     * AND WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS (`loop/research-scheduled-actions.md` §5). A plan whose
+     * `calls_out` has a `new` or `changed` action carries `approve`, the lines for them, and the install arms them only
+     * when `approve` hands back exactly those lines. The same call, not a proposal, because only an owner in a browser
+     * reaches here and the install is already one transaction: filing a proposal would half-install a pack whose rules
+     * run actions it does not have yet. An agent's way to an action is `propose`, whose acceptance is this same approval.
      */
-    async installPack(args: { doc: unknown; source?: PackSource; planHash: string }, ctx: CallContext) {
+    async installPack(args: { doc: unknown; source?: PackSource; planHash: string; approve?: readonly string[] }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.planHash) return no('REQUIRED_MISSING', 'Read the plan first; installing is approving one.', { at: 'planHash' });
+      const approve: unknown = args.approve;
+      if (approve !== undefined && (!Array.isArray(approve) || approve.some((l) => typeof l !== 'string')))
+        return no('VALUE_MALFORMED', 'approve is the list of lines the plan calls out, as it printed them.', { at: 'approve' });
 
       const pack = await normalise(args.doc, args.source ?? { kind: 'local' });
       if (!pack.ok) return pack;
       const diff = await plan(pack.value, installedState());
-      return tail(await install(pack.value, diff, packHost(ctx), args.planHash));
+      return tail(await install(pack.value, diff, packHost(ctx), args.planHash, (approve ?? []) as string[]));
     },
 
     /** Take one back out. Its declarations are retired and its rows are kept, which is the point. */
